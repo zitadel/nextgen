@@ -1,0 +1,13 @@
+title: ProjectMemberInvitationPayload
+description: Type-specific input for a `project_member` invitation.
+type: object
+required:
+  - relation
+properties:
+  relation:
+    type: string
+    enum:
+      - viewer
+      - editor
+      - admin
+    description: The project role the accepter receives, as in `POST /grants`.

@@ -1,0 +1,109 @@
+post:
+  operationId: createUser
+  x-zitadel-cli: users create
+  summary: Create a user
+  description: |
+    Creates a user whose attributes satisfy the user schema named in the request.
+
+    The server assigns the user's ID and returns it. `schema` is the `id` of a
+    schema, as `createSchema` (`POST /schemas`) returns it or `listSchemas` (`GET /schemas`) lists it. With
+    `team_id`, the user also becomes an active member of that team. A value the
+    schema marks unique that another user already holds is refused with `409`;
+    send a different value.
+  tags:
+    - Users
+  security:
+    - oauth2:
+        - user.write
+    - sessionCookie: []
+  parameters:
+    - $ref: ../../components/parameters/project-id.yaml
+    # Declared here rather than shared: `team_id` is the team parameter across
+    # the API, but what it does is the resource's own business. On a user it is
+    # membership, and saying so is the whole point of spelling it out locally.
+    - name: team_id
+      in: query
+      # Membership versus lifecycle ownership is decided in ADR 024.
+      description: |
+        Adds the new user to this team: creating the user also creates an
+        active membership in it. Omit it to create a user with no memberships.
+        Use the `id` that `createTeam` (`POST /teams`) returns or `queryTeams` (`POST /teams/query`) lists.
+
+        This is team membership, not lifecycle ownership. It does not decide
+        who may deprovision the user, and the created user stays self-owned
+        either way. The owning team is reported on reads as
+        `metadata.lifecycle_owner_team_id` and cannot be set through this API.
+
+        The team also scopes team-unique attributes for this create: an
+        attribute the schema marks unique per team is checked against this
+        team's members.
+      schema:
+        $ref: ../../components/schemas/team-id.yaml
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: create-user-request.yaml
+  responses:
+    '201':
+      description: The created user.
+      content:
+        application/json:
+          schema:
+            $ref: user.yaml
+    '400':
+      description: |
+        The provided input was not valid.
+
+        Attributes that fail the user schema answer `req.invalid`, the same
+        way a malformed body does: `details.details.fields` lists the dotted
+        path of every failing field from the request body, such as
+        `attributes.country` or `attributes.address.zip`, and a failure inside
+        an array item by the item's index, such as `attributes.phones.0.fax`.
+        Only the field names are reported, never the rejected values.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '403':
+      description: You do not have permission to create a user.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '409':
+      description: |
+        A user already exists with one of the unique values. For example, when
+        the schema marks `email` as unique across the team, only one user can
+        have a given `email` attribute.
+
+        `details.details.fields` names the attributes whose value is taken in
+        the same dotted form as a `400`, such as `attributes.email`. The user
+        holding the value is not named. When no attribute can be named, as
+        when the value was freed again since, `details` is absent. Send a
+        different value for each attribute named.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '500':
+      description: |
+        Something went wrong on the server. This was not your fault.
+
+        One case is recoverable: the user was created but the server could not
+        read it back to answer with. The body then carries the created user's
+        ID in `details.user_id`. Fetch that user by ID with `GetUserByID` (`GET /users/{user_id}`).
+        Repeating the create would conflict with the user that already exists.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    default:
+      $ref: createUser-error-response.yaml

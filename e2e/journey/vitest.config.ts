@@ -1,6 +1,6 @@
 import { defineConfig } from "vitest/config";
 
-import { baseTest } from "../../vitest.shared.mjs";
+import { baseTest } from "@zitadel/vitest-config";
 
 /**
  * Unit tests for this project's own harness scripts (`scripts/*.mjs`): port

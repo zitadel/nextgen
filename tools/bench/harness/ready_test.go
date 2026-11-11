@@ -8,7 +8,7 @@ import (
 
 func TestCheckReady(t *testing.T) {
 	healthy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/healthz" {
+		if r.URL.Path != "/readyz" {
 			http.NotFound(w, r)
 			return
 		}
@@ -24,7 +24,7 @@ func TestCheckReady(t *testing.T) {
 	}))
 	defer starting.Close()
 	if err := CheckReady(t.Context(), starting.URL); err == nil {
-		t.Fatal("503 from /healthz passed as ready")
+		t.Fatal("503 from /readyz passed as ready")
 	}
 
 	gone := httptest.NewServer(http.NotFoundHandler())

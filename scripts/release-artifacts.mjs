@@ -5,13 +5,20 @@ import { chmod, copyFile, mkdir, readFile, readdir, rm, stat, writeFile } from "
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { mapWithConcurrency, run, runReplayed } from "./dev-process.mjs";
+import { run, runReplayed } from "./dev-process.mjs";
+import { mapAll } from "./map-all.mjs";
 import {
   PUBLIC_PACKAGE_DIRS,
   PUBLIC_RELEASE_PACKAGES,
   SERVER_PLATFORM_PACKAGES,
+  hostOnlyPackageDirs,
 } from "./release-manifest.mjs";
-import { assertServerBuildPackage, gitInfo, serverLdflags } from "./server-build.mjs";
+import {
+  assertServerBuildPackage,
+  gitInfo,
+  serverLdflags,
+  serverModuleRoot,
+} from "./server-build.mjs";
 
 export { PUBLIC_PACKAGE_DIRS, SERVER_PLATFORM_PACKAGES } from "./release-manifest.mjs";
 export { gitInfo } from "./server-build.mjs";
@@ -51,6 +58,16 @@ export async function readServerRelease(repoRoot = defaultRepoRoot) {
   };
 }
 
+/** The public packages at the versions the checkout holds, `{ name, version, path }`. */
+export async function readReleasePackages(repoRoot = defaultRepoRoot) {
+  const packages = [];
+  for (const dir of PUBLIC_PACKAGE_DIRS) {
+    const manifest = await readPackageManifest(repoRoot, join(dir, "package.json"));
+    packages.push({ name: manifest.name, version: manifest.version, path: dir });
+  }
+  return packages;
+}
+
 export function validateSemver(version) {
   if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version)) {
     throw new Error(`invalid release version: ${version}`);
@@ -86,32 +103,36 @@ export async function buildServerBinaries(options = {}) {
 
   // The per-platform builds are independent and the Go build cache is safe
   // under concurrency, so cross-compile all platforms at once.
-  await mapWithConcurrency(platforms, platforms.length, async (platform) => {
-    const dir = platformDir(outDir, platform);
-    const output = join(dir, binaryName(platform.goos));
-    await mkdir(dir, { recursive: true });
-    await runFn(
-      "go",
-      [
-        "build",
-        "-trimpath",
-        "-ldflags",
-        serverLdflags({ version, commit: info.commit, date: info.date, strip: true }),
-        "-o",
-        output,
-        ".",
-      ],
-      {
-        cwd: repoRoot,
-        env: {
-          ...baseEnv,
-          CGO_ENABLED: "0",
-          GOOS: platform.goos,
-          GOARCH: platform.goarch,
+  await mapAll(
+    platforms,
+    async (platform) => {
+      const dir = platformDir(outDir, platform);
+      const output = join(dir, binaryName(platform.goos));
+      await mkdir(dir, { recursive: true });
+      await runFn(
+        "go",
+        [
+          "build",
+          "-trimpath",
+          "-ldflags",
+          serverLdflags({ version, commit: info.commit, date: info.date, strip: true }),
+          "-o",
+          output,
+          ".",
+        ],
+        {
+          cwd: serverModuleRoot(repoRoot),
+          env: {
+            ...baseEnv,
+            CGO_ENABLED: "0",
+            GOOS: platform.goos,
+            GOARCH: platform.goarch,
+          },
         },
-      },
-    );
-  });
+      );
+    },
+    platforms.length,
+  );
 
   return { outDir, platforms, version, gitInfo: info };
 }
@@ -164,9 +185,8 @@ export async function createArchives(options = {}) {
   // The archives are independent (one platform's binary each, distinct file
   // names) and gzip and zip use one core each, so compress all platforms at
   // once. The results keep platform order, so checksums.txt keeps its order.
-  const archives = await mapWithConcurrency(
+  const archives = await mapAll(
     SERVER_PLATFORMS,
-    SERVER_PLATFORMS.length,
     async (platform) => {
       const name = `nextgen_${version}_${platformName(platform)}`;
       const sourceDir = platformDir(outDir, platform);
@@ -203,6 +223,7 @@ export async function createArchives(options = {}) {
       );
       return archivePath;
     },
+    SERVER_PLATFORMS.length,
   );
 
   const checksumLines = [];
@@ -216,28 +237,35 @@ export async function createArchives(options = {}) {
 
 export async function packPublicPackages(options = {}) {
   const repoRoot = options.repoRoot ?? defaultRepoRoot;
-  const version = options.version ?? (await readServerRelease(repoRoot)).version;
-  const outDir = options.outDir ?? releaseDir(repoRoot, version);
   // The packs run side by side, so none may write to this process's stdout
   // (see runReplayed); each pack's output arrives in one piece once it is done.
   const runFn = options.run ?? runReplayed;
-  const tarballsDir = join(outDir, "npm");
+  const tarballsDir = options.tarballsDir ?? (await defaultTarballsDir(repoRoot, options));
   await rm(tarballsDir, { recursive: true, force: true });
   await mkdir(tarballsDir, { recursive: true });
 
   // Packs are independent (distinct package dirs, distinct tarball names in a
   // shared destination); cap concurrency so the cli prepack rebuild and the
   // larger packages do not stampede the runner.
-  await mapWithConcurrency(PUBLIC_PACKAGE_DIRS, 8, async (dir) => {
-    const manifest = await readPackageManifest(repoRoot, join(dir, "package.json"));
-    await assertPublishDirectoryReady({ repoRoot, dir, manifest });
-    await runFn("corepack", ["pnpm", "--dir", dir, "pack", "--pack-destination", tarballsDir], {
-      cwd: repoRoot,
-      env: process.env,
-    });
-  });
+  await mapAll(
+    options.dirs ?? PUBLIC_PACKAGE_DIRS,
+    async (dir) => {
+      const manifest = await readPackageManifest(repoRoot, join(dir, "package.json"));
+      await assertPublishDirectoryReady({ repoRoot, dir, manifest });
+      await runFn("corepack", ["pnpm", "--dir", dir, "pack", "--pack-destination", tarballsDir], {
+        cwd: repoRoot,
+        env: process.env,
+      });
+    },
+    8,
+  );
 
   return tarballsDir;
+}
+
+async function defaultTarballsDir(repoRoot, options) {
+  const version = options.version ?? (await readServerRelease(repoRoot)).version;
+  return join(options.outDir ?? releaseDir(repoRoot, version), "npm");
 }
 
 async function assertPublishDirectoryReady({ repoRoot, dir, manifest }) {
@@ -312,21 +340,11 @@ export async function buildContainerImage(options = {}) {
   return { args, contextDir, tags };
 }
 
-// Temporary: while the repo is pre-GA every release is a prerelease, so the
-// rule below ("only stable moves `:latest`") leaves `:latest` pinned to a build
-// that predates the alpha train. Anyone following the documented Docker quick
-// start — `docs/operations/env.example` defaults `NEXTGEN_IMAGE` to `:latest` —
-// gets that stale image rather than the alpha they expect.
-//
-// Until the first stable release, point `:latest` at the alpha train too. Flip
-// this back to `false` when leaving prerelease mode (`changeset pre exit`, see
-// `.changeset/README.md`), so a later alpha can never overwrite a stable
-// `:latest`.
-export const TAG_PRERELEASE_AS_LATEST = true;
-
+// Only a release moves `:latest`, so a prerelease never replaces the image the
+// Docker quick start runs (`docs/operations/env.example`).
 export function containerTags({ image = SERVER_IMAGE, version, prerelease }) {
   const tags = [`${image}:${version}`];
-  if (!prerelease || TAG_PRERELEASE_AS_LATEST) {
+  if (!prerelease) {
     tags.push(`${image}:latest`);
   }
   return tags;
@@ -337,11 +355,7 @@ export async function writeReleaseMetadata(options = {}) {
   const release = options.release ?? (await readServerRelease(repoRoot));
   const outDir = options.outDir ?? releaseDir(repoRoot, release.version);
   const info = options.gitInfo ?? (await gitInfo({ repoRoot }));
-  const packages = [];
-  for (const dir of PUBLIC_PACKAGE_DIRS) {
-    const manifest = await readPackageManifest(repoRoot, join(dir, "package.json"));
-    packages.push({ name: manifest.name, version: manifest.version, path: dir });
-  }
+  const packages = await readReleasePackages(repoRoot);
   const metadata = {
     version: release.version,
     tag: release.tag,
@@ -395,8 +409,10 @@ export async function verifyLocalArtifacts(options = {}) {
   const repoRoot = options.repoRoot ?? defaultRepoRoot;
   const release = options.release ?? (await readServerRelease(repoRoot));
   const outDir = options.outDir ?? releaseDir(repoRoot, release.version);
+  // A host-only snapshot has no archives and packs one server platform.
+  const hostOnly = options.hostOnly ?? false;
   const missing = [];
-  for (const platform of SERVER_PLATFORMS) {
+  for (const platform of hostOnly ? [] : SERVER_PLATFORMS) {
     const extension = platform.goos === "windows" ? "zip" : "tar.gz";
     const archive = join(
       outDir,
@@ -408,11 +424,12 @@ export async function verifyLocalArtifacts(options = {}) {
     }
   }
   const checksumPath = join(outDir, "archives", "checksums.txt");
-  if (!(await exists(checksumPath))) {
+  if (!hostOnly && !(await exists(checksumPath))) {
     missing.push(checksumPath);
   }
   const npmTarballs = (await exists(join(outDir, "npm"))) ? await readdir(join(outDir, "npm")) : [];
-  if (npmTarballs.length < PUBLIC_PACKAGE_DIRS.length) {
+  const packageDirs = hostOnly ? hostOnlyPackageDirs() : PUBLIC_PACKAGE_DIRS;
+  if (npmTarballs.length < packageDirs.length) {
     missing.push(`${join(outDir, "npm")}/*`);
   }
   if (missing.length > 0) {

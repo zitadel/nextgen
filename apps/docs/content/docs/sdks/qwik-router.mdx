@@ -8,35 +8,42 @@ import { File, Files } from "fumadocs-ui/components/files";
 import { Step, Steps } from "fumadocs-ui/components/steps";
 import { Tab, Tabs } from "fumadocs-ui/components/tabs";
 
-The Qwik Router SDK is an `onRequest` plugin that proxies and verifies sessions on the server. The login and logout widgets come from the [Qwik SDK](/docs/sdks/qwik).
+The Qwik Router SDK (`@zitadel/sdk-qwik-router`) is an `onRequest` plugin, a Qwik Router handler that runs on every request. It proxies `/__nextgen/*` to Zitadel and verifies sessions on the server. The login and logout components come from the [Qwik SDK](/docs/sdks/qwik).
 
-<Callout title="Qwik 2 required" type="warn">
-  The SDK peers Qwik 2: `@qwik.dev/core` and `@qwik.dev/router` (Qwik Router, which Qwik 2 renamed from Qwik City). A Qwik 1 app (`@builder.io/qwik-city`) is not supported, because the widgets need Qwik 2. Migrate the app to `@qwik.dev/*` first. The CLI scaffolds new apps on Qwik 2.
+<Callout title="Requires Qwik 2" type="warn">
+  The SDK declares Qwik 2 as peer dependencies: `@qwik.dev/core` and `@qwik.dev/router` (Qwik Router, which Qwik 2 renamed from Qwik City). A Qwik 1 app (`@builder.io/qwik-city`) is not supported, because the components need Qwik 2. Migrate the app to `@qwik.dev/*` first. The CLI scaffolds new apps on Qwik 2.
 </Callout>
 
-## Install
+## Prerequisites
 
-Install both packages as dev dependencies. Qwik bundles `devDependencies` into the server build, and its starter `vite.config.ts` refuses to start when a package is listed in both sections.
+- Node.js 24 or newer. Run `node --version` to check.
+- Qwik 2 (`@qwik.dev/core` and `@qwik.dev/router` `^2.0.0-beta.45`).
+- A Zitadel project from `zitadel setup`. Start the local runtime with `npx @zitadel/cli@latest start`, then run `npx @zitadel/cli@latest setup --server local` in your app's directory. See the [Quickstart](/docs/get-started/quickstart#scaffold-the-app-with-sign-in), or [Add Zitadel to an existing app](/docs/get-started/existing-app).
+- The URL, project ID and project secret. Setup writes them to `.env.local` as `ZITADEL_URL`, `ZITADEL_PROJECT_ID`, `ZITADEL_PROJECT_SECRET` and `PUBLIC_ZITADEL_PROJECT_ID`.
+
+## Install the SDKs
+
+Setup installs both packages. To add them yourself, install them as dev dependencies. Qwik bundles `devDependencies` into the server build, and its starter `vite.config.ts` refuses to start when a package is listed in both sections.
 
 <Tabs groupId="package-manager" items={["pnpm", "npm", "yarn"]}>
   <Tab>
     ```sh
-    pnpm add -D @zitadel/sdk-qwik-router@alpha @zitadel/sdk-qwik@alpha
+    pnpm add -D @zitadel/sdk-qwik-router@latest @zitadel/sdk-qwik@latest
     ```
   </Tab>
   <Tab>
     ```sh
-    npm install -D @zitadel/sdk-qwik-router@alpha @zitadel/sdk-qwik@alpha
+    npm install -D @zitadel/sdk-qwik-router@latest @zitadel/sdk-qwik@latest
     ```
   </Tab>
   <Tab>
     ```sh
-    yarn add -D @zitadel/sdk-qwik-router@alpha @zitadel/sdk-qwik@alpha
+    yarn add -D @zitadel/sdk-qwik-router@latest @zitadel/sdk-qwik@latest
     ```
   </Tab>
 </Tabs>
 
-## Setup
+## Wire the SDKs into your app
 
 <Tabs items={["CLI generated", "Manual"]}>
   <Tab>
@@ -67,7 +74,7 @@ Install both packages as dev dependencies. Qwik bundles `devDependencies` into t
     });
     ```
 
-    Render the widget from a route:
+    Render the login component from a route:
 
     ```tsx
     import { component$ } from "@qwik.dev/core";
@@ -85,22 +92,23 @@ Install both packages as dev dependencies. Qwik bundles `devDependencies` into t
   </Tab>
 </Tabs>
 
-## Runtime model
+## What the plugin does on each request
 
 <Steps>
-  <Step>The plugin proxies same-origin `/__nextgen/*` requests to the backend, attaching the project secret only to the session handoff.</Step>
+  <Step>The plugin proxies same-origin `/__nextgen/*` requests to the backend, attaching the project secret only to the session exchange, the call that turns a completed sign-in into a session.</Step>
   <Step>It verifies the session token and stores the result on the request's `sharedMap`; read it with `getAuth(ev)` in a `routeLoader$`, action, or endpoint.</Step>
-  <Step>It redirects unauthenticated requests for `protectedRoutes` to `loginPath`, with the requested path and query string in `?next=`, where the login widget returns after sign-in. A route matches with or without a trailing slash, since Qwik Router serves `/profile/` by default.</Step>
+  <Step>It redirects unauthenticated requests for `protectedRoutes` to `loginPath`, with the requested path and query string in `?next=`, where the login component returns after sign-in. A route matches with or without a trailing slash, since Qwik Router serves `/profile/` by default.</Step>
 </Steps>
 
-## Verify
+## Check that sign-in works
 
-- Start the app with `npm run dev`. Setup already wrote the URL, the secret, and the project id to `.env.local`.
-- Visit `/login` and register a user.
-- Confirm `/profile` shows signed-in state.
-- Log out and confirm `/profile` redirects to `/login`.
+1. Run `npm run dev`. Setup already wrote the URL, the secret and the project ID to `.env.local`.
+2. Open `/register` on the dev server, usually `http://localhost:3000/register`. Use the origin that setup registered: `localhost`, not `127.0.0.1`.
+3. Register a user. A completed sign-in lands on `/profile`.
+4. Confirm `/profile` shows the signed-in state.
+5. Sign out and confirm `/profile` redirects to `/login`.
 
 ## See also
 
-- [SDK proxy](/docs/sdks/proxy) — why `/__nextgen/*` must be same-origin and which call carries the project secret.
-- [`@zitadel/sdk-qwik-router` source](https://github.com/zitadel/nextgen/tree/main/packages/sdk-qwik-router) and the [CLI Qwik Router patcher](https://github.com/zitadel/nextgen/tree/main/apps/cli/src/lib/orca/patchers/rule/qwik-router).
+- [SDK proxy](/docs/sdks/proxy): why `/__nextgen/*` must be same-origin and which call carries the project secret.
+- [`@zitadel/sdk-qwik-router` source](https://github.com/zitadel/nextgen/tree/main/packages/sdk-qwik-router).

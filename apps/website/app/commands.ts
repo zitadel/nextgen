@@ -10,15 +10,17 @@ export const appFolder = "myapp";
 // The folder as the windows' title bars show it.
 export const appPath = `~/${appFolder}`;
 export const folderCommand = `mkdir ${appFolder} && cd ${appFolder}`;
-export const startCommand = "npx @zitadel/cli@alpha start";
-export const setupCommand = "npx @zitadel/cli@alpha setup --framework next --server local";
+export const startCommand = "npx @zitadel/cli@latest start";
+export const setupCommand = "npx @zitadel/cli@latest setup --framework next --server local";
 
-export const commands = [startCommand, setupCommand, "npm run dev"];
+export const devCommand = "npm run dev";
+
+export const commands = [startCommand, setupCommand, devCommand];
 
 // What publishes a change to the user model or the login flow, as steps 3
 // and 4 run it and /llms.txt tells agents.
-export const planCommand = "npx @zitadel/cli@alpha plan";
-export const applyCommand = "npx @zitadel/cli@alpha apply";
+export const dryRunCommand = "npx @zitadel/cli@latest deploy --dry-run";
+export const deployCommand = "npx @zitadel/cli@latest deploy";
 
 // The skills of this repository, for any skills-compatible coding agent
 // (README.md): the router skill, the CLI's, and one per framework SDK and

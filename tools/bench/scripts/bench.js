@@ -4,6 +4,7 @@
 // through __ENV: the Go module reads it from its own process environment.
 // Scenarios run one at a time; run together they contend for the same machine
 // and the cheap one starves the others.
+// @boundaries-ignore k6 resolves k6/x/nextgen from the xk6 binary at run time; it is no npm package
 import nextgen from "k6/x/nextgen";
 
 const shape = {

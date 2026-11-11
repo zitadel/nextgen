@@ -2,15 +2,12 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-import { FRAMEWORK_IDS } from "../../../../../../helpers/framework-ids";
-import type {
-  FileOp,
-  ScaffoldPlan,
-} from "../../../../../../../src/lib/orca/patchers/rule/file-writer/types";
-import { NextPatcher } from "../../../../../../../src/lib/orca/patchers/rule/next";
-import { PAGE_SURFACE_BACKGROUND } from "../../../../../../../src/lib/orca/patchers/rule/next/renderers/react";
-import type { PatchContext } from "../../../../../../../src/lib/orca/patchers/types";
-import { MANAGED_MARKER } from "../../../../../../../src/lib/paths";
+import { FRAMEWORK_IDS } from "@tests/helpers/framework-ids";
+import type { FileOp, ScaffoldPlan } from "@/lib/orca/patchers/rule/file-writer/types";
+import { NextPatcher } from "@/lib/orca/patchers/rule/next";
+import { PAGE_SURFACE_BACKGROUND } from "@/lib/orca/patchers/rule/next/renderers/react";
+import type { PatchContext } from "@/lib/orca/patchers/types";
+import { MANAGED_MARKER } from "@/lib/paths";
 
 function ctxFor(
   appDir: "app" | "src/app",
@@ -186,6 +183,21 @@ describe("NextPatcher.plan", () => {
     expect(writeContents(plan, "middleware.ts")).toBeUndefined();
   });
 
+  it("runs the request boundary on every route but Next's build files", () => {
+    // Next.js runs the boundary only where its matcher says: a matcher listing
+    // routes would leave a route later added to protectedRoutes public.
+    const boundary = writeContents(new NextPatcher().plan(ctxFor("app", 16)), "proxy.ts") ?? "";
+    const [, pattern] = /matcher: \["([^"]+)"\]/.exec(boundary) ?? [];
+    const matched = (path: string) => new RegExp(`^${pattern}$`).test(path);
+
+    for (const path of ["/", "/profile", "/orders/42", "/files/a.pdf", "/api/x", "/__nextgen/x"]) {
+      expect(matched(path), path).toBe(true);
+    }
+    for (const path of ["/_next/static/chunks/main.js", "/_next/image", "/favicon.ico"]) {
+      expect(matched(path), path).toBe(false);
+    }
+  });
+
   it("uses the CLI prerelease tag for the SDK dependency", () => {
     const plan = new NextPatcher().plan(ctxFor("app"));
     const dep = plan.ops.find(
@@ -195,7 +207,7 @@ describe("NextPatcher.plan", () => {
   });
 
   it.each([
-    ["1.2.0", "latest"],
+    ["1.2.0", "1.2.0"],
     ["2.0.0-beta.3", "beta"],
   ])("pins the SDK for CLI %s at %s", (cliVersion, expected) => {
     const plan = new NextPatcher().plan({ ...ctxFor("app"), cliVersion });
@@ -211,24 +223,27 @@ describe("NextPatcher.plan", () => {
     expect(writeContents(plan, ".zitadel/flows/default.json")).toBeUndefined();
   });
 
-  it("writes preview issuer_pattern from preview origins only, not a doubled scheme", () => {
-    const base = ctxFor("app");
-    const ctx = {
-      ...base,
-      project: {
-        ...base.project,
-        origins: [
-          { pattern: "https://app.example.com", kind: "primary" as const },
-          { pattern: "https://nextgen.dev.mrida.ng", kind: "preview" as const },
-        ],
-      },
-    };
+  it("records no environments in zitadel.json", () => {
     const zitadelJson = JSON.parse(
-      writeContents(new NextPatcher().plan(ctx), "zitadel.json") ?? "{}",
+      writeContents(new NextPatcher().plan(ctxFor("app")), "zitadel.json") ?? "{}",
     );
-    expect(zitadelJson.environments.preview.issuer_pattern).toEqual([
-      "https://nextgen.dev.mrida.ng",
-    ]);
+    expect(zitadelJson).not.toHaveProperty("environments");
+  });
+
+  it("writes the values the CLI reads to a private .env.development.local", () => {
+    const plan = new NextPatcher().plan(ctxFor("app"));
+    const op = plan.ops.find(
+      (candidate): candidate is Extract<FileOp, { kind: "merge-env" }> =>
+        candidate.kind === "merge-env" && candidate.path === ".env.development.local",
+    );
+    expect(op?.mode).toBe(0o600);
+    expect(op?.entries).toEqual({
+      ZITADEL_URL: "https://api.zitadel.cloud",
+      ZITADEL_PROJECT_ID: "proj-1",
+      ZITADEL_PROJECT_SECRET: "sk_proj_full",
+      ZITADEL_PREVIEW_TOKEN: "sk_proj_preview",
+      ZITADEL_ISSUER: "http://localhost:3000",
+    });
   });
 
   it("honors the src/app directory", () => {
@@ -237,7 +252,38 @@ describe("NextPatcher.plan", () => {
   });
 });
 
+describe("NextPatcher.plan for a scaffolded app", () => {
+  it("writes a home page that imports only from packages, never from the CLI's own modules", () => {
+    const plan = new NextPatcher().plan(ctxFor("app", undefined, true));
+    const page = editContents(plan, "app/page.tsx") ?? "";
+
+    expect(page).toContain(MANAGED_MARKER);
+    const imports = [...page.matchAll(/^import .* from "([^"]+)";$/gm)].map((match) => match[1]);
+    expect(imports.length).toBeGreaterThan(0);
+    expect(imports.filter((specifier) => specifier?.startsWith("."))).toEqual([]);
+  });
+});
+
 describe("NextPatcher.artifacts", () => {
+  it.each([
+    ["login", "Sign in"],
+    ["register", "Create account"],
+    ["profile", "Profile"],
+  ])("gives the %s route a managed layout that titles the browser tab %s", (route, title) => {
+    const plan = new NextPatcher().plan(ctxFor("app", 15, true));
+    const layout = writeContents(plan, `app/${route}/layout.tsx`);
+    expect(layout).toContain(MANAGED_MARKER);
+    expect(layout).toContain(`export const metadata: Metadata = { title: "${title}" };`);
+    expect(layout).toContain("return children;");
+  });
+
+  it("leaves an existing app's route layouts alone", () => {
+    const plan = new NextPatcher().plan(ctxFor("app"));
+    for (const route of ["login", "register", "profile"]) {
+      expect(writeContents(plan, `app/${route}/layout.tsx`)).toBeUndefined();
+    }
+  });
+
   it("lists managed files, the config file, the dir, and the env backup", () => {
     const artifacts = new NextPatcher().artifacts({
       framework: { id: "next", appDir: "app", devPort: 3000, url: "http://localhost:3000" },
@@ -246,14 +292,17 @@ describe("NextPatcher.artifacts", () => {
     expect(artifacts.markedFiles).toEqual([
       "app/page.tsx",
       "app/login/page.tsx",
+      "app/login/layout.tsx",
       "app/register/page.tsx",
+      "app/register/layout.tsx",
       "app/profile/page.tsx",
+      "app/profile/layout.tsx",
       "middleware.ts",
       "custom-elements.d.ts",
     ]);
     expect(artifacts.rootConfigFiles).toEqual(["zitadel.json"]);
     expect(artifacts.directories).toEqual([".zitadel"]);
-    expect(artifacts.envBackups).toEqual([".env.local"]);
+    expect(artifacts.envBackups).toEqual([".env.local", ".env.development.local"]);
     // The react renderer's SDK package — `eject` surfaces this as
     // `npm uninstall <name>` in next_commands.
     expect(artifacts.dependencies).toEqual(["@zitadel/sdk-next"]);

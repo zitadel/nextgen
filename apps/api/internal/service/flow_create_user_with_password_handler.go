@@ -1,0 +1,152 @@
+package service
+
+import (
+	"context"
+	"errors"
+	"fmt"
+
+	"github.com/zitadel/nextgen/internal/domain"
+)
+
+// FlowCreateUserWithPasswordHandler implements the `create_user` on_success:
+// persist a new user from validated identifier + password fields.
+type FlowCreateUserWithPasswordHandler struct {
+	protection  SignupProtection
+	hashers     ProjectHasherResolver
+	passwords   PasswordGate
+	userService UserService
+	schemaStore domain.JSONSchemaStore
+	db          StatementPool
+}
+
+func NewFlowCreateUserHandler(
+	hashers ProjectHasherResolver,
+	passwords PasswordGate,
+	userService UserService,
+	schemaStore domain.JSONSchemaStore,
+	db StatementPool,
+	protection SignupProtection,
+) *FlowCreateUserWithPasswordHandler {
+	return &FlowCreateUserWithPasswordHandler{
+		protection:  protection,
+		userService: userService,
+		schemaStore: schemaStore,
+		hashers:     hashers,
+		passwords:   passwords,
+		db:          db,
+	}
+}
+
+var _ domain.FlowOnSuccessHandler = (*FlowCreateUserWithPasswordHandler)(nil)
+
+func (h *FlowCreateUserWithPasswordHandler) Handle(ctx context.Context, in domain.FlowOnSuccessInput) (domain.FlowOnSuccessResult, error) {
+	if in.State == nil || in.ProjectID == "" || in.State.ProjectID != in.ProjectID {
+		return domain.FlowOnSuccessResult{}, domain.ErrFlowIntegrity()
+	}
+	password := in.State.CollectedData.AuthMethods.Password
+	if password == "" {
+		return domain.FlowOnSuccessResult{}, fmt.Errorf("%w: create_user has no password in collected data", domain.ErrFlowIntegrity())
+	}
+
+	// Signup has no password history. Check its cheap policy before spending
+	// the proof; SetUserPasswordAction still checks again before hashing.
+	if _, err := h.passwords.CheckPassword(ctx, SetPasswordInput{ProjectID: in.ProjectID, Password: password}); err != nil {
+		if derr, ok := errors.AsType[domain.Error](err); ok && errors.Is(err, domain.ErrUserPasswordPolicyViolation(nil)) {
+			if details, ok := derr.Details.(domain.PasswordPolicyViolations); ok {
+				return domain.FlowOnSuccessResult{StepError: domain.FlowStepFailed(domain.PasswordPolicyStepError(details.Violations), err)}, nil
+			}
+		}
+		return domain.FlowOnSuccessResult{}, err
+	}
+
+	// Spend once, before password hashing or any user mutation. A failed
+	// signup still costs the proof; the next GET issues a new challenge.
+	if h.protection == nil {
+		return domain.FlowOnSuccessResult{}, domain.ErrFlowIntegrity()
+	}
+	if err := h.protection.Consume(ctx, in.State, in.GateProofs[domain.SignupGate]); err != nil {
+		return domain.FlowOnSuccessResult{}, err
+	}
+	userID, err := h.db.Statements().NewManagedID(string(domain.PrefixUser))
+	if err != nil {
+		return domain.FlowOnSuccessResult{}, fmt.Errorf("create_user: mint user id: %w", err)
+	}
+
+	createUserAction := NewCreateUserAction(
+		CreateUserInput{
+			ProjectID:  in.ProjectID,
+			SchemaURL:  in.UserSchemaURL,
+			Attributes: in.State.CollectedData.UserData,
+			ID:         userID,
+		},
+		h.schemaStore,
+	)
+	setPasswordAction := NewSetUserPasswordAction(
+		SetPasswordInput{
+			ProjectID: in.ProjectID,
+			UserID:    userID,
+			Password:  password,
+		},
+		h.hashers,
+		h.passwords,
+	)
+	// The user just chose this password, so knowledge is proven: record real
+	// user + password factors on the attempt in the same transaction, so the
+	// exchanged session reflects how the user authenticated.
+	recordFactorsAction := &recordAttemptFactorsAction{
+		projectID: in.ProjectID,
+		attemptID: in.State.AuthAttemptID,
+		factors: []domain.AuthFactor{
+			&domain.AuthFactorUser{UserID: userID},
+			&domain.AuthFactorPassword{},
+		},
+	}
+
+	err = h.userService.ApplyActions(ctx, createUserAction, setPasswordAction, recordFactorsAction)
+	if err != nil {
+		if derr, ok := errors.AsType[domain.Error](err); ok && derr.Code == domain.ErrUserAlreadyExists().Code {
+			return domain.FlowOnSuccessResult{StepError: domain.FlowStepFailed(domain.FlowStepErrorUserAlreadyExists, err)}, nil
+		}
+		// A password the policy rejects stays on the step, next to the field,
+		// so the user can pick another one instead of seeing a failed request.
+		if errors.Is(err, domain.ErrUserPasswordPolicyViolation(nil)) {
+			if derr, ok := errors.AsType[domain.Error](err); ok {
+				if details, ok := derr.Details.(domain.PasswordPolicyViolations); ok {
+					return domain.FlowOnSuccessResult{StepError: domain.FlowStepFailed(domain.PasswordPolicyStepError(details.Violations), err)}, nil
+				}
+			}
+		}
+		return domain.FlowOnSuccessResult{}, err
+	}
+
+	return domain.FlowOnSuccessResult{
+		UserID:       userID,
+		Irreversible: true,
+	}, nil
+}
+
+// recordAttemptFactorsAction upserts verified factors on the auth attempt as
+// part of a user-mutation transaction, emitting the same auth.check.succeeded
+// events a challenge/proof cycle would.
+type recordAttemptFactorsAction struct {
+	projectID string
+	attemptID string
+	factors   []domain.AuthFactor
+}
+
+func (a *recordAttemptFactorsAction) Prepare(context.Context) error { return nil }
+
+func (a *recordAttemptFactorsAction) Apply(ctx context.Context, stmts AllStatements) error {
+	attempt, err := stmts.GetAuthAttemptByID(ctx, a.projectID, a.attemptID)
+	if err != nil {
+		return fmt.Errorf("record attempt factors: %w", err)
+	}
+	for _, factor := range a.factors {
+		if _, err := recordDirectAuthFactor(ctx, stmts, attempt, factor); err != nil {
+			return fmt.Errorf("record attempt factors: %w", err)
+		}
+	}
+	return nil
+}
+
+var _ UserAction = (*recordAttemptFactorsAction)(nil)

@@ -8,22 +8,22 @@
  * --local-config), so what it needs lives there, in fields a deployment does
  * not use:
  *
- * - server: `entrypoint` names apps/cloud/launcher. Vercel's Go builder builds
- *   it in dev and starts it on $PORT; a deployment runs build.sh instead,
- *   which compiles the same package. The launcher, without
+ * - server: `root` is the Go module, apps/api, and `entrypoint` names its
+ *   cmd/cloud-launcher package. Vercel's Go builder builds
+ *   it in dev and starts it on $PORT; a deployment's build runs
+ *   @zitadel/cloud's `deploy` instead, which compiles the same package
+ *   through turbo. The launcher, without
  *   CLOUD_DATABASE_URL, serves from SQLite and migrates it at startup.
- * - console and storybook: their `devCommand` builds them and serves the
- *   build, as the deployment serves it, behind the same service rewrites.
- *   Their dev servers cannot sit behind those rewrites: the console's live
- *   loop stays `moon run console:dev-real`, storybook's `moon run
- *   storybook:dev`.
+ * - console: its `devCommand` builds it with the add-on and serves the
+ *   build, as the deployment serves it, behind the same service rewrites. Its dev server
+ *   cannot sit behind those rewrites: the console's live loop stays
+ *   `moon run console:dev-real`.
  *
  * What only a local run needs comes from here: the builds the dev servers
- * read from disk (build.sh builds the login UI in a deployment), a throwaway
- * master key and root admin minted on the first run under
- * .zitadel/local/cloud/, where the SQLite database lives too, and the
- * function compiled without the console (-tags noconsole) as build.sh
- * compiles it. No Vercel account, link or secret is involved (-L), and Go
+ * read from disk, a throwaway master key and root admin minted on the first
+ * run under .zitadel/local/cloud/, where the SQLite database lives too, and
+ * the function compiled without the console (-tags noconsole) as
+ * build-launcher.sh compiles it. No Vercel account, link or secret is involved (-L), and Go
  * need not be installed: Vercel's Go builder downloads the version go.mod
  * names.
  */
@@ -63,10 +63,15 @@ try {
     BOOTSTRAP_ADMIN_USER_JSON_B64: secrets.adminUserB64,
     NEXTGEN_SERVER_DATA_DIR: join(localDir, "data"),
     NEXTGEN_SERVER_PUBLIC_BASE: origin,
+    // Where cloud-functions forwards the sign-in widget's calls: the server,
+    // on this origin. `vercel dev` hands a service its own port as the
+    // request's host, so the origin a deployment forwards to would be the
+    // functions themselves (apps/cloud-functions/src/sign-in.ts).
+    CLOUD_ZITADEL_URL: origin,
     NEXTGEN_INSTRUMENTATION_LOG_FORMAT: process.env.NEXTGEN_INSTRUMENTATION_LOG_FORMAT || "text",
     GOFLAGS: [process.env.GOFLAGS, "-tags=noconsole"].filter(Boolean).join(" "),
   };
-  console.log(`[cloud] ${origin}/ (website), /docs, /console/, /storybook/, /ui/login/`);
+  console.log(`[cloud] ${origin}/ (website), /docs, /console/`);
   console.log(`[cloud] root admin: ${join(localDir, "admin.json")}`);
   const vercel = await vercelCli();
   console.log(`[cloud] Vercel CLI ${vercel.version} (${vercel.source})`);
@@ -190,14 +195,13 @@ async function ensureLocalSecrets() {
 }
 
 /**
- * What the services' dev commands read from disk: the login UI the server
- * embeds, the packages the console and storybook builds import, and the
- * docs' generated sources. Two calls, because under turbo every named task
- * runs in every named package.
+ * What the services' dev commands read from disk: the packages the console's
+ * and the docs' builds import, and the docs' generated sources. Two calls,
+ * because under turbo every named task runs in every named package.
  */
 async function buildPrerequisites() {
   for (const targets of [
-    ["login-ui:build", "sdk-react:build", "api-mock:build", "components:build"],
+    ["sdk-react:build", "api:build", "api-mock:build", "components:build"],
     ["docs:generate", "design-tokens:generate"],
   ]) {
     const { command, args } = runnerCommand(targets);

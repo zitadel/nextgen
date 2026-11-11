@@ -5,76 +5,39 @@
  * sidebar stays in sync with the route tree — every row in the sidebar is a
  * screen that exists.
  */
-import type { NavIcon } from "./components/app-shell/icons";
+import type { ComponentType } from "react";
+
+/** A sidebar glyph. Lucide icons satisfy this. */
+export type NavIcon = ComponentType<{
+  size?: number | string;
+  className?: string;
+  "aria-hidden"?: boolean;
+}>;
 
 /**
- * Which sidebar an entry belongs to. The shell renders one of two navs from the
- * same route tree, so an entry has to say which: without it every Settings
- * screen would also appear in the portal's primary list.
- */
-export type NavView = "portal" | "settings";
-
-/**
- * A heading in the Settings nav. The design groups its rows under `ACCOUNT`
- * (the signed-in person) and `WORKSPACE` (the project everyone shares).
+ * Which sidebar list an entry belongs to. The shell renders one list at a
+ * time from the same route tree, so an entry has to say which: `portal` is
+ * the selected project's screens, `account` what sits above every project
+ * (Projects, and Settings; the sidebar lists the project's among them,
+ * `accountListItems`), `settings` the pages Settings opens (the person's
+ * profile, what an add-on adds beside it).
  *
- * A heading renders only when a route claims it, so a group never advertises a
- * section with nothing under it.
+ * `logs` is the list Logs opens, in place of the project's (D30). No route
+ * belongs to it: its rows are the views and filters of one screen, which the
+ * events feature draws (`LogViewPicker`, `LogFilters`).
  */
-export type NavGroup = "ACCOUNT" | "WORKSPACE";
+export type NavView = "portal" | "account" | "settings" | "logs";
 
 export interface NavMeta {
   /** Sidebar label. */
   label: string;
   /** Which sidebar this entry belongs to. Defaults to the portal list. */
   view?: NavView;
-  /** Settings-nav heading this entry sits under. Ignored in the portal list. */
-  group?: NavGroup;
-  /** Sort order among siblings (top level, or within one parent's children). */
+  /** Sort order in the sidebar, which is one level. */
   order: number;
-  /**
-   * Sidebar glyph (matches the design system's Lucide icon set). Optional
-   * because a nested entry renders as text: the design's nested item carries
-   * no icon, so a nested entry that declared one would be dead data.
-   */
-  icon?: NavIcon;
-  /**
-   * Route path of the entry this one nests under, e.g. `"/users"` for
-   * `User schemas`. Nested entries render in shadcn's `SidebarMenuSub` beneath
-   * the parent and are hidden with it when the sidebar collapses to the icon
-   * rail.
-   *
-   * Matched on the parent's path rather than its label so renaming a label does
-   * not silently orphan the child.
-   */
-  parent?: string;
+  /** Sidebar glyph (matches the design system's Lucide icon set). */
+  icon: NavIcon;
 }
-
-/**
- * Sidebar entries for designed screens that are not built.
- *
- * **Empty on purpose.** The sidebar lists only screens that work: a disabled
- * row reads as "your account cannot do this".
- *
- * Restore an entry when its screen has an endpoint behind it. None does today:
- *
- *   - App groups   — needs ADR 034's app-group catalog (epic #419)
- *   - Applications — no application resource or endpoints exist
- *   - Analytics    — no aggregate or time-series endpoint exists
- *   - Activity Log — no audit-log read API (#350)
- *
- * ```ts
- * import { Activity, AppWindow, Folder, LineChart } from "lucide-react";
- *
- * export const DESIGN_ONLY_NAV: NavMeta[] = [
- *   { label: "App groups", order: 3, icon: Folder },
- *   { label: "Applications", order: 4, icon: AppWindow },
- *   { label: "Analytics", order: 5, icon: LineChart },
- *   { label: "Activity Log", order: 7, icon: Activity },
- * ];
- * ```
- */
-export const DESIGN_ONLY_NAV: NavMeta[] = [];
 
 declare module "@tanstack/react-router" {
   interface StaticDataRouteOption {

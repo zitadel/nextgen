@@ -1,0 +1,12 @@
+title: InvitationTokenRequest
+description: The redeem token from an invitation link's fragment.
+type: object
+required:
+  - token
+properties:
+  token:
+    type: string
+    minLength: 1
+    description: |
+      The plaintext token from the invitation link fragment. It never appears in
+      a URL query. Every unknown or finished token gets the same `404`.

@@ -1,0 +1,270 @@
+---
+title: Turn password and passkey sign-in on and off
+description: Enable or disable password and passkey sign-in on a user schema with the zitadel CLI, and edit the login flow to match.
+---
+
+A sign-in method is a way for a user to prove who they are. A user schema turns each method on or off under `x-auth-methods`. A passkey is a credential stored on the user's device or password manager, checked with WebAuthn instead of a typed secret. `zitadel auth-method password|passkey enable|disable` switches one method on a schema. The login flow decides which screens offer it, and the command never edits the flow, so each change below comes with a flow edit.
+
+## Before you start
+
+You need an app set up with `zitadel setup`. Run the commands in that directory. `setup` writes two files that this guide edits:
+
+- `.zitadel/schemas/default-human-user.json`, the user schema
+- `.zitadel/flows/default-login.json`, the login flow
+
+The default `password-first` preset enables both methods in the schema, but its flow offers only a password. The `passkey-first` preset's flow offers both. [Edit the login flow](/docs/guides/edit-login-flow) explains steps, actions and transitions.
+
+## What the commands change
+
+Each of these commands sets `x-auth-methods.<method>.enabled` in one schema and nothing else:
+
+```sh
+npx @zitadel/cli@latest auth-method passkey enable
+```
+
+```text
+✔ Updated .zitadel/schemas/default-human-user.json
+Enabled passkey for default-human-user
+```
+
+Then deploy the change ([Deploy](/docs/guides/deploy)):
+
+```sh
+npx @zitadel/cli@latest deploy --dry-run
+npx @zitadel/cli@latest deploy
+```
+
+When the method is already in the state you asked for, the command writes nothing and says `passkey is already enabled for default-human-user`. That is the case for both methods in a new project, so after a flow edit run `deploy` anyway. Add `--dry-run` to see what a command would do without writing.
+
+`enable` warns when no step of an active flow lets an existing user sign in with the method:
+
+```text
+WARN  No login flow for default-human-user offers passkey yet. In .zitadel/flows/default-login.json, add a "kind": "passkey" action to a step reached from purposes.login, plus a transition under the action's name. A "kind": "passkey_register" action does the same for sign-up. See .zitadel/flows/README.md.
+```
+
+You can enable first and edit the flow second, or the other way round. Deploy both together.
+
+`disable` refuses while a flow still uses the method. It lists every step that does and what each is left with, and for a step left with nothing, what leads to it:
+
+```text
+Error E_VALIDATION: Disabling password in .zitadel/schemas/default-human-user.json would break a login flow that still uses it:
+  - .zitadel/flows/default-login.json: step "password" collects password
+    Left with no field or sign-in method. Targeted by identifier.submit, register.user_already_exists.
+  - .zitadel/flows/default-login.json: step "register-password" collects password
+    Left with no field or sign-in method. Targeted by register.submit.
+Edit those steps first; login flows are not edited for you. From each step, remove its x-auth-methods#password field. Delete a step left with no field or sign-in method: retarget the transitions listed for it. `zitadel deploy --dry-run` checks the edited flow; then run the command again.
+```
+
+So for a disable, edit the flow first, then run the command.
+
+## How a step offers each method
+
+A step offers a password when its `fields` list the reserved field `x-auth-methods#password`. Its `submit` action checks the password at sign-in. On a step with `"on_success": "create_user"`, it sets the password for a new user, as the default flow's `register-password` step does. This is the default flow's sign-in step:
+
+```json title=".zitadel/flows/default-login.json"
+{
+  "name": "password",
+  "fields": ["x-auth-methods#password"],
+  "actions": [
+    { "name": "submit", "kind": "submit", "primary": true, "text_key": "password.action.signin" }
+  ],
+  "transitions": {
+    "submit": { "target": "done" }
+  }
+}
+```
+
+A step offers a passkey through an action. A `passkey` action signs an existing user in with a passkey. A `passkey_register` action creates the new user and their passkey at sign-up, with no password step. Each action needs a transition with its name, which runs once the passkey checks out. This is the `passkey-first` preset's `identifier` step, cut to its sign-in actions:
+
+```json
+{
+  "name": "identifier",
+  "fields": ["email"],
+  "actions": [
+    { "name": "submit", "kind": "submit", "primary": true, "text_key": "identifier.action.continue" },
+    { "name": "passkey", "kind": "passkey", "primary": false, "text_key": "identifier.action.passkey" }
+  ],
+  "transitions": {
+    "submit": { "target": "password" },
+    "passkey": { "target": "done" }
+  }
+}
+```
+
+A step can offer both, as the `passkey-first` preset's `password` step does. Social sign-in is offered through a step's `sso_providers`, which `auth-method sso enable` writes for you ([Add social sign-in](/docs/guides/social-sign-in)).
+
+## Enable passkeys
+
+Add a `passkey` action to the sign-in step and a `passkey_register` action to the sign-up step of the default flow. The two steps then read:
+
+```json title=".zitadel/flows/default-login.json"
+{
+  "name": "identifier",
+  "fields": ["email"],
+  "actions": [
+    { "name": "submit", "kind": "submit", "primary": true, "text_key": "identifier.action.continue" },
+    { "name": "passkey", "kind": "passkey", "primary": false, "text_key": "identifier.action.passkey" },
+    { "name": "register", "kind": "navigate", "primary": false, "text_key": "identifier.action.register.link" }
+  ],
+  "transitions": {
+    "submit": { "target": "password" },
+    "passkey": { "target": "done" },
+    "user_not_found": { "target": "register" },
+    "register": { "purpose": "register" }
+  }
+},
+{
+  "name": "register",
+  "fields": ["email"],
+  "actions": [
+    { "name": "submit", "kind": "submit", "primary": true, "text_key": "register.action.password" },
+    { "name": "passkey_register", "kind": "passkey_register", "primary": false, "text_key": "register.action.passkey" },
+    { "name": "sign_in", "kind": "navigate", "primary": false, "text_key": "register.action.sign_in.link" }
+  ],
+  "transitions": {
+    "submit": { "target": "register-password" },
+    "passkey_register": { "target": "done" },
+    "user_already_exists": { "target": "password" },
+    "sign_in": { "purpose": "login" }
+  }
+}
+```
+
+Then enable the method and deploy:
+
+```sh
+npx @zitadel/cli@latest auth-method passkey enable
+npx @zitadel/cli@latest deploy --dry-run
+npx @zitadel/cli@latest deploy
+```
+
+To make a passkey the first thing the login offers, start from the `passkey-first` preset's flow instead: [`presets/passkey-first/login.json`](https://github.com/zitadel/nextgen/blob/main/packages/config/defaults/presets/passkey-first/login.json). Its entry step, `passkey-first`, has no fields and offers a passkey, with a link to the email and password steps.
+
+## Disable passkeys
+
+Remove every `passkey` and `passkey_register` action, and the transition with the same name. In the `passkey-first` flow, also remove the `passkey-first` step. It is the login entry, so point `purposes.login` at the `identifier` step:
+
+```json title=".zitadel/flows/default-login.json"
+"purposes": {
+  "login": "identifier",
+  "register": "register"
+}
+```
+
+In the `register` step, make `submit` the primary action once `passkey_register` is gone. The result is the default flow. Then disable the method and deploy:
+
+```sh
+npx @zitadel/cli@latest auth-method passkey disable
+npx @zitadel/cli@latest deploy --dry-run
+npx @zitadel/cli@latest deploy
+```
+
+Users who signed up with only a passkey have nothing left to sign in with once passkeys are off. The dry run warns with how many there are; keep passkeys enabled until each has another way in.
+
+## Enable password sign-in
+
+The default flow already offers a password. For a flow that does not, add a step whose `fields` list `x-auth-methods#password`, and point a transition at it, as the default flow's `identifier` step does with `"submit": { "target": "password" }`. A sign-up journey needs a step with `x-auth-methods#password` and `"on_success": "create_user"`, like `register-password`.
+
+```sh
+npx @zitadel/cli@latest auth-method password enable
+```
+
+A password is checked against the user that the schema's `x-identifier` property finds. The command refuses a schema without one:
+
+```text
+Error E_VALIDATION: .zitadel/schemas/default-human-user.json has no x-identifier for password
+```
+
+Set `"x-identifier": "email"`, or another property your users sign in with that has `"x-unique": "project"`, and run it again.
+
+## Disable password sign-in
+
+Remove every step that lists `x-auth-methods#password`. Retarget every transition that targets one of them, or remove it together with the action it belongs to: an action without a transition fails the check. Removing only the field leaves a step that signs nobody in. Another method must then sign users in. A passkey-only flow, cut down from the `passkey-first` preset, looks like this:
+
+```json title=".zitadel/flows/default-login.json"
+{
+  "$schema": "../meta/flow-definition.json",
+  "name": "default-login",
+  "status": "active",
+  "user_schema": "human-user",
+  "purposes": {
+    "login": "passkey-first",
+    "register": "register"
+  },
+  "steps": [
+    {
+      "name": "passkey-first",
+      "fields": [],
+      "actions": [
+        { "name": "passkey", "kind": "passkey", "primary": true, "text_key": "passkey-first.action.passkey" },
+        { "name": "register", "kind": "navigate", "primary": false, "text_key": "identifier.action.register.link" }
+      ],
+      "transitions": {
+        "passkey": { "target": "done" },
+        "register": { "purpose": "register" }
+      }
+    },
+    {
+      "name": "register",
+      "fields": ["email"],
+      "actions": [
+        { "name": "passkey_register", "kind": "passkey_register", "primary": true, "text_key": "register.action.passkey" },
+        { "name": "sign_in", "kind": "navigate", "primary": false, "text_key": "register.action.sign_in.link" }
+      ],
+      "transitions": {
+        "passkey_register": { "target": "done" },
+        "user_already_exists": { "target": "passkey-first" },
+        "sign_in": { "purpose": "login" }
+      }
+    },
+    { "name": "done", "complete": "show" }
+  ]
+}
+```
+
+Compared with the preset, it drops the `identifier`, `password` and `register-password` steps. It drops the `email_fallback` action on `passkey-first` and the `submit` action on `register`, with their transitions. `user_already_exists` on `register` now goes to `passkey-first`, so an existing user who tries to sign up is sent to sign in. A transition left pointing at a removed step, or an action left without a transition, stops the command before it checks anything:
+
+```text
+Error E_VALIDATION: A login flow has errors, so it cannot be checked against the changed schema:
+  - .zitadel/flows/default-login.json: step "register": action "submit" has no matching transition
+```
+
+Fix each step it names and run the command again.
+
+Then disable the method and deploy:
+
+```sh
+npx @zitadel/cli@latest auth-method password disable
+npx @zitadel/cli@latest deploy --dry-run
+npx @zitadel/cli@latest deploy
+```
+
+Users who signed up with only a password have nothing left to sign in with once passwords are off. The dry run warns with how many there are; keep passwords enabled until each has another way in.
+
+## Disable the last method
+
+The commands keep at least one way to sign in on a schema: a password, a passkey, or a social sign-in provider. In a terminal, disabling the last one asks for confirmation. With `--non-interactive`, or in an agent, it is refused and prints the commands to run instead:
+
+```text
+Error E_VALIDATION: .zitadel/schemas/default-human-user.json would have no way to sign in left
+Enable another method first, such as `zitadel auth-method sso enable --provider <name>`. If the schema's users are only managed through the API, re-run with --force.
+Next:
+  $ npx @zitadel/cli@latest auth-method passkey disable --schema default-human-user --force
+  $ npx @zitadel/cli@latest auth-method password enable --schema default-human-user
+```
+
+A `--dry-run` is refused the same way, and its first suggestion is `--force --dry-run`. Enable another method first. Pass `--force` only when the schema's users are created and managed through the API and never sign in. The command then warns `default-human-user has no way to sign in left. Its users can only be managed through the API.`
+
+## Choose the schema
+
+With one user schema, the commands change it. With more than one, name it with `--schema`. It takes the schema's file name, with or without `.json`, or its `objectType`:
+
+```sh
+npx @zitadel/cli@latest auth-method passkey enable --schema customers
+```
+
+That changes `.zitadel/schemas/customers.json` and checks the flows whose `user_schema` names its `objectType`. An unknown name fails with `This Project has no user schema named <name>`, exits with code 4, and lists the known schemas with their `objectType`: `Known schemas: default-human-user (human-user)`.
+
+## Check it works
+
+Open your app's sign-in page after the deploy. Sign up with a new email using the method you enabled, sign out, and sign in again. A method you disabled no longer shows a button or field.

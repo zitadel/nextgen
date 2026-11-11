@@ -1,18 +1,52 @@
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
+import { createServer } from "node:http";
 import { createHash } from "node:crypto";
-import { chmod, mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import {
+  chmod,
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  realpath,
+  rm,
+  stat,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Readable } from "node:stream";
+import { parseEnv, promisify } from "node:util";
 
 import { expect } from "vitest";
+import { z } from "zod";
 
 import { aFakeAppGeneratorPath } from "./app-generator";
 import { aFakeServerBinary, trackLocalServerDir, type ServerShape } from "./local-server";
+import { parseJsonOrUndefined } from "@/lib/json";
+import type { JsonObject } from "@/lib/zitadel/types";
+import { toJsonObject } from "@/lib/zitadel/utils/json";
 import { cliPackageRoot } from "./oclif-build";
 import { nextPort } from "./ports";
+
+/** How long a run gets to unwind after an interrupt before the test gives up on it. */
+const INTERRUPT_GRACE_MS = 10_000;
+
+/**
+ * What an interrupted run ended as: an exit code when it unwound through its
+ * own error path, or the signal that killed it when it never got that far.
+ */
+export type InterruptedRun = Readonly<{
+  exitCode: number | null;
+  signal: NodeJS.Signals | null;
+  stdout: string;
+  stderr: string;
+}>;
 import { aBinaryRecord } from "./runtime-record";
 import { parseJson, runCliForTest } from "./run-cli";
+import { asTerminal, offTerminal, onTerminalReadingAFile } from "./terminal";
+import { assertRunnableSuggestions } from "./suggestions";
+
+const execFileAsync = promisify(execFile);
 
 const SCHEMA_FILE = ".zitadel/schemas/default-human-user.json";
 const FLOW_FILE = ".zitadel/flows/default-login.json";
@@ -44,11 +78,33 @@ export interface Envelope<T = Record<string, unknown>> {
   readonly data: T;
 }
 
-export interface PlanTotals {
-  readonly creates: number;
-  readonly updates: number;
-  readonly deletes: number;
-  readonly total: number;
+/**
+ * A non-interactive `deploy` outside a git repository, as `aSetUpApp` arranges,
+ * needs a `-m` message, so the helpers default one unless the spec supplied its own.
+ */
+function withDeployMessage(extraArgs: readonly string[]): string[] {
+  const hasMessage = extraArgs.some((arg) => arg === "-m" || arg === "--message");
+  return hasMessage ? [...extraArgs] : ["-m", "test deploy", ...extraArgs];
+}
+
+/** The data a `deploy` envelope carries, for a deploy expected to succeed. */
+export interface DeployResult {
+  readonly content_hash?: string;
+  readonly release_id?: string;
+  readonly deployment_id?: string;
+  readonly resources?: number;
+  readonly origins?: string[];
+  readonly dry_run?: boolean;
+  readonly diff?: {
+    readonly against: string | null;
+    readonly files: ReadonlyArray<{
+      readonly path: string;
+      readonly status: string;
+      readonly previous_path?: string;
+      readonly patch: string;
+    }> | null;
+    readonly note?: string;
+  };
 }
 
 export interface FlowStep {
@@ -83,10 +139,38 @@ export interface ProjectVariable {
   readonly secret?: boolean;
 }
 
+export interface ProjectOrigin {
+  readonly pattern: string;
+  readonly kind: string;
+}
+
+/**
+ * The origin `zitadel setup` registers for the app it scaffolds: the development
+ * server, as a primary pattern, because only a primary one admits the app's own
+ * requests. A fresh project already holds it.
+ */
+export const SETUP_ORIGIN: ProjectOrigin = { pattern: "http://localhost:3000", kind: "primary" };
+
 export interface RegisteredIdp {
   readonly id: string;
   readonly slug: string;
 }
+
+export interface PublishedPolicy {
+  readonly id: string;
+  readonly operation: string;
+  readonly revision_id: string;
+  readonly config: Readonly<Record<string, number | string>>;
+}
+
+/** The operation the password policy guards, and its file's name. */
+export const PASSWORD_POLICY = "auth.factor.password.set";
+
+/** The sign-up policy `setup` publishes beside it: the default, the built-in proof of work. */
+export const DEFAULT_SIGNUP_POLICY = {
+  operation: "user.create",
+  config: { challenge: "zitadel_pow" },
+};
 
 /**
  * What a command did to the project, as a tree rather than as content.
@@ -104,6 +188,7 @@ export interface ProjectChanges {
 /** The user schema as committed, which the developer owns and edits. */
 export interface UserSchemaDocument {
   properties: Record<string, unknown>;
+  required?: string[];
   "x-auth-methods"?: Record<string, { enabled: boolean; providers?: string[] }>;
 }
 
@@ -113,7 +198,7 @@ export interface ConnectionDocument {
   protocol?: string;
   display_name?: string;
   subject_claim?: string;
-  oidc: { issuer: string; client_id?: string; client_secret?: string };
+  oidc: { issuer: string; client_id?: string; client_secret?: string; scopes?: string[] };
   claim_mapping?: Record<string, string>;
   verified_claims?: Record<string, string>;
 }
@@ -134,6 +219,120 @@ interface PackageJson {
   dependencies: Record<string, string>;
 }
 
+/** The checks behind {@link UserSchemaDocument}, run before a spec edits one. */
+const UserSchemaDocumentSchema: z.ZodType<UserSchemaDocument> = z.object({
+  properties: z.record(z.string(), z.unknown()),
+  required: z.array(z.string()).optional(),
+  "x-auth-methods": z
+    .record(
+      z.string(),
+      z.object({
+        enabled: z.boolean(),
+        providers: z.array(z.string()).optional(),
+      }),
+    )
+    .optional(),
+});
+
+/** The checks behind {@link ConnectionDocument}, run before a spec edits one. */
+const ConnectionDocumentSchema: z.ZodType<ConnectionDocument> = z.object({
+  slug: z.string(),
+  protocol: z.string().optional(),
+  display_name: z.string().optional(),
+  subject_claim: z.string().optional(),
+  oidc: z.object({
+    issuer: z.string(),
+    client_id: z.string().optional(),
+    client_secret: z.string().optional(),
+  }),
+  claim_mapping: z.record(z.string(), z.string()).optional(),
+  verified_claims: z.record(z.string(), z.string()).optional(),
+});
+
+/** The checks behind {@link FlowDocument}, run before a spec edits one. */
+const FlowDocumentSchema: z.ZodType<FlowDocument> = z.object({
+  purposes: z.record(z.string(), z.string()),
+  steps: z.array(
+    z.object({
+      name: z.string(),
+      fields: z.array(z.string()).optional(),
+      actions: z
+        .array(
+          z.object({
+            name: z.string(),
+            text_key: z.string().optional(),
+          }),
+        )
+        .optional(),
+      transitions: z.record(z.string(), z.unknown()).optional(),
+      sso_providers: z.array(z.string()).optional(),
+    }),
+  ),
+});
+
+/** The checks behind {@link PackageJson}, run before a spec edits one. */
+const PackageJsonSchema: z.ZodType<PackageJson> = z.object({
+  dependencies: z.record(z.string(), z.string()),
+});
+
+/** The origins `.zitadel/secret` records, which a spec rewrites. */
+const SecretOriginsSchema = z.object({
+  primary_origins: z.array(z.string()).optional(),
+  preview_origins: z.array(z.string()).optional(),
+});
+
+/** Any JSON object, for an edit that only adds or removes a key. */
+const AnyObjectSchema = z.record(z.string(), z.unknown());
+
+/** A committed connection's credentials, as a spec reads them back. */
+const CommittedIdpConnection = z.looseObject({
+  oidc: z.looseObject({
+    client_id: z.string(),
+    client_secret: z.string(),
+  }),
+});
+
+/** What the fake `npx` records of how `upgrade` ran it. */
+const RefreshLog = z.looseObject({
+  args: z.array(z.string()),
+});
+
+/** What the fake npm records of how setup ran it. */
+const InstallLog = z.looseObject({
+  cwd: z.string(),
+  args: z.array(z.string()),
+});
+
+/** The project values `.zitadel/secret` holds, as far as an environment binding reads them. */
+const ProjectSecret = z.looseObject({
+  project_id: z.string(),
+  project_secret: z.string(),
+  preview_secret: z.string(),
+});
+
+/** The recovery a failed `doctor` run offers, at the envelope's root. */
+const DoctorRecovery = z.looseObject({
+  details: z
+    .looseObject({
+      suggested_args: z.array(z.array(z.string())).optional(),
+    })
+    .optional(),
+});
+
+/**
+ * Whether a value passes `schema`'s checks, as a guard over the value itself
+ * rather than the copy `parse` makes, so an edit lands on the document as read
+ * and its keys keep their order. Sound only for a schema with no transforms or
+ * defaults, which none of the schemas here has.
+ *
+ * @param schema - The checks the value must pass.
+ * @param value - The value read.
+ * @returns Whether it is a `T`.
+ */
+function conforms<T>(schema: z.ZodType<T>, value: unknown): value is T {
+  return schema.safeParse(value).success;
+}
+
 /**
  * Files the developer commits and hand-edits.
  *
@@ -148,10 +347,16 @@ class CommittedFiles {
     this.root = root;
   }
 
-  idpConnection(slug: string): Promise<{ oidc: { client_id: string; client_secret: string } }> {
-    return this.read(`.zitadel/idps/${slug}.json`) as Promise<{
-      oidc: { client_id: string; client_secret: string };
-    }>;
+  /**
+   * A committed connection's credentials, as the file spells them.
+   *
+   * @param slug - The connection's slug, which names its file.
+   * @returns The connection, its `oidc` credentials checked to be strings.
+   */
+  async idpConnection(
+    slug: string,
+  ): Promise<{ oidc: { client_id: string; client_secret: string } }> {
+    return CommittedIdpConnection.parse(await this.read(`.zitadel/idps/${slug}.json`));
   }
 
   /** The ejected branding descriptor. */
@@ -169,11 +374,17 @@ class CommittedFiles {
     return JSON.stringify(documents);
   }
 
-  private async read(relativePath: string): Promise<Record<string, unknown>> {
-    return JSON.parse(await readFile(join(this.root, relativePath), "utf8")) as Record<
-      string,
-      unknown
-    >;
+  /**
+   * A committed JSON document.
+   *
+   * @param relativePath - The file, from the project's root.
+   * @returns Its contents, checked to be a JSON object.
+   */
+  private async read(relativePath: string): Promise<JsonObject> {
+    return toJsonObject(
+      JSON.parse(await readFile(join(this.root, relativePath), "utf8")),
+      relativePath,
+    );
   }
 }
 
@@ -217,9 +428,13 @@ export class ScaffoldedApp {
   async setup(
     extraArgs: string[] = [],
     { install = false }: { install?: boolean } = {},
+    env: NodeJS.ProcessEnv = {},
   ): Promise<CliResult> {
     if (!install) {
-      return this.cli(["setup", "--non-interactive", "--json", "--skip-install", ...extraArgs]);
+      return this.cli(
+        ["setup", "--non-interactive", "--json", "--skip-install", ...extraArgs],
+        env,
+      );
     }
     const npm = await fakePackageManager();
     this.installLogPath = npm.logPath;
@@ -227,6 +442,106 @@ export class ScaffoldedApp {
       PACKAGE_MANAGER_LOG: npm.logPath,
       PATH: `${npm.binDir}:${process.env.PATH ?? ""}`,
     });
+  }
+
+  /**
+   * Runs setup with a git that does everything but commit, as a full disk or a
+   * broken git would: setup creates the repository and then cannot commit.
+   */
+  async setupWithGitThatCannotCommit(): Promise<CliResult> {
+    const git = await gitThatCannotCommit();
+    return this.cli(["setup", "--non-interactive", "--json", "--skip-install"], {
+      PATH: `${git}:${process.env.PATH ?? ""}`,
+    });
+  }
+
+  /**
+   * Puts the app under version control with everything committed, the state a
+   * developer who already uses git is in before they run setup.
+   */
+  async underVersionControl(): Promise<void> {
+    await execFileAsync("git", ["init", "--quiet"], { cwd: this.path });
+    await execFileAsync("git", ["add", "--all"], { cwd: this.path });
+    await execFileAsync(
+      "git",
+      [
+        "-c",
+        "user.name=Dev",
+        "-c",
+        "user.email=dev@example.com",
+        "-c",
+        "commit.gpgsign=false",
+        "commit",
+        "--quiet",
+        "--no-verify",
+        "--message=feat: the developer's own work",
+      ],
+      { cwd: this.path },
+    );
+  }
+
+  /** Detaches HEAD from its branch, as a checkout of a tag or a CI job's checkout does. */
+  async onADetachedHead(): Promise<void> {
+    await execFileAsync("git", ["checkout", "--quiet", "--detach"], { cwd: this.path });
+  }
+
+  /** Leaves a file nobody has committed, as a developer mid-change would. */
+  async withUncommittedWork(): Promise<void> {
+    await writeFile(join(this.path, "notes.md"), "a note to self\n");
+  }
+
+  /**
+   * The paths setup's commit put under version control. Read from git because
+   * that is the behaviour: a secret that reaches version control cannot be
+   * scrubbed later, so what is tracked is the claim being made.
+   */
+  async trackedFiles(): Promise<string[]> {
+    try {
+      const { stdout } = await execFileAsync(
+        "git",
+        ["-c", "core.quotePath=false", "ls-files", "-z"],
+        { cwd: this.path },
+      );
+      return stdout.split("\0").filter((line) => line !== "");
+    } catch {
+      return [];
+    }
+  }
+
+  /** Commits everything outstanding, as the developer would before deploying. */
+  async commitEverything(): Promise<void> {
+    await execFileAsync("git", ["add", "--all"], { cwd: this.path });
+    await execFileAsync(
+      "git",
+      [
+        "-c",
+        "user.name=Dev",
+        "-c",
+        "user.email=dev@example.com",
+        "-c",
+        "commit.gpgsign=false",
+        "commit",
+        "--quiet",
+        "--no-verify",
+        "--message=feat: change the configuration",
+      ],
+      { cwd: this.path },
+    );
+  }
+
+  /** The subjects of the project's commits, newest first, or [] without a repo. */
+  async commitSubjects(): Promise<string[]> {
+    try {
+      const { stdout } = await execFileAsync("git", ["log", "--format=%s"], { cwd: this.path });
+      return stdout.split("\n").filter((line) => line !== "");
+    } catch {
+      return [];
+    }
+  }
+
+  /** `setup` without `--json`, for a spec asserting what the developer reads. */
+  setupRendered(extraArgs: string[] = [], env: NodeJS.ProcessEnv = {}): Promise<CliResult> {
+    return this.cli(["setup", "--non-interactive", "--skip-install", ...extraArgs], env);
   }
 
   /**
@@ -273,6 +588,23 @@ export class ScaffoldedApp {
         "sso",
         "enable",
         "--non-interactive",
+        "--provider",
+        provider,
+        "--client-id",
+        credentials.clientId,
+      ]),
+    );
+  }
+
+  /** `auth-method sso enable --dry-run` without `--json`, for a spec asserting what the developer reads. */
+  enableSsoDryRun(provider: string, credentials: Credentials): Promise<CliResult> {
+    return this.pipingStdin(credentials.secret, () =>
+      this.cli([
+        "auth-method",
+        "sso",
+        "enable",
+        "--non-interactive",
+        "--dry-run",
         "--provider",
         provider,
         "--client-id",
@@ -372,6 +704,27 @@ export class ScaffoldedApp {
     );
   }
 
+  /** `setup` with a custom connection, without `--json`, for a spec asserting what the developer reads. */
+  setupWithCustomSsoRendered(
+    connection: CustomConnection,
+    credentials: Credentials,
+  ): Promise<CliResult> {
+    return this.pipingSecret(credentials.secret, () =>
+      this.cli([
+        "setup",
+        "--non-interactive",
+        "--skip-install",
+        "--framework",
+        "next",
+        "--sso",
+        "custom",
+        ...customFlags(connection, "--sso-"),
+        "--sso-client-id",
+        credentials.clientId,
+      ]),
+    );
+  }
+
   /** `setup` with exactly these flags and this on stdin, for a spec asserting how it refuses. */
   setupSsoWith(args: string[], secret: string): Promise<CliResult> {
     return this.pipingSecret(secret, () => this.setup(["--framework", "next", ...args]));
@@ -392,11 +745,85 @@ export class ScaffoldedApp {
   }
 
   /** Runs `doctor` against a fake docker on PATH and a port from this worker. */
-  async doctor(extraArgs: string[] = []): Promise<CliResult> {
+  async doctor(extraArgs: string[] = [], env: NodeJS.ProcessEnv = {}): Promise<CliResult> {
     const docker = await fakeDocker();
     return this.cli(["doctor", "--json", ...extraArgs, "--port", String(nextPort())], {
       PATH: `${docker.binDir}:${process.env.PATH ?? ""}`,
       DOCKER_LOG: docker.logPath,
+      ...env,
+    });
+  }
+
+  /** Runs `doctor` with the update check on, which the suite otherwise keeps off. */
+  async doctorLookingForUpdates(): Promise<CliResult> {
+    const docker = await fakeDocker();
+    return this.cli(["doctor", "--json", "--port", String(nextPort())], {
+      PATH: `${docker.binDir}:${process.env.PATH ?? ""}`,
+      DOCKER_LOG: docker.logPath,
+      ZITADEL_UPDATE_CHECK: "",
+      XDG_CONFIG_HOME: docker.binDir,
+    });
+  }
+
+  /** Runs `doctor` for a person, against a fake docker on PATH. */
+  async doctorRendered(extraArgs: string[] = [], env: NodeJS.ProcessEnv = {}): Promise<CliResult> {
+    const docker = await fakeDocker();
+    return this.cli(["doctor", ...extraArgs, "--port", String(nextPort())], {
+      PATH: `${docker.binDir}:${process.env.PATH ?? ""}`,
+      DOCKER_LOG: docker.logPath,
+      ...env,
+    });
+  }
+
+  /** Runs `upgrade --json` against a fake npm and npx on PATH. */
+  upgrade(
+    extraArgs: string[] = [],
+    behavior: { refresh?: "done" | "issues" | "broken"; install?: "fails" } = {},
+    env: NodeJS.ProcessEnv = {},
+  ): Promise<CliResult> {
+    return this.upgradeWith(["--json", ...extraArgs], behavior, env);
+  }
+
+  /** Runs `upgrade` for a person, against the same fakes. */
+  upgradeRendered(env: NodeJS.ProcessEnv = {}): Promise<CliResult> {
+    return this.upgradeWith([], {}, env);
+  }
+
+  /** The arguments `upgrade` gave npx to refresh the generated files. */
+  async refreshInvocation(): Promise<string[]> {
+    if (this.refreshLogPath === undefined) {
+      throw new Error("upgrade was not run");
+    }
+    return RefreshLog.parse(JSON.parse((await readFile(this.refreshLogPath, "utf8")).trim())).args;
+  }
+
+  /** Whether the fake npm was asked for anything. */
+  async installWasRun(): Promise<boolean> {
+    if (this.installLogPath === undefined) {
+      throw new Error("upgrade was not run");
+    }
+    return readFile(this.installLogPath, "utf8").then(
+      () => true,
+      () => false,
+    );
+  }
+
+  private async upgradeWith(
+    args: string[],
+    behavior: { refresh?: "done" | "issues" | "broken"; install?: "fails" },
+    env: NodeJS.ProcessEnv = {},
+  ): Promise<CliResult> {
+    const npm = await fakePackageManager(behavior.install === "fails" ? 1 : 0);
+    const npx = await fakeNpx(behavior.refresh ?? "done");
+    this.installLogPath = npm.logPath;
+    this.refreshLogPath = npx.logPath;
+    return this.cli(["upgrade", ...args], {
+      PACKAGE_MANAGER_LOG: npm.logPath,
+      FAKE_NPX_LOG: npx.logPath,
+      PATH: `${npx.binDir}:${npm.binDir}:${process.env.PATH ?? ""}`,
+      // The lookup keeps its answer in the home; a run's must not reach the next.
+      XDG_CONFIG_HOME: npm.binDir,
+      ...env,
     });
   }
 
@@ -420,11 +847,15 @@ export class ScaffoldedApp {
     return this.envelopeOf<{ port: number }>(result).data.port;
   }
 
-  /** The argument lists a failed `doctor` run offered as recovery, for an agent to run as they are. */
+  /**
+   * The argument lists a failed `doctor` run offered as recovery, for an agent
+   * to run as they are.
+   *
+   * @param result - The `doctor --json` run.
+   * @returns Each suggested argument list, or none.
+   */
   suggestedArgsOf(result: CliResult): string[][] {
-    const { details } = this.envelopeOf<Record<string, unknown>>(result) as unknown as {
-      details?: { suggested_args?: string[][] };
-    };
+    const { details } = DoctorRecovery.parse(this.envelopeOf(result));
     return details?.suggested_args ?? [];
   }
 
@@ -524,6 +955,13 @@ export class ScaffoldedApp {
     await writeFile(join(this.path, ".zitadel/local/runtime.json"), "{not json");
   }
 
+  /** The log lines a `logs --json` run returned. */
+  loggedLinesOf(result: CliResult): string[] {
+    expect(result, "logs should have succeeded").toSucceed();
+    const { logs } = this.envelopeOf<{ logs: string }>(result).data;
+    return logs.split("\n").filter((line) => line !== "");
+  }
+
   /** The lifecycle `status` reports for the local server. */
   async localServerLifecycle(): Promise<string> {
     const status = await this.cli(["status", "--json"]);
@@ -534,29 +972,321 @@ export class ScaffoldedApp {
     return this.cli(["status", "--json", ...extraArgs]);
   }
 
-  apply(extraArgs: string[] = []): Promise<CliResult> {
-    return this.cli(["apply", "--non-interactive", "--json", ...extraArgs]);
+  /**
+   * `status` run as its own process against a server that accepts the
+   * connection and never answers.
+   *
+   * @remarks
+   * Its own process, because the in-process runner cannot see the thing this
+   * measures: the presence probe answers "unknown" on a deadline, and a
+   * request still in flight after that holds a real process open until the
+   * client's own timeout. Only a spawned run exits when the request is
+   * actually given up on.
+   *
+   * @returns The run, and how long the process took to exit.
+   */
+  async statusAgainstAStalledServer(): Promise<{
+    result: CliResult;
+    elapsedMs: number;
+  }> {
+    const stalled = createServer(() => {
+      // Accepted and never answered, which is the case a deadline is for.
+    });
+    const port = nextPort();
+    await new Promise<void>((listening) => {
+      stalled.listen(port, "127.0.0.1", listening);
+    });
+    const startedAt = Date.now();
+    try {
+      const result = await new Promise<CliResult>((resolve) => {
+        execFile(
+          process.execPath,
+          [
+            join(cliPackageRoot, "bin/run.js"),
+            ...["status", "--json", "--cwd", this.path],
+            ...["--server", `http://127.0.0.1:${String(port)}`],
+          ],
+          {
+            env: {
+              ...process.env,
+              DO_NOT_TRACK: "1",
+            },
+          },
+          (error, stdout, stderr) => {
+            return resolve({
+              exitCode: typeof error?.code === "number" ? error.code : 0,
+              stdout,
+              stderr,
+            });
+          },
+        );
+      });
+      return {
+        result,
+        elapsedMs: Date.now() - startedAt,
+      };
+    } finally {
+      stalled.closeAllConnections();
+      await new Promise<void>((closed) => {
+        stalled.close(() => {
+          return closed();
+        });
+      });
+    }
   }
 
-  /** The totals `plan` reports, for a plan expected to succeed. */
-  async plan(): Promise<PlanTotals> {
-    const result = await this.planAttempt();
-    expect(result, "plan should have succeeded").toSucceed();
-    return this.envelopeOf<PlanTotals>(result).data;
+  /**
+   * Run `status` against a server that never answers and interrupt it, as a
+   * person pressing Ctrl-C does.
+   *
+   * @remarks
+   * Spawned rather than run in process, because an interrupt is delivered to a
+   * process and a command that keeps running after one is only visible from
+   * outside. The probe is the only request in flight, so the signal reaches it
+   * and nothing else.
+   *
+   * @returns What the run exited with, and the signal that killed it instead.
+   */
+  async statusInterrupted(): Promise<InterruptedRun> {
+    // The probe's own request is what says the run has got far enough to be
+    // interrupted: a timer would either fire while the CLI was still booting,
+    // when the interrupt kills it outright, or after the probe's deadline.
+    const reached = { interrupt: (): void => {} };
+    const stalled = createServer(() => {
+      // Accepted and never answered, so the probe is still in flight.
+      reached.interrupt();
+    });
+    const port = nextPort();
+    await new Promise<void>((listening) => {
+      stalled.listen(port, "127.0.0.1", listening);
+    });
+    try {
+      return await new Promise<InterruptedRun>((resolve, reject) => {
+        const child = spawn(
+          process.execPath,
+          [
+            join(cliPackageRoot, "bin/run.js"),
+            ...["status", "--json", "--cwd", this.path],
+            ...["--server", `http://127.0.0.1:${String(port)}`],
+          ],
+          {
+            env: {
+              ...process.env,
+              DO_NOT_TRACK: "1",
+            },
+          },
+        );
+        const out: string[] = [];
+        const err: string[] = [];
+        child.stdout.on("data", (chunk: Buffer) => {
+          out.push(chunk.toString());
+        });
+        child.stderr.on("data", (chunk: Buffer) => {
+          err.push(chunk.toString());
+        });
+        reached.interrupt = () => {
+          child.kill("SIGINT");
+        };
+        // A run that neither unwinds nor dies would otherwise hold the suite
+        // until its own deadline, and the failure would read as a timeout
+        // somewhere else rather than as a command that ignored the interrupt.
+        const gaveUp = setTimeout(() => {
+          child.kill("SIGKILL");
+          reject(new Error(`status kept running ${String(INTERRUPT_GRACE_MS)}ms after SIGINT`));
+        }, INTERRUPT_GRACE_MS);
+        child.on("close", (code, signal) => {
+          clearTimeout(gaveUp);
+          // A run the signal killed outright never installed its handler, which
+          // is a different failure from one that unwound: it answers no exit
+          // code and names the signal instead, so neither reads as the other.
+          const run = {
+            exitCode: code,
+            signal,
+            stdout: out.join(""),
+            stderr: err.join(""),
+          };
+          assertNothingDrivesTheTerminal(run, ["status"]);
+          return resolve(run);
+        });
+      });
+    } finally {
+      stalled.closeAllConnections();
+      await new Promise<void>((closed) => {
+        stalled.close(() => {
+          return closed();
+        });
+      });
+    }
   }
 
-  /** `plan` as a raw result, for a spec asserting a refusal. */
-  planAttempt(): Promise<CliResult> {
-    return this.cli(["plan", "--non-interactive", "--json"]);
+  /** Add a primary origin, so a deploy to `primary` has somewhere to land. */
+  async addPrimaryOrigin(pattern = "https://app.example.com"): Promise<void> {
+    const result = await this.cli([
+      "origin",
+      "add",
+      pattern,
+      "--kind",
+      "primary",
+      "--non-interactive",
+      "--json",
+    ]);
+    expect(result, "origin add should have succeeded").toSucceed();
   }
 
-  /** `plan` without `--json`, for a spec asserting what the developer reads. */
-  planRendered(): Promise<CliResult> {
-    return this.cli(["plan", "--non-interactive"]);
+  /** How many deployments the project serves, as `deployment list` reports them. */
+  async liveDeploymentCount(): Promise<number> {
+    const result = await this.cli(["deployment", "list", "--json"]);
+    expect(result, "deployment list should have succeeded").toSucceed();
+    return this.envelopeOf<{ count: number }>(result).data.count;
+  }
+
+  /** The message a release records, as `release get` reports it. */
+  async releaseMessage(releaseId: string): Promise<string | null> {
+    const result = await this.cli(["release", "get", releaseId, "--json"]);
+    expect(result, "release get should have succeeded").toSucceed();
+    return this.envelopeOf<{ metadata: { message: string | null } }>(result).data.metadata.message;
+  }
+
+  /** The message a deployment records, as `deployment get` reports it. */
+  async deploymentMessage(deploymentId: string): Promise<string | null> {
+    const result = await this.cli(["deployment", "get", deploymentId, "--json"]);
+    expect(result, "deployment get should have succeeded").toSucceed();
+    return this.envelopeOf<{ metadata: { message: string | null } }>(result).data.metadata.message;
+  }
+
+  /** Build a release from `.zitadel/` and deploy it to every primary origin. */
+  deploy(extraArgs: string[] = []): Promise<CliResult> {
+    return this.cli(["deploy", "--non-interactive", "--json", ...withDeployMessage(extraArgs)]);
+  }
+
+  /**
+   * What `apply` was for a set-up project: gives it the primary origin a deploy
+   * needs, then deploys.
+   */
+  async publish(): Promise<CliResult> {
+    await this.addPrimaryOrigin();
+    return this.deploy();
+  }
+
+  /** {@link publish}, failing the arrange if the deploy does not succeed. */
+  async publishData(): Promise<DeployResult> {
+    await this.addPrimaryOrigin();
+    return this.deployData();
+  }
+
+  /** The envelope data of a deploy expected to succeed (its content digest). */
+  async deployData(extraArgs: string[] = []): Promise<DeployResult> {
+    const result = await this.deploy(extraArgs);
+    expect(result, "deploy should have succeeded").toSucceed();
+    return this.envelopeOf<DeployResult>(result).data;
+  }
+
+  /** Deploys a preview to `url` and returns its envelope data, failing the arrange if it does not. */
+  async previewData(url: string): Promise<Record<string, unknown>> {
+    const result = await this.run(["preview", "--origin", url, "--json"]);
+    expect(result, "preview should have succeeded").toSucceed();
+    return this.envelopeOf<Record<string, unknown>>(result).data;
+  }
+
+  /** `deploy --dry-run`: validates and shows the diff without writing. */
+  deployDryRun(extraArgs: string[] = []): Promise<CliResult> {
+    return this.cli(["deploy", "--dry-run", "--non-interactive", "--json", ...extraArgs]);
+  }
+
+  /** The envelope data of a dry run expected to succeed (its diff). */
+  async deployDryRunData(extraArgs: string[] = []): Promise<DeployResult> {
+    const result = await this.deployDryRun(extraArgs);
+    expect(result, "deploy --dry-run should have succeeded").toSucceed();
+    return this.envelopeOf<DeployResult>(result).data;
+  }
+
+  /**
+   * Commits the whole app to git, making it a repository the first time, as a
+   * developer does before they deploy: a deploy records the commit it was built
+   * from, and the next one diffs `.zitadel/` against it.
+   */
+  async commit(): Promise<void> {
+    const git = (args: string[]) => promisify(execFile)("git", args, { cwd: this.path });
+    await git(["init", "-q"]);
+    await git(["add", "-A"]);
+    await git([
+      "-c",
+      "user.name=Test",
+      "-c",
+      "user.email=test@example.com",
+      "commit",
+      "-qm",
+      "wip",
+    ]);
+  }
+
+  /** `deploy` without `--json`, for a spec asserting what the developer reads. */
+  deployRendered(extraArgs: string[] = []): Promise<CliResult> {
+    return this.cli(["deploy", "--non-interactive", ...withDeployMessage(extraArgs)]);
   }
 
   run(args: string[], env: NodeJS.ProcessEnv = {}): Promise<CliResult> {
     return this.cli(args, env);
+  }
+
+  /**
+   * The same run in each way a reader sees it, held to the fixture's invariants
+   * in every one: as a script reads it, piped, and on a terminal in colour and
+   * without.
+   *
+   * @remarks
+   * A command says what it says in three renderings, and the invariant — that
+   * nothing printed drives the reader's terminal, and that a JSON body parses —
+   * has to hold in all of them. Every escaping fix before this was the same
+   * invariant broken at one more site, because a command's spec exercised the
+   * one rendering it happened to use, which was almost always `--json`.
+   *
+   * It asserts no outcome of its own: `cli` holds every run to the invariants
+   * already, and this is what puts them to each rendering. A command run more
+   * than once may refuse the later runs — an origin already added, a release
+   * already built — and a refusal is a rendering too, which is where this broke
+   * first.
+   *
+   * `run` is given how to run, so a command needing a fake on `PATH` or a port
+   * of its own passes its own runner and keeps that knowledge in its own spec.
+   *
+   * @param run - Runs the command for one rendering.
+   */
+  async inEveryRendering(
+    run: (how: { json: boolean; env: NodeJS.ProcessEnv }) => Promise<CliResult>,
+  ): Promise<void> {
+    for (const how of [
+      { json: true, terminal: false, env: {} },
+      { json: false, terminal: false, env: {} },
+      // Output on a screen with the input a file, as a run in CI with a
+      // terminal attached has: a command that would ask something fails fast
+      // rather than waiting for an answer no test can give. `NO_COLOR` for the
+      // plain one, because on a terminal `picocolors` colours by itself, so
+      // leaving `FORCE_COLOR` unset would be the coloured run twice.
+      { json: false, terminal: true, env: { FORCE_COLOR: "1" } },
+      { json: false, terminal: true, env: { NO_COLOR: "1" } },
+      // A script reading the envelope with a terminal attached, which is the
+      // one rendering where `logJson` colours before it spells out.
+      { json: true, terminal: true, env: { FORCE_COLOR: "1" } },
+    ]) {
+      const once = (): Promise<CliResult> => {
+        return run({ json: how.json, env: how.env });
+      };
+      const result = await (how.terminal ? onTerminalReadingAFile(once) : offTerminal(once));
+      // A run that named no command would otherwise pass every rendering but
+      // the one the envelope is checked in.
+      expect(result.stdout + result.stderr, "the command ran").not.toContain(
+        "is not a zitadel command",
+      );
+    }
+  }
+
+  /**
+   * `command` as this fixture's runs suggest it again: with the server and
+   * `--cwd` every run is given, so a spec states the whole suggestion.
+   */
+  againAsRun(command: string): string {
+    return `${command} --server ${MOCK_SERVER_URL} --cwd ${this.path}`;
   }
 
   /** For output oclif owns rather than our envelope: `--help`, `--version`. */
@@ -567,6 +1297,7 @@ export class ScaffoldedApp {
   /** Without `--server`, so the spec sees which server the CLI resolves itself. */
   async runWithoutServer(args: string[], env: NodeJS.ProcessEnv = {}): Promise<CliResult> {
     const result = await runCliForTest([...args, "--cwd", this.path], env);
+    assertNothingDrivesTheTerminal(result, args);
     if (args.includes("--json")) {
       assertEnvelope(result, args);
     }
@@ -574,17 +1305,27 @@ export class ScaffoldedApp {
   }
 
   /** Sets a project variable, whose value is piped rather than passed as a flag. */
-  setVariable(name: string, value: string, { secret = false } = {}): Promise<CliResult> {
+  setVariable(
+    name: string,
+    value: string,
+    { secret = false, preview = false, dryRun = false } = {},
+  ): Promise<CliResult> {
     return this.pipingStdin(value, () =>
       this.cli([
-        "variables",
+        "variable",
         "set",
         name,
-        "--project-level",
         "--json",
         ...(secret ? ["--secret"] : []),
+        ...(preview ? ["--preview"] : []),
+        ...(dryRun ? ["--dry-run"] : []),
       ]),
     );
+  }
+
+  /** `variable set` without `--json`, for a spec asserting what the developer reads. */
+  setVariableRendered(name: string, ...args: string[]): Promise<CliResult> {
+    return this.cli(["variable", "set", name, ...args]);
   }
 
   /**
@@ -594,10 +1335,9 @@ export class ScaffoldedApp {
   setVariableWithNothingPiped(name: string, { secret = false } = {}): Promise<CliResult> {
     return this.withKeyboardOnStdin(() =>
       this.cli([
-        "variables",
+        "variable",
         "set",
         name,
-        "--project-level",
         "--non-interactive",
         "--json",
         ...(secret ? ["--secret"] : []),
@@ -605,17 +1345,131 @@ export class ScaffoldedApp {
     );
   }
 
-  getVariable(name: string): Promise<CliResult> {
-    return this.cli(["variables", "get", name, "--project-level", "--json"]);
+  /** `zitadel api` with an operation and its arguments, as a script runs it. */
+  api(...args: string[]): Promise<CliResult> {
+    return this.cli(["api", ...args, "--non-interactive", "--json"]);
   }
 
-  deleteVariable(name: string): Promise<CliResult> {
-    return this.cli(["variables", "delete", name, "--project-level", "--force", "--json"]);
+  /** `zitadel api` with `body` piped in on stdin. */
+  apiPiping(body: string, ...args: string[]): Promise<CliResult> {
+    return this.pipingStdin(body, () => this.api(...args));
+  }
+
+  /** `zitadel api` without `--json`, for a spec asserting what the developer reads. */
+  apiRendered(...args: string[]): Promise<CliResult> {
+    return this.cli(["api", ...args, "--non-interactive"]);
+  }
+
+  /** `zitadel api ls` with its arguments. */
+  apiOperations(...args: string[]): Promise<CliResult> {
+    return this.cli(["api", "ls", ...args, "--non-interactive", "--json"]);
+  }
+
+  /** `zitadel api ls` without `--json`. */
+  apiOperationsRendered(...args: string[]): Promise<CliResult> {
+    return this.cli(["api", "ls", ...args, "--non-interactive"]);
+  }
+
+  getVariable(
+    name: string,
+    { preview = false, dryRun = false, json = true } = {},
+  ): Promise<CliResult> {
+    return this.cli([
+      "variable",
+      "get",
+      name,
+      ...(json ? ["--json"] : []),
+      ...(preview ? ["--preview"] : []),
+      ...(dryRun ? ["--dry-run"] : []),
+    ]);
+  }
+
+  /** Adds one origin pattern to the project. */
+  addOrigin(pattern: string, kind: "primary" | "preview"): Promise<CliResult> {
+    return this.cli(["origin", "add", pattern, "--kind", kind, "--json"]);
+  }
+
+  /** Removes one origin pattern, non-interactively. */
+  removeOrigin(pattern: string): Promise<CliResult> {
+    return this.cli(["origin", "rm", pattern, "--force", "--json"]);
+  }
+
+  /**
+   * Removes every origin the project holds, `setup`'s own included, so a spec
+   * starts from the empty list, which admits any origin.
+   */
+  async clearOrigins(): Promise<void> {
+    for (const { pattern } of await this.projectOrigins()) {
+      expect(await this.removeOrigin(pattern), `removing ${pattern}`).toSucceed();
+    }
+  }
+
+  /**
+   * Leaves the app's origins as `zitadel setup` 0.1.0 registered them: its
+   * issuer a preview origin and nothing primary, on the project and in
+   * `.zitadel/secret`.
+   */
+  async hasItsIssuerAsAPreviewOrigin(): Promise<void> {
+    expect(await this.removeOrigin(SETUP_ORIGIN.pattern), "removing the issuer").toSucceed();
+    expect(await this.addOrigin(SETUP_ORIGIN.pattern, "preview"), "adding it back").toSucceed();
+    await this.editDocument(".zitadel/secret", SecretOriginsSchema, (secret) => {
+      secret.primary_origins = [];
+      secret.preview_origins = [SETUP_ORIGIN.pattern];
+    });
+  }
+
+  /** The origin patterns the project admits, read back through `origin list`. */
+  async projectOrigins(): Promise<ProjectOrigin[]> {
+    const result = await this.cli(["origin", "list", "--json"]);
+    expect(result, "origin list should have succeeded").toSucceed();
+    return this.envelopeOf<{ items: ProjectOrigin[] }>(result).data.items;
+  }
+
+  removeVariable(
+    name: string,
+    { preview = false, dryRun = false }: { preview?: boolean; dryRun?: boolean } = {},
+  ): Promise<CliResult> {
+    return this.cli([
+      "variable",
+      "rm",
+      name,
+      "--force",
+      "--json",
+      ...(preview ? ["--preview"] : []),
+      ...(dryRun ? ["--dry-run"] : []),
+    ]);
+  }
+
+  /**
+   * The variables a deployment froze, read through `variable resolve`: the one
+   * live on a target, or the one `deploymentId` names.
+   */
+  resolveVariables({
+    origin,
+    deploymentId,
+    json = true,
+  }: {
+    origin?: string;
+    deploymentId?: string;
+    json?: boolean;
+  } = {}): Promise<CliResult> {
+    return this.cli([
+      "variable",
+      "resolve",
+      ...(deploymentId === undefined ? [] : [deploymentId]),
+      ...(json ? ["--json"] : []),
+      ...(origin === undefined ? [] : ["--origin", origin]),
+    ]);
   }
 
   /** The providers the platform has registered. */
   registeredIdps(): Promise<RegisteredIdp[]> {
     return this.listed<RegisteredIdp>("idps");
+  }
+
+  /** The policies the platform holds, each at its newest revision. */
+  publishedPolicies(): Promise<PublishedPolicy[]> {
+    return this.listed<PublishedPolicy>("policies");
   }
 
   publishedSchemas(): Promise<PublishedSchema[]> {
@@ -641,10 +1495,15 @@ export class ScaffoldedApp {
    * than a ladder, so this is the project's own set and not a merge of
    * anything an environment holds.
    */
-  async projectVariables(): Promise<ProjectVariable[]> {
-    const result = await this.cli(["variables", "list", "--project-level", "--json"]);
-    expect(result, "variables list should have succeeded").toSucceed();
-    return this.envelopeOf<{ variables: ProjectVariable[] }>(result).data.variables;
+  async projectVariables({ preview = false } = {}): Promise<ProjectVariable[]> {
+    const result = await this.cli([
+      "variable",
+      "list",
+      "--json",
+      ...(preview ? ["--preview"] : []),
+    ]);
+    expect(result, "variable list should have succeeded").toSucceed();
+    return this.envelopeOf<{ items: ProjectVariable[] }>(result).data.items;
   }
 
   /**
@@ -658,17 +1517,230 @@ export class ScaffoldedApp {
     return flow_definition.steps.filter((step) => (step.sso_providers ?? []).length > 0);
   }
 
+  /**
+   * The auth methods the published user schema names, as `schemas list`
+   * reports them.
+   *
+   * @returns The schema's `x-auth-methods`, empty when it names none.
+   */
+  async publishedAuthMethods(): Promise<NonNullable<UserSchemaDocument["x-auth-methods"]>> {
+    const { schema } = await this.publishedSchema();
+    return schema["x-auth-methods"] ?? {};
+  }
+
+  /**
+   * Deploys the project's files, failing the arrange if the deploy does not
+   * succeed, then reads the auth methods the published user schema names.
+   *
+   * @returns The published schema's `x-auth-methods`.
+   */
+  async authMethodsOnceDeployed(): Promise<NonNullable<UserSchemaDocument["x-auth-methods"]>> {
+    await this.publishData();
+    return this.publishedAuthMethods();
+  }
+
+  /**
+   * Deploys the project's files, failing the arrange if the deploy does not
+   * succeed, then reads the published steps that offer a provider.
+   *
+   * @returns The steps, as {@link stepsOfferingSso} reads them.
+   */
+  async stepsOfferingSsoOnceDeployed(): Promise<FlowStep[]> {
+    await this.publishData();
+    return this.stepsOfferingSso();
+  }
+
+  /**
+   * Deploys the project's files, then reads each distinct list of providers a
+   * published step offers: one list when every step offers the same ones.
+   *
+   * @returns The distinct `sso_providers` lists, in step order.
+   */
+  async providerListsOfferedOnceDeployed(): Promise<string[][]> {
+    const lists = new Map<string, string[]>();
+    for (const step of await this.stepsOfferingSsoOnceDeployed()) {
+      const providers = step.sso_providers ?? [];
+      lists.set(JSON.stringify(providers), providers);
+    }
+    return [...lists.values()];
+  }
+
+  /**
+   * Deploys the project's files, then names the published steps that offer a
+   * provider but give `outcome` no transition.
+   *
+   * @param outcome - The transition every offering step should name.
+   * @returns The names of the steps that lack it.
+   */
+  async stepsOfferingSsoWithoutOnceDeployed(outcome: string): Promise<string[]> {
+    const steps = await this.stepsOfferingSsoOnceDeployed();
+    return steps
+      .filter((step) => {
+        return !Object.hasOwn(step.transitions ?? {}, outcome);
+      })
+      .map((step) => {
+        return step.name;
+      });
+  }
+
+  /**
+   * Deploys the project's files, then reads the slugs of the providers the
+   * platform has registered, sorted.
+   *
+   * @returns The registered slugs.
+   */
+  async registeredIdpSlugsOnceDeployed(): Promise<string[]> {
+    await this.publishData();
+    const registered = await this.registeredIdps();
+    return registered
+      .map((idp) => {
+        return idp.slug;
+      })
+      .sort();
+  }
+
+  /**
+   * Deploys the project's files, failing the arrange if the deploy does not
+   * succeed, then runs `deploy --dry-run`, which refuses when the platform
+   * and the files still differ.
+   *
+   * @returns The dry run.
+   */
+  async deployDryRunOnceDeployed(): Promise<CliResult> {
+    await this.publishData();
+    return this.deployDryRun();
+  }
+
+  /**
+   * Deploys the project's files twice in a row, failing the arrange if either
+   * deploy does not succeed.
+   *
+   * @returns The release each deploy made live, first then again.
+   */
+  async releasesOfTwoDeploys(): Promise<Array<string | undefined>> {
+    const first = await this.publishData();
+    const again = await this.deployData();
+    return [first.release_id, again.release_id];
+  }
+
+  /**
+   * Runs `auth-method password|passkey disable`, failing the arrange if it
+   * does not succeed.
+   *
+   * @param method - The method to turn off.
+   */
+  async hasDisabledMethod(method: "password" | "passkey"): Promise<void> {
+    const result = await this.disableMethod(method);
+    expect(result, `arranging auth-method ${method} disable should have succeeded`).toSucceed();
+  }
+
+  /**
+   * Turns `method` off in the committed user schema, as the developer owning it
+   * would, without a command.
+   *
+   * @param method - The method to turn off.
+   */
+  hasTurnedOffByHand(method: "password" | "passkey"): Promise<void> {
+    return this.editUserSchema((schema) => {
+      schema["x-auth-methods"] = { ...schema["x-auth-methods"], [method]: { enabled: false } };
+    });
+  }
+
+  /**
+   * Removes the committed user schema's `x-identifier`, so nothing names what
+   * a password is checked against.
+   */
+  lacksAnIdentifier(): Promise<void> {
+    return this.editDocument(SCHEMA_FILE, AnyObjectSchema, (schema) => {
+      delete schema["x-identifier"];
+    });
+  }
+
+  /**
+   * Runs `auth-method sso enable` with exactly these flags and this secret
+   * piped, failing the arrange if it does not succeed.
+   *
+   * @param args - The flags naming the provider and its client id.
+   * @param secret - The client secret, piped as a script would.
+   */
+  async hasEnabledSsoWith(args: string[], secret: string): Promise<void> {
+    const result = await this.enableSsoWith(args, secret);
+    expect(result, "arranging auth-method sso enable should have succeeded").toSucceed();
+  }
+
+  /**
+   * Enables a catalog provider, failing the arrange if it does not succeed.
+   *
+   * @param provider - The catalog provider.
+   * @param credentials - Its client id and secret.
+   */
+  async hasEnabledSso(provider: string, credentials: Credentials): Promise<void> {
+    const result = await this.enableSso(provider, credentials);
+    expect(result, "arranging auth-method sso enable should have succeeded").toSucceed();
+  }
+
+  /**
+   * Enables a connection the developer describes, failing the arrange if it
+   * does not succeed.
+   *
+   * @param connection - The connection.
+   * @param credentials - Its client id and secret.
+   */
+  async hasEnabledCustomSso(connection: CustomConnection, credentials: Credentials): Promise<void> {
+    const result = await this.enableCustomSso(connection, credentials);
+    expect(result, "arranging auth-method sso enable should have succeeded").toSucceed();
+  }
+
+  /**
+   * Runs `auth-method sso disable`, failing the arrange if it does not succeed.
+   *
+   * @param provider - The provider to remove.
+   */
+  async hasDisabledSso(provider: string): Promise<void> {
+    const result = await this.disableSso(provider);
+    expect(result, "arranging auth-method sso disable should have succeeded").toSucceed();
+  }
+
   /** What the fake npm was asked to do, for the install leg of setup. */
   async installInvocation(): Promise<{ cwd: string; args: string[] }> {
     if (this.installLogPath === undefined) {
       throw new Error("setup was not run with { install: true }");
     }
-    return JSON.parse((await readFile(this.installLogPath, "utf8")).trim()) as {
-      cwd: string;
-      args: string[];
-    };
+    return InstallLog.parse(JSON.parse((await readFile(this.installLogPath, "utf8")).trim()));
   }
 
+  /**
+   * The app's directory with every symlink resolved, as a process the CLI
+   * starts in it sees its working directory.
+   *
+   * @returns The resolved directory.
+   */
+  realPath(): Promise<string> {
+    return realpath(this.path);
+  }
+
+  /**
+   * `command` as setup suggests it: aimed at the project setup created by the
+   * env file it wrote, and run from `--cwd`.
+   *
+   * @param command - The command, after the runner.
+   * @returns The whole suggestion.
+   */
+  asSetupSuggests(command: string): string {
+    return `${command} --env-file ${this.path}/.env.development.local --cwd ${this.path}`;
+  }
+
+  /**
+   * The envelope a `--json` run printed, its `data` read as `T`.
+   *
+   * The cast stays: the spec names the shape of `data`, which differs for
+   * every command and is spelled at each of its many callers across the specs,
+   * so this signature is theirs. The envelope's own fields are not taken on
+   * trust: {@link assertEnvelope} checks them on every `--json` run.
+   *
+   * @param result - The finished run.
+   * @returns Its envelope.
+   */
   envelopeOf<T = Record<string, unknown>>(result: CliResult): Envelope<T> {
     try {
       return parseJson(result.stdout) as Envelope<T>;
@@ -735,7 +1807,33 @@ export class ScaffoldedApp {
 
   /** Edits the committed user schema, as the developer owning it would. */
   editUserSchema(edit: (schema: UserSchemaDocument) => void): Promise<void> {
-    return this.editDocument(SCHEMA_FILE, edit);
+    return this.editDocument(SCHEMA_FILE, UserSchemaDocumentSchema, edit);
+  }
+
+  /**
+   * Leaves `method` the schema's only way to sign in, with no login flow that
+   * would refuse removing it, so disabling it removes the last way in.
+   */
+  async signsInOnlyWith(method: "password" | "passkey"): Promise<void> {
+    await this.editUserSchema((schema) => {
+      schema["x-auth-methods"] = {
+        password: { enabled: method === "password" },
+        passkey: { enabled: method === "passkey" },
+      };
+    });
+    await this.deleteProjectFile(FLOW_FILE);
+  }
+
+  /** {@link signsInOnlyWith} for an SSO provider the project already offers. */
+  async signsInOnlyWithSso(provider: string): Promise<void> {
+    await this.editUserSchema((schema) => {
+      schema["x-auth-methods"] = {
+        password: { enabled: false },
+        passkey: { enabled: false },
+        sso: { enabled: true, providers: [provider] },
+      };
+    });
+    await this.deleteProjectFile(FLOW_FILE);
   }
 
   /** Edits the password step of the committed login flow, as the developer owning it would. */
@@ -751,7 +1849,7 @@ export class ScaffoldedApp {
 
   /** Edits a committed connection file, as the developer owning it would. */
   editConnection(slug: string, edit: (connection: ConnectionDocument) => void): Promise<void> {
-    return this.editDocument(`.zitadel/idps/${slug}.json`, edit);
+    return this.editDocument(`.zitadel/idps/${slug}.json`, ConnectionDocumentSchema, edit);
   }
 
   /** Adds a second connection file that claims the same slug as an existing one. */
@@ -780,6 +1878,14 @@ export class ScaffoldedApp {
     await this.setVariable(`${prefix}_CLIENT_SECRET`, "a-client-secret", { secret: true });
   }
 
+  /**
+   * Removes one editor schema setup wrote, as a project set up by a CLI that
+   * did not ship that dialect yet would lack it.
+   */
+  lacksEditorSchema(dialect: string): Promise<void> {
+    return this.deleteProjectFile(`.zitadel/meta/${dialect}.json`);
+  }
+
   /** Removes a committed connection file, as the developer owning it would. */
   removeConnection(slug: string): Promise<void> {
     return this.deleteProjectFile(`.zitadel/idps/${slug}.json`);
@@ -791,13 +1897,72 @@ export class ScaffoldedApp {
     await this.removeConnection(slug);
   }
 
+  /**
+   * Writes the password policy file, as the developer owning it would: named
+   * after its operation unless `name` says otherwise.
+   */
+  async writePasswordPolicy(
+    config: Record<string, number>,
+    { name = PASSWORD_POLICY, extra = {} }: { name?: string; extra?: Record<string, unknown> } = {},
+  ): Promise<void> {
+    await mkdir(join(this.path, ".zitadel/policies"), { recursive: true });
+    await this.writeProjectFile(
+      this.policyFile(name),
+      `${JSON.stringify({ $schema: "../meta/policy.json", operation: PASSWORD_POLICY, config, ...extra }, null, 2)}\n`,
+    );
+  }
+
+  /** Writes the sign-up policy file, as the developer owning it would. */
+  async writeSignupPolicy(config: Record<string, string>): Promise<void> {
+    await mkdir(join(this.path, ".zitadel/policies"), { recursive: true });
+    await this.writeProjectFile(
+      this.policyFile(DEFAULT_SIGNUP_POLICY.operation),
+      `${JSON.stringify({ $schema: "../meta/policy.json", operation: DEFAULT_SIGNUP_POLICY.operation, config }, null, 2)}\n`,
+    );
+  }
+
+  /** Writes the password policy's test file with `cases`, as the developer owning it would. */
+  async writePolicyTest(cases: ReadonlyArray<Record<string, unknown>>): Promise<void> {
+    await mkdir(join(this.path, ".zitadel/policies"), { recursive: true });
+    await this.writeProjectFile(
+      `.zitadel/policies/${PASSWORD_POLICY}.test.json`,
+      `${JSON.stringify({ $schema: "../meta/policy-test.json", operation: PASSWORD_POLICY, cases }, null, 2)}\n`,
+    );
+  }
+
+  /** Runs `zitadel policies test` with `args`. */
+  testPolicies(args: string[] = []): Promise<CliResult> {
+    return this.run(["policies", "test", "--non-interactive", ...args]);
+  }
+
+  /** Removes the committed password policy file, as the developer owning it would. */
+  removePasswordPolicy(): Promise<void> {
+    return this.deleteProjectFile(this.policyFile(PASSWORD_POLICY));
+  }
+
+  /** The project-relative path of a policy file, as a command reports it. */
+  policyFile(name: string = PASSWORD_POLICY): string {
+    return `.zitadel/policies/${name}.json`;
+  }
+
   /** Edits the committed login flow, as the developer owning it would. */
   editLoginFlow(edit: (flow: FlowDocument) => void): Promise<void> {
-    return this.editDocument(FLOW_FILE, edit);
+    return this.editDocument(FLOW_FILE, FlowDocumentSchema, edit);
+  }
+
+  /** Edits the step a visitor lands on to log in, as the developer owning the flow would. */
+  editLoginEntryStep(edit: (step: FlowDocument["steps"][number]) => void): Promise<void> {
+    return this.editLoginFlow((flow) => {
+      const step = flow.steps.find((candidate) => candidate.name === flow.purposes.login);
+      if (step === undefined) {
+        throw new Error("the login flow has no login entry step");
+      }
+      edit(step);
+    });
   }
 
   editPackageJson(edit: (pkg: PackageJson) => void): Promise<void> {
-    return this.editDocument("package.json", edit);
+    return this.editDocument("package.json", PackageJsonSchema, edit);
   }
 
   /** Adds a second flow definition, for a spec whose input is the flow itself. */
@@ -834,14 +1999,61 @@ export class ScaffoldedApp {
     );
   }
 
-  private async editDocument<T>(relativePath: string, edit: (document: T) => void): Promise<void> {
+  /**
+   * The values setup bound the development environment to — its file, then the
+   * project secret for anything the file leaves out — for binding another
+   * environment to the same project.
+   */
+  async developmentValues(): Promise<Record<string, string>> {
+    const file = parseEnv(await readFile(join(this.path, ".env.development.local"), "utf8"));
+    const secret = ProjectSecret.parse(
+      JSON.parse(await readFile(join(this.path, ".zitadel/secret"), "utf8")),
+    );
+    return {
+      ZITADEL_PROJECT_ID: secret.project_id,
+      ZITADEL_PROJECT_SECRET: secret.project_secret,
+      ZITADEL_PREVIEW_TOKEN: secret.preview_secret,
+      ...Object.fromEntries(
+        Object.entries(file).filter((entry): entry is [string, string] => entry[1] !== undefined),
+      ),
+    };
+  }
+
+  /** Writes `.env.<name>.local`, the file that binds an environment to a project. */
+  bindEnvironment(name: string, values: Record<string, string>): Promise<void> {
+    return this.writeProjectFile(`.env.${name}.local`, dotenv(values));
+  }
+
+  /** Writes a dotenv file the developer keeps anywhere, returning the path `--env-file` takes. */
+  async writeEnvFile(fileName: string, values: Record<string, string>): Promise<string> {
+    await this.writeProjectFile(fileName, dotenv(values));
+    return join(this.path, fileName);
+  }
+
+  /**
+   * Edits a committed JSON document in place, as the developer owning it
+   * would, once it passes `schema`'s checks.
+   *
+   * @param relativePath - The file, from the project's root.
+   * @param schema - The shape the edit expects the document to have.
+   * @param edit - Changes the document as read.
+   */
+  private async editDocument<T>(
+    relativePath: string,
+    schema: z.ZodType<T>,
+    edit: (document: T) => void,
+  ): Promise<void> {
     const contents = await readFile(join(this.path, relativePath), "utf8");
-    const document = JSON.parse(contents) as T;
+    const document: unknown = JSON.parse(contents);
+    if (!conforms(schema, document)) {
+      throw new Error(`${relativePath} is not the document this edit expects: ${contents}`);
+    }
     edit(document);
     await writeFile(join(this.path, relativePath), `${JSON.stringify(document, null, 2)}\n`);
   }
 
   private installLogPath: string | undefined;
+  private refreshLogPath: string | undefined;
 
   private async listed<T>(topic: string): Promise<T[]> {
     const result = await this.cli([topic, "list", "--json"]);
@@ -858,6 +2070,7 @@ export class ScaffoldedApp {
       [...args, "--cwd", this.path, "--server", MOCK_SERVER_URL],
       env,
     );
+    assertNothingDrivesTheTerminal(result, args);
     if (envelope && args.includes("--json")) {
       assertEnvelope(result, args);
     }
@@ -884,8 +2097,11 @@ export class ScaffoldedApp {
   /**
    * `runCliForTest` runs in-process, so a scripted run would otherwise read
    * the test runner's own stdin and block on a stream that never ends.
+   *
+   * Public for a spec that drives a command taking its value that way rather
+   * than in argv, where the fixture has no helper of its own for it.
    */
-  private async pipingStdin<T>(text: string, run: () => Promise<T>): Promise<T> {
+  async pipingStdin<T>(text: string, run: () => Promise<T>): Promise<T> {
     const original = Object.getOwnPropertyDescriptor(process, "stdin");
     Object.defineProperty(process, "stdin", {
       value: Readable.from([text]),
@@ -962,11 +2178,126 @@ async function hashTree(root: string, prefix = ""): Promise<Map<string, string>>
   return files;
 }
 
+function dotenv(values: Record<string, string>): string {
+  return `${Object.entries(values)
+    .map(([key, value]) => `${key}=${value}`)
+    .join("\n")}\n`;
+}
+
+/**
+ * The one item a list holds.
+ *
+ * @param items - The list.
+ * @param what - What the items are, for the failure.
+ * @returns The item, when there is exactly one.
+ */
 function only<T>(items: T[], what: string): T {
-  if (items.length !== 1) {
+  const [item] = items;
+  if (items.length !== 1 || item === undefined) {
     throw new Error(`expected exactly one ${what} on the platform, found ${items.length}`);
   }
-  return items[0] as T;
+  return item;
+}
+
+/** ESC, spelled out, so this file holds no control character of its own. */
+const ESC = "\\u001b";
+
+/**
+ * The zero-width joiner and non-joiner, which spell a word — an emoji, an
+ * Arabic or Indic name — rather than drive anything, and so are not a leak.
+ */
+const SPELLING = "\\u200c\\u200d";
+
+/**
+ * The colour the CLI itself applies: a CSI sequence ending in `m`, and nothing
+ * else. Everything else an ESC can start — clearing the screen, setting the
+ * window title, writing the reader's clipboard through OSC 52 — is what
+ * {@link assertNothingDrivesTheTerminal} is looking for.
+ */
+const SGR = new RegExp(`${ESC}\\[[0-9;]*m`, "g");
+
+/**
+ * Every character a terminal acts on rather than prints, less the colour above
+ * and less the newline, tab and carriage return that lay output out: the C0
+ * controls, DEL, the C1 controls, the format and bidi controls, and the line
+ * and paragraph separators.
+ *
+ * Spelled out here rather than imported from the escaper this audits, so the
+ * two agreeing is a result and not an arrangement.
+ */
+const DRIVES_A_TERMINAL = new RegExp(
+  `[[\\p{Cc}\\p{Cf}\\p{Zl}\\p{Zp}]--[${SPELLING}\\n\\t\\r]]`,
+  "gv",
+);
+
+/**
+ * Nothing a run printed may drive the reader's terminal.
+ *
+ * Checked on every invocation a spec makes — the ones this fixture runs in
+ * process and the one it spawns — not only the `--json` ones and not in a suite
+ * of its own, because a command that interpolates what the server answered into
+ * its own words is the shape this guards and every command has that shape. A
+ * command that leaves one through fails in its own spec.
+ *
+ * The CLI's own colour is allowed, and a `\u001b` written out as the six
+ * characters of its JSON escape is text, not a control character, so a payload
+ * that carries one passes.
+ */
+export function assertNothingDrivesTheTerminal(
+  // The two streams and nothing else, so a run the fixture spawns rather than
+  // runs in process is held to this as well.
+  result: { stdout: string; stderr: string },
+  args: string[] = [],
+): void {
+  const where = `\`${args.filter((arg) => !arg.startsWith("-")).join(" ")}\``;
+  for (const [stream, text] of [
+    ["stdout", result.stdout],
+    ["stderr", result.stderr],
+  ] as const) {
+    const left = text.replace(SGR, "");
+    const found = left.match(DRIVES_A_TERMINAL);
+    if (found !== null) {
+      const spelled = [...new Set(found)]
+        .map(
+          (char) => `U+${(char.codePointAt(0) ?? 0).toString(16).toUpperCase().padStart(4, "0")}`,
+        )
+        .join(", ");
+      expect.fail(
+        `${where}: ${stream} carries ${spelled}, which drives the reader's terminal.\n` +
+          `${stream}: ${JSON.stringify(text)}`,
+      );
+    }
+  }
+  assertAJsonBodyParses(result, where);
+}
+
+/**
+ * A body a script would parse must parse.
+ *
+ * Spelling a character out keeps it off the reader's terminal but says nothing
+ * about which spelling was used, and the terminal one — `\x9b` — is not an
+ * escape JSON has. So a run whose stdout is a JSON object is parsed here, on
+ * every invocation a spec makes, which is the only thing that tells a document
+ * spelled for a person apart from one spelled for a parser.
+ *
+ * An object and nothing else: a `{` cannot begin anything else the CLI prints,
+ * whereas a `[` begins consola's own `[info]` prefix as readily as an array, and
+ * a rule that has to tell those apart would be guessing rather than checking. A
+ * command whose body is a bare array says so in its own spec.
+ */
+function assertAJsonBodyParses(result: { stdout: string }, where: string): void {
+  const body = result.stdout.trim();
+  if (!body.startsWith("{")) {
+    return;
+  }
+  try {
+    JSON.parse(body);
+  } catch (error) {
+    expect.fail(
+      `${where}: stdout is a JSON document that does not parse (${String(error)}).\n` +
+        `stdout: ${JSON.stringify(result.stdout)}`,
+    );
+  }
 }
 
 /**
@@ -978,15 +2309,22 @@ function only<T>(items: T[], what: string): T {
  */
 export function assertEnvelope(result: CliResult, args: string[] = []): void {
   const where = `\`${args.filter((arg) => !arg.startsWith("-")).join(" ")}\` --json`;
-  let envelope: Envelope;
-  try {
-    envelope = parseJson(result.stdout) as Envelope;
-  } catch {
+  // A JSON envelope must never carry a raw ANSI colour byte: one would break
+  // `JSON.parse` and `jq` for every consumer. Checked on every spec's `--json`
+  // run rather than in a suite of its own, so a command that hand-writes colour
+  // onto the structured stream fails in that command's own spec. (A U+001B
+  // inside a string value is safe — `JSON.stringify` escapes it to `\u001b`, so
+  // this only trips on a raw control byte on stdout.)
+  expect(result.stdout, `${where}: JSON output contains ANSI colour codes`).not.toContain("\u001B");
+  const parsed = parseJsonOrUndefined(result.stdout);
+  if (parsed === undefined) {
     throw new Error(
       `${where} emitted no JSON envelope on stdout.\n` +
         `stdout: ${result.stdout || "(empty)"}\nstderr: ${result.stderr || "(empty)"}`,
     );
   }
+  const fields = EnvelopeFields.safeParse(parsed);
+  const envelope: z.infer<typeof EnvelopeFields> = fields.success ? fields.data : {};
   expect(envelope.cli_version, `${where}: cli_version missing`).toBeTypeOf("string");
   expect(envelope.command, `${where}: command missing`).toBeTypeOf("string");
   expect(envelope.source, `${where}: source missing`).toBeTypeOf("string");
@@ -994,6 +2332,96 @@ export function assertEnvelope(result: CliResult, args: string[] = []): void {
   if (envelope.status === "error") {
     expect(envelope.code, `${where}: error envelope carries no code`).toBeTypeOf("string");
   }
+  const contract = ContractEnvelope.parse(parsed);
+  assertRunnableSuggestions(where, contract);
+  assertDataShape(where, contract);
+}
+
+/**
+ * The fields of an envelope the contract asserts, each read as it is so the
+ * assertion, not the parse, reports one that is missing or of the wrong kind.
+ */
+const EnvelopeFields = z.looseObject({
+  cli_version: z.unknown().optional(),
+  command: z.unknown().optional(),
+  source: z.unknown().optional(),
+  status: z.unknown().optional(),
+  code: z.unknown().optional(),
+});
+
+/**
+ * An envelope that has passed the asserted half of the contract, read for the
+ * checks that follow: its suggestions and the shape of its `data`.
+ */
+const ContractEnvelope = z.looseObject({
+  status: z.enum(["ok", "skipped", "error"]),
+  command: z.string(),
+  message: z.string().optional(),
+  hint: z.string().optional(),
+  next_commands: z.array(z.string()).optional(),
+  data: z.unknown().optional(),
+});
+
+/** An envelope as {@link assertDataShape} reads it. */
+type ContractEnvelope = z.infer<typeof ContractEnvelope>;
+
+/**
+ * The `data`-shape half of the contract, enforced on every command so an agent
+ * reads every command's output the same way.
+ *
+ * Classed off the resolved command id (`envelope.command`), not the raw argv, so
+ * a positional argument that happens to be the word `list` (e.g. `variable get
+ * list`) is never misread as a list command. A `list` command (and `resources`,
+ * the one collection not named `… list`) must use the canonical
+ * `{ items, count, next_page_token }` envelope (`listData`); any command that
+ * emits `items` must carry `count` and `next_page_token`; a delete command must
+ * confirm with `deleted: true` (`deletedData`), and no command anywhere may use
+ * `removed`. A dry run has its own preview shape, so it is exempt. A divergent
+ * shape fails in that command's own spec, not a central list someone forgot to
+ * update.
+ */
+function assertDataShape(where: string, envelope: ContractEnvelope): void {
+  if (envelope.status !== "ok") {
+    return;
+  }
+  const { data } = envelope;
+  if (typeof data !== "object" || data === null) {
+    return;
+  }
+  // A dry run previews what a write would do; it carries `dry_run: true` and
+  // not the real result shape, so the shape contract does not apply to it.
+  if ("dry_run" in data && data.dry_run === true) {
+    return;
+  }
+  const { command } = envelope;
+  const verb = command.split(/[:\s]/).filter(Boolean).pop() ?? "";
+  const items = "items" in data ? data.items : undefined;
+
+  if (verb === "list" || command === "resources") {
+    expect(
+      Array.isArray(items),
+      `${where}: a list command must emit its rows under \`items\` (use listData())`,
+    ).toBe(true);
+  }
+  if (Array.isArray(items)) {
+    const count = "count" in data ? data.count : undefined;
+    expect(typeof count, `${where}: a list envelope needs a numeric \`count\``).toBe("number");
+    const token = "next_page_token" in data ? data.next_page_token : undefined;
+    expect(
+      token === null || typeof token === "string",
+      `${where}: a list envelope needs \`next_page_token\` (string or null), got ${JSON.stringify(token)}`,
+    ).toBe(true);
+  }
+  if (verb === "rm" || verb === "delete" || verb === "remove") {
+    expect(
+      "deleted" in data && data.deleted === true,
+      `${where}: a \`${verb}\` command must confirm with \`deleted: true\` (use deletedData())`,
+    ).toBe(true);
+  }
+  expect(
+    Object.hasOwn(data, "removed"),
+    `${where}: confirm a delete with \`deleted: true\`, never \`removed\` (use deletedData())`,
+  ).toBe(false);
 }
 
 /**
@@ -1033,25 +2461,107 @@ export async function anApp({
 
 /**
  * An empty directory for setup to create a new app in, under a name npm
- * accepts for a package, which setup requires of one.
+ * accepts for a package unless a `name` says otherwise.
  */
-export async function aNewAppDirectory(): Promise<ScaffoldedApp> {
+export async function aNewAppDirectory(name = "my-app"): Promise<ScaffoldedApp> {
   const parent = await mkdtemp(join(tmpdir(), "zitadel-new-"));
-  const path = join(parent, "my-app");
+  const path = join(parent, name);
   await mkdir(path);
   return new ScaffoldedApp(path);
 }
 
-/** An app already through `setup`, for specs about the commands after it. */
+/**
+ * A directory for setup to create a new app in that does not exist yet, under
+ * one that does: how `--cwd` names the folder a new app should live in.
+ */
+export async function aMissingAppDirectory(): Promise<ScaffoldedApp> {
+  const parent = await mkdtemp(join(tmpdir(), "zitadel-new-"));
+  return new ScaffoldedApp(join(parent, "my-app"));
+}
+
+/**
+ * An app already through `setup`, for specs about the commands after it.
+ *
+ * Setup's git commit is turned off here: this is the arrange for every other
+ * command's spec, and a repository of setup's making is not what they are
+ * about. Setup's spec drives setup with it on, and owns what it does.
+ */
 export async function aSetUpApp(extraArgs: string[] = []): Promise<ScaffoldedApp> {
   const app = await anApp();
-  const result = await app.setup(extraArgs);
+  const result = await app.setup(["--no-git", ...extraArgs]);
+  expect(result, "arranging setup should have succeeded").toSucceed();
+  return app;
+}
+
+/**
+ * A set-up app with a second environment, `staging`, that `env add` bound and
+ * nothing has been deployed to: setup deploys its own project, so this is
+ * where a spec finds a first deploy. Address it with `--env staging`.
+ */
+export async function anUndeployedEnvironment(): Promise<ScaffoldedApp> {
+  const app = await aSetUpApp();
+  const added = await app.run([
+    "env",
+    "add",
+    "staging",
+    "--app-url",
+    "https://staging.acme.com",
+    "--non-interactive",
+    "--json",
+  ]);
+  expect(added, "arranging env add should have succeeded").toSucceed();
+  return app;
+}
+
+/**
+ * A second working copy of the same project: a fresh app directory carrying
+ * the project's `.zitadel/secret` but none of its resource files, the way a
+ * developer who cloned the repo reaches a project someone else deployed.
+ *
+ * @param project - The project to check out again.
+ * @returns The checkout.
+ */
+export async function aFreshCheckoutOf(project: ScaffoldedApp): Promise<ScaffoldedApp> {
+  const checkout = await anApp();
+  await mkdir(join(checkout.path, ".zitadel"), { recursive: true });
+  await checkout.writeProjectFile(
+    ".zitadel/secret",
+    await project.readProjectFile(".zitadel/secret"),
+  );
+  return checkout;
+}
+
+/**
+ * A {@link aFreshCheckoutOf} that already holds a local human-user schema its
+ * contract refuses: only the object type the project's own schema has, so a
+ * pull has to replace it rather than write a second schema beside it.
+ *
+ * @param project - The project to check out again.
+ * @returns The checkout, holding the refused schema.
+ */
+export async function aFreshCheckoutHoldingARefusedSchemaOf(
+  project: ScaffoldedApp,
+): Promise<ScaffoldedApp> {
+  const checkout = await aFreshCheckoutOf(project);
+  const schema = JSON.parse(await project.readProjectFile(SCHEMA_FILE));
+  await mkdir(join(checkout.path, ".zitadel/schemas"), { recursive: true });
+  await checkout.writeProjectFile(SCHEMA_FILE, JSON.stringify({ objectType: schema.objectType }));
+  return checkout;
+}
+
+/**
+ * An app through `setup` with its commit kept, so a release built from it
+ * records a git sha and a later deploy has a baseline to diff against.
+ */
+export async function aCommittedApp(): Promise<ScaffoldedApp> {
+  const app = await anApp();
+  const result = await app.setup();
   expect(result, "arranging setup should have succeeded").toSucceed();
   return app;
 }
 
 /** A fake `npm` on PATH that records its invocation instead of installing. */
-async function fakePackageManager(): Promise<{ binDir: string; logPath: string }> {
+async function fakePackageManager(exitCode = 0): Promise<{ binDir: string; logPath: string }> {
   const binDir = await mkdtemp(join(tmpdir(), "zitadel-fake-pm-"));
   const logPath = join(binDir, "package-manager.log");
   const binPath = join(binDir, "npm");
@@ -1065,10 +2575,47 @@ fs.appendFileSync(
 );
 process.stdout.write("fake npm stdout\\n");
 process.stderr.write("fake npm stderr\\n");
+process.exitCode = ${String(exitCode)};
 `,
   );
   await chmod(binPath, 0o755);
   return { binDir, logPath };
+}
+
+/** A fake `npx` on PATH that records its invocation and answers as the new release's doctor. */
+async function fakeNpx(
+  outcome: "done" | "issues" | "broken",
+): Promise<{ binDir: string; logPath: string }> {
+  const binDir = await mkdtemp(join(tmpdir(), "zitadel-fake-npx-"));
+  const logPath = join(binDir, "npx.log");
+  const answer = { done: '{"status":"ok"}', issues: '{"status":"error"}', broken: "not json" }[
+    outcome
+  ];
+  const binPath = join(binDir, "npx");
+  await writeFile(
+    binPath,
+    `#!/usr/bin/env node
+require("node:fs").appendFileSync(
+  process.env.FAKE_NPX_LOG,
+  JSON.stringify({ args: process.argv.slice(2) }) + "\\n",
+);
+process.stdout.write(${JSON.stringify(answer)});
+`,
+  );
+  await chmod(binPath, 0o755);
+  return { binDir, logPath };
+}
+
+/** A `git` on PATH that runs the real one for everything but `commit`, which it refuses. Returns its directory. */
+async function gitThatCannotCommit(): Promise<string> {
+  const binDir = await mkdtemp(join(tmpdir(), "zitadel-git-no-commit-"));
+  const { stdout } = await execFileAsync("sh", ["-c", "command -v git"]);
+  await writeFile(
+    join(binDir, "git"),
+    `#!/bin/sh\nfor arg in "$@"; do\n  if [ "$arg" = "commit" ]; then\n    echo "fatal: cannot commit" >&2\n    exit 1\n  fi\ndone\nexec "${stdout.trim()}" "$@"\n`,
+  );
+  await chmod(join(binDir, "git"), 0o755);
+  return binDir;
 }
 
 /** A fake `docker` on PATH, so doctor's runtime probe needs no daemon. */
@@ -1088,3 +2635,6 @@ if (args[0] === "version") process.stdout.write("27.0.0\\n");
   await chmod(dockerPath, 0o755);
   return { binDir, logPath };
 }
+
+/** The one terminal harness, re-exported for the specs that reached for it here. */
+export { asTerminal };

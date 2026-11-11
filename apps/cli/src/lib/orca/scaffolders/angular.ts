@@ -37,6 +37,7 @@ function angularProjectName(cwd: string): string {
 export class AngularScaffolder extends AbstractCLIScaffolder {
   readonly displayName = "Angular";
   readonly supportedFrameworks: ReadonlyArray<string> = ["angular"];
+  protected override readonly requiresValidFolderName = false;
   readonly nodeEngines: NodeEngines = {
     label: "The Angular CLI",
     spec: ANGULAR_CLI,

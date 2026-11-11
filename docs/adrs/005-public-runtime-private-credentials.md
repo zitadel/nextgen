@@ -1,8 +1,16 @@
 # ADR 005: Public Runtime and Private Credentials
 
-> **Status:** Proposed
+> **Status:** Accepted — 2026-10-24 (originally Proposed 2026-04-26)
 > **Date:** 2026-04-26
 > **Context:** Browser-safe SDK runtime
+>
+> **Amendment (2026-10-24):** the rule holds: the browser gets the project ID,
+> and `ZITADEL_PROJECT_SECRET` and `.zitadel/secret` stay server-side and in the
+> CLI. [ADR 036](036-api-credential-planes.md) restates it. Two names below are
+> out of date: the React SDK exports `ZitadelLogin`, `ZitadelLogout` and
+> `ZitadelSession`, not `ZitadelFlow`
+> ([ADR 055](055-lit-only-login-surface.md)), and there is no environment to
+> pass since [ADR 068](068-project-is-the-data-boundary.md).
 
 ## Decision
 

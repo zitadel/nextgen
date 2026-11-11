@@ -4,13 +4,18 @@ Integrates Zitadel auth into a SvelteKit app. Like Next and Nuxt, SvelteKit prox
 verifies the session server-side — here through the `createNextgenHandle` hook from
 `@zitadel/sdk-sveltekit`.
 
-The detector requires `@sveltejs/kit` 2 or newer and `svelte` 5 or newer (the widgets come
+The detector requires `@sveltejs/kit` 3 or newer (for `$app/env/private`) and `svelte` 5 or newer (the widgets come
 from `@zitadel/sdk-svelte`, which is written with runes); older versions are refused.
 
 ## What it patches
 
 - `src/hooks.server.ts` — the server hook (infrastructure): proxies `/__nextgen/*`,
   verifies the session, and redirects unauthenticated requests for `/profile` to `/login`
+- `src/env.ts` (or an existing `src/env.js`) — declares `ZITADEL_URL`, `ZITADEL_PROJECT_SECRET`
+  and `ZITADEL_PROJECT_ID` for `$app/env/private`: written where the app has none, and
+  merged into the app's own `defineEnvVars({ ... })` call otherwise. Unmarked, since the
+  app declares its own variables there too; doctor checks the three entries as
+  infrastructure wiring, and eject lists them as a manual cleanup step
 - `src/routes/+layout.svelte` — dark surface for every page
 - `src/routes/+page.svelte`, `src/routes/login/+page.svelte`,
   `src/routes/register/+page.svelte`, `src/routes/profile/+page.svelte` — landing and
@@ -27,7 +32,8 @@ No config file is edited: the hook is a plain file, so every managed file carrie
 
 ## How the proxy works
 
-The hook reads `ZITADEL_URL` and `ZITADEL_PROJECT_SECRET` from `process.env`, loading
-`.env.local` itself (SvelteKit's `$env` modules differ across major versions); the URL
-falls back to the server from setup. There is no dev-only proxy, so it works the same in
-production.
+The hook imports `ZITADEL_URL`, `ZITADEL_PROJECT_SECRET` and `ZITADEL_PROJECT_ID` from
+`$app/env/private`, which SvelteKit fills from `.env.local` in dev and from the platform's
+environment in production, answers with an error naming any that is missing, and never bundles for the browser. The
+hook names no Node global, so the app type-checks without `@types/node`. There is no
+dev-only proxy, so it works the same in production.

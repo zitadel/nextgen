@@ -1,0 +1,41 @@
+title: RevokeReleaseConflict
+type: object
+description: |
+  The release cannot be revoked because origins still serve it.
+required:
+  - code
+  - message
+  - details
+properties:
+  code:
+    $ref: ../../../../components/schemas/error-code.yaml
+  message:
+    type: string
+    description: Human-readable explanation of the error.
+  details:
+    type: object
+    required:
+      - origins
+    properties:
+      origins:
+        type: array
+        minItems: 1
+        description: Every origin that still serves the release.
+        items:
+          type: object
+          required:
+            - origin
+            - deployment_id
+            - kind
+          properties:
+            origin:
+              $ref: ../../../../components/schemas/origin.yaml
+            deployment_id:
+              $ref: ../../../../components/schemas/deployment-id.yaml
+              description: The newest deployment to the origin, which pins the release.
+            kind:
+              $ref: ../../../deployments/deployment-kind.yaml
+              description: |
+                Whether the origin serves the release as a primary origin or as
+                a preview. A deploy or a rollback frees a primary origin;
+                removing the preview frees a preview.

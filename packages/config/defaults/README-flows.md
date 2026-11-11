@@ -30,51 +30,161 @@ The common workflow:
 
 1. Edit the flow definition (and, if it needs new data, the schema in
    `.zitadel/schemas/` first).
-2. Run `zitadel plan` to preview the change.
-3. Run `zitadel apply` to publish it.
+2. Run `zitadel deploy --dry-run` to preview the change.
+3. Run `zitadel deploy` to publish it.
 
-Every apply of an edited flow definition publishes a new immutable
+Every deploy of an edited flow definition publishes a new immutable
 revision. Earlier revisions stay readable by id, and stay active. A login
 that pins the flow definition's name serves its newest active revision. A
 login without a pin serves the project default: the project's newest
 active unscoped revision for its purpose, whatever its name, so revising
 a flow definition can make it the project default.
 
-Typical edits:
+### Collect another field
 
-- **Change which fields a step collects** — edit `steps[].fields[]`.
-  Values must be properties of the pinned schema (or reserved credential
-  tokens).
-- **Add or remove a step** — extend `steps[]`.
-- **Rewire transitions** — edit `steps[].transitions` to point at a
-  different next step. Cross-flow jumps (`action: switch` / `pivot`)
-  validate in a definition but are **not yet executed by the runtime** —
-  submitting through one fails with a 400 (`code: "flow.unsupported"`);
-  keep transitions within one flow definition, using a purpose switch
-  (next bullet) for login ↔ register navigation.
-- **Offer a purpose switch in the card** — pair a `kind: navigate`
-  action with a transition that declares a local `purpose`. The
-  scaffolded `default-login.json` ships this in both directions:
+Add the property to the schema in `.zitadel/schemas/` first, then list it
+in the step that should ask for it. Values must be properties of the
+pinned schema, or reserved credential tokens such as
+`x-auth-methods#password`:
 
-  ```json
-  "register": { "target": "register", "purpose": "register" }
-  ```
+```json
+{ "name": "register", "fields": ["email", "company"] }
+```
 
-  Navigation skips field validation (an empty email box can't block the
-  link), and the declared purpose is what makes the landing leg run with
-  the right semantics — register creates the user instead of trying to
-  verify one. Rules: the purpose must be one this flow definition's
-  `purposes` serves, the target must be that purpose's entry step, and
-  `purpose` never combines with `action` (which targets another flow
-  definition instead).
-- **Add another flow definition** — drop a new JSON file with its own
-  `purposes` and a distinct `name` (e.g. a kiosk login). See
-  [Multiple flow definitions](#multiple-flow-definitions) for how it gets
-  selected at runtime.
+A property the schema lists as `required` must be collected by some step
+of every flow that uses the schema, or `zitadel deploy --dry-run` stops
+with `required fields [...] in user schema are missing in the flow
+definition steps`.
+
+### Change the order of fields
+
+A step shows its fields in the order of `fields`:
+
+```json
+{ "name": "register", "fields": ["company", "email"] }
+```
+
+### Add a step
+
+Add a step object to `steps[]` and point a transition at it. The order of
+`steps[]` does not set the order of screens; the transitions do:
+
+```json
+{
+  "name": "register",
+  "fields": ["email"],
+  "transitions": { "submit": { "target": "company-details" } }
+},
+{
+  "name": "company-details",
+  "fields": ["company"],
+  "actions": [{ "name": "submit", "kind": "submit", "primary": true }],
+  "transitions": { "submit": { "target": "register-password" } }
+}
+```
+
+Keep the step's other transitions, such as `user_already_exists`. To
+remove a step, remove it and every transition that targets it.
+
+### Offer a password or a passkey
+
+A step offers a password when its `fields` list
+`x-auth-methods#password`; its `submit` checks the password, or sets it
+on a step with `"on_success": "create_user"`. A step offers a passkey
+through an action: `kind: passkey` signs an existing user in,
+`kind: passkey_register` creates the user with a passkey at sign-up.
+Each needs a transition with the action's name:
+
+```json
+{
+  "actions": [
+    { "name": "submit", "kind": "submit", "primary": true },
+    { "name": "passkey", "kind": "passkey", "primary": false }
+  ],
+  "transitions": {
+    "submit": { "target": "password" },
+    "passkey": { "target": "done" }
+  }
+}
+```
+
+A step offers social sign-in through `sso_providers`, which
+`zitadel auth-method sso enable` writes.
+
+The schema must enable the method as well: run
+`zitadel auth-method password|passkey enable`. Before
+`zitadel auth-method password|passkey disable`, remove the method from
+the flow: the steps that collect `x-auth-methods#password` (removing only
+the field leaves a step that signs nobody in), or the passkey actions.
+Retarget every transition that targets a removed step, or remove it
+with the action it belongs to. If you remove the login entry step, point
+`purposes.login` at another step.
+
+Guide: https://preview.zitadel.com/docs/guides/sign-in-methods
+
+### Link sign-in and sign-up
+
+Pair a `kind: navigate` action with a transition that declares a local
+`purpose`. The scaffolded `default-login.json` ships this in both
+directions:
+
+```json
+"register": { "purpose": "register" }
+```
+
+The transition goes to that purpose's entry step, so it needs no
+`target`. Navigation skips field validation (an empty email box can't
+block the link), and the declared purpose is what makes the landing leg
+run with the right semantics: register creates the user instead of
+trying to verify one. Rules: the purpose must be one this flow
+definition's `purposes` serves, a `target`, if you set one, must be that
+purpose's entry step, and `purpose` never combines with `action` (which
+targets another flow definition instead).
+
+Keep transitions within one flow definition. Cross-flow jumps
+(`action: switch` / `pivot`) deploy, with a warning, but are not yet
+executed by the runtime: submitting through one fails with a 400
+(`code: "flow.unsupported"`).
+
+### Choose whether the flow switches on its own
+
+The scaffolded flow wires two outcomes on its entry steps:
+`user_not_found` (an email with no account continues as a sign-up) and
+`user_already_exists` (an email that has an account continues a sign-up
+as a sign-in):
+
+```json
+"user_not_found": { "target": "register" }
+```
+
+Both are optional. Remove one, and that email stays on its step with an
+error instead (`error.user_not_found`, `error.user_already_exists`); the
+"Sign up" and "Sign in" links keep working. `zitadel deploy --dry-run`
+warns about a removed one and still deploys, except on a step that
+offers a provider that creates users: there a provider's sign-in raises
+`user_already_exists` too, so `deploy` requires it (and
+`sso_user_not_found`), and `auth-method sso enable` points it at the
+step that resolves the collision. To serve only one purpose, list only
+it in `purposes`.
+
+### Change or hide the switch notice
+
+After an automatic switch the login shows a notice saying why
+(`notice.user_not_found`, `notice.user_already_exists`,
+`notice.sso_user_not_found`). Change its text through the login's
+`locales`; set the text to `""` to show none.
+
+### Add another flow definition
+
+Drop a new JSON file with its own `purposes` and a distinct `name` (for
+example a kiosk login). See
+[Multiple flow definitions](#multiple-flow-definitions) for how it gets
+selected at runtime, and give it an `audience` before its first deploy
+unless it should become the project default.
 
 ## Multiple flow definitions
 
-All files in this folder sync on `apply`, but each sign-in in the widget
+All files in this folder are published on `deploy`, but each sign-in in the widget
 follows exactly one flow definition. Which one:
 
 - **By name** — give the flow definition a distinct `name` and pass it as
@@ -97,12 +207,11 @@ unscoped one serves the purpose.
 
 The flip side: a **new active flow definition without an `audience`, or a
 new revision of one, becomes the newest unscoped definition, i.e. the
-project default for the purposes it serves**, the moment it applies.
-`plan` calls this out with a `# warning:` line on that create or revision
-so an experiment can't silently take over `/login`. If that isn't the
-intent, give the flow definition an `audience` before its first `apply`
-and select it by `flowName`, or pin `flow-name` on the pages that should
-keep the current project default.
+project default for the purposes it serves**, the moment it deploys.
+So an experiment can't silently take over `/login`, give the flow
+definition an `audience` before its first `deploy` and select it by
+`flowName`, or pin `flow-name` on the pages that should keep the current
+project default.
 
 ## Presets
 
@@ -116,5 +225,6 @@ anything here afterwards.
 
 Editing a schema publishes a new immutable revision, and every flow
 definition naming its `objectType` uses it from then on, with no change
-to the files. Update `steps[].fields[]` yourself when the edit added or
-removed properties a step should collect.
+to the files, so `deploy` never rewrites anything locally. Update
+`steps[].fields[]` yourself when the edit added or removed properties a
+step should collect.

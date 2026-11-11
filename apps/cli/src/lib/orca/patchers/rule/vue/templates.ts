@@ -1,6 +1,6 @@
-import { MANAGED_MARKER } from "../../../../paths";
-import type { PatchContext } from "../../types";
-import { PROXY_PATH } from "../proxy";
+import { MANAGED_MARKER } from "@/lib/paths";
+import type { PatchContext } from "@/lib/orca/patchers/types";
+import { PROXY_PATH } from "@/lib/orca/patchers/rule/proxy";
 
 /**
  * The managed `src/App.vue`: a minimal path-based router that renders the

@@ -1,18 +1,23 @@
 ---
 title: Authentication attempts
-description: OpenAPI operations for the authentication attempt state machine.
+description: Run one sign-in round by creating an attempt, issuing challenges, verifying proofs and creating the handoff token.
 ---
 
-import { Card, Cards } from "fumadocs-ui/components/card";
+An authentication attempt is one sign-in round, and it expires 15 minutes after
+creation. Call these operations to run a sign-in from your own client, or to
+add factors to an existing session (step-up authentication).
 
-Authentication attempts hold the short-lived state for a login, registration,
-step-up, or recovery journey. Use these endpoints to start an attempt, issue
-factor challenges, verify proofs, and mint a handoff token for session exchange.
+The calls run in this order:
 
-<Cards>
-  <Card title="Create a new authentication attempt" href="/docs/reference/api/authentication-attempts/createAuthAttempt" />
-  <Card title="Get authentication attempt state" href="/docs/reference/api/authentication-attempts/getAuthAttempt" />
-  <Card title="Issue a factor challenge" href="/docs/reference/api/authentication-attempts/issueChallenge" />
-  <Card title="Verify a factor proof" href="/docs/reference/api/authentication-attempts/verifyChallengeProof" />
-  <Card title="Complete authentication and create handoff token" href="/docs/reference/api/authentication-attempts/createHandoff" />
-</Cards>
+1. Create the attempt.
+2. Issue a challenge, a request to prove one factor such as a password.
+3. Verify the proof for that challenge. Repeat steps 2 and 3 until the attempt
+   is `completed`.
+4. Create the handoff token, the short-lived credential that a completed
+   attempt hands to the session exchange.
+5. Exchange the handoff token for a session in [Sessions](/docs/reference/api/sessions).
+
+See [Sessions and auth attempts](/docs/concepts/sessions-auth-attempts) for the
+concepts.
+
+<Operations />

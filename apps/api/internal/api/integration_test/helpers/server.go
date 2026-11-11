@@ -1,0 +1,165 @@
+//go:build postgres_integration || spanner_integration || sqlite_integration
+
+package helpers
+
+import (
+	"bytes"
+	"log/slog"
+	"net/http"
+	"net/http/httptest"
+	"sync"
+	"testing"
+
+	"github.com/stretchr/testify/require"
+	"github.com/zitadel/nextgen/api/client"
+	"github.com/zitadel/nextgen/internal/api"
+	generated "github.com/zitadel/nextgen/internal/api/generated"
+	"github.com/zitadel/nextgen/internal/api/middleware"
+	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
+	"github.com/zitadel/nextgen/internal/service"
+	"go.opentelemetry.io/otel"
+)
+
+// serverLog is a concurrency-safe sink for the test server's request logs.
+type serverLog struct {
+	mutex sync.Mutex
+	buf   bytes.Buffer
+}
+
+func (l *serverLog) Write(p []byte) (int, error) {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+	return l.buf.Write(p)
+}
+
+// ServerLog is everything the server under test has logged so far. Tests use
+// it above all negatively: a secret, a code or a state in here is a leak.
+func (h *Harness) ServerLog() string {
+	h.serverLog.mutex.Lock()
+	defer h.serverLog.mutex.Unlock()
+	return h.serverLog.buf.String()
+}
+
+func (h *Harness) EnsureTestServer(t testing.TB) *httptest.Server {
+	t.Helper()
+	h.testServer.mutex.Lock()
+	defer h.testServer.mutex.Unlock()
+
+	if h.testServer.value == nil {
+		callback := h.withServerLog(api.NewIDPCallbackHandler(service.NewFlowSSOCallback(
+			h.EnsureIDPConnectionService(t),
+			h.EnsureAuthAttemptService(t),
+			h.EnsureKeyService(t),
+			h.EnsureVariableService(t),
+			h.EnsureHttpClient(t),
+		)))
+		// The same paths as the production mux (buildHTTPMux), not its
+		// middleware chain: the callback on both its spellings, then the API's
+		// mounts (prefix, OpenAPI document, probes and root alias).
+		mux := http.NewServeMux()
+		mux.Handle(api.IDPCallbackPattern, callback)
+		mux.Handle(api.IDPCallbackUpstreamPattern, callback)
+		api.MountAPI(mux, func(next http.Handler) http.Handler {
+			return h.withServerLog(api.WithSessionStateNoStore(api.WithCSRFRequest(next)))
+		}, h.withServerLog, h.EnsureAPIServers(t))
+		h.testServer.value = httptest.NewServer(mux)
+	}
+	return h.testServer.value
+}
+
+// APIBaseURL is where the test server answers the API: its origin, then
+// client.PathPrefix (ADR 077). A raw request builds its URL on it; the
+// generated client takes the origin (NewApiClient).
+func (h *Harness) APIBaseURL(t testing.TB) string {
+	t.Helper()
+	return h.EnsureTestServer(t).URL + client.PathPrefix
+}
+
+// withServerLog hands every request a logger collecting into the harness, the
+// way the production middleware hands one writing to the process log, and runs
+// the production request logging and panic recovery on top so the buffer holds
+// real log lines.
+func (h *Harness) withServerLog(next http.Handler) http.Handler {
+	logger := slog.New(slog.NewTextHandler(&h.serverLog, nil))
+	logging := middleware.WithLogging(api.WithRecover(next))
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		logging.ServeHTTP(w, r.WithContext(zlog.WithLoggingContext(r.Context(), logger)))
+	})
+}
+
+func (h *Harness) EnsureAPIServers(t testing.TB) api.Servers {
+	t.Helper()
+	h.apiServers.mutex.Lock()
+	defer h.apiServers.mutex.Unlock()
+
+	if h.apiServers.value == nil {
+		servers, err := api.NewServers(
+			h.EnsureHandler(t),
+			h.EnsureSecurityHandler(t),
+			generated.WithErrorHandler(api.OgenErrorHandler),
+			generated.WithNotFound(api.OgenNotFound(nil)),
+			generated.WithMethodNotAllowed(api.OgenMethodNotAllowed),
+			generated.WithTracerProvider(api.NewOgenTracerProvider(otel.GetTracerProvider())),
+		)
+		require.NoError(t, err)
+		h.apiServers.value = &servers
+	}
+	return *h.apiServers.value
+}
+
+// ConsoleOrigin is the test server's own origin, the one its
+// server.public_base would name: claim URLs point at its console, and the flow
+// gate admits it to open any project's flow.
+const ConsoleOrigin = "https://console.invalid"
+
+func (h *Harness) EnsureHandler(t testing.TB) *api.Handler {
+	t.Helper()
+	h.handler.mutex.Lock()
+	defer h.handler.mutex.Unlock()
+
+	if h.handler.value == nil {
+		platform := h.EnsurePlatformProject(t)
+		db := h.EnsureServiceDB(t)
+		releaseService := h.EnsureReleaseService(t)
+		h.handler.value = api.NewHandler(
+			h.EnsureFlowService(t),
+			h.EnsureAuthAttemptService(t),
+			h.EnsureSessionService(t),
+			// Unwrapped: the handler is cached for the whole run, so a wrapper
+			// here would register every later test's cleanup on whichever test
+			// happened to build the handler first. A test that creates a project
+			// over HTTP calls Harness.CleanupProject itself.
+			h.ensureProjectService(t),
+			h.EnsureUserService(t),
+			h.EnsureSchemaService(t),
+			h.EnsureFlowDefinitionService(t),
+			h.EnsureTeamService(t),
+			h.EnsureBrandingService(t),
+			releaseService,
+			h.EnsureDeploymentService(t),
+			h.EnsureIDPConnectionService(t),
+			h.EnsureEventService(t),
+			h.EnsureTokenService(t),
+			h.EnsureKeyService(t),
+			service.NewClaimService(db, ConsoleOrigin+"/ui/console", platform.ID),
+			service.NewGrantService(db, service.StatementsUserRefResolver{Pool: db}, platform.ID),
+			service.NewVariableService(db, h.EnsureKeyService(t)),
+			db,
+			platform.ID,
+		).WithBuiltinSchemaBases(BuiltinSchemaBases()).WithRuntimeResolver(service.NewRuntimeResolver(db, releaseService, ConsoleOrigin)).WithPolicyService(h.EnsurePolicyService(t))
+	}
+	return h.handler.value
+}
+
+func (h *Harness) EnsureSecurityHandler(t testing.TB) *api.SecurityHandler {
+	t.Helper()
+	h.securityHandler.mutex.Lock()
+	defer h.securityHandler.mutex.Unlock()
+
+	if h.securityHandler.value == nil {
+		h.securityHandler.value = api.NewSecurityHandler(
+			h.EnsureTokenService(t),
+		).WithPlatformProject(h.EnsurePlatformProject(t).ID)
+	}
+	return h.securityHandler.value
+}

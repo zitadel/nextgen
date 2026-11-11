@@ -1,8 +1,8 @@
 import type { Callback, Mixpanel as MixpanelClient, Modifiers, Properties } from "mixpanel";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { Telemetry, type TelemetryDeps } from "../../../../src/lib/telemetry";
-import type { Identity } from "../../../../src/lib/telemetry/identity";
+import { Telemetry, type TelemetryDeps } from "@/lib/telemetry";
+import type { Identity } from "@/lib/telemetry/identity";
 
 type Tracked = { event: string; properties: Properties };
 
@@ -43,17 +43,26 @@ function fakeClient(
 const identity: Identity = { distinctId: "did-123", isFirstRun: false };
 
 function deps(sink: Tracked[], extra: Partial<TelemetryDeps> = {}): TelemetryDeps {
-  let counter = 0;
+  const newId = vi.fn(() => `id-${newId.mock.calls.length}`);
   return {
-    env: {},
+    env: { ZITADEL_TELEMETRY_TOKEN: "tok" },
     initClient: () => fakeClient(sink),
     loadIdentity: () => identity,
-    newId: () => `id-${++counter}`,
+    newId,
     ...extra,
   };
 }
 
 describe("Telemetry (generic core)", () => {
+  it("does not serialise a payload for the trace when debugging is off", () => {
+    const sink: Tracked[] = [];
+    const circular: Record<string, unknown> = {};
+    circular.self = circular;
+    const t = Telemetry.create(deps(sink, { debug: false }));
+
+    expect(() => t.track("e", { circular } as never)).not.toThrow();
+  });
+
   it("tracks an event, stamping distinct_id and $insert_id", () => {
     const sink: Tracked[] = [];
     const t = Telemetry.create(deps(sink));
@@ -104,9 +113,26 @@ describe("Telemetry (generic core)", () => {
 
   it("is inert when consent is disabled via the environment", () => {
     const sink: Tracked[] = [];
-    const t = Telemetry.create(deps(sink, { env: { DO_NOT_TRACK: "1" } }));
+    const t = Telemetry.create(
+      deps(sink, { env: { DO_NOT_TRACK: "1", ZITADEL_TELEMETRY_TOKEN: "tok" } }),
+    );
     t.track("e", {});
     expect(sink).toHaveLength(0);
+  });
+
+  it("sends Mixpanel nothing without a token, and writes no install id", () => {
+    const sink: Tracked[] = [];
+    const loadIdentity = vi.fn(() => identity);
+    const t = Telemetry.create(
+      deps(sink, {
+        env: {},
+        loadIdentity,
+      }),
+    );
+    t.track("e", {});
+    expect(t.enabled).toBe(false);
+    expect(sink).toHaveLength(0);
+    expect(loadIdentity).not.toHaveBeenCalled();
   });
 
   it("fails open when the client constructor throws", () => {

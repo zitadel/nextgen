@@ -16,16 +16,15 @@ The public `@zitadel/*` packages are the `fixed` group in
 
 A change needs a changeset if it changes what the shipped product does —
 **release intent is product-level, not path-level.** The Go server, its API
-surface (`api/openapi/**`), and the SDKs all ship as one versioned bundle, so a
-server or API change needs one (list `@zitadel/server`) — even from `internal/`
-or `api/generated/**` — because it ships new server and SDK versions that belong
-in the release notes.
+surface (`apps/api/api/openapi/**`), and the SDKs all ship as one versioned
+bundle, so a server or API change needs one (list `@zitadel/server`) — even from
+`apps/api/internal/` or `apps/api/internal/api/generated/**` — because it ships new server
+and SDK versions that belong in the release notes.
 
-The console (`apps/console/**`) and login UI (`apps/login-ui/**`) are embedded in
-the server container, so a user-visible change there ships too and needs a
-changeset listing `@zitadel/server`. They publish no npm package of their own —
-that is why they sit in the `ignore` list — but a customer still receives the
-change.
+The console (`apps/console/**`) is embedded in the server container, so a
+user-visible change there ships too and needs a changeset listing
+`@zitadel/server`. It publishes no npm package of its own — that is why it sits
+in the `ignore` list — but a customer still receives the change.
 
 Skip a changeset **only** when the change is *exclusively*:
 
@@ -50,7 +49,7 @@ a customer gets something. Full title rule:
 | If the PR… | Add `.changeset/*.md`? | **Release notes / changeset** | PR title type |
 | --- | --- | --- | --- |
 | Changes shipped product behavior (any path) | **Yes** — real changeset | Name the file; summarize the note. List `@zitadel/server` for server changes | `feat` / `fix` — never `docs` or `chore` |
-| Changes what the console or login UI does for a user | **Yes** — list `@zitadel/server` | Name the file; summarize the note | `feat(console)` / `fix(login)` |
+| Changes what the console does for a user | **Yes** — list `@zitadel/server` | Name the file; summarize the note | `feat(console)` / `fix(console)` |
 | Is *exclusively* tests, generated mocks, docs, CI, or a no-op refactor | **No** | `No changeset required — no shipped behavior changed.` | `test` / `docs` / `ci` / `build` / `chore` / `refactor` — never `feat` or `fix` |
 | Touches a publishable path but ships nothing (rare) | **Empty changeset** | Say why the path changed but nothing ships | Not `feat` or `fix` |
 
@@ -71,9 +70,15 @@ the interactive prompt:
 One-line, user-facing summary.
 ```
 
-Use [public package names](#publishable-npm-packages) and `patch` / `minor` /
-`major`. For the rare empty changeset (publishable path, nothing ships):
+Use [public package names](#publishable-npm-packages): `patch` for a fix, and
+`minor` for a feature or a breaking change, which says what breaks in a
+paragraph that starts with `**Breaking:**` ([preview versions](#preview-versions)).
+For the rare empty changeset (publishable path, nothing ships):
 `corepack pnpm changeset --empty`.
+
+A fix or follow-up to a change that still has a pending `.changeset/*.md` (it
+has not been released) edits that file instead of adding a new one: union the
+packages and keep the higher bump.
 
 ### The summary is the release note
 
@@ -83,6 +88,13 @@ there — only a link. So the summary is the copy a customer actually reads, and
 has to stand on its own for someone with no access to this repo.
 
 - Lead with what the reader can now do, or what stopped being broken.
+- A fix is one sentence on what stopped being broken.
+- A feature is a lead sentence naming the command, API or component, with a
+  link to its page under `https://preview.zitadel.com/docs/` rather than a list
+  of every flag.
+- Spend length only on the `**Breaking:**` paragraph (what breaks, what to do)
+  and on upgrade steps, in a paragraph that starts with `**Upgrading …:**`.
+  `scripts/check-changesets-status.mjs` warns when the rest passes 60 words.
 - Name the surface they touch: `zitadel setup`, `<zitadel-login>`,
   `@zitadel/sdk-react`, the console.
 - No ADR numbers, PR numbers, internal file paths, or words like "foundation",
@@ -109,24 +121,18 @@ Confirm the planned bumps, then state the [decision-table](#decision-table)
 outcome in the PR. The command sees npm paths only — it can't infer server impact
 from Go paths, so judge those from the table.
 
-## Alpha prerelease mode
+## Preview versions
 
-The repo is in changesets prerelease mode, tag `alpha` (`.changeset/pre.json`):
+The public packages publish to npm's `latest` tag as `0.x`
+([ADR 074](../docs/adrs/074-preview-releases-on-0x.md)):
 
-- `changeset version` cuts `1.0.0-alpha.N`; consumed changesets are recorded in
-  `pre.json`, pending ones stay in the tree.
-- The fixed group versions together; `changeset publish` uses the `alpha` npm
-  dist-tag, except for a package whose every version on npm is an `alpha`
-  prerelease: that one goes to `latest`. `release publish` stops before
-  publishing such a package and prints the one-time fix
-  (`scripts/release-dist-tags.mjs`).
-
-Leave alpha for a stable `latest` release:
-
-```sh
-corepack pnpm changeset pre exit
-corepack pnpm changeset version   # strips -alpha
-```
+- Until 1.0.0 a breaking change is a `minor`. After the outcome, a paragraph
+  that starts with `**Breaking:**` says what breaks and what to do; the website
+  changelog lists such a change under Breaking. A `major` would release every
+  public package as 1.0.0, so `node scripts/check-changesets-status.mjs --pending`
+  refuses it; CI runs it on every PR.
+- 1.0.0 is cut by a PR that deletes that check and adds a `major` changeset.
+  Release candidates, if any, run in prerelease mode on a release branch.
 
 ## Publishing
 

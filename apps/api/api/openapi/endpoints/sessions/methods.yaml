@@ -1,0 +1,63 @@
+post:
+  operationId: createSession
+  summary: Create an anonymous session
+  description: |
+    Creates an anonymous session with no user and no factors (`state: building`).
+
+    A session is the durable record of a signed-in user. This call is optional: an
+    authentication attempt creates a session implicitly if none is provided.
+    Create one explicitly when you want to:
+
+    - Pre-allocate a `session_id` before the user is known, so device and telemetry signals
+      can be correlated with the eventual authenticated session from the start.
+    - Track anonymous state (bot detection, device fingerprint) that survives until authentication.
+
+    The session belongs to the project of the project secret. A `project_id` that
+    names another project answers `403` with `proj.mismatch` and creates nothing:
+    send the credential's own project.
+
+    Creating a session runs on the project credential (`session.write`). The returned
+    `session_token` is a session credential for the end-user client, not a
+    management scope. It is delivered as the `__Host-zitadel_session` cookie
+    (`zitadel_session` over plain http to a loopback host) and authorises the
+    self-service operations `GET /sessions/me` and `DELETE /sessions/me`
+    (`sessionCookie` scheme). The by-id operations `GET /sessions/{session_id}`
+    and `DELETE /sessions/{session_id}` are operator endpoints and require
+    `session.read` / `session.delete` instead.
+
+    The `session_token` is superseded when a handoff exchange completes. Clients
+    must replace it at that point.
+
+    Anonymous sessions expire after 10 minutes. The lifetime resets to the
+    configured full session lifetime when a completing authentication attempt
+    writes the first authentication factor.
+  tags:
+    - Sessions
+  security:
+    - oauth2:
+        - session.write
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: create-session-request.yaml
+  responses:
+    '201':
+      description: The anonymous session and its `session_token`.
+      content:
+        application/json:
+          schema:
+            $ref: session-with-token-response.yaml
+      headers:
+        Set-Cookie:
+          $ref: ../../components/headers/set-cookie-session-token.yaml
+    '400':
+      description: Invalid request.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    default:
+      $ref: createSession-error-response.yaml
+

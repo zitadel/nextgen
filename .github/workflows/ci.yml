@@ -21,6 +21,11 @@ jobs:
     permissions:
       contents: read
     env:
+      # What the change is measured against: a pull request's base, or the
+      # commit a merge group is built on. Against origin/main, an entry queued
+      # behind others re-tested every entry ahead of it, which its own group
+      # tests (docs/design/build/turborepo-graph.md).
+      CI_BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || 'origin/main' }}
       # Moon marks failed tasks by color alone, so a failed `moon ci` can end at
       # "Tasks: 1 failed" with no named target. The summary names them in plain
       # text and replays each failed task's own output. Green runs pay only a
@@ -58,14 +63,12 @@ jobs:
         with:
           fetch-depth: 0
 
-      # The queue squashes a version PR onto the PRs queued ahead of it, and
-      # while it waits GitHub refuses release-publish's refresh of
-      # changeset-release/main. A changeset one of those PRs adds would land
-      # unrecorded in .changeset/pre.json, and release-publish's preflight
-      # would then refuse to publish the version. Running that preflight here
-      # drops the stale version PR from the queue instead; release-publish
-      # refreshes it once the PRs ahead land. Any other merge group skips.
-      - name: Check a queued version PR is current
+      # A version PR has to land on its own: release-publish finds the version
+      # commit from the diff of the push, which would also hold every PR the
+      # queue squashed it onto, and then refuses to publish. Running that
+      # detection here drops such a version PR from the queue instead; queue it
+      # again once the PRs ahead of it land. Any other merge group skips.
+      - name: Check a queued version PR lands alone
         if: ${{ github.event_name == 'merge_group' }}
         env:
           BASE_SHA: ${{ github.event.merge_group.base_sha }}
@@ -80,14 +83,21 @@ jobs:
       # returns at once.
       - name: Pull the postgres lane's image
         run: |
-          image="$(sed -n 's/^const containerImage = "\(.*\)"$/\1/p' internal/storage/testdb/postgres.go)"
+          image="$(sed -n 's/^const containerImage = "\(.*\)"$/\1/p' apps/api/internal/storage/testdb/postgres.go)"
           if [ -z "$image" ]; then
-            echo "::warning::internal/storage/testdb/postgres.go has no containerImage constant; nothing to pull"
+            echo "::warning::apps/api/internal/storage/testdb/postgres.go has no containerImage constant; nothing to pull"
             exit 0
           fi
-          nohup docker pull --quiet "$image" </dev/null >"$RUNNER_TEMP/postgres-image-pull.log" 2>&1 &
+          # Both registries serve the same official image and version.
+          nohup bash -c '
+            if ! docker pull --quiet "$1"; then
+              fallback="docker.io/${1#public.ecr.aws/docker/}"
+              docker pull --quiet "$fallback" &&
+                docker tag "$fallback" "$1"
+            fi
+          ' -- "$image" </dev/null >"$RUNNER_TEMP/postgres-image-pull.log" 2>&1 &
 
-      # Keyed on every module's go.sum (tools/bench and tools/oidc-mock are
+      # Keyed on every module's go.sum and go.work.sum (tools/bench and tools/oidc-mock are
       # modules of their own) instead of setup-go's default, go.mod.
       # ci-turbo.yml shared the go.mod key until it got a cache of its own,
       # and its entry there for Go 1.26.8 holds Go's own cache files. On Depot
@@ -95,12 +105,14 @@ jobs:
       # depot-* files in GOCACHE), so it cannot use them.
       - uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
+          go-version-file: apps/api/go.mod
           cache: true
           cache-dependency-path: |
-            go.sum
+            apps/api/go.sum
+            packages/go/go.sum
             tools/bench/go.sum
             tools/oidc-mock/go.sum
+            go.work.sum
 
       - uses: pnpm/action-setup@v5
         with:
@@ -119,14 +131,22 @@ jobs:
       - name: Put workspace binaries on PATH
         run: echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
 
-      # A PR title is attacker-controlled text on a public repo, so it reaches the
-      # script through the environment — never interpolated into the shell body.
-      - name: Check PR title
+      # Each package imports only its own files and the packages its
+      # package.json declares; an import that cannot carries
+      # `// @boundaries-ignore <reason>` (docs/design/build/turborepo.md).
+      - name: Check package boundaries
+        run: turbo boundaries
+
+      # Below 1.0.0 a `major` changeset would release every public package as
+      # 1.0.0 (docs/adrs/074-preview-releases-on-0x.md), so the pending ones are
+      # checked before they reach the version PR. `changeset status` compares
+      # HEAD with the base branch by its local name, which a pull request's
+      # checkout does not have.
+      - name: Check pending changesets
         if: ${{ github.event_name == 'pull_request' }}
-        env:
-          PR_TITLE: ${{ github.event.pull_request.title }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        run: node scripts/check-pr-title.mjs --title "$PR_TITLE" --base "$BASE_SHA" --summary
+        run: |
+          git branch --force main origin/main
+          node scripts/check-changesets-status.mjs --pending --summary
 
       # Emits `mode`, per-lane affected gates (go_tests, e2e, snapshot,
       # journey_fresh_app, journey_passkey, journey_preexisting,
@@ -137,7 +157,7 @@ jobs:
       # tests: scripts/ci-mode.mjs.
       - name: Detect CI mode
         id: ci-mode
-        run: node scripts/ci-mode.mjs "${{ github.event.pull_request.base.sha || 'origin/main' }}"
+        run: node scripts/ci-mode.mjs "$CI_BASE"
 
       # Pruning variant: deletes every generated file before regenerating, so
       # output that no directive produces any more fails here instead of
@@ -186,7 +206,23 @@ jobs:
         # moon ci only selects tasks whose own inputs changed. --downstream deep
         # with --include-relations also runs the tasks of every project that
         # depends on a changed one, so an api change re-tests its consumers.
-        run: moon ci :lint :typecheck :build :test :check-adrs :check-moon-graph --downstream deep --include-relations
+        # It compares with the same base as ci-mode; without one, a merge
+        # group fell back to origin/main.
+        env:
+          MOON_BASE: ${{ env.CI_BASE }}
+        run: moon ci :lint :typecheck :build :test :check-typecheck :check-openapi-rules :check-adrs :check-moon-graph :check-go-work --downstream deep --include-relations
+
+      - name: Upload component test diagnostics
+        if: ${{ failure() && steps.moon-ci.outcome == 'failure' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: component-test-diagnostics
+          path: |
+            packages/components/test-output/vitest/junit.xml
+            packages/components/src/**/__screenshots__/**
+            packages/api-mock/test-output/vitest/junit.xml
+          if-no-files-found: ignore
+          retention-days: 7
 
       # The graph step above runs the Go database lanes whenever moon finds
       # them affected, as dependents of the console and login UI builds their
@@ -204,8 +240,8 @@ jobs:
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' && steps.graph-lanes.outputs.postgres != 'true' }}
         run: moon run server:test-postgres
 
-      # The Spanner emulator lane is not part of this job: it runs in
-      # spanner.yml (nightly and on demand) and is not a required check.
+      # The Spanner lane is not part of this job: it runs in spanner.yml
+      # (weekly on Spanner Omni, and on demand) and is not a required check.
 
       - name: Run Go integration tests (sqlite)
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' && steps.graph-lanes.outputs.sqlite != 'true' }}
@@ -309,8 +345,8 @@ jobs:
         run: env -u CI -u GITHUB_ACTIONS moon run release:version
 
       # npm trusted publishing cannot create a package, so release publish
-      # stops a version that includes a public package npm has never seen, or
-      # one with only prereleases of the pre tag (scripts/release-dist-tags.mjs).
+      # stops a version that includes a public package npm has never seen
+      # (scripts/release-npm-preflight.mjs).
       # It used to find out only after the version commit was on main (run
       # 39324183811). Asking npm here fails the version PR and its merge group
       # instead, with the one-time commands that fix it.

@@ -1,0 +1,19 @@
+title: IdentifierProof
+type: object
+# Which property identifies users is defined in ADR 058 §5.
+description: |
+  The proof for an `identifier` challenge: the login name of the user.
+
+  The login name is resolved against the designated identifier (`x-identifier`)
+  of every user schema in the project, and must identify exactly one user. A
+  login name that matches none, or users of more than one schema, rejects the
+  proof. The caller does not name the property: the project decides which
+  property identifies users, in its user schemas.
+required:
+  - login_name
+additionalProperties: false
+properties:
+  login_name:
+    type: string
+    description: The value being identified, as the user typed it.
+    example: alice@acme.com

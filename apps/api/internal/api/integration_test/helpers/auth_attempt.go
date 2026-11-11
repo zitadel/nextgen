@@ -1,0 +1,26 @@
+//go:build postgres_integration || spanner_integration || sqlite_integration
+
+package helpers
+
+import (
+	"testing"
+
+	"github.com/zitadel/nextgen/internal/service"
+)
+
+func (h *Harness) EnsureAuthAttemptService(t testing.TB) service.AuthAttemptService {
+	t.Helper()
+	h.authAttemptService.mutex.Lock()
+	defer h.authAttemptService.mutex.Unlock()
+
+	if h.authAttemptService.value == nil {
+		h.authAttemptService.value = service.NewAuthAttemptService(
+			h.EnsureServiceDB(t),
+			service.SessionStatementsResolver{Pool: h.EnsureServiceDB(t)},
+			service.UserStatementsLookup{Pool: h.EnsureServiceDB(t)},
+			h.EnsureProjectHashers(t),
+			h.ensureHasher(t),
+		)
+	}
+	return h.authAttemptService.value
+}

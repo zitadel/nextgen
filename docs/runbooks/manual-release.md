@@ -2,8 +2,9 @@
 
 This repo uses Moon for CI/build orchestration, server artifacts, containers,
 and the draft GitHub Release shell for `v<version>`. Changesets owns package
-versioning, changelogs, npm publishing, and public package tags. Product release
-prose is written manually by maintainers.
+versioning, changelogs, npm publishing, and public package tags. Notable
+changes get entries on the website's changelog, which an agent drafts in a
+pull request ([Product notes](#product-notes)).
 
 ## Normal release
 
@@ -14,15 +15,17 @@ prose is written manually by maintainers.
 3. `release-publish` runs the Changesets action and opens or updates the
    generated version PR.
 4. Review the generated version PR. It should update package versions,
-   changelogs, and the `@zitadel/server` npm runtime version.
+   changelogs, and the `@zitadel/server` npm runtime version; its description
+   lists each change once, as the GitHub Release will.
 5. Merge the version PR only after CI is green.
 6. `release-publish` runs automatically from that merge commit on `main`,
    publishes npm packages with Changesets, and pushes the
    `ghcr.io/zitadel/nextgen:<version>` container image. It also creates or
    updates the draft GitHub Release for `v<version>` with generated artifact and
    package facts.
-7. If a product announcement is needed, add the human-written product notes to
-   the draft GitHub Release and publish it.
+7. Publish the draft GitHub Release as the automation wrote it
+   (`gh release edit v<version> --repo zitadel/nextgen --draft=false`), then add
+   [changelog entries](#product-notes) for the release's notable changes.
 
 ## Manual controls
 
@@ -57,10 +60,10 @@ gh run rerun <run-id> --repo zitadel/nextgen --failed
 ```
 
 Prefer that over `recover_version` when a preflight stopped the run:
-`recover_version` publishes `main`'s head, and refuses while `main` holds
-changesets the version commit did not record. Re-run before the next version
-PR lands. Publishing the older version after it would move the npm pre tag
-(`alpha`) and the container's `:latest` back to it.
+`recover_version` publishes `main`'s head, which must still carry that
+version. Re-run before the next version
+PR lands. Publishing the older version after it would move npm's `latest` and
+the container's `:latest` back to it.
 
 Use `release-publish` with `recover_version=<version>` for an already-versioned
 release when any publish-side artifact may be missing. It verifies the
@@ -90,7 +93,6 @@ be a generated version commit" gate, but it still requires:
 
 - the checked-out `@zitadel/server` version to equal `recover_version`;
 - the workflow to run from `main`;
-- no unrecorded pending release changesets;
 - the normal artifact preflight and snapshot verification to pass.
 
 After the recovery run, verify the public surfaces and draft release shell:
@@ -104,17 +106,42 @@ gh release view v0.1.0-alpha.8 --repo zitadel/nextgen
 
 ## Product notes
 
-Product release prose is manual. Use the draft GitHub Release's generated facts
-block, the generated Changesets changelogs,
-`dist/release/<version>/artifact-summary.md`, and the merged product PRs as
-inputs. Publish the draft GitHub Release only when the product needs an
-announcement.
+The GitHub Release needs no prose: its generated facts block lists each change
+once. The website's changelog tells the notable changes instead, an entry
+each, `apps/website/changelog/<slug>.md`, saying when it landed on the cloud
+and which release ships it:
 
-GitHub rejects release bodies over 125000 characters, so the generated facts
-block replaces its largest package changelog sections with pointers to the
-per-package `CHANGELOG.md` when the body would not fit. If the human-written
-product notes alone push past the limit, the facts update fails loudly instead
-of truncating maintainer prose — shorten the notes and rerun.
+1. After a release, or once something notable has landed on the cloud, have an
+   agent draft the entries with the `zitadel-changelog-entries` skill
+   ([`SKILL.md`](../../apps/website/skills/zitadel-changelog-entries/SKILL.md)):
+   point the agent at that file, or install the skill with
+   `npx skills add zitadel/nextgen --skill zitadel-changelog-entries`.
+2. Review the pull request like any other, and merge it.
+
+An entry names its pull requests, and the site finds the release that ships
+them in the packages' `CHANGELOG.md` when it builds
+([`entries.ts`](../../apps/website/app/changelog/entries.ts)), so an entry
+written before its release shows it once it ships.
+
+Notes above the generated facts are optional and show on GitHub only. Leave
+the block as it is, and edit a draft's notes with `gh release edit`: an API
+`PATCH` without `tag_name` resets the draft's tag to `untagged-…`, and
+`scripts/release-github.mjs` finds the draft by `tag_name`. `--notes-file`
+replaces the whole body, so start from the draft's body:
+
+```sh
+gh release view v<version> --repo zitadel/nextgen --json body -q .body > notes.md
+gh release edit v<version> --repo zitadel/nextgen --notes-file notes.md
+```
+
+The block lists each change once, after the packages it changes. GitHub
+rejects release bodies over 125000 characters, so when the body would not fit,
+the block omits patch changes, then minor ones, and names the `CHANGELOG.md`
+files that hold them; it never omits a breaking change
+([`release-github.mjs`](../../scripts/release-github.mjs)). If the
+human-written product notes and the breaking changes alone push past the
+limit, the facts update fails loudly instead of truncating maintainer prose —
+shorten the notes and rerun.
 
 ## Local checks
 
@@ -124,3 +151,42 @@ moon run release:snapshot
 moon run release:publish -- --dry-run  # from a generated version commit
 moon run release:publish -- --dry-run --recover-version 0.1.0-alpha.8
 ```
+
+## Renumbering the 1.0.0-alpha releases
+
+Once, for [ADR 074](../adrs/074-preview-releases-on-0x.md). Run it from a
+checkout of `main`, with `gh` signed in as a maintainer and npm signed in as an
+owner of the `@zitadel` packages.
+
+1. Rename the tags and releases before you publish the `v0.1.0` draft: the
+   website changelog sorts releases by version, and would list `0.1.0` under
+   the old names.
+
+   ```sh
+   git fetch --tags origin
+   for n in 20 21 22 23 24 25 28; do
+     old="v1.0.0-alpha.$n" new="v0.1.0-alpha.$n" notes="$(mktemp)"
+     git push origin "$(git rev-parse "$old^{commit}"):refs/tags/$new"
+     { printf 'Published to npm and ghcr.io as `%s`.\n\n' "${old#v}"
+       gh release view "$old" --repo zitadel/nextgen --json body -q .body; } > "$notes"
+     gh release edit "$old" --repo zitadel/nextgen --tag "$new" \
+       --title "Zitadel NextGen $new" --notes-file "$notes"
+     git push origin ":refs/tags/$old" && git tag -d "$old"
+   done
+   ```
+
+2. Merge the `build: version packages` PR that releases `0.1.0` soon after
+   the PR that adopted ADR 074: until `0.1.0` is on npm, the docs'
+   `npx @zitadel/cli@latest` runs the placeholder build.
+3. Once `0.1.0` is on npm, deprecate the `1.0.0-alpha` versions and move
+   `alpha` to `0.1.0`:
+
+   ```sh
+   for pkg in $(node -p "require('./.changeset/config.json').fixed[0].join(' ')"); do
+     npm deprecate "$pkg@>=1.0.0-alpha.0 <1.0.0" "Superseded by the 0.x releases: install $pkg@latest"
+     npm dist-tag add "$pkg@0.1.0" alpha
+   done
+   ```
+
+4. Add the [product notes](#product-notes) to the `v0.1.0` draft release and
+   publish it; it becomes the repository's latest release.

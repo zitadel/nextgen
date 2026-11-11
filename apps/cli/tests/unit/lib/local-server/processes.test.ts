@@ -1,61 +1,42 @@
-import { execFile } from "node:child_process";
-
+import { execa } from "execa";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("node:child_process", () => ({
-  execFile: vi.fn(),
-}));
+vi.mock("execa", () => ({ execa: vi.fn() }));
 
-const mockExecFile = vi.mocked(execFile);
+const mockExeca = vi.mocked(execa);
 
-import { discoverManagedRuntimeProcesses } from "../../../../src/lib/local-server/processes";
+import { discoverManagedRuntimeProcesses } from "@/lib/local-server/processes";
 
-function whenPs(
-  impl: (
-    args: readonly string[],
-    cb: (err: NodeJS.ErrnoException | null, stdout: string) => void,
-  ) => void,
-): void {
-  mockExecFile.mockImplementation(((
-    file: string,
-    args: readonly string[],
-    _opts: unknown,
-    cb: (err: NodeJS.ErrnoException | null, stdout: string) => void,
-  ) => {
+/** Answers each `ps` the code runs from `impl`, which gets its arguments and returns its stdout. */
+function whenPs(impl: (args: readonly string[]) => string): void {
+  mockExeca.mockImplementation(((file: string, args: readonly string[]) => {
     expect(file).toBe("ps");
-    impl(args, cb);
-    return undefined as never;
+    return Promise.resolve({ stdout: impl(args), stderr: "", exitCode: 0 });
   }) as never);
 }
 
 beforeEach(() => {
-  mockExecFile.mockReset();
+  mockExeca.mockReset();
 });
 
 describe("discoverManagedRuntimeProcesses", () => {
   it("returns only CLI-managed local runtime processes", async () => {
-    whenPs((args, cb) => {
+    whenPs((args) => {
       if (args[0] === "axo") {
-        cb(
-          null,
-          [
-            " 123 1 /usr/local/bin/node /tmp/app/node_modules/@zitadel/server/bin/zitadel-server.js",
-            " 234 123 /tmp/app/node_modules/@zitadel/server-darwin-arm64/bin/nextgen",
-            " 345 1 /usr/local/bin/nextgen",
-            " 456 1 /usr/bin/node /tmp/other.js",
-            "",
-          ].join("\n"),
-        );
-        return;
+        return [
+          " 123 1 /usr/local/bin/node /tmp/app/node_modules/@zitadel/server/bin/zitadel-server.js",
+          " 234 123 /tmp/app/node_modules/@zitadel/server-darwin-arm64/bin/nextgen",
+          " 345 1 /usr/local/bin/nextgen",
+          " 456 1 /usr/bin/node /tmp/other.js",
+          "",
+        ].join("\n");
       }
       const pid = String(args[2]);
-      const env =
-        pid === "234"
-          ? "NEXTGEN_SERVER_DATA_DIR=/tmp/app/.zitadel/local/nextgen-data /tmp/app/node_modules/@zitadel/server-darwin-arm64/bin/nextgen"
-          : pid === "345"
-            ? "NEXTGEN_SERVER_DATA_DIR=/tmp/app/.zitadel/local/nextgen-data /usr/local/bin/nextgen"
-            : "";
-      cb(null, env);
+      return pid === "234"
+        ? "NEXTGEN_SERVER_DATA_DIR=/tmp/app/.zitadel/local/nextgen-data /tmp/app/node_modules/@zitadel/server-darwin-arm64/bin/nextgen"
+        : pid === "345"
+          ? "NEXTGEN_SERVER_DATA_DIR=/tmp/app/.zitadel/local/nextgen-data /usr/local/bin/nextgen"
+          : "";
     });
 
     const discovery = await discoverManagedRuntimeProcesses();
@@ -77,16 +58,11 @@ describe("discoverManagedRuntimeProcesses", () => {
   });
 
   it("strips environment markers without joining adjacent command tokens", async () => {
-    whenPs((args, cb) => {
-      if (args[0] === "axo") {
-        cb(null, " 567 1 /usr/local/bin/nextgen\n");
-        return;
-      }
-      cb(
-        null,
-        "NEXTGEN_SERVER_DATA_DIR=/tmp/app/.zitadel/local/nextgen-data /usr/local/bin/nextgen FOO=1 --serve",
-      );
-    });
+    whenPs((args) =>
+      args[0] === "axo"
+        ? " 567 1 /usr/local/bin/nextgen\n"
+        : "NEXTGEN_SERVER_DATA_DIR=/tmp/app/.zitadel/local/nextgen-data /usr/local/bin/nextgen FOO=1 --serve",
+    );
 
     const discovery = await discoverManagedRuntimeProcesses();
 
@@ -101,7 +77,7 @@ describe("discoverManagedRuntimeProcesses", () => {
     const enoent: NodeJS.ErrnoException = Object.assign(new Error("spawn ps ENOENT"), {
       code: "ENOENT",
     });
-    whenPs((_args, cb) => cb(enoent, ""));
+    mockExeca.mockRejectedValue(enoent);
 
     await expect(discoverManagedRuntimeProcesses()).resolves.toMatchObject({
       supported: false,

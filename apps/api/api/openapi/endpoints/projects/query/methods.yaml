@@ -1,0 +1,62 @@
+post:
+  operationId: queryProjects
+  x-zitadel-cli: projects list
+  summary: Query projects
+  # ADR 036 widens a credential beyond one project.
+  description: |
+    Returns the project the project secret belongs to, as a page of at most one
+    project.
+
+    A credential is scoped to one project today, so the filters and sorting
+    apply to that project alone. A signed-in person lists the projects they can
+    act on with `GET /users/me/projects`.
+  tags:
+    - Projects
+  security:
+    - oauth2:
+        # project.write, not project.read: project.read is carried by the
+        # browser-plane preview secret, so it cannot gate an operator read
+        # until ADR 036 splits the credential planes into distinct schemes.
+        - project.write
+  requestBody:
+    description: Request to query projects.
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: query-projects-request.yaml
+  responses:
+    '200':
+      description: A page with the project the secret belongs to.
+      content:
+        application/json:
+          schema:
+            $ref: query-projects-response.yaml
+    '400':
+      description: Invalid request, for example invalid query parameters.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '403':
+      description: Insufficient permissions.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '429':
+      description: |
+        Too many requests: the client sent too many in a given amount of time.
+        Wait and retry.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    default:
+      $ref: queryProjects-error-response.yaml

@@ -88,12 +88,13 @@ see [§ Drift notes](#drift-notes).
 | `signing_key` | action-verbs | `create`, `read`, `delete` — **no `signing_key.rotate`.** Rotation is create-a-successor ([ADR 039](../../adrs/039-signing-key-rotation-and-incident-response.md)), not in-place secret replacement. Emergency replacement creates the successor before deleting the compromised key. |
 | `billing` | read-write-only | Tier/subscription/payment — no `billing.create`. |
 | `branding` | manage | Immutable revisions: `write` publishes a revision; no update or delete. Already matches OpenAPI. |
+| `policy` | manage | Operation policies (ADR 066), immutable revisions: `write` publishes a revision; no update or delete. |
 | `domain`, `origin`, `webhook` | manage | Project-scoped collections; `write` = create + update; `delete` separate. Class covers the full set; grant `write` and/or `delete`, never a `manage` permission. |
 | `feature` | read-write-only | Project feature configuration has no independent create/delete lifecycle. |
 | `import` | job-lifecycle | Start job (`create`); poll status (`read`). |
 | `events` | read-only | Unified audit stream (`GET /events`); replaces retired `event` / `audit_event` split (ADR 049). |
 | `session`, `auth_attempt` | runtime | App-plane `*.write` only (no separate `*.create` — OpenAPI `*.write` covers start + mutate). Operator: `session.read` / `session.delete`. |
-| `app`, `idp`, `app_group`, `schema`, `flow_definition` | manage | No create/write split — `write` = create + update; `delete` where exposed. Matches OpenAPI. Class implies the full CRUD *set*; permissions remain `read` / `write` / `delete` (no `*.manage`). |
+| `application`, `idp`, `app_group`, `schema`, `flow_definition` | manage | No create/write split — `write` = create + update; `delete` where exposed. Matches OpenAPI. Class implies the full CRUD *set*; permissions remain `read` / `write` / `delete` (no `*.manage`). |
 
 ---
 
@@ -126,6 +127,8 @@ the target catalog for the planned paths in
 |---|---|---|
 | `branding.read` | `GET /branding`, `GET /branding/{id}` | Read/list immutable branding revisions. |
 | `branding.write` | `POST /branding` | Publish a new immutable revision; no separate create/delete permission. |
+| `policy.read` | `GET /policies/revisions/{revision_id}` | Read operation policy revisions. |
+| `policy.write` | `POST /policies` | Publish a new immutable policy revision. |
 | `domain.read` | Read/list `/projects/{id}/domains` | Domain context known to Zitadel; does not imply DNS/TLS infrastructure management. |
 | `domain.write` | Add/update a domain | Create + manage. |
 | `domain.delete` | Remove a domain | |
@@ -153,7 +156,7 @@ the corresponding resource permission.
 |---|---|---|
 | `team.create` | `POST /teams` | |
 | `team.read` | `POST /teams/query`, `GET /teams/{id}`, `POST /users/query` with `expand: ["lifecycle_owner_team"]` | Team resource only. Does **not** imply `team_membership.*` or `user.*`. Required on top of `user.read` to resolve `metadata.lifecycle_owner_team_id` into the team itself — the id alone is served unconditionally. **Drift ([ADR 036](../../adrs/036-api-credential-planes.md)):** granular scopes are not minted yet, so an operator project secret satisfies this interim — preview secrets do not. Tighten when #420 lands. **Sessions ([#1300](https://github.com/zitadel/nextgen/issues/1300)):** a Console session carries no scopes, so on `POST /users/query` alone the resolver answers instead: the session needs `viewer` on the target project, the finest read role the system catalog has ([ADR 054](../../adrs/054-customer-collaboration-grants.md) §5). A partial foothold still lists, but gets 403 on the expansion. The other endpoints in this row keep requiring the scope. |
-| `team.write` | `PATCH /teams/{id}` | Team attributes only. Does **not** imply `team_membership.*`, invitations, or billing. **Personal team:** the platform user a personal team is created for holds `editor` scoped to that team, so they can read and rename it and nothing else; it stands in for [ADR 054](../../adrs/054-customer-collaboration-grants.md) §2's `team.owner` until that relation is seeded. The grant is a foothold in the shared platform project, so until [#2112](https://github.com/zitadel/nextgen/issues/2112) lands an owner gets 403 rather than 404 for other users and teams there, and lists answer with a partial view. |
+| `team.write` | `PATCH /teams/{id}` | Team attributes only. Does **not** imply `team_membership.*`, invitations, or billing. **Personal team:** the platform user a personal team is created for holds `editor` scoped to that team, so they can read and rename it and nothing else; it stands in for [ADR 054](../../adrs/054-customer-collaboration-grants.md) §2's `team.owner` until that relation is seeded. Other users and teams there are outside the grant's scope and answer 404 like unknown ids ([#2112](https://github.com/zitadel/nextgen/issues/2112)); lists answer with a partial view. |
 | `team.delete` | `DELETE /teams/{id}` | Deactivates and tombstones the team, cascading to memberships and lifecycle-owned users (ADR 024). |
 
 ### Users
@@ -167,7 +170,7 @@ the corresponding resource permission.
 | Permission | Endpoints | Notes |
 |---|---|---|
 | `user.create` | `POST /users` | |
-| `user.read` | `POST /users/query`, `GET /users/{id}`, `GET /users/{id}/identity_links` | Get + list; full representation for now. Listing is `POST /users/query` — there is no `GET /users`. `project_id` is optional and defaults to the credential's project; a session may name another project it holds a grant on (#1300), a project secret only its own. |
+| `user.read` | `POST /users/query`, `GET /users/{id}`, `GET /users/{id}/identity_links`, `GET /users/{id}/passkeys`, `GET /users/{id}/password` | Get + list; full representation for now. Listing is `POST /users/query` — there is no `GET /users`. `project_id` is optional and defaults to the credential's project; a session may name another project it holds a grant on (#1300), a project secret only its own. |
 | `user.write` | `PATCH /users/{id}`, non-credential action verbs (e.g. `verify_email`) | Profile / attribute edits. Does **not** include setting another user's password — see `user.set_password`. `PATCH /users/{id}` takes the full project secret (`project.write`; the `user.write` scope is not checked) or a Console session, and needs editor access on the user's project. An editor can change any user's attributes there, identifiers and its own included, and move a user to another schema of the project. That is safe only while no sign-in method trusts the email alone: `magic_link` or `otp` must revisit this level (`internal/domain/schema_designation.go:68`). |
 | `user.set_password` | `PUT /users/{id}/password` | **Credential-tier, account-takeover-grade.** Admin sets/resets *another* user's password. Held separately so a profile-editor / help-desk role can hold `user.write` without it. OpenAPI tags this endpoint `user.write` today (see [Drift notes](#drift-notes)). Reserve `user.reset_mfa` / similar for future admin factor-reset endpoints. |
 | `user.delete` | `DELETE /users/{id}` | Takes the full project secret (`project.write`; the `user.delete` scope is not checked) or a Console session, and needs admin access on the user's project. |
@@ -233,15 +236,21 @@ Planned permissions once specified:
 Until endpoints exist, treat `billing.*` as reserved catalog names — do not
 grant them via `team.write`.
 
-### Apps
+### Platform (deployment-wide)
 
-> **Verb model:** manage — `write` = create + update (no `app.create`); `delete` separate. No `app.manage` permission.
+| Permission | Intended operations | Notes |
+|---|---|---|
+| `platform.operator` | Every operation `project.admin` allows, on every project of the deployment; `GET /users/me/projects` lists every project | [ADR 075](../../adrs/075-platform-operators.md). Users of the platform project only, never a team or a secret; issued only by the `platform.operators` configuration. Not a role on the platform project: `project.admin` there grants none of it ([ADR 053 §9](../../adrs/053-cross-project-principals.md#9-deployment-wide-operators-are-a-separate-authority)). |
+
+### Applications
+
+> **Verb model:** manage — `write` = create + update (no `application.create`); `delete` separate. No `application.manage` permission. Update is a revise: an application is a chain of immutable revisions, so `write` publishes one rather than editing in place.
 
 | Permission | Endpoints | Notes |
 |---|---|---|
-| `app.read` | `GET /apps/{id}` | |
-| `app.write` | `POST /apps`, `PATCH /apps/{id}` | Create + manage. |
-| `app.delete` | `DELETE /apps/{id}` | |
+| `application.read` | `GET /applications/{id}`; `POST /applications/query` (#2789), `GET /applications/{id}/revisions` and `GET /applications/revisions/{revision_id}` **not yet exposed** | Never returns a client secret. ADR 063 §4 requires the revision reads before a release can pin an application (#2790); they carry the same scope as the get. |
+| `application.write` | `POST /applications` | Create + revise: the `slug` in the submitted document decides whether it creates a registered application or appends a revision to an existing one in the project. A new client's secret is returned once. |
+| `application.delete` | `DELETE /applications/{id}` | **Not yet exposed** — target shape. |
 
 ### Identity providers
 
@@ -268,15 +277,15 @@ grant them via `team.write`.
 > **Verb model:** soft split — `create` vs `write` useful for delegation; default bundles grant full CRUD.
 
 A **grant** is an explicit access record: who may access what, at which scope
-(user ↔ app, team ↔ project, user ↔ role in an app_group, or a raw permission
+(user ↔ application, team ↔ project, user ↔ role in an app_group, or a raw permission
 assignment). This is the `/grants` management resource — **not** OAuth
 `grant_type` on `/oauth/token`.
 
 | Permission | Endpoints | Notes |
 |---|---|---|
-| `grant.create` | `POST /grants` | Bind a principal to an app, role, or permission at a scope. |
+| `grant.create` | `POST /grants` | Bind a principal to an application, role, or permission at a scope. |
 | `grant.read` | `GET /grants/{id}` | |
-| `grant.write` | `PATCH /grants/{id}` | Update an existing binding (e.g. role change on an app grant). |
+| `grant.write` | `PATCH /grants/{id}` | Update an existing binding (e.g. role change on an application grant). |
 | `grant.delete` | `DELETE /grants/{id}` | Revoke access. |
 
 ### Schemas (user schemas)
@@ -372,7 +381,7 @@ Replacements:
 | `team.events.read` | `events.read` | **Yes.** Filter to the team via grant/credential scope. |
 | `team.scim.sync` | TBD (`scim.sync` or similar) | **Parked** — SCIM interop exists (`/scim/v2/*` in resource-map); no management-permission mapping yet. |
 | `origins.write`, `signing_keys.*` | `origin.write`, `signing_key.*` | **Yes.** Flat resource permissions; the project grant carries scope. |
-| `apps.write` / `idps.write` | `app.write` / `idp.write` | **Yes.** Plural → singular. |
+| `apps.write` / `idps.write` | `application.write` / `idp.write` | **Yes.** Plural → singular; `apps` also becomes `application`. |
 | `projects.settings.write` | `project.write` | **Yes.** No separate “settings” resource. |
 
 ---
@@ -389,6 +398,7 @@ Full control over a project and its project-scoped resources.
 ```
 project.create, project.read, project.write, project.delete,
 branding.read, branding.write,
+policy.read, policy.write,
 domain.read, domain.write, domain.delete,
 feature.read, feature.write,
 origin.read, origin.write, origin.delete,
@@ -397,7 +407,7 @@ webhook.read, webhook.write, webhook.delete,
 team.create, team.read, team.write, team.delete,
 user.create, user.read, user.write, user.set_password, user.delete,
 team_membership.create, team_membership.read, team_membership.write, team_membership.delete,
-app.read, app.write, app.delete,
+application.read, application.write, application.delete,
 idp.read, idp.write, idp.delete,
 app_group.read, app_group.write, app_group.delete,
 grant.create, grant.read, grant.write, grant.delete,
@@ -422,6 +432,7 @@ Read-only access to all project resources.
 ```
 project.read,
 branding.read,
+policy.read,
 domain.read,
 feature.read,
 origin.read,
@@ -430,7 +441,7 @@ webhook.read,
 team.read,
 user.read,
 team_membership.read,
-app.read,
+application.read,
 idp.read,
 app_group.read,
 grant.read,
@@ -517,7 +528,7 @@ MUST NEVER:
                                       own-team team.read is under MAY)
   billing.*
   idp.*
-  app.*
+  application.*
   app_group.*
   grant.*
   schema.*
@@ -545,7 +556,7 @@ The remaining behavioral and endpoint gaps below are follow-up work.
 **Verb model.** OpenAPI scopes for several resources use only `.read` and
 `.write`, where `.write` means “create and update,” plus a separate `.delete`
 where exposed. This catalog keeps that model for **manage**-class resources
-(`app`, `idp`, `app_group`, `schema`, `flow_definition`, `branding`, `domain`,
+(`application`, `idp`, `app_group`, `schema`, `flow_definition`, `branding`, `domain`,
 `origin`, `webhook`): no separate `.create`, and **no grantable
 `manage` verb** — the class name means the resource’s full lifecycle
 (`write` + `delete` where an endpoint exists); grants still name `write` or

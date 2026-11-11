@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  maskPublicCliVersion,
   normalizePublicCliCommand,
   normalizePublicCliJson,
   normalizePublicCliProse,
@@ -10,7 +11,7 @@ import {
   portableCommands,
   publicCliCommand,
   sdkVersionForCli,
-} from "../../../src/lib/public-cli";
+} from "@/lib/public-cli";
 
 describe("public CLI command formatting", () => {
   it("keeps dist-tag detection separate from alpha follow-up selectors", () => {
@@ -22,15 +23,16 @@ describe("public CLI command formatting", () => {
   it.each([
     ["1.0.0-alpha.25", "1.0.0-alpha.25"],
     ["v1.0.0-alpha.25", "1.0.0-alpha.25"],
-    ["1.0.0", "latest"],
+    ["0.1.0", "0.1.0"],
+    ["1.0.0", "1.0.0"],
     ["1.0.0-beta.2", "beta"],
   ])("pins scaffolded SDKs for CLI %s at %s", (cliVersion, expected) => {
     expect(sdkVersionForCli(cliVersion)).toBe(expected);
   });
 
-  it("uses latest for stable versions", () => {
+  it("pins a release's follow-ups to its own version, whose dist-tag is latest", () => {
     expect(npmDistTagForCliVersion("0.1.0")).toBe("latest");
-    expect(publicCliCommand("start", "0.1.0")).toBe("npx @zitadel/cli@latest start");
+    expect(publicCliCommand("start", "0.1.0")).toBe("npx @zitadel/cli@0.1.0 start");
   });
 
   it("preserves command args exactly", () => {
@@ -123,6 +125,22 @@ describe("normalizePublicCliJson", () => {
       pattern: "^https://",
       nothing: null,
     });
+  });
+});
+
+describe("maskPublicCliVersion", () => {
+  it("makes documents normalized for different CLI versions equal", () => {
+    const body = { description: "Run `zitadel deploy` to publish.", items: ["`zitadel doctor`"] };
+
+    expect(maskPublicCliVersion(normalizePublicCliJson(body, "1.2.0"))).toEqual(
+      maskPublicCliVersion(normalizePublicCliJson(body, "1.3.0")),
+    );
+  });
+
+  it("keeps everything but the version", () => {
+    expect(maskPublicCliVersion({ a: "`npx @zitadel/cli@1.2.0 deploy` and @zitadel/sdk" })).toEqual(
+      { a: "`npx @zitadel/cli@* deploy` and @zitadel/sdk" },
+    );
   });
 });
 

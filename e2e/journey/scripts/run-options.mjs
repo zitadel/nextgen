@@ -117,7 +117,7 @@ export function parseLocalJourneyArgs(args) {
         throw new Error(
           [
             "--backend was removed from the journey runner.",
-            "The journey now always exercises `npx @zitadel/cli@alpha start`.",
+            "The journey now always exercises `npx @zitadel/cli@latest start`.",
             "Remove `--backend`, or pass `--image <docker-tag>` / set ZITADEL_LOCAL_IMAGE to choose the local runtime image.",
           ].join(" "),
         );

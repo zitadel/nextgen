@@ -8,8 +8,8 @@
 ## Decision
 
 Shared behavioral integration tests for v2 statement implementations live in
-[`internal/storage/stmttest`](../../internal/storage/stmttest/). They
-assert domain-visible behavior through [`service.AllStatements`](../../internal/service/statement.go),
+[`internal/storage/stmttest`](../../apps/api/internal/storage/stmttest/). They
+assert domain-visible behavior through [`service.AllStatements`](../../apps/api/internal/service/statement.go),
 not dialect SQL strings.
 
 ## Context
@@ -43,5 +43,5 @@ boundary without pulling in unrelated orchestration.
 - New portable statement behavior should gain a `stmttest` case (or extend an
   existing one) rather than only a dialect-package copy.
 - Engine-specific proof stays next to the engine.
-- Bring-up uses [`dbtest.Pool`](../../internal/storage/dbtest/dbtest.go)
+- Bring-up uses [`dbtest.Pool`](../../apps/api/internal/storage/dbtest/dbtest.go)
   (`database.Pool` + `service.Pool`).

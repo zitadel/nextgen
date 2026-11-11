@@ -1,0 +1,16 @@
+x-meta-schema: true
+type: object
+description: The authentication methods users of this schema can use, one entry per method. At least one is required.
+minProperties: 1
+additionalProperties: false
+properties:
+  password:
+    $ref: auth-method.yaml
+  passkey:
+    $ref: auth-method.yaml
+  magic_link:
+    $ref: auth-method.yaml
+  sso:
+    $ref: sso-auth-method.yaml
+  otp:
+    $ref: auth-method.yaml

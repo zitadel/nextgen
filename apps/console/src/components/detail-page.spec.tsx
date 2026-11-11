@@ -3,11 +3,12 @@ import { Box } from "lucide-react";
 import { describe, expect, it } from "vitest";
 
 import { MetaRule, MetaValue } from "./detail-meta";
-import { DetailHeader, DetailPage } from "./detail-page";
+import { DetailHeader } from "./detail-page";
+import { Page } from "./layout";
 
 function renderHeader(props: Partial<Parameters<typeof DetailHeader>[0]> = {}) {
   render(
-    <DetailPage>
+    <Page>
       <DetailHeader
         icon={Box}
         title="Engineering"
@@ -20,7 +21,7 @@ function renderHeader(props: Partial<Parameters<typeof DetailHeader>[0]> = {}) {
         }
         {...props}
       />
-    </DetailPage>,
+    </Page>,
   );
 }
 

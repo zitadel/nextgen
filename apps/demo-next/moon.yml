@@ -16,6 +16,9 @@ workspace:
 
 tasks:
   typecheck:
+    inputs: ["**/*"]
+    options:
+      mergeInputs: "replace"
     deps:
       - "sdk-next:build"
 

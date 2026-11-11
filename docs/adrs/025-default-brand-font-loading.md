@@ -100,9 +100,8 @@ third-party request.
   OS already has it and the system font otherwise.
 - `typography.font_url` stays the one opt-in, `variant="page"` only, so a
   third-party font host is always the tenant's choice.
-- First-party shells self-host Arimo from their own origin with
-  `@fontsource/arimo`: `apps/console` already did, and `apps/login-ui` now
-  does, so the server's hosted login keeps the brand face.
+- The first-party console self-hosts Arimo from its own origin with
+  `@fontsource/arimo`, so it keeps the brand face.
 - The mock's `defaultDevBranding` sets no typography, so the demos behave
   like a server without branding.
 
@@ -121,9 +120,9 @@ Bullets marked superseded or resolved describe the original decision; the
 amendment above changed them.
 
 - **Brand font out of the box** *(superseded)*. Unbranded login pages painted
-  Arimo from a Google Fonts `<link>`. Since the amendment, only the first-party
-  shells (console, the server's hosted login) paint Arimo, from their own
-  origin; the components render Arimo only where the page or the OS has it.
+  Arimo from a Google Fonts `<link>`. Since the amendment, only the
+  first-party console paints Arimo, from its own origin; the components render
+  Arimo only where the page or the OS has it.
 - **Override preserved.** `typography.font_url` still wins, and is now the only
   font request the components make.
 - **Third-party request by default** *(resolved by the amendment)*. The

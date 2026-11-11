@@ -9,7 +9,7 @@ const CONFIG_EXTENSIONS = ["ts", "mts", "js", "mjs"] as const;
  * The CommonJS extensions we still *probe* (after the ESM ones) so a project
  * whose only config is `*.cjs`/`*.cts` is found and rejected with a targeted
  * "CommonJS is unsupported" error, rather than a misleading "file not found".
- * {@link parseConfigModule} surfaces that error when it sees CommonJS source.
+ * {@link ConfigModule.open} surfaces that error when it sees CommonJS source.
  */
 const COMMONJS_EXTENSIONS = ["cts", "cjs"] as const;
 

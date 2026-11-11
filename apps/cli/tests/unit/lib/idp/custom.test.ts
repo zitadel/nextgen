@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { ZitadelError } from "../../../../src/lib/errors";
-import AuthMethodSsoEnable from "../../../../src/commands/auth-method/sso/enable";
-import Setup from "../../../../src/commands/setup";
+import { ZitadelError } from "@/lib/errors";
+import AuthMethodSsoEnable from "@/commands/auth-method/sso/enable";
+import Setup from "@/commands/setup";
 import {
   checkGivenCustomFlags,
   customExample,
@@ -16,8 +16,8 @@ import {
   loopbackIssuerWarning,
   SETUP_FLAG_NAMES,
   selectionFromFlags,
-} from "../../../../src/lib/idp";
-import { displayName, issuer, slug } from "../../../helpers/idp-values";
+} from "@/lib/idp";
+import { displayName, issuer, slug } from "@tests/helpers/idp-values";
 
 const flag = ENABLE_FLAG_NAMES;
 
@@ -162,10 +162,14 @@ describe("customFlagText", () => {
 });
 
 describe("customFlagValues", () => {
-  it("reads the settings under the keys the command defines them by", () => {
+  it("reads the settings as a command reads its flags, by the key each defines", () => {
     expect(
       customFlagValues(
-        { slug: "a", "display-name": "A", issuer: "https://a.example" },
+        {
+          slug: "a",
+          displayName: "A",
+          issuer: "https://a.example",
+        },
         ENABLE_FLAG_KEYS,
       ),
     ).toEqual({
@@ -177,7 +181,15 @@ describe("customFlagValues", () => {
   });
 
   it("reads setup's own keys, not enable's", () => {
-    expect(customFlagValues({ "sso-slug": "a", "sso-scopes": "openid" }, SETUP_FLAG_KEYS)).toEqual({
+    expect(
+      customFlagValues(
+        {
+          ssoSlug: "a",
+          ssoScopes: "openid",
+        },
+        SETUP_FLAG_KEYS,
+      ),
+    ).toEqual({
       slug: "a",
       displayName: undefined,
       issuer: undefined,

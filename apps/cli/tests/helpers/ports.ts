@@ -36,13 +36,43 @@ const PORT_BLOCK = 50;
 /** How many files can take ports at once, a block each: the most workers Vitest may run. */
 export const PORT_WORKERS = Math.floor((PORT_LAST - PORT_FIRST) / PORT_BLOCK);
 const POOL_SLOT = Math.max(1, Number(process.env.VITEST_POOL_ID ?? 1));
-let portOffset = 0;
 
-export function nextPort(): number {
+/**
+ * This worker's own block of ports, in order.
+ *
+ * @throws Error when the worker's slot is past the last block.
+ */
+function blockOfThisWorker(): readonly number[] {
   if (POOL_SLOT > PORT_WORKERS) {
     throw new Error(
       `VITEST_POOL_ID ${POOL_SLOT} has no port block: run at most ${PORT_WORKERS} workers`,
     );
   }
-  return PORT_FIRST + (POOL_SLOT - 1) * PORT_BLOCK + (portOffset++ % PORT_BLOCK);
+  const first = PORT_FIRST + (POOL_SLOT - 1) * PORT_BLOCK;
+  return Array.from({ length: PORT_BLOCK }, (_, offset) => {
+    return first + offset;
+  });
+}
+
+/**
+ * The ports of `block`, one after the other, and again from its first port
+ * once the last has been handed out. The walk remembers where it is, so no
+ * variable here has to.
+ */
+function* around(block: readonly number[]): Generator<number, never, undefined> {
+  for (;;) {
+    yield* block;
+  }
+}
+
+const walk = around(blockOfThisWorker());
+
+/**
+ * The next port of this worker's block. Successive calls differ until the block
+ * is used up, which is far more ports than a test file takes, so a port a
+ * finished test held is not handed out again while its server may still be
+ * closing.
+ */
+export function nextPort(): number {
+  return walk.next().value;
 }

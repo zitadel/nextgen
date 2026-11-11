@@ -1,0 +1,66 @@
+post:
+  operationId: queryTeams
+  x-zitadel-cli: teams list
+  summary: Query teams
+  description: |
+    Returns a page of a project's teams.
+
+    Pass the response's `next_page_token` as `page_token` to fetch the next
+    page. `project_id` names the project to list; without it, the credential's
+    own project is listed.
+  tags:
+    - Teams
+  security:
+    - oauth2:
+        - team.read
+    - sessionCookie: []
+  parameters:
+    - $ref: ../../../components/parameters/project-id-query.yaml
+  requestBody:
+    description: Request to query the teams of a project.
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: query-teams-request.yaml
+  responses:
+    '200':
+      description: A page of the project's teams.
+      content:
+        application/json:
+          schema:
+            $ref: query-teams-response.yaml
+    '400':
+      description: Invalid request, for example invalid query parameters.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '403':
+      description: Insufficient permissions.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '404':
+      description: Project not found.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '429':
+      description: |
+        Too many requests: the client sent too many in a given amount of time.
+        Wait and retry.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    default:
+      $ref: queryTeams-error-response.yaml

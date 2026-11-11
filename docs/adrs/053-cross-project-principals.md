@@ -21,6 +21,10 @@
 > **Clarifies:** [ADR 046 §1](046-claim-lifecycle-v2.md#1-claim-state-is-a-permission-engine-grant)
 > remains the ownership/claim rule; a direct user assignment defined here is an
 > access grant and never claim state or project ownership.
+>
+> **Amended 2026-11-03** (§2, §8): a grant to a foreign user or team needs a
+> claimed project, and the grant read shows a granted principal's label, not
+> its profile (zitadel/nextgen#2653).
 
 ## Context
 
@@ -141,6 +145,21 @@ partition as the protected resources, preserving ADR 033's consistency and
 residency invariant. Cross-region principal validation is accepted for v1;
 traffic is expected to be operator-scale, and a derived membership projection
 can be introduced later if measurements justify it.
+
+### Amendment (2026-11-03): a foreign grant needs a claimed project
+
+On a server with a platform project, a grant to a foreign `user` or `team`
+principal on a project that has not been claimed is refused with
+`403 grant.project_unclaimed`. This section
+already calls such a grant access to an already owned project, and a project
+with no active owning-team assignment
+([ADR 054 §2](054-customer-collaboration-grants.md#2-every-customer-project-has-one-owning-team))
+has no owner who could share it: whoever holds its project secret is not one.
+The platform project granting its own principals is unaffected, and so is
+every grant on a server without a platform project, where no
+project can be claimed. The refusal depends on the project only, and is
+decided before the principal is resolved, so it reveals nothing about the
+principal (zitadel/nextgen#2653).
 
 ### 3. The resolver keeps home and target scope separate
 
@@ -326,6 +345,19 @@ exception for project secrets does not extend to foreign human sessions.
 > pins both: every operation the Console calls answers a real foreign target
 > exactly as it answers a missing one.
 
+> **Implementation note (2026-10-21, #2112):** the foothold of a by-id check
+> covers the target, not the whole project: a grant scoped project-wide, to the
+> target's team or to the target itself, a membership in the target team or the
+> target's team, or the caller's own user record. Anything else answers like
+> an unknown id, so a principal granted on one team cannot confirm another
+> team or its users exist. Creates, project operations and lists keep the
+> project-wide foothold; they answer before any id is looked up, and the list
+> partial view depends on it. Deletes keep two existing exceptions: an
+> operator project secret gets `204` for an id that names nothing (D10's
+> delete idempotency), and `DELETE /teams/{id}` answers every refusal with
+> `403`. `TestConsoleSessionTeamScopedCannotProbeOtherTeams` pins the case for
+> a session.
+
 ### 8. Audit events are written in the protected project
 
 Every allowed cross-project mutation and every security-relevant read produces
@@ -370,6 +402,18 @@ profile. Audit APIs return the stable actor identifier and non-PII authorization
 metadata; any friendly display label is a separately authorized projection,
 not a cross-project directory read.
 
+### Amendment (2026-11-03): the grant read is the label projection
+
+The grant read on the protected project is that separately authorized
+projection. Whoever may read a project's grants sees, for a granted user, its
+`user_id`, the value of its schema's designated identifier and its display
+name; for a granted team, its `name`. The profile behind them is not readable
+from the protected project: `expand=principal` needs read on the principal's
+home project
+([ADR 059 amendment](059-expanding-embedded-objects.md#amendment-2026-11-03-expanding-needs-read-on-the-home-project)).
+Before this amendment a project secret could read a granted platform user's
+schema, attributes and metadata through the grant API (zitadel/nextgen#2653).
+
 ### 9. Deployment-wide operators are a separate authority
 
 No role, membership, or administrative permission on the platform project
@@ -411,7 +455,7 @@ the account that minted it.
 Cloud operations and self-hosted break-glass may use an explicit
 deployment-wide operator relation or credential. Its issuance, activation,
 customer visibility, and audit requirements are defined separately with staff
-support governance. It must not be represented as
+support governance, in [ADR 075](075-platform-operators.md). It must not be represented as
 `project:platform#admin -> every project`, and it must not be approximated by a
 platform-homed automation key granted broad roles — the operator credential is
 explicit precisely so issuance governance, customer visibility, and audit

@@ -1,22 +1,24 @@
 ---
 title: Projects
-description: OpenAPI operations for projects and project claims.
+description: Create a project, claim it for a team, and manage its origins and admins.
 ---
 
-import { Card, Cards } from "fumadocs-ui/components/card";
+A project is the top-level boundary that holds users, sessions and their
+sign-in configuration. You create one to give your app a place to sign users
+in; [`zitadel setup`](/docs/get-started/quickstart) does it for you.
 
-Projects group application configuration and runtime auth resources. Use these
-endpoints to create, query, read, and update projects, and to claim a project
-for a team.
+A common sequence:
 
-<Cards>
-  <Card title="Create project" href="/docs/reference/api/projects/createProject" />
-  <Card title="Query projects" href="/docs/reference/api/projects/queryProjects" />
-  <Card title="List the projects I can act on" href="/docs/reference/api/projects/listMyProjects" />
-  <Card title="Get project" href="/docs/reference/api/projects/getProject" />
-  <Card title="Update project" href="/docs/reference/api/projects/patchProject" />
-  <Card title="Initialize a project claim" href="/docs/reference/api/projects/initClaim" />
-  <Card title="Get the claim window for a project" href="/docs/reference/api/projects/getClaimWindow" />
-  <Card title="Get claim status" href="/docs/reference/api/projects/getClaimStatus" />
-  <Card title="Complete a project claim" href="/docs/reference/api/projects/completeClaim" />
-</Cards>
+1. Create the project. The response carries the project secret and the preview
+   secret, and no other operation returns them.
+2. Claim it. A project created before anyone signed in has no owning team. A
+   [claim](/docs/concepts/project-team-user#claim) attaches it to a team, so
+   that the team's members administer it. Start the claim, open the returned
+   URL in a browser, and poll the claim's status until it completes.
+   `zitadel claim` runs these steps.
+3. Add origin patterns for the URLs that may use the project.
+
+A claim must finish within 14 days of the project's creation. After that the
+project can no longer be claimed.
+
+<Operations />

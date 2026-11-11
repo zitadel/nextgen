@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/api",
-  "version": "1.0.0-alpha.28",
+  "version": "0.6.0",
   "description": "Generated TypeScript API client for the pre-release Zitadel preview.",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/api#readme",
   "bugs": {
@@ -42,6 +42,11 @@
       "types": "./dist/generated/endpoints/zitadelNextGen.zod.d.mts",
       "import": "./dist/generated/endpoints/zitadelNextGen.zod.mjs"
     },
+    "./generated/operations": {
+      "@zitadel/source": "./src/generated/operations.ts",
+      "types": "./dist/generated/operations.d.mts",
+      "import": "./dist/generated/operations.mjs"
+    },
     "./runtime/base-url": {
       "@zitadel/source": "./src/runtime/base-url.ts",
       "types": "./dist/runtime/base-url.d.mts",
@@ -51,6 +56,11 @@
       "@zitadel/source": "./src/runtime/auth.ts",
       "types": "./dist/runtime/auth.d.mts",
       "import": "./dist/runtime/auth.mjs"
+    },
+    "./runtime/paging": {
+      "@zitadel/source": "./src/runtime/paging.ts",
+      "types": "./dist/runtime/paging.d.mts",
+      "import": "./dist/runtime/paging.mjs"
     },
     "./runtime/fetch": {
       "@zitadel/source": "./src/runtime/fetch.ts",
@@ -70,7 +80,7 @@
   },
   "scripts": {
     "generate": "node ../../scripts/task-guard.mjs --mutex generated-sources -- orval --config orval.config.ts --clean",
-    "build": "tsdown",
+    "build": "tsdown && attw --pack . --profile=esm-only",
     "test": "vitest run",
     "test:all": "pnpm run test",
     "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json",
@@ -80,7 +90,9 @@
   },
   "devDependencies": {
     "@faker-js/faker": "catalog:",
+    "@redocly/openapi-core": "catalog:",
     "@types/node": "catalog:",
+    "@zitadel/vitest-config": "workspace:*",
     "msw": "catalog:",
     "orval": "catalog:",
     "tsdown": "catalog:",

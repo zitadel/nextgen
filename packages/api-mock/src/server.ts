@@ -6,6 +6,11 @@
  * reusing the existing MSW handlers via @mswjs/http-middleware — zero
  * duplication of routing logic.
  *
+ * Like the server until 1.0.0 (ADR 077), every API route answers at
+ * `/api/v1/<path>` and at its old root `<path>`; the paths below are the
+ * spec's. The JWKS, OIDC discovery, `/auth/*` and `/console/runtime.json`
+ * are not API operations and stay at the root.
+ *
  * Custom-only routes added on top:
  *   POST   /sessions/exchange     — exchange handoff_token for session cookie
  *   GET    /sessions/me           — get current session from opaque cookie
@@ -36,6 +41,7 @@ import type { Server } from "node:http";
 import { createMiddleware } from "@mswjs/http-middleware";
 import { CompleteClaimBody } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import type { ExchangeHandoff200, GetMySession200 } from "@zitadel/api/generated/model";
+import { API_PREFIX } from "@zitadel/api/runtime/base-url";
 import cookieParser from "cookie-parser";
 import express from "express";
 
@@ -47,6 +53,9 @@ import { buildOpenIdConfiguration } from "./openid-configuration.js";
 import { completeClaimChallenge, errorBody, setupPlatformHandlers } from "./platform-handlers.js";
 
 const SESSION_TTL_SECONDS = 3600;
+
+/** An API route's two spellings: under the API prefix and at the old root path. */
+const apiPaths = (path: string): string[] => [`${API_PREFIX}${path}`, path];
 
 // The claiming human's account lives in Zitadel's own platform project (ADR
 // 046 §2), so only a session belonging to it may complete a claim. Exported so
@@ -82,7 +91,22 @@ const DEMO_DISPLAY_NAMES = new Map<string, string>([
 ]);
 const sessionStore = new Map<string, StoredSession>();
 
-/** What the request's `__nextgen_session` cookie names, if anything. */
+/**
+ * The session cookie's names (ADR 083): the canonical one, which the SDK
+ * proxies send upstream and the server reads over any transport, and the one
+ * the server sets over plain http to a loopback host, where the mock runs. The
+ * names before ADR 083 are neither read nor written.
+ */
+const SESSION_COOKIE = "__Host-zitadel_session";
+const LOOPBACK_SESSION_COOKIE = "zitadel_session";
+
+/** The request's session token: the canonical cookie's first, as the server on loopback http reads them. */
+function sessionToken(req: express.Request): string | undefined {
+  const cookies = req.cookies as Record<string, string | undefined>;
+  return cookies[SESSION_COOKIE] || cookies[LOOPBACK_SESSION_COOKIE] || undefined;
+}
+
+/** What the request's session cookie names, if anything. */
 type SessionLookup =
   | { status: "missing" }
   | { status: "unknown"; token: string }
@@ -95,7 +119,7 @@ type SessionLookup =
  * the failures in its own words; this only says which one it was.
  */
 function lookupSession(req: express.Request): SessionLookup {
-  const token = (req.cookies as Record<string, string>).__nextgen_session;
+  const token = sessionToken(req);
   if (!token) return { status: "missing" };
   const session = sessionStore.get(token);
   if (!session) return { status: "unknown", token };
@@ -180,9 +204,8 @@ const idempotencyCache = new Map<string, IdempotencyCacheEntry>();
  * Build the configured Express app without binding it to a port.
  *
  * Returning the bare app (rather than a listening {@link Server}) lets a
- * serverless host — e.g. a Vercel function — use it directly as a
- * request handler, while {@link startMockServer} wraps it for the
- * standalone dev server.
+ * caller mount it as a request handler, while {@link startMockServer} wraps
+ * it for the standalone dev server.
  *
  * The issuer is fixed at construction on purpose: the handoff tokens the
  * mock signs (inside the MSW handlers) and the `expectedIss` it later
@@ -194,15 +217,14 @@ const idempotencyCache = new Map<string, IdempotencyCacheEntry>();
  * branding overlay is likewise module-scoped — `applyBranding` mutates it
  * during construction. So two apps built in the same process **share** all
  * of that state; there is no per-instance isolation. This is intentional
- * for the single-app dev/serverless use cases; tests that need isolation
- * should run in separate workers (as Vitest does) rather than creating
- * multiple apps in one.
+ * for the single-app dev server; tests that need isolation should run in
+ * separate workers (as Vitest does) rather than creating multiple apps in
+ * one.
  *
  * @param options.issuer - Absolute base URL this mock advertises as its
- *   OIDC issuer (`http://localhost:8080` locally, the preview domain on
- *   Vercel). Embedded in the discovery document and used as the expected
- *   issuer when verifying handoff tokens (the JWKS responses carry only
- *   the key, not the issuer).
+ *   OIDC issuer (e.g. `http://localhost:8080`). Embedded in the discovery
+ *   document and used as the expected issuer when verifying handoff tokens
+ *   (the JWKS responses carry only the key, not the issuer).
  */
 export function createMockApp(options: { issuer: string }): express.Express {
   applyBranding(defaultDevBranding);
@@ -210,11 +232,10 @@ export function createMockApp(options: { issuer: string }): express.Express {
   const app = express();
   app.use(cookieParser());
 
-  // CORS reflects any origin, with credentials, on purpose. Besides local
-  // development, apps/mock-zitadel deploys this app publicly for every pull
-  // request so a demo app, an SDK or a manual test on another origin can be
-  // pointed at a branch, and those callers need the session cookie. It serves
-  // only fake data. The real server's rules (ADR 053 §5) are not modelled here.
+  // CORS reflects any origin, with credentials, on purpose: a demo app, an SDK
+  // or a manual test on another local origin (another port) needs the session
+  // cookie. It serves only fake data. The real server's rules (ADR 053 §5) are
+  // not modelled here.
   app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
     const origin = req.headers.origin;
     res.setHeader("Vary", "Origin");
@@ -254,7 +275,7 @@ export function createMockApp(options: { issuer: string }): express.Express {
     });
   };
   app.post(
-    "/sessions/exchange",
+    apiPaths("/sessions/exchange"),
     jsonBodyParser,
     async (req: express.Request, res: express.Response) => {
       const projectId = req.query.project_id;
@@ -359,7 +380,7 @@ export function createMockApp(options: { issuer: string }): express.Express {
       sessionStore.set(opaqueToken, sessionData);
 
       const setCookie = [
-        `__nextgen_session=${opaqueToken}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${SESSION_TTL_SECONDS}`,
+        `${LOOPBACK_SESSION_COOKIE}=${opaqueToken}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${SESSION_TTL_SECONDS}`,
         `_zflow=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,
       ];
       res.setHeader("Set-Cookie", setCookie);
@@ -404,7 +425,7 @@ export function createMockApp(options: { issuer: string }): express.Express {
   // the same `401 auth.unauthorized` verdict (`invalidSessionCredential` and
   // the nextgenSession security handler in internal/api), which the SDKs and
   // widgets read as "no session".
-  app.get("/sessions/me", (req: express.Request, res: express.Response) => {
+  app.get(apiPaths("/sessions/me"), (req: express.Request, res: express.Response) => {
     // Both the session and the 401 are session state: neither may be stored.
     res.setHeader("Cache-Control", "private, no-store");
     // Mirrors the server, which validates a present project_id against the
@@ -429,7 +450,7 @@ export function createMockApp(options: { issuer: string }): express.Express {
 
   // GET /sessions/me/csrf — the session's CSRF token (ADR 053 §5). Mirrors
   // the Go server's GetMySessionCsrfToken handler.
-  app.get("/sessions/me/csrf", (req: express.Request, res: express.Response) => {
+  app.get(apiPaths("/sessions/me/csrf"), (req: express.Request, res: express.Response) => {
     // Both the token and the 401 are session state: neither may be stored.
     res.setHeader("Cache-Control", "private, no-store");
     const found = lookupSession(req);
@@ -448,7 +469,7 @@ export function createMockApp(options: { issuer: string }): express.Express {
   // Go server's revokeMySession handler and the SDK proxy's logout call: a
   // cookie that names no live, unexpired session is refused the way GET is,
   // with `401 auth.unauthorized`.
-  app.delete("/sessions/me", (req: express.Request, res: express.Response) => {
+  app.delete(apiPaths("/sessions/me"), (req: express.Request, res: express.Response) => {
     const found = lookupSession(req);
     if (found.status !== "active") {
       res.status(401).json(noSessionBody());
@@ -471,7 +492,7 @@ export function createMockApp(options: { issuer: string }): express.Express {
     if (refuseForProject(req, res, found.session)) return;
     sessionStore.delete(found.token);
     res.setHeader("Set-Cookie", [
-      `__nextgen_session=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,
+      `${LOOPBACK_SESSION_COOKIE}=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,
       `__nextgen_display=; Path=/; SameSite=Lax; Max-Age=0`,
       `_zflow=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,
     ]);
@@ -480,10 +501,10 @@ export function createMockApp(options: { issuer: string }): express.Express {
 
   // POST /projects/:project_id/claim/complete — the browser leg of the claim
   // dance. A custom Express route (not an MSW handler) because it authenticates
-  // with the module-scoped __nextgen_session cookie, exactly like GET
+  // with the module-scoped session cookie, exactly like GET
   // /sessions/me. The challenge_id from the body is its browser-safe authorization.
   app.post(
-    "/projects/:project_id/claim/complete",
+    apiPaths("/projects/:project_id/claim/complete"),
     jsonBodyParser,
     (req: express.Request, res: express.Response) => {
       const found = lookupSession(req);
@@ -535,12 +556,12 @@ export function createMockApp(options: { issuer: string }): express.Express {
 
   app.get("/auth/end-session", (req: express.Request, res: express.Response) => {
     // Clean up session from store when logging out
-    const token = (req.cookies as Record<string, string>).__nextgen_session;
+    const token = sessionToken(req);
     if (token) {
       sessionStore.delete(token);
     }
     res.setHeader("Set-Cookie", [
-      `__nextgen_session=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,
+      `${LOOPBACK_SESSION_COOKIE}=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,
       `__nextgen_display=; Path=/; SameSite=Lax; Max-Age=0`,
       `_zflow=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,
     ]);
@@ -561,6 +582,6 @@ export function startMockServer(port: number): Server {
   return app.listen(port, () => {
     console.log(`\napi-mock server listening on http://localhost:${port}`);
     console.log(`  JWKS: http://localhost:${port}/.well-known/jwks.json`);
-    console.log(`  Sessions exchange: http://localhost:${port}/sessions/exchange\n`);
+    console.log(`  Sessions exchange: http://localhost:${port}${API_PREFIX}/sessions/exchange\n`);
   });
 }

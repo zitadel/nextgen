@@ -14,18 +14,21 @@ conflict.
 
 | Path | What it is | Rules |
 | --- | --- | --- |
-| `main.go`, `cmd/`, `internal/` | the Go server | [internal](internal/AGENTS.md), [storage](internal/storage/AGENTS.md), [service](internal/service/AGENTS.md) |
-| `api/openapi/` | OpenAPI source of the wire contract | [openapi](api/openapi/AGENTS.md) |
+| `apps/api/` | the Go server module `github.com/zitadel/nextgen`: `main.go`, `cmd/`, `internal/`, `api/` | [internal](apps/api/internal/AGENTS.md), [storage](apps/api/internal/storage/AGENTS.md), [service](apps/api/internal/service/AGENTS.md) |
+| `apps/api/api/openapi/` | OpenAPI source of the wire contract | [openapi](apps/api/api/openapi/AGENTS.md) |
 | `apps/` | deployable apps | [apps](apps/AGENTS.md) |
-| `apps/server/`, `apps/server-*/` | the Go `server:*` tasks; the `@zitadel/server` npm binaries | — |
+| `apps/server/`, `apps/server-*/` | the Go `server:*` tasks, run against `apps/api`; the `@zitadel/server` npm binaries | — |
 | `apps/cli/` | the `zitadel` CLI | [cli](apps/cli/AGENTS.md), [tests](apps/cli/tests/AGENTS.md), [local server](apps/cli/src/lib/local-server/AGENTS.md) |
-| `apps/console/`, `apps/login-ui/` | the SPAs the server embeds | [console](apps/console/AGENTS.md) |
+| `apps/console/` | the SPA the server embeds | [console](apps/console/AGENTS.md) |
+| `apps/cloud-console/` | the hosted cloud's add-on to the console | [cloud-console](apps/cloud-console/AGENTS.md) |
+| `apps/cloud-functions/` | the hosted cloud's backend: RPC, bot check, webhooks, workflows | [cloud-functions](apps/cloud-functions/AGENTS.md) |
 | `apps/docs/`, `apps/website/` | the docs site; the hosted cloud's front page | [docs](apps/docs/AGENTS.md), [website](apps/website/AGENTS.md) |
 | `apps/storybook/` | workbench and a11y gate for the login atoms | [storybook](apps/storybook/AGENTS.md) |
 | `apps/demo-*/` | reference apps for the sign-in component | [next](apps/demo-next/README.md), [nuxt](apps/demo-nuxt/README.md) |
-| `apps/cloud/`, `apps/mock-zitadel/` | the hosted cloud; the per-PR mock API | [runbook](docs/runbooks/cloud.md) |
+| `apps/cloud/` | the hosted cloud | [runbook](docs/runbooks/cloud.md) |
 | `e2e/` | every end-to-end lane, moon project `e2e` | [journey](e2e/journey/AGENTS.md), [console](e2e/console/AGENTS.md), [demo-next](e2e/demo-next/AGENTS.md), [demo-nuxt](e2e/demo-nuxt/AGENTS.md) |
 | `packages/` | SDKs (`sdk-*`), API client, config schemas | [packages](packages/AGENTS.md) |
+| `packages/go/` | the Go API client module `go.zitadel.com/zitadel/v5`, generated with the server | [go](packages/go/AGENTS.md) |
 | `packages/components/` | `<zl-*>` atoms, the `<zitadel-login>` orchestrator | [components](packages/components/AGENTS.md) |
 | `packages/design-tokens/` | the `--zl-*` tokens both UIs share | [design-tokens](packages/design-tokens/AGENTS.md) |
 | `packages/api-mock/` | mock API for demos and tests | [api-mock](packages/api-mock/AGENTS.md) |
@@ -69,12 +72,15 @@ consumer-agent contract is the CLI's
   - CI's `server:check-generate-pruned` fails on drift and on generated files
     nothing generates any more.
   - Do not reintroduce a scheduler-side bootstrap pass for `go generate`;
-    `api/cmd/gen_openapi_errors` breaks the cycle itself.
+    `apps/api/api/cmd/gen_openapi_errors` breaks the cycle itself.
   - Keep `mockgen` directives in the mock packages, not beside the interfaces.
+- **Go modules**: every module in `go.work` compiles with what its own `go.mod`
+  selects; after a `go.mod` change run `node scripts/check-go-work.mjs --fix`
+  (`workspace:check-go-work`).
 - **Resource IDs**: never write ULID/UUID helpers; mint them as
-  [storage](internal/storage/AGENTS.md) says ([ADR 047](docs/adrs/047-dialect-id-generation.md)).
+  [storage](apps/api/internal/storage/AGENTS.md) says ([ADR 047](docs/adrs/047-dialect-id-generation.md)).
 - **Wire casing**: fields, enum values and parameters are `snake_case`;
-  `server:openapi` lints the spec ([openapi](api/openapi/AGENTS.md)).
+  `server:openapi` lints the spec ([openapi](apps/api/api/openapi/AGENTS.md)).
 - **CLI contract**: keep `--json` output one parseable envelope on stdout;
   update [SKILL.md](apps/cli/skills/zitadel-cli/SKILL.md) with every behavior change.
 - **UI surface**: decide whether a component is console or login UI before

@@ -5,6 +5,7 @@
 
   import type { ZitadelLogoutSvelteProps } from './types';
   import { assignGiven } from './given';
+  import { withDetail } from './events';
   import { onClient, proxyPathAttr } from './attributes';
 
   let {
@@ -45,7 +46,7 @@
       return;
     }
     const signout = (event: Event): void => {
-      if (event instanceof CustomEvent) onSignout?.(event.detail);
+      withDetail(event, onSignout);
     };
     node.addEventListener('zitadel-signout', signout);
     return () => {

@@ -1,0 +1,485 @@
+package authz_test
+
+import (
+	"strings"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/storage/dialect/authz"
+)
+
+type recordingWriter struct {
+	b    strings.Builder
+	args []any
+}
+
+func (r *recordingWriter) WriteString(s string) { r.b.WriteString(s) }
+func (r *recordingWriter) WriteArg(arg any) {
+	r.args = append(r.args, arg)
+	r.b.WriteString("?")
+}
+
+func testEnv(r *recordingWriter) authz.Env {
+	return authz.Env{
+		Schema: "zitadel_nextgen.",
+		Now:    func(w authz.ArgWriter) { w.WriteString("NOW_SENTINEL") },
+	}
+}
+
+func TestWriteCheckAndListShareFullTTU(t *testing.T) {
+	t.Parallel()
+	params := domain.AuthzCheckParams{
+		CatalogID:     "cat_sys_1",
+		ProjectID:     "proj_1",
+		PrincipalType: domain.AuthzPrincipalTypeUser,
+		PrincipalID:   "user_a",
+		ObjectType:    "project",
+		Relation:      "viewer",
+	}
+
+	var check recordingWriter
+	authz.WriteCheckAuthz(&check, testEnv(&check), params)
+	sql := check.b.String()
+	require.Contains(t, sql, "tuple_to_userset")
+	assert.Contains(t, sql, "a.scope_kind = 'team' AND a.scope_team_id = ts.principal_id")
+	assert.Contains(t, sql, "a.scope_kind = 'resource' AND a.scope_resource_id = ts.principal_id")
+	assert.Contains(t, sql, "ts.principal_type = edge.source_object_type")
+	assert.Contains(t, sql, "NOW_SENTINEL")
+	assert.Contains(t, sql, "zitadel_nextgen.authz_assignments")
+
+	listParams := domain.AuthzListObjectsParams{
+		AuthzCheckParams: params,
+		ResourceKind:     domain.ResourceKindUser,
+	}
+	var list recordingWriter
+	authz.WriteListAuthzObjectIDs(&list, testEnv(&list), listParams)
+	listSQL := list.b.String()
+	require.Contains(t, listSQL, "tuple_to_userset")
+	assert.Contains(t, listSQL, "a.scope_kind = 'team' AND a.scope_team_id = ts.principal_id")
+	assert.Contains(t, listSQL, "a.scope_kind = 'resource' AND a.scope_resource_id = ts.principal_id")
+	assert.Contains(t, listSQL, "ts.principal_type = edge.source_object_type")
+	assert.Contains(t, listSQL, "NOW_SENTINEL")
+
+	var exists recordingWriter
+	authz.WriteListAuthzExistsPredicate(&exists, testEnv(&exists), "zitadel_nextgen.users.id", listParams)
+	existsSQL := exists.b.String()
+	require.Contains(t, existsSQL, "EXISTS (")
+	assert.Contains(t, existsSQL, "r.resource_id = zitadel_nextgen.users.id")
+	assert.Contains(t, existsSQL, "tuple_to_userset")
+	assert.Contains(t, existsSQL, "a.scope_kind = 'team' AND a.scope_team_id = ts.principal_id")
+	assert.Contains(t, existsSQL, "a.scope_kind = 'resource' AND a.scope_resource_id = ts.principal_id")
+}
+
+func TestWriteCheckAuthzBindOrder(t *testing.T) {
+	t.Parallel()
+	params := domain.AuthzCheckParams{
+		CatalogID:              "cat_sys_1",
+		ProjectID:              "proj_1",
+		PrincipalHomeProjectID: "proj_home",
+		PrincipalType:          domain.AuthzPrincipalTypeUser,
+		PrincipalID:            "user_a",
+		ObjectType:             "project",
+		Relation:               "viewer",
+	}
+	var w recordingWriter
+	authz.WriteCheckAuthz(&w, testEnv(&w), params)
+	require.NotEmpty(t, w.args)
+	// The user's status in their home project comes first (#1234).
+	assert.Equal(t, []any{"proj_home", "user_a", domain.UserStatusActive.String()}, w.args[:3])
+	assert.Equal(t, "project", w.args[3])
+	assert.Equal(t, "viewer", w.args[4])
+	assert.Equal(t, "proj_1", w.args[5])
+	assert.Equal(t, "cat_sys_1", w.args[6])
+	assert.Contains(t, w.args, "user_a")
+	assert.Contains(t, w.args, "proj_home")
+	assert.Contains(t, w.args, domain.AuthzPrincipalTypeUser.String())
+	homeBinds := 0
+	for _, arg := range w.args {
+		if arg == "proj_home" {
+			homeBinds++
+		}
+	}
+	assert.GreaterOrEqual(t, homeBinds, 2, "home must bind in both the allowed arm and the foothold arm")
+}
+
+// The membership test must stay the correlated EXISTS, spelled exactly like
+// this. An `IN (SELECT e.set_id …)` rewrite is semantically identical and passes
+// every behavioural suite, but it sent the Spanner emulator's planner
+// pathological on the management-list predicate and timed the lane out. Pin the
+// text so the next refactor has to argue with a red test rather than with CI.
+func TestWriteUserMembershipInTeamStaysACorrelatedExists(t *testing.T) {
+	t.Parallel()
+	var w recordingWriter
+	authz.WriteCheckAuthz(&w, testEnv(&w), domain.AuthzCheckParams{
+		CatalogID:              "cat_sys_1",
+		ProjectID:              "proj_customer",
+		PrincipalHomeProjectID: "proj_platform",
+		PrincipalType:          domain.AuthzPrincipalTypeUser,
+		PrincipalID:            "user_a",
+		ObjectType:             "project",
+		Relation:               "viewer",
+	})
+	assert.Contains(t, w.b.String(), `EXISTS (
+        SELECT 1
+        FROM zitadel_nextgen.authz_membership_edges e
+        WHERE e.project_id = ?
+          AND e.set_type = 'team'
+          AND e.set_id = a.principal_id
+          AND e.member_type = 'user'
+          AND e.member_id = ?
+    )`)
+}
+
+func TestWriteActiveSystemCatalogID(t *testing.T) {
+	t.Parallel()
+	var w recordingWriter
+	authz.WriteActiveSystemCatalogID(&w, testEnv(&w))
+	assert.Equal(t, []any{
+		domain.AuthzCatalogKindSystem.String(),
+		domain.SystemCatalogOwnerID,
+		domain.AuthzCatalogStatusActive.String(),
+	}, w.args)
+	assert.Contains(t, w.b.String(), "zitadel_nextgen.authz_catalogs")
+}
+
+func TestWriteCheckAuthzScopedGrantArms(t *testing.T) {
+	t.Parallel()
+	params := domain.AuthzCheckParams{
+		CatalogID:      "cat_sys_1",
+		ProjectID:      "proj_1",
+		PrincipalType:  domain.AuthzPrincipalTypeUser,
+		PrincipalID:    "user_a",
+		ObjectType:     "project",
+		Relation:       "viewer",
+		ResourceID:     "usr_1",
+		ResourceTeamID: "team_1",
+	}
+	var w recordingWriter
+	authz.WriteCheckAuthz(&w, testEnv(&w), params)
+	assert.Contains(t, w.b.String(), "a.scope_kind = 'team' AND a.scope_team_id = ?")
+	assert.Contains(t, w.b.String(), "a.scope_kind = 'resource' AND a.scope_resource_id = ?")
+	assert.Contains(t, w.args, "team_1")
+	assert.Contains(t, w.args, "usr_1")
+}
+
+func TestWriteCheckAuthzConstraintTeam(t *testing.T) {
+	t.Parallel()
+	params := domain.AuthzCheckParams{
+		CatalogID:        "cat_sys_1",
+		ProjectID:        "proj_1",
+		PrincipalType:    domain.AuthzPrincipalTypeSKTeam,
+		PrincipalID:      "sk_team_1",
+		ObjectType:       "project",
+		Relation:         "viewer",
+		ConstraintTeamID: "team_1",
+		ResourceID:       "usr_in",
+	}
+	var w recordingWriter
+	authz.WriteCheckAuthz(&w, testEnv(&w), params)
+	assert.Contains(t, w.b.String(), "authz_membership_edges")
+	assert.Contains(t, w.args, "team_1")
+	assert.Contains(t, w.args, "usr_in")
+
+	listParams := domain.AuthzListObjectsParams{
+		AuthzCheckParams: params,
+		ResourceKind:     domain.ResourceKindUser,
+	}
+	var list recordingWriter
+	authz.WriteListAuthzObjectIDs(&list, testEnv(&list), listParams)
+	assert.Contains(t, list.b.String(), "authz_membership_edges")
+	assert.Contains(t, list.b.String(), "r.resource_kind = ?")
+	assert.Contains(t, list.b.String(), "r.resource_kind <> ?")
+	assert.Contains(t, list.args, "team_1")
+
+	withTeam := params
+	withTeam.ResourceTeamID = "team_1"
+	var checkTeam recordingWriter
+	authz.WriteCheckAuthz(&checkTeam, testEnv(&checkTeam), withTeam)
+	assert.Contains(t, checkTeam.b.String(), "authz_membership_edges")
+	assert.Contains(t, checkTeam.args, "team_1")
+}
+
+func TestWriteHasAuthzProjectFoothold(t *testing.T) {
+	t.Parallel()
+	var w recordingWriter
+	authz.WriteHasAuthzProjectFoothold(&w, testEnv(&w), "proj_1", "", domain.AuthzPrincipalTypeUser, "user_a")
+	assert.Contains(t, w.b.String(), "NOW_SENTINEL")
+	assert.Contains(t, w.args, "proj_1")
+	assert.Contains(t, w.args, "user_a")
+}
+
+func bindAtFragment(t *testing.T, sql string, args []any, fragment string) any {
+	t.Helper()
+	i := strings.Index(sql, fragment)
+	require.NotEqual(t, -1, i, "missing %q in:\n%s", fragment, sql)
+	n := strings.Count(sql[:i+len(fragment)], "?") - 1
+	require.GreaterOrEqual(t, n, 0)
+	require.Less(t, n, len(args))
+	return args[n]
+}
+
+func assertFootholdHomeSplit(t *testing.T, sql string, args []any, protected, home string) {
+	t.Helper()
+	assert.Equal(t, protected, bindAtFragment(t, sql, args, "a.project_id = ?"), "assignment filter binds the protected project")
+	assert.Equal(t, home, bindAtFragment(t, sql, args, "e.project_id = ?\n          AND e.set_type = 'team'"), "team expand binds the home project")
+	assert.Equal(t, protected, bindAtFragment(t, sql, args, "e.project_id = ?\n          AND e.member_type = 'user'"), "local membership shortcut stays on the protected project")
+}
+
+func TestWriteHasAuthzProjectFootholdDistinctHome(t *testing.T) {
+	t.Parallel()
+	var w recordingWriter
+	authz.WriteHasAuthzProjectFoothold(&w, testEnv(&w), "proj_customer", "proj_platform", domain.AuthzPrincipalTypeUser, "user_a")
+	assertFootholdHomeSplit(t, w.b.String(), w.args, "proj_customer", "proj_platform")
+}
+
+func TestWriteHasAuthzProjectFootholdEmptyHomeCoalesces(t *testing.T) {
+	t.Parallel()
+	var w recordingWriter
+	authz.WriteHasAuthzProjectFoothold(&w, testEnv(&w), "proj_1", "", domain.AuthzPrincipalTypeUser, "user_a")
+	assertFootholdHomeSplit(t, w.b.String(), w.args, "proj_1", "proj_1")
+}
+
+func TestWriteCheckAuthzDistinctHomeSplit(t *testing.T) {
+	t.Parallel()
+	params := domain.AuthzCheckParams{
+		CatalogID:              "cat_sys_1",
+		ProjectID:              "proj_customer",
+		PrincipalHomeProjectID: "proj_platform",
+		PrincipalType:          domain.AuthzPrincipalTypeUser,
+		PrincipalID:            "user_a",
+		ObjectType:             "project",
+		Relation:               "viewer",
+	}
+	var w recordingWriter
+	authz.WriteCheckAuthz(&w, testEnv(&w), params)
+	assertFootholdHomeSplit(t, w.b.String(), w.args, "proj_customer", "proj_platform")
+}
+
+// A targeted Check narrows the foothold to the target (#2112) and keeps the
+// home split: assignments on the protected project, team expansion in home,
+// the local membership on the protected project.
+func TestWriteCheckAuthzTargetFoothold(t *testing.T) {
+	t.Parallel()
+	params := domain.AuthzCheckParams{
+		CatalogID:              "cat_sys_1",
+		ProjectID:              "proj_customer",
+		PrincipalHomeProjectID: "proj_platform",
+		PrincipalType:          domain.AuthzPrincipalTypeUser,
+		PrincipalID:            "user_a",
+		ObjectType:             "project",
+		Relation:               "viewer",
+		ResourceID:             "team_1",
+		ResourceTeamID:         "team_1",
+	}
+	var w recordingWriter
+	authz.WriteCheckAuthz(&w, testEnv(&w), params)
+	sql := w.b.String()
+	assertFootholdHomeSplit(t, sql, w.args, "proj_customer", "proj_platform")
+	assert.Equal(t, "team_1", bindAtFragment(t, sql, w.args, "OR (a.scope_kind = 'team' AND a.scope_team_id = ?"))
+	assert.Equal(t, "team_1", bindAtFragment(t, sql, w.args, "AND (e.set_id = ?"))
+
+	untargeted := params
+	untargeted.ResourceID, untargeted.ResourceTeamID = "", ""
+	var u recordingWriter
+	authz.WriteCheckAuthz(&u, testEnv(&u), untargeted)
+	assert.NotContains(t, u.b.String(), "AND (e.set_id =", "no target keeps the project-wide foothold")
+}
+
+func TestWriteCheckAuthzEmptyHomeCoalesces(t *testing.T) {
+	t.Parallel()
+	params := domain.AuthzCheckParams{
+		CatalogID:     "cat_sys_1",
+		ProjectID:     "proj_1",
+		PrincipalType: domain.AuthzPrincipalTypeUser,
+		PrincipalID:   "user_a",
+		ObjectType:    "project",
+		Relation:      "viewer",
+	}
+	var w recordingWriter
+	authz.WriteCheckAuthz(&w, testEnv(&w), params)
+	assertFootholdHomeSplit(t, w.b.String(), w.args, "proj_1", "proj_1")
+}
+
+// Folding the constant arms back inside the correlated EXISTS changes only
+// timings, so every behavioural suite would stay green. Hence a string-index
+// guard on the emitted shape.
+func TestListPredicateLiftsConstantArms(t *testing.T) {
+	t.Parallel()
+	var w recordingWriter
+	authz.WriteListAuthzExistsPredicate(&w, testEnv(&w), "zitadel_nextgen.teams.id",
+		domain.AuthzListObjectsParams{
+			AuthzCheckParams: domain.AuthzCheckParams{
+				CatalogID:     "cat_sys_1",
+				ProjectID:     "proj_1",
+				PrincipalType: domain.AuthzPrincipalTypeUser,
+				PrincipalID:   "user_a",
+				ObjectType:    "project",
+				Relation:      "viewer",
+			},
+			ResourceKind: domain.ResourceKindTeam,
+		})
+	sql := w.b.String()
+
+	// The correlated subquery is the first mention of the RSI alias, so the
+	// lifted arms must appear before it.
+	firstRSI := strings.Index(sql, "resource_scope_index r")
+	require.NotEqual(t, -1, firstRSI, "predicate must query resource_scope_index")
+
+	// LastIndex, not Index: writeFullTTUExists emits `a.scope_kind = 'project'`
+	// too, so the first match would not pin the direct arm's placement.
+	require.Contains(t, sql, "a.scope_kind = 'project'", "project-scoped arm must be emitted")
+	assert.Less(t, strings.LastIndex(sql, "a.scope_kind = 'project'"), firstRSI,
+		"every project-scoped arm must be lifted out of the correlated EXISTS")
+
+	require.Contains(t, sql, "tuple_to_userset", "tuple-to-userset arm must be emitted")
+	assert.Less(t, strings.LastIndex(sql, "tuple_to_userset"), firstRSI,
+		"tuple-to-userset arm must be lifted out of the correlated EXISTS")
+
+	assert.Equal(t, 2, strings.Count(sql, "resource_scope_index r"),
+		"both halves of the lifted predicate must require an RSI row")
+
+	// The count above is blind to the connector, and an OR there is the leak.
+	head := sql[:firstRSI]
+	openingExists := strings.LastIndex(head, "EXISTS (")
+	require.NotEqual(t, -1, openingExists, "the first RSI subquery must be an EXISTS")
+	assert.True(t, strings.HasSuffix(strings.TrimSpace(head[:openingExists]), "AND"),
+		"the constant arms must be ANDed with the RSI existence check, not ORed: "+
+			"an OR would make objects with no RSI row visible to any project-wide grant")
+
+	// The arms that genuinely depend on the row must stay inside, correlated.
+	assert.Contains(t, sql, "a.scope_team_id = r.team_id")
+	assert.Contains(t, sql, "a.scope_resource_id = r.resource_id")
+}
+
+// The sk_team clause is correlated to r, so the lift must carry it into both
+// halves. In the correlated half only, the first half becomes `C AND
+// EXISTS(base)` and objects outside the token's team become visible to any
+// project-wide grant.
+func TestListPredicateConstraintTeamInBothHalves(t *testing.T) {
+	t.Parallel()
+	var w recordingWriter
+	authz.WriteListAuthzExistsPredicate(&w, testEnv(&w), "zitadel_nextgen.teams.id",
+		domain.AuthzListObjectsParams{
+			AuthzCheckParams: domain.AuthzCheckParams{
+				CatalogID:        "cat_sys_1",
+				ProjectID:        "proj_1",
+				PrincipalType:    domain.AuthzPrincipalTypeSKTeam,
+				PrincipalID:      "sk_team_1",
+				ObjectType:       "project",
+				Relation:         "viewer",
+				ConstraintTeamID: "team_1",
+			},
+			ResourceKind: domain.ResourceKindTeam,
+		})
+	sql := w.b.String()
+
+	// Split on the top-level OR joining the two halves: it is the OR that
+	// immediately precedes the second RSI subquery.
+	secondRSI := strings.LastIndex(sql, "resource_scope_index r")
+	require.NotEqual(t, -1, secondRSI)
+	firstRSI := strings.Index(sql, "resource_scope_index r")
+	require.NotEqual(t, firstRSI, secondRSI, "the lift must emit two RSI subqueries")
+
+	// Unique to writeListedObjectInConstraintTeam. Not "authz_membership_edges",
+	// which the TTU arm and every principal match also emit.
+	const ctClause = `) OR (r.resource_kind <> `
+	assert.Equal(t, 2, strings.Count(sql, ctClause),
+		"the constraint-team clause must be emitted once per half of the lift")
+	assert.Less(t, strings.Index(sql, ctClause), secondRSI,
+		"the constraint-team clause must be inside the constant half's RSI subquery; "+
+			"without it a project-wide grant sees objects outside the token's team")
+	assert.Greater(t, strings.LastIndex(sql, ctClause), secondRSI,
+		"the constraint-team clause must be inside the correlated half's RSI subquery")
+
+	// And it must be bound to the token's team, not merely present.
+	assert.Contains(t, w.args, "team_1")
+}
+
+// Every read that decides what a user may do asks first whether the user is
+// active in their home project (#1234): Check (both columns), the foothold,
+// the materialized list and the list predicate. Other principals have no user
+// row, and nothing reads one for them.
+func TestUserStatusReadOnEveryPath(t *testing.T) {
+	t.Parallel()
+	const statusRead = "FROM zitadel_nextgen.users u\n        WHERE u.project_id = ?\n          AND u.id = ?\n          AND u.status = ?"
+	params := func(principalType domain.AuthzPrincipalType) domain.AuthzCheckParams {
+		return domain.AuthzCheckParams{
+			CatalogID:              "cat_sys_1",
+			ProjectID:              "proj_customer",
+			PrincipalHomeProjectID: "proj_home",
+			PrincipalType:          principalType,
+			PrincipalID:            "principal_a",
+			ObjectType:             "project",
+			Relation:               "viewer",
+		}
+	}
+	paths := map[string]func(w *recordingWriter, p domain.AuthzCheckParams) int{
+		"check": func(w *recordingWriter, p domain.AuthzCheckParams) int {
+			authz.WriteCheckAuthz(w, testEnv(w), p)
+			return 2 // allowed and foothold
+		},
+		"check by id": func(w *recordingWriter, p domain.AuthzCheckParams) int {
+			p.ResourceID = "user_target"
+			authz.WriteCheckAuthz(w, testEnv(w), p)
+			return 2
+		},
+		"foothold": func(w *recordingWriter, p domain.AuthzCheckParams) int {
+			authz.WriteHasAuthzProjectFoothold(w, testEnv(w), p.ProjectID, p.PrincipalHomeProjectID, p.PrincipalType, p.PrincipalID)
+			return 1
+		},
+		"list": func(w *recordingWriter, p domain.AuthzCheckParams) int {
+			authz.WriteListAuthzObjectIDs(w, testEnv(w), domain.AuthzListObjectsParams{AuthzCheckParams: p, ResourceKind: domain.ResourceKindUser})
+			return 1
+		},
+		"list predicate": func(w *recordingWriter, p domain.AuthzCheckParams) int {
+			authz.WriteListAuthzExistsPredicate(w, testEnv(w), "zitadel_nextgen.users.id", domain.AuthzListObjectsParams{AuthzCheckParams: p, ResourceKind: domain.ResourceKindUser})
+			return 1
+		},
+	}
+	for name, write := range paths {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			var w recordingWriter
+			want := write(&w, params(domain.AuthzPrincipalTypeUser))
+			sql := w.b.String()
+			require.Equal(t, want, strings.Count(sql, statusRead), sql)
+			assert.Equal(t, "proj_home", bindAtFragment(t, sql, w.args, "u.project_id = ?"), "the status is read in the home project")
+			assert.Equal(t, "principal_a", bindAtFragment(t, sql, w.args, "u.id = ?"))
+			assert.Equal(t, domain.UserStatusActive.String(), bindAtFragment(t, sql, w.args, "u.status = ?"))
+
+			for _, other := range []domain.AuthzPrincipalType{domain.AuthzPrincipalTypeSKProj, domain.AuthzPrincipalTypeSKTeam, domain.AuthzPrincipalTypeTeam} {
+				var o recordingWriter
+				write(&o, params(other))
+				assert.NotContains(t, o.b.String(), "zitadel_nextgen.users u", "%s has no user row to read", other)
+			}
+		})
+	}
+}
+
+// The status read names no outer row, so the list predicate keeps it out of
+// both correlated RSI subqueries: a planner evaluates it once, not per row.
+func TestListPredicateLiftsUserStatus(t *testing.T) {
+	t.Parallel()
+	var w recordingWriter
+	authz.WriteListAuthzExistsPredicate(&w, testEnv(&w), "zitadel_nextgen.teams.id", domain.AuthzListObjectsParams{
+		AuthzCheckParams: domain.AuthzCheckParams{
+			CatalogID:     "cat_sys_1",
+			ProjectID:     "proj_1",
+			PrincipalType: domain.AuthzPrincipalTypeUser,
+			PrincipalID:   "user_a",
+			ObjectType:    "project",
+			Relation:      "viewer",
+		},
+		ResourceKind: domain.ResourceKindTeam,
+	})
+	sql := w.b.String()
+	firstRSI := strings.Index(sql, "resource_scope_index r")
+	require.NotEqual(t, -1, firstRSI)
+	require.Equal(t, 1, strings.Count(sql, "zitadel_nextgen.users u"))
+	assert.Less(t, strings.Index(sql, "zitadel_nextgen.users u"), firstRSI)
+	assert.True(t, strings.HasPrefix(sql, "(EXISTS (\n        SELECT 1\n        FROM zitadel_nextgen.users u"),
+		"the status read must AND the whole predicate, so neither half can skip it")
+}

@@ -1,25 +1,15 @@
 ---
 title: Users
-description: OpenAPI operations for user lifecycle and account data.
+description: Create and manage the identities of a project, such as people or service accounts, and their passwords, passkeys and teams.
 ---
 
-import { Card, Cards } from "fumadocs-ui/components/card";
+A user is an identity in a project, such as a person or a service account.
+Each user has a schema, which defines its attributes, and may hold a password,
+passkeys and links to accounts at identity providers.
 
-Users are identity records with profile data, credentials, and account state.
-Use these endpoints to create, query, read, update, and delete users, set
-passwords, register passkeys, and list a user's teams.
+A common sequence is to create a user, then set a password or register a
+passkey for it. The `/users/me` operations act on the signed-in user instead of
+one you name. See [Project, team, and user](/docs/concepts/project-team-user)
+for how users relate to teams and projects.
 
-<Cards>
-  <Card title="Create user" href="/docs/reference/api/users/createUser" />
-  <Card title="Query users" href="/docs/reference/api/users/queryUsers" />
-  <Card title="Get user by ID" href="/docs/reference/api/users/GetUserByID" />
-  <Card title="Update user by ID" href="/docs/reference/api/users/PatchUserByID" />
-  <Card title="Delete user by ID" href="/docs/reference/api/users/DeleteUserByID" />
-  <Card title="Get my user information" href="/docs/reference/api/users/getMyUser" />
-  <Card title="Update my user information" href="/docs/reference/api/users/patchMyUser" />
-  <Card title="Set user password" href="/docs/reference/api/users/setUserPassword" />
-  <Card title="List user passkeys" href="/docs/reference/api/users/listUserPasskeys" />
-  <Card title="Begin passkey registration" href="/docs/reference/api/users/beginUserPasskeyRegistration" />
-  <Card title="Finish passkey registration" href="/docs/reference/api/users/finishUserPasskeyRegistration" />
-  <Card title="List the teams a user belongs to" href="/docs/reference/api/users/listUserTeams" />
-</Cards>
+<Operations />

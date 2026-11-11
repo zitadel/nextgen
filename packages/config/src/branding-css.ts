@@ -1,6 +1,6 @@
 /**
  * Mirror of the server's appearance-value gates
- * (`internal/domain/branding_css.go`), so `plan` rejects what `apply` would.
+ * (`internal/domain/branding_css.go`), so `deploy --dry-run` rejects what the server would.
  *
  * The widget writes these values straight into a CSS declaration, so a value
  * able to close its own declaration can emit rules of its own. Both gates are

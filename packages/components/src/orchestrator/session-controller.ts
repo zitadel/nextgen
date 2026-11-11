@@ -52,6 +52,8 @@ export interface SessionControllerOptions {
  * the backend says has no session is `signed-out`, so the host can stop
  * offering a sign-out to nobody; any other failure keeps the host's surface
  * and sets `errorMessage`.
+ *
+ * @fires {CustomEvent<ZitadelSignoutDetail>} zitadel-signout - The session was revoked; carries the display and identifier.
  */
 export class SessionController implements ReactiveController {
   display = "";
@@ -149,7 +151,12 @@ export class SessionController implements ReactiveController {
     this.loading = false;
     this.host.requestUpdate();
     onRevoked?.();
-    emit(this.host, "zitadel-signout", { display: this.display, identifier: this.identifier });
+    await emit(
+      this.host,
+      "zitadel-signout",
+      { display: this.display, identifier: this.identifier },
+      { waitForListeners: true },
+    );
     return true;
   }
 
