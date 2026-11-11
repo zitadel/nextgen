@@ -244,18 +244,18 @@ the sidebar.
 > The account list leaves the portal entry at `/` out.
 
 > **Amendment (2026-11-10, design decision D30):** `/events` with anything
-> beneath it shows a list of its own too, Logs' (`NavView` `"logs"`), under a
+> beneath it shows a list of its own too, Events' (`NavView` `"events"`), under a
 > heading row that leads back to the project's landing route, `/`. The route
 > still picks the list, and it is the first whose rows are not
-> `staticData.nav` entries: no route declares `view: "logs"`. Its rows are the
-> views of the one Logs screen and its filters, which live in that route's
+> `staticData.nav` entries: no route declares `view: "events"`. Its rows are the
+> views of the one Events screen and its filters, which live in that route's
 > search params (`validateSearch`) and which the events feature draws
-> (`src/features/events/components/logs-nav.tsx`). A Logs URL therefore
+> (`src/features/events/components/events-nav.tsx`). An Events URL therefore
 > restores the list, the view and the filters on a refresh. A screen gets such
-> a list only when its views and filters are navigation the way Logs' are;
+> a list only when its views and filters are navigation the way Events' are;
 > every other entry stays a route with `staticData.nav`.
 
-> **Amendment (2026-11-10, D30):** the Logs list is the layout route
+> **Amendment (2026-11-10, D30):** the Events list is the layout route
 > `/events` (`routes/_authed/events/route.tsx`), which owns the filters
 > (`validateSearch`) and the list's loader; `/events/` only carries the
 > sidebar entry. An event, `/events/$eventId`, is its child and opens in a
@@ -265,13 +265,17 @@ the sidebar.
 > when a child changes belongs to the layout route, keyed on the search it
 > reads.
 
-> **Amendment (2026-11-11, D30):** Logs' list chooses the view from a picker
+> **Amendment (2026-11-11, D30):** Events' list chooses the view from a picker
 > (each view's glyph, name and what it holds), as Vercel's Logs chooses its
 > kind of log, rather than one row per view, and keeps only the filters chosen
 > from a list (time, category, type or status). The values a person pastes
 > (the ids, the operation, the resource type, My activity) are set in the
 > search above the table and shown there as chips. The URL keeps every filter
 > as before.
+
+> **Amendment (2026-11-11, design decision D36):** the screen and its list are
+> named Events, as the route, the API and the CLI are, and the list's
+> `NavView` is `"events"`.
 
 ## Consequences
 

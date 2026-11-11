@@ -16,6 +16,9 @@
 
 ## Decisions
 
+### D36 · The events screen is named Events — 2026-11-11
+Amends D30, which named the screen Logs for now, as in Vercel. Every other surface already says events: `GET /events`, `zitadel events list`, the route, the API reference and the event webhooks, which deliver these same events. And "logs" already names something else: `zitadel logs` prints the local server's output, and a self-hosted server writes logs of its own, which root ADR 048 keeps apart from events. The sidebar row, the list's heading and Overview's link now read Events; the views keep their names (Audit events, API requests, All), and nothing else about the screen changes.
+
 ### D35 · A project lands on its Overview — 2026-11-10
 Amends D20, whose landing (`/`) was Users. As in Vercel, where the team sidebar's Projects row is Overview inside a project, a project's sidebar now starts with Overview, the project's own page, and `/` opens it: after sign-in, from the logo of a project, from Logs' heading and when a project is chosen with no screen asked for. With no project chosen and several to choose from, `/` is still Projects itself, not "Continue to Overview" (D22). The page is the project's name, its site and its ID, then what its primary origins serve now (the live release, when and why it went live, the origins serving it, and Deployments), then its newest five audit events (each opening, and Logs). It holds no figures: the API has no counts or aggregates (D5), which is what dropped the earlier stat-card design. Each card reads on its own and says so when its read fails. The account list leaves Overview out: Projects stands in its slot (D34). Settings' first tab becomes General, as Vercel's is, so a project has one Overview.
 → Design review of the page: the header, the Production card and the activity rows, none of which has a frame.

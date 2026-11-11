@@ -37,42 +37,42 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table";
 import { listProjectEvents } from "@/features/events/api";
-import { EventSheet, LogRowsContext } from "@/features/events/components/event-panel";
-import { LogSearchField } from "@/features/events/components/log-search-field";
+import { EventSheet, EventRowsContext } from "@/features/events/components/event-panel";
+import { EventSearchField } from "@/features/events/components/event-search-field";
 import { EventSubject } from "@/features/events/components/event-subject";
 import {
   ExportMenu,
   LiveDot,
   LiveStatus,
   SidebarFilters,
-} from "@/features/events/components/logs-toolbar";
+} from "@/features/events/components/events-toolbar";
 import {
   around,
   eventFilterValues,
   isFailure,
   isNarrowed,
   isNarrowedTo,
-  type LogEvent,
-  type LogsSearch,
-  type LogView,
+  type ProjectEvent,
+  type EventsSearch,
+  type EventView,
   NO_AUDIT_EVENTS,
   narrowedBy,
-  parseLogsSearch,
+  parseEventsSearch,
   rangeStart,
 } from "@/features/events/model";
 import { useLiveEvents } from "@/features/events/use-live-events";
 import { requireProjectScope, useRequiredProjectScope } from "@/features/projects/project-scope";
 import { useLoadMore } from "@/hooks/use-load-more";
 import { useScrollEdges } from "@/hooks/use-scroll-edges";
-import { formatLogTime } from "@/lib/date";
+import { formatEventTime } from "@/lib/date";
 import { LIST_PAGE_SIZE } from "@/lib/paging";
 import { cn } from "@/lib/utils";
 
 /**
- * Logs: the project's events, newest first, on the shared resource table
- * (D17, D30). An event is what the server recorded of a sign-in step, a
- * change to a record or an API request (`GET /events`); the API and the CLI
- * call them events, and the route keeps that name.
+ * Events: the project's events, newest first, on the shared resource table
+ * (D17, D30, D36). An event is what the server recorded of a sign-in step,
+ * a change to a record or an API request (`GET /events`), and the screen, the
+ * route, the API and the CLI all call it that.
  *
  * A row names the event's type, what it was about, who caused it and when it
  * happened, to the millisecond, which tells the events of one request apart.
@@ -81,8 +81,8 @@ import { cn } from "@/lib/utils";
  * as Vercel's Logs opens a request: the list keeps its rows, its scroll and
  * its pages, and the drawer steps through them.
  *
- * Which events are listed is chosen in the sidebar, whose list Logs replaces
- * with its own (`LogViewPicker`, `LogFilters`): the view (audit events, the
+ * Which events are listed is chosen in the sidebar, whose list Events replaces
+ * with its own (`EventViewPicker`, `EventFilters`): the view (audit events, the
  * default; API requests; both), then the filters. They live in the URL, the
  * drawer's included: they are server-side, so they belong to the request the
  * loader makes. Any of them combine: the server bounds every read, and a
@@ -93,7 +93,7 @@ import { cn } from "@/lib/utils";
  *
  * The search, on a row of its own under the title, holds the filters set by a pasted value, as
  * chips: an id, an event type, an operation, or a filter named before its
- * value (`LogSearchField`). Its empty field offers **My activity**, the list
+ * value (`EventSearchField`). Its empty field offers **My activity**, the list
  * narrowed to what the signed-in person did. A row's menu narrows the list by
  * a value the row carries. While the sidebar is an icon rail, on a phone or
  * collapsed, a button beside the search names the view and opens it.
@@ -108,7 +108,7 @@ import { cn } from "@/lib/utils";
  * rows the range dropped. **Export** copies or downloads the rows loaded.
  */
 export const Route = createFileRoute("/_authed/events")({
-  validateSearch: parseLogsSearch,
+  validateSearch: parseEventsSearch,
   // The project and the list's filters, not the drawer's event: opening one
   // must not read the list again.
   loaderDeps: ({ search }) => search,
@@ -121,11 +121,11 @@ export const Route = createFileRoute("/_authed/events")({
     // continues these, not the ones a newer navigation is on its way to.
     return { ...page, search: deps, createdAfter };
   },
-  component: LogsScreen,
+  component: EventsScreen,
 });
 
 /** The empty table's sentence, by what was asked for. */
-const NOTHING: Record<LogView, string> = {
+const NOTHING: Record<EventView, string> = {
   audit: NO_AUDIT_EVENTS,
   requests: "This project has no API requests.",
   all: "This project has no events.",
@@ -134,7 +134,7 @@ const NOTHING: Record<LogView, string> = {
 /** Above the button, while a page came back short of its size with more behind it. */
 const NOT_ALL_READ = "Not every event has been read yet for these filters.";
 
-function LogsScreen() {
+function EventsScreen() {
   const projectId = useRequiredProjectScope();
   const loaded = Route.useLoaderData();
   const search = Route.useSearch();
@@ -188,14 +188,14 @@ function LogsScreen() {
   }
 
   return (
-    <LogRowsContext.Provider value={{ rows: events, search }}>
+    <EventRowsContext.Provider value={{ rows: events, search }}>
       <Page>
         <ResourceTitle
           filterBelow
           filter={
             <>
               <SidebarFilters search={search} />
-              <LogSearchField current={search} me={session.user_id || undefined} />
+              <EventSearchField current={search} me={session.user_id || undefined} />
             </>
           }
           action={
@@ -226,7 +226,7 @@ function LogsScreen() {
             </div>
           }
         >
-          Logs
+          Events
         </ResourceTitle>
 
         <FormError message={live.error} className="mt-3" />
@@ -294,7 +294,7 @@ function LogsScreen() {
       >
         <Outlet />
       </EventSheet>
-    </LogRowsContext.Provider>
+    </EventRowsContext.Provider>
   );
 }
 
@@ -312,8 +312,8 @@ function EventRow({
   selected,
   added,
 }: {
-  event: LogEvent;
-  search: LogsSearch;
+  event: ProjectEvent;
+  search: EventsSearch;
   /** Open in the drawer. */
   selected: boolean;
   /** Read by Live after the list loaded: it fades in. */
@@ -365,7 +365,7 @@ function EventRow({
         )}
       </TableCell>
       <TableCell className={cn(RESOURCE_CELL_MUTED, "tabular-nums")}>
-        <time dateTime={event.occurred_at}>{formatLogTime(event.occurred_at)}</time>
+        <time dateTime={event.occurred_at}>{formatEventTime(event.occurred_at)}</time>
       </TableCell>
       <TableCell
         className={cn(
