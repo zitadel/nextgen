@@ -1432,7 +1432,9 @@ describe("search", () => {
     await user.click(await dialog.findByRole("option", { name: /Copy project ID/ }));
 
     expect(await screen.findByText("Project ID copied")).toBeInTheDocument();
-    expect(await navigator.clipboard.readText()).toBe("proj_1");
+    // Read inside `waitFor`: the closed palette still settles its typing
+    // pause, and a bare await here lets that update land outside act().
+    await waitFor(async () => expect(await navigator.clipboard.readText()).toBe("proj_1"));
   });
 
   it("lists what was opened from it, until something is typed", async () => {
