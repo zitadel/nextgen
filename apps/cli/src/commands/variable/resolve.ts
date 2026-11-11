@@ -96,7 +96,7 @@ export default class VariableResolve extends Tabulatable(EnvironmentCommand) {
     const deploymentService = new DeploymentService(client, projectId);
     if (args.deploymentId !== undefined) {
       const items = await deploymentService.variables(args.deploymentId);
-      return this.render(flags, args.deploymentId, undefined, items);
+      return this.render(flags, args.deploymentId, items, "", {});
     }
     const found = await deploymentService.liveOn(flags.origin);
     switch (found.outcome) {
@@ -155,7 +155,8 @@ export default class VariableResolve extends Tabulatable(EnvironmentCommand) {
     // stated in the output.
     const live = found.deployment;
     const items = await deploymentService.variables(live.id);
-    return this.render(flags, live.id, [...live.origins].sort(), items);
+    const origins = [...live.origins].sort();
+    return this.render(flags, live.id, items, ` for ${origins.join(", ")}`, { origins });
   }
 
   /**
@@ -163,17 +164,18 @@ export default class VariableResolve extends Tabulatable(EnvironmentCommand) {
    *
    * @param flags - The run's flags, which choose the rendering.
    * @param deploymentId - The deployment the variables were frozen by.
-   * @param origins - The origins the deployment serves, sorted; omitted when none is named.
    * @param items - The frozen variables.
+   * @param where - The suffix naming the origins the deployment serves, or empty.
+   * @param extra - The origins the envelope carries beside the deployment id, or none.
    * @returns The envelope to print.
    */
   private async render(
     flags: Admitted<typeof VariableResolve>["flags"],
     deploymentId: string,
-    origins: string[] | undefined,
     items: readonly Variable[],
+    where: string,
+    extra: { origins?: string[] },
   ): Promise<JsonEnvelope> {
-    const where = origins === undefined ? "" : ` for ${origins.join(", ")}`;
     this.recordTelemetry({
       variable_count: items.length,
     });
@@ -185,9 +187,9 @@ export default class VariableResolve extends Tabulatable(EnvironmentCommand) {
     const empty = `${deploymentId} froze no variables${where}.`;
     const footer = [`Frozen by ${deploymentId}${where}`];
     const page = null;
-    const extra = {
+    const data = {
       deployment_id: deploymentId,
-      ...(origins === undefined ? {} : { origins }),
+      ...extra,
     };
 
     return this.emitList(flags, {
@@ -198,7 +200,7 @@ export default class VariableResolve extends Tabulatable(EnvironmentCommand) {
       empty,
       footer,
       page,
-      extra,
+      extra: data,
     });
   }
 }

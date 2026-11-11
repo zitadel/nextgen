@@ -188,13 +188,6 @@ describe("variable resolve", () => {
         const result = await app.resolveVariables({ deploymentId: firstDeploymentId });
 
         expect(result).toSucceed();
-      });
-
-      it("reports the earlier deployment it was given", async () => {
-        const { app, firstDeploymentId } = await aSupersededProject();
-
-        const result = await app.resolveVariables({ deploymentId: firstDeploymentId });
-
         expect(app.envelopeOf<{ deployment_id: string }>(result).data.deployment_id).toBe(
           firstDeploymentId,
         );
@@ -235,7 +228,6 @@ describe("variable resolve", () => {
         await app.addPrimaryOrigin();
         await app.setVariable("BANNER", "a\u001b[2Jwiped");
         const deployed = await app.deployData();
-        platform.servesAHostileOrigin();
         const args = ["variable", "resolve", deployed.deployment_id ?? ""];
 
         await app.inEveryRendering((how) =>
