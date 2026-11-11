@@ -43,6 +43,12 @@ export default defineConfig({
       CF_PAGES: "",
       TF_BUILD: "",
       CODEBUILD_BUILD_ID: "",
+      // A commit setup makes has an author on every machine, so no run warns
+      // only where git has no identity configured, as on a CI runner.
+      GIT_AUTHOR_NAME: "Zitadel Test",
+      GIT_AUTHOR_EMAIL: "test@zitadel.local",
+      GIT_COMMITTER_NAME: "Zitadel Test",
+      GIT_COMMITTER_EMAIL: "test@zitadel.local",
     },
     // Both suffixes, for the same reason the shared base matches both: a
     // renamed suite must not vanish silently. Specs are `*.spec.ts`, unit
