@@ -42,8 +42,8 @@ const NAV_ORDER = [
   "Logs",
   "Settings",
 ];
-// What sits above every project: the home, the project's screens, which ask
-// for a project (D34), then Settings, a list of its own. Projects stands in
+// What sits above every project: the home, the project's screens (D34), then
+// Settings, a list of its own. Projects stands in
 // for the project's Overview (D35), and the project's own Settings is left
 // out: up here Settings is the account's.
 const ACCOUNT_ORDER = [
@@ -53,8 +53,6 @@ const ACCOUNT_ORDER = [
 ];
 // Settings' list: the heading that leads back, then the person's profile.
 const SETTINGS_ORDER = ["Settings", "Profile"];
-// Logs' list: the heading that leads back, then the list's views.
-const LOGS_ORDER = ["Logs", "Audit events", "API requests", "All"];
 // Absent for two different reasons, both deliberate:
 //   - the first four have no endpoint at all
 //   - Sessions was built, but `POST /sessions/query` answers 501 (#699)
@@ -230,7 +228,7 @@ describe("app shell navigation", () => {
     expect(await screen.findByRole("navigation", { name: "Primary" })).toBeInTheDocument();
   });
 
-  it("asks for a project from Projects' list, though the URL still carries one", async () => {
+  it("opens a screen from Projects' list in the project that was selected", async () => {
     server.use(
       http.get(MY_PROJECTS, () =>
         HttpResponse.json({
@@ -241,15 +239,38 @@ describe("app shell navigation", () => {
         }),
       ),
     );
-    // Back on Projects from inside River: the selection rides along, but the
-    // pill names no project up here, so the project's rows do not use it.
+    // Back on Projects from inside River: it stays selected (D36), so the
+    // pill names it and the project's rows open in it without asking.
     const router = renderShell(scopedPath("/projects", "proj_1"));
     const nav = within(await screen.findByRole("navigation", { name: "Account" }));
-    expect(nav.getByRole("link", { name: "Users" })).toHaveAttribute("href", "/users");
-    expect(nav.getByRole("link", { name: "Settings" })).toHaveAttribute(
+    const pill = screen.getByRole("button", { name: "Switch project" });
+    await waitFor(() => expect(pill).toHaveTextContent("River"));
+    expect(pill).not.toHaveTextContent("All projects");
+    expect(nav.getByRole("link", { name: "Users" })).toHaveAttribute(
       "href",
-      scopedPath("/settings", "proj_1"),
+      scopedPath("/users", "proj_1"),
     );
+
+    await userEvent.click(nav.getByRole("link", { name: "Teams" }));
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/teams"));
+    expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_1" });
+    expect(await screen.findByRole("navigation", { name: "Primary" })).toBeInTheDocument();
+  });
+
+  it("asks for a project from Projects' list while none is selected", async () => {
+    server.use(
+      http.get(MY_PROJECTS, () =>
+        HttpResponse.json({
+          projects: [
+            { id: "proj_1", name: "River" },
+            { id: "proj_2", name: "Delta" },
+          ],
+        }),
+      ),
+    );
+    const router = renderShell("/projects");
+    const nav = within(await screen.findByRole("navigation", { name: "Account" }));
+    expect(nav.getByRole("link", { name: "Users" })).toHaveAttribute("href", "/users");
 
     await userEvent.click(nav.getByRole("link", { name: "Teams" }));
     await waitFor(() => expect(router.state.resolvedLocation?.search.next).toMatch(/^\/teams\b/));
@@ -280,11 +301,11 @@ describe("app shell navigation", () => {
 
     await userEvent.click(screen.getByRole("link", { name: "Home" }));
     await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
-    // The selection rides along, though the pill names no project up here.
+    // The selection rides along, and the pill still names it (D36).
     expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_1" });
-    expect(await screen.findByRole("button", { name: "Switch project" })).toHaveTextContent(
-      "All projects",
-    );
+    const pill = await screen.findByRole("button", { name: "Switch project" });
+    await waitFor(() => expect(pill).toHaveTextContent("console-dev"));
+    expect(pill).not.toHaveTextContent("All projects");
   });
 
   it("does not advertise screens that have no endpoint behind them", async () => {
@@ -354,16 +375,17 @@ describe("settings view", () => {
     );
   });
 
-  it("keeps the bar in Settings, its pill the way back into a project", async () => {
+  it("keeps the bar in Settings, its pill on the selected project", async () => {
     const router = renderShell("/settings");
     await screen.findByRole("navigation", { name: "Settings" });
 
     expect(screen.getByRole("button", { name: "Search" })).toBeInTheDocument();
     expect(document.querySelector('[data-sidebar="trigger"]')).toBeInTheDocument();
-    // The pill names no project up here, and its list opens on the one that
-    // was selected.
+    // The selection outlives the way up (D36), and the pill's list leads
+    // back into it.
     const pill = screen.getByRole("button", { name: "Switch project" });
-    expect(pill).toHaveTextContent("All projects");
+    await waitFor(() => expect(pill).toHaveTextContent("console-dev"));
+    expect(pill).not.toHaveTextContent("All projects");
 
     await userEvent.click(pill);
     const list = within(await screen.findByRole("listbox", { name: "Projects" }));
@@ -413,9 +435,10 @@ describe("logs view", () => {
   it("swaps the project's list for Logs' on a logs URL", async () => {
     renderShell("/events");
     const nav = within(await screen.findByRole("navigation", { name: "Logs" }));
-    expect(nav.getAllByRole("link").map((link) => link.textContent?.trim())).toEqual(LOGS_ORDER);
-    expect(nav.getByRole("link", { name: "Audit events" })).toHaveAttribute("data-active", "true");
-    // The list's filters follow its views, in a group of their own.
+    // The heading back, then the view, chosen from a menu as Vercel's is.
+    expect(nav.getAllByRole("link").map((link) => link.textContent?.trim())).toEqual(["Logs"]);
+    expect(nav.getByRole("button", { name: "View: Audit events" })).toBeInTheDocument();
+    // The list's filters follow the view, in a group of their own.
     expect(screen.getByRole("group", { name: "Filters" })).toBeInTheDocument();
     // The project's list is gone rather than sitting underneath it.
     expect(screen.queryByRole("navigation", { name: "Primary" })).not.toBeInTheDocument();
@@ -426,7 +449,7 @@ describe("logs view", () => {
     renderShell("/events/evt_1");
     expect(await screen.findByRole("heading", { name: "user.deleted" })).toBeInTheDocument();
     const nav = within(screen.getByRole("navigation", { name: "Logs" }));
-    expect(nav.getAllByRole("link").map((link) => link.textContent?.trim())).toEqual(LOGS_ORDER);
+    expect(nav.getByRole("button", { name: "View: Audit events" })).toBeInTheDocument();
     expect(screen.queryByRole("navigation", { name: "Primary" })).not.toBeInTheDocument();
   });
 

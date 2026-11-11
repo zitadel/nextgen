@@ -31335,6 +31335,22 @@ func (s CreateSessionErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case ProjMismatchCreateSessionErrorResponse:
+		e.FieldStart("code")
+		e.Str("proj.mismatch")
+		{
+			s := s.ProjMismatch
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidCreateSessionErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -31449,6 +31465,9 @@ func (s *CreateSessionErrorResponse) Decode(d *jx.Decoder) error {
 				case "not_implemented":
 					s.Type = NotImplementedCreateSessionErrorResponse
 					found = true
+				case "proj.mismatch":
+					s.Type = ProjMismatchCreateSessionErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidCreateSessionErrorResponse
 					found = true
@@ -31505,6 +31524,10 @@ func (s *CreateSessionErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case NotImplementedCreateSessionErrorResponse:
 		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
+	case ProjMismatchCreateSessionErrorResponse:
+		if err := s.ProjMismatch.Decode(d); err != nil {
 			return err
 		}
 	case ReqInvalidCreateSessionErrorResponse:
@@ -128090,11 +128113,16 @@ func (s *RevokeReleaseConflictDetailsOriginsItem) encodeFields(e *jx.Encoder) {
 		e.FieldStart("deployment_id")
 		s.DeploymentID.Encode(e)
 	}
+	{
+		e.FieldStart("kind")
+		s.Kind.Encode(e)
+	}
 }
 
-var jsonFieldsNameOfRevokeReleaseConflictDetailsOriginsItem = [2]string{
+var jsonFieldsNameOfRevokeReleaseConflictDetailsOriginsItem = [3]string{
 	0: "origin",
 	1: "deployment_id",
+	2: "kind",
 }
 
 // Decode decodes RevokeReleaseConflictDetailsOriginsItem from json.
@@ -128126,6 +128154,16 @@ func (s *RevokeReleaseConflictDetailsOriginsItem) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"deployment_id\"")
 			}
+		case "kind":
+			requiredBitSet[0] |= 1 << 2
+			if err := func() error {
+				if err := s.Kind.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"kind\"")
+			}
 		default:
 			return d.Skip()
 		}
@@ -128136,7 +128174,7 @@ func (s *RevokeReleaseConflictDetailsOriginsItem) Decode(d *jx.Decoder) error {
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [1]uint8{
-		0b00000011,
+		0b00000111,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.

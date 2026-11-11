@@ -11,7 +11,9 @@ type EventInserter interface {
 	InsertEvent(ctx context.Context, event *domain.Event) error
 }
 
-// EventBatchInserter persists a Path A flush batch in one call (preferably one TX).
+// EventBatchInserter persists a Path A flush batch whole or not at all (one
+// TX). The flusher's retry relies on it: a duplicate after a failed attempt
+// means that attempt wrote the whole batch.
 type EventBatchInserter interface {
 	InsertEvents(ctx context.Context, events []*domain.Event) error
 }
@@ -23,7 +25,8 @@ func (f BatchInserter) InsertEvents(ctx context.Context, events []*domain.Event)
 	return f(ctx, events)
 }
 
-// SequentialBatchInserter inserts each event via EventInserter (tests / fallback).
+// SequentialBatchInserter inserts each event via EventInserter. It can write
+// part of a batch, so it is for tests only.
 type SequentialBatchInserter struct {
 	Inner EventInserter
 }

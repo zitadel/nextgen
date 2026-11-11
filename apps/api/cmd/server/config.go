@@ -49,6 +49,7 @@ type OriginsConfig struct {
 
 // EventsConfig configures audit event retention and deployment export sinks.
 type EventsConfig struct {
+	Request   audit.RequestConfig   `mapstructure:"request"`
 	Retention audit.RetentionConfig `mapstructure:"retention"`
 	Export    audit.ExportConfig    `mapstructure:"export"`
 }
@@ -202,6 +203,14 @@ type ServerConfig struct {
 	// it only behind a proxy that overwrites the header: otherwise a client
 	// chooses its own request ID.
 	RequestIDHeader string `mapstructure:"request_id_header"`
+	// IdleTimeout is how long the server keeps a connection open while it
+	// waits for the next request on it. A proxy in front that reuses its
+	// connections has to give up on an idle one before the server does: a
+	// request it sends as the server closes the connection is lost, and one
+	// that is not safe to send twice, a POST, ends as the proxy's 502. Zero
+	// or less never closes an idle connection, for a server whose only client
+	// is such a proxy.
+	IdleTimeout time.Duration `mapstructure:"idle_timeout"`
 }
 
 func (c ServerConfig) Validate() error {
