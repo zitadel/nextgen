@@ -84,8 +84,14 @@ export default class Reset extends Destructive(BaseCommand) {
           await LocalServer.at(this.cwd, { cliVersion: this.cliVersion }).reset(consent);
           return {
             status: "ok",
-            data: { title: "Local Zitadel server runtime reset", runtime: described },
-            summary: { title: "Local Zitadel server runtime reset", sections: [] },
+            data: {
+              title: "Local Zitadel server runtime reset",
+              runtime: described,
+            },
+            summary: {
+              title: "Local Zitadel server runtime reset",
+              sections: [],
+            },
           };
         },
       }),

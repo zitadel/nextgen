@@ -391,16 +391,18 @@ export default class Doctor extends Destructive(BaseCommand) {
     return this.emit({
       status: "ok",
       data,
-      next,
-      warnings: warnings.map((warning) => `${warning.name}: ${warning.message}`),
-      warningsShown: true,
-      nextShown: asStepsShown(),
       summary: {
         title: warnings.length > 0 ? "Checks passed with warnings" : "All checks passed",
         sections: [],
         lines: report.lines,
         next: stepsOf(report.next),
       },
+      next,
+      warnings: warnings.map((warning) => {
+        return `${warning.name}: ${warning.message}`;
+      }),
+      nextShown: asStepsShown(),
+      warningsShown: true,
     });
   }
 

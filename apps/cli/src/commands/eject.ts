@@ -220,7 +220,12 @@ function ejected(
         title: "Nothing to remove",
         sections: [],
         lines: ["Zitadel is not set up in this app, so nothing was removed."],
-        next: [{ text: "Set it up whenever you like:", command: setItUp }],
+        next: [
+          {
+            text: "Set it up whenever you like:",
+            command: setItUp,
+          },
+        ],
       },
     };
   }
@@ -236,8 +241,13 @@ function ejected(
       backed_up: backedUp,
       manual_steps: manualSteps,
     },
-    next: { commands: assembleNextCommands(backedUp, actions.dependencies, dir) },
-    summary: { title, sections: [] },
+    summary: {
+      title,
+      sections: [],
+    },
+    next: {
+      commands: assembleNextCommands(backedUp, actions.dependencies, dir),
+    },
   };
 }
 
@@ -292,7 +302,10 @@ export default class Eject extends Destructive(BaseCommand) {
               sections: [],
               lines: ["Nothing was removed. Zitadel is still set up in this app."],
               next: [
-                { text: "Remove it whenever you like:", command: this.suggestUnscoped("eject") },
+                {
+                  text: "Remove it whenever you like:",
+                  command: this.suggestUnscoped("eject"),
+                },
               ],
             },
           }

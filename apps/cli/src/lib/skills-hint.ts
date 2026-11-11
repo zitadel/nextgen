@@ -39,10 +39,11 @@ async function pendingOffer({ env, interactive }: SkillsHintInput): Promise<stri
   if (shownPath === undefined || existsSync(shownPath)) {
     return undefined;
   }
-  const detected = (await rosie.agents()).some(
-    (agent) => agent.detected && agent.installPath !== null,
-  );
-  return detected ? shownPath : undefined;
+  return (await rosie.agents()).some((agent) => {
+    return agent.detected && agent.installPath !== null;
+  })
+    ? shownPath
+    : undefined;
 }
 
 /**

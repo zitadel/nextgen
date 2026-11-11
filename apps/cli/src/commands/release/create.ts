@@ -77,7 +77,10 @@ export default class ReleaseCreate extends EnvironmentCommand {
     if (this.dryRun) {
       return this.emit({
         status: "ok",
-        data: { dry_run: true, resources: prepared.resourceCount },
+        data: {
+          dry_run: true,
+          resources: prepared.resourceCount,
+        },
         summary: {
           title: `Validated ${renderCount(prepared.resourceCount, { singular: "resource" })} and created no release (dry run)`,
           sections: [],
@@ -98,7 +101,10 @@ export default class ReleaseCreate extends EnvironmentCommand {
         resources: prepared.resourceCount,
       },
       next: { commands: [this.suggest(`deployment create --release ${release.id}`)] },
-      summary: { title: `Created ${escapeControlCharacters(release.id)}`, sections: [] },
+      summary: {
+        title: `Created ${escapeControlCharacters(release.id)}`,
+        sections: [],
+      },
     });
   }
 }

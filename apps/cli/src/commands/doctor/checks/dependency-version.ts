@@ -40,7 +40,11 @@ export class DependencyVersionCheck implements SanityCheck {
     if (exact === undefined) {
       // A missing or unparsable package.json is the dependency check's
       // failure to report; double-flagging the same root cause helps nobody.
-      return { ...base, status: "pass", message: "No package.json to compare pins against" };
+      return {
+        ...base,
+        status: "pass",
+        message: "No package.json to compare pins against",
+      };
     }
     const mismatched = exact.filter(([, version]) => !semver.eq(version, ctx.cliVersion));
     if (mismatched.length > 0) {

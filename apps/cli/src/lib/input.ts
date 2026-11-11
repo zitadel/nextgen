@@ -114,7 +114,11 @@ class DrawnPrompter implements Prompter {
     if (this.guide) {
       return { withGuide: true };
     }
-    return { withGuide: false, input: process.stdin, output: flatOutput(process.stdout) };
+    return {
+      withGuide: false,
+      input: process.stdin,
+      output: flatOutput(process.stdout),
+    };
   }
 
   async text(question: AnyQuestion, validate: Validate): Promise<string> {
@@ -130,7 +134,13 @@ class DrawnPrompter implements Prompter {
   }
 
   async secret(question: AnyQuestion, validate: Validate): Promise<string> {
-    return this.answered(await password({ message: question.message, validate, ...this.drawing }));
+    return this.answered(
+      await password({
+        message: question.message,
+        validate,
+        ...this.drawing,
+      }),
+    );
   }
 
   async select(question: AnyQuestion): Promise<unknown> {
@@ -164,15 +174,25 @@ class DrawnPrompter implements Prompter {
     const initialValue = (question.initialValue as boolean | undefined) ?? false;
     if (this.guide) {
       return this.chosen(
-        await confirm({ message: question.message, initialValue, ...this.drawing }),
+        await confirm({
+          message: question.message,
+          initialValue,
+          ...this.drawing,
+        }),
       ) as boolean;
     }
     return this.chosen(
       await select<boolean>({
         message: question.message,
         options: [
-          { value: false, label: "No" },
-          { value: true, label: "Yes" },
+          {
+            value: false,
+            label: "No",
+          },
+          {
+            value: true,
+            label: "Yes",
+          },
         ],
         initialValue,
         ...this.drawing,
@@ -270,7 +290,11 @@ async function askOne(
     const hint = [
       ...(ways.length === 0
         ? []
-        : [`${ways.join(", or ").replace(/^./, (c) => c.toUpperCase())}.`]),
+        : [
+            `${ways.join(", or ").replace(/^./, (c) => {
+              return c.toUpperCase();
+            })}.`,
+          ]),
       ...(secret
         ? ["It is never a flag: that would put it in shell history, a process listing and CI logs."]
         : []),
@@ -320,7 +344,14 @@ async function askOne(
     return chosen;
   }
 
-  const parse = q.parse ?? ((raw: string): Parsed<unknown> => ({ ok: true, value: raw }));
+  const parse =
+    q.parse ??
+    ((raw: string): Parsed<unknown> => {
+      return {
+        ok: true,
+        value: raw,
+      };
+    });
   const accept = (raw: string): unknown => {
     const parsed = parse(raw);
     if (!parsed.ok) {

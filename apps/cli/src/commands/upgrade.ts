@@ -159,20 +159,29 @@ export default class Upgrade extends BaseCommand {
       status: "ok",
       data: {
         title: said,
+        ...(dryRun ? { dry_run: true } : {}),
         current_version: cliVersion,
         latest_version: target,
         up_to_date: upToDate,
         packages,
-        left_alone: leftAlone.map(([name, specifier]) => ({ name, specifier })),
+        left_alone: leftAlone.map(([name, specifier]) => {
+          return {
+            name,
+            specifier,
+          };
+        }),
         breaking_changes: breaking,
         release_notes_url: RELEASE_NOTES_URL,
         refresh,
         ...(installSuggestion === undefined ? {} : { install_command: installSuggestion }),
-        ...(dryRun ? { dry_run: true } : {}),
+      },
+      pretty: painted([strong(`${said}.`), ...rows].join("\n")),
+      summary: {
+        title: said,
+        sections: [],
+        lines: rows,
       },
       next,
-      summary: { title: said, sections: [], lines: rows },
-      pretty: painted([strong(`${said}.`), ...rows].join("\n")),
     });
   }
 

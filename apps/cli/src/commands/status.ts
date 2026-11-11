@@ -156,7 +156,6 @@ export default class Status extends EnvironmentCommand {
         },
         project,
       },
-      next: { actions: nextActions, commands: nextCommands },
       summary: {
         title: "Checked the status of the project",
         sections: [],
@@ -165,6 +164,10 @@ export default class Status extends EnvironmentCommand {
           escapeControlCharacters(`${projectSaid.join(", ")}.`),
         ],
         overview: exploreAllCommands(this.cliVersion),
+      },
+      next: {
+        actions: nextActions,
+        commands: nextCommands,
       },
     });
   }

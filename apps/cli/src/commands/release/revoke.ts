@@ -66,7 +66,10 @@ export default class ReleaseRevoke extends Destructive(EnvironmentCommand) {
         preview: () => {
           return {
             status: "ok",
-            data: { dry_run: true, release_id: args.releaseId },
+            data: {
+              dry_run: true,
+              release_id: args.releaseId,
+            },
             summary: {
               title: `Would revoke ${escapeControlCharacters(args.releaseId)} (dry run)`,
               sections: [],
@@ -85,7 +88,10 @@ export default class ReleaseRevoke extends Destructive(EnvironmentCommand) {
               ...mutatedData({ release_id: release.id }, "revoked"),
               revoked_at: release.revoked_at,
             },
-            summary: { title: `Revoked ${escapeControlCharacters(release.id)}`, sections: [] },
+            summary: {
+              title: `Revoked ${escapeControlCharacters(release.id)}`,
+              sections: [],
+            },
           };
         },
       }),

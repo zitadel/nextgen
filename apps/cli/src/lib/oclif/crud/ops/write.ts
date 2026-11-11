@@ -215,6 +215,21 @@ abstract class WriteOperation<
     return {
       status: "ok",
       data: result ?? {},
+      // A write that answered no body has no record to print, so it keeps the
+      // generic rendering that says the command completed. Printing `{}` would
+      // be the record the write did not make.
+      ...(result === undefined ? {} : { pretty: json(result) }),
+      summary:
+        result === undefined
+          ? {
+              title: "Command completed",
+              sections: [],
+            }
+          : {
+              title: `${this.verb === "create" ? "Created" : "Updated"} ${resource.singular} ${escapeControlCharacters(String(resource.idOf(result)))}`,
+              sections: [],
+              lines: escapeJsonControlCharacters(JSON.stringify(result, null, 2)).split("\n"),
+            },
       ...(result && resource.get
         ? {
             next: {
@@ -222,18 +237,6 @@ abstract class WriteOperation<
             },
           }
         : {}),
-      // A write that answered no body has no record to print, so it keeps the
-      // generic rendering that says the command completed. Printing `{}` would
-      // be the record the write did not make.
-      ...(result === undefined ? {} : { pretty: json(result) }),
-      summary:
-        result === undefined
-          ? { title: "Command completed", sections: [] }
-          : {
-              title: `${this.verb === "create" ? "Created" : "Updated"} ${resource.singular} ${escapeControlCharacters(String(resource.idOf(result)))}`,
-              sections: [],
-              lines: escapeJsonControlCharacters(JSON.stringify(result, null, 2)).split("\n"),
-            },
     };
   }
 

@@ -73,8 +73,6 @@ export default class ApiLs extends Tabulatable(BaseCommand) {
 
     const rows = items;
     const columns = COLUMNS;
-    const empty = "No operations found";
-    const footer: string[] = [];
     const page = null;
     const extra = {};
     const data = {
@@ -86,8 +84,8 @@ export default class ApiLs extends Tabulatable(BaseCommand) {
       columns,
       rows,
       singular: "operation",
-      empty,
-      footer,
+      empty: "No operations found",
+      footer: [],
       page,
       extra,
       data,

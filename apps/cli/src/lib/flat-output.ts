@@ -91,7 +91,11 @@ export class FlatOutput extends Writable {
 
   /** A new frame replaces the one before it, so only the lines since it count. */
   private count(flat: string): void {
-    const start = Math.max(...FRESH.map((code) => flat.lastIndexOf(code)));
+    const start = Math.max(
+      ...FRESH.map((code) => {
+        return flat.lastIndexOf(code);
+      }),
+    );
     if (start >= 0) {
       this.drawn = 0;
     }

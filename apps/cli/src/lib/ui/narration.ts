@@ -82,6 +82,8 @@ export class Narration {
       return;
     }
     // A line written while a spinner draws would be glued to its frame.
-    DrawnSpinner.around(() => writePlain(level, body));
+    DrawnSpinner.around(() => {
+      return writePlain(level, body);
+    });
   }
 }

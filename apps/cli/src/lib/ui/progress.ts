@@ -131,9 +131,19 @@ export class Progress {
         narrate();
       };
       return {
-        detail: (text) => narration.info(text),
-        done: (text) => once(() => narration.done(text ?? label)),
-        fail: (text) => once(() => narration.fail(text ?? `${label} failed`)),
+        detail: (text) => {
+          return narration.info(text);
+        },
+        done: (text) => {
+          return once(() => {
+            return narration.done(text ?? label);
+          });
+        },
+        fail: (text) => {
+          return once(() => {
+            return narration.fail(text ?? `${label} failed`);
+          });
+        },
       };
     }
     this.drawing.open();
@@ -160,22 +170,41 @@ export class Progress {
         }
         details.push(text);
       },
-      done: (text) => end(MARK.done, text ?? label),
-      fail: (text) => end(MARK.failed, text ?? `${label} failed`),
+      done: (text) => {
+        return end(MARK.done, text ?? label);
+      },
+      fail: (text) => {
+        return end(MARK.failed, text ?? `${label} failed`);
+      },
     };
   }
 
   /** A {@link Report} that remembers what it was told, in the order it was told. */
   private static collect(lines: Line[]): Report {
-    const line = (mark: string) => (verb: string, subject: string) => {
-      lines.push({ mark, verb, subject });
+    const line = (mark: string) => {
+      return (verb: string, subject: string) => {
+        lines.push({
+          mark,
+          verb,
+          subject,
+        });
+      };
     };
-    return { done: line(""), skipped: line(MARK.skipped), warning: line(MARK.warning) };
+    return {
+      done: line(""),
+      skipped: line(MARK.skipped),
+      warning: line(MARK.warning),
+    };
   }
 
   /** What a task reported, under its result, with the verbs in one column. */
   private draw(lines: readonly Line[]): void {
-    const width = Math.max(0, ...lines.map((entry) => entry.verb.length));
+    const width = Math.max(
+      0,
+      ...lines.map((entry) => {
+        return entry.verb.length;
+      }),
+    );
     for (const { mark, verb, subject } of lines) {
       this.detail(`${mark === "" ? "  " : `${mark} `}${verb.padEnd(width)}  ${subject}`);
     }
@@ -208,6 +237,9 @@ export class Progress {
       narration.plain(stripColumnMarks(text));
       return;
     }
-    log.message(stripColumnMarks(text), { symbol, spacing: 0 });
+    log.message(stripColumnMarks(text), {
+      symbol,
+      spacing: 0,
+    });
   }
 }

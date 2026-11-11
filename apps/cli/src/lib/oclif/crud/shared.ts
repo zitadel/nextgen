@@ -145,7 +145,9 @@ export const dryRunResult = ({
     summary: {
       title: `Would ${verb} ${escapeControlCharacters(subject)} (dry run)`,
       sections: [],
-      lines: [...printed.split("\n"), ...verdict.split("\n")].filter((line) => line !== ""),
+      lines: [...printed.split("\n"), ...verdict.split("\n")].filter((line) => {
+        return line !== "";
+      }),
     },
   };
 };

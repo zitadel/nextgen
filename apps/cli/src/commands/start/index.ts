@@ -125,7 +125,10 @@ export default class Start extends BaseCommand {
             console: `${serverUrl}/ui/console/`,
           },
         },
-        summary: { title: "Would start the local Zitadel server (dry run)", sections: [] },
+        summary: {
+          title: "Would start the local Zitadel server (dry run)",
+          sections: [],
+        },
         next: { commands: [this.suggestUnscoped("start")] },
       });
     }

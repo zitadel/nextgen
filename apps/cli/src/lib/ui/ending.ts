@@ -64,21 +64,29 @@ export class Ending {
     if (this.summary.failed === true) {
       const stated = stripColumnMarks(this.summary.title)
         .split("\n")
-        .map((line) => pc.red(line));
+        .map((line) => {
+          return pc.red(line);
+        });
       const hint = rendered.length === 0 ? "" : this.laidOut(rendered);
       const after = this.after();
       const under = [...(hint === "" ? [] : [hint]), ...(after === "" ? [] : ["", after])];
       const footer = place.length === 0 ? [] : ["", pc.dim(place.join(" · "))];
       return `${[...stated, ...under, ...footer].join("\n")}\n`;
     }
-    const said = this.summary.title === "Done" ? [] : [this.summary.title];
-    const footer = [...said, ...(this.summary.extras ?? []), ...place]
-      .map((part) => part.trim())
-      .filter((part) => part !== "")
+    const footer = [
+      ...(this.summary.title === "Done" ? [] : [this.summary.title]),
+      ...(this.summary.extras ?? []),
+      ...place,
+    ]
+      .map((part) => {
+        return part.trim();
+      })
+      .filter((part) => {
+        return part !== "";
+      })
       .join(" · ");
-    const setOff = rendered.length === 0 && this.after() !== "" ? [""] : [];
     return [
-      ...setOff,
+      ...(rendered.length === 0 && this.after() !== "" ? [""] : []),
       ...(body === "" ? [] : [body, ""]),
       ...(footer === "" ? [] : [pc.dim(footer)]),
       "",
@@ -93,13 +101,19 @@ export class Ending {
    */
   private laidOutWithSteps(body: readonly string[]): string {
     return [body.length === 0 ? "" : this.laidOut(body), this.after()]
-      .filter((part) => part !== "")
+      .filter((part) => {
+        return part !== "";
+      })
       .join("\n\n");
   }
 
   /** What follows the answer, set off from it by a blank line: the next steps, then the overview. */
   private after(): string {
-    return [this.nextBlock(), this.overview()].filter((part) => part !== "").join("\n\n");
+    return [this.nextBlock(), this.overview()]
+      .filter((part) => {
+        return part !== "";
+      })
+      .join("\n\n");
   }
 
   /**
@@ -115,16 +129,22 @@ export class Ending {
     }
     return [
       strong(NEXT_LABEL),
-      ...steps.flatMap((step) => [
-        ...(step.text === NEXT_LABEL
-          ? []
-          : stripColumnMarks(step.text)
-              .split("\n")
-              .map((line) => `  ${escapeControlCharacters(line)}`)),
-        ...(step.command === undefined
-          ? []
-          : step.command.split("\n").map((one) => `  ${dim("$")} ${command(one)}`)),
-      ]),
+      ...steps.flatMap((step) => {
+        return [
+          ...(step.text === NEXT_LABEL
+            ? []
+            : stripColumnMarks(step.text)
+                .split("\n")
+                .map((line) => {
+                  return `  ${escapeControlCharacters(line)}`;
+                })),
+          ...(step.command === undefined
+            ? []
+            : step.command.split("\n").map((one) => {
+                return `  ${dim("$")} ${command(one)}`;
+              })),
+        ];
+      }),
     ].join("\n");
   }
 
@@ -196,11 +216,16 @@ export class Ending {
    * meant to run next — the one thing an ending is most often read for.
    */
   private steps(): string[] {
-    const steps = this.presentation === "plain" ? (this.summary.next ?? []) : [];
-    return steps.flatMap((step) => [
-      step.text,
-      ...(step.command === undefined ? [] : step.command.split("\n").map((one) => `  $ ${one}`)),
-    ]);
+    return (this.presentation === "plain" ? (this.summary.next ?? []) : []).flatMap((step) => {
+      return [
+        step.text,
+        ...(step.command === undefined
+          ? []
+          : step.command.split("\n").map((one) => {
+              return `  $ ${one}`;
+            })),
+      ];
+    });
   }
 
   /**
@@ -226,7 +251,9 @@ export class Ending {
 
 /** Everything under the closing line clears the chain's gutter by this much. */
 const INDENT = 3;
-const indent = (text: string): string => text.replace(/^(?=.)/gm, " ".repeat(INDENT));
+const indent = (text: string): string => {
+  return text.replace(/^(?=.)/gm, " ".repeat(INDENT));
+};
 
 /** Drops the blank lines a command's own rendering leaves at either end. */
 function trimBlank(lines: readonly string[]): string[] {

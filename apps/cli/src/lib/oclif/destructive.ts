@@ -86,13 +86,18 @@ export function Destructive<TBase extends CommandClass<BaseCommand>>(Base: TBase
       if (ready instanceof Settled) {
         return ready.result;
       }
-      const question = typeof message === "function" ? await message(ready as Ready) : message;
-      const consent = await this.consent({ ...gate, message: question });
+      const consent = await this.consent({
+        ...gate,
+        message: typeof message === "function" ? await message(ready as Ready) : message,
+      });
       if (consent === undefined) {
         return {
           status: "skipped",
           reason: `${gate.verb}-cancelled`,
-          summary: { title: CANCELLED, sections: [] },
+          summary: {
+            title: CANCELLED,
+            sections: [],
+          },
         };
       }
       // Without a `prepare`, `Ready` is its default, `undefined`.
@@ -136,21 +141,30 @@ export function Destructive<TBase extends CommandClass<BaseCommand>>(Base: TBase
       });
       const delimited = positional.some((word) => word.startsWith("-"));
       const command = this.retryCommand([
-        ...(this.id ?? "").split(":").filter((word) => word !== ""),
+        ...(this.id ?? "").split(":").filter((word) => {
+          return word !== "";
+        }),
         ...(delimited ? [] : positional),
         "--force",
         ...flags,
       ]);
-      const retry = delimited ? inShell(command, { after: ` -- ${Cmd.of(positional)}` }) : command;
       const session = {
         interactive: !this.meta.nonInteractive,
         force: this.meta.force,
         dryRun: this.meta.dryRun,
       };
-      return Consent.request("retry" in gate ? gate : { ...gate, retry }, {
-        ...session,
-        confirmer: this.ui.confirmer(session),
-      });
+      return Consent.request(
+        "retry" in gate
+          ? gate
+          : {
+              ...gate,
+              retry: delimited ? inShell(command, { after: ` -- ${Cmd.of(positional)}` }) : command,
+            },
+        {
+          ...session,
+          confirmer: this.ui.confirmer(session),
+        },
+      );
     }
   }
   return DestructiveCommand;

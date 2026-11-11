@@ -32,11 +32,19 @@ export type EndingStep = { text: string; command?: string };
  * heading every command uses.
  */
 export function stepsOf(next: NextSteps | undefined): EndingStep[] {
-  const actions = (next?.actions ?? []).map((text) => ({ text }));
   const commands = next?.commands ?? [];
   return [
-    ...actions,
-    ...(commands.length === 0 ? [] : [{ text: NEXT_LABEL, command: commands.join("\n") }]),
+    ...(next?.actions ?? []).map((text) => {
+      return { text };
+    }),
+    ...(commands.length === 0
+      ? []
+      : [
+          {
+            text: NEXT_LABEL,
+            command: commands.join("\n"),
+          },
+        ]),
   ];
 }
 

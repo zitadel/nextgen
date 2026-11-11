@@ -68,11 +68,21 @@ export class GetOperation<Ctx> extends ResourceCommand<Ctx, GetSpec<Ctx>, ReadIn
     const heading = headingOf(resource.heading ?? resource.idField, item);
     const title = `Read ${escapeControlCharacters(heading ?? resource.singular)}`;
     if (!this.isOnScreen) {
-      return { status: "ok", data: item, pretty: json(item), summary: { title, sections: [] } };
+      return {
+        status: "ok",
+        data: item,
+        pretty: json(item),
+        summary: {
+          title,
+          sections: [],
+        },
+      };
     }
     const sections =
       flags.fields === undefined && !this.isJson
-        ? ((await spec.sections?.(item, (columns, rows) => this.tabulate(columns, rows))) ?? [])
+        ? ((await spec.sections?.(item, (columns, rows) => {
+            return this.tabulate(columns, rows);
+          })) ?? [])
         : [];
     const record = [this.tabulateDetail(undefined, fields, item), ...sections].join("\n\n");
     return {
@@ -83,7 +93,11 @@ export class GetOperation<Ctx> extends ResourceCommand<Ctx, GetSpec<Ctx>, ReadIn
           "\n",
         ),
       ),
-      summary: { title, sections: [], lines: record.split("\n") },
+      summary: {
+        title,
+        sections: [],
+        lines: record.split("\n"),
+      },
     };
   }
 }

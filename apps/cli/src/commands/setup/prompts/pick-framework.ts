@@ -13,7 +13,12 @@ export class PickFrameworkPrompt {
     return ask.select({
       name: "framework",
       message: "Which framework would you like to scaffold?",
-      options: choices.map((choice) => ({ value: choice.id, label: choice.displayName })),
+      options: choices.map((choice) => {
+        return {
+          value: choice.id,
+          label: choice.displayName,
+        };
+      }),
     });
   }
 }

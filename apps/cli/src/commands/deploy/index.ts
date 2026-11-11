@@ -231,7 +231,11 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
       return this.emit({
         status: "skipped",
         reason: "deploy-cancelled",
-        summary: { title: CANCELLED, sections: [], lines: ["Nothing was deployed."] },
+        summary: {
+          title: CANCELLED,
+          sections: [],
+          lines: ["Nothing was deployed."],
+        },
       });
     }
     const { resourceCount } = prepared;
@@ -311,12 +315,6 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
         origins: servedOrigins,
         ...prepared.report,
       },
-      next: {
-        commands: [
-          this.suggest("deployment list"),
-          ...(configUncommitted ? [shellCommand(commitConfig(this.cwd, message))] : []),
-        ],
-      },
       pretty: prose(
         [deployed(resourceCount), liveOn(release.content_hash, servedOrigins)].join("\n"),
       ),
@@ -324,6 +322,12 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
         title: deployed(resourceCount),
         sections: [],
         lines: [liveOn(release.content_hash, servedOrigins)],
+      },
+      next: {
+        commands: [
+          this.suggest("deployment list"),
+          ...(configUncommitted ? [shellCommand(commitConfig(this.cwd, message))] : []),
+        ],
       },
     });
   }

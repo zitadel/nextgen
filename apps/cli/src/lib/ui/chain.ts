@@ -107,13 +107,18 @@ export class Chain implements Drawing, Narratable {
   narrate(symbol: string, text: string): void {
     const body = stripColumnMarks(text);
     if (!this.audience.interactive) {
-      const stream =
-        symbol === MARK.warning || symbol === MARK.failed ? process.stderr : process.stdout;
-      stream.write(body === "" ? "\n" : `${symbol === GUIDE ? " " : symbol}  ${body}\n`);
+      (symbol === MARK.warning || symbol === MARK.failed ? process.stderr : process.stdout).write(
+        body === "" ? "\n" : `${symbol === GUIDE ? " " : symbol}  ${body}\n`,
+      );
       return;
     }
     this.open();
-    DrawnSpinner.around(() => log.message(body, { symbol, spacing: this.gap ? 1 : 0 }));
+    DrawnSpinner.around(() => {
+      return log.message(body, {
+        symbol,
+        spacing: this.gap ? 1 : 0,
+      });
+    });
     this.gap = false;
   }
 
@@ -205,8 +210,7 @@ export class Chain implements Drawing, Narratable {
       process.stdout.write(`\n${pc.red(CANCELLED)}\n`);
       return;
     }
-    const closedItself = error instanceof PromptCancelled;
-    if (closedItself || !this.opened) {
+    if (error instanceof PromptCancelled || !this.opened) {
       return;
     }
     this.ended = true;
@@ -230,8 +234,19 @@ export class Chain implements Drawing, Narratable {
       force: audience.force,
     };
     return this.presentation === "plain"
-      ? asker({ ...session, guide: false })
-      : asker({ ...session, before: () => this.open(), after: () => this.answered() });
+      ? asker({
+          ...session,
+          guide: false,
+        })
+      : asker({
+          ...session,
+          before: () => {
+            return this.open();
+          },
+          after: () => {
+            return this.answered();
+          },
+        });
   }
 
   say(text: string): void {

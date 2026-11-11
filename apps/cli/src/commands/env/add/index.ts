@@ -407,38 +407,6 @@ export default class EnvAdd extends Promptable(BaseCommand) {
                 origins: [...deployment.origins],
               },
       },
-      // A bound project admits no origin except a loopback origin until the
-      // first pattern is added, so the first step is `origin add` before
-      // anything ships. `next_commands` is machine-readable, so the entry is
-      // included only when it is actually runnable: a concrete origin (without
-      // `--app-url` it would be a `<your-app-url>` placeholder the shell
-      // reads as redirection) and a project secret in the file for it to
-      // authenticate with (a `--project` bind with no secret cannot). When it
-      // is not runnable, the human-facing line below spells it out instead.
-      next: {
-        commands: [
-          ...(needsOrigin && issuer !== undefined && writtenKeys.has("ZITADEL_PROJECT_SECRET")
-            ? // Cmd.quote quotes the origin: an IPv6 issuer like http://[::1]:3000
-              // carries brackets a shell such as zsh would treat as a glob.
-              [
-                projectCommand(
-                  `origin add ${Cmd.quote(issuer)} --kind primary`,
-                  newEnvironment,
-                  cliVersion,
-                ),
-              ]
-            : []),
-          // Only a created project is offered a deploy: it is this run's own,
-          // it has never had a release, and the file just written holds the
-          // secret the deploy authenticates with. A `--project` bind is a
-          // project someone else owns and may already serve a release of
-          // their own, so this run does not propose replacing it.
-          ...(hasSomewhereToLand && deployment === undefined
-            ? [projectCommand(DEPLOY_ARGS, newEnvironment, cliVersion)]
-            : []),
-          projectCommand("env", newEnvironment, cliVersion),
-        ],
-      },
       summary: {
         title: escapeControlCharacters(`Added the ${args.name} environment, bound to ${projectId}`),
         sections: [],
@@ -487,7 +455,41 @@ export default class EnvAdd extends Promptable(BaseCommand) {
           "",
           "Pipeline secret store, for the job that runs zitadel:",
           ...render(platform.pipeline),
-        ].map((line) => escapeControlCharacters(line)),
+        ].map((line) => {
+          return escapeControlCharacters(line);
+        }),
+      },
+      // A bound project admits no origin except a loopback origin until the
+      // first pattern is added, so the first step is `origin add` before
+      // anything ships. `next_commands` is machine-readable, so the entry is
+      // included only when it is actually runnable: a concrete origin (without
+      // `--app-url` it would be a `<your-app-url>` placeholder the shell
+      // reads as redirection) and a project secret in the file for it to
+      // authenticate with (a `--project` bind with no secret cannot). When it
+      // is not runnable, the human-facing line below spells it out instead.
+      next: {
+        commands: [
+          ...(needsOrigin && issuer !== undefined && writtenKeys.has("ZITADEL_PROJECT_SECRET")
+            ? // Cmd.quote quotes the origin: an IPv6 issuer like http://[::1]:3000
+              // carries brackets a shell such as zsh would treat as a glob.
+              [
+                projectCommand(
+                  `origin add ${Cmd.quote(issuer)} --kind primary`,
+                  newEnvironment,
+                  cliVersion,
+                ),
+              ]
+            : []),
+          // Only a created project is offered a deploy: it is this run's own,
+          // it has never had a release, and the file just written holds the
+          // secret the deploy authenticates with. A `--project` bind is a
+          // project someone else owns and may already serve a release of
+          // their own, so this run does not propose replacing it.
+          ...(hasSomewhereToLand && deployment === undefined
+            ? [projectCommand(DEPLOY_ARGS, newEnvironment, cliVersion)]
+            : []),
+          projectCommand("env", newEnvironment, cliVersion),
+        ],
       },
     });
   }

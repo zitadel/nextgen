@@ -80,7 +80,10 @@ export default class DeploymentGet extends Tabulatable(EnvironmentCommand) {
         status: "ok",
         data: deployment,
         pretty: json(deployment),
-        summary: { title, sections: [] },
+        summary: {
+          title,
+          sections: [],
+        },
       });
     }
     return this.emit({

@@ -371,9 +371,17 @@ export async function requireValueInteractive(
     parse: (answer: string) => {
       const typed = answer.trim();
       if (typed === "") {
-        return { ok: false, problem: `${key} cannot be empty` } as const;
+        return {
+          ok: false,
+          problem: `${key} cannot be empty`,
+        } as const;
       }
-      return key === "ZITADEL_URL" ? parseServer(typed) : ({ ok: true, value: typed } as const);
+      return key === "ZITADEL_URL"
+        ? parseServer(typed)
+        : ({
+            ok: true,
+            value: typed,
+          } as const);
     },
   };
   const value = SECRET_KEYS.has(key)

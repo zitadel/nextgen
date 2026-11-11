@@ -126,8 +126,14 @@ export class SocialSignInPrompt implements SetupPrompt {
       const selection: ProviderSelection =
         flagged?.selection ??
         (name === CUSTOM_PROVIDER
-          ? { kind: "custom", connection: await this.askCustom(ctx.ask) }
-          : { kind: "catalog", id: name });
+          ? {
+              kind: "custom",
+              connection: await this.askCustom(ctx.ask),
+            }
+          : {
+              kind: "catalog",
+              id: name,
+            });
       // A custom connection typed in here has not been through the flag checks.
       const loopback = flagged === undefined ? loopbackIssuerWarning(selection) : undefined;
       if (loopback !== undefined) {

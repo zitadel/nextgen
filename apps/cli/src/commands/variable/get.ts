@@ -52,7 +52,10 @@ export default class VariableGet extends Tabulatable(EnvironmentCommand) {
         status: "ok",
         data: variable,
         pretty: json(variable),
-        summary: { title, sections: [] },
+        summary: {
+          title,
+          sections: [],
+        },
       });
     }
     const cell = variableCell(variable);

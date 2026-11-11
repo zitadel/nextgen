@@ -607,25 +607,39 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
 
     if (this.dryRun) {
       this.report(change);
-      const preview = change.changed
-        ? `Would ${verb} ${method} for ${schema.name} (dry run)`
-        : unchanged;
       return this.emit({
         status: "ok",
-        data: { ...data, dry_run: true },
-        summary: { title: escapeControlCharacters(preview), sections: [] },
+        data: {
+          ...data,
+          dry_run: true,
+        },
+        summary: {
+          title: escapeControlCharacters(
+            change.changed ? `Would ${verb} ${method} for ${schema.name} (dry run)` : unchanged,
+          ),
+          sections: [],
+        },
       });
     }
     await this.write(target, change, confirmed.consent);
     this.report(change);
     const followUps = this.followUps(change.changed, target.cwdArgs);
-    const summary = change.changed ? `${done} ${method} for ${schema.name}` : unchanged;
 
     return this.emit({
       status: "ok",
-      data: { ...data, next_args: followUps.args },
-      next: { commands: followUps.commands },
-      summary: { title: escapeControlCharacters(summary), sections: [] },
+      data: {
+        ...data,
+        next_args: followUps.args,
+      },
+      summary: {
+        title: escapeControlCharacters(
+          change.changed ? `${done} ${method} for ${schema.name}` : unchanged,
+        ),
+        sections: [],
+      },
+      next: {
+        commands: followUps.commands,
+      },
     });
   }
 }

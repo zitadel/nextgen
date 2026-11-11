@@ -227,11 +227,11 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
       return {
         status: "ok",
         data: view.items === undefined ? view.data : this.canonicalData(view, token),
-        ...(nextCommand === undefined ? {} : { next: { commands: [nextCommand] } }),
         ...(plain || this.jsonEnabled()
           ? { pretty: (plain ? rows : painted)(await this.renderList(plain, view)) }
           : {}),
         summary: await this.listSummary(view, more),
+        ...(nextCommand === undefined ? {} : { next: { commands: [nextCommand] } }),
       };
     }
 
@@ -253,7 +253,12 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
         title: `Found ${view.rows.length} ${view.rows.length === 1 ? view.singular : plural}`,
         sections: [],
         lines: (await this.tabulate(view.columns, view.rows)).split("\n"),
-        extras: [...view.footer.map((line) => escapeControlCharacters(line)), ...more],
+        extras: [
+          ...view.footer.map((line) => {
+            return escapeControlCharacters(line);
+          }),
+          ...more,
+        ],
       };
     }
 
@@ -270,7 +275,10 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
       if (replaced.length > 0) {
         throw new Error(`a list's extra fields may not replace ${replaced.join(", ")}`);
       }
-      return { ...canonical, ...view.extra };
+      return {
+        ...canonical,
+        ...view.extra,
+      };
     }
 
     /**

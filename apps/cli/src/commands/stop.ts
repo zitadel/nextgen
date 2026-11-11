@@ -56,7 +56,10 @@ export default class Stop extends BaseCommand {
             data_dir: runtime?.data_dir,
           },
         },
-        summary: { title: "Would stop the local Zitadel server (dry run)", sections: [] },
+        summary: {
+          title: "Would stop the local Zitadel server (dry run)",
+          sections: [],
+        },
         next: { commands: [this.suggestUnscoped("stop")] },
       });
     }
@@ -84,7 +87,10 @@ export default class Stop extends BaseCommand {
           data_dir: runtime?.data_dir,
         },
       },
-      summary: { title: said, sections: [] },
+      summary: {
+        title: said,
+        sections: [],
+      },
     });
   }
 
@@ -95,7 +101,11 @@ export default class Stop extends BaseCommand {
         status: "ok",
         data: {
           title: "Managed local runtime process discovery is unavailable",
-          sweep: { supported: false, error: sweep.error, stopped: [] },
+          sweep: {
+            supported: false,
+            error: sweep.error,
+            stopped: [],
+          },
         },
         summary: {
           title: "Managed local runtime process discovery is unavailable",
@@ -121,7 +131,10 @@ export default class Stop extends BaseCommand {
           results: sweep.results,
         },
       },
-      summary: { title: said, sections: [] },
+      summary: {
+        title: said,
+        sections: [],
+      },
     });
   }
 }

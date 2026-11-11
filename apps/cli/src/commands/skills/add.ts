@@ -40,7 +40,9 @@ export default class SkillsAdd extends BaseCommand {
     const title = `${this.dryRun ? "Would add" : "Added"} the ${skills.length} Zitadel agent skills of CLI ${this.cliVersion}${this.dryRun ? " (dry run)" : ""}`;
     const said = [
       `${title} to:`,
-      ...dirs.map((dir) => `  ${dir}${dir === CLAUDE_SKILLS_DIR ? "  (Claude Code)" : ""}`),
+      ...dirs.map((dir) => {
+        return `  ${dir}${dir === CLAUDE_SKILLS_DIR ? "  (Claude Code)" : ""}`;
+      }),
       "Run this again after updating the CLI to keep them in step with it.",
     ];
 
@@ -48,16 +50,18 @@ export default class SkillsAdd extends BaseCommand {
       status: "ok",
       data: {
         title,
+        ...(this.dryRun ? { dry_run: true } : {}),
         skills,
         directories: dirs,
-        ...(this.dryRun ? { dry_run: true } : {}),
       },
+      pretty: prose(said.join("\n")),
       summary: {
         title: escapeControlCharacters(title),
         sections: [],
-        lines: said.slice(1).map((line) => escapeControlCharacters(line)),
+        lines: said.slice(1).map((line) => {
+          return escapeControlCharacters(line);
+        }),
       },
-      pretty: prose(said.join("\n")),
     });
   }
 }

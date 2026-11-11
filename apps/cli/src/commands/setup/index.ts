@@ -1166,8 +1166,8 @@ export default class Setup extends Destructive(BaseCommand) {
           title: "Zitadel is already set up in this app",
           sections: [],
           lines: ["Nothing was changed."],
-          boxed: true,
           ...(skippedHost === undefined ? {} : { ran: skippedHost }),
+          boxed: true,
         },
       });
     }
@@ -1269,9 +1269,15 @@ export default class Setup extends Destructive(BaseCommand) {
     const asks = !this.nonInteractive && !this.dryRun;
     const promptCtx: PromptContext = {
       ask: wizardQuestions,
-      note: (title, lines) => this.ui.note(title, lines),
-      say: (text) => this.ui.say(text),
-      spinner: (label, options) => this.ui.spinner(label, options),
+      note: (title, lines) => {
+        this.ui.note(title, lines);
+      },
+      say: (text) => {
+        this.ui.say(text);
+      },
+      spinner: (label, options) => {
+        return this.ui.spinner(label, options);
+      },
       framework: { id: app.framework, displayName: orca.displayName(app.framework) },
       suggest: (args: string) => projectCommand(args, recoverySelector(flags.cwd), this.cliVersion),
       cwd: this.cwd,
@@ -1518,7 +1524,9 @@ export default class Setup extends Destructive(BaseCommand) {
     } catch (error) {
       current?.fail();
       if (newApp !== undefined) {
-        await removeNewApp(newApp, this.cwd, this.env, (text) => this.ui.say(text));
+        await removeNewApp(newApp, this.cwd, this.env, (text) => {
+          this.ui.say(text);
+        });
       }
       throw error;
     }
@@ -1646,7 +1654,9 @@ export default class Setup extends Destructive(BaseCommand) {
       selector: recoverySelector(flags.cwd),
       scaffoldedFramework,
       skipInstall: Boolean(flags.skipInstall),
-      task: (label, work, done) => this.ui.task(label, work, done),
+      task: (label, work, done) => {
+        return this.ui.task(label, work, done);
+      },
     });
 
     this.recordTelemetry({
@@ -1818,7 +1828,10 @@ export default class Setup extends Destructive(BaseCommand) {
     // The structured report is human-only. Under `--json` we let the
     // envelope returned from `this.emit(...)` be the sole stdout
     // payload (oclif requires single-doc JSON).
-    let summary: Summary = { title: SET_UP_TITLE, sections: [] };
+    let summary: Summary = {
+      title: SET_UP_TITLE,
+      sections: [],
+    };
     let report = "";
     this.ui.ranAgainst(project.id, answers.server.replace(/^https?:\/\//, ""));
     if (!this.isJson) {
@@ -1928,7 +1941,12 @@ export default class Setup extends Destructive(BaseCommand) {
             ...nextActions,
             ...(exploreCommand === undefined
               ? []
-              : [{ text: exploreText, command: exploreCommand }]),
+              : [
+                  {
+                    text: exploreText,
+                    command: exploreCommand,
+                  },
+                ]),
           ],
         });
       }
@@ -1939,8 +1957,6 @@ export default class Setup extends Destructive(BaseCommand) {
 
     return this.emit({
       status: "ok",
-      summary,
-      ...(report === "" ? {} : { pretty: painted(report) }),
       data: {
         title: "Zitadel is ready",
         project: { project_id: project.id, issuer },
@@ -2010,6 +2026,8 @@ export default class Setup extends Destructive(BaseCommand) {
                 origins: [...deployment.origins],
               },
       },
+      ...(report === "" ? {} : { pretty: painted(report) }),
+      summary,
       next: {
         actions: [
           ...deployStep.actions,
@@ -2327,11 +2345,6 @@ export default class Setup extends Destructive(BaseCommand) {
 
     return this.emit({
       status: "ok",
-      summary: {
-        title: moved ? `Moved the app to ${move.issuer}` : `The app is already on ${move.issuer}`,
-        sections: [],
-        boxed: true,
-      },
       data: {
         title: moved ? `Moved the app to ${move.issuer}` : `The app is already on ${move.issuer}`,
         moved,
@@ -2340,6 +2353,11 @@ export default class Setup extends Destructive(BaseCommand) {
         dev_port: devPort,
         files_written: move.result.filesWritten.map((file) => relativeDisplay(cwd, file)),
         deployment_id: move.deploymentId ?? null,
+      },
+      summary: {
+        title: moved ? `Moved the app to ${move.issuer}` : `The app is already on ${move.issuer}`,
+        sections: [],
+        boxed: true,
       },
       next: {
         actions: [`Restart the dev server and open ${move.issuer}/login.`],

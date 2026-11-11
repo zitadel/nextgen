@@ -27,10 +27,12 @@ export type Section = { readonly heading?: string; readonly facts: readonly Fact
  * @example
  * section("Project", ["Id", project.id], ["Server", server])
  */
-export const section = (heading: string | undefined, ...facts: Fact[]): Section => ({
-  ...(heading === undefined ? {} : { heading }),
-  facts,
-});
+export const section = (heading: string | undefined, ...facts: Fact[]): Section => {
+  return {
+    ...(heading === undefined ? {} : { heading }),
+    facts,
+  };
+};
 
 /**
  * What a command ends on. Every field is read-only: a summary is a value the
@@ -79,7 +81,12 @@ export type Summary = {
  */
 export type Outcome<D> = { readonly data: D; readonly summary: Summary };
 
-export const outcome = <D>(data: D, summary: Summary): Outcome<D> => ({ data, summary });
+export const outcome = <D>(data: D, summary: Summary): Outcome<D> => {
+  return {
+    data,
+    summary,
+  };
+};
 
 /**
  * A summary as plain text, for a run nobody is drawing into: the headline, then
@@ -88,5 +95,6 @@ export const outcome = <D>(data: D, summary: Summary): Outcome<D> => ({ data, su
  * ones the terminal ends on and cannot drift from them. Its fields are already
  * spelled out where they were read, so none is spelled out again here.
  */
-export const textOf = (summary: Summary): string =>
-  [summary.title, ...(summary.lines === undefined ? [] : ["", ...summary.lines])].join("\n");
+export const textOf = (summary: Summary): string => {
+  return [summary.title, ...(summary.lines === undefined ? [] : ["", ...summary.lines])].join("\n");
+};

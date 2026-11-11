@@ -233,7 +233,11 @@ export default class Claim extends EnvironmentCommand {
           project_id: projectId,
           would,
         },
-        summary: { title: "Nothing was claimed (dry run)", sections: [], lines: [would] },
+        summary: {
+          title: "Nothing was claimed (dry run)",
+          sections: [],
+          lines: [would],
+        },
         next: {
           commands: [
             flags.challengeId === undefined
@@ -494,8 +498,14 @@ export default class Claim extends EnvironmentCommand {
     return this.emit({
       status: "skipped",
       reason: "already-claimed",
-      data: { title: "This project already belongs to a team", ...data },
-      summary: { title: "This project already belongs to a team", sections: [] },
+      data: {
+        title: "This project already belongs to a team",
+        ...data,
+      },
+      summary: {
+        title: "This project already belongs to a team",
+        sections: [],
+      },
     });
   }
 }

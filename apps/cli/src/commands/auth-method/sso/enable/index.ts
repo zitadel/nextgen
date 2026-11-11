@@ -654,7 +654,11 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     const payload = this.payload({ summary, change, published: NOTHING_PUBLISHED, names });
     return this.emit({
       status: "ok",
-      data: { ...payload, would_store: toStore, dry_run: true },
+      data: {
+        ...payload,
+        would_store: toStore,
+        dry_run: true,
+      },
       summary: {
         title: escapeControlCharacters(said[0] === undefined ? "" : `${said[0]} (dry run)`),
         sections: [],
@@ -790,9 +794,6 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       published: input.published,
       names: input.delivery.names,
     });
-    const next = unpublished
-      ? { actions, commands: followUps.commands }
-      : { commands: followUps.commands };
 
     if (!this.isJson) {
       this.drawMapping(input.change);
@@ -805,13 +806,19 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         ...payload,
         next_args: followUps.args,
       },
-      next,
       summary: {
         title: escapeControlCharacters(this.title(name, unpublished, false)),
         sections: [],
         lines: unpublished && stored ? ["Its credentials are stored in your project."] : [],
         next: [
-          ...(leading.length === 0 ? [] : [{ text: NEXT_LABEL, command: leading.join("\n") }]),
+          ...(leading.length === 0
+            ? []
+            : [
+                {
+                  text: NEXT_LABEL,
+                  command: leading.join("\n"),
+                },
+              ]),
           ...(unpublished
             ? [
                 {
@@ -822,6 +829,14 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
             : []),
         ],
       },
+      next: unpublished
+        ? {
+            actions,
+            commands: followUps.commands,
+          }
+        : {
+            commands: followUps.commands,
+          },
     });
   }
 

@@ -196,7 +196,13 @@ export abstract class BaseCommand extends Interruptible(Command) {
   protected meta: GlobalOptions = this.fallbackMeta();
 
   /** Everything a command shows a person. Silent until {@link toMeta} finds a terminal. */
-  protected ui: Ui = new Ui({ interactive: false, force: false }, this.presentation());
+  protected ui: Ui = new Ui(
+    {
+      interactive: false,
+      force: false,
+    },
+    this.presentation(),
+  );
 
   /**
    * Whether this run may offer the Zitadel skills, resolved while the command
@@ -504,12 +510,20 @@ export abstract class BaseCommand extends Interruptible(Command) {
       json,
     };
     this.ui = new Ui(
-      { interactive: !this.meta.nonInteractive, force: this.meta.force },
+      {
+        interactive: !this.meta.nonInteractive,
+        force: this.meta.force,
+      },
       this.presentation(),
     );
-    const named = this.constructor as typeof BaseCommand;
-    this.ui.describe(named.heading ?? `zitadel ${(this.id ?? "").replaceAll(":", " ")}`.trim());
-    this.ui.bridgeNarration({ debug, silent: json });
+    this.ui.describe(
+      (this.constructor as typeof BaseCommand).heading ??
+        `zitadel ${(this.id ?? "").replaceAll(":", " ")}`.trim(),
+    );
+    this.ui.bridgeNarration({
+      debug,
+      silent: json,
+    });
     this.skillsOffered =
       this.summarises() && !this.meta.dryRun
         ? await eligibleForSkills({
@@ -674,8 +688,9 @@ export abstract class BaseCommand extends Interruptible(Command) {
    */
   private endingOf(result: CommandResult, footer: string | undefined): Summary {
     const own = result.summary;
-    const shown = result.status === "ok" && result.nextShown !== undefined;
-    const steps = own.next ?? (shown ? [] : stepsOf(result.next));
+    const steps =
+      own.next ??
+      (result.status === "ok" && result.nextShown !== undefined ? [] : stepsOf(result.next));
     const ran = own.ran ?? this.serverRanOn();
     const warnings =
       result.status === "ok" && !result.warningsShown
@@ -689,9 +704,9 @@ export abstract class BaseCommand extends Interruptible(Command) {
     return this.withOverview(
       {
         ...own,
-        ...(ran === undefined ? {} : { ran }),
-        ...(steps.length === 0 ? {} : { next: steps }),
         ...(extras.length === 0 ? {} : { extras }),
+        ...(steps.length === 0 ? {} : { next: steps }),
+        ...(ran === undefined ? {} : { ran }),
       },
       result.status === "ok",
     );
@@ -738,16 +753,32 @@ export abstract class BaseCommand extends Interruptible(Command) {
   private withOverview(summary: Summary, changed: boolean): Summary {
     const steps = summary.next ?? [];
     if (!this.summarises()) {
-      return { ...summary, boxed: false };
+      return {
+        ...summary,
+        boxed: false,
+      };
     }
-    const overview = steps.some((step) => step.text === OVERVIEW)
+    const overview = steps.some((step) => {
+      return step.text === OVERVIEW;
+    })
       ? []
-      : [{ text: OVERVIEW, command: publicCliCommand("", this.config.version) }];
+      : [
+          {
+            text: OVERVIEW,
+            command: publicCliCommand("", this.config.version),
+          },
+        ];
     const skills =
       this.skillsOffered && changed ? [claimSkills(process.env, this.config.version)] : [];
     return {
       ...summary,
-      next: [...steps, ...overview, ...skills.filter((step) => step !== undefined)],
+      next: [
+        ...steps,
+        ...overview,
+        ...skills.filter((step) => {
+          return step !== undefined;
+        }),
+      ],
     };
   }
 
@@ -903,13 +934,22 @@ function asRaised(error: unknown): unknown {
 function normalizeCommandResult(result: CommandResult, meta: GlobalOptions): CommandResult {
   const stated =
     result.pretty === undefined && result.summary !== undefined
-      ? { ...result, pretty: painted(textOf(result.summary)) }
+      ? {
+          ...result,
+          pretty: painted(textOf(result.summary)),
+        }
       : result;
   if (stated.next?.commands === undefined) {
     return stated as CommandResult;
   }
   const commands = normalizePublicCliCommands(stated.next.commands, meta.cliVersion);
-  return { ...stated, next: { ...stated.next, commands } } as CommandResult;
+  return {
+    ...stated,
+    next: {
+      ...stated.next,
+      commands,
+    },
+  } as CommandResult;
 }
 
 /**
@@ -989,9 +1029,18 @@ function renderPretty(result: CommandResult, next: string): string {
   // made it knew which spelling its shape takes, so interpolating what the
   // server answered is safe wherever a command does it.
   const own = result.pretty?.text ?? "";
-  const warnings = result.status === "ok" && !result.warningsShown ? (result.warnings ?? []) : [];
   const body = next === "" || own === "" ? own : `${own.replace(/\n+$/, "")}\n`;
-  return [body, next, ...warnings.map(warningLine)].filter((line) => line !== "").join("\n");
+  return [
+    body,
+    next,
+    ...(result.status === "ok" && !result.warningsShown ? (result.warnings ?? []) : []).map(
+      warningLine,
+    ),
+  ]
+    .filter((line) => {
+      return line !== "";
+    })
+    .join("\n");
 }
 
 /**
@@ -1018,7 +1067,15 @@ function failureSummary(error: ZitadelError, meta: GlobalOptions): Summary {
       : [],
     ...(commands.length === 0
       ? {}
-      : { next: [{ text: NEXT_LABEL, command: commands.join("\n") }], boxed: true }),
+      : {
+          next: [
+            {
+              text: NEXT_LABEL,
+              command: commands.join("\n"),
+            },
+          ],
+          boxed: true,
+        }),
     failed: true,
   };
 }

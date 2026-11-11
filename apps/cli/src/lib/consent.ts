@@ -109,8 +109,7 @@ export class Consent {
       if (!session.force && !session.interactive) {
         gate.refuse?.();
       }
-      const confirmer = session.confirmer ?? asker(session);
-      const agreed = await confirmer.confirm({
+      const agreed = await (session.confirmer ?? asker(session)).confirm({
         name: gate.name,
         message: gate.message,
         retry: gate.retry,

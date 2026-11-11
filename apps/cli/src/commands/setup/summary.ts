@@ -61,12 +61,14 @@ export function relativeDisplayPath(cwd: string, absolute: string): string {
  */
 export function summarySections(sections: Section[]): UiSection[] {
   return sections
-    .filter((section) => section.rows.length > 0)
-    .map((section) =>
-      uiSection(
+    .filter((section) => {
+      return section.rows.length > 0;
+    })
+    .map((section) => {
+      return uiSection(
         section.title,
-        ...section.rows.map(
-          (row): Fact => [
+        ...section.rows.map((row): Fact => {
+          return [
             row.label,
             row.secondary === undefined
               ? row.value
@@ -74,10 +76,10 @@ export function summarySections(sections: Section[]): UiSection[] {
                 // whatever it is given, so only the brackets are dimmed: dimming the whole
                 // would print the styling's own escape as the text `\\x1b[36m`.
                 `${row.value} ${dim("(")}${row.secondary}${dim(")")}`,
-          ],
-        ),
-      ),
-    );
+          ];
+        }),
+      );
+    });
 }
 
 /**

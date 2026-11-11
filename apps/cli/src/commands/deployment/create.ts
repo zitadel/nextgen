@@ -77,7 +77,11 @@ export default class DeploymentCreate extends EnvironmentCommand {
     if (this.dryRun) {
       return this.emit({
         status: "ok",
-        data: { dry_run: true, release_id: flags.release, targets: "primary" },
+        data: {
+          dry_run: true,
+          release_id: flags.release,
+          targets: "primary",
+        },
         summary: {
           title: `Would deploy ${escapeControlCharacters(flags.release)} to primary (dry run)`,
           sections: [],
@@ -101,10 +105,12 @@ export default class DeploymentCreate extends EnvironmentCommand {
         release_id: deployment.release_id,
         origins: deployment.origins,
       },
-      next: { commands: [this.suggest("deployment list")] },
       summary: {
         title: `Deployed ${escapeControlCharacters(deployment.release_id)} to ${renderCount(deployment.origins.length, { singular: "origin" })}`,
         sections: [],
+      },
+      next: {
+        commands: [this.suggest("deployment list")],
       },
     });
   }

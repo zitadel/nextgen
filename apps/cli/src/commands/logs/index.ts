@@ -110,13 +110,20 @@ export default class Logs extends BaseCommand {
 
       return this.emit({
         status: "ok",
-        data: { title: "Stopped following local Zitadel logs" },
-        summary: { title: "Stopped following local Zitadel logs", sections: [] },
+        data: {
+          title: "Stopped following local Zitadel logs",
+        },
+        summary: {
+          title: "Stopped following local Zitadel logs",
+          sections: [],
+        },
       });
     }
 
     const { runtime, lines } = await server.logs({ tail: flags.tail, level: flags.level });
-    const shown = lines.map((line) => renderLogLine(line, this.isColored));
+    const shown = lines.map((line) => {
+      return renderLogLine(line, this.isColored);
+    });
 
     return this.emit({
       status: "ok",
@@ -135,8 +142,12 @@ export default class Logs extends BaseCommand {
               },
         logs: logText(lines),
       },
-      summary: { title: "Done", sections: [], lines: shown },
       pretty: painted(shown.join("\n")),
+      summary: {
+        title: "Done",
+        sections: [],
+        lines: shown,
+      },
     });
   }
 }

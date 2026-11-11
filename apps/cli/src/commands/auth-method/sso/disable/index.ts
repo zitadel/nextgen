@@ -122,13 +122,18 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
 
     if (this.dryRun) {
       this.report(change);
-      const preview = change.changed
-        ? `Would remove ${provider} from ${where} (dry run)`
-        : unchanged;
       return this.emit({
         status: "ok",
-        data: { ...data, dry_run: true },
-        summary: { title: escapeControlCharacters(preview), sections: [] },
+        data: {
+          ...data,
+          dry_run: true,
+        },
+        summary: {
+          title: escapeControlCharacters(
+            change.changed ? `Would remove ${provider} from ${where} (dry run)` : unchanged,
+          ),
+          sections: [],
+        },
       });
     }
     await this.write(target, change, confirmed.consent);
@@ -136,17 +141,28 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
     const followUps = this.followUps(change.changed, target.cwdArgs);
     const unused = change.changed ? change.after.connections.findUnused(provider) : undefined;
     const actions = unused === undefined ? [] : this.removalActions(unused, flags);
-    const summary = change.changed ? `Removed ${provider} from ${where}` : unchanged;
-    const next =
-      actions.length > 0
-        ? { actions, commands: followUps.commands }
-        : { commands: followUps.commands };
 
     return this.emit({
       status: "ok",
-      data: { ...data, next_args: followUps.args },
-      next,
-      summary: { title: escapeControlCharacters(summary), sections: [] },
+      data: {
+        ...data,
+        next_args: followUps.args,
+      },
+      summary: {
+        title: escapeControlCharacters(
+          change.changed ? `Removed ${provider} from ${where}` : unchanged,
+        ),
+        sections: [],
+      },
+      next:
+        actions.length > 0
+          ? {
+              actions,
+              commands: followUps.commands,
+            }
+          : {
+              commands: followUps.commands,
+            },
     });
   }
 

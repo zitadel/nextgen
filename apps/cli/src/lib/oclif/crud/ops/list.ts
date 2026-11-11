@@ -265,7 +265,6 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>, List
 
     const rows = items;
     const columns = chosenColumns(flags.fields, resource.columns, items, shape);
-    const empty = next ? `No ${plural} on this page` : `No ${plural} found`;
     const footer: string[] = [];
     const page = {
       token: next,
@@ -283,7 +282,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>, List
         items,
         singular: resource.singular,
         plural,
-        empty,
+        empty: next ? `No ${plural} on this page` : `No ${plural} found`,
         footer,
         page,
         extra,

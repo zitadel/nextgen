@@ -301,12 +301,16 @@ export default class Api extends Destructive(BaseCommand) {
     return this.emit({
       status: "ok",
       data: {},
-      next: this.jsonEnabled() ? { commands: [this.suggestUnscoped("api ls")] } : undefined,
+      pretty: prose(""),
       summary: {
         title: "Done",
         sections: [],
       },
-      pretty: prose(""),
+      next: this.jsonEnabled()
+        ? {
+            commands: [this.suggestUnscoped("api ls")],
+          }
+        : undefined,
     });
   }
 
@@ -336,8 +340,8 @@ export default class Api extends Destructive(BaseCommand) {
       return this.emit({
         status: "ok",
         data: {
-          dry_run: true,
           title: `Would call ${operation.id} (dry run)`,
+          dry_run: true,
           operation: operation.id,
           method: operation.method,
           url,
@@ -347,12 +351,12 @@ export default class Api extends Destructive(BaseCommand) {
                 body: request.body,
               }),
         },
+        pretty: curl,
         summary: {
           title: `Would call ${operation.id} (dry run)`,
           sections: [],
           lines: curl.text.split("\n"),
         },
-        pretty: curl,
       });
     }
 
@@ -412,8 +416,12 @@ export default class Api extends Destructive(BaseCommand) {
     return this.emit({
       status: "ok",
       data: response.body ?? null,
+      ...(answer.pretty === undefined
+        ? {}
+        : {
+            pretty: answer.pretty,
+          }),
       summary: answer.summary,
-      ...(answer.pretty === undefined ? {} : { pretty: answer.pretty }),
     });
   }
 

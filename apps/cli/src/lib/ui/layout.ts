@@ -45,10 +45,14 @@ export const COLUMN_GAP = 2;
 export const COLUMN_MARK = "\u2060";
 
 /** This row, marked as one a column builder aligned itself. */
-export const columnRow = (row: string): string => `${COLUMN_MARK}${row}`;
+export const columnRow = (row: string): string => {
+  return `${COLUMN_MARK}${row}`;
+};
 
 /** Whatever this text says without its marks, for anything but the layout. */
-export const stripColumnMarks = (text: string): string => text.replaceAll(COLUMN_MARK, "");
+export const stripColumnMarks = (text: string): string => {
+  return text.replaceAll(COLUMN_MARK, "");
+};
 
 /**
  * A line as the terminal shows it. Colour is invisible but not weightless: a
@@ -56,7 +60,9 @@ export const stripColumnMarks = (text: string): string => text.replaceAll(COLUMN
  * one character longer, so every width decision here measures what the
  * terminal shows, never `String.length`.
  */
-const bare = (line: string): string => stripColumnMarks(stripAnsi(line));
+const bare = (line: string): string => {
+  return stripColumnMarks(stripAnsi(line));
+};
 
 /**
  * The columns a character takes: none for a combining mark or a zero-width
@@ -85,8 +91,11 @@ const columnsOf = (character: string): number => {
 };
 
 /** How wide a line looks on screen. */
-const visible = (line: string): number =>
-  [...bare(line)].reduce((width, character) => width + columnsOf(character), 0);
+const visible = (line: string): number => {
+  return [...bare(line)].reduce((width, character) => {
+    return width + columnsOf(character);
+  }, 0);
+};
 
 /**
  * Which of these lines are rows of a column layout, and so must be left whole.
@@ -100,12 +109,16 @@ const visible = (line: string): number =>
  * produces, and which a single sentence cannot fake.
  */
 const columnRows = (lines: readonly string[]): boolean[] => {
-  const starts = lines.map((line) =>
-    [...bare(line).matchAll(new RegExp(`\\S( {${COLUMN_GAP},})(?=\\S)`, "g"))].map(
-      (match) => match.index + 1 + (match[1]?.length ?? 0),
-    ),
-  );
-  const isRule = (line: string): boolean => /^[\u2500\u2501-]{3,}$/.test(bare(line).trim());
+  const starts = lines.map((line) => {
+    return [...bare(line).matchAll(new RegExp(`\\S( {${COLUMN_GAP},})(?=\\S)`, "g"))].map(
+      (match) => {
+        return match.index + 1 + (match[1]?.length ?? 0);
+      },
+    );
+  });
+  const isRule = (line: string): boolean => {
+    return /^[\u2500\u2501-]{3,}$/.test(bare(line).trim());
+  };
   const neighbour = (index: number, step: 1 | -1): number[] | undefined => {
     let at = index + step;
     while (lines[at] !== undefined && isRule(lines[at] ?? "")) {
@@ -113,12 +126,19 @@ const columnRows = (lines: readonly string[]): boolean[] => {
     }
     return starts[at];
   };
-  const shares = (a: number[], b: number[] | undefined): boolean =>
-    b !== undefined && a.some((start) => b.includes(start));
-  return starts.map(
-    (own, index) =>
-      own.length > 0 && (shares(own, neighbour(index, -1)) || shares(own, neighbour(index, 1))),
-  );
+  const shares = (a: number[], b: number[] | undefined): boolean => {
+    return (
+      b !== undefined &&
+      a.some((start) => {
+        return b.includes(start);
+      })
+    );
+  };
+  return starts.map((own, index) => {
+    return (
+      own.length > 0 && (shares(own, neighbour(index, -1)) || shares(own, neighbour(index, 1)))
+    );
+  });
 };
 
 /**
@@ -157,15 +177,22 @@ export class Prose implements Renderable {
   }
 
   render(): string {
-    const marked = this.text.split("\n").map((line) => line.includes(COLUMN_MARK));
+    const marked = this.text.split("\n").map((line) => {
+      return line.includes(COLUMN_MARK);
+    });
     const lines = this.text.split("\n").map(stripColumnMarks);
     if (this.columns === true) {
       return lines.join("\n");
     }
     const aligned = this.columns === false ? [] : columnRows(lines);
-    const row = (index: number): boolean =>
-      this.columns !== false && (marked[index] === true || aligned[index] === true);
-    return lines.map((line, index) => (row(index) ? line : this.wrap(line))).join("\n");
+    const row = (index: number): boolean => {
+      return this.columns !== false && (marked[index] === true || aligned[index] === true);
+    };
+    return lines
+      .map((line, index) => {
+        return row(index) ? line : this.wrap(line);
+      })
+      .join("\n");
   }
 
   private wrap(line: string): string {
@@ -176,7 +203,9 @@ export class Prose implements Renderable {
     const item = /^(\[\w+\]|\$|-|\d+\.) /.test(line.trimStart()) ? "  " : "";
     return wrapAnsi(line.trimStart(), Math.max(1, this.width - lead.length - item.length))
       .split("\n")
-      .map((part, index) => (index === 0 ? lead : lead + item) + part)
+      .map((part, index) => {
+        return (index === 0 ? lead : lead + item) + part;
+      })
       .join("\n");
   }
 }
@@ -190,17 +219,26 @@ export class Facts implements Renderable {
   }
 
   render(): string {
-    return this.sections.map((section) => this.one(section)).join("\n\n");
+    return this.sections
+      .map((section) => {
+        return this.one(section);
+      })
+      .join("\n\n");
   }
 
   private one(section: Section): string {
-    const width = Math.max(0, ...section.facts.map(([label]) => label.length));
+    const width = Math.max(
+      0,
+      ...section.facts.map(([label]) => {
+        return label.length;
+      }),
+    );
     const gap = " ".repeat(COLUMN_GAP + 1);
     return [
       ...(section.heading === undefined ? [] : [pc.bold(section.heading)]),
-      ...section.facts.map(([label, value]) =>
-        columnRow(`${pc.dim(label.padEnd(width))}${gap}${value}`),
-      ),
+      ...section.facts.map(([label, value]) => {
+        return columnRow(`${pc.dim(label.padEnd(width))}${gap}${value}`);
+      }),
     ].join("\n");
   }
 }
@@ -251,7 +289,9 @@ export const wrapCommand = (command: string, width: number, lead = ""): string[]
   while (indent.length + rest.length > width) {
     const room = Math.max(1, width - indent.length - 2);
     const cut = argumentBreaks(rest)
-      .filter((at) => at > 0 && at <= room)
+      .filter((at) => {
+        return at > 0 && at <= room;
+      })
       .at(-1);
     if (cut === undefined) {
       break;
@@ -275,19 +315,19 @@ export const drawBox = (
   paint: (text: string) => string = pc.green,
 ): string => {
   const padding = 2;
-  const edge = (character: string): string => paint(character);
+  const edge = (character: string): string => {
+    return paint(character);
+  };
   const lines = text.split("\n");
   const width = Math.max(...lines.map(visible), visible(title)) + padding;
   const left = Math.floor((width - visible(title)) / 2);
-  const right = width - visible(title) - left + padding;
   const blank = `\u0020${edge("\u2502")}${" ".repeat(width + padding)}${edge("\u2502")}`;
   return [
-    `\u0020${edge("\u256d")}${edge("\u2500").repeat(left)}${paint(title)}${edge("\u2500").repeat(right)}${edge("\u256e")}`,
+    `\u0020${edge("\u256d")}${edge("\u2500").repeat(left)}${paint(title)}${edge("\u2500").repeat(width - visible(title) - left + padding)}${edge("\u256e")}`,
     blank,
-    ...lines.map(
-      (line) =>
-        `\u0020${edge("\u2502")}${" ".repeat(padding)}${line}${" ".repeat(width - visible(line))}${edge("\u2502")}`,
-    ),
+    ...lines.map((line) => {
+      return `\u0020${edge("\u2502")}${" ".repeat(padding)}${line}${" ".repeat(width - visible(line))}${edge("\u2502")}`;
+    }),
     blank,
     `\u0020${edge("\u2570")}${edge("\u2500").repeat(width + padding)}${edge("\u256f")}`,
     "",
@@ -331,7 +371,9 @@ export class Frame implements Renderable {
       ...(this.body.length === 0
         ? []
         : [new Prose(this.body.join("\n"), Frame.INNER, false).render()]),
-      ...this.steps.map((step) => this.step(step)),
+      ...this.steps.map((step) => {
+        return this.step(step);
+      }),
       ...(this.footer === undefined ? [] : [new Prose(this.footer, Frame.INNER, false).render()]),
     ];
     const lines = blocks.join("\n\n").split("\n");
@@ -348,8 +390,12 @@ export class Frame implements Renderable {
         ? []
         : step.command
             .split("\n")
-            .flatMap((command) => wrapCommand(command, Frame.INNER, "  "))
-            .map((line) => pc.bold(pc.cyan(line)))),
+            .flatMap((command) => {
+              return wrapCommand(command, Frame.INNER, "  ");
+            })
+            .map((line) => {
+              return pc.bold(pc.cyan(line));
+            })),
     ].join("\n");
   }
 }

@@ -47,13 +47,15 @@ export type DeploymentRecord = {
 };
 
 /** One deployment flattened to the cells {@link DEPLOYMENT_FIELDS} names. */
-export const deploymentRow = (deployment: DeploymentRecord) => ({
-  id: deployment.id,
-  release_id: deployment.release_id,
-  reason: deployment.reason ?? "deploy",
-  origins: deployment.origins.join(", "),
-  deployed_at: deployment.deployed_at,
-});
+export const deploymentRow = (deployment: DeploymentRecord) => {
+  return {
+    id: deployment.id,
+    release_id: deployment.release_id,
+    reason: deployment.reason ?? "deploy",
+    origins: deployment.origins.join(", "),
+    deployed_at: deployment.deployed_at,
+  };
+};
 
 /**
  * `zitadel deployment list` — show the project's deployment history.
@@ -115,8 +117,6 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
     // Flatten each deployment's targets to one `origins` cell for the table.
     const rows = items.map(deploymentRow);
 
-    const columns = DEPLOYMENT_FIELDS;
-    const empty = "No deployments found";
     const footer: string[] = [];
     const page = {
       token: listed.next,
@@ -130,11 +130,11 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
     const extra = {};
 
     return this.emitList(flags, {
-      columns,
+      columns: DEPLOYMENT_FIELDS,
       rows,
       items,
       singular: "deployment",
-      empty,
+      empty: "No deployments found",
       footer,
       page,
       extra,

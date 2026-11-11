@@ -74,10 +74,13 @@ export default class Console extends BaseCommand {
         status: "ok",
         data: {
           title: "Would mint a console sign-in link (dry run)",
-          signed_in_as: admin.email,
           dry_run: true,
+          signed_in_as: admin.email,
         },
-        summary: { title: "Would mint a console sign-in link (dry run)", sections: [] },
+        summary: {
+          title: "Would mint a console sign-in link (dry run)",
+          sections: [],
+        },
       });
     }
 
@@ -97,7 +100,10 @@ export default class Console extends BaseCommand {
         sign_in_url: signInUrl,
         browser_opened: opened,
       },
-      summary: { title: "Local console sign-in link", sections: [] },
+      summary: {
+        title: "Local console sign-in link",
+        sections: [],
+      },
       next: {
         actions: [
           `The link signs you in once. Run ${this.suggestUnscoped("console")} again for a fresh one.`,

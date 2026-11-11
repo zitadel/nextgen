@@ -292,10 +292,11 @@ export default class Pull extends EnvironmentCommand {
         release_id: release.id,
         pulled,
         skipped,
-        ...(this.dryRun ? { dry_run: true } : {}),
-      },
-      next: {
-        commands: this.dryRun || input.args.target !== undefined ? [] : [this.suggest(DEPLOY_ARGS)],
+        ...(this.dryRun
+          ? {
+              dry_run: true,
+            }
+          : {}),
       },
       summary: {
         title: escapeControlCharacters(
@@ -305,6 +306,9 @@ export default class Pull extends EnvironmentCommand {
         ),
         sections: [],
         lines: files,
+      },
+      next: {
+        commands: this.dryRun || input.args.target !== undefined ? [] : [this.suggest(DEPLOY_ARGS)],
       },
     });
   }

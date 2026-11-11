@@ -215,14 +215,23 @@ export type FailureText = {
  */
 export function failureText(message: string): FailureText {
   if (!OCLIF_HELP.test(message)) {
-    return { sentence: message, misuse: false };
+    return {
+      sentence: message,
+      misuse: false,
+    };
   }
   const [head = "", ...rest] = stripAnsi(message.replace(OCLIF_HELP, ""))
     .replace(OCLIF_PREAMBLE, "")
     .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => line !== "");
-  const listed = rest.map((line) => line.split(/\s{2,}/)[0] ?? line);
+    .map((line) => {
+      return line.trim();
+    })
+    .filter((line) => {
+      return line !== "";
+    });
+  const listed = rest.map((line) => {
+    return line.split(/\s{2,}/)[0] ?? line;
+  });
   return {
     sentence: head.endsWith(":")
       ? `${head} ${listed.join(", ")}`.trim()

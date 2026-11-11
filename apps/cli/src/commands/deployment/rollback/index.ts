@@ -158,7 +158,10 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
         preview: () => {
           return {
             status: "ok",
-            data: { dry_run: true, deployment_id: target.id },
+            data: {
+              dry_run: true,
+              deployment_id: target.id,
+            },
             summary: {
               title: `Would roll back to ${escapeControlCharacters(target.id)} (dry run)`,
               sections: [],
