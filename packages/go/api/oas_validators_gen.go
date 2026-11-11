@@ -10344,6 +10344,23 @@ func (s *ListEventsResponse) Validate() error {
 	return nil
 }
 
+func (s ListEventsStatusClassItem) Validate() error {
+	switch s {
+	case "1xx":
+		return nil
+	case "2xx":
+		return nil
+	case "3xx":
+		return nil
+	case "4xx":
+		return nil
+	case "5xx":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
 func (s ListFlowDefinitionsPurpose) Validate() error {
 	switch s {
 	case "login":

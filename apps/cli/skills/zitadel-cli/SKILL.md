@@ -292,6 +292,12 @@ schema's object type and exclude the newest revision's URL:
 `users list --filter schema_object_type=equals:<type> --filter
 schema=not_equals:<newest-url> --all --json`.
 
+To find the API requests that failed: `events list --filter status_class=4xx
+--filter status_class=5xx --json`, and add `--filter operation_id=<operation>`
+(such as `createUser`) for one operation. Only requests recorded by a server
+that has these filters match, so an older request is found by its
+`request_id`, not by them.
+
 ## Reading the envelope
 
 Each invocation prints one JSON object:
@@ -378,7 +384,13 @@ Each invocation prints one JSON object:
   challenge id the same way.
 - `deployment get <id>` emits the deployment as the API serves it; on a
   terminal it also shows the variables the deployment froze, secrets masked.
-  Read them as JSON with `variable resolve`.
+  Read them as JSON with `variable resolve <id>`.
+- `variable resolve` reads the variables a deployment froze: the one live on the
+  project (narrowed with `--origin` when several are live), or any deployment
+  named by `variable resolve <deployment_id>`. A deployment id together with
+  `--origin` is refused, since the id already says which deployment. Only the
+  live form's envelope carries `data.origins`, the origins that deployment
+  serves; a named read has none.
 - `variable set` stores the value on the project, but a sign-in keeps using the
   variables the last `deploy` froze, so the change applies after the next
   `deploy`. The envelope's `data.next_actions` says so and `data.next_commands`

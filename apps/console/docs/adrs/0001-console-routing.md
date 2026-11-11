@@ -225,6 +225,18 @@ the sidebar.
 > anything beneath it shows Settings' (`view: "settings"`), under a heading
 > row that leads back to Projects.
 
+> **Amendment (2026-11-10, design decision D34):** the account list draws
+> Projects, then the portal's entries, then the account's other entries; a
+> portal entry named like an account one is left out. Its project-scoped rows
+> link with `project: undefined`, so `_authed` does not retain the selection
+> and the guard asks for a project as D22 has it.
+
+> **Amendment (2026-11-10, design decision D35):** `/` is a screen again, the
+> project's Overview, declaring `scope: "project"` and the portal list's first
+> entry. The `_authed` guard sends it to Projects without `?next=` when no
+> project can be chosen for the person, since arriving asked for no screen.
+> The account list leaves the portal entry at `/` out.
+
 > **Amendment (2026-11-10, design decision D30):** `/events` with anything
 > beneath it shows a list of its own too, Logs' (`NavView` `"logs"`), under a
 > heading row that leads back to the project's landing route, `/`. The route
@@ -236,6 +248,16 @@ the sidebar.
 > restores the list, the view and the filters on a refresh. A screen gets such
 > a list only when its views and filters are navigation the way Logs' are;
 > every other entry stays a route with `staticData.nav`.
+
+> **Amendment (2026-11-10, D30):** the Logs list is the layout route
+> `/events` (`routes/_authed/events/route.tsx`), which owns the filters
+> (`validateSearch`) and the list's loader; `/events/` only carries the
+> sidebar entry. An event, `/events/$eventId`, is its child and opens in a
+> drawer over the list, as Vercel's Logs opens a request: the list's match
+> stays, so opening or stepping through events never reads the list again, and
+> the drawer's URL carries the list's filters. A loader that must not rerun
+> when a child changes belongs to the layout route, keyed on the search it
+> reads.
 
 ## Consequences
 

@@ -3,6 +3,15 @@ import { ArrowLeftRight, CornerDownLeft, Logs, type LucideIcon, ScrollText, X } 
 import { type ReactNode, useId, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import {
+  Combobox,
+  ComboboxAnchor,
+  ComboboxContent,
+  type ComboboxGroup,
+  ComboboxPlaceholder,
+  ComboboxTrigger,
+  ComboboxValue,
+} from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -22,7 +31,13 @@ import {
 import {
   AUDIT_CATEGORIES,
   type AuditCategory,
+  EVENT_TYPES,
+  FAILED_STATUS,
+  FAILURE_TYPES,
+  hasCustomRange,
   isNarrowed,
+  STATUS_CLASSES,
+  type StatusClass,
   LOG_VIEWS,
   type LogsSearch,
   type LogView,
@@ -35,7 +50,10 @@ import {
   type ValueFilter,
   VIEW_LABEL,
   withCategory,
+  withCustomRange,
+  withStatus,
   withTimeRange,
+  withTypes,
   withView,
 } from "../model";
 
@@ -45,13 +63,14 @@ import {
  * does. Its rows are the list's views, and under them sit the list's filters.
  *
  * Both read the filters from the URL and write them back to it, so the list's
- * loader is the only thing that asks the server. On an event's page nothing
- * is filtered yet: a view or a filter chosen there opens the list with it.
+ * loader is the only thing that asks the server. An event's drawer opens over
+ * the list and keeps its filters: a view or a filter chosen while it is open
+ * closes it and narrows the list.
  */
 
 /** The filters the list is under, or the default ones away from the list. */
 function useLogsSearch(): { current: LogsSearch; onList: boolean } {
-  const list = useMatch({ from: "/_authed/events/", shouldThrow: false });
+  const list = useMatch({ from: "/_authed/events", shouldThrow: false });
   return { current: list ? list.search : NO_FILTERS, onList: !!list };
 }
 
@@ -66,8 +85,7 @@ const VIEW_ICON: Record<LogView, LucideIcon> = {
 
 /**
  * The views as rows of the sidebar's menu: the audit events, the API
- * requests, and both. The view the list is in is the marked row; on an
- * event's page none is.
+ * requests, and both. The view the list is in is the marked row.
  */
 export function LogViewRows() {
   const { current, onList } = useLogsSearch();
@@ -112,28 +130,7 @@ export function LogFilters() {
     >
       <SidebarGroupLabel>Filters</SidebarGroupLabel>
       <SidebarGroupContent className="flex flex-col gap-3 px-2 pb-2">
-        <Field label="Timeline">
-          {(labelId) => (
-            <Select
-              value={current.since ?? ANY}
-              onValueChange={(since) =>
-                go(withTimeRange(current, since === ANY ? undefined : (since as TimeRange)))
-              }
-            >
-              <SelectTrigger size="sm" aria-labelledby={labelId} className={CONTROL}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ANY}>Everything retained</SelectItem>
-                {TIME_RANGES.map((range) => (
-                  <SelectItem key={range} value={range}>
-                    {TIME_RANGE_LABEL[range]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-        </Field>
+        <TimeFilter current={current} go={go} />
 
         {/* The requests are one category themselves. */}
         {current.view !== "requests" && (
@@ -167,14 +164,25 @@ export function LogFilters() {
           </Field>
         )}
 
-        {VALUE_FILTERS.map((filter) => (
-          <ValueField
-            key={filter.key}
-            filter={filter}
-            value={current[filter.key]}
-            onCommit={(value) => go(narrowedBy(current, filter.key, value))}
-          />
-        ))}
+        {/* A request is one type: the requests narrow by status instead. */}
+        {current.view === "requests" ? (
+          <StatusFilter current={current} go={go} />
+        ) : (
+          <TypeFilter current={current} go={go} />
+        )}
+
+        {VALUE_FILTERS.map((filter) =>
+          // The operation is a request's: its field is the requests view's.
+          filter.key === "type" ||
+          (filter.key === "operation" && current.view !== "requests") ? null : (
+            <ValueField
+              key={filter.key}
+              filter={filter}
+              value={current[filter.key]}
+              onCommit={(value) => go(narrowedBy(current, filter.key, value))}
+            />
+          ),
+        )}
 
         {isNarrowed(current) && (
           <Button
@@ -188,6 +196,317 @@ export function LogFilters() {
         )}
       </SidebarGroupContent>
     </SidebarGroup>
+  );
+}
+
+/** The Timeline's value for a range with fixed ends. */
+const CUSTOM = "custom";
+
+/**
+ * The time the list reads: a range counted back from when it loads, as
+ * Vercel's Logs offers them, everything retained, or a range with fixed ends.
+ * Choosing **Custom range** opens two fields, applied together.
+ */
+function TimeFilter({ current, go }: { current: LogsSearch; go: (search: LogsSearch) => void }) {
+  const custom = hasCustomRange(current);
+  const [editing, setEditing] = useState(false);
+  const value = custom || editing ? CUSTOM : (current.since ?? ANY);
+
+  return (
+    <>
+      <Field label="Timeline">
+        {(labelId) => (
+          <Select
+            value={value}
+            onValueChange={(choice) => {
+              if (choice === CUSTOM) {
+                setEditing(true);
+                return;
+              }
+              setEditing(false);
+              go(withTimeRange(current, choice === ANY ? undefined : (choice as TimeRange)));
+            }}
+          >
+            <SelectTrigger size="sm" aria-labelledby={labelId} className={CONTROL}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ANY}>Everything retained</SelectItem>
+              {TIME_RANGES.map((range) => (
+                <SelectItem key={range} value={range}>
+                  {TIME_RANGE_LABEL[range]}
+                </SelectItem>
+              ))}
+              <SelectItem value={CUSTOM}>Custom range</SelectItem>
+            </SelectContent>
+          </Select>
+        )}
+      </Field>
+      {(custom || editing) && (
+        <CustomRange
+          // A range set elsewhere (a row's "Events around this one") refills the fields.
+          key={`${current.from ?? ""}/${current.to ?? ""}`}
+          from={current.from}
+          to={current.to}
+          onApply={(from, to) => {
+            setEditing(false);
+            go(withCustomRange(current, from, to));
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+/** `2026-11-10T08:15:00.000Z` as a `datetime-local` field holds it: the viewer's local time, to the minute. */
+function localInput(value: string | undefined): string {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const pad = (part: number) => String(part).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+/** A `datetime-local` value, in the viewer's time zone, as an RFC 3339 moment; empty is open. */
+function fromLocalInput(value: string): string | undefined {
+  if (!value) return undefined;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
+}
+
+/**
+ * A range with fixed ends, in the viewer's local time: from, to, or both. A
+ * new range starts at the last hour, so Apply alone reads something. A start
+ * that is not before the end cannot be applied.
+ */
+function CustomRange({
+  from,
+  to,
+  onApply,
+}: {
+  from: string | undefined;
+  to: string | undefined;
+  onApply: (from: string | undefined, to: string | undefined) => void;
+}) {
+  const fresh = !from && !to;
+  const [start, setStart] = useState(() =>
+    localInput(fresh ? new Date(Date.now() - 60 * 60 * 1000).toISOString() : from),
+  );
+  const [end, setEnd] = useState(() => localInput(fresh ? new Date().toISOString() : to));
+  const startAt = fromLocalInput(start);
+  const endAt = fromLocalInput(end);
+  const valid = (startAt || endAt) && !(startAt && endAt && startAt >= endAt);
+  const fromId = useId();
+  const toId = useId();
+
+  return (
+    <form
+      className="flex flex-col gap-2"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (valid) onApply(startAt, endAt);
+      }}
+    >
+      <label htmlFor={fromId} className={FIELD_LABEL}>
+        From
+      </label>
+      <Input
+        id={fromId}
+        type="datetime-local"
+        value={start}
+        onChange={(event) => setStart(event.target.value)}
+        className="h-8 text-xs md:text-xs"
+      />
+      <label htmlFor={toId} className={FIELD_LABEL}>
+        To
+      </label>
+      <Input
+        id={toId}
+        type="datetime-local"
+        value={end}
+        onChange={(event) => setEnd(event.target.value)}
+        className="h-8 text-xs md:text-xs"
+      />
+      <Button type="submit" size="sm" variant="secondary" disabled={!valid} className="self-start">
+        Apply range
+      </Button>
+    </form>
+  );
+}
+
+/** The type list's captions: the first word of a type, as `auth` in `auth.check.failed`. */
+const TYPE_GROUPS: ComboboxGroup[] = EVENT_TYPES.reduce<ComboboxGroup[]>((groups, type) => {
+  const heading = type.split(".")[0] ?? type;
+  const option = { value: type, label: type };
+  const last = groups.at(-1);
+  if (last?.heading === heading) last.options.push(option);
+  else groups.push({ heading, options: [option] });
+  return groups;
+}, []);
+
+/**
+ * The event types the list is narrowed to, chosen from the types the server
+ * writes rather than typed: several at once, each one range of the type
+ * index, so any choice fills its pages. **Only failures** chooses the failure
+ * types. Types read the All view with no category beside them.
+ */
+function TypeFilter({ current, go }: { current: LogsSearch; go: (search: LogsSearch) => void }) {
+  const [open, setOpen] = useState(false);
+  const chosen = current.type ?? [];
+  const failuresOnly =
+    chosen.length === FAILURE_TYPES.length && FAILURE_TYPES.every((type) => chosen.includes(type));
+  const toggle = (type: string) =>
+    go(
+      withTypes(
+        current,
+        chosen.includes(type) ? chosen.filter((known) => known !== type) : [...chosen, type],
+      ),
+    );
+
+  return (
+    <Field label="Type">
+      {() => (
+        <div className="flex flex-col gap-1.5">
+          <Combobox open={open} onOpenChange={setOpen}>
+            <ComboboxAnchor asChild>
+              <ComboboxTrigger
+                label="Event types"
+                open={open}
+                onOpen={() => setOpen(true)}
+                className="h-8 w-full text-xs"
+              >
+                {chosen.length === 0 ? (
+                  <ComboboxPlaceholder>Any type</ComboboxPlaceholder>
+                ) : (
+                  <ComboboxValue>
+                    {failuresOnly
+                      ? "Failures"
+                      : chosen.length === 1
+                        ? chosen[0]
+                        : `${chosen.length} types`}
+                  </ComboboxValue>
+                )}
+              </ComboboxTrigger>
+            </ComboboxAnchor>
+            <ComboboxContent
+              groups={TYPE_GROUPS}
+              selected={chosen}
+              searchPlaceholder="Find a type"
+              emptyLabel="No type matches."
+              label="Event types"
+              closeOnSelect={false}
+              onSelect={toggle}
+              onClose={() => setOpen(false)}
+              footer={
+                chosen.length > 0
+                  ? { label: "Any type", onSelect: () => go(withTypes(current, [])) }
+                  : undefined
+              }
+              className="w-64"
+            />
+          </Combobox>
+          {!failuresOnly && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="self-start px-2 text-xs"
+              onClick={() => go(withTypes(current, FAILURE_TYPES))}
+            >
+              Only failures
+            </Button>
+          )}
+        </div>
+      )}
+    </Field>
+  );
+}
+
+/** What a status class means, beside it in the list. */
+const STATUS_MEANING: Record<StatusClass, string> = {
+  "2xx": "Succeeded",
+  "3xx": "Redirected",
+  "4xx": "Refused: the caller's mistake",
+  "5xx": "Failed: the server's error",
+};
+
+const STATUS_OPTIONS = STATUS_CLASSES.map((status) => ({
+  value: status,
+  label: status,
+  description: STATUS_MEANING[status],
+}));
+
+/**
+ * The API requests narrowed by the class of their response status, several
+ * at once: one range of the status index each, so any choice fills its pages.
+ * **Only failed requests** chooses 4xx and 5xx. Requests recorded before the
+ * server indexed the status are not matched.
+ */
+function StatusFilter({ current, go }: { current: LogsSearch; go: (search: LogsSearch) => void }) {
+  const [open, setOpen] = useState(false);
+  const chosen = current.status ?? [];
+  const failedOnly =
+    chosen.length === FAILED_STATUS.length &&
+    FAILED_STATUS.every((status) => chosen.includes(status));
+  const toggle = (status: string) => {
+    const known = STATUS_CLASSES.find((candidate) => candidate === status);
+    if (!known) return;
+    go(
+      withStatus(
+        current,
+        chosen.includes(known) ? chosen.filter((other) => other !== known) : [...chosen, known],
+      ),
+    );
+  };
+
+  return (
+    <Field label="Status">
+      {() => (
+        <div className="flex flex-col gap-1.5">
+          <Combobox open={open} onOpenChange={setOpen}>
+            <ComboboxAnchor asChild>
+              <ComboboxTrigger
+                label="Status classes"
+                open={open}
+                onOpen={() => setOpen(true)}
+                className="h-8 w-full text-xs"
+              >
+                {chosen.length === 0 ? (
+                  <ComboboxPlaceholder>Any status</ComboboxPlaceholder>
+                ) : (
+                  <ComboboxValue>{chosen.join(", ")}</ComboboxValue>
+                )}
+              </ComboboxTrigger>
+            </ComboboxAnchor>
+            <ComboboxContent
+              options={STATUS_OPTIONS}
+              selected={chosen}
+              searchPlaceholder="Find a status"
+              emptyLabel="No status matches."
+              label="Status classes"
+              closeOnSelect={false}
+              onSelect={toggle}
+              onClose={() => setOpen(false)}
+              footer={
+                chosen.length > 0
+                  ? { label: "Any status", onSelect: () => go(withStatus(current, [])) }
+                  : undefined
+              }
+              className="w-64"
+            />
+          </Combobox>
+          {!failedOnly && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="self-start px-2 text-xs"
+              onClick={() => go(withStatus(current, FAILED_STATUS))}
+            >
+              Only failed requests
+            </Button>
+          )}
+        </div>
+      )}
+    </Field>
   );
 }
 

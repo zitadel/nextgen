@@ -1394,17 +1394,23 @@ export class ScaffoldedApp {
     ]);
   }
 
-  /** The variables a target's live deployment froze, read through `variable resolve`. */
+  /**
+   * The variables a deployment froze, read through `variable resolve`: the one
+   * live on a target, or the one `deploymentId` names.
+   */
   resolveVariables({
     origin,
+    deploymentId,
     json = true,
   }: {
     origin?: string;
+    deploymentId?: string;
     json?: boolean;
   } = {}): Promise<CliResult> {
     return this.cli([
       "variable",
       "resolve",
+      ...(deploymentId === undefined ? [] : [deploymentId]),
       ...(json ? ["--json"] : []),
       ...(origin === undefined ? [] : ["--origin", origin]),
     ]);

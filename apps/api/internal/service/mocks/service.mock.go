@@ -4847,45 +4847,6 @@ func (c *MockAllStatementsListBrandingsCall) DoAndReturn(f func(context.Context,
 	return c
 }
 
-// ListClaimedProjectIDs mocks base method.
-func (m *MockAllStatements) ListClaimedProjectIDs(ctx context.Context, afterID string, limit uint32) ([]string, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListClaimedProjectIDs", ctx, afterID, limit)
-	ret0, _ := ret[0].([]string)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ListClaimedProjectIDs indicates an expected call of ListClaimedProjectIDs.
-func (mr *MockAllStatementsMockRecorder) ListClaimedProjectIDs(ctx, afterID, limit any) *MockAllStatementsListClaimedProjectIDsCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListClaimedProjectIDs", reflect.TypeOf((*MockAllStatements)(nil).ListClaimedProjectIDs), ctx, afterID, limit)
-	return &MockAllStatementsListClaimedProjectIDsCall{Call: call}
-}
-
-// MockAllStatementsListClaimedProjectIDsCall wrap *gomock.Call
-type MockAllStatementsListClaimedProjectIDsCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockAllStatementsListClaimedProjectIDsCall) Return(arg0 []string, arg1 error) *MockAllStatementsListClaimedProjectIDsCall {
-	c.Call = c.Call.Return(arg0, arg1)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsListClaimedProjectIDsCall) Do(f func(context.Context, string, uint32) ([]string, error)) *MockAllStatementsListClaimedProjectIDsCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsListClaimedProjectIDsCall) DoAndReturn(f func(context.Context, string, uint32) ([]string, error)) *MockAllStatementsListClaimedProjectIDsCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
 // ListDeployments mocks base method.
 func (m *MockAllStatements) ListDeployments(ctx context.Context, filter *database.ListOptions[domain.DeploymentField]) (*database.ListResult[*domain.Deployment], error) {
 	m.ctrl.T.Helper()
@@ -13019,45 +12980,6 @@ func (c *MockAuthzAssignmentStatementsListAuthzAssignmentsCall) Do(f func(contex
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAuthzAssignmentStatementsListAuthzAssignmentsCall) DoAndReturn(f func(context.Context, string, domain.AuthzPrincipalType, string, bool) ([]*domain.AuthzAssignment, error)) *MockAuthzAssignmentStatementsListAuthzAssignmentsCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
-// ListClaimedProjectIDs mocks base method.
-func (m *MockAuthzAssignmentStatements) ListClaimedProjectIDs(ctx context.Context, afterID string, limit uint32) ([]string, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListClaimedProjectIDs", ctx, afterID, limit)
-	ret0, _ := ret[0].([]string)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ListClaimedProjectIDs indicates an expected call of ListClaimedProjectIDs.
-func (mr *MockAuthzAssignmentStatementsMockRecorder) ListClaimedProjectIDs(ctx, afterID, limit any) *MockAuthzAssignmentStatementsListClaimedProjectIDsCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListClaimedProjectIDs", reflect.TypeOf((*MockAuthzAssignmentStatements)(nil).ListClaimedProjectIDs), ctx, afterID, limit)
-	return &MockAuthzAssignmentStatementsListClaimedProjectIDsCall{Call: call}
-}
-
-// MockAuthzAssignmentStatementsListClaimedProjectIDsCall wrap *gomock.Call
-type MockAuthzAssignmentStatementsListClaimedProjectIDsCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockAuthzAssignmentStatementsListClaimedProjectIDsCall) Return(arg0 []string, arg1 error) *MockAuthzAssignmentStatementsListClaimedProjectIDsCall {
-	c.Call = c.Call.Return(arg0, arg1)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockAuthzAssignmentStatementsListClaimedProjectIDsCall) Do(f func(context.Context, string, uint32) ([]string, error)) *MockAuthzAssignmentStatementsListClaimedProjectIDsCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAuthzAssignmentStatementsListClaimedProjectIDsCall) DoAndReturn(f func(context.Context, string, uint32) ([]string, error)) *MockAuthzAssignmentStatementsListClaimedProjectIDsCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
