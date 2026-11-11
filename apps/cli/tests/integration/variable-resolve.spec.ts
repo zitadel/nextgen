@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "@tests/helpers/platform";
 import { onTerminalReadingAFile } from "@tests/helpers/terminal";
-import { anUndeployedEnvironment, aSetUpApp } from "@tests/helpers/project";
+import {
+  anUndeployedEnvironment,
+  aSetUpApp,
+  type CliResult,
+  type ScaffoldedApp,
+} from "@tests/helpers/project";
 
 const platform = usePlatformMock();
 
@@ -117,6 +122,117 @@ describe("variable resolve", () => {
         const result = await app.resolveVariables({ origin: "https://pr-7-acme.vercel.app" });
 
         expect(result).not.toSuggest("deploy");
+      });
+    });
+
+    describe("a named deployment", () => {
+      async function aDeployedProject() {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        await app.setVariable("HOST", "app.acme.com");
+        const deployed = await app.deployData();
+        await app.setVariable("LATER", "set after the deploy");
+        return { app, deploymentId: deployed.deployment_id ?? "" };
+      }
+
+      async function aSupersededProject() {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        const first = await app.deployData();
+        await app.editUserSchema((schema) => {
+          schema.properties.company = { type: "string" };
+        });
+        const second = await app.deployData();
+        expect(second.release_id).not.toBe(first.release_id);
+        return { app, firstDeploymentId: first.deployment_id ?? "" };
+      }
+
+      function namesIn(app: ScaffoldedApp, result: CliResult): string[] {
+        return app.envelopeOf<{ items: { name: string }[] }>(result).data.items.map((item) => {
+          return item.name;
+        });
+      }
+
+      it("reports the deployment it was given", async () => {
+        const { app, deploymentId } = await aDeployedProject();
+
+        const result = await app.resolveVariables({ deploymentId });
+
+        expect(result).toSucceed();
+        expect(app.envelopeOf<{ deployment_id: string }>(result).data.deployment_id).toBe(
+          deploymentId,
+        );
+      });
+
+      it("lists the variables that deployment froze", async () => {
+        const { app, deploymentId } = await aDeployedProject();
+
+        const result = await app.resolveVariables({ deploymentId });
+
+        expect(result).toSucceed();
+        expect(namesIn(app, result)).toContain("HOST");
+      });
+
+      it("leaves out the variables set since", async () => {
+        const { app, deploymentId } = await aDeployedProject();
+
+        const result = await app.resolveVariables({ deploymentId });
+
+        expect(result).toSucceed();
+        expect(namesIn(app, result)).not.toContain("LATER");
+      });
+
+      it("reads a deployment that is no longer live", async () => {
+        const { app, firstDeploymentId } = await aSupersededProject();
+
+        const result = await app.resolveVariables({ deploymentId: firstDeploymentId });
+
+        expect(result).toSucceed();
+        expect(app.envelopeOf<{ deployment_id: string }>(result).data.deployment_id).toBe(
+          firstDeploymentId,
+        );
+      });
+
+      it("is refused for a credential that may not read variables", async () => {
+        const { app, deploymentId } = await aDeployedProject();
+        platform.refusesVariableReads();
+
+        const result = await app.resolveVariables({ deploymentId });
+
+        expect(result).toFailWith("E_AUTH");
+      });
+
+      it("is a miss for a deployment the project does not have", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.resolveVariables({
+          deploymentId: "dep_01KX5N7C9D2E7F0N9WD3P2E4YM6",
+        });
+
+        expect(result).toFailWith("E_NOT_FOUND");
+      });
+
+      it("is refused together with an origin", async () => {
+        const { app, deploymentId } = await aDeployedProject();
+
+        const result = await app.resolveVariables({
+          deploymentId,
+          origin: "https://app.acme.com",
+        });
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
+
+      it("holds its invariants in every rendering", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        await app.setVariable("BANNER", "a\u001b[2Jwiped");
+        const deployed = await app.deployData();
+        const args = ["variable", "resolve", deployed.deployment_id ?? ""];
+
+        await app.inEveryRendering((how) =>
+          app.run(how.json ? [...args, "--json"] : args, how.env),
+        );
       });
     });
 

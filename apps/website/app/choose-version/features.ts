@@ -3,7 +3,7 @@
 // when one of them changes what ships, change its row here.
 
 // The day the rows last changed, shown on the page: change it with them.
-export const UPDATED = "2026-11-03";
+export const UPDATED = "2026-11-10";
 
 // The guide above the tables: when to start with the next version, when
 // with v4. Keep it in step with the rows.
@@ -319,7 +319,7 @@ export const AREAS: Area[] = [
     title: "Configure and operate",
     features: [
       {
-        name: "Configuration as code with plan and apply",
+        name: "Configuration as code with dry run and deploy",
         preview: { status: "available", note: "Files in your repository." },
         v4: { status: "partial", note: "Terraform provider" },
       },

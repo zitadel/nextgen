@@ -277,10 +277,26 @@ over reading `<resource> --help` one at a time. A `list` verb's envelope carries
 you pass `--all`, so a "how many …?" question is one `list --all --json` call:
 read the count, do not page and tally.
 
+To find a user by their identifier, the value a user carries as `identifier`:
+`users list --filter identifier=starts_with:<start> --json` matches its start,
+ignoring case. Name the operation: `starts_with` is the only one, so a part from
+the middle of an identifier (the domain of an email) finds nothing. The users
+come back ordered by identifier, and `--sort` cannot be combined with the
+filter. The property comes from the revision the user is on, so a user who signs
+in through a flow on a newer revision that designates another property does not
+match on that property. Only string identifiers match, not a number or a
+boolean. Other attributes are not filterable.
+
 To find the users still on an older revision of a schema, filter on the
 schema's object type and exclude the newest revision's URL:
 `users list --filter schema_object_type=equals:<type> --filter
 schema=not_equals:<newest-url> --all --json`.
+
+To find the API requests that failed: `events list --filter status_class=4xx
+--filter status_class=5xx --json`, and add `--filter operation_id=<operation>`
+(such as `createUser`) for one operation. Only requests recorded by a server
+that has these filters match, so an older request is found by its
+`request_id`, not by them.
 
 ## Reading the envelope
 
@@ -302,14 +318,20 @@ Each invocation prints one JSON object:
   success: a warning usually means a follow-up step is needed.
 - A `list` verb emits `data: { items, count, next_page_token }`; when a page
   remains, `data.next_commands` carries the exact command for the next page.
+- A filtered `events list` page can hold fewer items than `--limit`, or none,
+  and still carry `next_page_token`: the server matches some filters over a
+  bounded number of events per request. Follow the token, or pass `--all`,
+  before you report that nothing matched.
 - `deploy` emits `data.content_hash` (the release digest), `data.origins`
   (the origins it went live on) and `data.resources` (how many it pinned). A
   re-run on unchanged config returns the same digest. Use it to confirm what
   went live.
 - When the server refuses a release, `deploy` fails with `E_VALIDATION` and
   the `hint` lists each refused resource as `<kind> <handle>: <reason>`, such
-  as `schema human-user: …` or `flow default-login: …`. Read the hint, not
-  only `message` (`release: invalid`); the same entries are in
+  as `schema human-user: …` or `flow default-login: …`. A connection's line
+  ends with the fields it may not change or the endpoints it left out, as in
+  `idp acme-sso: …: oidc.issuer`. Read the hint, not only `message`
+  (`release: invalid`); the same entries are in
   `details.body.details.resources`.
 - `deploy`, `deploy --dry-run` and `doctor` check each user schema against
   the meta-schema the server uses. On the schema's root or a property, a key
@@ -362,7 +384,24 @@ Each invocation prints one JSON object:
   challenge id the same way.
 - `deployment get <id>` emits the deployment as the API serves it; on a
   terminal it also shows the variables the deployment froze, secrets masked.
-  Read them as JSON with `variable resolve`.
+  Read them as JSON with `variable resolve <id>`.
+- `variable resolve` reads the variables a deployment froze: the one live on the
+  project (narrowed with `--origin` when several are live), or any deployment
+  named by `variable resolve <deployment_id>`. A deployment id together with
+  `--origin` is refused, since the id already says which deployment. Only the
+  live form's envelope carries `data.origins`, the origins that deployment
+  serves; a named read has none.
+- `variable set` stores the value on the project, but a sign-in keeps using the
+  variables the last `deploy` froze, so the change applies after the next
+  `deploy`. The envelope's `data.next_actions` says so and `data.next_commands`
+  holds `deploy -m '<what changed>'`. With `--preview` it points to
+  `preview --origin '<preview-url>' -m '<what changed>'` instead, since a primary
+  `deploy` leaves the preview value unapplied; a pull-request build that sets its
+  own preview URL can drop `--origin`. In an environment other than
+  `preview` or `development`, where `preview` skips, no command is suggested; nor in a
+  CI build that names no environment, where it says to pass `--env preview`.
+  A secret written without `--preview` clears the name's preview value; set it again
+  with `variable set <name> --secret --preview`.
 - `deployment rollback` emits `data.release_id` (the release live again),
   `data.origins` (the origins that deployment froze) and `data.pointers`, the
   `{kind, handle, revision_id}` revisions that release pins; the `schema` one
@@ -713,7 +752,29 @@ When `setup --sso` or `auth-method sso enable` adds a social sign-in provider, t
 must register the connection's redirect URI with the provider themselves: give
 them `data.sso[].callback_uri` from `setup`, or `data.callback_uri` from
 `auth-method sso enable`, verbatim. Each connection has its own URI, so a URI from another
-provider or an older CLI version does not work.
+provider or an older CLI version does not work. `data.callback_uri` is the development URI only. The
+text output of `auth-method sso enable` also lists the URI for each deployed origin, and one pattern for
+each preview origin, since a preview URL is known only when its build runs. A preview pattern is not a
+URI to register: replace it with the concrete preview URL first. A JSON caller reads the project's origins
+with `origin list` and builds the same URIs itself.
+
+The same results carry the connection's `claim_mapping` (user attribute to
+claim), `verified_claims` (what makes an attribute verified: a claim's name, or
+`true` when the provider is trusted outright), `scopes`, `unmapped` (the
+attributes no claim fills, each with `required`) and `used_by` (the schemas that
+sign in through it) in `data.sso[]` from `setup` and `data.connection` from
+`sso enable`. To map another claim, edit `claim_mapping` in the connection file
+named there, then run `deploy`; the connection is not tested until a real
+sign-in. `deploy` refuses a mapping that cannot work and names the file, the
+problem and the fix: a target no schema defines (with a "Did you mean" when one
+is close), an empty `claim_mapping`, a `verified_claims` key with no mapping, and
+a claim name with a space at its start or end. Mistakes that almost certainly
+do not do what was meant warn but do not stop, so `deploy` carries on: a
+standard claim of a type the property
+cannot hold, a verification that reads a claim that is not a boolean, a
+`subject_claim` that is a profile claim (only until the connection is first
+deployed, after which it cannot change), and a connection that reads a
+standard claim without the scope that returns it. Fix the file named.
 
 In a terminal, `setup --sso custom` asks for the name the sign-in button shows
 first, then offers a connection name made from it (`Zitadel Cloud` offers
@@ -784,10 +845,12 @@ than one. `--schema` takes the schema's file name or its `objectType`;
   In a terminal, a custom provider's settings you leave out are asked for, after
   the checks that need no answer; a connection that already has that slug
   supplies its own. A scripted, `--json`, `--dry-run` or `--non-interactive`
-  run must pass all three and gets an error naming the missing ones. After
-  writing a new custom connection that maps claims, the text output prints the
-  claim mappings and names the file to edit them in; `--json` carries the same
-  summary as an `info` entry in `data.notices`.
+  run must pass all three and gets an error naming the missing ones. The text
+  output, `--dry-run` included, prints a notice saying which claim fills each user
+  attribute, which attributes no claim fills (marked required or optional) and
+  which schemas sign in through the connection; `--json` carries the same in
+  `data.connection` as `claim_mapping`, `verified_claims`, `scopes`, `unmapped`
+  and `used_by`.
   An issuer on `http://localhost:<port>` (a test provider on this machine)
   works against a server `zitadel start` runs as a process: `start` sets
   `NEXTGEN_HTTPCLIENT_ALLOW_LIST=localhost,127.0.0.0/8,::1/128` unless

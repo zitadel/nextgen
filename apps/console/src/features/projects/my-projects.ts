@@ -2,6 +2,7 @@ import { api } from "@/api/zitadel";
 import { consoleSessionProject } from "@/auth/session";
 import { useAsync } from "@/hooks/use-async";
 import { TYPING_PAUSE_MS, useDebounced } from "@/hooks/use-debounced";
+import { LIST_PAGE_SIZE } from "@/lib/paging";
 import { sessionCached } from "@/lib/session-cache";
 
 import { type ProjectRef, toProjectRef } from "./model";
@@ -81,4 +82,31 @@ export function useProjectSearch(query: string, limit: number): ProjectMatches |
     { term, projects: [] },
     [term, limit],
   );
+}
+
+/**
+ * The list's order, by creation time rather than by id: an id says nothing
+ * about when a project was made (root ADR 047).
+ */
+const NEWEST_FIRST = "desc";
+
+/**
+ * One page of the Projects screen's list: the projects the signed-in person
+ * can act on (root ADR 053 §6), newest first, narrowed to the names that
+ * contain `q`. Read with the session cookie, not `POST /projects/query`, which
+ * the server pins to the calling credential's one home project (#1237).
+ *
+ * The first page, or the one after `pageToken`, which must come from a page
+ * of the same `q`: a token answers one question, and asking another with it is
+ * not a narrower list but a meaningless one, or a refused one.
+ */
+export async function listProjectsPage(q: string | undefined, pageToken?: string) {
+  const page = await api.listMyProjects({
+    limit: LIST_PAGE_SIZE,
+    page_token: pageToken,
+    order: NEWEST_FIRST,
+    name_contains: q,
+    ...consoleSessionProject(),
+  });
+  return { projects: page.projects, nextPageToken: page.next_page_token ?? undefined, q };
 }

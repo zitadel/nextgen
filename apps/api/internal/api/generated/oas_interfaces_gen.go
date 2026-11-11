@@ -549,6 +549,10 @@ type SchemaCreatedRes interface {
 	schemaCreatedRes()
 }
 
+type SearchRes interface {
+	searchRes()
+}
+
 type SessionDeletedRes interface {
 	sessionDeletedRes()
 }

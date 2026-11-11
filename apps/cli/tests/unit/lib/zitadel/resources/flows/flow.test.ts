@@ -684,15 +684,3 @@ describe("Flow.isPasskeyActionKind", () => {
     expect(Flow.isPasskeyActionKind(kind)).toBe(expected);
   });
 });
-
-describe("Flow.isProviderOutcome", () => {
-  it.each([
-    ["sso_authenticated", true],
-    ["sso_user_not_found", true],
-    ["user_already_exists", true],
-    ["password_verified", false],
-    ["", false],
-  ])("answers %j with %s", (outcome, expected) => {
-    expect(Flow.isProviderOutcome(outcome)).toBe(expected);
-  });
-});

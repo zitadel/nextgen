@@ -551,6 +551,9 @@ func (UnimplementedHandler) CreateSchema(ctx context.Context, req CreateSchemaRe
 // - Pre-allocate a `session_id` before the user is known, so device and telemetry signals
 // can be correlated with the eventual authenticated session from the start.
 // - Track anonymous state (bot detection, device fingerprint) that survives until authentication.
+// The session belongs to the project of the project secret. A `project_id` that
+// names another project answers `403` with `proj.mismatch` and creates nothing:
+// send the credential's own project.
 // Creating a session runs on the project credential (`session.write`). The returned
 // `session_token` is a session credential for the end-user client, not a
 // management scope. It is delivered as the `__Host-zitadel_session` cookie
@@ -854,7 +857,8 @@ func (UnimplementedHandler) GetDeploymentVariables(ctx context.Context, params G
 // answer `404`.
 // A project that is not claimed yet also answers `404`: its events are
 // stored but stay invisible until the
-// [claim](/docs/concepts/project-team-user#claim) succeeds.
+// [claim](/docs/concepts/project-team-user#claim) succeeds. The deployment's
+// platform operators read them from the start.
 //
 // GET /events/{id}
 func (UnimplementedHandler) GetEvent(ctx context.Context, params GetEventParams) (r GetEventRes, _ error) {
@@ -1282,11 +1286,20 @@ func (UnimplementedHandler) ListDeployments(ctx context.Context, params ListDepl
 // first. Requires `events.read`.
 // A project that is not claimed yet returns an empty list: its events are
 // stored but stay invisible until the
-// [claim](/docs/concepts/project-team-user#claim) succeeds.
+// [claim](/docs/concepts/project-team-user#claim) succeeds. The deployment's
+// platform operators read them from the start.
 // Team-scoped credentials see only the events whose `team_id` matches the
 // credential's team. Team-scoped credentials are not issued today.
 // Each item carries an `event_type` that says which type of event it is, and
 // the matching `payload`. To read one event, pass its `id` to `getEvent` (`GET /events/{id}`).
+// Filters combine. These are answered from an index and fill their pages: no
+// filter, `category`, `event_type`, `status_class`, `operation_id` with or
+// without `status_class`, `request_id`, `flow_id`, and `session_id`,
+// `entity_id`, `actor_id` or `entity_type` with or without `category`, each
+// with or without the time bounds. Any other filter or combination is
+// matched event by event, over at most a few thousand events per request.
+// Such a page can hold fewer events than `limit`, or none, and still carry
+// `next_page_token`: keep passing the token until a response has none.
 //
 // GET /events
 func (UnimplementedHandler) ListEvents(ctx context.Context, params ListEventsParams) (r ListEventsRes, _ error) {
@@ -1788,9 +1801,10 @@ func (UnimplementedHandler) RevokeMySession(ctx context.Context, params RevokeMy
 // it refuses it with `rel.revoked`, including a build that pins its digest.
 // A release that any origin still serves cannot be revoked. An origin serves
 // the release of the newest deployment to it, so the call answers `409` with
-// `rel.in_use`, naming each such origin and that deployment. Deploy another
-// release there or roll back first, then revoke. Revoking therefore never
-// takes an origin down. Deployments that named the release earlier stay in
+// `rel.in_use`, naming each such origin, that deployment and whether the
+// origin is primary or a preview. Deploy another release to a primary origin
+// or roll it back, and remove a preview, then revoke. Revoking therefore
+// never takes an origin down. Deployments that named the release earlier stay in
 // the history.
 // The call is idempotent: revoking a release that is already revoked answers
 // `200` with the release unchanged, and `revoked_at` still names the first
@@ -1859,6 +1873,45 @@ func (UnimplementedHandler) RevokeSession(ctx context.Context, params RevokeSess
 //
 // POST /deployments/{deployment_id}/rollback
 func (UnimplementedHandler) RollbackDeployment(ctx context.Context, req OptRollbackDeploymentRequest, params RollbackDeploymentParams) (r RollbackDeploymentRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// Search implements search operation.
+//
+// Finds the resources of a project that match a text, across resource types.
+// `query` is what the person typed and `types` names the kinds of result to
+// look for; only those are searched. Each result is a reference: its `type`,
+// its `id`, a `title` and sometimes a `subtitle`. Read the resource itself
+// with the type's own operation, for example `GetUserByID`
+// (`GET /users/{user_id}`) or `getTeam` (`GET /teams/{team_id}`).
+// What a type matches on:
+// - `user`: the start of the value they carry as `identifier` or of a part
+// of their `display` name, from three characters on
+// - `team`: its name
+// - `schema`: the `title` and the `objectType` of a user schema
+// - `flow_definition`: its name
+// - `idp`: the `slug` and the `display_name` of an identity provider
+// connection
+// A user matches from the start of the value; every other type matches the
+// text anywhere in it. Matching ignores case. A `query` that is the `id` of
+// a resource of a requested type finds that one. A schema and a flow
+// definition are found at their newest revision. `project_id` names the
+// project to search; without it, the credential's own project is searched. A
+// caller with access to part of the project finds only what that access
+// covers.
+// Authenticate with the project secret (`oauth2`) or a console session cookie
+// (`sessionCookie`). A preview secret is refused, as on every management
+// operation.
+// Results come best match first, at most `limit_per_type` of each type, and
+// types can be mixed in the order. `incomplete_types` lists the types that
+// have more to show: page those with the type's own list, such as
+// `queryUsers` (`POST /users/query`) or `queryTeams` (`POST /teams/query`).
+// How text is matched and ranked can change, and later versions can match
+// more of a resource. Treat the results as suggestions; to filter by an exact
+// rule, use the type's own list.
+//
+// POST /search
+func (UnimplementedHandler) Search(ctx context.Context, req *SearchRequest, params SearchParams) (r SearchRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

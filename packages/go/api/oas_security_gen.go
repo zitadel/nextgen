@@ -274,6 +274,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	RollbackDeploymentOperation: []string{
 		"deployment.write",
 	},
+	SearchOperation: []string{
+		"project.write",
+	},
 	SetUserPasswordOperation: []string{
 		"user.write",
 	},
@@ -326,6 +329,7 @@ var operationRolesSessionCookie = map[string][]string{
 	EvaluatePolicyOperation:        []string{},
 	GetBrandingByIdOperation:       []string{},
 	GetDeploymentByIdOperation:     []string{},
+	GetEventOperation:              []string{},
 	GetFlowDefinitionOperation:     []string{},
 	GetGrantOperation:              []string{},
 	GetIdpByIdOperation:            []string{},
@@ -348,6 +352,7 @@ var operationRolesSessionCookie = map[string][]string{
 	GetVariablesOperation:          []string{},
 	ListBrandingOperation:          []string{},
 	ListDeploymentsOperation:       []string{},
+	ListEventsOperation:            []string{},
 	ListFlowDefinitionsOperation:   []string{},
 	ListInvitationsOperation:       []string{},
 	ListMyIdentityLinksOperation:   []string{},
@@ -375,6 +380,7 @@ var operationRolesSessionCookie = map[string][]string{
 	RevokeMySessionOperation:       []string{},
 	RevokeReleaseOperation:         []string{},
 	RollbackDeploymentOperation:    []string{},
+	SearchOperation:                []string{},
 	UpdateTeamOperation:            []string{},
 }
 

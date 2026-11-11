@@ -30,7 +30,7 @@ var csrfOriginGuard = http.NewCrossOriginProtection()
 // cookie may authenticate without the X-Zitadel-CSRF token; every other one
 // needs it (ADR 053 §5), so an operation that starts accepting the cookie is
 // protected without being listed. These still get the origin check. The POST
-// query operations and invitation lookup are reads. Sign-out
+// query operations, search and invitation lookup are reads. Sign-out
 // (revokeMySession) needs the token like every other write: the session
 // widgets read it through the app's SDK proxy, which forwards only the app's
 // own cookie (ADR 073). Lookup is CSRF-on-writes only (ADR 086).
@@ -40,6 +40,7 @@ var csrfTokenExemptOperations = map[api.OperationName]bool{
 	api.QueryGrantsOperation:      true,
 	api.QueryIdpsOperation:        true,
 	api.LookupInvitationOperation: true,
+	api.SearchOperation:           true,
 }
 
 type csrfRequestKey struct{}

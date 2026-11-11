@@ -64,10 +64,22 @@ between files are the sign the component is missing.
 - The sidebar lists a project's screens, with or without a selection: without
   one, a screen asks for a project first (Projects with `?next=`, D22).
 - Projects (the home) and `/settings` are above every project: Projects lists
-  the account's screens (`nav.view: "account"`, D27), `/settings` its own pages
-  (`nav.view: "settings"`, D29).
+  the account's screens (`nav.view: "account"`, D27) around the project's
+  (D34); `/settings` its own pages (`nav.view: "settings"`, D29).
+- Going up to Projects or Settings never drops the selected project (D36):
+  never link with `project: undefined`.
+- `/` is the project's Overview (D35): only reads a screen already makes, and no
+  figures, since the API has no counts.
 - Screens outside every project (billing, operators) go in one of those lists,
   never beside a project's screens; every screen keeps the one frame.
+- `/events` swaps the project's list for Logs' (`NavView` `"logs"`, D30): a view
+  picker and the filters chosen from a list; a pasted value belongs in the search.
+- An event opens in a drawer over Logs' list: `/events/$eventId` is the list
+  route's child, so it never reads the list again (D30).
+- Send any combination of Logs' filters: the server bounds every read (root
+  ADR 048). One that must fill its pages needs an index and a read plan there.
+- A short Logs page with a token is not the end: say so and offer
+  `Keep looking` (D30), and never follow a token without a click.
 - Never hand-edit `src/routeTree.gen.ts`; the TanStack Router plugin
   regenerates it from `src/routes/`.
 - In specs, assert on `router.state.resolvedLocation`, never

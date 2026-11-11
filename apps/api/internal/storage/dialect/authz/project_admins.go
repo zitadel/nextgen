@@ -65,7 +65,10 @@ func ProjectAdminsCursorUserID(page database.Page[domain.ProjectAdminField]) (st
 // It follows the authorization check: team members are read from the
 // membership edges the resolver expands, with the resolver's own edge match,
 // grant expiry is compared to the dialect clock, and a grant to a user only
-// counts while the user exists.
+// counts while the user is active in their home project, as
+// writePrincipalActiveAnd requires of every user the resolver checks.
+// Deactivation deletes a user's membership edges, so it takes them off the
+// team sources by itself.
 //
 // It picks the page's people before reading everyone's sources: the
 // candidates are the members of the viewer's own admin teams and the users
@@ -137,7 +140,9 @@ direct_grants AS (
 	w.WriteString(`
   JOIN `)
 	writeTable(w, env, "users")
-	w.WriteString(` u ON u.project_id = r.project_id AND u.id = g.principal_id
+	w.WriteString(` u ON u.project_id = r.project_id AND u.id = g.principal_id AND u.status = `)
+	w.WriteArg(domain.UserStatusActive.String())
+	w.WriteString(`
   WHERE g.principal_type = 'user'`)
 	writeAfter("g.principal_id")
 	w.WriteString(`

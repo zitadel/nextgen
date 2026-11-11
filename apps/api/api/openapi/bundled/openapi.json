@@ -50,6 +50,10 @@
       "description": "Users are the identities of a project, such as people or service accounts.\nThese operations create, read, update, delete and query users, read the\nsigned-in user, and manage a user's password, passkeys, identity links\nand team memberships.\n"
     },
     {
+      "name": "Search",
+      "description": "Search finds the resources of a project that match a text, across\nresource types in one request. It answers with references; the\nresources themselves are read through their own operations.\n"
+    },
+    {
       "name": "Schemas",
       "description": "Schemas define the typed shape of user data and of other configurable\nresources. These operations create, list and read schemas.\n"
     },
@@ -3443,7 +3447,7 @@
       "post": {
         "operationId": "createSession",
         "summary": "Create an anonymous session",
-        "description": "Creates an anonymous session with no user and no factors (`state: building`).\n\nA session is the durable record of a signed-in user. This call is optional: an\nauthentication attempt creates a session implicitly if none is provided.\nCreate one explicitly when you want to:\n\n- Pre-allocate a `session_id` before the user is known, so device and telemetry signals\n  can be correlated with the eventual authenticated session from the start.\n- Track anonymous state (bot detection, device fingerprint) that survives until authentication.\n\nCreating a session runs on the project credential (`session.write`). The returned\n`session_token` is a session credential for the end-user client, not a\nmanagement scope. It is delivered as the `__Host-zitadel_session` cookie\n(`zitadel_session` over plain http to a loopback host) and authorises the\nself-service operations `GET /sessions/me` and `DELETE /sessions/me`\n(`sessionCookie` scheme). The by-id operations `GET /sessions/{session_id}`\nand `DELETE /sessions/{session_id}` are operator endpoints and require\n`session.read` / `session.delete` instead.\n\nThe `session_token` is superseded when a handoff exchange completes. Clients\nmust replace it at that point.\n\nAnonymous sessions expire after 10 minutes. The lifetime resets to the\nconfigured full session lifetime when a completing authentication attempt\nwrites the first authentication factor.\n",
+        "description": "Creates an anonymous session with no user and no factors (`state: building`).\n\nA session is the durable record of a signed-in user. This call is optional: an\nauthentication attempt creates a session implicitly if none is provided.\nCreate one explicitly when you want to:\n\n- Pre-allocate a `session_id` before the user is known, so device and telemetry signals\n  can be correlated with the eventual authenticated session from the start.\n- Track anonymous state (bot detection, device fingerprint) that survives until authentication.\n\nThe session belongs to the project of the project secret. A `project_id` that\nnames another project answers `403` with `proj.mismatch` and creates nothing:\nsend the credential's own project.\n\nCreating a session runs on the project credential (`session.write`). The returned\n`session_token` is a session credential for the end-user client, not a\nmanagement scope. It is delivered as the `__Host-zitadel_session` cookie\n(`zitadel_session` over plain http to a loopback host) and authorises the\nself-service operations `GET /sessions/me` and `DELETE /sessions/me`\n(`sessionCookie` scheme). The by-id operations `GET /sessions/{session_id}`\nand `DELETE /sessions/{session_id}` are operator endpoints and require\n`session.read` / `session.delete` instead.\n\nThe `session_token` is superseded when a handoff exchange completes. Clients\nmust replace it at that point.\n\nAnonymous sessions expire after 10 minutes. The lifetime resets to the\nconfigured full session lifetime when a completing authentication attempt\nwrites the first authentication factor.\n",
         "tags": [
           "Sessions"
         ],
@@ -5597,6 +5601,97 @@
           },
           "default": {
             "$ref": "#/components/responses/updateTeam-error-response"
+          }
+        }
+      }
+    },
+    "/search": {
+      "post": {
+        "operationId": "search",
+        "summary": "Search a project",
+        "description": "Finds the resources of a project that match a text, across resource types.\n\n`query` is what the person typed and `types` names the kinds of result to\nlook for; only those are searched. Each result is a reference: its `type`,\nits `id`, a `title` and sometimes a `subtitle`. Read the resource itself\nwith the type's own operation, for example `GetUserByID`\n(`GET /users/{user_id}`) or `getTeam` (`GET /teams/{team_id}`).\n\nWhat a type matches on:\n- `user`: the start of the value they carry as `identifier` or of a part\n  of their `display` name, from three characters on\n- `team`: its name\n- `schema`: the `title` and the `objectType` of a user schema\n- `flow_definition`: its name\n- `idp`: the `slug` and the `display_name` of an identity provider\n  connection\n\nA user matches from the start of the value; every other type matches the\ntext anywhere in it. Matching ignores case. A `query` that is the `id` of\na resource of a requested type finds that one. A schema and a flow\ndefinition are found at their newest revision. `project_id` names the\nproject to search; without it, the credential's own project is searched. A\ncaller with access to part of the project finds only what that access\ncovers.\n\nAuthenticate with the project secret (`oauth2`) or a console session cookie\n(`sessionCookie`). A preview secret is refused, as on every management\noperation.\n\nResults come best match first, at most `limit_per_type` of each type, and\ntypes can be mixed in the order. `incomplete_types` lists the types that\nhave more to show: page those with the type's own list, such as\n`queryUsers` (`POST /users/query`) or `queryTeams` (`POST /teams/query`).\n\nHow text is matched and ranked can change, and later versions can match\nmore of a resource. Treat the results as suggestions; to filter by an exact\nrule, use the type's own list.\n",
+        "tags": [
+          "Search"
+        ],
+        "security": [
+          {
+            "oauth2": [
+              "project.write"
+            ]
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project-id-query"
+          }
+        ],
+        "requestBody": {
+          "description": "The text to find and the types to look for.",
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/search-request"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The best matches of each requested type.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/search-response"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request, for example no `types`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permissions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/search-error-response"
           }
         }
       }
@@ -8170,7 +8265,7 @@
         "x-zitadel-cli": "release revoke",
         "x-zitadel-destructive": true,
         "summary": "Revoke a release",
-        "description": "Revokes a release, so that its content is never served again. Pass the\n`id` that `createRelease` (`POST /releases`), `buildRelease` (`POST /releases/build`) or `listReleases` (`GET /releases`) returns. It\nrecords a `release.revoked` event.\n\nFrom then on the release cannot be deployed. Every path that would serve\nit refuses it with `rel.revoked`, including a build that pins its digest.\n\nA release that any origin still serves cannot be revoked. An origin serves\nthe release of the newest deployment to it, so the call answers `409` with\n`rel.in_use`, naming each such origin and that deployment. Deploy another\nrelease there or roll back first, then revoke. Revoking therefore never\ntakes an origin down. Deployments that named the release earlier stay in\nthe history.\n\nThe call is idempotent: revoking a release that is already revoked answers\n`200` with the release unchanged, and `revoked_at` still names the first\nrevocation. There is no un-revoke. To serve that configuration again,\nchange it and build a new release: rebuilding unchanged content returns\nthe same revoked release.\n\nThe call takes no body. The lookup is scoped to the project in\n`project_id`, so a release ID of another project answers not found exactly\nas an unknown ID does.\n",
+        "description": "Revokes a release, so that its content is never served again. Pass the\n`id` that `createRelease` (`POST /releases`), `buildRelease` (`POST /releases/build`) or `listReleases` (`GET /releases`) returns. It\nrecords a `release.revoked` event.\n\nFrom then on the release cannot be deployed. Every path that would serve\nit refuses it with `rel.revoked`, including a build that pins its digest.\n\nA release that any origin still serves cannot be revoked. An origin serves\nthe release of the newest deployment to it, so the call answers `409` with\n`rel.in_use`, naming each such origin, that deployment and whether the\norigin is primary or a preview. Deploy another release to a primary origin\nor roll it back, and remove a preview, then revoke. Revoking therefore\nnever takes an origin down. Deployments that named the release earlier stay in\nthe history.\n\nThe call is idempotent: revoking a release that is already revoked answers\n`200` with the release unchanged, and `revoked_at` still names the first\nrevocation. There is no un-revoke. To serve that configuration again,\nchange it and build a new release: rebuilding unchanged content returns\nthe same revoked release.\n\nThe call takes no body. The lookup is scoped to the project in\n`project_id`, so a release ID of another project answers not found exactly\nas an unknown ID does.\n",
         "tags": [
           "Releases"
         ],
@@ -8241,7 +8336,7 @@
             }
           },
           "409": {
-            "description": "At least one origin still serves the release. `details.origins`\nnames each such origin and the newest deployment to it.\n",
+            "description": "At least one origin still serves the release. `details.origins`\nnames each such origin, the newest deployment to it and whether it\nserves the release as a primary origin or a preview.\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -8250,7 +8345,7 @@
                 "examples": {
                   "stillServed": {
                     "summary": "Two origins still serve the release",
-                    "description": "Deploy another release to these origins, or roll them back,\nthen revoke.\n",
+                    "description": "Deploy another release to the primary origin or roll it back,\nremove the preview, then revoke.\n",
                     "value": {
                       "code": "rel.in_use",
                       "message": "release: still served by an origin",
@@ -8258,11 +8353,13 @@
                         "origins": [
                           {
                             "origin": "https://app.acme.com",
-                            "deployment_id": "dep_01KX4SB9C8E1F0N9WD3P2E4YM5"
+                            "deployment_id": "dep_01KX4SB9C8E1F0N9WD3P2E4YM5",
+                            "kind": "primary"
                           },
                           {
                             "origin": "https://acme-git-sso-acmeinc.vercel.app",
-                            "deployment_id": "dep_01KX4SD2F7H3F0N9WD3P2E4YM5"
+                            "deployment_id": "dep_01KX4SD2F7H3F0N9WD3P2E4YM5",
+                            "kind": "preview"
                           }
                         ]
                       }
@@ -9291,7 +9388,7 @@
         "operationId": "listEvents",
         "x-zitadel-cli": "events list",
         "summary": "List events",
-        "description": "Lists a project's audit events, newest first. Pass `order=asc` for oldest\nfirst. Requires `events.read`.\n\nA project that is not claimed yet returns an empty list: its events are\nstored but stay invisible until the\n[claim](/docs/concepts/project-team-user#claim) succeeds.\n\nTeam-scoped credentials see only the events whose `team_id` matches the\ncredential's team. Team-scoped credentials are not issued today.\n\nEach item carries an `event_type` that says which type of event it is, and\nthe matching `payload`. To read one event, pass its `id` to `getEvent` (`GET /events/{id}`).\n",
+        "description": "Lists a project's audit events, newest first. Pass `order=asc` for oldest\nfirst. Requires `events.read`.\n\nA project that is not claimed yet returns an empty list: its events are\nstored but stay invisible until the\n[claim](/docs/concepts/project-team-user#claim) succeeds. The deployment's\nplatform operators read them from the start.\n\nTeam-scoped credentials see only the events whose `team_id` matches the\ncredential's team. Team-scoped credentials are not issued today.\n\nEach item carries an `event_type` that says which type of event it is, and\nthe matching `payload`. To read one event, pass its `id` to `getEvent` (`GET /events/{id}`).\n\nFilters combine. These are answered from an index and fill their pages: no\nfilter, `category`, `event_type`, `status_class`, `operation_id` with or\nwithout `status_class`, `request_id`, `flow_id`, and `session_id`,\n`entity_id`, `actor_id` or `entity_type` with or without `category`, each\nwith or without the time bounds. Any other filter or combination is\nmatched event by event, over at most a few thousand events per request.\nSuch a page can hold fewer events than `limit`, or none, and still carry\n`next_page_token`: keep passing the token until a response has none.\n",
         "tags": [
           "Events"
         ],
@@ -9300,6 +9397,9 @@
             "oauth2": [
               "events.read"
             ]
+          },
+          {
+            "sessionCookie": []
           }
         ],
         "parameters": [
@@ -9391,7 +9491,7 @@
           {
             "name": "entity_type",
             "in": "query",
-            "description": "Only events that affected this type of resource.",
+            "description": "Only events that affected this type of resource, such as `user`.",
             "schema": {
               "type": "string"
             }
@@ -9410,6 +9510,40 @@
             "description": "Only events emitted under this team, as stored on the event.",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "operation_id",
+            "in": "query",
+            "description": "Only `request.api` events of this API operation, the\n`payload.operation_id` they record, such as `createUser`. Repeat the\nparameter to match any of up to 10 operations. Requests recorded by a\nserver version before this filter existed are not matched; they leave\nthe list as retention removes them.\n",
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "type": "array",
+              "maxItems": 10,
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "status_class",
+            "in": "query",
+            "description": "Only `request.api` events whose response status, the `payload.status`\nthey record, is in this class: `4xx` is 400 to 499. Repeat the\nparameter to match any of several classes: `4xx` and `5xx` are the\nfailed requests. Requests recorded by a server version before this\nfilter existed are not matched; they leave the list as retention\nremoves them.\n",
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "1xx",
+                  "2xx",
+                  "3xx",
+                  "4xx",
+                  "5xx"
+                ]
+              }
             }
           },
           {
@@ -9502,7 +9636,7 @@
         "operationId": "getEvent",
         "x-zitadel-cli": "events get",
         "summary": "Get an event by ID",
-        "description": "Returns one event of a project by its ID. Requires `events.read`.\n\nPass the `id` of an event that `listEvents` (`GET /events`) returns, with its\n`project_id`. An unknown ID and the ID of another project's event both\nanswer `404`.\n\nA project that is not claimed yet also answers `404`: its events are\nstored but stay invisible until the\n[claim](/docs/concepts/project-team-user#claim) succeeds.\n",
+        "description": "Returns one event of a project by its ID. Requires `events.read`.\n\nPass the `id` of an event that `listEvents` (`GET /events`) returns, with its\n`project_id`. An unknown ID and the ID of another project's event both\nanswer `404`.\n\nA project that is not claimed yet also answers `404`: its events are\nstored but stay invisible until the\n[claim](/docs/concepts/project-team-user#claim) succeeds. The deployment's\nplatform operators read them from the start.\n",
         "tags": [
           "Events"
         ],
@@ -9511,6 +9645,9 @@
             "oauth2": [
               "events.read"
             ]
+          },
+          {
+            "sessionCookie": []
           }
         ],
         "parameters": [
@@ -12688,10 +12825,11 @@
       },
       "user-filter-field": {
         "type": "string",
-        "description": "The field to filter users by, one of:\n- `created_at`: RFC3339 timestamp\n- `id`: user ID\n- `schema`: the schema the user's attributes satisfy, matched against the\n  value the user carries as `schema`. Each revision of a schema has its own\n  URL, so `equals` selects the users on one revision and `not_equals` the\n  users on any other.\n- `schema_object_type`: the `object_type` of the user's schema, which every\n  revision of that schema shares. It may be repeated, like any field: give\n  `not_equals` once per object type to exclude several. A schema without an\n  object type reads as `\"\"`, so `not_equals` matches its users and `equals`\n  `\"\"` selects them. Combine `equals` here with `schema` `not_equals` the\n  newest revision to find the users still on an older one.\n- `status`: one of `active`, `suspended`, `deactivated`, `pending_purge`\n- `team_id`: restricts the result to users holding an **active** membership\n  in that team. A user who has been invited but has not accepted does not\n  match. `equals` is the only operation, and the field may be given once,\n  because it names one team, not a set.\n- `lifecycle_owner_team_id`: the team that owns the user's identity\n  lifecycle. A self-owned user has no owning team, and a null filter value\n  is rejected, so self-owned users cannot be selected by this field.\n\n**The two team fields answer different questions.** `team_id` is membership:\nwhich team the user collaborates in, readable per user at\n`GET /users/{user_id}/teams`. `lifecycle_owner_team_id` is ownership: which\nteam may deprovision the user. A user can belong to many teams while owning\ntheir own lifecycle, so the two disagree often and neither implies the other.\n\n`team_id` and `schema_object_type` are filterable but not sortable, so\nneither is a valid sort field.\n\nFiltering on `team_id` requires `team_membership.read` in addition to\n`user.read`: it reads the same memberships that `expand: [\"teams\"]` embeds.\nA console session, which carries no scopes, may filter on it when it may read\nthe whole project (the `viewer` role or above); with a grant covering only\npart of the project the filter is refused with `403 user.permission_denied`.\n",
+        "description": "The field to filter users by, one of:\n- `created_at`: RFC3339 timestamp\n- `id`: user ID\n- `identifier`: the value returned as the user's `identifier`: the property\n  designated by `x-identifier` in the revision of the schema the user is on.\n  `starts_with`, a case-insensitive match on the start of the value, is the\n  only operation. Case is folded as for a unique property, so a value found\n  here is the value sign-in resolves. The value may not be empty or longer\n  than 256 characters, only string values match, and the filter may be given\n  once. An index answers it, and the users come back ordered by identifier,\n  then `id`: `sorting` cannot be combined with it.\n- `schema`: the schema the user's attributes satisfy, matched against the\n  value the user carries as `schema`. Each revision of a schema has its own\n  URL, so `equals` selects the users on one revision and `not_equals` the\n  users on any other.\n- `schema_object_type`: the `object_type` of the user's schema, which every\n  revision of that schema shares. It may be repeated, like any field: give\n  `not_equals` once per object type to exclude several. A schema without an\n  object type reads as `\"\"`, so `not_equals` matches its users and `equals`\n  `\"\"` selects them. Combine `equals` here with `schema` `not_equals` the\n  newest revision to find the users still on an older one.\n- `status`: one of `active`, `suspended`, `deactivated`, `pending_purge`\n- `team_id`: restricts the result to users holding an **active** membership\n  in that team. A user who has been invited but has not accepted does not\n  match. `equals` is the only operation, and the field may be given once,\n  because it names one team, not a set.\n- `lifecycle_owner_team_id`: the team that owns the user's identity\n  lifecycle. A self-owned user has no owning team, and a null filter value\n  is rejected, so self-owned users cannot be selected by this field.\n\n**The two team fields answer different questions.** `team_id` is membership:\nwhich team the user collaborates in, readable per user at\n`GET /users/{user_id}/teams`. `lifecycle_owner_team_id` is ownership: which\nteam may deprovision the user. A user can belong to many teams while owning\ntheir own lifecycle, so the two disagree often and neither implies the other.\n\n`identifier`, `team_id` and `schema_object_type` are filterable but not\nsortable, so none is a valid sort field.\n\nFiltering on `team_id` requires `team_membership.read` in addition to\n`user.read`: it reads the same memberships that `expand: [\"teams\"]` embeds.\nA console session, which carries no scopes, may filter on it when it may read\nthe whole project (the `viewer` role or above); with a grant covering only\npart of the project the filter is refused with `403 user.permission_denied`.\n",
         "enum": [
           "created_at",
           "id",
+          "identifier",
           "schema",
           "schema_object_type",
           "status",
@@ -12718,12 +12856,13 @@
       },
       "filter-operation": {
         "type": "string",
-        "description": "The operation a filter applies to a field on a query endpoint.\n\nOn text fields, `contains` is a case-insensitive substring match. `equals`\ncompares the whole value and is case-sensitive unless the field documents\notherwise.\n",
+        "description": "The operation a filter applies to a field on a query endpoint.\n\nOn text fields, `contains` is a case-insensitive substring match. `equals`\ncompares the whole value and is case-sensitive unless the field documents\notherwise. `starts_with` is a case-insensitive match on the start of the\nvalue, answered from an index; only the fields that name it accept it.\n",
         "enum": [
           "equals",
           "not_equals",
           "contains",
           "not_contains",
+          "starts_with",
           "less_than",
           "less_than_or_equal",
           "greater_than",
@@ -18670,6 +18809,133 @@
           }
         }
       },
+      "search-result-type": {
+        "type": "string",
+        "description": "A type of result `search` (`POST /search`) finds:\n- `user`: a user, matched on the start of the value they carry as\n  `identifier` or of a part of their `display` name\n- `team`: a team, matched on its name\n- `schema`: a user schema at its newest revision, matched on its `title`\n  and its `objectType`\n- `flow_definition`: a flow definition at its newest revision, matched on\n  its name\n- `idp`: an identity provider connection, matched on its `slug` and its\n  `display_name`\n",
+        "enum": [
+          "user",
+          "team",
+          "schema",
+          "flow_definition",
+          "idp"
+        ]
+      },
+      "search-request": {
+        "type": "object",
+        "description": "Request to search a project.",
+        "required": [
+          "query",
+          "types"
+        ],
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "The text to find. Spaces around it are ignored, and a text of spaces\nalone finds nothing.\n",
+            "example": "ann@example.com"
+          },
+          "types": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "description": "The types to search. Only these appear in `results`, so a client never\nreceives a type it did not ask for.\n",
+            "items": {
+              "$ref": "#/components/schemas/search-result-type"
+            },
+            "example": [
+              "user",
+              "team"
+            ]
+          },
+          "limit_per_type": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20,
+            "default": 5,
+            "description": "The most results each type contributes."
+          }
+        }
+      },
+      "idp-permission_denied": {
+        "description": "Identity provider connection: the caller's project role does not allow this operation\n\nError code: idp.permission_denied\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "idp.permission_denied"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "search-result": {
+        "type": "object",
+        "description": "One match: a reference to a resource, not the resource. Every type has this\nshape.\n",
+        "required": [
+          "type",
+          "id",
+          "project_id",
+          "title"
+        ],
+        "properties": {
+          "type": {
+            "$ref": "#/components/schemas/search-result-type"
+          },
+          "id": {
+            "type": "string",
+            "description": "The resource's `id`, as its type's own operations take it. For a schema\nand a flow definition, the `id` of the newest revision.\n",
+            "example": "user_01KWH3B72K7M7F0N9WD3P2E4YM"
+          },
+          "project_id": {
+            "$ref": "#/components/schemas/project-id",
+            "description": "The project the resource belongs to."
+          },
+          "title": {
+            "type": "string",
+            "description": "What to call the resource:\n- a user: their `display`, else their `identifier`, else their `id`\n- a team: its name\n- a schema: its `title`, else its `objectType`, else its `id`\n- a flow definition: its name\n- an identity provider connection: its `display_name`, else its `slug`\n",
+            "example": "Ann Lee"
+          },
+          "subtitle": {
+            "type": "string",
+            "description": "A second line that tells two titles apart, absent when there is nothing\nto add:\n- a user shown by their `display`: their `identifier`\n- a schema shown by its `title`: its `objectType`\n- a flow definition: the purposes it handles\n- an identity provider connection shown by its `display_name`: its\n  `slug`\n",
+            "example": "ann@example.com"
+          }
+        }
+      },
+      "search-response": {
+        "type": "object",
+        "description": "The best matches of each requested type.",
+        "required": [
+          "results",
+          "incomplete_types"
+        ],
+        "properties": {
+          "results": {
+            "type": "array",
+            "description": "The matches, best first. Types can be mixed in the order: group by\n`type` to show them by type.\n",
+            "items": {
+              "$ref": "#/components/schemas/search-result"
+            }
+          },
+          "incomplete_types": {
+            "type": "array",
+            "uniqueItems": true,
+            "description": "The requested types whose matches are not all in `results`: there were\nmore than `limit_per_type`, the text was too short to search that type,\nor the project holds more of that type than one search reads. Empty when\nevery requested type is complete.\n",
+            "items": {
+              "$ref": "#/components/schemas/search-result-type"
+            }
+          }
+        }
+      },
       "brnd-not_found": {
         "description": "Branding: not found\n\nError code: brnd.not_found\n",
         "allOf": [
@@ -19043,26 +19309,6 @@
               "code": {
                 "type": "string",
                 "const": "idp.field_immutable"
-              }
-            },
-            "required": [
-              "code"
-            ]
-          }
-        ]
-      },
-      "idp-permission_denied": {
-        "description": "Identity provider connection: the caller's project role does not allow this operation\n\nError code: idp.permission_denied\n",
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/error-details"
-          },
-          {
-            "type": "object",
-            "properties": {
-              "code": {
-                "type": "string",
-                "const": "idp.permission_denied"
               }
             },
             "required": [
@@ -20491,6 +20737,16 @@
         "x-zitadel-pattern-message": "must be a deployment ID: dep_ followed by letters, digits, _ or -",
         "example": "dep_01KX4SB9C8E1F0N9WD3P2E4YM5"
       },
+      "deployment-kind": {
+        "title": "DeploymentKind",
+        "type": "string",
+        "description": "`primary` for the project's primary origins, `preview` for preview URLs.\n",
+        "enum": [
+          "primary",
+          "preview"
+        ],
+        "example": "primary"
+      },
       "revoke-release-conflict": {
         "title": "RevokeReleaseConflict",
         "type": "object",
@@ -20522,7 +20778,8 @@
                   "type": "object",
                   "required": [
                     "origin",
-                    "deployment_id"
+                    "deployment_id",
+                    "kind"
                   ],
                   "properties": {
                     "origin": {
@@ -20531,6 +20788,10 @@
                     "deployment_id": {
                       "$ref": "#/components/schemas/deployment-id",
                       "description": "The newest deployment to the origin, which pins the release."
+                    },
+                    "kind": {
+                      "$ref": "#/components/schemas/deployment-kind",
+                      "description": "Whether the origin serves the release as a primary origin or as\na preview. A deploy or a rollback frees a primary origin;\nremoving the preview frees a preview.\n"
                     }
                   }
                 }
@@ -24058,13 +24319,14 @@
         ],
         "properties": {
           "data": {
+            "description": "The events of this page. A filter the server matches event by event can\nleave it shorter than `limit`, or empty, while more events remain:\n`next_page_token` says whether they do.\n",
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/event"
             }
           },
           "next_page_token": {
-            "description": "Token to pass as `page_token` in the next request to fetch the following page.\nAbsent when there are no more results.\n",
+            "description": "Token to pass as `page_token` in the next request to fetch the following page.\nAbsent when there are no more results. A short or empty page still\ncarries one while the server has not read every event the filter could\nmatch.\n",
             "oneOf": [
               {
                 "$ref": "#/components/schemas/page-token"
@@ -24359,16 +24621,6 @@
         "enum": [
           "release"
         ]
-      },
-      "deployment-kind": {
-        "title": "DeploymentKind",
-        "type": "string",
-        "description": "`primary` for the project's primary origins, `preview` for preview URLs.\n",
-        "enum": [
-          "primary",
-          "preview"
-        ],
-        "example": "primary"
       },
       "deployment-target": {
         "title": "DeploymentTarget",
@@ -25633,6 +25885,13 @@
           "message": "the team still owns a project and cannot be deactivated while it does"
         }
       },
+      "idp-permission_denied": {
+        "summary": "idp.permission_denied",
+        "value": {
+          "code": "idp.permission_denied",
+          "message": "identity provider connection: the caller's project role does not allow this operation"
+        }
+      },
       "brnd-not_found": {
         "summary": "brnd.not_found",
         "value": {
@@ -25666,13 +25925,6 @@
         "value": {
           "code": "idp.field_immutable",
           "message": "identity provider connection: the field is fixed for the life of the connection"
-        }
-      },
-      "idp-permission_denied": {
-        "summary": "idp.permission_denied",
-        "value": {
-          "code": "idp.permission_denied",
-          "message": "identity provider connection: the caller's project role does not allow this operation"
         }
       },
       "idp-revision_conflict": {
@@ -30150,6 +30402,9 @@
                   "$ref": "#/components/schemas/not_implemented"
                 },
                 {
+                  "$ref": "#/components/schemas/proj-mismatch"
+                },
+                {
                   "$ref": "#/components/schemas/req-invalid"
                 },
                 {
@@ -30173,6 +30428,7 @@
                   "tkn.invalid": "#/components/schemas/tkn-invalid",
                   "tkn.invalid_tknid": "#/components/schemas/tkn-invalid_tknid",
                   "not_implemented": "#/components/schemas/not_implemented",
+                  "proj.mismatch": "#/components/schemas/proj-mismatch",
                   "req.invalid": "#/components/schemas/req-invalid",
                   "sess.token_creation_failed": "#/components/schemas/sess-token_creation_failed",
                   "enc_key.unknown_alg": "#/components/schemas/enc_key-unknown_alg",
@@ -30204,6 +30460,9 @@
               },
               "not_implemented": {
                 "$ref": "#/components/examples/not_implemented"
+              },
+              "proj.mismatch": {
+                "$ref": "#/components/examples/proj-mismatch"
               },
               "req.invalid": {
                 "$ref": "#/components/examples/req-invalid"
@@ -31772,6 +32031,171 @@
               },
               "unavailable": {
                 "$ref": "#/components/examples/unavailable"
+              }
+            }
+          }
+        }
+      },
+      "search-error-response": {
+        "description": "Error response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/auth-csrf_invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/auth-unauthorized"
+                },
+                {
+                  "$ref": "#/components/schemas/flowdef-invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/flowdef-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/flowdef-permission_denied"
+                },
+                {
+                  "$ref": "#/components/schemas/idp-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/idp-permission_denied"
+                },
+                {
+                  "$ref": "#/components/schemas/internal"
+                },
+                {
+                  "$ref": "#/components/schemas/sch-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/sch-permission_denied"
+                },
+                {
+                  "$ref": "#/components/schemas/flowdef-missing_project_id"
+                },
+                {
+                  "$ref": "#/components/schemas/not_implemented"
+                },
+                {
+                  "$ref": "#/components/schemas/proj-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/proj-permission_denied"
+                },
+                {
+                  "$ref": "#/components/schemas/req-invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/team-team_not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/team-permission_denied"
+                },
+                {
+                  "$ref": "#/components/schemas/team-project_not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/unavailable"
+                },
+                {
+                  "$ref": "#/components/schemas/user-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/user-permission_denied"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "code",
+                "mapping": {
+                  "auth.csrf_invalid": "#/components/schemas/auth-csrf_invalid",
+                  "auth.unauthorized": "#/components/schemas/auth-unauthorized",
+                  "flowdef.invalid": "#/components/schemas/flowdef-invalid",
+                  "flowdef.not_found": "#/components/schemas/flowdef-not_found",
+                  "flowdef.permission_denied": "#/components/schemas/flowdef-permission_denied",
+                  "idp.not_found": "#/components/schemas/idp-not_found",
+                  "idp.permission_denied": "#/components/schemas/idp-permission_denied",
+                  "internal": "#/components/schemas/internal",
+                  "sch.not_found": "#/components/schemas/sch-not_found",
+                  "sch.permission_denied": "#/components/schemas/sch-permission_denied",
+                  "flowdef.missing_project_id": "#/components/schemas/flowdef-missing_project_id",
+                  "not_implemented": "#/components/schemas/not_implemented",
+                  "proj.not_found": "#/components/schemas/proj-not_found",
+                  "proj.permission_denied": "#/components/schemas/proj-permission_denied",
+                  "req.invalid": "#/components/schemas/req-invalid",
+                  "team.team_not_found": "#/components/schemas/team-team_not_found",
+                  "team.permission_denied": "#/components/schemas/team-permission_denied",
+                  "team.project_not_found": "#/components/schemas/team-project_not_found",
+                  "unavailable": "#/components/schemas/unavailable",
+                  "user.not_found": "#/components/schemas/user-not_found",
+                  "user.permission_denied": "#/components/schemas/user-permission_denied"
+                }
+              }
+            },
+            "examples": {
+              "auth.csrf_invalid": {
+                "$ref": "#/components/examples/auth-csrf_invalid"
+              },
+              "auth.unauthorized": {
+                "$ref": "#/components/examples/auth-unauthorized"
+              },
+              "flowdef.invalid": {
+                "$ref": "#/components/examples/flowdef-invalid"
+              },
+              "flowdef.not_found": {
+                "$ref": "#/components/examples/flowdef-not_found"
+              },
+              "flowdef.permission_denied": {
+                "$ref": "#/components/examples/flowdef-permission_denied"
+              },
+              "idp.not_found": {
+                "$ref": "#/components/examples/idp-not_found"
+              },
+              "idp.permission_denied": {
+                "$ref": "#/components/examples/idp-permission_denied"
+              },
+              "internal": {
+                "$ref": "#/components/examples/internal"
+              },
+              "sch.not_found": {
+                "$ref": "#/components/examples/sch-not_found"
+              },
+              "sch.permission_denied": {
+                "$ref": "#/components/examples/sch-permission_denied"
+              },
+              "flowdef.missing_project_id": {
+                "$ref": "#/components/examples/flowdef-missing_project_id"
+              },
+              "not_implemented": {
+                "$ref": "#/components/examples/not_implemented"
+              },
+              "proj.not_found": {
+                "$ref": "#/components/examples/proj-not_found"
+              },
+              "proj.permission_denied": {
+                "$ref": "#/components/examples/proj-permission_denied"
+              },
+              "req.invalid": {
+                "$ref": "#/components/examples/req-invalid"
+              },
+              "team.team_not_found": {
+                "$ref": "#/components/examples/team-team_not_found"
+              },
+              "team.permission_denied": {
+                "$ref": "#/components/examples/team-permission_denied"
+              },
+              "team.project_not_found": {
+                "$ref": "#/components/examples/team-project_not_found"
+              },
+              "unavailable": {
+                "$ref": "#/components/examples/unavailable"
+              },
+              "user.not_found": {
+                "$ref": "#/components/examples/user-not_found"
+              },
+              "user.permission_denied": {
+                "$ref": "#/components/examples/user-permission_denied"
               }
             }
           }
