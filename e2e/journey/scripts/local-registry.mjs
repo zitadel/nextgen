@@ -16,7 +16,7 @@ export const packageDirs = [...PUBLIC_PACKAGE_DIRS];
 // Verdaccio serves a proxied packument from its storage until it is `maxage`
 // old, then asks npmjs again; the default is 2m, which makes a long journey
 // run ask npmjs again for packuments it fetched minutes earlier. An hour skips
-// those repeat checks within a run, and a store a later run reuses
+// those repeat checks within a run, and a store that a later run reuses
 // (`resetStorage: false`) still sees an npmjs release within the hour.
 export const UPLINK_MAXAGE = "1h";
 
