@@ -325,6 +325,14 @@ describe("preview", () => {
         expect(result).toFailWith("E_VALIDATION");
       });
 
+      it("does not send a refused primary origin on to a production deploy", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["preview", "--origin", "primary", "--json"]);
+
+        expect(result).not.toSuggest("deploy");
+      });
+
       it("deploys to the URL the hosting platform announces when no --origin is given", async () => {
         const app = await anAppAdmittingPreviews();
 

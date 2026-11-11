@@ -116,6 +116,26 @@ describe("DrawnSpinner.around", () => {
   });
 });
 
+describe("DrawnSpinner.clearAll", () => {
+  it("clears a spinner nobody ended", () => {
+    new DrawnSpinner("Committing");
+
+    DrawnSpinner.clearAll();
+
+    expect(handle().clear).toHaveBeenCalled();
+  });
+
+  it("leaves nothing for a later line to draw again", () => {
+    new DrawnSpinner("Committing");
+    DrawnSpinner.clearAll();
+    vi.mocked(spinner).mockClear();
+
+    DrawnSpinner.around(() => undefined);
+
+    expect(spinner).not.toHaveBeenCalled();
+  });
+});
+
 describe("QuietSpinner", () => {
   it("draws nothing, whatever it is asked to do", () => {
     const quiet: Spinner = new QuietSpinner();

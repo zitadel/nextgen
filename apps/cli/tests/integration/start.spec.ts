@@ -85,6 +85,21 @@ describe("start", () => {
         expect(result).toExplain("--image requires --runtime docker");
       });
 
+      it("suggests no command with a placeholder left in it", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run([
+          "start",
+          "--runtime",
+          "binary",
+          "--image",
+          "zitadel:latest",
+          "--json",
+        ]);
+
+        expect(result).not.toSuggest("<tag>");
+      });
+
       it("brings a directory back on the port it had", async () => {
         const app = await aSetUpApp();
         const first = await app.startLocalServer();

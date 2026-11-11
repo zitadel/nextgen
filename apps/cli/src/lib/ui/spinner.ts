@@ -83,6 +83,13 @@ export class DrawnSpinner implements Spinner {
     }
   }
 
+  /** Stops every spinner still drawing, so what ends a run is not drawn over. */
+  static clearAll(): void {
+    for (const one of [...DrawnSpinner.active]) {
+      one.clear();
+    }
+  }
+
   message(text: string): void {
     this.text = text;
     this.handle.message(text);

@@ -37,7 +37,6 @@ import type { SuggestedCommand } from "@/lib/suggestion";
 const IMAGE_NEEDS_DOCKER_REFUSAL: Refusal = {
   message: "--image requires --runtime docker",
   hint: "Pass --runtime docker with --image <tag>, or omit --image for the npm binary runtime.",
-  next: ["start --runtime docker --image <tag>"],
 };
 
 const MIN_PORT = 1;

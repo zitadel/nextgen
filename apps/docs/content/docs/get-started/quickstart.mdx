@@ -52,7 +52,7 @@ npx @zitadel/cli@latest start
 
 This runs the `@zitadel/server` npm binary that matches the CLI's version, on the first free port from 8080, usually `http://localhost:8080`. It also creates a local admin, `admin@zitadel.localhost`.
 
-`start` prints `Local Zitadel server is ready.`, then the server's host, such as `(server: localhost:8080)`, and names `setup` as the next step. `start --json` lists the API and console URLs. It prints no console sign-in link: you get one after `setup` ([Open the console](#open-the-console)). When 8080 is taken, `start` takes the next free port, and the host line shows it. A port you pass with `--port <port>` must be free, or `start` fails with `E_PORT_IN_USE`. [Run Zitadel locally](/docs/guides/local-runtime) covers the runtime's state and ports.
+`start` prints `Local Zitadel server is ready` and names `setup` as the next step. `start --json` lists the API and console URLs. It prints no console sign-in link: you get one after `setup` ([Open the console](#open-the-console)). When 8080 is taken, `start` takes the next free port, and the footer names it. A port you pass with `--port <port>` must be free, or `start` fails with `E_PORT_IN_USE`. [Run Zitadel locally](/docs/guides/local-runtime) covers the runtime's state and ports.
 
 ## Scaffold the app with sign-in
 

@@ -36,7 +36,6 @@ const NO_URLS_REFUSAL: Refusal = {
 const PRIMARY_ORIGIN_REFUSAL: Refusal = {
   message: "{origins} is a primary origin",
   hint: "Pass the preview URLs with --origin; production is deployed after merge.",
-  next: ["deploy"],
 };
 
 /** The shortest and longest a preview may live, as the server fixes them. */
@@ -60,7 +59,6 @@ const ORIGIN: Refused<string> = {
   refusal: {
     message: "{problem}",
     hint: "Pass the preview URLs with --origin; production is deployed after merge.",
-    next: ["deploy"],
   },
 };
 

@@ -134,6 +134,8 @@ export class Chain implements Drawing, Narratable {
     if (this.ended || !this.audience.interactive) {
       return;
     }
+    // A step the command left open must not keep drawing under what ends the run.
+    DrawnSpinner.clearAll();
     const ending = new Ending(summary, this.where(summary.ran), this.presentation);
     // A normal command draws no chain: its answer stands on its own, with a
     // footer rather than a closing line, however the run went.
