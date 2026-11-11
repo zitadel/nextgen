@@ -277,7 +277,7 @@ func serveTracedRequest(t *testing.T, buf *RequestBuffer, sampled bool) trace.Sp
 func newTracedBuffer(t *testing.T) (*channelInserter, *RequestBuffer) {
 	t.Helper()
 	ins := &channelInserter{}
-	buf := NewRequestBuffer(ins, RequestBufferConfig{BatchSize: 100, Capacity: 100, MaxAge: time.Hour})
+	buf := startRequestBuffer(ins, RequestBufferConfig{BatchSize: 100, Capacity: 100, MaxAge: time.Hour})
 	t.Cleanup(buf.Close)
 	return ins, buf
 }

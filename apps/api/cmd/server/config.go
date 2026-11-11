@@ -209,8 +209,16 @@ type ServerConfig struct {
 	// request it sends as the server closes the connection is lost, and one
 	// that is not safe to send twice, a POST, ends as the proxy's 502. Zero
 	// or less never closes an idle connection, for a server whose only client
-	// is such a proxy.
+	// is such a proxy. The default is a minute, or zero with RequestBound.
 	IdleTimeout time.Duration `mapstructure:"idle_timeout"`
+	// RequestBound states a fact about where the server runs: its process
+	// runs only while it starts or serves a request and is paused in
+	// between, as a Vercel function is, or a Cloud Run service with CPU
+	// allocated only during requests. It turns nothing on by itself. Each
+	// background task says what it does in such a process
+	// (internal/background), and the settings a pause changes take their
+	// defaults from it: IdleTimeout and events.request.flush_wait (ADR 088).
+	RequestBound bool `mapstructure:"request_bound"`
 }
 
 func (c ServerConfig) Validate() error {

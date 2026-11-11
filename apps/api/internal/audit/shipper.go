@@ -12,6 +12,7 @@ import (
 
 	"go.opentelemetry.io/otel/attribute"
 
+	"github.com/zitadel/nextgen/internal/background"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/events"
 )
@@ -87,6 +88,20 @@ func NewShipper(src EventExportSource, cfg ExportConfig) *Shipper {
 	}
 }
 
+// Task is the shipper as background work. It ships on a timer and has no
+// trigger, so a process that runs only while it serves a request refuses to
+// start with export on.
+func (s *Shipper) Task() background.Task {
+	return background.Task{
+		Name:     "event export",
+		Disabled: !s.cfg.Enabled,
+		Start:    s.Start,
+		Stop:     s.Close,
+		RequestBound: background.Unsupported(
+			"it ships on a timer and has no trigger; turn it off with events.export.enabled"),
+	}
+}
+
 func (s *Shipper) Start(ctx context.Context) error {
 	if !s.cfg.Enabled {
 		close(s.done)
@@ -121,7 +136,7 @@ func (s *Shipper) Start(ctx context.Context) error {
 		close(s.done)
 		return nil
 	}
-	go s.loop()
+	go s.loop() //background:allow the task "event export"
 	return nil
 }
 

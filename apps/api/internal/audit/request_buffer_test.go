@@ -50,7 +50,7 @@ func (c *channelInserter) batchCalls() int {
 
 func TestRequestBuffer_FlushOnBatchSize(t *testing.T) {
 	ins := &channelInserter{}
-	buf := NewRequestBuffer(ins, RequestBufferConfig{
+	buf := startRequestBuffer(ins, RequestBufferConfig{
 		BatchSize: 3,
 		Capacity:  100,
 		MaxAge:    time.Hour,
@@ -72,7 +72,7 @@ func TestRequestBuffer_FlushOnBatchSize(t *testing.T) {
 
 func TestRequestBuffer_DropWhenFull(t *testing.T) {
 	ins := SequentialBatchInserter{Inner: noopInserter{}}
-	buf := NewRequestBuffer(ins, RequestBufferConfig{
+	buf := startRequestBuffer(ins, RequestBufferConfig{
 		BatchSize:       1000,
 		Capacity:        2,
 		MaxAge:          24 * time.Hour,
@@ -94,7 +94,7 @@ func (noopInserter) InsertEvent(context.Context, *domain.Event) error { return n
 
 func TestRequestBuffer_BatchSizeTakesPrefix(t *testing.T) {
 	ins := &channelInserter{}
-	buf := NewRequestBuffer(ins, RequestBufferConfig{
+	buf := startRequestBuffer(ins, RequestBufferConfig{
 		BatchSize: 3,
 		Capacity:  100,
 		MaxAge:    time.Hour,
@@ -112,7 +112,7 @@ func TestRequestBuffer_BatchSizeTakesPrefix(t *testing.T) {
 
 func TestRequestBuffer_BatchSizeDrainsFullPrefixes(t *testing.T) {
 	ins := &channelInserter{}
-	buf := NewRequestBuffer(ins, RequestBufferConfig{
+	buf := startRequestBuffer(ins, RequestBufferConfig{
 		BatchSize: 3,
 		Capacity:  100,
 		MaxAge:    time.Hour,
@@ -170,7 +170,7 @@ func (f *failingInserter) InsertEvents(context.Context, []*domain.Event) error {
 
 func TestRequestBuffer_FlushFailureDropsAndCounts(t *testing.T) {
 	ins := &failingInserter{}
-	buf := NewRequestBuffer(ins, RequestBufferConfig{
+	buf := startRequestBuffer(ins, RequestBufferConfig{
 		BatchSize: 2,
 		Capacity:  100,
 		MaxAge:    time.Hour,
@@ -208,7 +208,7 @@ func (f *failThenSucceedInserter) InsertEvents(_ context.Context, events []*doma
 
 func TestRequestBuffer_OccurredAtWaitIncludesRetryBackoff(t *testing.T) {
 	ins := &failThenSucceedInserter{}
-	buf := NewRequestBuffer(ins, RequestBufferConfig{
+	buf := startRequestBuffer(ins, RequestBufferConfig{
 		BatchSize: 1,
 		Capacity:  100,
 		MaxAge:    time.Hour,
@@ -228,7 +228,7 @@ func TestRequestBuffer_OccurredAtWaitIncludesRetryBackoff(t *testing.T) {
 
 func TestRequestBuffer_OccurredAtWaitUsesRequestStart(t *testing.T) {
 	ins := &failThenSucceedInserter{}
-	buf := NewRequestBuffer(ins, RequestBufferConfig{
+	buf := startRequestBuffer(ins, RequestBufferConfig{
 		BatchSize: 1,
 		Capacity:  100,
 		MaxAge:    time.Hour,
@@ -248,7 +248,7 @@ func TestRequestBuffer_OccurredAtWaitUsesRequestStart(t *testing.T) {
 
 func TestRequestBuffer_MaxAgeUsesEnqueueTimeNotRequestStart(t *testing.T) {
 	ins := SequentialBatchInserter{Inner: noopInserter{}}
-	buf := NewRequestBuffer(ins, RequestBufferConfig{
+	buf := startRequestBuffer(ins, RequestBufferConfig{
 		BatchSize:       1000,
 		Capacity:        10,
 		MaxAge:          time.Hour,
@@ -307,7 +307,7 @@ func (s *storeInserter) state() (calls, stored int) {
 // database committed. The retry then meets its own rows, which is no loss.
 func TestRequestBuffer_DuplicateAfterAFailedAttemptIsWritten(t *testing.T) {
 	ins := &storeInserter{fail: map[int]error{1: context.DeadlineExceeded}}
-	buf := NewRequestBuffer(ins, RequestBufferConfig{BatchSize: 2, Capacity: 100, MaxAge: time.Hour})
+	buf := startRequestBuffer(ins, RequestBufferConfig{BatchSize: 2, Capacity: 100, MaxAge: time.Hour})
 	defer buf.Close()
 
 	buf.Enqueue(requestEvent())
@@ -324,7 +324,7 @@ func TestRequestBuffer_DuplicateAfterAFailedAttemptIsWritten(t *testing.T) {
 // write, and a retry would only meet it again.
 func TestRequestBuffer_DuplicateOnFirstAttemptIsDroppedAtOnce(t *testing.T) {
 	ins := &storeInserter{stored: map[string]bool{"evt_taken": true}}
-	buf := NewRequestBuffer(ins, RequestBufferConfig{BatchSize: 1, Capacity: 100, MaxAge: time.Hour})
+	buf := startRequestBuffer(ins, RequestBufferConfig{BatchSize: 1, Capacity: 100, MaxAge: time.Hour})
 	defer buf.Close()
 
 	ev := requestEvent()
@@ -377,7 +377,7 @@ func TestRequestBuffer_GivingUpLogsTheFirstError(t *testing.T) {
 	t.Cleanup(func() { slog.SetDefault(previous) })
 
 	ins := &sequenceInserter{errs: []error{errors.New("connection reset"), errors.New("still unreachable")}}
-	buf := NewRequestBuffer(ins, RequestBufferConfig{BatchSize: 1, Capacity: 100, MaxAge: time.Hour})
+	buf := startRequestBuffer(ins, RequestBufferConfig{BatchSize: 1, Capacity: 100, MaxAge: time.Hour})
 	defer buf.Close()
 
 	buf.Enqueue(requestEvent())
@@ -391,7 +391,7 @@ func TestRequestBuffer_GivingUpLogsTheFirstError(t *testing.T) {
 // before the request ends: EnqueueSince returns with it written.
 func TestRequestBuffer_FlushWaitWritesBeforeTheRequestEnds(t *testing.T) {
 	ins := &channelInserter{}
-	buf := NewRequestBuffer(ins, RequestBufferConfig{BatchSize: 100, Capacity: 100, MaxAge: time.Hour, FlushWait: 10 * time.Second})
+	buf := startRequestBuffer(ins, RequestBufferConfig{BatchSize: 100, Capacity: 100, MaxAge: time.Hour, FlushWait: 10 * time.Second})
 	defer buf.Close()
 
 	buf.EnqueueSince(t.Context(), requestEvent(), time.Now())
@@ -421,7 +421,7 @@ func (g *gatedInserter) InsertEvents(ctx context.Context, events []*domain.Event
 // flusher's retries; the event is still written once it does.
 func TestRequestBuffer_FlushWaitIsBounded(t *testing.T) {
 	ins := newGatedInserter()
-	buf := NewRequestBuffer(ins, RequestBufferConfig{BatchSize: 100, Capacity: 100, MaxAge: time.Hour, FlushWait: 30 * time.Millisecond})
+	buf := startRequestBuffer(ins, RequestBufferConfig{BatchSize: 100, Capacity: 100, MaxAge: time.Hour, FlushWait: 30 * time.Millisecond})
 	defer buf.Close()
 
 	start := time.Now()
@@ -439,7 +439,7 @@ func TestRequestBuffer_FlushWaitIsBounded(t *testing.T) {
 // A request whose client is gone has nothing left to hold open.
 func TestRequestBuffer_FlushWaitEndsWithTheRequest(t *testing.T) {
 	ins := newGatedInserter()
-	buf := NewRequestBuffer(ins, RequestBufferConfig{BatchSize: 100, Capacity: 100, MaxAge: time.Hour, FlushWait: time.Hour})
+	buf := startRequestBuffer(ins, RequestBufferConfig{BatchSize: 100, Capacity: 100, MaxAge: time.Hour, FlushWait: time.Hour})
 	defer buf.Close()
 	defer close(ins.release)
 
@@ -462,7 +462,7 @@ func TestRequestBuffer_FlushWaitEndsWithTheRequest(t *testing.T) {
 // wait costs a busy instance one write per round, not one per request.
 func TestRequestBuffer_FlushWaitSharesAWriteBetweenRequests(t *testing.T) {
 	ins := newGatedInserter()
-	buf := NewRequestBuffer(ins, RequestBufferConfig{BatchSize: 100, Capacity: 100, MaxAge: time.Hour, FlushWait: 10 * time.Second})
+	buf := startRequestBuffer(ins, RequestBufferConfig{BatchSize: 100, Capacity: 100, MaxAge: time.Hour, FlushWait: 10 * time.Second})
 	defer buf.Close()
 
 	var requests sync.WaitGroup

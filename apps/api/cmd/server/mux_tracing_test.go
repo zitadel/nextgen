@@ -64,6 +64,7 @@ func TestBuildHTTPMuxTracesTheAuditEventUnderTheServerSpan(t *testing.T) {
 				apiServerOptions(muxTracerProvider, noop.NewMeterProvider(), nil)...)
 			require.NoError(t, err)
 			events := audit.NewRequestBuffer(audit.BatchInserter(func(context.Context, []*domain.Event) error { return nil }), audit.RequestBufferConfig{})
+			require.NoError(t, events.Task().Start(t.Context()))
 			t.Cleanup(events.Close)
 			mux, err := buildHTTPMux(ServerConfig{}, idgen.NewULID(), apiServers, idpCallbackEcho(), nil, events, nil)
 			require.NoError(t, err)

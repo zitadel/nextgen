@@ -34,6 +34,7 @@ import (
 	oasapi "github.com/zitadel/nextgen/internal/api/generated"
 	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/audit"
+	"github.com/zitadel/nextgen/internal/background"
 	"github.com/zitadel/nextgen/internal/bootstrap/platform"
 	"github.com/zitadel/nextgen/internal/bootstrap/users"
 	"github.com/zitadel/nextgen/internal/build"
@@ -435,22 +436,18 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	ctx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
+	// Everything the server does outside a request starts through this
+	// group, which holds each task to what it does where the process runs
+	// only while it serves a request (ADR 088).
+	tasks := background.NewGroup(cfg.Server.RequestBound)
+	defer tasks.Close()
+
 	exportAdapter := service.EventExportAdapter{Pool: serviceDBPool}
 	requestEventCfg := audit.DefaultRequestBufferConfig()
 	requestEventCfg.FlushWait = cfg.Events.Request.FlushWait
 	requestEventBuf := audit.NewRequestBuffer(exportAdapter, requestEventCfg)
-	defer requestEventBuf.Close()
-
 	retentionJob := audit.NewRetentionJob(exportAdapter, cfg.Events.Retention)
-	retentionJob.Start()
-	defer retentionJob.Close()
-
 	shipper := audit.NewShipper(exportAdapter, cfg.Events.Export)
-	if err := shipper.Start(ctx); err != nil {
-		return fmt.Errorf("start event shipper: %w", err)
-	}
-	defer shipper.Close()
-
 	pinger := serviceping.New(cfg.ServicePing, serviceping.Facts{
 		Version:    build.Version(),
 		Commit:     build.Commit(),
@@ -458,8 +455,17 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		OnVercel:   os.Getenv("VERCEL") == "1",
 		PublicBase: cfg.Server.PublicBase,
 	})
-	pinger.Start()
-	defer pinger.Close()
+	for _, task := range []background.Task{
+		requestEventBuf.Task(),
+		retentionJob.Task(),
+		shipper.Task(),
+		pinger.Task(),
+		masterKeyRewrapTask(keyService, masterKey),
+	} {
+		if err := tasks.Start(ctx, task); err != nil {
+			return err
+		}
+	}
 
 	runtimeResolver := service.NewRuntimeResolver(serviceDBPool, releaseService, consoleHosts...)
 	apiServers, err := api.NewServers(
@@ -515,25 +521,13 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 
 	serverErr := make(chan error, 1)
 
-	go func() {
+	go func() { //background:allow the listener: it serves the requests
 		slog.Info("server listening for requests", slog.String("address", httpServer.Addr))
 		if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			serverErr <- err
 		}
 		slog.Debug("stopped listening")
 		close(serverErr)
-	}()
-
-	// TODO: on a multi-replica deployment, the migration can happen multiple
-	//       times. This is not a problem since the migration will not remove
-	//       any keys. So nothing breaks. But there is no need to recompute the
-	//       same thing multiple times.
-	go func() {
-		slog.Info("migrate keys to latest master key")
-		if err := keyService.MigrateToLatestMasterKey(ctx); err != nil {
-			slog.Error("error during master key migration", slog.Any(slogctx.ErrKey, err))
-		}
-		slog.Debug("master key migration done")
 	}()
 
 	select {
@@ -547,6 +541,42 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		return nil
 	case err := <-serverErr:
 		return err
+	}
+}
+
+// masterKeyRewrapTask re-wraps every project key to the current master key.
+// There is work only during a rotation, while the configuration still names
+// a key that only decrypts. A server that keeps running re-wraps beside its
+// requests. One that runs only while it serves a request re-wraps before it
+// takes the first, so a deployment that has started has re-wrapped, which is
+// when the operator removes the previous key. A failure is logged and the
+// server serves: the previous key still decrypts what it wrapped.
+//
+// TODO: on a multi-replica deployment, the migration can happen multiple
+// times. This is not a problem since the migration will not remove any
+// keys. So nothing breaks. But there is no need to recompute the same
+// thing multiple times.
+func masterKeyRewrapTask(keys interface {
+	MigrateToLatestMasterKey(ctx context.Context) error
+}, masterKeys *domain.MasterKeys) background.Task {
+	rewrap := func(ctx context.Context) {
+		slog.Info("migrate keys to latest master key")
+		if err := keys.MigrateToLatestMasterKey(ctx); err != nil {
+			slog.Error("error during master key migration", slog.Any(slogctx.ErrKey, err))
+		}
+		slog.Debug("master key migration done")
+	}
+	return background.Task{
+		Name:     "master key re-wrap",
+		Disabled: len(masterKeys.Keys) == 0,
+		Start: func(ctx context.Context) error {
+			go rewrap(ctx) //background:allow the task "master key re-wrap"
+			return nil
+		},
+		RequestBound: background.InRequest(func(ctx context.Context) error {
+			rewrap(ctx)
+			return nil
+		}),
 	}
 }
 
@@ -691,7 +721,9 @@ func readConfig(configPath string, overrides ...configOverride) (Config, error) 
 	v.SetDefault("server.console_path", "/ui/console")
 	v.SetDefault("server.public_base", "https://nextgen.zitadel.cloud")
 	v.SetDefault("server.console_origins", []string{})
-	v.SetDefault("server.idle_timeout", 60*time.Second)
+	// Off: the process keeps running between requests. requestBoundDefaults
+	// sets what follows from it, server.idle_timeout among them.
+	v.SetDefault("server.request_bound", false)
 	// Generation on by default: a first local start has to work with no
 	// configuration at all. Production turns it off, per ADR 029.
 	v.SetDefault("server.generate_master_key", true)
@@ -776,8 +808,6 @@ func readConfig(configPath string, overrides ...configOverride) (Config, error) 
 	v.SetDefault("platform.bootstrap_project", false)
 	// Empty: nobody is a platform operator (ADR 075).
 	v.SetDefault("platform.operators", []string{})
-	// Zero: a request does not wait for its event to be written.
-	v.SetDefault("events.request.flush_wait", time.Duration(0))
 	v.SetDefault("events.retention.window", 30*24*time.Hour)
 	v.SetDefault("events.retention.interval", time.Hour)
 	v.SetDefault("events.retention.enabled", true)
@@ -838,6 +868,10 @@ func readConfig(configPath string, overrides ...configOverride) (Config, error) 
 		override(v)
 	}
 
+	// Now that the file, the environment and the flags have said whether the
+	// process is request bound.
+	requestBoundDefaults(v)
+
 	warnIgnoredMasterKeyEnv(os.Environ())
 
 	var cfg Config
@@ -874,6 +908,23 @@ func readConfig(configPath string, overrides ...configOverride) (Config, error) 
 		return Config{}, err
 	}
 	return cfg, nil
+}
+
+// requestBoundDefaults sets the defaults that depend on server.request_bound
+// (ADR 088). A value the configuration sets itself outranks them, as it does
+// every default.
+//
+// A paused process measures time it did not run: it wakes with its idle
+// timer long expired and closes the connection the platform's proxy, its
+// only client, is about to reuse. And what it leaves for after a response
+// runs at its next request, or never.
+func requestBoundDefaults(v *viper.Viper) {
+	idleTimeout, flushWait := 60*time.Second, time.Duration(0)
+	if v.GetBool("server.request_bound") {
+		idleTimeout, flushWait = 0, audit.RequestBoundFlushWait
+	}
+	v.SetDefault("server.idle_timeout", idleTimeout)
+	v.SetDefault("events.request.flush_wait", flushWait)
 }
 
 // stringToWeakSliceHookFunc splits a string into a slice on sep, without

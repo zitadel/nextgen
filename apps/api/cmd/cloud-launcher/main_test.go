@@ -114,6 +114,7 @@ func setLauncherEnv(t *testing.T, dataDir string) {
 		"NEXTGEN_SERVER_CONSOLE_PATH",
 		"NEXTGEN_SERVER_IDLE_TIMEOUT",
 		"NEXTGEN_SERVER_PUBLIC_BASE",
+		"NEXTGEN_SERVER_REQUEST_BOUND",
 		"NEXTGEN_SERVER_REQUEST_ID_HEADER",
 		"PORT",
 		"VERCEL_BRANCH_URL",
@@ -355,7 +356,7 @@ func TestPrepareServerPinsTheDeploymentShape(t *testing.T) {
 	t.Setenv("NEXTGEN_SERVER_CONSOLE_ENABLED", "true")
 	t.Setenv("NEXTGEN_SERVER_CONSOLE_PATH", "/ui/console")
 	t.Setenv("NEXTGEN_SERVER_REQUEST_ID_HEADER", "x-request-id")
-	t.Setenv("NEXTGEN_SERVER_IDLE_TIMEOUT", "60s")
+	t.Setenv("NEXTGEN_SERVER_REQUEST_BOUND", "false")
 
 	_, err := prepareServer(nil)
 	require.NoError(t, err)
@@ -363,12 +364,70 @@ func TestPrepareServerPinsTheDeploymentShape(t *testing.T) {
 	assert.Equal(t, "false", os.Getenv("NEXTGEN_SERVER_CONSOLE_ENABLED"), "the console is a service of its own")
 	assert.Equal(t, "/console", os.Getenv("NEXTGEN_SERVER_CONSOLE_PATH"), "where vercel.json mounts the console")
 	assert.Equal(t, "x-vercel-id", os.Getenv("NEXTGEN_SERVER_REQUEST_ID_HEADER"), "the ID Vercel's dashboard shows")
-	assert.Equal(t, "0", os.Getenv("NEXTGEN_SERVER_IDLE_TIMEOUT"), "Vercel's proxy reuses its connections across a pause")
-	assert.Equal(t, "2s", os.Getenv("NEXTGEN_EVENTS_REQUEST_FLUSH_WAIT"), "a function runs only while it serves a request")
+	assert.Equal(t, "true", os.Getenv("NEXTGEN_SERVER_REQUEST_BOUND"), "a function runs only while it serves a request")
 	assert.Equal(t, "true", os.Getenv("NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT"))
 	assert.Equal(t, "json", os.Getenv("NEXTGEN_INSTRUMENTATION_LOG_FORMAT"))
 	assert.Equal(t, "https://nextgen-preview-cloud.vercel.app", os.Getenv("NEXTGEN_SERVER_PUBLIC_BASE"))
 	assert.Equal(t, "https://nextgen-preview-cloud.vercel.app", os.Getenv("NEXTGEN_SERVER_CONSOLE_ORIGINS"))
+}
+
+// The launcher states the one fact, that a deployment's function runs only
+// while it serves a request, and none of the settings that follow from it:
+// those are the server's defaults under server.request_bound, which an
+// operator's NEXTGEN_* variable still outranks. A local run is not paused.
+func TestPrepareServerSaysOnlyThatADeploymentIsRequestBound(t *testing.T) {
+	for _, tc := range []struct {
+		name, env    string
+		requestBound string
+	}{
+		{name: "production", env: "production", requestBound: "true"},
+		{name: "preview", env: "preview", requestBound: "true"},
+		{name: "vercel dev", env: "development"},
+		{name: "by hand", env: ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			setLauncherEnv(t, t.TempDir())
+			t.Setenv("VERCEL_ENV", tc.env)
+			t.Setenv("VERCEL_GIT_COMMIT_REF", branch)
+			if tc.requestBound != "" {
+				t.Setenv("CLOUD_DATABASE_URL", pooledURL)
+			}
+			before := os.Environ()
+
+			_, err := prepareServer(nil)
+			require.NoError(t, err)
+
+			assert.Equal(t, tc.requestBound, os.Getenv("NEXTGEN_SERVER_REQUEST_BOUND"))
+			assert.Empty(t, os.Getenv("NEXTGEN_SERVER_IDLE_TIMEOUT"), "the server's default under server.request_bound")
+			assert.Empty(t, os.Getenv("NEXTGEN_EVENTS_REQUEST_FLUSH_WAIT"), "the server's default under server.request_bound")
+			// Whatever else the launcher sets, it is none of the server's
+			// background settings: a new one belongs in the server, behind
+			// server.request_bound.
+			for _, entry := range os.Environ() {
+				if slices.Contains(before, entry) {
+					continue
+				}
+				key, _, _ := strings.Cut(entry, "=")
+				for _, prefix := range []string{"NEXTGEN_EVENTS_", "NEXTGEN_SERVICE_PING_"} {
+					assert.False(t, strings.HasPrefix(key, prefix), "the launcher sets %s", key)
+				}
+			}
+		})
+	}
+}
+
+func TestPrepareServerKeepsAnOperatorsOverrides(t *testing.T) {
+	setLauncherEnv(t, t.TempDir())
+	t.Setenv("VERCEL_ENV", "production")
+	t.Setenv("CLOUD_DATABASE_URL", pooledURL)
+	t.Setenv("NEXTGEN_SERVER_IDLE_TIMEOUT", "90s")
+	t.Setenv("NEXTGEN_EVENTS_REQUEST_FLUSH_WAIT", "5s")
+
+	_, err := prepareServer(nil)
+	require.NoError(t, err)
+
+	assert.Equal(t, "90s", os.Getenv("NEXTGEN_SERVER_IDLE_TIMEOUT"))
+	assert.Equal(t, "5s", os.Getenv("NEXTGEN_EVENTS_REQUEST_FLUSH_WAIT"))
 }
 
 // vercel.json mounts the console service, and builds it, at the path the

@@ -18,21 +18,20 @@
 //     the server re-wraps every project key to the current one at startup.
 //   - The optional bootstrap admin document, BOOTSTRAP_ADMIN_USER_JSON_B64,
 //     becomes a --user-file.
-//   - The audit event purge. A function runs only while it serves a request,
-//     so the server's own hourly purge cannot run here: a Vercel Cron Job
+//   - The pause. A function runs only while it serves a request, which the
+//     launcher tells a deployment's server as server.request_bound; what
+//     the server then does differently is the server's (ADR 088). Its
+//     hourly audit event purge cannot run on a timer here: a Vercel Cron Job
 //     (repo-root vercel.json) calls the server's retention trigger instead,
 //     with CRON_SECRET as its bearer token, which becomes
 //     events.retention.trigger_secret in <data_dir>/nextgen.yaml.
-//   - The request audit events. For the same reason a request waits until
-//     its event is written (events.request.flush_wait), where a server that
-//     keeps running writes it up to a second after the response.
 //   - The deployment's shape. The listen address follows PORT, the data dir
-//     is the function's writable /tmp, the console is a service of its own
-//     (repo-root vercel.json), and the server keeps idle connections open
-//     for Vercel's proxy, its only client. The platform project is bootstrapped, logs are
-//     JSON and the public base is the deployment's URL unless a NEXTGEN_*
-//     variable says otherwise. The URLs Vercel serves the deployment at are
-//     added to NEXTGEN_SERVER_CONSOLE_ORIGINS, whatever it already names.
+//     is the function's writable /tmp and the console is a service of its
+//     own (repo-root vercel.json). The platform project is bootstrapped,
+//     logs are JSON and the public base is the deployment's URL unless a
+//     NEXTGEN_* variable says otherwise. The URLs Vercel serves the
+//     deployment at are added to NEXTGEN_SERVER_CONSOLE_ORIGINS, whatever it
+//     already names.
 //
 // A deployment migrates at deploy time, never at startup: a turbo task runs
 // `launcher migrate` after compiling, which creates a preview's database when
@@ -81,12 +80,6 @@ const (
 	// server's /ui/console. The server derives the console's URLs (claim,
 	// dashboard) from it, so the three must agree; a test holds them together.
 	consolePath = "/console"
-
-	// requestEventFlushWait bounds how long a request waits for its audit
-	// event (events.request.flush_wait). The write takes milliseconds; the
-	// bound is for a database that does not answer, so a request then ends
-	// two seconds late instead of holding the instance.
-	requestEventFlushWait = "2s"
 )
 
 // servingParams size the pgx pool of one function instance and keep pgx off
@@ -532,17 +525,23 @@ func prepareServer(extra []string) ([]string, error) {
 	// how vercel.json routes, so a leftover variable must not move them. The
 	// request ID is Vercel's, the one its dashboard shows for the request:
 	// Vercel sets x-vercel-id on every request and replaces the ID a client
-	// sends. The server's only client is Vercel's proxy in the same instance,
-	// which reuses its connections, so the server never closes an idle one:
-	// an instance wakes from a pause with its idle timer long expired, and a
-	// POST the proxy sent on the connection the server then closed was a 502.
-	for key, value := range map[string]string{
+	// sends.
+	pinned := map[string]string{
 		"NEXTGEN_SERVER_ADDRESS":           ":" + port,
 		"NEXTGEN_SERVER_CONSOLE_ENABLED":   "false",
 		"NEXTGEN_SERVER_CONSOLE_PATH":      consolePath,
 		"NEXTGEN_SERVER_REQUEST_ID_HEADER": "x-vercel-id",
-		"NEXTGEN_SERVER_IDLE_TIMEOUT":      "0",
-	} {
+	}
+	// A deployment's function is paused once its last response ends. That
+	// one fact is all the launcher says: the server holds its background
+	// work to it and takes server.idle_timeout and
+	// events.request.flush_wait from it, unless a NEXTGEN_* variable sets
+	// those (ADR 088). A local run keeps running, and purges on its own
+	// timer without a CRON_SECRET.
+	if deployed(env) {
+		pinned["NEXTGEN_SERVER_REQUEST_BOUND"] = "true"
+	}
+	for key, value := range pinned {
 		if err := os.Setenv(key, value); err != nil {
 			return nil, err
 		}
@@ -557,10 +556,6 @@ func prepareServer(extra []string) ([]string, error) {
 		// The bootstrap admin administers every project (ADR 075), unless
 		// the deployment names its platform operators itself.
 		"NEXTGEN_PLATFORM_OPERATORS": s.adminID,
-		// A function runs only while it serves a request, so a request
-		// waits for its audit event to be written: a flush after the
-		// response may run minutes later, or never.
-		"NEXTGEN_EVENTS_REQUEST_FLUSH_WAIT": requestEventFlushWait,
 	} {
 		if err := setDefault(key, value); err != nil {
 			return nil, err

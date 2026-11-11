@@ -13,6 +13,7 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.39.0"
 	"go.opentelemetry.io/otel/trace"
 
+	"github.com/zitadel/nextgen/internal/background"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/instrumentation/metrics"
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -36,9 +37,16 @@ type RequestConfig struct {
 	// such as a Vercel function: there a write after the response waits for
 	// the next request to wake the instance, and is lost with an instance
 	// that never wakes. Requests in flight together still share one write.
-	// Zero, the default, never waits.
+	// Zero never waits, and is the default unless server.request_bound says
+	// the server is such a one: then it is RequestBoundFlushWait.
 	FlushWait time.Duration `mapstructure:"flush_wait"`
 }
+
+// RequestBoundFlushWait is FlushWait's default in a process that runs only
+// while it serves a request. The write takes milliseconds; the bound is for
+// a database that does not answer, so a request then ends two seconds late
+// instead of holding the instance.
+const RequestBoundFlushWait = 2 * time.Second
 
 func DefaultRequestBufferConfig() RequestBufferConfig {
 	return RequestBufferConfig{
@@ -97,10 +105,11 @@ type RequestBuffer struct {
 	done    chan struct{}
 }
 
-// NewRequestBuffer starts a background flusher. Call Close on shutdown.
+// NewRequestBuffer returns a buffer that takes events and writes none until
+// its flusher runs: start it through Task, and Close it on shutdown.
 func NewRequestBuffer(insert EventBatchInserter, cfg RequestBufferConfig) *RequestBuffer {
 	cfg = applyRequestBufferDefaults(cfg)
-	b := &RequestBuffer{
+	return &RequestBuffer{
 		cfg:    cfg,
 		insert: insert,
 		buf:    make([]bufferedEvent, 0, cfg.BatchSize),
@@ -108,8 +117,27 @@ func NewRequestBuffer(insert EventBatchInserter, cfg RequestBufferConfig) *Reque
 		stop:   make(chan struct{}),
 		done:   make(chan struct{}),
 	}
-	go b.loop()
-	return b
+}
+
+// Task is the flusher as background work. In a process that runs only while
+// it serves a request the flusher runs while a request waits for its event,
+// so it needs FlushWait: without it every write would come after a response.
+func (b *RequestBuffer) Task() background.Task {
+	start := func(context.Context) error {
+		go b.loop() //background:allow the task "request audit events"
+		return nil
+	}
+	return background.Task{
+		Name:  "request audit events",
+		Start: start,
+		Stop:  b.Close,
+		RequestBound: background.InRequest(func(ctx context.Context) error {
+			if b.cfg.FlushWait <= 0 {
+				return errors.New("events.request.flush_wait is 0, so no request would wait for its event: leave it unset or set how long a request may wait")
+			}
+			return start(ctx)
+		}),
+	}
 }
 
 // Enqueue adds a request event. Drops when full (never blocks).

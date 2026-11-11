@@ -12,11 +12,13 @@ package main
 import (
 	"golang.org/x/tools/go/analysis/multichecker"
 
+	"github.com/zitadel/nextgen/tools/analyzers/backgroundlint"
 	"github.com/zitadel/nextgen/tools/analyzers/egresslint"
 )
 
 func main() {
 	multichecker.Main(
+		backgroundlint.Analyzer,
 		egresslint.Analyzer,
 	)
 }
