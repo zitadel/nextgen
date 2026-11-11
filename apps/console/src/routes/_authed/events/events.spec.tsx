@@ -149,18 +149,18 @@ async function renderAt(path: string) {
 }
 
 /** The Events list of the sidebar: the heading back, then the view picker. */
-async function logsNav() {
+async function eventsNav() {
   return within(await screen.findByRole("navigation", { name: "Events" }));
 }
 
 /** The sidebar's view picker, which names the view the list is in. */
 async function viewPicker(view: string) {
-  return (await logsNav()).getByRole("button", { name: `View: ${view}` });
+  return (await eventsNav()).getByRole("button", { name: `View: ${view}` });
 }
 
 /** Chooses a view from the sidebar's picker. */
 async function chooseView(view: string) {
-  await userEvent.click((await logsNav()).getByRole("button", { name: /^View: / }));
+  await userEvent.click((await eventsNav()).getByRole("button", { name: /^View: / }));
   await userEvent.click(await screen.findByRole("menuitem", { name: new RegExp(`^${view}`) }));
 }
 
