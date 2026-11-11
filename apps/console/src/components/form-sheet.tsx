@@ -72,18 +72,24 @@ export function FormSheet({
 /**
  * The drawer's title and close, ruled off from the body beneath. 56px with the
  * rule inside it, as the top bar is, so the two rules meet in one line across
- * the drawer's edge.
+ * the drawer's edge. `actions` sit before the close, 8px apart (Logs' event
+ * panel steps to the previous and next event there).
  */
-export function FormSheetHeader({ title }: { title: string }) {
+export function FormSheetHeader({ title, actions }: { title: string; actions?: ReactNode }) {
   return (
-    <SheetHeader className="h-14 shrink-0 flex-row items-center justify-between gap-0 border-b border-border px-6 py-0">
-      <SheetTitle className="font-serif text-xl leading-none font-normal">{title}</SheetTitle>
-      <SheetClose
-        className="cursor-pointer opacity-70 transition-opacity hover:opacity-100 focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
-        aria-label="Close"
-      >
-        <X className="size-5" aria-hidden />
-      </SheetClose>
+    <SheetHeader className="h-14 shrink-0 flex-row items-center justify-between gap-3 border-b border-border px-6 py-0">
+      <SheetTitle className="min-w-0 truncate font-serif text-xl leading-none font-normal">
+        {title}
+      </SheetTitle>
+      <div className="flex shrink-0 items-center gap-2">
+        {actions}
+        <SheetClose
+          className="cursor-pointer opacity-70 transition-opacity hover:opacity-100 focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+          aria-label="Close"
+        >
+          <X className="size-5" aria-hidden />
+        </SheetClose>
+      </div>
     </SheetHeader>
   );
 }

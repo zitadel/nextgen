@@ -3471,8 +3471,13 @@
     {
       "id": "variable resolve",
       "group": "Configuration and releases",
-      "description": "Show the variables the live deployment froze for a target.",
-      "args": [],
+      "description": "Show the variables a deployment froze, the live one by default.",
+      "args": [
+        {
+          "name": "deployment_id",
+          "description": "The deployment to read; the live one when omitted."
+        }
+      ],
       "flags": [
         {
           "name": "origin",
@@ -3502,6 +3507,9 @@
         },
         {
           "command": "variable resolve --origin https://app.acme.com"
+        },
+        {
+          "command": "variable resolve dep_01KX5N7C9D2E7F0N9WD3P2E4YM6"
         },
         {
           "command": "variable resolve --json"
@@ -3856,7 +3864,7 @@
         },
         {
           "name": "filter",
-          "description": "Filter as field=operation:value (operation defaults to equals). Fields: category (equals; values request|auth|session|admin|entity|signal; repeats widen), event_type (equals; repeats widen), actor_id (equals), session_id (equals), flow_id (equals), request_id (equals), entity_type (equals), entity_id (equals), team_id (equals), created_at (greater_than_or_equal|less_than).",
+          "description": "Filter as field=operation:value (operation defaults to equals). Fields: category (equals; values request|auth|session|admin|entity|signal; repeats widen), event_type (equals; repeats widen), actor_id (equals), session_id (equals), flow_id (equals), request_id (equals), entity_type (equals), entity_id (equals), team_id (equals), operation_id (equals; repeats widen), status_class (equals; values 1xx|2xx|3xx|4xx|5xx; repeats widen), created_at (greater_than_or_equal|less_than).",
           "type": "option",
           "multiple": true
         },

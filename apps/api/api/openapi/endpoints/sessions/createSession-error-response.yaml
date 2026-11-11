@@ -12,6 +12,7 @@ content:
         - $ref: '../../components/schemas/errors/tkn-invalid.yaml'
         - $ref: '../../components/schemas/errors/tkn-invalid_tknid.yaml'
         - $ref: '../../components/schemas/errors/not_implemented.yaml'
+        - $ref: '../../components/schemas/errors/proj-mismatch.yaml'
         - $ref: '../../components/schemas/errors/req-invalid.yaml'
         - $ref: '../../components/schemas/errors/sess-token_creation_failed.yaml'
         - $ref: '../../components/schemas/errors/enc_key-unknown_alg.yaml'
@@ -27,6 +28,7 @@ content:
           tkn.invalid: '../../components/schemas/errors/tkn-invalid.yaml'
           tkn.invalid_tknid: '../../components/schemas/errors/tkn-invalid_tknid.yaml'
           not_implemented: '../../components/schemas/errors/not_implemented.yaml'
+          proj.mismatch: '../../components/schemas/errors/proj-mismatch.yaml'
           req.invalid: '../../components/schemas/errors/req-invalid.yaml'
           sess.token_creation_failed: '../../components/schemas/errors/sess-token_creation_failed.yaml'
           enc_key.unknown_alg: '../../components/schemas/errors/enc_key-unknown_alg.yaml'
@@ -48,6 +50,8 @@ content:
         $ref: '../../components/examples/errors/tkn-invalid_tknid.yaml'
       not_implemented:
         $ref: '../../components/examples/errors/not_implemented.yaml'
+      proj.mismatch:
+        $ref: '../../components/examples/errors/proj-mismatch.yaml'
       req.invalid:
         $ref: '../../components/examples/errors/req-invalid.yaml'
       sess.token_creation_failed:

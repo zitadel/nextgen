@@ -824,10 +824,6 @@ type AuthzAssignmentStatements interface {
 	// (ADR 046 / ADR 054 §2); at most one active row exists per project,
 	// enforced by authz_assignments_one_owning_team.
 	GetActiveOwningTeamGrant(ctx context.Context, projectID string) (*domain.AuthzAssignment, error)
-	// ListClaimedProjectIDs returns project ids holding an active owning-team
-	// grant (ADR 049 export visibility), ordered by project_id after afterID
-	// (empty starts at the beginning).
-	ListClaimedProjectIDs(ctx context.Context, afterID string, limit uint32) ([]string, error)
 	// HasActiveOwningTeamGrant reports whether the team still owns a project.
 	// Keyed on the team alone: the owning row sits on the owned project, which
 	// for a claim is not the team's own project. Expiry is not consulted, the
