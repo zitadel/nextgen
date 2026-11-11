@@ -59,7 +59,12 @@ export function cliSample(
   const [topic, verb] = command.split(" ");
   const positionals = pathParameterNames(path).map((name) => word(request.path[name]?.value ?? ""));
 
-  if (topic === "variables") return variables(verb, positionals, request);
+  if (topic === "variable") {
+    const kind = request.query.kind?.values[0];
+    return variableFits(verb, kind, request)
+      ? variables(verb, positionals, kind, request)
+      : apiSample(operation, path, request);
+  }
 
   const flags: string[] = [];
   if (verb === "list") {
@@ -122,28 +127,46 @@ function listFlags(request: RequestData): string[] {
   return flags;
 }
 
-// The variables commands name their owner, and the project is the one they
-// take (apps/cli/src/lib/oclif/owner-command.ts). `set` takes no value on the
-// command line: it prompts for it, or reads it from stdin, so a credential
-// stays out of the shell's history. A body sets many variables at once, so
-// it is a command for each, and the `null` that removes one is a delete.
-function variables(verb: string | undefined, positionals: string[], request: RequestData): string {
-  const owner = "--project-level";
+// Whether the variable command says what the request does. `set`, `rm` and
+// `list` address both kinds unless `--preview`, so a primary-only request has no
+// command, and `set` takes only a string for a secret.
+function variableFits(verb: string | undefined, kind: unknown, request: RequestData): boolean {
+  if (kind === "primary" && (verb === "set" || verb === "rm" || verb === "list")) {
+    return false;
+  }
+  return !Object.values(record(request.body)).some((value) => {
+    const { secret, value: scalar } = record(value);
+    return secret === true && typeof scalar !== "string";
+  });
+}
+
+// The variable commands act on the project the directory was set up for.
+// `set` takes no value on the command line: it prompts for it, or reads it
+// from stdin, so a credential stays out of the shell's history. A body sets
+// many variables at once, so it is a command for each, and the `null` that
+// removes one is an `rm`. `kind=preview` is `--preview`.
+function variables(
+  verb: string | undefined,
+  positionals: string[],
+  kind: unknown,
+  request: RequestData,
+): string {
+  const preview = kind === "preview" ? ["--preview"] : [];
   if (verb !== "set") {
-    return `${context}\n${line([`${cli} variables ${verb}`, ...positionals], [owner])}`;
+    return `${context}\n${line([`${cli} variable ${verb}`, ...positionals], preview)}`;
   }
 
   const entries: [string, unknown][] = Object.entries(record(request.body));
   const commands = (entries.length > 0 ? entries : [["NAME", ""]]).map(([name, value]) => {
-    if (value === null) return line([`${cli} variables delete`, word(name)], [owner]);
+    if (value === null) return line([`${cli} variable rm`, word(name)], preview);
     const { secret, value: scalar } = record(value);
     const type = typeof (scalar ?? value);
     return line(
-      [`${cli} variables set`, word(name)],
+      [`${cli} variable set`, word(name)],
       [
-        owner,
         ...(secret === true ? ["--secret"] : []),
         ...(type === "number" || type === "boolean" ? [`--as ${type}`] : []),
+        ...preview,
       ],
     );
   });
