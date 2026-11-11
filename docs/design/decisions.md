@@ -16,9 +16,13 @@
 
 ## Decisions
 
-### D40 · Configuration and resources share one detail layout — 2026-11-11 · [standing]
+### D41 · Configuration and resources share one detail layout — 2026-11-11 · [standing]
 Supersedes the look half of D0a. Login flows, identity providers and releases draw the same detail screen as users, teams and project settings: a header, then body cards of labelled rows on one 218px label rail, 16px either side of the rule between rows and no rule after the last, labels in medium weight, inputs and a section's aside starting on the rail. Configuration still differs in what it allows (D0b), not in how it looks.
 → Designs follow the shared layout.
+
+### D40 · A project's Settings opens its own list, as the root Settings do — 2026-11-11 · [standing]
+Amends D35, whose project Settings was one page with General and Admins tabs. On Projects, Settings carried an arrow and swapped the sidebar for its own list (D29); in a project, a row of the same name and glyph opened a page beside the project's screens. As Vercel's team and project Settings both do, a project's Settings now opens a list too: General (the project's name, origins, variables and policies), then Admins, under a heading that leads back to the project. Both pages keep the project's header (its name, ID and created date). The root Settings are the platform project's (Profile, and on the hosted cloud Billing, Support and Email), so the two lists hold different pages; only the way they open is shared. Search lists a project's Settings pages among its pages, marked Settings and the project.
+→ Design review of the pages without tabs: Admins' heading row with its Add button.
 
 ### D39 · Above every project, search finds what is in the person's projects — 2026-11-10, amended 2026-11-11 · [standing]
 Amends D37, which with no project selected found only pages, projects and the account, so "admin" answered "Nothing matches" for an administrator. The palette now asks the server's search without a project at All projects, and on Projects and Settings even while a project stays selected there (D36): those screens are above every project, as the switcher's list there is. The server reads the projects the person can act on, the newest ten of them ([ADR 087](../adrs/087-search.md) §6). Inside a project the palette searches that project alone. Users, teams and configuration of those projects rank with the rest, the selected project's first among equal matches, each with its project's name beneath, after its own second line, or the project's ID for one the palette has not listed. Opening one selects its project (`?project=`) and lands on it there; it is then a recent item of that project (D33). Across projects it asks once per pause in typing, for every type, so the server lists and checks the projects once; inside a project it asks for users apart, so the other kinds do not wait for them. Once the server has answered it says what it searched: users, teams and configuration, or only teams and configuration for text too short to match users by, in every project the person can act on or in the newest ten of them, and then choosing a project searches the others. That last line stays beneath the matches too. When a kind has more matches than the server read, or a grant that covers part of a project saw none of the rows read, a line beneath the list says more may match and to type more. "See all users matching" stays a project's: its list is one project's Users.
@@ -161,8 +165,8 @@ Minimal (email) · Consumer (email, given name, family name) · Business (+ comp
 ### D0b · Schemas are read-only in the portal — 2026-07-23 · [standing]
 No editing; changes go through the CLI only. Version switching is view-only (skip between versions, no restore/apply).
 
-### D0a · Resources vs. schemas are different page patterns — 2026-07-23 · [superseded in part by D40]
-Users/teams/projects are resources; schemas are configuration, not resources — they should look different (superseded by D40: the detail screens share one layout). MVP permissions: account creator = owner; invited users get admin; evolve later.
+### D0a · Resources vs. schemas are different page patterns — 2026-07-23 · [superseded in part by D41]
+Users/teams/projects are resources; schemas are configuration, not resources — they should look different (superseded by D41: the detail screens share one layout). MVP permissions: account creator = owner; invited users get admin; evolve later.
 
 ---
 
