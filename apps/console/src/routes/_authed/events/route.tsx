@@ -19,7 +19,10 @@ import {
   RESOURCE_MENU_CELL_NARROW,
   RESOURCE_ROW_ICON,
   RESOURCE_ROW_LINK,
+  RESOURCE_STICKY_BODY,
+  RESOURCE_STICKY_END,
   RESOURCE_TABLE_FIXED,
+  RESOURCE_TABLE_SCROLL,
   RESOURCE_TABLE_TOP,
   RESOURCE_TABLE_WRAP,
   ResourceEmptyRow,
@@ -60,6 +63,7 @@ import {
 import { useLiveEvents } from "@/features/events/use-live-events";
 import { requireProjectScope, useRequiredProjectScope } from "@/features/projects/project-scope";
 import { useLoadMore } from "@/hooks/use-load-more";
+import { useScrollEdges } from "@/hooks/use-scroll-edges";
 import { formatLogTime } from "@/lib/date";
 import { LIST_PAGE_SIZE } from "@/lib/paging";
 import { cn } from "@/lib/utils";
@@ -172,6 +176,8 @@ function LogsScreen() {
   const newestRows = newest.of === loaded ? newest.rows : loaded.items.length;
   const stoppedShort = paging.hasMore && newestRows < LIST_PAGE_SIZE;
 
+  const scroll = useScrollEdges();
+
   async function refresh() {
     setRefreshing(true);
     try {
@@ -226,7 +232,11 @@ function LogsScreen() {
         <FormError message={live.error} className="mt-3" />
         {live.on && <LiveStatus checkedAt={live.checkedAt} />}
 
-        <div className={`${RESOURCE_TABLE_WRAP} ${RESOURCE_TABLE_TOP}`}>
+        <div
+          ref={scroll.ref}
+          data-scroll-end={scroll.edges.end || undefined}
+          className={`${RESOURCE_TABLE_WRAP} ${RESOURCE_TABLE_TOP} ${RESOURCE_TABLE_SCROLL}`}
+        >
           {/* An event type runs to thirty characters, and the time must show
               its milliseconds, which tell the events of one request apart.
               The table keeps the width both need and scrolls in its card
@@ -239,7 +249,9 @@ function LogsScreen() {
                 <ResourceHeadCell className="w-[27%]">Details</ResourceHeadCell>
                 <ResourceHeadCell className="w-[15%]">Actor</ResourceHeadCell>
                 <ResourceHeadCell className="w-[26%]">Time</ResourceHeadCell>
-                <ResourceMenuHead narrow className="w-[6%]" />
+                {/* Pinned, as on Users: the table scrolls in its card, and the menu
+                    stays in reach. */}
+                <ResourceMenuHead narrow className={`w-[6%] ${RESOURCE_STICKY_END}`} />
               </ResourceHeaderRow>
             </TableHeader>
             <TableBody>
@@ -284,6 +296,10 @@ function LogsScreen() {
   );
 }
 
+/** A failed row's tint, opaque: the pinned menu cell covers the columns scrolled under it. */
+const FAILURE_STICKY =
+  "transition-colors bg-[color-mix(in_oklab,var(--color-destructive)_5%,var(--color-card))] group-hover:bg-[color-mix(in_oklab,var(--color-destructive)_10%,var(--color-card))]";
+
 /**
  * One event. The whole row opens it in the drawer; its menu narrows the list
  * by what it carries, or reads the minutes around it.
@@ -317,6 +333,8 @@ function EventRow({
       data-state={selected ? "selected" : undefined}
       aria-selected={selected}
       className={cn(
+        // For the pinned menu cell's hover.
+        "group",
         failure && "bg-destructive/5 hover:bg-destructive/10",
         selected && "bg-muted hover:bg-muted",
         added && "animate-in fade-in-0 duration-700 motion-reduce:animate-none",
@@ -352,7 +370,15 @@ function EventRow({
       <TableCell className={cn(RESOURCE_CELL_MUTED, "tabular-nums")}>
         <time dateTime={event.occurred_at}>{formatLogTime(event.occurred_at)}</time>
       </TableCell>
-      <TableCell className={`${RESOURCE_MENU_CELL_NARROW} text-right`}>
+      <TableCell
+        className={cn(
+          RESOURCE_MENU_CELL_NARROW,
+          "text-right",
+          RESOURCE_STICKY_END,
+          // The pinned cell paints its own fill, so it takes the row's.
+          selected ? "bg-muted" : failure ? FAILURE_STICKY : RESOURCE_STICKY_BODY,
+        )}
+      >
         <RowMenu name={`${event.event_type}, ${event.id}`} contentClassName="w-56">
           <DropdownMenuItem asChild>
             <Link to="/events/$eventId" params={params} search={search}>
