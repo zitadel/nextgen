@@ -5854,7 +5854,7 @@
           "type": {
             "text": "readonly (readonly [string, () => Response])[]"
           },
-          "default": "[ [ \"an SPA host's HTML 200\", () => new HttpResponse(\"<!doctype html><html><body>app</body></html>\", { status: 200, headers: { \"content-type\": \"text/html\" }, }), ], [\"an empty 200\", () => new HttpResponse(null, { status: 200 })], [\"a 200 JSON that is not a session\", () => HttpResponse.json({ ok: true })], ]",
+          "default": "[ [ \"an SPA host's HTML 200\", () => new HttpResponse(\"<!doctype html><html><body>app</body></html>\", { status: 200, headers: { \"content-type\": \"text/html\" }, }), ], [\"an empty 200\", () => new HttpResponse(null, { status: 200 })], [\"a 200 JSON that is not a session\", () => HttpResponse.json({ ok: true })], [\"a 200 with an empty session_id\", () => HttpResponse.json({ session_id: \"\" })], ]",
           "description": "`GET /sessions/me` 200s whose body is not the session JSON."
         }
       ],
@@ -10090,7 +10090,7 @@
       "declarations": [
         {
           "kind": "class",
-          "description": "`<zitadel-session>` — the \"signed in\" card.\n\nRenders the post-sign-in confirmation surface: a\ncentred auth card reading \"Signed in as {identity}\" with a **Sign out**\naction. Composed from the same `<zl-page-shell>` / `<zl-card>` /\n`<zl-button>` atoms as the `<zitadel-login>` orchestrator, so it inherits\ntenant branding tokens with no hardcoded colour, radius, or shadow.\n\nLike `<zitadel-login>` it is widget-first: the default `variant=\"widget\"`\nis content-sized and transparent so the card drops into an app's own\npage; dedicated signed-in routes opt into `variant=\"page\"`, which claims\nthe viewport and paints the surface background (the page paint lives on\nthe internal `<zl-page-shell>`). `theme` resolves through the shared\nsurface base — explicit value, else `dark` for `page` / `auto` for\n`widget`.\n\nThis is the companion surface to `<zitadel-login>` for the \"go straight to\n/login\" flow: the orchestrator signs the user in and redirects here (or to\nthe consumer's own page); this element proves the session and offers a way\nback out. The in-app avatar menu lives in the separate `<zitadel-logout>`.\n\n- Identity is fetched from the typed `getMySession` operation\n  (`GET /sessions/me`), sent with credentials so the session cookie\n  authenticates it. The card shows `name`, then `email`, then the\n  always-present `user_id`. NOTE: the current server response includes only\n  the `user_id`, so the card displays the raw id until the backend returns a\n  human-readable `name`/`email` on `/sessions/me`.\n- **No session.** When the backend answers that request with its\n  `401 auth.unauthorized` or `404 sess.not_found` (or names no user) the\n  visitor is signed out: the element navigates to `post-sign-out-url` when\n  one is set and otherwise renders nothing. Anything else is not \"signed\n  out\": a network error, a 5xx, a gateway's 401 or 404 without the backend's\n  code, or a 200 that is not a session keeps the card and shows the error.\n- **Sign out** calls the typed `revokeMySession` operation\n  (`DELETE /sessions/me`); the server clears the session cookie. On success\n  (the backend's no-session answer counts, the session is already gone) the\n  element fires `zitadel-signout` (detail `{ display, identifier }`, matching\n  the shared SPA contract) and optionally navigates to `post-sign-out-url`.\n\nA \"Continue\" action is intentionally omitted for now: the post-sign-in\ndestination contract is still being decided. Consumers redirect after\nsign-in via the `<zitadel-login>` `post-sign-in-url`.",
+          "description": "`<zitadel-session>` — the \"signed in\" card.\n\nRenders the post-sign-in confirmation surface: a\ncentred auth card reading \"Signed in as {identity}\" with a **Sign out**\naction. Composed from the same `<zl-page-shell>` / `<zl-card>` /\n`<zl-button>` atoms as the `<zitadel-login>` orchestrator, so it inherits\ntenant branding tokens with no hardcoded colour, radius, or shadow.\n\nLike `<zitadel-login>` it is widget-first: the default `variant=\"widget\"`\nis content-sized and transparent so the card drops into an app's own\npage; dedicated signed-in routes opt into `variant=\"page\"`, which claims\nthe viewport and paints the surface background (the page paint lives on\nthe internal `<zl-page-shell>`). `theme` resolves through the shared\nsurface base — explicit value, else `dark` for `page` / `auto` for\n`widget`.\n\nThis is the companion surface to `<zitadel-login>` for the \"go straight to\n/login\" flow: the orchestrator signs the user in and redirects here (or to\nthe consumer's own page); this element proves the session and offers a way\nback out. The in-app avatar menu lives in the separate `<zitadel-logout>`.\n\n- Identity is fetched from the typed `getMySession` operation\n  (`GET /sessions/me`), sent with credentials so the session cookie\n  authenticates it. The card shows `name`, then `email`, then the\n  always-present `user_id`. NOTE: the current server response includes only\n  the `user_id`, so the card displays the raw id until the backend returns a\n  human-readable `name`/`email` on `/sessions/me`.\n- **No session.** When the backend answers that request with its\n  `401 auth.unauthorized` or `404 sess.not_found` (or names no user) the\n  visitor is signed out: the element navigates to `post-sign-out-url` when\n  one is set and otherwise renders nothing. It never navigates to the page\n  it is on (same origin, path with or without a trailing slash, and query):\n  it renders nothing there instead, so a card whose sign-out comes back to\n  its own page does not reload it forever. Nor does it navigate when the\n  visitor was sent here from the target or from this page (the browser's\n  referrer), which stops the loop when the target redirects back here. Anything else is\n  not \"signed out\": a network error, a 5xx, a gateway's 401 or 404 without\n  the backend's code, or a 200 that is not a session keeps the card and\n  shows the error.\n- **Sign out** calls the typed `revokeMySession` operation\n  (`DELETE /sessions/me`); the server clears the session cookie. On success\n  (the backend's no-session answer counts, the session is already gone) the\n  element fires `zitadel-signout` (detail `{ display, identifier }`, matching\n  the shared SPA contract) and optionally navigates to `post-sign-out-url`.\n\nA \"Continue\" action is intentionally omitted for now: the post-sign-in\ndestination contract is still being decided. Consumers redirect after\nsign-in via the `<zitadel-login>` `post-sign-in-url`.",
           "name": "ZitadelSession",
           "members": [
             {
@@ -10100,7 +10100,7 @@
                 "text": "string"
               },
               "default": "\"\"",
-              "description": "URL to navigate to after a successful sign-out.",
+              "description": "URL to navigate to after a successful sign-out, and when the visitor has no\nsession, unless it is the page the card is on (a trailing slash, the query\norder and the fragment aside) or this page sent the visitor there moments\nago and got them back.",
               "attribute": "post-sign-out-url"
             },
             {
@@ -10128,7 +10128,7 @@
               "name": "session",
               "privacy": "private",
               "readonly": true,
-              "default": "new SessionController( this, () => resolveApi(this.project, this.projectAttrs, \"<zitadel-session>\"), { onSessionMissing: () => this.leave() }, )"
+              "default": "new SessionController( this, () => resolveApi(this.project, this.projectAttrs, \"<zitadel-session>\"), // A card on the page its `post-sign-out-url` names (\"sign out and come // back here\") would otherwise reload that page on every signed-out visit, // and find no session again each time. { onSessionMissing: () => this.leaveWithoutSession() }, )"
             },
             {
               "kind": "method",
@@ -10140,6 +10140,17 @@
                 }
               },
               "description": "Navigates to `postSignOutUrl` when one is set; reports whether it did."
+            },
+            {
+              "kind": "method",
+              "name": "leaveWithoutSession",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "description": "The no-session navigation to `postSignOutUrl`. It is skipped when that URL is\nthis page, or when the visitor was sent here from this page or from that URL\n(the browser keeps the original referrer across redirects): navigating again\nwould reload the two pages forever."
             },
             {
               "kind": "method",
@@ -10338,7 +10349,7 @@
                 "text": "string"
               },
               "default": "\"\"",
-              "description": "URL to navigate to after a successful sign-out.",
+              "description": "URL to navigate to after a successful sign-out, and when the visitor has no\nsession, unless it is the page the card is on (a trailing slash, the query\norder and the fragment aside) or this page sent the visitor there moments\nago and got them back.",
               "fieldName": "postSignOutUrl"
             },
             {
