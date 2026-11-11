@@ -1,0 +1,90 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  // The hosted cloud on Vercel: what the repo-root vercel.json's `server` and
+  // `schemas` services build. Moon has no project for it (moon's
+  // workspace:cloud is this package's `dev`), and the launcher's Go tests run
+  // in @zitadel/server#test (`go -C apps/api test ./...`).
+  "tasks": {
+    // The `server` service's function binary (build-launcher.sh), which
+    // `migrate` runs and `deploy` hands to Vercel. Go's compiler cache persists
+    // in Vercel's branch build cache. Always link fresh commit/date metadata:
+    // the build date orders platform configuration deployments. Branch builds
+    // and CI can write the team's remote cache; a planted executable there
+    // could run in production with its secrets. Never cache this task.
+    //
+    // What it compiles still decides when it is affected: the production
+    // sources of the server module and of every module it requires, through
+    // `nextgen#go-sources` (the module graph), and the server's version,
+    // which it stamps in.
+    "build": {
+      "cache": false,
+      "dependsOn": ["nextgen#go-sources"],
+      "env": ["GOFLAGS", "GOEXPERIMENT", "GOOS", "GOARCH", "GOAMD64", "GOARM64"],
+      "inputs": ["package.json", "turbo.json", "build-launcher.sh", "$TURBO_ROOT$/apps/server/package.json", "$TURBO_ROOT$/go.work", "$TURBO_ROOT$/go.work.sum"],
+      "outputs": ["dist/nextgen-launcher"]
+    },
+    // The deployment's database: `launcher migrate` creates a preview's when
+    // it is missing (apps/api/cmd/cloud-launcher/database.go) and migrates it. Migrations run
+    // here, before the deployment goes live, never when a function starts,
+    // and never from the cache. A failed migration fails the build and the
+    // previous deployment keeps serving, so every migration must leave the
+    // schema readable by the deployment still serving (expand/contract).
+    //
+    // It sees the whole environment: the deployment's configuration is the
+    // environment, and the launcher also checks every variable the function
+    // needs to start (a missing one fails the build), which strict mode would
+    // hide unless listed here.
+    "migrate": {
+      "cache": false,
+      "dependsOn": ["build"],
+      "passThroughEnv": ["*"]
+    },
+    // The last step of the `server` service's build, whose command installs
+    // first, as Vercel's Go builder runs no installCommand, and then runs
+    // this task: deploy.sh copies the migrated launcher to
+    // $VERCEL_OUTPUT_FILE, where the builder takes the function from.
+    "deploy": {
+      "cache": false,
+      "dependsOn": ["migrate"]
+    },
+    // The `schemas` service's static files: the built-in schemas the server
+    // embeds, rendered as the documents their identifiers name
+    // (scripts/render-builtin-schemas.mjs). Node only: on Vercel the
+    // service has no Go toolchain, so it renders the committed copies and
+    // waits for no generation.
+    "schemas": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/scripts/render-builtin-schemas.mjs",
+        "$TURBO_ROOT$/apps/api/api/openapi/endpoints/schemas/*.json"
+      ],
+      "outputs": ["dist/cloud-schemas/**"]
+    },
+    // The cloud on localhost: `vercel dev` over vercel.json's services
+    // (scripts/run-cloud.mjs). The dependencies are what the services' dev
+    // servers read from disk; the script builds the same targets itself for
+    // `pnpm run cloud` and moon, which under turbo are cache hits.
+    // It sees the whole environment, as `pnpm run cloud` does: `vercel dev`
+    // hands it to every service (the server reads NEXTGEN_* and the
+    // OpenTelemetry SDK's OTEL_*, each dev server its own), and a list would
+    // quietly drop whatever it missed.
+    "dev": {
+      "dependsOn": [
+        "@zitadel/sdk-react#build",
+        "@zitadel/api#build",
+        "@zitadel/api-mock#build",
+        "@zitadel/components#build",
+        "@zitadel/docs#generate",
+        "@zitadel/design-tokens#generate"
+      ],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/scripts/run-cloud.mjs",
+        "$TURBO_ROOT$/scripts/dev-process.mjs",
+        "$TURBO_ROOT$/scripts/task-runner.mjs"
+      ],
+      "passThroughEnv": ["*"]
+    }
+  }
+}

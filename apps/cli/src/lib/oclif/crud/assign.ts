@@ -1,4 +1,4 @@
-import { ZitadelError } from "../../errors";
+import { ZitadelError } from "@/lib/errors";
 import { jsonValue, refuseProtoKey, setAt, typedValue } from "./document";
 import type { BodyField } from "./fields";
 import type { Json } from "./types";

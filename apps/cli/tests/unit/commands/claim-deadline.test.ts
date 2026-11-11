@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { claimDeadline } from "../../../src/commands/claim";
+import { claimDeadline } from "@/commands/claim";
 
 const NOW = Date.parse("2026-08-04T12:00:00.000Z");
 const TEN_MINUTES = 10 * 60 * 1000;
@@ -34,6 +34,14 @@ describe("claimDeadline", () => {
       expect(deadline).toBe(NOW + TEN_MINUTES);
       expect(Number.isFinite(deadline)).toBe(true);
     }
+  });
+
+  it("falls back to the documented TTL for a resumed wait, which has no expires_at", () => {
+    expect(claimDeadline({ now: NOW })).toBe(NOW + TEN_MINUTES);
+  });
+
+  it("honours a timeout on a resumed wait", () => {
+    expect(claimDeadline({ timeoutSeconds: 5, now: NOW })).toBe(NOW + 5000);
   });
 
   it("still honours a timeout when expires_at is unparseable", () => {

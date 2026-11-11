@@ -24,6 +24,7 @@ those to the backend and attaches the project service-key secret (read from
 `ZITADEL_PROJECT_SECRET`) only to `POST /sessions/exchange`. It keeps the app's
 session in a cookie named after its project (`ZITADEL_PROJECT_ID`), so the app
 and the Console of a local server don't sign each other out on `localhost`
-(`docs/adrs/073-session-cookie-per-project.md`). The production
+(`docs/adrs/073-session-cookie-per-project.md`,
+`docs/adrs/083-session-cookie-host-prefix.md`). The production
 story is a platform rewrite plus the publishable key from ADR 036
 (`docs/adrs/036-api-credential-planes.md`), tracked in issue #560.

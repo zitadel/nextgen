@@ -19,7 +19,7 @@ verification into an App Router app.
 Use this when adding or customizing Zitadel auth in an **existing or custom**
 Next.js app, or when you need to understand how the pieces fit together.
 
-For a brand-new app, prefer the CLI: `npx @zitadel/cli@alpha setup --framework next` scaffolds
+For a brand-new app, prefer the CLI: `npx @zitadel/cli@latest setup --framework next` scaffolds
 the whole integration (middleware, login page, env) and wires it for you. Reach
 for this skill when that scaffold already exists and you are editing it, or when
 the app is bespoke and you are integrating by hand.
@@ -27,7 +27,7 @@ the app is bespoke and you are integrating by hand.
 ## Install
 
 ```bash
-pnpm add @zitadel/sdk-next@alpha
+pnpm add @zitadel/sdk-next@latest
 ```
 
 Peer deps the package expects: `next >=15.2.3`, `react >=18`, `react-dom >=18`.
@@ -73,7 +73,9 @@ export function proxy(req: NextRequest) {
   });
 }
 
-export const config = { matcher: ['/__nextgen/:path*', '/admin', '/login'] };
+// Every route but Next.js's build files: protectedRoutes alone decides what
+// needs a sign-in. A protected route a narrower matcher leaves out stays public.
+export const config = { matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'] };
 ```
 
 When unsure which the installed Next.js uses, check the CLI's own output — its
@@ -96,10 +98,10 @@ async function Greeting() {
 
 **3. Seed client components** by rendering `NextgenProvider` (server-only — it
 strips the raw token before the server→client boundary) in your root layout,
-then read with `useAuth()` in any client component. For chrome on **public**
-pages (which the matcher does not cover), read client-side with `getSession()`
-from `@zitadel/sdk-next/session` instead — it fetches same-origin
-`{proxyPath}/sessions/me`.
+then read with `useAuth()` in any client component. For chrome on pages the
+matcher does not cover, read client-side with `getSession()` from
+`@zitadel/sdk-next/session` instead — it fetches same-origin
+`{proxyPath}/api/v1/sessions/me`.
 
 **4. Login page.** Render `ZitadelLogin` from `@zitadel/sdk-next/components`
 client-side only (via `next/dynamic` with `ssr: false`); call
@@ -152,8 +154,11 @@ Confirm names against those before writing code.
   into the RSC flight payload. To seed from client state, use
   `AuthContextProvider` from `/react` (it only takes the token-less shape).
 - **Same-origin proxy is required.** The widgets and `getSession()` hit
-  `{proxyPath}/sessions/me` on the same origin; the middleware `matcher` must
+  `{proxyPath}/api/v1/sessions/me` on the same origin; the middleware `matcher` must
   cover `{proxyPath}/:path*` or the proxy breaks.
+- **A protected route must be in the matcher too.** Next.js runs the
+  middleware only on routes the matcher covers, so a `protectedRoutes` entry a
+  narrower matcher misses is never redirected. Keep the every-route matcher.
 - **`auth()` only sees a session on routes the matcher covers.** A header on an
   unmatched public page always looks signed out — use `getSession()` there.
 - **A rejected `getSession()` means *unknown*, not signed out** (broken proxy /

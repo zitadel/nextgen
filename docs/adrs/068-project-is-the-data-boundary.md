@@ -1,7 +1,11 @@
 # ADR 068: The Project Is the Data Boundary
 
-> **Status:** Proposed
+> **Status:** Implemented — 2026-10-24 (originally Proposed 2026-10-08)
 > **Date:** 2026-10-08
+>
+> **Amendment (2026-10-24):** the environment entity is gone (#1643,
+> migration `000028_drop_environments.sql`), and #1569 amended the ADRs that
+> assumed it.
 > **Context:** [#966](https://github.com/zitadel/nextgen/issues/966) (data
 > isolation) and [#528](https://github.com/zitadel/nextgen/issues/528)
 > (environments), answered by the spike
@@ -73,3 +77,10 @@ is bound to, and the server never sees it.
 - The exception ADR 035 notes, that a user record carries the user-schema
   revision it was created against, is unchanged and is per project like the
   user.
+
+## Amendment (2026-10-31): callers with no origin
+
+A caller with no `Origin`, and a console origin the project does not list, is
+served the project's newest primary deployment
+([ADR 085](085-which-release-serves-a-request.md)). Any other origin still serves
+the newest deployment to it.

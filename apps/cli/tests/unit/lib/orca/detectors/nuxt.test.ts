@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { NuxtDetector } from "../../../../../src/lib/orca/detectors/nuxt";
+import { NuxtDetector } from "@/lib/orca/detectors/nuxt";
 
 const dirs: string[] = [];
 

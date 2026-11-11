@@ -1,0 +1,1181 @@
+package server
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"log/slog"
+	"net/http"
+	"net/url"
+	"os"
+	"os/signal"
+	"path/filepath"
+	"reflect"
+	"regexp"
+	"strings"
+	"syscall"
+	"time"
+	"unicode"
+
+	"github.com/go-viper/mapstructure/v2"
+	lru "github.com/hashicorp/golang-lru/v2"
+	"github.com/ianlancetaylor/jsonschema"
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
+	slogctx "github.com/veqryn/slog-context"
+	"go.opentelemetry.io/contrib/bridges/otelslog"
+	"go.opentelemetry.io/otel/log"
+	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/trace"
+
+	"github.com/zitadel/nextgen/internal/api"
+	oasapi "github.com/zitadel/nextgen/internal/api/generated"
+	"github.com/zitadel/nextgen/internal/api/middleware"
+	"github.com/zitadel/nextgen/internal/audit"
+	"github.com/zitadel/nextgen/internal/bootstrap/platform"
+	"github.com/zitadel/nextgen/internal/bootstrap/users"
+	"github.com/zitadel/nextgen/internal/build"
+	"github.com/zitadel/nextgen/internal/cache"
+	"github.com/zitadel/nextgen/internal/crypto"
+	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/errorpage"
+	"github.com/zitadel/nextgen/internal/errreport"
+	"github.com/zitadel/nextgen/internal/httputil"
+	"github.com/zitadel/nextgen/internal/instrumentation"
+	"github.com/zitadel/nextgen/internal/instrumentation/metrics"
+	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
+	"github.com/zitadel/nextgen/internal/instrumentation/zotel"
+	"github.com/zitadel/nextgen/internal/policy"
+	"github.com/zitadel/nextgen/internal/securityheaders"
+	"github.com/zitadel/nextgen/internal/service"
+	"github.com/zitadel/nextgen/internal/serviceping"
+	"github.com/zitadel/nextgen/internal/staticui/console"
+	"github.com/zitadel/nextgen/internal/storage/database"
+	_ "github.com/zitadel/nextgen/internal/storage/dialect/all"
+	"github.com/zitadel/nextgen/internal/storage/dialect/idgen"
+	"github.com/zitadel/nextgen/internal/storage/dialect/sqlite"
+	configdefaults "github.com/zitadel/nextgen/packages/config/defaults"
+	"github.com/zitadel/oidc/v3/pkg/op"
+)
+
+// flagDisableMasterKeyGeneration is the command-line half of
+// server.generate_master_key. It is spelled as the negative because that is
+// what an operator reaches for: generation is on by default, and this turns a
+// silent "a key was minted for you" into a startup failure.
+const flagDisableMasterKeyGeneration = "disable-master-key-generation"
+
+func NewCommand() *cobra.Command {
+	var configPath string
+	var userFiles []string
+	var applyMigrations bool
+
+	runServer := func(cmd *cobra.Command, _ []string) error {
+		overrides, err := flagOverrides(cmd.Flags())
+		if err != nil {
+			return err
+		}
+		cfg, err := loadConfig(configPath, overrides...)
+		if err != nil {
+			return err
+		}
+		return run(cmd.Context(), cfg, userFiles, applyMigrations)
+	}
+
+	root := &cobra.Command{
+		Use:           "nextgen",
+		Short:         "Run the server",
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		RunE:          runServer,
+	}
+	root.PersistentFlags().StringVarP(&configPath, "config", "c", "", "Path to YAML configuration file")
+	addServerFlags(root, &applyMigrations, &userFiles)
+
+	serverCmd := &cobra.Command{
+		Use:           "server",
+		Short:         "Run the server",
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		RunE:          runServer,
+	}
+	addServerFlags(serverCmd, &applyMigrations, &userFiles)
+
+	root.AddCommand(serverCmd)
+	root.AddCommand(newMigrateCommand(&configPath))
+	return root
+}
+
+// flagOverrides turns the flags that shadow a configuration key into config
+// overrides. Only a flag the operator actually passed becomes one, so an
+// untouched flag leaves the config file and the environment in charge of the
+// key it shadows.
+func flagOverrides(flags *pflag.FlagSet) ([]configOverride, error) {
+	var overrides []configOverride
+
+	if flags.Changed(flagDisableMasterKeyGeneration) {
+		disabled, err := flags.GetBool(flagDisableMasterKeyGeneration)
+		if err != nil {
+			return nil, fmt.Errorf("read --%s: %w", flagDisableMasterKeyGeneration, err)
+		}
+		overrides = append(overrides, func(v *viper.Viper) {
+			v.Set("server.generate_master_key", !disabled)
+		})
+	}
+
+	return overrides, nil
+}
+
+func addServerFlags(cmd *cobra.Command, applyMigrations *bool, userFiles *[]string) {
+	cmd.Flags().BoolVar(applyMigrations, "migrate", false, "Apply database migrations before serving")
+	cmd.Flags().StringArrayVar(userFiles, "user-file", nil, "Bootstrap user JSON file (repeatable)")
+	cmd.Flags().Bool(flagDisableMasterKeyGeneration, false,
+		"Fail the start instead of generating a master key when none is configured (server.generate_master_key: false)")
+}
+
+// run is the server's lifetime. Its result is named so that the deferred report
+// sees what the caller gets. The early returns that declare err in an if or
+// case scope (`if err := f(); err != nil { return ... }`) never reached the
+// function-scoped err the defer used to check, so those failures went
+// unreported (#1409); the `x, err :=` returns reused that err, but it held the
+// unwrapped cause rather than the value returned.
+func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bool) (err error) {
+	sfs := &ShutdownFuncs{}
+	defer func() {
+		// Logged before the shutdown funcs run: one of them shuts down the
+		// OTel logger provider, after which a record reaches stderr only.
+		if err != nil {
+			slog.Error("run error", slogctx.Err(err))
+		}
+		// Kept apart from err: assigning the shutdown outcome to it would hand
+		// the caller nil after a clean shutdown of a failed start, and the
+		// process would exit 0.
+		if shutdownErr := sfs.Exec(context.WithoutCancel(ctx)); shutdownErr != nil {
+			slog.Error("shutdown error", slogctx.Err(shutdownErr))
+			err = errors.Join(err, shutdownErr)
+			return
+		}
+		slog.Info("shut down application")
+	}()
+
+	slog.Info("building server")
+
+	telemetry, err := zotel.NewOtelMetrics(ctx, zotel.MetricsConfig{
+		ServiceName:     cfg.Instrumentation.ServiceName,
+		TraceIdFraction: cfg.Instrumentation.Trace.Fraction,
+		TraceExporter:   cfg.Instrumentation.Trace.Exporter,
+		MetricExporter:  cfg.Instrumentation.Metric.Exporter,
+		LogExporter:     cfg.Instrumentation.Log.Exporter,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create otel metrics: %w", err)
+	}
+	sfs.Add(telemetry.Shutdown)
+
+	setUpLogging(cfg.Instrumentation.Log, telemetry.LoggerProvider())
+
+	pool, err := startDatabase(ctx, cfg, applyMigrations)
+	if err != nil {
+		return err
+	}
+	sfs.Add(func(ctx context.Context) error {
+		if err := pool.Close(ctx); err != nil {
+			return fmt.Errorf("failed to close database pool: %w", err)
+		}
+		return nil
+	})
+
+	masterKey, err := buildMasterKey(cfg.Server.MasterKeys)
+	if err != nil {
+		return fmt.Errorf("failed to create Crypter: %w", err)
+	}
+
+	hasherFactory, err := cfg.PasswordHasher.NewHasherFactory()
+	if err != nil {
+		return fmt.Errorf("failed to build password hasher: %w", err)
+	}
+	passwordHasher := hasherFactory.Default()
+
+	// ── Repositories ─────────────────
+	serviceDBPool := service.NewPool(pool.(service.Pool))
+	sessionResolver := service.SessionStatementsResolver{Pool: serviceDBPool}
+
+	// ── Schema Stuff ─────────────────
+	schemaCache, err := lru.New2Q[string, *jsonschema.Schema](cfg.Schema.LRUCacheSize)
+	if err != nil {
+		return fmt.Errorf("failed to build schema cache: %w", err)
+	}
+
+	var builtinPublicBase *url.URL
+	if cfg.Schema.BuiltinPublicBase != "" {
+		builtinPublicBase, err = url.Parse(cfg.Schema.BuiltinPublicBase)
+		if err != nil {
+			return fmt.Errorf("failed to parse builtin public base: %w", err)
+		}
+	}
+
+	// The hardened egress client guards the one fetch path a platform user
+	// controls: schema ingest by URL. Response size is capped by the client's
+	// MaxBodySize; the resolve timeout bounds one whole $ref chain.
+	egressClient, err := cfg.HTTPClient.NewClient()
+	if err != nil {
+		return fmt.Errorf("failed to build egress http client: %w", err)
+	}
+	schemaResolverWithHTTP := domain.NewJSONSchemaResolver(schemaCache, 10, cfg.Schema.ResolveTimeout, egressClient, builtinPublicBase)
+	// storageSchemaResolver without an HTTP client to fetch tenant schemas from the cache/storage
+	storageSchemaResolver := domain.NewJSONSchemaResolver(schemaCache, 10, 0, nil, builtinPublicBase)
+	// The config string rather than the parsed URL: an empty base is the
+	// validator's error to report, not a nil dereference here.
+	schemaValidator, err := domain.NewSchemaValidator(cfg.Schema.BuiltinPublicBase)
+	if err != nil {
+		return fmt.Errorf("failed to build schema validator: %w", err)
+	}
+	// The built-in schema namespace, built once and handed to everything that
+	// reads a schema by URL: users, flows, releases and bootstrap documents
+	// name the default schema under whichever base was current when they were
+	// written, and must find the row the project stores it at under any other.
+	builtinBases := domain.BuiltinSchemaBasesFor(cfg.Schema.BuiltinPublicBase)
+	schemaStore := domain.WithBuiltinSchemaAliases(serviceDBPool.Statements(), builtinBases)
+
+	userLookup := service.UserStatementsLookup{Pool: serviceDBPool}
+	userRefs := service.StatementsUserRefResolver{Pool: serviceDBPool}
+
+	// ── Services ─────────────────────
+	// Whether anything is exported stays the existing instrumentation.metric
+	// config's decision: with no exporter the provider is a no-op and the
+	// instruments cost nothing.
+	cacheMeter := metrics.WithMeterProvider(telemetry.MeterProvider())
+	crypterCache, err := cache.NewMeteredLRU[service.CrypterCacheKey, op.Crypto](cache.NameCrypter, cfg.Keys.CrypterLRUCacheSize, cacheMeter)
+	if err != nil {
+		return fmt.Errorf("failed to build crypter cache: %w", err)
+	}
+	signingKeyCache, err := cache.NewMeteredLRU[service.SigningKeyCacheKey, domain.SigningKey](cache.NameSigningKey, cfg.Keys.SigningKeyLRUCacheSize, cacheMeter)
+	if err != nil {
+		return fmt.Errorf("failed to build signing key cache: %w", err)
+	}
+	keyService := service.NewKeyService(serviceDBPool, *masterKey, crypterCache, signingKeyCache)
+
+	projectHashers := service.NewProjectHasherResolver(serviceDBPool, hasherFactory)
+	authAttemptSvc := service.NewAuthAttemptService(
+		serviceDBPool,
+		sessionResolver,
+		userLookup,
+		projectHashers,
+		passwordHasher,
+	)
+	sessionService := service.NewSessionService(serviceDBPool, userRefs, service.SessionConfig{
+		DefaultTTL: cfg.Session.DefaultTTL,
+		MaxTTL:     cfg.Session.MaxTTL,
+	})
+	projectService := service.NewProjectService(
+		serviceDBPool,
+		cfg.Schema.BuiltinPublicBase,
+		schemaValidator,
+		keyService,
+		hasherFactory,
+		cfg.Origins.SharedHosts,
+	)
+
+	// Bootstrap runs here rather than straight after the migrations because it
+	// creates the project's keys and so needs the project service, which needs
+	// the key service. It must still precede the user import: that import
+	// creates a bare project row for any project id a bootstrap user names, and
+	// a project row that already exists would make this a no-op and leave the
+	// platform project without keys.
+	if err := platform.Ensure(ctx, projectService, serviceDBPool, cfg.Platform.BootstrapProject); err != nil {
+		return fmt.Errorf("failed to bootstrap platform project: %w", err)
+	}
+
+	schemaService := service.NewSchemaService(serviceDBPool, schemaResolverWithHTTP, schemaValidator, builtinBases)
+	flowDefinitionSvc := service.NewFlowDefinitionService(
+		serviceDBPool,
+		schemaValidator,
+		nil,
+		builtinBases,
+	)
+	teamService := service.NewTeamService(serviceDBPool)
+	// The claim and dashboard URLs hang off the console, reached at the
+	// deployment's public base (not at schema.builtin_public_base, which is an
+	// identifier namespace and must not follow the deployment address).
+	consoleBase, err := consoleBaseURL(cfg.Server.PublicBase, cfg.Server.ConsolePath)
+	if err != nil {
+		return err
+	}
+	// The console previews a project's login from these origins, so opening a
+	// flow admits them for every project; no later step does.
+	consoleHosts, err := consoleOrigins(cfg.Server.PublicBase, cfg.Server.ConsoleOrigins)
+	if err != nil {
+		return err
+	}
+	claimService := service.NewClaimService(serviceDBPool, consoleBase, cfg.Platform.ResolvedProjectID())
+	grantService := service.NewGrantService(serviceDBPool, userRefs, cfg.Platform.ResolvedProjectID())
+	brandingService := service.NewBrandingService(serviceDBPool)
+	variableService := service.NewVariableService(serviceDBPool, keyService)
+	idpConnectionService := service.NewIDPConnectionService(serviceDBPool, schemaValidator)
+	deploymentService := service.NewDeploymentService(serviceDBPool, variableService)
+	eventService := service.NewEventService(serviceDBPool, cfg.Platform.ResolvedProjectID())
+	// Operation policies (ADR 066). Every template is compiled and checked
+	// here, so a template the server cannot evaluate stops it before it
+	// serves traffic. A project's published instance is resolved per password
+	// set through the policy service; without one, the gate holds passwords to
+	// the server's length cap only.
+	policyEngine, err := policy.New()
+	if err != nil {
+		return fmt.Errorf("failed to compile the policy catalog: %w", err)
+	}
+	policyService := service.NewPolicyService(serviceDBPool, policyEngine)
+	// A release build publishes the policies its bundle carries.
+	releaseService := service.NewReleaseService(
+		serviceDBPool,
+		schemaService,
+		flowDefinitionSvc,
+		brandingService,
+		idpConnectionService,
+		policyService,
+		builtinBases,
+	)
+	// The console signs operators in to the platform project from the public
+	// base, the first console origin, so that project serves a deployed release
+	// there like any other project. Before the user import, which needs the
+	// platform user schema this release stores.
+	if cfg.Platform.BootstrapProject {
+		if err := platform.EnsureDeployed(ctx, cfg.Schema.BuiltinPublicBase, build.Date(), consoleHosts[0], projectService, releaseService, deploymentService); err != nil {
+			return fmt.Errorf("failed to deploy the platform project: %w", err)
+		}
+		for _, origin := range consoleHosts[1:] {
+			slog.Info("console origin can preview a project's login but not sign in to the platform project", slog.String("origin", origin))
+		}
+	}
+
+	if err := users.Import(ctx, serviceDBPool, passwordHasher, users.DialectFromConfig(cfg.Database.Raw), builtinBases, userFiles); err != nil {
+		return fmt.Errorf("failed to bootstrap users: %w", err)
+	}
+
+	// After the import, so a bootstrap admin named in platform.operators
+	// exists by the time it is granted (ADR 075 §4).
+	if err := platform.ReconcileOperators(ctx, serviceDBPool, cfg.Platform.ResolvedProjectID(), cfg.Platform.Operators); err != nil {
+		return fmt.Errorf("failed to reconcile platform operators: %w", err)
+	}
+	passwordPolicy, err := service.NewPasswordPolicy(policyEngine, policyService, passwordHasher, serviceDBPool)
+	if err != nil {
+		return err
+	}
+	userService := service.NewUserService(
+		serviceDBPool,
+		schemaStore,
+		projectHashers,
+		passwordPolicy,
+		userRefs,
+		builtinBases,
+	)
+
+	// The platform project's registration side effect (#527): every flow-created
+	// user on the platform project gets their personal team — the team
+	// claim/complete attaches projects to — ensured idempotently. Gated on the
+	// explicit bootstrap opt-in, never the standalone pin: a pinned deployment's
+	// end-user registrations must not silently mint teams (#605, #736). Note the
+	// deliberate asymmetry with claimService above, which resolves the pin —
+	// a pinned deployment can attempt claims but is never auto-provisioned.
+	personalTeams := service.NewPersonalTeamService(
+		serviceDBPool,
+		cfg.Platform.ProvisioningProjectID(),
+	)
+
+	// ── Flow engine ──────────────────
+	fields := domain.NewSchemaFieldResolver()
+	// The sign-up guard asks the project's user.create policy which challenge
+	// to issue; without one, it issues its built-in proof of work.
+	userCreatePolicy, err := service.NewUserCreatePolicy(policyEngine, policyService)
+	if err != nil {
+		return err
+	}
+	signupProtection := service.NewSignupProtection(serviceDBPool, keyService, userCreatePolicy)
+	flowAuth := service.NewFlowAuthAttemptAdapter(authAttemptSvc, schemaStore, signupProtection)
+	createUserHandler := service.NewFlowCreateUserHandler(
+		projectHashers,
+		passwordPolicy,
+		userService,
+		schemaStore,
+		serviceDBPool,
+		signupProtection)
+	stateMachine := domain.NewFlowStateMachine(
+		storageSchemaResolver,
+		// The raw statements: the state machine only hands this store to the
+		// resolver, which follows the namespace itself, so the aliasing wrapper
+		// would only double the reads of a miss.
+		serviceDBPool.Statements(),
+		fields,
+		createUserHandler,
+		flowAuth,
+		service.NewFlowSSOProviderResolver(idpConnectionService),
+		service.NewFlowSSOIdentityResolver(serviceDBPool, idpConnectionService, userService, schemaStore, projectHashers, passwordPolicy),
+		service.NewFlowSSORedirectIssuer(idpConnectionService, authAttemptSvc, keyService, variableService, egressClient),
+		passwordPolicy,
+		time.Now,
+	)
+	ssoCallback := service.NewFlowSSOCallback(idpConnectionService, authAttemptSvc, keyService, variableService, egressClient)
+
+	flowService := service.NewFlowService(serviceDBPool, stateMachine, builtinBases, signupProtection)
+	tokenService := service.NewTokenService(keyService, serviceDBPool)
+
+	// ── Default project resolution ──
+	// Console ADR 0004 §2's cutover rule: until a human-usable seed transport
+	// ships, the console's sign-in project is the explicitly pinned one, or
+	// else the project the customer's integration (`zitadel setup`) created
+	// first. This is the transitional fallback, not a one-project ceiling —
+	// §1 is explicit that the data model does not enforce one. The server
+	// never creates it; it validates an explicitly pinned id up front and
+	// otherwise reports the current state for operators.
+	defaultProject, err := projectService.DefaultProject(ctx, cfg.Platform.ResolvedProjectID())
+	if err != nil {
+		return fmt.Errorf("failed to resolve the default project: %w", err)
+	}
+	if defaultProject != nil {
+		slog.Info("default project resolved", slog.String("project_id", defaultProject.ID))
+	} else {
+		slog.Info("no project exists yet; the first project created (e.g. by `zitadel setup`) becomes the default")
+	}
+
+	// ── HTTP Server ─────────────────
+
+	ctx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	exportAdapter := service.EventExportAdapter{Pool: serviceDBPool}
+	requestEventCfg := audit.DefaultRequestBufferConfig()
+	requestEventCfg.FlushWait = cfg.Events.Request.FlushWait
+	requestEventBuf := audit.NewRequestBuffer(exportAdapter, requestEventCfg)
+	defer requestEventBuf.Close()
+
+	retentionJob := audit.NewRetentionJob(exportAdapter, cfg.Events.Retention)
+	retentionJob.Start()
+	defer retentionJob.Close()
+
+	shipper := audit.NewShipper(exportAdapter, cfg.Events.Export)
+	if err := shipper.Start(ctx); err != nil {
+		return fmt.Errorf("start event shipper: %w", err)
+	}
+	defer shipper.Close()
+
+	pinger := serviceping.New(cfg.ServicePing, serviceping.Facts{
+		Version:    build.Version(),
+		Commit:     build.Commit(),
+		Dialect:    databaseDialectName(cfg),
+		OnVercel:   os.Getenv("VERCEL") == "1",
+		PublicBase: cfg.Server.PublicBase,
+	})
+	pinger.Start()
+	defer pinger.Close()
+
+	runtimeResolver := service.NewRuntimeResolver(serviceDBPool, releaseService, consoleHosts...)
+	apiServers, err := api.NewServers(
+		api.NewHandler(
+			flowService,
+			authAttemptSvc,
+			sessionService,
+			projectService,
+			userService,
+			schemaService,
+			flowDefinitionSvc,
+			teamService,
+			brandingService,
+			releaseService,
+			deploymentService,
+			idpConnectionService,
+			eventService,
+			tokenService,
+			keyService,
+			claimService,
+			grantService,
+			variableService,
+			serviceDBPool,
+			// Resolved, not the raw pin: in bootstrap mode project_id is empty
+			// and an empty handler pin rejects every claim/complete session.
+			cfg.Platform.ResolvedProjectID(),
+		).WithPersonalTeamEnsurer(personalTeams).WithBuiltinSchemaBases(builtinBases).WithRuntimeResolver(runtimeResolver).WithPolicyService(policyService).WithReadinessCheck(pool),
+		// The same platform project the handler resolves: sessions homed there
+		// can reach the platform operator path (ADR 075).
+		api.NewSecurityHandler(tokenService).WithPlatformProject(cfg.Platform.ResolvedProjectID()),
+		apiServerOptions(telemetry.TracerProvider(), telemetry.MeterProvider(), consoleLink(cfg.Server.ConsolePath))...)
+	if err != nil {
+		return fmt.Errorf("failed to build api servers: %w", err)
+	}
+
+	mux, err := buildHTTPMux(cfg.Server, idgen.NewULID(), apiServers,
+		api.NewIDPCallbackHandler(ssoCallback),
+		standaloneRuntimeResolver(projectService, tokenService, keyService, cfg.Platform.ResolvedProjectID()),
+		requestEventBuf,
+		retentionJob.Trigger())
+	if err != nil {
+		return fmt.Errorf("failed to build http mux: %w", err)
+	}
+
+	httpServer := &http.Server{
+		Addr:              cfg.Server.Address,
+		Handler:           withIncomingTraceContext(cfg.Instrumentation.Trace, telemetry.TextMapPropagator(), mux),
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       idleTimeout(cfg.Server.IdleTimeout),
+	}
+
+	serverErr := make(chan error, 1)
+
+	go func() {
+		slog.Info("server listening for requests", slog.String("address", httpServer.Addr))
+		if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			serverErr <- err
+		}
+		slog.Debug("stopped listening")
+		close(serverErr)
+	}()
+
+	// TODO: on a multi-replica deployment, the migration can happen multiple
+	//       times. This is not a problem since the migration will not remove
+	//       any keys. So nothing breaks. But there is no need to recompute the
+	//       same thing multiple times.
+	go func() {
+		slog.Info("migrate keys to latest master key")
+		if err := keyService.MigrateToLatestMasterKey(ctx); err != nil {
+			slog.Error("error during master key migration", slog.Any(slogctx.ErrKey, err))
+		}
+		slog.Debug("master key migration done")
+	}()
+
+	select {
+	case <-ctx.Done():
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		if err := httpServer.Shutdown(shutdownCtx); err != nil {
+			return fmt.Errorf("shutdown server: %w", err)
+		}
+		slog.Info("server shut down")
+		return nil
+	case err := <-serverErr:
+		return err
+	}
+}
+
+// consoleBaseURL joins the deployment's public base with the console mount
+// path. The public base may carry a path prefix (a proxy mounting the server
+// under a subpath) but nothing else: query, fragment, or userinfo would leak
+// into every minted claim and dashboard URL, so misconfiguration fails at
+// startup instead. The result never ends in a slash — callers append paths.
+func consoleBaseURL(publicBase, consolePath string) (string, error) {
+	base, err := url.Parse(publicBase)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse server public base: %w", err)
+	}
+	if (base.Scheme != "http" && base.Scheme != "https") || base.Host == "" {
+		return "", fmt.Errorf("server public base %q must be an absolute http(s) URL", publicBase)
+	}
+	if base.User != nil || base.RawQuery != "" || base.Fragment != "" {
+		return "", fmt.Errorf("server public base %q must carry only an origin and an optional path prefix", publicBase)
+	}
+	if consolePath != "" && !strings.HasPrefix(consolePath, "/") {
+		return "", fmt.Errorf("server console path %q must start with a slash", consolePath)
+	}
+	base.Path = strings.TrimRight(base.Path, "/") + strings.TrimRight(consolePath, "/")
+	return base.String(), nil
+}
+
+// publicOrigin is the browser origin of the deployment's public base: where
+// its console runs. A browser never spells out the scheme's default port, so
+// neither does this.
+func publicOrigin(publicBase string) (string, error) {
+	origin, err := browserOrigin(publicBase)
+	if err != nil {
+		return "", fmt.Errorf("server public base %q has no valid origin: %w", publicBase, err)
+	}
+	return origin, nil
+}
+
+// consoleOrigins are the origins a browser can open the console on: the
+// public base's, plus each of server.console_origins.
+func consoleOrigins(publicBase string, extra []string) ([]string, error) {
+	own, err := publicOrigin(publicBase)
+	if err != nil {
+		return nil, err
+	}
+	configured, err := configuredConsoleOrigins(extra)
+	if err != nil {
+		return nil, err
+	}
+	return append([]string{own}, configured...), nil
+}
+
+// configuredConsoleOrigins are the entries of server.console_origins as a
+// browser sends them; a blank entry names none.
+func configuredConsoleOrigins(entries []string) ([]string, error) {
+	var origins []string
+	for _, entry := range entries {
+		entry = strings.TrimSpace(entry)
+		if entry == "" {
+			continue
+		}
+		origin, err := consoleOrigin(entry)
+		if err != nil {
+			return nil, fmt.Errorf("server.console_origins: %q is not an origin: %w", entry, err)
+		}
+		origins = append(origins, origin)
+	}
+	return origins, nil
+}
+
+// consoleOrigin is entry as a browser sends it in an Origin header. What a
+// browser never sends there would never match, so it is refused rather than
+// dropped: a path, query or credentials, a wildcard, an empty port, or a host
+// not in its ASCII (punycode) form.
+func consoleOrigin(entry string) (string, error) {
+	u, err := url.Parse(entry)
+	if err != nil {
+		return "", err
+	}
+	switch {
+	case u.User != nil || (u.Path != "" && u.Path != "/") || strings.ContainsAny(entry, "?#"):
+		return "", errors.New("an origin is scheme://host[:port] and nothing more")
+	case strings.Contains(u.Host, "*"):
+		return "", errors.New("an origin names one host, not a pattern")
+	case strings.HasSuffix(u.Host, ":"):
+		return "", errors.New("an origin's port is never empty")
+	case strings.IndexFunc(u.Host, func(r rune) bool { return r > unicode.MaxASCII }) >= 0:
+		return "", errors.New("a browser sends the host in its ASCII (punycode) form")
+	}
+	return browserOrigin(entry)
+}
+
+// browserOrigin is the origin of raw as a browser sends it: lowercase, with no
+// path and no default port.
+func browserOrigin(raw string) (string, error) {
+	base, err := url.Parse(raw)
+	if err != nil {
+		return "", err
+	}
+	host := base.Host
+	if port := base.Port(); (base.Scheme == "https" && port == "443") || (base.Scheme == "http" && port == "80") {
+		host = strings.TrimSuffix(host, ":"+port)
+	}
+	return domain.NormalizeOrigin(base.Scheme + "://" + host)
+}
+
+// ----------------------------- CONFIG --------------------------------------
+
+// configOverride sets a value that outranks the config file and the
+// environment, which is what a command-line flag has to do.
+type configOverride func(*viper.Viper)
+
+// loadConfig reads the configuration the server serves with: readConfig's,
+// plus the master keys, one generated when none is configured and
+// generation is on.
+func loadConfig(configPath string, overrides ...configOverride) (Config, error) {
+	cfg, err := readConfig(configPath, overrides...)
+	if err != nil {
+		return Config{}, err
+	}
+	if err := ensureServerMasterKey(&cfg.Server); err != nil {
+		return Config{}, err
+	}
+	return cfg, nil
+}
+
+// readConfig reads and validates the configuration without touching the
+// master keys, which only serving needs: `migrate` reads its configuration
+// here, so it neither requires a master key nor generates one.
+func readConfig(configPath string, overrides ...configOverride) (Config, error) {
+	v := viper.NewWithOptions(viper.ExperimentalBindStruct())
+	v.SetEnvPrefix("NEXTGEN")
+	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	v.AutomaticEnv()
+
+	dataDir, err := defaultServerDataDir()
+	if err != nil {
+		return Config{}, err
+	}
+	v.SetDefault("server.address", ":8080")
+	v.SetDefault("server.data_dir", dataDir)
+	v.SetDefault("server.console_enabled", true)
+	v.SetDefault("server.console_path", "/ui/console")
+	v.SetDefault("server.public_base", "https://nextgen.zitadel.cloud")
+	v.SetDefault("server.console_origins", []string{})
+	v.SetDefault("server.idle_timeout", 60*time.Second)
+	// Generation on by default: a first local start has to work with no
+	// configuration at all. Production turns it off, per ADR 029.
+	v.SetDefault("server.generate_master_key", true)
+	// Default to argon2id (per ADR 029). Params follow the RFC 9106 second
+	// recommended option (t=3, m=64 MiB, p=4), a good balance for servers.
+	v.SetDefault("password_hasher.hasher.algorithm", crypto.HashNameArgon2id)
+	v.SetDefault("password_hasher.hasher.time", 3)
+	v.SetDefault("password_hasher.hasher.memory", 64*1024)
+	v.SetDefault("password_hasher.hasher.threads", 4)
+	// Keep bcrypt and legacy verifiers registered so pre-existing hashes still
+	// validate. A successful sign-in stores a new hash written by the project's
+	// hasher, argon2id unless the project chose another method.
+	v.SetDefault("password_hasher.verifiers", []crypto.HashName{
+		crypto.HashNameArgon2,
+		crypto.HashNameBcrypt,
+		crypto.HashNameScrypt,
+		crypto.HashNamePBKDF2,
+		crypto.HashNameSha2,
+		crypto.HashNameMd5,
+		crypto.HashNameMd5Salted,
+		crypto.HashNamePHPass,
+		crypto.HashNameDrupal7,
+	})
+	// The limits bound what a stored hash may cost: too cheap and it is not
+	// protecting anything, too dear and reading one back is a denial of service.
+	// They apply to hashes arriving from an import and to a hashing method a
+	// project picks for itself (ADR 029 §Hashing) -- the deployment says what is
+	// acceptable, a project chooses inside it. An algorithm left at zero here
+	// accepts nothing, which is why every algorithm with a verifier a project
+	// may hash with carries a range. Each spans passwap's recommended
+	// parameters: bcrypt 12, argon2id t=3/m=64MiB/p=4, scrypt ln=15,
+	// pbkdf2 290k rounds, sha2 5k rounds.
+	v.SetDefault("password_hasher.limits", crypto.HashLimitsConfig{
+		Bcrypt: crypto.BcryptLimitsConfig{MinCost: 10, MaxCost: 16},
+		Argon2: crypto.Argon2LimitsConfig{
+			MinTime: 1, MaxTime: 10,
+			MinMemory: 8 * 1024, MaxMemory: 512 * 1024,
+			MinThreads: 1, MaxThreads: 16,
+		},
+		Scrypt: crypto.ScryptLimitsConfig{
+			MinLN: 12, MaxLN: 20,
+			MinR: 8, MaxR: 8,
+			MinP: 1, MaxP: 4,
+		},
+		PBKDF2: crypto.PBKDF2LimitsConfig{MinRounds: 100_000, MaxRounds: 5_000_000},
+		Sha2: crypto.Sha2LimitsConfig{
+			MinSha256Rounds: 5_000, MaxSha256Rounds: 1_000_000,
+			MinSha512Rounds: 5_000, MaxSha512Rounds: 1_000_000,
+		},
+	})
+	v.SetDefault("schema.lru_cache_size", 1000) // todo: temp, review
+	v.SetDefault("keys.crypter_lru_cache_size", 1000)
+	v.SetDefault("keys.signing_key_lru_cache_size", 1000)
+	// An identifier namespace, not an address: it is stamped into documents
+	// and stored rows, so moving it means adding the new base to
+	// domain.KnownBuiltinSchemaBases, which keeps every earlier one resolving.
+	v.SetDefault("schema.builtin_public_base", configdefaults.DefaultBuiltinSchemaBase)
+	v.SetDefault("schema.resolve_timeout", domain.DefaultJSONSchemaResolveTimeout)
+	// Egress policy for user-injectable URLs (ADR 061). The deny list
+	// blocks by default; allow_list carves exceptions out of it, e.g.
+	// NEXTGEN_HTTPCLIENT_ALLOW_LIST="localhost,127.0.0.0/8,::1/128" for
+	// local development against loopback schema hosts.
+	v.SetDefault("httpclient.max_body_size", 1<<20) // 1 MiB; the only consumer is JSON schema ingest
+	v.SetDefault("httpclient.timeout", 10*time.Second)
+	v.SetDefault("httpclient.max_redirects", 5)
+	v.SetDefault("httpclient.allow_https_downgrade", false)
+	v.SetDefault("httpclient.deny_list", httputil.DefaultDenyList)
+	v.SetDefault("httpclient.allow_list", []string{})
+	// origins.shared_hosts is not SetDefault'd: viper merges map defaults with
+	// overrides, which would break replace-defaults. Nil after unmarshal means
+	// "use DefaultSharedHosts"; an explicit empty map disables the checks.
+	// default_ttl is the lifetime of a signed-in session, not of the
+	// anonymous shell POST /sessions mints (domain.SessionAnonymousTTL).
+	v.SetDefault("session.default_ttl", domain.SessionDefaultTTL)
+	v.SetDefault("session.max_ttl", 720*time.Hour)
+	// Empty means "the deployment's first-created non-platform project is the
+	// default" (Console ADR 0004 §2; the built-in platform row is skipped by
+	// the heuristic); set NEXTGEN_PLATFORM_PROJECT_ID to pin an existing
+	// project instead. The server never creates a project itself, unless
+	// platform.bootstrap_project explicitly opts in (#605).
+	v.SetDefault("platform.project_id", "")
+	v.SetDefault("platform.bootstrap_project", false)
+	// Empty: nobody is a platform operator (ADR 075).
+	v.SetDefault("platform.operators", []string{})
+	// Zero: a request does not wait for its event to be written.
+	v.SetDefault("events.request.flush_wait", time.Duration(0))
+	v.SetDefault("events.retention.window", 30*24*time.Hour)
+	v.SetDefault("events.retention.interval", time.Hour)
+	v.SetDefault("events.retention.enabled", true)
+	// Empty: the server purges on its own timer, not when a scheduler calls.
+	v.SetDefault("events.retention.trigger_secret", "")
+	v.SetDefault("events.export.enabled", false)
+	v.SetDefault("events.export.interval", 5*time.Second)
+	v.SetDefault("service_ping.enabled", false)
+	v.SetDefault("service_ping.vercel_endpoint", serviceping.DefaultVercelEndpoint)
+	v.SetDefault("service_ping.mixpanel_endpoint", serviceping.DefaultMixpanelEndpoint)
+	// Empty: Mixpanel is paused, so the ping sends it nothing by default.
+	v.SetDefault("service_ping.mixpanel_token", "")
+	v.SetDefault("service_ping.interval", 24*time.Hour)
+	v.SetDefault("instrumentation.service_name", "Zitadel")
+	v.SetDefault("instrumentation.log.level", zlog.LevelInfo)
+	v.SetDefault("instrumentation.log.streams", []zlog.Stream{
+		zlog.StreamRuntime,
+		zlog.StreamReady,
+		zlog.StreamRequest,
+		zlog.StreamService,
+		zlog.StreamStorage,
+	})
+	v.SetDefault("instrumentation.log.format", instrumentation.LogFormatText)
+	v.SetDefault("instrumentation.log.add_source", true)
+	// The location is cheap and stays on. A stack is one debug.Stack() per
+	// error, so it is opt-in. See ADR 030.
+	v.SetDefault("instrumentation.log.errors.report_location", true)
+	v.SetDefault("instrumentation.log.errors.stack_trace", false)
+	v.SetDefault("instrumentation.trace.fraction", 1.0)
+	// Off: an incoming traceparent is not used. See ADR 080.
+	v.SetDefault("instrumentation.trace.trust_remote_spans", false)
+
+	// AutomaticEnv only resolves nested keys viper already knows about
+	// (via default, config file, fields of config struct or explicit BindEnv).
+	// We need to bind all possible env keys of fields which use `mapstructure:",remain"` to ensure they are resolved from env vars.
+	for _, key := range database.DialectKeysForEnv() {
+		mustBindEnv(v, "database."+key)
+	}
+
+	if configPath != "" {
+		v.SetConfigFile(configPath)
+	} else {
+		v.SetConfigName("nextgen")
+		v.AddConfigPath(".")
+		v.AddConfigPath("./config")
+		v.AddConfigPath("/etc/nextgen")
+	}
+
+	if err := v.ReadInConfig(); err != nil {
+		var notFound viper.ConfigFileNotFoundError
+		if configPath != "" || !errors.As(err, &notFound) {
+			return Config{}, fmt.Errorf("read config: %w", err)
+		}
+	}
+
+	// Last, so a flag outranks both the file and the environment.
+	for _, override := range overrides {
+		override(v)
+	}
+
+	warnIgnoredMasterKeyEnv(os.Environ())
+
+	var cfg Config
+	if err := v.Unmarshal(&cfg, viper.DecodeHook(mapstructure.ComposeDecodeHookFunc(
+		// viper's own defaults (see viper.DecodeHook's doc comment) — lost if
+		// not restated here, since DecodeHook overrides rather than extends them.
+		// stringToWeakSliceHookFunc mirrors viper's own unexported hook of the
+		// same name: mapstructure.StringToSliceHookFunc only fires for a
+		// []string target, which would silently stop comma-separated env vars
+		// (e.g. NEXTGEN_INSTRUMENTATION_LOG_STREAMS=request,service) from
+		// reaching non-string slice fields such as []zlog.Stream.
+		mapstructure.StringToTimeDurationHookFunc(),
+		stringToWeakSliceHookFunc(","),
+		stringToRegexpHookFunc(),
+		// Lets enum types generated by enumer (zlog.Level, zlog.Stream,
+		// instrumentation.LogFormat, ...) decode from their documented string
+		// names via the encoding.TextUnmarshaler they already implement.
+		mapstructure.TextUnmarshallerHookFunc(),
+	))); err != nil {
+		return Config{}, fmt.Errorf("decode config: %w", err)
+	}
+	if cfg.Origins.SharedHosts == nil {
+		cfg.Origins.SharedHosts = domain.DefaultSharedHosts
+	}
+	// Create the data dir configuration actually selected, not the default
+	// computed above — an explicit empty data_dir still means the default.
+	if cfg.Server.DataDir == "" {
+		cfg.Server.DataDir = dataDir
+	}
+	if err := ensureServerDataDir(cfg.Server.DataDir); err != nil {
+		return Config{}, err
+	}
+	if err := cfg.Validate(); err != nil {
+		return Config{}, err
+	}
+	return cfg, nil
+}
+
+// stringToWeakSliceHookFunc splits a string into a slice on sep, without
+// requiring the target slice's element type to be string — matching
+// viper's own unexported hook of the same name (spf13/viper's
+// stringToWeakSliceHookFunc in viper.go), which viper.DecodeHook drops
+// unless it's restated alongside any custom hooks.
+func stringToWeakSliceHookFunc(sep string) mapstructure.DecodeHookFunc {
+	return func(f reflect.Type, t reflect.Type, data any) (any, error) {
+		if f.Kind() != reflect.String || t.Kind() != reflect.Slice {
+			return data, nil
+		}
+		raw := data.(string)
+		if raw == "" {
+			return []string{}, nil
+		}
+		return strings.Split(raw, sep), nil
+	}
+}
+
+// stringToRegexpHookFunc compiles string config values into *regexp.Regexp
+// (including map values of that type). Bad patterns fail config load.
+func stringToRegexpHookFunc() mapstructure.DecodeHookFunc {
+	regexpPtr := reflect.TypeOf((*regexp.Regexp)(nil))
+	return func(f reflect.Type, t reflect.Type, data any) (any, error) {
+		if f.Kind() != reflect.String || t != regexpPtr {
+			return data, nil
+		}
+		return regexp.Compile(data.(string))
+	}
+}
+
+// mustBindEnv panics on viper's documented "this can't fail in
+// normal use" BindEnv error path. Keeps the env wiring readable
+// without sprinkling error handling at every binding.
+func mustBindEnv(v *viper.Viper, key string) {
+	if err := v.BindEnv(key); err != nil {
+		panic(fmt.Errorf("bind env %q: %w", key, err))
+	}
+}
+
+// ----------------------------- HTTP --------------------------------------
+
+// apiServerOptions are the options of the ogen API servers that buildHTTPMux
+// mounts, to which api.NewServers adds each mount's own; shared with the
+// test of that chain. home is the way on that the error page of a path
+// nothing answers offers a person (ADR 076).
+func apiServerOptions(tracerProvider trace.TracerProvider, meterProvider metric.MeterProvider, home *errorpage.Link) []oasapi.ServerOption {
+	return []oasapi.ServerOption{
+		oasapi.WithMiddleware(
+			middleware.AddOperationIdToContext(),
+			// logging is done at net/http level
+		),
+		oasapi.WithMeterProvider(meterProvider),
+		oasapi.WithTracerProvider(api.NewOgenTracerProvider(tracerProvider)),
+		oasapi.WithErrorHandler(api.OgenErrorHandler),
+		oasapi.WithNotFound(api.OgenNotFound(home)),
+		oasapi.WithMethodNotAllowed(api.OgenMethodNotAllowed),
+	}
+}
+
+// consoleLink is the console's start page as an error page's way on. The
+// path is where the console lives even when this server does not serve it:
+// the hosted cloud runs it as a service of its own, and the claim and
+// dashboard links the server hands out assume the same.
+func consoleLink(consolePath string) *errorpage.Link {
+	consolePath = strings.TrimSuffix(consolePath, "/")
+	if consolePath == "" {
+		return nil
+	}
+	return &errorpage.Link{Label: "Open the console", Href: consolePath + "/"}
+}
+
+// idleTimeout is server.idle_timeout as net/http reads it. There zero means
+// "as long as ReadTimeout" and only a negative value never closes an idle
+// connection, which is what the config's zero asks for.
+func idleTimeout(configured time.Duration) time.Duration {
+	if configured <= 0 {
+		return -1
+	}
+	return configured
+}
+
+func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiServers api.Servers, idpCallbackHandler http.Handler, runtime runtimeResolver, requestEvents *audit.RequestBuffer, retentionTrigger http.Handler) (http.Handler, error) {
+	mux := http.NewServeMux()
+
+	if cfg.ConsoleEnabled {
+		if err := console.ValidateDist(); err != nil {
+			return nil, err
+		}
+		consoleHandler, err := console.Handler(cfg.ConsolePath)
+		if err != nil {
+			return nil, fmt.Errorf("build console UI handler: %w", err)
+		}
+		mux.Handle(cfg.ConsolePath, consoleHandler)
+		mux.Handle(cfg.ConsolePath+"/", consoleHandler)
+	}
+
+	// Pre-session runtime metadata for the console (Console ADR 0004 §3): the
+	// default project and its publishable key. Mounted whether or not this
+	// binary serves the console, because a console served elsewhere reads it
+	// from here: the hosted cloud's console service, and the console's dev
+	// server through its proxy. Registered as an exact path, so it wins over
+	// the catch-all API mount below. It takes the request ID and the request
+	// line, which its error lines join, but none of the middleware a
+	// client's API request passes.
+	mux.Handle(consoleRuntimePath, middleware.Chain(newConsoleRuntimeHandler(runtime),
+		func(next http.Handler) http.Handler {
+			return middleware.WithRequestContextMiddleware(reqIdGen, cfg.RequestIDHeader, next)
+		},
+		middleware.WithLogging,
+		api.WithRecover,
+	))
+
+	chain := func(h http.Handler) http.Handler {
+		return middleware.Chain(h,
+			func(next http.Handler) http.Handler {
+				return middleware.WithRequestContextMiddleware(reqIdGen, cfg.RequestIDHeader, next)
+			},
+			middleware.WithLogging,
+			api.WithRecover,
+			api.WithRequestHostMiddleware,
+			api.WithLoopbackSessionCookie,
+			middleware.WithUserAgentMiddleware,
+			api.WithSessionStateNoStore,
+			api.WithCSRFRequest,
+			func(next http.Handler) http.Handler { return audit.WithRequestEventMiddleware(requestEvents, next) },
+		)
+	}
+	// The same chain: the callback reads its cookie by the request scheme
+	// (WithRequestHostMiddleware). Both spellings serve one handler: the
+	// prefixed path arrives when the instance is the browser origin, the
+	// stripped one through a scaffolded app's SDK proxy.
+	callback := chain(idpCallbackHandler)
+	mux.Handle(api.IDPCallbackPattern, callback)
+	mux.Handle(api.IDPCallbackUpstreamPattern, callback)
+	// Request ID, access log and panic recovery — shared by mounts that sit
+	// outside the API's auth/CSRF chain (retention trigger, CSP reports, the
+	// embedded OpenAPI document).
+	observe := func(h http.Handler) http.Handler {
+		return middleware.Chain(h,
+			func(next http.Handler) http.Handler {
+				return middleware.WithRequestContextMiddleware(reqIdGen, cfg.RequestIDHeader, next)
+			},
+			middleware.WithLogging,
+			api.WithRecover,
+		)
+	}
+	// The event retention trigger, when a scheduler outside the process runs
+	// the purge (events.retention.trigger_secret, ADR 049): the operator's,
+	// not the API's, so it takes the request ID and the request line but none
+	// of the middleware a client's request passes.
+	if retentionTrigger != nil {
+		mux.Handle(audit.RetentionTriggerPath, observe(retentionTrigger))
+	}
+	// Where browsers post the violations of the console's and the error
+	// page's policies, and on the hosted cloud those of every service's
+	// pages. Outside the API's chain: a browser posts it without the CSRF
+	// token or a session, and nobody's audit trail needs it.
+	mux.Handle(securityheaders.ReportPath, observe(securityheaders.Report()))
+	// The API under /api/v1 (including the embedded OpenAPI document), the
+	// probes at the root, and the root alias for every other path until
+	// 1.0.0 (ADR 077).
+	api.MountAPI(mux, chain, observe, apiServers)
+	return securityheaders.Middleware(mux), nil
+}
+
+// withIncomingTraceContext decides what an incoming trace context means for
+// the server span. Unless cfg.TrustRemoteSpans is set it returns next
+// unchanged, so traceparent, tracestate and baggage are ignored and every
+// request starts a new trace. When set, the caller's context is extracted
+// ahead of everything else, so the request logs and the server span both see
+// it. ADR 080 records the decision.
+func withIncomingTraceContext(cfg instrumentation.TraceConfig, propagator propagation.TextMapPropagator, next http.Handler) http.Handler {
+	if !cfg.TrustRemoteSpans {
+		return next
+	}
+	return middleware.WithRemoteTraceContext(propagator)(next)
+}
+
+// ----------------------------- STORAGE --------------------------------------
+
+func connectDatabase(ctx context.Context, cfg Config) (database.Pool, error) {
+	dialect, err := buildDatabaseDialect(cfg)
+	if err != nil {
+		return nil, err
+	}
+	return database.Connect(ctx, dialect)
+}
+
+func startDatabase(ctx context.Context, cfg Config, applyMigrations bool) (database.Pool, error) {
+	pool, err := connectDatabase(ctx, cfg)
+	if err != nil {
+		return nil, err
+	}
+	if !applyMigrations {
+		return pool, nil
+	}
+	if err := pool.Migrate(ctx); err != nil {
+		_ = pool.Close(ctx)
+		return nil, err
+	}
+	return pool, nil
+}
+
+func buildDatabaseDialect(cfg Config) (database.Dialect, error) {
+	if len(cfg.Database.Raw) == 0 {
+		path := defaultSQLitePath(cfg.Server.DataDir)
+		slog.Info("no database dialect configured, using sqlite", slog.String("path", path))
+		return sqlite.Config{Path: path}, nil
+	}
+
+	dialect, err := cfg.Database.Build()
+	if err != nil {
+		return nil, fmt.Errorf("build database dialect: %w", err)
+	}
+	return dialect, nil
+}
+
+// databaseDialectName names the configured dialect without connecting, for
+// the service ping; an unconfigured database is the sqlite default.
+func databaseDialectName(cfg Config) string {
+	if len(cfg.Database.Raw) == 0 {
+		return "sqlite"
+	}
+	dialect, err := cfg.Database.Build()
+	if err != nil {
+		return "unknown"
+	}
+	return dialect.Name()
+}
+
+func defaultSQLitePath(dataDir string) string {
+	return filepath.Join(dataDir, "zitadel.db")
+}
+
+// ----------------------------- CRYPTO --------------------------------------
+
+func buildMasterKey(keyConfigs map[string]*MasterKeyConfig) (*domain.MasterKeys, error) {
+	ks := make([]domain.MasterKey, 0, len(keyConfigs))
+	for id, cfg := range keyConfigs {
+		if cfg == nil || (cfg.PrivateKey == "" && cfg.File == "") {
+			return nil, fmt.Errorf("server: either a private key or file must be provided (%s)", id)
+		}
+
+		raw := cfg.PrivateKey
+		if raw == "" && cfg.File != "" {
+			bs, err := os.ReadFile(cfg.File)
+			if err != nil {
+				return nil, fmt.Errorf("server: failed to read encryption key file %q: %w", cfg.File, err)
+			}
+			raw = string(bs)
+		}
+
+		key, err := crypto.ParseRSAKey(raw)
+		if err != nil {
+			return nil, fmt.Errorf("server: %w", err)
+		}
+		ks = append(ks, domain.NewMasterKey(
+			id,
+			*key,
+			cfg.UseForEncryption,
+		))
+	}
+
+	masterKeys, err := domain.NewMasterKeys(ks)
+	if err != nil {
+		return nil, fmt.Errorf("server: %w", err)
+	}
+
+	return masterKeys, nil
+}
+
+// ----------------------------- INSTRUMENTATION --------------------------------------
+
+func setUpLogging(cfg instrumentation.LogConfig, otelProvider log.LoggerProvider) {
+	errreport.EnableLocation(cfg.Errors.ReportLocation)
+	errreport.EnableStack(cfg.Errors.StackTrace)
+	errreport.GCPReporting(cfg.Format == instrumentation.LogFormatGCPErrorReporting)
+
+	otelHandler := otelslog.NewHandler(
+		Name,
+		otelslog.WithLoggerProvider(otelProvider),
+	)
+
+	stdErrHandler := cfg.Format.ErrorHandler(cfg.SlogHandlerOptions())
+	handler := zlog.NewHandler(
+		cfg.Level,
+		cfg.Streams,
+		slog.NewMultiHandler(
+			otelHandler,
+			stdErrHandler,
+		),
+	)
+	logger := zlog.NewLogger(handler)
+	logger.Info("structured logger configured", "config_level", cfg.Level, "format", cfg.Format)
+	slog.SetDefault(logger)
+}

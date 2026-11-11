@@ -213,7 +213,7 @@ export async function prepareApp(options = {}) {
 
 export function cliStepArgs(cliPackage, stepArgs, cwd) {
   const cwdArgs = cwd ? ["--cwd", cwd] : [];
-  return ["--yes", `${cliPackage}@alpha`, ...stepArgs, ...cwdArgs, "--non-interactive", "--json"];
+  return ["--yes", `${cliPackage}@latest`, ...stepArgs, ...cwdArgs, "--non-interactive", "--json"];
 }
 
 async function runCliJsonStep(input) {

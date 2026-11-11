@@ -60,7 +60,7 @@ concurrency:
 
 jobs:
   sync:
-    runs-on: depot-ubuntu-24.04-4
+    runs-on: ubuntu-24.04
     # Quiet git init / advice noise from actions/checkout (otherwise logs a
     # long "hint: Using 'master' as the name for the initial branch" block).
     env:

@@ -1,16 +1,24 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Monitor, Smartphone, Sun, Workflow } from "lucide-react";
+import { Monitor, Paintbrush, Smartphone, Workflow } from "lucide-react";
 import { useState } from "react";
-
 import {
   LoginPreview,
   type PreviewJourney,
   type PreviewState,
-} from "@/components/branding/login-preview";
-import { SettingsPanel } from "@/components/branding/settings-panel";
-import { ResourcePage, ResourceTitle } from "@/components/resource-list";
+} from "@/features/branding/components/login-preview";
+import { PreviewStage } from "@/features/branding/components/preview-stage";
+import { SettingsPanel } from "@/features/branding/components/settings-panel";
+import { ResourceTitle } from "@/components/resource-list";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Select,
   SelectContent,
@@ -20,18 +28,28 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { BrandingRevision } from "@/lib/branding-palette";
-import { flowDisplayName } from "@/lib/flow-definition";
-
+import type { BrandingRevision } from "@/features/branding/branding-palette";
+import { flowDisplayName } from "@/features/flow-definitions/model";
 import { api } from "@/api/zitadel";
-import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
+import { projectScopeDeps, requireProjectScope } from "@/features/projects/project-scope";
+import { Page } from "@/components/layout";
+import {
+  JOURNEYS,
+  type PreviewFlow,
+  type PreviewTheme,
+  STATE_LABELS,
+  THEMES,
+  revisionSide,
+  successStepName,
+  unpublishedSide,
+} from "@/features/branding/preview-options";
 
 export const Route = createFileRoute("/_authed/branding/")({
-  // Nested under Login flows, as in the design: branding is how those flows
-  // render, not a resource of its own. Sub-rows carry no icon.
+  // Order 6: right after Login flows, whose screens it styles, as the design's
+  // single-level sidebar places it.
   staticData: {
     scope: "project",
-    nav: { label: "Branding", order: 1, parent: "/flow-definitions" },
+    nav: { label: "Branding", order: 6, icon: Paintbrush },
   },
   loaderDeps: projectScopeDeps,
   loader: async ({ deps }) => {
@@ -66,46 +84,6 @@ export const Route = createFileRoute("/_authed/branding/")({
   },
   component: BrandingScreen,
 });
-
-/** A flow the preview can run, the purposes it serves, and its terminal screen. */
-type PreviewFlow = { name: string; label: string; purposes: string[]; successStep?: string };
-
-/**
- * The step a flow ends on a screen with: its one `complete: "show"` step. A
- * flow that declares none, or several, leaves the choice to the element.
- */
-function successStepName(steps: { name: string; complete?: string }[] = []): string | undefined {
-  const shown = steps.filter((step) => step.complete === "show");
-  return shown.length === 1 ? shown[0]?.name : undefined;
-}
-
-// Passkey is absent: it needs a step the flow only reaches after an
-// identifier, which the preview cannot ask for (the element shows the entry
-// step in a chosen state; a later step exists only once the server has walked
-// the flow to it), and a tab that renders the sign-in step under another name
-// claims a journey it does not preview.
-const JOURNEYS: { id: PreviewJourney; label: string }[] = [
-  { id: "register", label: "Sign up" },
-  { id: "login", label: "Sign in" },
-];
-
-// The states of the design's selector, in its order. All of them are the
-// element's own rendering of the step the project serves; none writes to it.
-// Keyed by state, so one the element gains has to be labelled here to compile.
-const STATE_LABELS: Record<PreviewState, string> = {
-  default: "Default",
-  validation_error: "Validation errors",
-  submission_error: "Submission error",
-  loading: "Loading",
-  success: "Success",
-};
-
-/**
- * Which side the preview paints: a fixed side, or `revision` to leave it to
- * the revision's own `theme.mode` — what a visitor gets. A pinned side still
- * cannot reach one the revision does not publish.
- */
-type PreviewTheme = "light" | "dark" | "revision";
 
 function BrandingScreen() {
   const { revision, flows } = Route.useLoaderData();
@@ -146,11 +124,14 @@ function BrandingScreen() {
   // Derived like `activeJourney`: a pick this step cannot show previews the
   // default, and comes back when a step that can show it is served.
   const activeState = states && !states.includes(state) ? "default" : state;
-  // Unset, a widget follows the visitor: the panel shows `auto` for it too.
-  const revisionMode = revision.theme?.mode ?? "auto";
+  // Derived like `activeState`: a side this revision does not publish is not
+  // offered, and a pick of it previews the revision's own until one does.
+  const unpublished = unpublishedSide(revision);
+  const activeTheme = theme === unpublished ? "revision" : theme;
+  const ActiveThemeIcon = THEMES[activeTheme].icon;
 
   return (
-    <ResourcePage>
+    <Page fill>
       <ResourceTitle>Branding</ResourceTitle>
 
       {/* Three rows on a phone, one on a desktop: the flow selector, then the
@@ -226,53 +207,77 @@ function BrandingScreen() {
             >
               {narrow ? <Smartphone /> : <Monitor />}
             </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              aria-label="Switch the previewed theme"
-              onClick={() => setTheme(nextTheme(theme))}
-              title={
-                theme === "revision"
-                  ? `Theme: ${revisionMode} (from the branding in use)`
-                  : `Theme: ${theme}`
-              }
-            >
-              <Sun />
-            </Button>
+            {/* A menu rather than a cycling button: three sides behind one
+                glyph left the operator guessing which one was on screen. */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  aria-label={`Previewed theme: ${THEMES[activeTheme].label}`}
+                  title={`Theme: ${THEMES[activeTheme].label}`}
+                >
+                  <ActiveThemeIcon />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Previewed theme</DropdownMenuLabel>
+                <DropdownMenuRadioGroup
+                  value={activeTheme}
+                  onValueChange={(value) => setTheme(value as PreviewTheme)}
+                >
+                  {Object.entries(THEMES).map(([id, entry]) => (
+                    <DropdownMenuRadioItem key={id} value={id} disabled={id === unpublished}>
+                      <entry.icon aria-hidden />
+                      {entry.label}
+                      {/* What a visitor gets, and why a side is not offered. */}
+                      {(id === "revision" || id === unpublished) && (
+                        <span className="ml-auto pl-4 text-xs text-muted-foreground">
+                          {id === "revision" ? revisionSide(revision) : "Not published"}
+                        </span>
+                      )}
+                    </DropdownMenuRadioItem>
+                  ))}
+                </DropdownMenuRadioGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </div>
 
       {/* The panel is long and the preview is content-sized, so the row takes
-          its height from the viewport and the panel scrolls inside it —
-          otherwise the grid stretches the preview to the panel's full length.
+          what the page leaves under the toolbar (`Page fill`, `flex-1`) and
+          the panel scrolls inside it — otherwise the grid stretches the
+          preview to the panel's full length, and a fixed `100vh` offset
+          overflows whenever the chrome above changes.
           302px is the design's 300 plus the 1px card border each side, so the
           content the rows align to is the 276 the design lays them out in. */}
-      <div className="mt-3 grid gap-4 lg:h-[calc(100vh-11rem)] lg:grid-cols-[minmax(0,1fr)_302px] lg:px-2">
-        <Card className="flex min-h-[29rem] items-center justify-center overflow-auto border-foreground/10 p-6 shadow-xs lg:min-h-[32rem]">
-          {/* The widget is content-sized, so the preview constrains the width
-              rather than the element: that is what an embedding page does. */}
-          <div className={narrow ? "w-96" : "w-full max-w-lg"}>
-            <LoginPreview
-              journey={activeJourney}
-              flowName={activeFlowName}
-              theme={theme}
-              state={activeState}
-              successStep={selected?.successStep}
-              onStates={(next) => setServed({ preview, states: next })}
-            />
-          </div>
-        </Card>
+      <div className="mt-3 grid gap-4 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_302px] lg:px-2">
+        <PreviewStage className="flex min-h-[29rem] overflow-auto rounded-md border border-foreground/10 bg-card p-6 shadow-xs transition-colors duration-300 lg:min-h-[32rem]">
+          {(onGround) => (
+            // The widget is content-sized, so the preview constrains the width
+            // rather than the element: that is what an embedding page does.
+            // Centred by auto margins, not the stage's alignment: a step
+            // taller than the stage (an error banner) then starts at its top
+            // and scrolls, instead of spilling above where it cannot.
+            <div className={narrow ? "m-auto w-96" : "m-auto w-full max-w-lg"}>
+              <LoginPreview
+                journey={activeJourney}
+                flowName={activeFlowName}
+                theme={activeTheme}
+                state={activeState}
+                successStep={selected?.successStep}
+                onStates={(next) => setServed({ preview, states: next })}
+                onGround={onGround}
+              />
+            </div>
+          )}
+        </PreviewStage>
 
         <Card className="min-h-0 overflow-hidden border-foreground/10 p-0 shadow-xs">
           <SettingsPanel revision={revision} />
         </Card>
       </div>
-    </ResourcePage>
+    </Page>
   );
-}
-
-function nextTheme(current: PreviewTheme): PreviewTheme {
-  if (current === "revision") return "light";
-  return current === "light" ? "dark" : "revision";
 }

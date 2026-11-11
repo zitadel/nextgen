@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { afterEach, test } from "vitest";
 
+// @boundaries-ignore root scripts/ belongs to the workspace root, which no package can depend on
 import { APP_RELEASE_PACKAGES } from "../../../scripts/release-manifest.mjs";
 import {
   localRegistryPaths,

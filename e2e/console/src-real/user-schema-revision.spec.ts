@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { expect, test } from "@zitadel/testing/playwright";
 
-import { withErrorBody } from "../support/api";
+import { createSchemaFromSeed, withErrorBody } from "../support/api";
 import { expectNoErrorBoundary } from "../support/screens";
 import { signIn } from "../support/sign-in";
 
@@ -12,8 +12,10 @@ import { signIn } from "../support/sign-in";
  * The unit specs cover what the link renders and where it points, and the
  * router's encoding of the id is client-only. What only a live backend proves
  * is that the dev proxy and the API route accept a `$id` URL id, `%2F` and
- * all, and return that schema. The seeded schema has a plain `sch_*` id, so
- * the test writes its own schema with a `$id` and puts the subject on it.
+ * all, and return that schema, and that the schema page's history read, keyed
+ * by the document's own `objectType`, finds the schema itself as its latest
+ * revision on a real server. The seeded schema has a plain `sch_*` id, so the
+ * test writes its own schema with a `$id` and puts the subject on it.
  */
 
 test("opens a user's URI schema revision from the user detail screen", async ({
@@ -21,37 +23,42 @@ test("opens a user's URI schema revision from the user detail screen", async ({
   zitadel,
   seed,
 }) => {
-  const { projectId, schemaId: seededSchemaId } = zitadel.handle;
-  const { schema: template } = await zitadel.api.getSchemaById(seededSchemaId);
+  const { projectId } = zitadel.handle;
   const suffix = randomUUID();
   const title = `Revision ${suffix}`;
   const uri = `https://e2e.test/schemas/${suffix}.json`;
-  // Its own `objectType`: sharing the seeded one would make this schema the
-  // newest revision of it, the one other specs' Add user drawers pick from.
-  const schema = await withErrorBody(
-    zitadel.api.createSchema(
-      { ...template, $id: uri, title, objectType: `e2e-revision-${suffix}` },
-      { project_id: projectId },
-    ),
-  );
+  const schema = await createSchemaFromSeed(zitadel, { $id: uri, title });
   expect(schema.id).toBe(uri);
   const email = seed.identity().email;
-  await withErrorBody(
+  const user = await withErrorBody(
     zitadel.api.createUser({ schema: schema.id, attributes: { email } }, { project_id: projectId }),
   );
 
   const actor = await seed.user();
   await signIn(page, zitadel, actor);
-  await page.goto("/users");
-  await page.getByRole("link", { name: email }).click();
+  // Straight to the user: this spec is about the detail screen, and the
+  // list's first page on a busy instance need not hold this user.
+  await page.goto(`/users/${user.id}`);
   await expect(page.getByRole("heading", { name: email })).toBeVisible();
 
-  // The Overview card's only link is the revision box.
-  await page.getByRole("tabpanel").getByRole("link").click();
+  // Two links name the schema: its title opens the newest revision, the box
+  // the revision this user is on. With one revision both open it; the box
+  // carries the id in its name.
+  const panel = page.getByRole("tabpanel");
+  expect(
+    await panel.getByRole("link", { name: title, exact: true }).getAttribute("href"),
+  ).toContain(`/schemas/${encodeURIComponent(schema.id)}`);
+  await panel.getByRole("link", { name: schema.id }).click();
 
   await expect(page).toHaveURL((url) =>
     url.pathname.endsWith(`/schemas/${encodeURIComponent(schema.id)}`),
   );
   await expect(page.getByRole("heading", { name: title })).toBeVisible();
+  // The revision picker lists the schema's own history, this one revision,
+  // and marks it Latest; a URI id survives the round trip into the picker too,
+  // shortened on the trigger and whole in the id's title.
+  const picker = page.getByRole("combobox", { name: "Schema revision" });
+  await expect(picker.getByTitle(schema.id)).toBeVisible();
+  await expect(picker).toContainText("Latest");
   await expectNoErrorBoundary(page);
 });

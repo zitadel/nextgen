@@ -5,7 +5,7 @@ Angular components for the Zitadel auth UI, for client-side SPAs.
 ## Installation
 
 ```bash
-pnpm add @zitadel/sdk-angular@alpha
+pnpm add @zitadel/sdk-angular@latest
 ```
 
 ## Requirements

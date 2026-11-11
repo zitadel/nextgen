@@ -1,11 +1,12 @@
-import type {
-  CreateFlow201,
-  CreateFlow201Step,
-  CreateFlow201StepFieldsItem,
+import {
+  type CreateFlow201,
+  type CreateFlow201Step,
+  type CreateFlow201StepFieldsItem,
+  type CreateFlowBody,
   CreateFlowBodyPurpose,
-  SubmitFlowStepBody,
-  SubmitFlowStepBodyChallengeResponse,
-  SubmitFlowStepBodyFields,
+  type SubmitFlowStepBody,
+  type SubmitFlowStepBodyChallengeResponse,
+  type SubmitFlowStepBodyFields,
 } from "@zitadel/api/generated/model";
 import { ApiError, apiErrorMessage } from "@zitadel/api/runtime/fetch";
 import { zitadelTrustmarkInnerHtml } from "../internal/attribution-markup.js";
@@ -33,8 +34,9 @@ import type { ResolvedTheme } from "./theme-controller.js";
 import type { Branding } from "./branding.js";
 import { stampExportparts } from "./exportparts.js";
 import { createLiquidEngine, localiseFlowErrorKeys } from "./liquid.js";
-import { localeFor, type Locale } from "./locales/index.js";
+import { isHidden, localeFor, type Locale } from "./locales/index.js";
 import { patchMandatoryGates } from "./mandatory-gates.js";
+import { solveSignupPow, stopIfAborted } from "./signup-pow.js";
 import { resolveApi } from "./resolve-api.js";
 import { returnPathFromLocation } from "./return-path.js";
 import { createSanitiser } from "./sanitiser.js";
@@ -152,6 +154,26 @@ function clearFlowIdFromLocation(): void {
   history.replaceState(history.state, "", url);
 }
 
+/** Autocomplete tokens that mark a field's value as a credential. */
+const SECRET_AUTOCOMPLETE_TOKENS = ["current-password", "new-password", "one-time-code"];
+
+/** Whether a field holds a password or one-time code. */
+function isSecretField(field: CreateFlow201StepFieldsItem): boolean {
+  if (field.type === "password") return true;
+  const tokens = (field.autocomplete ?? "").toLowerCase().split(/\s+/);
+  return tokens.some((token) => SECRET_AUTOCOMPLETE_TOKENS.includes(token));
+}
+
+/** `values` without the ones `step`'s secret fields hold. */
+function withoutSecrets(
+  values: Record<string, string>,
+  step: CreateFlow201Step,
+): Record<string, string> {
+  const secrets = new Set((step.fields ?? []).filter(isSecretField).map((field) => field.name));
+  if (secrets.size === 0) return values;
+  return Object.fromEntries(Object.entries(values).filter(([name]) => !secrets.has(name)));
+}
+
 /** The `code` of a Flow API error envelope, or "" for anything else. */
 function apiErrorCode(error: unknown): string {
   if (!(error instanceof ApiError)) return "";
@@ -159,6 +181,82 @@ function apiErrorCode(error: unknown): string {
   return typeof body === "object" && body !== null && "code" in body
     ? String((body as { code: unknown }).code)
     : "";
+}
+
+/**
+ * The request fields a `req.invalid` envelope names (`details.details.fields`),
+ * or none for any other error.
+ */
+function apiErrorFields(error: unknown): string[] {
+  if (!(error instanceof ApiError)) return [];
+  const details = (error.body as { details?: { details?: { fields?: unknown } } } | null)?.details;
+  const fields = details?.details?.fields;
+  return Array.isArray(fields) ? fields.filter((field) => typeof field === "string") : [];
+}
+
+/** Where a `<zitadel-login>` gets its project id, for errors about it. */
+const PROJECT_ID_FIX =
+  "Check the `project-id` attribute, `configureZitadel({ projectId })` or the `project` handle.";
+
+/**
+ * The server's envelope names what was wrong (a code, and for `req.invalid`
+ * the fields), but not that the value came from one of the element's
+ * attributes. Rewraps the codes a misconfigured element produces with the
+ * attribute, the value `request` sent and the fix, and the codes a project
+ * with nothing deployed produces with the deploy that fixes it, keeping the
+ * envelope as `cause`; every other error passes through.
+ */
+function describeStartError(error: unknown, request: CreateFlowBody): unknown {
+  const { project_id: projectId, purpose, flow_definition_name: flowName } = request;
+  const described = (message: string) => new Error(`<zitadel-login> ${message}`, { cause: error });
+  const code = apiErrorCode(error);
+  if (code === "req.invalid") {
+    const fields = apiErrorFields(error);
+    if (fields.includes("purpose")) {
+      return described(
+        `purpose="${purpose}" is not a flow purpose. ` +
+          `Use one of: ${Object.values(CreateFlowBodyPurpose).join(", ")}.`,
+      );
+    }
+    if (fields.includes("flow_definition_name")) {
+      return described(
+        `flow-name="${flowName}" is not a flow name. A name starts with a lowercase ` +
+          `letter and holds only lowercase letters, digits and hyphens, as the \`name\` ` +
+          `in your flow file does.`,
+      );
+    }
+    if (fields.includes("project_id")) {
+      return described(`"${projectId}" is not a project id. ${PROJECT_ID_FIX}`);
+    }
+  } else if (code === "proj.not_found") {
+    return described(`no project "${projectId}" exists on this server. ${PROJECT_ID_FIX}`);
+  } else if (code === "flowdef.not_found") {
+    return described(
+      flowName
+        ? `flow-name="${flowName}" does not match any active flow definition in this ` +
+            `project. Check the \`name\` in your flow file and that it has been deployed ` +
+            `(\`zitadel deploy\`).`
+        : `no active flow definition serves purpose "${purpose}" in this project. ` +
+            `Deploy one whose \`purposes\` include "${purpose}" (\`zitadel deploy\`).`,
+    );
+  } else if (code === "flowdef.purpose_mismatch") {
+    return described(
+      `flow-name="${flowName}" matched a flow definition that does not serve ` +
+        `purpose "${purpose}".`,
+    );
+  } else if (code === "rel.no_default") {
+    return described(
+      `project "${projectId}" has nothing deployed to its primary origins. Deploy its ` +
+        `configuration (\`zitadel deploy\`).`,
+    );
+  } else if (code === "rel.not_deployed") {
+    return described(
+      `project "${projectId}" has nothing deployed to this page's origin. Deploy its ` +
+        `configuration (\`zitadel deploy\`); an origin the project does not list needs ` +
+        `\`zitadel origin add <origin> --kind primary\` first.`,
+    );
+  }
+  return error;
 }
 
 /**
@@ -449,6 +547,8 @@ export class ZitadelLogin extends ZitadelSurface {
   }
 
   override disconnectedCallback(): void {
+    this.signupSolve?.abort();
+    this.signupPrepare?.controller.abort();
     super.disconnectedCallback();
     if (typeof window !== "undefined") {
       window.removeEventListener("popstate", this.handlePopState);
@@ -474,16 +574,22 @@ export class ZitadelLogin extends ZitadelSurface {
   /**
    * Resolves the effective locale dictionary for the resolved language, with
    * the `locales` map merged over the built-in copy ({@link localeFor}).
-   *
-   * Priority: explicit `lang` attr → `navigator.language` (user preference)
-   * → `document.documentElement.lang` (page default).
    */
   private resolveLocale(): Locale {
-    const code =
+    return localeFor(this.resolveLanguage(), this.locales);
+  }
+
+  /**
+   * The language tag the widget renders in. Priority: explicit `lang` attr →
+   * `navigator.language` (user preference) → `document.documentElement.lang`
+   * (page default).
+   */
+  private resolveLanguage(): string {
+    return (
       this.lang ||
       (typeof navigator !== "undefined" ? navigator.language : "") ||
-      (typeof document !== "undefined" ? document.documentElement.lang : "");
-    return localeFor(code, this.locales);
+      (typeof document !== "undefined" ? document.documentElement.lang : "")
+    );
   }
 
   override willUpdate(changed: PropertyValues<this>): void {
@@ -587,6 +693,13 @@ export class ZitadelLogin extends ZitadelSurface {
       void this.hydrateStepAfterRender(props.get("response") == null);
       return;
     }
+    if (props.has("loading")) {
+      // The loading toggle rebuilds the step from the server's field values:
+      // put back what was typed, which a submit reads again after a sign-up
+      // check, so the fields show what it sends.
+      void this.restoreValuesAfterRender();
+      return;
+    }
     if (previousTheme !== null && previousTheme !== this.lastRenderedTheme) {
       // A flip mid-step is not a step change: restore what was typed, but
       // leave focus where the visitor put it.
@@ -658,7 +771,7 @@ export class ZitadelLogin extends ZitadelSurface {
       novalidate
       aria-busy=${this.loading ? "true" : "false"}
     >
-      ${this.renderPairedIdentifier()}${unsafeHTML(rendered)}
+      ${this.renderPairedIdentifier()}${unsafeHTML(`${rendered}<!--${this.errorRevision}-->`)}
     </form>`;
   }
 
@@ -773,11 +886,15 @@ export class ZitadelLogin extends ZitadelSurface {
 
   /**
    * Set while a fresh flow replaces one the server refused to continue
-   * (`flow.restart_required`). It bypasses the resume handle, puts the notice
+   * (`flow.restart_required`, or `flow.sso_user_schema_mismatch` for an SSO
+   * sign-in the user's schema cannot complete). It bypasses the resume handle, puts the notice
    * on the new first step, and refuses a second restart until a step renders,
    * so a server that keeps refusing cannot loop the widget.
    */
   private restarting = false;
+
+  /** The step error the fresh flow opens with, set by the refusal that restarted it. */
+  private restartNotice = "error.flow_restart_required";
 
   private async startFlow(): Promise<void> {
     this.loading = true;
@@ -814,14 +931,17 @@ export class ZitadelLogin extends ZitadelSurface {
               "`configureZitadel({ projectId })`, or a `project` handle) to start a flow.",
           );
         }
-        wire = await apiStartFlow(api, {
+        const request: CreateFlowBody = {
           project_id: cfg.projectId,
           purpose: this.purpose,
           ...(this.flowName ? { flow_definition_name: this.flowName } : {}),
+        };
+        wire = await apiStartFlow(api, request).catch((error: unknown) => {
+          throw describeStartError(error, request);
         });
       }
       if (this.restarting) {
-        wire = { ...wire, step: { ...wire.step, error: "error.flow_restart_required" } };
+        wire = { ...wire, step: { ...wire.step, error: this.restartNotice } };
       }
       void this.applyResponse(wire);
       // Symmetric with `submit()`: every applied step announces itself, the
@@ -831,7 +951,7 @@ export class ZitadelLogin extends ZitadelSurface {
       emit(this, "zitadel-flow-step", { step: wire.step });
     } catch (error) {
       if (await this.restartIfRequired(error)) return;
-      this.handleTransportError(this.describeFlowSelectionError(error));
+      this.handleTransportError(error);
     } finally {
       this.loading = false;
     }
@@ -861,12 +981,24 @@ export class ZitadelLogin extends ZitadelSurface {
 
   /**
    * Start a fresh flow when the server says this one cannot continue (a
-   * parked identity whose connection or schema no longer fits). Returns
-   * whether it did; a second refusal before any step rendered is reported as
-   * an ordinary error instead.
+   * parked identity whose connection no longer fits). Returns whether it did;
+   * a second refusal before any step rendered is reported as an ordinary
+   * error instead. A provider identity linked to a user of another schema
+   * also starts a fresh flow, but its notice does not ask the visitor to start
+   * again, since the same provider can never succeed here.
    */
   private async restartIfRequired(error: unknown): Promise<boolean> {
-    if (this.restarting || apiErrorCode(error) !== "flow.restart_required") return false;
+    const code = apiErrorCode(error);
+    if (
+      this.restarting ||
+      (code !== "flow.restart_required" && code !== "flow.sso_user_schema_mismatch")
+    ) {
+      return false;
+    }
+    this.restartNotice =
+      code === "flow.sso_user_schema_mismatch"
+        ? "error.sso_user_schema_mismatch"
+        : "error.flow_restart_required";
     this.restarting = true;
     this.resumeFlowId = "";
     // Values typed into the refused flow (a password included) must not be
@@ -877,32 +1009,8 @@ export class ZitadelLogin extends ZitadelSurface {
     return true;
   }
 
-  /**
-   * When a `flow-name` lookup fails, the server's envelope only says
-   * "not found" / "purpose mismatch" — it cannot know the name came from
-   * an attribute. Rewrap those two codes with the attribute and the fix;
-   * every other error passes through untouched.
-   */
-  private describeFlowSelectionError(error: unknown): unknown {
-    if (!this.flowName) return error;
-    const code = apiErrorCode(error);
-    if (code === "flowdef.not_found") {
-      return new Error(
-        `<zitadel-login> flow-name="${this.flowName}" does not match any active flow ` +
-          `definition in this project. Check the \`name\` in your flow file and that ` +
-          `it has been applied (\`zitadel apply\`).`,
-      );
-    }
-    if (code === "flowdef.purpose_mismatch") {
-      return new Error(
-        `<zitadel-login> flow-name="${this.flowName}" matched a flow definition that ` +
-          `does not serve purpose "${this.purpose}".`,
-      );
-    }
-    return error;
-  }
-
   private async applyResponse(wire: CreateFlow201): Promise<void> {
+    this.signupSolve?.abort();
     this.restarting = false;
     // A fresh response carries fresh (or no) errors — un-dismiss.
     this.stepErrorDismissed = false;
@@ -911,6 +1019,13 @@ export class ZitadelLogin extends ZitadelSurface {
     // turn later, and by then the terminal screen has already painted. A
     // preview navigates nowhere, so it never holds the loader for it.
     this.completing = !preview && navigatesOnComplete(wire, this.postSignInUrl);
+    // A secret is for the step it was typed on: a step that offers another
+    // account, or a later step that asks for a password again, starts empty.
+    // A re-render of the same step (a refused value) keeps what was typed.
+    const leaving = this.response?.step;
+    if (leaving !== undefined && leaving.name !== wire.step.name) {
+      this.formValues = withoutSecrets(this.formValues, leaving);
+    }
     this.response = wire;
     const { branding, issues } = validateBranding(wire.branding, {
       renderingOrigin: this.ownerDocument.location.origin,
@@ -932,6 +1047,7 @@ export class ZitadelLogin extends ZitadelSurface {
       return;
     }
 
+    this.prepareSignupProof(wire.id, wire.step);
     this.syncBackSentinel(wire.step);
 
     if (await this.maybeRedirectToProvider(wire)) return;
@@ -1105,6 +1221,11 @@ export class ZitadelLogin extends ZitadelSurface {
           // step doesn't render their field — the inline outlet is the
           // only place the template shows them.
           fields: (step.fields ?? []).map((field) => field.name),
+          // A length error names the bound the field carries, e.g. the
+          // password policy's minimum.
+          validations: Object.fromEntries(
+            (step.fields ?? []).map((field) => [field.name, field.validation]),
+          ),
         }) ?? [{ message: step.error }])
       : [];
     // A dismissed step error must not flicker back on the `loading`
@@ -1132,7 +1253,13 @@ export class ZitadelLogin extends ZitadelSurface {
       // preview renders none at all: the atom starts its ceremony on connect.
       challenge: this.loading || this.preview ? null : (step.challenge ?? null),
       identifier: step.identifier ?? null,
-      messages: [],
+      // Why the flow moved between sign-in and sign-up without being asked,
+      // on the step right after the move. A host that sets the notice's text
+      // to "" in `locales` opts out of it ({@link isHidden}).
+      messages:
+        step.notice && !isHidden(this.resolveLanguage(), this.locales, step.notice)
+          ? [{ level: "info", text_key: step.notice }]
+          : [],
       identity: this.deriveIdentity(),
       errors,
       branding: this.brandingForTemplate(),
@@ -1203,38 +1330,54 @@ export class ZitadelLogin extends ZitadelSurface {
   }
 
   /**
-   * Names of the current step's `required` fields whose captured value is
-   * empty. Reads each atom's live `formValue` (the getter reflects the native
-   * control, so autofill that skipped `input` events is still seen), so this
-   * is browser-independent and does not rely on native constraint validation.
+   * The validation error keys the current step's captured values earn, in the
+   * server's own dialect: `error.<field>_required` for an empty required
+   * field, `_min_length` / `_max_length` for a value outside the field's
+   * declared bounds. Reads the live values through {@link captureFieldValues},
+   * so autofill that skipped `input` events is both judged and kept when the
+   * error rebuilds the step. The server checks the same rules again.
    */
-  private missingRequiredFields(): string[] {
-    const values = new Map<string, string>();
-    for (const atom of this.fieldAtoms()) {
-      const name = atom.getAttribute("name");
-      if (name) values.set(name, atom.formValue);
-    }
-    return this.response
-      ? requiredFieldNames(this.response.step).filter((name) => (values.get(name) ?? "") === "")
-      : [];
+  private fieldRuleErrors(): string[] {
+    const values = this.captureFieldValues();
+    return this.response ? fieldRuleErrorKeys(this.response.step, values) : [];
   }
 
   /**
-   * Surface a client-side required-field error using the server's own
-   * validation dialect (`error.<field>_required`, "; "-joined), so it flows
-   * through the same localisation and inline/banner routing as a real
-   * backend rejection — no native browser bubble. Idempotent: re-running with
-   * the same keys (both submit entry points fire on one click) is a no-op.
+   * Surface client-side field errors (keys from {@link fieldRuleErrors},
+   * "; "-joined), so they flow through the same localisation and
+   * inline/banner routing as a real backend rejection — no native browser
+   * bubble. The same keys again are a no-op while their error still shows;
+   * once the user edited it away they show it again, through
+   * {@link errorRevision}.
    */
-  private reportRequiredErrors(fields: readonly string[]): void {
+  private reportFieldErrors(keys: readonly string[]): void {
     if (!this.response) return;
-    const errorKey = fields.map((name) => `error.${name}_required`).join("; ");
-    if (this.response.step.error === errorKey) return;
+    const errorKey = keys.join("; ");
+    if (this.response.step.error === errorKey && !this.stepErrorDismissed) return;
     this.stepErrorDismissed = false;
+    this.errorRevision += 1;
     this.response = {
       ...this.response,
       step: { ...this.response.step, error: errorKey },
     };
+  }
+
+  /**
+   * Read every rendered field atom's live `formValue` (the getter reflects the
+   * native control, so autofill that skipped `input` events is still seen)
+   * and fold the values into `formValues`, which a step rebuild restores.
+   * Tag-agnostic: every form-participating atom is read the same way.
+   */
+  private captureFieldValues(): Map<string, string> {
+    const current = new Map<string, string>();
+    for (const atom of this.fieldAtoms()) {
+      const name = atom.getAttribute("name");
+      if (name) current.set(name, atom.formValue);
+    }
+    if (current.size > 0) {
+      this.formValues = { ...this.formValues, ...Object.fromEntries(current) };
+    }
+    return current;
   }
 
   /**
@@ -1247,14 +1390,7 @@ export class ZitadelLogin extends ZitadelSurface {
    * cross-step identity (the signed-in greeting) and post-error restoration.
    */
   private collectSubmitFields(): SubmitFlowStepBodyFields {
-    const current = new Map<string, string>();
-    for (const atom of this.fieldAtoms()) {
-      const name = atom.getAttribute("name");
-      if (name) current.set(name, atom.formValue);
-    }
-    if (current.size > 0) {
-      this.formValues = { ...this.formValues, ...Object.fromEntries(current) };
-    }
+    const current = this.captureFieldValues();
     const fields: SubmitFlowStepBodyFields = {};
     for (const f of this.response?.step.fields ?? []) {
       const value = current.get(f.name) ?? "";
@@ -1277,7 +1413,7 @@ export class ZitadelLogin extends ZitadelSurface {
       // "required" error instead of an enum mismatch. Other fields keep the ""
       // default so required-checks and challenge dispatch still run.
       if (f.type === "select" && !isAllowedSelectValue(f, value)) continue;
-      fields[f.name] = value;
+      fields[f.name] = f.type === "date_time" ? localDateTimeToRfc3339(value) : value;
     }
     return fields;
   }
@@ -1294,6 +1430,16 @@ export class ZitadelLogin extends ZitadelSurface {
    */
   private stepErrorDismissed = false;
 
+  /**
+   * Bumped by every client-side error report that is not a no-op, whether its
+   * keys are new or the same keys the user had edited away. The step markup
+   * carries it, so `unsafeHTML`, which keeps a subtree whose markup is
+   * unchanged, rebuilds the step and an error {@link clearStaleErrors} removed
+   * comes back. With new keys the step would rebuild anyway, so the bump is
+   * harmless there.
+   */
+  private errorRevision = 0;
+
   private handleAtomInput = (event: CustomEvent<ZlFieldInputDetail>): void => {
     if (!event.detail) return;
     const { name, value } = event.detail;
@@ -1304,11 +1450,7 @@ export class ZitadelLogin extends ZitadelSurface {
     // The widget never broadcasts a password or one-time-code value through its
     // own events. It cannot hide the input from other scripts on the same page.
     const field = this.response?.step.fields?.find((candidate) => candidate.name === name);
-    const autocompleteTokens = (field?.autocomplete ?? "").toLowerCase().split(/\s+/);
-    const secretTokens = ["current-password", "new-password", "one-time-code"];
-    const hasSecretToken = autocompleteTokens.some((token) => secretTokens.includes(token));
-    const isSecret = field?.type === "password" || hasSecretToken;
-    if (isSecret) {
+    if (field !== undefined && isSecretField(field)) {
       return;
     }
     emit(this, "zitadel-flow-input", { name, value });
@@ -1401,10 +1543,12 @@ export class ZitadelLogin extends ZitadelSurface {
   /** Secondary navigation rows (`data-action` on `.zl-card-nav__link`). */
   private handleDelegatedAction = (event: Event): void => {
     const target = (event.target as HTMLElement | null)?.closest<HTMLElement>("[data-action]");
-    if (!target || target.closest("zl-button") || this.loading) return;
+    if (!target || target.closest("zl-button")) return;
     const action = target.getAttribute("data-action");
     if (!action) return;
+    // An ignored click still must not follow href="#" and change history.
     event.preventDefault();
+    if (this.loading) return;
     void this.submit(action);
   };
 
@@ -1422,9 +1566,9 @@ export class ZitadelLogin extends ZitadelSurface {
     // empty required value for the server to reject. Secondary actions (back,
     // skip, passkey…) arrive via `zl-submit` → `handleAtomSubmit`, so they are
     // never gated.
-    const missing = this.missingRequiredFields();
-    if (missing.length > 0) {
-      this.reportRequiredErrors(missing);
+    const ruleErrors = this.fieldRuleErrors();
+    if (ruleErrors.length > 0) {
+      this.reportFieldErrors(ruleErrors);
       return;
     }
     // `submitter` is the button that triggered the submit. When the user
@@ -1529,6 +1673,66 @@ export class ZitadelLogin extends ZitadelSurface {
     target?.focus();
   }
 
+  private signupSolve?: AbortController;
+  private signupProof?: { id: string; proof: string };
+  /** The check a passkey sign-up solves while its ceremony runs, by the ceremony's id. */
+  private signupPrepare?: { ceremony: string; controller: AbortController; done: Promise<void> };
+  /** The ceremony whose attestation {@link signupProof} is for. */
+  private signupCeremony?: string;
+
+  /**
+   * Solve a passkey sign-up's check while its ceremony runs, so the proof is
+   * ready before the authenticator stores a passkey. The step announces the
+   * gate; its challenge comes with a step GET, as for a password sign-up. A
+   * check that fails first takes the ceremony off the step, which stops it:
+   * nobody is left holding a passkey for an account that was never made. The
+   * browser's prompt is not held back for any of it.
+   */
+  private prepareSignupProof(flowId: string, step: CreateFlow201["step"]): void {
+    // Every response passes here, and one a host resumed from its own render
+    // may carry no `gates` at all: that is a step without a check.
+    const gates = step.gates as CreateFlow201["step"]["gates"] | undefined;
+    const ceremony = gates?.signup_pow ? step.challenge?.challenge_id : undefined;
+    if (this.signupPrepare && this.signupPrepare.ceremony !== ceremony) {
+      this.signupPrepare.controller.abort();
+      this.signupPrepare = undefined;
+    }
+    if (ceremony === undefined || this.signupPrepare) return;
+    if (this.signupCeremony === ceremony && this.signupProof) return;
+    const controller = new AbortController();
+    const prepare = async (): Promise<void> => {
+      const { api } = resolveApi(this.project, this.projectAttrs, "<zitadel-login>");
+      const fresh = await getCurrentStep(api, flowId);
+      stopIfAborted(controller.signal);
+      // A flow that moved on, or a server that stopped asking, needs no proof.
+      const gate = fresh.step.name === step.name ? fresh.step.gates.signup_pow : undefined;
+      if (!gate) return;
+      if (gate.provider !== "zitadel_pow" || gate.kind !== "captcha" || !gate.challenge) {
+        throw new Error("Signup check is unavailable. Refresh and try again.");
+      }
+      if (this.signupProof?.id !== gate.challenge.challenge_id) {
+        const proof = await solveSignupPow(gate.challenge, controller.signal);
+        this.signupProof = { id: gate.challenge.challenge_id, proof };
+      }
+      this.signupCeremony = ceremony;
+    };
+    const done = prepare()
+      .catch(async (error: unknown) => {
+        if (controller.signal.aborted) return;
+        // An attestation already on its way runs the check itself and reports.
+        if (this.loading || this.response?.step.challenge?.challenge_id !== ceremony) return;
+        if (await this.restartIfRequired(error)) return;
+        await this.keepSignupForm(error, apiErrorCode(error), true);
+      })
+      .finally(() => {
+        if (this.signupPrepare?.controller === controller) this.signupPrepare = undefined;
+      });
+    this.signupPrepare = { ceremony, controller, done };
+  }
+
+  /** Settles when the submit in flight ends, so a back gesture can wait out a stopped sign-up check. */
+  private submitted: Promise<void> = Promise.resolve();
+
   private async submit(
     action: string | null,
     challengeResponse?: SubmitFlowStepBodyChallengeResponse,
@@ -1537,9 +1741,14 @@ export class ZitadelLogin extends ZitadelSurface {
     // Every other entry point (actions, back, passkey proofs) lands here, so
     // this one check keeps a preview from ever writing to the flow.
     if (!this.response || this.loading || this.preview) return;
-    const { id, session_token } = this.response;
+    const shown = this.response;
+    const { id, session_token } = shown;
     this.pendingAction = action ?? "submit";
     this.loading = true;
+    let settle = () => {};
+    this.submitted = new Promise((resolve) => (settle = resolve));
+    // From the step GET to the solved proof: a failure there keeps the form.
+    let checking = false;
     try {
       // Only send field values the current step defines. `formValues` carries
       // state across steps (e.g. email for the signed-in greeting), but
@@ -1558,19 +1767,160 @@ export class ZitadelLogin extends ZitadelSurface {
           : {}),
       };
       const { api } = resolveApi(this.project, this.projectAttrs, "<zitadel-login>");
-      const wire = await apiSubmitStep(api, id, body);
+      // A password sign-up spends its proof on the step's submit, a passkey
+      // sign-up on the attestation. Only the step carrying the ceremony says
+      // whether it creates a user, so its proof is solved while the ceremony
+      // runs (`prepareSignupProof`) and is ready here.
+      const signingUp =
+        this.response.step.actions.find((a) => a.name === body.action)?.kind === "submit" ||
+        challengeResponse?.method === "passkey_register";
+      let wire: CreateFlow201 | undefined;
+      if (signingUp && this.response.step.gates.signup_pow) {
+        const controller = new AbortController();
+        this.signupSolve = controller;
+        checking = true;
+        let prepared: string | undefined;
+        if (challengeResponse) {
+          // A check still running when the ceremony ends is waited out.
+          await this.signupPrepare?.done;
+          stopIfAborted(controller.signal);
+          if (this.signupCeremony === challengeResponse.challenge_id) {
+            prepared = this.signupProof?.proof;
+            // Sent once: a later attestation of this ceremony asks again.
+            this.signupCeremony = undefined;
+          }
+        }
+        // Refresh before solving: a previous attempt may have spent its proof,
+        // or the person may have left the password form open past its expiry.
+        // Keep the entered fields; GET only refreshes the server-owned gate.
+        // An attestation holding the proof solved during its ceremony needs
+        // neither.
+        const fresh = prepared === undefined ? await getCurrentStep(api, id) : shown;
+        stopIfAborted(controller.signal);
+        if (prepared !== undefined) {
+          body.gate_proofs = { signup_pow: prepared };
+        } else if (fresh.step.name !== this.response.step.name) {
+          // The flow moved on without this submit: show where it is.
+          wire = fresh;
+        } else {
+          // A server that stopped asking for a proof (a rollback) takes the
+          // submit without one.
+          const gate = fresh.step.gates.signup_pow;
+          if (gate) {
+            if (gate.provider !== "zitadel_pow" || gate.kind !== "captcha" || !gate.challenge) {
+              throw new Error("Signup check is unavailable. Refresh and try again.");
+            }
+            if (this.signupProof?.id !== gate.challenge.challenge_id) {
+              this.signupProof = {
+                id: gate.challenge.challenge_id,
+                proof: await solveSignupPow(gate.challenge, controller.signal),
+              };
+            }
+            body.gate_proofs = { signup_pow: this.signupProof.proof };
+          }
+          // The last moment a back gesture can stop the sign-up.
+          stopIfAborted(controller.signal);
+          // The fields stay editable during the check: send what they show now.
+          body.fields = this.collectSubmitFields();
+        }
+        checking = false;
+      }
+      wire ??= await apiSubmitStep(api, id, body);
       void this.applyResponse(wire);
       emit(this, "zitadel-flow-step", { step: wire.step });
     } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        // Only the step this attestation answered: a response that replaced
+        // it keeps its own ceremony.
+        if (challengeResponse && this.response === shown) this.holdCeremony();
+        return;
+      }
       if (await this.restartIfRequired(error)) return;
+      const code = apiErrorCode(error);
+      const refused = code === "flow.proof_invalid" || code === "flow.rate_limited";
+      // A dropped connection or a server fault during the check can pass on a
+      // retry; a 4xx such as a flow that is gone cannot.
+      const failed = checking && !(error instanceof ApiError && error.status < 500);
+      if (this.response && (refused || failed)) {
+        await this.keepSignupForm(error, code, challengeResponse !== undefined);
+        return;
+      }
       this.handleTransportError(error);
     } finally {
+      this.signupSolve = undefined;
       this.pendingAction = null;
       this.loading = false;
+      settle();
     }
     // Preview switched on while this submit was in flight: show the step it
     // landed on in the chosen state.
     if (this.preview) this.applyPreviewState();
+  }
+
+  /**
+   * Keep the sign-up form and its values for a retry after its check failed
+   * or the server refused the proof, with a message from the locale catalog.
+   * A refused proof is dropped and the step refreshed, so a step rendered
+   * without the gate, by a server from before it, carries it on the retry.
+   * After a passkey sign-up's attestation the step comes back without its
+   * ceremony, for the reason {@link holdCeremony} gives.
+   */
+  private async keepSignupForm(
+    error: unknown,
+    code: string | undefined,
+    ceremony = false,
+  ): Promise<void> {
+    const current = this.response;
+    if (!current) return;
+    console.warn("[zitadel-login] signup check failed:", error);
+    const key =
+      code === "flow.rate_limited"
+        ? "error.signup_rate_limited"
+        : globalThis.crypto?.subtle
+          ? "error.signup_check_failed"
+          : "error.signup_secure_connection";
+    let base = current;
+    if (code === "flow.proof_invalid") {
+      this.signupProof = undefined;
+      try {
+        const { api } = resolveApi(this.project, this.projectAttrs, "<zitadel-login>");
+        const fresh = await getCurrentStep(api, current.id);
+        if (fresh.step.name === current.step.name) base = fresh;
+      } catch {
+        // The retry refreshes the step again before it solves.
+      }
+    }
+    const step = { ...base.step, error: key };
+    if (ceremony) delete step.challenge;
+    await this.applyResponse({ ...base, step });
+    emit(this, "zitadel-flow-error", { message: this.resolveLocale()[key] ?? key });
+  }
+
+  /**
+   * Drop the ceremony from the step a stopped or refused attestation left:
+   * rendered again, it would mount a fresh `<zl-passkey>` that starts the
+   * ceremony unasked. Picking the passkey again resumes the server's pending
+   * ceremony.
+   */
+  private holdCeremony(): void {
+    if (!this.response?.step.challenge) return;
+    const { challenge: _dropped, ...step } = this.response.step;
+    this.response = { ...this.response, step };
+  }
+
+  /**
+   * Submit the step's back action. During a sign-up check it stops the check
+   * first, so the account the person is leaving is not created; once the
+   * check's submit has been sent, it finishes and decides where the flow is.
+   */
+  private async goBack(action: string): Promise<void> {
+    if (this.signupSolve) {
+      const step = this.response?.step.name;
+      this.signupSolve.abort();
+      await this.submitted;
+      if (this.response?.step.name !== step) return;
+    }
+    await this.submit(action);
   }
 
   /**
@@ -1612,7 +1962,7 @@ export class ZitadelLogin extends ZitadelSurface {
       if (backAction) {
         history.pushState({ zl: true }, "");
         this.armed = true;
-        void this.submit(backAction.name);
+        void this.goBack(backAction.name);
       }
       return;
     }
@@ -1636,6 +1986,28 @@ export class ZitadelLogin extends ZitadelSurface {
     console.error("[zitadel-login]", error);
     emit(this, "zitadel-flow-error", { message });
   }
+}
+
+/**
+ * What a `date_time` field submits: `datetime-local` yields local time with no
+ * offset (`2026-11-03T12:00`), which the server's `date-time` format refuses.
+ * An empty or unparsable value goes as it is, for the server to judge.
+ */
+function localDateTimeToRfc3339(value: string): string {
+  const parsed = new Date(value);
+  return value === "" || Number.isNaN(parsed.getTime()) ? value : parsed.toISOString();
+}
+
+/**
+ * What a `date_time` field shows for a value the server prefills: an RFC 3339
+ * timestamp is no valid `datetime-local` value, so the browser would blank it
+ * and the next submit would clear it. Anything else goes as it is.
+ */
+function rfc3339ToLocalDateTime(value: string): string {
+  const parsed = new Date(value);
+  if (!/(?:Z|[+-]\d{2}:\d{2})$/i.test(value) || Number.isNaN(parsed.getTime())) return value;
+  const shifted = new Date(parsed.getTime() - parsed.getTimezoneOffset() * 60_000);
+  return shifted.toISOString().slice(0, -1);
 }
 
 /**
@@ -1720,6 +2092,31 @@ function requiredFieldNames(step: CreateFlow201Step): string[] {
 }
 
 /**
+ * The error keys `values` earn against `step`'s required fields and length
+ * bounds. Length counts code points, as the server does; an empty value is
+ * judged only by `required`, and a checkbox not at all, since the server
+ * applies no string rules to a boolean.
+ */
+function fieldRuleErrorKeys(
+  step: CreateFlow201Step,
+  values: ReadonlyMap<string, string>,
+): string[] {
+  return (step.fields ?? []).flatMap((field) => {
+    if (field.type === "checkbox") return [];
+    const value = values.get(field.name) ?? "";
+    if (value === "") return field.required ? [`error.${field.name}_required`] : [];
+    // A password is measured after NFC normalization, as the server and
+    // its password policy measure it.
+    const measured = field.type === "password" ? value.normalize("NFC") : value;
+    const length = Array.from(measured).length;
+    const { min_length: min, max_length: max } = field.validation ?? {};
+    if (min && length < min) return [`error.${field.name}_min_length`];
+    if (max && length > max) return [`error.${field.name}_max_length`];
+    return [];
+  });
+}
+
+/**
  * Whether a terminal step ends in a navigation rather than a screen: a
  * `redirect` with a URI, or a `show` whose handoff the widget exchanges before
  * sending the browser to `post-sign-in-url`. A `show` without a
@@ -1741,7 +2138,8 @@ function collectInitialValues(step: CreateFlow201Step): Record<string, string> {
   const values: Record<string, string> = {};
   if (!step.fields) return values;
   for (const field of step.fields) {
-    values[field.name] = typeof field.value === "string" ? field.value : "";
+    const value = typeof field.value === "string" ? field.value : "";
+    values[field.name] = field.type === "date_time" ? rfc3339ToLocalDateTime(value) : value;
   }
   return values;
 }

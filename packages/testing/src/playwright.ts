@@ -3,7 +3,7 @@ import { test as base, type Page } from "@playwright/test";
 import { waitForHandshake } from "./handshake";
 import { connectZitadel } from "./index";
 import { enableVirtualPasskey, type VirtualPasskey } from "./passkey";
-import { sessionCookieName } from "./session";
+import { browserSessionCookieName, secureSessionCookie, sessionCookieName } from "./session";
 import type {
   ConnectedZitadel,
   Identity,
@@ -34,8 +34,9 @@ export interface ZitadelTestFixtures {
   /**
    * Start the test authenticated: a fresh user, a real session minted through
    * the flow API, and its cookie injected into a dedicated browser context,
-   * under the server's name and under the project's ({@link sessionCookieName}),
-   * so it signs the app in whichever cookie its proxy reads. The default `page`
+   * under the server's name ({@link browserSessionCookieName}) and under the
+   * project's ({@link sessionCookieName}) for its `baseURL`, so it signs the
+   * app in whichever cookie its proxy reads. The default `page`
    * stays signed out for login-flow tests. Requires `use.baseURL` (every withZitadel
    * consumer sets it).
    */
@@ -67,13 +68,14 @@ export const test = base.extend<ZitadelTestFixtures, ZitadelWorkerFixtures>({
         );
       }
       // Wait, don't read-once: the supervisor's Playwright readiness URL is
-      // the instance's /healthz, which answers as soon as the *server* is up
-      // — the handshake lands only after *bootstrap* (project, schema,
-      // flows) completes a moment later. Suites with an `app` entry never
-      // see the gap (the app runner waits for the handshake before the app
-      // reports ready), but in app-less mode the first worker can get here
-      // first. Bootstrap after health is seconds at most, so the default
-      // wait is generous; a bootstrap failure surfaces as this timeout.
+      // the instance's /readyz, which answers as soon as the *server* and its
+      // database are up — the handshake lands only after *bootstrap*
+      // (project, schema, flows) completes a moment later. Suites with an
+      // `app` entry never see the gap (the app runner waits for the handshake
+      // before the app reports ready), but in app-less mode the first worker
+      // can get here first. Bootstrap after readiness is seconds at most, so
+      // the default wait is generous; a bootstrap failure surfaces as this
+      // timeout.
       await use(connectZitadel(await waitForHandshake(handshakePath)));
     },
     // `auto`: every worker waits for the bootstrapped instance before its
@@ -111,11 +113,18 @@ export const test = base.extend<ZitadelTestFixtures, ZitadelWorkerFixtures>({
     // session goes in under both names, so it signs the app in whichever its
     // proxy reads: a server SDK and the dev proxy setup writes read the
     // project's cookie (ADR 073), a proxy that passes the server's cookie
-    // through reads that one.
+    // through reads that one. Both are the names a browser at baseURL holds,
+    // with Secure and the `__Host-` prefix unless it is loopback http (ADR 083).
     const { path: _path, ...cookie } = session.cookie;
+    const secure = secureSessionCookie(baseURL);
     await context.addCookies([
-      { ...cookie, url: baseURL },
-      { ...cookie, name: sessionCookieName(zitadel.handle.projectId), url: baseURL },
+      { ...cookie, name: browserSessionCookieName(baseURL), secure, url: baseURL },
+      {
+        ...cookie,
+        name: sessionCookieName(zitadel.handle.projectId, baseURL),
+        secure,
+        url: baseURL,
+      },
     ]);
     const page = await context.newPage();
     await use({ page, user: session.user, session });
@@ -149,7 +158,7 @@ export type { VirtualPasskey } from "./passkey";
 export { withZitadel } from "./playwright-config";
 export type { WithZitadelOptions } from "./playwright-config";
 export { identity } from "./seed";
-export { SESSION_COOKIE_NAME, sessionCookieName } from "./session";
+export { browserSessionCookieName, SESSION_COOKIE_NAME, sessionCookieName } from "./session";
 export type {
   ConnectedZitadel,
   Identity,

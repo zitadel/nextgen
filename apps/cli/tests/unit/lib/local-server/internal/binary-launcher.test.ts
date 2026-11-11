@@ -1,13 +1,15 @@
 import { spawn } from "node:child_process";
-import { mkdtemp } from "node:fs/promises";
+import { appendFileSync } from "node:fs";
+import { appendFile, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { BinaryLauncher } from "../../../../../src/lib/local-server/internal/binary-launcher";
-import { launched } from "../../../../../src/lib/local-server/internal/lifecycle";
-import { aBinaryRecord } from "../../../../helpers/runtime-record";
+import { AppendedLog, BinaryLauncher } from "@/lib/local-server/internal/binary-launcher";
+import { launched } from "@/lib/local-server/internal/lifecycle";
+import { ManualClock } from "@tests/helpers/clock";
+import { aBinaryRecord } from "@tests/helpers/runtime-record";
 
 const resolver = vi.hoisted(() => ({ missing: false }));
 
@@ -40,8 +42,6 @@ describe("local server binary helpers", () => {
     // a `vi.fn()` module mock's `.mock.calls`, so without this a later test reads
     // an earlier test's `spawn.mock.calls[0]`.
     vi.clearAllMocks();
-    vi.restoreAllMocks();
-    vi.unstubAllEnvs();
   });
 
   it("spawns the server with the address, data dir, and public base env", async () => {
@@ -261,18 +261,18 @@ describe("local server binary helpers", () => {
   });
 
   it("signals the process group even when its leader is already dead", async () => {
-    let groupAlive = true;
+    const signals: (string | number | undefined)[] = [];
     const kill = vi
       .spyOn(process, "kill")
       .mockImplementation((pid: number, signal?: string | number) => {
         if (pid === 12345) {
           throw errno("ESRCH");
         }
+        signals.push(signal);
         if (signal === "SIGTERM") {
-          groupAlive = false;
           return true;
         }
-        if (groupAlive) {
+        if (!signals.includes("SIGTERM")) {
           return true;
         }
         throw errno("ESRCH");
@@ -328,6 +328,90 @@ describe("local server binary helpers", () => {
     });
     expect(kill).toHaveBeenCalledWith(-12345, "SIGTERM");
     expect(kill).toHaveBeenCalledWith(-12345, "SIGKILL");
+  });
+});
+
+describe("reading a server's log file", () => {
+  const dirs: string[] = [];
+
+  afterEach(async () => {
+    for (const dir of dirs.splice(0)) {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  /** Where a server's log goes, holding `content` if any is given. */
+  async function aLogFile(content?: string | Buffer): Promise<string> {
+    const dir = await mkdtemp(join(tmpdir(), "zitadel-server-log-"));
+    dirs.push(dir);
+    const path = join(dir, "server.log");
+    if (content !== undefined) {
+      await writeFile(path, content);
+    }
+    return path;
+  }
+
+  it("reads the whole file first, then only what was appended", async () => {
+    const path = await aLogFile("level=INFO msg=one\n");
+    const log = new AppendedLog(path);
+
+    await expect(log.next()).resolves.toBe("level=INFO msg=one\n");
+    await appendFile(path, "level=WARN msg=two\n");
+    await expect(log.next()).resolves.toBe("level=WARN msg=two\n");
+    await expect(log.next()).resolves.toBe("");
+  });
+
+  it("keeps a character whole when a read ends inside it", async () => {
+    const path = await aLogFile(Buffer.from([0xc3]));
+    const log = new AppendedLog(path);
+
+    await expect(log.next()).resolves.toBe("");
+    await appendFile(path, Buffer.from([0xa9, 0x0a]));
+    await expect(log.next()).resolves.toBe("é\n");
+  });
+
+  it("reads a file that is not there yet as empty, and the file once it is", async () => {
+    const path = await aLogFile();
+    const log = new AppendedLog(path);
+
+    await expect(log.next()).resolves.toBe("");
+    await writeFile(path, "level=INFO msg=up\n");
+    await expect(log.next()).resolves.toBe("level=INFO msg=up\n");
+  });
+
+  it("reads a file that got shorter, as after it was deleted, from the top", async () => {
+    const path = await aLogFile("level=INFO msg=a long first line\n");
+    const log = new AppendedLog(path);
+    await log.next();
+
+    await writeFile(path, "level=INFO msg=b\n");
+
+    await expect(log.next()).resolves.toBe("level=INFO msg=b\n");
+  });
+
+  it("follows the file until it is stopped, handing over what was there apart from what came after", async () => {
+    const path = await aLogFile("level=INFO msg=one\n");
+    const stop = new AbortController();
+    const existing: string[] = [];
+    const appended: string[] = [];
+    const waits: number[] = [];
+    const clock = new ManualClock(() => {
+      waits.push(1);
+      if (waits.length === 1) {
+        appendFileSync(path, "level=WARN msg=two\n");
+      } else {
+        stop.abort();
+      }
+    });
+
+    await BinaryLauncher.followLogs(
+      path,
+      { existing: (text) => existing.push(text), appended: (text) => appended.push(text) },
+      { clock, signal: stop.signal },
+    );
+
+    expect(existing).toEqual(["level=INFO msg=one\n"]);
+    expect(appended).toEqual(["level=WARN msg=two\n"]);
   });
 });
 

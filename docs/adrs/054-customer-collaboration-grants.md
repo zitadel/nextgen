@@ -14,9 +14,16 @@
 > so claim selects an explicitly authorized target team instead of always
 > reusing the claimer's personal team.
 >
+> **Amended by:** [ADR 075](075-platform-operators.md) — §10's time-bounded
+> grant branch does not apply to platform operators, whose access is standing.
+>
 > **Amended 2026-09-21** (§8): deactivating a team that still holds an active
 > owning-team assignment is rejected until ownerless-team recovery exists
 > (zitadel/nextgen#1261).
+>
+> **Amended 2026-11-03** (§4): a direct user grant and a team grant to a
+> foreign principal both need a claimed protected project
+> (zitadel/nextgen#2653).
 
 ## Context
 
@@ -255,6 +262,19 @@ its access-group use. Access-team lifecycle authorization uses the existing team
 contract; this ADR does not give customer owners authority over every team in
 the platform project.
 
+### Amendment (2026-11-03): sharing needs a claimed project
+
+Both collaboration primitives, direct user grants and team grants, require a
+claimed protected project (an active owning-team assignment, §2) when the
+principal is foreign to the protected project and the server has a platform
+project. An unclaimed project has no owner to share it, so the grant API
+refuses with `403 grant.project_unclaimed` for every locator, before it
+resolves the principal. The platform project granting its own principals is
+unaffected, and so is every grant on a server without a platform project,
+such as a self-hosted one, where no project can be claimed
+([ADR 053 §2 amendment](053-cross-project-principals.md#amendment-2026-11-03-a-foreign-grant-needs-a-claimed-project),
+zitadel/nextgen#2653).
+
 ### 5. Project roles are additive and monotonic
 
 The v1 project roles are:
@@ -319,6 +339,12 @@ Customer-issued grants need no agency-side request flow in v1. The customer
 names the target user or team (by id or unique locator) and remains
 responsible for granting and revoking access. Invitations, approval
 handshakes, and a discoverable agency directory are later product surfaces.
+
+### Amendment (2026-11-04): invitations
+
+[ADR 086](086-invitations.md) adds invitations as their own resource. Pending
+invitation state lives there, not on `team_memberships` (§1), and project
+grants can be offered through an invitation link as well as created directly.
 
 ### 7. Project creation and claim name the target team
 
@@ -437,7 +463,9 @@ composed into the same SQL query, not after fetching an unfiltered page.
 Customer team ownership and customer/agency access-team grants never imply
 deployment-wide operator or staff-support authority. Staff support does not
 require membership in the customer's owning team and must use its own
-time-bounded, audited grant branch.
+time-bounded, audited grant branch. [ADR 075](075-platform-operators.md)
+defines that branch as the `platform.operator` relation and, if accepted,
+makes it standing until a narrower support tier exists.
 
 The Console may render customer management and instance-operator surfaces in
 one application, but it derives each capability independently. It must not use
@@ -487,6 +515,12 @@ The stable service-backed test matrix must include:
     restores its owner authority, and a platform-project administrator can
     assign `team.owner` to another active participant. The same privileged
     assignment is rejected while the team still has an active owner (§8).
+18. On a server with a platform project, an unclaimed project cannot grant a
+    platform user or a platform team, by any locator (§4 amendment).
+19. A project secret cannot read a granted platform user's schema,
+    attributes or metadata through the grant API.
+20. A user-bound session without read on the principal's home project cannot
+    expand a grant principal; it sees the label only.
 
 ## Consequences
 

@@ -1,0 +1,70 @@
+post:
+  operationId: createAuthAttempt
+  summary: Create an authentication attempt
+  # Sealed `deployment_id` and `release_id` are filled only when create runs
+  # with a runtime resolution already on the context (the flow create path).
+  # This HTTP entry point does not resolve the browser `Origin` itself.
+  description: |
+    Creates an authentication attempt, one sign-in round that expires 15 minutes after creation.
+
+    An authentication attempt collects the proofs for one sign-in and ends in a
+    handoff token. A handoff token is the short-lived, single-use credential that
+    a completed attempt hands to the session exchange. A client makes these calls
+    in order:
+
+    1. `createAuthAttempt` (`POST /auth_attempts`) creates the attempt.
+    2. `issueChallenge` (`POST /auth_attempts/{attempt_id}/challenges`) issues a challenge, a request to prove one factor such as
+       `identifier`, `password` or `passkey`.
+    3. `verifyChallengeProof` (`POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify`) submits the proof for that challenge: the
+       credential, code or assertion. Repeat steps 2 and 3 until
+       `getAuthAttempt` (`GET /auth_attempts/{attempt_id}`) reports state `completed`, which means every factor in
+       `required_factors` is verified.
+    4. `createHandoff` (`POST /auth_attempts/{attempt_id}/handoff`) completes the attempt and returns the `handoff_token`.
+    5. `exchangeHandoff` (`POST /sessions/exchange`) exchanges the handoff token
+       for the session and its `session_token`.
+
+    The body takes a `project_id` and a `challenge_nonce` (from
+    `POST /bootstrap/challenge`). For step-up authentication, which adds factors
+    to an existing session, also send that session's `session_id` and its
+    `session_token`, as `createSession` (`POST /sessions`) or `exchangeHandoff` returned them.
+    The attempt's `attempt_id` in the response is the ID every later call takes.
+
+    The project comes from the project secret. A body `project_id` that names
+    another project answers `403` with `proj.mismatch`: send the credential's own
+    project. The attempt seals the project's newest primary deployment, whatever
+    the caller's `Origin`. With none it answers `409` with `rel.no_default`, and a
+    revoked release answers `409` with `rel.revoked`.
+  tags:
+    - Authentication Attempts
+  security:
+    - oauth2:
+        - auth_attempt.write
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: create-auth-attempt-request.yaml
+  responses:
+    '201':
+      description: The created authentication attempt.
+      content:
+        application/json:
+          schema:
+            $ref: auth-attempt-response.yaml
+    '403':
+      description: |
+        The body `project_id` does not match the project the credential
+        belongs to (`proj.mismatch`).
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+          examples:
+            mismatch:
+              summary: Body project_id disagrees with the credential
+              value:
+                code: proj.mismatch
+                message: 'the project named in the request is not the one the credential belongs to'
+    default:
+      $ref: createAuthAttempt-error-response.yaml

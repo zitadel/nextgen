@@ -11,7 +11,7 @@ If you want to add Zitadel to your own app rather than contribute here, see the
 
 ## Prerequisites
 
-- Go version from [`go.mod`](go.mod)
+- Go version from [`apps/api/go.mod`](apps/api/go.mod)
 - Node.js from [`.nvmrc`](.nvmrc)
 - pnpm 12 from [`package.json`](package.json) (`corepack enable`)
 - [Moon](https://moonrepo.dev/moon)
@@ -42,8 +42,7 @@ For changes to the Go server, APIs, or database layer.
 | ----------------------------------------------------- | ------------------------------------------ |
 | Install dependencies                                  | `corepack pnpm install --frozen-lockfile`  |
 | Verify my toolchain                                   | `moon run workspace:doctor`                |
-| Start the server (builds console + login-ui, then Go) | `moon run workspace:server`                |
-| Start the server (skip UI builds)                     | `go run . server --migrate`                |
+| Start the server (builds the console, then Go)        | `moon run workspace:server`                |
 | Debug and attach VSCode                               | `moon run workspace:server-debug`          |
 | Regenerate Go/OpenAPI artifacts                       | `moon run server:generate`                 |
 | Verify committed generated output                     | `moon run server:check-generate`           |
@@ -55,28 +54,33 @@ node_modules automatically (`.moon/workspace.yml` sets `installDependencies: fal
 
 ### Starting the server from source
 
-The Go binary embeds production builds of two frontend apps:
-- `apps/console` → `internal/staticui/console/dist/`
-- `apps/login-ui` → `internal/staticui/login/dist/`
+The Go binary embeds a production build of the console: `apps/console` →
+`apps/api/internal/staticui/console/dist/`.
 
-`moon run workspace:server` builds both apps before starting Go. If you have not
-changed any frontend code, skip the UI builds with `go run . server --migrate`.
-
-To build the UIs manually (when bypassing the wrapper):
+`moon run workspace:server` builds it before starting Go; when no console code
+changed, that build is a cache hit. The wrapper (`scripts/run-server.mjs`)
+compiles the Go module in `apps/api` and starts the binary from the repository
+root, so the server's config search and a relative `-c` path resolve against
+the checkout. Arguments after `--` go to the server:
 
 ```sh
-moon run console:build login-ui:build
-go run . server --migrate
+moon run workspace:server -- server --migrate -c docs/operations/nextgen.example.yaml
 ```
+
+The dev server keeps its data (the SQLite database and the master key) under
+`dist/server/dev/<branch>/nextgen-data`, one directory per Git branch: it
+survives rebuilds on the same branch, and a branch with other migrations never
+migrates another branch's database. `workspace:server-debug` keeps its own data
+beside its binary in `dist/server/`.
 
 With no database configured, the server uses SQLite at
 `<server.data_dir>/zitadel.db`. Override with `-c docs/operations/nextgen.example.yaml`,
 `NEXTGEN_DATABASE_SQLITE`, or `NEXTGEN_DATABASE_POSTGRES` when you want a
 path or DSN you manage. Schema migrations run when you pass `--migrate`;
 `moon run workspace:server` adds that flag. To apply schema and exit without
-serving, run `go run . migrate`.
+serving, run `moon run workspace:server -- migrate`.
 
-Open http://localhost:8080/ui/console/ and http://localhost:8080/ui/login/
+Open http://localhost:8080/ui/console/
 
 ### Debugging with VSCode
 
@@ -139,7 +143,7 @@ that version is published on npm.
 
 The wrapper sets `ZITADEL_TELEMETRY_ENV=development` unless you set it, so local
 builds, which report their unreleased version, stay out of the production
-telemetry project.
+telemetry project and send no copy to Vercel Web Analytics.
 
 Pass `--runtime docker`, `--image <tag>`, or set `ZITADEL_LOCAL_IMAGE=<tag>` when
 intentionally testing the Docker backend.
@@ -155,10 +159,10 @@ last-built `dist/`, so after a fresh checkout or a source change run
 
 ---
 
-## I want to contribute to the front-end embedded apps
+## I want to contribute to the console
 
-For changes to the admin console (`apps/console`) or the login UI (`apps/login-ui`) —
-the two SPAs bundled directly into the server binary.
+For changes to the admin console (`apps/console`), the SPA bundled directly into
+the server binary.
 
 | I want to...                                 | Run                                        |
 | -------------------------------------------- | ------------------------------------------ |
@@ -166,64 +170,17 @@ the two SPAs bundled directly into the server binary.
 | Verify my toolchain                          | `moon run workspace:doctor`                |
 | Open the component workbench (Storybook)     | `moon run storybook:dev` → http://localhost:6006 |
 | Start the console on a seeded real instance  | `moon run console:dev-real` |
-| Start the login-UI dev server                | `moon run login-ui:dev` → http://localhost:5175 |
-| Build both apps and test with the Go server  | `moon run console:build login-ui:build` then `go run . server --migrate` |
+| Test the built console with the Go server    | `moon run workspace:server`                |
 | Run lint, type checks, and tests             | `moon ci :lint :typecheck :build :test`    |
 
 Run `corepack pnpm install --frozen-lockfile` first.
 
 `console:dev-real` boots an ephemeral real instance, seeds it, and starts the
 console dev server against it; the console's other loops are in its
-[README](apps/console/README.md#local-development). The login-UI dev server
-renders the real sign-in flow, so it needs a running backend server too.
+[README](apps/console/README.md#local-development).
 
-Dev servers serve at `/`; the embedded production builds are served at
-`/ui/console/` and `/ui/login/`.
-
-### First-run setup for the login-UI dev server
-
-The Go backend does **not** create a project on startup. Create one before the
-login UI can boot a flow. Project creation provisions the default human user
-schema and default login/register flow definition.
-
-**1. Start the API-only backend:**
-
-```sh
-NEXTGEN_SERVER_CONSOLE_ENABLED=false NEXTGEN_SERVER_LOGIN_ENABLED=false go run . server --migrate
-```
-
-This skips the embedded UI dist checks, so it works before you have built
-`apps/console` or `apps/login-ui`.
-
-**2. Create a project:**
-
-```sh
-curl -s -X POST http://localhost:8080/projects \
-  -H "Content-Type: application/json" \
-  -d '{"name": "dev"}'
-```
-
-The response contains an `id` field — that is your project ID. If you have
-`jq` installed, append `| jq .` to pretty-print the response.
-
-**3. Configure the dev server:**
-
-Copy the example env file and fill in your project ID:
-
-```sh
-cp apps/login-ui/.env.example apps/login-ui/.env.development.local
-# edit .env.development.local and uncomment VITE_PROJECT_ID=<id-from-step-2>
-```
-
-These Vite env vars are only for the local dev server. `VITE_PROXY_PATH` tells
-the login UI to prefix all API requests with
-`/__nextgen`, which the Vite dev server proxies to the Go backend on port 8080.
-Set `VITE_BACKEND_URL` in `.env.development.local` to override the target
-(default: `http://localhost:8080`). Production hosted-login builds ignore these
-development env vars and use request/URL-derived context instead.
-
-As a one-off alternative, pass `?project_id=<id>` in the browser URL instead
-of setting `VITE_PROJECT_ID`.
+The dev server serves at `/`; the embedded production build is served at
+`/ui/console/`.
 
 ---
 
@@ -257,7 +214,9 @@ Use `corepack pnpm exec changeset status --since origin/main` when you want to
 preview the package bumps Changesets will plan from your PR. Pull requests also
 get an informational Changesets comment; maintainers use that and the
 [changeset decision table](.changeset/README.md#decision-table) to review release
-intent.
+intent. CI runs `node scripts/check-changesets-status.mjs --pending`, which
+refuses a `major` bump before 1.0.0
+([preview versions](.changeset/README.md#preview-versions)).
 
 Task runs are accelerated by Moon's remote cache, configured under `remote` in
 [`.moon/workspace.yml`](.moon/workspace.yml); Depot CI runners authenticate
@@ -270,7 +229,7 @@ run on GitHub-hosted runners without the Depot cache credential.
 [`scripts/check.mjs`](scripts/check.mjs): the OpenAPI lint, the Go generate
 check and tests with the Postgres and Spanner lanes, the workspace gate, the
 release tarballs and snapshot, and the fresh-app journey. That comes close to
-`full-pr` but does not mirror it: CI runs Spanner only nightly, and adds the
+`full-pr` but does not mirror it: CI runs Spanner only weekly, and adds the
 SQLite lane, a few repository checks and every other e2e lane
 (`moon run e2e:all`). Rerun one phase with
 `moon run workspace:check -- --only <phase>`, one task with
@@ -281,7 +240,9 @@ SQLite lane, a few repository checks and every other e2e lane
 Branch protection requires the GitHub Actions context `full-pr`, shown in the
 pull request UI as `ci / full-pr` and defined in
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml). The job installs
-dependencies, then picks one of two modes via `scripts/ci-mode.mjs`:
+dependencies, checks with `turbo boundaries` that each package imports only
+its own files and the packages it declares, then picks one of two modes via
+`scripts/ci-mode.mjs`:
 
 **Full mode** (normal PRs) runs, in order:
 
@@ -315,9 +276,10 @@ dependencies, then picks one of two modes via `scripts/ci-mode.mjs`:
   port, wait for each other.
 
 Within full mode the `moon ci` graph selects only the tasks the diff affects
-(`--downstream deep --include-relations`): a lane is skipped when the diff
-provably cannot reach it — a docs-only PR runs almost nothing, a frontend-only
-PR skips the Go suites. The e2e lanes run, all together, whenever one of them
+(`--downstream deep --include-relations`), measured from the pull request's
+base or, in the merge queue, from the commit the group is built on: a lane is
+skipped when the diff provably cannot reach it — a docs-only PR runs almost
+nothing, a frontend-only PR skips the Go suites. The e2e lanes run, all together, whenever one of them
 is affected (its folder, a demo app it serves, or something it depends on: the
 server, CLI, console, SDKs, api-mock or testing kit), so most code PRs run
 them.
@@ -329,9 +291,8 @@ unless an SDK, the CLI, the test kit or the journey's own files moved; even the
 full matrix skips the frameworks in `ciExcludedFrameworkIds`
 ([`frameworks.mjs`](e2e/journey/scripts/frameworks.mjs)). It asks
 moon as a local run would: in CI, moon leaves `runInCI: "skip"` tasks such as
-the lanes out of its affected set when only their own files changed.
-ci-turbo.yml uses the same gates for its per-lane steps. The gates fail
-open: known repo-wide
+the lanes out of its affected set when only their own files changed. The
+gates fail open: known repo-wide
 files no moon task claims (workflow definitions, `scripts/`, moon config,
 root manifests and compiler/release inputs such as `tsconfig.base.json`), an
 empty diff, or a failed query all force the
@@ -339,10 +300,24 @@ complete run — and when the query returns an empty affected set, the run is
 only skipped if every changed file is on a narrow explicitly-inert allowlist
 (`docs/`, root agent notes), because unclaimed files are not assumed inert.
 
-The Spanner emulator suite (`moon run server:test-spanner`) is not part of
-`full-pr`. It runs in the separate `spanner` workflow, nightly on `main` and on
-demand, and is not a required check. To run it against a branch, use
-`gh workflow run spanner.yml --ref <branch>`, or run the Moon task locally.
+The Spanner suite (`moon run server:test-spanner`) is not part of `full-pr`.
+It runs in the separate `spanner` workflow against Spanner Omni, weekly on
+`main` and on demand, and is not a required check. To run it against a branch,
+use `gh workflow run spanner.yml --ref <branch>`, or run the Moon task locally,
+where it still starts the Spanner emulator.
+
+The PR title check is not part of `full-pr` either. It runs in the separate
+`pr-title` workflow, which a title edit starts on its own; see
+[Title format](#title-format).
+
+`ci-turbo / full-pr-turbo` is not required either: it runs the same checks
+under Turborepo, the dual run of the
+[migration plan](docs/design/build/turborepo-migration.md). Turbo selects what
+runs (`--affected`, from the same base as `full-pr`), so a change no task
+reads, such as a workflow edit, runs nothing there; every night it runs every
+task and lane without the cache. Run it by hand with `gh workflow run
+ci-turbo.yml --ref <branch>`, which on a branch runs every task through the
+cache, or add `-f force=true` for the nightly run.
 
 **Version-only mode** (Changesets version PRs) runs `release:version`, the
 publish preflight's npm check (`node scripts/release.mjs check-npm`: npm must
@@ -364,7 +339,7 @@ SQLite integration tests use a local file database and need no Docker:
 
 ```sh
 moon run server:test-sqlite
-# or: go test -v -tags sqlite_integration -timeout=5m ./...
+# or: go -C apps/api test -v -tags sqlite_integration -timeout=5m ./...
 ```
 
 Postgres and Spanner integration tests use
@@ -378,7 +353,7 @@ Docker.
 ```sh
 # Postgres (testcontainer, or ZITADEL_TEST_POSTGRES_URL)
 moon run server:test-postgres
-# or: go test -v -tags postgres_integration -timeout=10m ./...
+# or: go -C apps/api test -v -tags postgres_integration -timeout=10m ./...
 
 # Spanner (prefer the Moon task — see emulator-testcontainer note below)
 moon run server:test-spanner
@@ -387,40 +362,56 @@ moon run server:test-spanner
 To run the Postgres or Spanner suites against a database you manage instead of
 testcontainers, set `ZITADEL_TEST_POSTGRES_URL` (Postgres DSN) or
 `ZITADEL_TEST_SPANNER_URL` (Spanner DSN); those suites honor the env vars and
-connect instead of starting a container, so `go test -tags … ./...` needs no
+connect instead of starting a container, so `go -C apps/api test -tags … ./...` needs no
 Docker. Point them at a throwaway database — the suites run migrations that
 create the `zitadel_nextgen` schema.
 
-The Spanner emulator only supports one transaction at a time, so concurrent
-integration tests make it abort read-write transactions aggressively. That is
-deliberate and useful: Spanner aborts under concurrency in production too, and
-the emulator surfaces a missing retry immediately. The suite therefore runs at
-full parallelism against the emulator, and `TestTransactionContention` asserts
-that concurrent writers to one row all commit.
+Spanner aborts read-write transactions under contention in production, and a
+test suite produces too little contention to catch a missing retry on its own.
+So under the `spanner_integration` tag the Spanner dialect aborts a seeded share
+of read-write transactions on purpose, whatever engine the suite runs against:
+about one attempt in five, and never one transaction twice, however many
+statements it runs. The suite also runs at full parallelism, and
+`TestTransactionContention` asserts that concurrent writers to one row all
+commit. Each test package logs its seed (`spanner abort injection on … seed=…`).
+Set `ZITADEL_TEST_SPANNER_ABORT_SEED` to replay a failure, most reliably with
+`-run` on the one test, or `ZITADEL_TEST_SPANNER_ABORTS=false` to turn the
+injection off.
 
-If you see a raw `ABORTED` ("aborted due to another transaction getting
-priority"), do not serialize the tests and do not move them to a real instance —
-both hide the bug. It means something on that code path stripped the gRPC status
-off the error, so Spanner's `ReadWriteTransaction` stopped recognising it as
-retryable. See the error-wrapping rules in
-[internal/storage/AGENTS.md](internal/storage/AGENTS.md) and #788.
+If you see a raw `ABORTED` (an injected one reads
+`spannerabort: injected ABORTED …`), do not serialize the tests and do not turn
+the injection off: both hide the bug. Something on that code path stripped the
+gRPC status off the error, so Spanner's `ReadWriteTransaction` stopped
+recognising it as retryable, or a callback could not run twice. See the
+error-wrapping rules in [apps/api/internal/storage/AGENTS.md](apps/api/internal/storage/AGENTS.md)
+and #788.
 
 A stalled transaction is a different failure and has a different fix. Read-write
-transactions run under a retry budget, and because the emulator serializes
-process-wide and hands priority to the newest transaction, a transaction
-spanning several statements can be starved by any concurrent write regardless of
-which rows it touches. So the emulator gets a much looser budget (2 minutes)
-than production (30 seconds). Tell the two apart by timing:
+transactions run under a 30-second retry budget, in tests as in production. Tell
+the two apart by timing:
 
 - **Fails immediately** with a raw `ABORTED`: the status was stripped, see
   above. Fix the wrapping.
 - **Stalls, then fails** with `unavailable` / HTTP 503 and a
-  `spanner transaction gave up retrying` warning naming the elapsed time: it was
-  starved. Do not raise the budget; shorten the transaction, or reduce how many
-  statements it holds open.
+  `spanner transaction hit its deadline while retrying` warning naming the
+  elapsed time: it was starved. Do not raise the budget; shorten the
+  transaction, or reduce how many statements it holds open.
 
 Before that budget existed the second case surfaced as an opaque 500 with no log
 line, and had to be diagnosed from a test's wall-clock duration (#794).
+
+Locally, `moon run server:test-spanner` still starts the emulator. It serves one
+read-write transaction at a time process-wide and hands priority to the newest,
+so a local run can starve a transaction past the budget where CI passes. To run
+against Spanner Omni as CI does, start it with host networking (on macOS,
+Docker Desktop has that as an opt-in setting) and point the suite at it:
+
+```sh
+docker run -d --name omni --network host \
+  us-docker.pkg.dev/spanner-omni/images/spanner-omni:2026.r4-lts start-single-server
+ZITADEL_TEST_SPANNER_INSTANCE=projects/default/instances/default \
+  SPANNER_EMULATOR_HOST=localhost:15000 moon run server:test-spanner
+```
 
 The emulator container is pinned to `linux/amd64`. The arm64 build returns
 commit timestamps at a different resolution, which fails seven `created_at`
@@ -432,14 +423,10 @@ To run against a Spanner you manage instead of the emulator testcontainer, set
 `ZITADEL_TEST_SPANNER_URL` to its DSN.
 
 `ZITADEL_TEST_SPANNER_INSTANCE` (an instance path,
-`projects/<project>/instances/<instance>`) still works and still provisions a
-uniquely named database per run, dropping it afterwards, authenticating via
-Application Default Credentials. Nothing sets it: CI is emulator-only on
-purpose, and this path is kept only so the real instance can be brought back
-quickly if the emulator turns out not to hold. Re-wiring is CI-side (restore the
-Workload Identity Federation auth step and set the variable); the Go side needs
-no change. Do not reach for it to make a failing test pass — that hides exactly
-the aborts these suites exist to catch. Removal is tracked in #793.
+`projects/<project>/instances/<instance>`) provisions a uniquely named database
+per test package and drops it afterwards. CI sets it to the Spanner Omni
+instance the `spanner` workflow starts; against a real Cloud Spanner instance it
+authenticates through Application Default Credentials.
 
 ### Demo end-to-end suites
 
@@ -507,8 +494,7 @@ Releases):
 moon run release:snapshot
 ```
 
-The release task builds the embedded UI surfaces (console and login-ui)
-automatically.
+The release task builds the embedded console automatically.
 
 To cut or recover a release, follow the
 [release runbook](docs/runbooks/manual-release.md). Moon builds the artifacts
@@ -651,6 +637,12 @@ Check a title before opening the PR:
 ```bash
 node scripts/check-pr-title.mjs --title "fix(login): keep the passkey prompt after a failed attempt"
 ```
+
+CI runs the same check in the `pr-title` workflow
+([`.github/workflows/pr-title.yml`](.github/workflows/pr-title.yml)) on every
+push to the PR and every edit of it, against the title the PR has at that
+moment. To fix a rejected title, rename the PR: that reruns the check, with no
+push and no `full-pr` run.
 
 ### Description
 

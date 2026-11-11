@@ -55,13 +55,26 @@ vi.mock("@zitadel/sdk-react", () => ({
  * need its data call answered — an empty list is enough to prove the redirect
  * landed.
  */
-// `/` lands on Users and the redirect test asks for `/schemas`; both are
-// project-scoped, so the guard selects the visitor's only project.
+// `/` is the project's Overview (D35) and the redirect test asks for
+// `/schemas`; both are project-scoped, so the guard selects the visitor's only
+// project.
 beforeEach(() =>
   server.use(
-    http.post("*/api/users/query", () => HttpResponse.json({ users: [] })),
-    http.get("*/api/schemas", () => HttpResponse.json({ schemas: [] })),
-    http.get("*/api/users/me/projects", () =>
+    http.get("*/api/v1/projects/proj_test", () =>
+      HttpResponse.json({
+        id: "proj_test",
+        name: "Test",
+        origins: [],
+        created_at: "2026-01-01T00:00:00Z",
+        updated_at: "2026-01-01T00:00:00Z",
+        owning_team_id: null,
+      }),
+    ),
+    http.get("*/api/v1/deployments", () => HttpResponse.json({ deployments: [] })),
+    http.get("*/api/v1/events", () => HttpResponse.json({ data: [] })),
+    http.post("*/api/v1/users/query", () => HttpResponse.json({ users: [] })),
+    http.get("*/api/v1/schemas", () => HttpResponse.json({ schemas: [] })),
+    http.get("*/api/v1/users/me/projects", () =>
       HttpResponse.json({ projects: [{ id: "proj_test", name: "Test" }] }),
     ),
   ),
@@ -153,7 +166,7 @@ describe("authentication guard", () => {
     // Not the visitor's only project, which the guard would select by itself:
     // this one can only come from `next`.
     server.use(
-      http.get("*/api/projects/proj_other", () =>
+      http.get("*/api/v1/projects/proj_other", () =>
         HttpResponse.json({ id: "proj_other", name: "Other project" }),
       ),
     );
@@ -233,7 +246,7 @@ describe("authentication guard", () => {
       const reads: string[] = [];
       fetchSession.mockImplementation(async () => (reads.length > 0 ? null : makeTestSession()));
       server.use(
-        http.get("*/api/users/me", ({ request }) => {
+        http.get("*/api/v1/users/me", ({ request }) => {
           reads.push(request.url);
           return HttpResponse.json(
             {

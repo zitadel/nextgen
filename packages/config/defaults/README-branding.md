@@ -9,13 +9,16 @@ application, not in this template.
 ## Workflow
 
 1. Edit `login.liquid` (and `branding.json` for the logo URL).
-2. `zitadel plan` — validates the template (LiquidJS parse, banned patterns,
-   the required `{% mandatory_gates %}` tag) and shows the pending revision.
-3. `zitadel apply` — publishes an immutable branding revision. The login UI
-   picks up the newest revision on the next step response.
+2. `zitadel deploy --dry-run` — validates the template (LiquidJS parse, banned
+   patterns, the required `{% mandatory_gates %}` tag) and shows the diff
+   against what is live, without publishing anything.
+3. `zitadel deploy` — builds `.zitadel/` into an immutable release and makes it
+   live. The login UI picks up the newest release on the next step response.
 
-Every edit publishes a new revision; there is no in-place update. Roll back
-by re-applying an earlier template.
+A deploy of changed content publishes a new immutable release; there is no
+in-place update. Unchanged content is deduplicated and reuses the existing
+release rather than publishing another. Roll back a deployment with
+`zitadel deployment rollback`.
 
 ## Rules of the template
 
@@ -50,7 +53,7 @@ by re-applying an earlier template.
 
   A well-formed URL that serves nothing is the one branding mistake nothing
   else catches — it passes validation, publishes a revision, and then renders
-  as an invisible image. So `zitadel plan` probes `logo_url` and `hero_url` and warns
+  as an invisible image. So `zitadel deploy --dry-run` probes `logo_url` and `hero_url` and warns
   (never fails) when it is unreachable, bodyless, or not an image, and the
   login UI hides an asset that fails to load, restoring the shipped design's
   no-asset content rather than leaving a gap. If the host is only
@@ -58,7 +61,7 @@ by re-applying an earlier template.
   `ZITADEL_SKIP_ASSET_PROBE=1` to skip the check. The probe contacts public
   HTTPS destinations only and re-checks redirects; loopback/private/internal
   targets are left to the browser-side fallback instead of being requested by
-  the machine running `plan`.
+  the machine running `deploy`.
 
   `layout` is **not** a design picker. The shipped template does not read it,
   so changing it alone changes nothing on screen. Both shipped designs

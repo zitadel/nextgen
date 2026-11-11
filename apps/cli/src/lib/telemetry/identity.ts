@@ -21,13 +21,23 @@ type StoredIdentity = { distinctId: string };
  * the platform conventions: `XDG_CONFIG_HOME` then `~/.config` on Unix, and
  * `%APPDATA%` on Windows. The anonymous id lives here so it survives between
  * runs without touching the user's project tree.
+ *
+ * It is `undefined` when the home directory cannot be determined, as
+ * `os.homedir()` throws in some restricted or containerised environments.
  */
-export function telemetryConfigDir(env: NodeJS.ProcessEnv): string {
+export function telemetryConfigDir(env: NodeJS.ProcessEnv): string | undefined {
   if (process.platform === "win32" && env.APPDATA) {
     return join(env.APPDATA, "zitadel", "cli");
   }
-  const base = env.XDG_CONFIG_HOME?.trim() || join(homedir(), ".config");
-  return join(base, "zitadel", "cli");
+  const configured = env.XDG_CONFIG_HOME?.trim();
+  if (configured) {
+    return join(configured, "zitadel", "cli");
+  }
+  try {
+    return join(homedir(), ".config", "zitadel", "cli");
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -41,10 +51,8 @@ export function telemetryConfigDir(env: NodeJS.ProcessEnv): string {
  * never load-bearing.
  */
 export function loadOrCreateIdentity(env: NodeJS.ProcessEnv): Identity {
-  let dir: string;
-  try {
-    dir = telemetryConfigDir(env);
-  } catch {
+  const dir = telemetryConfigDir(env);
+  if (dir === undefined) {
     return { distinctId: randomUUID(), isFirstRun: false };
   }
   const file = join(dir, "telemetry.json");

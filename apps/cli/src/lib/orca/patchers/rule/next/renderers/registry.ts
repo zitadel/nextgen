@@ -1,4 +1,4 @@
-import { ZitadelError } from "../../../../../errors";
+import { ZitadelError } from "@/lib/errors";
 import { litRenderer } from "./lit";
 import { reactRenderer } from "./react";
 import type { RendererId, RendererSpec } from "./types";

@@ -16,6 +16,26 @@
 > envelope gains derived, read-only identity fields (`identifier`,
 > `identifier_property`, `display`, §3a). Builds on
 > [ADR 048](048-wide-events-internal-audit-primitive.md) (audit events).
+>
+> **Note (2026-10-24):** most of this is built: `x-identifier` and
+> `x-display`, user refs with batch resolution (#1090), sessions returning
+> resolved refs (#1085), the derived identity on user responses and console
+> surfaces (#1092), and case-insensitive uniqueness (#970). Not built: the
+> per-property `x-unique: {compare: "exact"}` opt-out (§4a), and §5's check
+> that identifier values stay unique across designations, with its conflict
+> scan on redesignation.
+>
+> **Note (2026-11-10):** the designated attributes are also what a search
+> reads. When a user is written, the identifier and each display part store a
+> search text beside the value (`user_attributes.search_text`): the string
+> under the case folding §4a uses for uniqueness, cut to 256 characters. One
+> index, `(project_id, key, search_text, user_id)` over the rows that carry
+> it, answers a prefix match as one range per property, read in index order,
+> so a page costs the same whether one user matches or every user does.
+> `identifier` with `starts_with` on `POST /users/query` is the first reader
+> ([ADR 031](031-openapi-querying.md)). A substring match has no such index
+> and is not offered. The text follows the revision the user was last written
+> under, as the `identifier` on a user response does.
 
 ## Decision
 
@@ -184,7 +204,7 @@ padded input through validation (`pattern`/`format`) instead of silently
 mutating it.
 
 This is a single comparison function shared by the uniqueness constraint,
-the unique-attributes registry hash, and every identifier resolution
+the unique-attribute value hash, and every identifier resolution
 lookup. It cannot be split: normalizing only lookups lets two casings of
 one address register as distinct "unique" values and then makes every
 lookup ambiguous; normalizing only writes leaves sign-ins failing on

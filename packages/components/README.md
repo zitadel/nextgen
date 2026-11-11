@@ -35,7 +35,7 @@ for the form-association / accessibility decisions baked into every input atom.
 ## Install
 
 ```sh
-corepack pnpm add @zitadel/components@alpha
+corepack pnpm add @zitadel/components@latest
 ```
 
 `lit`, `liquidjs`, `dompurify`, and `lucide` are runtime dependencies and are intentionally
@@ -172,7 +172,7 @@ form-associated inputs.
 | CSS hooks | `zitadel-login::part(form)`, `zitadel-login::part(field-input)` | targeted overrides of atom internals |
 | Locale | `el.lang = 'de'` / `el.locales = { ... }` | i18n / custom copy |
 | MSW mocks | `setupWorker` / `setupServer` from `msw` | offline / staging / fixtures |
-| Custom template | `zitadel branding eject` → edit Liquid → `zitadel apply`, or `branding.liquid_template` on the payload | tenant-supplied layouts |
+| Custom template | `zitadel branding eject` → edit Liquid → `zitadel deploy`, or `branding.liquid_template` on the payload | tenant-supplied layouts |
 | Atoms-only | hand-built form | non-standard flow shells |
 
 For styling, start with the generated `--zl-*` variables from
@@ -300,7 +300,12 @@ Events: `zitadel-flow-input`, `zitadel-flow-step`, `zitadel-flow-complete`,
 `zitadel-flow-error`, `zitadel-flow-redirect`. `zitadel-flow-step` fires for
 every applied step including the first, so a host app can drive its own chrome
 (progress, headings, analytics) from mount onwards rather than from the first
-submit.
+submit. A heading follows `step.purpose`, `login` or `register`: the login
+switches between them by itself when an email does or does not have an account,
+and then shows the visitor a notice saying why. To hide the notice, set its text
+to `""` in `locales` (`notice.user_not_found`, `notice.user_already_exists`,
+`notice.sso_user_not_found`). An `""` under `en` hides it in every language,
+unless that language has its own text for it.
 
 `zitadel-flow-redirect` fires when a step hands the browser to an identity
 provider, carrying the URL to send it to. The widget then navigates there
@@ -377,6 +382,23 @@ or just notify.
 Inline status message for the four Figma severities (`error \| success \|
 warning \| info`). Renders the matching icon automatically; supports an
 optional `heading` and default-slot body.
+
+### `<zl-sso-providers>`
+
+One outline button per identity provider the step offers. A provider's logo
+shows automatically when `<zl-icon>` ships a `brand-<template>` mark for its
+catalog `template` (`SHIPPED_BRAND_ICON_NAMES`); any other provider, including
+a tenant's own OIDC connection, stays text-only rather than getting a stand-in
+logo.
+
+- Multicolour marks (Google) keep the vendor's colours.
+- Monochrome marks (GitHub) carry no fill and follow the button's foreground,
+  so they flip with light and dark mode.
+- Every mark sits in the button's leading slot at 16px.
+
+To add a provider's logo, add its official artwork to `BRAND_GLYPHS` in
+`src/atoms/zl-icon.ts` and its name to `BrandIconName` and
+`SHIPPED_BRAND_ICON_NAMES`; the buttons and the Storybook mock pick it up.
 
 ### `<zl-icon>` / `<zl-pill>` / `<zl-card>` / `<zl-page-shell>`
 

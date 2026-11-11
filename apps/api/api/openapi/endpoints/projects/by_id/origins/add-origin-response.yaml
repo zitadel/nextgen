@@ -1,0 +1,15 @@
+type: object
+description: The origin pattern as the project stores it.
+required:
+  - pattern
+  - kind
+properties:
+  pattern:
+    type: string
+    description: The origin pattern.
+  kind:
+    type: string
+    description: What the pattern is for, `primary` or `preview`.
+    enum:
+      - primary
+      - preview

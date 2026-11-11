@@ -1,6 +1,6 @@
 ---
 title: TanStack Start SDK
-description: Request middleware, route guards, and React widgets for TanStack Start applications.
+description: Request middleware, route guards, and React components for TanStack Start applications.
 ---
 
 import { Callout } from "fumadocs-ui/components/callout";
@@ -8,33 +8,42 @@ import { File, Files } from "fumadocs-ui/components/files";
 import { Step, Steps } from "fumadocs-ui/components/steps";
 import { Tab, Tabs } from "fumadocs-ui/components/tabs";
 
-The TanStack Start SDK is a global request middleware that proxies and verifies sessions on the server, plus typed React wrappers for the login and logout widgets on its `/react` entry.
+The TanStack Start SDK (`@zitadel/sdk-tanstack-start`) is a global request middleware that runs on every request. It proxies `/__nextgen/*` to Zitadel and verifies sessions on the server. Its `/react` entry adds typed React wrappers for the login and logout components.
 
 <Callout title="Generated setup" type="info">
-  The CLI writes `src/start.ts`, the server entry TanStack Start loads on its own, and writes the backend URL, the project secret, and the project id to `.env.local`.
+  The CLI writes `src/start.ts`, the server entry TanStack Start loads on its own, and writes the backend URL, the project secret, and the project ID to `.env.local`.
 </Callout>
 
-## Install
+## Prerequisites
+
+- Node.js 24 or newer. Run `node --version` to check.
+- TanStack Start 1 (`@tanstack/react-start` `>=1.168.10`) with React 18 or newer.
+- A Zitadel project from `zitadel setup`. Start the local runtime with `npx @zitadel/cli@latest start`, then run `npx @zitadel/cli@latest setup --server local` in your app's directory. See the [Quickstart](/docs/get-started/quickstart#scaffold-the-app-with-sign-in), or [Add Zitadel to an existing app](/docs/get-started/existing-app).
+- The URL, project ID and project secret. Setup writes them to `.env.local` as `ZITADEL_URL`, `ZITADEL_PROJECT_ID` and `ZITADEL_PROJECT_SECRET`, and the project ID again as `VITE_ZITADEL_PROJECT_ID`, the name a Vite app exposes to the browser.
+
+## Install the SDK
+
+Setup installs the SDK. To add it yourself, run:
 
 <Tabs groupId="package-manager" items={["pnpm", "npm", "yarn"]}>
   <Tab>
     ```sh
-    pnpm add @zitadel/sdk-tanstack-start@alpha
+    pnpm add @zitadel/sdk-tanstack-start@latest
     ```
   </Tab>
   <Tab>
     ```sh
-    npm install @zitadel/sdk-tanstack-start@alpha
+    npm install @zitadel/sdk-tanstack-start@latest
     ```
   </Tab>
   <Tab>
     ```sh
-    yarn add @zitadel/sdk-tanstack-start@alpha
+    yarn add @zitadel/sdk-tanstack-start@latest
     ```
   </Tab>
 </Tabs>
 
-## Setup
+## Wire the SDK into your app
 
 <Tabs items={["CLI generated", "Manual"]}>
   <Tab>
@@ -104,7 +113,7 @@ The TanStack Start SDK is a global request middleware that proxies and verifies 
 
     Never return `getAuth(context)` itself from a server function: its `session` carries the raw session token, and a server function's result reaches browser scripts. Return only `userId` and other client-safe fields.
 
-    Render the widgets from `@zitadel/sdk-tanstack-start/react`. They mount client-only: on the server and during hydration they render nothing, so no flow starts before the app hydrates with its config. The `/react` entry also exports `businessLocales` and the Login, Logout and Session prop types; `@zitadel/sdk-tanstack-start/client` exports only `configureZitadel`, `getApi` and `getZitadelConfig`, with no element classes.
+    Render the components from `@zitadel/sdk-tanstack-start/react`. They mount client-only: on the server and during hydration they render nothing, so no flow starts before the app hydrates with its config. The `/react` entry also exports `businessLocales` and the Login, Logout and Session prop types; `@zitadel/sdk-tanstack-start/client` exports only `configureZitadel`, `getApi` and `getZitadelConfig`, with no element classes.
 
     ```tsx
     import { createFileRoute } from "@tanstack/react-router";
@@ -125,22 +134,23 @@ The TanStack Start SDK is a global request middleware that proxies and verifies 
   </Tab>
 </Tabs>
 
-## Runtime model
+## What the middleware does on each request
 
 <Steps>
-  <Step>The middleware proxies same-origin `/__nextgen/*` requests to the backend, attaching the project secret only to the session handoff.</Step>
+  <Step>The middleware proxies same-origin `/__nextgen/*` requests to the backend, attaching the project secret only to the session exchange, the call that turns a completed sign-in into a session.</Step>
   <Step>It verifies the session token and passes the result on as `nextgenAuth` in the request context, which server functions receive; read it with `getAuth(context)`.</Step>
-  <Step>It redirects unauthenticated document requests for `protectedRoutes` to `loginPath`, with the requested path and query string in `?next=`, where the login widget returns after sign-in. Routes guard client-side navigation in `beforeLoad`.</Step>
+  <Step>It redirects unauthenticated document requests for `protectedRoutes` to `loginPath`, with the requested path and query string in `?next=`, where the login component returns after sign-in. Routes guard client-side navigation in `beforeLoad`.</Step>
 </Steps>
 
-## Verify
+## Check that sign-in works
 
-- Start the app with `npm run dev`. Setup already wrote the URL, the secret, and the project id to `.env.local`.
-- Visit `/login` and register a user.
-- Confirm `/profile` shows signed-in state.
-- Log out and confirm `/profile` redirects to `/login`, both on a direct visit and from the landing page's link.
+1. Run `npm run dev`. Setup already wrote the URL, the secret and the project ID to `.env.local`.
+2. Open `/register` on the dev server, usually `http://localhost:3000/register`. Use the origin that setup registered: `localhost`, not `127.0.0.1`.
+3. Register a user. A completed sign-in lands on `/profile`.
+4. Confirm `/profile` shows the signed-in state.
+5. Sign out and confirm `/profile` redirects to `/login`, both on a direct visit and from the landing page's link.
 
 ## See also
 
-- [SDK proxy](/docs/sdks/proxy) — why `/__nextgen/*` must be same-origin and which call carries the project secret.
-- [`@zitadel/sdk-tanstack-start` source](https://github.com/zitadel/nextgen/tree/main/packages/sdk-tanstack-start) and the [CLI TanStack Start patcher](https://github.com/zitadel/nextgen/tree/main/apps/cli/src/lib/orca/patchers/rule/tanstack-start).
+- [SDK proxy](/docs/sdks/proxy): why `/__nextgen/*` must be same-origin and which call carries the project secret.
+- [`@zitadel/sdk-tanstack-start` source](https://github.com/zitadel/nextgen/tree/main/packages/sdk-tanstack-start).

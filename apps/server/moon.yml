@@ -3,33 +3,70 @@ language: "go"
 layer: "application"
 stack: "backend"
 
+# The Go module lives in apps/api (go.mod, main.go, cmd/, internal/, api/),
+# not in this project folder: this project owns the tasks and the npm
+# launcher. Every task runs from the workspace root, so the inputs name the
+# module's files by absolute path and the `go` commands enter it with
+# `go -C apps/api`; the scripts resolve the same directory themselves
+# (SERVER_MODULE_DIR in scripts/server-build.mjs).
+
 fileGroups:
   serverInputs:
-    - "/**/*.go"
-    # Embedded goose migrations (//go:embed sql/*.sql); without these Moon can
-    # cache-hit test/build after schema-only changes while Go would rebuild.
-    - "/**/*.sql"
-    - "/go.mod"
-    - "/go.sum"
-    - "/api/**/*.yaml"
-    - "/api/**/*.json"
+    - "/apps/api/**/*.go"
+    # Embedded goose migrations (//go:embed sql/*.sql) select the Go tasks
+    # even when no Go source changes.
+    - "/apps/api/**/*.sql"
+    - "/apps/api/go.mod"
+    - "/apps/api/go.sum"
+    - "/apps/api/api/**/*.yaml"
+    - "/apps/api/api/**/*.json"
     # Also compiled in through //go:embed or read by tests: the config defaults
-    # (incl. presets), the integration-test fixtures and the events catalog.
+    # (incl. presets), the error page and the design tokens it inlines, the
+    # integration-test fixtures and the events catalog.
     - "/packages/config/defaults/**/*"
-    - "/internal/**/*.json"
+    # The design tokens module the error page embeds (nested Go module).
+    - "/packages/design-tokens/*.go"
+    - "/packages/design-tokens/go.mod"
+    - "/apps/api/internal/errorpage/*"
+    - "/packages/design-tokens/src/generated/tokens.css"
+    - "/apps/api/internal/**/*.json"
     - "/docs/design/api/events-catalog.md"
-    - "/api/.ogen.yaml"
+    - "/apps/api/api/.ogen.yaml"
+    - "/apps/api/api/.ogen-client.yaml"
+    # The public Go client module, which the tests and the server compile
+    # (go.zitadel.com/zitadel/v5 through a replace in apps/api/go.mod).
+    - "/packages/go/**/*.go"
+    - "/packages/go/go.mod"
+    - "/packages/go/go.sum"
     - "/scripts/check-go-generate.mjs"
     - "/scripts/generate-meta-schemas.ts"
     - "moon.yml"
     - "package.json"
     - "bin/**"
 
+  serverTests:
+    - "/apps/api/**/testdata/**"
+    - "/docs/product-analytics-events.yaml"
+    - "/vercel.json"
+    - "/apps/cloud/build-launcher.sh"
+    - "/apps/cloud/go-import/**/*"
+    - "/apps/console/index.html"
+    # TestDocsOriginCopies reads DocsOrigin's TypeScript copies.
+    - "/packages/api/scripts/docs-links.ts"
+    - "/apps/console/src/lib/docs.ts"
+    - "/apps/cli/src/lib/orca/patchers/rule/guidance.ts"
+
+# Go's own cache accounts for the effective compiler and target defaults.
+# Runner result caches do not; native commands must run when selected.
+# Generation stays cached: go.mod pins its toolchain, and its output does not
+# depend on the host or the commit.
 tasks:
   openapi:
     command: "node scripts/lint-openapi.mjs"
     inputs:
       - "@group(serverInputs)"
+      - "!/**/*_test.go"
+      - "!/**/testdata/**"
       - "/scripts/lint-openapi.mjs"
       # Without these a lint-config change still cache-hits.
       - "/redocly.yaml"
@@ -39,7 +76,7 @@ tasks:
 
   format:
     script: |
-      unformatted="$(git ls-files -z -- '*.go' | xargs -0 gofmt -l)"
+      unformatted="$(git ls-files -z -- '*.go' ':!tools/bench/**' ':!tools/oidc-mock/**' | xargs -0 gofmt -l)"
       if [ -n "$unformatted" ]; then
         echo "error: gofmt would rewrite the following files:" >&2
         printf '%s\n' "$unformatted" >&2
@@ -48,31 +85,44 @@ tasks:
       fi
     inputs:
       - "@group(serverInputs)"
+      - "@group(serverTests)"
     options:
+      cache: false
       runFromWorkspaceRoot: true
 
   generate:
     # Not `go generate ./...`: that runs every directive serially, and the cost
     # is per-invocation (mockgen type-loads a package whether it mocks one
     # interface or twenty). The script runs packages in parallel behind the one
-    # ordering constraint that matters — see scripts/go-generate.mjs.
+    # ordering constraint that matters — see scripts/go-generate.mjs. The api
+    # package's last //go:generate writes bundled/openapi.json
+    # (scripts/bundle-openapi.mjs).
     command: "node scripts/go-generate.mjs"
     inputs:
       - "@group(serverInputs)"
+      - "!/**/*_test.go"
+      - "!/**/testdata/**"
       - "/scripts/go-generate.mjs"
+      - "/scripts/map-all.mjs"
+      - "/scripts/bundle-openapi.mjs"
+      - "/scripts/server-build.mjs"
       - "/scripts/dev-process.mjs"
+      - "/redocly.yaml"
     # Mirrored by GENERATED_GLOBS in scripts/generated-outputs.mjs, which is
     # what `clean-generated` deletes. Change both together.
     outputs:
-      - "/api/generated/**"
-      - "/api/openapi/components/schemas/errors/**"
-      - "/api/openapi/endpoints/**/*-error-response.yaml"
-      - "/api/openapi/endpoints/events/event.yaml"
-      - "/api/openapi/endpoints/events/types/*.yaml"
-      - "/api/openapi/endpoints/events/webhooks/*.yaml"
-      - "/api/openapi/endpoints/schemas/*.json"
-      - "/internal/**/*_enumer.go"
-      - "/internal/**/*.mock.go"
+      - "/apps/api/internal/api/generated/**"
+      - "/apps/api/api/openapi/components/schemas/errors/**"
+      - "/apps/api/api/openapi/components/examples/errors/*.yaml"
+      - "/apps/api/api/openapi/endpoints/**/*-error-response.yaml"
+      - "/apps/api/api/openapi/endpoints/events/event.yaml"
+      - "/apps/api/api/openapi/endpoints/events/types/*.yaml"
+      - "/apps/api/api/openapi/endpoints/events/webhooks/*.yaml"
+      - "/apps/api/api/openapi/endpoints/schemas/*.json"
+      - "/apps/api/api/openapi/bundled/openapi.json"
+      - "/apps/api/internal/**/*_enumer.go"
+      - "/apps/api/internal/**/*.mock.go"
+      - "/packages/go/api/*_gen.go"
     options:
       runFromWorkspaceRoot: true
       # Generation rewrites files other projects read mid-graph: the JSON
@@ -99,8 +149,14 @@ tasks:
     command: "node scripts/check-go-generate.mjs"
     inputs:
       - "@group(serverInputs)"
+      - "!/**/*_test.go"
+      - "!/**/testdata/**"
       - "/scripts/go-generate.mjs"
+      - "/scripts/map-all.mjs"
+      - "/scripts/bundle-openapi.mjs"
+      - "/scripts/server-build.mjs"
       - "/scripts/dev-process.mjs"
+      - "/redocly.yaml"
       # Imported at module scope, not only under --prune: GENERATED_GLOBS is
       # what this task's git comparison looks at, so a glob edit that does not
       # invalidate here would cache-hit and pass against the old pathspecs.
@@ -119,25 +175,32 @@ tasks:
     command: "node scripts/check-go-generate.mjs --prune"
     inputs:
       - "@group(serverInputs)"
+      - "!/**/*_test.go"
+      - "!/**/testdata/**"
       - "/scripts/go-generate.mjs"
+      - "/scripts/map-all.mjs"
+      - "/scripts/bundle-openapi.mjs"
+      - "/scripts/server-build.mjs"
       - "/scripts/clean-generated.mjs"
       - "/scripts/generated-outputs.mjs"
       - "/scripts/dev-process.mjs"
+      - "/redocly.yaml"
     options:
       runFromWorkspaceRoot: true
       mutex: "generated-sources"
 
   vet:
-    command: "go vet ./..."
+    command: "go -C apps/api vet ./..."
     deps:
       - "check-generate"
       # Same embed race as test/build: go vet compiles //go:embed all:dist while
-      # a concurrent console/login-ui build can emptyOutDir the placeholder.
+      # a concurrent console build can emptyOutDir the placeholder.
       - "console:build"
-      - "login-ui:build"
     inputs:
       - "@group(serverInputs)"
+      - "@group(serverTests)"
     options:
+      cache: false
       runFromWorkspaceRoot: true
 
   # Custom go/analysis checks, run directly rather than through go vet so the
@@ -145,7 +208,7 @@ tasks:
   # egresslint, which enforces the single egress-client invariant (ADR 061):
   # outbound HTTP or TCP clients may only be built in internal/httputil, and
   # any other site needs an //egress:allow <reason> directive. Further
-  # analyzers join the same binary (tools/analyzers/cmd/analyzers).
+  # analyzers join the same binary (apps/api/tools/analyzers/cmd/analyzers).
   #
   # Runs once per build configuration: the default set, then each integration
   # tag on its own, because the tagged files are invisible to the default run
@@ -153,9 +216,9 @@ tasks:
   lint:
     script: |
       set -e
-      go run ./tools/analyzers/cmd/analyzers ./...
+      go -C apps/api run ./tools/analyzers/cmd/analyzers ./...
       for tag in postgres_integration spanner_integration sqlite_integration; do
-        GOFLAGS="-tags=$tag" go run ./tools/analyzers/cmd/analyzers ./...
+        GOFLAGS="-tags=$tag" go -C apps/api run ./tools/analyzers/cmd/analyzers ./...
       done
       # This is a Go project, so it inherits no Biome lint task, but it owns a
       # JavaScript launcher (bin/zitadel-server.js). Lint it here so a change to
@@ -165,19 +228,62 @@ tasks:
     deps:
       - "check-generate"
       - "console:build"
-      - "login-ui:build"
     inputs:
       - "@group(serverInputs)"
-      # The Biome config the launcher check runs against.
+      - "@group(serverTests)"
+      # The Biome config the launcher check runs against, and its plugins.
       - "/biome.json"
+      - "/biome-plugins/*.grit"
+    options:
+      cache: false
+      runFromWorkspaceRoot: true
+
+  check-pow-vectors:
+    command: "node docs/design/flowengine/testdata/generate-pow-v1-vectors.mjs --check"
+    inputs:
+      - "/docs/design/flowengine/testdata/generate-pow-v1-vectors.mjs"
+      - "/docs/design/flowengine/testdata/pow-v1-vectors.json"
+      - "/packages/components/src/orchestrator/__fixtures__/signup-pow-vector.json"
     options:
       runFromWorkspaceRoot: true
 
-  test:
+  # The pure protocol package has no generated API, database or embedded UI
+  # dependency. A focused race/fuzz entry point keeps its feedback loop bounded.
+  test-pow:
     command: "go"
     args:
+      - "-C"
+      - "apps/api"
+      - "test"
+      - "-race"
+      - "-count=1"
+      - "-timeout"
+      - "60s"
+      - "./internal/crypto/pow"
+    deps:
+      - "check-pow-vectors"
+    inputs:
+      - "/apps/api/internal/crypto/pow/**"
+      - "/docs/design/flowengine/testdata/**"
+      - "/apps/api/go.mod"
+      - "/apps/api/go.sum"
+    options:
+      cache: false
+      runFromWorkspaceRoot: true
+
+  test:
+    # -count=1 disables go's test-result cache. Go keys a cached result on the
+    # files a test opens only inside the module (apps/api), and the drift
+    # tests read files outside it (serverTests, the events catalog), so a
+    # change to one of those alone would come back "ok (cached)": locally, and
+    # in CI, whose Go cache carries results between runs.
+    command: "go"
+    args:
+      - "-C"
+      - "apps/api"
       - "test"
       - "-v"
+      - "-count=1"
       - "-timeout"
       - "10m"
       - "./..."
@@ -186,19 +292,16 @@ tasks:
       - "format"
       - "vet"
       - "lint"
-      # The test binary embeds both UI dists (//go:embed all:dist). Listed here
+      - "check-pow-vectors"
+      # The test binary embeds the console's dist (//go:embed all:dist). Listed here
       # and not only reached through vet: vet has no outputs, so moon would not
-      # hash these builds through it and a UI change would replay a cached run.
+      # propagate these builds through it for affected-task selection.
       - "console:build"
-      - "login-ui:build"
     inputs:
       - "@group(serverInputs)"
-      # Read by the cloud launcher's tests (apps/cloud/launcher), which hold
-      # the deployment's configuration together. Scoped to test: nothing the
-      # server compiles reads them.
-      - "/vercel.json"
-      - "/apps/cloud/build.sh"
+      - "@group(serverTests)"
     options:
+      cache: false
       runFromWorkspaceRoot: true
 
   test-postgres:
@@ -217,6 +320,8 @@ tasks:
     # just as invisible to moon's hash as it is to go's.
     command: "go"
     args:
+      - "-C"
+      - "apps/api"
       - "test"
       - "-v"
       - "-count=1"
@@ -226,23 +331,23 @@ tasks:
       - "10m"
       - "./..."
     deps:
-      # check-generate rewrites api/generated while it runs. These suites
+      # check-generate rewrites internal/api/generated while it runs. These suites
       # compile that package and api/internal/erroranalysis type-loads it, so a
       # lane run beside it reads half-written files. vet, lint and build wait
       # for it the same way.
       - "check-generate"
-      # Order UI builds before go test so //go:embed all:dist has files.
+      # Order the console build before go test so //go:embed all:dist has files.
       - "console:build"
-      - "login-ui:build"
     inputs:
       - "@group(serverInputs)"
+      - "@group(serverTests)"
     options:
       runFromWorkspaceRoot: true
       # See the -count=1 note above: moon's own cache would skip the process
       # before go's cache mattered.
       cache: false
       # ci.yml's graph step (`moon ci --downstream deep`) runs it whenever it is
-      # affected, as a dependent of the UI builds. The "Run Go integration tests
+      # affected, as a dependent of the console build. The "Run Go integration tests
       # (postgres)" step runs it only when the graph did not, as when ci-mode
       # forces a full run for a workflow-only edit, which no lane lists as
       # input.
@@ -257,46 +362,47 @@ tasks:
     # replaying results recorded by an emulator execution. A benchmark number
     # was nearly read off a run that never happened.
     #
-    # -parallel is deliberately NOT pinned to 1. The emulator serves one
-    # transaction at a time, so tests running concurrently within a package force
-    # the aborts that prove the abort-retry path still works. Pinning it hid the
-    # missing retry rather than fixing it (#788); do not put it back.
+    # -parallel is deliberately NOT pinned to 1. Tests running concurrently
+    # within a package put transactions in real contention, on top of the
+    # aborts a spanner_integration build injects on purpose (#788); pinning it
+    # hid a missing retry rather than fixing it. Do not put it back.
     #
-    # -p 1 stays, but not for isolation: testdb.SpannerDSN starts a fresh
-    # emulator testcontainer per package, so each package already has its own
-    # database in its own process. What the flag buys is not running three
-    # emulators at once. Dropping it would overlap stmttest and the spanner
-    # dialect package with integration_test and save roughly 40 seconds, which
-    # is a poor trade against three concurrent emulator containers on a
-    # developer laptop.
+    # -p is left at its default, so the packages run at once. Each still
+    # gets its own database: with ZITADEL_TEST_SPANNER_INSTANCE set (spanner.yml
+    # points it at Spanner Omni) every package provisions one on that instance,
+    # because one shared database failed on tests reading each other's
+    # leftovers (#1011). Without it, each package starts its own emulator
+    # container, so a local run starts one per package at once.
     command: "go"
     args:
+      - "-C"
+      - "apps/api"
       - "test"
       - "-v"
       - "-count=1"
       - "-tags"
       - "spanner_integration"
-      # Same budget as test-postgres. The emulator's planner is still slow on the
-      # authz list predicate, which real Cloud Spanner answers in ~40ms, but the
-      # lane no longer lets rows pile up in front of it: tests delete their own
-      # project when they finish, and the one test that reads lists against the
-      # whole database runs serially, so it meets an almost empty one. The
-      # integration_test package takes about 111s in CI, so this leaves roughly
-      # five times headroom and a genuine hang surfaces again instead of sitting
-      # inside a 20 minute window. See #1011.
+      # Per package. Against Spanner Omni each package first spends about six
+      # minutes creating and migrating its database (#1011), and spanner.yml
+      # runs them all on one engine on a 4-vCPU runner. A hang still surfaces
+      # well inside that job's 60 minutes.
       - "-timeout"
-      - "10m"
-      - "-p"
-      - "1"
-      - "./..."
+      - "30m"
+      # Only the packages that open a Spanner database. Under this tag every
+      # other package has no Spanner test; internal/bootstrap/users builds on it
+      # but runs against Postgres, which test-postgres covers.
+      - "./internal/api/integration_test/"
+      - "./internal/storage/dialect/spanner/"
+      - "./internal/storage/dialect/spanner/migration/"
+      - "./internal/storage/stmttest/"
     deps:
-      # check-generate rewrites api/generated; see test-postgres.
+      # check-generate rewrites internal/api/generated; see test-postgres.
       - "check-generate"
-      # Order UI builds before go test so //go:embed all:dist has files.
+      # Order the console build before go test so //go:embed all:dist has files.
       - "console:build"
-      - "login-ui:build"
     inputs:
       - "@group(serverInputs)"
+      - "@group(serverTests)"
       # Belt-and-braces, not the thing protecting this lane: with cache: false
       # below, the task hash is never consulted, so nothing can be replayed from
       # it and this entry changes no outcome today. It is kept because the target
@@ -313,10 +419,10 @@ tasks:
       cache: false
       # Runs in .github/workflows/spanner.yml, never in ci.yml. "skip" keeps
       # `moon ci` from pulling it in: --downstream deep selects it as a
-      # dependent of the UI builds whenever the server or a UI changes, and
-      # its ~3.5 minutes then held up the whole PR graph. In CI, `moon run`
-      # refuses a skipped task ("No tasks found"); spanner.yml runs it with
-      # `moon exec --ignore-ci-checks`. Local `moon run` is unaffected.
+      # dependent of the console build whenever the server or the console
+      # changes, and its ~3.5 minutes then held up the whole PR graph. In CI,
+      # `moon run` refuses a skipped task ("No tasks found"); spanner.yml runs
+      # it with `moon exec --ignore-ci-checks`. Local `moon run` is unaffected.
       runInCI: "skip"
 
   test-sqlite:
@@ -326,6 +432,8 @@ tasks:
     # "ok" is no more trustworthy here than on the other two lanes.
     command: "go"
     args:
+      - "-C"
+      - "apps/api"
       - "test"
       - "-v"
       - "-count=1"
@@ -335,13 +443,13 @@ tasks:
       - "5m"
       - "./..."
     deps:
-      # check-generate rewrites api/generated; see test-postgres.
+      # check-generate rewrites internal/api/generated; see test-postgres.
       - "check-generate"
-      # Order UI builds before go test so //go:embed all:dist has files.
+      # Order the console build before go test so //go:embed all:dist has files.
       - "console:build"
-      - "login-ui:build"
     inputs:
       - "@group(serverInputs)"
+      - "@group(serverTests)"
     options:
       runFromWorkspaceRoot: true
       # See the -count=1 note above: moon's own cache would skip the process
@@ -356,28 +464,24 @@ tasks:
     command: "node scripts/server-build.mjs"
     deps:
       - "check-generate"
-      # The binary embeds both UI dists (//go:embed all:dist in
-      # internal/staticui/*/embed.go). These deps order the UI builds before
-      # the Go compile, so a batched invocation can never embed a half-written
-      # dist.
+      # The binary embeds the console's dist (//go:embed all:dist in
+      # apps/api/internal/staticui/console/embed.go). This dep orders the console build
+      # before the Go compile, so a batched invocation can never embed a
+      # half-written dist.
       - "console:build"
-      - "login-ui:build"
     inputs:
       - "@group(serverInputs)"
-      # The embedded dist bytes participate in the hash directly, so staticui
-      # changes made outside this task's deps still invalidate the cached
-      # binary. Scoped to build rather than serverInputs: only the binary
-      # artifact depends on dist content — test/vet/format must not re-run on
-      # UI-only changes.
-      - "/internal/staticui/**"
-      # Same scoping argument: the build script and its process helper decide
+      - "!/**/*_test.go"
+      - "!/**/testdata/**"
+      # The build script and its process helper decide
       # what this task produces, but nothing about how the Go sources lint or
       # test. dev-process.mjs is listed because server-build.mjs imports it —
-      # without it, editing the helper cache-hits a stale binary.
+      # without it, editing the helper would not select this build.
       - "/scripts/server-build.mjs"
       - "/scripts/dev-process.mjs"
     outputs:
       - "/dist/server/nextgen"
       - "/dist/server/metadata.json"
     options:
+      cache: false
       runFromWorkspaceRoot: true

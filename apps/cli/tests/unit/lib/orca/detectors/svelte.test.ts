@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { SvelteDetector } from "../../../../../src/lib/orca/detectors/svelte";
+import { SvelteDetector } from "@/lib/orca/detectors/svelte";
 
 const dirs: string[] = [];
 
@@ -31,7 +31,7 @@ describe("SvelteDetector", () => {
   it("excludes SvelteKit (which ships Svelte)", async () => {
     expect(
       await new SvelteDetector().detect(
-        await project({ "@sveltejs/kit": "^2", svelte: "^5", vite: "^5" }),
+        await project({ "@sveltejs/kit": "^3", svelte: "^5", vite: "^5" }),
       ),
     ).toBeNull();
   });

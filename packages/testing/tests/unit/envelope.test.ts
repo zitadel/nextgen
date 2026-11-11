@@ -9,7 +9,7 @@ const errorEnvelope = (overrides: Partial<CliEnvelope<unknown>> = {}): CliEnvelo
   code: "E_VALIDATION",
   message: "Zitadel server npm package is not available",
   hint: "Reinstall @zitadel/cli so npm can install @zitadel/server and its platform package.",
-  next_commands: ["npm install @zitadel/cli@alpha"],
+  next_commands: ["npm install @zitadel/cli@latest"],
   data: undefined,
   ...overrides,
 });
@@ -20,14 +20,14 @@ describe("describeEnvelopeError", () => {
       [
         "E_VALIDATION: Zitadel server npm package is not available",
         "hint: Reinstall @zitadel/cli so npm can install @zitadel/server and its platform package.",
-        "next: npm install @zitadel/cli@alpha",
+        "next: npm install @zitadel/cli@latest",
       ].join("\n"),
     );
   });
 
   it("omits absent fields and returns undefined without a message", () => {
     expect(describeEnvelopeError(errorEnvelope({ code: undefined, hint: undefined }))).toBe(
-      "Zitadel server npm package is not available\nnext: npm install @zitadel/cli@alpha",
+      "Zitadel server npm package is not available\nnext: npm install @zitadel/cli@latest",
     );
     expect(describeEnvelopeError({ status: "ok", data: undefined })).toBeUndefined();
   });
@@ -40,7 +40,7 @@ describe("bootLocalServer failure surfacing", () => {
       startStdout: JSON.stringify(errorEnvelope()),
     });
     await expect(bootLocalServer({ cliBin: fake.binPath, port: 18099 })).rejects.toThrow(
-      /hint: Reinstall @zitadel\/cli[\s\S]*next: npm install @zitadel\/cli@alpha/,
+      /hint: Reinstall @zitadel\/cli[\s\S]*next: npm install @zitadel\/cli@latest/,
     );
   });
 });

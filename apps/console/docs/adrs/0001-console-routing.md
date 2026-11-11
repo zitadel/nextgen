@@ -1,7 +1,7 @@
 # Console ADR 0001: Routing
 
 > **Status:** Accepted
-> **Date:** 2026-06-29 (accepted 2026-06-30; amended 2026-08-11, 2026-09-28, 2026-10-04)
+> **Date:** 2026-06-29 (accepted 2026-06-30; amended 2026-08-11, 2026-09-28, 2026-10-04, 2026-11-05)
 > **Scope:** `apps/console` only. See [`apps/console/AGENTS.md`](../../AGENTS.md).
 > **Context:** Console shell layout, navigation, and resource list pages
 > (issue [#440](https://github.com/zitadel/nextgen/issues/440)).
@@ -33,7 +33,7 @@ Two product constraints shape the answers:
 - The console is **embedded into the Go server under a configurable deployment
   prefix** and served as a static SPA with an `index.html` fallback for unknown
   client routes (see
-  [`internal/staticui/handler.go`](../../../../internal/staticui/handler.go)).
+  [`internal/staticui/handler.go`](../../../../apps/api/internal/staticui/handler.go)).
   Routing must survive a hard refresh on a deep link, and the client basepath
   must line up with that embed prefix.
 - That embed prefix is owned by the Vite `base`
@@ -141,10 +141,14 @@ endpoint.
 
 > **Amendment (2026-09-28, #1299):** screens now act on a **selected project**
 > carried as `?project=<id>` on the `_authed` layout, which validates it and
-> retains it on every navigation (`src/lib/project-scope.ts`). `projects/index.tsx`
+> retains it on every navigation (`src/features/projects/project-scope.ts`). `projects/index.tsx`
 > is the Projects overview, where a project is selected; the project's own page
 > moved to the scoped `project/index.tsx` (Project settings), and
 > `projects/$projectId.tsx` only redirects there with that project selected.
+
+> **Amendment (2026-11-05):** where the code behind a route lives is
+> [ADR 0007](0007-console-code-layout.md). The pending, error and not-found
+> boundaries are in `src/app-shell/boundaries.tsx`.
 
 ### 5. Data loading: route loaders, with three required boundaries
 
@@ -197,6 +201,78 @@ the sidebar.
 > first and alone until a project is selected; the selected project's screens
 > follow it.
 
+> **Amendment (2026-10-23, design decision D22):** the sidebar lists the scoped
+> routes whether or not a project is selected, as Vercel's does. Opening one
+> without a selection still goes to Projects with `?next=`; Projects is then
+> headed `Continue to <screen>` with that screen's entry marked, and choosing
+> a project goes on to it. `/` without a selection lands on Projects itself
+> rather than by way of Users, since arriving asked for no screen.
+
+> **Amendment (2026-10-26, design decision D24):** Projects is no longer a
+> sidebar entry (`staticData.nav`); it is the console's home, opened by the
+> logo and the project switcher's `All projects`, and the shell draws it
+> without the sidebar. The sidebar holds the selected project's screens only.
+
+> **Amendment (2026-11-09, design decision D27):** the shell draws one frame
+> for every screen, and the route picks which of two lists the sidebar shows.
+> Projects and `/settings` are above every project and show the account's
+> (`staticData.nav.view: "account"`), which Projects heads; every other route
+> shows the selected project's. The Settings view's own header is gone.
+
+> **Amendment (2026-11-09, design decision D29):** the route picks between
+> three lists. Projects shows the account's (`view: "account"`): Projects and
+> one Settings row, the `/settings` route's own entry. `/settings` with
+> anything beneath it shows Settings' (`view: "settings"`), under a heading
+> row that leads back to Projects.
+
+> **Amendment (2026-11-10, design decision D34):** the account list draws
+> Projects, then the portal's entries, then the account's other entries; a
+> portal entry named like an account one is left out. Its project-scoped rows
+> link with `project: undefined`, so `_authed` does not retain the selection
+> and the guard asks for a project as D22 has it.
+
+> **Amendment (2026-11-11, design decision D36):** a selected project stays
+> selected above every project. This replaces D34's `project: undefined` links
+> and D27's pill: on Projects and `/settings` the account list's rows open in
+> the selected project, and the pill names it. With none selected the pill
+> says `All projects` and a project's row asks for one (D22, D31).
+
+> **Amendment (2026-11-10, design decision D35):** `/` is a screen again, the
+> project's Overview, declaring `scope: "project"` and the portal list's first
+> entry. The `_authed` guard sends it to Projects without `?next=` when no
+> project can be chosen for the person, since arriving asked for no screen.
+> The account list leaves the portal entry at `/` out.
+
+> **Amendment (2026-11-10, design decision D30):** `/events` with anything
+> beneath it shows a list of its own too, Logs' (`NavView` `"logs"`), under a
+> heading row that leads back to the project's landing route, `/`. The route
+> still picks the list, and it is the first whose rows are not
+> `staticData.nav` entries: no route declares `view: "logs"`. Its rows are the
+> views of the one Logs screen and its filters, which live in that route's
+> search params (`validateSearch`) and which the events feature draws
+> (`src/features/events/components/logs-nav.tsx`). A Logs URL therefore
+> restores the list, the view and the filters on a refresh. A screen gets such
+> a list only when its views and filters are navigation the way Logs' are;
+> every other entry stays a route with `staticData.nav`.
+
+> **Amendment (2026-11-10, D30):** the Logs list is the layout route
+> `/events` (`routes/_authed/events/route.tsx`), which owns the filters
+> (`validateSearch`) and the list's loader; `/events/` only carries the
+> sidebar entry. An event, `/events/$eventId`, is its child and opens in a
+> drawer over the list, as Vercel's Logs opens a request: the list's match
+> stays, so opening or stepping through events never reads the list again, and
+> the drawer's URL carries the list's filters. A loader that must not rerun
+> when a child changes belongs to the layout route, keyed on the search it
+> reads.
+
+> **Amendment (2026-11-11, D30):** Logs' list chooses the view from a picker
+> (each view's glyph, name and what it holds), as Vercel's Logs chooses its
+> kind of log, rather than one row per view, and keeps only the filters chosen
+> from a list (time, category, type or status). The values a person pastes
+> (the ids, the operation, the resource type, My activity) are set in the
+> search above the table and shown there as chips. The URL keeps every filter
+> as before.
+
 ## Consequences
 
 - **One canonical router.** `main.tsx` renders the factory from `router.tsx`;
@@ -225,7 +301,7 @@ the sidebar.
 - [`apps/console/src/router.tsx`](../../src/router.tsx),
   [`apps/console/src/main.tsx`](../../src/main.tsx),
   [`apps/console/vite.config.ts`](../../vite.config.ts).
-- [`internal/staticui/handler.go`](../../../../internal/staticui/handler.go)
+- [`internal/staticui/handler.go`](../../../../apps/api/internal/staticui/handler.go)
   — SPA fallback that makes deep links survive refresh.
 - Root [ADR 055: A Lit-only login surface, with the console on shadcn/ui](../../../../docs/adrs/055-lit-only-login-surface.md)
   — the shell is built from shadcn/ui in `src/components/ui/`, sharing only

@@ -65,6 +65,10 @@ For example:
 Every property becomes available to the rest of the identity system,
 including login and registration flows.
 
+A property's `format` is enforced for the standard JSON Schema formats, such as
+`email`, `uri`, `uuid`, `date` and `date-time`. Any other format, such as `phone`,
+is only a label: use `pattern` if the value must match it.
+
 ## `required`
 
 Lists which properties every user must provide.
@@ -90,8 +94,8 @@ The most common workflow looks like this:
 1.  Update your schema.
 2.  If you've added, removed or renamed fields, update the corresponding
     login flow in `.zitadel/flows/`.
-3.  Run `zitadel plan` to preview the changes.
-4.  Run `zitadel apply` to publish them.
+3.  Run `zitadel deploy --dry-run` to preview the changes.
+4.  Run `zitadel deploy` to publish them.
 
 ## Why do I need to update the login flow?
 
@@ -123,9 +127,29 @@ Finally, update the login flow if users should be able to enter it.
 
 Remove it from `required`.
 
-## Enable passkeys
+## Show a user's name
 
-Set `"passkey": { "enabled": true }` in `x-auth-methods`.
+List the properties a user's name is made of in `x-display`, in order:
+`"x-display": ["givenName", "familyName"]`. Your app reads the result as the
+session's display name; without it, it has only the user's email. Users keep
+the schema revision they signed up under, so the name shows for those who
+sign up after you deploy it. The `consumer` and `business` use cases set it
+for you.
+
+## Turn password or passkey sign-in on and off
+
+Run `zitadel auth-method passkey enable` (or `disable`, or `password`
+instead of `passkey`). It sets `"enabled"` under `x-auth-methods` and
+edits nothing else. Pass `--schema` with the schema's file name or its
+`objectType` when this folder holds more than one schema.
+
+The login flow must offer the method too, so edit it in
+`.zitadel/flows/` as well. `enable` warns when no flow offers the method
+yet. `disable` refuses while a flow still uses it, and lists the steps to
+change first. Disabling the last way to sign in asks first in a
+terminal, and is refused elsewhere unless you pass `--force`.
+
+Guide: https://preview.zitadel.com/docs/guides/sign-in-methods
 
 ## Create another user type
 

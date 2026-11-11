@@ -1,0 +1,66 @@
+post:
+  operationId: initClaim
+  summary: Initialize a project claim
+  description: |
+    Starts a claim, which attaches a project created before sign-in to a
+    team, and returns the `claim_url` to open in a browser.
+
+    A claim [attaches a project to a team](/docs/concepts/project-team-user#claim)
+    so that the team's members administer it. This operation mints a
+    single-use, short-lived challenge for an unclaimed project. The developer
+    opens `claim_url`, signs in and completes the claim in the browser; see
+    `completeClaim` (`POST /projects/{project_id}/claim/complete`). Poll `getClaimStatus` (`GET /projects/{project_id}/claim/status`) with the returned `challenge_id`,
+    as `zitadel claim` does. The response's `expires_at` carries the exact expiry.
+
+    Authenticate with the project secret that `createProject` (`POST /projects`) returns as
+    `project_secret`.
+
+    A `409` means a team already claimed the project, and its details name
+    that team. A `410` means the project's 14-day claim window has closed,
+    which is final.
+  tags:
+    - Projects
+  parameters:
+    - $ref: ../../../../../components/parameters/project-id-path.yaml
+  security:
+    - oauth2:
+        # project.write, not project.read: project.read is carried by the
+        # browser-plane preview secret, so it cannot gate an operator write
+        # until ADR 036 splits the credential planes into distinct schemes.
+        - project.write
+  responses:
+    '201':
+      description: The claim challenge, with the browser URL to open.
+      content:
+        application/json:
+          schema:
+            $ref: init-claim-response.yaml
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../../components/error-details.yaml
+    '404':
+      description: Project not found.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../../components/schemas/errors/proj-not_found.yaml
+    '409':
+      description: The project is already claimed by a team.
+      content:
+        application/json:
+          schema:
+            $ref: already-claimed-response.yaml
+    '410':
+      description: |
+        The claim window has closed: the project was created more than 14 days
+        ago and can no longer be claimed. Unlike an expired challenge this is
+        final, so clients must not present it as retryable.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../../components/schemas/errors/proj-claim_window_expired.yaml
+    default:
+      $ref: initClaim-error-response.yaml

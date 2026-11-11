@@ -1,8 +1,9 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
+
+import { it } from "@tests/helpers/fixtures";
 
 import {
   DEFAULT_DEV_PORT,
@@ -11,7 +12,7 @@ import {
   issuerFromPort,
   portFromIssuer,
   withDevPort,
-} from "../../../../../src/lib/orca/detectors/port";
+} from "@/lib/orca/detectors/port";
 
 describe("extractPort", () => {
   it("parses the -p flag form", () => {
@@ -64,40 +65,30 @@ describe("DEFAULT_DEV_PORT", () => {
 });
 
 describe("detectDevPort", () => {
-  let dir: string;
-
-  beforeEach(async () => {
-    dir = await mkdtemp(join(tmpdir(), "zitadel-port-"));
-  });
-
-  afterEach(async () => {
-    await rm(dir, { recursive: true, force: true });
-  });
-
-  it("falls back to DEFAULT_DEV_PORT when nothing is configured", async () => {
+  it("falls back to DEFAULT_DEV_PORT when nothing is configured", async ({ dir }) => {
     expect(await detectDevPort(dir, {})).toBe(DEFAULT_DEV_PORT);
   });
 
-  it("reads the port from the dev script", async () => {
+  it("reads the port from the dev script", async ({ dir }) => {
     expect(await detectDevPort(dir, { scripts: { dev: "next dev -p 4567" } })).toBe(4567);
   });
 
-  it("reads the port from .env.local when the dev script has none", async () => {
+  it("reads the port from .env.local when the dev script has none", async ({ dir }) => {
     await writeFile(join(dir, ".env.local"), "PORT=5500\n");
     expect(await detectDevPort(dir, { scripts: { dev: "next dev" } })).toBe(5500);
   });
 
-  it("reads the port from .env when .env.local is absent", async () => {
+  it("reads the port from .env when .env.local is absent", async ({ dir }) => {
     await writeFile(join(dir, ".env"), "PORT=5600\n");
     expect(await detectDevPort(dir, {})).toBe(5600);
   });
 
-  it("prefers the dev script over an env file PORT", async () => {
+  it("prefers the dev script over an env file PORT", async ({ dir }) => {
     await writeFile(join(dir, ".env.local"), "PORT=8000\n");
     expect(await detectDevPort(dir, { scripts: { dev: "next dev -p 7000" } })).toBe(7000);
   });
 
-  it("prefers .env.local over .env", async () => {
+  it("prefers .env.local over .env", async ({ dir }) => {
     await writeFile(join(dir, ".env.local"), "PORT=5700\n");
     await writeFile(join(dir, ".env"), "PORT=5800\n");
     expect(await detectDevPort(dir, {})).toBe(5700);

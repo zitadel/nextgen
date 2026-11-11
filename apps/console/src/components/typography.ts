@@ -1,6 +1,18 @@
 /** A screen's title: the 24/24 display face. */
 export const PAGE_TITLE = "text-foreground font-serif text-2xl leading-6 tracking-tight";
 
+/** The row every screen's title sits in (`docs/styling.md`, "Page wrapper"). */
+export const PAGE_TITLE_ROW = "flex min-h-9 items-center justify-between gap-3";
+
+/**
+ * A card's or section's primary title: the 16/20 display face (Figma text
+ * style `zitadel/section-heading` in the detail panel components, not the larger
+ * `heading-md` token in the exported `4. Custom` collection). Every
+ * `DetailSection` title and every top-level section on a detail or settings
+ * screen uses it.
+ */
+export const SECTION_HEADING = "text-foreground font-serif text-base leading-5";
+
 /** The overline face: display, uppercase 12/16 with 0.72px tracking. Colour is the caller's. */
 export const OVERLINE = "font-serif text-xs leading-4 tracking-[0.72px] uppercase";
 
@@ -13,3 +25,6 @@ export const PANEL_HEAD_CELL =
 
 /** Body cell of a table inside a panel card. */
 export const PANEL_BODY_CELL = "px-0 py-3 text-sm";
+
+/** Form field labels: Arimo, 14px/20px, regular weight. */
+export const FIELD_LABEL_TYPOGRAPHY = "font-sans text-sm leading-5 font-normal";

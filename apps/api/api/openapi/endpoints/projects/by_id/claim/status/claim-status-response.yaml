@@ -1,0 +1,14 @@
+description: |
+  The state of a claim challenge. While pending it carries only `status`. Once
+  completed it also carries the owning team, the claim timestamp and the
+  dashboard URL. Switch on `status`: a `pending` response never carries
+  completion fields, and a `completed` response always does.
+# Discriminated variants keep stale completion fields out of a `pending` response.
+oneOf:
+  - $ref: ./claim-status-pending.yaml
+  - $ref: ./claim-status-completed.yaml
+discriminator:
+  propertyName: status
+  mapping:
+    pending: ./claim-status-pending.yaml
+    completed: ./claim-status-completed.yaml

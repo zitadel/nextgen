@@ -1,0 +1,65 @@
+post:
+  operationId: queryGrants
+  x-zitadel-cli: grants list
+  summary: Query grants
+  # Grants are not in `resource_scope_index`, so the project scope is required
+  # on the query, as for getGrant. The `user.read` and `team.read` scopes for
+  # `expand` cannot be ANDed onto the security block because they depend on
+  # the request body; they are documented on the expand enum instead.
+  description: |
+    Returns a page of a project's grants.
+
+    Only unrevoked grants this API manages are listed, which bind a user or team
+    to the viewer, editor or admin role. Expired grants are included, so a client
+    can revoke them with `deleteGrant` (`DELETE /grants/{id}`) before it grants the same binding again.
+    Project-secret setup (`sk_proj`) and owning-team (`relation=team`) rows are
+    not returned. Requires `project.read`.
+
+    `expand: ["principal"]` adds envelope fields on `user` and `team`. For project
+    secrets it additionally requires `user.read` and `team.read`. A user-bound
+    console session that already passed the project check may expand without those scopes.
+
+    Authenticate with a project secret (`oauth2`) or a console session cookie
+    (`sessionCookie`). Cookie requests follow that scheme's CSRF rules.
+  tags:
+    - Grants
+  security:
+    - oauth2:
+        - project.read
+    - sessionCookie: []
+  parameters:
+    - $ref: ../../../components/parameters/project-id.yaml
+  requestBody:
+    description: Request to query the grants of a project.
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: query-grants-request.yaml
+  responses:
+    '200':
+      description: A page of the project's grants.
+      content:
+        application/json:
+          schema:
+            $ref: query-grants-response.yaml
+    '400':
+      description: Invalid request, for example invalid query parameters.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '403':
+      description: Insufficient permissions.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    default:
+      $ref: queryGrants-error-response.yaml

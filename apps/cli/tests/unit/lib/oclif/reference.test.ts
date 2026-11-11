@@ -4,11 +4,11 @@ import { join } from "node:path";
 import { Args, Flags } from "@oclif/core";
 import { describe, expect, it } from "vitest";
 
-import { COMMANDS } from "../../../../src/index";
-import { EXIT_CODES } from "../../../../src/lib/errors";
-import { BaseCommand, FLAG_VARIABLES } from "../../../../src/lib/oclif/base";
-import { CommandGroups } from "../../../../src/lib/oclif/groups";
-import { cliReference } from "../../../../src/lib/oclif/reference";
+import { COMMANDS } from "@/index";
+import { EXIT_CODES } from "@/lib/errors";
+import { BaseCommand, FLAG_VARIABLES } from "@/lib/oclif/base";
+import { CommandGroups } from "@/lib/oclif/groups";
+import { cliReference } from "@/lib/oclif/reference";
 
 const packageRoot = join(import.meta.dirname, "../../../..");
 
@@ -22,7 +22,7 @@ const marker =
   "The docs site renders it as its CLI reference (apps/docs/lib/cli-reference.ts).";
 
 class Fake extends BaseCommand {
-  async run(): Promise<never> {
+  protected async execute(): Promise<never> {
     throw new Error("unused");
   }
 }
@@ -31,7 +31,7 @@ class Fake extends BaseCommand {
 function aCommand(statics: Record<string, unknown> = {}): typeof Fake {
   return Object.assign(class extends Fake {}, {
     description: "Do the thing.",
-    group: CommandGroups.project,
+    group: CommandGroups.gettingStarted,
     ...statics,
   });
 }
@@ -56,7 +56,7 @@ describe("cliReference", () => {
     const reference = cliReference(
       {
         zebra: aCommand(),
-        start: aCommand({ group: CommandGroups.localServer }),
+        start: aCommand({ group: CommandGroups.localDevelopment }),
         claim: aCommand({ groupOrder: 2 }),
         setup: aCommand({ groupOrder: 1 }),
       },
@@ -65,10 +65,10 @@ describe("cliReference", () => {
 
     expect(reference.groups).toEqual(Object.values(CommandGroups));
     expect(reference.commands.map(({ id, group }) => [id, group])).toEqual([
-      ["setup", CommandGroups.project],
-      ["claim", CommandGroups.project],
-      ["zebra", CommandGroups.project],
-      ["start", CommandGroups.localServer],
+      ["setup", CommandGroups.gettingStarted],
+      ["claim", CommandGroups.gettingStarted],
+      ["zebra", CommandGroups.gettingStarted],
+      ["start", CommandGroups.localDevelopment],
     ]);
   });
 

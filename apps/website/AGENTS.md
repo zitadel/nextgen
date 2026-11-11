@@ -1,6 +1,8 @@
 # Agent Instructions — `apps/website`
 
-The hosted cloud's front page at `/` and its changelog at `/changelog`.
+The hosted cloud's front page at `/`, its changelog at `/changelog`, with a
+page per entry and a feed under it, and the guide to choosing it or Zitadel v4
+at `/choose-version`.
 Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
 
 - The front page says the benefit, then proves it, and nothing else: the
@@ -15,6 +17,19 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
   `app/globals.css` (`bg-background`, `text-foreground`, `text-accent`).
 - It does not use `@zitadel/design-tokens`; only the login previews paint with
   them, on the login's own atoms.
+
+## Content-Security-Policy
+
+- `csp-adapter.mjs` enforces each prerendered page's script hashes, and the
+  404's for other URLs in place of `next.config.ts`' scriptless fallback.
+- Never give a page a nonce or `'unsafe-inline'`: pages, the changelog too,
+  stay prerendered ([why](../../docs/design/cloud/csp-docs-and-website.md)).
+- `csp-adapter.mjs` copies `apps/docs/csp-adapter.mjs` but for the policy:
+  change both.
+- Load nothing from another origin without widening the enforced policy
+  in the same change.
+- The cloud's deployment checks (`e2e/console/src-deployment/routes.spec.ts`)
+  fail a page with an unhashed inline script.
 
 ## The fonts
 
@@ -47,10 +62,12 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
   CSS keyframes in `app/globals.css`. A hover plays it once to the end, and
   with `autoplay` it also plays now and then by itself (the header's and the
   footer's); never for reduced motion. Give each copy its own `id`.
-- `apps/docs/components/logo.tsx` is a copy; change the copies together.
-- `public/favicons/` and `public/favicon.ico` are the cloud's favicons: the
-  console, the login UI and the docs link the same set, so a change here
-  reaches them. A single `/favicon.ico` cannot replace the light/dark set.
+- `apps/docs/components/logo.tsx` and `apps/console/src/app-shell/logo.tsx` are
+  copies; change the copies together.
+- `public/favicons/` and `public/favicon.ico` are the cloud's favicons: the docs
+  link the same set, so a change here reaches them. `apps/console/public/favicons/`
+  is a copy; change the copies together. A single `/favicon.ico` cannot replace
+  the light/dark set.
 - `layout.tsx` imports the share image (`app/og.jpg`) and sets no
   `metadataBase`: on Vercel, Next makes its URL absolute with the deployment's
   host. Render it from `scripts/og.html` at 1200×630 as a JPEG (quality 88),
@@ -82,27 +99,40 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
 
 ## The changelog
 
-- `app/changelog/releases.ts` reads the newest GitHub Releases when the page
-  builds and when it regenerates (`revalidate` in `page.tsx`), never per
-  visit. It parses the body `scripts/release-github.mjs` writes: change the
-  two together, and the fixture in `releases.spec.ts` with them.
-- GitHub failing never fails a build (the page links to GitHub instead); a
-  regeneration rethrows, so the last page stays up.
-- Render release Markdown only through `app/changelog/markdown.tsx`, as
+- An entry, `changelog/<slug>.md`, tells one notable change, which an agent
+  drafts with `skills/zitadel-changelog-entries`. The GitHub Releases keep
+  every change of each version; never list them all here.
+- `app/changelog/entries.ts` reads the entries when the site builds, and finds
+  the release that ships each one's pull requests in the published packages'
+  `CHANGELOG.md`, which `build` lists as inputs in `moon.yml` and
+  `turbo.json`. A broken entry fails the build.
+- Render an entry's Markdown only through `app/changelog/markdown.tsx`, as
   elements and never as HTML: this origin also serves the console's session.
-- The filters (`app/changelog/filter.ts`) name packages in `COMPONENTS`;
-  list a new published package there, or it shows under its bare name.
-- `WEBSITE_GITHUB_TOKEN`, a token without permissions, lifts GitHub's
-  rate limit on Vercel's shared addresses ([runbook](../../docs/runbooks/cloud.md)).
+  The feed carries each entry's plain-text summary instead.
+- Keep `metadata.internal` in the skill's `SKILL.md`: it keeps the skill out
+  of the users' installs, `zitadel skills add` and
+  `npx skills add zitadel/nextgen --full-depth`.
+
+## Analytics
+
+- Send a custom event only through `app/analytics.ts`, and list it in
+  [`docs/product-analytics-events.yaml`](../../docs/product-analytics-events.yaml) in the same change.
+
+## Choose a version
+
+- `app/choose-version/features.ts` holds every row, the guide above them
+  (`CHOOSE`) and the date shown (`UPDATED`). Change all three when a feature
+  ships or changes.
 
 ## Routing
 
-The cloud routes only `/`, `/changelog`, `/llms.txt`, `/_next/*`,
-`/favicon.ico` and `/favicons/*` here (repo-root
-[`vercel.json`](../../vercel.json)).
+The cloud routes every path no other service claims here (repo-root
+[`vercel.json`](../../vercel.json)), so `app/not-found.tsx` answers what
+nothing serves ([ADR 076](../../docs/adrs/076-error-pages-and-unmatched-routes.md) §4).
 
-- A new page or `public/` file needs a rewrite of its own in `vercel.json`, or
-  the server answers it with a 404.
+- A new page needs no rewrite, but must keep off the paths other services
+  claim: `/api/`, `/console/`, `/docs`, `/cloud/`, `/schemas/v1/`, the
+  server's root paths and the API's resource names (`vercel.json`).
 - Load every other asset from `/_next/`: fonts through `next/font`, images as
   imports. Never use Next's metadata files (`app/icon.svg`, `opengraph-image`),
   which Next serves at the root.
@@ -116,5 +146,6 @@ moon run website:typecheck website:lint website:test website:build
 moon run website:start   # the build on port 3004
 ```
 
-Vercel runs `turbo run build --filter=@zitadel/components`, then
-`pnpm run build`; the Next build itself never goes through a task runner.
+Vercel runs `turbo run build --filter=@zitadel/website`; the build's key
+holds the deployment's ID, so Vercel never restores it
+([turborepo.md](../../docs/design/build/turborepo.md)).

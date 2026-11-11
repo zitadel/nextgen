@@ -3,9 +3,9 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { usePlatformMock } from "../helpers/platform";
-import { anApp } from "../helpers/project";
-import { expectedPublicCliCommand, parseJson, runCliForTest } from "../helpers/run-cli";
+import { usePlatformMock } from "@tests/helpers/platform";
+import { anApp } from "@tests/helpers/project";
+import { expectedPublicCliCommand, parseJson, runCliForTest } from "@tests/helpers/run-cli";
 
 const platform = usePlatformMock();
 
@@ -42,7 +42,7 @@ async function suggestedCommandIds(): Promise<Set<string>> {
       const id = commandIdFromArgs(match[2]!);
       if (id) commands.add(id);
     }
-    for (const match of source.matchAll(/["`]zitadel\s+([^"`]*)/g)) {
+    for (const match of source.matchAll(/["`]zitadel\s+([^"`$]*)/g)) {
       const id = commandIdFromArgs(match[1] ?? "");
       if (id) commands.add(id);
     }
@@ -57,7 +57,7 @@ describe("the cli", () => {
         const app = await anApp();
         platform.isNotZitadel();
 
-        const result = await app.apply();
+        const result = await app.deploy();
 
         expect(result).toFailWith("E_VALIDATION");
       });
@@ -68,7 +68,7 @@ describe("the cli", () => {
         const app = await anApp();
         platform.isUnavailable();
 
-        const result = await app.apply();
+        const result = await app.deploy();
 
         expect(result).toFailWith("E_VALIDATION");
       });
@@ -79,7 +79,7 @@ describe("the cli", () => {
         const app = await anApp();
         platform.refusesConnections();
 
-        const result = await app.apply();
+        const result = await app.deploy();
 
         expect(result).toFailWith("E_VALIDATION");
       });
@@ -91,7 +91,7 @@ describe("the cli", () => {
       it("names the failure when run before setup", async () => {
         const app = await anApp();
 
-        const result = await app.apply();
+        const result = await app.deploy();
 
         expect(result).toFailWith("E_VALIDATION");
       });
@@ -99,20 +99,32 @@ describe("the cli", () => {
       it("points at setup as the way out", async () => {
         const app = await anApp();
 
-        const result = await app.apply();
+        const result = await app.deploy();
 
         expect(result).toSuggest(expectedPublicCliCommand("setup"));
       });
 
-      it("resolves the real server when nothing says otherwise", async () => {
+      it("has no server of its own when nothing names one", async () => {
         const app = await anApp();
 
         const result = await app.runWithoutServer(["status", "--json"]);
 
-        expect(app.envelopeOf(result).source).toBe("https://preview.zitadel.com");
+        expect(app.envelopeOf(result).source).toBe("");
       });
 
-      it("prefers the server named in zitadel.json", async () => {
+      it("takes the server from ZITADEL_URL in the project's env file", async () => {
+        const app = await anApp();
+        await app.bindEnvironment("development", {
+          ZITADEL_URL: "https://self.example",
+          ZITADEL_PROJECT_ID: "existing",
+        });
+
+        const result = await app.runWithoutServer(["status", "--json"]);
+
+        expect(app.envelopeOf(result).source).toBe("https://self.example");
+      });
+
+      it("ignores the server named in zitadel.json", async () => {
         const app = await anApp();
         await app.writeConfig({
           $schema: "./.zitadel/meta/project.json",
@@ -122,7 +134,7 @@ describe("the cli", () => {
 
         const result = await app.runWithoutServer(["status", "--json"]);
 
-        expect(app.envelopeOf(result).source).toBe("https://self.example");
+        expect(app.envelopeOf(result).source).toBe("");
       });
 
       it("only ever suggests commands a user can run", async () => {
@@ -136,7 +148,9 @@ describe("the cli", () => {
 
         const suggested = await suggestedCommandIds();
 
-        expect([...suggested].sort()).toEqual(expect.arrayContaining(["apply", "doctor", "setup"]));
+        expect([...suggested].sort()).toEqual(
+          expect.arrayContaining(["deploy", "doctor", "setup"]),
+        );
         for (const command of suggested) {
           expect(visible, `${command} is suggested but not a visible command`).toContain(command);
         }
@@ -156,6 +170,21 @@ describe("the cli", () => {
         expect(result).toFailWith("E_VALIDATION");
       });
 
+      it.each([["resources"], ["status"], ["logs"]])("accepts -h on %s", async (command) => {
+        const result = await runCliForTest([command, "-h"]);
+
+        expect(result).toPrint("USAGE");
+      });
+
+      /**
+       * Colour itself is not asserted here, and an assertion about it would
+       * mislead: picocolors and consola decide colour when they load, from the
+       * real process streams, so a run in this harness emits no escape byte
+       * whatever the flags say — a check for their absence would hold against
+       * any implementation, broken ones included. What a run decides is pinned
+       * in `tests/unit/lib/oclif/base-source.test.ts`, and that no command
+       * decides for itself is enforced by `biome-plugins/no-own-colour.grit`.
+       */
       it("accepts --no-color", async () => {
         const result = await runCliForTest(["resources", "--no-color", "--json"]);
 

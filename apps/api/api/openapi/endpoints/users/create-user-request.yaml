@@ -1,0 +1,32 @@
+title: CreateUserRequest
+description: |
+  The request body for creating a user: the `schema` it follows and the
+  `attributes` that must satisfy that schema.
+
+  The server assigns the user's ID and returns it in the response, so the
+  request carries no `id`. `metadata` is server-owned for the same reason.
+  Neither is part of this schema, which is what frees a user schema to declare
+  properties of those names.
+
+  A request carrying any other top-level property is rejected rather than
+  ignored. `attributes` stays open, since the user schema determines what
+  belongs in it.
+type: object
+additionalProperties: false
+required:
+  - schema
+  - attributes
+properties:
+  schema:
+    type: string
+    minLength: 1
+    description: |
+      The ID of the schema that defines the content of `attributes`: the `id`
+      that `createSchema` (`POST /schemas`) returns or `listSchemas` (`GET /schemas`) lists. A default schema is
+      provided.
+  attributes:
+    type: object
+    additionalProperties: true
+    description: |
+      The user's schema-defined content. Validated against `schema`; a
+      property the schema does not permit is rejected with `req.invalid`.

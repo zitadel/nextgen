@@ -344,7 +344,7 @@ export function applyBrandingTokens(shadowRoot: ShadowRoot, branding: Branding |
  * and a variant-derived fallback on top of the same branding input.
  *
  * Defaults to dark: the design system's primary surface, and the mode a
- * hosted login page renders when a revision states no preference.
+ * login page renders when a revision states no preference.
  */
 export function resolveTheme(branding: Branding | undefined): ResolvedTheme {
   const [only, second] = publishedSides(branding);

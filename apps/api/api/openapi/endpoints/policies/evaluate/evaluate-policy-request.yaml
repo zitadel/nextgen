@@ -1,0 +1,15 @@
+title: EvaluatePolicyRequest
+description: |
+  One dry run of an operation's policy. `operation` selects the operation's
+  template. `config` is the policy to evaluate, checked exactly as a publish
+  checks it. `input` is what the operation's request carries, in the
+  operation's own terms. `facts` states what the operation would look up at
+  runtime. The policy catalog lists the fields each operation accepts.
+oneOf:
+  - $ref: password-set-evaluate-request.yaml
+  - $ref: user-create-evaluate-request.yaml
+discriminator:
+  propertyName: operation
+  mapping:
+    auth.factor.password.set: password-set-evaluate-request.yaml
+    user.create: user-create-evaluate-request.yaml

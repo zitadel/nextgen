@@ -18,7 +18,7 @@ if (!deployment) {
   throw new Error("CLOUD_URL names the deployment to test");
 }
 const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
-// GitHub Actions (deployment-checks.yml): annotations on the check that name
+// GitHub Actions (deployment-suite.yml): annotations on the check that name
 // the failing test and its assertion.
 const onGitHub = !!process.env.GITHUB_RUN_ID;
 
@@ -35,7 +35,7 @@ export default defineConfig({
   use: {
     baseURL: deployment,
     // The repository is public: anyone signed in to GitHub can download what
-    // deployment-checks.yml uploads, so nothing uploaded may hold the bypass
+    // deployment-suite.yml uploads, so nothing uploaded may hold the bypass
     // secret. A trace records every request's headers, so there is none; a
     // screenshot shows only the page, and is all the workflow uploads.
     trace: "off",
@@ -43,8 +43,12 @@ export default defineConfig({
     // Every request the suite makes, from the request fixture and from the
     // browser, carries the bypass; a deployment without protection ignores
     // it. The console loads nothing from another origin, so it reaches no
-    // one else.
-    extraHTTPHeaders: bypassSecret ? { "x-vercel-protection-bypass": bypassSecret } : {},
+    // one else. The skip keeps Vercel's toolbar out of a preview's pages, so
+    // a policy violation the browser spec sees is the console's own.
+    extraHTTPHeaders: {
+      ...(bypassSecret ? { "x-vercel-protection-bypass": bypassSecret } : {}),
+      "x-vercel-skip-toolbar": "1",
+    },
   },
   projects: [
     // The routing checks talk HTTP through the request fixture: no browser.

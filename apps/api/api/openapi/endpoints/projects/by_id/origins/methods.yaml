@@ -1,0 +1,44 @@
+post:
+  operationId: addOrigin
+  x-zitadel-cli: origin add
+  summary: Add an origin pattern
+  description: |
+    Adds an origin pattern, a `pattern` and its `kind`, to the project's origins.
+
+    An origin pattern says which web origins the project accepts. A `primary`
+    pattern must be an exact URL with no wildcard. A `preview` pattern may
+    include a single DNS-label wildcard.
+
+    While the project has no patterns, it admits no origin except a loopback
+    origin, so the first pattern you add opens it to the origins that
+    pattern matches. Admitting an origin is not serving it: a new `primary`
+    origin answers `rel.not_deployed` until the next deploy to primary
+    (`zitadel deploy`).
+
+    Adding a pattern that already exists with the same kind is idempotent and
+    answers `201` with the stored origin. If the pattern exists with the other
+    kind, the request is refused with `origin.kind_conflict`: remove it with
+    `removeOrigin` (`POST /projects/{project_id}/origins/remove`), then add it again.
+  tags:
+    - Projects
+  parameters:
+    - $ref: ../../../../components/parameters/project-id-path.yaml
+  security:
+    - oauth2:
+        - origin.write
+    - sessionCookie: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../../project-origin.yaml
+  responses:
+    '201':
+      description: The stored origin pattern.
+      content:
+        application/json:
+          schema:
+            $ref: add-origin-response.yaml
+    default:
+      $ref: addOrigin-error-response.yaml

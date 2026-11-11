@@ -1,4 +1,9 @@
+import type { ZitadelClient } from "@/lib/backend";
+import type { Environment } from "@/lib/environment";
+import type { SuggestedCommand } from "@/lib/suggestion";
 import type { BaseCommand } from "./base";
+import type { NextSteps, StepsShown } from "./next-steps";
+import type { Rendering } from "./rendering";
 
 /**
  * Fields present on every JSON envelope regardless of status. Agents key off
@@ -77,6 +82,10 @@ export type GlobalOptions = {
   debug: boolean;
   env: NodeJS.ProcessEnv;
   isTTY: boolean;
+  /** Whether human output is coloured; the one decision, see `./base`. */
+  colored: boolean;
+  /** Whether the run answers in the JSON envelope. */
+  json: boolean;
 };
 
 /**
@@ -96,21 +105,72 @@ export type FlagVariable = {
 /**
  * What a command body returns to {@link import("./base").BaseCommand.emit}: a
  * success or a deliberate skip. The optional `pretty` string lets a command
- * supply a bespoke human rendering (e.g. the `apply` plan diff); otherwise the
+ * supply a bespoke human rendering (e.g. `deploy`'s summary); otherwise the
  * generic renderer formats `data`. Failures are thrown as `ZitadelError`,
  * never returned.
+ *
+ * `next` is the only way a result suggests what to do next: the base command
+ * writes it into the envelope (`data.next_actions`/`data.next_commands` on
+ * success, `next_commands` on a skip) and prints it after the rendering, on
+ * stderr instead when the rendering is output a script reads, and not again
+ * when `nextShown` says the command's own output showed it.
+ *
+ * A rendering is made by one of the four factories in `./rendering` —
+ * {@link import("./rendering").prose}, {@link import("./rendering").json},
+ * {@link import("./rendering").rows} or {@link import("./rendering").painted}
+ * — because each shape takes a different spelling and is ruined by the
+ * others'. The factory spells out what it is given, so a command
+ * interpolating what the server answered needs no escaping of its own, and
+ * the `kind` a rendering carries says only who the output is for.
  */
 export type CommandResult =
   | {
       readonly status: "ok";
       readonly data: unknown;
       readonly warnings?: ReadonlyArray<string>;
-      readonly pretty?: string;
+      /**
+       * A bespoke rendering, which says which kind it is so the base command
+       * can spell it out the way that kind takes.
+       */
+      readonly pretty?: Rendering;
+      readonly next?: NextSteps<SuggestedCommand>;
+      /**
+       * Set when the command already printed {@link next} in output of its
+       * own (`setup`'s summary box), so the trailing block would repeat it.
+       */
+      readonly nextShown?: StepsShown;
+      /** Set when {@link pretty} already says every warning, so none is printed again below it. */
+      readonly warningsShown?: boolean;
+      /** Printed in human mode after everything else, and never part of the envelope. */
+      readonly footer?: string;
     }
   | {
       readonly status: "skipped";
       readonly reason: string;
       readonly data?: unknown;
-      readonly nextCommands?: ReadonlyArray<string>;
-      readonly pretty?: string;
+      /** Only commands: a skipped envelope carries `next_commands` and no prose. */
+      readonly next?: Pick<NextSteps<SuggestedCommand>, "commands">;
+      /** As on a success: a rendering that says which kind it is. */
+      readonly pretty?: Rendering;
     };
+
+/** The platform connection a project command opens. */
+export type Connection = Readonly<{
+  client: ZitadelClient;
+  projectId: string;
+  server: string;
+  environment: Environment;
+}>;
+
+/** How a project command opens its {@link Connection}. */
+export type ConnectOptions = Readonly<{
+  quiet?: boolean;
+  prompt?: boolean;
+  /**
+   * How long one request on this connection may take, for a caller that must
+   * not wait as long as the rest of the run: a best-effort probe answers
+   * "unknown" rather than holding the command, and the request has to be given
+   * up on as well, or it keeps the process alive after the answer was settled.
+   */
+  timeoutMs?: number;
+}>;

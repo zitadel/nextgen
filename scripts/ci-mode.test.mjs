@@ -5,7 +5,6 @@ import { join } from "node:path";
 import { test } from "vitest";
 
 import {
-  affectedTurboTargets,
   computeMode,
   forceFullReason,
   queryAffectedTargets,
@@ -97,33 +96,6 @@ const SDK_VUE_CLASS = [
   "sdk-vue:test",
   "sdk-vue:typecheck",
 ];
-const LOGIN_UI_CLASS = [
-  "e2e:all",
-  "e2e:console-embedded",
-  "e2e:console-platform",
-  "e2e:console-real",
-  "e2e:demo-next-real",
-  "login-ui:build",
-  "login-ui:build-release",
-  "login-ui:dev",
-  "login-ui:lint",
-  "login-ui:preview",
-  "login-ui:test",
-  "login-ui:typecheck",
-  "release:pack",
-  "release:publish",
-  "release:snapshot",
-  "server:build",
-  "server:lint",
-  "server:test",
-  "server:test-postgres",
-  "server:test-spanner",
-  "server:test-sqlite",
-  "server:vet",
-  "testing:test-integration",
-  "workspace:build-local-image",
-  "workspace:smoke-container",
-];
 const TESTING_KIT_CLASS = [
   "e2e:all",
   "e2e:console-embedded",
@@ -184,12 +156,6 @@ const COMPONENTS_CLASS = [
   "e2e:demo-nuxt-mock",
   "e2e:journey",
   "e2e:journey-local",
-  "login-ui:build",
-  "login-ui:build-release",
-  "login-ui:dev",
-  "login-ui:preview",
-  "login-ui:test",
-  "login-ui:typecheck",
   "release:build-public-packages",
   "release:pack",
   "release:publish",
@@ -261,9 +227,6 @@ const API_MOCK_CLASS = [
   "e2e:all",
   "e2e:demo-next-mock",
   "e2e:demo-nuxt-mock",
-  "mock-zitadel:build",
-  "mock-zitadel:test",
-  "mock-zitadel:typecheck",
   "release:build-public-packages",
   "release:pack",
   "release:publish",
@@ -326,7 +289,7 @@ function journeys(gates) {
 
 test("mode: changeset/version files only is version-only", () => {
   assert.equal(computeMode([".changeset/x.md", "apps/server/package.json"]), "version-only");
-  assert.equal(computeMode([".changeset/x.md", "internal/a.go"]), "full");
+  assert.equal(computeMode([".changeset/x.md", "apps/api/internal/a.go"]), "full");
   assert.equal(computeMode([]), "full");
 });
 
@@ -353,7 +316,7 @@ test("docs-only change gates everything off", () => {
 test("go change runs everything but the mock lanes, and the journey matrix collapses to one framework", () => {
   const { gates, matrix } = resolveGates({
     mode: "full",
-    files: ["internal/a.go"],
+    files: ["apps/api/internal/a.go"],
     targets: GO_CLASS,
   });
   // The mock lanes run against api-mock, never the server.
@@ -439,19 +402,6 @@ test("console spec edit runs the console suites and the snapshot, on one framewo
   assert.deepEqual(journeys(gates), [false, false, false, false]);
   assert.equal(matrix, "single");
   assert.equal(gates.go_tests, false);
-});
-
-test("login-ui change runs all journeys on a single framework, and the Go tests", () => {
-  // The server's test binary embeds the login UI build, so server:test moves.
-  const { gates, matrix } = resolveGates({
-    mode: "full",
-    files: ["apps/login-ui/src/main.ts"],
-    targets: LOGIN_UI_CLASS,
-  });
-  assert.deepEqual(journeys(gates), [true, true, true, true]);
-  assert.equal(matrix, "single");
-  assert.equal(gates.go_tests, true);
-  assert.equal(gates.suites_console, true);
 });
 
 test("testing-kit change runs all journeys with the full matrix", () => {
@@ -542,7 +492,7 @@ test("the e2e step follows e2e:all", () => {
     ["e2e/console/src-real/console-real.spec.ts", CONSOLE_SPEC_CLASS, true],
     ["packages/sdk-vue/src/index.ts", SDK_VUE_CLASS, true],
     ["apps/demo-next/src/app/admin/page.tsx", DEMO_NEXT_CLASS, true],
-    ["internal/a.go", GO_CLASS, true],
+    ["apps/api/internal/a.go", GO_CLASS, true],
     ["docs/adrs/001-server-cli-cobra-viper.md", DOCS_CLASS, false],
   ]) {
     const { gates, reason } = resolveGates({ mode: "full", files: [file], targets });
@@ -578,7 +528,7 @@ test("an empty diff forces a full run", () => {
 test("a failed affected query fails open", () => {
   const { gates, reason } = resolveGates({
     mode: "full",
-    files: ["internal/a.go"],
+    files: ["apps/api/internal/a.go"],
     targets: null,
   });
   assert.ok(allTrue(gates));
@@ -614,13 +564,10 @@ function fakeSpawn(result) {
   return () => ({ status: 0, stdout: "", stderr: "", ...result });
 }
 
-const moon = { runner: "moon" };
-
 test("queryAffectedTargets parses the grouped task map", () => {
   const targets = queryAffectedTargets(
     "HEAD",
     fakeSpawn({ stdout: '{"tasks":{"server":{"test":{},"build":{}},"release":{"snapshot":{}}}}' }),
-    moon,
   );
   assert.deepEqual(targets?.sort(), ["release:snapshot", "server:build", "server:test"]);
 });
@@ -639,7 +586,7 @@ test("queryAffectedTargets asks moon as a local run would, against the given bas
   process.env.CI = "true";
   process.env.GITHUB_ACTIONS = "true";
   try {
-    queryAffectedTargets("abc123", spawn, moon);
+    queryAffectedTargets("abc123", spawn);
   } finally {
     for (const [name, value] of Object.entries(previous)) {
       if (value === undefined) delete process.env[name];
@@ -655,95 +602,15 @@ test("queryAffectedTargets asks moon as a local run would, against the given bas
 });
 
 test("queryAffectedTargets returns an empty set for an empty tasks map", () => {
-  assert.deepEqual(queryAffectedTargets("HEAD", fakeSpawn({ stdout: '{"tasks":{}}' }), moon), []);
+  assert.deepEqual(queryAffectedTargets("HEAD", fakeSpawn({ stdout: '{"tasks":{}}' })), []);
 });
 
 test("queryAffectedTargets fails open on schema drift, garbage output, and nonzero exits", () => {
-  const query = (result) => queryAffectedTargets("HEAD", fakeSpawn(result), moon);
+  const query = (result) => queryAffectedTargets("HEAD", fakeSpawn(result));
   assert.equal(query({ stdout: '{"unexpected":true}' }), null);
   assert.equal(query({ stdout: '{"tasks":[1,2]}' }), null);
   assert.equal(query({ stdout: "not json" }), null);
   assert.equal(query({ status: 1, stderr: "boom" }), null);
-});
-
-// A trimmed `turbo run … --dry=json`: inputs are relative to the task's
-// package directory, dependents are task ids. The api build feeds the console
-// build, which the server's tests embed; the docs check stands alone.
-function turboGraph() {
-  const task = (taskId, directory, inputs, dependents, command = "pnpm run x") => ({
-    taskId,
-    directory,
-    command,
-    inputs: Object.fromEntries(inputs.map((file) => [file, "hash"])),
-    dependents,
-  });
-  return {
-    globalCacheInputs: { files: { "tsconfig.base.json": "hash", "biome.json": "hash" } },
-    tasks: [
-      task(
-        "@zitadel/api#generate",
-        "packages/api",
-        ["../../api/openapi/openapi-spec.yaml"],
-        ["@zitadel/api#build"],
-      ),
-      task("@zitadel/api#build", "packages/api", ["src/index.ts"], ["@zitadel/console#build"]),
-      task("@zitadel/console#build", "apps/console", ["src/main.tsx"], ["@zitadel/server#test"]),
-      task("@zitadel/server#test", "apps/server", ["../../internal/server.go"], []),
-      task("@zitadel/testing#test:integration", "packages/testing", ["src/kit.ts"], []),
-      task("@zitadel/e2e#console-real", "e2e", ["console/src-real/console-real.spec.ts"], []),
-      task("//#check-adrs", "", ["docs/adrs/001.md"], []),
-      task("@zitadel/docs#test", "apps/docs", ["package.json"], [], "<NONEXISTENT>"),
-    ],
-  };
-}
-
-test("affectedTurboTargets walks dependents of the tasks whose inputs changed, not dependencies", () => {
-  assert.deepEqual(affectedTurboTargets(turboGraph(), ["apps/console/src/main.tsx"]).sort(), [
-    "console:build",
-    "server:test",
-  ]);
-  assert.deepEqual(affectedTurboTargets(turboGraph(), ["internal/server.go"]), ["server:test"]);
-  assert.deepEqual(affectedTurboTargets(turboGraph(), ["api/openapi/openapi-spec.yaml"]).sort(), [
-    "api:build",
-    "api:generate",
-    "console:build",
-    "server:test",
-  ]);
-});
-
-test("affectedTurboTargets maps root tasks, colon scripts and packages without a script", () => {
-  assert.deepEqual(affectedTurboTargets(turboGraph(), ["docs/adrs/001.md"]), [
-    "workspace:check-adrs",
-  ]);
-  assert.deepEqual(affectedTurboTargets(turboGraph(), ["packages/testing/src/kit.ts"]), [
-    "testing:test-integration",
-  ]);
-  // The e2e package's lanes land on the moon names ci-mode's gates check.
-  assert.deepEqual(
-    affectedTurboTargets(turboGraph(), ["e2e/console/src-real/console-real.spec.ts"]),
-    ["e2e:console-real"],
-  );
-  // apps/docs has no test script: its placeholder task is never affected.
-  assert.deepEqual(affectedTurboTargets(turboGraph(), ["apps/docs/package.json"]), []);
-  assert.deepEqual(affectedTurboTargets(turboGraph(), ["README.md"]), []);
-});
-
-test("affectedTurboTargets treats a changed global input as affecting every task", () => {
-  const targets = affectedTurboTargets(turboGraph(), ["biome.json"]);
-  assert.equal(targets.length, 7);
-  assert.ok(targets.includes("workspace:check-adrs"));
-});
-
-test("queryAffectedTargets under turbo fails open on garbage output and nonzero exits", () => {
-  const query = (result, files = ["x"]) =>
-    queryAffectedTargets("HEAD", fakeSpawn(result), { runner: "turbo", files });
-  assert.equal(query({ stdout: "not json" }), null);
-  assert.equal(query({ stdout: '{"nope":1}' }), null);
-  assert.equal(query({ status: 1, stderr: "boom" }), null);
-  assert.deepEqual(
-    query({ stdout: JSON.stringify(turboGraph()) }, ["apps/console/src/main.tsx"]).sort(),
-    ["console:build", "server:test"],
-  );
 });
 
 // A trimmed `moon ci` report (.moon/cache/ciReport.json, moon 2.6.1): sync

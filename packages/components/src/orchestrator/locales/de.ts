@@ -196,6 +196,8 @@ export const de: Locale = {
     "Ihre Anmeldung konnte nicht fortgesetzt werden. Bitte beginnen Sie erneut.",
   "error.passkey_registration_invalid":
     "Der neue Passkey konnte nicht bestätigt werden. Bitte registriere ihn erneut.",
+  "error.sso_user_schema_mismatch":
+    "Dieses Konto kann sich nicht mit diesem Anbieter anmelden. Bitte versuche eine andere Anmeldeart oder wende dich an deine Administration.",
   "error.sso_unavailable":
     "Dieser Anmeldeanbieter ist gerade nicht verfügbar. Bitte wähle eine andere Anmeldemethode.",
   "error.sso_verified_unique_value_changed":
@@ -210,6 +212,19 @@ export const de: Locale = {
   "error.outcome_unhandled":
     "Dieser Schritt konnte nicht fortgesetzt werden. Bitte versuche es erneut.",
   "error.sign_in_first": "Bitte melde dich zuerst bei deinem Konto an.",
+  "error.signup_check_failed": "Wir konnten dein Konto nicht erstellen. Bitte versuche es erneut.",
+  "error.signup_rate_limited":
+    "Zu viele Versuche. Bitte warte eine Minute und versuche es dann erneut.",
+  "error.signup_secure_connection":
+    "Für ein neues Konto ist eine sichere Verbindung nötig. Öffne diese Seite mit https://.",
+
+  // --- Hinweise: warum der Ablauf von selbst zwischen Anmelden und Registrieren wechselt ---
+  "notice.user_not_found":
+    "Zu dieser E-Mail-Adresse haben wir kein Konto gefunden. Du kannst jetzt eins erstellen. Vertippt? Korrigiere sie im E-Mail-Feld unten.",
+  "notice.user_already_exists":
+    "Zu dieser E-Mail-Adresse gibt es schon ein Konto. Melde dich an, um fortzufahren.",
+  "notice.sso_user_not_found":
+    "Für diese Anmeldung gibt es noch kein Konto. Du kannst jetzt eins erstellen.",
 
   // --- Feld- / Formularfehler ---
   "error.email_required": "Bitte gib eine E-Mail-Adresse ein",
@@ -225,7 +240,12 @@ export const de: Locale = {
   "error.field_format": "Bitte gib einen gültigen Wert für {0} ein.",
   "error.field_min_length": "{0} ist zu kurz.",
   "error.field_max_length": "{0} ist zu lang.",
+  "error.field_min_length_value": "{0} muss mindestens {1} Zeichen lang sein.",
+  "error.field_max_length_value": "{0} darf höchstens {1} Zeichen lang sein.",
   "error.field_invalid": "Bitte überprüfe {0}.",
+
+  // --- Feldhinweise aus Validierungsregeln ({0} = Grenzwert der Regel) ---
+  "hint.field_min_length": "Mindestens {0} Zeichen.",
 
   // --- Formular-Alerts ---
   "error.sign_in_server.title": "Anmeldung konnte nicht abgeschlossen werden.",

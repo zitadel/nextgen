@@ -1,0 +1,8 @@
+name: id
+in: path
+required: true
+description: |
+  The connection ID: the `id` that `createIdp` (`POST /idps`) returns or `queryIdps` (`POST /idps/query`) lists.
+schema:
+  type: string
+example: idp_01KWH3B72K7M7F0N9WD3P2E4YM

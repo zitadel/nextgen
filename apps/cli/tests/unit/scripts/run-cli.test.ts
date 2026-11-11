@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 type Env = Record<string, string | undefined>;
 
@@ -58,9 +58,15 @@ type DevProcessModule = {
   withWorkspaceTools: (env: Env, options?: { isExecutable?: (path: string) => boolean }) => Env;
 };
 
-let runCli: RunCliModule;
-let runtimeImage: BuildLocalRuntimeImageModule;
-let devProcess: DevProcessModule;
+const runCli = (await import(
+  new URL("../../../../../scripts/run-cli.mjs", import.meta.url).href
+)) as RunCliModule;
+const runtimeImage = (await import(
+  new URL("../../../../../scripts/build-local-runtime-image.mjs", import.meta.url).href
+)) as BuildLocalRuntimeImageModule;
+const devProcess = (await import(
+  new URL("../../../../../scripts/dev-process.mjs", import.meta.url).href
+)) as DevProcessModule;
 
 /** The env the wrapper hands its builds: `env` with the workspace tools on PATH. */
 const toolEnv = (env: Env): Env => devProcess.withWorkspaceTools(env);
@@ -73,18 +79,6 @@ type RunSpawn = (
   args: string[],
   options: { cwd: string; env: NodeJS.ProcessEnv },
 ) => Promise<void>;
-
-beforeAll(async () => {
-  runCli = (await import(
-    new URL("../../../../../scripts/run-cli.mjs", import.meta.url).href
-  )) as RunCliModule;
-  runtimeImage = (await import(
-    new URL("../../../../../scripts/build-local-runtime-image.mjs", import.meta.url).href
-  )) as BuildLocalRuntimeImageModule;
-  devProcess = (await import(
-    new URL("../../../../../scripts/dev-process.mjs", import.meta.url).href
-  )) as DevProcessModule;
-});
 
 describe("run-cli wrapper", () => {
   it("uses INIT_CWD as the CLI cwd when pnpm runs the script from the repo root", () => {
@@ -212,7 +206,7 @@ describe("run-cli wrapper", () => {
   it("builds and injects a local server binary for the default binary start runtime", async () => {
     const calls: string[] = [];
     const env = { PATH: "/bin" };
-    let runEnv: Record<string, string | undefined> | undefined;
+    const runEnvs: Array<Record<string, string | undefined>> = [];
 
     await runCli.main({
       args: ["start"],
@@ -237,11 +231,12 @@ describe("run-cli wrapper", () => {
         expect(args[0]).toMatch(/apps\/cli\/bin\/run\.js$/);
         expect(args.slice(1)).toEqual(["start"]);
         expect(options.cwd).toBe(process.cwd());
-        runEnv = options.env;
+        runEnvs.push(options.env);
       },
     });
 
     expect(calls).toEqual(["build-cli", "build-server", "run-cli"]);
+    const [runEnv] = runEnvs;
     expect(runEnv).toMatchObject({
       PATH: toolEnv({ PATH: "/bin" }).PATH,
       ZITADEL_SERVER_BINARY: "/repo/dist/server/nextgen",
@@ -255,7 +250,7 @@ describe("run-cli wrapper", () => {
   it("builds and injects the local image for explicit Docker start without an override", async () => {
     const calls: string[] = [];
     const env = { PATH: "/bin" };
-    let runEnv: Record<string, string | undefined> | undefined;
+    const runEnvs: Array<Record<string, string | undefined>> = [];
 
     await runCli.main({
       args: ["start", "--runtime", "docker"],
@@ -279,11 +274,12 @@ describe("run-cli wrapper", () => {
         expect(args[0]).toMatch(/apps\/cli\/bin\/run\.js$/);
         expect(args.slice(1)).toEqual(["start", "--runtime", "docker"]);
         expect(options.cwd).toBe(process.cwd());
-        runEnv = options.env;
+        runEnvs.push(options.env);
       },
     });
 
     expect(calls).toEqual(["build-cli", "build-image", "run-cli"]);
+    const [runEnv] = runEnvs;
     expect(runEnv).toMatchObject({
       PATH: toolEnv({ PATH: "/bin" }).PATH,
       ZITADEL_LOCAL_IMAGE: runtimeImage.LOCAL_RUNTIME_IMAGE,
@@ -468,7 +464,7 @@ describe("run-cli wrapper", () => {
   });
 
   it("routes local package preparation command output to stderr in JSON mode", async () => {
-    let stderrOutput = "";
+    const stderrChunks: string[] = [];
     const prepareLocalRegistry = vi.fn(async (options: Record<string, unknown>) => {
       (options.log as (message: string) => void)("preparing local packages");
       const runLocal = options.run as (
@@ -495,13 +491,14 @@ describe("run-cli wrapper", () => {
       runCapture,
       stderr: {
         write: (chunk: string) => {
-          stderrOutput += chunk;
+          stderrChunks.push(chunk);
           return true;
         },
       },
     });
 
     expect(runCapture).toHaveBeenCalledWith("npm", ["pack"], { cwd: "/repo", env: {} });
+    const stderrOutput = stderrChunks.join("");
     expect(stderrOutput).toContain("[zitadel-cli]");
     expect(stderrOutput).toContain("captured stdout");
     expect(stderrOutput).toContain("captured stderr");

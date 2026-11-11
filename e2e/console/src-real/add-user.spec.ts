@@ -15,13 +15,6 @@ import { signIn } from "../support/sign-in";
  * server's own message.
  */
 
-// The Projects block is out of the MVP: design removed the project selector
-// (design decisions log D6, 2026-07-31), and the backend could not grant access
-// regardless — roles need ADR 034's app-group catalog (epic #419) and
-// `queryProjects` is single-project (ADR 0004). D6 expects it back in a future
-// version, so the cases below are parked with the block, not deleted; restore
-// them alongside the block and the unit specs when both reasons clear.
-
 /**
  * Signs in, lands on /users and opens the drawer, with the seeded schema picked
  * unless `pick` is false.
@@ -35,7 +28,7 @@ async function openDrawer(
   await signIn(page, zitadel, user);
   await page.goto("/users");
   await expect(page.getByRole("heading", { name: "Users", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await page.getByRole("button", { name: "Add user", exact: true }).click();
   const drawer = page.getByRole("dialog", { name: "Add user" });
   await expect(drawer).toBeVisible();
   if (pick) await pickSeededSchema(page, drawer, zitadel);
@@ -111,7 +104,7 @@ test("creates a user and shows it in the list", async ({ page, zitadel, seed }) 
   await drawer.getByRole("button", { name: "Add user", exact: true }).click();
 
   // The drawer closes and the list refreshes with the new row. With only an
-  // email the display name falls back to it (`lib/user.ts`).
+  // email the display name falls back to it (`features/users/model.ts`).
   await expect(drawer).toBeHidden();
   await expect(page.getByRole("link", { name: email, exact: true })).toBeVisible();
   await expectNoErrorBoundary(page);
@@ -152,7 +145,7 @@ test("discards the draft when cancelled", async ({ page, zitadel, seed }) => {
 
   // Nothing was created, and reopening starts clean.
   await expect(page.getByText(email)).toHaveCount(0);
-  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await page.getByRole("button", { name: "Add user", exact: true }).click();
   // Read before any pick: picking a schema clears the values itself. Parallel
   // specs decide how many schemas the drawer offers. With several, a discarded
   // draft leaves none picked; with one, the drawer picks it again and its
@@ -177,74 +170,6 @@ test("closes from the header without creating anything", async ({ page, zitadel,
   await expect(page.getByText(email)).toHaveCount(0);
 });
 
-// test("offers the real project and keeps roles empty until one exists", async ({
-//   page,
-//   zitadel,
-//   seed,
-// }) => {
-//   const drawer = await openDrawer(page, zitadel, await seed.user());
-//
-//   // Roles cannot be reached before a project is chosen.
-//   await expect(drawer.getByRole("combobox", { name: "Select roles" })).toHaveAttribute(
-//     "aria-disabled",
-//     "true",
-//   );
-//
-//   await drawer.getByRole("combobox", { name: "Select project" }).click();
-//   // `queryProjects` is scope-pinned to the caller's own project (ADR 0004).
-//   const option = page.getByRole("option").first();
-//   await expect(option).toBeVisible();
-//   await option.click();
-//
-//   const roles = drawer.getByRole("combobox", { name: "Select roles" });
-//   await expect(roles).not.toHaveAttribute("aria-disabled", "true");
-//   await roles.click();
-//   // No endpoint serves a role catalogue yet (ADR 034 / epic #419), so the list
-//   // opens honestly empty rather than showing an invented vocabulary.
-//   await expect(page.getByText("No roles available.")).toBeVisible();
-//   expect(zitadel.handle.projectId).toBeTruthy();
-// });
-
-// test("adds and removes a project row", async ({ page, zitadel, seed }) => {
-//   const drawer = await openDrawer(page, zitadel, await seed.user());
-//
-//   // `Row · empty` carries no Remove — it appears once the row holds a project.
-//   await expect(drawer.getByRole("button", { name: "Remove", exact: true })).toHaveCount(0);
-//
-//   await drawer.getByRole("combobox", { name: "Select project" }).click();
-//   await page.getByRole("option").first().click();
-//
-//   const remove = drawer.getByRole("button", { name: "Remove", exact: true });
-//   await expect(remove).toBeVisible();
-//   // One project, one row: nothing left to add.
-//   await expect(drawer.getByRole("button", { name: /Add project/ })).toHaveCount(0);
-//
-//   await remove.click();
-//   // Removing the only row frees the project again.
-//   await expect(drawer.getByRole("button", { name: /Add project/ })).toBeVisible();
-// });
-
-// test("sends no project data on create", async ({ page, zitadel, seed }) => {
-//   const drawer = await openDrawer(page, zitadel, await seed.user());
-//   const email = seed.identity().email;
-//
-//   const request = page.waitForRequest(
-//     (candidate) =>
-//       candidate.method() === "POST" && new URL(candidate.url()).pathname.endsWith("/api/users"),
-//   );
-//
-//   await drawer.getByRole("combobox", { name: "Select project" }).click();
-//   await page.getByRole("option").first().click();
-//   await drawer.getByLabel("Email").fill(email);
-//   await drawer.getByRole("button", { name: "Add user", exact: true }).click();
-//
-//   // `POST /users` accepts no grants, and the only selectable project is the one
-//   // the create call is already scoped to — a chosen project changes nothing.
-//   const body = JSON.parse((await request).postData() ?? "{}") as Record<string, unknown>;
-//   expect(Object.keys(body).sort()).toEqual(["$schema", "email"]);
-//   expect(body.email).toBe(email);
-// });
-//
 /** What currently holds focus, described the way a keyboard user perceives it. */
 async function focused(page: Page): Promise<string> {
   return page.evaluate(() => {
@@ -277,7 +202,7 @@ test("can be completed with the keyboard alone", async ({ page, zitadel, seed })
   await expect(page.getByRole("heading", { name: "Users", exact: true })).toBeVisible();
 
   // Open the drawer from the toolbar without a pointer.
-  await page.getByRole("button", { name: "Add", exact: true }).press("Enter");
+  await page.getByRole("button", { name: "Add user", exact: true }).press("Enter");
   const drawer = page.getByRole("dialog", { name: "Add user" });
   await expect(drawer).toBeVisible();
   // The seeded schema, picked without a pointer (see `pickSeededSchema`).
@@ -337,37 +262,6 @@ test("opens and selects in the schema picker with the keyboard", async ({
   await expect(page.getByRole("option")).toHaveCount(0);
   await expect(picker).toContainText(name);
 });
-
-// test("reaches and operates the project picker with the keyboard", async ({ page, zitadel, seed }) => {
-//   const drawer = await openDrawer(page, zitadel, await seed.user());
-//   const project = drawer.getByRole("combobox", { name: "Select project" });
-//
-//   await project.press("Enter");
-//   await expect(page.getByRole("option").first()).toBeVisible();
-//   await page.keyboard.press("ArrowDown");
-//   await page.keyboard.press("Enter");
-//
-//   await expect(project).not.toContainText("Select project");
-//   // Roles become reachable only once a project is chosen.
-//   await expect(drawer.getByRole("combobox", { name: "Select roles" })).not.toHaveAttribute(
-//     "aria-disabled",
-//     "true",
-//   );
-// });
-
-// test("keeps the disabled roles control out of the tab order", async ({ page, zitadel, seed }) => {
-//   const drawer = await openDrawer(page, zitadel, await seed.user());
-//   const roles = drawer.getByRole("combobox", { name: "Select roles" });
-//
-//   await expect(roles).toHaveAttribute("aria-disabled", "true");
-//   // A control that cannot be used must not be a tab stop.
-//   await expect(roles).toHaveAttribute("tabindex", "-1");
-//
-//   // Tabbing from the project picker lands past it, on Cancel or Add user.
-//   await drawer.getByRole("combobox", { name: "Select project" }).focus();
-//   const landed = await tabUntil(page, (label) => label === "Cancel" || label === "Add user");
-//   expect(["Cancel", "Add user"]).toContain(landed);
-// });
 
 test("Escape closes the open list first, then the drawer", async ({ page, zitadel, seed }) => {
   const drawer = await openDrawer(page, zitadel, await seed.user());

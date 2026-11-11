@@ -1,0 +1,9 @@
+language js
+
+// A bare `chmod(...).catch(() => undefined)` hides a failed permission change
+// from the user and from the JSON envelope. The file may hold a credential, so
+// a mode we could not apply is something to report. `enforceMode()` in
+// apps/cli/src/lib/fs-safe.ts re-asserts the mode and warns once instead.
+`chmod($path, $mode).catch($handler)` where {
+  register_diagnostic(span=$handler, message="Do not swallow a chmod failure. Use enforceMode() from lib/fs-safe, which warns once instead of hiding it.", severity="error")
+}

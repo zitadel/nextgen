@@ -20,7 +20,7 @@ import {
   SOURCE_DIR,
   writeBuiltinSchemas,
 } from "./render-builtin-schemas.mjs";
-import { DEFAULT_BUILTIN_SCHEMA_BASE } from "../packages/config/src/defaults.ts";
+import { DEFAULT_BUILTIN_SCHEMA_BASE } from "../packages/config/src/builtin-schema-base.ts";
 
 const BASE = "https://schemas.example.test/v1";
 

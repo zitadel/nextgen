@@ -29,9 +29,6 @@
     },
     {
       "path": "./packages/api-mock"
-    },
-    {
-      "path": "./apps/login-ui"
     }
   ]
 }

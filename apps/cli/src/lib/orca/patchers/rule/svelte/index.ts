@@ -1,9 +1,19 @@
-import { sdkVersionForCli } from "../../../../public-cli";
-import type { FileOp } from "../file-writer/types";
-import type { PatchContext, PatchView } from "../../types";
-import { AbstractRulePatcher } from "../base";
-import { assertMountsRootComponent, type RootMount, viteEntry } from "../root-component";
-import { type ViteSupport, buildViteProxyOp, buildViteSessionCookieOp } from "../vite-support";
+import { sdkVersionForCli } from "@/lib/public-cli";
+import type { FileOp } from "@/lib/orca/patchers/rule/file-writer/types";
+import type { PatchContext, PatchView } from "@/lib/orca/patchers/types";
+import { AbstractRulePatcher } from "@/lib/orca/patchers/rule/base";
+import { PUBLIC_PROJECT_ID_VARIABLE } from "@/lib/orca/patchers/rule/public-project-id";
+import {
+  assertMountsRootComponent,
+  type RootMount,
+  viteEntry,
+} from "@/lib/orca/patchers/rule/root-component";
+import {
+  type ViteSupport,
+  buildViteApiPrefixOp,
+  buildViteProxyOp,
+  buildViteSessionCookieOp,
+} from "@/lib/orca/patchers/rule/vite-support";
 import { appTemplate } from "./templates";
 
 const SDK_DEPENDENCY = "@zitadel/sdk-svelte";
@@ -48,6 +58,10 @@ export class SveltePatcher extends AbstractRulePatcher implements ViteSupport {
     return buildViteSessionCookieOp();
   }
 
+  viteApiPrefixOp(): FileOp {
+    return buildViteApiPrefixOp();
+  }
+
   protected override async preflight(_ctx: PatchContext, cwd: string): Promise<void> {
     await assertMountsRootComponent(cwd, await viteEntry(cwd), ROOT);
   }
@@ -61,12 +75,17 @@ export class SveltePatcher extends AbstractRulePatcher implements ViteSupport {
       { kind: "write", path: ROOT.path, contents: appTemplate(ctx) },
       this.viteProxyOp(ctx.framework.devPort, ctx.server),
       this.viteSessionCookieOp(),
+      this.viteApiPrefixOp(),
       // Vite only exposes VITE_-prefixed vars to client code (import.meta.env).
-      { kind: "merge-env", path: ".env.example", entries: { VITE_ZITADEL_PROJECT_ID: "" } },
+      {
+        kind: "merge-env",
+        path: ".env.example",
+        entries: { [PUBLIC_PROJECT_ID_VARIABLE.svelte]: "" },
+      },
       {
         kind: "merge-env",
         path: ".env.local",
-        entries: { VITE_ZITADEL_PROJECT_ID: ctx.project.id },
+        entries: { [PUBLIC_PROJECT_ID_VARIABLE.svelte]: ctx.project.id },
       },
       {
         kind: "add-dep",

@@ -3,7 +3,12 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
-import { APP_RELEASE_PACKAGES, PUBLIC_PACKAGE_DIRS } from "../../../scripts/release-manifest.mjs";
+// @boundaries-ignore root scripts/ belongs to the workspace root, which no package can depend on
+import {
+  APP_RELEASE_PACKAGES,
+  PUBLIC_PACKAGE_DIRS,
+  hostOnlyPackageDirs,
+} from "../../../scripts/release-manifest.mjs";
 import { packageName, readManifest } from "./lib.mjs";
 
 const [tarballsDir, ...flags] = process.argv.slice(2);
@@ -22,9 +27,15 @@ const repoRoot = resolve(here, "../../..");
 // Journey registries and release artifact dirs carry the same set: exactly
 // the public release packages, nothing on top. `--app-packages` checks the
 // contributor CLI wrapper's set instead: exactly what a generated app installs.
-const packageDirs = flags.includes("--app-packages")
-  ? APP_RELEASE_PACKAGES.map((pkg) => pkg.dir)
-  : PUBLIC_PACKAGE_DIRS;
+// RELEASE_HOST_ONLY=1 checks a host-only snapshot's set: only this machine's
+// server platform package (scripts/release.mjs --host-only).
+function expectedPackageDirs() {
+  if (flags.includes("--app-packages")) {
+    return APP_RELEASE_PACKAGES.map((pkg) => pkg.dir);
+  }
+  return process.env.RELEASE_HOST_ONLY === "1" ? hostOnlyPackageDirs() : PUBLIC_PACKAGE_DIRS;
+}
+const packageDirs = expectedPackageDirs();
 const requiredPackageNames = new Set(
   await Promise.all(packageDirs.map((dir) => packageName(repoRoot, dir))),
 );
@@ -40,10 +51,14 @@ const manifests = new Map();
 const serverPlatformPackagePattern = /^@zitadel\/server-(?:darwin|linux|win32)-/;
 // The CLI ships its agent contract as an installable Agent Skill (ADR 004).
 // Shipping the complete skill — its entry file and every reference it links —
-// is core product behavior, so the tarball must carry all of them.
+// is core product behavior, so the tarball must carry all of them. So must the
+// bundle `zitadel skills add` installs from dist/skills, which its build fills.
 const cliSkillFiles = [
   "skills/zitadel-cli/SKILL.md",
   "skills/zitadel-cli/references/driving-login-ui.md",
+  "dist/skills/zitadel/SKILL.md",
+  "dist/skills/zitadel-cli/SKILL.md",
+  "dist/skills/zitadel-cli/references/driving-login-ui.md",
 ];
 
 const tarballs = (await readdir(tarballsDir)).filter((file) => file.endsWith(".tgz")).sort();

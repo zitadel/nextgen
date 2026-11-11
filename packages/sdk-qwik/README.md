@@ -5,7 +5,7 @@ Qwik components for the Zitadel auth UI, for client-side SPAs (Vite, etc.).
 ## Installation
 
 ```bash
-pnpm add @zitadel/sdk-qwik@alpha
+pnpm add @zitadel/sdk-qwik@latest
 ```
 
 ## Requirements

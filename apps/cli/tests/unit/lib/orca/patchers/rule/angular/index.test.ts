@@ -2,18 +2,45 @@ import { runInNewContext } from "node:vm";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { FRAMEWORK_IDS } from "../../../../../../helpers/framework-ids";
-import { AngularPatcher } from "../../../../../../../src/lib/orca/patchers/rule/angular";
-import type {
-  FileOp,
-  ScaffoldPlan,
-} from "../../../../../../../src/lib/orca/patchers/rule/file-writer/types";
-import { SESSION_COOKIE_MARKER } from "../../../../../../../src/lib/orca/patchers/rule/session-cookie";
-import type { PatchContext } from "../../../../../../../src/lib/orca/patchers/types";
-import { MANAGED_MARKER } from "../../../../../../../src/lib/paths";
-import { REMOTE_HOST, useRemoteServer } from "../../../../../../helpers/remote-server";
-import { bearerOnlyProxyConf } from "../../../../../../helpers/proxy-conf";
-import { aProxyConfApp, type DevApp } from "../../../../../../helpers/vite";
+import { FRAMEWORK_IDS } from "@tests/helpers/framework-ids";
+import { AngularPatcher } from "@/lib/orca/patchers/rule/angular";
+import type { FileOp, ScaffoldPlan } from "@/lib/orca/patchers/rule/file-writer/types";
+import {
+  proxyConfApiPrefixEdit,
+  proxyConfApiPrefixVerdict,
+} from "@/lib/orca/patchers/rule/angular/templates";
+import { SESSION_COOKIE_MARKER } from "@/lib/orca/patchers/rule/session-cookie";
+import type { PatchContext } from "@/lib/orca/patchers/types";
+import { MANAGED_MARKER } from "@/lib/paths";
+import { REMOTE_HOST, useRemoteServer } from "@tests/helpers/remote-server";
+import { bearerOnlyProxyConf, v1ProxyConf } from "@tests/helpers/proxy-conf";
+import { aProxyConfApp, type DevApp } from "@tests/helpers/vite";
+
+/** The bearer hook setup writes: the exchange with and without the API prefix. */
+const BEARER = `/* zitadel:proxy:v3 */
+function setBearer(proxyReq) {
+  const pathname = new URL(proxyReq.path, "http://zitadel.local").pathname;
+  if (
+    proxyReq.method === "POST" &&
+    (pathname === "/sessions/exchange" || pathname === "/api/v1/sessions/exchange") &&
+    !proxyReq.getHeader("authorization")
+  ) {
+    proxyReq.setHeader("authorization", bearer);
+  }
+}`;
+
+/** The bearer hook as setup wrote it before it knew the API prefix (ADR 077). */
+const V2_BEARER = `/* zitadel:proxy:v2 */
+function setBearer(proxyReq) {
+  const pathname = new URL(proxyReq.path, "http://zitadel.local").pathname;
+  if (
+    proxyReq.method === "POST" &&
+    pathname === "/sessions/exchange" &&
+    !proxyReq.getHeader("authorization")
+  ) {
+    proxyReq.setHeader("authorization", bearer);
+  }
+}`;
 
 function ctx(): PatchContext {
   return {
@@ -200,9 +227,7 @@ describe("AngularPatcher.plan", () => {
     );
     const proxy = proxyConfigEdit()(undefined);
     expect(proxy).toContain(MANAGED_MARKER);
-    expect(proxy).toContain('proxyReq.method === "POST"');
-    expect(proxy).toContain('pathname === "/sessions/exchange"');
-    expect(proxy).toContain('!proxyReq.getHeader("authorization")');
+    expect(proxy).toContain(BEARER);
     // The backend by its own name, the app's origin in X-Forwarded-*.
     expect(proxy).toContain("    changeOrigin: true,\n    xfwd: true,\n");
     expect(plan.ops.some((op) => op.kind === "edit" && op.path === "angular.json")).toBe(true);
@@ -232,10 +257,10 @@ describe("AngularPatcher.plan", () => {
 
   it("migrates a CRLF legacy managed proxy's bearer hook", () => {
     const legacy = proxyConfigEdit()(undefined).replace(
-      /\/\* zitadel:proxy:v2 \*\/\nfunction setBearer\(proxyReq\) \{[\s\S]*?\n\}/,
+      BEARER,
       'function setBearer(proxyReq) {\n  proxyReq.setHeader("authorization", bearer);\n}',
     );
-    expect(legacy).not.toContain("zitadel:proxy:v2");
+    expect(legacy).not.toContain("zitadel:proxy:");
 
     const out = proxyConfigEdit()(legacy.replace(/\n/g, "\r\n"));
 
@@ -280,6 +305,32 @@ describe("AngularPatcher.plan", () => {
     expect(sessionCookieEdit()(bearerOnlyProxyConf())).toBe(proxyConfigEdit()(undefined));
   });
 
+  it("replaces the session-cookie hooks it wrote before ADR 083", () => {
+    const out = sessionCookieEdit()(v1ProxyConf());
+
+    expect(out).toBe(proxyConfigEdit()(undefined));
+    expect(sessionCookieVerdict()(out)).toBe("applied");
+  });
+
+  // They keep the session in cookies the server no longer reads.
+  it("fails the doctor on the session-cookie hooks it wrote before ADR 083", () => {
+    expect(sessionCookieVerdict()(v1ProxyConf())).toEqual({
+      outdated: expect.stringContaining("doctor --fix updates them"),
+    });
+  });
+
+  it("leaves hooks from before ADR 083 that were changed by hand to the developer", () => {
+    const changed = v1ProxyConf().replace(
+      "function renameSessionCookie(proxyRes) {",
+      'function renameSessionCookie(proxyRes) {\n  console.debug("cookies");',
+    );
+
+    expect(sessionCookieEdit()(changed)).toBe(changed);
+    expect(sessionCookieVerdict()(changed)).toEqual({
+      outdated: expect.stringContaining("must be updated by hand"),
+    });
+  });
+
   it("leaves a managed proxy whose hooks were attached by hand alone", () => {
     const custom = bearerOnlyProxyConf().replace(
       "    onProxyReq: setBearer,\n",
@@ -303,6 +354,7 @@ describe("AngularPatcher.plan", () => {
     expect(ops.map((op) => (op.kind === "edit" ? op.wiring : undefined))).toEqual([
       "infrastructure",
       "convenience",
+      "infrastructure",
     ]);
   });
 
@@ -315,9 +367,10 @@ describe("AngularPatcher.plan", () => {
   it("migrates a legacy proxy's bearer hook and its entry together", () => {
     const edit = proxyConfigEdit();
     const legacy = previousProxyConf().replace(
-      /\/\* zitadel:proxy:v2 \*\/\nfunction setBearer\(proxyReq\) \{\n[\s\S]*?\n\}\n/,
-      `function setBearer(proxyReq) {\n  proxyReq.setHeader("authorization", bearer);\n}\n`,
+      BEARER,
+      `function setBearer(proxyReq) {\n  proxyReq.setHeader("authorization", bearer);\n}`,
     );
+    expect(legacy).not.toBe(previousProxyConf());
 
     expect(edit(legacy)).toBe(edit(undefined));
   });
@@ -340,24 +393,15 @@ describe("AngularPatcher.plan", () => {
   it("migrates only the legacy managed proxy bearer hook", () => {
     const edit = proxyConfigEdit();
     const legacy = edit(undefined).replace(
-      `/* zitadel:proxy:v2 */
-function setBearer(proxyReq) {
-  const pathname = new URL(proxyReq.path, "http://zitadel.local").pathname;
-  if (
-    proxyReq.method === "POST" &&
-    pathname === "/sessions/exchange" &&
-    !proxyReq.getHeader("authorization")
-  ) {
-    proxyReq.setHeader("authorization", bearer);
-  }
-}`,
+      BEARER,
       `function setBearer(proxyReq) {
   proxyReq.setHeader("authorization", bearer);
 }`,
     );
+    expect(legacy).not.toContain(BEARER);
 
     const migrated = edit(`${legacy}\n// preserved user note\n`);
-    expect(migrated).toContain('pathname === "/sessions/exchange"');
+    expect(migrated).toContain(BEARER);
     expect(migrated).toContain("// preserved user note");
 
     const custom = `// user-owned\nfunction setBearer(proxyReq) {\n  proxyReq.setHeader("authorization", bearer);\n}\n`;
@@ -367,26 +411,78 @@ function setBearer(proxyReq) {
   it("flags a reformatted unsafe legacy proxy for manual review", () => {
     const edit = proxyConfigEdit();
     const unsafe = edit(undefined).replace(
-      `/* zitadel:proxy:v2 */
-function setBearer(proxyReq) {
-  const pathname = new URL(proxyReq.path, "http://zitadel.local").pathname;
-  if (
-    proxyReq.method === "POST" &&
-    pathname === "/sessions/exchange" &&
-    !proxyReq.getHeader("authorization")
-  ) {
-    proxyReq.setHeader("authorization", bearer);
-  }
-}`,
+      BEARER,
       `function setBearer(proxyReq) {
   proxyReq
     .setHeader("authorization", bearer);
 }`,
     );
+    expect(unsafe).not.toContain(BEARER);
 
     expect(() => edit(unsafe)).toThrowError(
       /may forward ZITADEL_PROJECT_SECRET outside POST \/sessions\/exchange/,
     );
+  });
+
+  it("moves the managed proxy's v2 bearer hook to the exchange with and without the API prefix", () => {
+    const current = proxyConfigEdit()(undefined);
+    const v2 = current.replace(BEARER, V2_BEARER);
+    expect(v2).not.toBe(current);
+
+    expect(proxyConfApiPrefixEdit()(v2)).toBe(current);
+    expect(proxyConfApiPrefixEdit()(current)).toBe(current);
+    expect(proxyConfApiPrefixEdit()(v2.replace(/\n/g, "\r\n"))).toBe(
+      current.replace(/\n/g, "\r\n"),
+    );
+  });
+
+  it("gives the managed proxy it wrote before the session-cookie hooks both, whatever the order", () => {
+    const v2 = bearerOnlyProxyConf().replace(BEARER, V2_BEARER);
+
+    expect(proxyConfApiPrefixEdit()(sessionCookieEdit()(v2))).toBe(proxyConfigEdit()(undefined));
+    expect(sessionCookieEdit()(proxyConfApiPrefixEdit()(v2))).toBe(proxyConfigEdit()(undefined));
+  });
+
+  it("fails the doctor while the v2 bearer hook is there", () => {
+    const current = proxyConfigEdit()(undefined);
+    const v2 = current.replace(BEARER, V2_BEARER);
+
+    expect(proxyConfApiPrefixVerdict(current)).toBe("applied");
+    expect(proxyConfApiPrefixVerdict(v2)).toBe("detached");
+    expect(
+      new AngularPatcher()
+        .plan(ctx())
+        .ops.some(
+          (op) =>
+            op.kind === "edit" &&
+            op.path === "proxy.conf.cjs" &&
+            op.wiring === "infrastructure" &&
+            op.verify === proxyConfApiPrefixVerdict,
+        ),
+    ).toBe(true);
+  });
+
+  it("leaves a v2 bearer hook changed by hand, and reads it as unknown", () => {
+    const changed = proxyConfigEdit()(undefined).replace(
+      BEARER,
+      V2_BEARER.replace("  ) {\n", '  ) {\n    console.debug("exchange");\n'),
+    );
+
+    expect(proxyConfApiPrefixEdit()(changed)).toBe(changed);
+    expect(proxyConfApiPrefixVerdict(changed)).toEqual({
+      unknown: expect.stringContaining("must accept /api/v1/sessions/exchange by hand"),
+    });
+  });
+
+  it("leaves an unmanaged proxy alone, and reads it as unknown while it knows only the bare exchange", () => {
+    const custom = proxyConfigEdit()(undefined)
+      .replace(`${MANAGED_MARKER}\n`, "")
+      .replace(BEARER, V2_BEARER);
+
+    expect(proxyConfApiPrefixEdit()(custom)).toBe(custom);
+    expect(proxyConfApiPrefixVerdict(custom)).toEqual({
+      unknown: expect.stringContaining("not the proxy zitadel setup writes"),
+    });
   });
 
   it("adds a `dev` npm script so `npm run dev` works like the other frameworks", () => {
@@ -428,22 +524,36 @@ describe("AngularPatcher.artifacts", () => {
   });
 });
 
+/**
+ * Every session cookie a browser on the app's host may hold but the app's own:
+ * the server's under both names, another project's app's, and those from
+ * before ADR 083.
+ */
+const OTHER_SESSION_COOKIES = [
+  "zitadel_session=console",
+  "__Host-zitadel_session=console",
+  "zitadel_session_proj_other=other",
+  "__Host-zitadel_session_proj_other=other",
+  "__nextgen_session=old",
+  "__nextgen_session_proj_spa=old",
+].join("; ");
+
 describe("the generated proxy.conf.cjs, run by Vite against a remote https server", () => {
   const remote = useRemoteServer();
-  let app: DevApp | undefined;
+  const apps: DevApp[] = [];
 
   afterEach(async () => {
-    await app?.close();
-    app = undefined;
+    await Promise.all(apps.splice(0).map((app) => app.close()));
     remote.answerWith(undefined);
   });
 
   async function serve(proxyConf: string, projectId = ""): Promise<DevApp> {
-    app = await aProxyConfApp(proxyConf, {
+    const app = await aProxyConfApp(proxyConf, {
       ZITADEL_URL: remote.url,
       ZITADEL_PROJECT_SECRET: "sk_proj_test",
       ZITADEL_PROJECT_ID: projectId,
     });
+    apps.push(app);
     return app;
   }
 
@@ -482,6 +592,18 @@ describe("the generated proxy.conf.cjs, run by Vite against a remote https serve
     expect(me?.headers.authorization).toBeUndefined();
   });
 
+  it("attaches the project secret to the session exchange under the API prefix too", async () => {
+    const { origin } = await serve(proxyConfigEdit()(undefined));
+
+    await fetch(`${origin}/__nextgen/api/v1/sessions/exchange`, { method: "POST" });
+    await fetch(`${origin}/__nextgen/api/v1/sessions/me`);
+
+    const [exchange, me] = remote.requests.slice(-2);
+    expect(exchange?.path).toBe("/api/v1/sessions/exchange");
+    expect(exchange?.headers.authorization).toBe("Bearer sk_proj_test");
+    expect(me?.headers.authorization).toBeUndefined();
+  });
+
   it("could not reach it with the entry it wrote before", async () => {
     const { origin } = await serve(previousProxyConf());
     const reached = remote.requests.length;
@@ -496,36 +618,64 @@ describe("the generated proxy.conf.cjs, run by Vite against a remote https serve
     const { origin } = await serve(proxyConfigEdit()(undefined), "proj_spa");
 
     await fetch(`${origin}/__nextgen/users/me`, {
-      headers: {
-        cookie:
-          "theme=dark; __nextgen_session=console; __nextgen_session_proj_other=other; __nextgen_session_proj_spa=mine",
-      },
+      headers: { cookie: `theme=dark; ${OTHER_SESSION_COOKIES}; zitadel_session_proj_spa=mine` },
     });
 
-    expect(remote.requests.at(-1)?.headers.cookie).toBe("theme=dark; __nextgen_session=mine");
+    expect(remote.requests.at(-1)?.headers.cookie).toBe("theme=dark; __Host-zitadel_session=mine");
   });
 
+  // The remote server is https, so it sets the prefixed name with Secure; the
+  // app on loopback http keeps it without either.
   it("keeps the session cookie the server sets under the app's project's name", async () => {
-    remote.answerWith({ "set-cookie": "__nextgen_session=minted; Path=/; HttpOnly; SameSite=Lax" });
+    remote.answerWith({
+      "set-cookie":
+        "__Host-zitadel_session=minted; Path=/; Max-Age=60; HttpOnly; Secure; SameSite=Lax",
+    });
     const { origin } = await serve(proxyConfigEdit()(undefined), "proj_spa");
 
     const response = await fetch(`${origin}/__nextgen/sessions/exchange`, { method: "POST" });
 
     expect(response.headers.getSetCookie()).toEqual([
-      "__nextgen_session_proj_spa=minted; Path=/; HttpOnly; SameSite=Lax",
+      "zitadel_session_proj_spa=minted; Path=/; Max-Age=60; HttpOnly; SameSite=Lax",
     ]);
   });
 
-  it("passes the cookies through when no project is configured", async () => {
+  it("drops a session cookie from before ADR 083 the server sets", async () => {
     remote.answerWith({ "set-cookie": "__nextgen_session=minted; Path=/" });
+    const { origin } = await serve(proxyConfigEdit()(undefined), "proj_spa");
+
+    const response = await fetch(`${origin}/__nextgen/sessions/exchange`, { method: "POST" });
+
+    expect(response.headers.getSetCookie()).toEqual([]);
+  });
+
+  it("passes the cookies through when no project is configured", async () => {
+    remote.answerWith({ "set-cookie": "__Host-zitadel_session=minted; Path=/; Secure" });
     const { origin } = await serve(proxyConfigEdit()(undefined));
 
     const response = await fetch(`${origin}/__nextgen/sessions/me`, {
-      headers: { cookie: "__nextgen_session=tok" },
+      headers: { cookie: "zitadel_session=tok" },
     });
 
-    expect(remote.requests.at(-1)?.headers.cookie).toBe("__nextgen_session=tok");
-    expect(response.headers.getSetCookie()).toEqual(["__nextgen_session=minted; Path=/"]);
+    expect(remote.requests.at(-1)?.headers.cookie).toBe("zitadel_session=tok");
+    expect(response.headers.getSetCookie()).toEqual([
+      "__Host-zitadel_session=minted; Path=/; Secure",
+    ]);
+  });
+
+  it("keeps the session cookie per project once doctor --fix replaced the hooks before ADR 083", async () => {
+    remote.answerWith({ "set-cookie": "__Host-zitadel_session=minted; Path=/; Secure" });
+    const { origin } = await serve(sessionCookieEdit()(v1ProxyConf()), "proj_spa");
+
+    const response = await fetch(`${origin}/__nextgen/sessions/exchange`, {
+      method: "POST",
+      headers: { cookie: "zitadel_session=console; zitadel_session_proj_spa=mine" },
+    });
+
+    expect(remote.requests.at(-1)?.headers.cookie).toBe("__Host-zitadel_session=mine");
+    expect(response.headers.getSetCookie()).toEqual([
+      "zitadel_session_proj_spa=minted; Path=/; HttpOnly; SameSite=Lax",
+    ]);
   });
 });
 

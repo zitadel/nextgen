@@ -15,5 +15,3 @@ export function workspaceCommand(
   tasks: readonly string[],
   env?: NodeJS.ProcessEnv,
 ): { command: string; args: string[] };
-
-export function moonTargetOf(packageName: string, taskName: string): string;

@@ -1,0 +1,144 @@
+post:
+  operationId: submitFlowStep
+  summary: Submit a flow step
+  description: |
+    Submits the user's input for the current step of a flow. The server
+    validates it, processes it (for example, verifies a credential), advances
+    the flow through any invisible steps, and returns the next visible step.
+    The flow endpoints are the runtime calls the login component
+    (`<zitadel-login>`) makes, step by step; `createFlow` (`POST /flow`) starts a flow.
+
+    The response sets an updated encrypted `HttpOnly` cookie (`_zflow`)
+    with the new flow state. The server is stateless: all orchestration
+    state is carried in this cookie between requests.
+
+    Sign-up additionally requires a single-use `gate_proofs.signup_pow`
+    solution for `step.gates.signup_pow`: a password sign-up (`create_user`)
+    sends it with the submit, and a passkey registration that creates its user
+    sends it with the attestation in `challenge_response`. Pending
+    challenges and rate counters are stored on the server. Invalid or spent
+    proofs return `403 flow.proof_invalid`; exhausted per-flow budgets return
+    `429 flow.rate_limited`. GET the current step to obtain or refresh its
+    challenge before solving. Start and Submit announce the gate without a puzzle.
+
+    **Important:** The `id` in the response may differ from the `id` used in
+    the request. This happens when a flow pivots (pushes a new flow onto the
+    stack) or when a stacked flow completes (auto-pops to the parent flow).
+    Always use the `id` from the latest response for the next request.
+
+    ## Flow completion
+
+    When `step.type` is `complete`, the flow is terminal. The `step.behavior`
+    field tells the frontend what to do:
+
+    | `behavior`   | Action                                                     |
+    |------------- |------------------------------------------------------------|
+    | `redirect`   | Navigate to `redirect_uri` (OIDC/SAML auth request done). |
+    | `show`       | Render the step as a success screen, such as registration. |
+
+    A `complete` step is only returned when the **entire flow stack** is done.
+    If a stacked flow (for example, recovery pivoted from login) finishes, the
+    server auto-pops to the parent flow and returns the parent's next step.
+    The frontend never sees a `complete` for intermediate flows.
+
+    ## External sign-in
+
+    `{action: "sso", sso_provider_id, return_target}` on a step that offers
+    `sso_providers` returns the server-emitted `sso-redirect` step, whose
+    `redirect_url` the frontend navigates to.
+
+    - The flow state does not change, but `_zflow` is re-sealed like on
+      every response, so its ten-minute window restarts at this submission;
+      the external sign-in and the return must complete within it.
+    - A second `Set-Cookie` line carries the browser-binding cookie the
+      callback checks: `HttpOnly`, `Path=/`, `SameSite=Lax`.
+    - On every host except http loopback it is `__Host-_zsso` with `Secure`.
+    - When the request host is http loopback (local development, where
+      Safari rejects `Secure`), it is `_zsso` with no `Secure`; the
+      `__Host-` prefix is dropped because it requires `Secure`.
+
+    An identity provider (an external sign-in such as Google) whose
+    `client_id` is a `${{ NAME }}` reference has it filled from the project's
+    variables. A provider the server cannot start a sign-in with, including a
+    reference with no variable behind it, re-renders the step with
+    `error.sso_unavailable`.
+
+    Reuses the deployment sealed into `_zflow` at `createFlow`; it does not
+    re-resolve from `Origin`. If that release was revoked since the attempt
+    started, the response is `409` with `rel.revoked`.
+  tags:
+    - Flows
+  security: []
+  parameters:
+    - $ref: ../../../components/parameters/flow-id.yaml
+    - $ref: ../../../components/parameters/flow-cookie.yaml
+    - name: Origin
+      in: header
+      required: false
+      description: |
+        Standard browser `Origin` header. When a step issues a passkey
+        challenge, the server derives the WebAuthn relying-party ID and the
+        allowed origin from this value. An sso submission is bound to it as
+        well: `return_target` must be on this origin, and the callback route
+        is built under it (see External sign-in above). Browsers send it
+        automatically on the fetch POST; no client action is required.
+      schema:
+        type: string
+        format: uri
+        example: https://login.example.com
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../../../components/flows/flow-submit-request.yaml
+  responses:
+    '200':
+      description: |
+        The next step. The `id` may have changed if a pivot or stack-pop
+        occurred, so always use the returned `id` for the next request.
+      headers:
+        Set-Cookie:
+          $ref: ../../../components/headers/set-cookie-flow.yaml
+        Cache-Control:
+          $ref: ../../../components/headers/cache-control-private-no-store.yaml
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/flows/flow-response.yaml
+    '400':
+      description: |
+        Validation or proof verification failed. Returns the same step
+        with an `error` field. The session token and cookie are still rotated.
+        Correct the input and submit the step again.
+      headers:
+        Set-Cookie:
+          $ref: ../../../components/headers/set-cookie-flow.yaml
+        Cache-Control:
+          $ref: ../../../components/headers/cache-control-private-no-store.yaml
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/flows/flow-response.yaml
+    '409':
+      description: |
+        Conflict. The flow session moved on under another request
+        (`flow.session_conflict`), the flow's authentication attempt expired or
+        was already handed off (`flow.restart_required`): start a new flow, the
+        provider's identity is linked to a user of a schema this flow does not
+        serve (`flow.sso_user_schema_mismatch`), which a new flow does not
+        fix, or the sealed release was revoked (`rel.revoked`). A submission
+        racing the request that hands the attempt off can still fail with
+        `att.already_handed_off`.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+          examples:
+            revoked:
+              summary: The sealed release was revoked
+              value:
+                code: rel.revoked
+                message: 'the release this attempt runs on was revoked'
+    default:
+      $ref: submitFlowStep-error-response.yaml
