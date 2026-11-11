@@ -1663,7 +1663,14 @@ describe("user detail", () => {
         "a password",
         { password: { set_at: "2026-04-28T13:32:00Z" }, passkeys: [], identityLinks: [] },
       ],
-      ["a passkey", { password: {}, identityLinks: [] }],
+      [
+        "a passkey",
+        {
+          password: {},
+          passkeys: [{ id: "pk_1", name: "MacBook", created_at: "2026-07-01T00:00:00Z" }],
+          identityLinks: [],
+        },
+      ],
       [
         "a linked provider",
         {

@@ -11,13 +11,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatDate } from "@/lib/date";
 import { fetchUserDetail } from "@/features/users/api";
-import {
-  UserAuthentication,
-  hasNoSignInMethod,
-} from "@/features/users/components/user-authentication";
+import { UserAuthentication } from "@/features/users/components/user-authentication";
 import { projectScopeDeps, requireProjectScope } from "@/features/projects/project-scope";
 import { field } from "@/lib/record";
 import {
+  hasNoSignInMethod,
   userAttributes,
   userIdentity,
   userIdentitySecondary,

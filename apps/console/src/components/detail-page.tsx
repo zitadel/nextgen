@@ -1,7 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardDescription } from "@/components/ui/card";
 import { IdText } from "@/components/id-text";
 import { CopyButton } from "@/components/ui/copy-button";
 import { Separator } from "@/components/ui/separator";
@@ -81,7 +81,7 @@ export function DetailSection({
         ) : (
           heading
         )}
-        {description && <p className="text-sm text-muted-foreground">{description}</p>}
+        {description && <CardDescription>{description}</CardDescription>}
         <Separator />
         {children}
       </CardContent>

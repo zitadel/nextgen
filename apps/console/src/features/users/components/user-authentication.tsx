@@ -35,24 +35,6 @@ export function UserAuthentication({
   );
 }
 
-/**
- * Whether the user has no way to sign in: none of the credentials the sign-in
- * flow verifies (a password, a passkey, a linked provider account). What the
- * schema enables does not count, only what the user holds. A list that could
- * not be read is not taken as empty.
- */
-export function hasNoSignInMethod({
-  passwordSetAt,
-  passkeys,
-  identityLinks,
-}: {
-  passwordSetAt: string | null | undefined;
-  passkeys: unknown[] | undefined;
-  identityLinks: unknown[] | undefined;
-}): boolean {
-  return passwordSetAt === null && passkeys?.length === 0 && identityLinks?.length === 0;
-}
-
 interface AuthenticationRow {
   key: string;
   label: ReactNode;
