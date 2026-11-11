@@ -46,7 +46,7 @@ func TestWebhookWakeUp(t *testing.T) {
 	endpoint := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
 		var ev struct {
-			EventType string `json:"event_type"`
+			EventType string `json:"type"`
 		}
 		_ = json.Unmarshal(body, &ev)
 		mu.Lock()
