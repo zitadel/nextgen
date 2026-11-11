@@ -160,11 +160,17 @@ export interface PublishedPolicy {
   readonly id: string;
   readonly operation: string;
   readonly revision_id: string;
-  readonly config: Readonly<Record<string, number>>;
+  readonly config: Readonly<Record<string, number | string>>;
 }
 
 /** The operation the password policy guards, and its file's name. */
 export const PASSWORD_POLICY = "auth.factor.password.set";
+
+/** The sign-up policy `setup` publishes beside it: the default, the built-in proof of work. */
+export const DEFAULT_SIGNUP_POLICY = {
+  operation: "user.create",
+  config: { challenge: "zitadel_pow" },
+};
 
 /**
  * What a command did to the project, as a tree rather than as content.
@@ -1959,6 +1965,15 @@ export class ScaffoldedApp {
     await this.writeProjectFile(
       this.policyFile(name),
       `${JSON.stringify({ $schema: "../meta/policy.json", operation: PASSWORD_POLICY, config, ...extra }, null, 2)}\n`,
+    );
+  }
+
+  /** Writes the sign-up policy file, as the developer owning it would. */
+  async writeSignupPolicy(config: Record<string, string>): Promise<void> {
+    await mkdir(join(this.path, ".zitadel/policies"), { recursive: true });
+    await this.writeProjectFile(
+      this.policyFile(DEFAULT_SIGNUP_POLICY.operation),
+      `${JSON.stringify({ $schema: "../meta/policy.json", operation: DEFAULT_SIGNUP_POLICY.operation, config }, null, 2)}\n`,
     );
   }
 

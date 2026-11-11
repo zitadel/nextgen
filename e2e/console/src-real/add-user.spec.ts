@@ -28,7 +28,7 @@ async function openDrawer(
   await signIn(page, zitadel, user);
   await page.goto("/users");
   await expect(page.getByRole("heading", { name: "Users", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await page.getByRole("button", { name: "Add user", exact: true }).click();
   const drawer = page.getByRole("dialog", { name: "Add user" });
   await expect(drawer).toBeVisible();
   if (pick) await pickSeededSchema(page, drawer, zitadel);
@@ -145,7 +145,7 @@ test("discards the draft when cancelled", async ({ page, zitadel, seed }) => {
 
   // Nothing was created, and reopening starts clean.
   await expect(page.getByText(email)).toHaveCount(0);
-  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await page.getByRole("button", { name: "Add user", exact: true }).click();
   // Read before any pick: picking a schema clears the values itself. Parallel
   // specs decide how many schemas the drawer offers. With several, a discarded
   // draft leaves none picked; with one, the drawer picks it again and its
@@ -202,7 +202,7 @@ test("can be completed with the keyboard alone", async ({ page, zitadel, seed })
   await expect(page.getByRole("heading", { name: "Users", exact: true })).toBeVisible();
 
   // Open the drawer from the toolbar without a pointer.
-  await page.getByRole("button", { name: "Add", exact: true }).press("Enter");
+  await page.getByRole("button", { name: "Add user", exact: true }).press("Enter");
   const drawer = page.getByRole("dialog", { name: "Add user" });
   await expect(drawer).toBeVisible();
   // The seeded schema, picked without a pointer (see `pickSeededSchema`).

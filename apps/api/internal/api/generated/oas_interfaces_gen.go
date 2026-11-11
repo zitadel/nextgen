@@ -177,6 +177,14 @@ type FinishUserPasskeyRegistrationRes interface {
 	finishUserPasskeyRegistrationRes()
 }
 
+type FlowSignupChallengeConsumedRes interface {
+	flowSignupChallengeConsumedRes()
+}
+
+type FlowSignupChallengeIssuedRes interface {
+	flowSignupChallengeIssuedRes()
+}
+
 type FlowdefCreatedRes interface {
 	flowdefCreatedRes()
 }
@@ -331,6 +339,22 @@ type IdpUpdatedRes interface {
 
 type InitClaimRes interface {
 	initClaimRes()
+}
+
+type InvitationAcceptedRes interface {
+	invitationAcceptedRes()
+}
+
+type InvitationCancelledRes interface {
+	invitationCancelledRes()
+}
+
+type InvitationCreatedRes interface {
+	invitationCreatedRes()
+}
+
+type InvitationRejectedRes interface {
+	invitationRejectedRes()
 }
 
 type IssueChallengeRes interface {

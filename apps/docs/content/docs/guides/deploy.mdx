@@ -53,7 +53,7 @@ Keep `zitadel.json` and `.zitadel/**` in source control, and `.zitadel/local/**`
 
 ### Policies
 
-A policy file, `.zitadel/policies/<operation>.json`, holds the settings an operation is checked against. `auth.factor.password.set.json` is the password policy `zitadel setup` writes. Policies ship in the same release as your schemas, flows and branding: edit the file, then run `deploy --dry-run` and `deploy`, or `preview` on a pull request. The server publishes a new revision of a policy only when its config changed, and the release pins it.
+A policy file, `.zitadel/policies/<operation>.json`, holds the settings an operation is checked against. `zitadel setup` writes two: `auth.factor.password.set.json`, the password policy, and `user.create.json`, the sign-up policy. Policies ship in the same release as your schemas, flows and branding: edit the file, then run `deploy --dry-run` and `deploy`, or `preview` on a pull request. The server publishes a new revision of a policy only when its config changed, and the release pins it.
 
 A test file beside a policy, `<operation>.test.json`, is never part of a release. `zitadel policies test` runs its cases against the server: see [Test a policy](/docs/guides/test-policies).
 

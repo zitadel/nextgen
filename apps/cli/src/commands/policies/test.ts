@@ -16,11 +16,13 @@ import { reportWarning } from "@/lib/warnings";
 import {
   CONFIG_DIRECTORIES,
   DiskStore,
+  PASSWORD_POLICY_OPERATION,
   type PolicyCase,
   type PolicyCaseResult,
   type PolicyExpectation,
   type PolicyOperation,
   PolicyTest,
+  USER_CREATE_POLICY_OPERATION,
   ZitadelConfig,
 } from "@/lib/zitadel";
 
@@ -90,6 +92,16 @@ export type PolicySuiteResult = {
 };
 
 /**
+ * One operation's evaluate request.
+ *
+ * @typeParam Operation - The operation.
+ */
+type EvaluationOf<Operation extends PolicyOperation> = Extract<
+  PolicyEvaluation,
+  { operation: Operation }
+>;
+
+/**
  * One case to evaluate, and the test file it belongs to.
  */
 type CaseRun = {
@@ -99,14 +111,14 @@ type CaseRun = {
   readonly suite: number;
 
   /**
-   * The operation the file tests.
-   */
-  readonly operation: PolicyOperation;
-
-  /**
    * The case.
    */
   readonly testCase: PolicyCase;
+
+  /**
+   * The evaluate request the case sends, in its operation's own shape.
+   */
+  readonly request: PolicyEvaluation;
 };
 
 /**
@@ -387,6 +399,64 @@ The server evaluates every case, so the command needs a connection to it. By def
   }
 
   /**
+   * The evaluate request of every case of a test file, in its operation's own
+   * shape: the input, the facts where the operation has any, and the rules.
+   *
+   * @remarks
+   * The rules were read for this operation, which the policies are keyed by,
+   * so they hold this operation's settings, and the server checks them as a
+   * deploy would.
+   *
+   * @param test - The test file.
+   * @param suite - Its position among the files.
+   * @param config - The rules of its operation's policy; `{}` when there is none.
+   * @returns One run per case, in the file's order.
+   */
+  private caseRuns(
+    test: PolicyTest,
+    suite: number,
+    config: PolicyEvaluation["config"],
+  ): readonly CaseRun[] {
+    const value = test.value;
+    switch (value.operation) {
+      case PASSWORD_POLICY_OPERATION: {
+        const operation = value.operation;
+        const settings = config as EvaluationOf<typeof operation>["config"];
+        return value.cases.map((testCase): CaseRun => {
+          const facts = testCase.facts;
+          return {
+            suite,
+            testCase,
+            request: {
+              operation,
+              config: settings,
+              input: testCase.input,
+              // A case without facts sends none: the key is dropped on the
+              // wire. The case holds its facts read-only, so the request takes
+              // its own copy of the list.
+              facts:
+                facts === undefined
+                  ? undefined
+                  : { ...facts, history_matches: facts.history_matches?.slice() },
+            },
+          };
+        });
+      }
+      case USER_CREATE_POLICY_OPERATION: {
+        const operation = value.operation;
+        const settings = config as EvaluationOf<typeof operation>["config"];
+        return value.cases.map((testCase): CaseRun => {
+          return {
+            suite,
+            testCase,
+            request: { operation, config: settings, input: testCase.input },
+          };
+        });
+      }
+    }
+  }
+
+  /**
    * Evaluate every case of every test file against its operation's policy, or
    * `{}` when there is none.
    *
@@ -406,36 +476,13 @@ The server evaluates every case, so the command needs a connection to it. By def
     policies: ReadonlyMap<string, PolicyUnderTest>,
   ): Promise<readonly PolicySuiteResult[]> {
     const runs = tests.flatMap((test, suite) => {
-      const operation = test.operation;
-      return test.cases.map((testCase): CaseRun => {
-        return {
-          suite,
-          operation,
-          testCase,
-        };
-      });
+      return this.caseRuns(test, suite, policies.get(test.operation)?.config ?? {});
     });
     const outcomes = await mapBounded(
       runs,
       EVALUATE_CONCURRENCY,
       async (run): Promise<CaseOutcome> => {
-        const config = policies.get(run.operation)?.config ?? {};
-        const facts = run.testCase.facts;
-        // A case without facts sends none: the key is dropped on the wire. The
-        // case holds its facts read-only, so the request takes its own copy of
-        // the list.
-        const actual = await service.evaluate({
-          operation: run.operation,
-          config,
-          input: run.testCase.input,
-          facts:
-            facts === undefined
-              ? undefined
-              : {
-                  ...facts,
-                  history_matches: facts.history_matches?.slice(),
-                },
-        });
+        const actual = await service.evaluate(run.request);
         return {
           suite: run.suite,
           result: PolicyTest.resultOf(run.testCase, actual),

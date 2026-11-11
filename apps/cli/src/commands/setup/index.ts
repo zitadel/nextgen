@@ -41,6 +41,8 @@ import { z } from "zod";
 import {
   type CreatedProject,
   createZitadelClient,
+  InvalidError,
+  PolicyService,
   ProjectService,
   VariableService,
   VariableWrite,
@@ -149,6 +151,7 @@ import {
   PasswordPolicy,
   type Scaffold,
   type ScaffoldedConnection,
+  SignupPolicy,
   ZitadelConfig,
 } from "@/lib/zitadel";
 
@@ -1575,7 +1578,7 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
               filesWritten: [],
               passwordMinLength: signInOf(answers).password_min_length,
             }
-          : await this.writeConfiguration(answers);
+          : await this.writeConfiguration(answers, project);
       } catch (error) {
         // Setup is not atomic: the patcher already wrote `zitadel.json` (the
         // marker the already-initialized guard skips on) and `.zitadel/secret`.
@@ -2226,12 +2229,47 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
     }
     return (
       "The project was created but its default configuration (schema, login flow, " +
-      `password policy) was not all written. Rerun ${this.suggest("setup")} to start over; ` +
+      `password and sign-up policies) was not all written. Rerun ${this.suggest("setup")} to start over; ` +
       "--force overwrites the schema and flow files setup scaffolds and keeps an " +
-      "existing password policy file. It does not cover a connection under .zitadel/idps/ -- those are " +
+      "existing password or sign-up policy file. It does not cover a connection under .zitadel/idps/ -- those are " +
       "yours, so setup never replaces or removes one; delete it to scaffold a fresh " +
       "one, or keep it and enable the provider after setup to reuse it."
     );
+  }
+
+  /**
+   * Whether the server takes a sign-up policy.
+   *
+   * @remarks
+   * Asked by evaluating one with no settings, which stores nothing. The CLI's
+   * own client accepted the body, so a server refusing it as malformed does
+   * not know the operation yet. Any other failure says nothing about the
+   * policy and is left for the deploy to report.
+   *
+   * @param server - The server's base URL.
+   * @param project - The project just created, with the secret to ask as.
+   * @returns False when the server refuses the operation as unknown.
+   */
+  private async serverTakesSignupPolicy(server: string, project: CreatedProject): Promise<boolean> {
+    const service = new PolicyService(
+      createZitadelClient({
+        userAgent: userAgent(),
+        baseUrl: server,
+        token: project.project_secret,
+        signal: this.signal,
+      }),
+      project.id,
+    );
+    try {
+      await service.evaluate({
+        operation: SignupPolicy.OPERATION,
+        config: {},
+        input: { solved_challenge: "zitadel_pow" },
+      });
+      return true;
+    } catch (error) {
+      return !(error instanceof InvalidError && error.serverCode === "req.invalid");
+    }
   }
 
   /**
@@ -2242,17 +2280,33 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
    * Only files: the first deploy publishes them. The configuration is planned
    * again against what is on disk now, so it refuses what the plan before the
    * project was created would. A README already there is the developer's, and
-   * is kept even under `--force`.
+   * is kept even under `--force`. The first deploy carries every policy file,
+   * so a server that does not take the sign-up policy yet gets none: setup
+   * goes on without it. A file `--force` keeps stays, and the server refuses
+   * every deploy that carries it.
    *
    * @param answers - What to scaffold.
+   * @param project - The project just created, whose server is asked whether
+   *   it takes a sign-up policy.
    * @returns The absolute paths written, and the minimum password length the
    *   policy holds.
    * @throws {@link ZitadelError} With `E_CONFLICT` when a file setup will not
    *   replace is there, or `E_VALIDATION` when a policy `--force` keeps is not
    *   valid.
    */
-  private async writeConfiguration(answers: SetupAnswers): Promise<ScaffoldedConfiguration> {
-    const scaffold = await scaffoldOf(this.cwd, this.force, answers);
+  private async writeConfiguration(
+    answers: SetupAnswers,
+    project: CreatedProject,
+  ): Promise<ScaffoldedConfiguration> {
+    const signupPolicy = await this.serverTakesSignupPolicy(answers.server, project);
+    const scaffold = await scaffoldOf(this.cwd, this.force, answers, signupPolicy);
+    if (!signupPolicy) {
+      reportWarning(
+        scaffold.signupPolicy === undefined
+          ? `The server does not take a sign-up policy yet, so setup wrote none. Upgrade the server, then add ${SignupPolicy.PATH} and run \`zitadel deploy\`.`
+          : `The server does not take a sign-up policy yet, so every \`zitadel deploy\` fails while ${SignupPolicy.PATH} is there. Upgrade the server, or move the file out of ${CONFIG_DIRECTORIES.policies}/ until you do.`,
+      );
+    }
     const store = new DiskStore(this.cwd);
     const saved = await scaffold.change
       .save(store, {
@@ -2677,17 +2731,20 @@ type ScaffoldedConfiguration = {
  *
  * @param cwd - The project root.
  * @param force - Whether the default schema and flow may be replaced, and an
- *   existing password policy kept.
+ *   existing password or sign-up policy kept.
  * @param answers - What to scaffold.
+ * @param signupPolicy - Whether a project without a sign-up policy gets the
+ *   default one; false for a server that does not take the policy yet.
  * @returns The configuration, and the change that writes it.
  * @throws {@link ZitadelError} With `E_CONFLICT` for the first file setup
- *   would refuse to write, or `E_VALIDATION` for a kept password policy that
- *   is not valid.
+ *   would refuse to write, or `E_VALIDATION` for a kept password or sign-up
+ *   policy that is not valid.
  */
 async function scaffoldOf(
   cwd: string,
   force: boolean,
   answers: Pick<SetupAnswers, "preset" | "useCase" | "sso" | "passwordMinLength">,
+  signupPolicy = true,
 ): Promise<Scaffold<SsoDraft>> {
   try {
     // Read without refusing a broken file: the scaffold knows which paths it
@@ -2706,6 +2763,7 @@ async function scaffoldOf(
       useCase: answers.useCase,
       sso: answers.sso,
       passwordMinLength: answers.passwordMinLength,
+      signupPolicy,
       force,
     });
   } catch (error) {
@@ -2744,6 +2802,12 @@ function setupRefusal(error: unknown, connections: readonly ScaffoldedConnection
   if (error.path === PasswordPolicy.PATH) {
     return new ZitadelError("E_CONFLICT", error.message, {
       hint: "Rerun setup with --force to keep this policy and deploy it to the new project, or move the file aside to start from an empty one.",
+      details: error.details,
+    });
+  }
+  if (error.path === SignupPolicy.PATH) {
+    return new ZitadelError("E_CONFLICT", error.message, {
+      hint: "Rerun setup with --force to keep this policy and deploy it to the new project, or move the file aside to start from the default.",
       details: error.details,
     });
   }
@@ -3115,6 +3179,7 @@ const SENTENCE_BY_PATH: Record<string, { subject: string }> = {
   [DEFAULT_SCHEMA_CONFIG_PATH]: { subject: "the editable default human user schema" },
   [`${CONFIG_DIRECTORIES.schemas}/${README}`]: { subject: "the schemas folder README" },
   [PasswordPolicy.PATH]: { subject: "the editable password policy" },
+  [SignupPolicy.PATH]: { subject: "the editable sign-up policy" },
   [`${CONFIG_DIRECTORIES.policies}/${README}`]: { subject: "the policies folder README" },
   [`${META_SCHEMA_DIR}/policy.json`]: { subject: "the policy dialect spec (editor $schema)" },
   [`${META_SCHEMA_DIR}/flow-definition.json`]: {
