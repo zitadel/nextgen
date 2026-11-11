@@ -5810,6 +5810,99 @@
     },
     {
       "kind": "javascript-module",
+      "path": "src/orchestrator/__tests__/session-answers.ts",
+      "declarations": [
+        {
+          "kind": "function",
+          "name": "unauthorized",
+          "return": {
+            "type": {
+              "text": "Response"
+            }
+          },
+          "description": "Answers to `GET` / `DELETE /sessions/me` for the session widgets' specs.\n\n`NO_SESSION` are the backend's own \"there is no session\" answers, with the\nenvelopes the Go server sends (`internal/api/session.go`, the openapi's\n`auth-unauthorized` and `sess-not_found` errors). `OUTAGES` are everything\nelse that can come back instead: a gateway, a WAF, an ingress default\nbackend or an SPA host answers these, and none of them says the session is\ngone, so a widget must treat each one as an error."
+        },
+        {
+          "kind": "function",
+          "name": "sessionNotFound",
+          "return": {
+            "type": {
+              "text": "Response"
+            }
+          }
+        },
+        {
+          "kind": "variable",
+          "name": "NO_SESSION",
+          "type": {
+            "text": "readonly (readonly [string, () => Response])[]"
+          },
+          "default": "[ [\"401 auth.unauthorized\", unauthorized], [\"404 sess.not_found\", sessionNotFound], ]"
+        },
+        {
+          "kind": "variable",
+          "name": "OUTAGES",
+          "type": {
+            "text": "readonly (readonly [string, () => Response])[]"
+          },
+          "default": "[ [\"a gateway's HTML 401\", gatewayPage(401)], [\"a gateway's HTML 404\", gatewayPage(404)], [\"a bodyless 401\", () => new HttpResponse(null, { status: 401 })], [\"a bodyless 404\", () => new HttpResponse(null, { status: 404 })], [ \"a 404 with another service's code\", () => HttpResponse.json({ code: \"not_found\", message: \"no route\" }, { status: 404 }), ], [ \"a 403\", () => HttpResponse.json( { code: \"auth.csrf_invalid\", message: \"The request failed CSRF validation.\" }, { status: 403 }, ), ], [\"a 429\", () => new HttpResponse(\"Too Many Requests\", { status: 429 })], [\"a 500\", () => new HttpResponse(null, { status: 500 })], [\"a 503\", () => new HttpResponse(null, { status: 503 })], [\"a network error\", () => HttpResponse.error()], ]",
+          "description": "Answers that are not the backend speaking about the session."
+        },
+        {
+          "kind": "variable",
+          "name": "UNREADABLE_SESSIONS",
+          "type": {
+            "text": "readonly (readonly [string, () => Response])[]"
+          },
+          "default": "[ [ \"an SPA host's HTML 200\", () => new HttpResponse(\"<!doctype html><html><body>app</body></html>\", { status: 200, headers: { \"content-type\": \"text/html\" }, }), ], [\"an empty 200\", () => new HttpResponse(null, { status: 200 })], [\"a 200 JSON that is not a session\", () => HttpResponse.json({ ok: true })], ]",
+          "description": "`GET /sessions/me` 200s whose body is not the session JSON."
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "unauthorized",
+          "declaration": {
+            "name": "unauthorized",
+            "module": "src/orchestrator/__tests__/session-answers.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "sessionNotFound",
+          "declaration": {
+            "name": "sessionNotFound",
+            "module": "src/orchestrator/__tests__/session-answers.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "NO_SESSION",
+          "declaration": {
+            "name": "NO_SESSION",
+            "module": "src/orchestrator/__tests__/session-answers.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "OUTAGES",
+          "declaration": {
+            "name": "OUTAGES",
+            "module": "src/orchestrator/__tests__/session-answers.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "UNREADABLE_SESSIONS",
+          "declaration": {
+            "name": "UNREADABLE_SESSIONS",
+            "module": "src/orchestrator/__tests__/session-answers.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
       "path": "src/orchestrator/api-client.ts",
       "declarations": [
         {
@@ -7329,7 +7422,7 @@
       "declarations": [
         {
           "kind": "class",
-          "description": "The signed-in identity and the sign-out call shared by `<zitadel-session>`\nand `<zitadel-logout>`: one `GET /sessions/me` once a project is resolvable,\nand `DELETE /sessions/me` that fires `zitadel-signout` on success.",
+          "description": "The signed-in identity and the sign-out call shared by `<zitadel-session>`\nand `<zitadel-logout>`: one `GET /sessions/me` once a project is resolvable,\nand `DELETE /sessions/me` that fires `zitadel-signout` on success. A visitor\nthe backend says has no session is `signed-out`, so the host can stop\noffering a sign-out to nobody; any other failure keeps the host's surface\nand sets `errorMessage`.",
           "name": "SessionController",
           "members": [
             {
@@ -7374,7 +7467,24 @@
             },
             {
               "kind": "field",
+              "name": "state",
+              "type": {
+                "text": "SessionState"
+              },
+              "default": "\"unknown\""
+            },
+            {
+              "kind": "field",
               "name": "identityRequested",
+              "type": {
+                "text": "boolean"
+              },
+              "privacy": "private",
+              "default": "false"
+            },
+            {
+              "kind": "field",
+              "name": "missedSessionMissing",
               "type": {
                 "text": "boolean"
               },
@@ -7389,16 +7499,6 @@
               },
               "privacy": "private",
               "readonly": true,
-              "parameters": [
-                {
-                  "description": "Returns the host's project and API handle, throwing while no\nproject is resolvable.",
-                  "name": "resolve"
-                },
-                {
-                  "description": "Runs after the identity fetch resolves or fails.",
-                  "name": "onIdentitySettled"
-                }
-              ],
               "default": "host"
             },
             {
@@ -7413,13 +7513,13 @@
             },
             {
               "kind": "field",
-              "name": "onIdentitySettled",
+              "name": "options",
               "type": {
-                "text": "() => void | undefined"
+                "text": "SessionControllerOptions"
               },
               "privacy": "private",
               "readonly": true,
-              "default": "onIdentitySettled"
+              "default": "options"
             },
             {
               "kind": "method",
@@ -7474,7 +7574,7 @@
                   }
                 }
               ],
-              "description": "Revokes the session in the host's project with credentials; the server\nclears the cookie. Fires `zitadel-signout` (after `onRevoked`) and resolves\n`true` on success; on failure sets `errorMessage` and resolves `false`.\nThe revoke is sent whatever the identity read found, since the cookie may\nhave changed since: a session that is already gone, or one of another\nproject that the server refuses to revoke, leaves nobody signed in here, so\nsign-out completes and the other project's session stays."
+              "description": "Revokes the session in the host's project with credentials; the server\nclears the cookie. Fires `zitadel-signout` (after `onRevoked`) and resolves\n`true` on success. The backend answering that there is no session (see\nisNoSession) means it is already gone, which is what signing out\nasks for, so it succeeds the same way. Any other failure, a gateway's 401\nor 404 included, revoked nothing: it sets `errorMessage` and resolves\n`false`. The revoke is sent whatever the identity read found, since the\ncookie may have changed since: one of another project that the server\nrefuses to revoke leaves nobody signed in here, so sign-out completes and\nthe other project's session stays."
             },
             {
               "kind": "method",
@@ -7503,6 +7603,16 @@
                   }
                 }
               ]
+            },
+            {
+              "kind": "method",
+              "name": "notifyMissing",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              }
             }
           ],
           "events": [
@@ -9648,7 +9758,7 @@
       "declarations": [
         {
           "kind": "class",
-          "description": "`<zitadel-logout>` — orchestrator-tier element that lets the signed-in user\nsign out without touching the flow API.\n\nReads the user's identity from the typed `getMySession` operation\n(`GET /sessions/me`, credentialed) — the same source as `<zitadel-session>`,\nso both signed-in surfaces stay consistent and work against the real backend.\nThe avatar/preview show `name`, then `email`, then the always-present\n`user_id`. NOTE: the current server response includes only the `user_id`, so\nthe avatar falls back to the id until the backend returns a human-readable\n`name`/`email`.\n\nIt renders an avatar trigger with a dropdown that exposes a \"Sign out\"\naction, and calls the typed `revokeMySession` operation in `@zitadel/api`\n(`DELETE /sessions/me`). The server clears the session cookie via\n`Set-Cookie: Max-Age=0`; on success the element fires `zitadel-signout`\nand optionally navigates to `post-sign-out-url`.\n\n## Template-slot mode\n\nWhen the consumer projects a `<template>` child the element renders the\ntemplate's clone into its light DOM with `{{display}}`, `{{identifier}}`,\nand `{{initial}}` substituted (`{{name}}` and `{{email}}` fill as legacy\naliases of the first two). Any element with `data-action=\"logout\"` inside\nthe cloned template triggers the sign-out flow. This mirrors the\nplaceholder `<nextgen-logout>`'s contract so existing markup keeps working.\n\nDefault styles consume the `--zl-*` design tokens so tenant branding\napplies automatically.",
+          "description": "`<zitadel-logout>` — orchestrator-tier element that lets the signed-in user\nsign out without touching the flow API.\n\nReads the user's identity from the typed `getMySession` operation\n(`GET /sessions/me`, credentialed) — the same source as `<zitadel-session>`,\nso both signed-in surfaces stay consistent and work against the real backend.\nThe avatar/preview show `name`, then `email`, then the always-present\n`user_id`. NOTE: the current server response includes only the `user_id`, so\nthe avatar falls back to the id until the backend returns a human-readable\n`name`/`email`.\n\nIt renders an avatar trigger with a dropdown that exposes a \"Sign out\"\naction, and calls the typed `revokeMySession` operation in `@zitadel/api`\n(`DELETE /sessions/me`). The server clears the session cookie via\n`Set-Cookie: Max-Age=0`; on success (the backend's no-session answer counts,\nthe session is already gone) the element fires `zitadel-signout` and\noptionally navigates to `post-sign-out-url`.\n\nWhen `GET /sessions/me` gets the backend's no-session answer (`401\nauth.unauthorized` or `404 sess.not_found`) the visitor has no session: the\nelement renders nothing (no avatar, no projected template) and does not\nnavigate, since the menu sits in an app's own chrome, often on public pages.\nA network error, a 5xx or a gateway's 401 or 404 keeps the control and shows\nthe error.\n\n## Template-slot mode\n\nWhen the consumer projects a `<template>` child the element renders the\ntemplate's clone into its light DOM with `{{display}}`, `{{identifier}}`,\nand `{{initial}}` substituted (`{{name}}` and `{{email}}` fill as legacy\naliases of the first two). Any element with `data-action=\"logout\"` inside\nthe cloned template triggers the sign-out flow. This mirrors the\nplaceholder `<nextgen-logout>`'s contract so existing markup keeps working.\n\nDefault styles consume the `--zl-*` design tokens so tenant branding\napplies automatically.",
           "name": "ZitadelLogout",
           "members": [
             {
@@ -9719,7 +9829,7 @@
               "name": "session",
               "privacy": "private",
               "readonly": true,
-              "default": "new SessionController( this, () => resolveApi(this.project, this.projectAttrs, \"<zitadel-logout>\"), () => this.projectTemplate(), )"
+              "default": "new SessionController( this, () => resolveApi(this.project, this.projectAttrs, \"<zitadel-logout>\"), { onIdentitySettled: () => this.projectTemplate() }, )"
             },
             {
               "kind": "field",
@@ -9980,7 +10090,7 @@
       "declarations": [
         {
           "kind": "class",
-          "description": "`<zitadel-session>` — the \"signed in\" card.\n\nRenders the post-sign-in confirmation surface: a\ncentred auth card reading \"Signed in as {identity}\" with a **Sign out**\naction. Composed from the same `<zl-page-shell>` / `<zl-card>` /\n`<zl-button>` atoms as the `<zitadel-login>` orchestrator, so it inherits\ntenant branding tokens with no hardcoded colour, radius, or shadow.\n\nLike `<zitadel-login>` it is widget-first: the default `variant=\"widget\"`\nis content-sized and transparent so the card drops into an app's own\npage; dedicated signed-in routes opt into `variant=\"page\"`, which claims\nthe viewport and paints the surface background (the page paint lives on\nthe internal `<zl-page-shell>`). `theme` resolves through the shared\nsurface base — explicit value, else `dark` for `page` / `auto` for\n`widget`.\n\nThis is the companion surface to `<zitadel-login>` for the \"go straight to\n/login\" flow: the orchestrator signs the user in and redirects here (or to\nthe consumer's own page); this element proves the session and offers a way\nback out. The in-app avatar menu lives in the separate `<zitadel-logout>`.\n\n- Identity is fetched from the typed `getMySession` operation\n  (`GET /sessions/me`), sent with credentials so the session cookie\n  authenticates it. The card shows `name`, then `email`, then the\n  always-present `user_id`. NOTE: the current server response includes only\n  the `user_id`, so the card displays the raw id until the backend returns a\n  human-readable `name`/`email` on `/sessions/me`. A failed or\n  unauthenticated request renders the card without an identity line rather\n  than throwing.\n- **Sign out** calls the typed `revokeMySession` operation\n  (`DELETE /sessions/me`); the server clears the session cookie. On success\n  the element fires `zitadel-signout` (detail `{ display, identifier }`, matching the\n  shared SPA contract) and optionally navigates to `post-sign-out-url`.\n\nA \"Continue\" action is intentionally omitted for now: the post-sign-in\ndestination contract is still being decided. Consumers redirect after\nsign-in via the `<zitadel-login>` `post-sign-in-url`.",
+          "description": "`<zitadel-session>` — the \"signed in\" card.\n\nRenders the post-sign-in confirmation surface: a\ncentred auth card reading \"Signed in as {identity}\" with a **Sign out**\naction. Composed from the same `<zl-page-shell>` / `<zl-card>` /\n`<zl-button>` atoms as the `<zitadel-login>` orchestrator, so it inherits\ntenant branding tokens with no hardcoded colour, radius, or shadow.\n\nLike `<zitadel-login>` it is widget-first: the default `variant=\"widget\"`\nis content-sized and transparent so the card drops into an app's own\npage; dedicated signed-in routes opt into `variant=\"page\"`, which claims\nthe viewport and paints the surface background (the page paint lives on\nthe internal `<zl-page-shell>`). `theme` resolves through the shared\nsurface base — explicit value, else `dark` for `page` / `auto` for\n`widget`.\n\nThis is the companion surface to `<zitadel-login>` for the \"go straight to\n/login\" flow: the orchestrator signs the user in and redirects here (or to\nthe consumer's own page); this element proves the session and offers a way\nback out. The in-app avatar menu lives in the separate `<zitadel-logout>`.\n\n- Identity is fetched from the typed `getMySession` operation\n  (`GET /sessions/me`), sent with credentials so the session cookie\n  authenticates it. The card shows `name`, then `email`, then the\n  always-present `user_id`. NOTE: the current server response includes only\n  the `user_id`, so the card displays the raw id until the backend returns a\n  human-readable `name`/`email` on `/sessions/me`.\n- **No session.** When the backend answers that request with its\n  `401 auth.unauthorized` or `404 sess.not_found` (or names no user) the\n  visitor is signed out: the element navigates to `post-sign-out-url` when\n  one is set and otherwise renders nothing. Anything else is not \"signed\n  out\": a network error, a 5xx, a gateway's 401 or 404 without the backend's\n  code, or a 200 that is not a session keeps the card and shows the error.\n- **Sign out** calls the typed `revokeMySession` operation\n  (`DELETE /sessions/me`); the server clears the session cookie. On success\n  (the backend's no-session answer counts, the session is already gone) the\n  element fires `zitadel-signout` (detail `{ display, identifier }`, matching\n  the shared SPA contract) and optionally navigates to `post-sign-out-url`.\n\nA \"Continue\" action is intentionally omitted for now: the post-sign-in\ndestination contract is still being decided. Consumers redirect after\nsign-in via the `<zitadel-login>` `post-sign-in-url`.",
           "name": "ZitadelSession",
           "members": [
             {
@@ -10018,7 +10128,18 @@
               "name": "session",
               "privacy": "private",
               "readonly": true,
-              "default": "new SessionController(this, () => resolveApi(this.project, this.projectAttrs, \"<zitadel-session>\"), )"
+              "default": "new SessionController( this, () => resolveApi(this.project, this.projectAttrs, \"<zitadel-session>\"), { onSessionMissing: () => this.leave() }, )"
+            },
+            {
+              "kind": "method",
+              "name": "leave",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "boolean"
+                }
+              },
+              "description": "Navigates to `postSignOutUrl` when one is set; reports whether it did."
             },
             {
               "kind": "method",
