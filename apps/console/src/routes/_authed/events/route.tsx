@@ -7,8 +7,8 @@ import {
   useRouteContext,
   useRouter,
 } from "@tanstack/react-router";
-import { Download, ListFilter, Logs, Radio, RefreshCw, UserRound } from "lucide-react";
-import { useMemo, useState } from "react";
+import { Download, ListFilter, Logs, RefreshCw } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { FormError } from "@/components/form-error";
 import { IdText } from "@/components/id-text";
 import { Page } from "@/components/layout";
@@ -90,15 +90,19 @@ import { cn } from "@/lib/utils";
  * behind it. The list then says that not every event was read, and its
  * button reads **Keep looking**.
  *
- * The search above the table takes one id or one event type and sets the
- * filter it names (`EventSearch`). **My activity** narrows the list to what
- * the signed-in person did. A row's menu narrows the list by a value the row
- * carries. While the sidebar is an icon rail, on a phone or collapsed, a
- * button beside the search names the view and opens it.
+ * The search above the table holds the filters set by a pasted value, as
+ * chips: an id, an event type, an operation, or a filter named before its
+ * value (`EventSearch`). Its empty field offers **My activity**, the list
+ * narrowed to what the signed-in person did. A row's menu narrows the list by
+ * a value the row carries. While the sidebar is an icon rail, on a phone or
+ * collapsed, a button beside the search names the view and opens it.
  *
  * The list is a snapshot of the moment it loaded: **Refresh** reads it again
  * from the newest event, and **Live** adds what is recorded after it every
- * few seconds (`useLiveEvents`). The time range is counted back from the
+ * few seconds (`useLiveEvents`): a green dot marks it on, a line under the
+ * toolbar says when it last read, and the rows it adds fade in. It asks the
+ * server again rather than holding a stream open, one range of an index a
+ * read, which every dialect serves. The time range is counted back from the
  * moment it loaded, and `Load more` keeps it, so a page never slides past
  * rows the range dropped. **Export** copies or downloads the rows loaded.
  */
@@ -136,6 +140,7 @@ function LogsScreen() {
   const router = useRouter();
   const navigate = useNavigate();
   const { eventId } = useParams({ strict: false });
+  const { session } = useRouteContext({ from: "/_authed" });
   const [refreshing, setRefreshing] = useState(false);
 
   // How many rows the newest page held, and of which load: a page that lands
@@ -164,6 +169,7 @@ function LogsScreen() {
     () => [...live.events, ...loaded.items, ...paging.extra],
     [live.events, loaded.items, paging.extra],
   );
+  const added = useMemo(() => new Set(live.events.map((event) => event.id)), [live.events]);
   // A page short of its size that still has a token: the server stopped at
   // its bound, not at the end of the events (root ADR 048).
   const newestRows = newest.of === loaded ? newest.rows : loaded.items.length;
@@ -185,20 +191,19 @@ function LogsScreen() {
           filter={
             <>
               <SidebarFilters search={search} />
-              <EventSearch current={search} />
-              <MyActivity search={search} />
+              <EventSearch current={search} me={session.user_id || undefined} />
             </>
           }
           action={
             <div className="flex items-center gap-2">
               {canGoLive && (
                 <Button
-                  variant={live.on ? "default" : "secondary"}
-                  className="shrink-0 gap-1.5 px-2.5!"
+                  variant="secondary"
+                  className="shrink-0 gap-2 px-3!"
                   aria-pressed={live.on}
                   onClick={live.toggle}
                 >
-                  <Radio aria-hidden className={cn(live.on && "animate-pulse")} />
+                  <LiveDot on={live.on} />
                   Live
                 </Button>
               )}
@@ -221,6 +226,7 @@ function LogsScreen() {
         </ResourceTitle>
 
         <FormError message={live.error} className="mt-3" />
+        {live.on && <LiveStatus checkedAt={live.checkedAt} />}
 
         <div className={`${RESOURCE_TABLE_WRAP} ${RESOURCE_TABLE_TOP}`}>
           {/* An event type runs to thirty characters, and the time must show
@@ -255,6 +261,7 @@ function LogsScreen() {
                     event={event}
                     search={search}
                     selected={event.id === eventId}
+                    added={added.has(event.id)}
                   />
                 ))
               )}
@@ -307,29 +314,50 @@ function SidebarFilters({ search }: { search: LogsSearch }) {
 }
 
 /**
- * The list narrowed to what the signed-in person did, as Vercel's "My Logs":
- * the actor filter set to their user id, one range of the actor index. Pressed
- * while it is set; pressing it again clears it.
+ * Live's mark: a dot, grey while it is off, green and pulsing while it reads,
+ * as a recording light is. The button's pressed state says the same to
+ * assistive tech.
  */
-function MyActivity({ search }: { search: LogsSearch }) {
-  const { session } = useRouteContext({ from: "/_authed" });
-  const me = session.user_id;
-  if (!me) return null;
-  const pressed = search.actor === me;
+function LiveDot({ on }: { on: boolean }) {
   return (
-    <Button
-      asChild
-      variant={pressed ? "default" : "outline"}
-      size="icon"
-      className="shrink-0"
-      aria-pressed={pressed}
-      title="My activity"
-    >
-      <Link to="/events" search={narrowedBy(search, "actor", pressed ? undefined : me)}>
-        <UserRound aria-hidden />
-        <span className="sr-only">My activity</span>
-      </Link>
-    </Button>
+    <span aria-hidden className="relative flex size-2">
+      {on && (
+        <span className="bg-success absolute inline-flex size-full animate-ping rounded-full opacity-75 motion-reduce:animate-none" />
+      )}
+      <span
+        className={cn(
+          "relative inline-flex size-2 rounded-full",
+          on ? "bg-success" : "bg-muted-foreground/60",
+        )}
+      />
+    </span>
+  );
+}
+
+/**
+ * The line under the toolbar while Live is on: that new events appear at the
+ * top, and how long ago it last read, counted every second, so a quiet log
+ * still shows that it is being read.
+ */
+function LiveStatus({ checkedAt }: { checkedAt: Date | undefined }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  const seconds = checkedAt
+    ? Math.max(0, Math.round((now - checkedAt.getTime()) / 1000))
+    : undefined;
+
+  return (
+    <p role="status" className="text-muted-foreground mt-3 px-0 text-xs lg:px-2">
+      Live: new events appear at the top as they are recorded.{" "}
+      {seconds === undefined
+        ? "Reading…"
+        : seconds < 2
+          ? "Checked just now."
+          : `Checked ${seconds} s ago.`}
+    </p>
   );
 }
 
@@ -371,11 +399,14 @@ function EventRow({
   event,
   search,
   selected,
+  added,
 }: {
   event: LogEvent;
   search: LogsSearch;
   /** Open in the drawer. */
   selected: boolean;
+  /** Read by Live after the list loaded: it fades in. */
+  added: boolean;
 }) {
   const navigate = useNavigate();
   const params = { eventId: event.id };
@@ -395,6 +426,7 @@ function EventRow({
       className={cn(
         failure && "bg-destructive/5 hover:bg-destructive/10",
         selected && "bg-muted hover:bg-muted",
+        added && "animate-in fade-in-0 duration-700 motion-reduce:animate-none",
       )}
     >
       <TableCell className={RESOURCE_CELL}>
