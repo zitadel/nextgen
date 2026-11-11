@@ -748,14 +748,16 @@ type InvitationStatements interface {
 	// acceptedBy, and nulls its metadata. Any other invitation returns a
 	// [database.NoRowFoundError].
 	ChangeInvitationStatus(ctx context.Context, projectID, id string, status domain.InvitationStatus, acceptedBy *string, now time.Time) (*domain.Invitation, error)
-	// ClearInvitationMetadata nulls the metadata. Returns a
-	// [database.NoRowFoundError] when no invitation carries the id.
-	ClearInvitationMetadata(ctx context.Context, projectID, id string) error
+	// ClearInvitationMetadata nulls the metadata of an invitation that is no
+	// longer pending at now, as replace does. A pending, unexpired or absent
+	// invitation returns a [database.NoRowFoundError].
+	ClearInvitationMetadata(ctx context.Context, projectID, id string, now time.Time) error
 	// DeletePendingInvitation removes a pending, unexpired invitation. Any
 	// other invitation returns a [database.NoRowFoundError].
 	DeletePendingInvitation(ctx context.Context, projectID, id string, now time.Time) error
 	// CountPendingInvitations counts the project's pending, unexpired
-	// invitations.
+	// invitations. The cap holds only when the count and the create run in
+	// one transaction under LockProject.
 	CountPendingInvitations(ctx context.Context, projectID string, now time.Time) (int64, error)
 }
 

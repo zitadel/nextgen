@@ -112,10 +112,10 @@ func TestInvitationStatements_Create(t *testing.T) {
 			assert.ErrorIs(t, d.stmts.CreateInvitation(t.Context(), entity), new(database.ForeignKeyError))
 		})
 
-		t.Run("missing_type_object_is_invalid", func(t *testing.T) {
+		t.Run("missing_type_object_is_a_server_fault", func(t *testing.T) {
 			entity := newTestInvitation(ensureProject(t, d.stmts), "admin", invitationNow().Add(time.Hour))
 			entity.ProjectMember = nil
-			assert.ErrorIs(t, d.stmts.CreateInvitation(t.Context(), entity), domain.ErrInvitationInvalid())
+			assert.ErrorIs(t, d.stmts.CreateInvitation(t.Context(), entity), domain.ErrInternal(nil))
 		})
 	})
 }
@@ -255,7 +255,7 @@ func TestInvitationStatements_ChangeStatus(t *testing.T) {
 				{domain.InvitationStatusExpired, nil},
 			} {
 				_, err := d.stmts.ChangeInvitationStatus(t.Context(), projectID, entity.ID, change.status, change.acceptedBy, now)
-				assert.ErrorIs(t, err, domain.ErrInvitationInvalid(), "status %q", change.status)
+				assert.ErrorIs(t, err, domain.ErrInternal(nil), "status %q", change.status)
 			}
 		})
 	})
@@ -264,14 +264,24 @@ func TestInvitationStatements_ChangeStatus(t *testing.T) {
 func TestInvitationStatements_ClearMetadata(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID := ensureProject(t, d.stmts)
-		entity := createInvitation(t, d.stmts, projectID, invitationNow().Add(time.Hour))
+		now := invitationNow()
 
-		require.NoError(t, d.stmts.ClearInvitationMetadata(t.Context(), projectID, entity.ID))
-		got, err := d.stmts.GetInvitationByID(t.Context(), projectID, entity.ID)
+		// Replacing an expired invitation moves its metadata to the new one.
+		expired := createInvitation(t, d.stmts, projectID, now.Add(-time.Hour))
+		require.NoError(t, d.stmts.ClearInvitationMetadata(t.Context(), projectID, expired.ID, now))
+		got, err := d.stmts.GetInvitationByID(t.Context(), projectID, expired.ID)
 		require.NoError(t, err)
 		assert.Nil(t, got.EncryptedMetadata)
 
-		err = d.stmts.ClearInvitationMetadata(t.Context(), projectID, "inv_does_not_exist")
+		// A live invitation keeps the metadata its accepter's journey shows.
+		pending := createInvitation(t, d.stmts, projectID, now.Add(time.Hour))
+		err = d.stmts.ClearInvitationMetadata(t.Context(), projectID, pending.ID, now)
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
+		got, err = d.stmts.GetInvitationByID(t.Context(), projectID, pending.ID)
+		require.NoError(t, err)
+		assert.Equal(t, "ciphertext", *got.EncryptedMetadata)
+
+		err = d.stmts.ClearInvitationMetadata(t.Context(), projectID, "inv_does_not_exist", now)
 		assert.ErrorIs(t, err, new(database.NoRowFoundError))
 	})
 }

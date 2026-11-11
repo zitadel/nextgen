@@ -24,7 +24,8 @@ const (
 		` SET status = $3, accepted_by = $4, accepted_at = $5, metadata = NULL` +
 		` WHERE project_id = $1 AND id = $2 AND status = 'pending' AND expires_at > $6` +
 		` RETURNING ` + invitationColumns
-	clearInvitationMetadataStmt = `UPDATE zitadel_nextgen.invitations SET metadata = NULL WHERE project_id = $1 AND id = $2`
+	clearInvitationMetadataStmt = `UPDATE zitadel_nextgen.invitations SET metadata = NULL` +
+		` WHERE project_id = $1 AND id = $2 AND (status <> 'pending' OR expires_at <= $3)`
 	deletePendingInvitationStmt = `DELETE FROM zitadel_nextgen.invitations` +
 		` WHERE project_id = $1 AND id = $2 AND status = 'pending' AND expires_at > $3`
 	countPendingInvitationsStmt = `SELECT count(*) FROM zitadel_nextgen.invitations` +
@@ -118,8 +119,8 @@ func (s invitationStatements) ChangeInvitationStatus(ctx context.Context, projec
 }
 
 // ClearInvitationMetadata implements [service.InvitationStatements].
-func (s invitationStatements) ClearInvitationMetadata(ctx context.Context, projectID, id string) error {
-	return s.execOne(ctx, clearInvitationMetadataStmt, projectID, id)
+func (s invitationStatements) ClearInvitationMetadata(ctx context.Context, projectID, id string, now time.Time) error {
+	return s.execOne(ctx, clearInvitationMetadataStmt, projectID, id, now)
 }
 
 // DeletePendingInvitation implements [service.InvitationStatements].

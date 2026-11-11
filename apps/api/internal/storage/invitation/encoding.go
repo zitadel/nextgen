@@ -29,21 +29,23 @@ type Row struct {
 }
 
 // MarshalPayload encodes the object of the invitation's type for the payload
-// column.
+// column. The service validates the request, so a malformed entity here is a
+// server fault.
 func MarshalPayload(entity *domain.Invitation) ([]byte, error) {
 	switch entity.Type {
 	case domain.InvitationTypeProjectMember:
 		if entity.ProjectMember == nil {
-			return nil, domain.ErrInvitationInvalid().WithMessage("a project_member invitation needs its relation")
+			return nil, domain.ErrInternal(fmt.Errorf("project_member invitation %q has no relation", entity.ID))
 		}
 		return json.Marshal(entity.ProjectMember)
 	default:
-		return nil, domain.ErrInvitationInvalid().WithMessage(fmt.Sprintf("unknown invitation type %q", entity.Type))
+		return nil, domain.ErrInternal(fmt.Errorf("unknown invitation type %q", entity.Type))
 	}
 }
 
-// StatusChange returns the accepted_at a ChangeInvitationStatus writes, and
-// refuses a change it cannot: accepted needs the accepter, rejected takes none.
+// StatusChange returns the accepted_at a ChangeInvitationStatus writes. A
+// change it cannot write is a server fault: accepted needs the accepter,
+// rejected takes none.
 func StatusChange(status domain.InvitationStatus, acceptedBy *string, now time.Time) (*time.Time, error) {
 	switch {
 	case status == domain.InvitationStatusAccepted && acceptedBy != nil && *acceptedBy != "":
@@ -51,7 +53,7 @@ func StatusChange(status domain.InvitationStatus, acceptedBy *string, now time.T
 	case status == domain.InvitationStatusRejected && acceptedBy == nil:
 		return nil, nil
 	default:
-		return nil, domain.ErrInvitationInvalid().WithMessage(fmt.Sprintf("cannot change an invitation's status to %q", status))
+		return nil, domain.ErrInternal(fmt.Errorf("cannot change an invitation's status to %q", status))
 	}
 }
 

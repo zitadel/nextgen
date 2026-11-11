@@ -482,17 +482,17 @@ func (c *MockAllStatementsCheckPlatformOperatorCall) DoAndReturn(f func(context.
 }
 
 // ClearInvitationMetadata mocks base method.
-func (m *MockAllStatements) ClearInvitationMetadata(ctx context.Context, projectID, id string) error {
+func (m *MockAllStatements) ClearInvitationMetadata(ctx context.Context, projectID, id string, now time.Time) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ClearInvitationMetadata", ctx, projectID, id)
+	ret := m.ctrl.Call(m, "ClearInvitationMetadata", ctx, projectID, id, now)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // ClearInvitationMetadata indicates an expected call of ClearInvitationMetadata.
-func (mr *MockAllStatementsMockRecorder) ClearInvitationMetadata(ctx, projectID, id any) *MockAllStatementsClearInvitationMetadataCall {
+func (mr *MockAllStatementsMockRecorder) ClearInvitationMetadata(ctx, projectID, id, now any) *MockAllStatementsClearInvitationMetadataCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ClearInvitationMetadata", reflect.TypeOf((*MockAllStatements)(nil).ClearInvitationMetadata), ctx, projectID, id)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ClearInvitationMetadata", reflect.TypeOf((*MockAllStatements)(nil).ClearInvitationMetadata), ctx, projectID, id, now)
 	return &MockAllStatementsClearInvitationMetadataCall{Call: call}
 }
 
@@ -508,13 +508,13 @@ func (c *MockAllStatementsClearInvitationMetadataCall) Return(arg0 error) *MockA
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsClearInvitationMetadataCall) Do(f func(context.Context, string, string) error) *MockAllStatementsClearInvitationMetadataCall {
+func (c *MockAllStatementsClearInvitationMetadataCall) Do(f func(context.Context, string, string, time.Time) error) *MockAllStatementsClearInvitationMetadataCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsClearInvitationMetadataCall) DoAndReturn(f func(context.Context, string, string) error) *MockAllStatementsClearInvitationMetadataCall {
+func (c *MockAllStatementsClearInvitationMetadataCall) DoAndReturn(f func(context.Context, string, string, time.Time) error) *MockAllStatementsClearInvitationMetadataCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

@@ -22,7 +22,8 @@ const (
 	changeInvitationStatusStmt   = `UPDATE invitations SET status = ?, accepted_by = ?, accepted_at = ?, metadata = NULL` +
 		` WHERE project_id = ? AND id = ? AND status = 'pending' AND expires_at > ?` +
 		` RETURNING ` + invitationColumns
-	clearInvitationMetadataStmt = `UPDATE invitations SET metadata = NULL WHERE project_id = ? AND id = ?`
+	clearInvitationMetadataStmt = `UPDATE invitations SET metadata = NULL` +
+		` WHERE project_id = ? AND id = ? AND (status <> 'pending' OR expires_at <= ?)`
 	deletePendingInvitationStmt = `DELETE FROM invitations` +
 		` WHERE project_id = ? AND id = ? AND status = 'pending' AND expires_at > ?`
 	countPendingInvitationsStmt = `SELECT count(*) FROM invitations` +
@@ -121,8 +122,8 @@ func (s invitationStatements) ChangeInvitationStatus(ctx context.Context, projec
 }
 
 // ClearInvitationMetadata implements [service.InvitationStatements].
-func (s invitationStatements) ClearInvitationMetadata(ctx context.Context, projectID, id string) error {
-	return s.execOne(ctx, clearInvitationMetadataStmt, projectID, id)
+func (s invitationStatements) ClearInvitationMetadata(ctx context.Context, projectID, id string, now time.Time) error {
+	return s.execOne(ctx, clearInvitationMetadataStmt, projectID, id, now.UnixNano())
 }
 
 // DeletePendingInvitation implements [service.InvitationStatements].
