@@ -467,6 +467,9 @@ func IDPConnectionPayloadDelta(previous, next *IDPConnection) (IDPConnectionPayl
 	return payload, nil
 }
 
+// SignupChallengePayload is empty: challenge and flow IDs live on event columns.
+type SignupChallengePayload struct{}
+
 // WebhookPayload is shared by webhook.created (snapshot) and webhook.updated
 // (delta: only the fields the update named, with their new values). The
 // signing secret is never part of it, plain or encrypted, and the url is

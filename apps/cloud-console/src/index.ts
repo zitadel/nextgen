@@ -1,3 +1,4 @@
+import { SIGN_IN_PREFIX } from "@zitadel/cloud-functions/contract";
 import type { ConsoleAddon } from "@zitadel/console/addon";
 
 import { track } from "./analytics";
@@ -39,7 +40,7 @@ export const addon: ConsoleAddon = unreleased
       track,
       screens: [billingScreen, supportScreen, emailScreen],
       signedOutScreens: [signUpScreen],
-      signInApiBase: "/cloud/zitadel",
+      signInApiBase: SIGN_IN_PREFIX,
     }
   : {
       Root: CloudRoot,
