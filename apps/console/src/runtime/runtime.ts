@@ -49,6 +49,15 @@ export interface ConsoleRuntime {
    * server-side secret injection.
    */
   publishable_key?: string;
+  /**
+   * The reserved platform project (ADR 0004 §3 amendment, D41): present, and
+   * equal to `console_project_id`, only when the console signs in to the
+   * project bootstrap provisioned. The console draws that project at its root
+   * (the root Settings' People, Authentication, Login flows, Branding and Audit
+   * log) and never offers it as a project. Absent for the pinned or
+   * first-created fallback, whose project is an ordinary one.
+   */
+  platform_project_id?: string;
 }
 
 /** Why discovery produced no document — ADR 0004 §3's third state. */
@@ -132,6 +141,17 @@ export function getConsoleProjectId(): string {
 }
 
 /**
+ * The reserved platform project's id (D41), or `undefined` when the console
+ * signs in to an ordinary project or none. The only way the console knows that
+ * project: never a written id, and never `console_project_id` on its own.
+ * Whether the person may act on it is another question
+ * (`features/platform/access.ts`).
+ */
+export function getPlatformProjectId(): string | undefined {
+  return getRuntime().platform_project_id;
+}
+
+/**
  * The discovered publishable key, or `undefined` when the server does not
  * serve one (older servers, no project yet). The login widget's handoff
  * exchange requires it: without it every sign-in answers 401.
@@ -200,12 +220,26 @@ function parseRuntime(doc: unknown): ConsoleRuntime | undefined {
   const record = doc as Record<string, unknown>;
   // Destructured first: a type predicate does not narrow a property read off
   // a `Record<string, unknown>`, only a local.
-  const { mode, console_project_id: projectId, publishable_key: publishableKey } = record;
+  const {
+    mode,
+    console_project_id: projectId,
+    publishable_key: publishableKey,
+    platform_project_id: platformProjectId,
+  } = record;
 
   if (mode !== "standalone" && mode !== "platform") return undefined;
   if (!absentOrString(projectId) || !absentOrString(publishableKey)) return undefined;
+  if (!absentOrString(platformProjectId)) return undefined;
+  // The server marks only the project it signs the console in to; anything
+  // else came from something that is not our server.
+  if (platformProjectId !== undefined && platformProjectId !== projectId) return undefined;
 
-  return { mode, console_project_id: projectId, publishable_key: publishableKey };
+  return {
+    mode,
+    console_project_id: projectId,
+    publishable_key: publishableKey,
+    ...(platformProjectId === undefined ? {} : { platform_project_id: platformProjectId }),
+  };
 }
 
 /**

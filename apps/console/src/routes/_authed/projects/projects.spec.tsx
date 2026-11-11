@@ -610,6 +610,39 @@ describe("projects screen", () => {
     expect(reads.map((params) => params.get("project_id"))).toEqual(
       reads.map(() => "proj_platform"),
     );
+    // And every read leaves the reserved platform project out: the root draws
+    // it, and it is never a project to choose (D41).
+    expect(reads.map((params) => params.get("exclude_platform"))).toEqual(reads.map(() => "true"));
+  });
+
+  it("never selects the platform project a URL names (D41)", async () => {
+    _setRuntimeForTesting({
+      mode: "standalone",
+      console_project_id: "proj_platform",
+      platform_project_id: "proj_platform",
+    });
+    server.use(
+      http.get(PROJECTS_URL, () =>
+        HttpResponse.json({
+          projects: [
+            { id: "proj_1", name: "River", created_at: "2026-07-08T09:00:00Z" },
+            { id: "proj_2", name: "Delta", created_at: "2026-07-07T09:00:00Z" },
+          ],
+        }),
+      ),
+      // The root's pages ask whether the person may act on it; here they may not.
+      http.get("*/api/v1/projects/proj_platform", () =>
+        HttpResponse.json({ code: "proj.not_found", message: "Not found" }, { status: 404 }),
+      ),
+    );
+    const router = await renderProjects("/projects?project=proj_platform");
+
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
+    expect(router.state.resolvedLocation?.search).not.toHaveProperty("project");
+    expect(await screen.findByRole("button", { name: "Switch project" })).toHaveTextContent(
+      "All projects",
+    );
+    expect(screen.getByRole("link", { name: "Home" })).toHaveAttribute("href", "/projects");
   });
 });
 

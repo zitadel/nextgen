@@ -4,6 +4,7 @@ import {
   RUNTIME_URL,
   _resetRuntimeForTesting,
   getConsoleProjectId,
+  getPlatformProjectId,
   getPublishableKey,
   getRuntime,
   initRuntime,
@@ -200,5 +201,48 @@ describe("getConsoleProjectId", () => {
   it("resolves to an empty id before discovery", () => {
     expect(getRuntime()).toEqual({ mode: "standalone" });
     expect(getConsoleProjectId()).toBe("");
+  });
+});
+
+// The server marks the reserved platform project (D41): the console reads it
+// from the document only, and only as the project it signs in to.
+describe("getPlatformProjectId", () => {
+  it("names the reserved platform project the document marks", async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse({
+        mode: "standalone",
+        console_project_id: "proj_platform",
+        publishable_key: "pk_test",
+        platform_project_id: "proj_platform",
+      }),
+    );
+    await initRuntime();
+
+    expect(getPlatformProjectId()).toBe("proj_platform");
+  });
+
+  it("names none for an ordinary sign-in project, a self-hoster's only one", async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse({ mode: "standalone", console_project_id: "proj_mine", publishable_key: "pk" }),
+    );
+    await initRuntime();
+
+    expect(getPlatformProjectId()).toBeUndefined();
+    expect(getRuntime()).not.toHaveProperty("platform_project_id");
+  });
+
+  it("reports a document marking another project than it signs in to as a failure", async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse({
+        mode: "standalone",
+        console_project_id: "proj_mine",
+        platform_project_id: "proj_platform",
+      }),
+    );
+
+    const result = await initRuntime();
+
+    expect(result.ok).toBe(false);
+    expect(getPlatformProjectId()).toBeUndefined();
   });
 });

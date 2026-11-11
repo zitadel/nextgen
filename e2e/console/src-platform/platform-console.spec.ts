@@ -70,12 +70,27 @@ test("a platform operator reaches every management screen without an error", asy
   });
   await expect(page.locator("zitadel-login").getByRole("textbox", { name: "Email" })).toBeVisible();
 
+  // The platform project the console signs in to is the root, not a project
+  // (D41): the server marks it, Projects never lists it, and this operator,
+  // who holds no grant on it, finds none of its pages in Settings.
+  const runtime = (await (await page.request.get("/console/runtime.json")).json()) as {
+    console_project_id?: string;
+    platform_project_id?: string;
+  };
+  expect(runtime.platform_project_id).toBeTruthy();
+  expect(runtime.platform_project_id).toBe(runtime.console_project_id);
+
   // The granted customer project: listed on Projects, where a row opens the
   // project (selects it, lands on its Overview, D35); its Settings open on
   // their first page, General (D40).
   await page.goto("/ui/console/projects");
   const projectLink = page.getByRole("table").getByRole("link").first();
   await expect(projectLink).toBeVisible();
+  // Bootstrap names the platform project "Platform" (internal/bootstrap/platform).
+  await expect(page.getByRole("table").getByRole("link", { name: "Platform" })).toHaveCount(0);
+  await expect(
+    page.getByRole("navigation", { name: "Account" }).getByRole("link", { name: "Settings" }),
+  ).toHaveCount(0);
   await projectLink.click();
   await expect(page).toHaveURL(new RegExp(`/console/?\\?project=${zitadel.handle.projectId}$`));
   await expect(page.getByRole("region", { name: "Production" })).toBeVisible();
@@ -116,7 +131,7 @@ test("a platform operator adds their name from the account menu", async ({ page,
   // The person heading the menu opens their profile.
   await page.getByRole("menuitem", { name: operator.email }).click();
 
-  await expect(page).toHaveURL(/\/settings\/profile/);
+  await expect(page).toHaveURL(/\/account(\?|$)/);
   await expect(page.getByLabel("Email", { exact: true })).toBeDisabled();
   const name = page.getByLabel("Name", { exact: true });
   await name.fill("Ada Lovelace");

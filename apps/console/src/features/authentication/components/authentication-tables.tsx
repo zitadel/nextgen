@@ -27,14 +27,15 @@ import {
   type SignInMethodRow,
   signInMethodRows,
 } from "@/features/authentication/model";
+import type { AuthenticationData } from "@/features/authentication/load";
 import type { SchemaEntry } from "@/features/schemas/model";
 
-/** What the loader hands the tabs. */
-export interface Loaded {
-  schemas: SchemaEntry[];
-  /** `null` without `idp.read`. */
-  idps: IdpConnection[] | null;
-}
+/**
+ * The page a connection opens: the project's, or the root's in the reserved
+ * platform project (D41). The screen that draws the tables names it, so a row
+ * never opens a project's page at the root.
+ */
+export type IdpDetailRoute = "/authentication/idps/$idpId" | "/settings/authentication/idps/$idpId";
 
 /** The first and last columns; the user schema column takes the rest. */
 const COLUMN = "w-1/4";
@@ -44,7 +45,13 @@ const COLUMN = "w-1/4";
  * — with the user schemas that allow it: "who can sign in with this?" at a
  * glance.
  */
-export function SignInMethods({ loaded }: { loaded: Loaded }) {
+export function SignInMethods({
+  loaded,
+  detail,
+}: {
+  loaded: AuthenticationData;
+  detail: IdpDetailRoute;
+}) {
   const rows = signInMethodRows(loaded.schemas, loaded.idps);
 
   return (
@@ -63,7 +70,7 @@ export function SignInMethods({ loaded }: { loaded: Loaded }) {
               No user schema in this project enables a sign-in method.
             </ResourceEmptyRow>
           ) : (
-            rows.map((row) => <MethodRow key={row.key} row={row} />)
+            rows.map((row) => <MethodRow key={row.key} row={row} detail={detail} />)
           )}
         </TableBody>
       </Table>
@@ -71,22 +78,18 @@ export function SignInMethods({ loaded }: { loaded: Loaded }) {
   );
 }
 
-function MethodRow({ row }: { row: SignInMethodRow }) {
+function MethodRow({ row, detail }: { row: SignInMethodRow; detail: IdpDetailRoute }) {
   const navigate = useNavigate();
   // A provider with a connection opens it; Passkey and Password have no page.
   const idpId = row.idpId;
 
   return (
     <ResourceRow
-      onOpen={
-        idpId
-          ? () => void navigate({ to: "/authentication/idps/$idpId", params: { idpId } })
-          : undefined
-      }
+      onOpen={idpId ? () => void navigate({ to: detail, params: { idpId } }) : undefined}
     >
       <TableCell className={`${RESOURCE_CELL} truncate`}>
         {idpId ? (
-          <Link to="/authentication/idps/$idpId" params={{ idpId }} className={RESOURCE_ROW_LINK}>
+          <Link to={detail} params={{ idpId }} className={RESOURCE_ROW_LINK}>
             {row.label}
           </Link>
         ) : row.missing ? (
@@ -130,9 +133,11 @@ function SchemaNames({ items }: { items: IdpReference[] }) {
 export function IdentityProviders({
   idps,
   schemas,
+  detail,
 }: {
   idps: IdpConnection[];
   schemas: SchemaEntry[];
+  detail: IdpDetailRoute;
 }) {
   const users = schemasBySsoProvider(schemas);
 
@@ -154,7 +159,9 @@ export function IdentityProviders({
               <InlineCode>zitadel auth-method sso enable</InlineCode>.
             </ResourceEmptyRow>
           ) : (
-            idps.map((idp) => <IdpRow key={idp.id} idp={idp} users={users.get(idp.slug) ?? []} />)
+            idps.map((idp) => (
+              <IdpRow key={idp.id} idp={idp} users={users.get(idp.slug) ?? []} detail={detail} />
+            ))
           )}
         </TableBody>
       </Table>
@@ -162,20 +169,22 @@ export function IdentityProviders({
   );
 }
 
-function IdpRow({ idp, users }: { idp: IdpConnection; users: IdpReference[] }) {
+function IdpRow({
+  idp,
+  users,
+  detail,
+}: {
+  idp: IdpConnection;
+  users: IdpReference[];
+  detail: IdpDetailRoute;
+}) {
   const navigate = useNavigate();
   const name = idp.definition.display_name;
 
   return (
-    <ResourceRow
-      onOpen={() => void navigate({ to: "/authentication/idps/$idpId", params: { idpId: idp.id } })}
-    >
+    <ResourceRow onOpen={() => void navigate({ to: detail, params: { idpId: idp.id } })}>
       <TableCell className={`${RESOURCE_CELL} truncate`}>
-        <Link
-          to="/authentication/idps/$idpId"
-          params={{ idpId: idp.id }}
-          className={RESOURCE_ROW_LINK}
-        >
+        <Link to={detail} params={{ idpId: idp.id }} className={RESOURCE_ROW_LINK}>
           <Shield aria-hidden strokeWidth={1.5} className={RESOURCE_ROW_ICON} />
           {name}
         </Link>
@@ -189,7 +198,7 @@ function IdpRow({ idp, users }: { idp: IdpConnection; users: IdpReference[] }) {
       <TableCell className={`${RESOURCE_CELL} text-right`}>
         <RowMenu name={name}>
           <DropdownMenuItem asChild>
-            <Link to="/authentication/idps/$idpId" params={{ idpId: idp.id }}>
+            <Link to={detail} params={{ idpId: idp.id }}>
               View connection
             </Link>
           </DropdownMenuItem>

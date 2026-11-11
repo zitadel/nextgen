@@ -57,12 +57,13 @@ describe("an add-on's screens", () => {
     expect(await screen.findByRole("heading", { name: "3 invoices" })).toBeInTheDocument();
   });
 
-  it("list themselves in the view their entry names, after the console's own", async () => {
+  it("list themselves in the view their entry names", async () => {
     await renderAt("/settings/invoices");
     const nav = await screen.findByRole("navigation", { name: "Settings" });
     const links = within(nav).getAllByRole("link");
-    // Under the list's heading, after the console's own page, the profile.
-    expect(links.map((link) => link.textContent)).toEqual(["Settings", "Profile", "Invoices"]);
+    // Under the list's heading. No platform project here, so the add-on's page
+    // is the list's only one (D41): the profile is the account menu's.
+    expect(links.map((link) => link.textContent)).toEqual(["Settings", "Invoices"]);
   });
 });
 

@@ -69,7 +69,15 @@ between files are the sign the component is missing.
   one, a screen asks for a project first (Projects with `?next=`, D22).
 - Projects (the home) and `/settings` are above every project: Projects lists
   the account's screens (`nav.view: "account"`, D27) around the project's
-  (D34); `/settings` its own pages (`nav.view: "settings"`, D29).
+  (D34); `/settings` its own pages (`nav.view: "settings"`, D29). The person's
+  profile is `/account`, opened from the account menu, never a Settings page
+  (D41).
+- The reserved platform project is the root, never a project (D41): read its
+  id only from `getPlatformProjectId()`, and send `exclude_platform` with every
+  `listMyProjects`.
+- A root page of the platform project sets `staticData.platformRoot`, guards
+  with `requirePlatformRoot` and draws the project screen's components inside
+  `ManagedProject`; never copy the screen.
 - A project's Settings opens its own list too (`nav.view: "project-settings"`,
   D40); add a project setting as a page there, never as a tab.
 - Going up to Projects or Settings never drops the selected project (D36):

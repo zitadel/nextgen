@@ -1,8 +1,11 @@
 import type { AnyRoute } from "@tanstack/react-router";
 import { useMatch, useRouter, useSearch } from "@tanstack/react-router";
 
+import { usePlatformAccess } from "@/features/platform/access";
 import { withoutTrailingSlash } from "@/lib/base-path";
 import type { NavMeta, NavView } from "@/nav";
+
+import { SETTINGS_PATH } from "./user-menu";
 
 /** Route prefix of the selected project's Settings, whose pages have a list of their own (D40). */
 export const PROJECT_SETTINGS_PATH = "/project";
@@ -26,16 +29,22 @@ export interface NavItem {
  * project is selected (D22): without one, the `_authed` guard sends such a
  * screen to Projects to choose one first (`?next=`), and choosing one goes on
  * to it. Links need not carry the selection — the `_authed` layout retains it.
+ *
+ * The root pages of the reserved platform project (`staticData.platformRoot`,
+ * D41) are listed only for someone who may act on that project.
  */
 export function useNavItems(view: NavView = "portal"): NavItem[] {
   const router = useRouter();
+  const platform = usePlatformAccess();
 
   return (Object.values(router.routesById) as AnyRoute[])
     .map((route): NavItem | undefined => {
-      const nav = route.options.staticData?.nav;
+      const staticData = route.options.staticData;
+      const nav = staticData?.nav;
       // `view` defaults to the portal list so the existing screens, none of
       // which declare one, keep their place.
       if (!nav || (nav.view ?? "portal") !== view) return undefined;
+      if (staticData.platformRoot && !platform) return undefined;
       const to = withoutTrailingSlash(route.fullPath);
       return { to, nav };
     })
@@ -56,8 +65,15 @@ export function useNavItems(view: NavView = "portal"): NavItem[] {
  * like an account row (the project's own Settings) would name two places
  * alike: up here Settings is the account's.
  */
-export function accountListItems(account: NavItem[], project: NavItem[]): NavItem[] {
-  const [home, ...rest] = account;
+export function accountListItems(
+  account: NavItem[],
+  project: NavItem[],
+  settings: NavItem[],
+): NavItem[] {
+  // Settings opens a list (D29): with nothing in it (no add-on, no access to
+  // the platform project, D41) the row would open nothing, so it is left out.
+  const [home, ...others] = account;
+  const rest = settings.length > 0 ? others : others.filter((item) => item.to !== SETTINGS_PATH);
   const taken = new Set(account.map((item) => item.nav.label));
   const screens = project.filter((item) => item.to !== "/" && !taken.has(item.nav.label));
   return home ? [home, ...screens, ...rest] : screens;

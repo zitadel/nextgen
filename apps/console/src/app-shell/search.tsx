@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { Copy, type LucideIcon, Plus, Search } from "lucide-react";
+import { CircleUser, Copy, type LucideIcon, Plus, Search } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -40,6 +40,7 @@ import { recentHits, rememberHit } from "@/features/search/recents";
 import { AddTeamSheet } from "@/features/teams/components/add-team-sheet";
 import { AddUserSheet } from "@/features/users/components/add-user-sheet";
 import { cn } from "@/lib/utils";
+import { getPlatformProjectId } from "@/runtime/runtime";
 
 import type { NavIcon } from "@/nav";
 import { type NavItem, PROJECT_SETTINGS_PATH, useNavItems } from "./use-nav-items";
@@ -310,6 +311,8 @@ function SearchPalette({
 
   const selected = useSelectedProject();
   const projectName = selected?.name;
+  // The reserved platform project, whose hits read as the root (D41).
+  const platformProjectId = getPlatformProjectId();
   // Where the selected project's rows are: its name, or its id until that is read.
   const place = projectId ? (projectName ?? projectId) : undefined;
   const q = query.trim().toLowerCase();
@@ -397,8 +400,10 @@ function SearchPalette({
     const iconOf = (type: SearchResultType): LucideIcon | NavIcon =>
       pages.find((item) => item.to === LIST_PATH[type])?.nav.icon ?? Search;
     // A hit opens in its own project, which opening it selects (`?project=`,
-    // D39).
+    // D39). One in the reserved platform project opens its root page instead
+    // and keeps the selection (D41, D36).
     const openHit = (hit: SearchHit) => {
+      if (hit.projectId === platformProjectId) return openRootHit(hit);
       const search = (prev: Record<string, unknown>) => ({ ...prev, project: hit.projectId });
       switch (hit.type) {
         case "user":
@@ -421,6 +426,24 @@ function SearchPalette({
           });
       }
     };
+    const openRootHit = (hit: SearchHit) => {
+      switch (hit.type) {
+        case "user":
+          return navigate({ to: "/settings/people/$userId", params: { userId: hit.id } });
+        case "flow_definition":
+          return navigate({
+            to: "/settings/login-flows/$definitionId",
+            params: { definitionId: hit.id },
+          });
+        case "idp":
+          return navigate({
+            to: "/settings/authentication/idps/$idpId",
+            params: { idpId: hit.id },
+          });
+        default:
+          return undefined;
+      }
+    };
     // The project a hit is in, by name: the selected one's, else the person's
     // projects the palette holds, else its id, which the server answers with.
     const projectNames = new Map<string, string>();
@@ -433,26 +456,33 @@ function SearchPalette({
     // project it is in.
     const hitResult = (hit: SearchHit, group: string): RankedResult => {
       const Icon = iconOf(hit.type);
+      const root = hit.projectId === platformProjectId;
+      // A root hit reads as the root page it opens (D41), as Settings' pages do,
+      // never as a project named for the platform.
+      const placed = root ? `Settings · ${ROOT_PAGE[hit.type]}` : placeOf(hit.projectId);
       return {
         id: `${group}:${hit.type}:${hit.projectId}:${hit.id}`,
         icon: <Icon aria-hidden />,
         label: hit.title,
         // The server matches a user on their identifier too, which is this line.
         alias: hit.subtitle,
-        description:
-          [hit.subtitle, placeOf(hit.projectId)].filter(Boolean).join(" · ") || undefined,
+        description: [hit.subtitle, placed].filter(Boolean).join(" · ") || undefined,
         inProject: hit.projectId === projectId,
         kind: HIT_KIND[hit.type],
         go: close(() => {
-          rememberHit(hit.projectId, hit);
+          // Recents are a project's (D33), and the root is none.
+          if (!root) rememberHit(hit.projectId, hit);
           void openHit(hit);
         }),
       };
     };
     // What the server found of one type, for the text in the field now
-    // (`hitsFor`).
+    // (`hitsFor`). The platform project's kinds that no root page shows
+    // (its teams, its schemas) are left out (D41).
     const hitResults = (answer: typeof users, type: SearchResultType): RankedResult[] =>
-      hitsFor(answer ?? NO_ANSWER, query, type).map((hit) => hitResult(hit, "hit"));
+      hitsFor(answer ?? NO_ANSWER, query, type)
+        .filter((hit) => hit.projectId !== platformProjectId || ROOT_PAGE[hit.type] !== undefined)
+        .map((hit) => hitResult(hit, "hit"));
 
     // Beneath a project, as the switcher draws it (D21): its site's host, or
     // else its id, which tells two of one name apart.
@@ -468,11 +498,26 @@ function SearchPalette({
     });
 
     // The Settings row is a list, not a page: its pages stand in for it.
+    // Profile is the account menu's, apart from Settings (D41).
+    const profile: RankedResult[] = matches(PROFILE)
+      ? [
+          {
+            id: "page:/account",
+            icon: <CircleUser aria-hidden />,
+            label: PROFILE,
+            description: where(ACCOUNT),
+            inProject: false,
+            kind: KIND.account,
+            go: close(() => void navigate({ to: "/account" })),
+          },
+        ]
+      : [];
     const accountResults = [
       ...navResults(
         account.filter((item) => item.to !== SETTINGS_PATH),
         { description: where(ACCOUNT), inProject: false, kind: KIND.account },
       ),
+      ...profile,
       ...navResults(settings, { list: "Settings", inProject: false, kind: KIND.account }),
     ];
 
@@ -557,6 +602,7 @@ function SearchPalette({
     scope,
     projectName,
     place,
+    platformProjectId,
     q,
     query,
     navigate,
@@ -668,6 +714,21 @@ const CHOOSE_A_PROJECT = "Choose a project";
 
 /** What is above every project: the menu's heading, and beneath its rows once typed. */
 const ACCOUNT = "Account";
+
+/** The person's own page, which the account menu opens (`/account`, D41). */
+const PROFILE = "Profile";
+
+/**
+ * The root page a hit in the reserved platform project opens, by kind (D41):
+ * its users are People, its login flows and identity providers how people
+ * sign in. Kinds the root has no page for are absent, and such hits are left
+ * out.
+ */
+const ROOT_PAGE: Partial<Record<SearchResultType, string>> = {
+  user: "People",
+  flow_definition: "Login flows",
+  idp: "Authentication",
+};
 
 /** The list screen of each kind of hit: where its glyph comes from. */
 const LIST_PATH: Record<SearchResultType, string> = {

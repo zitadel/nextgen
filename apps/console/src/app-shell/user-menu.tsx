@@ -174,8 +174,8 @@ export function UserMenuItem({ user, onSignOut }: { user?: ShellUser; onSignOut?
  * above the row instead, which sits at the bottom of the sheet.
  *
  * It follows Vercel's: the person heads it and opens their profile
- * (Settings); then Theme, Documentation and Log out.
- * Nothing else repeats a Settings page. `Feedback` is parked: it has no
+ * (`/account`, apart from the root Settings, D41); then Theme, Documentation
+ * and Log out. Nothing else repeats a Settings page. `Feedback` is parked: it has no
  * destination yet, and a row that does nothing reads as broken.
  */
 function AccountMenuContent({ user, onSignOut }: { user?: ShellUser; onSignOut?: () => void }) {
@@ -191,7 +191,7 @@ function AccountMenuContent({ user, onSignOut }: { user?: ShellUser; onSignOut?:
     >
       <DropdownMenuGroup className="p-1">
         <DropdownMenuItem asChild className="flex-col items-start gap-1 py-2">
-          <Link to="/settings/profile">
+          <Link to="/account">
             <span className="max-w-full truncate text-sm font-medium">{name}</span>
             {second && (
               <span className="max-w-full truncate text-xs leading-none text-muted-foreground">

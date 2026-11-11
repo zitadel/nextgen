@@ -47,6 +47,11 @@
 > example and the first consequence (one Console artifact for cloud and
 > self-host) hold only for the surfaces both builds share. Those still render
 > from effective permissions.
+>
+> **Amendment (2026-11-11) — [D41](../../../../docs/design/decisions.md):**
+> the reserved platform project is the Console's root level, not a project to
+> select. The runtime document names it (§3), and its surfaces render at the
+> root from effective permissions on it (§5).
 
 ## Context
 
@@ -273,6 +278,30 @@ it does not choose a different Console login project and does not grant access.
 > preferred a default selection among the operator's projects; the default is
 > now their only project, or none.
 
+> **Amendment (2026-11-11, D41):** the document carries one more
+> sign-in fact, whether the sign-in target is the reserved platform project:
+>
+> ```json
+> { "mode": "standalone", "console_project_id": "proj_platform",
+>   "publishable_key": "pk_proj_...", "platform_project_id": "proj_platform" }
+> ```
+>
+> `platform_project_id` is present only when `console_project_id` names the
+> project bootstrap provisioned (§2), and then equals it. Until the cutover
+> the server derives it from the built-in id, which only the bootstrap
+> provisioner writes and `POST /projects` never mints. The pin to an ordinary
+> project and the first-created fallback leave it out, so the transitional
+> caveat above changes nothing for a self-hoster: with no
+> `platform_project_id` the Console hides no project and shows no root
+> surface. At cutover it is always present once bootstrap has run. The
+> Console reads the reserved project's id from this field only, never from a
+> written id, and never infers it from `console_project_id` alone.
+>
+> The Console never selects the reserved project: its lists ask
+> `listMyProjects` with `exclude_platform`, and a `?project=` naming it is
+> dropped. Without the parameter, `listMyProjects` is unchanged (root ADR 075
+> §6).
+
 ### 4. The embedded Console uses a first-party session credential
 
 The Console performs same-origin API calls with its HttpOnly
@@ -325,6 +354,17 @@ export const Route = createFileRoute("/_authed/billing/")({
 
 The sidebar and a route guard hide unavailable routes, but UI gating is never
 authorization. Each API operation performs its own target-scoped check.
+
+> **Amendment (2026-11-11, D41):** the reserved platform project's
+> surfaces (its people, how they sign in, its audit log) are root surfaces,
+> listed in the root Settings, and the same rule governs them, with the
+> reserved project as the target. They are listed when the signed-in person
+> can act on that project, which the Console learns by reading it
+> (`GET /projects/{platform_project_id}`) until effective permissions are
+> exposed. Each page's own reads then decide what it shows. Being signed in
+> to the reserved project, or homed in it, lists none of them: §1's control
+> project grants nothing by itself, and root ADR 075's operators reach these
+> surfaces through `operator from platform`, as they reach every project.
 
 ### 6. Standalone and platform differ in defaults, not primitives
 

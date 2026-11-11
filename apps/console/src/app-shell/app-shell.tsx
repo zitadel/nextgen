@@ -92,12 +92,16 @@ export function AppShell({
 /** The console's home: Projects, the list of every project. */
 const HOME_ROUTE = "/_authed/projects/";
 
+/** The person's profile, which the account menu opens (D41). */
+const ACCOUNT_ROUTE = "/_authed/account/";
+
 /** Events, whose list replaces the project's on the screen and under an event's drawer. */
 const EVENTS_PATH = "/events";
 
 /**
  * Which of the sidebar's lists is showing, and the **route** decides:
- * Projects is above every project, so it lists the account's screens;
+ * Projects is above every project, so it lists the account's screens, and
+ * so does the person's profile (`/account`, D41);
  * `/settings` with anything beneath it lists Settings' pages (D29); `/project`
  * with anything beneath it lists the selected project's Settings pages (D40);
  * `/events` with anything beneath it lists Events' views and filters (D30);
@@ -109,10 +113,12 @@ const EVENTS_PATH = "/events";
 function useShellView(): NavView {
   const matchRoute = useMatchRoute();
   const atHome = !!useMatch({ from: HOME_ROUTE, shouldThrow: false });
+  // The person's profile is above every project too (D41), with no row of its own.
+  const atAccount = !!useMatch({ from: ACCOUNT_ROUTE, shouldThrow: false });
   if (matchRoute({ to: SETTINGS_PATH, fuzzy: true })) return "settings";
   if (matchRoute({ to: PROJECT_SETTINGS_PATH, fuzzy: true })) return "project-settings";
   if (matchRoute({ to: EVENTS_PATH, fuzzy: true })) return "events";
-  return atHome ? "account" : "portal";
+  return atHome || atAccount ? "account" : "portal";
 }
 
 /**
@@ -233,7 +239,8 @@ const NAV_LABEL: Record<NavView, string> = {
 function NavList({ view }: { view: NavView }) {
   const own = useNavItems(view);
   const project = useNavItems("portal");
-  const items = view === "account" ? accountListItems(own, project) : own;
+  const settings = useNavItems("settings");
+  const items = view === "account" ? accountListItems(own, project, settings) : own;
   // On Projects' way to a screen (`?next=`), that screen's row is the marked one.
   const requested = useRequestedNavItem(project);
   const matchRoute = useMatchRoute();

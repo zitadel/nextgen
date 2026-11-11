@@ -200,3 +200,19 @@ export function passwordState(setAt: string | null | undefined): string {
   if (setAt === undefined) return "Could not be loaded";
   return setAt === null ? "Not set" : `Set ${formatDateTime(setAt)}`;
 }
+
+/**
+ * The Authentication screen's search. The open tab is in the URL (`?tab=`),
+ * so a reload or a shared link opens the same one.
+ */
+export interface AuthenticationSearch {
+  /** `identity-providers`, or absent for the default Sign-in methods tab. */
+  tab?: "identity-providers";
+}
+
+/** `validateSearch` of the project's Authentication screen and the root's (D41). */
+export function validateAuthenticationSearch(
+  search: Record<string, unknown>,
+): AuthenticationSearch {
+  return search.tab === "identity-providers" ? { tab: "identity-providers" } : {};
+}

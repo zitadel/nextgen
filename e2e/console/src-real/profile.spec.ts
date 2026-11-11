@@ -4,7 +4,7 @@ import { expectNoErrorBoundary } from "../support/screens";
 import { signIn } from "../support/sign-in";
 
 /**
- * Settings → Profile, against a real instance.
+ * Profile (`/account`, D41), against a real instance.
  *
  * The unit spec stubs `GET /users/me`. This proves the signed-in person's own
  * record reaches the screen through the session cookie alone: the email shown
@@ -17,7 +17,7 @@ test("shows the signed-in person's email, read-only", async ({ page, zitadel, se
   const user = await seed.user();
   await signIn(page, zitadel, user);
 
-  await page.goto("/settings/profile");
+  await page.goto("/account");
 
   await expect(page.getByRole("heading", { name: "Profile", exact: true })).toBeVisible();
 
@@ -25,20 +25,14 @@ test("shows the signed-in person's email, read-only", async ({ page, zitadel, se
   await expect(email).toHaveValue(user.email);
   await expect(email).toBeDisabled();
 
-  const nav = page.getByRole("navigation", { name: "Settings" });
-  await expect(nav.getByRole("link", { name: "Profile" })).toHaveAttribute("aria-current", "page");
-  // Above every project the person's one project stays selected, so the pill
-  // still names it (D36). The list's heading leads back up to the account's
-  // list, which Projects heads.
+  // Above every project, apart from the root Settings: the account's list,
+  // with no row of its own. The person's one project stays selected, so the
+  // pill still names it (D36).
+  const account = page.getByRole("navigation", { name: "Account" });
+  await expect(account.getByRole("link", { name: "Projects" })).toBeVisible();
+  await expect(account.getByRole("link", { name: "Profile" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Switch project" })).not.toHaveText(
     /All projects|Select a project|No projects/,
   );
-  await nav.getByRole("link", { name: "Settings: back to Projects" }).click();
-  const account = page.getByRole("navigation", { name: "Account" });
-  await expect(account.getByRole("link", { name: "Projects" })).toHaveAttribute(
-    "aria-current",
-    "page",
-  );
-  await expect(account.getByRole("link", { name: "Settings" })).toBeVisible();
   await expectNoErrorBoundary(page);
 });

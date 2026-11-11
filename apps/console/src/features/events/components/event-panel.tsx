@@ -1,4 +1,5 @@
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link, type LinkProps, useNavigate } from "@tanstack/react-router";
+import { ApiError } from "@zitadel/api/runtime/fetch";
 import { ChevronDown, ChevronUp, Loader2 } from "lucide-react";
 import { createContext, type ReactNode, useContext, useEffect } from "react";
 
@@ -8,6 +9,7 @@ import { SECTION_HEADING } from "@/components/typography";
 import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/components/ui/copy-button";
 import { Sheet, SheetContent, SheetDescription } from "@/components/ui/sheet";
+import { describeError } from "@/lib/api-error";
 import { formatClockTime, formatEventTime } from "@/lib/date";
 import { cn } from "@/lib/utils";
 
@@ -22,15 +24,43 @@ import {
 } from "../model";
 import { EventSubject } from "./event-subject";
 
+/** Where one of an events list's links leads. */
+export type EventLink = Pick<LinkProps, "to" | "params" | "search">;
+
 /**
- * The rows the Events list draws, in its order, and the filters it is under:
- * what the event panel steps through and keeps when it opens another event.
- * The list provides it; the panel beside it reads it.
+ * Where an events list's links lead, which the route that draws it knows: the
+ * project's Events (`/events`) or the root's Audit log (`/settings/audit-log`,
+ * D41). The list and the drawer over it link only through these, so each
+ * stays on its own route.
  */
-export const EventRowsContext = createContext<{ rows: ProjectEvent[]; search: EventsSearch }>({
-  rows: [],
-  search: { view: "audit" },
-});
+export interface EventLinks {
+  /** An event of the list, open in the drawer over it, under the list's filters. */
+  event: (eventId: string) => EventLink;
+  /** The list with no event open: where the drawer closes to. */
+  list: EventLink;
+  /**
+   * The list under other filters: what a row's menu and the drawer's Related
+   * events narrow it to. Unset for a list that has none to set (the root's
+   * Audit log, D41), which then offers no way to narrow it.
+   */
+  filtered?: (search: EventsSearch) => EventLink;
+}
+
+/**
+ * The rows an events list draws, in its order, and where its links lead: what
+ * the event panel steps through, and how it opens another event without
+ * leaving the list's route. The list provides it; the panel beside it reads it.
+ */
+export const EventRowsContext = createContext<
+  { rows: ProjectEvent[]; links: EventLinks } | undefined
+>(undefined);
+
+/** The list the panel is drawn over; the panel is only ever drawn inside one. */
+function useEventRows() {
+  const list = useContext(EventRowsContext);
+  if (!list) throw new Error("An event panel is drawn over an events list (EventRowsContext).");
+  return list;
+}
 
 /**
  * The drawer an event opens in, over the right of the Events list, as Vercel's
@@ -88,6 +118,23 @@ export function EventPanelPending() {
   );
 }
 
+/**
+ * The drawer when its event cannot be read: gone (retention deletes events by
+ * age, so a kept link can outlive one), never this list's, or the server
+ * failed. `notFound` says which list holds no such event. Its close leads back
+ * to the list.
+ */
+export function EventPanelError({ error, notFound }: { error: unknown; notFound: string }) {
+  if (error instanceof ApiError && error.status === 404) {
+    return <EventPanelMessage title="Event not found">{notFound}</EventPanelMessage>;
+  }
+  return (
+    <EventPanelMessage title="Event">
+      {describeError(error, "Could not load this event.")}
+    </EventPanelMessage>
+  );
+}
+
 /** Whether a key press belongs to a field, where the arrow keys move the caret. */
 function typing(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -105,7 +152,9 @@ function typing(target: EventTarget | null): boolean {
  *
  * The arrows in its header, and ↑ and ↓ (or k and j) anywhere but a field,
  * open the previous and next row of the list. At the last row loaded they
- * stop: `Load more` is the list's.
+ * stop: `Load more` is the list's. Where the list has no filters to set (the
+ * root's Audit log, D41), it offers none either: no Related events, and the
+ * request's steps open in the same drawer.
  */
 export function EventPanel({
   event,
@@ -115,7 +164,7 @@ export function EventPanel({
   /** Its request's events, oldest first, when it was made by one. */
   request?: { items: ProjectEvent[]; more: boolean };
 }) {
-  const { rows, search } = useContext(EventRowsContext);
+  const { rows, links } = useEventRows();
   const navigate = useNavigate();
   const index = rows.findIndex((row) => row.id === event.id);
   const previous = index > 0 ? rows[index - 1] : undefined;
@@ -123,7 +172,7 @@ export function EventPanel({
 
   const open = (target: ProjectEvent | undefined) => {
     if (!target) return;
-    void navigate({ to: "/events/$eventId", params: { eventId: target.id }, search });
+    void navigate(links.event(target.id));
   };
 
   useEffect(() => {
@@ -139,14 +188,15 @@ export function EventPanel({
             : undefined;
       if (!step) return;
       keyEvent.preventDefault();
-      void navigate({ to: "/events/$eventId", params: { eventId: step.id }, search });
+      void navigate(links.event(step.id));
     }
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [previous, next, navigate, search]);
+  }, [previous, next, navigate, links]);
 
   const fields = eventFields(event);
   const related = eventFilterValues(event);
+  const { filtered } = links;
 
   return (
     <>
@@ -206,10 +256,9 @@ export function EventPanel({
                 <RequestStep key={step.id} event={step} current={step.id === event.id} />
               ))}
             </ol>
-            {request.more && event.request_id && (
+            {request.more && event.request_id && filtered && (
               <Link
-                to="/events"
-                search={sharing("request", event.request_id)}
+                {...filtered(sharing("request", event.request_id))}
                 className="text-sm underline underline-offset-4"
               >
                 List all of this request’s events
@@ -228,26 +277,24 @@ export function EventPanel({
           </PanelSection>
         )}
 
-        <PanelSection title="Related events">
-          <ul className="flex flex-wrap gap-2">
-            {related.map(({ filter, value }) => (
-              <li key={filter.key}>
+        {filtered && (
+          <PanelSection title="Related events">
+            <ul className="flex flex-wrap gap-2">
+              {related.map(({ filter, value }) => (
+                <li key={filter.key}>
+                  <Button asChild variant="outline" size="sm">
+                    <Link {...filtered(sharing(filter.key, value))}>Same {filter.name}</Link>
+                  </Button>
+                </li>
+              ))}
+              <li>
                 <Button asChild variant="outline" size="sm">
-                  <Link to="/events" search={sharing(filter.key, value)}>
-                    Same {filter.name}
-                  </Link>
+                  <Link {...filtered(around(event))}>Around this time</Link>
                 </Button>
               </li>
-            ))}
-            <li>
-              <Button asChild variant="outline" size="sm">
-                <Link to="/events" search={around(event)}>
-                  Around this time
-                </Link>
-              </Button>
-            </li>
-          </ul>
-        </PanelSection>
+            </ul>
+          </PanelSection>
+        )}
 
         <PanelSection title="Document">
           <DocumentViewer document={event} noun="event" cliHint={false} />
@@ -291,7 +338,7 @@ function PanelSection({ title, children }: { title: string; children: ReactNode 
  * a link; the others open in the drawer.
  */
 function RequestStep({ event, current }: { event: ProjectEvent; current: boolean }) {
-  const { search } = useContext(EventRowsContext);
+  const { links } = useEventRows();
   const line = (
     <>
       <time dateTime={event.occurred_at} className="text-muted-foreground shrink-0 tabular-nums">
@@ -313,12 +360,7 @@ function RequestStep({ event, current }: { event: ProjectEvent; current: boolean
           {line}
         </div>
       ) : (
-        <Link
-          to="/events/$eventId"
-          params={{ eventId: event.id }}
-          search={search}
-          className={cn(row, "hover:bg-muted/60")}
-        >
+        <Link {...links.event(event.id)} className={cn(row, "hover:bg-muted/60")}>
           {line}
         </Link>
       )}

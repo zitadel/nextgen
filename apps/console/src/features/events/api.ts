@@ -4,7 +4,7 @@ import { LIST_PAGE_SIZE } from "@/lib/paging";
 import { eventsQuery, type ProjectEvent, type EventsSearch } from "./model";
 
 /** One page of a project's events, newest first. */
-interface EventPage {
+export interface EventPage {
   items: ProjectEvent[];
   nextPageToken?: string;
 }

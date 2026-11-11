@@ -31,6 +31,7 @@ import { useSubmit } from "@/hooks/use-submit";
 import { describeError, errorFieldNames } from "@/lib/api-error";
 import { useRequiredProjectScope } from "@/features/projects/project-scope";
 import type { SchemaRevision, UserSchema, ValueField } from "@/features/schemas/model";
+import type { UserLinks } from "@/features/users/links";
 import {
   attributeJson,
   formRoot,
@@ -95,6 +96,7 @@ async function dryRunMove(
 export function UserRevisionSheet({
   children,
   userId,
+  detail,
   attributes,
   currentId,
   currentSchema,
@@ -106,6 +108,8 @@ export function UserRevisionSheet({
   /** The trigger. */
   children: ReactNode;
   userId: string;
+  /** The user's page, which a long list of kept attributes points to. */
+  detail: UserLinks["detail"];
   attributes: Record<string, unknown>;
   /** The revision the user is on. */
   currentId: string;
@@ -122,6 +126,7 @@ export function UserRevisionSheet({
       {(close) => (
         <RevisionForm
           userId={userId}
+          detail={detail}
           attributes={attributes}
           currentId={currentId}
           currentSchema={currentSchema}
@@ -138,6 +143,7 @@ export function UserRevisionSheet({
 
 function RevisionForm({
   userId,
+  detail,
   attributes,
   currentId,
   currentSchema,
@@ -148,6 +154,7 @@ function RevisionForm({
   onClose,
 }: {
   userId: string;
+  detail: UserLinks["detail"];
   attributes: Record<string, unknown>;
   currentId: string;
   currentSchema: UserSchema;
@@ -442,7 +449,12 @@ function RevisionForm({
                     : `${keptCount} attributes stay the same`}
                 </CollapsibleTrigger>
                 <CollapsibleContent className="rounded-md border border-input">
-                  <AttributeFields attributes={kept} schema={target} userId={userId} />
+                  <AttributeFields
+                    attributes={kept}
+                    schema={target}
+                    userId={userId}
+                    detail={detail}
+                  />
                 </CollapsibleContent>
               </Collapsible>
             )}

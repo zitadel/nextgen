@@ -8,6 +8,14 @@ import { sessionCached } from "@/lib/session-cache";
 import { type ProjectRef, toProjectRef } from "./model";
 
 /**
+ * Every list of the person's projects leaves out the reserved platform project
+ * (D41): the console draws it at the root and never offers it as a project.
+ * The server excludes it only where the deployment has one, so a pinned
+ * ordinary project stays listed.
+ */
+const CUSTOMER_PROJECTS = { exclude_platform: true } as const;
+
+/**
  * `GET /users/me/projects`, shared by the `_authed` guard and the project
  * switcher: on a landing both need it, and one request answers both. The
  * Projects screen pages the list itself and does not use this. Like that
@@ -16,7 +24,7 @@ import { type ProjectRef, toProjectRef } from "./model";
  * person's projects.
  */
 export const listMyProjectsCached = sessionCached(
-  () => api.listMyProjects(consoleSessionProject()),
+  () => api.listMyProjects({ ...CUSTOMER_PROJECTS, ...consoleSessionProject() }),
   15_000,
 );
 
@@ -52,6 +60,7 @@ export async function searchMyProjects(nameContains: string, limit: number): Pro
   const page = await api.listMyProjects({
     name_contains: nameContains,
     limit,
+    ...CUSTOMER_PROJECTS,
     ...consoleSessionProject(),
   });
   return page.projects.map(toProjectRef);
@@ -104,6 +113,7 @@ export async function listProjectsPage(q: string | undefined, pageToken?: string
     page_token: pageToken,
     order: NEWEST_FIRST,
     name_contains: q,
+    ...CUSTOMER_PROJECTS,
     ...consoleSessionProject(),
   });
   return { projects: page.projects, nextPageToken: page.next_page_token ?? undefined, q };

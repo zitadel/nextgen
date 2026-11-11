@@ -12,6 +12,7 @@ import {
   countRows,
 } from "@/features/users/attribute-fields";
 import { type UserSchema, resolveSchemaPath } from "@/features/schemas/model";
+import type { UserLinks } from "@/features/users/links";
 import { cn } from "@/lib/utils";
 
 /**
@@ -37,10 +38,13 @@ export function AttributeFields({
   attributes,
   schema,
   userId,
+  detail,
 }: {
   attributes: Record<string, unknown>;
   schema?: UserSchema;
   userId: string;
+  /** The user's page, which a list past `ROW_CAP` rows points to. */
+  detail: UserLinks["detail"];
 }) {
   const [path, setPath] = useState<string[]>([]);
   // A path goes stale only if the user changes underneath an open popover;
@@ -64,7 +68,7 @@ export function AttributeFields({
       )}
       {total > ROW_CAP && (
         <Link
-          to="/users/$userId"
+          to={detail}
           params={{ userId }}
           className="text-foreground self-start text-xs underline-offset-2 hover:underline"
         >
