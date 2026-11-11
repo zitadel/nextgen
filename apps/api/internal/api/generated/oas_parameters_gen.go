@@ -13940,8 +13940,9 @@ func decodeRollbackDeploymentParams(args [1]string, argsEscaped bool, r *http.Re
 
 // SearchParams is parameters of search operation.
 type SearchParams struct {
-	// The project the request addresses, by the `id` that `createProject` (`POST /projects`)
-	// returns. Omit it to address the credential's own project.
+	// The project to search, by the `id` that `createProject` (`POST /projects`)
+	// returns. Omit it to search the credential's own project with a project
+	// secret, or the projects the person can act on with a session.
 	ProjectID OptProjectID `json:",omitempty,omitzero"`
 }
 

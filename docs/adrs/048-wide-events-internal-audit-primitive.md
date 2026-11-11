@@ -633,7 +633,7 @@ When exporting to OTEL, the projector maps: `request_id → trace_id`,
 ## Amendment (2026-11-10): indexes for the reads the console makes
 
 §1 kept one secondary index, `(project_id, created_at, id)`, and deferred the
-rest until a query path was measured. The console's Logs screen is that path:
+rest until a query path was measured. The console's Events screen is that path:
 it opens on a project's audit events, every category but `request`, narrows
 them by type, actor or resource, and follows one request, session or login
 flow from an event. The one index serves none of those. A filtered
@@ -785,7 +785,7 @@ met the batch's own rows and logged it as dropped.
 
 ## Amendment (2026-11-10): the resource type, and API requests by operation and status
 
-The console's Logs screen also narrows its list to one type of resource, and
+The console's Events screen also narrows its list to one type of resource, and
 the API requests to one operation or to the failed ones. The first amendment
 left the resource type matched over a budget, and a request's operation and
 status were only in its payload, which no index holds.

@@ -47,6 +47,14 @@ describe("fieldPaths", () => {
     expect(allows(paths, "category")).toBe(true);
   });
 
+  it("reads each variant's own payload, not only the last variant's", () => {
+    const paths = pathsOf(ListEventsResponse.shape.data.element);
+    expect(allows(paths, "payload.operation_id")).toBe(true);
+    expect(allows(paths, "payload.status")).toBe(true);
+    expect(allows(paths, "payload.kind")).toBe(true);
+    expect(allows(paths, "payload.nope")).toBe(false);
+  });
+
   it("suggests the known paths and marks the open ones", () => {
     const suggestions = suggestable(userPaths);
     expect(suggestions).toContain("metadata.status");

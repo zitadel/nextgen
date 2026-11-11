@@ -5140,7 +5140,7 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 							switch method {
 							case "POST":
 								r.name = SearchOperation
-								r.summary = "Search a project"
+								r.summary = "Search projects"
 								r.operationID = "search"
 								r.operationGroup = ""
 								r.pathPattern = "/search"

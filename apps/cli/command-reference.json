@@ -3732,6 +3732,17 @@
           "char": "f",
           "description": "Call an operation that deletes, revokes or rolls back without the confirmation prompt. Required when non-interactive.",
           "type": "boolean"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
+          "type": "option"
         }
       ],
       "examples": [

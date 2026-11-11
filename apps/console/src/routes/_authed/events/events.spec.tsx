@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { _resetLiveForTesting } from "@/features/events/use-live-events";
-import { formatLogTime } from "@/lib/date";
+import { formatEventTime } from "@/lib/date";
 import { scopedPath } from "@/test/project-scope.fixture";
 import { server } from "@/test/msw";
 import { createAppRouter } from "../../../router";
@@ -148,25 +148,25 @@ async function renderAt(path: string) {
   return router;
 }
 
-/** The Logs list of the sidebar: the heading back, then the view picker. */
-async function logsNav() {
-  return within(await screen.findByRole("navigation", { name: "Logs" }));
+/** The Events list of the sidebar: the heading back, then the view picker. */
+async function eventsNav() {
+  return within(await screen.findByRole("navigation", { name: "Events" }));
 }
 
 /** The sidebar's view picker, which names the view the list is in. */
 async function viewPicker(view: string) {
-  return (await logsNav()).getByRole("button", { name: `View: ${view}` });
+  return (await eventsNav()).getByRole("button", { name: `View: ${view}` });
 }
 
 /** Chooses a view from the sidebar's picker. */
 async function chooseView(view: string) {
-  await userEvent.click((await logsNav()).getByRole("button", { name: /^View: / }));
+  await userEvent.click((await eventsNav()).getByRole("button", { name: /^View: / }));
   await userEvent.click(await screen.findByRole("menuitem", { name: new RegExp(`^${view}`) }));
 }
 
 /** The search above the table, where pasted values narrow the list. */
 const find = () =>
-  screen.findByRole("searchbox", { name: "Search logs by ID, event type or operation" });
+  screen.findByRole("searchbox", { name: "Search events by ID, event type or operation" });
 
 /** Types a term into the search and applies it. */
 async function searchFor(term: string) {
@@ -201,12 +201,12 @@ function expectServed(query: URLSearchParams | undefined) {
   if (categories.includes("request")) expect(categories).toEqual(["request"]);
 }
 
-describe("logs", () => {
+describe("events", () => {
   it("opens on the audit events, and says so when the project has none", async () => {
     const queries = serveEvents({ data: [] });
     await renderAt("/events");
 
-    expect(await screen.findByRole("heading", { name: "Logs" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Events" })).toBeInTheDocument();
     expect(await viewPicker("Audit events")).toBeInTheDocument();
     expect(screen.getByText("This project has no audit events.")).toBeInTheDocument();
     // The selected project's events, a page at a time, without the API
@@ -251,7 +251,7 @@ describe("logs", () => {
     );
     expect(first.getByText("DELETE deleteUser")).toBeInTheDocument();
     expect(first.getByText("204")).toBeInTheDocument();
-    expect(first.getByText(formatLogTime(OCCURRED_AT))).toBeInTheDocument();
+    expect(first.getByText(formatEventTime(OCCURRED_AT))).toBeInTheDocument();
 
     // Any other event reads as the record it touched, and who caused it.
     const second = within(changeRow as HTMLElement);
@@ -564,7 +564,7 @@ describe("logs", () => {
   });
 });
 
-describe("logs views", () => {
+describe("events views", () => {
   it("chooses the view from a picker in the sidebar, in place of the project's screens", async () => {
     serveEvents({ data: [] });
     await renderAt("/events");
@@ -619,7 +619,7 @@ describe("logs views", () => {
   });
 });
 
-describe("logs filters", () => {
+describe("events filters", () => {
   it("narrows the audit events to one category, and back to all of them", async () => {
     const queries = serveEvents({ data: [event("evt_1")] });
     const router = await renderAt("/events");
@@ -1071,7 +1071,7 @@ describe("logs filters", () => {
   });
 });
 
-describe("logs search", () => {
+describe("events search", () => {
   it("says in the field what it takes", async () => {
     serveEvents({ data: [] });
     await renderAt("/events");
@@ -1194,7 +1194,7 @@ describe("logs search", () => {
   });
 });
 
-describe("logs with the sidebar as an icon rail", () => {
+describe("events with the sidebar as an icon rail", () => {
   afterEach(() => {
     // biome-ignore lint/suspicious/noDocumentCookie: the sidebar keeps its state in this cookie
     document.cookie = "sidebar_state=; path=/; max-age=0";
@@ -1205,7 +1205,7 @@ describe("logs with the sidebar as an icon rail", () => {
     serveEvents({ data: [] });
     await renderAt("/events");
 
-    await screen.findByRole("heading", { name: "Logs" });
+    await screen.findByRole("heading", { name: "Events" });
     expect(screen.queryByRole("button", { name: /^Views and filters/ })).not.toBeInTheDocument();
   });
 
@@ -1247,7 +1247,7 @@ describe("logs with the sidebar as an icon rail", () => {
       await screen.findByRole("button", { name: "Views and filters: Audit events" }),
     );
 
-    // The whole Logs list, over the page: its view picker and its filters.
+    // The whole Events list, over the page: its view picker and its filters.
     const sheet = within(await screen.findByRole("dialog"));
     expect(sheet.getByRole("group", { name: "Filters" })).toBeInTheDocument();
     await userEvent.click(sheet.getByRole("button", { name: "View: Audit events" }));
@@ -1275,7 +1275,7 @@ describe("event drawer", () => {
     expect(queries[0]?.get("project_id")).toBe("proj_test");
     expect(panel.getByText("evt_1")).toBeInTheDocument();
     expect(panel.getByRole("button", { name: "Copy Event ID" })).toBeInTheDocument();
-    expect(panel.getByText(formatLogTime(OCCURRED_AT))).toBeInTheDocument();
+    expect(panel.getByText(formatEventTime(OCCURRED_AT))).toBeInTheDocument();
 
     const details = within(
       panel.getByRole("heading", { name: "Details" }).closest("section") as HTMLElement,
@@ -1349,7 +1349,7 @@ describe("event drawer", () => {
     await waitFor(() => expect(queries.at(-1)?.getAll("category")).toEqual(["auth"]));
   });
 
-  it("says the event is gone when the project does not hold it, and closes back to Logs", async () => {
+  it("says the event is gone when the project does not hold it, and closes back to Events", async () => {
     // The loader error is expected: silence the error boundary's dump and the
     // router's route-match warning.
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);

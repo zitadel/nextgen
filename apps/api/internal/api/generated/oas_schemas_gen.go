@@ -72525,6 +72525,52 @@ func (o OptSessTokenCreationFailedDetails) Or(d SessTokenCreationFailedDetails) 
 	return d
 }
 
+// NewOptSessTokenInvalidDetails returns new OptSessTokenInvalidDetails with value set to v.
+func NewOptSessTokenInvalidDetails(v SessTokenInvalidDetails) OptSessTokenInvalidDetails {
+	return OptSessTokenInvalidDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptSessTokenInvalidDetails is optional SessTokenInvalidDetails.
+type OptSessTokenInvalidDetails struct {
+	Value SessTokenInvalidDetails
+	Set   bool
+}
+
+// IsSet returns true if OptSessTokenInvalidDetails was set.
+func (o OptSessTokenInvalidDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptSessTokenInvalidDetails) Reset() {
+	var v SessTokenInvalidDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptSessTokenInvalidDetails) SetTo(v SessTokenInvalidDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptSessTokenInvalidDetails) Get() (v SessTokenInvalidDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptSessTokenInvalidDetails) Or(d SessTokenInvalidDetails) SessTokenInvalidDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptSessionDeletedEventDelegationType returns new OptSessionDeletedEventDelegationType with value set to v.
 func NewOptSessionDeletedEventDelegationType(v SessionDeletedEventDelegationType) OptSessionDeletedEventDelegationType {
 	return OptSessionDeletedEventDelegationType{
@@ -93614,24 +93660,16 @@ type SearchErrorResponse struct {
 	AuthCsrfInvalid         AuthCsrfInvalid
 	AuthUnauthorized        AuthUnauthorized
 	FlowdefInvalid          FlowdefInvalid
-	FlowdefNotFound         FlowdefNotFound
-	FlowdefPermissionDenied FlowdefPermissionDenied
-	IdpNotFound             IdpNotFound
-	IdpPermissionDenied     IdpPermissionDenied
 	Internal                Internal
-	SchNotFound             SchNotFound
-	SchPermissionDenied     SchPermissionDenied
 	FlowdefMissingProjectID FlowdefMissingProjectID
 	NotImplemented          NotImplemented
 	ProjNotFound            ProjNotFound
 	ProjPermissionDenied    ProjPermissionDenied
 	ReqInvalid              ReqInvalid
-	TeamTeamNotFound        TeamTeamNotFound
-	TeamPermissionDenied    TeamPermissionDenied
+	SessProjectMismatch     SessProjectMismatch
+	SessTokenInvalid        SessTokenInvalid
 	TeamProjectNotFound     TeamProjectNotFound
 	Unavailable             Unavailable
-	UserNotFound            UserNotFound
-	UserPermissionDenied    UserPermissionDenied
 }
 
 // SearchErrorResponseType is oneOf type of SearchErrorResponse.
@@ -93642,24 +93680,16 @@ const (
 	AuthCsrfInvalidSearchErrorResponse         SearchErrorResponseType = "auth.csrf_invalid"
 	AuthUnauthorizedSearchErrorResponse        SearchErrorResponseType = "auth.unauthorized"
 	FlowdefInvalidSearchErrorResponse          SearchErrorResponseType = "flowdef.invalid"
-	FlowdefNotFoundSearchErrorResponse         SearchErrorResponseType = "flowdef.not_found"
-	FlowdefPermissionDeniedSearchErrorResponse SearchErrorResponseType = "flowdef.permission_denied"
-	IdpNotFoundSearchErrorResponse             SearchErrorResponseType = "idp.not_found"
-	IdpPermissionDeniedSearchErrorResponse     SearchErrorResponseType = "idp.permission_denied"
 	InternalSearchErrorResponse                SearchErrorResponseType = "internal"
-	SchNotFoundSearchErrorResponse             SearchErrorResponseType = "sch.not_found"
-	SchPermissionDeniedSearchErrorResponse     SearchErrorResponseType = "sch.permission_denied"
 	FlowdefMissingProjectIDSearchErrorResponse SearchErrorResponseType = "flowdef.missing_project_id"
 	NotImplementedSearchErrorResponse          SearchErrorResponseType = "not_implemented"
 	ProjNotFoundSearchErrorResponse            SearchErrorResponseType = "proj.not_found"
 	ProjPermissionDeniedSearchErrorResponse    SearchErrorResponseType = "proj.permission_denied"
 	ReqInvalidSearchErrorResponse              SearchErrorResponseType = "req.invalid"
-	TeamTeamNotFoundSearchErrorResponse        SearchErrorResponseType = "team.team_not_found"
-	TeamPermissionDeniedSearchErrorResponse    SearchErrorResponseType = "team.permission_denied"
+	SessProjectMismatchSearchErrorResponse     SearchErrorResponseType = "sess.project_mismatch"
+	SessTokenInvalidSearchErrorResponse        SearchErrorResponseType = "sess.token_invalid"
 	TeamProjectNotFoundSearchErrorResponse     SearchErrorResponseType = "team.project_not_found"
 	UnavailableSearchErrorResponse             SearchErrorResponseType = "unavailable"
-	UserNotFoundSearchErrorResponse            SearchErrorResponseType = "user.not_found"
-	UserPermissionDeniedSearchErrorResponse    SearchErrorResponseType = "user.permission_denied"
 )
 
 // IsAuthCsrfInvalid reports whether SearchErrorResponse is AuthCsrfInvalid.
@@ -93677,34 +93707,8 @@ func (s SearchErrorResponse) IsFlowdefInvalid() bool {
 	return s.Type == FlowdefInvalidSearchErrorResponse
 }
 
-// IsFlowdefNotFound reports whether SearchErrorResponse is FlowdefNotFound.
-func (s SearchErrorResponse) IsFlowdefNotFound() bool {
-	return s.Type == FlowdefNotFoundSearchErrorResponse
-}
-
-// IsFlowdefPermissionDenied reports whether SearchErrorResponse is FlowdefPermissionDenied.
-func (s SearchErrorResponse) IsFlowdefPermissionDenied() bool {
-	return s.Type == FlowdefPermissionDeniedSearchErrorResponse
-}
-
-// IsIdpNotFound reports whether SearchErrorResponse is IdpNotFound.
-func (s SearchErrorResponse) IsIdpNotFound() bool { return s.Type == IdpNotFoundSearchErrorResponse }
-
-// IsIdpPermissionDenied reports whether SearchErrorResponse is IdpPermissionDenied.
-func (s SearchErrorResponse) IsIdpPermissionDenied() bool {
-	return s.Type == IdpPermissionDeniedSearchErrorResponse
-}
-
 // IsInternal reports whether SearchErrorResponse is Internal.
 func (s SearchErrorResponse) IsInternal() bool { return s.Type == InternalSearchErrorResponse }
-
-// IsSchNotFound reports whether SearchErrorResponse is SchNotFound.
-func (s SearchErrorResponse) IsSchNotFound() bool { return s.Type == SchNotFoundSearchErrorResponse }
-
-// IsSchPermissionDenied reports whether SearchErrorResponse is SchPermissionDenied.
-func (s SearchErrorResponse) IsSchPermissionDenied() bool {
-	return s.Type == SchPermissionDeniedSearchErrorResponse
-}
 
 // IsFlowdefMissingProjectID reports whether SearchErrorResponse is FlowdefMissingProjectID.
 func (s SearchErrorResponse) IsFlowdefMissingProjectID() bool {
@@ -93727,14 +93731,14 @@ func (s SearchErrorResponse) IsProjPermissionDenied() bool {
 // IsReqInvalid reports whether SearchErrorResponse is ReqInvalid.
 func (s SearchErrorResponse) IsReqInvalid() bool { return s.Type == ReqInvalidSearchErrorResponse }
 
-// IsTeamTeamNotFound reports whether SearchErrorResponse is TeamTeamNotFound.
-func (s SearchErrorResponse) IsTeamTeamNotFound() bool {
-	return s.Type == TeamTeamNotFoundSearchErrorResponse
+// IsSessProjectMismatch reports whether SearchErrorResponse is SessProjectMismatch.
+func (s SearchErrorResponse) IsSessProjectMismatch() bool {
+	return s.Type == SessProjectMismatchSearchErrorResponse
 }
 
-// IsTeamPermissionDenied reports whether SearchErrorResponse is TeamPermissionDenied.
-func (s SearchErrorResponse) IsTeamPermissionDenied() bool {
-	return s.Type == TeamPermissionDeniedSearchErrorResponse
+// IsSessTokenInvalid reports whether SearchErrorResponse is SessTokenInvalid.
+func (s SearchErrorResponse) IsSessTokenInvalid() bool {
+	return s.Type == SessTokenInvalidSearchErrorResponse
 }
 
 // IsTeamProjectNotFound reports whether SearchErrorResponse is TeamProjectNotFound.
@@ -93744,14 +93748,6 @@ func (s SearchErrorResponse) IsTeamProjectNotFound() bool {
 
 // IsUnavailable reports whether SearchErrorResponse is Unavailable.
 func (s SearchErrorResponse) IsUnavailable() bool { return s.Type == UnavailableSearchErrorResponse }
-
-// IsUserNotFound reports whether SearchErrorResponse is UserNotFound.
-func (s SearchErrorResponse) IsUserNotFound() bool { return s.Type == UserNotFoundSearchErrorResponse }
-
-// IsUserPermissionDenied reports whether SearchErrorResponse is UserPermissionDenied.
-func (s SearchErrorResponse) IsUserPermissionDenied() bool {
-	return s.Type == UserPermissionDeniedSearchErrorResponse
-}
 
 // SetAuthCsrfInvalid sets SearchErrorResponse to AuthCsrfInvalid.
 func (s *SearchErrorResponse) SetAuthCsrfInvalid(v AuthCsrfInvalid) {
@@ -93816,90 +93812,6 @@ func NewFlowdefInvalidSearchErrorResponse(v FlowdefInvalid) SearchErrorResponse 
 	return s
 }
 
-// SetFlowdefNotFound sets SearchErrorResponse to FlowdefNotFound.
-func (s *SearchErrorResponse) SetFlowdefNotFound(v FlowdefNotFound) {
-	s.Type = FlowdefNotFoundSearchErrorResponse
-	s.FlowdefNotFound = v
-}
-
-// GetFlowdefNotFound returns FlowdefNotFound and true boolean if SearchErrorResponse is FlowdefNotFound.
-func (s SearchErrorResponse) GetFlowdefNotFound() (v FlowdefNotFound, ok bool) {
-	if !s.IsFlowdefNotFound() {
-		return v, false
-	}
-	return s.FlowdefNotFound, true
-}
-
-// NewFlowdefNotFoundSearchErrorResponse returns new SearchErrorResponse from FlowdefNotFound.
-func NewFlowdefNotFoundSearchErrorResponse(v FlowdefNotFound) SearchErrorResponse {
-	var s SearchErrorResponse
-	s.SetFlowdefNotFound(v)
-	return s
-}
-
-// SetFlowdefPermissionDenied sets SearchErrorResponse to FlowdefPermissionDenied.
-func (s *SearchErrorResponse) SetFlowdefPermissionDenied(v FlowdefPermissionDenied) {
-	s.Type = FlowdefPermissionDeniedSearchErrorResponse
-	s.FlowdefPermissionDenied = v
-}
-
-// GetFlowdefPermissionDenied returns FlowdefPermissionDenied and true boolean if SearchErrorResponse is FlowdefPermissionDenied.
-func (s SearchErrorResponse) GetFlowdefPermissionDenied() (v FlowdefPermissionDenied, ok bool) {
-	if !s.IsFlowdefPermissionDenied() {
-		return v, false
-	}
-	return s.FlowdefPermissionDenied, true
-}
-
-// NewFlowdefPermissionDeniedSearchErrorResponse returns new SearchErrorResponse from FlowdefPermissionDenied.
-func NewFlowdefPermissionDeniedSearchErrorResponse(v FlowdefPermissionDenied) SearchErrorResponse {
-	var s SearchErrorResponse
-	s.SetFlowdefPermissionDenied(v)
-	return s
-}
-
-// SetIdpNotFound sets SearchErrorResponse to IdpNotFound.
-func (s *SearchErrorResponse) SetIdpNotFound(v IdpNotFound) {
-	s.Type = IdpNotFoundSearchErrorResponse
-	s.IdpNotFound = v
-}
-
-// GetIdpNotFound returns IdpNotFound and true boolean if SearchErrorResponse is IdpNotFound.
-func (s SearchErrorResponse) GetIdpNotFound() (v IdpNotFound, ok bool) {
-	if !s.IsIdpNotFound() {
-		return v, false
-	}
-	return s.IdpNotFound, true
-}
-
-// NewIdpNotFoundSearchErrorResponse returns new SearchErrorResponse from IdpNotFound.
-func NewIdpNotFoundSearchErrorResponse(v IdpNotFound) SearchErrorResponse {
-	var s SearchErrorResponse
-	s.SetIdpNotFound(v)
-	return s
-}
-
-// SetIdpPermissionDenied sets SearchErrorResponse to IdpPermissionDenied.
-func (s *SearchErrorResponse) SetIdpPermissionDenied(v IdpPermissionDenied) {
-	s.Type = IdpPermissionDeniedSearchErrorResponse
-	s.IdpPermissionDenied = v
-}
-
-// GetIdpPermissionDenied returns IdpPermissionDenied and true boolean if SearchErrorResponse is IdpPermissionDenied.
-func (s SearchErrorResponse) GetIdpPermissionDenied() (v IdpPermissionDenied, ok bool) {
-	if !s.IsIdpPermissionDenied() {
-		return v, false
-	}
-	return s.IdpPermissionDenied, true
-}
-
-// NewIdpPermissionDeniedSearchErrorResponse returns new SearchErrorResponse from IdpPermissionDenied.
-func NewIdpPermissionDeniedSearchErrorResponse(v IdpPermissionDenied) SearchErrorResponse {
-	var s SearchErrorResponse
-	s.SetIdpPermissionDenied(v)
-	return s
-}
-
 // SetInternal sets SearchErrorResponse to Internal.
 func (s *SearchErrorResponse) SetInternal(v Internal) {
 	s.Type = InternalSearchErrorResponse
@@ -93918,48 +93830,6 @@ func (s SearchErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalSearchErrorResponse(v Internal) SearchErrorResponse {
 	var s SearchErrorResponse
 	s.SetInternal(v)
-	return s
-}
-
-// SetSchNotFound sets SearchErrorResponse to SchNotFound.
-func (s *SearchErrorResponse) SetSchNotFound(v SchNotFound) {
-	s.Type = SchNotFoundSearchErrorResponse
-	s.SchNotFound = v
-}
-
-// GetSchNotFound returns SchNotFound and true boolean if SearchErrorResponse is SchNotFound.
-func (s SearchErrorResponse) GetSchNotFound() (v SchNotFound, ok bool) {
-	if !s.IsSchNotFound() {
-		return v, false
-	}
-	return s.SchNotFound, true
-}
-
-// NewSchNotFoundSearchErrorResponse returns new SearchErrorResponse from SchNotFound.
-func NewSchNotFoundSearchErrorResponse(v SchNotFound) SearchErrorResponse {
-	var s SearchErrorResponse
-	s.SetSchNotFound(v)
-	return s
-}
-
-// SetSchPermissionDenied sets SearchErrorResponse to SchPermissionDenied.
-func (s *SearchErrorResponse) SetSchPermissionDenied(v SchPermissionDenied) {
-	s.Type = SchPermissionDeniedSearchErrorResponse
-	s.SchPermissionDenied = v
-}
-
-// GetSchPermissionDenied returns SchPermissionDenied and true boolean if SearchErrorResponse is SchPermissionDenied.
-func (s SearchErrorResponse) GetSchPermissionDenied() (v SchPermissionDenied, ok bool) {
-	if !s.IsSchPermissionDenied() {
-		return v, false
-	}
-	return s.SchPermissionDenied, true
-}
-
-// NewSchPermissionDeniedSearchErrorResponse returns new SearchErrorResponse from SchPermissionDenied.
-func NewSchPermissionDeniedSearchErrorResponse(v SchPermissionDenied) SearchErrorResponse {
-	var s SearchErrorResponse
-	s.SetSchPermissionDenied(v)
 	return s
 }
 
@@ -94068,45 +93938,45 @@ func NewReqInvalidSearchErrorResponse(v ReqInvalid) SearchErrorResponse {
 	return s
 }
 
-// SetTeamTeamNotFound sets SearchErrorResponse to TeamTeamNotFound.
-func (s *SearchErrorResponse) SetTeamTeamNotFound(v TeamTeamNotFound) {
-	s.Type = TeamTeamNotFoundSearchErrorResponse
-	s.TeamTeamNotFound = v
+// SetSessProjectMismatch sets SearchErrorResponse to SessProjectMismatch.
+func (s *SearchErrorResponse) SetSessProjectMismatch(v SessProjectMismatch) {
+	s.Type = SessProjectMismatchSearchErrorResponse
+	s.SessProjectMismatch = v
 }
 
-// GetTeamTeamNotFound returns TeamTeamNotFound and true boolean if SearchErrorResponse is TeamTeamNotFound.
-func (s SearchErrorResponse) GetTeamTeamNotFound() (v TeamTeamNotFound, ok bool) {
-	if !s.IsTeamTeamNotFound() {
+// GetSessProjectMismatch returns SessProjectMismatch and true boolean if SearchErrorResponse is SessProjectMismatch.
+func (s SearchErrorResponse) GetSessProjectMismatch() (v SessProjectMismatch, ok bool) {
+	if !s.IsSessProjectMismatch() {
 		return v, false
 	}
-	return s.TeamTeamNotFound, true
+	return s.SessProjectMismatch, true
 }
 
-// NewTeamTeamNotFoundSearchErrorResponse returns new SearchErrorResponse from TeamTeamNotFound.
-func NewTeamTeamNotFoundSearchErrorResponse(v TeamTeamNotFound) SearchErrorResponse {
+// NewSessProjectMismatchSearchErrorResponse returns new SearchErrorResponse from SessProjectMismatch.
+func NewSessProjectMismatchSearchErrorResponse(v SessProjectMismatch) SearchErrorResponse {
 	var s SearchErrorResponse
-	s.SetTeamTeamNotFound(v)
+	s.SetSessProjectMismatch(v)
 	return s
 }
 
-// SetTeamPermissionDenied sets SearchErrorResponse to TeamPermissionDenied.
-func (s *SearchErrorResponse) SetTeamPermissionDenied(v TeamPermissionDenied) {
-	s.Type = TeamPermissionDeniedSearchErrorResponse
-	s.TeamPermissionDenied = v
+// SetSessTokenInvalid sets SearchErrorResponse to SessTokenInvalid.
+func (s *SearchErrorResponse) SetSessTokenInvalid(v SessTokenInvalid) {
+	s.Type = SessTokenInvalidSearchErrorResponse
+	s.SessTokenInvalid = v
 }
 
-// GetTeamPermissionDenied returns TeamPermissionDenied and true boolean if SearchErrorResponse is TeamPermissionDenied.
-func (s SearchErrorResponse) GetTeamPermissionDenied() (v TeamPermissionDenied, ok bool) {
-	if !s.IsTeamPermissionDenied() {
+// GetSessTokenInvalid returns SessTokenInvalid and true boolean if SearchErrorResponse is SessTokenInvalid.
+func (s SearchErrorResponse) GetSessTokenInvalid() (v SessTokenInvalid, ok bool) {
+	if !s.IsSessTokenInvalid() {
 		return v, false
 	}
-	return s.TeamPermissionDenied, true
+	return s.SessTokenInvalid, true
 }
 
-// NewTeamPermissionDeniedSearchErrorResponse returns new SearchErrorResponse from TeamPermissionDenied.
-func NewTeamPermissionDeniedSearchErrorResponse(v TeamPermissionDenied) SearchErrorResponse {
+// NewSessTokenInvalidSearchErrorResponse returns new SearchErrorResponse from SessTokenInvalid.
+func NewSessTokenInvalidSearchErrorResponse(v SessTokenInvalid) SearchErrorResponse {
 	var s SearchErrorResponse
-	s.SetTeamPermissionDenied(v)
+	s.SetSessTokenInvalid(v)
 	return s
 }
 
@@ -94149,48 +94019,6 @@ func (s SearchErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
 func NewUnavailableSearchErrorResponse(v Unavailable) SearchErrorResponse {
 	var s SearchErrorResponse
 	s.SetUnavailable(v)
-	return s
-}
-
-// SetUserNotFound sets SearchErrorResponse to UserNotFound.
-func (s *SearchErrorResponse) SetUserNotFound(v UserNotFound) {
-	s.Type = UserNotFoundSearchErrorResponse
-	s.UserNotFound = v
-}
-
-// GetUserNotFound returns UserNotFound and true boolean if SearchErrorResponse is UserNotFound.
-func (s SearchErrorResponse) GetUserNotFound() (v UserNotFound, ok bool) {
-	if !s.IsUserNotFound() {
-		return v, false
-	}
-	return s.UserNotFound, true
-}
-
-// NewUserNotFoundSearchErrorResponse returns new SearchErrorResponse from UserNotFound.
-func NewUserNotFoundSearchErrorResponse(v UserNotFound) SearchErrorResponse {
-	var s SearchErrorResponse
-	s.SetUserNotFound(v)
-	return s
-}
-
-// SetUserPermissionDenied sets SearchErrorResponse to UserPermissionDenied.
-func (s *SearchErrorResponse) SetUserPermissionDenied(v UserPermissionDenied) {
-	s.Type = UserPermissionDeniedSearchErrorResponse
-	s.UserPermissionDenied = v
-}
-
-// GetUserPermissionDenied returns UserPermissionDenied and true boolean if SearchErrorResponse is UserPermissionDenied.
-func (s SearchErrorResponse) GetUserPermissionDenied() (v UserPermissionDenied, ok bool) {
-	if !s.IsUserPermissionDenied() {
-		return v, false
-	}
-	return s.UserPermissionDenied, true
-}
-
-// NewUserPermissionDeniedSearchErrorResponse returns new SearchErrorResponse from UserPermissionDenied.
-func NewUserPermissionDeniedSearchErrorResponse(v UserPermissionDenied) SearchErrorResponse {
-	var s SearchErrorResponse
-	s.SetUserPermissionDenied(v)
 	return s
 }
 
@@ -94281,9 +94109,14 @@ type SearchResponse struct {
 	Results []SearchResult `json:"results"`
 	// The requested types whose matches are not all in `results`: there were
 	// more than `limit_per_type`, the text was too short to search that type,
-	// or the project holds more of that type than one search reads. Empty when
-	// every requested type is complete.
+	// a project holds more matches of that type than one search reads, or
+	// `more_projects` is true. Empty when every requested type is complete.
 	IncompleteTypes []SearchResultType `json:"incomplete_types"`
+	// True when a session searched without `project_id` and the person can act
+	// on more projects than one search reads: the results come from the
+	// newest 10 of them. Search another by naming it in `project_id`. Always
+	// false when the request names a project or uses a project secret.
+	MoreProjects bool `json:"more_projects"`
 }
 
 // GetResults returns the value of Results.
@@ -94296,6 +94129,11 @@ func (s *SearchResponse) GetIncompleteTypes() []SearchResultType {
 	return s.IncompleteTypes
 }
 
+// GetMoreProjects returns the value of MoreProjects.
+func (s *SearchResponse) GetMoreProjects() bool {
+	return s.MoreProjects
+}
+
 // SetResults sets the value of Results.
 func (s *SearchResponse) SetResults(val []SearchResult) {
 	s.Results = val
@@ -94304,6 +94142,11 @@ func (s *SearchResponse) SetResults(val []SearchResult) {
 // SetIncompleteTypes sets the value of IncompleteTypes.
 func (s *SearchResponse) SetIncompleteTypes(val []SearchResultType) {
 	s.IncompleteTypes = val
+}
+
+// SetMoreProjects sets the value of MoreProjects.
+func (s *SearchResponse) SetMoreProjects(val bool) {
+	s.MoreProjects = val
 }
 
 func (*SearchResponse) searchRes() {}
@@ -94947,6 +94790,59 @@ func (s *SessTokenCreationFailed) SetDetails(val OptSessTokenCreationFailedDetai
 type SessTokenCreationFailedDetails map[string]jx.Raw
 
 func (s *SessTokenCreationFailedDetails) init() SessTokenCreationFailedDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type SessTokenInvalid struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptSessTokenInvalidDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *SessTokenInvalid) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *SessTokenInvalid) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *SessTokenInvalid) GetDetails() OptSessTokenInvalidDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *SessTokenInvalid) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *SessTokenInvalid) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *SessTokenInvalid) SetDetails(val OptSessTokenInvalidDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type SessTokenInvalidDetails map[string]jx.Raw
+
+func (s *SessTokenInvalidDetails) init() SessTokenInvalidDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}
