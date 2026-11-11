@@ -1,6 +1,6 @@
 import { Link, useMatch, useMatchRoute } from "@tanstack/react-router";
 import { ChevronLeft } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 
 import {
   Sidebar,
@@ -22,7 +22,8 @@ import { LogFilters, LogViewRows } from "@/features/events/components/logs-nav";
 import { ContextSwitcher } from "./context-switcher";
 import { ZitadelLogo } from "./logo";
 import { SearchDialog, SearchTrigger, useSearchShortcut } from "./search";
-import { useNavItems } from "./use-nav-items";
+import { accountListItems, useNavItems, useRequestedNavItem } from "./use-nav-items";
+import { cn } from "@/lib/utils";
 import type { NavView } from "@/nav";
 import { SETTINGS_PATH, type ShellUser, UserMenuItem } from "./user-menu";
 
@@ -37,7 +38,9 @@ import { SETTINGS_PATH, type ShellUser, UserMenuItem } from "./user-menu";
  * Every screen is drawn in this one frame (D27). What changes with where the
  * person is is the sidebar's list and what the project pill says
  * (`useShellView`), never the frame, so going from a project to Projects, and
- * from there into Settings, moves nothing but the list.
+ * from there into Settings, moves nothing but the list. Opening a list from a
+ * row of another slides it in from the right, and the way back from the left
+ * (`useListEntrance`).
  */
 export function AppShell({
   children,
@@ -144,7 +147,8 @@ function AppSidebar({
     <Sidebar collapsible="icon">
       <BrandHeader />
 
-      <SidebarContent>
+      {/* Clips sideways so a list sliding in never draws a scrollbar. */}
+      <SidebarContent className="overflow-x-hidden">
         {/* Search heads the list, as Vercel's `Find` does: in the top bar it
             sat a row above a list's own search (D27). */}
         <SidebarGroup className="pt-4 pb-0">
@@ -189,8 +193,11 @@ const NAV_LABEL: Record<NavView, string> = {
 /**
  * The sidebar's nav: one flat list of the view's routes (`staticData.nav`,
  * Console ADR 0001). Portal is the project's screens. Account is what sits
- * above every project: Projects, the home, then what an add-on lists, then
- * Settings. Settings is that row's own list, under a heading that leads back:
+ * above every project: Projects, the home, then the project's screens, then
+ * what an add-on lists, then Settings (D34). The pill there names no project,
+ * so a project's screen chosen from it drops the selection the URL still
+ * carries and asks for one (D31), marking its row while it asks (D22).
+ * Settings is that row's own list, under a heading that leads back:
  * the person's profile, alone while accounts are not surfaced (Console ADR
  * 0005 §3), then what an add-on lists. A row stays marked on the screens
  * beneath it, so a resource's detail keeps its list marked.
@@ -203,11 +210,18 @@ const NAV_LABEL: Record<NavView, string> = {
  * moves nothing vertically.
  */
 function NavList({ view }: { view: NavView }) {
-  const items = useNavItems(view);
+  const own = useNavItems(view);
+  const project = useNavItems("portal");
+  const account = view === "account";
+  const items = account ? accountListItems(own, project) : own;
+  // On Projects' way to a screen (`?next=`), that screen's row is the marked one.
+  const requested = useRequestedNavItem(project);
   const matchRoute = useMatchRoute();
+  const entrance = useListEntrance(view);
 
   return (
-    <>
+    // Keyed by the list, so a new one mounts and plays its entrance once.
+    <div key={view} className={cn("flex flex-col gap-2", entrance)}>
       <SidebarGroup role="navigation" aria-label={NAV_LABEL[view]} className="pt-2 pb-0">
         <SidebarMenu className="gap-0.5">
           {/* Projects is the account list's first screen. */}
@@ -215,14 +229,19 @@ function NavList({ view }: { view: NavView }) {
           {/* `/` is where a project lands, whichever screen that is. */}
           {view === "logs" && <ListHeading name="Logs" to="/" back="the project" />}
           {view === "logs" && <LogViewRows />}
-          {items.map(({ to, nav: { icon: Icon, label: name } }) => (
-            <SidebarMenuItem key={name}>
+          {items.map(({ to, scope, nav: { icon: Icon, label: name } }) => (
+            <SidebarMenuItem key={to}>
               <SidebarMenuButton
                 asChild
-                isActive={!!matchRoute({ to, fuzzy: to !== "/" })}
+                isActive={requested ? requested.to === to : !!matchRoute({ to, fuzzy: to !== "/" })}
                 tooltip={name}
               >
-                <Link to={to} title={name}>
+                <Link
+                  to={to}
+                  // An explicit `undefined` is what stops `_authed` retaining it.
+                  search={account && scope === "project" ? { project: undefined } : undefined}
+                  title={name}
+                >
                   <Icon aria-hidden />
                   <span>{name}</span>
                 </Link>
@@ -232,8 +251,43 @@ function NavList({ view }: { view: NavView }) {
         </SidebarMenu>
       </SidebarGroup>
       {view === "logs" && <LogFilters />}
-    </>
+    </div>
   );
+}
+
+/**
+ * How deep each list sits: Projects' and a project's are where the console
+ * starts; Settings' and Logs' open from a row of one (D29, D30).
+ */
+const LIST_DEPTH: Record<NavView, number> = { portal: 0, account: 0, settings: 1, logs: 1 };
+
+/** A short fade and slide, with the design's motion tokens; none for reduced motion. */
+const LIST_MOTION =
+  "animate-in fade-in-0 duration-(--zl-duration-base) ease-(--zl-easing-decelerate) motion-reduce:animate-none";
+
+/**
+ * The entrance of the list `view` names, as Vercel's sidebar plays it: in from
+ * the right going down into a list, in from the left on the way back up, so
+ * the person sees which way they went. The first list drawn and a swap between
+ * two at one depth (a project's and Projects') stay still. The view it last
+ * saw is state, adjusted while rendering, so the class is there on the new
+ * list's first paint.
+ */
+function useListEntrance(view: NavView): string | undefined {
+  const [shown, setShown] = useState(view);
+  const [entrance, setEntrance] = useState<string>();
+  if (view !== shown) {
+    const step = LIST_DEPTH[view] - LIST_DEPTH[shown];
+    setShown(view);
+    setEntrance(
+      step > 0
+        ? `${LIST_MOTION} slide-in-from-right-4`
+        : step < 0
+          ? `${LIST_MOTION} slide-in-from-left-4`
+          : undefined,
+    );
+  }
+  return entrance;
 }
 
 /**
