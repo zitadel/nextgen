@@ -155,8 +155,9 @@ wake-up only says that a project has something new:
   does, publishes a message to a queue, which calls the server's delivery
   path. A retry is a delayed message.
 - A lost wake-up loses no event: the next one in the project delivers
-  everything after the cursor. A scheduler may call the delivery path as
-  well, so a quiet project does not wait for its next event.
+  everything after the cursor. The hosted cloud also has a scheduler call
+  the delivery path once an hour, so a quiet project does not wait for its
+  next event.
 
 What changes for a project's webhook:
 
@@ -245,8 +246,7 @@ disable it and rotate its secret.
   the platform's OIDC token from a Go function, and
   [ADR 084](084-hosted-cloud-business-systems.md) decided against a queue of
   our own for usage. Here it is one message per project with something new,
-  not one per event. Whether the scheduler's check runs beside it is the
-  cloud's choice.
+  not one per event.
 - **A lost rotate response.** Rotating again drops the secret the endpoint
   still uses, so its deliveries fail until it has the newest one. An
   `Idempotency-Key` would let the caller repeat the request and get the same
