@@ -5,6 +5,8 @@ export type SearchResultType = "user" | "team" | "schema" | "flow_definition" | 
 export interface SearchHit {
   type: SearchResultType;
   id: string;
+  /** The project it is in, which opening it selects. */
+  projectId: string;
   /** What to call it. */
   title: string;
   /** A second line that tells two titles apart, when the server has one. */
@@ -17,10 +19,15 @@ export interface SearchAnswer {
   hits: SearchHit[];
   /** The types that have more matches than `hits` holds. */
   incomplete: SearchResultType[];
+  /**
+   * Searched without a project, the person can act on more projects than one
+   * search reads, so the hits come from the first of them.
+   */
+  moreProjects: boolean;
 }
 
 /** No answer yet, and a failed search's: nothing found. */
-export const NO_ANSWER: SearchAnswer = { term: "", hits: [], incomplete: [] };
+export const NO_ANSWER: SearchAnswer = { term: "", hits: [], incomplete: [], moreProjects: false };
 
 /**
  * Users are asked for apart from the rest. They are searched only from

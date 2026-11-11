@@ -60,12 +60,13 @@ import { SETTINGS_PATH } from "./user-menu";
  * (Projects, then Settings' pages).
  *
  * Once something is typed it is one list, best match first, as Vercel's is
- * (D36): those pages and actions; what `POST /search` finds in the selected
- * project (root ADR 087), which is users, teams and configuration (user
- * schemas, login flows, identity providers), each matched on the server, an
- * id pasted into the field included; projects, matched on the server across
- * every project the person can act on; and the account's pages. They are
- * ranked together (`ranked`), the selected project's first among equally
+ * (D36): those pages and actions; what `POST /search` finds (root ADR 087),
+ * which is users, teams and configuration (user schemas, login flows,
+ * identity providers), each matched on the server, an id pasted into the
+ * field included, in the selected project or, at All projects, in the
+ * projects the person can act on (D37); projects, matched on the server
+ * across every project the person can act on; and the account's pages. They
+ * are ranked together (`ranked`), the selected project's first among equally
  * good matches, and each row says beneath its name where it is, so a page of
  * the project and a project of that name read apart.
  */
@@ -227,16 +228,17 @@ function SearchPalette({
   const projectId = useProjectScope();
   // One round of requests per pause in typing, not per keystroke.
   const typed = useDebounced(query.trim(), TYPING_PAUSE_MS);
-  // Users apart from the rest, so the quick types do not wait for them.
+  // Users apart from the rest, so the quick types do not wait for them. With
+  // no project selected, the server searches the person's projects.
   const users = useAsync(
-    typed.length >= USER_SEARCH_MIN_LENGTH && projectId
+    typed.length >= USER_SEARCH_MIN_LENGTH
       ? () => search(projectId, typed, USER_TYPES, HITS_PER_TYPE)
       : null,
     NO_ANSWER,
     [typed, projectId],
   );
   const others = useAsync(
-    typed && projectId ? () => search(projectId, typed, OTHER_TYPES, HITS_PER_TYPE) : null,
+    typed ? () => search(projectId, typed, OTHER_TYPES, HITS_PER_TYPE) : null,
     NO_ANSWER,
     [typed, projectId],
   );
@@ -331,36 +333,52 @@ function SearchPalette({
     // A hit wears the glyph of the sidebar page that lists its kind.
     const iconOf = (type: SearchResultType): LucideIcon | NavIcon =>
       pages.find((item) => item.to === LIST_PATH[type])?.nav.icon ?? Search;
+    // A hit opens in its own project, which a hit found at All projects
+    // selects (`?project=`, D37).
     const openHit = (hit: SearchHit) => {
+      const search = (prev: Record<string, unknown>) => ({ ...prev, project: hit.projectId });
       switch (hit.type) {
         case "user":
-          return navigate({ to: "/users/$userId", params: { userId: hit.id } });
+          return navigate({ to: "/users/$userId", params: { userId: hit.id }, search });
         case "team":
-          return navigate({ to: "/teams/$teamId", params: { teamId: hit.id } });
+          return navigate({ to: "/teams/$teamId", params: { teamId: hit.id }, search });
         case "schema":
-          return navigate({ to: "/schemas/$schemaId", params: { schemaId: hit.id } });
+          return navigate({ to: "/schemas/$schemaId", params: { schemaId: hit.id }, search });
         case "flow_definition":
           return navigate({
             to: "/flow-definitions/$definitionId",
             params: { definitionId: hit.id },
+            search,
           });
         case "idp":
-          return navigate({ to: "/authentication/idps/$idpId", params: { idpId: hit.id } });
+          return navigate({
+            to: "/authentication/idps/$idpId",
+            params: { idpId: hit.id },
+            search,
+          });
       }
     };
+    // The project a hit is in, by name: the selected one's, else the person's
+    // projects the palette holds, else its id, which the server answers with.
+    const projectNames = new Map<string, string>();
+    for (const project of [...(mine?.projects ?? []), ...(found?.projects ?? [])]) {
+      projectNames.set(project.id, project.name);
+    }
+    const placeOf = (hitProject: string) =>
+      hitProject === projectId ? place : (projectNames.get(hitProject) ?? hitProject);
     // Beneath a hit: the server's second line (a user's identifier), then the
     // project it is in.
     const hitResult = (hit: SearchHit, group: string): RankedResult => {
       const Icon = iconOf(hit.type);
       return {
-        id: `${group}:${hit.type}:${hit.id}`,
+        id: `${group}:${hit.type}:${hit.projectId}:${hit.id}`,
         icon: <Icon aria-hidden />,
         label: hit.title,
-        description: [hit.subtitle, place].filter(Boolean).join(" · ") || undefined,
-        inProject: true,
+        description: [hit.subtitle, placeOf(hit.projectId)].filter(Boolean).join(" · ") || undefined,
+        inProject: hit.projectId === projectId,
         kind: HIT_KIND[hit.type],
         go: close(() => {
-          if (projectId) rememberHit(projectId, hit);
+          rememberHit(hit.projectId, hit);
           void openHit(hit);
         }),
       };
@@ -433,10 +451,12 @@ function SearchPalette({
     // The palette shows the best few; the Users list searches the same text
     // across every page, the users the list has no room for among them. Its
     // row takes the list's last place, so the list never grows past the cap.
+    // That list is one project's, so the row needs one selected.
     const shown = all.slice(0, MAX_RESULTS);
     const seeAllUsers =
-      hasMore(users ?? NO_ANSWER, query, "user") ||
-      userResults.some((result) => !shown.includes(result));
+      projectId !== undefined &&
+      (hasMore(users ?? NO_ANSWER, query, "user") ||
+        userResults.some((result) => !shown.includes(result)));
     const best = seeAllUsers ? all.slice(0, MAX_RESULTS - 1) : shown;
     if (seeAllUsers) {
       best.push({
@@ -471,6 +491,8 @@ function SearchPalette({
   ]);
 
   const text = query.trim();
+  // At All projects the server read the first of the person's projects only.
+  const moreProjects = !projectId && (users?.moreProjects || others?.moreProjects);
   return (
     // Filtering is ours, not cmdk's: what the server found arrives already
     // matched and ranked, and the pages match as a substring, any case.
@@ -487,7 +509,8 @@ function SearchPalette({
       </div>
       <CommandList className="max-h-[440px] p-1.5">
         {/* Says where it looked: users, teams and configuration are found in
-            the selected project only, and in none without one. */}
+            the selected project only, or at All projects in the person's
+            projects, the first ten of them when there are more. */}
         <CommandEmpty className="px-2 py-2 text-xs text-muted-foreground">
           <p className="tracking-wide uppercase">
             {place ? `Nothing in ${place} matches “${text}”` : `Nothing matches “${text}”`}
@@ -495,7 +518,9 @@ function SearchPalette({
           <p className="mt-1">
             {place
               ? "Users, teams and configuration are found in the selected project only."
-              : "Choose a project to search its users, teams and configuration."}
+              : moreProjects
+                ? "Searched the first ten of your projects. Choose a project to search it."
+                : "Searched every project you can act on."}
           </p>
         </CommandEmpty>
         {groups.map((group) => (

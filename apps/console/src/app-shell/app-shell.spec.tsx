@@ -1705,7 +1705,8 @@ describe("search", () => {
     ).toBeInTheDocument();
   });
 
-  it("says a project is needed to find what is in one", async () => {
+  it("at All projects searches the person's projects, and says so when nothing matches", async () => {
+    const asked: (string | null)[] = [];
     // Several to choose from, so `/` lands on Projects with nothing selected.
     server.use(
       http.get(MY_PROJECTS, ({ request }) =>
@@ -1718,6 +1719,10 @@ describe("search", () => {
               ],
         }),
       ),
+      http.post(SEARCH, ({ request }) => {
+        asked.push(new URL(request.url).searchParams.get("project_id"));
+        return HttpResponse.json({ results: [], incomplete_types: [], more_projects: false });
+      }),
     );
     const router = renderShell();
     await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
@@ -1736,8 +1741,92 @@ describe("search", () => {
     await userEvent.clear(field);
     await userEvent.type(field, "admin");
     expect(await dialog.findByText("Nothing matches “admin”")).toBeInTheDocument();
+    expect(dialog.getByText("Searched every project you can act on.")).toBeInTheDocument();
+    // No project named: the server reads the person's projects (D37).
+    await waitFor(() => expect(asked.length).toBeGreaterThan(0));
+    expect(asked.every((projectId) => projectId === null)).toBe(true);
+  });
+
+  it("at All projects says it read the first ten of many projects", async () => {
+    server.use(
+      http.get(MY_PROJECTS, () =>
+        HttpResponse.json({
+          projects: [
+            { id: "proj_1", name: "River" },
+            { id: "proj_2", name: "Delta" },
+          ],
+          next_page_token: "page-2",
+        }),
+      ),
+      http.post(SEARCH, () =>
+        HttpResponse.json({ results: [], incomplete_types: ["team"], more_projects: true }),
+      ),
+    );
+    const router = renderShell();
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
+    await userEvent.click(await screen.findByRole("button", { name: "Search" }));
+    const dialog = within(await screen.findByRole("dialog", { name: "Go to" }));
+    await userEvent.type(
+      dialog.getByPlaceholderText("Go to a page, user, team or project, or run an action"),
+      "qqqq",
+    );
+
     expect(
-      dialog.getByText("Choose a project to search its users, teams and configuration."),
+      await dialog.findByText(
+        "Searched the first ten of your projects. Choose a project to search it.",
+      ),
     ).toBeInTheDocument();
+  });
+
+  it("at All projects finds a team in a project and opens it there", async () => {
+    server.use(
+      http.get(MY_PROJECTS, () =>
+        HttpResponse.json({
+          projects: [
+            { id: "proj_1", name: "River" },
+            { id: "proj_2", name: "Delta" },
+          ],
+        }),
+      ),
+      http.post(SEARCH, async ({ request }) => {
+        const body = (await request.json()) as SearchBody;
+        return HttpResponse.json({
+          results: body.types.includes("team")
+            ? [
+                { type: "team", id: "team_d", project_id: "proj_2", title: "Support" },
+                // A project the palette has not listed is named by its id.
+                { type: "team", id: "team_x", project_id: "proj_9", title: "Support Desk" },
+              ]
+            : [],
+          incomplete_types: [],
+          more_projects: false,
+        });
+      }),
+      http.get("*/api/v1/teams/team_d", () =>
+        HttpResponse.json({
+          id: "team_d",
+          name: "Support",
+          status: "active",
+          created_at: "2026-01-01T00:00:00Z",
+          updated_at: "2026-01-01T00:00:00Z",
+        }),
+      ),
+    );
+    const router = renderShell();
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
+    await userEvent.click(await screen.findByRole("button", { name: "Search" }));
+    const dialog = within(await screen.findByRole("dialog", { name: "Go to" }));
+    await userEvent.type(
+      dialog.getByPlaceholderText("Go to a page, user, team or project, or run an action"),
+      "supp",
+    );
+
+    // Beneath each: the project it is in.
+    await waitFor(() =>
+      expect(rows(dialog.getByRole("listbox"))).toEqual(["Support · Delta", "Support Desk · proj_9"]),
+    );
+    await userEvent.click(dialog.getByRole("option", { name: /Delta/ }));
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/teams/team_d"));
+    expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_2" });
   });
 });

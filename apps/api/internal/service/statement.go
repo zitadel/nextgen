@@ -767,6 +767,7 @@ type ClaimStatements interface {
 //   - DeleteResourceScope: explicit cleanup where FK cascade does not apply (user /
 //     schema / flow_definition / session delete today; branding relies on project
 //     cascade; project delete cascades RSI via project_id FK).
+//
 // SearchEntryStatements reads what search finds teams, user schemas, flow
 // definitions and identity provider connections by (ADR 087 §5): their
 // [domain.SearchEntry] rows. The statements that write those resources write
