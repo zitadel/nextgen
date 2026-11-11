@@ -52,6 +52,7 @@ type AllStatements interface {
 	VariableStatements
 	VariableSetStatements
 	ClaimStatements
+	InvitationStatements
 	ResourceScopeStatements
 	AuthzAssignmentStatements
 	AuthzMembershipEdgeStatements
@@ -726,6 +727,38 @@ type VariableSetStatements interface {
 	// deployment that was never linked -- or does not exist, or belongs to
 	// another project -- returns NoRowFoundError.
 	GetDeploymentVariables(ctx context.Context, projectID, deploymentID string) (*domain.VariableSet, error)
+}
+
+// InvitationStatements persists invitations (ADR 086). A pending invitation
+// past its expires_at reads as expired, so the guarded writes take now.
+type InvitationStatements interface {
+	Statements
+	// CreateInvitation inserts entity as pending and stamps its id and
+	// created_at. A token hash already stored returns a [database.UniqueError].
+	CreateInvitation(ctx context.Context, entity *domain.Invitation) error
+	GetInvitationByID(ctx context.Context, projectID, id string) (*domain.Invitation, error)
+	// GetInvitationByTokenHash finds an invitation in any project by the hash
+	// of its link's token.
+	GetInvitationByTokenHash(ctx context.Context, tokenHash string) (*domain.Invitation, error)
+	// ListInvitations lists invitations; invitation.ListOptions builds the
+	// project, status and type filters.
+	ListInvitations(ctx context.Context, filter *database.ListOptions[domain.InvitationField]) (*database.ListResult[*domain.Invitation], error)
+	// ChangeInvitationStatus moves a pending, unexpired invitation to
+	// accepted, recording acceptedBy and now, or to rejected with a nil
+	// acceptedBy, and nulls its metadata. Any other invitation returns a
+	// [database.NoRowFoundError].
+	ChangeInvitationStatus(ctx context.Context, projectID, id string, status domain.InvitationStatus, acceptedBy *string, now time.Time) (*domain.Invitation, error)
+	// ClearInvitationMetadata nulls the metadata of an invitation that is no
+	// longer pending at now, as replace does. A pending, unexpired or absent
+	// invitation returns a [database.NoRowFoundError].
+	ClearInvitationMetadata(ctx context.Context, projectID, id string, now time.Time) error
+	// DeletePendingInvitation removes a pending, unexpired invitation. Any
+	// other invitation returns a [database.NoRowFoundError].
+	DeletePendingInvitation(ctx context.Context, projectID, id string, now time.Time) error
+	// CountPendingInvitations counts the project's pending, unexpired
+	// invitations. The cap holds only when the count and the create run in
+	// one transaction under LockProject.
+	CountPendingInvitations(ctx context.Context, projectID string, now time.Time) (int64, error)
 }
 
 type ClaimStatements interface {
