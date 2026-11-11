@@ -201,7 +201,7 @@ const PLAIN_WORD = /^[a-z]+[:,]?(\s|$)/;
 
 /** A failure's message as one sentence, which is how a person is shown it. */
 export type FailureText = {
-  /** What `Error <code>: ` introduces. Said once, wherever the failure is drawn. */
+  /** What `Error: ` introduces, before the code in brackets. Said once, wherever the failure is drawn. */
   readonly sentence: string;
   /** The command line itself was refused, so `--help` is what to run next. */
   readonly misuse: boolean;
