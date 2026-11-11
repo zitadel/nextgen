@@ -1360,9 +1360,16 @@ export default class Setup extends Destructive(BaseCommand) {
     if (scaffolding) {
       current = this.ui.begin(`Scaffolding a new ${app.framework} project`);
     }
-    const newApp = scaffolding
-      ? await orca.scaffoldUndoably(this.cwd, app.framework, this.force)
-      : undefined;
+    let newApp: Awaited<ReturnType<typeof orca.scaffoldUndoably>> | undefined;
+    if (scaffolding) {
+      try {
+        newApp = await orca.scaffoldUndoably(this.cwd, app.framework, this.force);
+      } catch (error) {
+        // Ended as failed, so the spinner does not keep turning under the error.
+        current?.fail();
+        throw error;
+      }
+    }
     if (newApp !== undefined) {
       current?.done(`Scaffolded ${newApp.facts.id} skeleton`);
     }
@@ -2198,6 +2205,10 @@ export default class Setup extends Destructive(BaseCommand) {
       dryRun,
       signal: this.signal,
       consent: (gate) => this.consent(gate),
+    }).catch((error: unknown) => {
+      // Ended as failed, so the spinner does not keep turning under the error.
+      moving.fail();
+      throw error;
     });
     for (const file of move.result.filesWritten) {
       moving.detail(`${dryRun ? "Would update" : "Updated"} ${relativeDisplay(cwd, file)}`);
