@@ -8265,7 +8265,7 @@
         "x-zitadel-cli": "release revoke",
         "x-zitadel-destructive": true,
         "summary": "Revoke a release",
-        "description": "Revokes a release, so that its content is never served again. Pass the\n`id` that `createRelease` (`POST /releases`), `buildRelease` (`POST /releases/build`) or `listReleases` (`GET /releases`) returns. It\nrecords a `release.revoked` event.\n\nFrom then on the release cannot be deployed. Every path that would serve\nit refuses it with `rel.revoked`, including a build that pins its digest.\n\nA release that any origin still serves cannot be revoked. An origin serves\nthe release of the newest deployment to it, so the call answers `409` with\n`rel.in_use`, naming each such origin and that deployment. Deploy another\nrelease there or roll back first, then revoke. Revoking therefore never\ntakes an origin down. Deployments that named the release earlier stay in\nthe history.\n\nThe call is idempotent: revoking a release that is already revoked answers\n`200` with the release unchanged, and `revoked_at` still names the first\nrevocation. There is no un-revoke. To serve that configuration again,\nchange it and build a new release: rebuilding unchanged content returns\nthe same revoked release.\n\nThe call takes no body. The lookup is scoped to the project in\n`project_id`, so a release ID of another project answers not found exactly\nas an unknown ID does.\n",
+        "description": "Revokes a release, so that its content is never served again. Pass the\n`id` that `createRelease` (`POST /releases`), `buildRelease` (`POST /releases/build`) or `listReleases` (`GET /releases`) returns. It\nrecords a `release.revoked` event.\n\nFrom then on the release cannot be deployed. Every path that would serve\nit refuses it with `rel.revoked`, including a build that pins its digest.\n\nA release that any origin still serves cannot be revoked. An origin serves\nthe release of the newest deployment to it, so the call answers `409` with\n`rel.in_use`, naming each such origin, that deployment and whether the\norigin is primary or a preview. Deploy another release to a primary origin\nor roll it back, and remove a preview, then revoke. Revoking therefore\nnever takes an origin down. Deployments that named the release earlier stay in\nthe history.\n\nThe call is idempotent: revoking a release that is already revoked answers\n`200` with the release unchanged, and `revoked_at` still names the first\nrevocation. There is no un-revoke. To serve that configuration again,\nchange it and build a new release: rebuilding unchanged content returns\nthe same revoked release.\n\nThe call takes no body. The lookup is scoped to the project in\n`project_id`, so a release ID of another project answers not found exactly\nas an unknown ID does.\n",
         "tags": [
           "Releases"
         ],
@@ -8336,7 +8336,7 @@
             }
           },
           "409": {
-            "description": "At least one origin still serves the release. `details.origins`\nnames each such origin and the newest deployment to it.\n",
+            "description": "At least one origin still serves the release. `details.origins`\nnames each such origin, the newest deployment to it and whether it\nserves the release as a primary origin or a preview.\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -8345,7 +8345,7 @@
                 "examples": {
                   "stillServed": {
                     "summary": "Two origins still serve the release",
-                    "description": "Deploy another release to these origins, or roll them back,\nthen revoke.\n",
+                    "description": "Deploy another release to the primary origin or roll it back,\nremove the preview, then revoke.\n",
                     "value": {
                       "code": "rel.in_use",
                       "message": "release: still served by an origin",
@@ -8353,11 +8353,13 @@
                         "origins": [
                           {
                             "origin": "https://app.acme.com",
-                            "deployment_id": "dep_01KX4SB9C8E1F0N9WD3P2E4YM5"
+                            "deployment_id": "dep_01KX4SB9C8E1F0N9WD3P2E4YM5",
+                            "kind": "primary"
                           },
                           {
                             "origin": "https://acme-git-sso-acmeinc.vercel.app",
-                            "deployment_id": "dep_01KX4SD2F7H3F0N9WD3P2E4YM5"
+                            "deployment_id": "dep_01KX4SD2F7H3F0N9WD3P2E4YM5",
+                            "kind": "preview"
                           }
                         ]
                       }
@@ -20619,6 +20621,16 @@
         "x-zitadel-pattern-message": "must be a deployment ID: dep_ followed by letters, digits, _ or -",
         "example": "dep_01KX4SB9C8E1F0N9WD3P2E4YM5"
       },
+      "deployment-kind": {
+        "title": "DeploymentKind",
+        "type": "string",
+        "description": "`primary` for the project's primary origins, `preview` for preview URLs.\n",
+        "enum": [
+          "primary",
+          "preview"
+        ],
+        "example": "primary"
+      },
       "revoke-release-conflict": {
         "title": "RevokeReleaseConflict",
         "type": "object",
@@ -20650,7 +20662,8 @@
                   "type": "object",
                   "required": [
                     "origin",
-                    "deployment_id"
+                    "deployment_id",
+                    "kind"
                   ],
                   "properties": {
                     "origin": {
@@ -20659,6 +20672,10 @@
                     "deployment_id": {
                       "$ref": "#/components/schemas/deployment-id",
                       "description": "The newest deployment to the origin, which pins the release."
+                    },
+                    "kind": {
+                      "$ref": "#/components/schemas/deployment-kind",
+                      "description": "Whether the origin serves the release as a primary origin or as\na preview. A deploy or a rollback frees a primary origin;\nremoving the preview frees a preview.\n"
                     }
                   }
                 }
@@ -24142,16 +24159,6 @@
         "enum": [
           "release"
         ]
-      },
-      "deployment-kind": {
-        "title": "DeploymentKind",
-        "type": "string",
-        "description": "`primary` for the project's primary origins, `preview` for preview URLs.\n",
-        "enum": [
-          "primary",
-          "preview"
-        ],
-        "example": "primary"
       },
       "deployment-target": {
         "title": "DeploymentTarget",

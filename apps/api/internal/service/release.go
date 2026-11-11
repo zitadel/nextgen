@@ -302,7 +302,7 @@ func servedOrigins(ctx context.Context, stmts DeploymentStatements, projectID, r
 	var served []domain.ReleaseInUseOrigin
 	for _, live := range result.Items {
 		for _, origin := range live.Origins() {
-			served = append(served, domain.ReleaseInUseOrigin{Origin: origin, DeploymentID: live.ID})
+			served = append(served, domain.ReleaseInUseOrigin{Origin: origin, DeploymentID: live.ID, Kind: live.OriginKind})
 		}
 	}
 	slices.SortFunc(served, func(a, b domain.ReleaseInUseOrigin) int { return strings.Compare(a.Origin, b.Origin) })
