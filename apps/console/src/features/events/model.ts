@@ -181,6 +181,8 @@ export const EVENT_TYPES = [
   "authz.revoked",
   "branding.created",
   "deployment.created",
+  "flow.signup_challenge.consumed",
+  "flow.signup_challenge.issued",
   "flowdef.created",
   "flowdef.deleted",
   "flowdef.updated",

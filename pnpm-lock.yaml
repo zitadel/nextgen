@@ -887,6 +887,9 @@ importers:
       '@types/react':
         specifier: ^19.2.14
         version: 19.2.14
+      '@zitadel/api':
+        specifier: workspace:*
+        version: link:../../packages/api
       '@zitadel/cloud-functions':
         specifier: workspace:*
         version: link:../cloud-functions

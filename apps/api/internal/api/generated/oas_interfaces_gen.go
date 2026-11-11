@@ -177,6 +177,14 @@ type FinishUserPasskeyRegistrationRes interface {
 	finishUserPasskeyRegistrationRes()
 }
 
+type FlowSignupChallengeConsumedRes interface {
+	flowSignupChallengeConsumedRes()
+}
+
+type FlowSignupChallengeIssuedRes interface {
+	flowSignupChallengeIssuedRes()
+}
+
 type FlowdefCreatedRes interface {
 	flowdefCreatedRes()
 }

@@ -127,6 +127,8 @@ const (
 	AuthzRevokedOperation                  OperationName = "AuthzRevoked"
 	BrandingCreatedOperation               OperationName = "BrandingCreated"
 	DeploymentCreatedOperation             OperationName = "DeploymentCreated"
+	FlowSignupChallengeConsumedOperation   OperationName = "FlowSignupChallengeConsumed"
+	FlowSignupChallengeIssuedOperation     OperationName = "FlowSignupChallengeIssued"
 	FlowdefCreatedOperation                OperationName = "FlowdefCreated"
 	FlowdefDeletedOperation                OperationName = "FlowdefDeleted"
 	FlowdefUpdatedOperation                OperationName = "FlowdefUpdated"
