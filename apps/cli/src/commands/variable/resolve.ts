@@ -185,7 +185,7 @@ export default class VariableResolve extends Tabulatable(EnvironmentCommand) {
       return variableCell(item);
     });
     const columns = COLUMNS;
-    const empty = `${deploymentId} froze no variables${where}.`;
+    const empty = `${deploymentId} froze no variables${where}`;
     const footer = [`Frozen by ${deploymentId}${where}`];
     const page = null;
     const data = {

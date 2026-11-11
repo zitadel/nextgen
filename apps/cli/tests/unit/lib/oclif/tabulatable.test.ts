@@ -179,7 +179,7 @@ describe("a list for a person", () => {
     rows,
     items: rows,
     singular: "thing",
-    empty: "No things.",
+    empty: "No things",
     footer: [],
     page: null,
     extra: {},
@@ -222,7 +222,7 @@ describe("a list for a person", () => {
   });
 
   it("escapes the empty line, which names what the server answered", async () => {
-    const empty = "dep_1\u001b[2J froze no variables.";
+    const empty = "dep_1\u001b[2J froze no variables";
 
     const summary = await asTerminal(() =>
       summarised({ plain: false }, { ...view, rows: [], empty }),
@@ -258,7 +258,7 @@ describe("a list for a script", () => {
     rows,
     items: rows,
     singular: "thing",
-    empty: "No things.",
+    empty: "No things",
     footer: [],
     page: null,
     extra: {},
@@ -332,7 +332,7 @@ describe("emitList", () => {
     rows,
     items: rows,
     singular: "thing",
-    empty: "No things.",
+    empty: "No things",
     footer: [],
     page: null,
     extra: {},
@@ -462,7 +462,7 @@ describe("emitList", () => {
           ...view,
           rows: [],
           items: [],
-          empty: "No things on this page.",
+          empty: "No things on this page",
           page: { token: "p2", command: "thing list", flags: [] },
         },
       ),
