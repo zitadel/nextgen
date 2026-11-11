@@ -135,6 +135,17 @@ describe("variable resolve", () => {
         return { app, deploymentId: deployed.deployment_id ?? "" };
       }
 
+      async function aSupersededProject() {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        const first = await app.deployData();
+        await app.editUserSchema((schema) => {
+          schema.properties.company = { type: "string" };
+        });
+        await app.deployData();
+        return { app, firstDeploymentId: first.deployment_id ?? "" };
+      }
+
       function namesIn(app: ScaffoldedApp, result: CliResult): string[] {
         return app.envelopeOf<{ items: { name: string }[] }>(result).data.items.map((item) => {
           return item.name;
@@ -171,20 +182,20 @@ describe("variable resolve", () => {
       });
 
       it("reads a deployment that is no longer live", async () => {
-        const app = await aSetUpApp();
-        await app.addPrimaryOrigin();
-        const first = await app.deployData();
-        await app.editUserSchema((schema) => {
-          schema.properties.company = { type: "string" };
-        });
-        const second = await app.deployData();
-        expect(second.release_id).not.toBe(first.release_id);
+        const { app, firstDeploymentId } = await aSupersededProject();
 
-        const result = await app.resolveVariables({ deploymentId: first.deployment_id ?? "" });
+        const result = await app.resolveVariables({ deploymentId: firstDeploymentId });
 
         expect(result).toSucceed();
+      });
+
+      it("reports the earlier deployment it was given", async () => {
+        const { app, firstDeploymentId } = await aSupersededProject();
+
+        const result = await app.resolveVariables({ deploymentId: firstDeploymentId });
+
         expect(app.envelopeOf<{ deployment_id: string }>(result).data.deployment_id).toBe(
-          first.deployment_id,
+          firstDeploymentId,
         );
       });
 

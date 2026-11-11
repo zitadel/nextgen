@@ -167,6 +167,23 @@ export class Deployment {
   }
 
   /**
+   * The origins whose target has not expired: every primary origin, and a
+   * preview origin until its expiry.
+   *
+   * @returns One origin per target that has not expired.
+   */
+  get unexpiredOrigins(): readonly string[] {
+    const now = Date.now();
+    return this.targets
+      .filter((target) => {
+        return target.expires_at == null || Date.parse(target.expires_at) > now;
+      })
+      .map((target) => {
+        return target.origin;
+      });
+  }
+
+  /**
    * Whether this deployment serves a primary origin. A preview deployment's
    * targets carry an expiry; it is never the baseline, the guard or the thing a
    * bare rollback undoes.

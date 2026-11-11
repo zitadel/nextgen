@@ -52,7 +52,7 @@ const COLUMNS = ["name", "value"] as const;
  * Not the store's current values but the map frozen onto a deployment: what a
  * later `variable set` has not reached. A deployment id names one, live or not,
  * as `deployment get` does, and `--origin` cannot accompany it. The origins
- * shown are the ones it was deployed to, as `deployment get` lists them.
+ * shown are those of its targets that have not expired.
  *
  * Without an id, the deployment live on the target is read. `--origin` names
  * one of the project's origins. Without it, resolving is unambiguous only when
@@ -96,9 +96,11 @@ export default class VariableResolve extends Tabulatable(EnvironmentCommand) {
     const { client, projectId } = await this.connect();
     const deploymentService = new DeploymentService(client, projectId);
     if (args.deploymentId !== undefined) {
-      const deployment = await deploymentService.get(args.deploymentId);
-      const items = await deploymentService.variables(deployment.id);
-      return this.render(flags, deployment.id, [...deployment.origins].sort(), items);
+      const [deployment, items] = await Promise.all([
+        deploymentService.get(args.deploymentId),
+        deploymentService.variables(args.deploymentId),
+      ]);
+      return this.render(flags, deployment.id, [...deployment.unexpiredOrigins].sort(), items);
     }
     const found = await deploymentService.liveOn(flags.origin);
     switch (found.outcome) {
@@ -165,7 +167,7 @@ export default class VariableResolve extends Tabulatable(EnvironmentCommand) {
    *
    * @param flags - The run's flags, which choose the rendering.
    * @param deploymentId - The deployment the variables were frozen by.
-   * @param origins - The origins it was deployed to, sorted.
+   * @param origins - The origins it serves or was deployed to, sorted.
    * @param items - The frozen variables.
    * @returns The envelope to print.
    */
