@@ -238,19 +238,11 @@ test("every API operation shows its call through @zitadel/api, its CLI command a
     // call without one with `zitadel api` (lib/cli-sample.ts).
     const named = /"x-zitadel-cli": "([^"]+)"/.exec(markdown)?.[1];
     const command = named ?? apiCommand(operationOf(markdown));
-    // A variable command that cannot carry the request leaves the call to
-    // `zitadel api` (lib/cli-sample.ts).
-    const accepted = command?.startsWith("variable ")
-      ? [command, apiCommand(operationOf(markdown))]
-      : [command];
-    const shown = (name: string | undefined) => {
-      return name !== undefined && markdown.includes(`npx @zitadel/cli@latest ${name}`);
-    };
-    if (command && !accepted.some(shown)) {
+    if (command && !markdown.includes(`npx @zitadel/cli@latest ${command}`)) {
       return `${markdownUrl(url)}: no \`${command}\` command`;
     }
-    if (markdown.includes("npx @zitadel/cli@latest variables ")) {
-      return `${markdownUrl(url)}: a \`variables\` command, which the CLI does not have`;
+    if (/npx @zitadel\/cli@latest variable[^`]*--(?:data|project-level)/.test(markdown)) {
+      return `${markdownUrl(url)}: a \`variable\` command with a flag it does not have`;
     }
     if (named) {
       // The command's page links back to the operation (lib/cli-reference.ts).

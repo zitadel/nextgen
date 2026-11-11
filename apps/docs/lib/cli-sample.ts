@@ -12,9 +12,7 @@ import { authentication, operationParameters, pathParameterNames } from "./sdk-s
 //
 // The CLI acts on the project its directory was set up for, so `project_id`
 // never appears. The path parameter is the command's positional, a write's
-// body goes in `--data`, and a list's query becomes its flags. The variable
-// commands are shown only for a request they do exactly (`variableCommand`);
-// any other variable request is the `zitadel api` call.
+// body goes in `--data`, and a list's query becomes its flags.
 
 export const cli = "npx @zitadel/cli@latest";
 
@@ -61,10 +59,7 @@ export function cliSample(
   const [topic, verb] = command.split(" ");
   const positionals = pathParameterNames(path).map((name) => word(request.path[name]?.value ?? ""));
 
-  if (topic === "variable") {
-    const exact = variableCommand(verb, positionals, request);
-    return exact ?? apiSample(operation, path, request, "input");
-  }
+  if (topic === "variable") return variables(verb, positionals, request);
 
   const flags: string[] = [];
   if (verb === "list") {
@@ -78,30 +73,17 @@ export function cliSample(
 // `zitadel api <operationId>`: the path parameters are its arguments, but a
 // trailing `project_id`, which the CLI fills in itself; each query parameter
 // and top-level body field is a `--field`, typed by the operation's schema, and
-// an object, a list or `null` is JSON after `:=`. With `bodyAs: "input"` the
-// body is JSON on stdin instead, written by `printf` because `echo` reads a
-// backslash as an escape: a variables map has keys of its own, and one named
-// `kind` as a `--field` would be the query parameter.
-function apiSample(
-  operation: OperationObject,
-  path: string,
-  request: RequestData,
-  bodyAs: "fields" | "input" = "fields",
-): string {
+// an object, a list or `null` is JSON after `:=`.
+function apiSample(operation: OperationObject, path: string, request: RequestData): string {
   const names = pathParameterNames(path);
   const positionals = names
     .filter((name, index) => name !== "project_id" || index < names.length - 1)
     .map((name) => word(request.path[name]?.value ?? ""));
-  const body = record(request.body);
-  const piped = bodyAs === "input" && Object.keys(body).length > 0;
   const fields = [
-    ...(piped ? ["--input -"] : []),
     ...Object.entries(request.query)
       .filter(([name]) => name !== "project_id")
-      .flatMap(([name, { values }]) =>
-        values.filter((value) => value !== "").map((value) => field(name, value)),
-      ),
-    ...(bodyAs === "fields" ? Object.entries(body).map(([name, value]) => field(name, value)) : []),
+      .flatMap(([name, { values }]) => values.map((value) => field(name, value))),
+    ...Object.entries(record(request.body)).map(([name, value]) => field(name, value)),
   ];
   // An operation that needs no credential runs anywhere, unless the CLI is
   // to fill in its project.
@@ -109,8 +91,7 @@ function apiSample(
     authentication(operation) === "secret" ||
     names.includes("project_id") ||
     "project_id" in request.query;
-  const run = line([`${cli} api ${operation.operationId ?? ""}`, ...positionals], fields);
-  const call = piped ? `printf '%s' ${quote(JSON.stringify(body, null, 2))} | ${run}` : run;
+  const call = line([`${cli} api ${operation.operationId ?? ""}`, ...positionals], fields);
   return project ? `${context}\n${call}` : call;
 }
 
@@ -141,68 +122,41 @@ function listFlags(request: RequestData): string[] {
   return flags;
 }
 
-// Whether `variable <verb>` does what the request does for its `kind`. The
-// commands act on both kinds, or on the preview value with `--preview`, so a
-// `get` must name a kind and the rest must not ask for `primary` alone.
-// `resolve` takes an origin, not the deployment id the path names.
-function variableRunsAs(verb: string | undefined, kind: string | undefined): boolean {
-  switch (verb) {
-    case "get":
-      return kind === "primary" || kind === "preview";
-    case "list":
-    case "set":
-    case "rm":
-      return kind === undefined || kind === "preview";
-    default:
-      return false;
+// The variable commands act on the project the directory was set up for.
+// `set` takes no value on the command line: it prompts for it, or reads it
+// from stdin, so a credential stays out of the shell's history. A body sets
+// many variables at once, so it is a command for each, and the `null` that
+// removes one is an `rm`. `kind=preview` is `--preview`, and `resolve` takes
+// an origin rather than the deployment the path names.
+function variables(verb: string | undefined, positionals: string[], request: RequestData): string {
+  const preview = request.query.kind?.values[0] === "preview" ? ["--preview"] : [];
+  if (verb === "resolve") {
+    return `${context}\n${cli} variable resolve`;
   }
-}
+  if (verb !== "set") {
+    return `${context}\n${line([`${cli} variable ${verb}`, ...positionals], preview)}`;
+  }
 
-// The `variable` command for a request it does exactly; `undefined` for any
-// other, which the caller shows as the `zitadel api` call. A `set` prompts for
-// the value, or reads it from stdin, so a credential stays out of the shell's
-// history.
-function variableCommand(
-  verb: string | undefined,
-  positionals: string[],
-  request: RequestData,
-): string | undefined {
-  const kind = request.query.kind?.values[0] || undefined;
-  if (!variableRunsAs(verb, kind)) {
-    return undefined;
-  }
-  if (verb === "set") {
-    return variableSet(request.body, kind === "preview");
-  }
-  const flags = kind === "preview" ? ["--preview"] : [];
-  return `${context}\n${line([`${cli} variable ${verb}`, ...positionals], flags)}`;
-}
-
-// `variable set` for a body of one variable it can store. Several variables
-// are one atomic request, a `null` removes a name that may not exist, and
-// `--secret` refuses `--as number` and `--as boolean`. A plain `--preview`
-// value is refused for a name whose primary value is a secret, which the
-// generator cannot know, so only a secret is shown with it.
-function variableSet(body: unknown, preview: boolean): string | undefined {
-  const entries = Object.entries(record(body));
-  const [name, value] = entries[0] ?? ["NAME", ""];
-  const { secret, value: scalar } = record(value);
-  const refused =
-    entries.length > 1 ||
-    value === null ||
-    (secret === true && typeof scalar !== "string") ||
-    (preview && secret !== true);
-  if (refused) {
-    return undefined;
-  }
-  const type = typeof (scalar ?? value);
-  const flags = [
-    ...(secret === true ? ["--secret"] : []),
-    ...(type === "number" || type === "boolean" ? [`--as ${type}`] : []),
-    ...(preview ? ["--preview"] : []),
-  ];
-  const command = line([`${cli} variable set`, word(name)], flags);
-  return [context, "# The set prompts for the value, or reads it from stdin.", command].join("\n");
+  const entries: [string, unknown][] = Object.entries(record(request.body));
+  const commands = (entries.length > 0 ? entries : [["NAME", ""]]).map(([name, value]) => {
+    if (value === null) return line([`${cli} variable rm`, word(name)], preview);
+    const { secret, value: scalar } = record(value);
+    const type = typeof (scalar ?? value);
+    return line(
+      [`${cli} variable set`, word(name)],
+      [
+        ...(secret === true ? ["--secret"] : []),
+        ...(type === "number" || type === "boolean" ? [`--as ${type}`] : []),
+        ...preview,
+      ],
+    );
+  });
+  const prompts = entries.length === 0 || entries.some(([, value]) => value !== null);
+  return [
+    context,
+    ...(prompts ? ["# Each set prompts for the value, or reads it from stdin."] : []),
+    ...commands,
+  ].join("\n");
 }
 
 /** One command: on a line while it fits the repo's 100 columns, else a flag a line, as cURL is. */
