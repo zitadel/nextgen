@@ -99,13 +99,6 @@ SELECT EXISTS (
       AND object_type = 'project' AND relation = 'team'
       AND revoked_at IS NULL
 )`
-
-	listClaimedProjectIDsStmt = `
-SELECT DISTINCT project_id FROM authz_assignments
-WHERE object_type = 'project' AND relation = 'team' AND revoked_at IS NULL
-  AND (@p1 = '' OR project_id > @p1)
-ORDER BY project_id
-LIMIT @p2`
 )
 
 var authzAssignmentColumns = []string{
@@ -280,29 +273,6 @@ func (s authzAssignmentStatements) HasActiveOwningTeamGrant(ctx context.Context,
 		return false, wrapError(err)
 	}
 	return owns, nil
-}
-
-// ListClaimedProjectIDs implements [service.AuthzAssignmentStatements].
-func (s authzAssignmentStatements) ListClaimedProjectIDs(ctx context.Context, afterID string, limit uint32) ([]string, error) {
-	if limit == 0 {
-		limit = 500
-	}
-	var ids []string
-	err := s.db.Query(ctx, buildStatement(listClaimedProjectIDsStmt, afterID, int64(limit)).statement(), func(iter *spanner.RowIterator) error {
-		var qErr error
-		ids, qErr = collectRows(iter, func(row *spanner.Row) (string, error) {
-			var id string
-			if err := row.Columns(&id); err != nil {
-				return "", err
-			}
-			return id, nil
-		})
-		return qErr
-	})
-	if err != nil {
-		return nil, err
-	}
-	return ids, nil
 }
 
 // ListAuthorizedProjects implements [service.AuthzAssignmentStatements].

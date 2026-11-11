@@ -104,6 +104,7 @@ func setLauncherEnv(t *testing.T, dataDir string) {
 		"MASTER_KEY_PREVIOUS_ID",
 		"MASTER_KEY_PREVIOUS_PEM_B64",
 		"NEXTGEN_DATABASE_POSTGRES",
+		"NEXTGEN_EVENTS_REQUEST_FLUSH_WAIT",
 		"NEXTGEN_INSTRUMENTATION_LOG_FORMAT",
 		"NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT",
 		"NEXTGEN_PLATFORM_OPERATORS",
@@ -111,6 +112,7 @@ func setLauncherEnv(t *testing.T, dataDir string) {
 		"NEXTGEN_SERVER_CONSOLE_ENABLED",
 		"NEXTGEN_SERVER_CONSOLE_ORIGINS",
 		"NEXTGEN_SERVER_CONSOLE_PATH",
+		"NEXTGEN_SERVER_IDLE_TIMEOUT",
 		"NEXTGEN_SERVER_PUBLIC_BASE",
 		"NEXTGEN_SERVER_REQUEST_ID_HEADER",
 		"PORT",
@@ -353,6 +355,7 @@ func TestPrepareServerPinsTheDeploymentShape(t *testing.T) {
 	t.Setenv("NEXTGEN_SERVER_CONSOLE_ENABLED", "true")
 	t.Setenv("NEXTGEN_SERVER_CONSOLE_PATH", "/ui/console")
 	t.Setenv("NEXTGEN_SERVER_REQUEST_ID_HEADER", "x-request-id")
+	t.Setenv("NEXTGEN_SERVER_IDLE_TIMEOUT", "60s")
 
 	_, err := prepareServer(nil)
 	require.NoError(t, err)
@@ -360,6 +363,8 @@ func TestPrepareServerPinsTheDeploymentShape(t *testing.T) {
 	assert.Equal(t, "false", os.Getenv("NEXTGEN_SERVER_CONSOLE_ENABLED"), "the console is a service of its own")
 	assert.Equal(t, "/console", os.Getenv("NEXTGEN_SERVER_CONSOLE_PATH"), "where vercel.json mounts the console")
 	assert.Equal(t, "x-vercel-id", os.Getenv("NEXTGEN_SERVER_REQUEST_ID_HEADER"), "the ID Vercel's dashboard shows")
+	assert.Equal(t, "0", os.Getenv("NEXTGEN_SERVER_IDLE_TIMEOUT"), "Vercel's proxy reuses its connections across a pause")
+	assert.Equal(t, "2s", os.Getenv("NEXTGEN_EVENTS_REQUEST_FLUSH_WAIT"), "a function runs only while it serves a request")
 	assert.Equal(t, "true", os.Getenv("NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT"))
 	assert.Equal(t, "json", os.Getenv("NEXTGEN_INSTRUMENTATION_LOG_FORMAT"))
 	assert.Equal(t, "https://nextgen-preview-cloud.vercel.app", os.Getenv("NEXTGEN_SERVER_PUBLIC_BASE"))
