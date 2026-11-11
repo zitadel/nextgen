@@ -1672,9 +1672,10 @@ describe("users screen", () => {
   it("reads only the rows for a new term, keeping the older revisions filter", async () => {
     serveLineage();
     const bodies = recordQueries(() => HttpResponse.json({ users: [] }));
-    let schemaReads = 0;
+    const schemaReads: string[] = [];
     const countSchemaReads = ({ request }: { request: Request }) => {
-      if (new URL(request.url).pathname.startsWith("/api/v1/schemas")) schemaReads += 1;
+      const url = new URL(request.url);
+      if (url.pathname.startsWith("/api/v1/schemas")) schemaReads.push(url.pathname + url.search);
     };
     await renderUsers(`${scopedPath("/users")}&schema=business&revision=older`);
     await screen.findByText("No users match this filter.");
@@ -1695,7 +1696,7 @@ describe("users screen", () => {
       ),
     );
     await waitFor(() => expect(screen.getByRole("table")).not.toHaveAttribute("aria-busy", "true"));
-    expect(schemaReads).toBe(0);
+    expect(schemaReads).toEqual([]);
   });
 
   it.each([

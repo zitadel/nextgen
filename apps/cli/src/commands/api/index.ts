@@ -16,13 +16,16 @@ import {
   Operation,
   OperationService,
   type Target,
+  type ZitadelClient,
 } from "@/lib/backend";
 import { CANCELLED, ZitadelError } from "@/lib/errors";
 import { log } from "@/lib/log";
+import { DEFAULT_SERVER } from "@/lib/server";
 import {
   type Admitted,
-  BaseCommand,
   CommandGroups,
+  CREDENTIALS,
+  EnvironmentCommand,
   type JsonEnvelope,
   nonBlankString,
 } from "@/lib/oclif";
@@ -30,8 +33,6 @@ import { Destructive } from "@/lib/oclif/destructive";
 import { reads, type Refused } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { json, prose, type Rendering } from "@/lib/oclif/rendering";
-import { Suggestible } from "@/lib/oclif/suggestible";
-import { readZitadelSecret, type ZitadelSecret } from "@/lib/project";
 import { type SuggestedCommand, unscopedCommand } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import type { Summary } from "@/lib/ui";
@@ -136,23 +137,14 @@ export function refuseUnpaged(target: Target | undefined, paginate: boolean): vo
 }
 
 /**
- * The project the operation is called on behalf of, when there is one. An
- * operation that needs no credential runs anywhere; one that does needs the
- * project `zitadel setup` wrote, and is refused without it. Either way a
- * project at hand fills a `project_id` left out, and with the operation still
- * to be chosen a missing project only narrows what can be chosen.
+ * Where a call goes, the project a `project_id` left out is filled from, and
+ * the client that sends it.
  */
-export async function readProjectSecret(
-  target: Target | undefined,
-  cwd: string,
-): Promise<ZitadelSecret | undefined> {
-  if (target?.operation.auth === "secret") {
-    return readZitadelSecret(cwd);
-  }
-  return readZitadelSecret(cwd).catch(() => {
-    return undefined;
-  });
-}
+type Reach = Readonly<{
+  server: string;
+  projectId: string | undefined;
+  client: ZitadelClient;
+}>;
 
 /**
  * Every path parameter's value the command line gives: from the path itself
@@ -225,6 +217,8 @@ function quote(value: string): string {
  * The api command — call any operation of the Zitadel API with the server and
  * project secret every other command uses: the escape hatch for what no
  * resource command covers yet, as `gh api` and `vercel api` are for theirs.
+ * Both come from the same environment, so the secret only ever goes to the
+ * server its project belongs to.
  *
  * The operations are the spec's (`@zitadel/api/generated/operations`), so an
  * operation is named by its `operationId` or found by its path, a field is
@@ -233,7 +227,7 @@ function quote(value: string): string {
  * it. An operation that deletes, revokes or rolls back asks first, as the
  * command that covers it does.
  */
-export default class Api extends Suggestible(Destructive(BaseCommand)) {
+export default class Api extends Destructive(EnvironmentCommand) {
   static override description =
     "Call any operation of the Zitadel API, with this project's server and project secret.";
   static override group = CommandGroups.diagnostics;
@@ -321,29 +315,28 @@ export default class Api extends Suggestible(Destructive(BaseCommand)) {
       return this.suggest(next);
     });
     refuseUnpaged(named, flags.paginate);
-    const secret = await readProjectSecret(named, this.cwd);
-    this.ui.ranAgainst(secret?.project_id, this.meta.source);
 
-    const target = named ?? resolveTarget(await this.chooseOperation(flags.paginate, secret));
+    const target = named ?? resolveTarget(await this.chooseOperation(flags.paginate));
     const { operation } = target;
     this.recordTelemetry({
       operation: operation.id,
       is_paginated: flags.paginate,
     });
+    const { server, projectId, client } = await this.reach(operation);
 
-    const built = await requestOf(target, flags, secret?.project_id);
+    const built = await requestOf(target, flags, projectId);
     refuseUnforced(built, this.meta);
     const request = withPathValues(
       built,
       await this.pathValues(
         target,
-        pathValuesFromWords(target, argv, args.operation !== undefined, secret?.project_id),
+        pathValuesFromWords(target, argv, args.operation !== undefined, projectId),
       ),
     );
 
-    const url = operation.urlOn(this.meta.source, request);
+    const url = operation.urlOn(server, request);
     if (this.dryRun) {
-      const curl = prose(this.curlFor(request));
+      const curl = prose(this.curlFor(request, server));
       const title = `Would call ${operation.id} (dry run)`;
 
       return this.emit({
@@ -381,10 +374,8 @@ export default class Api extends Suggestible(Destructive(BaseCommand)) {
           name: `call ${operation.id}`,
           message: [
             `Call ${operation.id}${
-              secret === undefined
-                ? ""
-                : ` in project ${escapeControlCharacters(secret.project_id)}`
-            } on ${escapeControlCharacters(this.meta.source.replace(/^https?:\/\//, ""))}?`,
+              projectId === undefined ? "" : ` in project ${escapeControlCharacters(projectId)}`
+            } on ${escapeControlCharacters(server.replace(/^https?:\/\//, ""))}?`,
             ...(operation.summary === "" ? [] : [`${operation.summary}.`]),
           ].join(" "),
           // A body is not repeated in a suggestion: it can hold a secret, or
@@ -407,13 +398,6 @@ export default class Api extends Suggestible(Destructive(BaseCommand)) {
         },
       });
     }
-    const token = operation.auth === "secret" ? secret?.project_secret : undefined;
-    const client = createZitadelClient({
-      userAgent: userAgent(),
-      baseUrl: this.meta.source,
-      token,
-      signal: this.signal,
-    });
     const operationService = new OperationService(
       consent === undefined ? client : consent.unlock(client),
     );
@@ -471,16 +455,45 @@ export default class Api extends Suggestible(Destructive(BaseCommand)) {
     };
   }
 
-  /** Choose an operation the CLI can call: its part of the API, then the operation. */
-  private async chooseOperation(
-    paginate: boolean,
-    secret: ZitadelSecret | undefined,
-  ): Promise<string> {
+  /**
+   * The server, project and client a call to `operation` uses. One that needs
+   * the project secret takes all three from the environment, as every other
+   * command does, and is refused, naming the variable, when one is missing:
+   * the secret is never sent to a server its project did not name. One that
+   * needs no credential runs anywhere: against the project's server when the
+   * environment names one, else against the cloud, with no project to fill in.
+   */
+  private async reach(operation: Operation): Promise<Reach> {
+    if (operation.auth === "secret") {
+      return this.connect();
+    }
+    const { values } = this.environment;
+    const named = values.ZITADEL_URL?.value;
+    const server = named ?? DEFAULT_SERVER;
+    return {
+      server,
+      projectId: named === undefined ? undefined : values.ZITADEL_PROJECT_ID?.value,
+      client: createZitadelClient({
+        userAgent: userAgent(),
+        baseUrl: server,
+        token: undefined,
+        signal: this.signal,
+      }),
+    };
+  }
+
+  /**
+   * Choose an operation the CLI can call: its part of the API, then the
+   * operation. One that needs the project secret is offered only where the
+   * environment has one.
+   */
+  private async chooseOperation(paginate: boolean): Promise<string> {
+    const hasSecret = this.environment.values[CREDENTIALS.project] !== undefined;
     const callable = Operation.all().filter((operation) => {
       return (
         operation.uncallable === undefined &&
         (!paginate || operation.paging !== null) &&
-        (operation.auth !== "secret" || secret !== undefined)
+        (operation.auth !== "secret" || hasSecret)
       );
     });
     const retry = this.suggest("api ls --json");
@@ -561,11 +574,12 @@ export default class Api extends Suggestible(Destructive(BaseCommand)) {
    * double quotes so the shell expands it.
    *
    * @param request - The request.
+   * @param server - The server it is sent to.
    * @returns The command.
    */
-  private curlFor(request: ApiRequest): string {
+  private curlFor(request: ApiRequest, server: string): string {
     return [
-      `curl -X ${request.operation.method} ${quote(request.operation.urlOn(this.meta.source, request))}`,
+      `curl -X ${request.operation.method} ${quote(request.operation.urlOn(server, request))}`,
       ...(request.operation.auth === "secret"
         ? ['-H "Authorization: Bearer $ZITADEL_PROJECT_SECRET"']
         : []),
