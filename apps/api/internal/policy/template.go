@@ -49,12 +49,16 @@ type Template struct {
 }
 
 // Setting describes one value an instance may set: its type and, for an
-// integer, the bounds the server can technically support. There is no
-// default: an omitted setting is off.
+// integer, the bounds the server can technically support, or for a string,
+// the values it may take. There is no default: an omitted setting is off.
 type Setting struct {
 	Type    SettingType `json:"type"`
 	Minimum *int64      `json:"minimum,omitempty"`
 	Maximum *int64      `json:"maximum,omitempty"`
+	// Enum lists every value a string setting may take, and a string setting
+	// must have one: the longest value bounds what the cost estimator assumes
+	// a string costs, which a free-form string could exceed.
+	Enum []string `json:"enum,omitempty"`
 }
 
 // SettingType is the JSON type of a setting.
@@ -63,6 +67,7 @@ type SettingType string
 const (
 	SettingTypeInteger SettingType = "integer"
 	SettingTypeBoolean SettingType = "boolean"
+	SettingTypeString  SettingType = "string"
 )
 
 // Rule is one named boolean CEL expression.
@@ -180,12 +185,25 @@ func (t *Template) validate() error {
 		}
 		switch setting.Type {
 		case SettingTypeInteger, SettingTypeBoolean:
-		case "string":
-			// A string has no size the cost estimator could bound a rule by,
-			// so a rule over one could not be checked at startup. Adding
-			// string settings needs a length bound that also feeds the
-			// estimator.
-			return fmt.Errorf("setting %q: string settings are not supported; they need a length bound the cost estimator can use", name)
+			if len(setting.Enum) > 0 {
+				return fmt.Errorf("setting %q: enum only applies to strings", name)
+			}
+		case SettingTypeString:
+			// A free-form string has no size the cost estimator could bound a
+			// rule by, so a string setting lists its values.
+			if len(setting.Enum) == 0 {
+				return fmt.Errorf("setting %q: a string setting needs an enum of the values it may take", name)
+			}
+			for i, value := range setting.Enum {
+				// The values reach clients in constraints and are written in
+				// policy files, so they follow the wire's snake_case.
+				if !publicName.MatchString(value) {
+					return fmt.Errorf("setting %q: enum value %q must be snake_case", name, value)
+				}
+				if slices.Contains(setting.Enum[:i], value) {
+					return fmt.Errorf("setting %q: duplicate enum value %q", name, value)
+				}
+			}
 		default:
 			return fmt.Errorf("setting %q: unsupported type %q", name, setting.Type)
 		}
@@ -283,6 +301,7 @@ func (t *Template) clone() *Template {
 		if setting.Maximum != nil {
 			setting.Maximum = new(*setting.Maximum)
 		}
+		setting.Enum = slices.Clone(setting.Enum)
 		out.Config[name] = setting
 	}
 	out.ConfigRules = slices.Clone(t.ConfigRules)
@@ -319,7 +338,7 @@ func checkTemplateKeys(data []byte) error {
 			return fmt.Errorf("config: %w", err)
 		}
 		for name, setting := range settings {
-			if err := exactKeys(fmt.Sprintf("setting %q", name), setting, "type", "minimum", "maximum"); err != nil {
+			if err := exactKeys(fmt.Sprintf("setting %q", name), setting, "type", "minimum", "maximum", "enum"); err != nil {
 				return err
 			}
 		}

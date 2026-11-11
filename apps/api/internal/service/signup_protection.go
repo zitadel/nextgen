@@ -16,7 +16,8 @@ import (
 )
 
 // SignupProtection is deliberately limited to password signup. A proof buys
-// one create_user attempt in its flow, not an authentication factor.
+// one create_user attempt in its flow, not an authentication factor. It is
+// the guard, and the project's user.create policy chooses its challenge.
 type SignupProtection interface {
 	Challenge(context.Context, *domain.FlowState) (*pow.PublicChallenge, error)
 	Consume(context.Context, *domain.FlowState, string) error
@@ -35,15 +36,36 @@ const (
 )
 
 type signupProtection struct {
-	db    StatementPool
-	keys  KeyService
-	now   func() time.Time
-	sweep func() bool
+	db     StatementPool
+	keys   KeyService
+	policy *UserCreatePolicy
+	now    func() time.Time
+	sweep  func() bool
 }
 
-func NewSignupProtection(db StatementPool, keys KeyService) SignupProtection {
-	return &signupProtection{db: db, keys: keys, now: time.Now,
+// NewSignupProtection builds the guard over the project's user.create policy,
+// which names the challenge a sign-up must solve.
+func NewSignupProtection(db StatementPool, keys KeyService, policy *UserCreatePolicy) SignupProtection {
+	return &signupProtection{db: db, keys: keys, policy: policy, now: time.Now,
 		sweep: func() bool { return mrand.IntN(signupSweepOneIn) == 0 }}
+}
+
+// requireBuiltinChallenge checks that the project's policy asks for the
+// built-in proof of work, the only challenge the server issues. The
+// template's enum admits no other, so any other answer is a server fault,
+// never a sign-up without a challenge.
+func (s *signupProtection) requireBuiltinChallenge(ctx context.Context, projectID string) error {
+	if s.policy == nil {
+		return domain.ErrInternal(errors.New("signup protection has no user create policy"))
+	}
+	challenge, err := s.policy.Challenge(ctx, projectID)
+	if err != nil {
+		return err
+	}
+	if challenge != domain.SignupGateProvider {
+		return domain.ErrInternal(fmt.Errorf("no issuer for the sign-up challenge %q", challenge))
+	}
+	return nil
 }
 
 // The per-challenge solution MAC key never leaves encrypted storage. The
@@ -136,6 +158,11 @@ func (s *signupProtection) open(ctx context.Context, record *domain.SignupChalle
 func (s *signupProtection) Challenge(ctx context.Context, state *domain.FlowState) (*pow.PublicChallenge, error) {
 	if state == nil || state.ID == "" || state.ProjectID == "" {
 		return nil, domain.ErrFlowIntegrity()
+	}
+	// Asked on every render, a live challenge included: a policy that names
+	// another challenge must not keep serving one it would refuse.
+	if err := s.requireBuiltinChallenge(ctx, state.ProjectID); err != nil {
+		return nil, err
 	}
 	now := s.now()
 	record, err := s.db.Statements().GetSignupChallenge(ctx, state.ProjectID, state.ID)
@@ -246,6 +273,14 @@ func (s *signupProtection) Consume(ctx context.Context, state *domain.FlowState,
 		signupBinding(state, record.ID, record.ExpiresAt), pow.Keys{Solution: payload.SolutionKey}, s.now())
 	if err != nil {
 		return domain.ErrFlowProofInvalid()
+	}
+	// A solved proof of work is the request's bot signal; the policy decides
+	// whether it is the challenge this project's sign-up asks for.
+	if s.policy == nil {
+		return domain.ErrInternal(errors.New("signup protection has no user create policy"))
+	}
+	if err := s.policy.CheckSolved(ctx, state.ProjectID, domain.SignupGateProvider); err != nil {
+		return err
 	}
 	return s.db.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		st := tx.Statements()

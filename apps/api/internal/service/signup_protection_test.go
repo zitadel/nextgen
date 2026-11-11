@@ -47,7 +47,7 @@ func TestSignupProofExpiresWhileWaitingForLock(t *testing.T) {
 			func(_ context.Context, r *domain.SignupChallengeRecord) error { record = r; return nil },
 		)
 		stmts.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
-		svc := service.NewSignupProtectionForTest(pool, keys, true)
+		svc := service.NewSignupProtectionForTest(pool, keys, builtinChallenge(t), true)
 		state := &domain.FlowState{ProjectID: "project", ID: "flow"}
 		challenge, err := svc.Challenge(t.Context(), state)
 		require.NoError(t, err)
@@ -80,7 +80,7 @@ func TestSignupRateLimitedIssuanceDoesNotSweep(t *testing.T) {
 		ProjectID: "project", FlowID: "flow", WindowStart: time.Now().Unix(), Issued: 10,
 	}, nil)
 	// No cleanup, key lookup or KDF may follow a refused issuance.
-	svc := service.NewSignupProtection(pool, nil)
+	svc := service.NewSignupProtection(pool, nil, builtinChallenge(t))
 	_, err := svc.Challenge(t.Context(), &domain.FlowState{ProjectID: "project", ID: "flow"})
 	require.ErrorIs(t, err, domain.ErrFlowRateLimited())
 }
@@ -88,7 +88,7 @@ func TestSignupRateLimitedIssuanceDoesNotSweep(t *testing.T) {
 func TestSignupMalformedProofSpendsNoBudget(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	// Any read, lock or budget write fails the test.
-	svc := service.NewSignupProtection(servicemocks.NewMockPool(ctrl), nil)
+	svc := service.NewSignupProtection(servicemocks.NewMockPool(ctrl), nil, builtinChallenge(t))
 	err := svc.Consume(t.Context(), &domain.FlowState{ProjectID: "project", ID: "flow"}, "not-a-proof")
 	require.ErrorIs(t, err, domain.ErrFlowProofInvalid())
 }
@@ -119,7 +119,7 @@ func TestSignupSweepNeverFailsIssuance(t *testing.T) {
 			if sweepErr != nil {
 				stmts.EXPECT().DeleteExpiredSignupProtection(gomock.Any(), "project", gomock.Any(), 1000).Return(sweepErr)
 			}
-			svc := service.NewSignupProtectionForTest(pool, keys, sweepErr != nil)
+			svc := service.NewSignupProtectionForTest(pool, keys, builtinChallenge(t), sweepErr != nil)
 			challenge, err := svc.Challenge(t.Context(), &domain.FlowState{ProjectID: "project", ID: "flow"})
 			require.NoError(t, err)
 			require.Equal(t, "challenge", challenge.ChallengeID)
@@ -148,7 +148,7 @@ func TestSignupChargeSurvivesASweptLimitsRow(t *testing.T) {
 			ProjectID: "project", FlowID: "flow", WindowStart: time.Now().Unix(), Issued: 10,
 		}, nil),
 	)
-	svc := service.NewSignupProtection(pool, nil)
+	svc := service.NewSignupProtection(pool, nil, builtinChallenge(t))
 	_, err := svc.Challenge(t.Context(), &domain.FlowState{ProjectID: "project", ID: "flow"})
 	// The row read on the second try is the one charged: its budget is spent.
 	require.ErrorIs(t, err, domain.ErrFlowRateLimited())

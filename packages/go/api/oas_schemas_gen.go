@@ -25390,6 +25390,7 @@ func (*EvaluatePolicyErrorResponseStatusCode) evaluatePolicyRes() {}
 type EvaluatePolicyRequest struct {
 	Type                       EvaluatePolicyRequestType // switch on this field
 	PasswordSetEvaluateRequest PasswordSetEvaluateRequest
+	UserCreateEvaluateRequest  UserCreateEvaluateRequest
 }
 
 // EvaluatePolicyRequestType is oneOf type of EvaluatePolicyRequest.
@@ -25398,11 +25399,17 @@ type EvaluatePolicyRequestType string
 // Possible values for EvaluatePolicyRequestType.
 const (
 	PasswordSetEvaluateRequestEvaluatePolicyRequest EvaluatePolicyRequestType = "auth.factor.password.set"
+	UserCreateEvaluateRequestEvaluatePolicyRequest  EvaluatePolicyRequestType = "user.create"
 )
 
 // IsPasswordSetEvaluateRequest reports whether EvaluatePolicyRequest is PasswordSetEvaluateRequest.
 func (s EvaluatePolicyRequest) IsPasswordSetEvaluateRequest() bool {
 	return s.Type == PasswordSetEvaluateRequestEvaluatePolicyRequest
+}
+
+// IsUserCreateEvaluateRequest reports whether EvaluatePolicyRequest is UserCreateEvaluateRequest.
+func (s EvaluatePolicyRequest) IsUserCreateEvaluateRequest() bool {
+	return s.Type == UserCreateEvaluateRequestEvaluatePolicyRequest
 }
 
 // SetPasswordSetEvaluateRequest sets EvaluatePolicyRequest to PasswordSetEvaluateRequest.
@@ -25426,6 +25433,27 @@ func NewPasswordSetEvaluateRequestEvaluatePolicyRequest(v PasswordSetEvaluateReq
 	return s
 }
 
+// SetUserCreateEvaluateRequest sets EvaluatePolicyRequest to UserCreateEvaluateRequest.
+func (s *EvaluatePolicyRequest) SetUserCreateEvaluateRequest(v UserCreateEvaluateRequest) {
+	s.Type = UserCreateEvaluateRequestEvaluatePolicyRequest
+	s.UserCreateEvaluateRequest = v
+}
+
+// GetUserCreateEvaluateRequest returns UserCreateEvaluateRequest and true boolean if EvaluatePolicyRequest is UserCreateEvaluateRequest.
+func (s EvaluatePolicyRequest) GetUserCreateEvaluateRequest() (v UserCreateEvaluateRequest, ok bool) {
+	if !s.IsUserCreateEvaluateRequest() {
+		return v, false
+	}
+	return s.UserCreateEvaluateRequest, true
+}
+
+// NewUserCreateEvaluateRequestEvaluatePolicyRequest returns new EvaluatePolicyRequest from UserCreateEvaluateRequest.
+func NewUserCreateEvaluateRequestEvaluatePolicyRequest(v UserCreateEvaluateRequest) EvaluatePolicyRequest {
+	var s EvaluatePolicyRequest
+	s.SetUserCreateEvaluateRequest(v)
+	return s
+}
+
 // The decision the operation would reach for the request. A refusal carries
 // the error code and violations an API call of the operation would answer
 // with. A login flow shows the same rules as field errors instead.
@@ -25434,8 +25462,8 @@ type EvaluatePolicyResponse struct {
 	// Whether the operation would go ahead.
 	Allowed bool `json:"allowed"`
 	// The error code an API call of the operation would answer with, set
-	// only when it would refuse, for example `user.password_empty` or
-	// `user.password_policy_violation`.
+	// only when it would refuse, for example `user.password_empty`,
+	// `user.password_policy_violation` or, for a sign-up, `flow.proof_invalid`.
 	Code OptString `json:"code"`
 	// Every failed rule keyed by name, with the value of the setting it is
 	// named after, for example `{"min_length": 12}`. It matches the live
@@ -75527,6 +75555,52 @@ func (o OptUserConflictDetails) Or(d UserConflictDetails) UserConflictDetails {
 	return d
 }
 
+// NewOptUserCreateConfigChallenge returns new OptUserCreateConfigChallenge with value set to v.
+func NewOptUserCreateConfigChallenge(v UserCreateConfigChallenge) OptUserCreateConfigChallenge {
+	return OptUserCreateConfigChallenge{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptUserCreateConfigChallenge is optional UserCreateConfigChallenge.
+type OptUserCreateConfigChallenge struct {
+	Value UserCreateConfigChallenge
+	Set   bool
+}
+
+// IsSet returns true if OptUserCreateConfigChallenge was set.
+func (o OptUserCreateConfigChallenge) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptUserCreateConfigChallenge) Reset() {
+	var v UserCreateConfigChallenge
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptUserCreateConfigChallenge) SetTo(v UserCreateConfigChallenge) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptUserCreateConfigChallenge) Get() (v UserCreateConfigChallenge, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptUserCreateConfigChallenge) Or(d UserCreateConfigChallenge) UserCreateConfigChallenge {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptUserCreateFailedEventDelegationType returns new OptUserCreateFailedEventDelegationType with value set to v.
 func NewOptUserCreateFailedEventDelegationType(v UserCreateFailedEventDelegationType) OptUserCreateFailedEventDelegationType {
 	return OptUserCreateFailedEventDelegationType{
@@ -80827,6 +80901,7 @@ func (s *PolRevisionConflictDetails) init() PolRevisionConflictDetails {
 type Policy struct {
 	Type              PolicyType // switch on this field
 	PasswordSetPolicy PasswordSetPolicy
+	UserCreatePolicy  UserCreatePolicy
 }
 
 // PolicyType is oneOf type of Policy.
@@ -80835,10 +80910,14 @@ type PolicyType string
 // Possible values for PolicyType.
 const (
 	PasswordSetPolicyPolicy PolicyType = "auth.factor.password.set"
+	UserCreatePolicyPolicy  PolicyType = "user.create"
 )
 
 // IsPasswordSetPolicy reports whether Policy is PasswordSetPolicy.
 func (s Policy) IsPasswordSetPolicy() bool { return s.Type == PasswordSetPolicyPolicy }
+
+// IsUserCreatePolicy reports whether Policy is UserCreatePolicy.
+func (s Policy) IsUserCreatePolicy() bool { return s.Type == UserCreatePolicyPolicy }
 
 // SetPasswordSetPolicy sets Policy to PasswordSetPolicy.
 func (s *Policy) SetPasswordSetPolicy(v PasswordSetPolicy) {
@@ -80858,6 +80937,27 @@ func (s Policy) GetPasswordSetPolicy() (v PasswordSetPolicy, ok bool) {
 func NewPasswordSetPolicyPolicy(v PasswordSetPolicy) Policy {
 	var s Policy
 	s.SetPasswordSetPolicy(v)
+	return s
+}
+
+// SetUserCreatePolicy sets Policy to UserCreatePolicy.
+func (s *Policy) SetUserCreatePolicy(v UserCreatePolicy) {
+	s.Type = UserCreatePolicyPolicy
+	s.UserCreatePolicy = v
+}
+
+// GetUserCreatePolicy returns UserCreatePolicy and true boolean if Policy is UserCreatePolicy.
+func (s Policy) GetUserCreatePolicy() (v UserCreatePolicy, ok bool) {
+	if !s.IsUserCreatePolicy() {
+		return v, false
+	}
+	return s.UserCreatePolicy, true
+}
+
+// NewUserCreatePolicyPolicy returns new Policy from UserCreatePolicy.
+func NewUserCreatePolicyPolicy(v UserCreatePolicy) Policy {
+	var s Policy
+	s.SetUserCreatePolicy(v)
 	return s
 }
 
@@ -81320,12 +81420,14 @@ type PolicyOperation string
 
 const (
 	PolicyOperationAuthFactorPasswordSet PolicyOperation = "auth.factor.password.set"
+	PolicyOperationUserCreate            PolicyOperation = "user.create"
 )
 
 // AllValues returns all PolicyOperation values.
 func (PolicyOperation) AllValues() []PolicyOperation {
 	return []PolicyOperation{
 		PolicyOperationAuthFactorPasswordSet,
+		PolicyOperationUserCreate,
 	}
 }
 
@@ -81333,6 +81435,8 @@ func (PolicyOperation) AllValues() []PolicyOperation {
 func (s PolicyOperation) MarshalText() ([]byte, error) {
 	switch s {
 	case PolicyOperationAuthFactorPasswordSet:
+		return []byte(s), nil
+	case PolicyOperationUserCreate:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -81344,6 +81448,9 @@ func (s *PolicyOperation) UnmarshalText(data []byte) error {
 	switch PolicyOperation(data) {
 	case PolicyOperationAuthFactorPasswordSet:
 		*s = PolicyOperationAuthFactorPasswordSet
+		return nil
+	case PolicyOperationUserCreate:
+		*s = PolicyOperationUserCreate
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)
@@ -85305,6 +85412,7 @@ func (*PublishPolicyErrorResponseStatusCode) publishPolicyRes() {}
 type PublishPolicyRequest struct {
 	Type                   PublishPolicyRequestType // switch on this field
 	PasswordSetPolicyInput PasswordSetPolicyInput
+	UserCreatePolicyInput  UserCreatePolicyInput
 }
 
 // PublishPolicyRequestType is oneOf type of PublishPolicyRequest.
@@ -85313,11 +85421,17 @@ type PublishPolicyRequestType string
 // Possible values for PublishPolicyRequestType.
 const (
 	PasswordSetPolicyInputPublishPolicyRequest PublishPolicyRequestType = "auth.factor.password.set"
+	UserCreatePolicyInputPublishPolicyRequest  PublishPolicyRequestType = "user.create"
 )
 
 // IsPasswordSetPolicyInput reports whether PublishPolicyRequest is PasswordSetPolicyInput.
 func (s PublishPolicyRequest) IsPasswordSetPolicyInput() bool {
 	return s.Type == PasswordSetPolicyInputPublishPolicyRequest
+}
+
+// IsUserCreatePolicyInput reports whether PublishPolicyRequest is UserCreatePolicyInput.
+func (s PublishPolicyRequest) IsUserCreatePolicyInput() bool {
+	return s.Type == UserCreatePolicyInputPublishPolicyRequest
 }
 
 // SetPasswordSetPolicyInput sets PublishPolicyRequest to PasswordSetPolicyInput.
@@ -85338,6 +85452,27 @@ func (s PublishPolicyRequest) GetPasswordSetPolicyInput() (v PasswordSetPolicyIn
 func NewPasswordSetPolicyInputPublishPolicyRequest(v PasswordSetPolicyInput) PublishPolicyRequest {
 	var s PublishPolicyRequest
 	s.SetPasswordSetPolicyInput(v)
+	return s
+}
+
+// SetUserCreatePolicyInput sets PublishPolicyRequest to UserCreatePolicyInput.
+func (s *PublishPolicyRequest) SetUserCreatePolicyInput(v UserCreatePolicyInput) {
+	s.Type = UserCreatePolicyInputPublishPolicyRequest
+	s.UserCreatePolicyInput = v
+}
+
+// GetUserCreatePolicyInput returns UserCreatePolicyInput and true boolean if PublishPolicyRequest is UserCreatePolicyInput.
+func (s PublishPolicyRequest) GetUserCreatePolicyInput() (v UserCreatePolicyInput, ok bool) {
+	if !s.IsUserCreatePolicyInput() {
+		return v, false
+	}
+	return s.UserCreatePolicyInput, true
+}
+
+// NewUserCreatePolicyInputPublishPolicyRequest returns new PublishPolicyRequest from UserCreatePolicyInput.
+func NewUserCreatePolicyInputPublishPolicyRequest(v UserCreatePolicyInput) PublishPolicyRequest {
+	var s PublishPolicyRequest
+	s.SetUserCreatePolicyInput(v)
 	return s
 }
 
@@ -102835,6 +102970,196 @@ func (s *UserConflictDetails) init() UserConflictDetails {
 	return m
 }
 
+// The settings of a `user.create` policy, checked before a sign-up creates a
+// user. Every setting is optional; a setting left out switches its rule off,
+// and `{}` switches every rule off. Zitadel's own sign-up protection, a proof
+// of work on every password sign-up and limits per sign-up flow, applies
+// either way: a policy chooses among challenges and never switches it off.
+// Sign-ups with a passkey or through a sign-in provider are not challenged.
+// Ref: #
+type UserCreateConfig struct {
+	// The challenge a password sign-up must solve before the user is
+	// created. `zitadel_pow` is Zitadel's built-in proof of work, which every
+	// password sign-up solves when no policy names a challenge.
+	Challenge OptUserCreateConfigChallenge `json:"challenge"`
+}
+
+// GetChallenge returns the value of Challenge.
+func (s *UserCreateConfig) GetChallenge() OptUserCreateConfigChallenge {
+	return s.Challenge
+}
+
+// SetChallenge sets the value of Challenge.
+func (s *UserCreateConfig) SetChallenge(val OptUserCreateConfigChallenge) {
+	s.Challenge = val
+}
+
+// The challenge a password sign-up must solve before the user is
+// created. `zitadel_pow` is Zitadel's built-in proof of work, which every
+// password sign-up solves when no policy names a challenge.
+type UserCreateConfigChallenge string
+
+const (
+	UserCreateConfigChallengeZitadelPow UserCreateConfigChallenge = "zitadel_pow"
+)
+
+// AllValues returns all UserCreateConfigChallenge values.
+func (UserCreateConfigChallenge) AllValues() []UserCreateConfigChallenge {
+	return []UserCreateConfigChallenge{
+		UserCreateConfigChallengeZitadelPow,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s UserCreateConfigChallenge) MarshalText() ([]byte, error) {
+	switch s {
+	case UserCreateConfigChallengeZitadelPow:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *UserCreateConfigChallenge) UnmarshalText(data []byte) error {
+	switch UserCreateConfigChallenge(data) {
+	case UserCreateConfigChallengeZitadelPow:
+		*s = UserCreateConfigChallengeZitadelPow
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The sign-up as it reaches the server. A real sign-up proves the challenge
+// it solved; a dry run names it.
+// Ref: #
+type UserCreateEvaluateInput struct {
+	// The challenge the sign-up solved. `zitadel_pow` is Zitadel's built-in
+	// proof of work.
+	SolvedChallenge UserCreateEvaluateInputSolvedChallenge `json:"solved_challenge"`
+}
+
+// GetSolvedChallenge returns the value of SolvedChallenge.
+func (s *UserCreateEvaluateInput) GetSolvedChallenge() UserCreateEvaluateInputSolvedChallenge {
+	return s.SolvedChallenge
+}
+
+// SetSolvedChallenge sets the value of SolvedChallenge.
+func (s *UserCreateEvaluateInput) SetSolvedChallenge(val UserCreateEvaluateInputSolvedChallenge) {
+	s.SolvedChallenge = val
+}
+
+// The challenge the sign-up solved. `zitadel_pow` is Zitadel's built-in
+// proof of work.
+type UserCreateEvaluateInputSolvedChallenge string
+
+const (
+	UserCreateEvaluateInputSolvedChallengeZitadelPow UserCreateEvaluateInputSolvedChallenge = "zitadel_pow"
+)
+
+// AllValues returns all UserCreateEvaluateInputSolvedChallenge values.
+func (UserCreateEvaluateInputSolvedChallenge) AllValues() []UserCreateEvaluateInputSolvedChallenge {
+	return []UserCreateEvaluateInputSolvedChallenge{
+		UserCreateEvaluateInputSolvedChallengeZitadelPow,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s UserCreateEvaluateInputSolvedChallenge) MarshalText() ([]byte, error) {
+	switch s {
+	case UserCreateEvaluateInputSolvedChallengeZitadelPow:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *UserCreateEvaluateInputSolvedChallenge) UnmarshalText(data []byte) error {
+	switch UserCreateEvaluateInputSolvedChallenge(data) {
+	case UserCreateEvaluateInputSolvedChallengeZitadelPow:
+		*s = UserCreateEvaluateInputSolvedChallengeZitadelPow
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// A dry run of the sign-up policy for one sign-up.
+// Ref: #
+type UserCreateEvaluateRequest struct {
+	// The operation the policy guards.
+	Operation UserCreateEvaluateRequestOperation `json:"operation"`
+	Config    UserCreateConfig                   `json:"config"`
+	Input     UserCreateEvaluateInput            `json:"input"`
+}
+
+// GetOperation returns the value of Operation.
+func (s *UserCreateEvaluateRequest) GetOperation() UserCreateEvaluateRequestOperation {
+	return s.Operation
+}
+
+// GetConfig returns the value of Config.
+func (s *UserCreateEvaluateRequest) GetConfig() UserCreateConfig {
+	return s.Config
+}
+
+// GetInput returns the value of Input.
+func (s *UserCreateEvaluateRequest) GetInput() UserCreateEvaluateInput {
+	return s.Input
+}
+
+// SetOperation sets the value of Operation.
+func (s *UserCreateEvaluateRequest) SetOperation(val UserCreateEvaluateRequestOperation) {
+	s.Operation = val
+}
+
+// SetConfig sets the value of Config.
+func (s *UserCreateEvaluateRequest) SetConfig(val UserCreateConfig) {
+	s.Config = val
+}
+
+// SetInput sets the value of Input.
+func (s *UserCreateEvaluateRequest) SetInput(val UserCreateEvaluateInput) {
+	s.Input = val
+}
+
+// The operation the policy guards.
+type UserCreateEvaluateRequestOperation string
+
+const (
+	UserCreateEvaluateRequestOperationUserCreate UserCreateEvaluateRequestOperation = "user.create"
+)
+
+// AllValues returns all UserCreateEvaluateRequestOperation values.
+func (UserCreateEvaluateRequestOperation) AllValues() []UserCreateEvaluateRequestOperation {
+	return []UserCreateEvaluateRequestOperation{
+		UserCreateEvaluateRequestOperationUserCreate,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s UserCreateEvaluateRequestOperation) MarshalText() ([]byte, error) {
+	switch s {
+	case UserCreateEvaluateRequestOperationUserCreate:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *UserCreateEvaluateRequestOperation) UnmarshalText(data []byte) error {
+	switch UserCreateEvaluateRequestOperation(data) {
+	case UserCreateEvaluateRequestOperationUserCreate:
+		*s = UserCreateEvaluateRequestOperationUserCreate
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
 // Merged schema.
 // Ref: #
 type UserCreateFailedEvent struct {
@@ -103297,6 +103622,191 @@ func (s *UserCreateFailedPayload) GetKeyName() OptString {
 // SetKeyName sets the value of KeyName.
 func (s *UserCreateFailedPayload) SetKeyName(val OptString) {
 	s.KeyName = val
+}
+
+// One revision of a project's `user.create` policy. `id` is shared by every
+// revision of the operation's policy; `revision_id` names this revision.
+// Ref: #
+type UserCreatePolicy struct {
+	ID         PolicyID         `json:"id"`
+	RevisionID PolicyRevisionID `json:"revision_id"`
+	// The project the policy belongs to.
+	ProjectID ProjectID `json:"project_id"`
+	// The operation the policy guards.
+	Operation UserCreatePolicyOperation `json:"operation"`
+	Config    UserCreateConfig          `json:"config"`
+	// When the operation's policy was first published.
+	CreatedAt time.Time `json:"created_at"`
+	// When this revision was published.
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// GetID returns the value of ID.
+func (s *UserCreatePolicy) GetID() PolicyID {
+	return s.ID
+}
+
+// GetRevisionID returns the value of RevisionID.
+func (s *UserCreatePolicy) GetRevisionID() PolicyRevisionID {
+	return s.RevisionID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *UserCreatePolicy) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetOperation returns the value of Operation.
+func (s *UserCreatePolicy) GetOperation() UserCreatePolicyOperation {
+	return s.Operation
+}
+
+// GetConfig returns the value of Config.
+func (s *UserCreatePolicy) GetConfig() UserCreateConfig {
+	return s.Config
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *UserCreatePolicy) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetUpdatedAt returns the value of UpdatedAt.
+func (s *UserCreatePolicy) GetUpdatedAt() time.Time {
+	return s.UpdatedAt
+}
+
+// SetID sets the value of ID.
+func (s *UserCreatePolicy) SetID(val PolicyID) {
+	s.ID = val
+}
+
+// SetRevisionID sets the value of RevisionID.
+func (s *UserCreatePolicy) SetRevisionID(val PolicyRevisionID) {
+	s.RevisionID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *UserCreatePolicy) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetOperation sets the value of Operation.
+func (s *UserCreatePolicy) SetOperation(val UserCreatePolicyOperation) {
+	s.Operation = val
+}
+
+// SetConfig sets the value of Config.
+func (s *UserCreatePolicy) SetConfig(val UserCreateConfig) {
+	s.Config = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *UserCreatePolicy) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetUpdatedAt sets the value of UpdatedAt.
+func (s *UserCreatePolicy) SetUpdatedAt(val time.Time) {
+	s.UpdatedAt = val
+}
+
+// A publish of the sign-up policy, checked before a sign-up creates a user.
+// Ref: #
+type UserCreatePolicyInput struct {
+	// The operation the policy guards.
+	Operation UserCreatePolicyInputOperation `json:"operation"`
+	Config    UserCreateConfig               `json:"config"`
+}
+
+// GetOperation returns the value of Operation.
+func (s *UserCreatePolicyInput) GetOperation() UserCreatePolicyInputOperation {
+	return s.Operation
+}
+
+// GetConfig returns the value of Config.
+func (s *UserCreatePolicyInput) GetConfig() UserCreateConfig {
+	return s.Config
+}
+
+// SetOperation sets the value of Operation.
+func (s *UserCreatePolicyInput) SetOperation(val UserCreatePolicyInputOperation) {
+	s.Operation = val
+}
+
+// SetConfig sets the value of Config.
+func (s *UserCreatePolicyInput) SetConfig(val UserCreateConfig) {
+	s.Config = val
+}
+
+// The operation the policy guards.
+type UserCreatePolicyInputOperation string
+
+const (
+	UserCreatePolicyInputOperationUserCreate UserCreatePolicyInputOperation = "user.create"
+)
+
+// AllValues returns all UserCreatePolicyInputOperation values.
+func (UserCreatePolicyInputOperation) AllValues() []UserCreatePolicyInputOperation {
+	return []UserCreatePolicyInputOperation{
+		UserCreatePolicyInputOperationUserCreate,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s UserCreatePolicyInputOperation) MarshalText() ([]byte, error) {
+	switch s {
+	case UserCreatePolicyInputOperationUserCreate:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *UserCreatePolicyInputOperation) UnmarshalText(data []byte) error {
+	switch UserCreatePolicyInputOperation(data) {
+	case UserCreatePolicyInputOperationUserCreate:
+		*s = UserCreatePolicyInputOperationUserCreate
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The operation the policy guards.
+type UserCreatePolicyOperation string
+
+const (
+	UserCreatePolicyOperationUserCreate UserCreatePolicyOperation = "user.create"
+)
+
+// AllValues returns all UserCreatePolicyOperation values.
+func (UserCreatePolicyOperation) AllValues() []UserCreatePolicyOperation {
+	return []UserCreatePolicyOperation{
+		UserCreatePolicyOperationUserCreate,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s UserCreatePolicyOperation) MarshalText() ([]byte, error) {
+	switch s {
+	case UserCreatePolicyOperationUserCreate:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *UserCreatePolicyOperation) UnmarshalText(data []byte) error {
+	switch UserCreatePolicyOperation(data) {
+	case UserCreatePolicyOperationUserCreate:
+		*s = UserCreatePolicyOperationUserCreate
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
 }
 
 // Merged schema.
