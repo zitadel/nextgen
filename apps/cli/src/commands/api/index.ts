@@ -217,7 +217,7 @@ function quote(value: string): string {
 }
 
 /**
- * `zitadel api` — call any operation of the Zitadel API with the server and
+ * The api command — call any operation of the Zitadel API with the server and
  * project secret every other command uses: the escape hatch for what no
  * resource command covers yet, as `gh api` and `vercel api` are for theirs.
  *
@@ -295,7 +295,7 @@ export default class Api extends Suggestible(Destructive(BaseCommand)) {
       ...this.meta,
       command: this.id ?? this.meta.command,
     };
-    if (!this.isJson) {
+    if (!this.jsonEnabled()) {
       await this.config.runCommand("help", [Api.id]);
     }
 
@@ -307,7 +307,7 @@ export default class Api extends Suggestible(Destructive(BaseCommand)) {
         title: "Done",
         sections: [],
       },
-      next: this.isJson ? { commands: [this.suggest("api ls")] } : undefined,
+      next: this.jsonEnabled() ? { commands: [this.suggest("api ls")] } : undefined,
     });
   }
 
