@@ -29,10 +29,6 @@ const (
 	oauthLoopbackOrigin = "http://localhost:3000"
 	oauthPreviewPattern = "https://*.preview.example.com"
 	oauthPreviewOrigin  = "https://pr-1.preview.example.com"
-	// A preview pattern on loopback, as a local preview server would use: a
-	// loopback origin it matches is still no issuer.
-	oauthLoopbackPreviewPattern = "http://*.localhost:3000"
-	oauthLoopbackPreviewOrigin  = "http://pr-1.localhost:3000"
 )
 
 // rfc8414Fields are the metadata names RFC 8414 §2 defines (and RFC 8628
@@ -125,7 +121,6 @@ func TestOAuthAuthorizationServerMetadata(t *testing.T) {
 		{Pattern: oauthAppOrigin, Kind: domain.OriginKindPrimary},
 		{Pattern: oauthLoopbackOrigin, Kind: domain.OriginKindPrimary},
 		{Pattern: oauthPreviewPattern, Kind: domain.OriginKindPreview},
-		{Pattern: oauthLoopbackPreviewPattern, Kind: domain.OriginKindPreview},
 	}, false)
 	require.NoError(t, err)
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
@@ -216,14 +211,6 @@ func TestOAuthAuthorizationServerMetadata(t *testing.T) {
 			assert.Equal(t, http.StatusNotFound, resp.StatusCode, "%s: %s", name, body)
 			assert.Equal(t, "no-store", resp.Header.Get("Cache-Control"), name)
 		}
-	})
-
-	t.Run("a loopback origin under a preview pattern is no issuer", func(t *testing.T) {
-		// A preview deployment never targets a loopback URL, so no live
-		// preview can exist there; the admission refuses the origin on the
-		// pattern alone (internal/oauth covers a live one).
-		resp, body := getMetadata(t, wellKnown(issuerPath), forwarded(t, oauthLoopbackPreviewOrigin, ""))
-		assert.Equal(t, http.StatusNotFound, resp.StatusCode, string(body))
 	})
 
 	t.Run("openid configuration is not served", func(t *testing.T) {

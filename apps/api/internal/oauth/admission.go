@@ -3,7 +3,7 @@ package oauth
 import (
 	"context"
 	"errors"
-	"net/url"
+	"slices"
 	"strings"
 
 	"github.com/zitadel/nextgen/internal/domain"
@@ -18,46 +18,40 @@ type projectReader interface {
 }
 
 // ProjectAdmission admits an origin as an issuer of a project from the
-// project's own origins: a primary origin, matched literally, or a loopback
-// origin for local development. A preview origin is never an issuer, and
-// neither is the server's own origin, which only the platform project's
-// issuer sits on.
+// project's own origins: a primary origin, matched literally. A preview
+// origin is never an issuer, and neither is any of the server's own
+// origins, which only the platform project's issuer sits on. An issuer on a
+// primary origin assumes that origin's SDK proxy forwards only its own
+// project's /__nextgen/oauth/{project} paths (issue #2931); Admit does not
+// check that no other project lists the same origin.
 type ProjectAdmission struct {
 	projects projectReader
-	// publicOrigin is the server's own origin, normalized: "" when the
-	// public base is not an origin, in which case it is nobody's issuer.
-	publicOrigin string
+	// ownOrigins are the server's console origins, normalized, the public
+	// base's first; empty when the server has none, in which case the
+	// platform project has no issuer.
+	ownOrigins []string
 }
 
-// NewProjectAdmission builds the admission over projects, with publicBase
-// as the server's own address.
-func NewProjectAdmission(projects service.ProjectService, publicBase *url.URL) *ProjectAdmission {
-	return newProjectAdmission(projects, publicBase)
-}
-
-func newProjectAdmission(projects projectReader, publicBase *url.URL) *ProjectAdmission {
-	a := &ProjectAdmission{projects: projects}
-	if publicBase != nil {
-		if origin, err := domain.NormalizeOrigin(publicBase.Scheme + "://" + publicBase.Host); err == nil {
-			a.publicOrigin = origin
-		}
-	}
-	return a
+// NewProjectAdmission builds the admission over projects, with ownOrigins
+// as the server's own console origins, normalized.
+func NewProjectAdmission(projects projectReader, ownOrigins []string) *ProjectAdmission {
+	return &ProjectAdmission{projects: projects, ownOrigins: ownOrigins}
 }
 
 // Admit implements [Admission]. origin is normalized already, as
 // deriveIssuer leaves it.
 func (a *ProjectAdmission) Admit(ctx context.Context, projectID, origin string) error {
 	origin = strings.TrimSpace(origin)
+	own := slices.Contains(a.ownOrigins, origin)
 	if projectID == domain.PlatformProjectID {
-		// The platform project's issuer is the server's public base and
-		// nothing else: it is reached directly, never through an app.
-		if a.publicOrigin == "" || origin != a.publicOrigin {
+		// The platform project's issuer sits on the server's own origins
+		// and nothing else: it is reached directly, never through an app.
+		if !own {
 			return domain.ErrOriginNotFound()
 		}
 		return nil
 	}
-	if a.publicOrigin != "" && origin == a.publicOrigin {
+	if own {
 		return domain.ErrOriginNotFound()
 	}
 	project, err := a.projects.Get(ctx, projectID, service.ProjectQueryOptions{})
@@ -70,17 +64,6 @@ func (a *ProjectAdmission) Admit(ctx context.Context, projectID, origin string) 
 		}
 		return domain.ErrInternal(err).WithMessage("failed to read the project")
 	}
-	if domain.IsLoopbackOrigin(origin) {
-		// A loopback origin is a developer's machine, admitted for local
-		// development even when the project does not list it, unless the
-		// project names it a preview: a preview is never an issuer, on
-		// loopback or anywhere else. The settings source then still asks for
-		// a deployment made to that exact origin.
-		if _, preview := domain.MatchOrigin(originsOfKind(project.Origins, domain.OriginKindPreview), origin); preview {
-			return domain.ErrOriginNotFound()
-		}
-		return nil
-	}
 	entry, ok := domain.MatchOrigin(originsOfKind(project.Origins, domain.OriginKindPrimary), origin)
 	if !ok || entry.Pattern != origin {
 		return domain.ErrOriginNotFound()
@@ -89,8 +72,8 @@ func (a *ProjectAdmission) Admit(ctx context.Context, projectID, origin string) 
 }
 
 // originsOfKind keeps the entries of one kind, so that a primary origin is
-// matched among primaries only and a preview pattern is recognized as what
-// it is: it admits a browser to a preview deployment, never an issuer.
+// matched among primaries only: a preview pattern admits a browser to a
+// preview deployment, never an issuer.
 func originsOfKind(origins []domain.Origin, kind domain.OriginKind) []domain.Origin {
 	kept := make([]domain.Origin, 0, len(origins))
 	for _, origin := range origins {
