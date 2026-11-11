@@ -119,18 +119,19 @@ function readSidebarOpen(): boolean {
 
 /**
  * The sidebar's top band: the logo with the collapse toggle beside it, 56px
- * tall, level with the top bar. In the icon rail the logo goes and the toggle
- * centres — there is no room for both, and the toggle brings the logo back.
+ * tall, level with the top bar. The logo starts 20px in, on the rows' glyphs.
+ * In the icon rail the logo goes and the toggle centres — there is no room for
+ * both, and the toggle brings the logo back.
  */
 const BRAND_HEADER =
-  "h-14 shrink-0 flex-row items-center justify-between py-0 pr-3 pl-4 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0";
+  "h-14 shrink-0 flex-row items-center justify-between py-0 pr-3 pl-5 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0";
 
 /** The design's `Sidebar / Header Button`: 28px square around a 16px glyph. */
 const HEADER_BUTTON = "size-7! text-sidebar-foreground";
 
 /**
  * The sidebar: the brand header, search, the list `view` names, and the
- * account in the footer. Every list collapses to the same 48px icon rail.
+ * account in the footer. Every list collapses to the same 56px icon rail.
  */
 function AppSidebar({
   view,
@@ -206,8 +207,9 @@ const NAV_LABEL: Record<NavView, string> = {
  * project's: its rows are the list's views, not routes, and its filters
  * follow them in a group of their own (D30). The events feature draws both.
  *
- * Rows keep their height and a 2px gap in both sidebar states, so collapsing
- * moves nothing vertically.
+ * Rows are Vercel's: 36px with a 1px gap, the glyph 12px in and the label 10px
+ * after it. They keep that height in the rail, so collapsing moves nothing
+ * vertically.
  */
 function NavList({ view }: { view: NavView }) {
   const own = useNavItems(view);
@@ -223,7 +225,7 @@ function NavList({ view }: { view: NavView }) {
     // Keyed by the list, so a new one mounts and plays its entrance once.
     <div key={view} className={cn("flex flex-col gap-2", entrance)}>
       <SidebarGroup role="navigation" aria-label={NAV_LABEL[view]} className="pt-2 pb-0">
-        <SidebarMenu className="gap-0.5">
+        <SidebarMenu className="gap-px">
           {/* Projects is the account list's first screen. */}
           {view === "settings" && <ListHeading name="Settings" to="/projects" back="Projects" />}
           {/* `/` is where a project lands, whichever screen that is. */}
