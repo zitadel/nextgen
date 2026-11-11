@@ -227,7 +227,7 @@ describe("variable list", () => {
     expect(res.stdout).toContain("No variables found");
   });
 
-  it("says nothing was found in the same words when --preview holds none", async () => {
+  it("says nothing was found, naming the preview set, when --preview holds none", async () => {
     const cwd = await makeProject();
     server.use(http.get("*/variables", () => HttpResponse.json({})));
 
@@ -235,7 +235,7 @@ describe("variable list", () => {
       runCliForTest(["variable", "list", "--preview", ...plainArgs(cwd)]),
     );
 
-    expect(res.stdout).toContain("No variables found");
+    expect(res.stdout).toContain("No preview variables found");
   });
 
   it("refuses to guess a server when nothing names one", async () => {
