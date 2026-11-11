@@ -98,12 +98,12 @@ func BindPublicRequest(ctx context.Context, projectID, flowID, sessionID string)
 
 // BindFlow stamps the login flow onto the actor slot of a request that names
 // none itself, so its request.api event joins the flow's. No-op when flowID is
-// empty or there is no slot.
+// empty, there is no slot, or the request already names a flow.
 func BindFlow(ctx context.Context, flowID string) {
 	if flowID == "" {
 		return
 	}
-	if slot, ok := ActorSlotFromContext(ctx); ok && slot != nil {
+	if slot, ok := ActorSlotFromContext(ctx); ok && slot != nil && slot.FlowID == nil {
 		slot.FlowID = &flowID
 	}
 }

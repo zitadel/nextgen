@@ -112,7 +112,7 @@ func TestBindPublicRequest_NoSlotIsNoop(t *testing.T) {
 	BindPublicRequest(t.Context(), "proj_1", "flow_1", "sess_1")
 }
 
-func TestBindFlow_StampsOnlyTheFlow(t *testing.T) {
+func TestBindFlow_StampsOnlyTheFlowOfARequestWithNone(t *testing.T) {
 	ctx := WithActorSlot(t.Context())
 	slot, ok := ActorSlotFromContext(ctx)
 	require.True(t, ok)
@@ -126,6 +126,10 @@ func TestBindFlow_StampsOnlyTheFlow(t *testing.T) {
 	assert.Equal(t, "flow_1", *slot.FlowID)
 	assert.Equal(t, "proj_1", slot.ProjectID)
 	assert.Nil(t, slot.SessionID)
+
+	// The flow a request names itself stays.
+	BindFlow(ctx, "flow_2")
+	assert.Equal(t, "flow_1", *slot.FlowID)
 
 	BindFlow(t.Context(), "flow_1") // no slot: a no-op
 }

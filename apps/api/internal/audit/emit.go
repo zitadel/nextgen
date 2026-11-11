@@ -17,8 +17,9 @@ type EmitSpec struct {
 	EntityID   string
 	Payload    any
 	SessionID  *string
-	// FlowID names the login flow when the request carries none: the handoff
-	// exchange is a service call, and its flow is the consumed attempt's.
+	// FlowID, when set and not empty, is the event's login flow in place of
+	// the request's own. The handoff exchange sets it: a service call whose
+	// flow is the one of the attempt it consumed.
 	FlowID  *string
 	TokenID string
 	// Optional actor overrides when the request ActorContext is empty
