@@ -10,7 +10,7 @@
 > [ADR 064](064-cli-resource-commands.md) (CLI resources).
 > **Amends if accepted:**
 > [ADR 049 §3](049-events-api-retention-export.md#3-external-export-per-sink-delivery)
-> (one webhook per project, a sink's identity, sinks from configuration only)
+> (a project's webhooks are a resource of their own, not project-scoped sinks)
 > and [ADR 047 §2](047-dialect-id-generation.md) (registers the `hook`
 > prefix).
 > **Related:** ADR 089, proposed apart from this one (versions of event
@@ -26,8 +26,8 @@ events, choose which events it gets, or check that a request came from Zitadel.
 
 Much of what that needs exists:
 
-- the `event_sinks` table has a `project` scope and a `project_id` column, and
-  the shipper keeps one cursor per sink and project;
+- the shipper delivers events in order from a cursor, at least once, and
+  lists only settled events;
 - the spec documents one webhook per event type, whose body is the event as
   `GET /events` returns it;
 - `webhook.read`, `webhook.write` and `webhook.delete` are reserved scopes,
@@ -46,9 +46,14 @@ versions of the payload (§6).
 
 ### 1. The webhook resource
 
-A webhook is a row of `event_sinks` with `type = webhook` and
-`scope = project`. It is a runtime resource: no release pins it, so a deploy
-or a rollback never changes where events go.
+A webhook is a row of its own table, `webhooks`, owned by one project. Its
+delivery cursor is two columns on that row. It is a runtime resource: no
+release pins it, so a deploy or a rollback never changes where events go.
+
+The operator's sinks stay as ADR 049 has them, in `event_sinks` with their
+cursors per project. ADR 049 sketched a project's webhook as one more row
+there. A webhook belongs to one project, so it needs no cursor table, and
+`event_sinks` identifies a sink by its URL, which two webhooks may share.
 
 ```jsonc
 {
@@ -89,8 +94,7 @@ or a rollback never changes where events go.
   later than `last_delivered_at`, and a reader works that out: a field that
   only restates two others is one more thing to keep true.
 - A project holds at most 10 webhooks. Two projects, or two webhooks of one
-  project, may name the same URL: the unique key `(type, scope, url)` is
-  dropped for project sinks.
+  project, may name the same URL.
 - Deleting a project deletes its webhooks.
 
 ### 2. What an endpoint receives
@@ -143,7 +147,7 @@ The shipper delivers, with the cursor and the settled-events bound of
 ADR 049. What changes for a project's webhook:
 
 - **Start.** The cursor is set when the webhook is created, so a new webhook
-  gets no history. Changing `url` keeps the sink and its cursor.
+  gets no history. Changing `url` keeps the cursor.
 - **Filter.** An event whose type the webhook does not list is skipped, and
   the cursor moves past it.
 - **Order.** Events arrive in `(created_at, id)` order. A failed delivery
@@ -242,8 +246,10 @@ disable it and rotate its secret.
   the webhook is disabled. Per-event retries would remove that and need the
   jobs table of [ADR 065](065-background-jobs.md).
 - A webhook's page shows the last result, not a history of attempts.
-- Storage changes on all three dialects: columns on `event_sinks` for the
-  filter, the secrets, the failure state and the lease; the unique key.
+- One new table on all three dialects. `event_sinks`, its cursors and the
+  operator's export are untouched.
+- The shipper reads two sources: the operator's sinks with their cursor
+  table, and webhooks with the cursor on the row.
 
 ## Rejected alternatives
 
@@ -258,8 +264,10 @@ disable it and rotate its secret.
   sketched. Every project-scoped resource added since is flat.
 - **A `status` field, a failure counter and a nested `last_error`.** Each
   restates what `enabled` and two timestamps already say.
-- **`sink_` ids for webhooks.** One prefix per table, but "sink" is the
-  export's internal word and a customer manages a webhook.
+- **Webhooks as project-scoped rows of `event_sinks`**, with `sink_` ids, as
+  ADR 049 sketched. It needs the unique key on a sink's URL taken apart, a
+  second way to delete cursors and, on SQLite, both tables rebuilt, to save
+  one table.
 - **An envelope around the event.** The event already carries its id, type
   and time, and the spec already documents it as the body.
 - **Webhooks as release configuration.** The URL differs per environment, and
