@@ -259,6 +259,14 @@ the sidebar.
 > when a child changes belongs to the layout route, keyed on the search it
 > reads.
 
+> **Amendment (2026-11-11, D30):** Logs' list chooses the view from a picker
+> (each view's glyph, name and what it holds), as Vercel's Logs chooses its
+> kind of log, rather than one row per view, and keeps only the filters chosen
+> from a list (time, category, type or status). The values a person pastes
+> (the ids, the operation, the resource type, My activity) are set in the
+> search above the table and shown there as chips. The URL keeps every filter
+> as before.
+
 ## Consequences
 
 - **One canonical router.** `main.tsx` renders the factory from `router.tsx`;

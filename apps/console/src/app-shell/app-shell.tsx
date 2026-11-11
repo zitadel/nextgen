@@ -17,7 +17,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 
-import { LogFilters, LogViewRows } from "@/features/events/components/logs-nav";
+import { LogFilters, LogViewPicker } from "@/features/events/components/logs-nav";
 
 import { ContextSwitcher } from "./context-switcher";
 import { ZitadelLogo } from "./logo";
@@ -204,8 +204,8 @@ const NAV_LABEL: Record<NavView, string> = {
  * beneath it, so a resource's detail keeps its list marked.
  *
  * Logs is one screen's own list, under a heading that leads back to the
- * project's: its rows are the list's views, not routes, and its filters
- * follow them in a group of their own (D30). The events feature draws both.
+ * project's: a picker of the list's views, not routes, and its filters in a
+ * group of their own (D30). The events feature draws both.
  *
  * Rows are Vercel's: 36px with a 1px gap, the glyph 12px in and the label 10px
  * after it. They keep that height in the rail, so collapsing moves nothing
@@ -230,7 +230,7 @@ function NavList({ view }: { view: NavView }) {
           {view === "settings" && <ListHeading name="Settings" to="/projects" back="Projects" />}
           {/* `/` is where a project lands, whichever screen that is. */}
           {view === "logs" && <ListHeading name="Logs" to="/" back="the project" />}
-          {view === "logs" && <LogViewRows />}
+          {view === "logs" && <LogViewPicker />}
           {items.map(({ to, scope, nav: { icon: Icon, label: name } }) => (
             <SidebarMenuItem key={to}>
               <SidebarMenuButton

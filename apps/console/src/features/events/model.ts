@@ -82,6 +82,13 @@ export const VIEW_LABEL: Record<LogView, string> = {
   all: "All",
 };
 
+/** What each view holds, under its name in the view picker. */
+export const VIEW_DESCRIPTION: Record<LogView, string> = {
+  audit: "Sign-ins and changes to the project",
+  requests: "One per call to the API",
+  all: "Both, in the order they happened",
+};
+
 /**
  * The audit categories a list can be narrowed to, as the API names them
  * (`category`). `signal` is an audit category too, and the audit view reads
@@ -237,21 +244,16 @@ export function isFailure(event: LogEvent): boolean {
  * budget (root ADR 048), and the list says when a page stopped short.
  */
 export const VALUE_FILTERS = [
-  { key: "type", label: "Type", name: "type", placeholder: "user.created" },
-  { key: "actor", label: "Actor", name: "actor", placeholder: "user_…" },
-  { key: "resource", label: "Resource", name: "resource", placeholder: "user_…, team_…" },
-  {
-    key: "resource_type",
-    label: "Resource type",
-    name: "resource type",
-    placeholder: "user, team",
-  },
-  { key: "client", label: "Application", name: "application", placeholder: "app_…" },
-  { key: "operation", label: "Operation", name: "operation", placeholder: "createUser" },
-  { key: "request", label: "Request", name: "request", placeholder: "req_…" },
-  { key: "session", label: "Session", name: "session", placeholder: "sess_…" },
-  { key: "flow", label: "Login flow", name: "login flow", placeholder: "flow_…" },
-  { key: "device", label: "Device", name: "device", placeholder: "Fingerprint ID" },
+  { key: "type", label: "Type", name: "type", prefix: "type" },
+  { key: "actor", label: "Actor", name: "actor", prefix: "actor" },
+  { key: "resource", label: "Resource", name: "resource", prefix: "resource" },
+  { key: "resource_type", label: "Resource type", name: "resource type", prefix: "resource_type" },
+  { key: "client", label: "Application", name: "application", prefix: "app" },
+  { key: "operation", label: "Operation", name: "operation", prefix: "operation" },
+  { key: "request", label: "Request", name: "request", prefix: "request" },
+  { key: "session", label: "Session", name: "session", prefix: "session" },
+  { key: "flow", label: "Login flow", name: "login flow", prefix: "flow" },
+  { key: "device", label: "Device", name: "device", prefix: "device" },
 ] as const;
 export type ValueFilter = (typeof VALUE_FILTERS)[number];
 export type ValueFilterKey = ValueFilter["key"];
@@ -583,6 +585,18 @@ export function sharing(key: ValueFilterKey, value: string): LogsSearch {
   return { view: "all", [key]: value };
 }
 
+/**
+ * The filters set by a pasted value, in the order the search draws them as
+ * chips: every one but the type, which the sidebar chooses.
+ */
+export function chipFilters(search: LogsSearch): { filter: ValueFilter; value: string }[] {
+  return VALUE_FILTERS.flatMap((filter) => {
+    if (filter.key === "type") return [];
+    const value = search[filter.key];
+    return value ? [{ filter, value }] : [];
+  });
+}
+
 /** What a pasted or typed term can mean to the list. */
 export type SearchMeaning =
   | { kind: "event"; id: string }
@@ -593,11 +607,22 @@ const TRACE_ID = /^[0-9a-f]{32}$/i;
 /** An API operation: one camel-cased word, as `createUser`. IDs carry an underscore. */
 const OPERATION = /^[a-z]+(?:[A-Z][a-z0-9]*)+$/;
 
+/** A filter named before its value, as `actor:user_1`. */
+const NAMED = /^([a-z_]+):(\S+)$/;
+/** The prefixes a term may name a filter by: each filter's own, and `application` for the app. */
+const PREFIXES: Record<string, ValueFilterKey> = {
+  ...Object.fromEntries(VALUE_FILTERS.map((filter) => [filter.prefix, filter.key])),
+  application: "client",
+};
+
 /**
  * What a term in the search above the table means: the filters it could set,
  * or the event it names. The list is searched by exact value on a field the
- * server holds, never by text, so a term is read by its shape:
+ * server holds, never by text, so a term says which field, or is read by its
+ * shape:
  *
+ * - `actor:…`, `resource:…`, `resource_type:…`, `app:…`, `device:…` and the
+ *   other filters' prefixes ({@link VALUE_FILTERS}) name the filter.
  * - `evt_…` is an event, and opens it.
  * - `req_…` (or a 32-digit trace id), `sess_…`, `flow_…` and `app_…` are a
  *   request, a session, a login flow and an application.
@@ -616,6 +641,9 @@ export function searchMeanings(term: string): SearchMeaning[] {
     filter: FILTER_BY_KEY[key],
     value,
   });
+  const named = NAMED.exec(value);
+  const key = named?.[1] ? PREFIXES[named[1]] : undefined;
+  if (named?.[2] && key) return [{ kind: "filter", filter: FILTER_BY_KEY[key], value: named[2] }];
   if (value.startsWith("evt_")) return [{ kind: "event", id: value }];
   if (value.startsWith("req_") || TRACE_ID.test(value)) return [filter("request")];
   if (value.startsWith("sess_")) return [filter("session")];
