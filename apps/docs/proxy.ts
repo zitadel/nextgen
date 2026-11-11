@@ -35,6 +35,10 @@ export default function proxy(request: NextRequest) {
 export const config = {
   // Pages only. The docs' other routes live under /docs as well, so an agent
   // asking for Markdown or plain text must reach them unchanged: search and
-  // the MCP server (api/), llms.txt, the Open Graph images and the assets.
-  matcher: ["/docs", "/docs/((?!api/|llms\\.txt|llms-full\\.txt|og/|_next/).*)"],
+  // the MCP server (api/), llms.txt, the OpenAPI document, the live examples'
+  // service worker, the Open Graph images and the assets.
+  matcher: [
+    "/docs",
+    "/docs/((?!api/|llms\\.txt|llms-full\\.txt|openapi\\.json|mock-service-worker\\.js|og/|_next/).*)",
+  ],
 };

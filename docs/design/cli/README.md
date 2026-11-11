@@ -111,44 +111,72 @@ The example below shows how the commands currently available can be organised. I
 ```console
 $ zitadel
 
-ZITADEL CLI
-Build and manage authentication and identity.
+Manage your Zitadel project and local identity server from the command line.
+
+Usage
+  zitadel <command> [flags]
+
+Run a command below. Use `zitadel <command> --help` to see its options.
 
 Getting started
-  setup              Set up a Project
-  doctor             Check the local setup
-  claim              Claim a Project
+  setup             Create a Zitadel project and scaffold local auth
+  start             Start a local Zitadel server
+  status            Summarize the local Zitadel server and project state
+  claim             Claim this project to make it permanent
 
 Local development
-  start              Start ZITADEL locally
-  stop               Stop local ZITADEL
-  logs               Show local logs
-  reset              Reset the local runtime
-  eject              Remove generated files and local state
+  console           Open the local console, signed in as the local admin
+  logs              Show local Zitadel server logs
+  stop              Stop the local Zitadel server
+  reset             Delete the local Zitadel server runtime and data
+  eject             Remove managed files and local Zitadel state
 
-Configuration
-  plan               Preview configuration changes
-  apply              Apply configuration changes
-  status             Show local and Project status
-  schemas            Inspect user schemas
-  branding           Customise login branding
+Users and teams
+  users             Create and manage users
+  teams             Create and manage teams
+  grants            Manage access grants
 
-Utilities
-  autocomplete       Configure shell completion
-  commands           List available commands
-  help               Show command help
-  search             Search for a command
-  version            Show the CLI version
-  which              Show where a command comes from
+Authentication
+  auth-method       Configure how users sign in
+  idps              Manage identity provider connections
+  sessions          View and revoke sessions
+
+Configuration and releases
+  deploy            Apply your local configuration to Zitadel
+  pull              Rebuild your .zitadel/ files from a release
+  branding          Manage the login branding
+  deployment        Deploy releases and roll them back
+  env               Show and bind environments
+  flow-definitions  View login flows
+  origin            Manage the project's allowed origins
+  policies          View policies
+  projects          View and update projects
+  release           Build and manage releases
+  schemas           View user schemas
+  variable          Manage project variables
+
+Diagnostics and utilities
+  doctor            Verify local runtime and project state
+  api               Call any operation of the Zitadel API
+  autocomplete      Display autocomplete installation instructions
+  commands          List all zitadel commands
+  events            View events
+  resources         List the resources this CLI manages
+  search            Search for a command
+  version           Show the CLI version
+  which             Show which plugin a command is in
+
+Flags
+  --help      Show help for command
+  --version   Show zitadel version
 
 Examples
-  zitadel setup          Set up a Project
-  zitadel schemas list   List user schemas
-
-Run zitadel --help for flags and more details.
+  $ zitadel setup --framework next
+  $ zitadel start
+  $ zitadel doctor
 ```
 
-`apply` is included because it is currently available but transitional: `deploy` replaces it in the environment and release workflow, while `plan` has no replacement under the release model.
+A family of commands is one row, so the screen stays short as commands are added; its own help (`zitadel users --help`) lists the operations. `zitadel commands` remains the flat list of every command.
 
 Each level provides help for the commands available beneath it:
 

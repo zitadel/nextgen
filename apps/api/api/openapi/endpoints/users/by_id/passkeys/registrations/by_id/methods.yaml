@@ -1,0 +1,66 @@
+post:
+  operationId: finishUserPasskeyRegistration
+  summary: Finish a passkey registration
+  description: |
+    Verifies the attestation against the registration ceremony and stores
+    the new passkey for the user. `registration_id` is the one that
+    `beginUserPasskeyRegistration` (`POST /users/{user_id}/passkeys/registrations`)
+    returned when it started the ceremony. The attestation is
+    the browser's answer from `navigator.credentials.create()`.
+
+    A rejected attestation leaves the ceremony open for a retry. An expired ceremony answers
+    `att.stale_challenge`: begin a new registration. An unknown or
+    already-consumed registration ID answers `att.not_found`.
+  tags:
+    - Users
+  parameters:
+    - $ref: ../../../../../../components/parameters/user-id.yaml
+    - $ref: ../../../../../../components/parameters/passkey-registration-id.yaml
+  security:
+    - oauth2:
+        - user.write
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: finish-user-passkey-registration-request.yaml
+  responses:
+    '201':
+      description: The registered passkey.
+      content:
+        application/json:
+          schema:
+            $ref: finish-user-passkey-registration-response.yaml
+    '400':
+      description: The provided input was not valid.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../../../components/error-details.yaml
+    '401':
+      description: Client was not authorized or the session is anonymous.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../../../components/error-details.yaml
+    '403':
+      description: Client does not have the permissions to perform this action.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../../../components/error-details.yaml
+    '404':
+      description: No user was found for the provided user ID.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../../../components/error-details.yaml
+    '500':
+      description: Something went wrong on the server. This was not your fault.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../../../components/error-details.yaml
+    default:
+      $ref: finishUserPasskeyRegistration-error-response.yaml

@@ -6,7 +6,12 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, test } from "vitest";
 
-import { PUBLIC_PACKAGE_DIRS } from "../../../scripts/release-manifest.mjs";
+// @boundaries-ignore root scripts/ belongs to the workspace root, which no package can depend on
+import {
+  APP_RELEASE_PACKAGES,
+  PUBLIC_PACKAGE_DIRS,
+  hostOnlyPackageDirs,
+} from "../../../scripts/release-manifest.mjs";
 import { packageName } from "./lib.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -102,6 +107,41 @@ test("rejects a @zitadel/cli tarball missing the agent skill bundle", () => {
   assert.match(result.stderr, /missing CLI agent skill files/);
 });
 
+test("--app-packages accepts exactly what a generated app installs", async () => {
+  const appSetDir = join(fixtureRoot, "app-set");
+  await mkdir(appSetDir, { recursive: true });
+  for (const pkg of APP_RELEASE_PACKAGES) {
+    await makeTarball(appSetDir, pkg.name);
+  }
+
+  const result = runVerify(appSetDir, "--app-packages");
+  assert.equal(result.status, 0, result.stderr);
+  // Without the flag the CLI and server tarballs are missing.
+  assert.match(runVerify(appSetDir).stderr, /missing tarball for @zitadel\/cli/);
+  // The release set carries packages a generated app never installs.
+  assert.match(
+    runVerify(releaseSetDir, "--app-packages").stderr,
+    /unexpected package @zitadel\/(cli|server)/,
+  );
+});
+
+test("RELEASE_HOST_ONLY=1 accepts a host-only snapshot and still requires the host's server", async () => {
+  const hostOnlyDir = join(fixtureRoot, "host-only");
+  await mkdir(hostOnlyDir, { recursive: true });
+  for (const dir of hostOnlyPackageDirs()) {
+    await makeTarball(hostOnlyDir, await packageName(repoRoot, dir));
+  }
+  const hostOnlyEnv = { ...process.env, RELEASE_HOST_ONLY: "1" };
+
+  const result = spawnSync("node", [script, hostOnlyDir], { encoding: "utf8", env: hostOnlyEnv });
+  assert.equal(result.status, 0, result.stderr);
+  // Without it the other platforms' server packages are missing.
+  assert.match(runVerify(hostOnlyDir).stderr, /missing tarball for @zitadel\/server-/);
+  // With it another platform's server package is one too many.
+  const full = spawnSync("node", [script, releaseSetDir], { encoding: "utf8", env: hostOnlyEnv });
+  assert.match(full.stderr, /unexpected package @zitadel\/server-/);
+});
+
 test("unknown flags are rejected", () => {
   const result = runVerify(releaseSetDir, "--bogus");
   assert.notEqual(result.status, 0);
@@ -109,7 +149,10 @@ test("unknown flags are rejected", () => {
 });
 
 function runVerify(dir, ...flags) {
-  return spawnSync("node", [script, dir, ...flags], { encoding: "utf8" });
+  return spawnSync("node", [script, dir, ...flags], {
+    encoding: "utf8",
+    env: { ...process.env, RELEASE_HOST_ONLY: "" },
+  });
 }
 
 /**
@@ -135,6 +178,12 @@ async function makeTarball(
   }
   if (name === "@zitadel/cli" && !omitCliSkill) {
     await cp(join(repoRoot, "apps/cli/skills"), join(packageDir, "skills"), { recursive: true });
+    await cp(join(repoRoot, "apps/cli/skills"), join(packageDir, "dist/skills"), {
+      recursive: true,
+    });
+    await cp(join(repoRoot, "skills/zitadel"), join(packageDir, "dist/skills/zitadel"), {
+      recursive: true,
+    });
   }
   await writeFile(join(packageDir, "package.json"), JSON.stringify(manifest));
   const tar = spawnSync("tar", ["-czf", join(outDir, `${safe}.tgz`), "-C", stage, "package"], {

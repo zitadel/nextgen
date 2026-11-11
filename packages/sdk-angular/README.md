@@ -5,7 +5,7 @@ Angular components for the Zitadel auth UI, for client-side SPAs.
 ## Installation
 
 ```bash
-pnpm add @zitadel/sdk-angular@alpha
+pnpm add @zitadel/sdk-angular@latest
 ```
 
 ## Requirements
@@ -85,6 +85,8 @@ Each widget event reaches the callback in the last column, which receives the ev
 ```html
 <zitadel-auth-login [project]="project" theme="light" (flowComplete)="track($event)" />
 ```
+
+The `zitadel-flow-complete`, `zitadel-flow-redirect` and `zitadel-signout` details carry a `waitUntil(promise)`; call it from your handler to make the widget wait for your async work before it navigates.
 
 ## Standard HTML attributes
 

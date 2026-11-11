@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { useLocalServers } from "../helpers/local-server";
-import { usePlatformMock } from "../helpers/platform";
-import { aSetUpApp } from "../helpers/project";
+import { useLocalServers } from "@tests/helpers/local-server";
+import { usePlatformMock } from "@tests/helpers/platform";
+import { aSetUpApp } from "@tests/helpers/project";
 
 const platform = usePlatformMock();
 useLocalServers();
@@ -44,6 +44,13 @@ describe("start", () => {
   });
 
   describe("against a valid server", () => {
+    it("holds its invariants in every rendering", async () => {
+      const app = await aSetUpApp();
+      const args = ["start", "--port", "0"];
+
+      await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));
+    });
+
     describe("--json", () => {
       it("refuses a port outside the usable range", async () => {
         const app = await aSetUpApp();
@@ -51,7 +58,7 @@ describe("start", () => {
         const result = await app.run(["start", "--port", "99999", "--json"]);
 
         expect(result).toFailWith("E_VALIDATION");
-        expect(result).toExplain("Invalid port 99999");
+        expect(result).toExplain("99999 is not a TCP port");
       });
 
       it("refuses port zero", async () => {
@@ -59,7 +66,7 @@ describe("start", () => {
 
         const result = await app.run(["start", "--port", "0", "--json"]);
 
-        expect(result).toExplain("Invalid port 0");
+        expect(result).toExplain("0 is not a TCP port");
       });
 
       it("refuses an image for a runtime that takes none", async () => {

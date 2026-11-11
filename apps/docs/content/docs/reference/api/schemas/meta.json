@@ -1,4 +1,0 @@
-{
-  "title": "Schemas",
-  "pages": ["createSchema", "listSchemas", "getSchemaById", "..."]
-}

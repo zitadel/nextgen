@@ -158,6 +158,7 @@ export const it: Locale = {
   // Fallback generico per la chiave `<step>.action.back` iniettata dal motore
   // (vedi INJECTED_KEY_FALLBACKS in liquid.ts).
   "action.back": "Indietro",
+  "action.use_another_account": "Usa un altro account",
 
   // --- SSO ---
   "sso.continue_with": "Continua con {name}",
@@ -190,6 +191,8 @@ export const it: Locale = {
   "error.flow_restart_required": "Non è stato possibile proseguire l'accesso. Ricomincia da capo.",
   "error.passkey_registration_invalid":
     "Non è stato possibile verificare la nuova passkey. Riprova a registrarla.",
+  "error.sso_user_schema_mismatch":
+    "Questo account non può accedere con questo provider. Prova un altro metodo di accesso o contatta l'amministratore.",
   "error.sso_unavailable":
     "Questo provider di accesso non è disponibile al momento. Prova un altro metodo di accesso.",
   "error.sso_verified_unique_value_changed":
@@ -202,6 +205,18 @@ export const it: Locale = {
   "error.sso_user_not_found": "Non esiste ancora un account per questo accesso.",
   "error.outcome_unhandled": "Non è stato possibile proseguire questo passaggio. Riprova.",
   "error.sign_in_first": "Accedi prima al tuo account.",
+  "error.signup_check_failed": "Non è stato possibile creare il tuo account. Riprova.",
+  "error.signup_rate_limited": "Troppi tentativi. Attendi un minuto e riprova.",
+  "error.signup_secure_connection":
+    "Per creare un account serve una connessione sicura. Apri questa pagina con https://.",
+
+  // --- Avvisi: perché il flusso passa da solo tra accesso e registrazione ---
+  "notice.user_not_found":
+    "Non abbiamo trovato un account per questo indirizzo e-mail: puoi crearne uno ora. Hai sbagliato a scriverlo? Correggilo nel campo E-mail qui sotto.",
+  "notice.user_already_exists":
+    "Esiste già un account per questo indirizzo e-mail. Accedi per continuare.",
+  "notice.sso_user_not_found":
+    "Non esiste ancora un account per questo accesso: puoi crearne uno ora.",
 
   // --- Errori campo / modulo ---
   "error.email_required": "Inserisci un indirizzo e-mail",
@@ -217,7 +232,12 @@ export const it: Locale = {
   "error.field_format": "Inserisci un valore valido per {0}.",
   "error.field_min_length": "{0} è troppo corto.",
   "error.field_max_length": "{0} è troppo lungo.",
+  "error.field_min_length_value": "{0} deve contenere almeno {1} caratteri.",
+  "error.field_max_length_value": "{0} può contenere al massimo {1} caratteri.",
   "error.field_invalid": "Controlla {0}.",
+
+  // --- Suggerimenti dalle regole di validazione ({0} = limite della regola) ---
+  "hint.field_min_length": "Almeno {0} caratteri.",
 
   // --- Alert a livello di modulo ---
   "error.sign_in_server.title": "Non è stato possibile completare l'accesso.",

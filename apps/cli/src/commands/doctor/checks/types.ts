@@ -1,5 +1,6 @@
-import { ZitadelError, type ZitadelErrorCode } from "../../../lib/errors";
-import type { Orca } from "../../../lib/orca";
+import type { Consent, Gate } from "@/lib/consent";
+import { ZitadelError, type ZitadelErrorCode, errorMessage } from "@/lib/errors";
+import type { Orca } from "@/lib/orca";
 
 /** Pass/fail/advisory outcome of a single {@link SanityCheck}. */
 export type CheckOutcome = {
@@ -25,6 +26,13 @@ export type CheckContext = {
   readonly cliVersion: string;
   /** When true, {@link SanityCheck.fix} must preview without writing. */
   readonly dryRun: boolean;
+  /** Aborts what a check has in flight, as Ctrl-C does for the command running it. */
+  readonly signal: AbortSignal;
+  /**
+   * Asks for consent to a destructive repair: `doctor`'s own confirmation,
+   * which `--force` answers. `undefined` is a no. Never called on a dry run.
+   */
+  readonly consent: (gate: Gate) => Promise<Consent | undefined>;
 };
 
 /**
@@ -67,7 +75,7 @@ export abstract class AbstractSanityCheck implements SanityCheck {
       return {
         name: this.name,
         status: "fail",
-        message: error instanceof Error ? error.message : String(error),
+        message: isMissingFile(error) ? `${this.path} was not found` : errorMessage(error),
         path: this.path,
         ...(error instanceof ZitadelError
           ? { code: error.code, ...(error.hint === undefined ? {} : { hint: error.hint }) }
@@ -79,4 +87,9 @@ export abstract class AbstractSanityCheck implements SanityCheck {
   async fix(_ctx: CheckContext): Promise<void> {
     return;
   }
+}
+
+/** A read that found no file: named by the check's own path, not the system's error and absolute path. */
+function isMissingFile(error: unknown): boolean {
+  return error instanceof Error && (error as NodeJS.ErrnoException).code === "ENOENT";
 }

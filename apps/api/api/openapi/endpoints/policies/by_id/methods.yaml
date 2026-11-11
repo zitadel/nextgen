@@ -1,0 +1,31 @@
+get:
+  operationId: getPolicy
+  x-zitadel-cli: policies get
+  summary: Get a policy by ID
+  description: |
+    Returns a policy as its newest revision. A revision applies once a deployed
+    release pins it.
+
+    A policy holds a project's rules for one operation, such as setting a
+    password. Pass the `id` that `listPolicies` (`GET /policies`) or `publishPolicy` (`POST /policies`) returns.
+
+    The lookup is scoped to the project in `project_id`: a policy of another
+    project answers not found exactly as an unknown ID does.
+  tags:
+    - Policies
+  parameters:
+    - $ref: ../../../components/parameters/project-id.yaml
+    - $ref: ../../../components/parameters/policy-id.yaml
+  security:
+    - oauth2:
+        - policy.read
+    - sessionCookie: []
+  responses:
+    '200':
+      description: The policy, as its newest revision.
+      content:
+        application/json:
+          schema:
+            $ref: ../policy.yaml
+    default:
+      $ref: getPolicy-error-response.yaml

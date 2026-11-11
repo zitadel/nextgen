@@ -8,7 +8,7 @@ import (
 	"net/http"
 
 	"github.com/go-faster/jx"
-	api "github.com/zitadel/nextgen/api/generated"
+	api "go.zitadel.com/zitadel/v5/api"
 )
 
 // Operation ids. They are the `op` tag on every sample and the only
@@ -59,13 +59,22 @@ func Login(ctx context.Context, c *api.Client, t Target) (LoginResult, error) {
 	created, err := c.CreateFlow(WithOp(ctx, OpCreateFlow), &api.CreateFlowRequest{
 		ProjectID: api.ProjectID(t.ProjectID),
 		Purpose:   api.CreateFlowRequestPurposeLogin,
-	})
+	}, api.CreateFlowParams{})
 	if err != nil {
 		return LoginResult{}, Classify(OpCreateFlow, err)
 	}
 	flow, ok := created.(*api.FlowResponseHeaders)
 	if !ok {
-		return LoginResult{}, classifyResponse(OpCreateFlow, http.StatusBadRequest, created)
+		switch r := created.(type) {
+		case *api.CreateFlowBadRequest:
+			return LoginResult{}, classifyResponse(OpCreateFlow, http.StatusBadRequest, (*api.ErrorDetails)(r))
+		case *api.CreateFlowForbidden:
+			return LoginResult{}, classifyResponse(OpCreateFlow, http.StatusForbidden, (*api.ErrorDetails)(r))
+		case *api.CreateFlowConflict:
+			return LoginResult{}, classifyResponse(OpCreateFlow, http.StatusConflict, (*api.ErrorDetails)(r))
+		default:
+			return LoginResult{}, classifyResponse(OpCreateFlow, http.StatusBadRequest, created)
+		}
 	}
 	zflow, err := cookieValue(flow.SetCookie, "_zflow")
 	if err != nil {

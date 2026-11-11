@@ -14,6 +14,14 @@ describe("DOMPurify sanitiser", () => {
     expect(out).toContain("required");
   });
 
+  it.each(["name", "title", "id", "action", "method", "length", "location", "body", "domain"])(
+    'keeps a field named "%s" that collides with a DOM property (#2532)',
+    (value) => {
+      const out = sanitise(`<zl-field name="${value}" label="x"></zl-field>`);
+      expect(out).toContain(`name="${value}"`);
+    },
+  );
+
   it("preserves <zl-button> with hierarchy, action, and label", () => {
     const out = sanitise(
       `<zl-button hierarchy="primary" size="medium" type="submit" action="submit" label="Continue"></zl-button>`,
@@ -58,6 +66,20 @@ describe("DOMPurify sanitiser", () => {
     expect(out).toContain('class="zl-card-nav__link"');
     expect(out).toContain('data-action="register"');
     expect(out).not.toContain("<zl-button");
+  });
+
+  it("keeps the account chip and what the template tells it", () => {
+    const out = sanitise(
+      `<zl-account identifier="maya@example.com" action="back" label="Use another account" avatar=""></zl-account>`,
+    );
+    expect(out).toContain(
+      '<zl-account identifier="maya@example.com" action="back" label="Use another account" avatar="">',
+    );
+  });
+
+  it("keeps the account's avatar and its seed", () => {
+    const out = sanitise(`<zl-avatar seed="maya@example.com"></zl-avatar>`);
+    expect(out).toContain('<zl-avatar seed="maya@example.com">');
   });
 
   it("preserves data-* and aria-* attributes", () => {

@@ -1,7 +1,7 @@
 import { fileURLToPath } from "node:url";
 import { defineConfig, type Plugin } from "vitest/config";
 
-import { baseTest, edgeProject, edgeSpecs } from "../../vitest.shared.mjs";
+import { baseTest, edgeProject, edgeSpecs } from "@zitadel/vitest-config";
 
 // auth.ts imports "server-only", whose default entry throws to keep server
 // modules out of client bundles. Tests run outside both module graphs, so

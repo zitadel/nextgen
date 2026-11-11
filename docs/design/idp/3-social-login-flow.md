@@ -506,6 +506,16 @@ user_already_exists → authored step: "an account with this email already exist
   shared with the `password` step. The credential must still be correct; what
   the step confirms about account existence is covered by the enumeration note
   below.
+* **What the step shows the bound user:** it adds nothing to what the note
+  below already confirms.
+  It names the account (`step.identifier`) only by the identifier claim the
+  provider verified, which the visitor proved they hold, or by a value the
+  visitor typed on the flow; an unverified claim names nothing.
+  It leaves out the provider whose sign-in collided, since choosing it again
+  collides again.
+  It offers a passkey only to an account that has one: the ceremony for a
+  bound user lists that user's passkeys as `allowCredentials`, so choosing
+  the action already tells the visitor as much.
 
 ### Navigation Mechanics: `switch` vs. `pivot`
 
@@ -590,7 +600,7 @@ and recovery route without exposing internal technical details to the end user.
 | **Localization Keys:** Export conflict-step copy (the account-exists explanation plus its submit, passkey, and sign-in actions), error copy, and provider button labels as `text_key` entries. | Login UI / Locale Work |
 | **UI & Branding Assets:** Add conditional SSO blocks to all five branding `login.liquid` templates and `default.liquid`; add provider glyphs to `zl-icon`. | Branding Defaults / Components |
 | **`<zl-sso-providers>` and `sso-redirect`:** An atom rendering one button per provider (`name` and `template` on the rendered step, filled by the engine from the connection; `template` is the brand hint) that submits `{action: "sso", sso_provider_id, return_target}`, and orchestrator navigation when a step carries `redirect_url`. | Components / Orchestrator |
-| **Failure-Details Channel:** Details are written to the server log; tenant-side misconfigurations are hidden from the end user. The log never carries authorization codes, tokens, or secret values; claim values follow `x-audit`'s deny-by-default; access logs redact `code` and `state` from the callback query. | Engine; the login UI shows the generic error |
+| **Failure-Details Channel:** Details are written to the server log; tenant-side misconfigurations are hidden from the end user. The log never carries authorization codes, tokens, or secret values; claim values follow `x-audit`'s deny-by-default; the access log carries the callback path only, never its query. | Engine; the login UI shows the generic error |
 
 ## Open Points
 

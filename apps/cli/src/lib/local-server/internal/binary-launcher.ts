@@ -1,14 +1,21 @@
-import { execFile, spawn } from "node:child_process";
+import { spawn } from "node:child_process";
 import { createReadStream } from "node:fs";
 import { mkdir, open, readFile, stat } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { basename, dirname } from "node:path";
+import { StringDecoder } from "node:string_decoder";
+import { buffer } from "node:stream/consumers";
 
 import { resolveServerBinary, serverBinaryPath } from "@zitadel/server/binary";
+import { execa } from "execa";
+import pWaitFor from "p-wait-for";
 
-import { ZitadelError, isErrno } from "../../errors";
-import { EMPTY_ENV, type ResolvedEnv, envSummary } from "../env-vars";
-import type { BinaryRuntimeMetadata } from "../runtime";
+import { ZitadelError, errorMessage, isErrno } from "@/lib/errors";
+import { shellCommand } from "@/lib/suggestion";
+import { EMPTY_ENV, type ResolvedEnv, envSummary } from "@/lib/local-server/env-vars";
+import type { BinaryRuntimeMetadata } from "@/lib/local-server/runtime";
+import type { LogSink } from "@/lib/local-server/server-log";
+import { type Clock, realClock, stopSignal } from "./clock";
 import { type Launched, type Launcher, launched } from "./lifecycle";
 
 export const SERVER_NPM_PACKAGE = "@zitadel/server";
@@ -16,6 +23,8 @@ const COMMAND_ENV = "ZITADEL_SERVER_BINARY";
 const COMMAND_VERSION_ENV = "ZITADEL_SERVER_BINARY_VERSION";
 const STOP_TIMEOUT_MS = 10_000;
 const STOP_KILL_TIMEOUT_MS = 2_000;
+/** How often a followed log file is checked for new lines. */
+const LOG_POLL_MS = 1_000;
 const MIGRATE_FLAG = "--migrate";
 /** What the server binary is called, whatever launched it. */
 const SERVER_PROGRAM = "nextgen";
@@ -231,7 +240,7 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
     } catch (error) {
       throw new ZitadelError("E_VALIDATION", "Zitadel server npm package is not available", {
         hint: "Reinstall @zitadel/cli so npm can install @zitadel/server and its platform package.",
-        nextCommands: ["npm install @zitadel/cli@alpha"],
+        nextCommands: [shellCommand("npm install @zitadel/cli@latest")],
         details: { package: SERVER_NPM_PACKAGE, message: errorMessage(error) },
       });
     }
@@ -307,20 +316,23 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
   }
 
   /**
-   * The last `tail` lines of a server's log file, or an empty string if it has
-   * none yet. Read from the file, not the process, so a stopped server's log is
-   * still there.
+   * A server's whole log file, or an empty string if it has none yet. Read from
+   * the file, not the process, so a stopped server's log is still there.
    */
-  static async readLogs(logPath: string, tail: number): Promise<string> {
-    let content = "";
+  static async readLog(logPath: string): Promise<string> {
     try {
-      content = await readFile(logPath, "utf8");
+      return await readFile(logPath, "utf8");
     } catch (error) {
       if (isErrno(error, "ENOENT")) {
         return "";
       }
       throw error;
     }
+  }
+
+  /** The last `tail` lines of a server's log file, or an empty string if it has none yet. */
+  static async readLogs(logPath: string, tail: number): Promise<string> {
+    const content = await BinaryLauncher.readLog(logPath);
     const lines = content.split(/\r?\n/);
     const hasTrailingNewline = lines.at(-1) === "";
     const body = hasTrailingNewline ? lines.slice(0, -1) : lines;
@@ -329,35 +341,63 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
   }
 
   /**
-   * Writes the last `tail` lines to the terminal and then each line as it is
-   * appended, until interrupted. The file is polled by size: it is appended to by
-   * another process, and there is no event to wait on that works on every platform.
+   * Hands `sink` the log file as it is, then each part appended to it, until
+   * `signal` aborts, by default when the CLI is interrupted. The file is
+   * polled by size: it is appended to by another process, and there is no
+   * event to wait on that works on every platform.
    */
-  static async followLogs(logPath: string, tail: number): Promise<void> {
-    process.stdout.write(await BinaryLauncher.readLogs(logPath, tail));
-    let offset = await fileSize(logPath);
-    await new Promise<void>((resolveFollow, reject) => {
-      const interval = setInterval(() => {
-        void (async () => {
-          try {
-            const size = await fileSize(logPath);
-            if (size > offset) {
-              const stream = createReadStream(logPath, { start: offset, end: size - 1 });
-              stream.pipe(process.stdout, { end: false });
-              offset = size;
-            }
-          } catch (error) {
-            reject(error);
-          }
-        })();
-      }, 1000);
-      const stop = () => {
-        clearInterval(interval);
-        resolveFollow();
-      };
-      process.once("SIGINT", stop);
-      process.once("SIGTERM", stop);
-    });
+  static async followLogs(
+    logPath: string,
+    sink: LogSink,
+    options: { clock?: Clock; signal?: AbortSignal } = {},
+  ): Promise<void> {
+    const clock = options.clock ?? realClock;
+    const stop = options.signal ? { signal: options.signal, dispose: () => {} } : stopSignal();
+    try {
+      const log = new AppendedLog(logPath);
+      sink.existing(await log.next());
+      while (!stop.signal.aborted) {
+        await clock.wait(LOG_POLL_MS, stop.signal);
+        if (!stop.signal.aborted) {
+          sink.appended(await log.next());
+        }
+      }
+    } finally {
+      stop.dispose();
+    }
+  }
+}
+
+/**
+ * A log file another process appends to, read a part at a time: each
+ * {@link AppendedLog.next} returns what was written since the one before, the
+ * first the whole file. Reading by byte offset, rather than by size after a
+ * read, loses nothing written in between. A part ends where the file did when
+ * it was read, which can be inside a character, so the decoder keeps a
+ * character's first bytes until the rest are read.
+ */
+export class AppendedLog {
+  private readonly path: string;
+  private readonly decoder = new StringDecoder("utf8");
+  private offset = 0;
+
+  constructor(path: string) {
+    this.path = path;
+  }
+
+  async next(): Promise<string> {
+    const size = await fileSize(this.path);
+    // A file shorter than what was read of it is another one, as after it was
+    // deleted: it is read from the top.
+    if (size < this.offset) {
+      this.offset = 0;
+    }
+    if (size === this.offset) {
+      return "";
+    }
+    const bytes = await readBytes(this.path, this.offset, size - this.offset);
+    this.offset += bytes.length;
+    return this.decoder.write(bytes);
   }
 }
 
@@ -379,12 +419,10 @@ async function ownsProcess(record: BinaryRuntimeMetadata): Promise<boolean> {
     return true;
   }
   const programs = [started, SERVER_PROGRAM];
-  let listing: string;
-  try {
-    // `ww`: without it `ps` cuts the command column to `COLUMNS` (which tools
-    // such as pnpm and moon export), and the server's long path is cut before its name.
-    listing = await ps(["axww", "-o", "pid=,pgid=,command="]);
-  } catch {
+  // `ww`: without it `ps` cuts the command column to `COLUMNS` (which tools
+  // such as pnpm and moon export), and the server's long path is cut before its name.
+  const listing = await ps(["axww", "-o", "pid=,pgid=,command="]).catch(() => undefined);
+  if (listing === undefined) {
     return true;
   }
   const candidates = listing.split(/\r?\n/).flatMap((line) => {
@@ -406,10 +444,8 @@ const DATA_DIR_VARIABLE = "NEXTGEN_SERVER_DATA_DIR=";
 
 /** Whether a process serves a data directory, or its environment does not say. */
 async function servesDataDir(pid: number, dataDir: string): Promise<boolean> {
-  let command: string;
-  try {
-    command = await ps(["eww", "-p", String(pid), "-o", "command="]);
-  } catch {
+  const command = await ps(["eww", "-p", String(pid), "-o", "command="]).catch(() => undefined);
+  if (command === undefined) {
     return true;
   }
   const at = command.indexOf(DATA_DIR_VARIABLE);
@@ -426,15 +462,8 @@ async function servesDataDir(pid: number, dataDir: string): Promise<boolean> {
 /**
  * Runs `ps` and returns its output, rejecting where `ps` is missing or fails.
  */
-function ps(args: string[]): Promise<string> {
-  return new Promise<string>((resolve, reject) => {
-    execFile(
-      "ps",
-      args,
-      { timeout: 3000, encoding: "utf8", maxBuffer: 16 * 1024 * 1024 },
-      (error, stdout) => (error ? reject(error) : resolve(stdout)),
-    );
-  });
+async function ps(args: string[]): Promise<string> {
+  return (await execa("ps", args, { timeout: 3000, maxBuffer: 16 * 1024 * 1024 })).stdout;
 }
 
 /**
@@ -458,7 +487,7 @@ async function spawned(child: ReturnType<typeof spawn>, command: string): Promis
   } catch (error) {
     throw new ZitadelError("E_VALIDATION", "The Zitadel server could not be started", {
       hint: "Check that the server binary exists and can be run, or reinstall @zitadel/cli.",
-      nextCommands: ["npm install @zitadel/cli@alpha"],
+      nextCommands: [shellCommand("npm install @zitadel/cli@latest")],
       details: { command, message: errorMessage(error) },
     });
   }
@@ -478,6 +507,18 @@ async function fileSize(path: string): Promise<number> {
   } catch (error) {
     if (isErrno(error, "ENOENT")) {
       return 0;
+    }
+    throw error;
+  }
+}
+
+/** Up to `length` bytes of a file from `position` on; none for a file that is gone. */
+async function readBytes(path: string, position: number, length: number): Promise<Buffer> {
+  try {
+    return await buffer(createReadStream(path, { start: position, end: position + length - 1 }));
+  } catch (error) {
+    if (isErrno(error, "ENOENT")) {
+      return Buffer.alloc(0);
     }
     throw error;
   }
@@ -526,22 +567,12 @@ function signalRuntime(
  * process's child, so there is no exit event to wait on.
  */
 async function waitForExit(pid: number, timeoutMs: number): Promise<boolean> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    if (!BinaryLauncher.isRunning(pid)) {
-      return true;
-    }
-    await delay(200);
-  }
-  return !BinaryLauncher.isRunning(pid);
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolveDelay) => setTimeout(resolveDelay, ms));
+  const gone = () => !BinaryLauncher.isRunning(pid);
+  await pWaitFor(gone, {
+    interval: 200,
+    timeout: { milliseconds: timeoutMs, fallback: () => undefined },
+  });
+  return gone();
 }
 
 /**

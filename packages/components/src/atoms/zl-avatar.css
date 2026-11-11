@@ -1,0 +1,17 @@
+/* Styles for `<zl-avatar>` — shadow host rules first; the painted surface is
+   the shared `.zl-avatar` (`src/styles/avatar.css`). The host sizes it:
+   24px unless a template sets another width and height. */
+
+:host {
+  display: inline-block;
+  flex-shrink: 0;
+  inline-size: var(--zl-spacing-6);
+  block-size: var(--zl-spacing-6);
+  vertical-align: middle;
+}
+
+.zl-avatar {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+}

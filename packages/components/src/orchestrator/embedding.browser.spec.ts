@@ -80,6 +80,18 @@ const fieldlessStep: CreateFlow201 = {
 };
 
 /**
+ * The account row a template ejected before `<zl-account>` still carries, as
+ * the bundled template drew it: layout-chrome.css keeps its styles.
+ */
+const ejectedAccountRowTemplate = `<zl-page-shell data-zl-template-root><zl-card>
+  <p class="zl-card-account" data-testid="zitadel-account">
+    <span class="zl-card-account__value">{{ identifier.value }}</span>
+    <a href="#" class="zl-card-nav__link" data-action="back">Use another account</a>
+  </p>
+  <zl-field name="password" type="password" label="Password"></zl-field>
+</zl-card></zl-page-shell>`;
+
+/**
  * A branding asset URL that genuinely loads in the test browser. It has to
  * be same-origin (the vitest server is loopback http, which
  * `validateBranding` allows for assets, unlike a `data:` URI) and it has to
@@ -376,6 +388,38 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
     // The padded 48rem branch is live in this viewport, so this pins the
     // widget override beating the media query, not just the narrow default.
     expect(getComputedStyle(surface).padding).toBe("0px");
+  });
+
+  it("keeps an ejected template's account row inside the card for a long address", async () => {
+    const address = `${"a".repeat(64)}@${"b".repeat(40)}.example`;
+    const element = await mount({
+      ...identifierStep,
+      step: {
+        ...identifierStep.step,
+        name: "password",
+        fields: [
+          {
+            name: "password",
+            type: "password",
+            text_key: "password.field.password",
+            required: true,
+            autocomplete: "current-password",
+          },
+        ],
+        identifier: { value: address, autocomplete: "username" },
+      },
+      branding: { liquid_template: ejectedAccountRowTemplate },
+    });
+    const value = await waitFor(() =>
+      element.shadowRoot?.querySelector<HTMLElement>(".zl-card-account__value"),
+    );
+    const card = element.shadowRoot?.querySelector("zl-card") as HTMLElement;
+    expect(value.textContent).toBe(address);
+    expect(getComputedStyle(value).overflowWrap).toBe("anywhere");
+    expect(value.getBoundingClientRect().right).toBeLessThanOrEqual(
+      card.getBoundingClientRect().right,
+    );
+    expect(card.getBoundingClientRect().width).toBeLessThanOrEqual(360);
   });
 
   it("widget default: does not steal focus on initial load", async () => {

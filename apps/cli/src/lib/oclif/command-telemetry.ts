@@ -1,10 +1,10 @@
-import type { Properties } from "../telemetry";
-import { ciFlag } from "../telemetry/dimensions/ci-flag";
-import { ciProvider } from "../telemetry/dimensions/ci-provider";
-import { country } from "../telemetry/dimensions/country";
-import { hostAgent } from "../telemetry/dimensions/host-agent";
-import { invocationChannel } from "../telemetry/dimensions/invocation-channel";
-import { operatingSystem } from "../telemetry/dimensions/operating-system";
+import type { Properties } from "@/lib/telemetry";
+import { ciFlag } from "@/lib/telemetry/dimensions/ci-flag";
+import { ciProvider } from "@/lib/telemetry/dimensions/ci-provider";
+import { country } from "@/lib/telemetry/dimensions/country";
+import { hostAgent } from "@/lib/telemetry/dimensions/host-agent";
+import { invocationChannel } from "@/lib/telemetry/dimensions/invocation-channel";
+import { operatingSystem } from "@/lib/telemetry/dimensions/operating-system";
 import { serverKind } from "./server-kind";
 import type { GlobalOptions } from "./types";
 
@@ -17,6 +17,39 @@ import type { GlobalOptions } from "./types";
 export const CLI_COMMAND_STARTED = "cli_command_started";
 export const CLI_COMMAND_COMPLETED = "cli_command_completed";
 export const CLI_COMMAND_FAILED = "cli_command_failed";
+
+/**
+ * The one dimension of its own a command's Vercel Web Analytics copy keeps, by
+ * command id; the rest go to Mixpanel only.
+ */
+export const VERCEL_COMMAND_DIMENSIONS: ReadonlyMap<string, string> = new Map([
+  ["setup", "framework"],
+  ["claim", "claim_outcome"],
+  ["doctor", "failed_checks"],
+  ["api", "operation"],
+  ["start", "runtime"],
+]);
+
+/**
+ * The properties the Vercel Web Analytics copy of `command`'s lifecycle events
+ * keeps, in priority order, the header first: the intake takes 8. The
+ * command's own dimension ranks after `host_agent`, so on a failed run, where
+ * `reason` fills the eighth place, it takes `non_interactive`'s.
+ */
+export function vercelEventKeys(command: string): readonly string[] {
+  const dimension = VERCEL_COMMAND_DIMENSIONS.get(command);
+  return [
+    "surface",
+    "cli_version",
+    "server_kind",
+    "command",
+    "status",
+    "reason",
+    "host_agent",
+    ...(dimension === undefined ? [] : [dimension]),
+    "non_interactive",
+  ];
+}
 
 export const FIRST_RUN_NOTICE =
   "Zitadel CLI collects anonymous usage analytics to help improve the tool. " +
@@ -74,11 +107,12 @@ function profileDeviceProperties(meta: GlobalOptions): Properties {
 
 /**
  * Build the dimensions shared by every lifecycle event, merged with any
- * per-command `extra`. The allow-list: only enums, booleans, counts, and
- * versions cross the boundary — never URLs, project ids, file paths, emails, or
- * secrets. `extra` is spread first so the canonical base dimensions always win;
- * callers order their own extras so reserved lifecycle fields win over command
- * props.
+ * per-command `extra`. They include the header every Zitadel component sends,
+ * as `docs/product-analytics-events.yaml` defines it. The allow-list: only
+ * enums, booleans, counts, and versions cross the boundary — never URLs,
+ * project ids, file paths, emails, or secrets. `extra` is spread first so the
+ * canonical base dimensions always win; callers order their own extras so
+ * reserved lifecycle fields win over command props.
  */
 export function commandEventProperties(
   meta: GlobalOptions,
@@ -88,6 +122,7 @@ export function commandEventProperties(
   const { env } = meta;
   return {
     ...extra,
+    surface: "cli",
     ...eventDeviceProperties(meta),
     ip: 0,
     invocation_id: invocationId,

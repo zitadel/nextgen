@@ -1,0 +1,8 @@
+language js
+
+// A delete is confirmed with `deleted: true` (see `deletedData()` in
+// apps/cli/src/lib/oclif/envelope.ts), never `removed: true`, so an agent reads
+// "did the delete succeed?" the same way for every command.
+`removed: true` as $member where {
+  register_diagnostic(span=$member, message="Confirm a delete with deletedData() from lib/oclif/envelope (`deleted: true`), not `removed: true`.", severity="error")
+}

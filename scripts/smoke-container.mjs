@@ -58,16 +58,17 @@ export async function smokeContainer(options = {}) {
       throw new Error(`container never logged ${JSON.stringify(READY_LOG)}:\n${logs}`);
     }
 
-    // Logging is not serving: probe the port the image exposes.
+    // Logging is not serving: probe the port the image exposes, on the probe
+    // that also needs the database in the data dir to answer.
     let status = 0;
     while (Date.now() < deadline && status !== 200) {
-      status = await fetch(`http://127.0.0.1:${port}/healthz`)
+      status = await fetch(`http://127.0.0.1:${port}/readyz`)
         .then((response) => response.status)
         .catch(() => 0);
       if (status !== 200) await delay(1000);
     }
     if (status !== 200) {
-      throw new Error(`container logged readiness but /healthz returned ${status}`);
+      throw new Error(`container logged readiness but /readyz returned ${status}`);
     }
 
     return { image, port, status };

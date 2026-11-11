@@ -67,7 +67,7 @@ This builds the embedded console and login UIs, then starts the Go server on
 #### 2. Create a project
 
 ```bash
-curl -s -X POST http://localhost:8080/projects \
+curl -s -X POST http://localhost:8080/api/v1/projects \
   -H 'Content-Type: application/json' \
   -d '{"name": "demo"}' | jq .
 ```

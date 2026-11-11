@@ -1,10 +1,10 @@
 import { join } from "node:path";
 
-import { sdkVersionForCli } from "../../../../public-cli";
-import type { FileOp } from "../file-writer/types";
-import type { PatchContext, PatchView } from "../../types";
-import { AbstractRulePatcher } from "../base";
-import { devScriptPortOp } from "../dev-script-port";
+import { sdkVersionForCli } from "@/lib/public-cli";
+import type { FileOp } from "@/lib/orca/patchers/rule/file-writer/types";
+import type { PatchContext, PatchView } from "@/lib/orca/patchers/types";
+import { AbstractRulePatcher } from "@/lib/orca/patchers/rule/base";
+import { devScriptPortOp } from "@/lib/orca/patchers/rule/dev-script-port";
 import {
   indexPageTemplate,
   loginPageTemplate,
@@ -44,8 +44,18 @@ export class QwikRouterPatcher extends AbstractRulePatcher {
   protected routeOps(ctx: PatchContext): FileOp[] {
     const src = (rel: string) => join(ctx.framework.appDir, rel);
     return [
+      // The auth boundary is written on every setup; a pre-existing plugin at
+      // this exact path is a genuine conflict the file-writer refuses (and
+      // --force replaces), the same way Next writes its request boundary.
       { kind: "write", path: src("routes/plugin@nextgen.ts"), contents: pluginTemplate() },
-      { kind: "write", path: src("routes/index.tsx"), contents: indexPageTemplate() },
+      // The landing page is written only when setup created the skeleton
+      // itself — a pre-existing app keeps its own landing page (ADR 044),
+      // same as the Next/Nuxt homepage.
+      ...(ctx.scaffoldedFramework
+        ? ([
+            { kind: "write", path: src("routes/index.tsx"), contents: indexPageTemplate() },
+          ] satisfies FileOp[])
+        : []),
       { kind: "write", path: src("routes/login/index.tsx"), contents: loginPageTemplate(ctx) },
       {
         kind: "write",
@@ -101,6 +111,13 @@ export class QwikRouterPatcher extends AbstractRulePatcher {
     // infrastructure: without it /__nextgen/* 404s and protected routes open, so
     // doctor fails rather than warning about a missing page.
     return [join(view.framework.appDir, "routes/plugin@nextgen.ts")];
+  }
+
+  protected override conditionallyScaffoldedFiles(view: PatchView): ReadonlyArray<string> {
+    // Written only when setup created the app skeleton itself; on a
+    // pre-existing app the landing page stays user-owned (see routeOps), so
+    // the managed-files check must not expect it on a manifest-less app.
+    return [join(view.framework.appDir, "routes/index.tsx")];
   }
 
   protected routeDeps(_view: PatchView): ReadonlyArray<string> {

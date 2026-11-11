@@ -7,8 +7,10 @@ inheritedBy:
   language: "javascript"
 
 implicitInputs:
-  # The shared Biome config the lint task runs against.
+  # The shared Biome config the lint task runs against, and the GritQL rules
+  # it loads as plugins.
   - "/biome.json"
+  - "/biome-plugins/*.grit"
 
 tasks:
   # Same single standardized Biome `check` (lint + format) as the TypeScript

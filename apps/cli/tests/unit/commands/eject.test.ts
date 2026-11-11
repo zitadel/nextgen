@@ -4,14 +4,14 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@clack/prompts", async () => (await import("../../helpers/clack")).clackDouble());
+vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
 
 import { cancel, confirm, isCancel } from "@clack/prompts";
 
-import Eject from "../../../src/commands/eject";
-import { parseJson, runCliForTest } from "../../helpers/run-cli";
-import { asTerminal } from "../../helpers/terminal";
-import { MANAGED_MARKER } from "../../../src/lib/paths";
+import Eject from "@/commands/eject";
+import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
+import { asTerminal } from "@tests/helpers/terminal";
+import { MANAGED_MARKER } from "@/lib/paths";
 
 function eject(cwd: string, extra: string[] = []) {
   return runCliForTest([
@@ -142,7 +142,7 @@ describe("eject command", () => {
     expect(res.exitCode).toBe(3);
     const json = parseJson(res.stdout) as { status: string; code: string };
     expect(json.status).toBe("error");
-    expect(json.code).toBe("E_VALIDATION");
+    expect(json.code).toBe("E_CONFIRMATION_REQUIRED");
     // Nothing should have been removed.
     expect(await exists(join(cwd, "zitadel.json"))).toBe(true);
     expect(await exists(join(cwd, ".zitadel"))).toBe(true);
@@ -166,7 +166,8 @@ describe("eject command", () => {
     expect(json.status).toBe("ok");
     // The CLI doesn't touch package.json (lockfile + other deps), but suggests
     // the user uninstall the SDK package the patcher added.
-    expect(json.data.next_commands).toContain("npm uninstall @zitadel/sdk-next");
+    // Run in the ejected project, which is --cwd and not the shell's directory.
+    expect(json.data.next_commands).toContain(`cd ${cwd} && npm uninstall @zitadel/sdk-next`);
 
     // Managed files and config/state are gone.
     expect(json.data.files_removed).toContain("zitadel.json");

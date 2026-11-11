@@ -1,0 +1,3 @@
+# The response every webhook shares: gen_event_schemas $refs it from each
+# webhooks/*.yaml, so the bundle carries it once.
+description: Delivered. Any 2xx status acknowledges the event; the response body is ignored.

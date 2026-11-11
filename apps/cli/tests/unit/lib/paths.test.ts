@@ -2,7 +2,7 @@ import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { MANAGED_MARKER, resolveCwd } from "../../../src/lib/paths";
+import { ancestors, MANAGED_MARKER, resolveCwd } from "@/lib/paths";
 
 describe("resolveCwd", () => {
   it("returns process.cwd() when no argument is given", () => {
@@ -26,5 +26,19 @@ describe("resolveCwd", () => {
 describe("MANAGED_MARKER", () => {
   it("is the versioned managed-file sentinel comment", () => {
     expect(MANAGED_MARKER).toBe("// zitadel-cli: managed-file v1");
+  });
+});
+
+describe("ancestors", () => {
+  it("lists the path and each directory above it, nearest first, up to the root", () => {
+    expect(ancestors("/a/b/c")).toEqual(["/a/b/c", "/a/b", "/a", "/"]);
+  });
+
+  it("ends at the stop directory, which it includes", () => {
+    expect(ancestors("/a/b/c", "/a/b")).toEqual(["/a/b/c", "/a/b"]);
+  });
+
+  it("is just the root for the root", () => {
+    expect(ancestors("/")).toEqual(["/"]);
   });
 });

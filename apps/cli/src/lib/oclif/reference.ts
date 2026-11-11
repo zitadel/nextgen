@@ -1,7 +1,9 @@
 import type { Command, Interfaces } from "@oclif/core";
 
-import { BaseCommand } from "./base";
+import { EXIT_CODES, type ZitadelErrorCode } from "@/lib/errors";
+import { BaseCommand, FLAG_VARIABLES } from "./base";
 import { COMMAND_GROUPS, type CommandGroup, compareInGroup } from "./groups";
+import type { FlagVariable } from "./types";
 
 /**
  * The command surface as data, which the docs site's CLI reference renders a
@@ -12,8 +14,9 @@ import { COMMAND_GROUPS, type CommandGroup, compareInGroup } from "./groups";
  * It reads the statics oclif's help reads, in the root help's order: the
  * groups as they print, and each group by {@link compareInGroup}. The flags
  * every command inherits from {@link BaseCommand} are listed once, as
- * `globalFlags`, and an example keeps only what follows the bin, so the docs
- * show the invocation they teach.
+ * `globalFlags`, with the environment variables that set what they set, and
+ * an example keeps only what follows the bin, so the docs show the invocation
+ * they teach.
  */
 
 /** A flag as the help describes it. An absent field is the flag's default. */
@@ -57,6 +60,8 @@ export type CommandReference = {
   /** oclif's `state`, such as `beta` or `deprecated`. */
   state?: string;
   args: ArgReference[];
+  /** Takes more arguments than it names, as `api` takes its path parameters. */
+  variadic?: true;
   flags: FlagReference[];
   examples: ExampleReference[];
 };
@@ -65,6 +70,10 @@ export type CliReference = {
   bin: string;
   groups: CommandGroup[];
   globalFlags: FlagReference[];
+  /** In the order of the global flags they stand in for. */
+  env: FlagVariable[];
+  /** The process exit code of each error `code` an envelope can carry. */
+  exitCodes: Record<ZitadelErrorCode, number>;
   commands: CommandReference[];
 };
 
@@ -99,10 +108,14 @@ export function cliReference(
         ),
     );
 
+  const flagOrder = Object.keys(BaseCommand.baseFlags);
+
   return {
     bin,
     groups: [...COMMAND_GROUPS],
     globalFlags: [JSON_FLAG, ...flagReferences(BaseCommand.baseFlags, (text) => text)],
+    env: [...FLAG_VARIABLES].sort((a, b) => flagOrder.indexOf(a.flag) - flagOrder.indexOf(b.flag)),
+    exitCodes: { ...EXIT_CODES },
     commands: entries.map(({ id, command, group }) =>
       commandReference(id.replaceAll(":", " "), command, group, bin),
     ),
@@ -158,6 +171,7 @@ function commandReference(
         ...(arg.required === true && { required: true as const }),
         ...(arg.options !== undefined && { options: arg.options.map(String) }),
       })),
+    ...(command.strict === false && { variadic: true as const }),
     flags: flagReferences({ ...own, ...Object.fromEntries(family) }, render),
     examples: (command.examples ?? []).map((example) => exampleReference(example, render, id, bin)),
   };

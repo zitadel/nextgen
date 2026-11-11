@@ -1,0 +1,7 @@
+title: UserCreateFailedPayload
+type: object
+description: Payload for `user.create.failed` events.
+properties:
+  key_name:
+    type: string
+    description: The name of the unique constraint that was already taken.

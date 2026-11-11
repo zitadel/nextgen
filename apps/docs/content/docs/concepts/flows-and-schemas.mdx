@@ -3,10 +3,12 @@ title: Flows and schemas
 description: The relationship between login flows, user schemas, and generated UI.
 ---
 
-The flow engine drives login, registration, passkey, and related auth journeys.
+A user schema and a login flow together decide who a user is and how they sign in. The flow engine runs the flows to drive sign-in, registration, passkey, and related journeys.
 
-A user schema defines **what** the platform stores about a user and how that user type can authenticate. A flow definition defines **when and where** users are asked to provide that data — which step renders when, and which fields each step collects. A flow names its schema by `objectType` in `user_schema` and runs against that schema's newest revision; its `steps[].fields` must name properties of it.
+A user schema defines **what** the platform stores about a user and how that user type can authenticate. A flow definition defines **when and where** users are asked to provide that data: which step renders when, and which fields each step collects.
 
-`zitadel setup` scaffolds editable copies of the default user schema and login flow into `.zitadel/schemas/` and `.zitadel/flows/`, uploads them, and seeds `.zitadel/state.json` so the local files and the platform start in sync. Each folder contains a README explaining what you can change.
+A flow names its schema by `objectType` in `user_schema`. Its `steps[].fields` must name properties of that schema. The flow runs against the schema revision that the deployed [release](/docs/concepts/releases-and-deployments) pins. With nothing deployed, the request is refused.
 
-The local files are the source of truth: edit them, then sync with `plan` and `apply` ([Edit the login flow and schema](/docs/guides/plan-apply)). An edit publishes a new immutable revision instead of changing the old one ([How syncing works](/docs/concepts/repo-config#how-syncing-works)).
+`zitadel setup` scaffolds editable copies of the default user schema and login flow into `.zitadel/schemas/` and `.zitadel/flows/`. Its first deploy publishes them, so the local files and the platform start in sync. Each folder contains a README explaining what you can change.
+
+The local files are the source of truth: edit them, then publish with [`deploy`](/docs/guides/deploy), which builds them into an immutable release and makes it live. Schema and flow edits each publish a new immutable revision. Existing users keep validating against the schema revision they were created with until you [migrate them](/docs/guides/migrate-user-schema). A login that names a flow runs the revision of it the deployed release pins. Without a name, it chooses among the flows that release pins.

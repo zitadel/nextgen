@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
-import { fstatSync } from "node:fs";
+import { accessSync, constants, fstatSync, readFileSync } from "node:fs";
+import { delimiter } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, test, vi } from "vitest";
 
-import { runReplayed } from "./dev-process.mjs";
+import { runReplayed, withWorkspaceTools } from "./dev-process.mjs";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -54,4 +56,34 @@ test("runReplayed replays a failed command's output before it rejects", async ()
   });
   assert.equal(stdout.text, "x".repeat(200_000));
   assert.equal(stderr.text, "boom");
+});
+
+test("withWorkspaceTools stands in for a missing pnpm and adds the workspace bin last", () => {
+  const env = { HOME: "/home/dev", PATH: ["/usr/bin", "/bin"].join(delimiter) };
+  const result = withWorkspaceTools(env, { repoRoot: "/repo", isExecutable: () => false });
+
+  assert.equal(
+    result.PATH,
+    ["/repo/scripts/shims", "/usr/bin", "/bin", "/repo/node_modules/.bin"].join(delimiter),
+  );
+  assert.equal(result.HOME, "/home/dev");
+  assert.equal(env.PATH, ["/usr/bin", "/bin"].join(delimiter));
+});
+
+test("withWorkspaceTools keeps a pnpm on PATH and adds nothing twice", () => {
+  const withPnpm = withWorkspaceTools(
+    { PATH: "/opt/pnpm" },
+    { repoRoot: "/repo", isExecutable: (path) => path === "/opt/pnpm/pnpm" },
+  );
+  assert.equal(withPnpm.PATH, ["/opt/pnpm", "/repo/node_modules/.bin"].join(delimiter));
+
+  const noPnpm = { repoRoot: "/repo", isExecutable: () => false };
+  const shimmed = withWorkspaceTools({ PATH: "/bin" }, noPnpm);
+  assert.equal(withWorkspaceTools(shimmed, noPnpm).PATH, shimmed.PATH);
+});
+
+test("the pnpm shim is an executable that runs corepack pnpm", () => {
+  const shim = fileURLToPath(new URL("./shims/pnpm", import.meta.url));
+  accessSync(shim, constants.X_OK);
+  assert.match(readFileSync(shim, "utf8"), /^exec corepack pnpm "\$@"$/m);
 });

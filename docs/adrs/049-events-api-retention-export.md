@@ -5,6 +5,23 @@
 > **Context:** Operator and integrator access to the wide event audit stream
 > **Builds on:** [ADR 048](048-wide-events-internal-audit-primitive.md), [ADR 027](027-cursor-based-pagination.md), [ADR 033](033-internal-permission-management.md), [ADR 036](036-api-credential-planes.md), [ADR 046](046-claim-lifecycle-v2.md), [ADR 047](047-dialect-id-generation.md)
 > **Related:** [resource-map](../design/api/resource-map.md)
+>
+> **Amendment (2026-10-27):** §2's purge can run on a scheduler's request
+> instead of on the server's own timer, and it runs as the server's role, not
+> a dedicated one. See
+> [the amendment](#amendment-2026-10-27-who-starts-the-purge-and-as-which-role).
+>
+> **Amendment (2026-10-30):** §3's shipper and §1's ascending pages list only
+> settled events, so no cursor skips an event whose transaction commits late.
+> See [the amendment](#amendment-2026-10-30-no-cursor-skips-a-late-commit).
+>
+> **Amendment (2026-11-10):** §4's gate lets the deployment's platform project
+> through without a claim, for reads and export alike. See
+> [the amendment](#amendment-2026-11-10-the-platform-project-needs-no-claim).
+>
+> **Amendment (2026-11-10):** §4's gate lets platform operators read every
+> project, and §3's deployment sinks ship every project, claimed or not. See
+> [the amendment](#amendment-2026-11-10-platform-operators-see-every-project).
 
 ## Context
 
@@ -297,6 +314,9 @@ flowchart LR
 
 - At-least-once delivery within the retention window. Consumers must be
   **idempotent** on `event.id`.
+- No event is skipped: the shipper lists only settled events, so one whose
+  transaction commits late still ships
+  ([amendment 2026-10-30](#amendment-2026-10-30-no-cursor-skips-a-late-commit)).
 - Shipper retries on transient failure without advancing the cursor.
 - Duplicate external delivery is acceptable (crash between deliver and upsert);
   missing delivery after retention purge is accepted (metric
@@ -332,6 +352,11 @@ Per [ADR 046](046-claim-lifecycle-v2.md) and
   job**.
 - Retention remains **time-only** for unclaimed projects (same window); disk
   does not grow forever waiting for claim or sinks.
+- The deployment's platform project is never claimed and is visible from the
+  start ([amendment 2026-11-10](#amendment-2026-11-10-the-platform-project-needs-no-claim)).
+- Platform operators read every project's events, and deployment sinks ship
+  them, before the claim too
+  ([amendment 2026-11-10](#amendment-2026-11-10-platform-operators-see-every-project)).
 
 ## Non-goals
 
@@ -397,3 +422,157 @@ Per [ADR 046](046-claim-lifecycle-v2.md) and
 | [036 API Credential Planes](036-api-credential-planes.md) | `/events` is operator/confidential-plane |
 | [046 Claim Lifecycle v2](046-claim-lifecycle-v2.md) | Pre-claim: store always; visibility/export gated until claim |
 | [047 Dialect-Owned ID Generation](047-dialect-id-generation.md) | Event and sink managed ids |
+
+## Amendment (2026-10-27): who starts the purge, and as which role
+
+§2's background job runs in the server's process: one purge as the server
+starts, then one every `events.retention.interval`. That fits a server that
+runs until it is stopped. A server that runs only while it serves a request,
+as a Vercel function does, cannot keep a timer: its purge starts at a cold
+start, outside the request that started the instance, and its hourly runs
+happen only while an instance is up. On the hosted cloud those runs failed
+while connecting to the database.
+
+**Trigger.** `events.retention.trigger_secret` hands the schedule to a
+scheduler outside the process.
+
+- Unset, the default, a server purges on its own timer as before.
+- Set, the server keeps no timer. Each `GET` or `POST` to
+  `/cron/events-retention` that carries the secret as a bearer token runs one
+  purge; any other request to the path gets 401.
+- A run is the same purge: it deletes what is older than the window. A missed
+  run leaves its events to the next, and a second run at the same time
+  deletes what the first left, or nothing; within one process, runs wait for
+  each other.
+- The path is the operator's, not the API's: it is not in the OpenAPI
+  document and takes no API credential.
+- The hosted cloud calls it hourly from a Vercel Cron Job in `vercel.json`,
+  which sends the project's `CRON_SECRET` as the bearer token; the launcher
+  makes it the trigger secret ([runbook](../runbooks/cloud.md#operating)).
+
+[ADR 065](065-background-jobs.md) proposes moving the purge onto an in-process
+job loop with no HTTP surface. On such a platform that loop needs a trigger
+like this one.
+
+**Role.** §2 gives the purge a dedicated role with `DELETE` on `events` and
+the application none. No deployment has one: the server opens one pool and
+purges through it, as the server's role. On the hosted cloud that role
+inherits `pg_write_all_data`, so it may delete from every table. A dedicated
+role needs a second connection for the purge and an application role with
+grants of its own in place of `pg_write_all_data`. Until a deployment needs
+that, the code holds the line: one statement deletes events,
+`DeleteEventsOlderThan`, and only the purge calls it.
+
+## Amendment (2026-10-30): no cursor skips a late commit
+
+§3's shipper reads `(created_at, id) > cursor`, and so does every page of
+`GET /events?order=asc` after the first. Such a reader skips an event for good
+when the event commits after the reader has moved past it. On Postgres
+`created_at` was `now()`, the start of the transaction, so a transaction that
+began first and committed last left its events behind cursors that had already
+passed later ones. Path B events commit with their mutation
+([ADR 048](048-wide-events-internal-audit-primitive.md)), so any slow mutation
+could do it, and sinks missed those events without a trace.
+
+**Guarantee.** Forward readers list only *settled* events: those no open
+transaction can still commit an event before. The shipper delivers every event
+committed within the retention window, in `(created_at, id)` order within a
+project. Delivery stays at least once, since a crash between delivery and the
+cursor upsert repeats events, so consumers still drop duplicates by `id`.
+Paging `GET /events?order=asc` forward returns every committed event once.
+
+**Cost.** An event is listed once every transaction that may still commit an
+earlier event of its project has ended. A transaction that stays open holds
+back its own project's export and ascending lists, never another project's,
+and never makes a reader skip. Descending lists are not bounded: nothing reads
+them as a feed.
+
+| Dialect | `created_at` | Settled events |
+|---|---|---|
+| Postgres | `clock_timestamp()` at the insert, which first takes a shared advisory lock keyed by the project and the current second; the transaction holds it until it ends | Those before the oldest second from which a writer of the project still holds a lock, read from `pg_locks` before the list |
+| Spanner | The commit timestamp (`allow_commit_timestamp`) | All: a strong read sees every event up to its timestamp, and a later commit sorts after them |
+| SQLite | The clock, raised past every event already stored in the project; the one writer holds its lock from the stamp to the commit | All |
+
+`EventsSettledBefore` returns the bound; `ListEventsAfterCursor` and the
+ascending list apply it.
+
+**Rejected:**
+
+- *A safety lag*, listing only events older than now minus a margin, holds
+  only while every transaction that writes an event ends within the margin.
+  Nothing bounds a Path B transaction: Postgres 17's `transaction_timeout`
+  would abort every slow mutation, a serverless instance frozen mid-transaction
+  outlives any margin, and on Spanner the application servers' clock skew adds
+  to it. A lag also delays every event, not only those behind an open
+  transaction.
+- *A snapshot `xmin` guard* bounds transaction IDs, not times. Postgres
+  assigns an ID at a transaction's first write, not when it stamps an event,
+  so a finished transaction with an older ID can have stamped its events after
+  a running one: listing only IDs older than the oldest running one still
+  passes the running one's events.
+- *The oldest `xact_start` in `pg_stat_activity`* holds every project back by
+  the database's oldest open transaction, a retention purge or a dump
+  included. It also sees only the sessions of the reader's role, and only
+  while `track_activities` is on.
+
+## Amendment (2026-11-10): the platform project needs no claim
+
+§4 hides a project's events until it is claimed, so that nobody reads its
+history before an accountable owner exists
+([ADR 046](046-claim-lifecycle-v2.md)). The platform project is never
+claimed: it is the deployment's own, with its operators from the start. Its
+events were stored but shown to no one, so the console's Logs for it stayed
+empty.
+
+**Decision.** The platform project's events are visible as a claimed
+project's are.
+
+- `GET /events` and `GET /events/{id}` read them, and the shipper exports
+  them: one gate for reads and export, as §4 says.
+- The platform project is the one the server already names for claims and
+  grants: `platform.project_id`, or the built-in project under
+  `platform.bootstrap_project`. Without one, every project waits for its
+  claim, as before.
+- Unclaimed customer projects stay hidden, except from platform operators
+  ([next amendment](#amendment-2026-11-10-platform-operators-see-every-project)).
+  The gate's reason, no history before an owner, does not apply to a project
+  that has its admins from the start.
+- Who may read is unchanged: `events.read` on the platform project decides,
+  so only those who already administer it gain anything.
+- An export without a cursor for the platform project ships its retained
+  history from the start (§3), once.
+
+## Amendment (2026-11-10): platform operators see every project
+
+§4 hides an unclaimed project from everyone who holds `events.read` on it,
+the deployment's platform operators
+([ADR 075](075-platform-operators.md)) included. Its reason is the project's
+own secret: a bearer with no identity behind it should not read history
+before an accountable owner exists ([ADR 046](046-claim-lifecycle-v2.md)).
+Operators are not anonymous. The server's configuration names them, they
+administer every project, and they can already read and change everything an
+unclaimed project holds. Hiding its events from them hid only what happens on
+their own platform.
+
+**Decision.** A platform operator reads every project's events, claimed or
+not, and the deployment's sinks ship them.
+
+- `GET /events` and `GET /events/{id}` show an operator an unclaimed
+  project's events as they show a claimed project's. Everyone else, the
+  project's own secret and a platform user who is not an operator included,
+  still gets an empty list or a 404 until the claim.
+- The gate asks whether the caller is an operator (ADR 075 §3) only about a
+  project that exists and is unclaimed. Only a session homed in the platform
+  project costs a read. If the lookup fails, the request fails; it never
+  answers with an empty page.
+- An operator's read of an unclaimed project is marked on the request's events
+  the way ADR 075 §5 marks an operator's writes.
+- A project that is gone shows nothing, to an operator too.
+- Deployment-scoped sinks ship every live project. They are set in the
+  server's configuration, which ADR 075 §4 makes the root of operator trust,
+  so they belong to the operators. When project-scoped sinks exist, a
+  project's sink will ship only what its own readers see, and nothing before
+  the claim.
+- Each shipper tick now reads a cursor and a page for every project and sink,
+  unclaimed projects included. A project's retained history ships from the
+  start (§3), without waiting for the claim.

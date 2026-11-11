@@ -1,0 +1,446 @@
+openapi: 3.1.0
+info: 
+  # TODO: set correct information
+  title: Zitadel NextGen
+  description: This is the next generation of the Zitadel identity platform.
+  version: 0.0.1
+  # This describes the exposed API contract/specification license, not the
+  # AGPL-3.0-only license of the Zitadel server implementation.
+  # See /LICENSING.md for the repository-level licensing policy.
+  license:
+    name: MIT
+    identifier: MIT
+
+servers:
+  # The resource API lives under /api/v1 on the deployment's host (ADR 077).
+  # Until 1.0.0 the server also answers every operation at its root path,
+  # with a Deprecation header.
+  - url: /api/v1
+    description: The API on the current origin. Use http://localhost:8080/api/v1 for local development.
+  # Add the public production API once that endpoint is available.
+  # - url: https://api.zitadel.com
+  #   description: Production API
+
+tags:
+  - name: System
+    description: |
+      Liveness and readiness probes. They answer under `/api/v1` like every
+      operation, and at the root, `/livez` and `/readyz`, where orchestrators
+      probe them.
+  - name: Flows
+    description: |
+      A flow is one browser journey, such as sign-in, registration or recovery.
+      These operations start a flow, return its current step and accept the
+      step the user submits.
+  - name: Flow Definitions
+    description: |
+      Flow definitions are templates for user journeys such as sign-in,
+      registration and recovery. These operations create, list and read them;
+      each create publishes a new revision under the flow's name.
+  - name: Authentication Attempts
+    description: |
+      An authentication attempt is one sign-in round, and it expires 15 minutes
+      after creation. These operations create an attempt, issue challenges,
+      verify proofs and create the handoff token that the session exchange takes.
+  - name: Sessions
+    description: |
+      A session is the durable record of an anonymous or signed-in user. These
+      operations create and read sessions, exchange a handoff token for one,
+      and revoke it.
+  - name: Projects
+    description: |
+      A project is the top-level boundary that holds users, sessions and their
+      sign-in configuration. These operations create and manage projects, claim
+      a project for a team, and manage its origin patterns.
+  - name: Teams
+    description: |
+      Teams group users inside a project and can own projects. These operations
+      create, read, update, query and deactivate teams.
+  - name: Users
+    description: |
+      Users are the identities of a project, such as people or service accounts.
+      These operations create, read, update, delete and query users, read the
+      signed-in user, and manage a user's password, passkeys, identity links
+      and team memberships.
+  - name: Search
+    description: |
+      Search finds the resources of a project that match a text, across
+      resource types in one request. It answers with references; the
+      resources themselves are read through their own operations.
+  - name: Schemas
+    description: |
+      Schemas define the typed shape of user data and of other configurable
+      resources. These operations create, list and read schemas.
+  - name: Branding
+    description: |
+      Branding sets how the login looks: its layout, asset URLs and Liquid
+      template. Each publish creates an immutable revision. The login renders
+      the revision the deployed release pins.
+  - name: Identity Providers
+    description: |
+      Identity providers are the external login providers a project offers.
+      Each is published as a revisioned connection document and referenced by
+      its slug from user schemas and flow definitions. These operations create
+      or revise a connection, query connections, read one by ID, and read its
+      revisions. A slug resolves through the query.
+  - name: Applications
+    description: |
+      Applications authenticate their users via Zitadel, each through its
+      OAuth clients. A registered application is written through the API as
+      one revisioned document. These operations create or revise a registered
+      application and read one by ID.
+  - name: Policies
+    description: |
+      A policy holds the settings an operation is checked against, such as a
+      password policy's minimum length. A project publishes them per guarded
+      operation, and every publish is an immutable revision.
+  - name: Releases
+    description: |
+      A release is a snapshot of a project's configuration: one revision of
+      each resource, plus who made it, when, and from which commit. It points
+      at those revisions and never copies their content, which stays with
+      each resource's own endpoints.
+
+      Create a release from the files in your `.zitadel/` directory, or from
+      revision ids you already have. Creating a release doesn't deploy it,
+      and you can deploy the same release to any number of origins.
+
+      Every release carries a digest of its content, so you can check
+      whether the files you have are already released.
+
+      A release's content never changes. If it must never be served again,
+      revoke it. A release can't be revoked while any origin still serves
+      it.
+  - name: Deployments
+    description: |
+      A deployment makes one release live on one or more targets — the
+      project's primary origins, or preview URLs — and freezes the variable
+      values those targets use.
+
+      Deployments form an append-only history of what ran where, and when. A
+      rollback is another deployment: it re-deploys an earlier one with the
+      variable values it froze, and the deployments in between stay in the
+      history.
+  - name: Previews
+    description: |
+      Previews are the preview URLs that are live. A deployment to a URL
+      matching one of the project's preview patterns creates or renews its
+      preview. These operations list previews and remove one before it expires.
+  - name: Grants
+    description: |
+      Grants give a user or a team the project.viewer, project.editor or
+      project.admin role on a project. These operations create, get, query and
+      revoke grants. There is no operation to change a grant's role yet.
+  - name: Invitations
+    description: |
+      Invitations are 72-hour links that grant a project role (or, later, a team
+      role) to whoever redeems them. These operations create, list, read and
+      cancel invitations, and look up, accept or decline one by its token.
+  - name: Events
+    description: |
+      Events are the project's audit trail: identity, session, admin and entity
+      events. These operations list and read them; filter the list by `category`
+      or `event_type`. An event's `event_type` selects its typed payload.
+  - name: Event Webhooks
+    description: |
+      Event webhooks are the requests the server POSTs to a webhook sink as it
+      stores events, one event per request and, within a project, in the order they were
+      stored. The body is the event as `GET /events` returns it; `event_type`
+      tells the webhooks apart. Delivery is at least once, so drop duplicates
+      by `id`. The sink is set in the server's configuration, under
+      `events.export`.
+  - name: Variables
+    description: |
+      Named values a project enters and references from configuration documents
+      as `${{ NAME }}`. A variable has a value per kind, `primary` or `preview`,
+      and each deployment freezes the values of its kind. There is no fallback
+      between kinds.
+
+      Secrets are the same resource with the value stored encrypted: same
+      names, same references, same endpoints. They are write-only — a read says
+      that a secret is held, never what it is.
+
+paths:
+  /livez:
+    $ref: endpoints/livez/methods.yaml
+  /readyz:
+    $ref: endpoints/readyz/methods.yaml
+  /users:
+    $ref: endpoints/users/methods.yaml
+  /users/query:
+    $ref: endpoints/users/query/methods.yaml
+  /users/{user_id}:
+    $ref: endpoints/users/by_id/methods.yaml
+  /users/{user_id}/identity_links:
+    $ref: endpoints/users/by_id/identity_links/methods.yaml
+  /users/{user_id}/passkeys:
+    $ref: endpoints/users/by_id/passkeys/methods.yaml
+  /users/{user_id}/passkeys/registrations:
+    $ref: endpoints/users/by_id/passkeys/registrations/methods.yaml
+  /users/{user_id}/passkeys/registrations/{registration_id}:
+    $ref: endpoints/users/by_id/passkeys/registrations/by_id/methods.yaml
+  /users/{user_id}/password:
+    $ref: endpoints/users/by_id/password/methods.yaml
+  /users/{user_id}/teams:
+    $ref: endpoints/users/by_id/teams/methods.yaml
+  /users/me:
+    $ref: endpoints/users/me/methods.yaml
+  /users/me/identity_links:
+    $ref: endpoints/users/me/identity_links/methods.yaml
+  /users/me/passkeys:
+    $ref: endpoints/users/me/passkeys/methods.yaml
+  /users/me/password:
+    $ref: endpoints/users/me/password/methods.yaml
+  /users/me/projects:
+    $ref: endpoints/users/me/projects/methods.yaml
+  /users/me/schema:
+    $ref: endpoints/users/me/schema/methods.yaml
+  /users/me/teams:
+    $ref: endpoints/users/me/teams/methods.yaml
+  /flow:
+    $ref: endpoints/flow/methods.yaml
+  /flow/{id}:
+    $ref: endpoints/flow/session/methods.yaml
+  /flow/{id}/submit:
+    $ref: endpoints/flow/submit/methods.yaml
+  /auth_attempts:
+    $ref: endpoints/auth_attempts/methods.yaml
+  /auth_attempts/{attempt_id}:
+    $ref: endpoints/auth_attempts/by_id/methods.yaml
+  /auth_attempts/{attempt_id}/challenges:
+    $ref: endpoints/auth_attempts/by_id/challenges/methods.yaml
+  /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify:
+    $ref: endpoints/auth_attempts/by_id/challenges/by_id/methods.yaml
+  /auth_attempts/{attempt_id}/handoff:
+    $ref: endpoints/auth_attempts/by_id/handoff/methods.yaml
+  /projects:
+    $ref: endpoints/projects/methods.yaml
+  /projects/query:
+    $ref: endpoints/projects/query/methods.yaml
+  /projects/{project_id}:
+    $ref: endpoints/projects/by_id/methods.yaml
+  /projects/{project_id}/admins:
+    $ref: endpoints/projects/by_id/admins/methods.yaml
+  /projects/{project_id}/claim/init:
+    $ref: endpoints/projects/by_id/claim/init/methods.yaml
+  /projects/{project_id}/claim/status:
+    $ref: endpoints/projects/by_id/claim/status/methods.yaml
+  /projects/{project_id}/claim/complete:
+    $ref: endpoints/projects/by_id/claim/complete/methods.yaml
+  /projects/{project_id}/claim/window:
+    $ref: endpoints/projects/by_id/claim/window/methods.yaml
+  /projects/{project_id}/origins:
+    $ref: endpoints/projects/by_id/origins/methods.yaml
+  /projects/{project_id}/origins/remove:
+    $ref: endpoints/projects/by_id/origins/remove/methods.yaml
+  /projects/{project_id}/previews:
+    $ref: endpoints/projects/by_id/previews/methods.yaml
+  /projects/{project_id}/previews/remove:
+    $ref: endpoints/projects/by_id/previews/remove/methods.yaml
+  /sessions:
+    $ref: endpoints/sessions/methods.yaml
+  /sessions/query:
+    $ref: endpoints/sessions/query/methods.yaml
+  /sessions/exchange:
+    $ref: endpoints/sessions/exchange/methods.yaml
+  /sessions/{session_id}:
+    $ref: endpoints/sessions/by_id/methods.yaml
+  /sessions/me:
+    $ref: endpoints/sessions/me/methods.yaml
+  /sessions/me/csrf:
+    $ref: endpoints/sessions/me/csrf/methods.yaml
+  /schemas:
+    $ref: endpoints/schemas/methods.yaml
+  /schemas/{id}:
+    $ref: endpoints/schemas/by_id/methods.yaml
+  /flow_definitions:
+    $ref: endpoints/flow_definitions/methods.yaml
+  /flow_definitions/{id}:
+    $ref: endpoints/flow_definitions/by_id/methods.yaml
+  /teams:
+    $ref: endpoints/teams/methods.yaml
+  /teams/query:
+    $ref: endpoints/teams/query/methods.yaml
+  /teams/{team_id}:
+    $ref: endpoints/teams/by_id/methods.yaml
+  /search:
+    $ref: endpoints/search/methods.yaml
+  /branding:
+    $ref: endpoints/branding/methods.yaml
+  /branding/{id}:
+    $ref: endpoints/branding/by_id/methods.yaml
+  /idps:
+    $ref: endpoints/idps/methods.yaml
+  /idps/query:
+    $ref: endpoints/idps/query/methods.yaml
+  /idps/{id}:
+    $ref: endpoints/idps/by_id/methods.yaml
+  /idps/{id}/revisions:
+    $ref: endpoints/idps/by_id/revisions/methods.yaml
+  /idps/revisions/{revision_id}:
+    $ref: endpoints/idps/revisions/by_id/methods.yaml
+  /applications:
+    $ref: endpoints/applications/methods.yaml
+  /applications/{id}:
+    $ref: endpoints/applications/by_id/methods.yaml
+  /policies:
+    $ref: endpoints/policies/methods.yaml
+  /policies/evaluate:
+    $ref: endpoints/policies/evaluate/methods.yaml
+  /policies/{policy_id}:
+    $ref: endpoints/policies/by_id/methods.yaml
+  /policies/{policy_id}/revisions:
+    $ref: endpoints/policies/by_id/revisions/methods.yaml
+  /policies/revisions/{revision_id}:
+    $ref: endpoints/policies/revisions/by_id/methods.yaml
+  /releases:
+    $ref: endpoints/releases/methods.yaml
+  /releases/build:
+    $ref: endpoints/releases/build/methods.yaml
+  /releases/{release_id}:
+    $ref: endpoints/releases/by_id/methods.yaml
+  /releases/{release_id}/revoke:
+    $ref: endpoints/releases/by_id/revoke/methods.yaml
+  /grants:
+    $ref: endpoints/grants/methods.yaml
+  /grants/query:
+    $ref: endpoints/grants/query/methods.yaml
+  /grants/{id}:
+    $ref: endpoints/grants/by_id/methods.yaml
+  /invitations:
+    $ref: endpoints/invitations/methods.yaml
+  /invitations/lookup:
+    $ref: endpoints/invitations/lookup/methods.yaml
+  /invitations/accept:
+    $ref: endpoints/invitations/accept/methods.yaml
+  /invitations/reject:
+    $ref: endpoints/invitations/reject/methods.yaml
+  /invitations/{id}:
+    $ref: endpoints/invitations/by_id/methods.yaml
+  /events:
+    $ref: endpoints/events/methods.yaml
+  /events/{id}:
+    $ref: endpoints/events/by_id/methods.yaml
+  /variables:
+    $ref: endpoints/variables/methods.yaml
+  /variables/{variable_name}:
+    $ref: endpoints/variables/by_name/methods.yaml
+  /deployments:
+    $ref: endpoints/deployments/methods.yaml
+  /deployments/{deployment_id}:
+    $ref: endpoints/deployments/by_id/methods.yaml
+  /deployments/{deployment_id}/rollback:
+    $ref: endpoints/deployments/by_id/rollback/methods.yaml
+  /deployments/{deployment_id}/variables:
+    $ref: endpoints/deployments/by_id/variables/methods.yaml
+
+# One per domain event type, keyed by its event_type. gen_event_schemas writes
+# the files and fails until this list names exactly the domain's event types.
+webhooks:
+  flow.signup_challenge.issued:
+    $ref: endpoints/events/webhooks/flow-signup_challenge-issued.yaml
+  flow.signup_challenge.consumed:
+    $ref: endpoints/events/webhooks/flow-signup_challenge-consumed.yaml
+  auth.attempt.created:
+    $ref: endpoints/events/webhooks/auth-attempt-created.yaml
+  auth.attempt.handed_off:
+    $ref: endpoints/events/webhooks/auth-attempt-handed_off.yaml
+  auth.check.failed:
+    $ref: endpoints/events/webhooks/auth-check-failed.yaml
+  auth.check.succeeded:
+    $ref: endpoints/events/webhooks/auth-check-succeeded.yaml
+  auth.factor.passkey.enrolled:
+    $ref: endpoints/events/webhooks/auth-factor-passkey-enrolled.yaml
+  auth.factor.password.set:
+    $ref: endpoints/events/webhooks/auth-factor-password-set.yaml
+  auth.sso.authorization.failed:
+    $ref: endpoints/events/webhooks/auth-sso-authorization-failed.yaml
+  auth.sso.exchange.failed:
+    $ref: endpoints/events/webhooks/auth-sso-exchange-failed.yaml
+  auth.sso.exchange.succeeded:
+    $ref: endpoints/events/webhooks/auth-sso-exchange-succeeded.yaml
+  auth.token.issued:
+    $ref: endpoints/events/webhooks/auth-token-issued.yaml
+  auth.token.revoked:
+    $ref: endpoints/events/webhooks/auth-token-revoked.yaml
+  authz.granted:
+    $ref: endpoints/events/webhooks/authz-granted.yaml
+  authz.revoked:
+    $ref: endpoints/events/webhooks/authz-revoked.yaml
+  branding.created:
+    $ref: endpoints/events/webhooks/branding-created.yaml
+  deployment.created:
+    $ref: endpoints/events/webhooks/deployment-created.yaml
+  flowdef.created:
+    $ref: endpoints/events/webhooks/flowdef-created.yaml
+  flowdef.deleted:
+    $ref: endpoints/events/webhooks/flowdef-deleted.yaml
+  flowdef.updated:
+    $ref: endpoints/events/webhooks/flowdef-updated.yaml
+  idp.created:
+    $ref: endpoints/events/webhooks/idp-created.yaml
+  idp.identity_link.created:
+    $ref: endpoints/events/webhooks/idp-identity_link-created.yaml
+  idp.updated:
+    $ref: endpoints/events/webhooks/idp-updated.yaml
+  invitation.accepted:
+    $ref: endpoints/events/webhooks/invitation-accepted.yaml
+  invitation.cancelled:
+    $ref: endpoints/events/webhooks/invitation-cancelled.yaml
+  invitation.created:
+    $ref: endpoints/events/webhooks/invitation-created.yaml
+  invitation.rejected:
+    $ref: endpoints/events/webhooks/invitation-rejected.yaml
+  origin.added:
+    $ref: endpoints/events/webhooks/origin-added.yaml
+  origin.removed:
+    $ref: endpoints/events/webhooks/origin-removed.yaml
+  policy.created:
+    $ref: endpoints/events/webhooks/policy-created.yaml
+  policy.updated:
+    $ref: endpoints/events/webhooks/policy-updated.yaml
+  preview.removed:
+    $ref: endpoints/events/webhooks/preview-removed.yaml
+  project.created:
+    $ref: endpoints/events/webhooks/project-created.yaml
+  project.deleted:
+    $ref: endpoints/events/webhooks/project-deleted.yaml
+  project.updated:
+    $ref: endpoints/events/webhooks/project-updated.yaml
+  release.created:
+    $ref: endpoints/events/webhooks/release-created.yaml
+  release.revoked:
+    $ref: endpoints/events/webhooks/release-revoked.yaml
+  request.api:
+    $ref: endpoints/events/webhooks/request-api.yaml
+  schema.created:
+    $ref: endpoints/events/webhooks/schema-created.yaml
+  session.deleted:
+    $ref: endpoints/events/webhooks/session-deleted.yaml
+  session.established:
+    $ref: endpoints/events/webhooks/session-established.yaml
+  team.created:
+    $ref: endpoints/events/webhooks/team-created.yaml
+  team.deactivated:
+    $ref: endpoints/events/webhooks/team-deactivated.yaml
+  team.updated:
+    $ref: endpoints/events/webhooks/team-updated.yaml
+  user.create.failed:
+    $ref: endpoints/events/webhooks/user-create-failed.yaml
+  user.created:
+    $ref: endpoints/events/webhooks/user-created.yaml
+  user.deleted:
+    $ref: endpoints/events/webhooks/user-deleted.yaml
+  user.updated:
+    $ref: endpoints/events/webhooks/user-updated.yaml
+  variable.removed:
+    $ref: endpoints/events/webhooks/variable-removed.yaml
+  variable.set:
+    $ref: endpoints/events/webhooks/variable-set.yaml
+
+components:
+  securitySchemes:
+    oauth2:
+      $ref: security/oauth2.yaml
+    sessionCookie:
+      $ref: security/session-cookie.yaml

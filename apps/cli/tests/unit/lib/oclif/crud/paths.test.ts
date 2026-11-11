@@ -6,7 +6,7 @@ import {
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import { describe, expect, it } from "vitest";
 
-import { allows, fieldPaths, itemSchemaOf, suggestable } from "../../../../../src/lib/oclif/crud";
+import { allows, fieldPaths, suggestable } from "@/lib/oclif/crud";
 
 /** Narrowed once here, so the assertions read without `!` on every line. */
 const pathsOf = (schema: Parameters<typeof fieldPaths>[0]) => {
@@ -17,7 +17,7 @@ const pathsOf = (schema: Parameters<typeof fieldPaths>[0]) => {
   return paths;
 };
 
-const userPaths = pathsOf(itemSchemaOf(QueryUsersResponse, "users"));
+const userPaths = pathsOf(QueryUsersResponse.shape.users.element);
 
 describe("fieldPaths", () => {
   it("reads a list's record shape through its item array", () => {
@@ -42,9 +42,17 @@ describe("fieldPaths", () => {
   });
 
   it("gathers every variant of a union response, since any of them can arrive", () => {
-    const paths = pathsOf(itemSchemaOf(ListEventsResponse, "data"));
+    const paths = pathsOf(ListEventsResponse.shape.data.element);
     expect(allows(paths, "event_type")).toBe(true);
     expect(allows(paths, "category")).toBe(true);
+  });
+
+  it("reads each variant's own payload, not only the last variant's", () => {
+    const paths = pathsOf(ListEventsResponse.shape.data.element);
+    expect(allows(paths, "payload.operation_id")).toBe(true);
+    expect(allows(paths, "payload.status")).toBe(true);
+    expect(allows(paths, "payload.kind")).toBe(true);
+    expect(allows(paths, "payload.nope")).toBe(false);
   });
 
   it("suggests the known paths and marks the open ones", () => {
@@ -59,7 +67,7 @@ describe("fieldPaths", () => {
   });
 
   it("reads a simpler resource the same way", () => {
-    const paths = pathsOf(itemSchemaOf(QueryTeamsResponse, "teams"));
+    const paths = pathsOf(QueryTeamsResponse.shape.teams.element);
     expect(allows(paths, "name")).toBe(true);
     expect(allows(paths, "nmae")).toBe(false);
   });

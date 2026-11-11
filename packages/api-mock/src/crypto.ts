@@ -105,8 +105,8 @@ export async function signHandoffToken(claims: { sub: string; iss: string }): Pr
 }
 
 /**
- * Signs a long-lived session token (1 h) suitable for the
- * `__nextgen_session` HttpOnly cookie.
+ * Signs a long-lived session token (1 h) suitable for the HttpOnly session
+ * cookie.
  */
 export async function signSessionToken(claims: {
   sub: string;

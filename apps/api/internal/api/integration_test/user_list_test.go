@@ -1,0 +1,276 @@
+//go:build postgres_integration || spanner_integration || sqlite_integration
+
+package integration_test
+
+import (
+	"encoding/json"
+	"fmt"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	apischemas "github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
+	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
+	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
+	api "go.zitadel.com/zitadel/v5/api"
+)
+
+// POST /users/query is the CLI status probe's endpoint: bearer = project
+// secret, no project parameter — the oauth2 principal is the only scope. This
+// is the HTTP e2e for exactly that call shape: empty on a fresh project, the
+// created users afterwards newest-first, a page-token window, and no
+// cross-project leakage.
+func TestQueryUsers(t *testing.T) {
+	t.Parallel()
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	team, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
+		ProjectID: project.ID,
+		Name:      helpers.TeamName(),
+	})
+	require.NoError(t, err)
+	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+
+	queryUsers := func(t *testing.T, req *api.QueryUsersRequest) *api.QueryUsersResponse {
+		t.Helper()
+		res, err := client.QueryUsers(t.Context(), req, api.QueryUsersParams{})
+		require.NoError(t, err)
+		require.IsType(t, &api.QueryUsersResponse{}, res, helpers.MustMarshal(t, res))
+		return res.(*api.QueryUsersResponse)
+	}
+	listIDs := func(t *testing.T, req *api.QueryUsersRequest) []string {
+		t.Helper()
+		list := queryUsers(t, req)
+		ids := make([]string, 0, len(list.Users))
+		for _, item := range list.Users {
+			ids = append(ids, userID(t, item))
+		}
+		return ids
+	}
+
+	// A fresh project lists no users — the probe's "verify login first" stage.
+	empty := queryUsers(t, &api.QueryUsersRequest{})
+	assert.Empty(t, empty.Users)
+	assert.False(t, empty.NextPageToken.IsSet(), "a short page carries no cursor")
+
+	// Seed two users in creation order.
+	users := harness.EnsureUserFixture(t)
+	for i, id := range []string{"user_list-user-01", "user_list-user-02"} {
+		emailAttr, err := domain.NewCreateAttribute(
+			"email", fmt.Sprintf("list-%d@example.com", i), domain.AttributeUniquenessProject)
+		require.NoError(t, err)
+		require.NoError(t, users.Create(t.Context(), &domain.CreateUser{
+			ProjectID:               project.ID,
+			SchemaURL:               schemaURL,
+			ID:                      id,
+			InitialMembershipTeamID: &team.ID,
+			Attributes:              domain.CreateAttributes{*emailAttr},
+		}))
+	}
+
+	// Full list: newest first, attributes hydrated, metadata attached.
+	list := queryUsers(t, &api.QueryUsersRequest{})
+	require.Len(t, list.Users, 2)
+	assert.False(t, list.NextPageToken.IsSet(), "the whole result fits in one page")
+
+	newest := list.Users[0]
+	assert.Equal(t, "user_list-user-02", userID(t, newest))
+	assert.Equal(t, "list-1@example.com", userProp(t, newest, "email"))
+	assert.Equal(t, schemaURL, newest.Schema)
+
+	metadata := newest.Metadata
+	assert.Equal(t, api.UserMetadataStatusActive, metadata.Status)
+	assert.False(t, metadata.CreatedAt.IsZero())
+	assert.False(t, metadata.UpdatedAt.Before(metadata.CreatedAt))
+
+	assert.Equal(t, []string{"user_list-user-02", "user_list-user-01"}, listIDs(t, &api.QueryUsersRequest{}),
+		"users are ordered newest first")
+
+	// The window walks backwards through creation time, one page at a time.
+	firstPage := queryUsers(t, &api.QueryUsersRequest{Limit: api.NewOptLimit(1)})
+	require.Len(t, firstPage.Users, 1)
+	assert.Equal(t, "user_list-user-02", userID(t, firstPage.Users[0]))
+	pageToken, ok := firstPage.NextPageToken.Get()
+	require.True(t, ok, "a full page carries a cursor")
+
+	secondPage := queryUsers(t, &api.QueryUsersRequest{
+		Limit:     api.NewOptLimit(1),
+		PageToken: api.NewOptNilPageToken(pageToken),
+	})
+	require.Len(t, secondPage.Users, 1)
+	assert.Equal(t, "user_list-user-01", userID(t, secondPage.Users[0]))
+
+	// The second page is the last: look-ahead sees no further row, so it
+	// carries no cursor and there is no trailing empty page (#849).
+	assert.False(t, secondPage.NextPageToken.IsSet(), "the final page carries no cursor")
+
+	// Another project's bearer sees nothing: scope comes from the token, so
+	// the same call answers with that project's (empty) user list.
+	other, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	otherClient, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, otherClient, other)
+
+	otherRes, err := otherClient.QueryUsers(t.Context(), &api.QueryUsersRequest{}, api.QueryUsersParams{})
+	require.NoError(t, err)
+	require.IsType(t, &api.QueryUsersResponse{}, otherRes, helpers.MustMarshal(t, otherRes))
+	assert.Empty(t, otherRes.(*api.QueryUsersResponse).Users)
+}
+
+// The identifier filter end to end: the schema designates the property, the
+// service stores its search text when the user is written, and the query
+// answers from the search index, ordered by identifier and paged in that
+// order.
+func TestQueryUsersByIdentifier(t *testing.T) {
+	t.Parallel()
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
+	users := harness.EnsureUserService(t)
+	for _, email := range []string{"Zoe.Ann@example.com", "ann.b@example.com", "Ann.A@Example.com", "bob@example.com"} {
+		_, err := users.CreateUser(t.Context(), service.CreateUserInput{
+			ProjectID:  project.ID,
+			SchemaURL:  schemaURL,
+			Attributes: map[string]any{"email": email},
+		})
+		require.NoError(t, err)
+	}
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+
+	identifier := func(operation api.FilterOperation, value string) []api.QueryUsersRequestFilterItem {
+		return []api.QueryUsersRequestFilterItem{{
+			Field:     api.UserFilterFieldIdentifier,
+			Operation: operation,
+			Value:     api.NewOptFilterValue(api.NewStringFilterValue(value)),
+		}}
+	}
+	query := func(t *testing.T, req *api.QueryUsersRequest) *api.QueryUsersResponse {
+		t.Helper()
+		res, err := client.QueryUsers(t.Context(), req, api.QueryUsersParams{})
+		require.NoError(t, err)
+		require.IsType(t, &api.QueryUsersResponse{}, res, helpers.MustMarshal(t, res))
+		return res.(*api.QueryUsersResponse)
+	}
+	emails := func(t *testing.T, res *api.QueryUsersResponse) []string {
+		t.Helper()
+		out := make([]string, 0, len(res.Users))
+		for _, user := range res.Users {
+			out = append(out, userProp(t, user, "email"))
+		}
+		return out
+	}
+
+	// The start of the value, whatever its case; not a part inside it.
+	found := query(t, &api.QueryUsersRequest{Filter: identifier(api.FilterOperationStartsWith, "ANN")})
+	assert.Equal(t, []string{"Ann.A@Example.com", "ann.b@example.com"}, emails(t, found), "ordered by identifier")
+	assert.False(t, found.NextPageToken.IsSet())
+
+	first := query(t, &api.QueryUsersRequest{Filter: identifier(api.FilterOperationStartsWith, "ann"), Limit: api.NewOptLimit(1)})
+	assert.Equal(t, []string{"Ann.A@Example.com"}, emails(t, first))
+	token, ok := first.NextPageToken.Get()
+	require.True(t, ok, "a full page carries a cursor")
+	second := query(t, &api.QueryUsersRequest{
+		Filter:    identifier(api.FilterOperationStartsWith, "ann"),
+		Limit:     api.NewOptLimit(1),
+		PageToken: api.NewOptNilPageToken(token),
+	})
+	assert.Equal(t, []string{"ann.b@example.com"}, emails(t, second))
+	assert.False(t, second.NextPageToken.IsSet(), "the final page carries no cursor")
+
+	assert.Empty(t, query(t, &api.QueryUsersRequest{Filter: identifier(api.FilterOperationStartsWith, "example")}).Users)
+
+	// No index answers a substring match, and a search has one order.
+	for name, req := range map[string]*api.QueryUsersRequest{
+		"contains": {Filter: identifier(api.FilterOperationContains, "ann")},
+		"sorting": {
+			Filter:  identifier(api.FilterOperationStartsWith, "ann"),
+			Sorting: api.NewOptQueryUsersRequestSorting(api.QueryUsersRequestSorting{Field: api.UserSortFieldCreatedAt, Direction: api.SortDirectionAsc}),
+		},
+	} {
+		res, err := client.QueryUsers(t.Context(), req, api.QueryUsersParams{})
+		require.NoError(t, err, name)
+		require.IsType(t, &api.QueryUsersBadRequest{}, res, name)
+		assert.Equal(t, api.ErrorCode(domain.ErrRequestInvalid().Code), res.(*api.QueryUsersBadRequest).Code, name)
+	}
+}
+
+// userID reads the listed user's id, which the API carries on the envelope
+// rather than as part of the schema-defined content.
+func userID(t *testing.T, user api.User) string {
+	t.Helper()
+
+	return string(user.ID)
+}
+
+// userProp reads a string property off a listed user. Everything the user
+// schema defines arrives under attributes; id, schema and metadata are the
+// envelope around it.
+func userProp(t *testing.T, user api.User, key string) string {
+	t.Helper()
+
+	raw, ok := user.Attributes[key]
+	require.True(t, ok, "user item carries no %q: %s", key, helpers.MustMarshal(t, user))
+	var value string
+	require.NoError(t, json.Unmarshal(raw, &value))
+	return value
+}
+
+func TestQueryUsersSessionCaller(t *testing.T) {
+	t.Parallel()
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+
+	operatorID := harness.CreateUserWithTeam(t, project.ID)
+	harness.SeedProjectViewer(t, project.ID, operatorID)
+
+	subjectID := harness.CreateUserWithTeam(t, project.ID)
+
+	session := harness.CreateActiveSession(t, project.ID, operatorID)
+	tokenCrypter, err := harness.EnsureKeyService(t).GetProjectCrypter(t.Context(), project.ID, domain.EncryptionKeyPurposeToken)
+	require.NoError(t, err)
+	sessionToken, err := session.Token(tokenCrypter)
+	require.NoError(t, err)
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	client.SetSessionToken(sessionToken)
+
+	resp, err := client.QueryUsers(t.Context(), &api.QueryUsersRequest{}, api.QueryUsersParams{})
+	require.NoError(t, err)
+	listed, ok := resp.(*api.QueryUsersResponse)
+	require.True(t, ok, helpers.MustMarshal(t, resp))
+	ids := make([]string, 0, len(listed.Users))
+	for _, item := range listed.Users {
+		ids = append(ids, userID(t, item))
+	}
+	assert.Contains(t, ids, operatorID)
+	assert.Contains(t, ids, subjectID)
+
+	t.Run("no foothold is an empty page", func(t *testing.T) {
+		t.Parallel()
+		strangerID := harness.CreateUserWithTeam(t, project.ID)
+		strangerSession := harness.CreateActiveSession(t, project.ID, strangerID)
+		strangerToken, err := strangerSession.Token(tokenCrypter)
+		require.NoError(t, err)
+		stranger, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+		require.NoError(t, err)
+		stranger.SetSessionToken(strangerToken)
+		resp, err := stranger.QueryUsers(t.Context(), &api.QueryUsersRequest{}, api.QueryUsersParams{})
+		require.NoError(t, err)
+		page, ok := resp.(*api.QueryUsersResponse)
+		require.True(t, ok, helpers.MustMarshal(t, resp))
+		assert.Empty(t, page.Users)
+	})
+}

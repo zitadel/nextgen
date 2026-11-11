@@ -6,9 +6,18 @@ export function npmDistTagForCliVersion(cliVersion: string): string {
   return match?.[1] ?? "latest";
 }
 
+/**
+ * Whether a version is one the release train publishes: a release (`0.1.0`) or
+ * an alpha prerelease (`1.0.0-alpha.25`). Any other prerelease (`1.0.0-beta.2`,
+ * `0.0.0-test`) has only its dist-tag to point at.
+ */
+export function isTrainVersion(version: string): boolean {
+  return /^\d+\.\d+\.\d+(-alpha\.\d+)?$/.test(version.trim().replace(/^v/, ""));
+}
+
 export function npmSelectorForCliVersion(cliVersion: string): string {
   const normalized = cliVersion.trim().replace(/^v/, "");
-  if (/^\d+\.\d+\.\d+-alpha\.\d+$/.test(normalized)) {
+  if (isTrainVersion(normalized)) {
     return normalized;
   }
   return npmDistTagForCliVersion(normalized);
@@ -16,8 +25,8 @@ export function npmSelectorForCliVersion(cliVersion: string): string {
 
 /**
  * The version a scaffold writes for the `@zitadel/*` packages it adds: the
- * CLI's own exact version on an alpha train, else its dist-tag (`latest` for a
- * stable CLI). The packages publish as one lockstep train, so the exact pin
+ * CLI's own exact version on the train, else its dist-tag (`beta` for
+ * `1.0.0-beta.2`). The packages publish as one lockstep train, so the exact pin
  * keeps the app on the SDK that matches the files this CLI wrote, and lets
  * doctor's `dependency-version` check compare it against the CLI.
  */
@@ -66,6 +75,15 @@ export function publicCliCommand(args: string, cliVersion: string): string {
   return args.length > 0 ? `${prefix} ${args}` : prefix;
 }
 
+/**
+ * The command on this CLI's dist-tag rather than its exact version, for what
+ * has to run the newest release: `upgrade` run by the old version would not
+ * know what the new one writes.
+ */
+export function newestCliCommand(args: string, cliVersion: string): string {
+  return `npx ${CLI_PACKAGE_NAME}@${npmDistTagForCliVersion(cliVersion)} ${args}`;
+}
+
 export function normalizePublicCliCommand(command: string, cliVersion: string): string {
   if (command === "zitadel") {
     return publicCliCommand("", cliVersion);
@@ -76,11 +94,12 @@ export function normalizePublicCliCommand(command: string, cliVersion: string): 
   return command;
 }
 
-export function normalizePublicCliCommands(
-  commands: ReadonlyArray<string> | undefined,
+export function normalizePublicCliCommands<T extends string>(
+  commands: ReadonlyArray<T> | undefined,
   cliVersion: string,
-): string[] | undefined {
-  return commands?.map((command) => normalizePublicCliCommand(command, cliVersion));
+): T[] | undefined {
+  // Only the `zitadel` prefix changes, so a suggestion stays a suggestion.
+  return commands?.map((command) => normalizePublicCliCommand(command, cliVersion) as T);
 }
 
 /**
@@ -91,7 +110,7 @@ export function normalizePublicCliCommands(
  * command — that is the canonical, readable spelling — but the CLI is not a
  * dependency of the scaffolded app, so the bare command does not exist on
  * the user's PATH (and `npx zitadel` would fetch an unrelated npm package).
- * Covers inline code spans (`` `zitadel plan` ``) and fenced-block lines
+ * Covers inline code spans (`` `zitadel deploy` ``) and fenced-block lines
  * that start with `zitadel `; prose file names like `zitadel.json` and
  * `zitadel.db` don't match because the word must end the span or be
  * followed by a space.
@@ -141,6 +160,30 @@ export function normalizePublicCliJson<T>(value: T, cliVersion: string): T {
   if (typeof value === "object" && value !== null) {
     return Object.fromEntries(
       Object.entries(value).map(([key, item]) => [key, normalizePublicCliJson(item, cliVersion)]),
+    ) as T;
+  }
+  return value;
+}
+
+/** The version selector of a public `npx @zitadel/cli@<selector>` mention. */
+const PUBLIC_CLI_VERSION = new RegExp(`${CLI_PACKAGE_NAME.replaceAll("/", "\\/")}@[^\\s\`]+`, "g");
+
+/**
+ * Replaces the version in every public CLI mention inside a JSON document
+ * with `*`, so two documents {@link normalizePublicCliJson} wrote for
+ * different CLI versions compare equal when nothing else differs. Returns a
+ * rewritten copy.
+ */
+export function maskPublicCliVersion<T>(value: T): T {
+  if (typeof value === "string") {
+    return value.replace(PUBLIC_CLI_VERSION, `${CLI_PACKAGE_NAME}@*`) as T;
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => maskPublicCliVersion(item)) as T;
+  }
+  if (typeof value === "object" && value !== null) {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, maskPublicCliVersion(item)]),
     ) as T;
   }
   return value;

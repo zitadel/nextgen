@@ -1,0 +1,16 @@
+title: CreateTeamMemberInvitationResponse
+description: |
+  The created team-member invitation and its one-shot link. Creating a
+  team-member invitation answers `501` until team invitations ship.
+allOf:
+  - $ref: invitation-team-member.yaml
+  - type: object
+    required:
+      - link
+    properties:
+      link:
+        type: string
+        format: uri
+        description: |
+          The browser URL to share. It carries the redeem token in the fragment.
+          Only this create or replace response returns it.

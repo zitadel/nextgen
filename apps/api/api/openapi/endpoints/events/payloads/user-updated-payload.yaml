@@ -1,0 +1,13 @@
+title: UserUpdatedPayload
+type: object
+description: |
+  Payload for `user.updated`. The attribute rules are those of `user.created`:
+  the keys written, plus values only for fields marked `x-audit`.
+properties:
+  attribute_keys:
+    type: array
+    items:
+      type: string
+  attributes:
+    type: object
+    additionalProperties: true

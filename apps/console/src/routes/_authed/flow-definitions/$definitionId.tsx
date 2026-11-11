@@ -5,8 +5,8 @@ import { api } from "@/api/zitadel";
 import { MetaCard, MetaRule, MetaValue } from "@/components/detail-meta";
 import { DetailPanel, PanelTitle } from "@/components/detail-page";
 import { DocumentViewer } from "@/components/document-viewer";
-import { DETAIL_PANEL_PAGE } from "@/components/layout";
-import { EYEBROW, PANEL_BODY_CELL, PANEL_HEAD_CELL } from "@/components/typography";
+import { Page } from "@/components/layout";
+import { SECTION_HEADING, PANEL_BODY_CELL, PANEL_HEAD_CELL } from "@/components/typography";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -24,12 +24,12 @@ import {
   flowDisplayName,
   stepActionNames,
   stepFieldNames,
-} from "@/lib/flow-definition";
-import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
-import { schemaDisplayName } from "@/lib/schema";
+} from "@/features/flow-definitions/model";
+import { projectScopeDeps, requireProjectScope } from "@/features/projects/project-scope";
+import { schemaDisplayName } from "@/features/schemas/model";
 
 export const Route = createFileRoute("/_authed/flow-definitions/$definitionId")({
-  staticData: { scope: "project" },
+  staticData: { scope: "project", resource: "login flow" },
   loaderDeps: projectScopeDeps,
   loader: async ({ params, deps }) => {
     const entry = await api.getFlowDefinition(params.definitionId);
@@ -73,7 +73,7 @@ function FlowDefinitionDetail() {
   const steps = definition.steps ?? [];
 
   return (
-    <div className={DETAIL_PANEL_PAGE}>
+    <Page inset="panel">
       <DetailPanel>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           {/* Stacks below `sm` so a long schema name cannot squeeze the title. */}
@@ -90,7 +90,7 @@ function FlowDefinitionDetail() {
           </div>
 
           {/* The design draws a third value, `EXPIRES AT`; nothing backs it. */}
-          <MetaCard>
+          <MetaCard bordered={false}>
             <MetaValue label="Flow ID" value={definitionId} copyable />
             <MetaRule />
             <MetaValue label="Created" value={formatDate(createdAt)} />
@@ -99,10 +99,10 @@ function FlowDefinitionDetail() {
 
         <Separator />
 
-        {/* No inset: `STEPS` lines up with the icon tile. (The schema detail
+        {/* No inset: "Steps" lines up with the icon tile. (The schema detail
             insets its equivalent to clear a tab strip; there are none here.) */}
         <section className="flex flex-col gap-3">
-          <h2 className={EYEBROW}>Steps</h2>
+          <h2 className={SECTION_HEADING}>Steps</h2>
           {/* `table-fixed`: equal thirds, not redistributed by content. */}
           <Table className="table-fixed">
             <TableHeader>
@@ -128,7 +128,7 @@ function FlowDefinitionDetail() {
 
         <DocumentViewer document={definition} noun="definition" />
       </DetailPanel>
-    </div>
+    </Page>
   );
 }
 

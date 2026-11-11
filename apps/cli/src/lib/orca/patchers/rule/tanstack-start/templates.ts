@@ -1,7 +1,7 @@
-import { MANAGED_MARKER } from "../../../../paths";
+import { MANAGED_MARKER } from "@/lib/paths";
 
-import type { PatchContext } from "../../types";
-import { PROXY_PATH } from "../proxy";
+import type { PatchContext } from "@/lib/orca/patchers/types";
+import { PROXY_PATH } from "@/lib/orca/patchers/rule/proxy";
 
 // Enforce the dark surface the Zitadel widgets are designed for, so pages never
 // follow the OS light/dark setting. Inlined as a React style object on each

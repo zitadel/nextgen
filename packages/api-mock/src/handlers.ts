@@ -1,3 +1,4 @@
+import { signupGate, validSignupProof } from "./fixtures/signup-pow.js";
 /**
  * MSW handler factory for the mock Flow API.
  *
@@ -17,12 +18,12 @@
  */
 import {
   getCreateFlowMockHandler,
-  getExchangeHandoffMockHandler,
   getExchangeHandoffResponseMock,
   getGetFlowStepMockHandler,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.msw";
 import type {
   CreateFlow201,
+  CreateFlow201StepPurpose,
   CreateFlowBody,
   CreateFlowBodyPurpose,
   ExchangeHandoffBody,
@@ -46,6 +47,7 @@ import {
   passkeyUpsellStep,
   passwordStep,
   recoverStep,
+  registerPasskeyStep,
   registerPasswordStep,
   registerStep,
   registerSsoStep,
@@ -73,6 +75,12 @@ export type MockHandle = {
   reset: () => void;
   /** Return captured request bodies for test assertions. */
   getCaptured: () => readonly CapturedRequest[];
+  /** Reject one submit with a step error, without advancing the flow. */
+  rejectNextSubmit: (errorKey: string) => void;
+  /** Hold one captured submit until the test releases it; callers must settle the promise. */
+  delayNextSubmitUntil: (released: Promise<void>) => void;
+  /** Fail one exchange with a 503 error envelope. */
+  failNextExchange: () => void;
   /**
    * Pre-register a WebAuthn credential so that a subsequent passkey-login
    * submission succeeds without going through the full register flow.
@@ -109,6 +117,18 @@ export type MockHandle = {
 
 const FLOW_ID = "flow_mock";
 
+/** The purpose a step of the default flow serves, where the step decides it. */
+const STEP_PURPOSES: Partial<Record<FlowStepName, CreateFlow201StepPurpose>> = {
+  identifier: "login",
+  password: "login",
+  "passkey-login": "login",
+  "sso-conflict": "login",
+  register: "register",
+  "register-password": "register",
+  "register-sso": "register",
+  recover: "recovery",
+};
+
 /**
  * The engine's one answer to a callback it cannot place (`idp_callback.go`):
  * without a pending sign-in there is no return target to send the browser to.
@@ -127,8 +147,8 @@ const IDP_CALLBACK_ERROR_PAGE = `<!doctype html>
  * `httputil.ParseRedirectTarget`, ported as `parseRedirectTarget`, then binds it
  * to the request origin: the `Origin` header, else the request's own host. The
  * callback redirects to this value, so a target the server would refuse would
- * make it an open redirect, and this mock is publicly deployed
- * (`apps/mock-zitadel`). The accepted target is the one stored, as on the
+ * make it an open redirect, and a client that sends one must fail here as it
+ * would against the server. The accepted target is the one stored, as on the
  * engine.
  */
 function returnTargetRefusal(
@@ -163,11 +183,30 @@ function returnTargetRefusal(
  *   `"http://localhost:4000"`). Pass the server's own origin so that
  *   `verifyHandoffToken` can enforce issuer consistency.
  */
-export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
+export function setupMockHandlers(
+  options: {
+    iss?: string;
+    /**
+     * Emails that already have an account (case-insensitive). Passing a list,
+     * even an empty one, routes typed emails as the default flow does: an
+     * unknown one signing in moves to sign-up, a known one signing up moves to
+     * sign-in, and a sign-up the mock completes joins the list until `reset()`.
+     * The `exists@example.com` registration error gives way to that switch.
+     * Omit it to keep every typed email on the happy path.
+     */
+    accounts?: readonly string[];
+  } = {},
+): MockHandle {
   const iss = options.iss ?? "http://localhost:8080";
+  const routesByAccount = options.accounts !== undefined;
   let actor: FlowActor = startFlowActor();
   let captured: CapturedRequest[] = [];
-  const authn = new AuthnStore();
+  let submitError: string | undefined;
+  let submitDelay: Promise<void> | undefined;
+  let exchangeFails = false;
+  // Typed emails and the provider's return ask the same store, so an account
+  // is one whichever way the visitor arrives.
+  const authn = new AuthnStore(options.accounts);
   // Which emails this mock has already seen arrive through a provider. The
   // engine keys links on the provider's subject; see SsoIdentityStore for why
   // the mock keys on email.
@@ -199,10 +238,30 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
     return authn.hasAccount(email) ? "user_already_exists" : "sso_user_not_found";
   }
 
+  /**
+   * The engine's email lookup on a typed submit, when the caller opted in: it
+   * moves the flow to the other purpose only when the email says the visitor
+   * picked the wrong one.
+   */
+  function accountOutcome(
+    before: FlowStepName | "idle",
+    action: string,
+    email: string | undefined,
+  ): "user_not_found" | "user_already_exists" | undefined {
+    if (!routesByAccount || action !== "submit" || !email) return undefined;
+    const known = authn.hasAccount(email);
+    if (before === "identifier" && !known) return "user_not_found";
+    if (before === "register" && known) return "user_already_exists";
+    return undefined;
+  }
+
   function reset(): void {
     actor = startFlowActor();
     pendingStepError = null;
     captured = [];
+    submitError = undefined;
+    submitDelay = undefined;
+    exchangeFails = false;
     authn.clear();
     // Links too: a caller asking for a clean mock must not inherit an email
     // that a previous test signed up through a provider, which would turn the
@@ -318,7 +377,21 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
    * response even though project enablement has not changed.
    */
   function withOverlays(step: CreateFlow201): CreateFlow201 {
-    return withPasskey(withSsoProviders(step));
+    return withPurpose(withPasskey(withSsoProviders(step)));
+  }
+
+  /**
+   * `step.purpose`, as the server reports it: the default flow fixes it on the
+   * steps that sign in or sign up, and the others keep the purpose the flow
+   * currently serves. Automatic email switches attach their notice only to
+   * the submit response, as the engine does, not to later reads of that step.
+   */
+  function withPurpose(response: CreateFlow201): CreateFlow201 {
+    const purpose =
+      STEP_PURPOSES[response.step.name as FlowStepName] ??
+      actor.getSnapshot().context.purpose ??
+      "login";
+    return { ...response, step: { ...response.step, purpose } };
   }
 
   /**
@@ -349,7 +422,9 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
     const step = snapshot.value as FlowStepName | "idle";
     switch (step) {
       case "register":
-        return withBranding(registerStep(input));
+        return withBranding(
+          snapshot.context.passkeyRegistration ? registerPasskeyStep(input) : registerStep(input),
+        );
       case "register-password":
         return withBranding(registerPasswordStep(input));
       case "recover":
@@ -389,6 +464,18 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
       const flowId = String(params.id);
       const body = (await request.clone().json()) as SubmitFlowStepBody;
       captured.push({ kind: "submitFlowStep", flowId, body });
+      const delayed = submitDelay;
+      const rejected = submitError;
+      submitDelay = undefined;
+      submitError = undefined;
+      if (delayed) await delayed;
+      if (rejected) {
+        const response = await currentResponse();
+        return HttpResponse.json(
+          { ...response, step: { ...response.step, error: rejected } },
+          { status: 400 },
+        );
+      }
       // The engine refuses an sso submission without `return_target`, the
       // page the callback sends the browser back to, before anything else.
       let acceptedTarget: string | null = null;
@@ -427,8 +514,29 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
         iss,
       };
 
+      // A sign-up spends the proof where the user is created: the password
+      // submit, or the attestation of a passkey registration.
+      const signingUp =
+        (before === "register-password" && body.action === "submit") ||
+        (before === "register" &&
+          body.action === "passkey_register" &&
+          Boolean(body.challenge_response) &&
+          snapshot.context.passkeyRegistration);
+      if (
+        signingUp &&
+        !validSignupProof(body.gate_proofs?.signup_pow, snapshot.context.sessionToken)
+      ) {
+        return HttpResponse.json(
+          { code: "flow.proof_invalid", message: "signup proof is missing or invalid" },
+          { status: 403 },
+        );
+      }
+      const outcome = accountOutcome(before, body.action, email);
+
+      // With account routing the collision is the switch to sign-in, as the
+      // default flow wires `user_already_exists`, not this error.
       const registrationErrorKey =
-        before === "register" && body.action === "submit" && email
+        !routesByAccount && before === "register" && body.action === "submit" && email
           ? authn.registrationError(email)
           : null;
       if (registrationErrorKey) {
@@ -514,24 +622,56 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
         action: body.action,
         fields: submitted,
         sso_provider_id: body.sso_provider_id ?? null,
+        outcome,
+        attested: Boolean(body.challenge_response),
       });
-      return ok(await currentResponse());
+      const after = actor.getSnapshot();
+      const createdEmail = after.context.capturedFields.email;
+      if (
+        routesByAccount &&
+        (before === "register" || before === "register-password" || before === "register-sso") &&
+        after.value === "done" &&
+        createdEmail
+      ) {
+        authn.addAccount(createdEmail);
+      }
+      const response = await currentResponse();
+      return ok(
+        outcome
+          ? { ...response, step: { ...response.step, notice: `notice.${outcome}` } }
+          : response,
+      );
     }),
     getGetFlowStepMockHandler(async ({ params }) => {
       captured.push({ kind: "getFlowStep", flowId: String(params.id) });
-      return currentResponse();
+      const response = await currentResponse();
+      // As on the server, only GET prepares the announced signup challenge.
+      if (response.step.gates.signup_pow) {
+        response.step.gates = {
+          ...response.step.gates,
+          ...signupGate(actor.getSnapshot().context.sessionToken),
+        };
+      }
+      return response;
     }),
     // Both mounts the engine serves (`internal/api/flow_sso.go`): the
     // published path, and the one an SDK proxy forwards after stripping its
     // prefix.
     http.get("*/__nextgen/idp/callback", idpCallback),
     http.get("*/idp/callback", idpCallback),
-    getExchangeHandoffMockHandler(async ({ request }) => {
+    http.post("*/sessions/exchange", async ({ request }) => {
       const body = (await request.clone().json()) as ExchangeHandoffBody;
       const url = new URL(request.url);
       const projectId = url.searchParams.get("project_id") ?? undefined;
       captured.push({ kind: "exchangeHandoff", body, projectId });
-      return getExchangeHandoffResponseMock();
+      if (exchangeFails) {
+        exchangeFails = false;
+        return HttpResponse.json(
+          { code: "unavailable", message: "Session exchange is temporarily unavailable." },
+          { status: 503 },
+        );
+      }
+      return HttpResponse.json(getExchangeHandoffResponseMock());
     }),
     // The session endpoints `<zitadel-session>` and `<zitadel-logout>` read on
     // mount and on sign-out. In-process there is no session cookie to present,
@@ -556,5 +696,20 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
     ),
   ];
 
-  return { handlers, reset, getCaptured, registerCredential, returnFromProvider };
+  return {
+    handlers,
+    reset,
+    getCaptured,
+    registerCredential,
+    returnFromProvider,
+    rejectNextSubmit: (errorKey) => {
+      submitError = errorKey;
+    },
+    delayNextSubmitUntil: (released) => {
+      submitDelay = released;
+    },
+    failNextExchange: () => {
+      exchangeFails = true;
+    },
+  };
 }

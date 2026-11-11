@@ -1,5 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { createServer, type Server } from "node:http";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -7,21 +6,26 @@ import {
   completeClaimChallenge,
   expireClaimChallenge,
   expireClaimWindow,
-  resetPlatformStore,
-  setupPlatformHandlers,
   snapshotPlatformStore,
 } from "@zitadel/api-mock/platform";
-import { http, passthrough } from "msw";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { HttpResponse, http, passthrough } from "msw";
+import { text } from "@clack/prompts";
+import { beforeEach, describe, expect, vi } from "vitest";
+
+import { it, type Serve } from "@tests/helpers/fixtures";
 
 import {
   localRuntimePaths,
   writeRuntimeMetadata,
   type RuntimeMetadata,
-} from "../../../src/lib/local-server/runtime";
-import { parseJson, runCliForTest } from "../../helpers/run-cli";
-import { aBinaryRecord } from "../../helpers/runtime-record";
+} from "@/lib/local-server/runtime";
+import Claim from "@/commands/claim";
+import { usePlatformServer } from "@tests/helpers/platform-project";
+import { parseJson, pressCtrlC, runCliForTest } from "@tests/helpers/run-cli";
+import { asTerminal } from "@tests/helpers/terminal";
+
+vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
+import { aBinaryRecord } from "@tests/helpers/runtime-record";
 
 /**
  * `zitadel claim` against the api-mock, which is the only working claim
@@ -31,27 +35,7 @@ import { aBinaryRecord } from "../../helpers/runtime-record";
  * not reachable through msw handlers.
  */
 const SERVER = "https://api.zitadel.cloud";
-const server = setupServer(...setupPlatformHandlers());
-const tempDirs: string[] = [];
-const servers: Server[] = [];
-
-beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
-afterAll(() => server.close());
-
-afterEach(async () => {
-  server.resetHandlers();
-  resetPlatformStore();
-  for (const httpServer of servers.splice(0)) {
-    await new Promise<void>((resolve) => httpServer.close(() => resolve()));
-  }
-  while (tempDirs.length > 0) {
-    const dir = tempDirs.pop();
-    if (dir) {
-      await rm(dir, { recursive: true, force: true });
-    }
-  }
-});
-
+const { server, dirs: tempDirs } = usePlatformServer();
 type Project = { id: string; project_secret: string };
 
 /**
@@ -60,14 +44,12 @@ type Project = { id: string; project_secret: string };
  * written. Going through the API rather than poking the store keeps the
  * project secret and the store in agreement, which `claim/init` checks.
  */
-async function makeProject(overrides: Record<string, unknown> = {}): Promise<{
-  cwd: string;
-  project: Project;
-}> {
-  const cwd = await mkdtemp(join(tmpdir(), "zitadel-claim-"));
-  tempDirs.push(cwd);
-
-  const response = await fetch(`${SERVER}/projects`, {
+/**
+ * Creates a project through the mock's own create endpoint (msw intercepts the
+ * fetch) so its secret and the store agree — `claim/init` checks that.
+ */
+async function createProjectOnMock(): Promise<Project> {
+  const response = await fetch(`${SERVER}/api/v1/projects`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ name: "demo", origins: [] }),
@@ -79,6 +61,17 @@ async function makeProject(overrides: Record<string, unknown> = {}): Promise<{
   if (typeof project.project_secret !== "string") {
     throw new Error(`mock POST /projects returned no project_secret: ${JSON.stringify(project)}`);
   }
+  return project;
+}
+
+async function makeProject(overrides: Record<string, unknown> = {}): Promise<{
+  cwd: string;
+  project: Project;
+}> {
+  const cwd = await mkdtemp(join(tmpdir(), "zitadel-claim-"));
+  tempDirs.push(cwd);
+
+  const project = await createProjectOnMock();
 
   await mkdir(join(cwd, ".zitadel"), { recursive: true });
   await writeSecret(cwd, {
@@ -114,7 +107,9 @@ function claim(cwd: string, extra: string[] = []) {
  * response body to itself — so the store snapshot is how a test learns it.
  */
 async function onChallengeMinted(act: (challengeId: string) => void): Promise<void> {
-  const deadline = Date.now() + 5000;
+  // Generous: the first run in a file loads the CLI cold, which on a loaded
+  // machine can take seconds before the request goes out.
+  const deadline = Date.now() + 15_000;
   while (Date.now() < deadline) {
     const [challengeId] = snapshotPlatformStore().claimChallengeIds;
     if (challengeId) {
@@ -127,6 +122,25 @@ async function onChallengeMinted(act: (challengeId: string) => void): Promise<vo
 }
 
 describe("claim", () => {
+  it.each(["challenge", "ch_", "not-a-challenge"])(
+    "refuses --challenge-id %j, which is not one the contract mints",
+    async (given) => {
+      const { cwd } = await makeProject();
+
+      const res = await claim(cwd, ["--challenge-id", given]);
+
+      expect(res.exitCode).toBe(3);
+      const json = parseJson(res.stdout) as {
+        code: string;
+        message: string;
+        next_commands: string[];
+      };
+      expect(json.code).toBe("E_VALIDATION");
+      expect(json.message).toContain("starts with ch_");
+      expect(json.next_commands).toEqual([expect.stringContaining("claim --no-wait")]);
+    },
+  );
+
   it("attaches the project to a team and records it in .zitadel/secret", async () => {
     const { cwd, project } = await makeProject();
 
@@ -325,6 +339,21 @@ describe("claim", () => {
     expect(secret.team_id).toBeUndefined();
   });
 
+  it("keeps waiting after the platform rate-limits a status check", async () => {
+    const { cwd, project } = await makeProject();
+    const rateLimited = vi.fn(() => new HttpResponse(null, { status: 429 }));
+    server.use(http.get("*/projects/:project_id/claim/status", rateLimited, { once: true }));
+
+    const [res] = await Promise.all([
+      claim(cwd),
+      onChallengeMinted((challengeId) => completeClaimChallenge(challengeId, project.id)),
+    ]);
+
+    expect(rateLimited).toHaveBeenCalledOnce();
+    expect(res.exitCode).toBe(0);
+    expect((await readSecret(cwd)).team_id).toMatch(/^team-/);
+  });
+
   it("stops waiting at --timeout and leaves the secret untouched", async () => {
     const { cwd } = await makeProject();
 
@@ -336,6 +365,86 @@ describe("claim", () => {
     expect(json.code).toBe("E_VALIDATION");
     expect(json.message).toContain("Stopped waiting");
     expect((await readSecret(cwd)).team_id).toBeUndefined();
+  });
+
+  it("never asks for the status of a link that has already expired", async () => {
+    const { cwd } = await makeProject();
+    const statusChecks = vi.fn(() =>
+      HttpResponse.json({
+        status: "completed",
+        team_id: "team-late",
+        claimed_at: "2026-03-03T00:00:00.000Z",
+        dashboard_url: "https://example.test/teams/team-late",
+      }),
+    );
+    server.use(
+      http.post("*/projects/:project_id/claim/init", () =>
+        HttpResponse.json(
+          {
+            claim_url: "https://example.test/claim/ch_expired",
+            challenge_id: "ch_expired",
+            expires_at: new Date(Date.now() - 1_000).toISOString(),
+          },
+          { status: 201 },
+        ),
+      ),
+      http.get("*/projects/:project_id/claim/status", statusChecks),
+    );
+
+    const res = await claim(cwd);
+
+    expect(statusChecks).not.toHaveBeenCalled();
+    expect(res.exitCode).toBe(3);
+    expect((parseJson(res.stdout) as { message: string }).message).toContain("Stopped waiting");
+    expect((await readSecret(cwd)).team_id).toBeUndefined();
+  });
+
+  it("stops at once when interrupted while it waits to ask again", async () => {
+    vi.spyOn(process, "exit").mockImplementation((() => undefined) as never);
+    const { cwd } = await makeProject();
+    const statusChecks = vi.fn(() => new HttpResponse(null, { status: 429 }));
+    server.use(http.get("*/projects/:project_id/claim/status", statusChecks));
+
+    const running = claim(cwd);
+    await vi.waitFor(() => expect(statusChecks).toHaveBeenCalledOnce());
+    pressCtrlC();
+    const res = await running;
+
+    expect(res.exitCode).toBe(130);
+    expect((parseJson(res.stdout) as { code: string }).code).toBe("E_CANCELLED");
+    expect(statusChecks).toHaveBeenCalledOnce();
+    expect((await readSecret(cwd)).team_id).toBeUndefined();
+  });
+
+  it("waits longer between each status check that is answered with 429, up to five seconds", async () => {
+    vi.spyOn(process, "exit").mockImplementation((() => undefined) as never);
+    const { cwd } = await makeProject();
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    const askedAt: number[] = [];
+    server.use(
+      http.get("*/projects/:project_id/claim/status", () => {
+        askedAt.push(Date.now());
+        return new HttpResponse(null, { status: 429 });
+      }),
+    );
+
+    const running = claim(cwd, ["--timeout", "60"]);
+    while (askedAt.length < 7) {
+      await new Promise<void>((resolve) => {
+        setImmediate(resolve);
+      });
+      if (vi.getTimerCount() > 0) {
+        await vi.advanceTimersToNextTimerAsync();
+      }
+    }
+    vi.useRealTimers();
+    pressCtrlC();
+    await running;
+
+    const gaps = askedAt.slice(1).map((at, index) => {
+      return at - (askedAt[index] as number);
+    });
+    expect(gaps).toEqual([1000, 1500, 2250, 3375, 5000, 5000]);
   });
 
   it("mutates neither the platform nor the secret under --dry-run", async () => {
@@ -357,10 +466,255 @@ describe("claim", () => {
     expect((await readSecret(cwd)).team_id).toBeUndefined();
   });
 
+  it("claims the project the resolved environment names, not the fallback secret", async () => {
+    const { cwd, project: fallback } = await makeProject();
+    const envProject = await createProjectOnMock();
+    await writeFile(
+      join(cwd, ".env.production.local"),
+      [
+        `ZITADEL_URL=${SERVER}`,
+        `ZITADEL_PROJECT_ID=${envProject.id}`,
+        `ZITADEL_PROJECT_SECRET=${envProject.project_secret}`,
+        "",
+      ].join("\n"),
+      { mode: 0o600 },
+    );
+
+    const [res] = await Promise.all([
+      claim(cwd, ["--env", "production"]),
+      onChallengeMinted((challengeId) => completeClaimChallenge(challengeId, envProject.id)),
+    ]);
+
+    expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as { status: string; data: { project_id: string } };
+    expect(json.status).toBe("ok");
+    expect(json.data.project_id).toBe(envProject.id);
+    // The fallback `.zitadel/secret` describes a different project, so it must
+    // not be marked claimed — that would conflate the two environments.
+    const secret = await readSecret(cwd);
+    expect(secret.project_id).toBe(fallback.id);
+    expect(secret.team_id).toBeUndefined();
+    expect(secret.claimed_at).toBeUndefined();
+  });
+
+  it("asks for a missing project id on a terminal and keeps the answer", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "zitadel-claim-"));
+    tempDirs.push(cwd);
+    const envProject = await createProjectOnMock();
+    await writeFile(
+      join(cwd, ".env.production.local"),
+      [`ZITADEL_URL=${SERVER}`, `ZITADEL_PROJECT_SECRET=${envProject.project_secret}`, ""].join(
+        "\n",
+      ),
+      { mode: 0o600 },
+    );
+    vi.mocked(text).mockResolvedValueOnce(envProject.id);
+
+    // The built CLI bundles its own prompts, so a prompt can only be answered
+    // by running the command from source, where `input` is the one module asked.
+    await Promise.all([
+      asTerminal(() => Claim.run(["--cwd", cwd, "--no-open", "--env", "production"])),
+      onChallengeMinted((challengeId) => completeClaimChallenge(challengeId, envProject.id)),
+    ]);
+
+    expect(await readFile(join(cwd, ".env.production.local"), "utf8")).toContain(
+      `ZITADEL_PROJECT_ID=${envProject.id}`,
+    );
+  });
+
+  it("claims from an env file with no local secret present", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "zitadel-claim-"));
+    tempDirs.push(cwd);
+    const envProject = await createProjectOnMock();
+    const file = join(cwd, "prod.env");
+    await writeFile(
+      file,
+      [
+        `ZITADEL_URL=${SERVER}`,
+        `ZITADEL_PROJECT_ID=${envProject.id}`,
+        `ZITADEL_PROJECT_SECRET=${envProject.project_secret}`,
+        "",
+      ].join("\n"),
+    );
+
+    const [res] = await Promise.all([
+      runCliForTest(["claim", "--cwd", cwd, "--json", "--no-open", "--env-file", file]),
+      onChallengeMinted((challengeId) => completeClaimChallenge(challengeId, envProject.id)),
+    ]);
+
+    expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as { status: string; data: { project_id: string } };
+    expect(json.status).toBe("ok");
+    expect(json.data.project_id).toBe(envProject.id);
+  });
+
+  describe("--no-wait", () => {
+    type LinkEnvelope = {
+      status: string;
+      data: {
+        title: string;
+        project_id: string;
+        claim_url: string;
+        challenge_id: string;
+        expires_at: string;
+        next_actions: string[];
+        next_commands: string[];
+      };
+    };
+
+    it("returns the link and the command that waits for it, without waiting", async () => {
+      const { cwd, project } = await makeProject();
+
+      const res = await claim(cwd, ["--no-wait"]);
+
+      expect(res.exitCode).toBe(0);
+      const json = parseJson(res.stdout) as LinkEnvelope;
+      expect(json.status).toBe("ok");
+      expect(json.data.title).toBe("Open the link in a browser to make your Project permanent.");
+      expect(json.data.project_id).toBe(project.id);
+      expect(json.data.challenge_id).toMatch(/^ch_/);
+      expect(json.data.claim_url).toContain(`/claim/${json.data.challenge_id}`);
+      expect(Number.isNaN(Date.parse(json.data.expires_at))).toBe(false);
+      expect(json.data.next_actions).toEqual(["Wait for the browser step to finish with:"]);
+      // The resume keeps this run's server and directory, or it would wait on
+      // the default project instead.
+      expect(json.data.next_commands).toEqual([
+        expect.stringMatching(
+          new RegExp(`claim --challenge-id ${json.data.challenge_id} --server ${SERVER} --cwd `),
+        ),
+      ]);
+    });
+
+    it("claims nothing and leaves the secret untouched", async () => {
+      const { cwd } = await makeProject();
+
+      await claim(cwd, ["--no-wait"]);
+
+      expect(snapshotPlatformStore().claims).toBe(0);
+      const secret = await readSecret(cwd);
+      expect(secret.team_id).toBeUndefined();
+      expect(secret.claimed_at).toBeUndefined();
+    });
+
+    it("prints the link and the resume command for a person", async () => {
+      const { cwd } = await makeProject();
+
+      const res = await runCliForTest(["claim", "--cwd", cwd, "--server", SERVER, "--no-wait"]);
+
+      expect(res.exitCode).toBe(0);
+      expect(res.stdout).toContain("/claim/ch_");
+      expect(res.stdout).toContain("Wait for the browser step to finish with:");
+      expect(res.stdout).toContain("claim --challenge-id ch_");
+    });
+
+    it("refuses --timeout, which a run that does not wait cannot honour", async () => {
+      const { cwd } = await makeProject();
+
+      const res = await claim(cwd, ["--no-wait", "--timeout", "5"]);
+
+      expect(res.exitCode).not.toBe(0);
+      expect(snapshotPlatformStore().claimChallengeIds).toEqual([]);
+    });
+
+    it("previews a link under --dry-run and suggests the same mode for real", async () => {
+      const { cwd } = await makeProject();
+
+      const res = await claim(cwd, ["--no-wait", "--dry-run"]);
+
+      const json = parseJson(res.stdout) as {
+        status: string;
+        data: { would: string };
+        next_commands: string[];
+      };
+      expect(json.status).toBe("skipped");
+      expect(json.data.would).toBe("Create a link to claim this project.");
+      expect(json.next_commands).toEqual([expect.stringContaining("claim --no-wait")]);
+    });
+  });
+
+  describe("--challenge-id", () => {
+    async function handOutLink(cwd: string): Promise<string> {
+      const res = await claim(cwd, ["--no-wait"]);
+      return (parseJson(res.stdout) as { data: { challenge_id: string } }).data.challenge_id;
+    }
+
+    it("waits on a handed-out link and records the claim", async () => {
+      const { cwd, project } = await makeProject();
+      const challengeId = await handOutLink(cwd);
+      completeClaimChallenge(challengeId, project.id);
+
+      const res = await claim(cwd, ["--challenge-id", challengeId]);
+
+      expect(res.exitCode).toBe(0);
+      const json = parseJson(res.stdout) as {
+        status: string;
+        data: { title: string; team_id: string; claimed_at: string };
+      };
+      expect(json.status).toBe("ok");
+      expect(json.data.title).toBe("Your Project is now permanent.");
+      const secret = await readSecret(cwd);
+      expect(secret.team_id).toBe(json.data.team_id);
+      expect(secret.claimed_at).toBe(json.data.claimed_at);
+    });
+
+    it("mints no second link", async () => {
+      const { cwd, project } = await makeProject();
+      const challengeId = await handOutLink(cwd);
+      completeClaimChallenge(challengeId, project.id);
+
+      await claim(cwd, ["--challenge-id", challengeId]);
+
+      expect(snapshotPlatformStore().claimChallengeIds).toEqual([challengeId]);
+    });
+
+    it("suggests a new link that does not wait when the handed-out one expires", async () => {
+      const { cwd } = await makeProject();
+      const challengeId = await handOutLink(cwd);
+      expireClaimChallenge(challengeId);
+
+      const res = await claim(cwd, ["--challenge-id", challengeId]);
+
+      expect(res.exitCode).toBe(3);
+      const json = parseJson(res.stdout) as { code: string; next_commands: string[] };
+      expect(json.code).toBe("E_VALIDATION");
+      expect(json.next_commands).toEqual([expect.stringContaining("claim --no-wait")]);
+    });
+
+    it("reports a link the platform never minted for this project as not found", async () => {
+      const { cwd } = await makeProject();
+
+      const res = await claim(cwd, ["--challenge-id", "ch_neverminted"]);
+
+      expect(res.exitCode).toBe(4);
+      const json = parseJson(res.stdout) as {
+        code: string;
+        message: string;
+        next_commands: string[];
+      };
+      expect(json.code).toBe("E_NOT_FOUND");
+      expect(json.message).toBe("This project has no claim link with that challenge id.");
+      expect(json.next_commands).toEqual([expect.stringContaining("claim --no-wait")]);
+    });
+
+    it("refuses an id that is not a challenge id before connecting", async () => {
+      const cwd = await mkdtemp(join(tmpdir(), "zitadel-claim-"));
+      tempDirs.push(cwd);
+
+      // No project is set up here, so reaching the server would fail on the
+      // missing project id instead: the refusal has to come first.
+      const res = await claim(cwd, ["--challenge-id", "ch_x;whoami"]);
+
+      expect(res.exitCode).toBe(3);
+      const json = parseJson(res.stdout) as { code: string; message: string };
+      expect(json.code).toBe("E_VALIDATION");
+      expect(json.message).toContain("--challenge-id");
+    });
+  });
+
   describe("--server local", () => {
     // These talk to a real socket on an ephemeral port. msw's platform
     // handlers match any origin, so they would otherwise swallow the stub's
-    // claim routes and `onUnhandledRequest: "error"` would reject `/healthz`.
+    // claim routes and `onUnhandledRequest: "error"` would reject `/readyz`.
     beforeEach(() => {
       server.use(http.all(/^http:\/\/localhost:\d+\//, () => passthrough()));
     });
@@ -377,9 +731,9 @@ describe("claim", () => {
       expect(json.code).toBe("E_LOCAL_SERVER_NOT_RUNNING");
     });
 
-    it("claims against the resolved local server", async () => {
+    it("claims against the resolved local server", async ({ serve }) => {
       const { cwd } = await makeProject();
-      const serverUrl = await startClaimServer();
+      const serverUrl = await startClaimServer(serve);
       await writeRuntimeMetadata(cwd, runtimeFor(cwd, serverUrl));
 
       const res = await runCliForTest([
@@ -402,9 +756,10 @@ describe("claim", () => {
 
     // No `--json` in the next two: the warning is consola narration, and the
     // envelope silences it.
-    it("warns when a local server advertises a remote claim page", async () => {
+    it("warns when a local server advertises a remote claim page", async ({ serve }) => {
       const { cwd } = await makeProject();
       const serverUrl = await startClaimServer(
+        serve,
         "https://nextgen.zitadel.cloud/ui/console/claim?challenge_id=ch_localstub",
       );
       await writeRuntimeMetadata(cwd, runtimeFor(cwd, serverUrl));
@@ -415,9 +770,9 @@ describe("claim", () => {
       expect(`${res.stdout}${res.stderr}`).toContain("NEXTGEN_SERVER_PUBLIC_BASE");
     });
 
-    it("does not warn when the claim page is on the local server itself", async () => {
+    it("does not warn when the claim page is on the local server itself", async ({ serve }) => {
       const { cwd } = await makeProject();
-      const serverUrl = await startClaimServer();
+      const serverUrl = await startClaimServer(serve);
       await writeRuntimeMetadata(cwd, runtimeFor(cwd, serverUrl));
 
       const res = await runCliForTest(["claim", "--cwd", cwd, "--server", "local", "--no-open"]);
@@ -429,16 +784,19 @@ describe("claim", () => {
 });
 
 /**
- * A minimal stand-in for a local Zitadel server: enough of `/healthz` for
+ * A minimal stand-in for a local Zitadel server: enough of `/readyz` for
  * `resolveLocalServer` to accept it, and a claim pair that completes on the
  * first poll. msw is bypassed here because the request goes to localhost with
  * a port only known at runtime; a real socket is simpler than reshaping the
  * handlers.
  */
-async function startClaimServer(claimUrl = "http://localhost/claim/ch_localstub"): Promise<string> {
-  const httpServer = createServer((req, res) => {
+function startClaimServer(
+  serve: Serve,
+  claimUrl = "http://localhost/claim/ch_localstub",
+): Promise<string> {
+  return serve((req, res) => {
     const url = req.url ?? "";
-    if (url === "/healthz") {
+    if (url === "/readyz") {
       res.writeHead(200).end("ok");
       return;
     }
@@ -465,13 +823,6 @@ async function startClaimServer(claimUrl = "http://localhost/claim/ch_localstub"
     }
     res.writeHead(404).end();
   });
-  servers.push(httpServer);
-  await new Promise<void>((resolve) => httpServer.listen(0, "localhost", () => resolve()));
-  const address = httpServer.address();
-  if (!address || typeof address === "string") {
-    throw new Error("claim server did not expose a TCP address");
-  }
-  return `http://localhost:${String(address.port)}`;
 }
 
 /** A runtime record of a server that is running: this process, answering at `serverUrl`. */

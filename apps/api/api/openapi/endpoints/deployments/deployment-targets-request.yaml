@@ -1,0 +1,8 @@
+title: DeploymentTargetsRequest
+description: |
+  Where the release goes live: `primary`, every primary origin of the project,
+  or a list of preview URLs.
+oneOf:
+  - $ref: deployment-primary-target.yaml
+  - $ref: deployment-preview-urls.yaml
+example: primary

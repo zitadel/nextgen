@@ -1,7 +1,11 @@
-import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
-import { describeRegistry } from "../lib/oclif/crud";
-import { CommandGroups } from "../lib/oclif/groups";
+import { type Admitted, BaseCommand, type JsonEnvelope } from "@/lib/oclif";
+import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
+import { describeRegistry } from "@/lib/oclif/crud";
+import { CommandGroups } from "@/lib/oclif/groups";
 import { RESOURCES } from "./resources";
+
+/** The columns `resources` renders, in order. */
+const COLUMNS = ["topic", "verbs", "filters"] as const;
 
 /**
  * `zitadel resources` — what the resource surface exposes, in one call.
@@ -12,50 +16,58 @@ import { RESOURCES } from "./resources";
  * of them from the registry at once, and `--json` makes it machine-readable.
  * The command talks to no server: it describes the CLI, not the project.
  */
-export default class ResourcesList extends BaseCommand {
+export default class ResourcesList extends Tabulatable(BaseCommand) {
   static override id = "resources";
-  static override group = CommandGroups.resources;
-  static override groupOrder = 0;
-  static override description = "List the resources this CLI manages and what can be done to each.";
+  static override description =
+    "List the resources this CLI manages.\n\nShows what can be done to each.";
+  static override group = CommandGroups.diagnostics;
   static override examples = [
     "<%= config.bin %> resources",
     "<%= config.bin %> resources --json",
-    '<%= config.bin %> resources --json | jq -r \'.data.resources[] | "\\(.topic): \\(.verbs | join(", "))"\'',
+    '<%= config.bin %> resources --json | jq -r \'.data.items[] | "\\(.topic): \\(.verbs | join(", "))"\'',
   ];
+  static override flags = {
+    plain: plainFlag,
+  };
 
-  async run(): Promise<JsonEnvelope> {
-    const { flags } = await this.parse(ResourcesList);
-    // No server call, so no server resolution: the answer is the same offline.
-    await this.toMeta(flags, { resolveServer: false });
-    const resources = describeRegistry(RESOURCES);
+  static override meta = {
+    resolveServer: false,
+  };
 
-    const rows = resources.map((resource) => ({
-      topic: String(resource.topic),
-      verbs: (resource.verbs as string[]).join(", "),
-      // Every list shares one filter grammar now, so the column is simply the
-      // fields `--filter` accepts. What each field accepts beyond that — its
-      // operations, its closed values — is in `--json` and in `--help`, which
-      // is where a reader goes once they know the field exists.
-      filters: ((resource.filters as Array<{ field: string }> | undefined) ?? [])
-        .map((filter) => filter.field)
-        .join(", "),
-    }));
-    const width = (key: keyof (typeof rows)[number]) =>
-      Math.max(key.length, ...rows.map((row) => row[key].length));
-    const widths = { topic: width("topic"), verbs: width("verbs"), filters: width("filters") };
-    const line = (topic: string, verbs: string, filters: string) =>
-      `${topic.padEnd(widths.topic)}  ${verbs.padEnd(widths.verbs)}  ${filters}`.trimEnd();
+  protected async execute({ flags }: Admitted<typeof ResourcesList>): Promise<JsonEnvelope> {
+    const items = describeRegistry(RESOURCES);
 
-    return this.emit({
-      status: "ok",
-      data: { resources, count: resources.length },
-      pretty: [
-        line("resource", "verbs", "filter on"),
-        line("-".repeat(widths.topic), "-".repeat(widths.verbs), "-".repeat(widths.filters)),
-        ...rows.map((row) => line(row.topic, row.verbs, row.filters)),
-        "",
-        `${resources.length} resources. Run \`${this.config.bin} <resource> <verb> --help\` for a command's flags.`,
-      ].join("\n"),
+    const rows = items.map((resource) => {
+      return {
+        topic: String(resource.topic),
+        verbs: (resource.verbs as string[]).join(", "),
+        // Every list shares one filter grammar now, so the column is simply the
+        // fields `--filter` accepts. What each field accepts beyond that — its
+        // operations, its closed values — is in `--json` and in `--help`, which
+        // is where a reader goes once they know the field exists.
+        filters: ((resource.filters as Array<{ field: string }> | undefined) ?? [])
+          .map((filter) => {
+            return filter.field;
+          })
+          .join(", "),
+      };
+    });
+
+    const columns = COLUMNS;
+    const empty = "No resources.";
+    const footer = [`Run \`${this.config.bin} <resource> <verb> --help\` for a command's flags.`];
+    const page = null;
+    const extra = {};
+
+    return this.emitList(flags, {
+      columns,
+      rows,
+      items,
+      singular: "resource",
+      empty,
+      footer,
+      page,
+      extra,
     });
   }
 }

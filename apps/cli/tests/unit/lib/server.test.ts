@@ -1,128 +1,76 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { createServer, type Server } from "node:http";
-import { tmpdir } from "node:os";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
 
-import { localRuntimePaths } from "../../../src/lib/local-server/runtime";
-import { DEFAULT_SERVER, resolveServer } from "../../../src/lib/server";
-import { aBinaryRecord } from "../../helpers/runtime-record";
+import { it, type Serve } from "@tests/helpers/fixtures";
 
-let dir: string;
-let servers: Server[] = [];
-
-beforeEach(async () => {
-  dir = await mkdtemp(join(tmpdir(), "zitadel-resolve-server-"));
-});
-
-afterEach(async () => {
-  for (const server of servers) {
-    await new Promise<void>((resolve) => server.close(() => resolve()));
-  }
-  servers = [];
-  await rm(dir, { recursive: true, force: true });
-});
-
-async function writeConfig(config: unknown): Promise<void> {
-  await writeFile(join(dir, "zitadel.json"), JSON.stringify(config), "utf8");
-}
+import { localRuntimePaths } from "@/lib/local-server/runtime";
+import { DEFAULT_SERVER, isLoopbackUrl, parseServer, resolveServer } from "@/lib/server";
+import { aBinaryRecord } from "@tests/helpers/runtime-record";
 
 describe("resolveServer", () => {
-  it("falls back to DEFAULT_SERVER when nothing resolves and no config exists", async () => {
-    const resolved = await resolveServer({ cwd: dir, env: {} });
+  it("falls back to DEFAULT_SERVER when no flag is given", async ({ dir }) => {
+    const resolved = await resolveServer({ cwd: dir });
     expect(resolved).toEqual({ value: DEFAULT_SERVER, origin: "default" });
   });
 
-  it("prefers the --server flag above all other sources", async () => {
-    await writeConfig({ server: "https://config.example.com" });
-    const resolved = await resolveServer({
-      cwd: dir,
-      env: { ZITADEL_API_BASE: "https://env.example.com" },
-      serverFlag: "https://flag.example.com",
-    });
+  it("ignores the server in zitadel.json", async ({ dir }) => {
+    await writeFile(
+      join(dir, "zitadel.json"),
+      JSON.stringify({ server: "https://config.example.com" }),
+      "utf8",
+    );
+    const resolved = await resolveServer({ cwd: dir });
+    expect(resolved).toEqual({ value: DEFAULT_SERVER, origin: "default" });
+  });
+
+  it("uses the --server flag", async ({ dir }) => {
+    const resolved = await resolveServer({ cwd: dir, serverFlag: "https://flag.example.com" });
     expect(resolved).toEqual({ value: "https://flag.example.com", origin: "flag" });
   });
 
-  it("uses ZITADEL_API_BASE env when no flag is given", async () => {
-    await writeConfig({ server: "https://config.example.com" });
+  it("normalises a resolved URL down to its origin", async ({ dir }) => {
     const resolved = await resolveServer({
       cwd: dir,
-      env: { ZITADEL_API_BASE: "https://env.example.com" },
-    });
-    expect(resolved).toEqual({ value: "https://env.example.com", origin: "env" });
-  });
-
-  it("uses the top-level server from zitadel.json", async () => {
-    await writeConfig({ server: "https://top.example.com" });
-    const resolved = await resolveServer({ cwd: dir, env: {} });
-    expect(resolved).toEqual({ value: "https://top.example.com", origin: "config-top" });
-  });
-
-  it("ignores a per-environment server block in zitadel.json", async () => {
-    await writeConfig({
-      server: "https://top.example.com",
-      environments: { production: { server: "https://prod.example.com" } },
-    });
-    const resolved = await resolveServer({ cwd: dir, env: {} });
-    expect(resolved).toEqual({ value: "https://top.example.com", origin: "config-top" });
-  });
-
-  it("falls back to DEFAULT_SERVER when the config has no server field", async () => {
-    await writeConfig({ environments: { production: { server: "https://prod.example.com" } } });
-    const resolved = await resolveServer({ cwd: dir, env: {} });
-    expect(resolved).toEqual({ value: DEFAULT_SERVER, origin: "default" });
-  });
-
-  it("ignores the environment that used to be the default, `development`", async () => {
-    // Every command without `--environment` once resolved as though it had been
-    // given `development`, so this block silently became the target. Nothing
-    // reads it now, and a project holding one falls through to the default.
-    await writeConfig({ environments: { development: { server: "https://dev.example.com" } } });
-    const resolved = await resolveServer({ cwd: dir, env: {} });
-    expect(resolved).toEqual({ value: DEFAULT_SERVER, origin: "default" });
-  });
-
-  it("normalises a resolved URL down to its origin", async () => {
-    const resolved = await resolveServer({
-      cwd: dir,
-      env: {},
       serverFlag: "https://flag.example.com/some/path?q=1",
     });
     expect(resolved).toEqual({ value: "https://flag.example.com", origin: "flag" });
   });
 
-  it("rejects a non-http(s) URL with E_VALIDATION", async () => {
+  it("rejects a non-http(s) URL with E_VALIDATION", async ({ dir }) => {
     await expect(
-      resolveServer({ cwd: dir, env: {}, serverFlag: "ftp://flag.example.com" }),
+      resolveServer({ cwd: dir, serverFlag: "ftp://flag.example.com" }),
     ).rejects.toMatchObject({ code: "E_VALIDATION" });
   });
 
-  it("rejects an unparseable URL with E_VALIDATION", async () => {
-    await expect(
-      resolveServer({ cwd: dir, env: {}, serverFlag: "not a url" }),
-    ).rejects.toMatchObject({ code: "E_VALIDATION" });
+  it("rejects an unparseable URL with E_VALIDATION", async ({ dir }) => {
+    await expect(resolveServer({ cwd: dir, serverFlag: "not a url" })).rejects.toMatchObject({
+      code: "E_VALIDATION",
+    });
   });
 
-  it("resolves --server local from healthy local runtime metadata", async () => {
-    const serverUrl = await startHealthServer();
-    await writeLocalRuntime(serverUrl);
+  it("resolves --server local from healthy local runtime metadata", async ({ dir, serve }) => {
+    const serverUrl = await startHealthServer(serve);
+    await writeLocalRuntime(dir, serverUrl);
 
-    const resolved = await resolveServer({ cwd: dir, env: {}, serverFlag: "local" });
+    const resolved = await resolveServer({ cwd: dir, serverFlag: "local" });
 
     expect(resolved).toEqual({ value: serverUrl, origin: "local" });
   });
 
-  it("fails --server local when runtime metadata points at an unhealthy server", async () => {
-    await writeLocalRuntime("http://localhost:9");
+  it("fails --server local when runtime metadata points at an unhealthy server", async ({
+    dir,
+  }) => {
+    await writeLocalRuntime(dir, "http://localhost:9");
 
-    await expect(resolveServer({ cwd: dir, env: {}, serverFlag: "local" })).rejects.toMatchObject({
+    await expect(resolveServer({ cwd: dir, serverFlag: "local" })).rejects.toMatchObject({
       code: "E_LOCAL_SERVER_NOT_RUNNING",
     });
   });
 });
 
-async function writeLocalRuntime(serverUrl: string): Promise<void> {
+async function writeLocalRuntime(dir: string, serverUrl: string): Promise<void> {
   const paths = localRuntimePaths(dir);
   await mkdir(paths.runtimeDir, { recursive: true });
   await writeFile(
@@ -141,19 +89,42 @@ async function writeLocalRuntime(serverUrl: string): Promise<void> {
   );
 }
 
-async function startHealthServer(): Promise<string> {
-  const server = createServer((req, res) => {
-    if (req.url === "/healthz") {
+function startHealthServer(serve: Serve): Promise<string> {
+  return serve((req, res) => {
+    if (req.url === "/readyz") {
       res.writeHead(200).end("ok");
       return;
     }
     res.writeHead(404).end();
   });
-  servers.push(server);
-  await new Promise<void>((resolve) => server.listen(0, "localhost", () => resolve()));
-  const address = server.address();
-  if (!address || typeof address === "string") {
-    throw new Error("health server did not expose a TCP address");
-  }
-  return `http://localhost:${String(address.port)}`;
 }
+
+describe("parseServer", () => {
+  it("gives the origin of a URL", () => {
+    expect(parseServer(" https://api.example.com/some/path ")).toEqual({
+      ok: true,
+      value: "https://api.example.com",
+    });
+  });
+
+  it("reports a URL with no scheme instead of throwing", () => {
+    expect(parseServer("api.zitadel.cloud")).toMatchObject({ ok: false });
+  });
+
+  it("reports an empty answer", () => {
+    expect(parseServer("  ")).toEqual({ ok: false, problem: "Enter the server URL." });
+  });
+});
+
+describe("isLoopbackUrl", () => {
+  it.for(["http://localhost:8080", "http://127.0.0.1", "http://[::1]:3000/path"])(
+    "accepts %s",
+    (url) => {
+      expect(isLoopbackUrl(url)).toBe(true);
+    },
+  );
+
+  it.for(["https://example.com", "http://10.0.0.1:8080", "not a url", ""])("rejects %s", (url) => {
+    expect(isLoopbackUrl(url)).toBe(false);
+  });
+});

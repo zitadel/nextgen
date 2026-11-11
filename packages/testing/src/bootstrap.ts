@@ -1,7 +1,7 @@
-import { createZitadelClient, type ZitadelClient } from "@zitadel/api/client";
+import { createZitadelClient } from "@zitadel/api/client";
 import {
   DEFAULT_FLOW_SCHEMA_URI,
-  getDefaultHumanUserSchema,
+  getDefaultHumanUserSchemaBody,
   getDefaultLoginFlow,
   type SetupPreset,
   type SetupUseCase,
@@ -22,7 +22,8 @@ export interface BootstrapProjectOptions {
 export interface BootstrappedProject {
   projectId: string;
   projectSecret: string;
-  previewSecret?: string;
+  /** The browser-plane credential the server issues with every project. */
+  previewSecret: string;
   schemaId: string;
   flowId: string;
 }
@@ -35,54 +36,64 @@ const DEFAULT_PROJECT_NAME = "zitadel-testing";
  * bearer for everything else; the schema is uploaded without `$id` so the
  * server assigns an opaque id, which the flow must then reference.
  */
+/**
+ * A deployment needs a primary origin. A loopback origin is always admitted, so
+ * listing this one opens nothing up.
+ */
+const FALLBACK_APP_ORIGIN = "http://localhost:3000";
+
 export async function bootstrapProject(
   options: BootstrapProjectOptions,
 ): Promise<BootstrappedProject> {
   const { baseUrl } = options;
   const unauthenticated = createZitadelClient({ baseUrl });
-  const project = (await unauthenticated.createProject({
+  const project = await unauthenticated.createProject({
     name: options.projectName ?? DEFAULT_PROJECT_NAME,
-    origins: (options.appOrigins ?? []).map((pattern) => ({
-      pattern,
-      kind: "preview" as const,
-    })),
+    origins: (options.appOrigins?.length ? options.appOrigins : [FALLBACK_APP_ORIGIN]).map(
+      (pattern) => ({
+        pattern,
+        kind: "primary" as const,
+      }),
+    ),
     seed_defaults: false,
-  } as Parameters<ZitadelClient["createProject"]>[0])) as Record<string, unknown>;
-  const projectId = requireString(project.id, "project id");
-  const projectSecret = requireString(project.project_secret, "project secret");
-  const previewSecret =
-    typeof project.preview_secret === "string" ? project.preview_secret : undefined;
+  });
+  const client = createZitadelClient({ baseUrl, token: project.project_secret });
 
-  const client = createZitadelClient({ baseUrl, token: projectSecret });
-
-  const { $id: _templateId, ...schemaBody } = getDefaultHumanUserSchema({
+  const schemaBody = getDefaultHumanUserSchemaBody({
     preset: options.preset,
     useCase: options.useCase,
-  }) as { $id?: string } & Record<string, unknown>;
-  void _templateId;
-  const schema = (await client.createSchema(
-    schemaBody as Parameters<ZitadelClient["createSchema"]>[0],
-    { project_id: projectId },
-  )) as Record<string, unknown>;
-  const schemaId = requireString(schema.id, "schema id");
+  });
+  const schema = await client.createSchema(schemaBody, { project_id: project.id });
 
   const flowBody = getDefaultLoginFlow({
     preset: options.preset,
     useCase: options.useCase,
   });
-  const flow = (await client.createFlowDefinition({
-    project_id: projectId,
+  const flow = await client.createFlowDefinition({
+    project_id: project.id,
     schema_uri: DEFAULT_FLOW_SCHEMA_URI,
     flow_definition: flowBody,
-  } as Parameters<ZitadelClient["createFlowDefinition"]>[0])) as Record<string, unknown>;
-  const flowId = requireString(flow.id, "flow definition id");
+  });
 
-  return { projectId, projectSecret, previewSecret, schemaId, flowId };
-}
+  const release = await client.createRelease(
+    {
+      pointers: [
+        { kind: "schema", revision_id: schema.id },
+        { kind: "flow_definition", revision_id: flow.id },
+      ],
+    },
+    { project_id: project.id },
+  );
+  await client.createDeployment(
+    { release_id: release.id, targets: "primary" },
+    { project_id: project.id },
+  );
 
-export function requireString(value: unknown, label: string): string {
-  if (typeof value === "string" && value.length > 0) {
-    return value;
-  }
-  throw new Error(`Missing ${label} in server response.`);
+  return {
+    projectId: project.id,
+    projectSecret: project.project_secret,
+    previewSecret: project.preview_secret,
+    schemaId: schema.id,
+    flowId: flow.id,
+  };
 }

@@ -14,9 +14,14 @@ import {
   describeBody,
   fieldExample,
   flagsAloneMayBeIncomplete,
-} from "../../../../../src/lib/oclif/crud";
+} from "@/lib/oclif/crud";
+import { named } from "@/lib/oclif/names";
 
 type Described = Parameters<typeof describeBody>;
+
+/** Flags as a command reads them, which is what the body is built from. */
+const asRead = (flags: Record<string, unknown>): Record<string, unknown> =>
+  Object.fromEntries(Object.entries(flags).map(([name, value]) => [named(name), value]));
 
 const byName = (...args: Described) =>
   Object.fromEntries(describeBody(...args).map((field) => [field.name, field]));
@@ -229,23 +234,47 @@ describe("bodyFromFlags", () => {
   const grantFields = describeBody(CreateGrantBody);
   const userFields = describeBody(CreateUserBody);
 
+  const read = async (fields: ReturnType<typeof describeBody>, flags: Record<string, unknown>) => {
+    const defined = bodyFieldFlags(fields) as Record<
+      string,
+      { parse: (input: string, context: unknown, flag: unknown) => Promise<unknown> }
+    >;
+    const parsed: Record<string, unknown> = { ...flags };
+    for (const field of fields) {
+      const entries = field.flag === undefined ? undefined : flags[field.flag];
+      if (field.kind === "record" && field.flag !== undefined && Array.isArray(entries)) {
+        const flag = defined[field.flag];
+        parsed[field.flag] = await Promise.all(
+          entries.map((entry) => flag?.parse(String(entry), {}, flag)),
+        );
+      }
+    }
+    return bodyFromFlags(fields, asRead(parsed));
+  };
+
   it("collects scalar and enum flags under their wire names", () => {
     expect(
-      bodyFromFlags(grantFields, {
-        relation: "viewer",
-        "expires-at": "2030-01-01T00:00:00Z",
-      }),
+      bodyFromFlags(
+        grantFields,
+        asRead({
+          relation: "viewer",
+          "expires-at": "2030-01-01T00:00:00Z",
+        }),
+      ),
     ).toEqual({ relation: "viewer", expires_at: "2030-01-01T00:00:00Z" });
   });
 
   it("nests a nested field's value at its path", () => {
     expect(
-      bodyFromFlags(describeBody(CreateIdpBody, { root: "idp" }), {
-        slug: "acme",
-        "oidc-issuer": "https://sso.acme.example",
-        "oidc-scopes": ["openid", "email"],
-        "oidc-pkce-enabled": false,
-      }),
+      bodyFromFlags(
+        describeBody(CreateIdpBody, { root: "idp" }),
+        asRead({
+          slug: "acme",
+          "oidc-issuer": "https://sso.acme.example",
+          "oidc-scopes": ["openid", "email"],
+          "oidc-pkce-enabled": false,
+        }),
+      ),
     ).toEqual({
       slug: "acme",
       oidc: {
@@ -256,18 +285,18 @@ describe("bodyFromFlags", () => {
     });
   });
 
-  it("builds an object from repeated key=value entries", () => {
+  it("builds an object from repeated key=value entries", async () => {
     expect(
-      bodyFromFlags(userFields, {
+      await read(userFields, {
         schema: "sch_1",
         attributes: ["email=ada@example.com", "givenName=Ada"],
       }),
     ).toEqual({ schema: "sch_1", attributes: { email: "ada@example.com", givenName: "Ada" } });
   });
 
-  it("parses a `key:=value` entry as JSON so numbers and booleans keep their type", () => {
+  it("parses a `key:=value` entry as JSON so numbers and booleans keep their type", async () => {
     expect(
-      bodyFromFlags(userFields, {
+      await read(userFields, {
         attributes: [
           "email=ada@example.com",
           "age:=30",
@@ -289,70 +318,62 @@ describe("bodyFromFlags", () => {
     });
   });
 
-  it("keeps a numeric-looking string a string with `=` where the values are untyped", () => {
-    expect(bodyFromFlags(userFields, { attributes: ["postcode=02139", "phone=+1555"] })).toEqual({
+  it("keeps a numeric-looking string a string with `=` where the values are untyped", async () => {
+    expect(await read(userFields, { attributes: ["postcode=02139", "phone=+1555"] })).toEqual({
       attributes: { postcode: "02139", phone: "+1555" },
     });
   });
 
-  it("reads `=` as the type a record declares for its values", () => {
+  it("reads `=` as the type a record declares for its values", async () => {
     const fields = describeBody(z.object({ limits: z.record(z.string(), z.number()) }));
-    expect(bodyFromFlags(fields, { limits: ["requests=10"] })).toEqual({
+    expect(await read(fields, { limits: ["requests=10"] })).toEqual({
       limits: { requests: 10 },
     });
-    expect(() => bodyFromFlags(fields, { limits: ["requests=ten"] })).toThrowError(
-      expect.objectContaining({
-        code: "E_VALIDATION",
-        message: '--limits requests expects a number, got "ten"',
-      }),
-    );
+    await expect(read(fields, { limits: ["requests=ten"] })).rejects.toMatchObject({
+      code: "E_VALIDATION",
+      message: '--limits requests expects a number, got "ten"',
+    });
   });
 
-  it("keeps a string where a record's values may be a string or something else", () => {
+  it("keeps a string where a record's values may be a string or something else", async () => {
     // `verified_claims` takes a claim name or `true`; `email=true` names a
     // claim called "true", and `email:=true` is the boolean.
     const fields = describeBody(CreateIdpBody, { root: "idp" });
-    expect(bodyFromFlags(fields, { "verified-claims": ["email=true", "phone:=true"] })).toEqual({
+    expect(await read(fields, { "verified-claims": ["email=true", "phone:=true"] })).toEqual({
       verified_claims: { email: "true", phone: true },
     });
   });
 
-  it("explains a malformed JSON value and offers the string form", () => {
-    expect(() => bodyFromFlags(userFields, { attributes: ["age:=thirty"] })).toThrowError(
-      expect.objectContaining({
-        code: "E_VALIDATION",
-        message: '--attributes age:= expects JSON, got "thirty"',
-        hint: expect.stringContaining("age=thirty"),
-      }),
-    );
+  it("explains a malformed JSON value and offers the string form", async () => {
+    await expect(read(userFields, { attributes: ["age:=thirty"] })).rejects.toMatchObject({
+      code: "E_VALIDATION",
+      message: '--attributes age:= expects JSON, got "thirty"',
+      hint: expect.stringContaining("age=thirty"),
+    });
   });
 
-  it("keeps `=` inside a value", () => {
-    expect(bodyFromFlags(userFields, { attributes: ["note=a=b"] })).toEqual({
+  it("keeps `=` inside a value", async () => {
+    expect(await read(userFields, { attributes: ["note=a=b"] })).toEqual({
       attributes: { note: "a=b" },
     });
   });
 
   it.each(["__proto__=x", '__proto__:={"polluted":true}'])(
     "refuses the record key in %s, which the schema check would drop",
-    (entry) => {
-      expect(() => bodyFromFlags(userFields, { attributes: [entry] })).toThrowError(
-        expect.objectContaining({
-          code: "E_VALIDATION",
-          message: "--attributes __proto__ names __proto__, which no body can carry",
-        }),
-      );
+    async (entry) => {
+      await expect(read(userFields, { attributes: [entry] })).rejects.toMatchObject({
+        code: "E_VALIDATION",
+        message: "--attributes __proto__ names __proto__, which no body can carry",
+      });
       expect(({} as Record<string, unknown>).polluted).toBeUndefined();
     },
   );
 
-  it("rejects a malformed pair with an actionable error", () => {
-    expect(() => bodyFromFlags(userFields, { attributes: ["nonsense"] })).toThrowError(
-      expect.objectContaining({
-        code: "E_VALIDATION",
-        hint: expect.stringContaining("--attributes key=value"),
-      }),
-    );
+  it("rejects a malformed pair with an actionable error", async () => {
+    await expect(read(userFields, { attributes: ["nonsense"] })).rejects.toMatchObject({
+      code: "E_VALIDATION",
+      hint: expect.stringContaining("--attributes key=value"),
+    });
   });
 
   it("returns undefined when no field flag was given", () => {

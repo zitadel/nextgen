@@ -16,20 +16,30 @@ tasks:
         echo "hint: run gofmt -w on those paths, then re-check with moon run oidc-mock:format" >&2
         exit 1
       fi
+    options:
+      cache: false
 
   vet:
     command: "go vet ./..."
+    options:
+      cache: false
 
   # dist/ is gitignored at the root.
   build:
     command: "go build -o dist/oidc-mock ."
-    deps:
-      - "vet"
+    inputs:
+      - "**/*"
+      - "!**/*_test.go"
+      - "!**/testdata/**"
     outputs:
       - "dist/oidc-mock"
+    options:
+      cache: false
 
   test:
     command: "go test -timeout 2m ./..."
     deps:
       - "format"
       - "vet"
+    options:
+      cache: false

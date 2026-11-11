@@ -33,7 +33,7 @@ change needs a changeset, and the whole train versions together.
   implement it; SPA SDKs document a dev/deploy proxy (production guidance:
   [#560](https://github.com/zitadel/nextgen/issues/560)).
 - **Edge entries are tested in the edge runtime**: an SDK entry that claims
-  edge support has an `edge` project (`edgeProject()` in `vitest.shared.mjs`,
+  edge support has an `edge` project (`edgeProject()` in `@zitadel/vitest-config`,
   Vercel's `edge-runtime` VM) that runs only its edge specs. It fails at
   config load if none exists. Every edge project resolves with `workerd`, the
   condition Wrangler adds for Cloudflare Workers. A package adds a condition
@@ -66,7 +66,7 @@ change needs a changeset, and the whole train versions together.
 
 The generated TypeScript client: orval output under `src/generated/`.
 Regenerate it, never hand-edit it; the source is
-[`api/openapi/`](../api/openapi/AGENTS.md). The runtime helpers in
+[`apps/api/api/openapi/`](../apps/api/api/openapi/AGENTS.md). The runtime helpers in
 `src/runtime/` (`configureZitadel()` from `@zitadel/api/config`, proxy-path
 handling) are hand-written and the primary consumer surface.
 

@@ -40,11 +40,9 @@ configureZitadel({ proxyPath: window.location.origin, projectId: "storybook" });
 // the page stays uncontrolled.
 //
 // The worker script follows Vite's base. `storybook build` emits a relocatable
-// site (base `./`), which the hosted cloud serves under `/storybook/` (repo-root
-// vercel.json): the worker loads from there and its scope stays inside the
-// prefix, so it never intercepts the console's or login UI's requests. The dev
-// server and the Vitest browser runner have base `/`, so they keep loading
-// `/mockServiceWorker.js`.
+// site (base `./`), so wherever it is served from the worker loads from there
+// and its scope stays inside that path. The dev server and the Vitest browser
+// runner have base `/`, so they keep loading `/mockServiceWorker.js`.
 const RELOADED_FOR_CONTROL = "zitadel-storybook:msw-control-reload";
 const viteBase = (import.meta as ImportMeta & { env?: { BASE_URL?: string } }).env?.BASE_URL ?? "/";
 const startWorker = async () => {

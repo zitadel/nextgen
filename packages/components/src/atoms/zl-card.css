@@ -62,7 +62,7 @@
 .zr-card__body {
   display: flex;
   flex-direction: column;
-  gap: var(--zl-spacing-7);
+  gap: var(--zl-spacing-5);
 }
 .zr-card--compact {
   gap: var(--zl-spacing-4);
