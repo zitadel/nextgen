@@ -417,6 +417,7 @@ func TestRevokeRelease(t *testing.T) {
 		var served []string
 		for _, origin := range conflict.Details.Origins {
 			assert.Equal(t, live.ID, origin.DeploymentID)
+			assert.Equal(t, api.DeploymentKindPrimary, origin.Kind)
 			served = append(served, string(origin.Origin))
 		}
 		assert.Equal(t, origins(live.Targets), served)
@@ -434,6 +435,7 @@ func TestRevokeRelease(t *testing.T) {
 		require.Len(t, conflict.Details.Origins, 1)
 		assert.Equal(t, api.Origin(previewOrigin), conflict.Details.Origins[0].Origin)
 		assert.Equal(t, api.DeploymentID(preview.Deployment.ID), conflict.Details.Origins[0].DeploymentID)
+		assert.Equal(t, api.DeploymentKindPreview, conflict.Details.Origins[0].Kind)
 
 		// The preview moves on to the other release, so nothing serves it.
 		fixture.deployPreview(t, other)

@@ -55,6 +55,10 @@ between files are the sign the component is missing.
   screen `src/components/detail-page.tsx` ("Resource list layout" and
   "Resource detail layout" in `docs/styling.md`). Follow the shipped screens
   under `src/routes/_authed/`: loader-fetched data, `$param` detail routes.
+- Narrow a list through `ResourceFilter` by the "List filters" recipe in
+  `docs/styling.md`, never a select of the screen's own.
+- Keep a filter's value in the URL and send it to the server; never filter the
+  rows already loaded.
 - A screen that acts on one project declares `staticData.scope: "project"`
   and reads the selected project (`?project=`) through
   `src/features/projects/project-scope.ts`: `projectScopeDeps` +
@@ -64,12 +68,18 @@ between files are the sign the component is missing.
 - The sidebar lists a project's screens, with or without a selection: without
   one, a screen asks for a project first (Projects with `?next=`, D22).
 - Projects (the home) and `/settings` are above every project: Projects lists
-  the account's screens (`nav.view: "account"`, D27), `/settings` its own pages
-  (`nav.view: "settings"`, D29).
+  the account's screens (`nav.view: "account"`, D27) around the project's
+  (D34); `/settings` its own pages (`nav.view: "settings"`, D29).
+- Going up to Projects or Settings never drops the selected project (D36):
+  never link with `project: undefined`.
+- `/` is the project's Overview (D35): only reads a screen already makes, and no
+  figures, since the API has no counts.
 - Screens outside every project (billing, operators) go in one of those lists,
   never beside a project's screens; every screen keeps the one frame.
-- `/events` swaps the project's list for Logs' (`NavView` `"logs"`, D30): its
-  rows are views and filters the events feature draws, not `nav` routes.
+- `/events` swaps the project's list for Logs' (`NavView` `"logs"`, D30): a view
+  picker and the filters chosen from a list; a pasted value belongs in the search.
+- An event opens in a drawer over Logs' list: `/events/$eventId` is the list
+  route's child, so it never reads the list again (D30).
 - Send any combination of Logs' filters: the server bounds every read (root
   ADR 048). One that must fill its pages needs an index and a read plan there.
 - A short Logs page with a token is not the end: say so and offer

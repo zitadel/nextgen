@@ -33,6 +33,40 @@ func EventCategories() []EventCategory {
 	}
 }
 
+// HTTPStatusClass is the class of an HTTP response status, named by its
+// first digit (RFC 9110 §15).
+type HTTPStatusClass string
+
+const (
+	HTTPStatusClassInformational HTTPStatusClass = "1xx"
+	HTTPStatusClassSuccessful    HTTPStatusClass = "2xx"
+	HTTPStatusClassRedirection   HTTPStatusClass = "3xx"
+	HTTPStatusClassClientError   HTTPStatusClass = "4xx"
+	HTTPStatusClassServerError   HTTPStatusClass = "5xx"
+)
+
+// HTTPStatusClasses lists every class a request.api event is stored under. A
+// read by operation names a class for each of its ranges and reads each of
+// these when the list names none, so a class added above joins this list.
+func HTTPStatusClasses() []HTTPStatusClass {
+	return []HTTPStatusClass{
+		HTTPStatusClassInformational,
+		HTTPStatusClassSuccessful,
+		HTTPStatusClassRedirection,
+		HTTPStatusClassClientError,
+		HTTPStatusClassServerError,
+	}
+}
+
+// HTTPStatusClassOf is the class of status, and false for a status outside
+// 100–599, which HTTP defines no class for.
+func HTTPStatusClassOf(status int) (HTTPStatusClass, bool) {
+	if status < 100 || status > 599 {
+		return "", false
+	}
+	return HTTPStatusClasses()[status/100-1], true
+}
+
 // EventActorType is who triggered the event.
 type EventActorType string
 
@@ -123,6 +157,11 @@ const (
 	EventTypeAuthzGranted EventType = "authz.granted"
 	EventTypeAuthzRevoked EventType = "authz.revoked"
 
+	EventTypeInvitationCreated   EventType = "invitation.created"
+	EventTypeInvitationAccepted  EventType = "invitation.accepted"
+	EventTypeInvitationRejected  EventType = "invitation.rejected"
+	EventTypeInvitationCancelled EventType = "invitation.cancelled"
+
 	EventTypeAuthFactorPasswordSet     EventType = "auth.factor.password.set"
 	EventTypeAuthFactorPasskeyEnrolled EventType = "auth.factor.passkey.enrolled"
 )
@@ -154,6 +193,14 @@ type Event struct {
 	RequestID *string
 	SessionID *string
 	FlowID    *string
+
+	// OperationID and StatusClass copy what a request.api event's payload
+	// records, the operation and the class of the response status, into
+	// columns GET /events reads them from by index
+	// (RequestAPIPayload.Indexed). Nil on every other event. The operation is
+	// stored with its class, as one key (events.OperationStatus).
+	OperationID *string
+	StatusClass *HTTPStatusClass
 
 	Payload  json.RawMessage
 	Metadata json.RawMessage
@@ -214,6 +261,8 @@ const (
 	EventFieldRequestID
 	EventFieldSessionID
 	EventFieldFlowID
+	EventFieldOperationStatus
+	EventFieldStatusClass
 )
 
 func ErrEventNotFound() Error {

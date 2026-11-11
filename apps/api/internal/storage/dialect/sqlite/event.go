@@ -28,6 +28,7 @@ INSERT INTO events (
     entity_type, entity_id,
     client_id, token_id, delegation_type, delegation_id, grantor, fingerprint,
     request_id, session_id, flow_id,
+    operation_status, status_class,
     payload, metadata
 ) VALUES (
     ?, ?, ?, ?,
@@ -36,6 +37,7 @@ INSERT INTO events (
     ?, ?,
     ?, ?, ?, ?, ?, ?,
     ?, ?, ?,
+    ?, ?,
     ?, ?
 ) RETURNING occurred_at, created_at`
 
@@ -46,6 +48,7 @@ INSERT INTO events (
     entity_type, entity_id,
     client_id, token_id, delegation_type, delegation_id, grantor, fingerprint,
     request_id, session_id, flow_id,
+    operation_status, status_class,
     payload, metadata
 FROM events`
 
@@ -118,6 +121,7 @@ func (e eventStatements) InsertEvent(ctx context.Context, event *domain.Event) e
 		nullString(event.EntityType), nullString(event.EntityID),
 		event.ClientID, event.TokenID, event.DelegationType, event.DelegationID, event.Grantor, event.Fingerprint,
 		nullString(event.RequestID), nullString(event.SessionID), nullString(event.FlowID),
+		nullString(events.OperationStatusOf(event)), nullStatusClass(event.StatusClass),
 		string(payload), string(metadata),
 	).Scan(&occurredOut, &createdOut)
 	if err != nil {
@@ -335,6 +339,7 @@ func scanEvent(row *sql.Rows) (*domain.Event, error) {
 		eventType, category                              string
 		teamID, actorID, actorType, entityType, entityID sql.NullString
 		requestID, sessionID, flowID                     sql.NullString
+		operationStatus, statusClass                     sql.NullString
 		occurredNano, createdNano                        int64
 		payload, metadata                                string
 	)
@@ -345,6 +350,7 @@ func scanEvent(row *sql.Rows) (*domain.Event, error) {
 		&entityType, &entityID,
 		&ev.ClientID, &ev.TokenID, &ev.DelegationType, &ev.DelegationID, &ev.Grantor, &ev.Fingerprint,
 		&requestID, &sessionID, &flowID,
+		&operationStatus, &statusClass,
 		&payload, &metadata,
 	); err != nil {
 		return nil, err
@@ -364,6 +370,14 @@ func scanEvent(row *sql.Rows) (*domain.Event, error) {
 	ev.RequestID = nullStringPtr(requestID)
 	ev.SessionID = nullStringPtr(sessionID)
 	ev.FlowID = nullStringPtr(flowID)
+	if statusClass.Valid {
+		c := domain.HTTPStatusClass(statusClass.String)
+		ev.StatusClass = &c
+	}
+	if operationStatus.Valid {
+		operation := events.OperationOf(operationStatus.String)
+		ev.OperationID = &operation
+	}
 	ev.Payload = events.NormalizeJSON([]byte(payload))
 	ev.Metadata = events.NormalizeJSON([]byte(metadata))
 	return &ev, nil
@@ -377,6 +391,13 @@ func nullString(p *string) any {
 }
 
 func nullActorType(p *domain.EventActorType) any {
+	if p == nil {
+		return nil
+	}
+	return string(*p)
+}
+
+func nullStatusClass(p *domain.HTTPStatusClass) any {
 	if p == nil {
 		return nil
 	}

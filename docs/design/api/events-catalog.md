@@ -114,6 +114,14 @@ without AuthGate. `createFlow` mints `flow_id` before `CreateAuthAttempt` so
 Path B `auth.attempt.created` shares `flow_id` / `session_id` columns with
 Path A `request.api`. Probes (`livez` / `readyz`) do not.
 
+The class of the payload's `status` (`2xx`, `4xx`, …) is also written to the
+`status_class` column, and its `operation_id` with that class to
+`operation_status` (`createUser 4xx`), which the `GET /events` filters
+`status_class` and `operation_id` read from an index
+(`RequestAPIPayload.Indexed`). A request refused before an operation ran has a
+class and no operation. Every other event leaves both empty, and so do the
+requests stored before the columns existed.
+
 Path A buffer: flush on batch size **N≈100** or age **T≈1s**. Capacity **C**
 (default 2000); drop only when full; never block the request.
 
@@ -198,7 +206,20 @@ every supported deployment; that removal is its own breaking change.
 Types whose API contract is published before their producer lands. Each has
 a `domain.EventType` constant and an events API schema, so clients can be
 built against it, but nothing emits it yet. A type moves to Path B with its
-producer. None today.
+producer.
+
+Invitation events ([ADR 086 §5](../../adrs/086-invitations.md#5-events)) are
+`admin` category with `entity_type` `invitation`. `type` names the
+invitation's kind, and the object of the same name (`project_member` with
+`relation`, or `team_member` with `team_id` and `role`) says what it grants. No payload
+carries the invitation's metadata or its token.
+
+| `event_type` | Payload | Producer |
+|--------------|---------|----------|
+| `invitation.created` | `type` and its object, `journey_id`, `replaces_invitation_id`, `expires_at` | InvitationService create, and the new row of a replace ([#2852](https://github.com/zitadel/nextgen/issues/2852)) |
+| `invitation.accepted` | `type` and its object, `journey_id`, `user_id` (secondary) | InvitationService accept, sharing its `request_id` with the grant service's authz events when it writes any (none when the user already holds an identical active grant) ([#2853](https://github.com/zitadel/nextgen/issues/2853)) |
+| `invitation.rejected` | `journey_id`, `user_id` (secondary) | InvitationService decline ([#2853](https://github.com/zitadel/nextgen/issues/2853)) |
+| `invitation.cancelled` | `journey_id`, `reason` (`cancelled` or `replaced`), `replaced_by_invitation_id` | InvitationService cancel, and the old row of a replace ([#2852](https://github.com/zitadel/nextgen/issues/2852)) |
 
 ## Deferred
 

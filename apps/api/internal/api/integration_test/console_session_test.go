@@ -94,19 +94,20 @@ func TestConsoleManagementAcceptsSession(t *testing.T) {
 
 	t.Run("identity providers", func(t *testing.T) {
 		t.Parallel()
-		// Connections are created with the secret only (#998). The platform
-		// project is shared, so the slug is this test's own.
-		secret, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
-		require.NoError(t, err)
-		harness.SetProjectSecretOnApiClient(t, secret, console)
-		created := idpFixture{project: console, client: secret}.create(t, helpers.OIDCConnection(strings.ToLower(claimerID)))
+		// Connections are created with the secret only (#998). A deploy of
+		// the shared platform project pins every connection in it, and this
+		// one references a variable the platform project has no value for,
+		// so the connection lives in a project of this test's own, which
+		// holds the variable and goes with the test.
+		owned := newIdpFixture(t)
+		harness.SeedProjectAdmin(t, owned.project.ID, claimerID)
+		created := owned.create(t, helpers.OIDCConnection("google"))
 
-		read := idpFixture{project: console, client: session}
+		read := idpFixture{project: owned.project, client: session}
 		require.Contains(t, idpIDs(read.queryOK(t, &api.QueryIdpsRequest{}).Idps), created.ID)
 		got := read.get(t, created.ID)
 		require.IsType(t, &api.IdpResponse{}, got, helpers.MustMarshal(t, got))
-		revision, err := session.GetIdpRevisionById(t.Context(), api.GetIdpRevisionByIdParams{ProjectID: api.ProjectID(console.ID), RevisionID: created.RevisionID})
-		require.NoError(t, err)
+		revision := read.getRevision(t, created.RevisionID)
 		require.IsType(t, &api.IdpResponse{}, revision, helpers.MustMarshal(t, revision))
 	})
 
@@ -1236,6 +1237,48 @@ func TestConsoleSessionRevokedStopsAuthorizing(t *testing.T) {
 	require.IsType(t, &api.RevokeMySessionNoContent{}, revoked, helpers.MustMarshal(t, revoked))
 
 	assert.Equal(t, http.StatusUnauthorized, queryUsers(), "the revoked session's cookie must not authorize")
+}
+
+// TestConsoleSessionDeactivatedUserStopsAuthorizing pins ADR 053 §4 (#1234)
+// end to end, for a user of the project and for a platform user granted on it:
+// deactivating a user leaves their sessions alive (#553) and their direct
+// grants in place, so only the resolver's read of the user's status in their
+// home project stops the next request. A deactivated user then gets what an
+// unknown project gets.
+func TestConsoleSessionDeactivatedUserStopsAuthorizing(t *testing.T) {
+	t.Parallel()
+	stmts := harness.EnsureServiceDB(t).Statements()
+
+	home, localID, local := ownSessionUser(t)
+	harness.SeedProjectAdmin(t, home.ID, localID)
+
+	platform := harness.EnsurePlatformProject(t)
+	customer, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	foreignID := platformUser(t)
+	harness.SeedProjectAdmin(t, customer.ID, foreignID)
+	foreign := platformSessionCookie(t, foreignID)
+
+	for name, tc := range map[string]struct {
+		cookie                    *http.Cookie
+		homeID, userID, projectID string
+	}{
+		"a user of the project":         {local, home.ID, localID, home.ID},
+		"a platform user granted on it": {foreign, platform.ID, foreignID, customer.ID},
+	} {
+		t.Run(name, func(t *testing.T) {
+			status, body := consoleCall(t, tc.cookie, http.MethodGet, "/projects/"+tc.projectID, "")
+			require.Equal(t, http.StatusOK, status, body)
+
+			require.NoError(t, stmts.DeactivateUser(t.Context(), tc.homeID, tc.userID))
+
+			status, body = consoleCall(t, tc.cookie, http.MethodGet, "/projects/"+tc.projectID, "")
+			assert.Equal(t, http.StatusNotFound, status, body)
+			unknownStatus, unknownBody := consoleCall(t, tc.cookie, http.MethodGet, "/projects/"+unknownLike(tc.projectID), "")
+			assert.Equal(t, unknownStatus, status, "same status as an unknown project")
+			assert.Equal(t, unknownBody, body, "same body as an unknown project")
+		})
+	}
 }
 
 // requireUsersNotFound pins a refused users list to its not-found shape: 404

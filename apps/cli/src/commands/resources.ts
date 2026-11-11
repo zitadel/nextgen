@@ -1,6 +1,7 @@
 import {
   type GetReleaseById200,
   ListEventsCategoryItem,
+  ListEventsStatusClassItem,
   ListFlowDefinitionsRevisions,
   ListSchemasRevisions,
   QueryGrantsBodyFilterItemOperation,
@@ -473,6 +474,13 @@ export const RESOURCES = {
         { field: "entity_type", operations: ["equals"] },
         { field: "entity_id", operations: ["equals"] },
         { field: "team_id", operations: ["equals"] },
+        { field: "operation_id", operations: ["equals"], combine: "or" },
+        {
+          field: "status_class",
+          operations: ["equals"],
+          values: Object.values(ListEventsStatusClassItem),
+          combine: "or",
+        },
         {
           field: "created_at",
           ...range({ greater_than_or_equal: "created_after", less_than: "created_before" }),

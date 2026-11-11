@@ -37,9 +37,11 @@ export {
   type ConnectionCredentials,
   type ConnectionPath,
   type ConnectionSetting,
+  type ConnectionSummary,
   type Credential,
   type LookupOptions,
   type SsoOptions,
+  type UnmappedProperty,
   type UnusedConnection,
 } from "@/lib/zitadel/resources/connections";
 export type {
@@ -78,7 +80,6 @@ export {
   type IncomingTransition,
   type MethodUse,
   type Offer,
-  type SignUpGap,
   type Step,
   type Transition,
 } from "@/lib/zitadel/resources/flows";

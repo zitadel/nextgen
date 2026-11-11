@@ -3447,7 +3447,7 @@
       "post": {
         "operationId": "createSession",
         "summary": "Create an anonymous session",
-        "description": "Creates an anonymous session with no user and no factors (`state: building`).\n\nA session is the durable record of a signed-in user. This call is optional: an\nauthentication attempt creates a session implicitly if none is provided.\nCreate one explicitly when you want to:\n\n- Pre-allocate a `session_id` before the user is known, so device and telemetry signals\n  can be correlated with the eventual authenticated session from the start.\n- Track anonymous state (bot detection, device fingerprint) that survives until authentication.\n\nCreating a session runs on the project credential (`session.write`). The returned\n`session_token` is a session credential for the end-user client, not a\nmanagement scope. It is delivered as the `__Host-zitadel_session` cookie\n(`zitadel_session` over plain http to a loopback host) and authorises the\nself-service operations `GET /sessions/me` and `DELETE /sessions/me`\n(`sessionCookie` scheme). The by-id operations `GET /sessions/{session_id}`\nand `DELETE /sessions/{session_id}` are operator endpoints and require\n`session.read` / `session.delete` instead.\n\nThe `session_token` is superseded when a handoff exchange completes. Clients\nmust replace it at that point.\n\nAnonymous sessions expire after 10 minutes. The lifetime resets to the\nconfigured full session lifetime when a completing authentication attempt\nwrites the first authentication factor.\n",
+        "description": "Creates an anonymous session with no user and no factors (`state: building`).\n\nA session is the durable record of a signed-in user. This call is optional: an\nauthentication attempt creates a session implicitly if none is provided.\nCreate one explicitly when you want to:\n\n- Pre-allocate a `session_id` before the user is known, so device and telemetry signals\n  can be correlated with the eventual authenticated session from the start.\n- Track anonymous state (bot detection, device fingerprint) that survives until authentication.\n\nThe session belongs to the project of the project secret. A `project_id` that\nnames another project answers `403` with `proj.mismatch` and creates nothing:\nsend the credential's own project.\n\nCreating a session runs on the project credential (`session.write`). The returned\n`session_token` is a session credential for the end-user client, not a\nmanagement scope. It is delivered as the `__Host-zitadel_session` cookie\n(`zitadel_session` over plain http to a loopback host) and authorises the\nself-service operations `GET /sessions/me` and `DELETE /sessions/me`\n(`sessionCookie` scheme). The by-id operations `GET /sessions/{session_id}`\nand `DELETE /sessions/{session_id}` are operator endpoints and require\n`session.read` / `session.delete` instead.\n\nThe `session_token` is superseded when a handoff exchange completes. Clients\nmust replace it at that point.\n\nAnonymous sessions expire after 10 minutes. The lifetime resets to the\nconfigured full session lifetime when a completing authentication attempt\nwrites the first authentication factor.\n",
         "tags": [
           "Sessions"
         ],
@@ -8286,7 +8286,7 @@
         "x-zitadel-cli": "release revoke",
         "x-zitadel-destructive": true,
         "summary": "Revoke a release",
-        "description": "Revokes a release, so that its content is never served again. Pass the\n`id` that `createRelease` (`POST /releases`), `buildRelease` (`POST /releases/build`) or `listReleases` (`GET /releases`) returns. It\nrecords a `release.revoked` event.\n\nFrom then on the release cannot be deployed. Every path that would serve\nit refuses it with `rel.revoked`, including a build that pins its digest.\n\nA release that any origin still serves cannot be revoked. An origin serves\nthe release of the newest deployment to it, so the call answers `409` with\n`rel.in_use`, naming each such origin and that deployment. Deploy another\nrelease there or roll back first, then revoke. Revoking therefore never\ntakes an origin down. Deployments that named the release earlier stay in\nthe history.\n\nThe call is idempotent: revoking a release that is already revoked answers\n`200` with the release unchanged, and `revoked_at` still names the first\nrevocation. There is no un-revoke. To serve that configuration again,\nchange it and build a new release: rebuilding unchanged content returns\nthe same revoked release.\n\nThe call takes no body. The lookup is scoped to the project in\n`project_id`, so a release ID of another project answers not found exactly\nas an unknown ID does.\n",
+        "description": "Revokes a release, so that its content is never served again. Pass the\n`id` that `createRelease` (`POST /releases`), `buildRelease` (`POST /releases/build`) or `listReleases` (`GET /releases`) returns. It\nrecords a `release.revoked` event.\n\nFrom then on the release cannot be deployed. Every path that would serve\nit refuses it with `rel.revoked`, including a build that pins its digest.\n\nA release that any origin still serves cannot be revoked. An origin serves\nthe release of the newest deployment to it, so the call answers `409` with\n`rel.in_use`, naming each such origin, that deployment and whether the\norigin is primary or a preview. Deploy another release to a primary origin\nor roll it back, and remove a preview, then revoke. Revoking therefore\nnever takes an origin down. Deployments that named the release earlier stay in\nthe history.\n\nThe call is idempotent: revoking a release that is already revoked answers\n`200` with the release unchanged, and `revoked_at` still names the first\nrevocation. There is no un-revoke. To serve that configuration again,\nchange it and build a new release: rebuilding unchanged content returns\nthe same revoked release.\n\nThe call takes no body. The lookup is scoped to the project in\n`project_id`, so a release ID of another project answers not found exactly\nas an unknown ID does.\n",
         "tags": [
           "Releases"
         ],
@@ -8357,7 +8357,7 @@
             }
           },
           "409": {
-            "description": "At least one origin still serves the release. `details.origins`\nnames each such origin and the newest deployment to it.\n",
+            "description": "At least one origin still serves the release. `details.origins`\nnames each such origin, the newest deployment to it and whether it\nserves the release as a primary origin or a preview.\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -8366,7 +8366,7 @@
                 "examples": {
                   "stillServed": {
                     "summary": "Two origins still serve the release",
-                    "description": "Deploy another release to these origins, or roll them back,\nthen revoke.\n",
+                    "description": "Deploy another release to the primary origin or roll it back,\nremove the preview, then revoke.\n",
                     "value": {
                       "code": "rel.in_use",
                       "message": "release: still served by an origin",
@@ -8374,11 +8374,13 @@
                         "origins": [
                           {
                             "origin": "https://app.acme.com",
-                            "deployment_id": "dep_01KX4SB9C8E1F0N9WD3P2E4YM5"
+                            "deployment_id": "dep_01KX4SB9C8E1F0N9WD3P2E4YM5",
+                            "kind": "primary"
                           },
                           {
                             "origin": "https://acme-git-sso-acmeinc.vercel.app",
-                            "deployment_id": "dep_01KX4SD2F7H3F0N9WD3P2E4YM5"
+                            "deployment_id": "dep_01KX4SD2F7H3F0N9WD3P2E4YM5",
+                            "kind": "preview"
                           }
                         ]
                       }
@@ -9407,7 +9409,7 @@
         "operationId": "listEvents",
         "x-zitadel-cli": "events list",
         "summary": "List events",
-        "description": "Lists a project's audit events, newest first. Pass `order=asc` for oldest\nfirst. Requires `events.read`.\n\nA project that is not claimed yet returns an empty list: its events are\nstored but stay invisible until the\n[claim](/docs/concepts/project-team-user#claim) succeeds.\n\nTeam-scoped credentials see only the events whose `team_id` matches the\ncredential's team. Team-scoped credentials are not issued today.\n\nEach item carries an `event_type` that says which type of event it is, and\nthe matching `payload`. To read one event, pass its `id` to `getEvent` (`GET /events/{id}`).\n\nFilters combine. These are answered from an index and fill their pages: no\nfilter, `category`, `event_type`, `request_id`, `flow_id`, and `session_id`,\n`entity_id` or `actor_id` with or without `category`, each with or without\nthe time bounds. Any other filter or combination is matched event by\nevent, over at most a few thousand events per request. Such a page can\nhold fewer events than `limit`, or none, and still carry\n`next_page_token`: keep passing the token until a response has none.\n",
+        "description": "Lists a project's audit events, newest first. Pass `order=asc` for oldest\nfirst. Requires `events.read`.\n\nA project that is not claimed yet returns an empty list: its events are\nstored but stay invisible until the\n[claim](/docs/concepts/project-team-user#claim) succeeds. The deployment's\nplatform operators read them from the start.\n\nTeam-scoped credentials see only the events whose `team_id` matches the\ncredential's team. Team-scoped credentials are not issued today.\n\nEach item carries an `event_type` that says which type of event it is, and\nthe matching `payload`. To read one event, pass its `id` to `getEvent` (`GET /events/{id}`).\n\nFilters combine. These are answered from an index and fill their pages: no\nfilter, `category`, `event_type`, `status_class`, `operation_id` with or\nwithout `status_class`, `request_id`, `flow_id`, and `session_id`,\n`entity_id`, `actor_id` or `entity_type` with or without `category`, each\nwith or without the time bounds. Any other filter or combination is\nmatched event by event, over at most a few thousand events per request.\nSuch a page can hold fewer events than `limit`, or none, and still carry\n`next_page_token`: keep passing the token until a response has none.\n",
         "tags": [
           "Events"
         ],
@@ -9510,7 +9512,7 @@
           {
             "name": "entity_type",
             "in": "query",
-            "description": "Only events that affected this type of resource.",
+            "description": "Only events that affected this type of resource, such as `user`.",
             "schema": {
               "type": "string"
             }
@@ -9529,6 +9531,40 @@
             "description": "Only events emitted under this team, as stored on the event.",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "operation_id",
+            "in": "query",
+            "description": "Only `request.api` events of this API operation, the\n`payload.operation_id` they record, such as `createUser`. Repeat the\nparameter to match any of up to 10 operations. Requests recorded by a\nserver version before this filter existed are not matched; they leave\nthe list as retention removes them.\n",
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "type": "array",
+              "maxItems": 10,
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "status_class",
+            "in": "query",
+            "description": "Only `request.api` events whose response status, the `payload.status`\nthey record, is in this class: `4xx` is 400 to 499. Repeat the\nparameter to match any of several classes: `4xx` and `5xx` are the\nfailed requests. Requests recorded by a server version before this\nfilter existed are not matched; they leave the list as retention\nremoves them.\n",
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "1xx",
+                  "2xx",
+                  "3xx",
+                  "4xx",
+                  "5xx"
+                ]
+              }
             }
           },
           {
@@ -9621,7 +9657,7 @@
         "operationId": "getEvent",
         "x-zitadel-cli": "events get",
         "summary": "Get an event by ID",
-        "description": "Returns one event of a project by its ID. Requires `events.read`.\n\nPass the `id` of an event that `listEvents` (`GET /events`) returns, with its\n`project_id`. An unknown ID and the ID of another project's event both\nanswer `404`.\n\nA project that is not claimed yet also answers `404`: its events are\nstored but stay invisible until the\n[claim](/docs/concepts/project-team-user#claim) succeeds.\n",
+        "description": "Returns one event of a project by its ID. Requires `events.read`.\n\nPass the `id` of an event that `listEvents` (`GET /events`) returns, with its\n`project_id`. An unknown ID and the ID of another project's event both\nanswer `404`.\n\nA project that is not claimed yet also answers `404`: its events are\nstored but stay invisible until the\n[claim](/docs/concepts/project-team-user#claim) succeeds. The deployment's\nplatform operators read them from the start.\n",
         "tags": [
           "Events"
         ],
@@ -11417,6 +11453,122 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/idp-updated-event"
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "$ref": "#/components/responses/webhook-delivered"
+          },
+          "default": {
+            "$ref": "#/components/responses/webhook-not-delivered"
+          }
+        }
+      }
+    },
+    "invitation.accepted": {
+      "post": {
+        "operationId": "invitationAccepted",
+        "summary": "invitation.accepted",
+        "description": "An invitation was accepted. Grant events the acceptance writes carry\nthis event's `request_id`; there are none when the user already holds an\nidentical active grant.\n\nNot sent yet: the contract is published ahead of the code that sends it.\n\nThe body is the event as `GET /events` returns it.\n",
+        "tags": [
+          "Event Webhooks"
+        ],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/invitation-accepted-event"
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "$ref": "#/components/responses/webhook-delivered"
+          },
+          "default": {
+            "$ref": "#/components/responses/webhook-not-delivered"
+          }
+        }
+      }
+    },
+    "invitation.cancelled": {
+      "post": {
+        "operationId": "invitationCancelled",
+        "summary": "invitation.cancelled",
+        "description": "A pending invitation was cancelled by an administrator, or by a\nreplacement.\n\nNot sent yet: the contract is published ahead of the code that sends it.\n\nThe body is the event as `GET /events` returns it.\n",
+        "tags": [
+          "Event Webhooks"
+        ],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/invitation-cancelled-event"
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "$ref": "#/components/responses/webhook-delivered"
+          },
+          "default": {
+            "$ref": "#/components/responses/webhook-not-delivered"
+          }
+        }
+      }
+    },
+    "invitation.created": {
+      "post": {
+        "operationId": "invitationCreated",
+        "summary": "invitation.created",
+        "description": "An invitation was created, new or as the replacement of another.\n\nNot sent yet: the contract is published ahead of the code that sends it.\n\nThe body is the event as `GET /events` returns it.\n",
+        "tags": [
+          "Event Webhooks"
+        ],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/invitation-created-event"
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "$ref": "#/components/responses/webhook-delivered"
+          },
+          "default": {
+            "$ref": "#/components/responses/webhook-not-delivered"
+          }
+        }
+      }
+    },
+    "invitation.rejected": {
+      "post": {
+        "operationId": "invitationRejected",
+        "summary": "invitation.rejected",
+        "description": "An invitation was declined.\n\nNot sent yet: the contract is published ahead of the code that sends it.\n\nThe body is the event as `GET /events` returns it.\n",
+        "tags": [
+          "Event Webhooks"
+        ],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/invitation-rejected-event"
               }
             }
           }
@@ -20924,6 +21076,16 @@
         "x-zitadel-pattern-message": "must be a deployment ID: dep_ followed by letters, digits, _ or -",
         "example": "dep_01KX4SB9C8E1F0N9WD3P2E4YM5"
       },
+      "deployment-kind": {
+        "title": "DeploymentKind",
+        "type": "string",
+        "description": "`primary` for the project's primary origins, `preview` for preview URLs.\n",
+        "enum": [
+          "primary",
+          "preview"
+        ],
+        "example": "primary"
+      },
       "revoke-release-conflict": {
         "title": "RevokeReleaseConflict",
         "type": "object",
@@ -20955,7 +21117,8 @@
                   "type": "object",
                   "required": [
                     "origin",
-                    "deployment_id"
+                    "deployment_id",
+                    "kind"
                   ],
                   "properties": {
                     "origin": {
@@ -20964,6 +21127,10 @@
                     "deployment_id": {
                       "$ref": "#/components/schemas/deployment-id",
                       "description": "The newest deployment to the origin, which pins the release."
+                    },
+                    "kind": {
+                      "$ref": "#/components/schemas/deployment-kind",
+                      "description": "Whether the origin serves the release as a primary origin or as\na preview. A deploy or a rollback frees a primary origin;\nremoving the preview frees a preview.\n"
                     }
                   }
                 }
@@ -23144,6 +23311,377 @@
           }
         ]
       },
+      "invitation-accepted-common-payload": {
+        "title": "InvitationAcceptedCommonPayload",
+        "description": "Fields every `invitation.accepted` payload carries, whatever its `type`.\n",
+        "type": "object",
+        "required": [
+          "journey_id",
+          "user_id"
+        ],
+        "properties": {
+          "journey_id": {
+            "type": "string",
+            "description": "Shared by an invitation and every invitation that replaces it."
+          },
+          "user_id": {
+            "type": "string"
+          }
+        }
+      },
+      "invitation-accepted-project-member-payload": {
+        "title": "InvitationAcceptedProjectMemberPayload",
+        "description": "An `invitation.accepted` payload for a `project_member` invitation.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/invitation-accepted-common-payload"
+          },
+          {
+            "type": "object",
+            "required": [
+              "type",
+              "project_member"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "project_member"
+                ]
+              },
+              "project_member": {
+                "$ref": "#/components/schemas/invitation-project-member-payload"
+              }
+            }
+          }
+        ]
+      },
+      "invitation-accepted-team-member-payload": {
+        "title": "InvitationAcceptedTeamMemberPayload",
+        "description": "An `invitation.accepted` payload for a `team_member` invitation.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/invitation-accepted-common-payload"
+          },
+          {
+            "type": "object",
+            "required": [
+              "type",
+              "team_member"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "team_member"
+                ]
+              },
+              "team_member": {
+                "$ref": "#/components/schemas/invitation-team-member-payload"
+              }
+            }
+          }
+        ]
+      },
+      "invitation-accepted-payload": {
+        "title": "InvitationAcceptedPayload",
+        "description": "Payload for `invitation.accepted`. The invitation ID is the event's\n`entity_id`, and `user_id` is the user who redeemed the link. Discriminate\non `type`; the object named after it says what the invitation granted. Grant\nevents the acceptance writes, such as `authz.granted`, carry this event's\n`request_id`. There are none when the user already holds an identical\nactive grant.\n",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/invitation-accepted-project-member-payload"
+          },
+          {
+            "$ref": "#/components/schemas/invitation-accepted-team-member-payload"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "project_member": "#/components/schemas/invitation-accepted-project-member-payload",
+            "team_member": "#/components/schemas/invitation-accepted-team-member-payload"
+          }
+        }
+      },
+      "invitation-accepted-event": {
+        "title": "InvitationAcceptedEvent",
+        "description": "An event of type invitation.accepted, with the shared event fields and its own payload.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/event-base"
+          },
+          {
+            "type": "object",
+            "required": [
+              "event_type",
+              "payload"
+            ],
+            "properties": {
+              "event_type": {
+                "type": "string",
+                "const": "invitation.accepted"
+              },
+              "payload": {
+                "$ref": "#/components/schemas/invitation-accepted-payload"
+              }
+            }
+          }
+        ]
+      },
+      "invitation-cancelled-by-administrator-payload": {
+        "title": "InvitationCancelledByAdministratorPayload",
+        "description": "An `invitation.cancelled` payload for an invitation an administrator\ncancelled.\n",
+        "type": "object",
+        "required": [
+          "journey_id",
+          "reason"
+        ],
+        "properties": {
+          "journey_id": {
+            "type": "string",
+            "description": "Shared by an invitation and every invitation that replaces it."
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "cancelled"
+            ]
+          }
+        }
+      },
+      "invitation-cancelled-by-replacement-payload": {
+        "title": "InvitationCancelledByReplacementPayload",
+        "description": "An `invitation.cancelled` payload for an invitation a replacement\ncancelled.\n",
+        "type": "object",
+        "required": [
+          "journey_id",
+          "reason",
+          "replaced_by_invitation_id"
+        ],
+        "properties": {
+          "journey_id": {
+            "type": "string",
+            "description": "Shared by an invitation and every invitation that replaces it."
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "replaced"
+            ]
+          },
+          "replaced_by_invitation_id": {
+            "type": "string",
+            "description": "The invitation that replaced this one."
+          }
+        }
+      },
+      "invitation-cancelled-payload": {
+        "title": "InvitationCancelledPayload",
+        "description": "Payload for `invitation.cancelled`. The invitation ID is the event's\n`entity_id`. Discriminate on `reason`: `cancelled` when an administrator\ncancelled it, `replaced` when a replacement cancelled it, which then names\nthe replacement in `replaced_by_invitation_id`.\n",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/invitation-cancelled-by-administrator-payload"
+          },
+          {
+            "$ref": "#/components/schemas/invitation-cancelled-by-replacement-payload"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "reason",
+          "mapping": {
+            "cancelled": "#/components/schemas/invitation-cancelled-by-administrator-payload",
+            "replaced": "#/components/schemas/invitation-cancelled-by-replacement-payload"
+          }
+        }
+      },
+      "invitation-cancelled-event": {
+        "title": "InvitationCancelledEvent",
+        "description": "An event of type invitation.cancelled, with the shared event fields and its own payload.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/event-base"
+          },
+          {
+            "type": "object",
+            "required": [
+              "event_type",
+              "payload"
+            ],
+            "properties": {
+              "event_type": {
+                "type": "string",
+                "const": "invitation.cancelled"
+              },
+              "payload": {
+                "$ref": "#/components/schemas/invitation-cancelled-payload"
+              }
+            }
+          }
+        ]
+      },
+      "invitation-created-common-payload": {
+        "title": "InvitationCreatedCommonPayload",
+        "description": "Fields every `invitation.created` payload carries, whatever its `type`.\n",
+        "type": "object",
+        "required": [
+          "journey_id",
+          "expires_at"
+        ],
+        "properties": {
+          "journey_id": {
+            "type": "string",
+            "description": "Shared by an invitation and every invitation that replaces it."
+          },
+          "replaces_invitation_id": {
+            "type": "string",
+            "description": "The invitation this one replaces, when it was created as a replacement."
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "invitation-created-project-member-payload": {
+        "title": "InvitationCreatedProjectMemberPayload",
+        "description": "An `invitation.created` payload for a `project_member` invitation.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/invitation-created-common-payload"
+          },
+          {
+            "type": "object",
+            "required": [
+              "type",
+              "project_member"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "project_member"
+                ]
+              },
+              "project_member": {
+                "$ref": "#/components/schemas/invitation-project-member-payload"
+              }
+            }
+          }
+        ]
+      },
+      "invitation-created-team-member-payload": {
+        "title": "InvitationCreatedTeamMemberPayload",
+        "description": "An `invitation.created` payload for a `team_member` invitation.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/invitation-created-common-payload"
+          },
+          {
+            "type": "object",
+            "required": [
+              "type",
+              "team_member"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "team_member"
+                ]
+              },
+              "team_member": {
+                "$ref": "#/components/schemas/invitation-team-member-payload"
+              }
+            }
+          }
+        ]
+      },
+      "invitation-created-payload": {
+        "title": "InvitationCreatedPayload",
+        "description": "Payload for `invitation.created`. The invitation ID is the event's\n`entity_id`. Discriminate on `type`; the object named after it says what\nthe invitation's link grants. The metadata entered at creation and the\nlink's token never appear.\n",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/invitation-created-project-member-payload"
+          },
+          {
+            "$ref": "#/components/schemas/invitation-created-team-member-payload"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "project_member": "#/components/schemas/invitation-created-project-member-payload",
+            "team_member": "#/components/schemas/invitation-created-team-member-payload"
+          }
+        }
+      },
+      "invitation-created-event": {
+        "title": "InvitationCreatedEvent",
+        "description": "An event of type invitation.created, with the shared event fields and its own payload.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/event-base"
+          },
+          {
+            "type": "object",
+            "required": [
+              "event_type",
+              "payload"
+            ],
+            "properties": {
+              "event_type": {
+                "type": "string",
+                "const": "invitation.created"
+              },
+              "payload": {
+                "$ref": "#/components/schemas/invitation-created-payload"
+              }
+            }
+          }
+        ]
+      },
+      "invitation-rejected-payload": {
+        "title": "InvitationRejectedPayload",
+        "type": "object",
+        "description": "Payload for `invitation.rejected`. The invitation ID is the event's\n`entity_id`, and `user_id` is the user who declined it.\n",
+        "required": [
+          "journey_id",
+          "user_id"
+        ],
+        "properties": {
+          "journey_id": {
+            "type": "string",
+            "description": "Shared by an invitation and every invitation that replaces it."
+          },
+          "user_id": {
+            "type": "string"
+          }
+        }
+      },
+      "invitation-rejected-event": {
+        "title": "InvitationRejectedEvent",
+        "description": "An event of type invitation.rejected, with the shared event fields and its own payload.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/event-base"
+          },
+          {
+            "type": "object",
+            "required": [
+              "event_type",
+              "payload"
+            ],
+            "properties": {
+              "event_type": {
+                "type": "string",
+                "const": "invitation.rejected"
+              },
+              "payload": {
+                "$ref": "#/components/schemas/invitation-rejected-payload"
+              }
+            }
+          }
+        ]
+      },
       "origin-payload": {
         "title": "OriginPayload",
         "type": "object",
@@ -24074,6 +24612,18 @@
             "$ref": "#/components/schemas/idp-updated-event"
           },
           {
+            "$ref": "#/components/schemas/invitation-accepted-event"
+          },
+          {
+            "$ref": "#/components/schemas/invitation-cancelled-event"
+          },
+          {
+            "$ref": "#/components/schemas/invitation-created-event"
+          },
+          {
+            "$ref": "#/components/schemas/invitation-rejected-event"
+          },
+          {
             "$ref": "#/components/schemas/origin-added-event"
           },
           {
@@ -24169,6 +24719,10 @@
             "idp.created": "#/components/schemas/idp-created-event",
             "idp.identity_link.created": "#/components/schemas/idp-identity_link-created-event",
             "idp.updated": "#/components/schemas/idp-updated-event",
+            "invitation.accepted": "#/components/schemas/invitation-accepted-event",
+            "invitation.cancelled": "#/components/schemas/invitation-cancelled-event",
+            "invitation.created": "#/components/schemas/invitation-created-event",
+            "invitation.rejected": "#/components/schemas/invitation-rejected-event",
             "origin.added": "#/components/schemas/origin-added-event",
             "origin.removed": "#/components/schemas/origin-removed-event",
             "policy.created": "#/components/schemas/policy-created-event",
@@ -24505,16 +25059,6 @@
         "enum": [
           "release"
         ]
-      },
-      "deployment-kind": {
-        "title": "DeploymentKind",
-        "type": "string",
-        "description": "`primary` for the project's primary origins, `preview` for preview URLs.\n",
-        "enum": [
-          "primary",
-          "preview"
-        ],
-        "example": "primary"
       },
       "deployment-target": {
         "title": "DeploymentTarget",
@@ -30331,6 +30875,9 @@
                   "$ref": "#/components/schemas/not_implemented"
                 },
                 {
+                  "$ref": "#/components/schemas/proj-mismatch"
+                },
+                {
                   "$ref": "#/components/schemas/req-invalid"
                 },
                 {
@@ -30354,6 +30901,7 @@
                   "tkn.invalid": "#/components/schemas/tkn-invalid",
                   "tkn.invalid_tknid": "#/components/schemas/tkn-invalid_tknid",
                   "not_implemented": "#/components/schemas/not_implemented",
+                  "proj.mismatch": "#/components/schemas/proj-mismatch",
                   "req.invalid": "#/components/schemas/req-invalid",
                   "sess.token_creation_failed": "#/components/schemas/sess-token_creation_failed",
                   "enc_key.unknown_alg": "#/components/schemas/enc_key-unknown_alg",
@@ -30385,6 +30933,9 @@
               },
               "not_implemented": {
                 "$ref": "#/components/examples/not_implemented"
+              },
+              "proj.mismatch": {
+                "$ref": "#/components/examples/proj-mismatch"
               },
               "req.invalid": {
                 "$ref": "#/components/examples/req-invalid"

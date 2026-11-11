@@ -828,6 +828,55 @@ describe("setup", () => {
           ).toEqual([provider.slug]);
         });
 
+        it("reports the claim mapping the connection was written with", async () => {
+          const app = await anApp();
+
+          const result = await provider.setUp(app);
+
+          const { data } = app.envelopeOf<{ sso: { claim_mapping: Record<string, string> }[] }>(
+            result,
+          );
+          expect(data.sso[0]?.claim_mapping).toEqual({ email: "email" });
+        });
+
+        it("reports what makes the email verified apart from the mapping", async () => {
+          const app = await anApp();
+
+          const result = await provider.setUp(app);
+
+          const { data } = app.envelopeOf<{ sso: { verified_claims: Record<string, string> }[] }>(
+            result,
+          );
+          expect(data.sso[0]?.verified_claims).toEqual({ email: "email_verified" });
+        });
+
+        it("reports the scopes the connection asks for", async () => {
+          const app = await anApp();
+
+          const result = await provider.setUp(app);
+
+          const { data } = app.envelopeOf<{ sso: { scopes: string[] }[] }>(result);
+          expect(data.sso[0]?.scopes).toEqual(["openid", "profile", "email"]);
+        });
+
+        it("reports the attributes no claim fills", async () => {
+          const app = await anApp();
+
+          const result = await provider.setUp(app);
+
+          const { data } = app.envelopeOf<{ sso: { unmapped: unknown[] }[] }>(result);
+          expect(data.sso[0]?.unmapped).toEqual([]);
+        });
+
+        it("reports the schemas that sign in through the connection", async () => {
+          const app = await anApp();
+
+          const result = await provider.setUp(app);
+
+          const { data } = app.envelopeOf<{ sso: { used_by: string[] }[] }>(result);
+          expect(data.sso[0]?.used_by).toEqual(["default-human-user"]);
+        });
+
         it("publishes the client id as a readable project variable", async () => {
           const app = await anApp();
 
@@ -1023,6 +1072,50 @@ describe("setup", () => {
 
           expect(await before.changes()).toMatchObject(NO_CHANGES);
         });
+      });
+    });
+
+    describe("rendered for a terminal", () => {
+      it("names the provider in the connection's box", async () => {
+        const app = await anApp();
+
+        const result = await app.setupWithCustomSsoRendered(ACME, ACME_CREDENTIALS);
+
+        expect(result).toPrint("When someone signs in with Acme SSO");
+      });
+
+      it("says which claim fills each attribute", async () => {
+        const app = await anApp();
+
+        const result = await app.setupWithCustomSsoRendered(ACME, ACME_CREDENTIALS);
+
+        expect(result).toPrint("- email comes from the provider's email claim.");
+      });
+
+      it("says which schemas sign in through the connection", async () => {
+        const app = await anApp();
+
+        const result = await app.setupWithCustomSsoRendered(ACME, ACME_CREDENTIALS);
+
+        expect(result).toPrint("This connection is used by default-human-user");
+      });
+
+      it("says which scopes it asks the provider for", async () => {
+        const app = await anApp();
+
+        const result = await app.setupWithCustomSsoRendered(ACME, ACME_CREDENTIALS);
+
+        expect(result).toPrint(
+          "Zitadel asks Acme SSO for these scopes: openid, profile, and email.",
+        );
+      });
+
+      it("says where to change the mapping", async () => {
+        const app = await anApp();
+
+        const result = await app.setupWithCustomSsoRendered(ACME, ACME_CREDENTIALS);
+
+        expect(result).toPrint("To change which claim fills an attribute, edit claim_mapping in");
       });
     });
   });

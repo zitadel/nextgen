@@ -188,6 +188,7 @@ export interface ProjectChanges {
 /** The user schema as committed, which the developer owns and edits. */
 export interface UserSchemaDocument {
   properties: Record<string, unknown>;
+  required?: string[];
   "x-auth-methods"?: Record<string, { enabled: boolean; providers?: string[] }>;
 }
 
@@ -197,7 +198,7 @@ export interface ConnectionDocument {
   protocol?: string;
   display_name?: string;
   subject_claim?: string;
-  oidc: { issuer: string; client_id?: string; client_secret?: string };
+  oidc: { issuer: string; client_id?: string; client_secret?: string; scopes?: string[] };
   claim_mapping?: Record<string, string>;
   verified_claims?: Record<string, string>;
 }
@@ -221,6 +222,7 @@ interface PackageJson {
 /** The checks behind {@link UserSchemaDocument}, run before a spec edits one. */
 const UserSchemaDocumentSchema: z.ZodType<UserSchemaDocument> = z.object({
   properties: z.record(z.string(), z.unknown()),
+  required: z.array(z.string()).optional(),
   "x-auth-methods": z
     .record(
       z.string(),
@@ -594,6 +596,23 @@ export class ScaffoldedApp {
     );
   }
 
+  /** `auth-method sso enable --dry-run` without `--json`, for a spec asserting what the developer reads. */
+  enableSsoDryRun(provider: string, credentials: Credentials): Promise<CliResult> {
+    return this.pipingStdin(credentials.secret, () =>
+      this.cli([
+        "auth-method",
+        "sso",
+        "enable",
+        "--non-interactive",
+        "--dry-run",
+        "--provider",
+        provider,
+        "--client-id",
+        credentials.clientId,
+      ]),
+    );
+  }
+
   enableSso(provider: string, credentials: Credentials): Promise<CliResult> {
     return this.pipingSecret(credentials.secret, () =>
       this.cli([
@@ -682,6 +701,27 @@ export class ScaffoldedApp {
   enableSsoWith(args: string[], secret = "a-client-secret"): Promise<CliResult> {
     return this.pipingSecret(secret, () =>
       this.cli(["auth-method", "sso", "enable", "--non-interactive", "--json", ...args]),
+    );
+  }
+
+  /** `setup` with a custom connection, without `--json`, for a spec asserting what the developer reads. */
+  setupWithCustomSsoRendered(
+    connection: CustomConnection,
+    credentials: Credentials,
+  ): Promise<CliResult> {
+    return this.pipingSecret(credentials.secret, () =>
+      this.cli([
+        "setup",
+        "--non-interactive",
+        "--skip-install",
+        "--framework",
+        "next",
+        "--sso",
+        "custom",
+        ...customFlags(connection, "--sso-"),
+        "--sso-client-id",
+        credentials.clientId,
+      ]),
     );
   }
 
@@ -1400,17 +1440,23 @@ export class ScaffoldedApp {
     ]);
   }
 
-  /** The variables a target's live deployment froze, read through `variable resolve`. */
+  /**
+   * The variables a deployment froze, read through `variable resolve`: the one
+   * live on a target, or the one `deploymentId` names.
+   */
   resolveVariables({
     origin,
+    deploymentId,
     json = true,
   }: {
     origin?: string;
+    deploymentId?: string;
     json?: boolean;
   } = {}): Promise<CliResult> {
     return this.cli([
       "variable",
       "resolve",
+      ...(deploymentId === undefined ? [] : [deploymentId]),
       ...(json ? ["--json"] : []),
       ...(origin === undefined ? [] : ["--origin", origin]),
     ]);
