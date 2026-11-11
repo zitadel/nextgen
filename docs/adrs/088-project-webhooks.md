@@ -143,7 +143,7 @@ webhook-signature: v1,K5oZfzN95Z9UVu1EsfQmfVNQhnkZ2pj9o9NDN/H/pI4=
 
 ### 4. Delivery
 
-![An API request writes an event to the events table; a wake-up starts the delivery engine, which reads the webhooks table and sends signed events to the endpoint; a failed delivery asks for a delayed wake-up.](assets/088-webhook-system.svg)
+![An API request writes an event to the events table; a wake-up starts the delivery engine, which reads the webhooks table and sends signed events to the endpoint; a failed delivery asks for a delayed wake-up.](../assets/adr-088-webhook-system.svg)
 
 The shipper delivers, with the cursor and the settled-events bound of
 ADR 049. The events table and each webhook's cursor decide what is sent. A
