@@ -2066,7 +2066,7 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
     return this.emit({
       status: "ok",
       data: {
-        title: "Zitadel is ready",
+        title: this.dryRun ? "Zitadel would be set up (dry run)" : "Zitadel is ready",
         ...(this.dryRun ? { dry_run: true } : {}),
         project: {
           project_id: project.id,
