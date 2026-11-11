@@ -94,6 +94,7 @@ type gateCodes struct{ denied, readMiss, writeMiss string }
 
 var (
 	brandingCodes   = gateCodes{domain.ErrBrandingPermissionDenied().Code, domain.ErrBrandingNotFound().Code, domain.ErrBrandingInvalid("", nil).Code}
+	oauthSetCodes   = gateCodes{domain.ErrOAuthSettingsPermissionDenied().Code, domain.ErrOAuthSettingsNotFound().Code, domain.ErrOAuthSettingsInvalid(nil, nil).Code}
 	deploymentCodes = gateCodes{domain.ErrDeploymentPermissionDenied().Code, domain.ErrDeploymentNotFound().Code, domain.ErrEnvironmentProjectNotFound().Code}
 	eventCodes      = gateCodes{domain.ErrEventPermissionDenied().Code, domain.ErrEventNotFound().Code, domain.ErrEventNotFound().Code}
 	flowDefCodes    = gateCodes{domain.ErrFlowDefinitionPermissionDenied().Code, domain.ErrFlowDefinitionNotFound().Code, domain.ErrFlowDefinitionInvalid("", nil).Code}
@@ -138,6 +139,7 @@ var gateRows = []gateRow{
 	{op: "ListBranding", cookie: true, relation: viewer, target: onProject, list: true, miss: brandingCodes.readMiss},
 	{op: "CreateBranding", relation: editor, target: onProject, denied: brandingCodes.denied, miss: brandingCodes.writeMiss},
 	{op: "GetBrandingById", cookie: true, relation: viewer, target: onResource, idField: "ID", kind: domain.ResourceKindBranding, denied: brandingCodes.denied, miss: brandingCodes.readMiss},
+	{op: "GetOAuthSettingsById", cookie: true, relation: viewer, target: onResource, idField: "OAuthSettingsID", kind: domain.ResourceKindOAuthSettings, denied: oauthSetCodes.denied, miss: oauthSetCodes.readMiss},
 
 	// Deployments and previews.
 	{op: "ListDeployments", cookie: true, relation: viewer, target: onProject, list: true, miss: deploymentCodes.readMiss},
