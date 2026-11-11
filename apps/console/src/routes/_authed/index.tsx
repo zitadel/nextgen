@@ -1,31 +1,66 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
+import { Boxes, LayoutGrid } from "lucide-react";
+
+import { MetaRule, MetaValue } from "@/components/detail-meta";
+import { DETAIL_BODY, DetailHeader } from "@/components/detail-page";
+import { Page } from "@/components/layout";
+import { loadProjectOverview } from "@/features/overview/api";
+import { ProductionCard } from "@/features/overview/components/production-card";
+import { RecentActivityCard } from "@/features/overview/components/recent-activity-card";
+import { primaryHost } from "@/features/projects/model";
+import { projectScopeDeps, requireProjectScope } from "@/features/projects/project-scope";
+import { formatDate } from "@/lib/date";
 
 /**
- * Home.
+ * Overview: the project's landing, and the first row of its sidebar, where
+ * Projects stands above every project (D35). As Vercel's project Overview, it
+ * says what the project is and what it is doing, and hands each part over to
+ * the screen it summarizes: what the primary origins serve now (Deployments)
+ * and the newest audit events (Logs).
  *
- * **There is no Home screen, so `/` lands on Users.** The designed overview is a
- * set of figures nothing can compute: the stat cards need an aggregate or count
- * endpoint (`POST /users/query` and `POST /projects/query` return pages),
- * "Total Projects" and its trend need a multi-project list and a time series,
- * and the "Browse all" rows have no resource behind them at all. Rendering a
- * page that explains this is worse than going somewhere useful, because `/` is
- * where sign-in, `zitadel console`, the logo and the claim flow's "Open the
- * console" all land.
+ * It holds no figures. An earlier overview design was stat cards (totals and
+ * their trends), and nothing can compute them: the API's lists return pages,
+ * with no count or aggregate behind them (D5). Every block here is a read a
+ * screen already makes, cut short.
  *
- * Users is the target because it is the first thing a developer arriving
- * through those paths can check: whoever just signed up through their app is
- * listed there. A fresh project's Teams screen is empty until someone creates
- * a team, which reads as "nothing happened".
- * Point this at the overview when the figures behind it exist.
- *
- * Users acts on the selected project. The `_authed` guard has given `/` the
- * default one by the time this runs, so with none selected there are several
- * projects to choose from (or none), and `/` lands on Projects itself: by way
- * of Users it would arrive as a detour, `Continue to Users` (D22), which is
- * not what anybody arriving at the console asked for.
+ * `/` is where sign-in, `zitadel console`, the logo of a project and the claim
+ * flow's "Open the console" land, and where choosing a project goes when no
+ * screen was asked for. With no project selected and several to choose from,
+ * the `_authed` guard sends `/` to Projects itself rather than by way of
+ * "Continue to Overview": arriving at the console asked for no screen (D22).
  */
 export const Route = createFileRoute("/_authed/")({
-  beforeLoad: ({ search }) => {
-    throw redirect({ to: search.project ? "/users" : "/projects" });
-  },
+  // First: the project's own page, in the slot Projects holds above it.
+  staticData: { scope: "project", nav: { label: "Overview", order: 1, icon: LayoutGrid } },
+  loaderDeps: projectScopeDeps,
+  loader: ({ deps }) => loadProjectOverview(requireProjectScope(deps.project)),
+  component: OverviewScreen,
 });
+
+function OverviewScreen() {
+  const { project, live, activity } = Route.useLoaderData();
+
+  return (
+    <Page>
+      <DetailHeader
+        icon={Boxes}
+        title={project.name}
+        // The site the project signs people into, as Projects names it (D21).
+        subtitle={primaryHost(project.origins)}
+        meta={
+          <>
+            <MetaValue label="Project ID" value={project.id} copyable />
+            <MetaRule />
+            <MetaValue label="Created" value={formatDate(project.created_at)} />
+          </>
+        }
+      />
+
+      {/* The page owns the 16px between its cards, as Settings does. */}
+      <div className={`${DETAIL_BODY} flex flex-col gap-4`}>
+        <ProductionCard live={live} />
+        <RecentActivityCard activity={activity} />
+      </div>
+    </Page>
+  );
+}

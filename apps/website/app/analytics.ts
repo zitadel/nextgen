@@ -1,9 +1,9 @@
 import { track } from "@vercel/analytics";
 
 import {
-  applyCommand,
+  deployCommand,
   devCommand,
-  planCommand,
+  dryRunCommand,
   setupCommand,
   skillsCommand,
   startCommand,
@@ -20,14 +20,14 @@ import {
 export type Placement = "hero" | "showcase" | "footer";
 
 /** What a copy button copied, never its text: `all` is the hero's whole block. */
-export type Snippet = "all" | "start" | "setup" | "dev" | "plan" | "apply" | "skills";
+export type Snippet = "all" | "start" | "setup" | "dev" | "dry_run" | "deploy" | "skills";
 
 const SNIPPETS = new Map<string, Snippet>([
   [startCommand, "start"],
   [setupCommand, "setup"],
   [devCommand, "dev"],
-  [planCommand, "plan"],
-  [applyCommand, "apply"],
+  [dryRunCommand, "dry_run"],
+  [deployCommand, "deploy"],
   [skillsCommand, "skills"],
 ]);
 

@@ -22,6 +22,49 @@ export function formatDateTime(value: string): string {
   return format(value, { ...DATE, hour: "2-digit", minute: "2-digit" });
 }
 
+/**
+ * `2026-04-28T15:32:07Z` → `28 Apr 2026, 15:32:07` in the viewer's locale and
+ * time zone — {@link formatDateTime} to the second, for a log, where the
+ * entries of one minute are told apart by it. The same fallback.
+ */
+export function formatTimestamp(value: string): string {
+  return format(value, { ...DATE, hour: "2-digit", minute: "2-digit", second: "2-digit" });
+}
+
+/** A moment the server stamped finer than the second, as `…T15:32:07.123Z`. */
+const FRACTION = /T\d{2}:\d{2}:\d{2}[.,]\d/;
+
+/** The milliseconds, for a moment that has them: a whole second shows none rather than `.000`. */
+function fraction(value: string): Intl.DateTimeFormatOptions {
+  return FRACTION.test(value) ? { fractionalSecondDigits: 3 } : {};
+}
+
+/**
+ * `2026-04-28T15:32:07.123Z` → `28 Apr 2026, 15:32:07.123` in the viewer's
+ * locale and time zone: {@link formatTimestamp} to the millisecond, for a log,
+ * where the events of one request fall within the same second. A moment the
+ * server stamped to the whole second shows no milliseconds. The same fallback.
+ */
+export function formatLogTime(value: string): string {
+  return format(value, {
+    ...DATE,
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    ...fraction(value),
+  });
+}
+
+/** `2026-04-28T15:32:07.123Z` → `15:32:07.123`: {@link formatLogTime} without the date. */
+export function formatClockTime(value: string): string {
+  return format(value, {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    ...fraction(value),
+  });
+}
+
 const DATE: Intl.DateTimeFormatOptions = { day: "numeric", month: "short", year: "numeric" };
 
 function format(value: string, options: Intl.DateTimeFormatOptions): string {

@@ -1,19 +1,26 @@
 import type * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
+import { Slot } from "radix-ui";
 
 import { cn } from "@/lib/utils";
 
 /**
- * Departures from the registry default, from the design system's Empty: 16px
- * between its parts, the title in the section heading (the 16/20 display
- * face), and `rounded-md` as every console surface (D18).
+ * shadcn's Empty: a centred state that stands in for a screen's content, an
+ * icon tile over a title and one sentence, then whatever leads on from it.
+ *
+ * Ours differs from the registry's in three places: corners are `rounded-md`
+ * (D18), the title is the display face, and `EmptyTitle` takes `asChild` so a
+ * screen whose only heading it is can make it the `h1`.
+ *
+ * It draws no outline, as in the registry: `border-dashed` only sets the style
+ * for a caller that adds `border`.
  */
 function Empty({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="empty"
       className={cn(
-        "flex min-w-0 flex-1 flex-col items-center justify-center gap-4 rounded-md border-dashed p-6 text-center text-balance md:p-12",
+        "flex min-w-0 flex-1 flex-col items-center justify-center gap-6 rounded-md border-dashed p-6 text-center text-balance md:p-12",
         className,
       )}
       {...props}
@@ -25,19 +32,19 @@ function EmptyHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="empty-header"
-      className={cn("flex max-w-sm flex-col items-center gap-4 text-center", className)}
+      className={cn("flex max-w-sm flex-col items-center gap-2 text-center", className)}
       {...props}
     />
   );
 }
 
 const emptyMediaVariants = cva(
-  "flex shrink-0 items-center justify-center [&_svg]:pointer-events-none [&_svg]:shrink-0",
+  "mb-2 flex shrink-0 items-center justify-center [&_svg]:pointer-events-none [&_svg]:shrink-0",
   {
     variants: {
       variant: {
         default: "bg-transparent",
-        icon: "flex size-10 shrink-0 items-center justify-center rounded-md bg-muted text-foreground [&_svg:not([class*='size-'])]:size-6",
+        icon: "flex size-10 shrink-0 items-center justify-center rounded-md bg-muted text-foreground [&_svg:not([class*='size-'])]:size-5",
       },
     },
     defaultVariants: {
@@ -61,11 +68,17 @@ function EmptyMedia({
   );
 }
 
-function EmptyTitle({ className, ...props }: React.ComponentProps<"div">) {
+function EmptyTitle({
+  className,
+  asChild = false,
+  ...props
+}: React.ComponentProps<"div"> & { asChild?: boolean }) {
+  const Comp = asChild ? Slot.Root : "div";
+
   return (
-    <div
+    <Comp
       data-slot="empty-title"
-      className={cn("font-serif text-base leading-5 text-foreground", className)}
+      className={cn("text-foreground font-serif text-lg leading-6", className)}
       {...props}
     />
   );
@@ -76,7 +89,7 @@ function EmptyDescription({ className, ...props }: React.ComponentProps<"p">) {
     <p
       data-slot="empty-description"
       className={cn(
-        "text-sm leading-5 text-muted-foreground [&>a]:underline [&>a]:underline-offset-4 [&>a:hover]:text-primary",
+        "text-sm/relaxed text-muted-foreground [&>a]:underline [&>a]:underline-offset-4 [&>a:hover]:text-primary",
         className,
       )}
       {...props}

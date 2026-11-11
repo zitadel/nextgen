@@ -202,7 +202,7 @@ describe("project invitations", () => {
     );
     const section = await openInvitations();
     expect(section.getByText("This operation is not implemented yet.")).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Overview" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "General" })).toBeInTheDocument();
   });
 
   it("loads the next page with the token it was given", async () => {

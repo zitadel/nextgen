@@ -32,7 +32,8 @@ import {
  * one, so a single-project person gets it wherever they arrive. With no default
  * — several projects to choose from — an unscoped screen renders as it is, and
  * one declaring `staticData.scope: "project"` goes to Projects, carrying the
- * requested location in `?next=` so choosing a project ends there.
+ * requested location in `?next=` so choosing a project ends there. The landing,
+ * `/`, carries none: choosing a project then opens its Overview.
  *
  * The layout also renders the `AppShell` (moved here from `__root` so the
  * login screen stays shell-less) and feeds it the signed-in identity from the
@@ -58,9 +59,13 @@ export const Route = createFileRoute("/_authed")({
         });
       }
       if (leaf.staticData.scope === "project") {
+        // `/`, the project's Overview, is where arriving at the console lands:
+        // it asked for no screen, so it is Projects itself rather than the way
+        // to Overview (D22).
+        const landing = withoutTrailingSlash(leaf.fullPath) === "/";
         throw redirect({
           to: "/projects",
-          search: { next: routerRelativeHref(location.href) },
+          search: landing ? {} : { next: routerRelativeHref(location.href) },
           replace: true,
         });
       }

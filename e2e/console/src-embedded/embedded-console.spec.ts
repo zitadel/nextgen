@@ -61,8 +61,8 @@ test("signs in end to end against the embedded API", async ({ page, seed }) => {
   // back into the console, where the guard's `GET /sessions/me` now answers
   // 200. Four more calls that only resolve if the base is right.
   await page.waitForURL((url) => !url.pathname.endsWith("/login"));
-  // `/` has no screen of its own and lands on Users, which acts on a selected
-  // project. The seeded user holds no grant, so `GET /users/me/projects` lists
+  // `/` is the project's Overview (D35), which acts on a selected project.
+  // The seeded user holds no grant, so `GET /users/me/projects` lists
   // nothing and there is no project to select for them
   // (`resolveDefaultProjectScope`): `/` lands on Projects instead, never on the
   // project the console signed into, which they could not manage.

@@ -26,6 +26,7 @@ import { Card } from "@/components/ui/card";
 import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import {
   Empty,
+  EmptyContent,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
@@ -149,10 +150,12 @@ function InvitationsTable({
         <Empty className="w-full">
           <EmptyHeader>
             <EmptyMedia variant="icon">
-              <UserCog aria-hidden strokeWidth={1.5} />
+              <UserCog aria-hidden className="stroke-[1.5]" />
             </EmptyMedia>
             <EmptyTitle>No invitations yet</EmptyTitle>
             <EmptyDescription>Create a link to invite someone to this project.</EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent>
             <InviteMemberDialog
               projectId={projectId}
               projectName={projectName}
@@ -162,7 +165,7 @@ function InvitationsTable({
                 Invite member
               </Button>
             </InviteMemberDialog>
-          </EmptyHeader>
+          </EmptyContent>
         </Empty>
       </Card>
     );
