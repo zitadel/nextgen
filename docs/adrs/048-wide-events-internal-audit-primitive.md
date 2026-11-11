@@ -753,3 +753,24 @@ logging each statement's plan:
 `(created_at, id)`, and its place in `planEventRead`. The server does not
 know which category an event type belongs to; if it did, a type beside an id
 would read that id's one range of the type's category rather than six.
+
+## Amendment (2026-11-10): a server that runs only while it serves a request
+
+§4's Path A writes a request event up to T after the response, from a
+background flusher. A Vercel function is paused once its last response ends,
+so that write waits for the instance's next request, and is lost with an
+instance that gets none. On the hosted cloud a flush also failed as its
+instance woke although the database had committed it, and its retries then
+met the batch's own rows and logged it as dropped.
+
+- **A request can wait for its event.** `events.request.flush_wait` makes a
+  request wait, up to that long, until its event is written. The buffer then
+  flushes as soon as it holds an event, and requests in flight together
+  share a write. Unset, the default, Path A is as §4 has it. The hosted
+  cloud sets two seconds.
+- **Path A stays best-effort.** Past the wait, or when the flush gives up,
+  the request ends without its event.
+- **A duplicate after a failed attempt is a written batch.** An event keeps
+  the id its first insert minted and a batch is one transaction, so the
+  failed attempt was committed and only its answer was lost. A duplicate on
+  the first attempt is dropped without a retry.

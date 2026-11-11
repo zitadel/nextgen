@@ -436,7 +436,9 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	defer stop()
 
 	exportAdapter := service.EventExportAdapter{Pool: serviceDBPool}
-	requestEventBuf := audit.NewRequestBuffer(exportAdapter, audit.DefaultRequestBufferConfig())
+	requestEventCfg := audit.DefaultRequestBufferConfig()
+	requestEventCfg.FlushWait = cfg.Events.Request.FlushWait
+	requestEventBuf := audit.NewRequestBuffer(exportAdapter, requestEventCfg)
 	defer requestEventBuf.Close()
 
 	retentionJob := audit.NewRetentionJob(exportAdapter, cfg.Events.Retention)
@@ -508,7 +510,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      30 * time.Second,
-		IdleTimeout:       60 * time.Second,
+		IdleTimeout:       idleTimeout(cfg.Server.IdleTimeout),
 	}
 
 	serverErr := make(chan error, 1)
@@ -689,6 +691,7 @@ func readConfig(configPath string, overrides ...configOverride) (Config, error) 
 	v.SetDefault("server.console_path", "/ui/console")
 	v.SetDefault("server.public_base", "https://nextgen.zitadel.cloud")
 	v.SetDefault("server.console_origins", []string{})
+	v.SetDefault("server.idle_timeout", 60*time.Second)
 	// Generation on by default: a first local start has to work with no
 	// configuration at all. Production turns it off, per ADR 029.
 	v.SetDefault("server.generate_master_key", true)
@@ -773,6 +776,8 @@ func readConfig(configPath string, overrides ...configOverride) (Config, error) 
 	v.SetDefault("platform.bootstrap_project", false)
 	// Empty: nobody is a platform operator (ADR 075).
 	v.SetDefault("platform.operators", []string{})
+	// Zero: a request does not wait for its event to be written.
+	v.SetDefault("events.request.flush_wait", time.Duration(0))
 	v.SetDefault("events.retention.window", 30*24*time.Hour)
 	v.SetDefault("events.retention.interval", time.Hour)
 	v.SetDefault("events.retention.enabled", true)
@@ -940,6 +945,16 @@ func consoleLink(consolePath string) *errorpage.Link {
 		return nil
 	}
 	return &errorpage.Link{Label: "Open the console", Href: consolePath + "/"}
+}
+
+// idleTimeout is server.idle_timeout as net/http reads it. There zero means
+// "as long as ReadTimeout" and only a negative value never closes an idle
+// connection, which is what the config's zero asks for.
+func idleTimeout(configured time.Duration) time.Duration {
+	if configured <= 0 {
+		return -1
+	}
+	return configured
 }
 
 func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiServers api.Servers, idpCallbackHandler http.Handler, runtime runtimeResolver, requestEvents *audit.RequestBuffer, retentionTrigger http.Handler) (http.Handler, error) {
