@@ -76,8 +76,9 @@ type Invitation struct {
 	ID            string
 	Type          InvitationType
 	ProjectMember *InvitationProjectMember
-	// EncryptedMetadata is the metadata encrypted with the project's key; nil
-	// once accepted or declined.
+	// EncryptedMetadata is the metadata JSON encrypted with the project's key,
+	// opaque to storage, so validate it before encrypting. Nil once accepted
+	// or declined.
 	EncryptedMetadata *string
 	// Status is the stored status, never expired; StatusAt derives that.
 	Status        InvitationStatus

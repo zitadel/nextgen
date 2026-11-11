@@ -10,7 +10,9 @@ CREATE TABLE zitadel_nextgen.invitations (
     -- The object named after the type: a document, so a type can grow fields
     -- without a migration on three dialects.
     , payload JSONB NOT NULL CHECK (jsonb_typeof(payload) = 'object')
-    -- Ciphertext under the project's key; NULL once accepted or declined.
+    -- The metadata JSON encrypted under the project's key, so TEXT with no
+    -- JSON CHECK: the service validates the shape before encrypting. NULL
+    -- once accepted or declined.
     , metadata TEXT
     , status TEXT COLLATE "C" NOT NULL DEFAULT 'pending'
         CHECK (status IN ('pending', 'accepted', 'rejected'))
