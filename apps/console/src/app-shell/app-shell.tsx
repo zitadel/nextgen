@@ -22,7 +22,7 @@ import { LogFilters, LogViewRows } from "@/features/events/components/logs-nav";
 import { ContextSwitcher } from "./context-switcher";
 import { ZitadelLogo } from "./logo";
 import { SearchDialog, SearchTrigger, useSearchShortcut } from "./search";
-import { useNavItems } from "./use-nav-items";
+import { accountListItems, useNavItems, useRequestedNavItem } from "./use-nav-items";
 import type { NavView } from "@/nav";
 import { SETTINGS_PATH, type ShellUser, UserMenuItem } from "./user-menu";
 
@@ -189,8 +189,11 @@ const NAV_LABEL: Record<NavView, string> = {
 /**
  * The sidebar's nav: one flat list of the view's routes (`staticData.nav`,
  * Console ADR 0001). Portal is the project's screens. Account is what sits
- * above every project: Projects, the home, then what an add-on lists, then
- * Settings. Settings is that row's own list, under a heading that leads back:
+ * above every project: Projects, the home, then the project's screens, then
+ * what an add-on lists, then Settings (D34). The pill there names no project,
+ * so a project's screen chosen from it drops the selection the URL still
+ * carries and asks for one (D31), marking its row while it asks (D22).
+ * Settings is that row's own list, under a heading that leads back:
  * the person's profile, alone while accounts are not surfaced (Console ADR
  * 0005 §3), then what an add-on lists. A row stays marked on the screens
  * beneath it, so a resource's detail keeps its list marked.
@@ -203,7 +206,12 @@ const NAV_LABEL: Record<NavView, string> = {
  * moves nothing vertically.
  */
 function NavList({ view }: { view: NavView }) {
-  const items = useNavItems(view);
+  const own = useNavItems(view);
+  const project = useNavItems("portal");
+  const account = view === "account";
+  const items = account ? accountListItems(own, project) : own;
+  // On Projects' way to a screen (`?next=`), that screen's row is the marked one.
+  const requested = useRequestedNavItem(project);
   const matchRoute = useMatchRoute();
 
   return (
@@ -215,14 +223,19 @@ function NavList({ view }: { view: NavView }) {
           {/* `/` is where a project lands, whichever screen that is. */}
           {view === "logs" && <ListHeading name="Logs" to="/" back="the project" />}
           {view === "logs" && <LogViewRows />}
-          {items.map(({ to, nav: { icon: Icon, label: name } }) => (
-            <SidebarMenuItem key={name}>
+          {items.map(({ to, scope, nav: { icon: Icon, label: name } }) => (
+            <SidebarMenuItem key={to}>
               <SidebarMenuButton
                 asChild
-                isActive={!!matchRoute({ to, fuzzy: to !== "/" })}
+                isActive={requested ? requested.to === to : !!matchRoute({ to, fuzzy: to !== "/" })}
                 tooltip={name}
               >
-                <Link to={to} title={name}>
+                <Link
+                  to={to}
+                  // An explicit `undefined` is what stops `_authed` retaining it.
+                  search={account && scope === "project" ? { project: undefined } : undefined}
+                  title={name}
+                >
                   <Icon aria-hidden />
                   <span>{name}</span>
                 </Link>

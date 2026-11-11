@@ -40,3 +40,17 @@ export async function listProjectEvents(
 export function getProjectEvent(projectId: string, eventId: string): Promise<LogEvent> {
   return api.getEvent(eventId, { project_id: projectId });
 }
+
+/**
+ * The project's newest audit events, at most `limit`: the sign-ins and changes,
+ * as Logs' default view lists them. The audit view is one range of an index,
+ * so the page fills up to `limit` whenever the project has that many.
+ */
+export async function listRecentEvents(projectId: string, limit: number): Promise<LogEvent[]> {
+  const answer = await api.listEvents({
+    project_id: projectId,
+    ...eventsQuery({ view: "audit" }),
+    limit,
+  });
+  return answer.data;
+}

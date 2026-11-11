@@ -64,8 +64,11 @@ between files are the sign the component is missing.
 - The sidebar lists a project's screens, with or without a selection: without
   one, a screen asks for a project first (Projects with `?next=`, D22).
 - Projects (the home) and `/settings` are above every project: Projects lists
-  the account's screens (`nav.view: "account"`, D27), `/settings` its own pages
+  the account's screens (`nav.view: "account"`, D27) around the project's,
+  which ask for a project there (D34); `/settings` its own pages
   (`nav.view: "settings"`, D29).
+- `/` is the project's Overview (D35): only reads a screen already makes, and no
+  figures, since the API has no counts.
 - Screens outside every project (billing, operators) go in one of those lists,
   never beside a project's screens; every screen keeps the one frame.
 - `/events` swaps the project's list for Logs' (`NavView` `"logs"`, D30): its

@@ -31,6 +31,7 @@ vi.mock("@/auth/session", async (importOriginal) => {
 // that are not built (Sessions). Projects is not a row here: it heads the
 // other list, the account's.
 const NAV_ORDER = [
+  "Overview",
   "Teams",
   "Users",
   "User schemas",
@@ -41,8 +42,15 @@ const NAV_ORDER = [
   "Logs",
   "Settings",
 ];
-// What sits above every project: the home, then Settings, a list of its own.
-const ACCOUNT_ORDER = ["Projects", "Settings"];
+// What sits above every project: the home, the project's screens, which ask
+// for a project (D34), then Settings, a list of its own. Projects stands in
+// for the project's Overview (D35), and the project's own Settings is left
+// out: up here Settings is the account's.
+const ACCOUNT_ORDER = [
+  "Projects",
+  ...NAV_ORDER.filter((name) => name !== "Overview" && name !== "Settings"),
+  "Settings",
+];
 // Settings' list: the heading that leads back, then the person's profile.
 const SETTINGS_ORDER = ["Settings", "Profile"];
 // Logs' list: the heading that leads back, then the list's views.
@@ -57,7 +65,7 @@ const NEVER_SHOWN = ["App groups", "Applications", "Analytics", "Activity Log", 
 const MY_PROJECTS = "*/api/v1/users/me/projects";
 // System, the portal screen that needs no project, reads the server's readiness.
 const READY = "*/api/v1/readyz";
-// `/` lands on Users, so most tests read it once a project is selected.
+// Users is where most tests go once a project is selected.
 const USERS_QUERY = "*/api/v1/users/query";
 // Some tests open on Teams to prove a switch keeps the screen.
 const TEAMS_QUERY = "*/api/v1/teams/query";
@@ -70,8 +78,11 @@ interface SearchBody {
   types: string[];
   limit_per_type: number;
 }
-// Logs reads the project's events.
+// Logs reads the project's events, and Overview its newest few.
 const EVENTS = "*/api/v1/events";
+// Overview reads the selected project and what its primary origins serve.
+const PROJECT_1 = "*/api/v1/projects/proj_1";
+const DEPLOYMENTS = "*/api/v1/deployments";
 beforeEach(() => {
   // The switcher's recent projects live in localStorage: none carry over.
   localStorage.clear();
@@ -85,6 +96,21 @@ beforeEach(() => {
     http.post(USERS_QUERY, () => HttpResponse.json({ users: [] })),
     http.post(TEAMS_QUERY, () => HttpResponse.json({ teams: [] })),
     http.post(SEARCH, () => HttpResponse.json({ results: [], incomplete_types: [] })),
+    // `/` is the project's Overview (D35): the project, what is live, and its
+    // newest events. Only the listed project: a selection the list does not
+    // carry is a test's own to answer.
+    http.get(PROJECT_1, () =>
+      HttpResponse.json({
+        id: "proj_1",
+        name: "console-dev",
+        origins: [],
+        created_at: "2026-01-01T00:00:00Z",
+        updated_at: "2026-01-01T00:00:00Z",
+        owning_team_id: null,
+      }),
+    ),
+    http.get(DEPLOYMENTS, () => HttpResponse.json({ deployments: [] })),
+    http.get(EVENTS, () => HttpResponse.json({ data: [] })),
   );
 });
 
@@ -204,6 +230,50 @@ describe("app shell navigation", () => {
     expect(await screen.findByRole("navigation", { name: "Primary" })).toBeInTheDocument();
   });
 
+  it("asks for a project from Projects' list, though the URL still carries one", async () => {
+    server.use(
+      http.get(MY_PROJECTS, () =>
+        HttpResponse.json({
+          projects: [
+            { id: "proj_1", name: "River" },
+            { id: "proj_2", name: "Delta" },
+          ],
+        }),
+      ),
+    );
+    // Back on Projects from inside River: the selection rides along, but the
+    // pill names no project up here, so the project's rows do not use it.
+    const router = renderShell(scopedPath("/projects", "proj_1"));
+    const nav = within(await screen.findByRole("navigation", { name: "Account" }));
+    expect(nav.getByRole("link", { name: "Users" })).toHaveAttribute("href", "/users");
+    expect(nav.getByRole("link", { name: "Settings" })).toHaveAttribute(
+      "href",
+      scopedPath("/settings", "proj_1"),
+    );
+
+    await userEvent.click(nav.getByRole("link", { name: "Teams" }));
+    await waitFor(() => expect(router.state.resolvedLocation?.search.next).toMatch(/^\/teams\b/));
+    expect(router.state.resolvedLocation?.search).not.toHaveProperty("project");
+    expect(await screen.findByRole("heading", { name: "Continue to Teams" })).toBeInTheDocument();
+    // The screen asked for is the marked row, not Projects (D22).
+    expect(nav.getByRole("link", { name: "Teams" })).toHaveAttribute("data-active", "true");
+    expect(nav.getByRole("link", { name: "Projects" })).toHaveAttribute("data-active", "false");
+
+    await userEvent.click(await screen.findByRole("link", { name: "Delta" }));
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/teams"));
+    expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_2" });
+  });
+
+  it("goes into the only project from Projects' list without asking", async () => {
+    const router = renderShell("/projects");
+    const nav = within(await screen.findByRole("navigation", { name: "Account" }));
+
+    await userEvent.click(nav.getByRole("link", { name: "Users" }));
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/users"));
+    expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_1" });
+    expect(await screen.findByRole("navigation", { name: "Primary" })).toBeInTheDocument();
+  });
+
   it("goes home to Projects from the logo", async () => {
     const router = renderShell();
     await screen.findByRole("link", { name: /^Users/ });
@@ -299,7 +369,7 @@ describe("settings view", () => {
     const list = within(await screen.findByRole("listbox", { name: "Projects" }));
     await userEvent.click(await list.findByRole("option", { name: /^console-dev/ }));
 
-    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/users"));
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/"));
     expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_1" });
     await waitFor(() => expect(pill).toHaveTextContent("console-dev"));
   });
@@ -369,7 +439,7 @@ describe("logs view", () => {
     expect(heading).toHaveAttribute("href", scopedPath("/", "proj_1"));
 
     await userEvent.click(heading);
-    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/users"));
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/"));
     const primary = within(await screen.findByRole("navigation", { name: "Primary" }));
     expect(
       primary.getAllByRole("listitem").map((li) => within(li).getAllByRole("link")[0]?.textContent),
@@ -606,7 +676,7 @@ describe("project pill", () => {
         HttpResponse.json({ projects: [{ id: "proj_theirs", name: "Granted to me" }] }),
       ),
     );
-    renderShell();
+    renderShell("/users");
 
     const pill = await screen.findByRole("button", { name: "Switch project" });
     await waitFor(() => expect(pill).toHaveTextContent("Granted to me"));
@@ -817,18 +887,29 @@ describe("project pill", () => {
     await waitFor(() => expect(queried).toEqual(["proj_1", "proj_2"]));
   });
 
-  it("lands on the new project's first screen when chosen from an unscoped one", async () => {
+  it("lands on the new project's Overview when chosen from an unscoped one", async () => {
     server.use(
       http.get(MY_PROJECTS, RIVER_AND_DELTA),
       // System is the portal screen that needs no project.
       http.get(READY, () => HttpResponse.text("ok")),
+      // Delta's Overview reads it.
+      http.get("*/api/v1/projects/proj_2", () =>
+        HttpResponse.json({
+          id: "proj_2",
+          name: "Delta",
+          origins: [],
+          created_at: "2026-01-01T00:00:00Z",
+          updated_at: "2026-01-01T00:00:00Z",
+          owning_team_id: null,
+        }),
+      ),
     );
     const router = renderShell(scopedPath("/system", "proj_1"));
 
     const { list } = await openList("River");
     await userEvent.click(within(list).getByRole("option", { name: /^Delta/ }));
 
-    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/users"));
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/"));
     expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_2" });
   });
 
