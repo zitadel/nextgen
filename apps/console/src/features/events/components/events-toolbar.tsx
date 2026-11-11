@@ -15,9 +15,9 @@ import { useSidebar } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 
 import { copyEvents, downloadEvents } from "../export";
-import { filterCount, type LogEvent, type LogsSearch, VIEW_LABEL } from "../model";
+import { filterCount, type ProjectEvent, type EventsSearch, VIEW_LABEL } from "../model";
 
-/** What Logs' title row and the line under it hold, beside the search (`LogSearchField`). */
+/** What Events' title row and the line under it hold, beside the search (`EventSearchField`). */
 
 /**
  * The way to the views and filters while the sidebar is an icon rail, on a
@@ -26,7 +26,7 @@ import { filterCount, type LogEvent, type LogsSearch, VIEW_LABEL } from "../mode
  * many filters narrow it, and opens the sidebar, where both are changed.
  * Beside an open sidebar it would repeat it, so it is not drawn.
  */
-export function SidebarFilters({ search }: { search: LogsSearch }) {
+export function SidebarFilters({ search }: { search: EventsSearch }) {
   const { isMobile, state, setOpen, setOpenMobile } = useSidebar();
   if (!isMobile && state === "expanded") return null;
   const count = filterCount(search);
@@ -69,7 +69,7 @@ export function LiveDot({ on }: { on: boolean }) {
 
 /**
  * The line under the toolbar while Live is on: that new events appear at the
- * top, and how long ago it last read, counted every second, so a quiet log
+ * top, and how long ago it last read, counted every second, so a quiet list
  * still shows that it is being read.
  */
 export function LiveStatus({ checkedAt }: { checkedAt: Date | undefined }) {
@@ -100,12 +100,12 @@ export function LiveStatus({ checkedAt }: { checkedAt: Date | undefined }) {
  * list holds, Live's rows and the pages loaded included.
  */
 /** Copies the loaded events and says whether it did, as search's Copy project ID does. */
-async function copy(events: LogEvent[]) {
+async function copy(events: ProjectEvent[]) {
   if (await copyEvents(events)) toast.success("Events copied");
   else toast.error("Could not copy the events");
 }
 
-export function ExportMenu({ events }: { events: LogEvent[] }) {
+export function ExportMenu({ events }: { events: ProjectEvent[] }) {
   const empty = events.length === 0;
   return (
     <DropdownMenu>

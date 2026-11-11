@@ -17,7 +17,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 
-import { LogFilters, LogViewPicker } from "@/features/events/components/logs-nav";
+import { EventFilters, EventViewPicker } from "@/features/events/components/events-nav";
 
 import { ContextSwitcher } from "./context-switcher";
 import { ZitadelLogo } from "./logo";
@@ -58,7 +58,7 @@ export function AppShell({
 
   return (
     <SidebarProvider defaultOpen={readSidebarOpen()}>
-      <SearchDialog open={searchOpen} onOpenChange={setSearchOpen} />
+      <SearchDialog open={searchOpen} onOpenChange={setSearchOpen} userId={user?.userId} />
       <AppSidebar
         view={view}
         user={user}
@@ -81,23 +81,23 @@ export function AppShell({
 /** The console's home: Projects, the list of every project. */
 const HOME_ROUTE = "/_authed/projects/";
 
-/** Logs, whose list replaces the project's on the screen and under an event's drawer. */
-const LOGS_PATH = "/events";
+/** Events, whose list replaces the project's on the screen and under an event's drawer. */
+const EVENTS_PATH = "/events";
 
 /**
  * Which of the sidebar's lists is showing, and the **route** decides:
  * Projects is above every project, so it lists the account's screens;
  * `/settings` with anything beneath it lists Settings' pages (D29); `/events`
- * with anything beneath it lists Logs' views and filters (D30); everything
+ * with anything beneath it lists Events' views and filters (D30); everything
  * else lists the selected project's. Deriving it from the route rather than
- * from component state is what lets a settings or logs URL survive a refresh,
+ * from component state is what lets a settings or events URL survive a refresh,
  * and it keeps the shell consistent with ADR 0001's route-driven nav.
  */
 function useShellView(): NavView {
   const matchRoute = useMatchRoute();
   const atHome = !!useMatch({ from: HOME_ROUTE, shouldThrow: false });
   if (matchRoute({ to: SETTINGS_PATH, fuzzy: true })) return "settings";
-  if (matchRoute({ to: LOGS_PATH, fuzzy: true })) return "logs";
+  if (matchRoute({ to: EVENTS_PATH, fuzzy: true })) return "events";
   return atHome ? "account" : "portal";
 }
 
@@ -190,7 +190,7 @@ const NAV_LABEL: Record<NavView, string> = {
   portal: "Primary",
   account: "Account",
   settings: "Settings",
-  logs: "Logs",
+  events: "Events",
 };
 
 /**
@@ -205,7 +205,7 @@ const NAV_LABEL: Record<NavView, string> = {
  * 0005 §3), then what an add-on lists. A row stays marked on the screens
  * beneath it, so a resource's detail keeps its list marked.
  *
- * Logs is one screen's own list, under a heading that leads back to the
+ * Events is one screen's own list, under a heading that leads back to the
  * project's: a picker of the list's views, not routes, and its filters in a
  * group of their own (D30). The events feature draws both.
  *
@@ -230,8 +230,8 @@ function NavList({ view }: { view: NavView }) {
           {/* Projects is the account list's first screen. */}
           {view === "settings" && <ListHeading name="Settings" to="/projects" back="Projects" />}
           {/* `/` is where a project lands, whichever screen that is. */}
-          {view === "logs" && <ListHeading name="Logs" to="/" back="the project" />}
-          {view === "logs" && <LogViewPicker />}
+          {view === "events" && <ListHeading name="Events" to="/" back="the project" />}
+          {view === "events" && <EventViewPicker />}
           {items.map(({ to, nav: { icon: Icon, label: name } }) => (
             <SidebarMenuItem key={to}>
               <SidebarMenuButton
@@ -260,28 +260,28 @@ function NavList({ view }: { view: NavView }) {
           ))}
         </SidebarMenu>
       </SidebarGroup>
-      {view === "logs" && <LogFilters />}
+      {view === "events" && <EventFilters />}
     </div>
   );
 }
 
 /**
  * How deep each list sits: Projects' and a project's are where the console
- * starts; Settings' and Logs' open from a row of one (D29, D30).
+ * starts; Settings' and Events' open from a row of one (D29, D30).
  */
-const LIST_DEPTH: Record<NavView, number> = { portal: 0, account: 0, settings: 1, logs: 1 };
+const LIST_DEPTH: Record<NavView, number> = { portal: 0, account: 0, settings: 1, events: 1 };
 
 /** The list a row's screen shows, where it is not the project's or the account's. */
 function listOf(to: string): NavView | undefined {
   const under = (path: string) => to === path || to.startsWith(`${path}/`);
   if (under(SETTINGS_PATH)) return "settings";
-  if (under(LOGS_PATH)) return "logs";
+  if (under(EVENTS_PATH)) return "events";
   return undefined;
 }
 
 /**
  * Whether a row of the list `view` names swaps the sidebar for a list one
- * level down (Logs in a project's list, Settings in the account's), rather
+ * level down (Events in a project's list, Settings in the account's), rather
  * than opening a screen beside it. Such a row carries an arrow, so the swap
  * is no surprise. A row of the list it is already in (Settings' Profile) does
  * not: the rule is the depth, so a new list needs no change here.

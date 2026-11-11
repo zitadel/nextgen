@@ -10,7 +10,7 @@ import { ApiError } from "@zitadel/api/runtime/fetch";
 import { describeError } from "@/lib/api-error";
 
 /**
- * One event, in the drawer over Logs' list (`EventSheet`, drawn by the list's
+ * One event, in the drawer over Events' list (`EventSheet`, drawn by the list's
  * route): a row opens it, the overview's recent activity links to it, and a
  * link to it opens the list beside it under the filters it carries.
  *
