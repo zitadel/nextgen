@@ -106,7 +106,7 @@ func (s *releaseService) Build(ctx context.Context, input BuildReleaseInput) (_ 
 	var preparedOAuth *domain.OAuthSettings
 	if input.OAuth != nil {
 		var err error
-		preparedOAuth, err = prepareOAuthSettings(*input.OAuth)
+		preparedOAuth, err = domain.NewOAuthSettings(input.OAuth.ProjectID, input.OAuth.Enabled)
 		if err != nil {
 			failures.add(domain.ReleasePointerKindOauth, 0, domain.ReleaseOAuthHandle, err)
 		}

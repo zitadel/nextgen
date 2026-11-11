@@ -9,7 +9,6 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/flowdefinition"
-	"github.com/zitadel/nextgen/internal/storage/oauthsettings"
 )
 
 // Variables returns the set deploymentID froze. A deployment that was never
@@ -159,15 +158,7 @@ func releasePointerDocument(ctx context.Context, stmts AllStatements, projectID 
 		}
 		return raw, nil
 	case domain.ReleasePointerKindOauth:
-		settings, err := stmts.GetOAuthSettingsByID(ctx, projectID, pointer.RevisionID)
-		if err != nil {
-			return nil, revisionReadError(err)
-		}
-		raw, err := oauthsettings.Marshal(settings)
-		if err != nil {
-			return nil, domain.ErrInternal(err).WithMessage("failed to read an oauth settings revision")
-		}
-		return raw, nil
+		return nil, nil // an OAuth settings revision holds no variables
 	default:
 		return nil, domain.ErrInternal(nil).WithMessage(fmt.Sprintf("unknown release pointer kind %d", pointer.Kind))
 	}

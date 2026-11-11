@@ -94,7 +94,7 @@ type gateCodes struct{ denied, readMiss, writeMiss string }
 
 var (
 	brandingCodes   = gateCodes{domain.ErrBrandingPermissionDenied().Code, domain.ErrBrandingNotFound().Code, domain.ErrBrandingInvalid("", nil).Code}
-	oauthSetCodes   = gateCodes{domain.ErrOAuthSettingsPermissionDenied().Code, domain.ErrOAuthSettingsNotFound().Code, domain.ErrOAuthSettingsInvalid(nil, nil).Code}
+	oauthSetCodes   = gateCodes{domain.ErrOAuthSettingsPermissionDenied().Code, domain.ErrOAuthSettingsNotFound().Code, domain.ErrOAuthSettingsNotFound().Code}
 	deploymentCodes = gateCodes{domain.ErrDeploymentPermissionDenied().Code, domain.ErrDeploymentNotFound().Code, domain.ErrEnvironmentProjectNotFound().Code}
 	eventCodes      = gateCodes{domain.ErrEventPermissionDenied().Code, domain.ErrEventNotFound().Code, domain.ErrEventNotFound().Code}
 	flowDefCodes    = gateCodes{domain.ErrFlowDefinitionPermissionDenied().Code, domain.ErrFlowDefinitionNotFound().Code, domain.ErrFlowDefinitionInvalid("", nil).Code}

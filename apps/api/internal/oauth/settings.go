@@ -27,11 +27,7 @@ type ReleaseSettings struct {
 
 // NewReleaseSettings builds the source over the resolver the API serves
 // flows with and the service that reads revisions.
-func NewReleaseSettings(runtime *service.RuntimeResolver, settings *service.OAuthSettingsService) *ReleaseSettings {
-	return newReleaseSettings(runtime, settings)
-}
-
-func newReleaseSettings(runtime runtimeResolver, settings service.OAuthSettingsReader) *ReleaseSettings {
+func NewReleaseSettings(runtime runtimeResolver, settings service.OAuthSettingsReader) *ReleaseSettings {
 	return &ReleaseSettings{runtime: runtime, settings: settings}
 }
 

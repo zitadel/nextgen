@@ -39,8 +39,12 @@ func TestMarshalWritesDisabledExplicitly(t *testing.T) {
 	assert.JSONEq(t, `{"enabled":false}`, string(raw))
 }
 
+// The column is NOT NULL, so an empty definition is a corrupt row, not an
+// older shape.
 func TestToDomainRejectsMalformedDefinition(t *testing.T) {
 	t.Parallel()
-	_, err := oauthsettings.ToDomain("proj_1", "oauthset_1", time.Now(), []byte(`{`))
-	require.Error(t, err)
+	for _, raw := range []string{`{`, ``} {
+		_, err := oauthsettings.ToDomain("proj_1", "oauthset_1", time.Now(), []byte(raw))
+		require.Error(t, err, raw)
+	}
 }
