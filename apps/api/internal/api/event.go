@@ -16,9 +16,10 @@ func (h *Handler) ListEvents(ctx context.Context, params api.ListEventsParams) (
 	}
 
 	req := service.ListEventsRequest{
-		ProjectID: string(params.ProjectID),
-		Limit:     int(params.Limit.Value),
-		PageToken: string(params.PageToken.Value),
+		ProjectID:        string(params.ProjectID),
+		Limit:            int(params.Limit.Value),
+		PageToken:        string(params.PageToken.Value),
+		PlatformOperator: h.eventsPlatformOperator,
 	}
 	if len(params.Category) > 0 {
 		req.Categories = make([]string, len(params.Category))
@@ -93,11 +94,25 @@ func (h *Handler) GetEvent(ctx context.Context, params api.GetEventParams) (api.
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), eventsAccess, opRead); err != nil {
 		return nil, err
 	}
-	event, err := h.eventService.Get(ctx, string(params.ProjectID), params.ID)
+	event, err := h.eventService.Get(ctx, string(params.ProjectID), params.ID, h.eventsPlatformOperator)
 	if err != nil {
 		return nil, err
 	}
 	return eventToAPI(event)
+}
+
+// eventsPlatformOperator is the events gate's question about a project nobody
+// has claimed: is the caller a platform operator, who reads every project's
+// events (ADR 049 §4). Only a session homed in the platform project costs a
+// read (platformOperator). An operator's read is marked on the request's
+// events, as the operator path's Check marks it (ADR 075 §5).
+func (h *Handler) eventsPlatformOperator(ctx context.Context) (bool, error) {
+	scope, _ := GetScopeContext(ctx)
+	operator, err := h.platformOperator(ctx, scope)
+	if operator {
+		markPlatformOperator(ctx, scope)
+	}
+	return operator, err
 }
 
 // eventToAPI maps a domain event onto the OpenAPI Event sum type by encoding

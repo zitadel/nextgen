@@ -14,8 +14,8 @@ export interface EventPage {
  * page token continues the filters it was issued under, so `Load more` sends
  * the same ones, `createdAfter` included: the start of the time range, which
  * the list computed once when it loaded. A project that is not claimed yet
- * answers an empty page: its events are stored but stay hidden until the
- * claim.
+ * answers an empty page, except to a platform operator: its events are stored
+ * but stay hidden until the claim.
  *
  * A page can hold fewer events than asked for, or none, and still carry a
  * token: the server reads a bounded number of events a request, and filters

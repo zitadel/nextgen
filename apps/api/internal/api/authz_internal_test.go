@@ -66,10 +66,6 @@ func (s stubAuthzStmts) ListAuthzObjectIDs(context.Context, domain.AuthzListObje
 	return nil, nil
 }
 
-func (stubAuthzStmts) ListClaimedProjectIDs(context.Context, string, uint32) ([]string, error) {
-	return nil, nil
-}
-
 func (s stubAuthzStmts) GetResourceScope(_ context.Context, resourceID string) (*domain.ResourceScope, error) {
 	if s.scopes == nil {
 		return nil, new(database.NoRowFoundError)

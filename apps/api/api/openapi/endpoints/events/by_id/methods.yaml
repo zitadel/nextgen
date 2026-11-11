@@ -13,7 +13,8 @@ get:
 
     A project that is not claimed yet also answers `404`: its events are
     stored but stay invisible until the
-    [claim](/docs/concepts/project-team-user#claim) succeeds.
+    [claim](/docs/concepts/project-team-user#claim) succeeds. The deployment's
+    platform operators read them from the start.
   tags:
     - Events
   security:

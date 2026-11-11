@@ -741,7 +741,8 @@ type Handler interface {
 	// answer `404`.
 	// A project that is not claimed yet also answers `404`: its events are
 	// stored but stay invisible until the
-	// [claim](/docs/concepts/project-team-user#claim) succeeds.
+	// [claim](/docs/concepts/project-team-user#claim) succeeds. The deployment's
+	// platform operators read them from the start.
 	//
 	// GET /events/{id}
 	GetEvent(ctx context.Context, params GetEventParams) (GetEventRes, error)
@@ -1082,7 +1083,8 @@ type Handler interface {
 	// first. Requires `events.read`.
 	// A project that is not claimed yet returns an empty list: its events are
 	// stored but stay invisible until the
-	// [claim](/docs/concepts/project-team-user#claim) succeeds.
+	// [claim](/docs/concepts/project-team-user#claim) succeeds. The deployment's
+	// platform operators read them from the start.
 	// Team-scoped credentials see only the events whose `team_id` matches the
 	// credential's team. Team-scoped credentials are not issued today.
 	// Each item carries an `event_type` that says which type of event it is, and

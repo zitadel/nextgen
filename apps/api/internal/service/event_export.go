@@ -2,8 +2,6 @@ package service
 
 import (
 	"context"
-	"errors"
-	"slices"
 	"time"
 
 	"github.com/zitadel/nextgen/internal/audit"
@@ -16,11 +14,11 @@ const listProjectIDsPageSize = 500
 // EventExportAdapter adapts AllStatements to audit retention/shipper interfaces.
 type EventExportAdapter struct {
 	Pool *DB
-	// PlatformProjectID is the deployment's platform project, which ships
-	// without a claim (ADR 049 §4); empty, only claimed projects ship.
-	PlatformProjectID string
 }
 
+// ListProjectIDs returns every project, the ones the shipper's deployment
+// sinks export: they are the platform operators', who see every project's
+// events, claimed or not (ADR 049 §4).
 func (a EventExportAdapter) ListProjectIDs(ctx context.Context) (_ []string, err error) {
 	ctx, end := startSpan(ctx, "EventExportAdapter.ListProjectIDs")
 	defer end(&err)
@@ -60,42 +58,6 @@ func collectProjectIDs(
 		ids = append(ids, project.ID)
 	}
 	return ids, nil
-}
-
-// ListVisibleProjectIDs returns the projects whose events ship: those that
-// have completed claim (active owning-team grant, ADR 054 §2) and the platform
-// project, the same projects GET /events reads (ADR 049 §4).
-func (a EventExportAdapter) ListVisibleProjectIDs(ctx context.Context) (_ []string, err error) {
-	ctx, end := startSpan(ctx, "EventExportAdapter.ListVisibleProjectIDs")
-	defer end(&err)
-
-	var (
-		after string
-		all   []string
-	)
-	for {
-		ids, err := a.Pool.Statements().ListClaimedProjectIDs(ctx, after, listProjectIDsPageSize)
-		if err != nil {
-			return nil, err
-		}
-		all = append(all, ids...)
-		if len(ids) < listProjectIDsPageSize {
-			break
-		}
-		after = ids[len(ids)-1]
-	}
-	if a.PlatformProjectID == "" || slices.Contains(all, a.PlatformProjectID) {
-		return all, nil
-	}
-	// A platform project that is gone ships nothing: its sink cursor could not
-	// be stored, so every run would deliver its first page again.
-	if _, err := a.Pool.Statements().GetProjectByID(ctx, a.PlatformProjectID); err != nil {
-		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
-			return all, nil
-		}
-		return nil, err
-	}
-	return append(all, a.PlatformProjectID), nil
 }
 
 func (a EventExportAdapter) DeleteEventsOlderThan(ctx context.Context, createdBefore time.Time) (_ int64, err error) {

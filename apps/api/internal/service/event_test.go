@@ -3,6 +3,7 @@ package service_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strconv"
 	"testing"
 	"time"
@@ -52,7 +53,7 @@ func TestEventService_Get_preClaimNotFound(t *testing.T) {
 	stmts.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(&domain.Project{ID: "proj_1"}, nil)
 	stmts.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), "proj_1").Return(nil, database.NewNoRowFoundError(nil))
 
-	_, err := svc.Get(context.Background(), "proj_1", "evt_1")
+	_, err := svc.Get(context.Background(), "proj_1", "evt_1", nil)
 	require.Error(t, err)
 	assert.Equal(t, domain.ErrEventNotFound().Code, err.(domain.Error).Code)
 }
@@ -72,7 +73,7 @@ func TestEventService_platformProjectVisibleUnclaimed(t *testing.T) {
 	require.Len(t, resp.Events, 1)
 	assert.Equal(t, "evt_1", resp.Events[0].ID)
 
-	got, err := svc.Get(context.Background(), "proj_platform", "evt_1")
+	got, err := svc.Get(context.Background(), "proj_platform", "evt_1", nil)
 	require.NoError(t, err)
 	assert.Equal(t, want, got)
 }
@@ -90,7 +91,7 @@ func TestEventService_unclaimedCustomerProjectHiddenBesidePlatform(t *testing.T)
 	assert.Empty(t, resp.Events)
 	assert.Empty(t, resp.NextPageToken)
 
-	_, err = svc.Get(context.Background(), "proj_1", "evt_1")
+	_, err = svc.Get(context.Background(), "proj_1", "evt_1", nil)
 	require.ErrorIs(t, err, domain.ErrEventNotFound())
 }
 
@@ -106,67 +107,117 @@ func TestEventService_noPlatformProjectGatesEveryProject(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, resp.Events)
 
-	_, err = svc.Get(context.Background(), domain.PlatformProjectID, "evt_1")
+	_, err = svc.Get(context.Background(), domain.PlatformProjectID, "evt_1", nil)
 	require.ErrorIs(t, err, domain.ErrEventNotFound())
 }
 
-// The shipper exports the projects GET /events reads: the claimed ones and
-// the platform project, once, and only while it exists.
-func TestEventExportAdapter_ListVisibleProjectIDs(t *testing.T) {
-	for _, tc := range []struct {
-		name     string
-		platform string
-		claimed  []string
-		// platformRow answers the platform project's lookup; nil, none is expected.
-		platformRow func(*servicemocks.MockAllStatements)
-		want        []string
-	}{
-		{
-			name:    "no platform project ships the claimed ones",
-			claimed: []string{"proj_a"},
-			want:    []string{"proj_a"},
-		},
-		{
-			name:     "the platform project ships beside the claimed ones",
-			platform: "proj_platform",
-			claimed:  []string{"proj_a"},
-			platformRow: func(stmts *servicemocks.MockAllStatements) {
-				stmts.EXPECT().GetProjectByID(gomock.Any(), "proj_platform").Return(&domain.Project{ID: "proj_platform"}, nil)
-			},
-			want: []string{"proj_a", "proj_platform"},
-		},
-		{
-			name:     "a claimed platform project ships once",
-			platform: "proj_platform",
-			claimed:  []string{"proj_a", "proj_platform"},
-			want:     []string{"proj_a", "proj_platform"},
-		},
-		{
-			name:     "a platform project that is gone ships nothing",
-			platform: "proj_platform",
-			claimed:  []string{"proj_a"},
-			platformRow: func(stmts *servicemocks.MockAllStatements) {
-				stmts.EXPECT().GetProjectByID(gomock.Any(), "proj_platform").Return(nil, database.NewNoRowFoundError(nil))
-			},
-			want: []string{"proj_a"},
-		},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			pool := servicemocks.NewMockPool(ctrl)
-			stmts := servicemocks.NewMockAllStatements(ctrl)
-			pool.EXPECT().Statements().Return(stmts).AnyTimes()
-			stmts.EXPECT().ListClaimedProjectIDs(gomock.Any(), "", gomock.Any()).Return(tc.claimed, nil)
-			if tc.platformRow != nil {
-				tc.platformRow(stmts)
-			}
+// operatorAnswers is a PlatformOperatorCheck that answers operator and err,
+// and counts how often it was asked.
+func operatorAnswers(operator bool, err error) (service.PlatformOperatorCheck, *int) {
+	asked := new(int)
+	return func(context.Context) (bool, error) {
+		*asked++
+		return operator, err
+	}, asked
+}
 
-			adapter := service.EventExportAdapter{Pool: service.NewPool(pool), PlatformProjectID: tc.platform}
-			got, err := adapter.ListVisibleProjectIDs(t.Context())
+// expectUnclaimed answers the claim lookups for an existing, unclaimed project
+// times times.
+func expectUnclaimed(stmts *servicemocks.MockAllStatements, projectID string, times int) {
+	stmts.EXPECT().GetProjectByID(gomock.Any(), projectID).Return(&domain.Project{ID: projectID}, nil).Times(times)
+	stmts.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), projectID).Return(nil, database.NewNoRowFoundError(nil)).Times(times)
+}
+
+// A platform operator reads a project nobody has claimed: list and get each
+// ask the question once, after the claim lookup came back empty (ADR 049 §4).
+func TestEventService_operatorReadsUnclaimedProject(t *testing.T) {
+	svc, stmts := newMockedEventServiceOnPlatform(t, "proj_platform")
+	expectUnclaimed(stmts, "proj_1", 2)
+
+	want := &domain.Event{ProjectID: "proj_1", ID: "evt_1", EventType: domain.EventTypeProjectCreated, Category: domain.EventCategoryAdmin}
+	stmts.EXPECT().ListEvents(gomock.Any(), gomock.Any()).
+		Return(&database.ListResult[*domain.Event]{Items: []*domain.Event{want}}, nil)
+	stmts.EXPECT().GetEventByID(gomock.Any(), "proj_1", "evt_1").Return(want, nil)
+	operator, asked := operatorAnswers(true, nil)
+
+	resp, err := svc.List(context.Background(), service.ListEventsRequest{ProjectID: "proj_1", PlatformOperator: operator})
+	require.NoError(t, err)
+	require.Len(t, resp.Events, 1)
+	assert.Equal(t, "evt_1", resp.Events[0].ID)
+
+	got, err := svc.Get(context.Background(), "proj_1", "evt_1", operator)
+	require.NoError(t, err)
+	assert.Equal(t, want, got)
+	assert.Equal(t, 2, *asked)
+}
+
+// Anyone else, the project's own secret and a platform user who is no
+// operator among them, still sees nothing of an unclaimed project. A caller
+// the handler never asks about (nil) is no operator either.
+func TestEventService_unclaimedProjectHiddenFromNonOperators(t *testing.T) {
+	notOperator, _ := operatorAnswers(false, nil)
+	for name, check := range map[string]service.PlatformOperatorCheck{
+		"not an operator": notOperator,
+		"never asked":     nil,
+	} {
+		t.Run(name, func(t *testing.T) {
+			svc, stmts := newMockedEventServiceOnPlatform(t, "proj_platform")
+			expectUnclaimed(stmts, "proj_1", 2)
+
+			resp, err := svc.List(context.Background(), service.ListEventsRequest{ProjectID: "proj_1", PlatformOperator: check})
 			require.NoError(t, err)
-			assert.Equal(t, tc.want, got)
+			assert.Empty(t, resp.Events)
+			assert.Empty(t, resp.NextPageToken)
+
+			_, err = svc.Get(context.Background(), "proj_1", "evt_1", check)
+			require.ErrorIs(t, err, domain.ErrEventNotFound())
 		})
 	}
+}
+
+// The question costs nothing where the claim already answers: a claimed
+// project and the platform project show their events without it, and a
+// project that is gone shows nothing, to an operator too.
+func TestEventService_operatorAskedOnlyOfUnclaimedProjects(t *testing.T) {
+	never := func(context.Context) (bool, error) {
+		t.Error("the platform operator question was asked")
+		return true, nil
+	}
+	svc, stmts := newMockedEventServiceOnPlatform(t, "proj_platform")
+
+	stmts.EXPECT().GetProjectByID(gomock.Any(), "proj_claimed").Return(&domain.Project{ID: "proj_claimed"}, nil)
+	stmts.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), "proj_claimed").Return(&domain.AuthzAssignment{PrincipalID: "team_1"}, nil)
+	stmts.EXPECT().ListEvents(gomock.Any(), gomock.Any()).
+		Return(&database.ListResult[*domain.Event]{Items: []*domain.Event{}}, nil).Times(2)
+	resp, err := svc.List(context.Background(), service.ListEventsRequest{ProjectID: "proj_claimed", PlatformOperator: never})
+	require.NoError(t, err)
+	assert.Empty(t, resp.Events)
+
+	_, err = svc.List(context.Background(), service.ListEventsRequest{ProjectID: "proj_platform", PlatformOperator: never})
+	require.NoError(t, err)
+
+	stmts.EXPECT().GetProjectByID(gomock.Any(), "proj_gone").Return(nil, database.NewNoRowFoundError(nil)).Times(2)
+	resp, err = svc.List(context.Background(), service.ListEventsRequest{ProjectID: "proj_gone", PlatformOperator: never})
+	require.NoError(t, err)
+	assert.Empty(t, resp.Events)
+	_, err = svc.Get(context.Background(), "proj_gone", "evt_1", never)
+	require.ErrorIs(t, err, domain.ErrEventNotFound())
+}
+
+// A question that could not be answered fails the request: it is never an
+// empty page or a 404 (internal/AGENTS.md).
+func TestEventService_operatorCheckFailureIsAServerFault(t *testing.T) {
+	svc, stmts := newMockedEventServiceOnPlatform(t, "proj_platform")
+	expectUnclaimed(stmts, "proj_1", 2)
+	failed, _ := operatorAnswers(false, domain.ErrInternal(errors.New("database down")))
+
+	resp, err := svc.List(context.Background(), service.ListEventsRequest{ProjectID: "proj_1", PlatformOperator: failed})
+	require.ErrorIs(t, err, domain.ErrInternal(nil))
+	assert.Nil(t, resp)
+
+	_, err = svc.Get(context.Background(), "proj_1", "evt_1", failed)
+	require.ErrorIs(t, err, domain.ErrInternal(nil))
+	assert.NotErrorIs(t, err, domain.ErrEventNotFound())
 }
 
 func TestEventService_List_claimedAppliesFilters(t *testing.T) {
@@ -504,7 +555,7 @@ func TestEventService_Get_claimed(t *testing.T) {
 		ProjectID: "proj_1", ID: "evt_1", EventType: domain.EventTypeUserCreated,
 	}, nil)
 
-	got, err := svc.Get(context.Background(), "proj_1", "evt_1")
+	got, err := svc.Get(context.Background(), "proj_1", "evt_1", nil)
 	require.NoError(t, err)
 	assert.Equal(t, "evt_1", got.ID)
 }
