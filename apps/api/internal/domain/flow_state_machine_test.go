@@ -2624,6 +2624,35 @@ func TestFlowStateMachine_Process_PasskeyRegisterTakesTheSignupProofOnlyWithTheA
 	require.ErrorIs(t, err, domain.ErrFlowUnsupported())
 }
 
+// With no registration pending, only a passkey registration's attestation may
+// bring the sign-up proof. Another challenge response, such as a passkey
+// sign-in's assertion on a step that offers both, is refused with it.
+func TestFlowStateMachine_Process_SignupProofRefusedWithAnotherChallengeResponse(t *testing.T) {
+	t.Parallel()
+	w := newFlowTestWorld(t)
+	def := passkeyRegisterDefinition()
+	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
+
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+
+	_, err = w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionPasskeyRegister,
+		ChallengeResponse: &domain.FlowChallengeResponse{
+			ChallengeID: "assert-1",
+			Method:      domain.FlowChallengeMethodPasskey,
+			Proof:       []byte(`{}`),
+		},
+		GateProofs: map[string]string{domain.SignupGate: "pow-proof"},
+	})
+	require.ErrorIs(t, err, domain.ErrFlowUnsupported())
+}
+
 // A step announces the sign-up gate for as long as it carries a passkey
 // registration, so a client solves it for whatever it submits next. The
 // password path a person falls back to after a cancelled prompt brings the

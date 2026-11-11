@@ -2695,7 +2695,10 @@ func acceptsSignupProof(step *FlowDefinitionStep, state *FlowState, in FlowSubmi
 		return false
 	}
 	pending := state.PendingChallenge != nil && state.PendingChallenge.Method == FlowChallengeMethodPasskeyRegister
-	return pending || in.ChallengeResponse != nil
+	// Without a pending registration only its attestation may bring the
+	// proof: an assertion of a sign-in the step also offers creates nobody.
+	attests := in.ChallengeResponse != nil && in.ChallengeResponse.Method == FlowChallengeMethodPasskeyRegister
+	return pending || attests
 }
 
 // stepHasActionKind reports whether the step declares any action of the
