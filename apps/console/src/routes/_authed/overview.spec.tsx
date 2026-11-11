@@ -130,7 +130,7 @@ describe("project overview", () => {
       "href",
       scopedPath("/releases/rel_1"),
     );
-    expect(card.getByText("live")).toBeInTheDocument();
+    expect(card.getByText("Live")).toBeInTheDocument();
     expect(card.getByText("Add phone_number")).toBeInTheDocument();
     expect(card.getByRole("link", { name: "https://app.acme.com" })).toHaveAttribute(
       "href",

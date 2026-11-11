@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="680" height="530" viewBox="0 0 680 530" role="img" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <title>Parts of the webhook system</title>
+  <desc>An API request writes an event to the events table. A wake-up starts the delivery engine, which reads the webhooks table, filters and signs events and sends them to the customer's endpoint. A failed delivery schedules a delayed wake-up. Webhooks are managed through the console, the CLI and the API.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="#888780" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <style>
+      .box { fill: #F7F6F2; stroke: #B4B2A9; stroke-width: 1; }
+      .act { fill: #EEEDFE; stroke: #534AB7; stroke-width: 1; }
+      .th { font-size: 14px; font-weight: 500; fill: #2C2C2A; text-anchor: middle; dominant-baseline: central; }
+      .ts { font-size: 12px; fill: #5F5E5A; text-anchor: middle; dominant-baseline: central; }
+      .act-th { fill: #3C3489; }
+      .act-ts { fill: #534AB7; }
+      .arr { fill: none; stroke: #888780; stroke-width: 1.5; }
+      .legend { font-size: 12px; fill: #888780; dominant-baseline: central; }
+    </style>
+  </defs>
+
+  <rect class="box" x="250" y="30" width="180" height="56" rx="8"/>
+  <text class="th" x="340" y="48">API request</text>
+  <text class="ts" x="340" y="66">Writes an event</text>
+  <line class="arr" x1="340" y1="86" x2="340" y2="124" marker-end="url(#arrow)"/>
+
+  <rect class="box" x="250" y="126" width="180" height="56" rx="8"/>
+  <text class="th" x="340" y="144">Events table</text>
+  <text class="ts" x="340" y="162">Source of truth</text>
+  <line class="arr" x1="340" y1="182" x2="340" y2="220" marker-end="url(#arrow)"/>
+
+  <rect class="act" x="250" y="222" width="180" height="56" rx="8"/>
+  <text class="th act-th" x="340" y="240">Wake-up</text>
+  <text class="ts act-ts" x="340" y="258">In-process or queue</text>
+  <line class="arr" x1="340" y1="278" x2="340" y2="316" marker-end="url(#arrow)"/>
+
+  <rect class="act" x="250" y="318" width="180" height="56" rx="8"/>
+  <text class="th act-th" x="340" y="336">Delivery engine</text>
+  <text class="ts act-ts" x="340" y="354">Filter, sign, send</text>
+  <line class="arr" x1="340" y1="374" x2="340" y2="412" marker-end="url(#arrow)"/>
+
+  <rect class="box" x="250" y="414" width="180" height="56" rx="8"/>
+  <text class="th" x="340" y="432">Your endpoint</text>
+  <text class="ts" x="340" y="450">Verifies the signature</text>
+
+  <rect class="box" x="40" y="126" width="160" height="56" rx="8"/>
+  <text class="th" x="120" y="144">Console, CLI, API</text>
+  <text class="ts" x="120" y="162">Manage webhooks</text>
+  <line class="arr" x1="120" y1="182" x2="120" y2="316" marker-end="url(#arrow)"/>
+
+  <rect class="box" x="40" y="318" width="160" height="56" rx="8"/>
+  <text class="th" x="120" y="336">Webhooks table</text>
+  <text class="ts" x="120" y="354">Settings and cursor</text>
+  <line class="arr" x1="200" y1="346" x2="248" y2="346" marker-end="url(#arrow)"/>
+
+  <rect class="act" x="480" y="222" width="160" height="56" rx="8"/>
+  <text class="th act-th" x="560" y="240">Retry later</text>
+  <text class="ts act-ts" x="560" y="258">Delayed wake-up</text>
+  <path class="arr" d="M430 346 L560 346 L560 280" marker-end="url(#arrow)"/>
+  <line class="arr" x1="480" y1="250" x2="432" y2="250" marker-end="url(#arrow)"/>
+
+  <rect class="act" x="250" y="496" width="14" height="14" rx="3"/>
+  <text class="legend" x="272" y="503">Parts the trigger choice changes</text>
+</svg>
