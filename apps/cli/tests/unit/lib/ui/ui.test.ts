@@ -247,14 +247,14 @@ describe("Ui", () => {
       expect(printed()).toBe("");
     });
 
-    it("stops saying anything once released", () => {
-      const ui = normally();
+    it("stops drawing into its chain once released, and writes a later line plainly", () => {
+      const ui = watched();
 
       ui.bridgeNarration();
       ui.releaseNarration();
       log.info("after the command ended");
 
-      expect(printed()).toBe("");
+      expect(printed()).toBe("after the command ended\n");
     });
   });
 

@@ -22,7 +22,7 @@ class Collected {
 const installed: Narration[] = [];
 
 /** A narration installed as the sink, torn down however the test ends. */
-const drawn = (chain = new Collected(), options: { debug?: boolean } = {}) => {
+const drawn = (chain = new Collected(), options: { debug?: boolean; silent?: boolean } = {}) => {
   const narration = new Narration(chain);
   narration.install(options);
   installed.push(narration);
@@ -63,6 +63,16 @@ describe("Narration", () => {
     log.info("");
 
     expect(chain.lines).toEqual([`${stripAnsi(MARK.info)} `]);
+  });
+
+  it("draws nothing when it is silent, which is what --json asks for", () => {
+    const { chain } = drawn(new Collected(), { silent: true });
+
+    log.info("a statement");
+    log.warn("a warning");
+    log.fail("a failure");
+
+    expect(chain.lines).toEqual([]);
   });
 
   it("keeps debug detail back unless it was asked for", () => {

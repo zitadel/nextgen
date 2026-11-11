@@ -34,6 +34,7 @@ const MARKS: Readonly<Record<LogLevel, string>> = {
 export class Narration {
   private readonly chain: Narratable;
   private debug = false;
+  private silent = false;
   private release: (() => void) | undefined;
 
   constructor(chain: Narratable) {
@@ -49,12 +50,15 @@ export class Narration {
    * Draws narration until {@link restore}.
    *
    * @param options - `debug` also draws the detail that only `--debug` asks for.
+   *   `silent` draws nothing at all, which is what `--json` asks for: the sink
+   *   is installed so that a line is swallowed here, not written plainly.
    */
-  install(options: { debug?: boolean } = {}): void {
+  install(options: { debug?: boolean; silent?: boolean } = {}): void {
     if (this.release !== undefined) {
       return;
     }
     this.debug = options.debug ?? false;
+    this.silent = options.silent ?? false;
     this.release = installLogSink((level, text) => {
       this.draw(level, text);
     });
@@ -68,7 +72,7 @@ export class Narration {
 
   private draw(level: LogLevel, text: string): void {
     const body = text;
-    if (level === "debug" && !this.debug) {
+    if (this.silent || (level === "debug" && !this.debug)) {
       return;
     }
     if (this.chain.chained) {

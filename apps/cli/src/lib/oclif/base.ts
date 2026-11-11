@@ -510,10 +510,9 @@ export abstract class BaseCommand extends Interruptible(Command) {
     const named = this.constructor as typeof BaseCommand;
     this.ui.describe(named.heading ?? `zitadel ${(this.id ?? "").replaceAll(":", " ")}`.trim());
     // `--json` draws no narration, so the structured envelope is the only
-    // thing on stdout. `--debug` also draws the detail it asks for.
-    if (!json) {
-      this.ui.bridgeNarration({ debug });
-    }
+    // thing on stdout: its sink swallows every line, which no sink at all would
+    // not. `--debug` also draws the detail it asks for.
+    this.ui.bridgeNarration({ debug, silent: json });
     // Only a box carries the offer, so only a wizard looks for it, and a dry
     // run changes nothing, so it does not spend the one offer a machine gets.
     this.skillsOffered =

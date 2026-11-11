@@ -127,9 +127,10 @@ export class Ui {
    * the same marks written out. `--json` installs nothing, so nothing reaches
    * a terminal there.
    *
-   * @param options - `debug` also draws the detail that only `--debug` asks for.
+   * @param options - `debug` also draws the detail that only `--debug` asks for;
+   *   `silent` draws nothing, for `--json`.
    */
-  bridgeNarration(options: { debug?: boolean } = {}): void {
+  bridgeNarration(options: { debug?: boolean; silent?: boolean } = {}): void {
     this.narration.install(options);
   }
 

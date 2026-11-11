@@ -12,7 +12,18 @@ export type LogSink = (level: LogLevel, text: string) => void;
 let sink: LogSink | undefined;
 
 function emit(level: LogLevel, args: readonly unknown[]): void {
-  sink?.(level, format(...args));
+  const text = format(...args);
+  if (sink !== undefined) {
+    sink(level, text);
+    return;
+  }
+  // Nothing is drawing: code that runs outside a command, such as the root help
+  // page, still has to be heard. `--json` is silent because it installs a sink
+  // that draws nothing, not because there is none.
+  if (level === "debug") {
+    return;
+  }
+  (level === "warn" || level === "fail" ? process.stderr : process.stdout).write(`${text}\n`);
 }
 
 /**
@@ -38,8 +49,9 @@ export function installLogSink(next: LogSink): () => void {
  *
  * It names no look: the sink installed by the running command decides whether
  * a line is a chain line with its mark, a plain line, or nothing at all
- * (`--json` installs none). Code that logs therefore never needs to know which
- * kind of command it is running under, or be handed the UI to talk to.
+ * (`--json` installs a sink that draws nothing). Code that logs therefore never
+ * needs to know which kind of command it is running under, or be handed the UI
+ * to talk to. With no sink installed, a line is written plainly.
  */
 export const log = {
   /** A statement of fact: what was found, or where a command is pointed. */

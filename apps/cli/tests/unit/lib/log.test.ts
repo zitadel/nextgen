@@ -14,10 +14,29 @@ afterEach(() => {
 });
 
 describe("log", () => {
-  it("says nothing when no command has installed a sink", () => {
-    expect(() => {
-      log.info("nobody is listening");
-    }).not.toThrow();
+  it("writes a line plainly when no command has installed a sink, so code outside a command is heard", () => {
+    const written: string[] = [];
+    const out = process.stdout.write;
+    const err = process.stderr.write;
+    process.stdout.write = ((chunk: string) => {
+      written.push(`out:${chunk}`);
+      return true;
+    }) as typeof process.stdout.write;
+    process.stderr.write = ((chunk: string) => {
+      written.push(`err:${chunk}`);
+      return true;
+    }) as typeof process.stderr.write;
+    try {
+      log.plain("the skills offer");
+      log.info("a statement");
+      log.warn("a warning");
+      log.debug("a detail nobody asked for");
+    } finally {
+      process.stdout.write = out;
+      process.stderr.write = err;
+    }
+
+    expect(written).toEqual(["out:the skills offer\n", "out:a statement\n", "err:a warning\n"]);
   });
 
   it.each([

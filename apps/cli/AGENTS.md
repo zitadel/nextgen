@@ -121,7 +121,8 @@
   imports `lib/oclif`.
 - Say what a command is doing with `log` (`src/lib/log.ts`) from a command or a
   library alike, never a logger or stream of your own: the running command's
-  sink decides the look, and `--json` installs none. A unit test fails on a
+  sink decides the look, and `--json` installs one that draws nothing; with no
+  sink installed, a line is written plainly. A unit test fails on a
   `consola` import.
 - Report a warning through `reportWarning` (`src/lib/warnings.ts`) or a
   result's `warnings`, never `log.warn`: `--json` silences `log`. A unit test
