@@ -13,7 +13,7 @@ import (
 
 // Pins the events resource-flavored answers through the resolver gate.
 func TestEventsAccessRow(t *testing.T) {
-	stmts := stubAuthzStmts{}
+	stmts := stubAuthzStmts{granted: []string{"proj_a"}}
 	operator := WithScopeContext(context.Background(), ScopeContext{
 		ProjectID:     "proj_a",
 		Scope:         []string{"project.write", "project.read"},
