@@ -81,14 +81,19 @@ describe("detail rows", () => {
     expect(list?.lastElementChild).toHaveTextContent("Created by");
   });
 
-  it("keeps a list a list: rules are presentational items", () => {
-    render(
+  it("keeps a list a list: it holds only its items, each rule inside one", () => {
+    const { container } = render(
       <DetailRows as="ul">
         <DetailRow label="Password">Not set</DetailRow>
         <DetailRow label="Passkey">Not set up</DetailRow>
       </DetailRows>,
     );
     expect(screen.getAllByRole("listitem")).toHaveLength(2);
+    // axe's `list` rule: no `role="none"` items or bare rules beside the rows.
+    const list = container.querySelector("ul");
+    expect([...(list?.children ?? [])].map((child) => child.tagName)).toEqual(["LI", "LI"]);
+    expect([...(list?.children ?? [])].some((child) => child.hasAttribute("role"))).toBe(false);
+    expect(list?.children[1]?.querySelector("[data-slot=separator]")).not.toBeNull();
   });
 });
 

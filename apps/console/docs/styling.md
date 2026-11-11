@@ -219,8 +219,9 @@ row and cards 16px apart (`DETAIL_STACK`).
 
 - A body card with a titled section is a `DetailSection`: the title, with an
   optional `aside` on the label rail (a login flow's or a user's schema and
-  its `RevisionLink`) and `action` at the row's end, a rule, then the
-  content. A single name field with its Save button is a
+  its `RevisionLink`) and `action` at the row's end, an optional
+  `description` (a muted sentence about the whole section) under them, a
+  rule, then the content. A single name field with its Save button is a
   `RenameCard` (`src/components/rename-card.tsx`).
 - A labelled value is a `DetailRow`, its value in `DETAIL_VALUE`, and a card's
   rows sit in `DetailRows`. Do not lay out a label and value by hand: every
