@@ -60,8 +60,9 @@ export function cliSample(
   const positionals = pathParameterNames(path).map((name) => word(request.path[name]?.value ?? ""));
 
   if (topic === "variable") {
-    return variableFits(verb, request)
-      ? variables(verb, positionals, request)
+    const kind = request.query.kind?.values[0];
+    return variableFits(verb, kind, request)
+      ? variables(verb, positionals, kind, request)
       : apiSample(operation, path, request);
   }
 
@@ -126,11 +127,11 @@ function listFlags(request: RequestData): string[] {
   return flags;
 }
 
-// Whether the variable command says what the request does. `set` and `rm`
-// write both kinds unless `--preview`, so a primary-only request has no command,
-// and `set` takes only a string for a secret.
-function variableFits(verb: string | undefined, request: RequestData): boolean {
-  if ((verb === "set" || verb === "rm") && request.query.kind?.values[0] === "primary") {
+// Whether the variable command says what the request does. `set`, `rm` and
+// `list` address both kinds unless `--preview`, so a primary-only request has no
+// command, and `set` takes only a string for a secret.
+function variableFits(verb: string | undefined, kind: unknown, request: RequestData): boolean {
+  if (kind === "primary" && (verb === "set" || verb === "rm" || verb === "list")) {
     return false;
   }
   return !Object.values(record(request.body)).some((value) => {
@@ -144,8 +145,13 @@ function variableFits(verb: string | undefined, request: RequestData): boolean {
 // from stdin, so a credential stays out of the shell's history. A body sets
 // many variables at once, so it is a command for each, and the `null` that
 // removes one is an `rm`. `kind=preview` is `--preview`.
-function variables(verb: string | undefined, positionals: string[], request: RequestData): string {
-  const preview = request.query.kind?.values[0] === "preview" ? ["--preview"] : [];
+function variables(
+  verb: string | undefined,
+  positionals: string[],
+  kind: unknown,
+  request: RequestData,
+): string {
+  const preview = kind === "preview" ? ["--preview"] : [];
   if (verb !== "set") {
     return `${context}\n${line([`${cli} variable ${verb}`, ...positionals], preview)}`;
   }
