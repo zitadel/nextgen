@@ -143,10 +143,6 @@ webhook-signature: v1,K5oZfzN95Z9UVu1EsfQmfVNQhnkZ2pj9o9NDN/H/pI4=
 
 ### 4. Delivery
 
-<<<<<<< HEAD
-The shipper delivers, with the cursor and the settled-events bound of
-ADR 049. What changes for a project's webhook:
-=======
 ![An API request writes an event to the events table; a wake-up starts the delivery engine, which reads the webhooks table and sends signed events to the endpoint; a failed delivery asks for a delayed wake-up.](../assets/adr-088-webhook-system.svg)
 
 The shipper delivers, with the cursor and the settled-events bound of
@@ -164,7 +160,6 @@ wake-up only says that a project has something new:
   next event.
 
 What changes for a project's webhook:
->>>>>>> origin/webhooks/adr
 
 - **Start.** The cursor is set when the webhook is created, so a new webhook
   gets no history. Changing `url` keeps the cursor.
@@ -247,19 +242,11 @@ disable it and rotate its secret.
 
 ## Open questions
 
-<<<<<<< HEAD
-- **The hosted cloud.** A function runs only while it serves a request, so
-  the shipper's timer does not run there, as the retention purge's did not
-  (ADR 049, amendment 2026-10-27). A `/cron/events-export` trigger is the same
-  fix and delivers at best once a minute; a queue in `apps/cloud-functions`
-  delivers sooner and is new infrastructure.
-=======
 - **The hosted cloud's queue.** Vercel Queues is in beta, publishing needs
   the platform's OIDC token from a Go function, and
   [ADR 084](084-hosted-cloud-business-systems.md) decided against a queue of
   our own for usage. Here it is one message per project with something new,
   not one per event.
->>>>>>> origin/webhooks/adr
 - **A lost rotate response.** Rotating again drops the secret the endpoint
   still uses, so its deliveries fail until it has the newest one. An
   `Idempotency-Key` would let the caller repeat the request and get the same
