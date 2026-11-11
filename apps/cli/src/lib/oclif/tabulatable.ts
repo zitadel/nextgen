@@ -251,7 +251,13 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
      */
     private async listSummary(view: ListView, more: readonly string[]): Promise<Summary> {
       if (view.rows.length === 0) {
-        return { title: escapeControlCharacters(view.empty).replace(/\.$/, ""), sections: [] };
+        // A page can be empty while more remain, so the way to the next one is
+        // said under it, as it is under a page with rows.
+        return {
+          title: escapeControlCharacters(view.empty).replace(/\.$/, ""),
+          sections: [],
+          ...(more.length === 0 ? {} : { extras: [...more] }),
+        };
       }
       const plural = view.plural ?? `${view.singular}s`;
       return {

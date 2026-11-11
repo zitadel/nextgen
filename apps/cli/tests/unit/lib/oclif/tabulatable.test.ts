@@ -434,6 +434,10 @@ describe("emitList", () => {
     expect(result).toMatchObject({
       data: { items: [], next_page_token: "p2" },
       pretty: { text: "No things on this page.\nMore available: --page-token p2 (or --all)" },
+      summary: {
+        title: "No things on this page",
+        extras: ["More available: --page-token p2 (or --all)"],
+      },
     });
   });
 
