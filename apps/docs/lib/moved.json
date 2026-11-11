@@ -26,6 +26,8 @@
   "/docs/reference/api/event-webhooks/authzRevoked": "/docs/reference/api/event-webhooks/eventStored",
   "/docs/reference/api/event-webhooks/brandingCreated": "/docs/reference/api/event-webhooks/eventStored",
   "/docs/reference/api/event-webhooks/deploymentCreated": "/docs/reference/api/event-webhooks/eventStored",
+  "/docs/reference/api/event-webhooks/flowSignupChallengeConsumed": "/docs/reference/api/event-webhooks/eventStored",
+  "/docs/reference/api/event-webhooks/flowSignupChallengeIssued": "/docs/reference/api/event-webhooks/eventStored",
   "/docs/reference/api/event-webhooks/flowdefCreated": "/docs/reference/api/event-webhooks/eventStored",
   "/docs/reference/api/event-webhooks/flowdefDeleted": "/docs/reference/api/event-webhooks/eventStored",
   "/docs/reference/api/event-webhooks/flowdefUpdated": "/docs/reference/api/event-webhooks/eventStored",

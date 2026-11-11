@@ -240,7 +240,7 @@ func TestAuthAttemptService_PasskeyRegistration_integration(t *testing.T) {
 			service.NewUserService(pool, pool.Statements(), service.FixedProjectHasherResolver{Hasher: hasher}, noPolicyGate(t), service.StatementsUserRefResolver{Pool: pool}, domain.BuiltinSchemaBases{}),
 			pool.Statements(),
 			pool,
-		)
+			stubSignupProtection{})
 
 		attempt, err := svc.Create(t.Context(), service.CreateAuthAttemptInput{ProjectID: projectID})
 		require.NoError(t, err)

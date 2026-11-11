@@ -21,6 +21,7 @@ var regexMap = map[string]ogenregex.Regexp{
 	"^(\\*|[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+)$":                                            ogenregex.MustCompile("^(\\*|[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+)$"),
 	"^(https://[^\\s/?#]+|http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?)(/[^\\s?#]*)?$":   ogenregex.MustCompile("^(https://[^\\s/?#]+|http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?)(/[^\\s?#]*)?$"),
 	"^(https://[^\\s/?#]+|http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?)([/?][^\\s#]*)?$": ogenregex.MustCompile("^(https://[^\\s/?#]+|http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?)([/?][^\\s#]*)?$"),
+	"^[0-9a-f]{32}$":        ogenregex.MustCompile("^[0-9a-f]{32}$"),
 	"^[A-Za-z0-9_.~@-]+$":   ogenregex.MustCompile("^[A-Za-z0-9_.~@-]+$"),
 	"^[^$]":                 ogenregex.MustCompile("^[^$]"),
 	"^[a-z0-9][a-z0-9_-]*$": ogenregex.MustCompile("^[a-z0-9][a-z0-9_-]*$"),

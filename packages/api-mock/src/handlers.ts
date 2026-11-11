@@ -1,3 +1,4 @@
+import { signupGate, validSignupProof } from "./fixtures/signup-pow.js";
 /**
  * MSW handler factory for the mock Flow API.
  *
@@ -510,6 +511,16 @@ export function setupMockHandlers(
         iss,
       };
 
+      if (
+        before === "register-password" &&
+        body.action === "submit" &&
+        !validSignupProof(body.gate_proofs?.signup_pow, snapshot.context.sessionToken)
+      ) {
+        return HttpResponse.json(
+          { code: "flow.proof_invalid", message: "signup proof is missing or invalid" },
+          { status: 403 },
+        );
+      }
       const outcome = accountOutcome(before, body.action, email);
 
       // With account routing the collision is the switch to sign-in, as the
@@ -622,7 +633,15 @@ export function setupMockHandlers(
     }),
     getGetFlowStepMockHandler(async ({ params }) => {
       captured.push({ kind: "getFlowStep", flowId: String(params.id) });
-      return currentResponse();
+      const response = await currentResponse();
+      // As on the server, only GET prepares the announced signup challenge.
+      if (response.step.gates.signup_pow) {
+        response.step.gates = {
+          ...response.step.gates,
+          ...signupGate(actor.getSnapshot().context.sessionToken),
+        };
+      }
+      return response;
     }),
     // Both mounts the engine serves (`internal/api/flow_sso.go`): the
     // published path, and the one an SDK proxy forwards after stripping its
