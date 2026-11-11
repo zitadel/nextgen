@@ -122,7 +122,7 @@ describe("release detail", () => {
 
     expect(await screen.findByRole("heading", { name: "rel_1" })).toBeInTheDocument();
     // Nothing has been deployed, so no origin serves the release.
-    expect(screen.getByText("inactive")).toBeInTheDocument();
+    expect(screen.getByText("Inactive")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Copy Release ID" })).toBeInTheDocument();
 
     // One h2 per card, in visual order, and the pinned groups as h3s inside
@@ -267,7 +267,7 @@ describe("release detail", () => {
 
     await screen.findByRole("heading", { name: "rel_1" });
     expect(screen.getByText("Revoked")).toBeInTheDocument();
-    expect(screen.queryByText("inactive")).not.toBeInTheDocument();
+    expect(screen.queryByText("Inactive")).not.toBeInTheDocument();
   });
 
   it("lists where the release went, marking what is still served", async () => {
@@ -290,17 +290,17 @@ describe("release detail", () => {
     const rows = within(card).getAllByRole("list");
     expect(rows).toHaveLength(2);
     // The header says the release is live too: the preview still serves it.
-    expect(screen.getAllByText("live")).toHaveLength(2);
+    expect(screen.getAllByText("Live")).toHaveLength(2);
 
     // Newest first: the preview, still served.
     expect(within(card).getByText("Preview")).toBeInTheDocument();
-    expect(within(card).getByText("live")).toBeInTheDocument();
+    expect(within(card).getByText("Live")).toBeInTheDocument();
     expect(
       within(card).getByRole("link", { name: "https://acme-k3x9v2.vercel.app" }),
     ).toHaveAttribute("href", "https://acme-k3x9v2.vercel.app");
     // Then the primary deployment, superseded, with each origin it named.
     expect(within(card).getByText("Primary")).toBeInTheDocument();
-    expect(within(card).getByText("inactive")).toBeInTheDocument();
+    expect(within(card).getByText("Inactive")).toBeInTheDocument();
     expect(within(card).getByRole("link", { name: "https://app.acme.com" })).toBeInTheDocument();
     expect(within(card).getByRole("link", { name: "https://www.acme.com" })).toBeInTheDocument();
     expect(within(card).getByText(formatDateTime(DEPLOYED_AT))).toBeInTheDocument();

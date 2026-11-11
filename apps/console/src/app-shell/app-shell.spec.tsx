@@ -139,6 +139,20 @@ describe("app shell navigation", () => {
     expect(linkedRows).toHaveLength(NAV_ORDER.length);
   });
 
+  it("marks with an arrow the one row that swaps the list for its own", async () => {
+    renderShell();
+    await screen.findByRole("link", { name: /^Users/ });
+    const nav = within(screen.getByRole("navigation", { name: "Primary" }));
+
+    // Logs opens Logs' list. The project's Settings is a screen beside the
+    // others, whatever it shares a name with.
+    const arrowed = nav
+      .getAllByRole("link")
+      .filter((link) => link.querySelector("[data-opens-list]"))
+      .map((link) => link.textContent?.trim());
+    expect(arrowed).toEqual(["Logs"]);
+  });
+
   it("draws the home, Projects, in the frame every screen has", async () => {
     // Several to choose from, so `/` lands on Projects with nothing selected.
     server.use(
@@ -164,6 +178,13 @@ describe("app shell navigation", () => {
     expect(nav.getByRole("link", { name: "Projects" })).toHaveAttribute("data-active", "true");
     // One row for Settings: its pages are its own list's, not repeated here.
     expect(nav.getByRole("link", { name: "Settings" })).toHaveAttribute("href", "/settings");
+    // It and Logs each open a list of their own, and say so with an arrow.
+    expect(
+      nav
+        .getAllByRole("link")
+        .filter((link) => link.querySelector("[data-opens-list]"))
+        .map((link) => link.textContent?.trim()),
+    ).toEqual(["Logs", "Settings"]);
     expect(screen.queryByRole("navigation", { name: "Primary" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Switch project" })).toHaveTextContent(
       "All projects",
@@ -385,6 +406,10 @@ describe("settings view", () => {
       SETTINGS_ORDER,
     );
     expect(nav.getByRole("link", { name: "Profile" })).toHaveAttribute("data-active", "true");
+    // A row of the list it is already in opens no other.
+    expect(
+      nav.getByRole("link", { name: "Profile" }).querySelector("[data-opens-list]"),
+    ).toBeNull();
     // The project's list and the account's are gone rather than sitting
     // underneath it.
     expect(screen.queryByRole("navigation", { name: "Primary" })).not.toBeInTheDocument();
@@ -1440,7 +1465,9 @@ describe("search", () => {
     await user.click(await dialog.findByRole("option", { name: /Copy project ID/ }));
 
     expect(await screen.findByText("Project ID copied")).toBeInTheDocument();
-    expect(await navigator.clipboard.readText()).toBe("proj_1");
+    // Read inside `waitFor`: the closed palette still settles its typing
+    // pause, and a bare await here lets that update land outside act().
+    await waitFor(async () => expect(await navigator.clipboard.readText()).toBe("proj_1"));
   });
 
   it("lists what was opened from it, until something is typed", async () => {
