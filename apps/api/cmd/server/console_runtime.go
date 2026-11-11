@@ -43,6 +43,14 @@ type consoleRuntime struct {
 	// it carries `project.read` only and no management operation accepts
 	// it (`internal/api/authz.go`).
 	PublishableKey string `json:"publishable_key,omitempty"`
+	// PlatformProjectID marks the sign-in project as the deployment's
+	// reserved platform project (Console ADR 0004 §3, D41): present, and equal
+	// to ConsoleProjectID, only when that is the built-in row bootstrap
+	// provisioned. The console draws that project's surfaces at its root and
+	// never offers it as a project. A pin to an ordinary project and the
+	// first-created fallback leave it out, so a self-hoster's only project
+	// stays a project.
+	PlatformProjectID string `json:"platform_project_id,omitempty"`
 }
 
 // runtimeResolver produces the current runtime document. Resolved per
@@ -69,6 +77,7 @@ func standaloneRuntimeResolver(
 			return meta, nil
 		}
 		meta.ConsoleProjectID = project.ID
+		meta.PlatformProjectID = domain.ReservedPlatformProjectID(project.ID)
 
 		key, err := publishableKey(ctx, tokens, keys, project)
 		if err != nil {

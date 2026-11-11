@@ -20,6 +20,20 @@ const (
 // project. Readable body per ADR 047 §3.3; operators never author it.
 var PlatformProjectID = PrefixProject.IDPrefix("platform") // "proj_platform"
 
+// ReservedPlatformProjectID is the deployment's reserved platform project
+// (Console ADR 0004 §2, D41), given the project the deployment treats as its
+// platform project: that project when it is the built-in row, else "". Only
+// the bootstrap provisioner writes that row (POST /projects never mints its
+// id), so its id is the persisted marker. A platform.project_id pin naming an
+// ordinary project is not reserved: it is a self-hoster's own project, which
+// the console keeps showing as one.
+func ReservedPlatformProjectID(platformProjectID string) string {
+	if platformProjectID == PlatformProjectID {
+		return platformProjectID
+	}
+	return ""
+}
+
 func ErrProjectNameInvalid() Error {
 	return newError(PrefixProject.ErrorCodePrefix("name_invalid"), "The project name is invalid. Expected a non-empty string.", nil, nil)
 }

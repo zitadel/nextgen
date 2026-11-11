@@ -21,6 +21,11 @@ get:
     With `project_id`, the projects are listed only when the session belongs to
     that project. It names the project the session was signed in to, not one to
     list.
+
+    With `exclude_platform`, the deployment's reserved platform project is left
+    out: the project the console signs in to, which holds the console's
+    accounts rather than an application's users. A deployment without one lists
+    the same projects either way.
   tags:
     - Projects
   security:
@@ -58,6 +63,18 @@ get:
       schema:
         $ref: ../../../../components/schemas/sort-direction.yaml
       example: desc
+    # Console ADR 0004 §3 (D41): the console lists customer projects only and
+    # draws the platform project's surfaces at its root.
+    - name: exclude_platform
+      in: query
+      required: false
+      description: |
+        Leaves out the deployment's reserved platform project, the one the
+        console signs in to. Defaults to `false`. Send the same value with
+        every `page_token` the list returns.
+      schema:
+        type: boolean
+      example: true
     - $ref: ../../../../components/parameters/session-project-id.yaml
   responses:
     '200':

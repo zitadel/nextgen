@@ -1397,6 +1397,10 @@ func (UnimplementedHandler) ListMyPasskeys(ctx context.Context, params ListMyPas
 // With `project_id`, the projects are listed only when the session belongs to
 // that project. It names the project the session was signed in to, not one to
 // list.
+// With `exclude_platform`, the deployment's reserved platform project is left
+// out: the project the console signs in to, which holds the console's
+// accounts rather than an application's users. A deployment without one lists
+// the same projects either way.
 //
 // GET /users/me/projects
 func (UnimplementedHandler) ListMyProjects(ctx context.Context, params ListMyProjectsParams) (r ListMyProjectsRes, _ error) {
