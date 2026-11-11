@@ -136,13 +136,11 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
     const effects: string[] = [];
     if (dropped.length > 0) {
       effects.push(
-        `${escapeControlCharacters(new Intl.ListFormat("en", { type: "conjunction" }).format(dropped))} refuse sign-in until the next deploy`,
+        `${escapeControlCharacters(dropped.join(", "))} refuse sign-in until the next deploy`,
       );
     }
     if (restored.length > 0) {
-      effects.push(
-        `${escapeControlCharacters(new Intl.ListFormat("en", { type: "conjunction" }).format(restored))} serve it again`,
-      );
+      effects.push(`${escapeControlCharacters(restored.join(", "))} serve it again`);
     }
     let consequence = "";
     if (effects.length > 0) {
