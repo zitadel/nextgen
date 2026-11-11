@@ -75,6 +75,20 @@ describe("preview rm", () => {
 describe("preview rm asked about a URL with a control character", () => {
   it("spells the character out in the question it asks a person", async () => {
     const { cwd } = await aProjectWithPreviewsOnTwoPages();
+    server.use(
+      http.get("*/api/v1/projects/:project_id/previews", () => {
+        return HttpResponse.json({
+          previews: [
+            {
+              origin: "https://pr-1\u001b[31m.app.acme.com",
+              expires_at: "2026-02-01T00:00:00.000Z",
+              created_at: "2026-01-01T00:00:00.000Z",
+            },
+          ],
+          next_page_token: null,
+        });
+      }),
+    );
 
     const result = await runCliForTest([
       "preview",

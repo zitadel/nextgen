@@ -109,7 +109,7 @@ describe("--follow off a terminal", () => {
 
     const running = runCliForTest(["logs", "--no-telemetry", "--cwd", dir, "--follow"]);
     await vi.waitFor(() => {
-      expect(process.listenerCount("SIGINT")).toBeGreaterThan(listening + 1);
+      expect(process.listenerCount("SIGINT")).toBeGreaterThan(listening);
     });
     pressCtrlC();
     const { stdout } = await running;

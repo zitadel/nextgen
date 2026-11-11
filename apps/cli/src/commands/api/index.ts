@@ -470,9 +470,11 @@ export default class Api extends Destructive(EnvironmentCommand) {
     const { values } = this.environment;
     const named = values.ZITADEL_URL?.value;
     const server = named ?? DEFAULT_SERVER;
+    const projectId = named === undefined ? undefined : values.ZITADEL_PROJECT_ID?.value;
+    this.ui.ranAgainst(projectId, server);
     return {
       server,
-      projectId: named === undefined ? undefined : values.ZITADEL_PROJECT_ID?.value,
+      projectId,
       client: createZitadelClient({
         userAgent: userAgent(),
         baseUrl: server,
