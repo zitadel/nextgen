@@ -4,7 +4,7 @@
 > **Date:** 2026-05-26
 > **Context:** Flow engine gates, bot detection, captcha providers, edge/platform risk signals
 
-> **Implemented slice (2026-11-03):** Password signup uses ZITADEL-owned PBKDF2
+> **Implemented slice (2026-11-03):** Password and passkey signup use ZITADEL-owned PBKDF2
 > proof of work, a native browser solver, database-backed single-use proofs and
 > fixed per-flow retry limits. See the [implementation](../design/flowengine/bot-protection-implementation.md).
 > The broader provider/CEL/signal design below remains proposed.
@@ -15,10 +15,11 @@ The turnkey implementation is internal PBKDF2, with no ALTCHA server or library.
 This supersedes the proposed built-in ALTCHA choice below. The runtime injects
 `gates.signup_pow` with `kind: captcha`, `provider: zitadel_pow` and a typed public
 `challenge`. The existing `gate_proofs` submission channel carries its solution.
-Enforcement lives in the shared `create_user` handler before password hashing;
+Enforcement lives in the shared `create_user` handler before password hashing,
+and in the passkey registration before an attestation creates its user;
 proofs are not authentication factors and do not go through `auth_attempts`.
 
-A proof permits one password signup attempt scoped to its project and flow.
+A proof permits one signup attempt scoped to its project and flow.
 Storage atomically consumes it, including when the subsequent mutation fails.
 Pending challenges are reused across renders and expire after five minutes.
 The only active profile is PBKDF2-SHA256, 5,000 iterations and up to 512 trials.
