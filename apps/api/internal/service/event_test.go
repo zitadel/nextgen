@@ -324,7 +324,23 @@ func TestEventService_List_plansEachReadOntoAnIndex(t *testing.T) {
 	one := func(within ...database.Filter[domain.EventField]) []database.Filter[domain.EventField] {
 		return []database.Filter[domain.EventField]{base(within...)}
 	}
+	// The operation_status keys of operations in classes, operation by
+	// operation.
+	keys := func(operations, classes []string) []string {
+		var keys []string
+		for _, operation := range operations {
+			for _, class := range classes {
+				keys = append(keys, operation+" "+class)
+			}
+		}
+		return keys
+	}
+	// One range per operation and status class.
+	byOperation := func(operations, classes []string) []database.Filter[domain.EventField] {
+		return each(domain.EventFieldOperationStatus, keys(operations, classes))
+	}
 	everyCategory := []string{"request", "auth", "session", "admin", "entity", "signal"}
+	everyClass := []string{"1xx", "2xx", "3xx", "4xx", "5xx"}
 	after := time.Date(2026, 11, 3, 8, 0, 0, 0, time.UTC)
 
 	for name, tc := range map[string]struct {
@@ -413,9 +429,85 @@ func TestEventService_List_plansEachReadOntoAnIndex(t *testing.T) {
 			match: database.And(equal(domain.EventFieldClientID, "app_1"), equal(domain.EventFieldTeamID, "team_1")),
 		},
 		"what no index holds is matched over the range of what one does": {
-			req:   service.ListEventsRequest{Categories: []string{"auth"}, EntityType: "user", Fingerprint: "fp_1"},
+			req:   service.ListEventsRequest{Categories: []string{"auth"}, Fingerprint: "fp_1"},
 			scans: each(domain.EventFieldCategory, []string{"auth"}),
-			match: database.And(equal(domain.EventFieldFingerprint, "fp_1"), equal(domain.EventFieldEntityType, "user")),
+			match: database.And(equal(domain.EventFieldFingerprint, "fp_1")),
+		},
+		"one resource type, every category: its index is by category": {
+			req:   service.ListEventsRequest{EntityType: "user"},
+			lists: each(domain.EventFieldCategory, everyCategory, equal(domain.EventFieldEntityType, "user")),
+		},
+		"one resource type, some categories": {
+			req:   service.ListEventsRequest{EntityType: "user", Categories: []string{"auth", "entity"}},
+			lists: each(domain.EventFieldCategory, []string{"auth", "entity"}, equal(domain.EventFieldEntityType, "user")),
+		},
+		"a resource beside its type: the resource reads, the type is matched": {
+			req:   service.ListEventsRequest{EntityType: "user", EntityID: "user_2", Categories: []string{"entity"}},
+			scans: each(domain.EventFieldCategory, []string{"entity"}, equal(domain.EventFieldEntityID, "user_2")),
+			match: database.And(equal(domain.EventFieldEntityType, "user")),
+		},
+		"a resource type beside a type: the resource type reads, by category": {
+			req:   service.ListEventsRequest{EntityType: "user", EventTypes: []string{"user.created"}, Fingerprint: "fp_1"},
+			scans: each(domain.EventFieldCategory, everyCategory, equal(domain.EventFieldEntityType, "user")),
+			match: database.And(equal(domain.EventFieldEventType, "user.created"), equal(domain.EventFieldFingerprint, "fp_1")),
+		},
+		"one operation, every status class: its index is by status class": {
+			req:   service.ListEventsRequest{OperationIDs: []string{"createUser"}},
+			lists: byOperation([]string{"createUser"}, everyClass),
+		},
+		"operations in some status classes, each named once": {
+			req: service.ListEventsRequest{
+				OperationIDs:  []string{"createUser", "deleteUser", "createUser"},
+				StatusClasses: []string{"4xx", "5xx", "4xx"},
+			},
+			lists: byOperation([]string{"createUser", "deleteUser"}, []string{"4xx", "5xx"}),
+		},
+		"one status class": {
+			req:   service.ListEventsRequest{StatusClasses: []string{"5xx"}},
+			lists: each(domain.EventFieldStatusClass, []string{"5xx"}),
+		},
+		"several status classes: the failed requests": {
+			req:   service.ListEventsRequest{StatusClasses: []string{"4xx", "5xx"}},
+			lists: each(domain.EventFieldStatusClass, []string{"4xx", "5xx"}),
+		},
+		"the time bounds narrow an operation's ranges": {
+			req: service.ListEventsRequest{OperationIDs: []string{"createUser"}, StatusClasses: []string{"5xx"}, CreatedAfter: &after},
+			lists: each(domain.EventFieldOperationStatus, []string{"createUser 5xx"},
+				database.GreaterThanOrEqual(database.Col(domain.EventFieldCreatedAt), after)),
+		},
+		"an operation beside a session: the session reads, the operation in its classes is matched": {
+			req:   service.ListEventsRequest{SessionID: "sess_1", OperationIDs: []string{"createUser"}, StatusClasses: []string{"4xx", "5xx"}},
+			scans: each(domain.EventFieldCategory, everyCategory, equal(domain.EventFieldSessionID, "sess_1")),
+			match: database.And(database.Or(
+				equal(domain.EventFieldOperationStatus, "createUser 4xx"),
+				equal(domain.EventFieldOperationStatus, "createUser 5xx"),
+			)),
+		},
+		"a status class beside an actor: the actor reads, the class is matched": {
+			req:   service.ListEventsRequest{ActorID: "user_1", StatusClasses: []string{"5xx"}, Categories: []string{"request"}},
+			scans: each(domain.EventFieldCategory, []string{"request"}, equal(domain.EventFieldActorID, "user_1")),
+			match: database.And(equal(domain.EventFieldStatusClass, "5xx")),
+		},
+		"an operation beside a request: the request reads, the operation in every class is matched": {
+			req:   service.ListEventsRequest{RequestID: "req_1", OperationIDs: []string{"createUser"}},
+			scans: one(equal(domain.EventFieldRequestID, "req_1")),
+			match: database.And(database.Or(
+				equal(domain.EventFieldOperationStatus, "createUser 1xx"),
+				equal(domain.EventFieldOperationStatus, "createUser 2xx"),
+				equal(domain.EventFieldOperationStatus, "createUser 3xx"),
+				equal(domain.EventFieldOperationStatus, "createUser 4xx"),
+				equal(domain.EventFieldOperationStatus, "createUser 5xx"),
+			)),
+		},
+		"an operation beside a type and a category: the operation reads": {
+			req:   service.ListEventsRequest{OperationIDs: []string{"createUser"}, EventTypes: []string{"request.api"}, Categories: []string{"request"}},
+			scans: byOperation([]string{"createUser"}, everyClass),
+			match: database.And(equal(domain.EventFieldCategory, "request"), equal(domain.EventFieldEventType, "request.api")),
+		},
+		"a status class beside a type: the class reads": {
+			req:   service.ListEventsRequest{StatusClasses: []string{"5xx"}, EventTypes: []string{"request.api"}},
+			scans: each(domain.EventFieldStatusClass, []string{"5xx"}),
+			match: database.And(equal(domain.EventFieldEventType, "request.api")),
 		},
 	} {
 		t.Run(name, func(t *testing.T) {

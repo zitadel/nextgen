@@ -12,6 +12,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/deployment"
 	"github.com/zitadel/nextgen/internal/storage/dialect/authz"
 	"github.com/zitadel/nextgen/internal/storage/dialect/schematest"
+	"github.com/zitadel/nextgen/internal/storage/events"
 	"github.com/zitadel/nextgen/internal/storage/flowdefinition"
 	"github.com/zitadel/nextgen/internal/storage/idpconnection"
 	"github.com/zitadel/nextgen/internal/storage/idpidentitylink"
@@ -46,6 +47,7 @@ func sharedSchemaColumns(t *testing.T) []schematest.ColumnNullability {
 	cols = append(cols, schematest.Columns("authz_membership_edges", authz.MembershipEdgeSchema)...)
 	cols = append(cols, schematest.Columns("authz_assignments", authz.AuthzAssignmentSchema)...)
 	cols = append(cols, schematest.Columns("idp_identity_links", idpidentitylink.Schema)...)
+	cols = append(cols, schematest.Columns("events", events.Schema)...)
 	joined, err := schematest.JoinColumns(map[string]string{"m": "team_memberships", "t": "teams"}, userteam.Schema)
 	require.NoError(t, err)
 	cols = append(cols, joined...)

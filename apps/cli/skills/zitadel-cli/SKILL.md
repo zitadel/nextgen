@@ -292,6 +292,12 @@ schema's object type and exclude the newest revision's URL:
 `users list --filter schema_object_type=equals:<type> --filter
 schema=not_equals:<newest-url> --all --json`.
 
+To find the API requests that failed: `events list --filter status_class=4xx
+--filter status_class=5xx --json`, and add `--filter operation_id=<operation>`
+(such as `createUser`) for one operation. Only requests recorded by a server
+that has these filters match, so an older request is found by its
+`request_id`, not by them.
+
 ## Reading the envelope
 
 Each invocation prints one JSON object:

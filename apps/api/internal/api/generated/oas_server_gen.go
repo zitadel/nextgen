@@ -1093,11 +1093,12 @@ type Handler interface {
 	// Each item carries an `event_type` that says which type of event it is, and
 	// the matching `payload`. To read one event, pass its `id` to `getEvent` (`GET /events/{id}`).
 	// Filters combine. These are answered from an index and fill their pages: no
-	// filter, `category`, `event_type`, `request_id`, `flow_id`, and `session_id`,
-	// `entity_id` or `actor_id` with or without `category`, each with or without
-	// the time bounds. Any other filter or combination is matched event by
-	// event, over at most a few thousand events per request. Such a page can
-	// hold fewer events than `limit`, or none, and still carry
+	// filter, `category`, `event_type`, `status_class`, `operation_id` with or
+	// without `status_class`, `request_id`, `flow_id`, and `session_id`,
+	// `entity_id`, `actor_id` or `entity_type` with or without `category`, each
+	// with or without the time bounds. Any other filter or combination is
+	// matched event by event, over at most a few thousand events per request.
+	// Such a page can hold fewer events than `limit`, or none, and still carry
 	// `next_page_token`: keep passing the token until a response has none.
 	//
 	// GET /events
