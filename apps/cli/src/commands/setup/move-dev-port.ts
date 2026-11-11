@@ -8,6 +8,7 @@ import {
 } from "@/lib/backend";
 
 import { type Consent, type Gate, isRefusal } from "@/lib/consent";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 import { errorMessage, isCancellation, toZitadelError, ZitadelError } from "@/lib/errors";
 import { DiskStore, ZitadelConfig } from "@/lib/zitadel";
 import { issuerFromPort, type Orca } from "@/lib/orca";
@@ -131,7 +132,7 @@ export async function moveDevPort(opts: {
         .consent({
           verb: "replace",
           name: `remove ${previousIssuer} from the project's origins`,
-          message: `Remove ${previousIssuer}, the app's previous origin, from the project? ${issuer} replaces it.`,
+          message: `Remove ${previousIssuer}, the app's previous origin, from project ${escapeControlCharacters(secret.project_id)} on ${escapeControlCharacters(source.replace(/^https?:\/\//, ""))}, now that ${issuer} replaces it?`,
         })
         .catch((error: unknown) => {
           if (isRefusal(error)) {

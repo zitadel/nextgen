@@ -3,6 +3,11 @@ import { describe, expect, it } from "vitest";
 import { usePlatformMock } from "@tests/helpers/platform";
 import { aSetUpApp } from "@tests/helpers/project";
 
+const SERVERS = [
+  ["a remote server", "http://mock.zitadel.test"],
+  ["a local server", "http://localhost:8112"],
+];
+
 const platform = usePlatformMock();
 
 describe("variable rm", () => {
@@ -155,6 +160,25 @@ describe("variable rm", () => {
 
         expect(result).toHintAt("--force");
       });
+
+      it.each(SERVERS)(
+        "names the project and the server it would act on, for %s",
+        async (_kind, server) => {
+          const app = await aSetUpApp();
+          expect(await app.setVariable("FOO", "bar")).toSucceed();
+
+          const result = await app.runWithoutServer([
+            "variable",
+            "rm",
+            "FOO",
+            "--server",
+            server,
+            "--json",
+          ]);
+
+          expect(result).toHintAt(await app.projectPlace(server));
+        },
+      );
 
       it("suggests running it again with --force", async () => {
         const app = await aSetUpApp();

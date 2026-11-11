@@ -3,6 +3,11 @@ import { describe, expect, it } from "vitest";
 import { usePlatformMock } from "@tests/helpers/platform";
 import { aSetUpApp } from "@tests/helpers/project";
 
+const SERVERS = [
+  ["a remote server", "http://mock.zitadel.test"],
+  ["a local server", "http://localhost:8112"],
+];
+
 const platform = usePlatformMock();
 
 describe("deployment rollback", () => {
@@ -313,6 +318,26 @@ describe("deployment rollback", () => {
 
           expect(result).toHintAt("--force");
         });
+
+        it.each(SERVERS)(
+          "names the project and the server it would act on, for %s",
+          async (_kind, server) => {
+            const app = await aSetUpApp();
+            await app.addPrimaryOrigin();
+            const first = await app.deployData();
+
+            const result = await app.runWithoutServer([
+              "deployment",
+              "rollback",
+              first.deployment_id ?? "",
+              "--server",
+              server,
+              "--json",
+            ]);
+
+            expect(result).toHintAt(await app.projectPlace(server));
+          },
+        );
 
         it("suggests running it again with --force", async () => {
           const app = await aSetUpApp();

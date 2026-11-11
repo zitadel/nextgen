@@ -1,6 +1,14 @@
 import { HttpResponse, http } from "msw";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
+
+import * as prompts from "@clack/prompts";
+import { confirm, isCancel } from "@clack/prompts";
+
+import DeploymentRollback from "@/commands/deployment/rollback/index";
+import { answering, type clackDouble } from "@tests/helpers/clack";
+import { asTerminal as asPerson } from "@tests/helpers/terminal";
 import {
   aProjectWithTwoDeploys,
   liveAcrossTwoPages,
@@ -244,5 +252,40 @@ describe("deployment rollback", () => {
     expect(envelope.data).not.toHaveProperty("dropped_origins");
     expect(envelope.data).not.toHaveProperty("unserved_origins");
     expect(envelope.warnings).toEqual([expect.stringContaining("Could not check which origins")]);
+  });
+});
+
+describe("deployment rollback asked on a terminal", () => {
+  const rollingBackOn = async (serverUrl: string) => {
+    const { cwd } = await twoDeploys();
+    const talk = answering(prompts as unknown as ReturnType<typeof clackDouble>, false);
+    await asPerson(() => DeploymentRollback.run(["--cwd", cwd, "--server", serverUrl]));
+    return talk;
+  };
+
+  afterEach(() => {
+    vi.mocked(confirm).mockReset();
+    vi.mocked(isCancel).mockReset();
+    vi.mocked(isCancel).mockReturnValue(false);
+  });
+
+  it("asks whether to roll back, naming the project and a remote server", async () => {
+    const talk = await rollingBackOn(SERVER);
+
+    expect(talk.asked()).toEqual([
+      expect.stringMatching(
+        /^Roll back to dep_\S+ in project proj-\S+ on preview\.zitadel\.com so its release goes live again\?$/,
+      ),
+    ]);
+  });
+
+  it("names a local server by its host and port", async () => {
+    const talk = await rollingBackOn("http://localhost:8112");
+
+    expect(talk.asked()).toEqual([
+      expect.stringMatching(
+        /^Roll back to dep_\S+ in project proj-\S+ on localhost:8112 so its release goes live again\?$/,
+      ),
+    ]);
   });
 });

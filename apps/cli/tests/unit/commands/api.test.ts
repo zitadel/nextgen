@@ -117,6 +117,14 @@ describe("zitadel api without an operation, at a terminal", () => {
     ]);
   });
 
+  it("asks before a destructive call, naming the project and the server", async ({ dir }) => {
+    const { talk } = await asking(dir, [...choosingRevokeSession, false]);
+
+    expect(talk.asked().at(-1)).toBe(
+      "Call revokeSession in project proj_01TEST on localhost:8080? Revoke a session.",
+    );
+  });
+
   it("offers only what the CLI can call", async ({ dir }) => {
     const { talk } = await asking(dir, choosingRevokeSession, "--dry-run");
 

@@ -29,7 +29,13 @@ export class Settled {
 }
 
 /** A destructive change: the question that guards it, and the change. */
-export type DestructiveChange<Ready = undefined> = Gate & {
+export type DestructiveChange<Ready = undefined> = Omit<Gate, "message"> & {
+  /**
+   * The question as the prompt shows it. A function words it from what
+   * `prepare` read, for a question that names the project and server the
+   * change is made on, which only the connection knows.
+   */
+  message: string | ((ready: Ready) => string | Promise<string>);
   /** The result of a dry run, which never asks, never reads and never acts. */
   preview: () => CommandResult | Promise<CommandResult>;
   /**
@@ -70,6 +76,7 @@ export function Destructive<TBase extends CommandClass<BaseCommand>>(Base: TBase
       preview,
       prepare,
       apply,
+      message,
       ...gate
     }: DestructiveChange<Ready>): Promise<CommandResult> {
       if (this.meta.dryRun) {
@@ -79,7 +86,9 @@ export function Destructive<TBase extends CommandClass<BaseCommand>>(Base: TBase
       if (ready instanceof Settled) {
         return ready.result;
       }
-      const consent = await this.consent(gate);
+      // The question names what `prepare` read, when it is worded from it.
+      const question = typeof message === "function" ? await message(ready as Ready) : message;
+      const consent = await this.consent({ ...gate, message: question });
       if (consent === undefined) {
         return {
           status: "skipped",

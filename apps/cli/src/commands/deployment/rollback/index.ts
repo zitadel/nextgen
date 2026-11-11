@@ -113,7 +113,7 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
     flags,
     args,
   }: Admitted<typeof DeploymentRollback>): Promise<JsonEnvelope> {
-    const { client, projectId } = await this.connect();
+    const { client, projectId, server } = await this.connect();
     const deploymentService = new DeploymentService(client, projectId);
     const suggest = (command: string) => {
       return this.suggest(command);
@@ -135,8 +135,8 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
     return this.emit(
       await this.confirmed({
         verb: "rollback",
-        name: `re-apply ${target.id}`,
-        message: `Re-apply ${target.id}? Its release goes live again.${
+        name: `roll back to ${target.id}`,
+        message: `Roll back to ${target.id} in project ${escapeControlCharacters(projectId)} on ${escapeControlCharacters(server.replace(/^https?:\/\//, ""))} so its release goes live again?${
           dropped.length === 0
             ? ""
             : ` ${dropped.join(", ")} will refuse sign-in until the next deploy.`
@@ -152,7 +152,7 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
             status: "ok",
             data: { dry_run: true, deployment_id: target.id },
             summary: {
-              title: `Would re-apply ${escapeControlCharacters(target.id)} (dry run)`,
+              title: `Would roll back to ${escapeControlCharacters(target.id)} (dry run)`,
               sections: [],
             },
           };

@@ -6,6 +6,7 @@ import {
   type ZitadelClient,
 } from "@/lib/backend";
 import { unscopedCommand } from "@/lib/suggestion";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 import {
   readProjectServer,
   readZitadelConfig,
@@ -85,11 +86,11 @@ export class IssuerOriginCheck implements SanityCheck {
     if (finding.status === "pass") {
       return;
     }
-    const { client, pattern, secret } = finding;
+    const { client, pattern, secret, server } = finding;
     const consent = await ctx.consent({
       verb: "replace",
       name: `replace the preview origin ${pattern} with a primary one`,
-      message: `Make ${pattern} a primary origin? It is removed and added back as primary.`,
+      message: `Replace the preview origin ${pattern} with a primary one in project ${escapeControlCharacters(secret.project_id)} on ${escapeControlCharacters(server.replace(/^https?:\/\//, ""))}?`,
     });
     if (consent === undefined) {
       return;

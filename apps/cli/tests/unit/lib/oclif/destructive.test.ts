@@ -10,7 +10,7 @@ import { BaseCommand } from "@/lib/oclif/base";
 import { Destructive, type DestructiveChange, Settled } from "@/lib/oclif/destructive";
 import type { CommandResult } from "@/lib/oclif/types";
 
-const GATE: Omit<DestructiveChange, "apply"> = {
+const GATE: Omit<DestructiveChange<string | undefined>, "apply"> = {
   verb: "remove",
   name: "remove API_URL from the project",
   message: "Remove API_URL from the project?",

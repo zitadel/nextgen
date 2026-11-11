@@ -60,7 +60,10 @@ export default class ReleaseRevoke extends Destructive(EnvironmentCommand) {
       await this.confirmed({
         verb: "revoke",
         name: `revoke ${args.releaseId}`,
-        message: `Revoke ${args.releaseId}? Its content can never be served again.`,
+        message: async () => {
+          const { projectId, server } = await this.connect();
+          return `Revoke ${args.releaseId} in project ${escapeControlCharacters(projectId)} on ${escapeControlCharacters(server.replace(/^https?:\/\//, ""))} so its content can never be served again?`;
+        },
         preview: () => {
           return {
             status: "ok",

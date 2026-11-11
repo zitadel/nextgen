@@ -315,15 +315,15 @@ describe("IssuerOriginCheck.fix", () => {
   });
 
   describe("when the replacement is declined", () => {
-    it("asks to replace the preview origin", async ({ dir }) => {
-      await aProject(dir, AS_PREVIEW);
+    it("asks to replace the preview origin, naming the project and the server", async ({ dir }) => {
+      const project = await aProject(dir, AS_PREVIEW);
       const consent = vi.fn(declined);
 
       await check.fix(aCheckContext(dir, { consent }));
 
       expect(consent).toHaveBeenCalledWith(
         expect.objectContaining({
-          message: `Make ${ISSUER} a primary origin? It is removed and added back as primary.`,
+          message: `Replace the preview origin ${ISSUER} with a primary one in project ${project.id} on api.zitadel.example?`,
         }),
       );
     });

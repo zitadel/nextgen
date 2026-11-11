@@ -1958,6 +1958,18 @@ export class ScaffoldedApp {
     };
   }
 
+  /**
+   * How a question to a person names where it would act: the project this app
+   * is bound to, then the server's host without its scheme.
+   *
+   * @param serverUrl - The server the run is pointed at, which defaults to the mock platform.
+   * @returns `project <id> on <host>`.
+   */
+  async projectPlace(serverUrl = MOCK_SERVER_URL): Promise<string> {
+    const { ZITADEL_PROJECT_ID } = await this.developmentValues();
+    return `project ${ZITADEL_PROJECT_ID} on ${new URL(serverUrl).host}`;
+  }
+
   /** Writes `.env.<name>.local`, the file that binds an environment to a project. */
   bindEnvironment(name: string, values: Record<string, string>): Promise<void> {
     return this.writeProjectFile(`.env.${name}.local`, dotenv(values));

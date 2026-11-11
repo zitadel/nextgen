@@ -13,6 +13,7 @@ import {
 } from "@/lib/backend";
 import { CANCELLED, ZitadelError } from "@/lib/errors";
 import { unscopedCommand } from "@/lib/suggestion";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 import { userAgent } from "@/lib/user-agent";
 import {
   buildRequest,
@@ -373,7 +374,11 @@ export default class Api extends Destructive(BaseCommand) {
           verb: "call",
           name: `call ${operation.id}`,
           message: [
-            `Would you like to call ${operation.id} at ${url}?`,
+            `Call ${operation.id}${
+              secret === undefined
+                ? ""
+                : ` in project ${escapeControlCharacters(secret.project_id)}`
+            } on ${escapeControlCharacters(this.meta.source.replace(/^https?:\/\//, ""))}?`,
             ...(operation.summary === "" ? [] : [`${operation.summary}.`]),
           ].join(" "),
           // A body is not repeated in a suggestion: it can hold a secret, or

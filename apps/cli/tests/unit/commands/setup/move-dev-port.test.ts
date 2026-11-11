@@ -5,6 +5,7 @@ import { describe, expect } from "vitest";
 
 import { moveDevPort } from "@/commands/setup/move-dev-port";
 import { createOrca } from "@/lib/orca";
+import { readZitadelSecret } from "@/lib/project";
 import { aGoogleConnection } from "@tests/helpers/config";
 import { it } from "@tests/helpers/fixtures";
 import { usePlatformServer } from "@tests/helpers/platform-project";
@@ -111,6 +112,32 @@ describe("moveDevPort", () => {
       const move = await movingTo3101(dir);
 
       expect(move.ssoProviders).toEqual(["google"]);
+    });
+  });
+
+  describe("when it asks to remove the previous origin", () => {
+    it("names the project and the server it removes it from", async ({ dir }) => {
+      await setUpApp(dir);
+      const { project_id } = await readZitadelSecret(dir);
+      const asked: string[] = [];
+
+      await moveDevPort({
+        cwd: dir,
+        devPort: 3101,
+        source: CLOUD,
+        orca: createOrca(),
+        cliVersion: "0.0.0",
+        dryRun: false,
+        signal: new AbortController().signal,
+        consent: (gate) => {
+          asked.push(gate.message);
+          return Promise.resolve(undefined);
+        },
+      });
+
+      expect(asked).toEqual([
+        `Remove http://localhost:3000, the app's previous origin, from project ${project_id} on api.zitadel.cloud, now that http://localhost:3101 replaces it?`,
+      ]);
     });
   });
 

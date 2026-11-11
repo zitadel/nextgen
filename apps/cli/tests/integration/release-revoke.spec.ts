@@ -3,6 +3,11 @@ import { describe, expect, it } from "vitest";
 import { usePlatformMock } from "@tests/helpers/platform";
 import { aSetUpApp, type ScaffoldedApp } from "@tests/helpers/project";
 
+const SERVERS = [
+  ["a remote server", "http://mock.zitadel.test"],
+  ["a local server", "http://localhost:8112"],
+];
+
 const platform = usePlatformMock();
 
 /** Build a release and return its id. */
@@ -194,6 +199,25 @@ describe("release revoke", () => {
 
           expect(result).toHintAt("--force");
         });
+
+        it.each(SERVERS)(
+          "names the project and the server it would act on, for %s",
+          async (_kind, server) => {
+            const app = await aSetUpApp();
+            const releaseId = await aRelease(app);
+
+            const result = await app.runWithoutServer([
+              "release",
+              "revoke",
+              releaseId,
+              "--server",
+              server,
+              "--json",
+            ]);
+
+            expect(result).toHintAt(await app.projectPlace(server));
+          },
+        );
 
         it("suggests running it again with --force", async () => {
           const app = await aSetUpApp();

@@ -4,6 +4,11 @@ import { usePlatformMock } from "@tests/helpers/platform";
 import { anApp, aSetUpApp } from "@tests/helpers/project";
 import { CREDENTIALS, PREVIEW_CREDENTIAL } from "@/lib/oclif";
 
+const SERVERS = [
+  ["a remote server", "http://mock.zitadel.test"],
+  ["a local server", "http://localhost:8112"],
+];
+
 const platform = usePlatformMock();
 
 const PREVIEW_PATTERN = "https://*-acme.vercel.app";
@@ -131,6 +136,24 @@ describe("preview rm", () => {
 
           expect(result).toHintAt("--force");
         });
+
+        it.each(SERVERS)(
+          "names the project and the server it would act on, for %s",
+          async (_kind, server) => {
+            const app = await anAppWithAPreview();
+
+            const result = await app.runWithoutServer([
+              "preview",
+              "rm",
+              PREVIEW_URL,
+              "--server",
+              server,
+              "--json",
+            ]);
+
+            expect(result).toHintAt(await app.projectPlace(server));
+          },
+        );
 
         it("suggests running it again with --force", async () => {
           const app = await anAppWithAPreview();

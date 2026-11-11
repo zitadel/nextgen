@@ -1000,7 +1000,7 @@ describe("variable set --as", () => {
 describe("variable rm asked on a terminal", () => {
   // The built CLI bundles its own prompts, so a prompt can only be answered
   // by running the command from source, where `input` is the one module asked.
-  const removing = async (cwd: string, ...answers: unknown[]) => {
+  const removingOn = async (serverUrl: string, cwd: string, ...answers: unknown[]) => {
     const talk = answering(prompts as unknown as ReturnType<typeof clackDouble>, ...answers);
     const written: string[] = [];
     const capture = vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
@@ -1009,13 +1009,15 @@ describe("variable rm asked on a terminal", () => {
     });
     try {
       const result = await asPerson(() =>
-        VariableRm.run(["SUPPORT_EMAIL", "--cwd", cwd, "--server", DEFAULT_SERVER]),
+        VariableRm.run(["SUPPORT_EMAIL", "--cwd", cwd, "--server", serverUrl]),
       );
       return { result, shown: written.join(""), talk };
     } finally {
       capture.mockRestore();
     }
   };
+  const removing = (cwd: string, ...answers: unknown[]) =>
+    removingOn(DEFAULT_SERVER, cwd, ...answers);
   const watchingDeletes = () => {
     const seen = { deleted: false };
     server.use(
@@ -1033,13 +1035,26 @@ describe("variable rm asked on a terminal", () => {
     vi.mocked(isCancel).mockReturnValue(false);
   });
 
-  it("asks whether to remove the variable from the project", async () => {
+  it("asks whether to remove the variable, naming the project and a remote server", async () => {
     const cwd = await makeProject();
     watchingDeletes();
 
     const { talk } = await removing(cwd, true);
 
-    expect(talk.asked()).toEqual(["Remove SUPPORT_EMAIL from the project?"]);
+    expect(talk.asked()).toEqual([
+      "Remove SUPPORT_EMAIL from project proj_test on preview.zitadel.com?",
+    ]);
+  });
+
+  it("names a local server by its host and port", async () => {
+    const cwd = await makeProject();
+    watchingDeletes();
+
+    const { talk } = await removingOn("http://localhost:8112", cwd, true);
+
+    expect(talk.asked()).toEqual([
+      "Remove SUPPORT_EMAIL from project proj_test on localhost:8112?",
+    ]);
   });
 
   it("asks nothing when forced", async () => {
@@ -1251,7 +1266,7 @@ describe("variable rm", () => {
     };
     expect(json.code).toBe("E_CONFIRMATION_REQUIRED");
     expect(json.next_commands.join(" ")).toContain("--force");
-    expect(json.hint).toContain("from the project");
+    expect(json.hint).toContain("from project proj_test on preview.zitadel.com");
   });
 });
 

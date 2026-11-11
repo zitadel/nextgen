@@ -4,6 +4,11 @@ import { usePlatformMock } from "@tests/helpers/platform";
 import { anApp, aSetUpApp, PASSWORD_POLICY } from "@tests/helpers/project";
 import { pressCtrlC } from "@tests/helpers/run-cli";
 
+const SERVERS = [
+  ["a remote server", "http://mock.zitadel.test"],
+  ["a local server", "http://localhost:8112"],
+];
+
 const platform = usePlatformMock();
 
 interface ResourceRow {
@@ -141,6 +146,24 @@ describe("resources", () => {
 
           expect(result).toHintAt("--force");
         });
+
+        it.each(SERVERS)(
+          "names the project and the server it would act on, for %s",
+          async (_kind, server) => {
+            const app = await aSetUpApp();
+
+            const result = await app.runWithoutServer([
+              "teams",
+              "deactivate",
+              "team_1",
+              "--server",
+              server,
+              "--json",
+            ]);
+
+            expect(result).toHintAt(await app.projectPlace(server));
+          },
+        );
 
         it.each(DESTRUCTIVE)(
           "suggests running %s %s again with --force",

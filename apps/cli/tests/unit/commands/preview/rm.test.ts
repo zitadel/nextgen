@@ -1,6 +1,14 @@
 import { HttpResponse, http } from "msw";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
+
+import * as prompts from "@clack/prompts";
+import { confirm, isCancel } from "@clack/prompts";
+
+import PreviewRm from "@/commands/preview/rm";
+import { answering, type clackDouble } from "@tests/helpers/clack";
+import { asTerminal as asPerson } from "@tests/helpers/terminal";
 import {
   aProjectDirectory,
   PLATFORM_URL,
@@ -20,7 +28,7 @@ async function aProjectWithPreviewsOnTwoPages(): Promise<{ cwd: string; removed:
     created_at: "2026-01-01T00:00:00.000Z",
   });
   server.use(
-    http.get(`${SERVER}/api/v1/projects/:project_id/previews`, ({ request }) =>
+    http.get("*/api/v1/projects/:project_id/previews", ({ request }) =>
       HttpResponse.json(
         new URL(request.url).searchParams.get("page_token") === "p2"
           ? { previews: [preview("https://pr-2.app.acme.com")], next_page_token: null }
@@ -28,7 +36,7 @@ async function aProjectWithPreviewsOnTwoPages(): Promise<{ cwd: string; removed:
       ),
     ),
     http.post<{ project_id: string }, { origin: string }>(
-      `${SERVER}/api/v1/projects/:project_id/previews/remove`,
+      "*/api/v1/projects/:project_id/previews/remove",
       async ({ request }) => {
         const body = await request.json();
         removed.push(body.origin);
@@ -60,6 +68,39 @@ describe("preview rm", () => {
     expect([parseJson(res.stdout), removed]).toEqual([
       expect.objectContaining({ status: "ok" }),
       ["https://pr-2.app.acme.com"],
+    ]);
+  });
+});
+
+describe("preview rm asked on a terminal", () => {
+  const removingOn = async (serverUrl: string) => {
+    const { cwd } = await aProjectWithPreviewsOnTwoPages();
+    const talk = answering(prompts as unknown as ReturnType<typeof clackDouble>, false);
+    await asPerson(() =>
+      PreviewRm.run(["https://pr-1.app.acme.com", "--cwd", cwd, "--server", serverUrl]),
+    );
+    return talk;
+  };
+
+  afterEach(() => {
+    vi.mocked(confirm).mockReset();
+    vi.mocked(isCancel).mockReset();
+    vi.mocked(isCancel).mockReturnValue(false);
+  });
+
+  it("asks whether to stop serving the preview, naming the project and a remote server", async () => {
+    const talk = await removingOn(SERVER);
+
+    expect(talk.asked()).toEqual([
+      "Stop serving https://pr-1.app.acme.com for project proj_test on preview.zitadel.com?",
+    ]);
+  });
+
+  it("names a local server by its host and port", async () => {
+    const talk = await removingOn("http://localhost:8112");
+
+    expect(talk.asked()).toEqual([
+      "Stop serving https://pr-1.app.acme.com for project proj_test on localhost:8112?",
     ]);
   });
 });

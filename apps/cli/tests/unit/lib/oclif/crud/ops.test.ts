@@ -851,6 +851,54 @@ describe("delete confirmation", () => {
     expect(vi.mocked(confirm).mock.calls[0]?.[0]).toMatchObject({ message: "Revoke team team_1?" });
   });
 
+  it("names the project and the server when the environment resolves them", async () => {
+    vi.stubEnv("ZITADEL_PROJECT_ID", "proj_env");
+    vi.stubEnv("ZITADEL_URL", "https://api.zitadel.example");
+    vi.mocked(confirm).mockResolvedValueOnce(true as never);
+
+    await asTerminal(() => deleting("revoke").run(["team_1"]));
+
+    expect(vi.mocked(confirm).mock.calls[0]?.[0]).toMatchObject({
+      message: "Revoke team team_1 in project proj_env on api.zitadel.example?",
+    });
+  });
+
+  it("names a local server by its host and port", async () => {
+    vi.stubEnv("ZITADEL_PROJECT_ID", "proj_env");
+    vi.stubEnv("ZITADEL_URL", "http://localhost:8112");
+    vi.mocked(confirm).mockResolvedValueOnce(true as never);
+
+    await asTerminal(() => deleting("delete").run(["team_1"]));
+
+    expect(vi.mocked(confirm).mock.calls[0]?.[0]).toMatchObject({
+      message: "Delete team team_1 in project proj_env on localhost:8112?",
+    });
+  });
+
+  it("leaves the server out when only the project is known", async () => {
+    vi.stubEnv("ZITADEL_PROJECT_ID", "proj_env");
+    vi.stubEnv("ZITADEL_URL", "");
+    vi.mocked(confirm).mockResolvedValueOnce(true as never);
+
+    await asTerminal(() => deleting("delete").run(["team_1"]));
+
+    expect(vi.mocked(confirm).mock.calls[0]?.[0]).toMatchObject({
+      message: "Delete team team_1 in project proj_env?",
+    });
+  });
+
+  it("leaves the project out when only the server is known", async () => {
+    vi.stubEnv("ZITADEL_PROJECT_ID", "");
+    vi.stubEnv("ZITADEL_URL", "https://api.zitadel.example");
+    vi.mocked(confirm).mockResolvedValueOnce(true as never);
+
+    await asTerminal(() => deleting("delete").run(["team_1"]));
+
+    expect(vi.mocked(confirm).mock.calls[0]?.[0]).toMatchObject({
+      message: "Delete team team_1 on api.zitadel.example?",
+    });
+  });
+
   it("is skipped when the answer is no", async () => {
     vi.mocked(confirm).mockResolvedValueOnce(false as never);
 

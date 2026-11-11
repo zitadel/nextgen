@@ -4,6 +4,11 @@ import { usePlatformMock } from "@tests/helpers/platform";
 import { anApp, aSetUpApp, SETUP_ORIGIN } from "@tests/helpers/project";
 import { expectedPublicCliCommand } from "@tests/helpers/run-cli";
 
+const SERVERS = [
+  ["a remote server", "http://mock.zitadel.test"],
+  ["a local server", "http://localhost:8112"],
+];
+
 const platform = usePlatformMock();
 
 describe("origin rm", () => {
@@ -139,6 +144,25 @@ describe("origin rm", () => {
 
           expect(result).toHintAt("--force");
         });
+
+        it.each(SERVERS)(
+          "names the project and the server it would act on, for %s",
+          async (_kind, server) => {
+            const app = await aSetUpApp();
+            await app.addOrigin("https://app.acme.com", "primary");
+
+            const result = await app.runWithoutServer([
+              "origin",
+              "rm",
+              "https://app.acme.com",
+              "--server",
+              server,
+              "--json",
+            ]);
+
+            expect(result).toHintAt(await app.projectPlace(server));
+          },
+        );
 
         it("suggests running it again with --force", async () => {
           const app = await aSetUpApp();

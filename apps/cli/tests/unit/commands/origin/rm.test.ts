@@ -3,9 +3,17 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { HttpResponse, http } from "msw";
-import { afterEach, describe, expect } from "vitest";
+import { afterEach, describe, expect, vi } from "vitest";
 
+vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
+
+import * as prompts from "@clack/prompts";
+import { confirm, isCancel } from "@clack/prompts";
+
+import OriginRm from "@/commands/origin/rm";
+import { answering, type clackDouble } from "@tests/helpers/clack";
 import { it } from "@tests/helpers/fixtures";
+import { asTerminal as asPerson } from "@tests/helpers/terminal";
 
 import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
 
@@ -169,5 +177,38 @@ describe("origin rm", () => {
 
     const envelope = parseJson(result.stdout) as { next_commands?: string[] };
     expect(envelope.next_commands?.[0]).toContain("origin rm 'https://*-acme.vercel.app' --force");
+  });
+});
+
+describe("origin rm asked on a terminal", () => {
+  const removingOn = async (serverUrl: string) => {
+    const cwd = await anAppDir();
+    const talk = answering(prompts as unknown as ReturnType<typeof clackDouble>, false);
+    await asPerson(() =>
+      OriginRm.run(["https://app.acme.com", "--cwd", cwd, "--server", serverUrl]),
+    );
+    return talk;
+  };
+
+  afterEach(() => {
+    vi.mocked(confirm).mockReset();
+    vi.mocked(isCancel).mockReset();
+    vi.mocked(isCancel).mockReturnValue(false);
+  });
+
+  it("asks whether to remove the pattern, naming the project and a remote server", async () => {
+    const talk = await removingOn(SERVER);
+
+    expect(talk.asked()).toEqual([
+      "Remove https://app.acme.com from project proj_unit on api.zitadel.example?",
+    ]);
+  });
+
+  it("names a local server by its host and port", async () => {
+    const talk = await removingOn("http://localhost:8112");
+
+    expect(talk.asked()).toEqual([
+      "Remove https://app.acme.com from project proj_unit on localhost:8112?",
+    ]);
   });
 });
