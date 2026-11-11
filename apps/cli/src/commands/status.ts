@@ -19,7 +19,7 @@ import {
   readRuntimeMetadata,
   runtimeSummary,
 } from "@/lib/local-server/runtime";
-import { LocalServer } from "@/lib/local-server/server";
+import { LocalServer, type ServerStatus } from "@/lib/local-server/server";
 import {
   type Admitted,
   type Connection,
@@ -138,7 +138,7 @@ export default class Status extends EnvironmentCommand {
       summary: {
         title: "Checked the status of the project",
         sections: [],
-        lines: [projectSentence(project)],
+        lines: [serverSentence(server), projectSentence(project)],
         overview: exploreAllCommands(this.cliVersion),
       },
     });
@@ -245,6 +245,32 @@ async function projectStatus(
     issuer,
     ...(claim.kind === "not-applicable" ? {} : { claim }),
   };
+}
+
+/**
+ * Where this directory's local server stands, as one sentence: whether it is
+ * running and answering, and where it listens, which is what `status` is run to
+ * find out. A server Docker could not be asked about says so.
+ */
+function serverSentence(server: ServerStatus): string {
+  const url =
+    server.runtime === undefined ? undefined : escapeControlCharacters(server.runtime.server_url);
+  const backend = server.runtime?.backend;
+  const how =
+    server.runtime?.backend === "binary" && server.process !== undefined
+      ? `${backend}, pid ${server.process.pid}`
+      : backend;
+  const said = {
+    missing: "No local server was started in this directory",
+    stopped: `The local server is stopped, and last ran at ${url} (${how})`,
+    unhealthy: `The local server is running at ${url} (${how}) but does not answer`,
+    running: `The local server is running and healthy at ${url} (${how})`,
+  }[server.lifecycle];
+  const docker =
+    backend === "docker" && !server.docker.available
+      ? `, and Docker could not be asked about it${server.docker.error === undefined ? "" : `: ${escapeControlCharacters(server.docker.error)}`}`
+      : "";
+  return `${said}${docker}.`;
 }
 
 /**

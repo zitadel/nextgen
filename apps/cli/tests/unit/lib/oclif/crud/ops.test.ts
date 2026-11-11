@@ -2,7 +2,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
@@ -799,6 +799,12 @@ describe("delete confirmation", () => {
     return { stdout: written.join(""), stderr: errors.join("") };
   };
 
+  beforeEach(() => {
+    vi.stubEnv("ZITADEL_URL", "https://api.zitadel.example");
+    vi.stubEnv("ZITADEL_PROJECT_ID", "proj_env");
+    vi.stubEnv("ZITADEL_PROJECT_SECRET", "sk_proj_env");
+  });
+
   afterEach(() => {
     vi.mocked(confirm).mockReset();
     vi.mocked(isCancel).mockReset();
@@ -843,17 +849,7 @@ describe("delete confirmation", () => {
     },
   );
 
-  it("asks the question with the verb, the resource and the id", async () => {
-    vi.mocked(confirm).mockResolvedValueOnce(true as never);
-
-    await asTerminal(() => deleting("revoke").run(["team_1"]));
-
-    expect(vi.mocked(confirm).mock.calls[0]?.[0]).toMatchObject({ message: "Revoke team team_1?" });
-  });
-
-  it("names the project and the server when the environment resolves them", async () => {
-    vi.stubEnv("ZITADEL_PROJECT_ID", "proj_env");
-    vi.stubEnv("ZITADEL_URL", "https://api.zitadel.example");
+  it("asks the question with the verb, the resource, the id and the place", async () => {
     vi.mocked(confirm).mockResolvedValueOnce(true as never);
 
     await asTerminal(() => deleting("revoke").run(["team_1"]));
@@ -864,7 +860,6 @@ describe("delete confirmation", () => {
   });
 
   it("names a local server by its host and port", async () => {
-    vi.stubEnv("ZITADEL_PROJECT_ID", "proj_env");
     vi.stubEnv("ZITADEL_URL", "http://localhost:8112");
     vi.mocked(confirm).mockResolvedValueOnce(true as never);
 
@@ -872,30 +867,6 @@ describe("delete confirmation", () => {
 
     expect(vi.mocked(confirm).mock.calls[0]?.[0]).toMatchObject({
       message: "Delete team team_1 in project proj_env on localhost:8112?",
-    });
-  });
-
-  it("leaves the server out when only the project is known", async () => {
-    vi.stubEnv("ZITADEL_PROJECT_ID", "proj_env");
-    vi.stubEnv("ZITADEL_URL", "");
-    vi.mocked(confirm).mockResolvedValueOnce(true as never);
-
-    await asTerminal(() => deleting("delete").run(["team_1"]));
-
-    expect(vi.mocked(confirm).mock.calls[0]?.[0]).toMatchObject({
-      message: "Delete team team_1 in project proj_env?",
-    });
-  });
-
-  it("leaves the project out when only the server is known", async () => {
-    vi.stubEnv("ZITADEL_PROJECT_ID", "");
-    vi.stubEnv("ZITADEL_URL", "https://api.zitadel.example");
-    vi.mocked(confirm).mockResolvedValueOnce(true as never);
-
-    await asTerminal(() => deleting("delete").run(["team_1"]));
-
-    expect(vi.mocked(confirm).mock.calls[0]?.[0]).toMatchObject({
-      message: "Delete team team_1 on api.zitadel.example?",
     });
   });
 

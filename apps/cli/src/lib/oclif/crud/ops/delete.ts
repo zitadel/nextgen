@@ -60,17 +60,9 @@ export class DeleteOperation<Ctx> extends ResourceCommand<Ctx, DeleteSpec<Ctx>, 
     return this.confirmed({
       verb,
       name: `${verb} ${resource.singular} ${id}`,
-      message: () => {
-        const { values } = this.environment;
-        const project = values.ZITADEL_PROJECT_ID?.value;
-        const server = values.ZITADEL_URL?.value;
-        const place = [
-          project === undefined ? "" : ` in project ${escapeControlCharacters(project)}`,
-          server === undefined
-            ? ""
-            : ` on ${escapeControlCharacters(server.replace(/^https?:\/\//, ""))}`,
-        ].join("");
-        return `${capitalize(verb)} ${resource.singular} ${id}${place}?`;
+      message: async () => {
+        const { projectId, server } = await this.connect();
+        return `${capitalize(verb)} ${resource.singular} ${id} in project ${escapeControlCharacters(projectId)} on ${escapeControlCharacters(server.replace(/^https?:\/\//, ""))}?`;
       },
       preview: () => dryRunResult({ verb, topic, id }),
       prepare: () => this.context(),

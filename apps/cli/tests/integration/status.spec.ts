@@ -149,6 +149,16 @@ describe("status", () => {
         expect(result).toPrint("Project proj-001");
       });
 
+      it("says whether a local server was started in the directory", async () => {
+        const app = await aConfiguredApp();
+
+        const result = await asTerminal(() =>
+          app.runWithoutServer(["status", "--server", "https://self.example"]),
+        );
+
+        expect(result).toPrint("No local server was started in this directory.");
+      });
+
       it("ends on where it ran", async () => {
         const app = await aConfiguredApp();
 
