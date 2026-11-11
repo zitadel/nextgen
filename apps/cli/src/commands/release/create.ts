@@ -98,9 +98,6 @@ export default class ReleaseCreate extends EnvironmentCommand {
         resources: prepared.resourceCount,
       },
       next: { commands: [this.suggest(`deployment create --release ${release.id}`)] },
-      // One clause and nothing else, like every other small action. The
-      // content hash is 71 characters nobody reads off a terminal. `--json`
-      // and `release get` carry it.
       summary: { title: `Created ${escapeControlCharacters(release.id)}`, sections: [] },
     });
   }

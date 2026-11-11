@@ -592,9 +592,6 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
    * @param provider - The provider.
    */
   private introduce(summary: Summary, schema: UserSchema, provider: IdpProvider): void {
-    // Which project this ran against is the summary's last line, not a label
-    // printed before the first question: `connect()` above already recorded it.
-    // The schema is this command's own subject, so it stays as narration.
     log.info(
       `Editing ${escapeControlCharacters(schema.path)}${schema.methods.length > 0 ? `, which offers ${escapeControlCharacters(schema.methods.join(", "))}` : ""}`,
     );
@@ -658,7 +655,6 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     return this.emit({
       status: "ok",
       data: { ...payload, would_store: toStore, dry_run: true },
-      // The ending closes on the first line and lists the others under it.
       summary: {
         title: escapeControlCharacters(said[0] === undefined ? "" : `${said[0]} (dry run)`),
         sections: [],
@@ -813,12 +809,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       summary: {
         title: escapeControlCharacters(this.title(name, unpublished, false)),
         sections: [],
-        // The headline stays one line; what else it would have said goes under it.
         lines: unpublished && stored ? ["Its credentials are stored in your project."] : [],
-        // A credential that did not reach the project is published first, and
-        // the deploy comes after it: the deploy is a step with its command on a
-        // line of its own, so it can be copied; the envelope's action carries it
-        // inline, as a script reads it.
         next: [
           ...(leading.length === 0 ? [] : [{ text: NEXT_LABEL, command: leading.join("\n") }]),
           ...(unpublished

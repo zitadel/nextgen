@@ -204,8 +204,6 @@ export abstract class EnvironmentCommand extends BaseCommand {
     const server = await requireValueInteractive(environment, "ZITADEL_URL", ask);
     const projectId = await requireValueInteractive(environment, "ZITADEL_PROJECT_ID", ask);
     const token = await requireValueInteractive(environment, CREDENTIALS[credential], ask);
-    // Recorded, never printed here: the summary says where the command ran,
-    // once, at its foot.
     this.ui.ranAgainst(projectId, server.replace(/^https?:\/\//, ""));
     return {
       client: createZitadelClient({

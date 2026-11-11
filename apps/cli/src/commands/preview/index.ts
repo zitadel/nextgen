@@ -291,7 +291,6 @@ export default class Preview extends PreviewCommand {
           dry_run: true,
           targets: urls,
         },
-        // A pipe gets the URLs directly under the sentence, as it always did.
         pretty: prose(
           [
             `Validated the preview for ${renderCount(urls.length, { singular: "URL" })} and deployed nothing (dry run)`,

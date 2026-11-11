@@ -86,7 +86,6 @@ export function Destructive<TBase extends CommandClass<BaseCommand>>(Base: TBase
       if (ready instanceof Settled) {
         return ready.result;
       }
-      // The question names what `prepare` read, when it is worded from it.
       const question = typeof message === "function" ? await message(ready as Ready) : message;
       const consent = await this.consent({ ...gate, message: question });
       if (consent === undefined) {

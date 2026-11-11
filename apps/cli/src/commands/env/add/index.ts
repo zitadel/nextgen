@@ -231,8 +231,6 @@ export default class EnvAdd extends Promptable(BaseCommand) {
           project_id: flags.project,
           issuer,
         },
-        // Nothing was created or written, so the ending says what a real run
-        // would have done.
         summary: {
           title: escapeControlCharacters(
             `Would add the ${args.name} environment, bound to ${flags.project ?? "a new project"} (dry run)`,
@@ -270,10 +268,6 @@ export default class EnvAdd extends Promptable(BaseCommand) {
       log.done(`Created project ${escapeControlCharacters(project.id)}`);
     }
     const { id: projectId, project_secret: projectSecret, preview_secret: previewToken } = project;
-    // This command creates the project and deploys to it, so it says where it
-    // ran like every other command that reaches a server. It never calls
-    // `connect()` — the environment it is adding has no file yet to resolve —
-    // so the project and server are recorded here, as soon as both are known.
     this.ui.ranAgainst(projectId, server.replace(/^https?:\/\//, ""));
 
     const values: Record<string, string> = {
@@ -446,14 +440,9 @@ export default class EnvAdd extends Promptable(BaseCommand) {
         ],
       },
       summary: {
-        // The closing line is what the run achieved, not the least interesting
-        // of its three outcomes: a file was written, but an environment was
-        // added and a project bound to it.
         title: escapeControlCharacters(`Added the ${args.name} environment, bound to ${projectId}`),
         sections: [],
         lines: [
-          // Named, not "it": the box this opens is read on its own, and the
-          // line that said which file was written is now the closing line above.
           `${environment.file} holds ${Object.keys(values).join(", ")}.`,
           ...guidanceBlock([
             // The runnable `origin add` is in the next steps; the line here is

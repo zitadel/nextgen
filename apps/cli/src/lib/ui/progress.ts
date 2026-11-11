@@ -89,7 +89,6 @@ export class Progress {
       try {
         result = await work(report);
       } catch (error) {
-        // Closed as failed, as the drawn step is, so the step never dangles.
         narration.fail(`${label} failed`);
         throw error;
       }
@@ -105,7 +104,6 @@ export class Progress {
       const result = await work(report);
       progress.clear();
       this.drawing.closeGap();
-      // The spinner already drew the blank guide line above the title.
       this.line(MARK.done, done?.(result) ?? label);
       this.draw(lines);
       return result;
@@ -124,9 +122,6 @@ export class Progress {
   begin(label: string): Step {
     if (!this.drawing.interactive) {
       narration.start(label);
-      // Ending once is the step's contract, not the chain's: a caller that
-      // ends its own step in both a `try` and a `catch` must not narrate the
-      // step twice just because nobody is watching.
       let narrated = false;
       const once = (narrate: () => void) => {
         if (narrated) {
@@ -158,8 +153,6 @@ export class Progress {
       }
     };
     return {
-      // A detail given after the step has ended is drawn at once, under it,
-      // rather than waiting for an end that already happened.
       detail: (text) => {
         if (ended) {
           this.detail(text);

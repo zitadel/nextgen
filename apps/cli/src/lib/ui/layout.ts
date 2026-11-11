@@ -89,18 +89,6 @@ const visible = (line: string): number =>
   [...bare(line)].reduce((width, character) => width + columnsOf(character), 0);
 
 /**
- * Where each column after the first begins, inside the line.
- *
- * Measured at the end of the gap rather than its start: a cell is padded to
- * the width of its column, so it is the column after it that lines up, not the
- * space it was padded with.
- */
-const gaps = (line: string): number[] =>
-  [...bare(line).matchAll(new RegExp(`\\S( {${COLUMN_GAP},})(?=\\S)`, "g"))].map(
-    (match) => match.index + 1 + (match[1]?.length ?? 0),
-  );
-
-/**
  * Which of these lines are rows of a column layout, and so must be left whole.
  *
  * A column is not "a line with two spaces in it": it is a gap that lines up
@@ -112,12 +100,11 @@ const gaps = (line: string): number[] =>
  * produces, and which a single sentence cannot fake.
  */
 const columnRows = (lines: readonly string[]): boolean[] => {
-  const starts = lines.map((line) => gaps(line));
-  // The rule a table draws under its header is not a row, and it sits between
-  // the header and the first row. Read as a neighbour it breaks the alignment
-  // the two share, so a header went unrecognised and was folded, and so did
-  // the only row of a one-row table. A neighbour is the nearest line that is
-  // not a rule.
+  const starts = lines.map((line) =>
+    [...bare(line).matchAll(new RegExp(`\\S( {${COLUMN_GAP},})(?=\\S)`, "g"))].map(
+      (match) => match.index + 1 + (match[1]?.length ?? 0),
+    ),
+  );
   const isRule = (line: string): boolean => /^[\u2500\u2501-]{3,}$/.test(bare(line).trim());
   const neighbour = (index: number, step: 1 | -1): number[] | undefined => {
     let at = index + step;
@@ -187,11 +174,6 @@ export class Prose implements Renderable {
     }
     const lead = /^\s*/.exec(line)?.[0] ?? "";
     const item = /^(\[\w+\]|\$|-|\d+\.) /.test(line.trimStart()) ? "  " : "";
-    // A line indented further than the width it is folded to asks for a
-    // negative one. `wrap-ansi` happens to read that as one column today,
-    // which is not something it promises, so it is clamped here instead.
-    // Either way such a line folds a word to a line; there is nothing better
-    // to do with an indent wider than the terminal.
     return wrapAnsi(line.trimStart(), Math.max(1, this.width - lead.length - item.length))
       .split("\n")
       .map((part, index) => (index === 0 ? lead : lead + item) + part)
@@ -213,9 +195,6 @@ export class Facts implements Renderable {
 
   private one(section: Section): string {
     const width = Math.max(0, ...section.facts.map(([label]) => label.length));
-    // One gap, wider than a column gap, in every row. Each row is marked as
-    // well: a section of one fact is one line, so the alignment it is laid
-    // out with has nothing to agree with and only the mark says it is a row.
     const gap = " ".repeat(COLUMN_GAP + 1);
     return [
       ...(section.heading === undefined ? [] : [pc.bold(section.heading)]),
@@ -275,10 +254,6 @@ export const wrapCommand = (command: string, width: number, lead = ""): string[]
       .filter((at) => at > 0 && at <= room)
       .at(-1);
     if (cut === undefined) {
-      // Nothing to break at, so this is one long token: a URL, a digest, a
-      // path. It is left whole and the box widens for it. A `\` inside a
-      // token does not survive being copied — a split URL stops being
-      // clickable, and `claim` prints one the journey reads back out.
       break;
     }
     lines.push(`${indent}${rest.slice(0, cut)} \\`);
@@ -359,10 +334,6 @@ export class Frame implements Renderable {
       ...this.steps.map((step) => this.step(step)),
       ...(this.footer === undefined ? [] : [new Prose(this.footer, Frame.INNER, false).render()]),
     ];
-    // The last line is padded so every box is the same width, rather than as
-    // wide as its content. The padding is measured without the colour: a styled
-    // last line — a command, or the dimmed footer — would otherwise count its
-    // escapes as width and leave the box as narrow as whatever it happens to hold.
     const lines = blocks.join("\n\n").split("\n");
     const last = lines.length - 1;
     const tail = lines[last] ?? "";

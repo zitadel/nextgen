@@ -175,10 +175,6 @@ function outcome(input: {
     `Start your project: ${input.devCommand} (then open ${input.issuer}/register)`,
     verifyLoginAction(),
   ];
-  // Every step is a sentence that says what its command cannot say for
-  // itself — why it is here, or when to run it. `Next:` is the heading for
-  // commands nothing introduces, and a box that introduces its own commands
-  // never needs it.
   const boxActions: BoxAction[] = [
     ...(input.includeInstallCommand
       ? [

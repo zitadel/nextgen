@@ -368,8 +368,6 @@ export async function requireValueInteractive(
   const question = {
     name: key,
     message: `What is the value of ${key} for the ${name} environment?`,
-    // Persist (and return) the normalized form, matching how the resolver
-    // stores a server value, so the file and this run agree with every later run.
     parse: (answer: string) => {
       const typed = answer.trim();
       if (typed === "") {
@@ -378,11 +376,6 @@ export async function requireValueInteractive(
       return key === "ZITADEL_URL" ? parseServer(typed) : ({ ok: true, value: typed } as const);
     },
   };
-  // The command's own asker, so the question is drawn the way that command
-  // draws everything: a prompt without the guide for a normal command, a prompt
-  // inside the chain for a wizard. Minting one here drew a gutter for a chain that was
-  // never opened. A credential is never echoed, so which method asks it is
-  // the question's own property rather than a flag passed to one method.
   const value = SECRET_KEYS.has(key)
     ? await options.ask.secret(question)
     : await options.ask.text(question);

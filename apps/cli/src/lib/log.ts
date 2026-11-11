@@ -19,9 +19,6 @@ function emit(level: LogLevel, args: readonly unknown[]): void {
     sink(level, text);
     return;
   }
-  // Nothing is drawing: code that runs outside a command, such as the root help
-  // page, still has to be heard. `--json` is silent because it installs a sink
-  // that draws nothing, not because there is none.
   if (level !== "debug") {
     writePlain(level, text);
   }

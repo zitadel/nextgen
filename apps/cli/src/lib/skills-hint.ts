@@ -36,13 +36,9 @@ async function pendingOffer({ env, interactive }: SkillsHintInput): Promise<stri
     return undefined;
   }
   const shownPath = shownFile(env);
-  // No config directory to hold the marker, so the offer could never be
-  // recorded as made, and would be made on every run.
   if (shownPath === undefined || existsSync(shownPath)) {
     return undefined;
   }
-  // Detected agents only decide whether the offer is relevant; it does not
-  // name them.
   const detected = (await rosie.agents()).some(
     (agent) => agent.detected && agent.installPath !== null,
   );

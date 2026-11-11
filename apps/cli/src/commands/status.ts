@@ -19,7 +19,7 @@ import {
   readRuntimeMetadata,
   runtimeSummary,
 } from "@/lib/local-server/runtime";
-import { LocalServer, type ServerStatus } from "@/lib/local-server/server";
+import { LocalServer } from "@/lib/local-server/server";
 import {
   type Admitted,
   type Connection,
@@ -90,9 +90,6 @@ export default class Status extends EnvironmentCommand {
         ? { name: this.environment.name.value, envFile: this.environment.envFile }
         : undefined,
     );
-    // Said here rather than left to `connect()`: the probe below only connects
-    // for a configured project and swallows every failure, so a run that never
-    // reached the server would otherwise report no project at all.
     this.ui.ranAgainst(
       project.lifecycle === "configured" ? project.project_id : undefined,
       (this.environment.values.ZITADEL_URL?.value ?? this.meta.source).replace(/^https?:\/\//, ""),
@@ -118,6 +115,31 @@ export default class Status extends EnvironmentCommand {
     );
     const nextActions = nextActionsFor(project, users, this.cliVersion, this.environmentSelector());
 
+    const serverUrl =
+      server.runtime === undefined ? undefined : escapeControlCharacters(server.runtime.server_url);
+    const backend = server.runtime?.backend;
+    const how =
+      server.runtime?.backend === "binary" && server.process !== undefined
+        ? `${backend}, pid ${server.process.pid}`
+        : backend;
+    const serverSaid = {
+      missing: "No local server was started in this directory",
+      stopped: `The local server is stopped, and last ran at ${serverUrl} (${how})`,
+      unhealthy: `The local server is running at ${serverUrl} (${how}) but does not answer`,
+      running: `The local server is running and healthy at ${serverUrl} (${how})`,
+    }[server.lifecycle];
+    const dockerSaid =
+      backend === "docker" && !server.docker.available
+        ? `, and Docker could not be asked about it${server.docker.error === undefined ? "" : `: ${escapeControlCharacters(server.docker.error)}`}`
+        : "";
+    const projectSaid = [
+      ...("project_id" in project && project.project_id !== undefined
+        ? [`Project ${project.project_id}`]
+        : []),
+      `lifecycle ${project.lifecycle}`,
+      ...("issuer" in project && project.issuer !== undefined ? [`issuer ${project.issuer}`] : []),
+    ];
+
     return this.emit({
       status: "ok",
       data: {
@@ -138,7 +160,10 @@ export default class Status extends EnvironmentCommand {
       summary: {
         title: "Checked the status of the project",
         sections: [],
-        lines: [serverSentence(server), projectSentence(project)],
+        lines: [
+          `${serverSaid}${dockerSaid}.`,
+          escapeControlCharacters(`${projectSaid.join(", ")}.`),
+        ],
         overview: exploreAllCommands(this.cliVersion),
       },
     });
@@ -245,47 +270,6 @@ async function projectStatus(
     issuer,
     ...(claim.kind === "not-applicable" ? {} : { claim }),
   };
-}
-
-/**
- * Where this directory's local server stands, as one sentence: whether it is
- * running and answering, and where it listens, which is what `status` is run to
- * find out. A server Docker could not be asked about says so.
- */
-function serverSentence(server: ServerStatus): string {
-  const url =
-    server.runtime === undefined ? undefined : escapeControlCharacters(server.runtime.server_url);
-  const backend = server.runtime?.backend;
-  const how =
-    server.runtime?.backend === "binary" && server.process !== undefined
-      ? `${backend}, pid ${server.process.pid}`
-      : backend;
-  const said = {
-    missing: "No local server was started in this directory",
-    stopped: `The local server is stopped, and last ran at ${url} (${how})`,
-    unhealthy: `The local server is running at ${url} (${how}) but does not answer`,
-    running: `The local server is running and healthy at ${url} (${how})`,
-  }[server.lifecycle];
-  const docker =
-    backend === "docker" && !server.docker.available
-      ? `, and Docker could not be asked about it${server.docker.error === undefined ? "" : `: ${escapeControlCharacters(server.docker.error)}`}`
-      : "";
-  return `${said}${docker}.`;
-}
-
-/**
- * What the project amounts to, as one sentence: its id, where it stands and
- * the origin its app is served from, whichever of them the status knows.
- */
-function projectSentence(project: ProjectStatus): string {
-  const said = [
-    ...("project_id" in project && project.project_id !== undefined
-      ? [`Project ${project.project_id}`]
-      : []),
-    `lifecycle ${project.lifecycle}`,
-    ...("issuer" in project && project.issuer !== undefined ? [`issuer ${project.issuer}`] : []),
-  ];
-  return escapeControlCharacters(`${said.join(", ")}.`);
 }
 
 type UserPresence = "none" | "some" | "unknown";

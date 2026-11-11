@@ -50,10 +50,6 @@ export default class Env extends Tabulatable(EnvironmentCommand) {
       supplied: supplied.join(", "),
     }));
 
-    // Every command that resolves a project ends on where it ran. This one
-    // never opens a connection — reporting what resolves is its whole job —
-    // so it states the same place from the values it just read, rather than
-    // being the one command whose answer has no footer under it.
     this.ui.ranAgainst(
       values.ZITADEL_PROJECT_ID?.value,
       values.ZITADEL_URL?.value.replace(/^https?:\/\//, ""),
@@ -74,14 +70,9 @@ export default class Env extends Tabulatable(EnvironmentCommand) {
         })),
       },
       // Painted, because the two tables below are the CLI's own; the heading
-      // names a value read from a file, so it is spelled out here. A script is
-      // given the tables under that heading, not under the sentence a person's
-      // ending closes on.
+      // names a value read from a file, so it is spelled out here.
       pretty: painted(
         [
-          // One space, not two: two made the headline look like a row of a
-          // table, so it was read as part of the answer and the run ended
-          // with no footer at all.
           escapeControlCharacters(`Environment ${name.value} (from ${name.source})`),
           "",
           variables,

@@ -1,6 +1,6 @@
 import { readBoundEnvironments } from "@/lib/environment";
 import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
-import { nothingFound, plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
+import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
 
 /** The columns `list` renders, in order. */
 const COLUMNS = ["name", "source", "server", "project_id", "resolved"] as const;
@@ -51,7 +51,7 @@ export default class EnvList extends Tabulatable(EnvironmentCommand) {
       resolved: entry.resolved ? "yes" : "",
     }));
     const columns = COLUMNS;
-    const empty = nothingFound("environments");
+    const empty = "No environments found";
     const footer = [`Resolved now: ${name.value} (from ${name.source})`];
     const page = null;
     const extra = {

@@ -98,7 +98,6 @@ export default class Console extends BaseCommand {
         browser_opened: opened,
       },
       summary: { title: "Local console sign-in link", sections: [] },
-      // The one place it says the link works once, as the link is above it.
       next: {
         actions: [
           `The link signs you in once. Run ${this.suggestUnscoped("console")} again for a fresh one.`,

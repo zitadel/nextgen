@@ -2,7 +2,7 @@ import { Flags } from "@oclif/core";
 
 import { VariableService } from "@/lib/backend";
 import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
-import { nothingFound, plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
+import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
 import { inventoryCell, variableCell } from "@/lib/variables";
 
 /** The columns `list` renders, in order; `--preview` leaves out the preview column. */
@@ -48,7 +48,7 @@ export default class VariableList extends Tabulatable(EnvironmentCommand) {
         return variableCell(item);
       });
       const columns = PREVIEW_COLUMNS;
-      const empty = nothingFound("preview variables");
+      const empty = "No preview variables found";
       const footer: string[] = [];
       const page = null;
       const extra = {};
@@ -73,7 +73,7 @@ export default class VariableList extends Tabulatable(EnvironmentCommand) {
       return inventoryCell(item);
     });
     const columns = COLUMNS;
-    const empty = nothingFound("variables");
+    const empty = "No variables found";
     const footer: string[] = [];
     const page = null;
     const extra = {};

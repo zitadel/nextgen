@@ -135,7 +135,26 @@ export default class Upgrade extends BaseCommand {
           ? `Zitadel can be upgraded to ${target}`
           : `Zitadel upgraded to ${target}`
     }${dryRun ? " (dry run)" : ""}`;
-    const rows = upgradeRows({ packages, leftAlone, refresh, dryRun, installSuggestion });
+    const done = dryRun ? arrow : mark.pass;
+    const rows = [
+      // A package's name and versions are what the registry answered, and this
+      // line colours only the mark in front of them, so they are spelled out
+      // here rather than by whatever prints the report.
+      ...packages.map((pkg) => {
+        return `  ${done} ${escapeControlCharacters(`${pkg.name} ${pkg.from} → ${pkg.to}`)}`;
+      }),
+      ...(dryRun && installSuggestion !== undefined
+        ? [`  Would run ${command(installSuggestion)}`]
+        : []),
+      ...(refresh === "done" ? [`  ${done} Refreshed generated files with doctor --fix`] : []),
+      ...(refresh === "issues"
+        ? [`  ${mark.warn} Refreshed generated files; doctor still reports issues`]
+        : []),
+      ...(refresh === "failed" ? [`  ${mark.warn} Could not refresh generated files`] : []),
+      ...leftAlone.map(([name, specifier]) => {
+        return `  ${dim(escapeControlCharacters(`- ${name} left at "${specifier}", not an exact version`))}`;
+      }),
+    ];
     return this.emit({
       status: "ok",
       data: {
@@ -153,8 +172,6 @@ export default class Upgrade extends BaseCommand {
       },
       next,
       summary: { title: said, sections: [], lines: rows },
-      // Painted, because the report is a coloured one the CLI drew; the
-      // machine text keeps its headline, with a full stop, above the rows.
       pretty: painted([strong(`${said}.`), ...rows].join("\n")),
     });
   }
@@ -230,34 +247,4 @@ function renderBreakingChanges(breaking: readonly BreakingChange[]): string {
     `Release notes: ${url(RELEASE_NOTES_URL)}`,
     "",
   ].join("\n");
-}
-
-function upgradeRows(input: {
-  packages: readonly PackageUpgrade[];
-  leftAlone: ReadonlyArray<readonly [string, string]>;
-  refresh: Refresh;
-  dryRun: boolean;
-  installSuggestion: string | undefined;
-}): string[] {
-  const { packages, leftAlone, refresh, dryRun, installSuggestion } = input;
-  const done = dryRun ? arrow : mark.pass;
-  return [
-    // A package's name and versions are what the registry answered, and this
-    // line colours only the mark in front of them, so they are spelled out
-    // here rather than by whatever prints the report.
-    ...packages.map((pkg) => {
-      return `  ${done} ${escapeControlCharacters(`${pkg.name} ${pkg.from} → ${pkg.to}`)}`;
-    }),
-    ...(dryRun && installSuggestion !== undefined
-      ? [`  Would run ${command(installSuggestion)}`]
-      : []),
-    ...(refresh === "done" ? [`  ${done} Refreshed generated files with doctor --fix`] : []),
-    ...(refresh === "issues"
-      ? [`  ${mark.warn} Refreshed generated files; doctor still reports issues`]
-      : []),
-    ...(refresh === "failed" ? [`  ${mark.warn} Could not refresh generated files`] : []),
-    ...leftAlone.map(([name, specifier]) => {
-      return `  ${dim(escapeControlCharacters(`- ${name} left at "${specifier}", not an exact version`))}`;
-    }),
-  ];
 }

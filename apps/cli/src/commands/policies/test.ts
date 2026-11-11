@@ -216,8 +216,6 @@ The server evaluates every case, so the command needs a connection to it. By def
       return this.emit({
         status: "skipped",
         reason: "no-policy-tests",
-        // A pipe gets the one paragraph it always did; a person gets what
-        // was found as the headline and what to add under it.
         pretty: prose(
           `No policy test files in ${directory}/. Add <operation>.test.json beside a policy; ${directory}/README.md shows one.`,
         ),
@@ -272,9 +270,6 @@ The server evaluates every case, so the command needs a connection to it. By def
       );
     }
 
-    // The rendering ends on its totals ("2 passed"), which are the headline
-    // of the ending; the cases above them are what the run produced. A pipe
-    // keeps the whole rendering, totals last, so `tail -1` still reads them.
     return this.emit({
       status: "ok",
       data,

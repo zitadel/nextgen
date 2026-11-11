@@ -154,7 +154,17 @@ export function doctorReport(input: DoctorReportInput): DoctorReport {
   const shownActions = new Set(
     (input.fixes ?? []).filter((fix) => shownCommands.has(fix.command)).map((fix) => fix.action),
   );
-  return { lines, next: remainingSteps(input.next, shownCommands, shownActions) };
+  return {
+    lines,
+    next: {
+      actions: input.next.actions?.filter((action) => {
+        return !shownActions.has(action);
+      }),
+      commands: input.next.commands?.filter((suggested) => {
+        return !shownCommands.has(suggested);
+      }),
+    },
+  };
 }
 
 /** The report as one block of text, with its title and the steps under it. */
@@ -315,16 +325,4 @@ function conclusion(checks: readonly CheckOutcome[]): string {
     return `${mark.warn} Zitadel doctor passed with warnings in ${categories(affected("warn"))}.`;
   }
   return `${mark.pass} Zitadel doctor passed.`;
-}
-
-/** The next steps not already shown under a row, which is why doctor draws them itself. */
-function remainingSteps(
-  next: NextSteps,
-  shownCommands: ReadonlySet<string>,
-  shownActions: ReadonlySet<string>,
-): NextSteps {
-  return {
-    actions: next.actions?.filter((action) => !shownActions.has(action)),
-    commands: next.commands?.filter((suggested) => !shownCommands.has(suggested)),
-  };
 }

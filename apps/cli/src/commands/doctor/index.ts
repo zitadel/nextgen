@@ -207,9 +207,6 @@ export default class Doctor extends Destructive(BaseCommand) {
             parentRuntimeDir,
           )
         : [];
-    // `doctor` is not an EnvironmentCommand but honours --env/--env-file/--server
-    // to check a chosen environment, so a suggested rerun of a failed check has
-    // to carry that same selection or it would check the default project.
     const selector = environmentSelectorSuffix({
       cwd: flags.cwd,
       envFile: flags.envFile,
@@ -307,9 +304,6 @@ export default class Doctor extends Destructive(BaseCommand) {
         ? environmentSelectorSuffix({ cwd: flags.cwd, server: projectServer })
         : undefined;
     const warningAdvice = advisoryForWarnings(warnings, this.cliVersion, claimSelector, selector);
-    // `doctor` never opens a connection, so nothing else records where it ran:
-    // the project it checked and the server that project names are already in
-    // hand here, and the summary's last line is where they belong.
     this.ui.ranAgainst(projectId, (projectServer ?? this.meta.source).replace(/^https?:\/\//, ""));
     // A server that is running is one a sign-in or a request can fail
     // against, and its log is where the reason is.
@@ -393,20 +387,13 @@ export default class Doctor extends Destructive(BaseCommand) {
       });
     }
 
-    // The report is a coloured one the CLI drew, and every value it names was
-    // spelled out where it was read. The rows say the next steps they repair
-    // themselves, so the box lists only the ones they do not.
     const report = doctorReport(reportInput);
     return this.emit({
       status: "ok",
       data,
       next,
       warnings: warnings.map((warning) => `${warning.name}: ${warning.message}`),
-      // The report's rows already say each warning, so the ending must not say
-      // them again underneath.
       warningsShown: true,
-      // The rows say the steps they repair, and the summary lists only the ones
-      // they do not, so the full list is not printed again under them.
       nextShown: asStepsShown(),
       summary: {
         title: warnings.length > 0 ? "Checks passed with warnings" : "All checks passed",

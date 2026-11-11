@@ -509,12 +509,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
     );
     const named = this.constructor as typeof BaseCommand;
     this.ui.describe(named.heading ?? `zitadel ${(this.id ?? "").replaceAll(":", " ")}`.trim());
-    // `--json` draws no narration, so the structured envelope is the only
-    // thing on stdout: its sink swallows every line, which no sink at all would
-    // not. `--debug` also draws the detail it asks for.
     this.ui.bridgeNarration({ debug, silent: json });
-    // Only a box carries the offer, so only a wizard looks for it, and a dry
-    // run changes nothing, so it does not spend the one offer a machine gets.
     this.skillsOffered =
       this.summarises() && !this.meta.dryRun
         ? await eligibleForSkills({
@@ -634,13 +629,8 @@ export abstract class BaseCommand extends Interruptible(Command) {
     // list of no records must leave stdout empty, so `wc -l` reports 0.
     const rendered = renderPretty(normalized, beside ? "" : next);
     const footer = normalized.status === "ok" ? normalized.footer : undefined;
-    // A skip ends on its own summary too, so a deliberate no-op reads like
-    // every other ending instead of as the reason token the envelope carries.
     const ending = this.endingOf(normalized, footer);
     if (beside) {
-      // `--plain` and a write's data are for something to read: nothing frames
-      // them, whether or not a person is watching, and their next steps go
-      // beside them on stderr, set apart by a blank line like everywhere else.
       if (rendered !== "") {
         this.log(stripColumnMarks(rendered));
       }
@@ -651,13 +641,8 @@ export abstract class BaseCommand extends Interruptible(Command) {
         this.log(`\n${stripColumnMarks(footer)}`);
       }
     } else if (this.ui.interactive) {
-      // A person at a terminal: the result closes the chain the questions began.
       this.ui.finish(ending);
     } else if (this.rendersForAMachine()) {
-      // Nothing folds this text, so nothing takes the mark a builder puts at
-      // the head of a row it aligned (`COLUMN_MARK`): it is invisible on
-      // screen but it is in the bytes, and it would travel with anything
-      // copied or parsed out of them.
       if (rendered !== "") {
         this.log(stripColumnMarks(rendered));
       }
@@ -665,9 +650,6 @@ export abstract class BaseCommand extends Interruptible(Command) {
         this.log(`\n${stripColumnMarks(footer)}`);
       }
     } else {
-      // Nothing can be drawn, so the same ending is written out instead. It
-      // goes through `log`, which `--json` silences, so the envelope still
-      // travels alone on stdout.
       const text = this.ui.written(ending).replace(/\n+$/, "");
       if (text !== "") {
         this.log(text);
@@ -695,8 +677,6 @@ export abstract class BaseCommand extends Interruptible(Command) {
     const shown = result.status === "ok" && result.nextShown !== undefined;
     const steps = own.next ?? (shown ? [] : stepsOf(result.next));
     const ran = own.ran ?? this.serverRanOn();
-    // A rendering that read its own warnings says so with `warningsShown`; the
-    // ending says the rest, or a person at a terminal would never read them.
     const warnings =
       result.status === "ok" && !result.warningsShown
         ? (result.warnings ?? []).map(warningLine)
@@ -722,7 +702,6 @@ export abstract class BaseCommand extends Interruptible(Command) {
    * that knows no project can still say where it ran.
    */
   private serverRanOn(): string | undefined {
-    // A dry run spoke to no server, so it did not run on one.
     if (this.meta.dryRun) {
       return undefined;
     }
@@ -759,16 +738,11 @@ export abstract class BaseCommand extends Interruptible(Command) {
   private withOverview(summary: Summary, changed: boolean): Summary {
     const steps = summary.next ?? [];
     if (!this.summarises()) {
-      // A normal command has no box, and no overview step either: that is a
-      // wizard's last word. Its own steps are kept, and the ending writes them
-      // out as lines rather than losing the command to run next.
       return { ...summary, boxed: false };
     }
     const overview = steps.some((step) => step.text === OVERVIEW)
       ? []
       : [{ text: OVERVIEW, command: publicCliCommand("", this.config.version) }];
-    // The skills offer is the last step of the first summary a machine sees,
-    // rather than a block of its own after the box.
     const skills =
       this.skillsOffered && changed ? [claimSkills(process.env, this.config.version)] : [];
     return {
@@ -848,17 +822,8 @@ export abstract class BaseCommand extends Interruptible(Command) {
     if (this.jsonEnabled()) {
       this.logJson(withWarnings(toErrorEnvelope(zitadelError, meta), takeReportedWarnings()));
     } else if (zitadelError.code === "E_CANCELLED") {
-      // Ctrl-C is the person's own decision, and the terminal already shows it
-      // (`^C`, or a cancelled prompt's "Cancelled"), so it gets no error
-      // block. The exit code still says the command did not finish. The chain
-      // it interrupted still has to be closed, or the shell prompt is drawn
-      // inside the gutter.
       this.ui.stop(zitadelError);
     } else {
-      // A failure has no machine form — `--json` is where a machine reads one
-      // — so it is said in the command's own shape either way. It closes the
-      // chain a wizard has drawn, which is on stdout; every other failure is
-      // written to stderr, where a script expects to find it, terminal or not.
       const ending = failureSummary(zitadelError, meta);
       if (this.ui.interactive && this.ui.opened) {
         this.ui.finish(ending);
@@ -885,8 +850,6 @@ export abstract class BaseCommand extends Interruptible(Command) {
    */
   protected override async finally(error: Error | undefined): Promise<void> {
     this.stopListeningForInterrupt();
-    // The narration sink is process-wide: it is installed while this command
-    // runs and must be removed however the command ended.
     this.ui.releaseNarration();
     await this.telemetry?.shutdown(1000);
     if (this.telemetry?.enabled) {
@@ -938,8 +901,6 @@ function asRaised(error: unknown): unknown {
 
 /** Rewrites each suggested `zitadel …` command to the public form the reader can run. */
 function normalizeCommandResult(result: CommandResult, meta: GlobalOptions): CommandResult {
-  // A command that states its ending and nothing else is written out as that
-  // ending where a person is not being drawn to, so there is one set of words.
   const stated =
     result.pretty === undefined && result.summary !== undefined
       ? { ...result, pretty: painted(textOf(result.summary)) }
@@ -1028,12 +989,7 @@ function renderPretty(result: CommandResult, next: string): string {
   // made it knew which spelling its shape takes, so interpolating what the
   // server answered is safe wherever a command does it.
   const own = result.pretty?.text ?? "";
-  // A rendering replaces nothing of its next steps or its warnings: setting one
-  // cannot drop them, and only `warningsShown` says the rendering said every
-  // one itself.
   const warnings = result.status === "ok" && !result.warningsShown ? (result.warnings ?? []) : [];
-  // One blank line before the next steps, whatever newlines the rendering
-  // ends with and whether the run succeeded or was skipped.
   const body = next === "" || own === "" ? own : `${own.replace(/\n+$/, "")}\n`;
   return [body, next, ...warnings.map(warningLine)].filter((line) => line !== "").join("\n");
 }
@@ -1053,8 +1009,6 @@ function failureSummary(error: ZitadelError, meta: GlobalOptions): Summary {
   // The envelope keeps them as they came, so a reader parses the real text.
   // Only the label is coloured, so there is nothing for the spelling to undo.
   const suggested = normalizePublicCliCommands(error.nextCommands, meta.cliVersion) ?? [];
-  // A refused command line is told where its own help is, under the same label
-  // as every other suggestion, rather than under oclif's "See more help with".
   const commands = suggested.length > 0 ? suggested : misuse ? [helpFor(meta)] : [];
   return {
     title: `Error: ${escapeControlCharacters(spellOutCommands(sentence, meta.cliVersion))} (${error.code})`,

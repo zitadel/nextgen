@@ -1,5 +1,5 @@
 import { type Admitted, BaseCommand, type JsonEnvelope } from "@/lib/oclif";
-import { nothingFound, plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
+import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
 import { describeRegistry } from "@/lib/oclif/crud";
 import { CommandGroups } from "@/lib/oclif/groups";
 import { RESOURCES } from "./resources";
@@ -55,7 +55,7 @@ export default class ResourcesList extends Tabulatable(BaseCommand) {
     });
 
     const columns = COLUMNS;
-    const empty = nothingFound("resources");
+    const empty = "No resources found";
     const footer = ["Add --help to any command for its flags."];
     const page = null;
     const extra = {};

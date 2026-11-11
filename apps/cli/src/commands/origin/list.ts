@@ -1,6 +1,6 @@
 import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { OriginService } from "@/lib/backend";
-import { nothingFound, plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
+import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
 
 /** The columns `list` renders, in order. */
 const COLUMNS = ["pattern", "kind"] as const;
@@ -33,7 +33,7 @@ export default class OriginList extends Tabulatable(EnvironmentCommand) {
     const items = origins.all;
     const rows = items;
     const columns = COLUMNS;
-    const empty = nothingFound("origins");
+    const empty = "No origins found";
     const footer: string[] = [];
     const page = null;
     const extra = {};

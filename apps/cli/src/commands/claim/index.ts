@@ -282,10 +282,7 @@ export default class Claim extends EnvironmentCommand {
       // Always show the link first, before attempting anything: it is the whole
       // instruction on its own, so a launch that never happens (headless box,
       // no `xdg-open`, `--no-open`, an agent) needs no separate path.
-      //
-      // The URL prints as a bare line under the explanation rather than inside
-      // anything: it must never be split (clickability, and the journey e2e
-      // scrape reads it out of the narration).
+      // The URL prints bare: it must never be split (clickability, the journey e2e scrape).
       this.ui.note("Finish in your browser", [
         "Create an account or sign in to claim your project, make it permanent and start collaborating.",
       ]);
@@ -353,7 +350,6 @@ export default class Claim extends EnvironmentCommand {
         claimed_at: completed.claimed_at,
         dashboard_url: completed.dashboard_url,
       },
-      // The link sits under the sentence that introduces it, as one step.
       summary: {
         title: "Your project is now permanent",
         sections: [],
@@ -464,7 +460,6 @@ export default class Claim extends EnvironmentCommand {
         challenge_id: challenge.challenge_id,
         expires_at: challenge.expires_at,
       },
-      // The command sits under the sentence that introduces it, as one step.
       summary: {
         title: "Open the link in a browser to make your project permanent",
         sections: [],

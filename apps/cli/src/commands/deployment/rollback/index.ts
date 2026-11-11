@@ -230,7 +230,6 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
               ...(pointers === undefined ? {} : { pointers }),
             },
             summary: {
-              // Counted, not spelled out, for the reason `deployment create` gives.
               title: `Rolled back to ${escapeControlCharacters(deployment.release_id)} on ${renderCount(deployment.origins.length, { singular: "origin" })}`,
               sections: [],
               lines: [

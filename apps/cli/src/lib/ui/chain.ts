@@ -105,13 +105,8 @@ export class Chain implements Drawing, Narratable {
    * is indented to the same column, so the marks still line up.
    */
   narrate(symbol: string, text: string): void {
-    // Not folded to a width: the terminal wraps a long line to its own, and a
-    // line it wraps is still one line when it is copied.
     const body = stripColumnMarks(text);
     if (!this.audience.interactive) {
-      // A blank line is a gap, so it carries no mark.
-      // A warning and a failure go where a normal command puts them, so a
-      // script that captures stdout reads the report alone.
       const stream =
         symbol === MARK.warning || symbol === MARK.failed ? process.stderr : process.stdout;
       stream.write(body === "" ? "\n" : `${symbol === GUIDE ? " " : symbol}  ${body}\n`);
@@ -141,8 +136,6 @@ export class Chain implements Drawing, Narratable {
     // A step the command left open must not keep drawing under what ends the run.
     DrawnSpinner.clearAll();
     const ending = new Ending(summary, this.where(summary.ran), this.presentation);
-    // A normal command draws no chain: its answer stands on its own, with a
-    // footer rather than a closing line, however the run went.
     if (ending.standalone) {
       this.ended = true;
       process.stdout.write(ending.renderStandalone());
@@ -252,7 +245,6 @@ export class Chain implements Drawing, Narratable {
   note(title: string, lines: readonly string[]): void {
     if (this.drawsAChain) {
       this.open();
-      // A box is never wider than 80 columns, so its lines are wrapped to fit.
       note(new Prose(lines.join("\n"), WIDTH - 8).render(), title);
       this.gap = true;
       return;

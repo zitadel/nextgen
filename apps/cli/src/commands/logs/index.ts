@@ -135,8 +135,6 @@ export default class Logs extends BaseCommand {
               },
         logs: logText(lines),
       },
-      // The server's own lines, written as they came: a headline over them
-      // would say nothing, and folding them would break a line the server wrote.
       summary: { title: "Done", sections: [], lines: shown },
       pretty: painted(shown.join("\n")),
     });

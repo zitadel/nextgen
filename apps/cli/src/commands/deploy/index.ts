@@ -64,14 +64,10 @@ export function deployed(resources: number): string {
  * and is in the envelope, where a machine reads it.
  */
 export function liveOn(hash: string, origins: readonly string[]): string {
-  // The server named the hash, and the sentence is drawn as the CLI's own, so
-  // it is spelled out here like the origins below.
   const release = `Release ${escapeControlCharacters(abbreviate(hash))} is now live`;
   if (origins.length === 0) {
     return `${release}.`;
   }
-  // The server named these, and the sentence is drawn as the CLI's own, so
-  // they are spelled out here.
   const named = origins.map((origin) => escapeControlCharacters(origin));
   const where =
     named.length === 1 ? named[0] : `${named.slice(0, -1).join(", ")} and ${named.at(-1)}`;
@@ -355,7 +351,6 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
     for (const lockout of lockouts) {
       reportWarning(lockout);
     }
-    // What a deploy that would leave existing users unable to sign in asks.
     const { projectId, server } = await this.connect();
     const question = `Deploy to project ${escapeControlCharacters(projectId)} on ${escapeControlCharacters(server.replace(/^https?:\/\//, ""))} even though the users above will not be able to sign in?`;
     if (!this.dryRun) {

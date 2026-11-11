@@ -10,7 +10,7 @@ import {
   PreviewCommand,
 } from "@/lib/oclif";
 import { reads, type Refused, whole } from "@/lib/oclif/flags";
-import { nothingFound, plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
+import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
 
 /** The columns `list` renders, in order. */
 const COLUMNS = ["url", "expires", "created"] as const;
@@ -92,7 +92,7 @@ export default class PreviewList extends Tabulatable(PreviewCommand) {
     });
 
     const columns = COLUMNS;
-    const empty = nothingFound("previews");
+    const empty = "No previews found";
     const footer: string[] = [];
     const page = {
       token: listed.next,

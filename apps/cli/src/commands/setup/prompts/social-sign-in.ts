@@ -168,10 +168,6 @@ export class SocialSignInPrompt implements SetupPrompt {
         );
         continue;
       }
-      // A secret is never `given`: the question type refuses it, because a
-      // value a flag could carry is a value that ends up in shell history. One
-      // the run already holds -- piped in before the Project was created --
-      // skips the question instead of answering it.
       const secret =
         flagged?.credentials.secret ??
         (await ctx.ask.secret({
@@ -236,9 +232,6 @@ export class SocialSignInPrompt implements SetupPrompt {
    */
   private announce(ctx: PromptContext, entry: IdpProvider, devPort: number, issuer?: Issuer): void {
     ctx.note(`${entry.displayName} sign-in`, [
-      // Where to register depends on who is actually answering: pointing a
-      // developer at the vendor's console when the connection runs against
-      // their own stand-in would be worse than saying nothing.
       ...(issuer === undefined
         ? [
             entry.consoleUrl === undefined

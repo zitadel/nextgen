@@ -102,9 +102,6 @@ export default class DeploymentCreate extends EnvironmentCommand {
         origins: deployment.origins,
       },
       next: { commands: [this.suggest("deployment list")] },
-      // One clause and nothing else: spelling the origins out would make the
-      // headline as long as the project has origins. `--json` and
-      // `deployment get` name them.
       summary: {
         title: `Deployed ${escapeControlCharacters(deployment.release_id)} to ${renderCount(deployment.origins.length, { singular: "origin" })}`,
         sections: [],

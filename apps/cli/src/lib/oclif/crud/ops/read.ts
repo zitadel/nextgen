@@ -66,8 +66,6 @@ export class GetOperation<Ctx> extends ResourceCommand<Ctx, GetSpec<Ctx>, ReadIn
     const item = await spec.call(await this.context(), idValue(resource, args));
     const fields = chosenColumns(flags.fields, resource.detail ?? resource.columns, [item], shape);
     const heading = headingOf(resource.heading ?? resource.idField, item);
-    // Read, said of what was read: the identifier heads the record, and the
-    // record is spelled out where it is read, so only the words here are ours.
     const title = `Read ${escapeControlCharacters(heading ?? resource.singular)}`;
     if (!this.isOnScreen) {
       return { status: "ok", data: item, pretty: json(item), summary: { title, sections: [] } };

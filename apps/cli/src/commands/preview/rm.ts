@@ -86,8 +86,6 @@ export default class PreviewRm extends Destructive(PreviewCommand) {
             return new Settled({
               status: "skipped",
               reason: "not-live",
-              // A pipe gets the one sentence it always did; a person gets what
-              // happened as the headline and why under it.
               pretty: prose(
                 `${args.url} is not a live preview of the project; nothing was removed`,
               ),

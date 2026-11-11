@@ -69,9 +69,6 @@ export type Session = {
   after?: () => void;
 };
 
-/** The one thing a cancelled prompt throws, whichever prompter was asking. */
-const cancelledByUser = (): ZitadelError => new PromptCancelled();
-
 /** How a typed answer is refused as it is typed: the problem, or nothing. */
 type Validate = (value: string | undefined) => string | undefined;
 
@@ -192,7 +189,7 @@ class DrawnPrompter implements Prompter {
         throw new ZitadelError("E_CANCELLED", "Cancelled by user");
       }
       cancel(CANCELLED);
-      throw cancelledByUser();
+      throw new PromptCancelled();
     }
     return answer as T;
   }
@@ -287,8 +284,6 @@ async function askOne(
       return true;
     }
     if (!session.interactive) {
-      // Its own code, so an agent tells it from a flag it can supply itself:
-      // the retry carries --force, which only a person may agree to.
       throw new ZitadelError(
         "E_CONFIRMATION_REQUIRED",
         `Cannot ${q.name} without --force in non-interactive mode`,
@@ -325,7 +320,6 @@ async function askOne(
     return chosen;
   }
 
-  // Only `text` and `secret` are left, and both carry a parser.
   const parse = q.parse ?? ((raw: string): Parsed<unknown> => ({ ok: true, value: raw }));
   const accept = (raw: string): unknown => {
     const parsed = parse(raw);

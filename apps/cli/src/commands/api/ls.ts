@@ -8,7 +8,7 @@ import {
   type JsonEnvelope,
   nonBlankString,
 } from "@/lib/oclif";
-import { nothingFound, plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
+import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
 
 /** The columns `ls` renders, in order. */
 const COLUMNS = ["id", "method", "path", "summary"] as const;
@@ -73,7 +73,7 @@ export default class ApiLs extends Tabulatable(BaseCommand) {
 
     const rows = items;
     const columns = COLUMNS;
-    const empty = nothingFound("operations");
+    const empty = "No operations found";
     const footer: string[] = [];
     const page = null;
     const extra = {};

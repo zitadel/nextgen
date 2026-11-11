@@ -211,7 +211,6 @@ export default class BrandingEject extends Promptable(BaseCommand) {
     for (const file of filesWritten) {
       log.info(`Wrote ${file}`);
     }
-    // Said once, by the line the command ends on.
     const ejected = `Ejected the ${design} design into ${CONFIG_DIRECTORIES.branding}/`;
 
     return this.emit({
@@ -224,9 +223,6 @@ export default class BrandingEject extends Promptable(BaseCommand) {
       next: {
         actions: [
           `Edit ${DEFAULT_BRANDING_TEMPLATE_PATH} — the login UI is yours now.`,
-          // The two commands are the box's own steps, so the sentence says
-          // what they are for and leaves the spelling to them: a suggestion
-          // written out here as well would name each command twice.
           "Validate the template and see the diff with a dry run, then publish it.",
         ],
         commands: [this.suggestUnscoped("deploy --dry-run"), this.suggestUnscoped(DEPLOY_ARGS)],

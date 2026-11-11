@@ -48,20 +48,12 @@ export default class DeploymentGet extends Tabulatable(EnvironmentCommand) {
     const { client, projectId } = await this.connect();
 
     const deploymentService = new DeploymentService(client, projectId);
-    // Only the terminal rendering names the frozen set, so only it reads one:
-    // `--json` carries the record alone and prints no rendering, and a pipe
-    // gets the record too, because a script wants the record rather than a
-    // view of it.
     const shows = !this.isJson && this.isOnScreen;
     const [deployment, variables] = await Promise.all([
       deploymentService.get(args.deploymentId),
       shows ? deploymentService.variables(args.deploymentId) : undefined,
     ]);
 
-    // One record reads the same here as it does from any other `get`: the
-    // identifier, then a labelled line per field, at the left margin and
-    // named as the wire names them, with the set the deployment froze tabled
-    // under them.
     const frozen =
       variables === undefined
         ? undefined
@@ -84,7 +76,6 @@ export default class DeploymentGet extends Tabulatable(EnvironmentCommand) {
             ].join("\n");
     const title = `Read ${escapeControlCharacters(deployment.id)}`;
     if (!shows) {
-      // A pipe gets the object itself.
       return this.emit({
         status: "ok",
         data: deployment,

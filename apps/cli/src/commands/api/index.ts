@@ -302,8 +302,6 @@ export default class Api extends Destructive(BaseCommand) {
       status: "ok",
       data: {},
       next: this.jsonEnabled() ? { commands: [this.suggestUnscoped("api ls")] } : undefined,
-      // The help was already written by the help command, so there is no
-      // ending to add to it.
       summary: {
         title: "Done",
         sections: [],
@@ -316,10 +314,6 @@ export default class Api extends Destructive(BaseCommand) {
     const named = readOperation(args.operation, flags.method);
     refuseUnpaged(named, flags.paginate);
     const secret = await readProjectSecret(named, this.cwd);
-    // This command calls the server, so its summary says where it ran, the
-    // same sentence every other command ends on. The project is the one whose
-    // secret authenticates the call, which an unauthenticated operation has
-    // none of.
     this.ui.ranAgainst(secret?.project_id, this.meta.source.replace(/^https?:\/\//, ""));
 
     const target = named ?? resolveTarget(await this.chooseOperation(flags.paginate, secret));
@@ -353,9 +347,6 @@ export default class Api extends Destructive(BaseCommand) {
                 body: request.body,
               }),
         },
-        // A script reads the command on its own; a person at a terminal is
-        // told it is not sent, with the command under it exactly as written
-        // because it is copied, not read.
         summary: {
           title: `Would call ${operation.id} (dry run)`,
           sections: [],
@@ -452,7 +443,6 @@ export default class Api extends Destructive(BaseCommand) {
           title: `No content (${response.status})`,
           sections: [],
         },
-        // Nothing is written for a script, which reads an empty answer.
         ...(this.isOnScreen ? {} : { pretty: prose("") }),
       };
     }

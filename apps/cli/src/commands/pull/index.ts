@@ -294,8 +294,6 @@ export default class Pull extends EnvironmentCommand {
         skipped,
         ...(this.dryRun ? { dry_run: true } : {}),
       },
-      // A named release or deployment is usually an earlier one, and deploying
-      // it would put that content back on every primary origin.
       next: {
         commands: this.dryRun || input.args.target !== undefined ? [] : [this.suggest(DEPLOY_ARGS)],
       },

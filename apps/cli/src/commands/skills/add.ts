@@ -37,8 +37,6 @@ export default class SkillsAdd extends BaseCommand {
       });
     }
 
-    // The sentence that introduces the paths comes first, so it is the body's
-    // first line: a headline closes the output, and would put it under them.
     const title = `${this.dryRun ? "Would add" : "Added"} the ${skills.length} Zitadel agent skills of CLI ${this.cliVersion}${this.dryRun ? " (dry run)" : ""}`;
     const said = [
       `${title} to:`,

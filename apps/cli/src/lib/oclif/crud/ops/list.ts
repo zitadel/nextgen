@@ -5,7 +5,7 @@ import { Paging } from "@/lib/backend/transport";
 import { nonBlankString, type Refused, reads, whole } from "@/lib/oclif/flags";
 
 import type { CommandResult } from "@/lib/oclif/types";
-import { nothingFound, plainFlag } from "@/lib/oclif/tabulatable";
+import { plainFlag } from "@/lib/oclif/tabulatable";
 import { wireOf } from "@/lib/oclif/crud/wire";
 import {
   type ParsedFilter,
@@ -236,9 +236,6 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>, List
     // page: asking for one with --limit or --page-token is asking for one.
     const asked = flags.limit !== undefined || flags.pageToken !== undefined;
     const all = paged && (flags.all === true || (spec.drains === true && !asked));
-    // `--all` is one request per page, so a wide drain would otherwise sit
-    // silent. `this.ui` hands out a spinner that draws nothing when nobody is
-    // watching, so no animation reaches a pipe and `--json` stays one envelope.
     const progress = all ? this.ui.spinner(`Fetching ${topic}`) : undefined;
     const paging = new Paging({
       items: (response) => {
@@ -258,21 +255,17 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>, List
     // page that fails mid-drain has to stop it too; otherwise the error prints
     // under a live spinner and the handler outlives the command.
     const collected = await paging.collect(walk, { all }).catch((error: unknown) => {
-      // Cleared rather than stopped with text: a stop draws the success mark,
-      // and the error that follows says what failed.
       progress?.clear();
       throw error;
     });
     const { items } = collected;
-    // The noun the person reads: the descriptor's own plural when it has one,
-    // since the topic is the command's name (`idps`, `release`).
     const plural = resource.plural ?? topic;
     const next = collected.next;
     progress?.stop(`Fetched ${items.length} ${items.length === 1 ? resource.singular : plural}`);
 
     const rows = items;
     const columns = chosenColumns(flags.fields, resource.columns, items, shape);
-    const empty = next ? `No ${plural} on this page.` : nothingFound(plural);
+    const empty = next ? `No ${plural} on this page` : `No ${plural} found`;
     const footer: string[] = [];
     const page = {
       token: next,

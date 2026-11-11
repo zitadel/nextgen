@@ -10,7 +10,7 @@ import {
   nonBlankString,
 } from "@/lib/oclif";
 import { reads, type Refused, whole } from "@/lib/oclif/flags";
-import { nothingFound, plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
+import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
 import { Cmd } from "@/lib/cmd";
 
 /**
@@ -116,7 +116,7 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
     const rows = items.map(deploymentRow);
 
     const columns = DEPLOYMENT_FIELDS;
-    const empty = nothingFound("deployments");
+    const empty = "No deployments found";
     const footer: string[] = [];
     const page = {
       token: listed.next,

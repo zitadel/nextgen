@@ -222,9 +222,6 @@ export function failureText(message: string): FailureText {
     .split("\n")
     .map((line) => line.trim())
     .filter((line) => line !== "");
-  // oclif lists what it rejected under a heading, in the aligned columns it
-  // lists everything in. Named after the heading they belong to they read as
-  // one sentence; a column of descriptions under a closing line does not.
   const listed = rest.map((line) => line.split(/\s{2,}/)[0] ?? line);
   return {
     sentence: head.endsWith(":")

@@ -12,8 +12,6 @@ export class Where {
   private readonly server: string | undefined;
 
   constructor(project?: string, server?: string) {
-    // Both were named by the server or read from a file, and this is drawn as
-    // the CLI's own words, so what could drive a terminal is spelled out.
     this.project = project === undefined ? undefined : escapeControlCharacters(project);
     this.server = server === undefined ? undefined : escapeControlCharacters(server);
   }
@@ -27,13 +25,8 @@ export class Where {
   get plain(): string {
     const target = this.project === undefined ? "" : `project ${this.project}`;
     if (this.server === undefined) {
-      // Nothing to name but the project, and "on your Zitadel project" reads
-      // as a second, different place.
       return target;
     }
-    // A command that resolves no project — `stop`, `doctor`, `setup` — still
-    // says where it ran as a phrase rather than a bare host, so the footer
-    // reads the same either way: `… · on localhost:8080`.
     return `${target === "" ? "on " : `${target} on `}${this.server}`;
   }
 

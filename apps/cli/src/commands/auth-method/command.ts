@@ -616,8 +616,6 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
         summary: { title: escapeControlCharacters(preview), sections: [] },
       });
     }
-    // Nothing is narrated when nothing changed: the closing line below already
-    // says it, and saying it twice reads as two separate findings.
     await this.write(target, change, confirmed.consent);
     this.report(change);
     const followUps = this.followUps(change.changed, target.cwdArgs);

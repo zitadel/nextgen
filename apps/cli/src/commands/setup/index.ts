@@ -45,7 +45,6 @@ import {
   selectionName,
 } from "@zitadel/config/idp";
 import { isDevelopmentBuild } from "@/lib/build-channel";
-import type { BoxAction } from "@/lib/box";
 import {
   claimAction,
   claimBoxAction,
@@ -1159,6 +1158,7 @@ export default class Setup extends Destructive(BaseCommand) {
         return this.moveToDevPort(this.cwd, flags.cwd, flags.devPort, this.dryRun);
       }
 
+      const skippedHost = hostUnlessDefault(preflight.server.value);
       return this.emit({
         status: "skipped",
         reason: "already-initialized",
@@ -1167,7 +1167,7 @@ export default class Setup extends Destructive(BaseCommand) {
           sections: [],
           lines: ["Nothing was changed."],
           boxed: true,
-          ...ranOn(hostUnlessDefault(preflight.server.value)),
+          ...(skippedHost === undefined ? {} : { ran: skippedHost }),
         },
       });
     }
@@ -1354,7 +1354,6 @@ export default class Setup extends Destructive(BaseCommand) {
     // A new app is created only now, with every answer in hand. A dry run
     // creates none, so it has no app to patch.
     const scaffolding = detected === undefined && !this.dryRun;
-    // The step that is running, so a failure ends it as failed.
     let current: Step | undefined;
     if (detected === undefined && this.dryRun) {
       this.ui
@@ -1369,7 +1368,6 @@ export default class Setup extends Destructive(BaseCommand) {
       try {
         newApp = await orca.scaffoldUndoably(this.cwd, app.framework, this.force);
       } catch (error) {
-        // Ended as failed, so the spinner does not keep turning under the error.
         current?.fail();
         throw error;
       }
@@ -1630,10 +1628,6 @@ export default class Setup extends Destructive(BaseCommand) {
           posture,
         });
       } catch (error) {
-        // Said out loud rather than logged under `--debug`, as every other
-        // best-effort step here is: nothing else tells the developer that
-        // `doctor` will be checking their app files against the templates
-        // instead of against what setup actually wrote.
         reportWarning(
           `Could not record what setup scaffolded, so doctor will check this app against the current templates: ${toZitadelError(error).message}`,
         );
@@ -1824,18 +1818,8 @@ export default class Setup extends Destructive(BaseCommand) {
     // The structured report is human-only. Under `--json` we let the
     // envelope returned from `this.emit(...)` be the sole stdout
     // payload (oclif requires single-doc JSON).
-    //
-    // The two renderings are one summary: a person at a terminal gets it as
-    // the ending of the chain their answers opened, and a run with nobody
-    // watching gets the same thing as text, because the chain draws nothing
-    // then and this report is the whole point of running setup. The overview
-    // is the last step of both — the base command appends it to a chain's
-    // ending, so only the text one names it here.
     let summary: Summary = { title: SET_UP_TITLE, sections: [] };
     let report = "";
-    // Where setup ran, as the box's last line, the way every other command's
-    // box states it. Setup learns its project while it works rather than
-    // before its first question, so it says so here.
     this.ui.ranAgainst(project.id, answers.server.replace(/^https?:\/\//, ""));
     if (!this.isJson) {
       const projectFacts = await detectProjectFacts(this.cwd, app.framework);
@@ -1928,21 +1912,24 @@ export default class Setup extends Destructive(BaseCommand) {
         ];
       });
       summary = {
-        // The chain closes on what the run did, in the past tense every other
-        // wizard closes on, and the box it opens is the `Summary` every other
-        // box is titled: a run that says "Zitadel is ready" twice in four
-        // lines has said it once too often.
         title: SET_UP_TITLE,
         sections: summarySections(sections),
-        // What the connections do with a claim, under the facts and before the steps.
         lines: connectionLines[0] === "" ? connectionLines.slice(1) : connectionLines,
         next: nextActions,
         boxed: true,
       };
       if (!this.ui.interactive) {
+        const [exploreText = "", exploreCommand] = exploreAllCommands(this.cliVersion)
+          .split("\n")
+          .map((line) => line.trim());
         report = this.ui.ending({
           ...summary,
-          next: [...nextActions, ...exploreAction(this.cliVersion)],
+          next: [
+            ...nextActions,
+            ...(exploreCommand === undefined
+              ? []
+              : [{ text: exploreText, command: exploreCommand }]),
+          ],
         });
       }
     }
@@ -1950,10 +1937,6 @@ export default class Setup extends Destructive(BaseCommand) {
     // The box holds the next steps, so the base command does not repeat them.
     const nextShown: StepsShown | undefined = this.isJson ? undefined : asStepsShown();
 
-    // The whole of what a person sees, so the base command's generic renderer
-    // does not summarise the payload underneath it. Empty for a run that ends
-    // on the chain instead, and under `--json`, where the envelope is the only
-    // thing on stdout.
     return this.emit({
       status: "ok",
       summary,
@@ -2187,7 +2170,6 @@ export default class Setup extends Destructive(BaseCommand) {
     const committing = this.ui.begin("Committing the scaffolded project");
     const outcome = await ensureInitialCommit(cwd);
     if (outcome.kind !== "created" && outcome.kind !== "committed") {
-      // Why there is no commit is said once, in the warning under the step.
       committing.done("Left the project uncommitted");
     }
     if (outcome.kind === "created" || outcome.kind === "committed") {
@@ -2253,15 +2235,11 @@ export default class Setup extends Destructive(BaseCommand) {
         },
         suggest: (args) => projectCommand(args, opts.selector, this.cliVersion),
       });
-      // Abbreviated, because a step of the chain is one line and `sha256:`
-      // with 64 hex digits is wider than one. The envelope carries the hash
-      // in full, for whatever matches on it.
       deploying.done(
         `Deployed ${escapeControlCharacters(abbreviate(deployment.contentHash))} to ${renderCount(deployment.origins.length, { singular: "origin" })}`,
       );
       return deployment;
     } catch (error) {
-      // Why there is no deployment is said once, in the warning under the step.
       deploying.done("Left .zitadel/ undeployed");
       reportWarning(
         `The project was set up but its first deploy failed: ${toZitadelError(error).message}. Run ${projectCommand(DEPLOY_ARGS, opts.selector, this.cliVersion)} to publish .zitadel/.`,
@@ -2295,7 +2273,6 @@ export default class Setup extends Destructive(BaseCommand) {
       signal: this.signal,
       consent: (gate) => this.consent(gate),
     }).catch((error: unknown) => {
-      // Ended as failed, so the spinner does not keep turning under the error.
       moving.fail();
       throw error;
     });
@@ -3099,17 +3076,4 @@ export function buildSummary(opts: {
     { title: "Customize", rows: customizeRows },
     { title: "Project", rows: projectRows },
   ];
-}
-
-/** The `ran` of a summary, for a run that never learned its project: nothing for the default server. */
-function ranOn(host: string | undefined): { ran?: string } {
-  return host === undefined ? {} : { ran: host };
-}
-
-/** The command overview as a step of the summary, split from its sentence. */
-function exploreAction(cliVersion: string): BoxAction[] {
-  const [text = "", command] = exploreAllCommands(cliVersion)
-    .split("\n")
-    .map((line) => line.trim());
-  return command === undefined ? [] : [{ text, command }];
 }

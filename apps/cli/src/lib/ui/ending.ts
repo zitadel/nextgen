@@ -65,9 +65,6 @@ export class Ending {
       const stated = stripColumnMarks(this.summary.title)
         .split("\n")
         .map((line) => pc.red(line));
-      // The next steps are set off by a blank line from what precedes them,
-      // as they are under every other ending; the hint sits directly under
-      // the error it explains.
       const hint = rendered.length === 0 ? "" : this.laidOut(rendered);
       const after = this.after();
       const under = [...(hint === "" ? [] : [hint]), ...(after === "" ? [] : ["", after])];
@@ -79,8 +76,6 @@ export class Ending {
       .map((part) => part.trim())
       .filter((part) => part !== "")
       .join(" · ");
-    // With no answer of its own the next steps follow whatever the command
-    // wrote above, so they open on the blank line that sets them off from it.
     const setOff = rendered.length === 0 && this.after() !== "" ? [""] : [];
     return [
       ...setOff,
@@ -163,13 +158,8 @@ export class Ending {
   render(): string | undefined {
     const body = this.body();
     if (!this.boxed()) {
-      // A listing is what the command was asked for, printed as it is. Where it
-      // ran is part of a summary, so a command that has no summary does not
-      // say it: the table is the answer, and nothing else belongs under it.
       return body.length === 0 ? undefined : `${indent(stripColumnMarks(body.join("\n")))}\n`;
     }
-    // The report and the steps share one frame: what the command produced and
-    // what to do about it belong together.
     return `\n${new Frame(
       this.summary.boxTitle ?? "Summary",
       body,

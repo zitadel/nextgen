@@ -20,7 +20,6 @@ import { Cmd } from "@/lib/cmd";
 import { shellCommand, type SuggestedCommand } from "@/lib/suggestion";
 import { Destructive } from "@/lib/oclif/destructive";
 import { Consent } from "@/lib/consent";
-import type { Summary } from "@/lib/ui";
 
 /**
  * Asks the framework patcher which artifacts it owns. Falls back to the
@@ -187,34 +186,6 @@ async function ejectProject(cwd: string, permit: "plan" | Consent): Promise<Ejec
   return { actions, removed, preserved, backedUp };
 }
 
-/**
- * How a declined eject ends. The question was answered on purpose, so the
- * ending states what that answer left in place and the one command that
- * changes it, rather than restating the refusal.
- */
-function cancelledSummary(removeIt: SuggestedCommand): Summary {
-  return {
-    title: CANCELLED,
-    sections: [],
-    lines: ["Nothing was removed. Zitadel is still set up in this app."],
-    next: [{ text: "Remove it whenever you like:", command: removeIt }],
-  };
-}
-
-/**
- * How an eject with nothing to remove ends. It is the same shape as a
- * declined one — what the app looks like now, then the command that moves it
- * on — because both are a run that changed nothing.
- */
-function nothingToEjectSummary(setItUp: SuggestedCommand): Summary {
-  return {
-    title: "Nothing to remove",
-    sections: [],
-    lines: ["Zitadel is not set up in this app, so nothing was removed."],
-    next: [{ text: "Set it up whenever you like:", command: setItUp }],
-  };
-}
-
 /** The result of an ejection, or of its plan. */
 function ejected(
   cwd: string,
@@ -245,7 +216,12 @@ function ejected(
       status: "skipped",
       reason: "nothing-to-eject",
       data: { cwd },
-      summary: nothingToEjectSummary(setItUp),
+      summary: {
+        title: "Nothing to remove",
+        sections: [],
+        lines: ["Zitadel is not set up in this app, so nothing was removed."],
+        next: [{ text: "Set it up whenever you like:", command: setItUp }],
+      },
     };
   }
 
@@ -307,11 +283,19 @@ export default class Eject extends Destructive(BaseCommand) {
       apply: async (consent) =>
         ejected(this.cwd, await ejectProject(this.cwd, consent), dir, setItUp),
     });
-    // A no ends the run as skipped; this command says what that answer left in
-    // place, and the one command that changes it.
     return this.emit(
       result.status === "skipped" && result.reason === "eject-cancelled"
-        ? { ...result, summary: cancelledSummary(this.suggestUnscoped("eject")) }
+        ? {
+            ...result,
+            summary: {
+              title: CANCELLED,
+              sections: [],
+              lines: ["Nothing was removed. Zitadel is still set up in this app."],
+              next: [
+                { text: "Remove it whenever you like:", command: this.suggestUnscoped("eject") },
+              ],
+            },
+          }
         : result,
     );
   }

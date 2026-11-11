@@ -17,14 +17,6 @@ type CommandClass<T extends BaseCommand> = abstract new (...args: any[]) => T;
 export type Tabulate = (columns: readonly string[], items: readonly unknown[]) => Promise<string>;
 
 /**
- * What a list says when it found nothing. One sentence for every list,
- * derived from the same noun the count is: a command that wrote its own ("No
- * deployments yet", "No variables on the project") told the reader the same
- * thing in a different voice and made two lists look like two tools.
- */
-export const nothingFound = (plural: string): string => `No ${plural} found.`;
-
-/**
  * The `--plain` flag every list command declares, as the last entry of its
  * `flags`. One definition, so the help reads the same on all of them.
  */
@@ -236,11 +228,6 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
         status: "ok",
         data: view.items === undefined ? view.data : this.canonicalData(view, token),
         ...(nextCommand === undefined ? {} : { next: { commands: [nextCommand] } }),
-        // Plain records are what a script reads, so they keep stdout to
-        // themselves, and every fragment of them was spelled out where it was
-        // read. A person at a terminal is drawn the summary below, which is
-        // where the table is built: building it here as well would do the work
-        // twice for a text nothing prints.
         ...(plain || this.jsonEnabled()
           ? { pretty: (plain ? rows : painted)(await this.renderList(plain, view)) }
           : {}),
@@ -255,10 +242,8 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
      */
     private async listSummary(view: ListView, more: readonly string[]): Promise<Summary> {
       if (view.rows.length === 0) {
-        // A page can be empty while more remain, so the way to the next one is
-        // said under it, as it is under a page with rows.
         return {
-          title: escapeControlCharacters(view.empty).replace(/\.$/, ""),
+          title: escapeControlCharacters(view.empty),
           sections: [],
           ...(more.length === 0 ? {} : { extras: [...more] }),
         };
