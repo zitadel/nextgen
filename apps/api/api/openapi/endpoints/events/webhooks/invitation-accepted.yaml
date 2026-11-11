@@ -3,9 +3,9 @@ post:
   operationId: invitationAccepted
   summary: invitation.accepted
   description: |
-    An invitation was accepted. When accepting grants a role or membership
-    the user did not hold yet, that change has its own event in the same
-    request.
+    An invitation was accepted. Grant events the acceptance writes carry
+    this event's `request_id`; there are none when the user already holds an
+    identical active grant.
 
     Not sent yet: the contract is published ahead of the code that sends it.
 

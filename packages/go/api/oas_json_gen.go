@@ -77537,6 +77537,321 @@ func (s *InvitationAcceptedTeamMemberPayloadType) UnmarshalJSON(data []byte) err
 }
 
 // Encode implements json.Marshaler.
+func (s *InvitationCancelledByAdministratorPayload) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *InvitationCancelledByAdministratorPayload) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("journey_id")
+		e.Str(s.JourneyID)
+	}
+	{
+		e.FieldStart("reason")
+		s.Reason.Encode(e)
+	}
+}
+
+var jsonFieldsNameOfInvitationCancelledByAdministratorPayload = [2]string{
+	0: "journey_id",
+	1: "reason",
+}
+
+// Decode decodes InvitationCancelledByAdministratorPayload from json.
+func (s *InvitationCancelledByAdministratorPayload) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode InvitationCancelledByAdministratorPayload to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "journey_id":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.JourneyID = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"journey_id\"")
+			}
+		case "reason":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				if err := s.Reason.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"reason\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode InvitationCancelledByAdministratorPayload")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfInvitationCancelledByAdministratorPayload) {
+					name = jsonFieldsNameOfInvitationCancelledByAdministratorPayload[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *InvitationCancelledByAdministratorPayload) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *InvitationCancelledByAdministratorPayload) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes InvitationCancelledByAdministratorPayloadReason as json.
+func (s InvitationCancelledByAdministratorPayloadReason) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes InvitationCancelledByAdministratorPayloadReason from json.
+func (s *InvitationCancelledByAdministratorPayloadReason) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode InvitationCancelledByAdministratorPayloadReason to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch InvitationCancelledByAdministratorPayloadReason(v) {
+	case InvitationCancelledByAdministratorPayloadReasonCancelled:
+		*s = InvitationCancelledByAdministratorPayloadReasonCancelled
+	default:
+		*s = InvitationCancelledByAdministratorPayloadReason(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s InvitationCancelledByAdministratorPayloadReason) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *InvitationCancelledByAdministratorPayloadReason) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *InvitationCancelledByReplacementPayload) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *InvitationCancelledByReplacementPayload) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("journey_id")
+		e.Str(s.JourneyID)
+	}
+	{
+		e.FieldStart("reason")
+		s.Reason.Encode(e)
+	}
+	{
+		e.FieldStart("replaced_by_invitation_id")
+		e.Str(s.ReplacedByInvitationID)
+	}
+}
+
+var jsonFieldsNameOfInvitationCancelledByReplacementPayload = [3]string{
+	0: "journey_id",
+	1: "reason",
+	2: "replaced_by_invitation_id",
+}
+
+// Decode decodes InvitationCancelledByReplacementPayload from json.
+func (s *InvitationCancelledByReplacementPayload) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode InvitationCancelledByReplacementPayload to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "journey_id":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.JourneyID = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"journey_id\"")
+			}
+		case "reason":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				if err := s.Reason.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"reason\"")
+			}
+		case "replaced_by_invitation_id":
+			requiredBitSet[0] |= 1 << 2
+			if err := func() error {
+				v, err := d.Str()
+				s.ReplacedByInvitationID = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"replaced_by_invitation_id\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode InvitationCancelledByReplacementPayload")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000111,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfInvitationCancelledByReplacementPayload) {
+					name = jsonFieldsNameOfInvitationCancelledByReplacementPayload[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *InvitationCancelledByReplacementPayload) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *InvitationCancelledByReplacementPayload) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes InvitationCancelledByReplacementPayloadReason as json.
+func (s InvitationCancelledByReplacementPayloadReason) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes InvitationCancelledByReplacementPayloadReason from json.
+func (s *InvitationCancelledByReplacementPayloadReason) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode InvitationCancelledByReplacementPayloadReason to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch InvitationCancelledByReplacementPayloadReason(v) {
+	case InvitationCancelledByReplacementPayloadReasonReplaced:
+		*s = InvitationCancelledByReplacementPayloadReasonReplaced
+	default:
+		*s = InvitationCancelledByReplacementPayloadReason(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s InvitationCancelledByReplacementPayloadReason) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *InvitationCancelledByReplacementPayloadReason) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
 func (s *InvitationCancelledEvent) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
@@ -78121,35 +78436,40 @@ func (s *InvitationCancelledEventDelegationType) UnmarshalJSON(data []byte) erro
 	return s.Decode(d)
 }
 
-// Encode implements json.Marshaler.
-func (s *InvitationCancelledPayload) Encode(e *jx.Encoder) {
+// Encode encodes InvitationCancelledPayload as json.
+func (s InvitationCancelledPayload) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
 	e.ObjEnd()
 }
 
-// encodeFields encodes fields.
-func (s *InvitationCancelledPayload) encodeFields(e *jx.Encoder) {
-	{
-		e.FieldStart("journey_id")
-		e.Str(s.JourneyID)
-	}
-	{
+func (s InvitationCancelledPayload) encodeFields(e *jx.Encoder) {
+	switch s.Type {
+	case InvitationCancelledByAdministratorPayloadInvitationCancelledPayload:
 		e.FieldStart("reason")
-		s.Reason.Encode(e)
-	}
-	{
-		if s.ReplacedByInvitationID.Set {
-			e.FieldStart("replaced_by_invitation_id")
-			s.ReplacedByInvitationID.Encode(e)
+		e.Str("cancelled")
+		{
+			s := s.InvitationCancelledByAdministratorPayload
+			{
+				e.FieldStart("journey_id")
+				e.Str(s.JourneyID)
+			}
+		}
+	case InvitationCancelledByReplacementPayloadInvitationCancelledPayload:
+		e.FieldStart("reason")
+		e.Str("replaced")
+		{
+			s := s.InvitationCancelledByReplacementPayload
+			{
+				e.FieldStart("journey_id")
+				e.Str(s.JourneyID)
+			}
+			{
+				e.FieldStart("replaced_by_invitation_id")
+				e.Str(s.ReplacedByInvitationID)
+			}
 		}
 	}
-}
-
-var jsonFieldsNameOfInvitationCancelledPayload = [3]string{
-	0: "journey_id",
-	1: "reason",
-	2: "replaced_by_invitation_id",
 }
 
 // Decode decodes InvitationCancelledPayload from json.
@@ -78157,87 +78477,60 @@ func (s *InvitationCancelledPayload) Decode(d *jx.Decoder) error {
 	if s == nil {
 		return errors.New("invalid: unable to decode InvitationCancelledPayload to nil")
 	}
-	var requiredBitSet [1]uint8
+	// Sum type discriminator.
+	if typ := d.Next(); typ != jx.Object {
+		return errors.Errorf("unexpected json type %q", typ)
+	}
 
-	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
-		switch string(k) {
-		case "journey_id":
-			requiredBitSet[0] |= 1 << 0
-			if err := func() error {
-				v, err := d.Str()
-				s.JourneyID = string(v)
+	var found bool
+	if err := d.Capture(func(d *jx.Decoder) error {
+		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
+			if found {
+				return d.Skip()
+			}
+			switch string(key) {
+			case "reason":
+				typ, err := d.Str()
 				if err != nil {
 					return err
 				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"journey_id\"")
-			}
-		case "reason":
-			requiredBitSet[0] |= 1 << 1
-			if err := func() error {
-				if err := s.Reason.Decode(d); err != nil {
-					return err
+				switch typ {
+				case "cancelled":
+					s.Type = InvitationCancelledByAdministratorPayloadInvitationCancelledPayload
+					found = true
+				case "replaced":
+					s.Type = InvitationCancelledByReplacementPayloadInvitationCancelledPayload
+					found = true
+				default:
+					return errors.Errorf("unknown type %s", typ)
 				}
 				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"reason\"")
 			}
-		case "replaced_by_invitation_id":
-			if err := func() error {
-				s.ReplacedByInvitationID.Reset()
-				if err := s.ReplacedByInvitationID.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"replaced_by_invitation_id\"")
-			}
-		default:
 			return d.Skip()
-		}
-		return nil
+		})
 	}); err != nil {
-		return errors.Wrap(err, "decode InvitationCancelledPayload")
+		return errors.Wrap(err, "capture")
 	}
-	// Validate required fields.
-	var failures []validate.FieldError
-	for i, mask := range [1]uint8{
-		0b00000011,
-	} {
-		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
-			// Mask only required fields and check equality to mask using XOR.
-			//
-			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
-			// Bits of fields which would be set are actually bits of missed fields.
-			missed := bits.OnesCount8(result)
-			for bitN := 0; bitN < missed; bitN++ {
-				bitIdx := bits.TrailingZeros8(result)
-				fieldIdx := i*8 + bitIdx
-				var name string
-				if fieldIdx < len(jsonFieldsNameOfInvitationCancelledPayload) {
-					name = jsonFieldsNameOfInvitationCancelledPayload[fieldIdx]
-				} else {
-					name = strconv.Itoa(fieldIdx)
-				}
-				failures = append(failures, validate.FieldError{
-					Name:  name,
-					Error: validate.ErrFieldRequired,
-				})
-				// Reset bit.
-				result &^= 1 << bitIdx
-			}
+	if !found {
+		return errors.New("unable to detect sum type variant")
+	}
+	switch s.Type {
+	case InvitationCancelledByAdministratorPayloadInvitationCancelledPayload:
+		if err := s.InvitationCancelledByAdministratorPayload.Decode(d); err != nil {
+			return err
 		}
+	case InvitationCancelledByReplacementPayloadInvitationCancelledPayload:
+		if err := s.InvitationCancelledByReplacementPayload.Decode(d); err != nil {
+			return err
+		}
+	default:
+		return errors.Errorf("inferred invalid type: %s", s.Type)
 	}
-	if len(failures) > 0 {
-		return &validate.Error{Fields: failures}
-	}
-
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s *InvitationCancelledPayload) MarshalJSON() ([]byte, error) {
+func (s InvitationCancelledPayload) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
@@ -78245,46 +78538,6 @@ func (s *InvitationCancelledPayload) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *InvitationCancelledPayload) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes InvitationCancelledPayloadReason as json.
-func (s InvitationCancelledPayloadReason) Encode(e *jx.Encoder) {
-	e.Str(string(s))
-}
-
-// Decode decodes InvitationCancelledPayloadReason from json.
-func (s *InvitationCancelledPayloadReason) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode InvitationCancelledPayloadReason to nil")
-	}
-	v, err := d.StrBytes()
-	if err != nil {
-		return err
-	}
-	// Try to use constant string.
-	switch InvitationCancelledPayloadReason(v) {
-	case InvitationCancelledPayloadReasonCancelled:
-		*s = InvitationCancelledPayloadReasonCancelled
-	case InvitationCancelledPayloadReasonReplaced:
-		*s = InvitationCancelledPayloadReasonReplaced
-	default:
-		*s = InvitationCancelledPayloadReason(v)
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s InvitationCancelledPayloadReason) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *InvitationCancelledPayloadReason) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }

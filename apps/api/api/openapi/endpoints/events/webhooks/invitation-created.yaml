@@ -3,8 +3,7 @@ post:
   operationId: invitationCreated
   summary: invitation.created
   description: |
-    An invitation was created, new or as the replacement of another. Whoever
-    redeems its link gets what the invitation grants.
+    An invitation was created, new or as the replacement of another.
 
     Not sent yet: the contract is published ahead of the code that sends it.
 

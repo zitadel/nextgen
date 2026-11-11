@@ -216,10 +216,10 @@ var webhookByEventType = map[string]webhookDoc{
 	"authz.granted": {description: "A role on a project was granted."},
 	"authz.revoked": {description: "A role on a project was revoked."},
 
-	"invitation.created": {description: "An invitation was created, new or as the replacement of another. " +
-		"Whoever redeems its link gets what the invitation grants.", status: statusContracted},
-	"invitation.accepted": {description: "An invitation was accepted. When accepting grants a role or " +
-		"membership the user did not hold yet, that change has its own event in the same request.",
+	"invitation.created": {description: "An invitation was created, new or as the replacement of another.",
+		status: statusContracted},
+	"invitation.accepted": {description: "An invitation was accepted. Grant events the acceptance writes " +
+		"carry this event's `request_id`; there are none when the user already holds an identical active grant.",
 		status: statusContracted},
 	"invitation.rejected": {description: "An invitation was declined.", status: statusContracted},
 	"invitation.cancelled": {description: "A pending invitation was cancelled by an administrator, " +

@@ -11392,7 +11392,7 @@
       "post": {
         "operationId": "invitationAccepted",
         "summary": "invitation.accepted",
-        "description": "An invitation was accepted. When accepting grants a role or membership\nthe user did not hold yet, that change has its own event in the same\nrequest.\n\nNot sent yet: the contract is published ahead of the code that sends it.\n\nThe body is the event as `GET /events` returns it.\n",
+        "description": "An invitation was accepted. Grant events the acceptance writes carry\nthis event's `request_id`; there are none when the user already holds an\nidentical active grant.\n\nNot sent yet: the contract is published ahead of the code that sends it.\n\nThe body is the event as `GET /events` returns it.\n",
         "tags": [
           "Event Webhooks"
         ],
@@ -11450,7 +11450,7 @@
       "post": {
         "operationId": "invitationCreated",
         "summary": "invitation.created",
-        "description": "An invitation was created, new or as the replacement of another. Whoever\nredeems its link gets what the invitation grants.\n\nNot sent yet: the contract is published ahead of the code that sends it.\n\nThe body is the event as `GET /events` returns it.\n",
+        "description": "An invitation was created, new or as the replacement of another.\n\nNot sent yet: the contract is published ahead of the code that sends it.\n\nThe body is the event as `GET /events` returns it.\n",
         "tags": [
           "Event Webhooks"
         ],
@@ -22996,7 +22996,7 @@
       },
       "invitation-accepted-payload": {
         "title": "InvitationAcceptedPayload",
-        "description": "Payload for `invitation.accepted`. The invitation ID is the event's\n`entity_id`, and `user_id` is the user who redeemed the link. Discriminate\non `type`; the object named after it says what the invitation granted. When\naccepting changes the user's roles or memberships, each change has its own\nevent, such as `authz.granted`, with this event's `request_id`. A user who\nalready held the role gets no such event.\n",
+        "description": "Payload for `invitation.accepted`. The invitation ID is the event's\n`entity_id`, and `user_id` is the user who redeemed the link. Discriminate\non `type`; the object named after it says what the invitation granted. Grant\nevents the acceptance writes, such as `authz.granted`, carry this event's\n`request_id`. There are none when the user already holds an identical\nactive grant.\n",
         "oneOf": [
           {
             "$ref": "#/components/schemas/invitation-accepted-project-member-payload"
@@ -23038,10 +23038,10 @@
           }
         ]
       },
-      "invitation-cancelled-payload": {
-        "title": "InvitationCancelledPayload",
+      "invitation-cancelled-by-administrator-payload": {
+        "title": "InvitationCancelledByAdministratorPayload",
+        "description": "An `invitation.cancelled` payload for an invitation an administrator\ncancelled.\n",
         "type": "object",
-        "description": "Payload for `invitation.cancelled`. The invitation ID is the event's\n`entity_id`. `reason` is `cancelled` when an administrator cancelled it,\nand `replaced` when a replacement cancelled it; the replacement is then\n`replaced_by_invitation_id`.\n",
         "required": [
           "journey_id",
           "reason"
@@ -23054,12 +23054,53 @@
           "reason": {
             "type": "string",
             "enum": [
-              "cancelled",
+              "cancelled"
+            ]
+          }
+        }
+      },
+      "invitation-cancelled-by-replacement-payload": {
+        "title": "InvitationCancelledByReplacementPayload",
+        "description": "An `invitation.cancelled` payload for an invitation a replacement\ncancelled.\n",
+        "type": "object",
+        "required": [
+          "journey_id",
+          "reason",
+          "replaced_by_invitation_id"
+        ],
+        "properties": {
+          "journey_id": {
+            "type": "string",
+            "description": "Shared by an invitation and every invitation that replaces it."
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
               "replaced"
             ]
           },
           "replaced_by_invitation_id": {
-            "type": "string"
+            "type": "string",
+            "description": "The invitation that replaced this one."
+          }
+        }
+      },
+      "invitation-cancelled-payload": {
+        "title": "InvitationCancelledPayload",
+        "description": "Payload for `invitation.cancelled`. The invitation ID is the event's\n`entity_id`. Discriminate on `reason`: `cancelled` when an administrator\ncancelled it, `replaced` when a replacement cancelled it, which then names\nthe replacement in `replaced_by_invitation_id`.\n",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/invitation-cancelled-by-administrator-payload"
+          },
+          {
+            "$ref": "#/components/schemas/invitation-cancelled-by-replacement-payload"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "reason",
+          "mapping": {
+            "cancelled": "#/components/schemas/invitation-cancelled-by-administrator-payload",
+            "replaced": "#/components/schemas/invitation-cancelled-by-replacement-payload"
           }
         }
       },

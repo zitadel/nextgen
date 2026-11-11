@@ -79,39 +79,55 @@ func TestEventToAPI_UserUpdated(t *testing.T) {
 }
 
 // The invitation payload structs must decode into their generated schemas,
-// required fields included.
+// and a payload missing what its discriminator requires must not.
 func TestEventToAPI_InvitationPayloads(t *testing.T) {
 	t.Parallel()
 	now := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
 	for _, tc := range []struct {
+		name      string
 		eventType domain.EventType
 		payload   any
 		want      api.EventType
+		wantErr   bool
 	}{
-		{domain.EventTypeInvitationCreated, domain.InvitationCreatedPayload{
+		{"created", domain.EventTypeInvitationCreated, domain.InvitationCreatedPayload{
 			Type:                 "project_member",
 			ProjectMember:        &domain.InvitationProjectMemberPayload{Relation: "admin"},
 			JourneyID:            "journey_1",
 			ReplacesInvitationID: "inv_0",
 			ExpiresAt:            now.Add(72 * time.Hour),
-		}, api.InvitationCreatedEventEvent},
-		{domain.EventTypeInvitationAccepted, domain.InvitationAcceptedPayload{
+		}, api.InvitationCreatedEventEvent, false},
+		{"accepted", domain.EventTypeInvitationAccepted, domain.InvitationAcceptedPayload{
 			Type:       "team_member",
 			TeamMember: &domain.InvitationTeamMemberPayload{TeamID: "team_01JD6N8Q0S2U4W6Y8A0C2E4G6J", Role: "member"},
 			JourneyID:  "journey_1",
 			UserID:     "user_1",
-		}, api.InvitationAcceptedEventEvent},
-		{domain.EventTypeInvitationRejected, domain.InvitationRejectedPayload{
+		}, api.InvitationAcceptedEventEvent, false},
+		{"accepted without its type's object", domain.EventTypeInvitationAccepted, domain.InvitationAcceptedPayload{
+			Type:       "project_member",
+			TeamMember: &domain.InvitationTeamMemberPayload{TeamID: "team_01JD6N8Q0S2U4W6Y8A0C2E4G6J", Role: "member"},
+			JourneyID:  "journey_1",
+			UserID:     "user_1",
+		}, "", true},
+		{"rejected", domain.EventTypeInvitationRejected, domain.InvitationRejectedPayload{
 			JourneyID: "journey_1",
 			UserID:    "user_1",
-		}, api.InvitationRejectedEventEvent},
-		{domain.EventTypeInvitationCancelled, domain.InvitationCancelledPayload{
+		}, api.InvitationRejectedEventEvent, false},
+		{"cancelled", domain.EventTypeInvitationCancelled, domain.InvitationCancelledPayload{
+			JourneyID: "journey_1",
+			Reason:    domain.InvitationCancelReasonCancelled,
+		}, api.InvitationCancelledEventEvent, false},
+		{"replaced", domain.EventTypeInvitationCancelled, domain.InvitationCancelledPayload{
 			JourneyID:              "journey_1",
 			Reason:                 domain.InvitationCancelReasonReplaced,
 			ReplacedByInvitationID: "inv_2",
-		}, api.InvitationCancelledEventEvent},
+		}, api.InvitationCancelledEventEvent, false},
+		{"replaced without the replacement", domain.EventTypeInvitationCancelled, domain.InvitationCancelledPayload{
+			JourneyID: "journey_1",
+			Reason:    domain.InvitationCancelReasonReplaced,
+		}, "", true},
 	} {
-		t.Run(string(tc.eventType), func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			payload, err := json.Marshal(tc.payload)
 			require.NoError(t, err)
@@ -129,34 +145,14 @@ func TestEventToAPI_InvitationPayloads(t *testing.T) {
 				ClientID:   "app_1",
 				Payload:    payload,
 			})
+			if tc.wantErr {
+				require.Error(t, err)
+				return
+			}
 			require.NoError(t, err)
 			assert.Equal(t, tc.want, got.Type)
 		})
 	}
-}
-
-// A payload whose type names an object it lacks does not decode.
-func TestEventToAPI_InvitationPayloadMissingTypeObject(t *testing.T) {
-	t.Parallel()
-	payload, err := json.Marshal(domain.InvitationAcceptedPayload{
-		Type:       "project_member",
-		TeamMember: &domain.InvitationTeamMemberPayload{TeamID: "team_01JD6N8Q0S2U4W6Y8A0C2E4G6J", Role: "member"},
-		JourneyID:  "journey_1",
-		UserID:     "user_1",
-	})
-	require.NoError(t, err)
-	now := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
-	_, err = eventToAPI(&domain.Event{
-		ID:         "evt_inv",
-		ProjectID:  "proj_1",
-		EventType:  domain.EventTypeInvitationAccepted,
-		Category:   domain.EventCategoryAdmin,
-		OccurredAt: now,
-		CreatedAt:  now,
-		ClientID:   "app_1",
-		Payload:    payload,
-	})
-	require.Error(t, err)
 }
 
 func TestEventToAPI_EmptyPayload(t *testing.T) {

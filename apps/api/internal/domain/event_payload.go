@@ -370,8 +370,9 @@ type InvitationCreatedPayload struct {
 	ExpiresAt            time.Time                       `json:"expires_at"`
 }
 
-// InvitationAcceptedPayload names the accepting user; the grant acceptance
-// wrote joins through the shared request_id.
+// InvitationAcceptedPayload names the accepting user. Grant events written on
+// accept carry this event's request_id; there are none when the user already
+// holds an identical active grant.
 type InvitationAcceptedPayload struct {
 	Type          string                          `json:"type"`
 	ProjectMember *InvitationProjectMemberPayload `json:"project_member,omitempty"`

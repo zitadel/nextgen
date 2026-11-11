@@ -9698,6 +9698,70 @@ func (s InvitationAcceptedTeamMemberPayloadType) Validate() error {
 	}
 }
 
+func (s *InvitationCancelledByAdministratorPayload) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Reason.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "reason",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s InvitationCancelledByAdministratorPayloadReason) Validate() error {
+	switch s {
+	case "cancelled":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
+func (s *InvitationCancelledByReplacementPayload) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Reason.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "reason",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s InvitationCancelledByReplacementPayloadReason) Validate() error {
+	switch s {
+	case "replaced":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
 func (s *InvitationCancelledEvent) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -9846,37 +9910,20 @@ func (s InvitationCancelledEventDelegationType) Validate() error {
 	}
 }
 
-func (s *InvitationCancelledPayload) Validate() error {
-	if s == nil {
-		return validate.ErrNilPointer
-	}
-
-	var failures []validate.FieldError
-	if err := func() error {
-		if err := s.Reason.Validate(); err != nil {
+func (s InvitationCancelledPayload) Validate() error {
+	switch s.Type {
+	case InvitationCancelledByAdministratorPayloadInvitationCancelledPayload:
+		if err := s.InvitationCancelledByAdministratorPayload.Validate(); err != nil {
 			return err
 		}
 		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "reason",
-			Error: err,
-		})
-	}
-	if len(failures) > 0 {
-		return &validate.Error{Fields: failures}
-	}
-	return nil
-}
-
-func (s InvitationCancelledPayloadReason) Validate() error {
-	switch s {
-	case "cancelled":
-		return nil
-	case "replaced":
+	case InvitationCancelledByReplacementPayloadInvitationCancelledPayload:
+		if err := s.InvitationCancelledByReplacementPayload.Validate(); err != nil {
+			return err
+		}
 		return nil
 	default:
-		return errors.Errorf("invalid value: %v", s)
+		return errors.Errorf("invalid type %q", s.Type)
 	}
 }
 

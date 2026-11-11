@@ -46790,10 +46790,10 @@ func (s *InvitationAcceptedEventDelegationType) UnmarshalText(data []byte) error
 
 // Payload for `invitation.accepted`. The invitation ID is the event's
 // `entity_id`, and `user_id` is the user who redeemed the link. Discriminate
-// on `type`; the object named after it says what the invitation granted. When
-// accepting changes the user's roles or memberships, each change has its own
-// event, such as `authz.granted`, with this event's `request_id`. A user who
-// already held the role gets no such event.
+// on `type`; the object named after it says what the invitation granted. Grant
+// events the acceptance writes, such as `authz.granted`, carry this event's
+// `request_id`. There are none when the user already holds an identical
+// active grant.
 // Ref: #
 // InvitationAcceptedPayload represents sum type.
 type InvitationAcceptedPayload struct {
@@ -47025,6 +47025,144 @@ func (s *InvitationAcceptedTeamMemberPayloadType) UnmarshalText(data []byte) err
 	switch InvitationAcceptedTeamMemberPayloadType(data) {
 	case InvitationAcceptedTeamMemberPayloadTypeTeamMember:
 		*s = InvitationAcceptedTeamMemberPayloadTypeTeamMember
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// An `invitation.cancelled` payload for an invitation an administrator
+// cancelled.
+// Ref: #
+type InvitationCancelledByAdministratorPayload struct {
+	// Shared by an invitation and every invitation that replaces it.
+	JourneyID string                                          `json:"journey_id"`
+	Reason    InvitationCancelledByAdministratorPayloadReason `json:"reason"`
+}
+
+// GetJourneyID returns the value of JourneyID.
+func (s *InvitationCancelledByAdministratorPayload) GetJourneyID() string {
+	return s.JourneyID
+}
+
+// GetReason returns the value of Reason.
+func (s *InvitationCancelledByAdministratorPayload) GetReason() InvitationCancelledByAdministratorPayloadReason {
+	return s.Reason
+}
+
+// SetJourneyID sets the value of JourneyID.
+func (s *InvitationCancelledByAdministratorPayload) SetJourneyID(val string) {
+	s.JourneyID = val
+}
+
+// SetReason sets the value of Reason.
+func (s *InvitationCancelledByAdministratorPayload) SetReason(val InvitationCancelledByAdministratorPayloadReason) {
+	s.Reason = val
+}
+
+type InvitationCancelledByAdministratorPayloadReason string
+
+const (
+	InvitationCancelledByAdministratorPayloadReasonCancelled InvitationCancelledByAdministratorPayloadReason = "cancelled"
+)
+
+// AllValues returns all InvitationCancelledByAdministratorPayloadReason values.
+func (InvitationCancelledByAdministratorPayloadReason) AllValues() []InvitationCancelledByAdministratorPayloadReason {
+	return []InvitationCancelledByAdministratorPayloadReason{
+		InvitationCancelledByAdministratorPayloadReasonCancelled,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s InvitationCancelledByAdministratorPayloadReason) MarshalText() ([]byte, error) {
+	switch s {
+	case InvitationCancelledByAdministratorPayloadReasonCancelled:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *InvitationCancelledByAdministratorPayloadReason) UnmarshalText(data []byte) error {
+	switch InvitationCancelledByAdministratorPayloadReason(data) {
+	case InvitationCancelledByAdministratorPayloadReasonCancelled:
+		*s = InvitationCancelledByAdministratorPayloadReasonCancelled
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// An `invitation.cancelled` payload for an invitation a replacement
+// cancelled.
+// Ref: #
+type InvitationCancelledByReplacementPayload struct {
+	// Shared by an invitation and every invitation that replaces it.
+	JourneyID string                                        `json:"journey_id"`
+	Reason    InvitationCancelledByReplacementPayloadReason `json:"reason"`
+	// The invitation that replaced this one.
+	ReplacedByInvitationID string `json:"replaced_by_invitation_id"`
+}
+
+// GetJourneyID returns the value of JourneyID.
+func (s *InvitationCancelledByReplacementPayload) GetJourneyID() string {
+	return s.JourneyID
+}
+
+// GetReason returns the value of Reason.
+func (s *InvitationCancelledByReplacementPayload) GetReason() InvitationCancelledByReplacementPayloadReason {
+	return s.Reason
+}
+
+// GetReplacedByInvitationID returns the value of ReplacedByInvitationID.
+func (s *InvitationCancelledByReplacementPayload) GetReplacedByInvitationID() string {
+	return s.ReplacedByInvitationID
+}
+
+// SetJourneyID sets the value of JourneyID.
+func (s *InvitationCancelledByReplacementPayload) SetJourneyID(val string) {
+	s.JourneyID = val
+}
+
+// SetReason sets the value of Reason.
+func (s *InvitationCancelledByReplacementPayload) SetReason(val InvitationCancelledByReplacementPayloadReason) {
+	s.Reason = val
+}
+
+// SetReplacedByInvitationID sets the value of ReplacedByInvitationID.
+func (s *InvitationCancelledByReplacementPayload) SetReplacedByInvitationID(val string) {
+	s.ReplacedByInvitationID = val
+}
+
+type InvitationCancelledByReplacementPayloadReason string
+
+const (
+	InvitationCancelledByReplacementPayloadReasonReplaced InvitationCancelledByReplacementPayloadReason = "replaced"
+)
+
+// AllValues returns all InvitationCancelledByReplacementPayloadReason values.
+func (InvitationCancelledByReplacementPayloadReason) AllValues() []InvitationCancelledByReplacementPayloadReason {
+	return []InvitationCancelledByReplacementPayloadReason{
+		InvitationCancelledByReplacementPayloadReasonReplaced,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s InvitationCancelledByReplacementPayloadReason) MarshalText() ([]byte, error) {
+	switch s {
+	case InvitationCancelledByReplacementPayloadReasonReplaced:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *InvitationCancelledByReplacementPayloadReason) UnmarshalText(data []byte) error {
+	switch InvitationCancelledByReplacementPayloadReason(data) {
+	case InvitationCancelledByReplacementPayloadReasonReplaced:
+		*s = InvitationCancelledByReplacementPayloadReasonReplaced
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)
@@ -47479,86 +47617,76 @@ func (s *InvitationCancelledEventDelegationType) UnmarshalText(data []byte) erro
 }
 
 // Payload for `invitation.cancelled`. The invitation ID is the event's
-// `entity_id`. `reason` is `cancelled` when an administrator cancelled it,
-// and `replaced` when a replacement cancelled it; the replacement is then
-// `replaced_by_invitation_id`.
+// `entity_id`. Discriminate on `reason`: `cancelled` when an administrator
+// cancelled it, `replaced` when a replacement cancelled it, which then names
+// the replacement in `replaced_by_invitation_id`.
 // Ref: #
+// InvitationCancelledPayload represents sum type.
 type InvitationCancelledPayload struct {
-	// Shared by an invitation and every invitation that replaces it.
-	JourneyID              string                           `json:"journey_id"`
-	Reason                 InvitationCancelledPayloadReason `json:"reason"`
-	ReplacedByInvitationID OptString                        `json:"replaced_by_invitation_id"`
+	Type                                      InvitationCancelledPayloadType // switch on this field
+	InvitationCancelledByAdministratorPayload InvitationCancelledByAdministratorPayload
+	InvitationCancelledByReplacementPayload   InvitationCancelledByReplacementPayload
 }
 
-// GetJourneyID returns the value of JourneyID.
-func (s *InvitationCancelledPayload) GetJourneyID() string {
-	return s.JourneyID
-}
+// InvitationCancelledPayloadType is oneOf type of InvitationCancelledPayload.
+type InvitationCancelledPayloadType string
 
-// GetReason returns the value of Reason.
-func (s *InvitationCancelledPayload) GetReason() InvitationCancelledPayloadReason {
-	return s.Reason
-}
-
-// GetReplacedByInvitationID returns the value of ReplacedByInvitationID.
-func (s *InvitationCancelledPayload) GetReplacedByInvitationID() OptString {
-	return s.ReplacedByInvitationID
-}
-
-// SetJourneyID sets the value of JourneyID.
-func (s *InvitationCancelledPayload) SetJourneyID(val string) {
-	s.JourneyID = val
-}
-
-// SetReason sets the value of Reason.
-func (s *InvitationCancelledPayload) SetReason(val InvitationCancelledPayloadReason) {
-	s.Reason = val
-}
-
-// SetReplacedByInvitationID sets the value of ReplacedByInvitationID.
-func (s *InvitationCancelledPayload) SetReplacedByInvitationID(val OptString) {
-	s.ReplacedByInvitationID = val
-}
-
-type InvitationCancelledPayloadReason string
-
+// Possible values for InvitationCancelledPayloadType.
 const (
-	InvitationCancelledPayloadReasonCancelled InvitationCancelledPayloadReason = "cancelled"
-	InvitationCancelledPayloadReasonReplaced  InvitationCancelledPayloadReason = "replaced"
+	InvitationCancelledByAdministratorPayloadInvitationCancelledPayload InvitationCancelledPayloadType = "cancelled"
+	InvitationCancelledByReplacementPayloadInvitationCancelledPayload   InvitationCancelledPayloadType = "replaced"
 )
 
-// AllValues returns all InvitationCancelledPayloadReason values.
-func (InvitationCancelledPayloadReason) AllValues() []InvitationCancelledPayloadReason {
-	return []InvitationCancelledPayloadReason{
-		InvitationCancelledPayloadReasonCancelled,
-		InvitationCancelledPayloadReasonReplaced,
-	}
+// IsInvitationCancelledByAdministratorPayload reports whether InvitationCancelledPayload is InvitationCancelledByAdministratorPayload.
+func (s InvitationCancelledPayload) IsInvitationCancelledByAdministratorPayload() bool {
+	return s.Type == InvitationCancelledByAdministratorPayloadInvitationCancelledPayload
 }
 
-// MarshalText implements encoding.TextMarshaler.
-func (s InvitationCancelledPayloadReason) MarshalText() ([]byte, error) {
-	switch s {
-	case InvitationCancelledPayloadReasonCancelled:
-		return []byte(s), nil
-	case InvitationCancelledPayloadReasonReplaced:
-		return []byte(s), nil
-	default:
-		return nil, errors.Errorf("invalid value: %q", s)
-	}
+// IsInvitationCancelledByReplacementPayload reports whether InvitationCancelledPayload is InvitationCancelledByReplacementPayload.
+func (s InvitationCancelledPayload) IsInvitationCancelledByReplacementPayload() bool {
+	return s.Type == InvitationCancelledByReplacementPayloadInvitationCancelledPayload
 }
 
-// UnmarshalText implements encoding.TextUnmarshaler.
-func (s *InvitationCancelledPayloadReason) UnmarshalText(data []byte) error {
-	switch InvitationCancelledPayloadReason(data) {
-	case InvitationCancelledPayloadReasonCancelled:
-		*s = InvitationCancelledPayloadReasonCancelled
-		return nil
-	case InvitationCancelledPayloadReasonReplaced:
-		*s = InvitationCancelledPayloadReasonReplaced
-		return nil
-	default:
-		return errors.Errorf("invalid value: %q", data)
+// SetInvitationCancelledByAdministratorPayload sets InvitationCancelledPayload to InvitationCancelledByAdministratorPayload.
+func (s *InvitationCancelledPayload) SetInvitationCancelledByAdministratorPayload(v InvitationCancelledByAdministratorPayload) {
+	s.Type = InvitationCancelledByAdministratorPayloadInvitationCancelledPayload
+	s.InvitationCancelledByAdministratorPayload = v
+}
+
+// GetInvitationCancelledByAdministratorPayload returns InvitationCancelledByAdministratorPayload and true boolean if InvitationCancelledPayload is InvitationCancelledByAdministratorPayload.
+func (s InvitationCancelledPayload) GetInvitationCancelledByAdministratorPayload() (v InvitationCancelledByAdministratorPayload, ok bool) {
+	if !s.IsInvitationCancelledByAdministratorPayload() {
+		return v, false
 	}
+	return s.InvitationCancelledByAdministratorPayload, true
+}
+
+// NewInvitationCancelledByAdministratorPayloadInvitationCancelledPayload returns new InvitationCancelledPayload from InvitationCancelledByAdministratorPayload.
+func NewInvitationCancelledByAdministratorPayloadInvitationCancelledPayload(v InvitationCancelledByAdministratorPayload) InvitationCancelledPayload {
+	var s InvitationCancelledPayload
+	s.SetInvitationCancelledByAdministratorPayload(v)
+	return s
+}
+
+// SetInvitationCancelledByReplacementPayload sets InvitationCancelledPayload to InvitationCancelledByReplacementPayload.
+func (s *InvitationCancelledPayload) SetInvitationCancelledByReplacementPayload(v InvitationCancelledByReplacementPayload) {
+	s.Type = InvitationCancelledByReplacementPayloadInvitationCancelledPayload
+	s.InvitationCancelledByReplacementPayload = v
+}
+
+// GetInvitationCancelledByReplacementPayload returns InvitationCancelledByReplacementPayload and true boolean if InvitationCancelledPayload is InvitationCancelledByReplacementPayload.
+func (s InvitationCancelledPayload) GetInvitationCancelledByReplacementPayload() (v InvitationCancelledByReplacementPayload, ok bool) {
+	if !s.IsInvitationCancelledByReplacementPayload() {
+		return v, false
+	}
+	return s.InvitationCancelledByReplacementPayload, true
+}
+
+// NewInvitationCancelledByReplacementPayloadInvitationCancelledPayload returns new InvitationCancelledPayload from InvitationCancelledByReplacementPayload.
+func NewInvitationCancelledByReplacementPayloadInvitationCancelledPayload(v InvitationCancelledByReplacementPayload) InvitationCancelledPayload {
+	var s InvitationCancelledPayload
+	s.SetInvitationCancelledByReplacementPayload(v)
+	return s
 }
 
 // Merged schema.
