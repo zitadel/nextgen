@@ -18,6 +18,7 @@ Example file: [`docs/operations/nextgen.example.yaml`](../operations/nextgen.exa
 | `server.public_base`     | `NEXTGEN_SERVER_PUBLIC_BASE`     | `https://nextgen.zitadel.cloud`                                     | Public origin browsers reach this deployment at; feeds the claim and dashboard URLs. Set to `http://localhost:8080` when running the server locally by hand; the CLI runtime (`zitadel start`) sets it itself. With platform bootstrap on, it is the platform project's one primary origin, so servers sharing a database need the same value. |
 | `server.console_origins` | `NEXTGEN_SERVER_CONSOLE_ORIGINS` | — (none) | Other origins the console is reached at, beside the origin of `server.public_base`, such as another hostname in front of the deployment. Like that origin, they may open any project's flow to preview its login; signing in to the platform project works only at `server.public_base`. A comma-separated list in the environment. |
 | `server.request_id_header` | `NEXTGEN_SERVER_REQUEST_ID_HEADER` | — (unset)                                                      | A header a proxy in front of the server sets to its own ID for each request, such as Vercel's `x-vercel-id`. The server then uses that ID in its logs, `X-Request-Id`, audit events and error pages. Set it only behind a proxy that overwrites the header, or a client chooses its own ID. |
+| `server.idle_timeout`    | `NEXTGEN_SERVER_IDLE_TIMEOUT`    | `60s`                                                               | How long the server keeps a connection open while it waits for the next request. Behind a proxy that reuses its connections, set it above the proxy's own idle timeout, or to `0` to never close one: a `POST` the proxy sends as the server closes the connection ends as the proxy's 502. |
 
 ## Platform
 
@@ -109,6 +110,19 @@ session:
   default_ttl: 168h # a week
   max_ttl: 720h
 ```
+
+## Request audit events
+
+| YAML key                    | Environment                         | Default | Description                                                     |
+| --------------------------- | ----------------------------------- | ------- | --------------------------------------------------------------- |
+| `events.request.flush_wait` | `NEXTGEN_EVENTS_REQUEST_FLUSH_WAIT` | `0s`    | How long a request waits for its audit event to be written      |
+
+The server writes a request's audit event up to a second after the response,
+many requests in one write. A server that runs only while it serves a request,
+such as a Vercel function, may not get to that write before it is paused. Set
+`flush_wait`, to `2s` for example, and a request ends once its event is
+written, or after that long when the database does not answer. Requests in
+flight together still share a write.
 
 ## Audit event retention
 

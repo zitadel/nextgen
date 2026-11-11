@@ -16,6 +16,24 @@ type RequestAPIPayload struct {
 	DurationMs    int64  `json:"duration_ms"`
 }
 
+// Indexed is what a request.api event is listed by beside its payload, the
+// operation and the class of the response status (Event.OperationID and
+// Event.StatusClass). A request refused before an operation ran names no
+// operation. A status outside 100–599, which the payload's schema rules out,
+// has no class, and then neither is set: a list by operation reads the
+// operation's events one class at a time, so each indexed operation needs one.
+func (p RequestAPIPayload) Indexed() (operationID *string, statusClass *HTTPStatusClass) {
+	class, ok := HTTPStatusClassOf(p.Status)
+	if !ok {
+		return nil, nil
+	}
+	if p.OperationID != "" {
+		id := p.OperationID
+		operationID = &id
+	}
+	return operationID, &class
+}
+
 // ProjectPayload is shared by project.created (full snapshot) and
 // project.updated (delta: only changed fields set).
 type ProjectPayload struct {

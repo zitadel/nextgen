@@ -1,6 +1,9 @@
 import { useNavigate } from "@tanstack/react-router";
-import { Box, Boxes, type LucideIcon, Search } from "lucide-react";
+import { Boxes, Copy, type LucideIcon, Plus, Search } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
+
+import { copyText } from "@/lib/clipboard";
 
 import {
   Command,
@@ -16,7 +19,20 @@ import { useAsync } from "@/hooks/use-async";
 import { TYPING_PAUSE_MS, useDebounced } from "@/hooks/use-debounced";
 import { useProjectSearch } from "@/features/projects/my-projects";
 import { useProjectScope, useSelectedProject } from "@/features/projects/project-scope";
-import { queryActiveTeams } from "@/features/teams/api";
+import { search } from "@/features/search/api";
+import {
+  NO_ANSWER,
+  OTHER_TYPES,
+  type SearchHit,
+  type SearchResultType,
+  USER_SEARCH_MIN_LENGTH,
+  USER_TYPES,
+  hasMore,
+  hitsFor,
+} from "@/features/search/model";
+import { recentHits, rememberHit } from "@/features/search/recents";
+import { AddTeamSheet } from "@/features/teams/components/add-team-sheet";
+import { AddUserSheet } from "@/features/users/components/add-user-sheet";
 import { cn } from "@/lib/utils";
 
 import type { NavIcon } from "@/nav";
@@ -25,20 +41,22 @@ import { SETTINGS_PATH } from "./user-menu";
 
 /**
  * Console search: the sidebar's trigger and the "Go to" palette it opens (⌘K /
- * Ctrl K anywhere). It moves you somewhere — a page, a team, a project, your
- * settings. Searching *inside* a list stays in that list's own toolbar; this
- * is navigation, not a results page.
+ * Ctrl K anywhere). It moves you somewhere — a page, a user, a team, a schema,
+ * a project, your settings. Searching *inside* a list stays in that list's own
+ * toolbar; this is navigation, not a results page.
  *
  * The trigger heads the sidebar's list rather than sitting in the top bar
  * (D27): in the bar it stacked on a list's own search, two fields a row apart.
  * A row of the sidebar's menu: a field at full width, its glyph in the rail.
  *
- * Groups, top to bottom: pages in the selected project, teams (matched on the
- * server, so a project with many is searched in full), projects (matched on
- * the server too, across every project the person can act on), and the
- * account (Projects, then Settings' pages, which "Settings" finds too). Users
- * are not offered: `POST /users/query` filters by id, schema, status and team
- * only — there is no email or name filter to search with.
+ * Groups, top to bottom: what was opened from here last, until something is
+ * typed; pages in the selected project; actions in it (the drawers its list
+ * screens open, and its id to copy); what `POST /search` finds in it (root ADR
+ * 087), which is users, teams and configuration (user schemas, login flows,
+ * identity providers), each matched and ranked on the server, an id pasted
+ * into the field included; projects, matched on the server across every
+ * project the person can act on; and the account (Projects, then Settings'
+ * pages, which "Settings" finds too).
  */
 export function SearchTrigger({ onOpen }: { onOpen: () => void }) {
   return (
@@ -110,15 +128,23 @@ export function SearchDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const [query, setQuery] = useState("");
+  // The drawer an action opened. It outlives the palette, which closes first.
+  const [adding, setAdding] = useState<"user" | "team" | null>(null);
   const navigate = useNavigate();
   const projectId = useProjectScope();
-  // One request per pause in typing, not per keystroke.
+  // One round of requests per pause in typing, not per keystroke.
   const typed = useDebounced(open ? query.trim() : "", TYPING_PAUSE_MS);
-  const teams = useAsync(
-    typed && projectId
-      ? () => queryActiveTeams(projectId, { nameContains: typed, limit: TEAM_RESULTS })
+  // Users apart from the rest, so the quick types do not wait for them.
+  const users = useAsync(
+    typed.length >= USER_SEARCH_MIN_LENGTH && projectId
+      ? () => search(projectId, typed, USER_TYPES, HITS_PER_TYPE)
       : null,
-    [],
+    NO_ANSWER,
+    [typed, projectId],
+  );
+  const others = useAsync(
+    typed && projectId ? () => search(projectId, typed, OTHER_TYPES, HITS_PER_TYPE) : null,
+    NO_ANSWER,
     [typed, projectId],
   );
   // The first page until something is typed, then the server's matches; each
@@ -156,17 +182,80 @@ export function SearchDialog({
           go: close(() => void navigate({ to: item.to })),
         }));
 
-    // Re-filtered against the live query: until the next debounced read lands,
-    // the last one's answer can name teams the typing has already ruled out.
-    const teamResults: Result[] = (q ? (teams ?? []) : [])
-      .filter((team) => matches(team.name))
-      .map((team) => ({
-        id: `team:${team.id}`,
-        icon: Box,
-        label: team.name,
-        context: projectName,
-        go: close(() => void navigate({ to: "/teams/$teamId", params: { teamId: team.id } })),
-      }));
+    // What the palette does in the selected project: what its list screens'
+    // own buttons do. The server refuses what the person may not do, as it
+    // does there.
+    const actions: Result[] = projectId
+      ? [
+          {
+            id: "action:add-user",
+            icon: Plus,
+            label: "Add user",
+            go: close(() => setAdding("user")),
+          },
+          {
+            id: "action:add-team",
+            icon: Plus,
+            label: "Add team",
+            go: close(() => setAdding("team")),
+          },
+          {
+            id: "action:copy-project-id",
+            icon: Copy,
+            label: "Copy project ID",
+            context: projectId,
+            go: close(() => void copyProjectId(projectId)),
+          },
+        ].filter((action) => matches(action.label))
+      : [];
+
+    // A hit wears the glyph of the sidebar page that lists its kind.
+    const iconOf = (type: SearchResultType): LucideIcon | NavIcon =>
+      pages.find((item) => item.to === LIST_PATH[type])?.nav.icon ?? Search;
+    const openHit = (hit: SearchHit) => {
+      switch (hit.type) {
+        case "user":
+          return navigate({ to: "/users/$userId", params: { userId: hit.id } });
+        case "team":
+          return navigate({ to: "/teams/$teamId", params: { teamId: hit.id } });
+        case "schema":
+          return navigate({ to: "/schemas/$schemaId", params: { schemaId: hit.id } });
+        case "flow_definition":
+          return navigate({
+            to: "/flow-definitions/$definitionId",
+            params: { definitionId: hit.id },
+          });
+        case "idp":
+          return navigate({ to: "/authentication/idps/$idpId", params: { idpId: hit.id } });
+      }
+    };
+    // A row without a subtitle says which project it is in.
+    const hitResult = (hit: SearchHit, group: string): Result => ({
+      id: `${group}:${hit.type}:${hit.id}`,
+      icon: iconOf(hit.type),
+      label: hit.title,
+      context: hit.subtitle ?? projectName,
+      go: close(() => {
+        if (projectId) rememberHit(projectId, hit);
+        void openHit(hit);
+      }),
+    });
+    // What the server found of one type, for the text in the field now
+    // (`hitsFor`).
+    const hitResults = (answer: typeof users, type: SearchResultType): Result[] =>
+      hitsFor(answer ?? NO_ANSWER, query, type).map((hit) => hitResult(hit, "hit"));
+
+    const userResults = hitResults(users, "user");
+    if (hasMore(users ?? NO_ANSWER, query, "user")) {
+      // The palette shows the best few; the Users list searches the same
+      // text across every page.
+      userResults.push({
+        id: "users:all",
+        icon: Search,
+        label: `See all users matching “${query.trim()}”`,
+        go: close(() => void navigate({ to: "/users", search: { q: query.trim() } })),
+      });
+    }
 
     const projectResults: Result[] = (projects?.projects ?? []).map((project) => ({
       id: `project:${project.id}`,
@@ -178,10 +267,28 @@ export function SearchDialog({
 
     return [
       {
+        heading: "Recent",
+        // Until something is typed: then the server's matches take over.
+        results:
+          !q && open && projectId
+            ? recentHits(projectId).map((hit) => hitResult(hit, "recent"))
+            : [],
+      },
+      {
         heading: projectName ? `Pages in ${projectName}` : "Pages",
         results: navResults(pages),
       },
-      { heading: "Teams", results: teamResults },
+      { heading: "Actions", results: actions },
+      { heading: "Users", results: userResults },
+      { heading: "Teams", results: hitResults(others, "team") },
+      {
+        heading: "Configuration",
+        results: [
+          ...hitResults(others, "schema"),
+          ...hitResults(others, "flow_definition"),
+          ...hitResults(others, "idp"),
+        ],
+      },
       { heading: "Projects", results: projectResults },
       {
         heading: "Account",
@@ -192,24 +299,99 @@ export function SearchDialog({
         ],
       },
     ].filter((group) => group.results.length > 0);
-  }, [pages, account, settings, teams, projects, projectName, q, navigate, onOpenChange]);
+    // `open` is here for the recent hits, which are read when the palette opens.
+  }, [
+    pages,
+    account,
+    settings,
+    users,
+    others,
+    projects,
+    projectId,
+    projectName,
+    q,
+    query,
+    open,
+    navigate,
+    onOpenChange,
+  ]);
 
+  return (
+    <>
+      <SearchPalette
+        open={open}
+        onOpenChange={onOpenChange}
+        query={query}
+        onQueryChange={setQuery}
+        groups={groups}
+      />
+      {projectId && (
+        <>
+          <AddUserSheet
+            open={adding === "user"}
+            onOpenChange={(next) => setAdding(next ? "user" : null)}
+            onCreated={(user) => navigate({ to: "/users/$userId", params: { userId: user.id } })}
+          />
+          <AddTeamSheet
+            open={adding === "team"}
+            onOpenChange={(next) => setAdding(next ? "team" : null)}
+            onCreated={(team) => navigate({ to: "/teams/$teamId", params: { teamId: team.id } })}
+          />
+        </>
+      )}
+    </>
+  );
+}
+
+/** The list screen of each kind of hit: where its glyph comes from. */
+const LIST_PATH: Record<SearchResultType, string> = {
+  user: "/users",
+  team: "/teams",
+  schema: "/schemas",
+  flow_definition: "/flow-definitions",
+  idp: "/authentication",
+};
+
+/**
+ * Puts the project's id on the clipboard and says so. A refused write, or a
+ * missing clipboard on an insecure origin, says that instead of claiming a
+ * copy.
+ */
+async function copyProjectId(projectId: string) {
+  if (await copyText(projectId)) toast.success("Project ID copied");
+  else toast.error("Could not copy the project ID");
+}
+
+/** The palette itself: the field and the groups it is given. */
+function SearchPalette({
+  open,
+  onOpenChange,
+  query,
+  onQueryChange,
+  groups,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  query: string;
+  onQueryChange: (query: string) => void;
+  groups: { heading: string; results: Result[] }[];
+}) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent showCloseButton={false} className={PALETTE}>
         <DialogTitle className="sr-only">Go to</DialogTitle>
         <DialogDescription className="sr-only">
-          Search for a page, a team or a project.
+          Search for a page, an action, a user, a team, configuration or a project.
         </DialogDescription>
-        {/* Filtering is ours, not cmdk's: teams and projects arrive already
-            filtered by the server, and every group matches the same way
-            (substring, any case). */}
+        {/* Filtering is ours, not cmdk's: what the server found arrives
+            already matched and ranked, and the pages match as a substring,
+            any case. */}
         <Command shouldFilter={false} className="bg-popover">
           <div className="relative">
             <CommandInput
               value={query}
-              onValueChange={setQuery}
-              placeholder="Go to a page, project or team"
+              onValueChange={onQueryChange}
+              placeholder="Go to a page, user, team or project, or run an action"
               aria-label="Search"
               className="h-12 pr-12 text-[15px]"
             />
@@ -249,7 +431,8 @@ export function SearchDialog({
   );
 }
 
-const TEAM_RESULTS = 8;
+/** How many of each kind the server is asked for: the best few, not a list. */
+const HITS_PER_TYPE = 5;
 const PROJECT_RESULTS = 8;
 
 function Kbd({ children, className }: { children: ReactNode; className?: string }) {

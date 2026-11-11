@@ -94,3 +94,19 @@ func InsertUserPasswordAt(ctx context.Context, pool database.Pool, projectID, id
 	).statement())
 	return wrapError(err)
 }
+
+// ReactivateUser sets a deactivated user back to active so stmttest can assert
+// that authorization reads the user's status at check time (ADR 053 §4). There
+// is no product statement that reactivates a user.
+func ReactivateUser(ctx context.Context, pool database.Pool, projectID, userID string) error {
+	c, ok := pool.(*Client)
+	if !ok {
+		return fmt.Errorf("spanner.ReactivateUser: expected *Client, got %T", pool)
+	}
+	db := newClientDB(c.client)
+	_, err := db.Update(ctx, buildStatement(
+		`UPDATE users SET status = @p1, updated_at = CURRENT_TIMESTAMP() WHERE project_id = @p2 AND id = @p3`,
+		domain.UserStatusActive.String(), projectID, userID,
+	).statement())
+	return wrapError(err)
+}

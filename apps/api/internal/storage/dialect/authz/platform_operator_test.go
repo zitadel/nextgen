@@ -63,14 +63,16 @@ func TestListPredicateAddsPlatformOperatorArm(t *testing.T) {
 		return w.b.String()
 	}
 
-	assert.NotContains(t, write(params), "zitadel_nextgen.users u", "no platform project, no operator arm")
+	// Only the operator arm matches an edge against its own type's tupleset.
+	const operatorArm = "edge.tupleset_object_type = edge.object_type"
+	assert.NotContains(t, write(params), operatorArm, "no platform project, no operator arm")
 
 	params.PlatformProjectID = "proj_platform"
 	withArm := write(params)
-	require.Contains(t, withArm, "zitadel_nextgen.users u")
+	require.Contains(t, withArm, operatorArm)
 	// The arm is a constant one: it sits before the row-correlated EXISTS.
-	assert.Less(t, strings.Index(withArm, "zitadel_nextgen.users u"), strings.Index(withArm, "r.resource_id = zitadel_nextgen.users.id"))
+	assert.Less(t, strings.Index(withArm, operatorArm), strings.Index(withArm, "r.resource_id = zitadel_nextgen.users.id"))
 
 	params.PrincipalHomeProjectID = "proj_customer"
-	assert.NotContains(t, write(params), "zitadel_nextgen.users u", "a user homed elsewhere gets no operator arm")
+	assert.NotContains(t, write(params), operatorArm, "a user homed elsewhere gets no operator arm")
 }

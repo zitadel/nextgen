@@ -8,6 +8,7 @@ import (
 	"github.com/zitadel/nextgen/internal/authz/compiler"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/events"
 )
 
 type StatementPool interface {
@@ -511,6 +512,12 @@ type UserQueryOptions struct {
 	UniqueTeamID *string
 	// MembershipTeamID, when set, requires an active team membership.
 	MembershipTeamID *string
+	// Search, when set, turns the read into a prefix search over the search
+	// index (see [UserSearch]). The read then returns users in
+	// [github.com/zitadel/nextgen/internal/storage/user.SearchOrder] and pages
+	// in it, whatever order the list options name, and each user carries the
+	// text it matched on. Not combinable with UniqueAttributesOnly.
+	Search *UserSearch
 	// IncludeTeams hydrates each user's team memberships (ADR 059). The list is loaded
 	// by a batched second query keyed on the page's ids, never by joining it
 	// into the user query: a join multiplies rows, which would make LIMIT
@@ -524,6 +531,30 @@ type UserQueryOptions struct {
 	// keyed on the distinct owner ids the page returned; self-owned users
 	// contribute no id and stay nil.
 	IncludeLifecycleOwnerTeam bool
+}
+
+// UserSearch finds users by the start of an attribute's search text
+// ([domain.SearchText]), which only the attributes a user's schema designates
+// as identifier or display part carry. Every arm is one range of the search
+// index, read in index order, so the cost of a page does not grow with the
+// number of users that match.
+type UserSearch struct {
+	ProjectID string
+	// Prefix is the term as [domain.SearchText] returns it. Never empty.
+	Prefix string
+	// Arms are the attribute keys searched, each read on its own and merged.
+	// A search with no arm finds nobody. A user matching in two arms is
+	// returned once per arm, so a caller that pages gives the arms disjoint
+	// users.
+	Arms []UserSearchArm
+}
+
+// UserSearchArm is one attribute key of a [UserSearch].
+type UserSearchArm struct {
+	Key domain.AttributeKey
+	// Users narrows the arm to the users a match on Key counts for; nil
+	// counts it for everyone.
+	Users database.Filter[domain.UserField]
 }
 
 // DefaultUserTeamsLimit caps an embedded membership list. Embedded collections are not
@@ -793,10 +824,6 @@ type AuthzAssignmentStatements interface {
 	// (ADR 046 / ADR 054 §2); at most one active row exists per project,
 	// enforced by authz_assignments_one_owning_team.
 	GetActiveOwningTeamGrant(ctx context.Context, projectID string) (*domain.AuthzAssignment, error)
-	// ListClaimedProjectIDs returns project ids holding an active owning-team
-	// grant (ADR 049 export visibility), ordered by project_id after afterID
-	// (empty starts at the beginning).
-	ListClaimedProjectIDs(ctx context.Context, afterID string, limit uint32) ([]string, error)
 	// HasActiveOwningTeamGrant reports whether the team still owns a project.
 	// Keyed on the team alone: the owning row sits on the owned project, which
 	// for a claim is not the team's own project. Expiry is not consulted, the
@@ -904,6 +931,11 @@ type EventStatements interface {
 	InsertEvent(ctx context.Context, event *domain.Event) error
 	GetEventByID(ctx context.Context, projectID, id string) (*domain.Event, error)
 	ListEvents(ctx context.Context, filter *database.ListOptions[domain.EventField]) (*database.ListResult[*domain.Event], error)
+	// ScanEvents reads the rows of one index range, within, in its order and
+	// no further than its limit, and says of each whether it satisfies match
+	// (events.ScanEach): how a filter no index holds is tried over a bounded
+	// number of rows.
+	ScanEvents(ctx context.Context, within *database.ListOptions[domain.EventField], match database.Filter[domain.EventField]) ([]events.Scanned, error)
 	// DeleteEventsOlderThan removes events with created_at before cutoff across
 	// all projects (retention job; includes orphaned project_id rows).
 	DeleteEventsOlderThan(ctx context.Context, createdBefore time.Time) (int64, error)

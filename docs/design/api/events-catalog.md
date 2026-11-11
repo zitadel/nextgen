@@ -114,6 +114,14 @@ without AuthGate. `createFlow` mints `flow_id` before `CreateAuthAttempt` so
 Path B `auth.attempt.created` shares `flow_id` / `session_id` columns with
 Path A `request.api`. Probes (`livez` / `readyz`) do not.
 
+The class of the payload's `status` (`2xx`, `4xx`, …) is also written to the
+`status_class` column, and its `operation_id` with that class to
+`operation_status` (`createUser 4xx`), which the `GET /events` filters
+`status_class` and `operation_id` read from an index
+(`RequestAPIPayload.Indexed`). A request refused before an operation ran has a
+class and no operation. Every other event leaves both empty, and so do the
+requests stored before the columns existed.
+
 Path A buffer: flush on batch size **N≈100** or age **T≈1s**. Capacity **C**
 (default 2000); drop only when full; never block the request.
 

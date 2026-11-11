@@ -1,6 +1,7 @@
 import {
   type GetReleaseById200,
   ListEventsCategoryItem,
+  ListEventsStatusClassItem,
   ListFlowDefinitionsRevisions,
   ListSchemasRevisions,
   QueryGrantsBodyFilterItemOperation,
@@ -260,13 +261,17 @@ export const resource = <
 });
 
 // The filter operations each `POST /<resource>/query` endpoint takes (ADR 031),
-// from its own body's enum, so a query that gains one offers it.
-const USER_OPERATIONS = Object.values(QueryUsersBodyFilterItemOperation);
-const TEAM_OPERATIONS = Object.values(QueryTeamsBodyFilterItemOperation);
-const SESSION_OPERATIONS = Object.values(QuerySessionsBodyFilterItemOperation);
-const GRANT_OPERATIONS = Object.values(QueryGrantsBodyFilterItemOperation);
-const IDP_OPERATIONS = Object.values(QueryIdpsBodyFilterItemOperation);
-const PROJECT_OPERATIONS = Object.values(QueryProjectsBodyFilterItemOperation);
+// from its own body's enum, so a query that gains one offers it. `starts_with`
+// is in every body's enum, but only the fields that name it take it, so those
+// list it themselves.
+const general = <O extends string>(operations: Readonly<Record<string, O>>): O[] =>
+  Object.values(operations).filter((operation) => operation !== "starts_with");
+const USER_OPERATIONS = general(QueryUsersBodyFilterItemOperation);
+const TEAM_OPERATIONS = general(QueryTeamsBodyFilterItemOperation);
+const SESSION_OPERATIONS = general(QuerySessionsBodyFilterItemOperation);
+const GRANT_OPERATIONS = general(QueryGrantsBodyFilterItemOperation);
+const IDP_OPERATIONS = general(QueryIdpsBodyFilterItemOperation);
+const PROJECT_OPERATIONS = general(QueryProjectsBodyFilterItemOperation);
 
 /** A filter operation any of the API's structured queries takes. */
 type Operation =
@@ -279,13 +284,13 @@ type Operation =
 
 /** Every filter operation the API knows, so `--filter` tells one from a value. */
 const OPERATIONS: readonly Operation[] = [
-  ...new Set([
-    ...USER_OPERATIONS,
-    ...TEAM_OPERATIONS,
-    ...SESSION_OPERATIONS,
-    ...GRANT_OPERATIONS,
-    ...IDP_OPERATIONS,
-    ...PROJECT_OPERATIONS,
+  ...new Set<Operation>([
+    ...Object.values(QueryUsersBodyFilterItemOperation),
+    ...Object.values(QueryTeamsBodyFilterItemOperation),
+    ...Object.values(QuerySessionsBodyFilterItemOperation),
+    ...Object.values(QueryGrantsBodyFilterItemOperation),
+    ...Object.values(QueryIdpsBodyFilterItemOperation),
+    ...Object.values(QueryProjectsBodyFilterItemOperation),
   ]),
 ];
 
@@ -337,6 +342,7 @@ export const RESOURCES = {
       filters: [
         { field: "created_at", operations: USER_OPERATIONS },
         { field: "id", operations: USER_OPERATIONS },
+        { field: "identifier", operations: ["starts_with"] },
         { field: "schema", operations: USER_OPERATIONS },
         { field: "schema_object_type", operations: ["equals", "not_equals", "contains"] },
         { field: "status", operations: USER_OPERATIONS },
@@ -466,6 +472,13 @@ export const RESOURCES = {
         { field: "entity_type", operations: ["equals"] },
         { field: "entity_id", operations: ["equals"] },
         { field: "team_id", operations: ["equals"] },
+        { field: "operation_id", operations: ["equals"], combine: "or" },
+        {
+          field: "status_class",
+          operations: ["equals"],
+          values: Object.values(ListEventsStatusClassItem),
+          combine: "or",
+        },
         {
           field: "created_at",
           ...range({ greater_than_or_equal: "created_after", less_than: "created_before" }),

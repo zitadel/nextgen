@@ -24,6 +24,7 @@ type dialectOpener struct {
 	insertJSONSchemaAt     func(ctx context.Context, pool dbtest.Pool, projectID, url string, objectType *string, createdAt time.Time) error
 	insertFlowDefinitionAt func(ctx context.Context, pool dbtest.Pool, projectID, id, name string, createdAt time.Time) error
 	insertUserPasswordAt   func(ctx context.Context, pool dbtest.Pool, projectID, id, userID, encodedHash string, createdAt time.Time) error
+	reactivateUser         func(ctx context.Context, pool dbtest.Pool, projectID, userID string) error
 	schemaNullability      []schematest.ColumnNullability
 	liveNullability        func(ctx context.Context, pool dbtest.Pool) (map[string]map[string]bool, error)
 }
@@ -39,6 +40,7 @@ func registerDialect(
 	insertJSONSchemaAt func(ctx context.Context, pool dbtest.Pool, projectID, url string, objectType *string, createdAt time.Time) error,
 	insertFlowDefinitionAt func(ctx context.Context, pool dbtest.Pool, projectID, id, name string, createdAt time.Time) error,
 	insertUserPasswordAt func(ctx context.Context, pool dbtest.Pool, projectID, id, userID, encodedHash string, createdAt time.Time) error,
+	reactivateUser func(ctx context.Context, pool dbtest.Pool, projectID, userID string) error,
 	schemaNullability []schematest.ColumnNullability,
 	liveNullability func(ctx context.Context, pool dbtest.Pool) (map[string]map[string]bool, error),
 ) {
@@ -47,6 +49,7 @@ func registerDialect(
 		insertJSONSchemaAt:     insertJSONSchemaAt,
 		insertFlowDefinitionAt: insertFlowDefinitionAt,
 		insertUserPasswordAt:   insertUserPasswordAt,
+		reactivateUser:         reactivateUser,
 		schemaNullability:      schemaNullability, liveNullability: liveNullability,
 	})
 }
@@ -70,8 +73,11 @@ type dialect struct {
 	// which SetUserPassword never accepts from a caller: it stages a newest
 	// password the clock has not reached yet.
 	insertUserPasswordAt func(ctx context.Context, projectID, id, userID, encodedHash string, createdAt time.Time) error
-	schemaNullability    []schematest.ColumnNullability
-	liveNullability      func(ctx context.Context) (map[string]map[string]bool, error)
+	// reactivateUser sets a deactivated user back to active, which no product
+	// statement does yet.
+	reactivateUser    func(ctx context.Context, projectID, userID string) error
+	schemaNullability []schematest.ColumnNullability
+	liveNullability   func(ctx context.Context) (map[string]map[string]bool, error)
 }
 
 // dialects is populated by TestMain for every registered opener.
@@ -112,6 +118,7 @@ func run(m *testing.M) int {
 		insertJSONSchemaAt := opener.insertJSONSchemaAt
 		insertFlowDefinitionAt := opener.insertFlowDefinitionAt
 		insertUserPasswordAt := opener.insertUserPasswordAt
+		reactivateUser := opener.reactivateUser
 		liveNullability := opener.liveNullability
 		dialects = append(dialects, dialect{
 			name:  opener.name,
@@ -131,6 +138,9 @@ func run(m *testing.M) int {
 			},
 			insertUserPasswordAt: func(ctx context.Context, projectID, id, userID, encodedHash string, createdAt time.Time) error {
 				return insertUserPasswordAt(ctx, pool, projectID, id, userID, encodedHash, createdAt)
+			},
+			reactivateUser: func(ctx context.Context, projectID, userID string) error {
+				return reactivateUser(ctx, pool, projectID, userID)
 			},
 			schemaNullability: opener.schemaNullability,
 			liveNullability: func(ctx context.Context) (map[string]map[string]bool, error) {
