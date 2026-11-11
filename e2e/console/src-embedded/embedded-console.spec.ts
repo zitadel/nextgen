@@ -61,8 +61,8 @@ test("signs in end to end against the embedded API", async ({ page, seed }) => {
   // back into the console, where the guard's `GET /sessions/me` now answers
   // 200. Four more calls that only resolve if the base is right.
   await page.waitForURL((url) => !url.pathname.endsWith("/login"));
-  // `/` has no screen of its own and lands on Users, which acts on a selected
-  // project. The seeded user holds no grant, so `GET /users/me/projects` lists
+  // `/` is the project's Overview (D35), which acts on a selected project.
+  // The seeded user holds no grant, so `GET /users/me/projects` lists
   // nothing and there is no project to select for them
   // (`resolveDefaultProjectScope`): `/` lands on Projects instead, never on the
   // project the console signed into, which they could not manage.
@@ -73,10 +73,11 @@ test("signs in end to end against the embedded API", async ({ page, seed }) => {
   expect(new URL(page.url()).searchParams.get("project")).toBeNull();
 
   // The shell, not the screen: it is what shows the signed-in console was
-  // reached. Projects is the home, drawn without the sidebar.
+  // reached. Projects is the home, heading the account's list in the sidebar.
   await expect(page.getByRole("button", { name: /^Account:/ })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Account" })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "Primary" })).toHaveCount(0);
-  await expect(page.getByText("No projects yet.")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Create your first project" })).toBeVisible();
   expect(violations, "policy violations").toEqual([]);
 });
 

@@ -180,6 +180,7 @@
     "@zitadel/api-mock": "workspace:*",
     "@zitadel/sdk-next": "workspace:*",
     "@zitadel/vitest-config": "workspace:*",
+    "memfs": "catalog:",
     "msw": "catalog:",
     "oclif": "catalog:",
     "tsdown": "catalog:",

@@ -107,6 +107,23 @@ var Schema = database.NewSchema(map[domain.EventField]database.FieldBinding[doma
 		Coerce:   database.CoerceString,
 		Nullable: true,
 	},
+	domain.EventFieldOperationStatus: {
+		SQLName:  "operation_status",
+		Accessor: func(e *domain.Event) any { return database.NullableValue(OperationStatusOf(e)) },
+		Coerce:   database.CoerceString,
+		Nullable: true,
+	},
+	domain.EventFieldStatusClass: {
+		SQLName: "status_class",
+		Accessor: func(e *domain.Event) any {
+			if e.StatusClass == nil {
+				return nil
+			}
+			return string(*e.StatusClass)
+		},
+		Coerce:   database.CoerceString,
+		Nullable: true,
+	},
 })
 
 // CreatedAtAsc is keyset order (created_at, id) ascending per ADR 027/048.

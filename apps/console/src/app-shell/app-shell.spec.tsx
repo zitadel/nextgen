@@ -28,9 +28,10 @@ vi.mock("@/auth/session", async (importOriginal) => {
  * theme toggle writing `data-theme` and persisting the preference.
  */
 // The design's single-level sidebar ("01 / Nav Level 1"), less the screens
-// that are not built (Sessions). Projects is not a row: it is the home,
-// behind the logo and the switcher's `All projects`.
+// that are not built (Sessions). Projects is not a row here: it heads the
+// other list, the account's.
 const NAV_ORDER = [
+  "Overview",
   "Teams",
   "Users",
   "User schemas",
@@ -38,8 +39,22 @@ const NAV_ORDER = [
   "Branding",
   "Deployments",
   "Authentication",
+  "Logs",
   "Settings",
 ];
+// What sits above every project: the home, the project's screens, which ask
+// for a project (D34), then Settings, a list of its own. Projects stands in
+// for the project's Overview (D35), and the project's own Settings is left
+// out: up here Settings is the account's.
+const ACCOUNT_ORDER = [
+  "Projects",
+  ...NAV_ORDER.filter((name) => name !== "Overview" && name !== "Settings"),
+  "Settings",
+];
+// Settings' list: the heading that leads back, then the person's profile.
+const SETTINGS_ORDER = ["Settings", "Profile"];
+// Logs' list: the heading that leads back, then the list's views.
+const LOGS_ORDER = ["Logs", "Audit events", "API requests", "All"];
 // Absent for two different reasons, both deliberate:
 //   - the first four have no endpoint at all
 //   - Sessions was built, but `POST /sessions/query` answers 501 (#699)
@@ -50,12 +65,24 @@ const NEVER_SHOWN = ["App groups", "Applications", "Analytics", "Activity Log", 
 const MY_PROJECTS = "*/api/v1/users/me/projects";
 // System, the portal screen that needs no project, reads the server's readiness.
 const READY = "*/api/v1/readyz";
-// `/` lands on Users, so most tests read it once a project is selected.
+// Users is where most tests go once a project is selected.
 const USERS_QUERY = "*/api/v1/users/query";
 // Some tests open on Teams to prove a switch keeps the screen.
 const TEAMS_QUERY = "*/api/v1/teams/query";
 // `/settings` lands on the profile, which reads the signed-in person's own record.
 const MY_USER = "*/api/v1/users/me";
+// What the palette asks once something is typed: users, then the other types.
+const SEARCH = "*/api/v1/search";
+interface SearchBody {
+  query: string;
+  types: string[];
+  limit_per_type: number;
+}
+// Logs reads the project's events, and Overview its newest few.
+const EVENTS = "*/api/v1/events";
+// Overview reads the selected project and what its primary origins serve.
+const PROJECT_1 = "*/api/v1/projects/proj_1";
+const DEPLOYMENTS = "*/api/v1/deployments";
 beforeEach(() => {
   // The switcher's recent projects live in localStorage: none carry over.
   localStorage.clear();
@@ -68,6 +95,22 @@ beforeEach(() => {
     ),
     http.post(USERS_QUERY, () => HttpResponse.json({ users: [] })),
     http.post(TEAMS_QUERY, () => HttpResponse.json({ teams: [] })),
+    http.post(SEARCH, () => HttpResponse.json({ results: [], incomplete_types: [] })),
+    // `/` is the project's Overview (D35): the project, what is live, and its
+    // newest events. Only the listed project: a selection the list does not
+    // carry is a test's own to answer.
+    http.get(PROJECT_1, () =>
+      HttpResponse.json({
+        id: "proj_1",
+        name: "console-dev",
+        origins: [],
+        created_at: "2026-01-01T00:00:00Z",
+        updated_at: "2026-01-01T00:00:00Z",
+        owning_team_id: null,
+      }),
+    ),
+    http.get(DEPLOYMENTS, () => HttpResponse.json({ deployments: [] })),
+    http.get(EVENTS, () => HttpResponse.json({ data: [] })),
   );
 });
 
@@ -96,7 +139,7 @@ describe("app shell navigation", () => {
     expect(linkedRows).toHaveLength(NAV_ORDER.length);
   });
 
-  it("draws the home, Projects, without the sidebar", async () => {
+  it("draws the home, Projects, in the frame every screen has", async () => {
     // Several to choose from, so `/` lands on Projects with nothing selected.
     server.use(
       http.get(MY_PROJECTS, () =>
@@ -114,14 +157,24 @@ describe("app shell navigation", () => {
     expect(router.state.resolvedLocation?.search).not.toHaveProperty("next");
     expect(await screen.findByRole("heading", { name: "Projects" })).toBeInTheDocument();
 
-    // The sidebar is one project's screens; the home is above every project.
-    // Its bar keeps the logo, search and the account, and no project pill:
-    // the page is that list at full size (D21).
+    // One frame for every screen (D27). Above every project the sidebar lists
+    // the account's screens, and the pill says so rather than naming one.
+    const nav = within(screen.getByRole("navigation", { name: "Account" }));
+    expect(nav.getAllByRole("link").map((link) => link.textContent?.trim())).toEqual(ACCOUNT_ORDER);
+    expect(nav.getByRole("link", { name: "Projects" })).toHaveAttribute("data-active", "true");
+    // One row for Settings: its pages are its own list's, not repeated here.
+    expect(nav.getByRole("link", { name: "Settings" })).toHaveAttribute("href", "/settings");
     expect(screen.queryByRole("navigation", { name: "Primary" })).not.toBeInTheDocument();
-    expect(document.querySelector('[data-slot="sidebar"]')).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Switch project" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Switch project" })).toHaveTextContent(
+      "All projects",
+    );
     expect(screen.getByRole("link", { name: "Home" })).toHaveAttribute("href", "/projects");
-    expect(screen.getByRole("button", { name: "Search" })).toBeInTheDocument();
+    // Search heads the sidebar, not the bar, where it would sit a row above
+    // the list's own search.
+    const sidebar = within(document.querySelector('[data-slot="sidebar"]') as HTMLElement);
+    expect(sidebar.getByRole("button", { name: "Search" })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Search" })).toHaveLength(1);
+    expect(screen.getByRole("searchbox", { name: "Search projects" })).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: /^Account:/ }));
     expect(await screen.findByRole("menuitem", { name: "Log out" })).toBeInTheDocument();
@@ -169,12 +222,55 @@ describe("app shell navigation", () => {
     // (`?status=active`).
     await waitFor(() => expect(router.state.resolvedLocation?.search.next).toMatch(/^\/teams\b/));
     expect(await screen.findByRole("heading", { name: "Continue to Teams" })).toBeInTheDocument();
-    expect(screen.getByText("Choose a project to continue.")).toBeInTheDocument();
 
     await userEvent.click(await screen.findByRole("link", { name: "Delta" }));
     await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/teams"));
     expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_2" });
-    // Inside a project, the sidebar is back.
+    // Inside a project, the sidebar lists its screens again.
+    expect(await screen.findByRole("navigation", { name: "Primary" })).toBeInTheDocument();
+  });
+
+  it("asks for a project from Projects' list, though the URL still carries one", async () => {
+    server.use(
+      http.get(MY_PROJECTS, () =>
+        HttpResponse.json({
+          projects: [
+            { id: "proj_1", name: "River" },
+            { id: "proj_2", name: "Delta" },
+          ],
+        }),
+      ),
+    );
+    // Back on Projects from inside River: the selection rides along, but the
+    // pill names no project up here, so the project's rows do not use it.
+    const router = renderShell(scopedPath("/projects", "proj_1"));
+    const nav = within(await screen.findByRole("navigation", { name: "Account" }));
+    expect(nav.getByRole("link", { name: "Users" })).toHaveAttribute("href", "/users");
+    expect(nav.getByRole("link", { name: "Settings" })).toHaveAttribute(
+      "href",
+      scopedPath("/settings", "proj_1"),
+    );
+
+    await userEvent.click(nav.getByRole("link", { name: "Teams" }));
+    await waitFor(() => expect(router.state.resolvedLocation?.search.next).toMatch(/^\/teams\b/));
+    expect(router.state.resolvedLocation?.search).not.toHaveProperty("project");
+    expect(await screen.findByRole("heading", { name: "Continue to Teams" })).toBeInTheDocument();
+    // The screen asked for is the marked row, not Projects (D22).
+    expect(nav.getByRole("link", { name: "Teams" })).toHaveAttribute("data-active", "true");
+    expect(nav.getByRole("link", { name: "Projects" })).toHaveAttribute("data-active", "false");
+
+    await userEvent.click(await screen.findByRole("link", { name: "Delta" }));
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/teams"));
+    expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_2" });
+  });
+
+  it("goes into the only project from Projects' list without asking", async () => {
+    const router = renderShell("/projects");
+    const nav = within(await screen.findByRole("navigation", { name: "Account" }));
+
+    await userEvent.click(nav.getByRole("link", { name: "Users" }));
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/users"));
+    expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_1" });
     expect(await screen.findByRole("navigation", { name: "Primary" })).toBeInTheDocument();
   });
 
@@ -184,9 +280,11 @@ describe("app shell navigation", () => {
 
     await userEvent.click(screen.getByRole("link", { name: "Home" }));
     await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
-    // The selection rides along, so the list marks the open project.
+    // The selection rides along, though the pill names no project up here.
     expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_1" });
-    expect(await screen.findByText("Current")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Switch project" })).toHaveTextContent(
+      "All projects",
+    );
   });
 
   it("does not advertise screens that have no endpoint behind them", async () => {
@@ -201,12 +299,14 @@ describe("app shell navigation", () => {
 });
 
 /**
- * The sidebar has two views and the route picks between them, so a settings URL
- * restores the Settings view rather than dropping the operator back into Portal
- * chrome. The account dropdown is the way in; `Back to dashboard` is the way out.
+ * The sidebar has three lists and the route picks between them, so a settings
+ * URL restores Settings' list rather than dropping the operator back into the
+ * project's. The account list's Settings row and the account dropdown are the
+ * ways in; the list's heading leads back up, and the project pill back into a
+ * project (D29).
  */
 describe("settings view", () => {
-  it("shows the portal nav and the account dropdown's entry point by default", async () => {
+  it("shows the project's list and the account dropdown's entry point by default", async () => {
     renderShell();
     await screen.findByRole("link", { name: /^Users/ });
     expect(screen.getByRole("navigation", { name: "Primary" })).toBeInTheDocument();
@@ -214,8 +314,7 @@ describe("settings view", () => {
     await userEvent.click(screen.getByRole("button", { name: /^Account:/ }));
     expect(await screen.findByRole("menuitem", { name: "Log out" })).toBeInTheDocument();
     // The person heads the menu and opens their profile in account settings.
-    // The selection rides along, so `Back to dashboard` returns to the same
-    // project.
+    // The selection rides along, so the pill's list still marks the project.
     expect(screen.getByRole("menuitem", { name: /^Test User/ })).toHaveAttribute(
       "href",
       scopedPath("/settings/profile", "proj_1"),
@@ -225,30 +324,163 @@ describe("settings view", () => {
     expect(screen.queryByRole("menuitem", { name: "Test account" })).not.toBeInTheDocument();
   });
 
-  it("swaps the portal nav for the settings view on a settings URL", async () => {
+  it("swaps the project's list for Settings' on a settings URL", async () => {
     renderShell("/settings");
-    // The way back out is present...
-    // One project, so it is selected here too, and the way back keeps it.
-    expect(await screen.findByRole("link", { name: "Back to dashboard" })).toHaveAttribute(
-      "href",
-      scopedPath("/", "proj_1"),
+    const nav = within(await screen.findByRole("navigation", { name: "Settings" }));
+    expect(nav.getAllByRole("link").map((link) => link.textContent?.trim())).toEqual(
+      SETTINGS_ORDER,
     );
-    // ...and the portal list is gone rather than sitting underneath it.
+    expect(nav.getByRole("link", { name: "Profile" })).toHaveAttribute("data-active", "true");
+    // The project's list and the account's are gone rather than sitting
+    // underneath it.
+    expect(screen.queryByRole("navigation", { name: "Primary" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("navigation", { name: "Account" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /^Users/ })).not.toBeInTheDocument();
+  });
+
+  it("goes back up to the account's list from the Settings heading", async () => {
+    const router = renderShell("/settings");
+    const nav = within(await screen.findByRole("navigation", { name: "Settings" }));
+    // A row of the left nav (D13), named for where it leads. One project, so
+    // it is selected here too, and Projects keeps it.
+    const heading = nav.getByRole("link", { name: "Settings: back to Projects" });
+    expect(heading).toHaveAttribute("href", scopedPath("/projects", "proj_1"));
+
+    await userEvent.click(heading);
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
+    const account = within(await screen.findByRole("navigation", { name: "Account" }));
+    expect(account.getAllByRole("link").map((link) => link.textContent?.trim())).toEqual(
+      ACCOUNT_ORDER,
+    );
+  });
+
+  it("keeps the bar in Settings, its pill the way back into a project", async () => {
+    const router = renderShell("/settings");
+    await screen.findByRole("navigation", { name: "Settings" });
+
+    expect(screen.getByRole("button", { name: "Search" })).toBeInTheDocument();
+    expect(document.querySelector('[data-sidebar="trigger"]')).toBeInTheDocument();
+    // The pill names no project up here, and its list opens on the one that
+    // was selected.
+    const pill = screen.getByRole("button", { name: "Switch project" });
+    expect(pill).toHaveTextContent("All projects");
+
+    await userEvent.click(pill);
+    const list = within(await screen.findByRole("listbox", { name: "Projects" }));
+    await userEvent.click(await list.findByRole("option", { name: /^console-dev/ }));
+
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/"));
+    expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_1" });
+    await waitFor(() => expect(pill).toHaveTextContent("console-dev"));
+  });
+});
+
+/**
+ * Logs swaps the project's list for its own, as Settings does: the views and
+ * the filters of that one screen, under a heading that leads back to the
+ * project's screens (D30). Logs is inside a project, so the pill still names
+ * it.
+ */
+describe("logs view", () => {
+  beforeEach(() => {
+    server.use(
+      http.get(EVENTS, () => HttpResponse.json({ data: [] })),
+      http.get(`${EVENTS}/evt_1`, () =>
+        HttpResponse.json({
+          id: "evt_1",
+          project_id: "proj_1",
+          event_type: "user.deleted",
+          category: "entity",
+          occurred_at: "2026-11-10T08:15:43Z",
+          created_at: "2026-11-10T08:15:43Z",
+          client_id: "",
+          payload: {},
+        }),
+      ),
+    );
+  });
+
+  it("opens Logs' list from the project's Logs row", async () => {
+    const router = renderShell();
+    const primary = within(await screen.findByRole("navigation", { name: "Primary" }));
+
+    await userEvent.click(primary.getByRole("link", { name: "Logs" }));
+
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/events"));
+    expect(await screen.findByRole("navigation", { name: "Logs" })).toBeInTheDocument();
+  });
+
+  it("swaps the project's list for Logs' on a logs URL", async () => {
+    renderShell("/events");
+    const nav = within(await screen.findByRole("navigation", { name: "Logs" }));
+    expect(nav.getAllByRole("link").map((link) => link.textContent?.trim())).toEqual(LOGS_ORDER);
+    expect(nav.getByRole("link", { name: "Audit events" })).toHaveAttribute("data-active", "true");
+    // The list's filters follow its views, in a group of their own.
+    expect(screen.getByRole("group", { name: "Filters" })).toBeInTheDocument();
+    // The project's list is gone rather than sitting underneath it.
     expect(screen.queryByRole("navigation", { name: "Primary" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /^Users/ })).not.toBeInTheDocument();
   });
 
-  it("drops the context bar in the settings view", async () => {
-    // The settings design draws no bar. Its project switcher and search are
-    // portal chrome; the sidebar keeps a trigger of its own, so the
-    // collapse is not lost with them.
-    renderShell("/settings");
-    await screen.findByRole("link", { name: "Back to dashboard" });
+  it("keeps Logs' list on an event's page", async () => {
+    renderShell("/events/evt_1");
+    expect(await screen.findByRole("heading", { name: "user.deleted" })).toBeInTheDocument();
+    const nav = within(screen.getByRole("navigation", { name: "Logs" }));
+    expect(nav.getAllByRole("link").map((link) => link.textContent?.trim())).toEqual(LOGS_ORDER);
+    expect(screen.queryByRole("navigation", { name: "Primary" })).not.toBeInTheDocument();
+  });
 
-    expect(screen.queryByRole("button", { name: "Switch project" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Search" })).not.toBeInTheDocument();
-    // The collapse toggle is the sidebar's, so it survives the bar going away.
-    expect(document.querySelector('[data-sidebar="trigger"]')).toBeInTheDocument();
+  it("goes back up to the project's list from the Logs heading", async () => {
+    const router = renderShell("/events");
+    const nav = within(await screen.findByRole("navigation", { name: "Logs" }));
+    // A row of the left nav (D13), named for where it leads: the project's
+    // landing screen, whichever that is.
+    const heading = nav.getByRole("link", { name: "Logs: back to the project" });
+    expect(heading).toHaveAttribute("href", scopedPath("/", "proj_1"));
+
+    await userEvent.click(heading);
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/"));
+    const primary = within(await screen.findByRole("navigation", { name: "Primary" }));
+    expect(
+      primary.getAllByRole("listitem").map((li) => within(li).getAllByRole("link")[0]?.textContent),
+    ).toEqual(NAV_ORDER);
+    // Logs' filters leave with its list.
+    expect(screen.queryByRole("group", { name: "Filters" })).not.toBeInTheDocument();
+  });
+
+  it("slides Logs' list in from the right, and the project's back in from the left", async () => {
+    renderShell();
+    const primary = await screen.findByRole("navigation", { name: "Primary" });
+    // The first list drawn stays still.
+    expect(primary.parentElement).not.toHaveClass("animate-in");
+
+    await userEvent.click(within(primary).getByRole("link", { name: "Logs" }));
+    const logs = await screen.findByRole("navigation", { name: "Logs" });
+    expect(logs.parentElement).toHaveClass("animate-in", "slide-in-from-right-4");
+
+    await userEvent.click(within(logs).getByRole("link", { name: "Logs: back to the project" }));
+    const back = await screen.findByRole("navigation", { name: "Primary" });
+    expect(back.parentElement).toHaveClass("animate-in", "slide-in-from-left-4");
+  });
+
+  it("keeps the pill on the project, which Logs is inside", async () => {
+    renderShell("/events");
+    await screen.findByRole("navigation", { name: "Logs" });
+
+    const pill = screen.getByRole("button", { name: "Switch project" });
+    await waitFor(() => expect(pill).toHaveTextContent("console-dev"));
+    expect(pill).not.toHaveTextContent("All projects");
+  });
+
+  it("finds Logs among the project's pages in search, from its own list too", async () => {
+    renderShell("/events");
+    await screen.findByRole("navigation", { name: "Logs" });
+
+    await userEvent.click(screen.getByRole("button", { name: "Search" }));
+    const dialog = within(await screen.findByRole("dialog", { name: "Go to" }));
+    // The way to any other screen without going back up first.
+    expect(await dialog.findByRole("option", { name: "Teams" })).toBeInTheDocument();
+    expect(dialog.getByRole("option", { name: "Logs" })).toBeInTheDocument();
   });
 });
 
@@ -382,7 +614,7 @@ describe("theme toggle", () => {
   it("switches data-theme from the account menu and persists the preference", async () => {
     renderShell();
     await screen.findByRole("link", { name: /^Users/ });
-    // The bar carries search now; the theme lives with the person.
+    // The bar carries the switchers only; the theme lives with the person.
     expect(screen.queryByRole("menuitemradio", { name: "Light" })).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: /^Account:/ }));
@@ -459,7 +691,7 @@ describe("project pill", () => {
         HttpResponse.json({ projects: [{ id: "proj_theirs", name: "Granted to me" }] }),
       ),
     );
-    renderShell();
+    renderShell("/users");
 
     const pill = await screen.findByRole("button", { name: "Switch project" });
     await waitFor(() => expect(pill).toHaveTextContent("Granted to me"));
@@ -670,18 +902,29 @@ describe("project pill", () => {
     await waitFor(() => expect(queried).toEqual(["proj_1", "proj_2"]));
   });
 
-  it("lands on the new project's first screen when chosen from an unscoped one", async () => {
+  it("lands on the new project's Overview when chosen from an unscoped one", async () => {
     server.use(
       http.get(MY_PROJECTS, RIVER_AND_DELTA),
       // System is the portal screen that needs no project.
       http.get(READY, () => HttpResponse.text("ok")),
+      // Delta's Overview reads it.
+      http.get("*/api/v1/projects/proj_2", () =>
+        HttpResponse.json({
+          id: "proj_2",
+          name: "Delta",
+          origins: [],
+          created_at: "2026-01-01T00:00:00Z",
+          updated_at: "2026-01-01T00:00:00Z",
+          owning_team_id: null,
+        }),
+      ),
     );
     const router = renderShell(scopedPath("/system", "proj_1"));
 
     const { list } = await openList("River");
     await userEvent.click(within(list).getByRole("option", { name: /^Delta/ }));
 
-    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/users"));
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/"));
     expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_2" });
   });
 
@@ -834,25 +1077,28 @@ describe("project pill", () => {
 });
 
 /**
- * Search moves you somewhere: the bar's field (or ⌘K / Ctrl K) opens a "Go to"
+ * Search moves you somewhere: the sidebar's field (or ⌘K / Ctrl K) opens a "Go to"
  * palette over pages, teams found by name, projects and your settings.
  */
 describe("search", () => {
-  it("opens from the bar and goes to a page", async () => {
+  it("opens from the sidebar and goes to a page", async () => {
     const router = renderShell();
     await userEvent.click(await screen.findByRole("button", { name: "Search" }));
     const dialog = within(await screen.findByRole("dialog", { name: "Go to" }));
 
-    await userEvent.type(dialog.getByPlaceholderText("Go to a page, project or team"), "tea");
+    await userEvent.type(
+      dialog.getByPlaceholderText("Go to a page, user, team or project, or run an action"),
+      "tea",
+    );
     await userEvent.click(await dialog.findByRole("option", { name: "Teams" }));
 
     await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/teams"));
     expect(screen.queryByRole("dialog", { name: "Go to" })).not.toBeInTheDocument();
   });
 
-  it("toggles with the keyboard shortcut, in the settings view too", async () => {
+  it("toggles with the keyboard shortcut, in Settings too", async () => {
     renderShell("/settings/profile");
-    await screen.findByRole("link", { name: "Back to dashboard" });
+    await screen.findByRole("navigation", { name: "Settings" });
     await userEvent.keyboard("{Control>}k{/Control}");
     expect(await screen.findByRole("dialog", { name: "Go to" })).toBeInTheDocument();
     await userEvent.keyboard("{Control>}k{/Control}");
@@ -891,15 +1137,13 @@ describe("search", () => {
 
   it("drops a team the typing has ruled out before the next read lands", async () => {
     server.use(
-      http.post(TEAMS_QUERY, async ({ request }) => {
-        const body = (await request.json()) as { filter?: { field: string; value: string }[] };
-        const name = body.filter?.find((f) => f.field === "name")?.value;
+      http.post(SEARCH, async ({ request }) => {
+        const body = (await request.json()) as SearchBody;
         // The answer for "ma"; the one for "mar" never lands in this test.
-        if (name === "ma") {
+        if (body.query === "ma") {
           return HttpResponse.json({
-            teams: [
-              { id: "team_m", name: "Mainframe", status: "active", created_at: "", updated_at: "" },
-            ],
+            results: [{ type: "team", id: "team_m", project_id: "proj_1", title: "Mainframe" }],
+            incomplete_types: [],
           });
         }
         return new Promise(() => {});
@@ -908,7 +1152,9 @@ describe("search", () => {
     renderShell();
     await userEvent.click(await screen.findByRole("button", { name: "Search" }));
     const dialog = within(await screen.findByRole("dialog", { name: "Go to" }));
-    const input = dialog.getByPlaceholderText("Go to a page, project or team");
+    const input = dialog.getByPlaceholderText(
+      "Go to a page, user, team or project, or run an action",
+    );
 
     await userEvent.type(input, "ma");
     expect(await dialog.findByRole("option", { name: /Mainframe/ })).toBeInTheDocument();
@@ -918,34 +1164,43 @@ describe("search", () => {
     );
   });
 
-  it("finds your settings by the Settings sidebar's name for them", async () => {
+  it("finds Settings' pages by their own name and by the list's", async () => {
     const router = renderShell();
     await userEvent.click(await screen.findByRole("button", { name: "Search" }));
     const dialog = within(await screen.findByRole("dialog", { name: "Go to" }));
+    const field = dialog.getByPlaceholderText(
+      "Go to a page, user, team or project, or run an action",
+    );
+
+    // The Settings row is a list, not a page, so its pages stand in for it,
+    // each marked with the list's name.
+    await userEvent.type(field, "prof");
+    const byName = within(await dialog.findByRole("group", { name: "Account" }));
+    expect(byName.getByRole("option", { name: /^Profile/ })).toHaveTextContent("Settings");
 
     // The project's own page is called Settings too, under the project's
     // pages; the group heading is what tells them apart.
-    await userEvent.type(dialog.getByPlaceholderText("Go to a page, project or team"), "sett");
-    const you = within(await dialog.findByRole("group", { name: "You" }));
-    await userEvent.click(you.getByRole("option", { name: "Settings" }));
+    await userEvent.clear(field);
+    await userEvent.type(field, "sett");
+    const account = within(await dialog.findByRole("group", { name: "Account" }));
+    expect(account.getAllByRole("option")).toHaveLength(1);
+    await userEvent.click(account.getByRole("option", { name: /^Profile/ }));
 
     await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/settings/profile"));
   });
 
-  it("finds teams by name on the server and opens one", async () => {
-    let filter: unknown;
+  it("finds teams on the server and opens one", async () => {
+    const asked: SearchBody[] = [];
     server.use(
-      http.post(TEAMS_QUERY, async ({ request }) => {
-        const body = (await request.json()) as { filter?: { field: string; value: string }[] };
-        if (body.filter?.some((f) => f.field === "name")) {
-          filter = body.filter;
-          return HttpResponse.json({
-            teams: [
-              { id: "team_s", name: "Support", status: "active", created_at: "", updated_at: "" },
-            ],
-          });
-        }
-        return HttpResponse.json({ teams: [] });
+      http.post(SEARCH, async ({ request }) => {
+        const body = (await request.json()) as SearchBody;
+        asked.push(body);
+        return HttpResponse.json({
+          results: body.types.includes("team")
+            ? [{ type: "team", id: "team_s", project_id: "proj_1", title: "Support" }]
+            : [],
+          incomplete_types: [],
+        });
       }),
       http.get("*/api/v1/teams/team_s", () =>
         HttpResponse.json({
@@ -960,11 +1215,221 @@ describe("search", () => {
     const router = renderShell();
     await userEvent.click(await screen.findByRole("button", { name: "Search" }));
     const dialog = within(await screen.findByRole("dialog", { name: "Go to" }));
-    await userEvent.type(dialog.getByPlaceholderText("Go to a page, project or team"), "sup");
+    await userEvent.type(
+      dialog.getByPlaceholderText("Go to a page, user, team or project, or run an action"),
+      "sup",
+    );
 
-    await userEvent.click(await dialog.findByRole("option", { name: /Support/ }));
-    expect(filter).toContainEqual({ field: "name", operation: "contains", value: "sup" });
+    const teams = within(await dialog.findByRole("group", { name: "Teams" }));
+    await userEvent.click(teams.getByRole("option", { name: /Support/ }));
+    // Users are asked for on their own, so the quick types do not wait for them.
+    expect(asked).toContainEqual({ query: "sup", types: ["user"], limit_per_type: 5 });
+    expect(asked).toContainEqual({
+      query: "sup",
+      types: ["team", "schema", "flow_definition", "idp"],
+      limit_per_type: 5,
+    });
     await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/teams/team_s"));
+  });
+
+  it("asks for users only once there is enough to match them by", async () => {
+    const asked: SearchBody[] = [];
+    server.use(
+      http.post(SEARCH, async ({ request }) => {
+        asked.push((await request.json()) as SearchBody);
+        return HttpResponse.json({ results: [], incomplete_types: [] });
+      }),
+    );
+    renderShell();
+    await userEvent.click(await screen.findByRole("button", { name: "Search" }));
+    const dialog = within(await screen.findByRole("dialog", { name: "Go to" }));
+
+    await userEvent.type(
+      dialog.getByPlaceholderText("Go to a page, user, team or project, or run an action"),
+      "an",
+    );
+    await waitFor(() => expect(asked).toHaveLength(1));
+    expect(asked[0]?.types).not.toContain("user");
+  });
+
+  it("finds users by what the server matched, and hands a long list to Users", async () => {
+    server.use(
+      http.post(SEARCH, async ({ request }) => {
+        const body = (await request.json()) as SearchBody;
+        if (!body.types.includes("user")) {
+          return HttpResponse.json({ results: [], incomplete_types: [] });
+        }
+        return HttpResponse.json({
+          results: [
+            {
+              type: "user",
+              id: "user_9",
+              project_id: "proj_1",
+              title: "Grace Hopper",
+              subtitle: "grace@example.com",
+            },
+          ],
+          incomplete_types: ["user"],
+        });
+      }),
+    );
+    const router = renderShell();
+    await userEvent.click(await screen.findByRole("button", { name: "Search" }));
+    const dialog = within(await screen.findByRole("dialog", { name: "Go to" }));
+    // The text is in the identifier, which the row shows under the name.
+    await userEvent.type(
+      dialog.getByPlaceholderText("Go to a page, user, team or project, or run an action"),
+      "example",
+    );
+
+    const users = within(await dialog.findByRole("group", { name: "Users" }));
+    expect(users.getByRole("option", { name: /Grace Hopper/ })).toHaveTextContent(
+      "grace@example.com",
+    );
+    await userEvent.click(users.getByRole("option", { name: /See all users matching/ }));
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/users"));
+    expect(router.state.resolvedLocation?.search).toMatchObject({ q: "example" });
+  });
+
+  it("lists the configuration the server found under one heading", async () => {
+    server.use(
+      http.post(SEARCH, async ({ request }) => {
+        const body = (await request.json()) as SearchBody;
+        if (body.types.includes("user")) {
+          return HttpResponse.json({ results: [], incomplete_types: [] });
+        }
+        return HttpResponse.json({
+          results: [
+            {
+              type: "schema",
+              id: "sch_1",
+              project_id: "proj_1",
+              title: "Partner Staff",
+              subtitle: "partner-user",
+            },
+            {
+              type: "flow_definition",
+              id: "flowdef_1",
+              project_id: "proj_1",
+              title: "partner-sign-in",
+              subtitle: "login",
+            },
+            {
+              type: "idp",
+              id: "idp_1",
+              project_id: "proj_1",
+              title: "Partner Portal",
+              subtitle: "partner-sso",
+            },
+          ],
+          incomplete_types: [],
+        });
+      }),
+    );
+    renderShell();
+    await userEvent.click(await screen.findByRole("button", { name: "Search" }));
+    const dialog = within(await screen.findByRole("dialog", { name: "Go to" }));
+    await userEvent.type(
+      dialog.getByPlaceholderText("Go to a page, user, team or project, or run an action"),
+      "partner",
+    );
+
+    const configuration = within(await dialog.findByRole("group", { name: "Configuration" }));
+    expect(configuration.getByRole("option", { name: /Partner Staff/ })).toHaveTextContent(
+      "partner-user",
+    );
+    expect(configuration.getByRole("option", { name: /partner-sign-in/ })).toHaveTextContent(
+      "login",
+    );
+    expect(configuration.getByRole("option", { name: /Partner Portal/ })).toHaveTextContent(
+      "partner-sso",
+    );
+  });
+
+  it("opens the drawers its actions name, over the screen it was opened on", async () => {
+    const router = renderShell(scopedPath("/users", "proj_1"));
+    for (const action of ["Add team", "Add user"]) {
+      await userEvent.click(await screen.findByRole("button", { name: "Search" }));
+      const dialog = within(await screen.findByRole("dialog", { name: "Go to" }));
+      await userEvent.type(
+        dialog.getByPlaceholderText("Go to a page, user, team or project, or run an action"),
+        "add",
+      );
+
+      const actions = within(await dialog.findByRole("group", { name: "Actions" }));
+      await userEvent.click(actions.getByRole("option", { name: action }));
+
+      // The palette makes way for the drawer, and the screen stays.
+      const drawer = await screen.findByRole("dialog", { name: action });
+      expect(screen.queryByRole("dialog", { name: "Go to" })).not.toBeInTheDocument();
+      expect(router.state.resolvedLocation?.pathname).toBe("/users");
+      await userEvent.click(within(drawer).getByRole("button", { name: "Cancel" }));
+      await waitFor(() =>
+        expect(screen.queryByRole("dialog", { name: action })).not.toBeInTheDocument(),
+      );
+    }
+  });
+
+  it("copies the selected project's id and says so", async () => {
+    // `setup()` is what gives the page a clipboard to write to.
+    const user = userEvent.setup();
+    renderShell(scopedPath("/users", "proj_1"));
+    await user.click(await screen.findByRole("button", { name: "Search" }));
+    const dialog = within(await screen.findByRole("dialog", { name: "Go to" }));
+    await user.type(
+      dialog.getByPlaceholderText("Go to a page, user, team or project, or run an action"),
+      "copy",
+    );
+
+    await user.click(await dialog.findByRole("option", { name: /Copy project ID/ }));
+
+    expect(await screen.findByText("Project ID copied")).toBeInTheDocument();
+    expect(await navigator.clipboard.readText()).toBe("proj_1");
+  });
+
+  it("lists what was opened from it, until something is typed", async () => {
+    server.use(
+      http.post(SEARCH, async ({ request }) => {
+        const body = (await request.json()) as SearchBody;
+        return HttpResponse.json({
+          results: body.types.includes("team")
+            ? [{ type: "team", id: "team_s", project_id: "proj_1", title: "Support" }]
+            : [],
+          incomplete_types: [],
+        });
+      }),
+      http.get("*/api/v1/teams/team_s", () =>
+        HttpResponse.json({
+          id: "team_s",
+          name: "Support",
+          status: "active",
+          created_at: "2026-01-01T00:00:00Z",
+          updated_at: "2026-01-01T00:00:00Z",
+        }),
+      ),
+    );
+    const router = renderShell(scopedPath("/users", "proj_1"));
+    await userEvent.click(await screen.findByRole("button", { name: "Search" }));
+    let dialog = within(await screen.findByRole("dialog", { name: "Go to" }));
+    // Nothing was opened yet.
+    expect(dialog.queryByRole("group", { name: "Recent" })).not.toBeInTheDocument();
+    await userEvent.type(
+      dialog.getByPlaceholderText("Go to a page, user, team or project, or run an action"),
+      "sup",
+    );
+    await userEvent.click(await dialog.findByRole("option", { name: /Support/ }));
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/teams/team_s"));
+
+    await userEvent.click(screen.getByRole("button", { name: "Search" }));
+    dialog = within(await screen.findByRole("dialog", { name: "Go to" }));
+    const recent = within(await dialog.findByRole("group", { name: "Recent" }));
+    expect(recent.getByRole("option", { name: /Support/ })).toBeInTheDocument();
+
+    await userEvent.type(
+      dialog.getByPlaceholderText("Go to a page, user, team or project, or run an action"),
+      "x",
+    );
+    expect(dialog.queryByRole("group", { name: "Recent" })).not.toBeInTheDocument();
   });
 
   it("finds projects by name on the server and selects one", async () => {
@@ -996,7 +1461,10 @@ describe("search", () => {
     const router = renderShell(scopedPath("/users", "proj_1"));
     await userEvent.click(await screen.findByRole("button", { name: "Search" }));
     const dialog = within(await screen.findByRole("dialog", { name: "Go to" }));
-    await userEvent.type(dialog.getByPlaceholderText("Go to a page, project or team"), "zep");
+    await userEvent.type(
+      dialog.getByPlaceholderText("Go to a page, user, team or project, or run an action"),
+      "zep",
+    );
 
     await userEvent.click(await dialog.findByRole("option", { name: "Zephyr" }));
     expect(searched).toEqual(["zep"]);
@@ -1035,7 +1503,10 @@ describe("search", () => {
 
     // Through the pause in typing and the request, the group keeps what it
     // showed instead of emptying.
-    await userEvent.type(dialog.getByPlaceholderText("Go to a page, project or team"), "zep");
+    await userEvent.type(
+      dialog.getByPlaceholderText("Go to a page, user, team or project, or run an action"),
+      "zep",
+    );
     expect(dialog.getByRole("option", { name: "console-dev" })).toBeInTheDocument();
     await waitFor(() => expect(answer).toBeDefined());
     expect(dialog.getByRole("option", { name: "console-dev" })).toBeInTheDocument();
@@ -1059,7 +1530,10 @@ describe("search", () => {
     renderShell();
     await userEvent.click(await screen.findByRole("button", { name: "Search" }));
     const dialog = within(await screen.findByRole("dialog", { name: "Go to" }));
-    await userEvent.type(dialog.getByPlaceholderText("Go to a page, project or team"), "zzzz");
+    await userEvent.type(
+      dialog.getByPlaceholderText("Go to a page, user, team or project, or run an action"),
+      "zzzz",
+    );
     expect(await dialog.findByText("Nothing matches “zzzz”")).toBeInTheDocument();
   });
 });

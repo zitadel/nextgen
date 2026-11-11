@@ -1,0 +1,8 @@
+name: id
+in: path
+required: true
+description: |
+  The application ID: the `id` that `createApplication` (`POST /applications`) returns.
+schema:
+  type: string
+example: app_01KWH3B72K7M7F0N9WD3P2E4YM

@@ -57,7 +57,6 @@ import {
   CreateProjectBody,
   CreateReleaseBody,
   CreateReleaseQueryParams,
-  CreateSchemaBody,
   CreateSchemaQueryParams,
   DeleteVariableParams,
   DeleteVariableQueryParams,
@@ -132,6 +131,7 @@ import {
 import { validateFlowDefinition } from "@zitadel/config/validate";
 import { getDefaultHumanUserSchema, getDefaultLoginFlow } from "@zitadel/config/defaults";
 import { missingEndpoints } from "@zitadel/config/idp";
+import { schemaFileIssues } from "@zitadel/config/meta-schemas";
 import { policyConfigSchema } from "@zitadel/config/schemas";
 import { http, HttpResponse } from "msw";
 import { z } from "zod";
@@ -598,8 +598,12 @@ function matchesIdpFilters(
   return true;
 }
 
+const IDP_FIELD_IMMUTABLE_MESSAGE =
+  "identity provider connection: the field is fixed for the life of the connection";
+
 /**
- * Which identity field a revision would change, or `undefined` when none would.
+ * The identity fields a revision would change, in the server's order, or empty
+ * when none would.
  *
  * `protocol`, `subject_claim` and the field naming the authority decide which
  * provider account a stored subject belongs to, so changing one repoints
@@ -607,22 +611,25 @@ function matchesIdpFilters(
  * for the life of the connection, and a mock that accepted it would let the CLI
  * pass a test the real service fails.
  */
-function immutableFieldClash(
+function immutableFieldsChanged(
   before: Record<string, unknown>,
   after: Record<string, unknown>,
-): string | undefined {
-  for (const field of ["protocol", "subject_claim"] as const) {
-    if (before[field] !== undefined && before[field] !== after[field]) {
-      return field;
-    }
+): string[] {
+  const changed: string[] = [];
+  if (before.protocol !== undefined && before.protocol !== after.protocol) {
+    changed.push("protocol");
   }
-  // The authority is the issuer.
+  // An absent subject_claim reads as `sub`, as the server resolves it.
+  if ((before.subject_claim ?? "sub") !== (after.subject_claim ?? "sub")) {
+    changed.push("subject_claim");
+  }
+  // The authority is the issuer, compared as the server does: exactly.
   const was = before.oidc;
   const now = after.oidc;
   if (isObject(was) && isObject(now) && was.issuer !== undefined && was.issuer !== now.issuer) {
-    return "oidc.issuer";
+    changed.push("oidc.issuer");
   }
-  return undefined;
+  return changed;
 }
 
 type VariableKind = "primary" | "preview";
@@ -1248,25 +1255,34 @@ function materializeBundle(
 }
 
 /**
- * The first connection in the bundle that would change a field fixed for the
- * life of the connection, with the field it changes.
+ * Every connection in the bundle that would change a field fixed for the life
+ * of the connection, as the server reports it under `rel.invalid`: the fields
+ * sit in the resource's own `details`, where the CLI's hint reads them.
  */
-function bundleIdpClash(
+function bundleIdpFailures(
   projectId: string,
   bundle: Record<string, unknown>,
-): { slug: string; field: string } | undefined {
-  for (const item of asArray(bundle.idps)) {
+): Record<string, unknown>[] {
+  const failures: Record<string, unknown>[] = [];
+  asArray(bundle.idps).forEach((item, index) => {
     const resource = isObject(item) ? item : {};
     const slug = bundleResourceHandle("idp", resource);
     const existing = [...store.idps.values()].find(
       (record) => record.projectId === projectId && record.slug === slug,
     );
-    const field = existing === undefined ? undefined : immutableFieldClash(existing.body, resource);
-    if (field !== undefined) {
-      return { slug, field };
+    const fields = existing === undefined ? [] : immutableFieldsChanged(existing.body, resource);
+    if (fields.length > 0) {
+      failures.push({
+        kind: "idp",
+        index,
+        handle: slug,
+        code: "idp.field_immutable",
+        message: IDP_FIELD_IMMUTABLE_MESSAGE,
+        details: { details: { fields } },
+      });
     }
-  }
-  return undefined;
+  });
+  return failures;
 }
 
 /**
@@ -1518,18 +1534,44 @@ function deploymentKind(deployment: DeploymentRecord): "primary" | "preview" {
   return deployment.targets.some((target) => target.expiresAt !== null) ? "preview" : "primary";
 }
 
+/** The project's newest primary deployment, what a deploy or rollback replaces. */
+function newestPrimaryDeployment(projectId: string): DeploymentRecord | undefined {
+  return [...store.deployments.values()]
+    .filter(
+      (deployment) =>
+        deployment.projectId === projectId && deploymentKind(deployment) === "primary",
+    )
+    .sort((a, b) => b.seq - a.seq)[0];
+}
+
 /**
- * Whether the deployment still serves its release: `live` while at least one
- * of its targets is served by it, `inactive` once a later deployment replaced
- * every one, or its previews expired or were removed.
+ * Whether the deployment still serves its release: the newest primary deployment
+ * always does, and a preview deployment while a target is served by it. A later
+ * deployment, or its previews expiring or being removed, makes it `inactive`.
  */
 function deploymentStatus(deployment: DeploymentRecord): "live" | "inactive" {
+  if (deploymentKind(deployment) === "primary") {
+    return newestPrimaryDeployment(deployment.projectId)?.id === deployment.id
+      ? "live"
+      : "inactive";
+  }
   return deployment.targets.some(
     (target) =>
       newestDeploymentForOrigin(deployment.projectId, target.origin)?.id === deployment.id,
   )
     ? "live"
     : "inactive";
+}
+
+/** Whether a deployment has this release and exactly these origins. */
+function repeats(deployment: DeploymentRecord, releaseId: string, origins: string[]): boolean {
+  const named = deployment.targets.map((target) => target.origin).sort();
+  const wanted = [...origins].sort();
+  return (
+    deployment.releaseId === releaseId &&
+    named.length === wanted.length &&
+    named.every((origin, index) => origin === wanted[index])
+  );
 }
 
 /** The wire shape of a deployment, optionally over a restricted target set. */
@@ -1785,21 +1827,11 @@ export function setupPlatformHandlers() {
       const bundle = data.bundle;
       // A connection's fixed fields are checked before anything is written, as
       // the service checks them inside the build's transaction: a bundle that
-      // would change one is refused whole rather than revising it.
-      const clash = bundleIdpClash(project.id, bundle);
-      if (clash) {
-        return HttpResponse.json(
-          errorBody(
-            "idp.field_immutable",
-            `release: ${clash.slug}: the field ${clash.field} is fixed for the life of the connection`,
-          ),
-          { status: 400 },
-        );
-      }
-      // The service validates each policy against its template and refuses two
-      // for one operation, reporting every refused resource under
+      // would change one is refused whole rather than revising it. The service
+      // also validates each policy against its template and refuses two for
+      // one operation. Every refused resource is reported at once under
       // `rel.invalid`.
-      const refused = bundlePolicyFailures(bundle);
+      const refused = [...bundleIdpFailures(project.id, bundle), ...bundlePolicyFailures(bundle)];
       if (refused.length > 0) {
         return HttpResponse.json(
           errorBody("rel.invalid", "release: the bundle has invalid resources", {
@@ -2071,12 +2103,15 @@ export function setupPlatformHandlers() {
       const targets = [...resolved].sort();
       const expectedId =
         typeof data.expected_deployment_id === "string" ? data.expected_deployment_id : undefined;
-      // The contract's guard: the newest deployment to any of the targets.
+      // The contract's guard: the newest primary deployment, or the newest
+      // deployment to any of the preview URLs.
       if (expectedId !== undefined) {
-        const newest = targets
-          .map((origin) => newestDeploymentForOrigin(project.id, origin))
-          .filter((deployment): deployment is DeploymentRecord => deployment !== undefined)
-          .sort((a, b) => b.seq - a.seq)[0];
+        const newest = sawPreview
+          ? targets
+              .map((origin) => newestDeploymentForOrigin(project.id, origin))
+              .filter((deployment): deployment is DeploymentRecord => deployment !== undefined)
+              .sort((a, b) => b.seq - a.seq)[0]
+          : newestPrimaryDeployment(project.id);
         if (newest && newest.id !== expectedId) {
           return HttpResponse.json(
             errorBody(
@@ -2112,25 +2147,13 @@ export function setupPlatformHandlers() {
         }
       }
 
-      // Idempotent on what is served: when every target already runs this
-      // release, the newest deployment to the targets is returned unchanged.
-      // Never for preview URLs: the contract has a preview deploy always write
-      // a new deployment (201), which is how its expiry is renewed.
-      const alreadyServed = targets.every(
-        (origin) => newestDeploymentForOrigin(project.id, origin)?.releaseId === release.id,
-      );
-      if (targets.length > 0 && alreadyServed && !sawPreview) {
-        const newest = [...store.deployments.values()]
-          .filter(
-            (deployment) =>
-              deployment.projectId === project.id &&
-              deployment.releaseId === release.id &&
-              deployment.targets.some((target) => targets.includes(target.origin)),
-          )
-          .sort((a, b) => b.seq - a.seq)[0];
-        if (newest) {
-          return HttpResponse.json(deploymentResponse(newest), { status: 200 });
-        }
+      // Idempotent on what is served: when the newest primary deployment has
+      // this release and these origins it is returned unchanged. Never for
+      // preview URLs: the contract has a preview deploy always write a new
+      // deployment (201), which is how its expiry is renewed.
+      const newestPrimary = newestPrimaryDeployment(project.id);
+      if (!sawPreview && newestPrimary && repeats(newestPrimary, release.id, targets)) {
+        return HttpResponse.json(deploymentResponse(newestPrimary), { status: 200 });
       }
 
       const id = `dep_${shortId()}`;
@@ -2204,6 +2227,14 @@ export function setupPlatformHandlers() {
             .filter((deployment) => deployment.targets.some((t) => t.origin === target))
             .sort((a, b) => b.seq - a.seq)[0];
           if (!newest) {
+            continue;
+          }
+          // A primary origin is served only by the newest primary deployment:
+          // an older one that names it, such as before a rollback, serves nothing.
+          if (
+            deploymentKind(newest) === "primary" &&
+            newest.id !== newestPrimaryDeployment(query.data.project_id)?.id
+          ) {
             continue;
           }
           const row = newest.targets.find((candidate) => candidate.origin === target);
@@ -2305,8 +2336,8 @@ export function setupPlatformHandlers() {
         });
       }
 
-      // Only a deployment to primary origins can be rolled back, and every
-      // target must still be a primary origin of the project.
+      // Only a deployment to primary origins can be rolled back. It restores
+      // the origins it froze, listed or not.
       if (target.targets.some((row) => row.expiresAt !== null)) {
         return HttpResponse.json(
           errorBody(
@@ -2316,17 +2347,6 @@ export function setupPlatformHandlers() {
           { status: 400 },
         );
       }
-      const primaries = primaryOrigins(project);
-      const removed = target.targets.find((row) => !primaries.includes(row.origin));
-      if (removed) {
-        return HttpResponse.json(
-          errorBody(
-            "proj.origin_not_allowed",
-            `project: ${removed.origin} is not a primary origin`,
-          ),
-          { status: 403 },
-        );
-      }
       const release = store.releases.get(target.releaseId);
       if (release?.revokedAt) {
         return HttpResponse.json(errorBody("rel.revoked", "release: revoked"), { status: 409 });
@@ -2334,43 +2354,29 @@ export function setupPlatformHandlers() {
 
       const origins = target.targets.map((row) => row.origin);
       // The optimistic guard: the deployment the caller believes is the newest
-      // one to any of the targets. A mismatch is a deploy that raced in.
+      // primary one. A mismatch is a deploy that raced in.
       const rollbackData = body.data as Record<string, unknown>;
       const expectedRollbackId =
         typeof rollbackData.expected_deployment_id === "string"
           ? rollbackData.expected_deployment_id
           : undefined;
-      if (expectedRollbackId !== undefined) {
-        const newestToTargets = origins
-          .map((origin) => newestDeploymentForOrigin(project.id, origin))
-          .filter((deployment): deployment is DeploymentRecord => deployment !== undefined)
-          .sort((a, b) => b.seq - a.seq)[0];
-        if (newestToTargets && newestToTargets.id !== expectedRollbackId) {
-          return HttpResponse.json(
-            errorBody(
-              "dep.conflict",
-              "deployment: the newest deployment to the targets does not match expected_deployment_id",
-              { deployment: deploymentResponse(newestToTargets) },
-            ),
-            { status: 409 },
-          );
-        }
+      const newestPrimary = newestPrimaryDeployment(project.id);
+      if (
+        expectedRollbackId !== undefined &&
+        newestPrimary &&
+        newestPrimary.id !== expectedRollbackId
+      ) {
+        return HttpResponse.json(
+          errorBody(
+            "dep.conflict",
+            "deployment: the newest deployment to the targets does not match expected_deployment_id",
+            { deployment: deploymentResponse(newestPrimary) },
+          ),
+          { status: 409 },
+        );
       }
-      const alreadyServed = origins.every(
-        (origin) => newestDeploymentForOrigin(project.id, origin)?.releaseId === target.releaseId,
-      );
-      if (alreadyServed) {
-        const newest = [...store.deployments.values()]
-          .filter(
-            (deployment) =>
-              deployment.projectId === project.id &&
-              deployment.releaseId === target.releaseId &&
-              deployment.targets.some((row) => origins.includes(row.origin)),
-          )
-          .sort((a, b) => b.seq - a.seq)[0];
-        if (newest) {
-          return HttpResponse.json(deploymentResponse(newest), { status: 200 });
-        }
+      if (newestPrimary && repeats(newestPrimary, target.releaseId, origins)) {
+        return HttpResponse.json(deploymentResponse(newestPrimary), { status: 200 });
       }
 
       const id = `dep_${shortId()}`;
@@ -2699,9 +2705,12 @@ export function setupPlatformHandlers() {
       if (raw === null) {
         return HttpResponse.json(INVALID_JSON, { status: 400 });
       }
-      const body = parse(CreateSchemaBody, raw, "invalid_schema");
-      if (!body.ok) {
-        return body.response;
+      const issues = schemaFileIssues(raw);
+      if (issues.length > 0) {
+        return HttpResponse.json(
+          errorBody("invalid_schema", "request does not conform to spec", { issues }),
+          { status: 400 },
+        );
       }
 
       const schemaBody = raw as unknown as GetSchemaById200Schema;
@@ -2937,13 +2946,10 @@ export function setupPlatformHandlers() {
         (record) => record.projectId === query.data.project_id && record.slug === slug,
       );
       if (existing) {
-        const clash = immutableFieldClash(existing.body, definition);
-        if (clash) {
+        const fields = immutableFieldsChanged(existing.body, definition);
+        if (fields.length > 0) {
           return HttpResponse.json(
-            errorBody(
-              "idp.field_immutable",
-              "identity provider connection: the field is fixed for the life of the connection",
-            ),
+            errorBody("idp.field_immutable", IDP_FIELD_IMMUTABLE_MESSAGE, { details: { fields } }),
             { status: 400 },
           );
         }

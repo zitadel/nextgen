@@ -71,9 +71,11 @@ func openRoundTrip(t *testing.T) (*goose.Provider, func(t *testing.T) migrationt
 
 // known: Spanner adds a NOT NULL column to an existing table only with a
 // default, and the column 000004 created had none. 000011's Down re-adds
-// users.team_id nullable instead of leaving a default behind.
+// users.team_id nullable instead of leaving a default behind, and 000043's
+// Down does the same for user_attributes.team_id.
 var known = migrationtest.Known{
 	11: {"column users.team_id"},
+	43: {"column user_attributes.team_id"},
 }
 
 // snapshot reads the schema from INFORMATION_SCHEMA, leaving out goose's table

@@ -164,7 +164,7 @@ func TestImport_teamPlaceholderNameTaken(t *testing.T) {
 }
 
 // A user schema that identifies users by `email` must see the imported user's
-// email in the unique-attributes registry, or sign-in cannot resolve them.
+// email as a unique claim, or sign-in cannot resolve them.
 func TestImport_uniqueAttributesFollowSchema(t *testing.T) {
 	ctx := t.Context()
 	v2Pool := testPool(t)
@@ -203,6 +203,60 @@ func TestImport_uniqueAttributesFollowSchema(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, scopes, domain.AttributeKey("email"))
 	require.Contains(t, scopes, domain.AttributeKey("username"))
+}
+
+// A new user's document is held to the formats a user write is. A user already
+// imported is skipped first, so a document that no longer passes cannot stop a
+// server from starting.
+func TestImport_assertsFormatOnNewUsersOnly(t *testing.T) {
+	ctx := t.Context()
+	v2Pool := testPool(t)
+	stmts := v2Pool.Statements()
+
+	suffix := rand.Text()
+	projectID := "proj_" + suffix
+	require.NoError(t, stmts.CreateProject(ctx, &domain.Project{
+		ID:      projectID,
+		Name:    "project-" + projectID,
+		Origins: []domain.Origin{},
+	}))
+	t.Cleanup(func() { _, _ = stmts.DeleteProjectByID(context.Background(), projectID) })
+
+	writeDocument := func(userID, email string) string {
+		doc := validDocument()
+		doc.Header.ProjectID = projectID
+		doc.Header.ID = userID
+		doc.Attributes["username"] = json.RawMessage(`"` + userID + `"`)
+		doc.Attributes["email"] = json.RawMessage(`"` + email + `"`)
+		raw, err := json.Marshal(doc)
+		require.NoError(t, err)
+		path := filepath.Join(t.TempDir(), "user.json")
+		require.NoError(t, os.WriteFile(path, raw, 0o600))
+		return path
+	}
+	require.NoError(t, stmts.CreateJSONSchema(ctx, &domain.JSONSchema{
+		ProjectID: projectID,
+		URL:       validDocument().Header.SchemaURL,
+		Kind:      domain.JSONSchemaKindUnknown,
+		Schema:    []byte(`{"type":"object","properties":{"email":{"type":"string","format":"email"}}}`),
+	}))
+	imported := func(userID string) bool {
+		_, err := stmts.GetUser(ctx, database.And(
+			database.Equal(database.Col(domain.UserFieldProjectID), projectID),
+			database.Equal(database.Col(domain.UserFieldID), userID),
+		), service.UserQueryOptions{})
+		return err == nil
+	}
+
+	refused := "user_refused_" + suffix
+	err := users.Import(ctx, v2Pool, testHasher(t), "postgres", testBuiltinBases, []string{writeDocument(refused, "not-an-email")})
+	require.ErrorContains(t, err, `"email"`)
+	require.False(t, imported(refused), "a refused document must store nothing")
+
+	existing := "user_existing_" + suffix
+	require.NoError(t, users.Import(ctx, v2Pool, testHasher(t), "postgres", testBuiltinBases, []string{writeDocument(existing, "admin-"+suffix+"@example.com")}))
+	require.True(t, imported(existing))
+	require.NoError(t, users.Import(ctx, v2Pool, testHasher(t), "postgres", testBuiltinBases, []string{writeDocument(existing, "not-an-email")}))
 }
 
 // A bootstrap document minted while the built-in schemas lived under a legacy

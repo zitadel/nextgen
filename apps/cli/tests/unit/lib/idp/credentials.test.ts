@@ -14,24 +14,24 @@ const VERSION = "1.0.0-alpha.23";
 describe("the recovery command for a credential", () => {
   it("is runnable rather than a bare subcommand", () => {
     // A JSON result is read by agents, which execute these as shell commands.
-    expect(republishCommand(idVariable("GOOGLE_CLIENT_ID"), false, VERSION, NO_SELECTOR)).toMatch(
+    expect(republishCommand(idVariable("google"), false, VERSION, NO_SELECTOR)).toMatch(
       /^npx .+ variable set /,
     );
   });
 
   it("marks a secret as one, so the value is not stored in the clear", () => {
-    expect(
-      republishCommand(secretVariable("GOOGLE_CLIENT_SECRET"), true, VERSION, NO_SELECTOR),
-    ).toContain("variable set GOOGLE_CLIENT_SECRET --secret");
-    expect(
-      republishCommand(idVariable("GOOGLE_CLIENT_ID"), false, VERSION, NO_SELECTOR),
-    ).not.toContain("--secret");
+    expect(republishCommand(secretVariable("google"), true, VERSION, NO_SELECTOR)).toContain(
+      "variable set GOOGLE_CLIENT_SECRET --secret",
+    );
+    expect(republishCommand(idVariable("google"), false, VERSION, NO_SELECTOR)).not.toContain(
+      "--secret",
+    );
   });
 
   it("carries the environment selector so the retry targets the same project", () => {
     // The selector reproduces the invocation's --env/--env-file/--server; a
     // retry without it would silently target the default project.
-    expect(republishCommand(idVariable("GOOGLE_CLIENT_ID"), false, VERSION, PRODUCTION)).toContain(
+    expect(republishCommand(idVariable("google"), false, VERSION, PRODUCTION)).toContain(
       "variable set GOOGLE_CLIENT_ID --env production",
     );
   });
@@ -42,8 +42,8 @@ describe("the recovery commands a result carries", () => {
     expect(
       republishCommands(
         [
-          { name: idVariable("GOOGLE_CLIENT_ID"), secret: false, published: "stored" },
-          { name: secretVariable("GOOGLE_CLIENT_SECRET"), secret: true, published: "stored" },
+          { name: idVariable("google"), secret: false, published: "stored" },
+          { name: secretVariable("google"), secret: true, published: "stored" },
         ],
         VERSION,
         NO_SELECTOR,
@@ -54,8 +54,8 @@ describe("the recovery commands a result carries", () => {
   it("names every credential that did not land, and only those", () => {
     const commands = republishCommands(
       [
-        { name: idVariable("GOOGLE_CLIENT_ID"), secret: false, published: "stored" },
-        { name: secretVariable("GOOGLE_CLIENT_SECRET"), secret: true, published: "failed" },
+        { name: idVariable("google"), secret: false, published: "stored" },
+        { name: secretVariable("google"), secret: true, published: "failed" },
       ],
       VERSION,
       NO_SELECTOR,
@@ -70,7 +70,7 @@ describe("the recovery commands a result carries", () => {
     // fails at token exchange just the same.
     expect(
       republishCommands(
-        [{ name: idVariable("GOOGLE_CLIENT_ID"), secret: false, published: "deferred" }],
+        [{ name: idVariable("google"), secret: false, published: "deferred" }],
         VERSION,
         NO_SELECTOR,
       ),
@@ -89,7 +89,7 @@ describe("the recovery commands a result carries", () => {
     ).toEqual([]);
     expect(
       republishCommands(
-        [{ name: idVariable("GOOGLE_CLIENT_ID"), secret: false, published: undefined }],
+        [{ name: idVariable("google"), secret: false, published: undefined }],
         VERSION,
         NO_SELECTOR,
       ),
@@ -102,8 +102,8 @@ describe("the recovery commands as argument lists", () => {
     expect(
       republishArgs(
         [
-          { name: idVariable("GOOGLE_CLIENT_ID"), secret: false, published: "failed" },
-          { name: secretVariable("GOOGLE_CLIENT_SECRET"), secret: true, published: "deferred" },
+          { name: idVariable("google"), secret: false, published: "failed" },
+          { name: secretVariable("google"), secret: true, published: "deferred" },
         ],
         ["--cwd", "/home/dev/app"],
       ),
@@ -115,7 +115,7 @@ describe("the recovery commands as argument lists", () => {
 
   it("lists the same commands as the strings", () => {
     const credentials = [
-      { name: secretVariable("GOOGLE_CLIENT_SECRET"), secret: true, published: "failed" as const },
+      { name: secretVariable("google"), secret: true, published: "failed" as const },
     ];
 
     expect(republishCommands(credentials, VERSION, NO_SELECTOR)).toEqual(

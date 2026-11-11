@@ -258,6 +258,33 @@ func TestConsoleManagementAcceptsSession(t *testing.T) {
 		assert.Equal(t, api.VariableByKind{Primary: api.NewOptVariable(held)}, *one.(*api.VariableByKind))
 	})
 
+	t.Run("events", func(t *testing.T) {
+		t.Parallel()
+		// The Logs screen lists the project's events and opens one. An event
+		// this project does not hold is a miss, not a refused credential.
+		resp, err := session.ListEvents(t.Context(), api.ListEventsParams{ProjectID: projectID})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListEventsResponse{}, resp, helpers.MustMarshal(t, resp))
+
+		// Filters combine, whether or not one index holds them all: what none
+		// holds is matched over a bounded number of events.
+		resp, err = session.ListEvents(t.Context(), api.ListEventsParams{
+			ProjectID: projectID,
+			Category:  []api.ListEventsCategoryItem{api.ListEventsCategoryItemAuth, api.ListEventsCategoryItemAdmin},
+			ActorID:   api.NewOptString(claimerID),
+			EntityID:  api.NewOptString(claimerID),
+			ClientID:  api.NewOptString("app_none"),
+		})
+		require.NoError(t, err)
+		combined, ok := resp.(*api.ListEventsResponse)
+		require.True(t, ok, helpers.MustMarshal(t, resp))
+		assert.Empty(t, combined.Data)
+
+		got, err := session.GetEvent(t.Context(), api.GetEventParams{ID: "evt_missing", ProjectID: projectID})
+		require.NoError(t, err)
+		require.IsType(t, &api.GetEventNotFound{}, got, helpers.MustMarshal(t, got))
+	})
+
 	t.Run("teams", func(t *testing.T) {
 		t.Parallel()
 		created, err := session.CreateTeam(t.Context(), &api.CreateTeamRequest{Name: helpers.TeamName()},
@@ -369,6 +396,19 @@ func TestConsoleManagementSessionWithoutAccess(t *testing.T) {
 		denied := resp.(*api.ListBrandingErrorResponseStatusCode)
 		assert.Equal(t, http.StatusNotFound, denied.StatusCode)
 		assert.True(t, denied.Response.IsBrndNotFound(), helpers.MustMarshal(t, resp))
+	})
+
+	t.Run("cannot list or read another project's events", func(t *testing.T) {
+		resp, err := session.ListEvents(t.Context(), api.ListEventsParams{ProjectID: otherID})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListEventsErrorResponseStatusCode{}, resp, helpers.MustMarshal(t, resp))
+		denied := resp.(*api.ListEventsErrorResponseStatusCode)
+		assert.Equal(t, http.StatusNotFound, denied.StatusCode)
+		assert.True(t, denied.Response.IsEvtNotFound(), helpers.MustMarshal(t, resp))
+
+		got, err := session.GetEvent(t.Context(), api.GetEventParams{ID: "evt_missing", ProjectID: otherID})
+		require.NoError(t, err)
+		require.IsType(t, &api.GetEventNotFound{}, got, helpers.MustMarshal(t, got))
 	})
 
 	t.Run("cannot create a team in another project", func(t *testing.T) {
@@ -1196,6 +1236,48 @@ func TestConsoleSessionRevokedStopsAuthorizing(t *testing.T) {
 	require.IsType(t, &api.RevokeMySessionNoContent{}, revoked, helpers.MustMarshal(t, revoked))
 
 	assert.Equal(t, http.StatusUnauthorized, queryUsers(), "the revoked session's cookie must not authorize")
+}
+
+// TestConsoleSessionDeactivatedUserStopsAuthorizing pins ADR 053 §4 (#1234)
+// end to end, for a user of the project and for a platform user granted on it:
+// deactivating a user leaves their sessions alive (#553) and their direct
+// grants in place, so only the resolver's read of the user's status in their
+// home project stops the next request. A deactivated user then gets what an
+// unknown project gets.
+func TestConsoleSessionDeactivatedUserStopsAuthorizing(t *testing.T) {
+	t.Parallel()
+	stmts := harness.EnsureServiceDB(t).Statements()
+
+	home, localID, local := ownSessionUser(t)
+	harness.SeedProjectAdmin(t, home.ID, localID)
+
+	platform := harness.EnsurePlatformProject(t)
+	customer, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	foreignID := platformUser(t)
+	harness.SeedProjectAdmin(t, customer.ID, foreignID)
+	foreign := platformSessionCookie(t, foreignID)
+
+	for name, tc := range map[string]struct {
+		cookie                    *http.Cookie
+		homeID, userID, projectID string
+	}{
+		"a user of the project":         {local, home.ID, localID, home.ID},
+		"a platform user granted on it": {foreign, platform.ID, foreignID, customer.ID},
+	} {
+		t.Run(name, func(t *testing.T) {
+			status, body := consoleCall(t, tc.cookie, http.MethodGet, "/projects/"+tc.projectID, "")
+			require.Equal(t, http.StatusOK, status, body)
+
+			require.NoError(t, stmts.DeactivateUser(t.Context(), tc.homeID, tc.userID))
+
+			status, body = consoleCall(t, tc.cookie, http.MethodGet, "/projects/"+tc.projectID, "")
+			assert.Equal(t, http.StatusNotFound, status, body)
+			unknownStatus, unknownBody := consoleCall(t, tc.cookie, http.MethodGet, "/projects/"+unknownLike(tc.projectID), "")
+			assert.Equal(t, unknownStatus, status, "same status as an unknown project")
+			assert.Equal(t, unknownBody, body, "same body as an unknown project")
+		})
+	}
 }
 
 // requireUsersNotFound pins a refused users list to its not-found shape: 404

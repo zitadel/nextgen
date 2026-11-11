@@ -88,8 +88,9 @@ each response carries security headers:
   of its own.
 
 The launcher pins what follows from this layout (listen address from
-`PORT`, console off with its links at `/console`) and defaults the rest
-(platform project bootstrapped, JSON logs, public base from Vercel's URL).
+`PORT`, console off with its links at `/console`, idle connections kept
+open) and defaults the rest (platform project bootstrapped, JSON logs, public
+base from Vercel's URL, a request waiting for its audit event).
 Any `NEXTGEN_*` variable overrides a default. The URLs Vercel serves a
 deployment at are added to `NEXTGEN_SERVER_CONSOLE_ORIGINS`, never replaced
 by it.
@@ -308,6 +309,42 @@ deployment.
 The build parses everything the function needs to start (the master key,
 its id, the serving URL, the admin document), so a variable that is missing
 or garbled fails the build and the serving deployment stays.
+
+### 4. Firewall rules
+
+The edge's rate limits ([ADR 078](../adrs/078-abuse-prevention-in-layers.md)
+§2) are project state, not part of a deployment: custom rules of the
+project's Vercel Firewall, each counting per address in a fixed window of
+60 s. `vercel firewall rules list --project cloud --scope zitadel` shows them.
+
+| Rule | Matches | Limit per address |
+|---|---|---|
+| `server-per-address` | every path the server answers: `/api/*`, its own root paths and, until 1.0.0, the API's root paths | 3000 |
+| `credential-free-operations` | `createProject` and `getClaimWindow`, with and without the API's prefix | 30 |
+| `cloud-account-ensure` | `POST /cloud/api/account/ensure`, which can start workflow runs | 20 |
+| `telemetry-proxy` | `/telemetry/mixpanel/*` | 300 |
+
+- **Log first.** Published on 2026-11-10 with the exceed action `log`, which
+  blocks nothing. A rule enforces once a week of traffic shows nobody
+  legitimate near its limit, a customer's relay or a CI runner's shared
+  address in particular:
+
+  ```sh
+  vercel firewall traffic list --action log --dimension rule --dimension ip --project cloud --scope zitadel
+  vercel firewall rules update <rule> --rate-limit-action rate_limit --project cloud --scope zitadel
+  vercel firewall diff --project cloud --scope zitadel
+  vercel firewall publish --project cloud --scope zitadel
+  ```
+
+- **A change is a draft until published.** `rules add`, `update` and `remove`
+  stage it; `publish` makes every staged change live at once, `discard` drops
+  them.
+- **The server's root paths are listed in the rule.** A resource added to
+  `vercel.json`'s rule for the API's root paths belongs in
+  `server-per-address` too; paths under `/api/` need nothing.
+- **No challenge on API paths:** the CLI and the SDKs cannot answer one.
+  Attack Mode (`vercel firewall attack-mode`) is an incident switch for
+  browser paths only.
 
 ## Deploying
 
@@ -663,6 +700,22 @@ project and imports the root admin.
   its `duration`, and compare it with the edge arrival in its Vercel
   request ID (`<id>-<unix ms>-<hash>`): a gap of a second or more is a cold
   start, a long handler time is sharing.
+- **Idle connections:** Vercel's proxy in the instance reuses its
+  connections to the server, and an instance wakes from a pause with every
+  idle timer expired, so the launcher has the server never close an idle
+  connection (`server.idle_timeout` `0`). A `502` whose only line is
+  `http: proxy error` is that proxy failing to reach the server; it sends a
+  GET again by itself, never a POST.
+- **Request audit events:** a request ends once its audit event is written,
+  or two seconds later when the database does not answer
+  (`events.request.flush_wait`): a write after the response would wait for
+  the instance's next request, and be lost with an instance that gets none.
+  The requests an instance has in flight together share the write.
+  - An `ERROR` line `failed to flush request audit event batch` is a batch
+    that was lost; its `first_error` is the cause.
+  - A `WARN` line `request audit event batch was written by an attempt that
+    reported a failure` lost nothing: the database had stored the batch and
+    only its answer went missing.
 - **Connections:** four per instance through PlanetScale's PgBouncer, which
   pools per database and role: on `preview` every preview database is a
   pool of its own, so the cluster's `max_connections` bounds how many

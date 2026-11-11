@@ -19,8 +19,8 @@ export const commands = [startCommand, setupCommand, devCommand];
 
 // What publishes a change to the user model or the login flow, as steps 3
 // and 4 run it and /llms.txt tells agents.
-export const planCommand = "npx @zitadel/cli@latest plan";
-export const applyCommand = "npx @zitadel/cli@latest apply";
+export const dryRunCommand = "npx @zitadel/cli@latest deploy --dry-run";
+export const deployCommand = "npx @zitadel/cli@latest deploy";
 
 // The skills of this repository, for any skills-compatible coding agent
 // (README.md): the router skill, the CLI's, and one per framework SDK and

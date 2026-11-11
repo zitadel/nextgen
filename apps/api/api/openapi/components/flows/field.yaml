@@ -13,13 +13,16 @@ properties:
     example: email
   type:
     type: string
-    enum: [text, email, password, tel, number, url, date, hidden, checkbox, select]
+    enum: [text, email, password, tel, number, url, date, date_time, hidden, checkbox, select]
     description: |
       The input kind the client should render. Encodes the formats and
       JSON types that map to a familiar HTML input: `email`, `url`,
-      `date` come from `format`; `checkbox` from JSON `type: boolean`;
-      `select` from a closed `enum`. For other formats (for example uuid) the
-      type is `text` and `validation.format` carries the rule.
+      `date`, `date_time` come from `format`; `checkbox` from JSON
+      `type: boolean`; `select` from a closed `enum`. For other formats (for
+      example uuid) the type is `text` and `validation.format` carries the
+      rule. A `date_time` value is an RFC 3339 timestamp, both prefilled and
+      submitted, which a `datetime-local` input neither shows nor produces on
+      its own.
   text_key:
     type: string
     description: Localization key for the field label.

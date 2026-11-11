@@ -667,7 +667,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
   test("GET /schemas/:id round-trips the raw uploaded document inside the envelope (no zod re-shaping)", async () => {
     // The real server persists the uploaded JSON Schema bytes verbatim, and
     // schema documents legitimately carry fields the request zod strips
-    // (title, description, custom x-* extensions). The mock must do the same,
+    // (title, description). The mock must do the same,
     // serving the document under `schema` in the {id, schema, metadata}
     // envelope.
     const doc = {
@@ -676,7 +676,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       objectType: "conformance",
       "x-auth-methods": { password: { enabled: true } },
       title: "CustomTitle",
-      "x-custom-extension": { keep: true },
+      description: "Kept verbatim",
     };
     const create = await fetch(`${API}/schemas?project_id=proj_schema_raw`, {
       method: "POST",
@@ -807,6 +807,26 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     // silently clamped.
     const oversized = await fetch(`${API}/schemas?project_id=proj_schema_paging&limit=101`);
     expect(oversized.status).toBe(400);
+  });
+
+  test("POST /schemas refuses a key the user meta-schema does not allow, as the server does", async () => {
+    const res = await fetch(`${API}/schemas?project_id=proj_conformance`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        kind: "user-schema",
+        metaSchema: "https://zitadel.com/schemas/v1/user-schema.json",
+        objectType: "conformance",
+        "x-auth-methods": { password: { enabled: true } },
+        properties: { firstName: { type: "string", minimumLength: 3 } },
+      }),
+    });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { code: string; details: { issues: unknown[] } };
+    expect(body.code).toBe("invalid_schema");
+    expect(body.details.issues).toContainEqual(
+      expect.objectContaining({ path: "properties.firstName", key: "minimumLength" }),
+    );
   });
 
   test("POST /schemas with invalid kind returns spec-compliant 400 envelope", async () => {
@@ -1736,7 +1756,23 @@ describe("api-mock idp and variable contract details", () => {
     });
 
     expect(repointed.status).toBe(400);
-    expect(((await repointed.json()) as { code: string }).code).toBe("idp.field_immutable");
+    expect(await repointed.json()).toMatchObject({
+      code: "idp.field_immutable",
+      details: { details: { fields: ["oidc.issuer"] } },
+    });
+
+    // An absent subject_claim reads as `sub`, so dropping an explicit one is no
+    // change, while naming another claim is.
+    const implicitSub = await putIdp(projectId, { ...base, subject_claim: undefined });
+
+    expect(implicitSub.status).toBe(200);
+
+    const otherClaim = await putIdp(projectId, { ...base, subject_claim: "oid" });
+
+    expect(otherClaim.status).toBe(400);
+    expect(await otherClaim.json()).toMatchObject({
+      details: { details: { fields: ["subject_claim"] } },
+    });
   });
 
   test("accepts a revision that changes something mutable", async () => {
@@ -2074,7 +2110,19 @@ describe("api-mock releases and deployments", () => {
     });
 
     expect(res.status).toBe(400);
-    expect(((await res.json()) as { code: string }).code).toBe("idp.field_immutable");
+    expect(await res.json()).toMatchObject({
+      code: "rel.invalid",
+      details: {
+        resources: [
+          {
+            kind: "idp",
+            handle: "google",
+            code: "idp.field_immutable",
+            details: { details: { fields: ["oidc.issuer"] } },
+          },
+        ],
+      },
+    });
   });
 
   test("evaluates a password policy as a password set would, storing nothing", async () => {
@@ -2455,7 +2503,7 @@ describe("api-mock releases and deployments", () => {
     expect(deployed.targets[0]?.expires_at).not.toBeNull();
   });
 
-  test("refuses a rollback to an origin that is no longer primary with 403", async () => {
+  test("a rollback keeps the origins it froze when one is no longer primary", async () => {
     const project = await newProject("deploy-rollback-removed");
     await addPrimary(project.id, project.secret, "https://app.acme.com");
     await addPrimary(project.id, project.secret, "https://www.acme.com");
@@ -2483,8 +2531,46 @@ describe("api-mock releases and deployments", () => {
       },
     );
 
-    expect(rollback.status).toBe(403);
-    expect(((await rollback.json()) as { code: string }).code).toBe("proj.origin_not_allowed");
+    expect(rollback.status).toBe(200);
+    const restored = (await rollback.json()) as { targets: { origin: string }[] };
+    expect(restored.targets.map((target) => target.origin)).toEqual([
+      "https://app.acme.com",
+      "https://www.acme.com",
+    ]);
+  });
+
+  test("a live read leaves out an origin the newest primary deployment does not name", async () => {
+    const project = await newProject("deploy-rollback-narrower");
+    await addPrimary(project.id, project.secret, "https://app.acme.com");
+    const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+    const narrow = (await (
+      await createDeployment(project.id, project.secret, {
+        release_id: release.id,
+        targets: "primary",
+      })
+    ).json()) as { id: string };
+    await addPrimary(project.id, project.secret, "https://www.acme.com");
+    await createDeployment(project.id, project.secret, {
+      release_id: release.id,
+      targets: "primary",
+    });
+    await fetch(`${BASE}/deployments/${narrow.id}/rollback?project_id=${project.id}`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+      body: JSON.stringify({ message: "revert" }),
+    });
+
+    const live = (await (
+      await fetch(`${BASE}/deployments?project_id=${project.id}&live=true`, {
+        headers: { authorization: `Bearer ${project.secret}` },
+      })
+    ).json()) as { deployments: { targets: { origin: string }[] }[] };
+
+    expect(
+      live.deployments.flatMap((deployment) => deployment.targets.map((target) => target.origin)),
+    ).toEqual(["https://app.acme.com"]);
   });
 
   test("rolls back to an earlier deployment, reversing the live release", async () => {

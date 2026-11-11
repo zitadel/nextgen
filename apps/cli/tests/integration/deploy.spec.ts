@@ -147,6 +147,19 @@ describe("deploy", () => {
         );
       });
 
+      it("names the field the server refused to change on a connection", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        platform.rejectsAConnection();
+
+        const result = await app.deploy();
+
+        expect(result).toFailWith("E_VALIDATION");
+        expect(result).toHintAt(
+          "idp google: identity provider connection: the field is fixed for the life of the connection: oidc.issuer",
+        );
+      });
+
       it("does not warn about the scaffolded login flow", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();
@@ -175,7 +188,7 @@ describe("deploy", () => {
         await app.addPrimaryOrigin();
         platform.holdsAUserWithoutAnEmail();
 
-        const result = await app.deployDryRun();
+        const result = await app.deployDryRun(["--force"]);
 
         expect(app.envelopeOf(result).warnings?.join("\n")).toContain(
           '1 of 1 existing user of "human-user" has no "email"',
@@ -187,7 +200,7 @@ describe("deploy", () => {
         await app.addPrimaryOrigin();
         platform.holdsAUserWithoutAnEmail();
 
-        const result = await app.deployDryRun();
+        const result = await app.deployDryRun(["--force"]);
 
         expect(app.envelopeOf(result).warnings?.join("\n")).toContain(
           '1 of 1 existing user of "human-user" has no "email"',
@@ -222,7 +235,7 @@ describe("deploy", () => {
         await app.addPrimaryOrigin();
         platform.holdsASsoUserOnAnotherSchema();
 
-        const result = await app.deployDryRun();
+        const result = await app.deployDryRun(["--force"]);
 
         expect(app.envelopeOf(result).warnings?.join("\n")).toContain("has an SSO link");
       });
@@ -237,6 +250,57 @@ describe("deploy", () => {
         expect(app.envelopeOf(result).warnings?.join("\n")).toContain(
           "Could not finish checking existing users",
         );
+      });
+
+      it("refuses a deploy that leaves existing users unable to sign in", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        platform.holdsAUserWithoutAnEmail();
+
+        const result = await app.deploy();
+
+        expect(result).toFailWith("E_CONFIRMATION_REQUIRED");
+      });
+
+      it("deploys nothing when it refuses a lockout", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        platform.holdsAUserWithoutAnEmail();
+        const before = await app.liveDeploymentCount();
+
+        await app.deploy();
+
+        expect(await app.liveDeploymentCount()).toBe(before);
+      });
+
+      it("deploys a release that leaves existing users unable to sign in with --force", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        platform.holdsAUserWithoutAnEmail();
+
+        const result = await app.deploy(["--force"]);
+
+        expect(result).toSucceed();
+      });
+
+      it("refuses a dry run that would leave existing users unable to sign in", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        platform.holdsAUserWithoutAnEmail();
+
+        const result = await app.deployDryRun();
+
+        expect(result).toFailWith("E_CONFIRMATION_REQUIRED");
+      });
+
+      it("previews a release that leaves existing users unable to sign in with --force", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        platform.holdsAUserWithoutAnEmail();
+
+        const result = await app.deployDryRun(["--force"]);
+
+        expect(result).toSucceed();
       });
 
       it("still deploys when the users cannot be read", async () => {
@@ -347,6 +411,23 @@ describe("deploy", () => {
         await app.deployData();
 
         expect((await app.registeredIdps()).map((idp) => idp.slug)).toEqual(["google"]);
+      });
+
+      it("does not warn that the subject claim can change once the connection is deployed", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        await app.enableSso("google", {
+          clientId: "1234-abc.apps.googleusercontent.com",
+          secret: "the-client-secret",
+        });
+        await app.editConnection("google", (connection) => {
+          connection.subject_claim = "email";
+        });
+        await app.deployData();
+
+        const result = await app.deployDryRun();
+
+        expect(app.envelopeOf(result).warnings ?? []).toEqual([]);
       });
 
       it("writes no connection when the deploy never reaches the release", async () => {

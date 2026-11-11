@@ -220,4 +220,4 @@ snapshot with `pnpm run release:snapshot` (more in
 [release runbook](docs/runbooks/manual-release.md); for when to add a
 changeset, see [`.changeset/README.md`](.changeset/README.md); for the
 rationale, see [ADR 002](docs/adrs/002-multi-package-release-strategy.md) and
-[ADR 087](docs/adrs/087-turborepo-task-runner.md).
+[ADR 088](docs/adrs/088-turborepo-task-runner.md).

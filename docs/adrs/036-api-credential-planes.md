@@ -342,3 +342,10 @@ request with no `Origin`, and one from a console origin the project does not
 list, needs a primary deployment, and without one answers `409` with
 `rel.no_default`. A listed origin, a loopback origin, or a live preview with
 nothing deployed answers `409` with `rel.not_deployed`.
+
+## Amendment (2026-10-31): a deployment freezes its origins
+
+A deployment to `primary` freezes the project's primary origins, and a rollback
+restores the ones it names. A primary origin serves the newest primary
+deployment only when that deployment names it and the project still lists it.
+So an added origin waits for a deploy, and removing one takes effect at once.

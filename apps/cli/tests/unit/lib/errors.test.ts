@@ -10,6 +10,7 @@ import {
   isErrno,
   toZitadelError,
 } from "@/lib/errors";
+import { ConfigError, ConflictError, NotFoundError } from "@/lib/zitadel";
 import { unscopedCommand } from "@/lib/suggestion";
 
 describe("EXIT_CODES", () => {
@@ -100,6 +101,44 @@ describe("toZitadelError", () => {
     expect(result.code).toBe("E_VALIDATION");
     expect(result.message).toBe("missing");
     expect(result.hint).toBe("A required file or directory is missing.");
+  });
+
+  it.each([
+    ["a ConflictError", new ConflictError("two with one slug"), "E_CONFLICT"],
+    ["a NotFoundError", new NotFoundError("no such connection"), "E_NOT_FOUND"],
+    ["any other ConfigError", new ConfigError("not valid"), "E_VALIDATION"],
+    [
+      "a ConfigError for a file the OS refused to read",
+      new ConfigError("x.json cannot be read (EACCES)", { details: { code: "EACCES" } }),
+      "E_AUTH",
+    ],
+    [
+      "a ConfigError for a file the OS would not let it touch",
+      new ConfigError("x.json cannot be read (EPERM)", { details: { code: "EPERM" } }),
+      "E_AUTH",
+    ],
+    [
+      "a ConfigError for any other errno",
+      new ConfigError("x.json cannot be read (EIO)", { details: { code: "EIO" } }),
+      "E_VALIDATION",
+    ],
+  ])("maps %s to %s", (_name, err, code) => {
+    expect(toZitadelError(err).code).toBe(code);
+  });
+
+  it("passes a ConfigError's message, hint and details on", () => {
+    const err = new ConfigError("boom", { hint: "do this", details: { file: "a.json" } });
+    const result = toZitadelError(err);
+    expect([result.message, result.hint, result.details]).toEqual([
+      "boom",
+      "do this",
+      { file: "a.json" },
+    ]);
+  });
+
+  it("leaves out the hint and details a ConfigError has none of", () => {
+    const result = toZitadelError(new ConfigError("boom"));
+    expect([result.hint, result.details]).toEqual([undefined, undefined]);
   });
 
   it.each([
@@ -468,6 +507,51 @@ describe("resources the platform rejected", () => {
 
     expect(error.hint).toBe(
       'flow default-login: flow definition: invalid: step "register-password": on_success create_user requires "identifier" to be collected upstream.',
+    );
+  });
+
+  it("appends the fields a connection may not change", () => {
+    const error = rejected({
+      code: "rel.invalid",
+      message: "release: invalid",
+      details: {
+        resources: [
+          {
+            code: "idp.field_immutable",
+            kind: "idp",
+            handle: "zitadel-cloud",
+            message:
+              "identity provider connection: the field is fixed for the life of the connection",
+            details: { details: { fields: ["oidc.issuer"] } },
+          },
+        ],
+      },
+    });
+
+    expect(error.hint).toBe(
+      "idp zitadel-cloud: identity provider connection: the field is fixed for the life of the connection: oidc.issuer.",
+    );
+  });
+
+  it("appends the endpoints a connection left out", () => {
+    const error = rejected({
+      code: "rel.invalid",
+      message: "release: invalid",
+      details: {
+        resources: [
+          {
+            code: "idp.endpoints_partial",
+            kind: "idp",
+            handle: "acme-sso",
+            message: "identity provider connection: the endpoints are partially set",
+            details: { details: { missing: ["jwks_uri", "token_endpoint"] } },
+          },
+        ],
+      },
+    });
+
+    expect(error.hint).toBe(
+      "idp acme-sso: identity provider connection: the endpoints are partially set: jwks_uri, token_endpoint.",
     );
   });
 
