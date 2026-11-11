@@ -695,12 +695,26 @@ export abstract class BaseCommand extends Interruptible(Command) {
     const shown = result.status === "ok" && result.nextShown !== undefined;
     const steps = own.next ?? (shown ? [] : stepsOf(result.next));
     const ran = own.ran ?? this.serverRanOn();
-    return this.withOverview({
-      ...own,
-      ...(ran === undefined ? {} : { ran }),
-      ...(steps.length === 0 ? {} : { next: steps }),
-      ...(footer === undefined ? {} : { extras: [...(own.extras ?? []), ...footer.split("\n")] }),
-    });
+    // A rendering that read its own warnings says so with `warningsShown`; the
+    // ending says the rest, or a person at a terminal would never read them.
+    const warnings =
+      result.status === "ok" && !result.warningsShown
+        ? (result.warnings ?? []).map(warningLine)
+        : [];
+    const extras = [
+      ...(own.extras ?? []),
+      ...(footer === undefined ? [] : footer.split("\n")),
+      ...warnings,
+    ];
+    return this.withOverview(
+      {
+        ...own,
+        ...(ran === undefined ? {} : { ran }),
+        ...(steps.length === 0 ? {} : { next: steps }),
+        ...(extras.length === 0 ? {} : { extras }),
+      },
+      result.status === "ok",
+    );
   }
 
   /**
@@ -736,8 +750,13 @@ export abstract class BaseCommand extends Interruptible(Command) {
    * The command overview as the last step of a summary that has steps, so every
    * box ends the same way and the overview can be found from anywhere without
    * already knowing it exists. A summary that names it already keeps its own.
+   *
+   * @param summary - The ending as the command stated it.
+   * @param changed - Whether the run did its work. Only one that did spends the
+   * skills offer, which a machine gets once: a skip or a no leaves it for the
+   * next run that changes something.
    */
-  private withOverview(summary: Summary): Summary {
+  private withOverview(summary: Summary, changed: boolean): Summary {
     const steps = summary.next ?? [];
     if (!this.summarises()) {
       // A normal command has no box, and no overview step either: that is a
@@ -750,7 +769,8 @@ export abstract class BaseCommand extends Interruptible(Command) {
       : [{ text: OVERVIEW, command: publicCliCommand("", this.config.version) }];
     // The skills offer is the last step of the first summary a machine sees,
     // rather than a block of its own after the box.
-    const skills = this.skillsOffered ? [claimSkills(process.env, this.config.version)] : [];
+    const skills =
+      this.skillsOffered && changed ? [claimSkills(process.env, this.config.version)] : [];
     return {
       ...summary,
       next: [...steps, ...overview, ...skills.filter((step) => step !== undefined)],

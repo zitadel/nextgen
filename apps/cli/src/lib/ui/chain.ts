@@ -114,7 +114,7 @@ export class Chain implements Drawing, Narratable {
       return;
     }
     this.open();
-    log.message(body, { symbol, spacing: this.gap ? 1 : 0 });
+    DrawnSpinner.around(() => log.message(body, { symbol, spacing: this.gap ? 1 : 0 }));
     this.gap = false;
   }
 

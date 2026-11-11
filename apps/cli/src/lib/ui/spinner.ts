@@ -36,7 +36,13 @@ export class QuietSpinner implements Spinner {
  * line leaves that line behind.
  */
 export class DrawnSpinner implements Spinner {
-  private readonly handle: ReturnType<typeof spinner>;
+  /** The spinners that are drawing now, so a line written meanwhile can make room (read by the tests, which clear it). */
+  static readonly active = new Set<DrawnSpinner>();
+
+  private handle: ReturnType<typeof spinner>;
+  private text: string;
+  private readonly guide: boolean;
+  private readonly input: { isTTY?: boolean; setRawMode?: (mode: boolean) => unknown };
 
   /**
    * @param label - What the work is.
@@ -52,22 +58,53 @@ export class DrawnSpinner implements Spinner {
     guide = true,
     input: { isTTY?: boolean; setRawMode?: (mode: boolean) => unknown } = process.stdin,
   ) {
-    this.handle = spinner({ withGuide: guide });
-    this.handle.start(label);
-    if (input.isTTY === true) {
-      input.setRawMode?.(false);
+    this.text = label;
+    this.guide = guide;
+    this.input = input;
+    this.handle = this.spin();
+    DrawnSpinner.active.add(this);
+  }
+
+  /**
+   * Write something while a spinner may be drawing. Clack redraws its frame in
+   * place, so a line written under it is glued to the frame or erased by the
+   * next tick: the spinner is cleared first and drawn again below the line.
+   *
+   * @param write - Writes the line.
+   */
+  static around(write: () => void): void {
+    const running = [...DrawnSpinner.active];
+    for (const one of running) {
+      one.handle.clear();
+    }
+    write();
+    for (const one of running) {
+      one.handle = one.spin();
     }
   }
 
   message(text: string): void {
+    this.text = text;
     this.handle.message(text);
   }
 
   stop(text?: string): void {
+    DrawnSpinner.active.delete(this);
     this.handle.stop(text);
   }
 
   clear(): void {
+    DrawnSpinner.active.delete(this);
     this.handle.clear();
+  }
+
+  /** Starts clack's spinner under the current text, with Ctrl-C left as a signal. */
+  private spin(): ReturnType<typeof spinner> {
+    const handle = spinner({ withGuide: this.guide });
+    handle.start(this.text);
+    if (this.input.isTTY === true) {
+      this.input.setRawMode?.(false);
+    }
+    return handle;
   }
 }

@@ -11,6 +11,8 @@ const handle = () => vi.mocked(spinner).mock.results.at(-1)?.value as ReturnType
 
 afterEach(() => {
   vi.clearAllMocks();
+  // A spinner no test stopped must not be drawn again by the next test's line.
+  DrawnSpinner.active.clear();
 });
 
 describe("DrawnSpinner", () => {
@@ -71,6 +73,46 @@ describe("DrawnSpinner", () => {
     new DrawnSpinner("Fetching users").clear();
 
     expect(handle().clear).toHaveBeenCalled();
+  });
+});
+
+describe("DrawnSpinner.around", () => {
+  it("clears a running spinner before the line and draws it again after", () => {
+    const order: string[] = [];
+    const running = new DrawnSpinner("Deploying");
+    vi.mocked(handle().clear).mockImplementation(() => void order.push("clear"));
+
+    DrawnSpinner.around(() => order.push("line"));
+
+    expect(order).toEqual(["clear", "line"]);
+    expect(handle().start).toHaveBeenCalledWith("Deploying");
+    expect(vi.mocked(spinner)).toHaveBeenCalledTimes(2);
+    running.clear();
+  });
+
+  it("draws it again under the name it was last given", () => {
+    const running = new DrawnSpinner("Deploying");
+    running.message("Deploying — 2 of 3");
+
+    DrawnSpinner.around(() => undefined);
+
+    expect(handle().start).toHaveBeenCalledWith("Deploying — 2 of 3");
+    running.clear();
+  });
+
+  it("starts nothing when no spinner is running", () => {
+    DrawnSpinner.around(() => undefined);
+
+    expect(spinner).not.toHaveBeenCalled();
+  });
+
+  it("does not bring back a spinner that has stopped", () => {
+    new DrawnSpinner("Deploying").stop("Deployed");
+    vi.mocked(spinner).mockClear();
+
+    DrawnSpinner.around(() => undefined);
+
+    expect(spinner).not.toHaveBeenCalled();
   });
 });
 

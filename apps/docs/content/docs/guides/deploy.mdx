@@ -83,7 +83,7 @@ Undo the last deploy by deploying the release before it:
 npx @zitadel/cli@latest deployment rollback
 ```
 
-It asks first. Add `--force` when non-interactive and `-m "<why>"` to record the reason. `--dry-run` prints "Would re-apply `<deployment id>`" and changes nothing. To restore a specific deployment, pass its ID from `deployment list`.
+It asks first. Add `--force` when non-interactive and `-m "<why>"` to record the reason. `--dry-run` prints "Would roll back to `<deployment id>`" and changes nothing. To restore a specific deployment, pass its ID from `deployment list`.
 
 It prints `Rolled back to <release id> on <origins>`, then a table of the revisions that release pins (`kind`, `handle`, `revision_id`). A revision is one immutable version of a schema, flow or branding resource. The `schema` row is the revision new registrations use. With `--json`, `data` carries `deployment_id`, `release_id`, `rolled_back_to`, `origins` and `pointers`.
 

@@ -290,4 +290,57 @@ describe("looking for the skills offer", () => {
   it("is not done on a dry run, which must not spend the one offer a machine gets", async () => {
     expect(await looked(SummarisingCommand, { "dry-run": true })).toBe(0);
   });
+
+  it("is not spent by a run that changed nothing, so the next one that does still offers it", async () => {
+    rosie.agents.mockReset();
+    rosie.agents.mockResolvedValue([CLAUDE]);
+    vi.stubEnv("CI", "");
+    vi.stubEnv("NO_SKILLS_PROMPT", "");
+    vi.stubEnv("XDG_CONFIG_HOME", mkdtempSync(join(tmpdir(), "zitadel-skills-")));
+    const run = async (result: CommandResult) => {
+      const chunks: string[] = [];
+      vi.spyOn(process.stdout, "write").mockImplementation((chunk: string | Uint8Array) => {
+        chunks.push(typeof chunk === "string" ? chunk : Buffer.from(chunk).toString());
+        return true;
+      });
+      const command = new SummarisingCommand([], { version: "0.0.0-test" } as unknown as Config);
+      await asTerminal(() => command.finish(result));
+      return stripAnsi(chunks.join(""));
+    };
+
+    await run({
+      status: "skipped",
+      reason: "already-initialized",
+      summary: { title: "Nothing was changed", sections: [] },
+    });
+    const next = await run({ summary: { title: "Done", sections: [] }, status: "ok", data: "x" });
+    vi.unstubAllEnvs();
+
+    expect(next).toContain("skills add");
+  });
+});
+
+describe("the ending of a result with warnings", () => {
+  it("says a warning the command returned to a person at a terminal", async () => {
+    const shown = await drawn({
+      summary: { title: "Done", sections: [] },
+      status: "ok",
+      data: "x",
+      warnings: ["the server is older than the CLI"],
+    });
+
+    expect(shown).toContain("Warning: the server is older than the CLI");
+  });
+
+  it("does not say it twice when the rendering already did", async () => {
+    const shown = await drawn({
+      summary: { title: "Done", sections: [] },
+      status: "ok",
+      data: "x",
+      warnings: ["the server is older than the CLI"],
+      warningsShown: true,
+    });
+
+    expect(shown).not.toContain("the server is older than the CLI");
+  });
 });

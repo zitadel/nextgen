@@ -128,6 +128,7 @@ const NO_SCHEMA_REFUSAL: Refusal = {
   code: "E_NOT_FOUND",
   message: "This project has no user schema under .zitadel/schemas",
   hint: "Set the project up first.",
+  next: ["setup"],
 };
 
 /**

@@ -59,6 +59,7 @@ const METHOD: Refused<string> = {
 const UNCALLABLE_REFUSAL: Refusal = {
   message: "{reason}",
   hint: "Call it from the app it belongs to, through the SDK; the api ls command marks what the CLI can call.",
+  next: ["api ls"],
 };
 
 const NOTHING_TO_PAGE_REFUSAL: Refusal = {
