@@ -1,0 +1,36 @@
+type: object
+additionalProperties: false
+required: [protocol, challenge_id, profile_id, salt, nonce, key_prefix, expires_at]
+description: |
+  A short-lived, single-use signup challenge scoped to this project and flow.
+  For pbkdf2_sha256_5000_l1, try counters 0 through 511, deriving 32 bytes with
+  PBKDF2-HMAC-SHA256 (5000 iterations), password nonce || uint32_be(counter),
+  and the supplied salt. Match the first 16 derived bytes to key_prefix.
+  Submit gate_proofs.signup_pow as a JSON string containing protocol,
+  challenge_id and derived_key (the full 32 bytes in lowercase hex).
+  The proof is spent before password hashing, even if user creation fails.
+properties:
+  protocol:
+    type: string
+    example: zitadel_pow_poc_v1
+  challenge_id:
+    type: string
+    example: ch_example
+  profile_id:
+    type: string
+    example: pbkdf2_sha256_5000_l1
+  salt:
+    type: string
+    pattern: '^[0-9a-f]{32}$'
+    x-zitadel-pattern-message: "must be 32 lowercase hex digits"
+  nonce:
+    type: string
+    pattern: '^[0-9a-f]{32}$'
+    x-zitadel-pattern-message: "must be 32 lowercase hex digits"
+  key_prefix:
+    type: string
+    pattern: '^[0-9a-f]{32}$'
+    x-zitadel-pattern-message: "must be 32 lowercase hex digits"
+  expires_at:
+    type: string
+    format: date-time

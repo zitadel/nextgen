@@ -73,6 +73,13 @@ export interface PlatformMock {
   rejectsAFlow(): void;
 
   /**
+   * Answers as a server from before the sign-up policy: an evaluation of one,
+   * and a release build that carries one, are refused as malformed
+   * (`req.invalid`), because the server does not know the operation.
+   */
+  predatesTheSignupPolicy(): void;
+
+  /**
    * Refuses every release build as a server does a bundle whose connection
    * changes a field fixed for the life of the connection: `rel.invalid`, with
    * the field named in the resource's own `details`.
@@ -333,6 +340,32 @@ export function usePlatformMock(): PlatformMock {
           message: 'schema designation invalid: "x-display" names unknown property "nickname"',
         },
       ]);
+    },
+
+    predatesTheSignupPolicy() {
+      const unknownOperation = () =>
+        HttpResponse.json(
+          { code: "req.invalid", message: "the request is invalid" },
+          { status: 400 },
+        );
+      const isSignupPolicy = (policy: unknown) =>
+        typeof policy === "object" &&
+        policy !== null &&
+        "operation" in policy &&
+        policy.operation === "user.create";
+      // A handler that answers nothing leaves the request to the platform's own.
+      server.use(
+        http.post("*/policies/evaluate", async ({ request }) => {
+          return isSignupPolicy(await request.clone().json()) ? unknownOperation() : undefined;
+        }),
+        http.post("*/releases/build", async ({ request }) => {
+          const body = z
+            .object({ bundle: z.object({ policies: z.array(z.unknown()).optional() }) })
+            .safeParse(await request.clone().json());
+          const carriesOne = body.success && (body.data.bundle.policies ?? []).some(isSignupPolicy);
+          return carriesOne ? unknownOperation() : undefined;
+        }),
+      );
     },
 
     rejectsAFlow() {
