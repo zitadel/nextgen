@@ -6,7 +6,7 @@ import { DEFAULT_LOCAL_SERVER_URL, readNearestRuntimeMetadata } from "@/lib/loca
 import { LocalServer } from "@/lib/local-server/server";
 import { LOG_LEVELS, type LogLine, logText, renderLogLine } from "@/lib/local-server/server-log";
 import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
-import { type Refused, reads, whole } from "@/lib/oclif/flags";
+import { reads, type Refused, whole } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { painted } from "@/lib/oclif/rendering";
 import { Suggestible } from "@/lib/oclif/suggestible";
@@ -114,17 +114,21 @@ export default class Logs extends Suggestible(BaseCommand) {
         },
       });
 
+      const title = "Stopped following local Zitadel logs";
       return this.emit({
         status: "ok",
-        data: { title: "Stopped following local Zitadel logs" },
+        data: { title },
         summary: {
-          title: "Stopped following local Zitadel logs",
+          title,
           sections: [],
         },
       });
     }
 
-    const { runtime, lines } = await server.logs({ tail: flags.tail, level: flags.level });
+    const { runtime, lines } = await server.logs({
+      tail: flags.tail,
+      level: flags.level,
+    });
     const shown = lines.map((line) => {
       return renderLogLine(line, this.isColored);
     });
@@ -157,5 +161,9 @@ export default class Logs extends Suggestible(BaseCommand) {
 }
 
 function render(lines: readonly LogLine[], color: boolean): string {
-  return lines.map((line) => renderLogLine(line, color)).join("\n");
+  return lines
+    .map((line) => {
+      return renderLogLine(line, color);
+    })
+    .join("\n");
 }

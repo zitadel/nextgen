@@ -1,5 +1,5 @@
 import { resolveEnvironment } from "@/lib/environment";
-import { issuerFromPort, type FrameworkFacts, type Orca } from "@/lib/orca";
+import { type FrameworkFacts, issuerFromPort, type Orca } from "@/lib/orca";
 import type { PatchContext } from "@/lib/orca/patchers/types";
 import {
   readPreset,
@@ -48,14 +48,18 @@ export async function loadPatchContext(
       project_secret: secret.project_secret,
       preview_secret: secret.preview_secret,
       origins: [
-        ...(secret.primary_origins ?? []).map((pattern) => ({
-          pattern,
-          kind: "primary" as const,
-        })),
-        ...secret.preview_origins.map((pattern) => ({
-          pattern,
-          kind: "preview" as const,
-        })),
+        ...(secret.primary_origins ?? []).map((pattern) => {
+          return {
+            pattern,
+            kind: "primary" as const,
+          };
+        }),
+        ...secret.preview_origins.map((pattern) => {
+          return {
+            pattern,
+            kind: "preview" as const,
+          };
+        }),
       ],
       created_at: secret.created_at,
     },
@@ -70,8 +74,13 @@ export async function loadPatchContext(
  * `undefined` when no file sets it, or one the resolver cannot read.
  */
 export async function configuredIssuer(cwd: string): Promise<string | undefined> {
-  return resolveEnvironment({ cwd, env: {} }).then(
-    ({ values }) => values.ZITADEL_ISSUER?.value,
+  return resolveEnvironment({
+    cwd,
+    env: {},
+  }).then(
+    ({ values }) => {
+      return values.ZITADEL_ISSUER?.value;
+    },
     () => undefined,
   );
 }

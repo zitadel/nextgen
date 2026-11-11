@@ -1,5 +1,5 @@
 import type { Consent, Gate } from "@/lib/consent";
-import { ZitadelError, type ZitadelErrorCode, errorMessage } from "@/lib/errors";
+import { errorMessage, ZitadelError, type ZitadelErrorCode } from "@/lib/errors";
 import type { Orca } from "@/lib/orca";
 import type { EnvironmentSelector } from "@/lib/suggestion";
 
@@ -73,7 +73,12 @@ export abstract class AbstractSanityCheck implements SanityCheck {
   async run(ctx: CheckContext): Promise<CheckOutcome> {
     try {
       await this.verify(ctx);
-      return { name: this.name, status: "pass", message: this.summary, path: this.path };
+      return {
+        name: this.name,
+        status: "pass",
+        message: this.summary,
+        path: this.path,
+      };
     } catch (error) {
       return {
         name: this.name,
@@ -81,7 +86,10 @@ export abstract class AbstractSanityCheck implements SanityCheck {
         message: isMissingFile(error) ? `${this.path} was not found` : errorMessage(error),
         path: this.path,
         ...(error instanceof ZitadelError
-          ? { code: error.code, ...(error.hint === undefined ? {} : { hint: error.hint }) }
+          ? {
+              code: error.code,
+              ...(error.hint === undefined ? {} : { hint: error.hint }),
+            }
           : {}),
       };
     }

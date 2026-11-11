@@ -72,7 +72,6 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
 
   protected async execute({ flags }: Admitted<typeof DeploymentList>): Promise<JsonEnvelope> {
     const { client, projectId } = await this.connect();
-
     const deploymentService = new DeploymentService(client, projectId);
     const listed = await deploymentService.page(
       {

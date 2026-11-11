@@ -28,7 +28,10 @@ export class DependencyVersionCheck implements SanityCheck {
   readonly path = "package.json";
 
   async run(ctx: CheckContext): Promise<CheckOutcome> {
-    const base = { name: this.name, path: this.path };
+    const base = {
+      name: this.name,
+      path: this.path,
+    };
     if (semver.valid(ctx.cliVersion) === null) {
       // A dev or placeholder CLI version has no train to compare against.
       return {
@@ -47,28 +50,38 @@ export class DependencyVersionCheck implements SanityCheck {
         message: "No package.json to compare pins against",
       };
     }
-    const mismatched = exact.filter(([, version]) => !semver.eq(version, ctx.cliVersion));
+    const mismatched = exact.filter(([, version]) => {
+      return !semver.eq(version, ctx.cliVersion);
+    });
     if (mismatched.length > 0) {
       // Repair with the project's own package manager and an exact-save flag:
       // a bare `npm install` would switch managers on a pnpm/yarn/bun project
       // and write a caret range — exactly the float this check ignores.
       const remedy = addExactCommandFor(
         await detectPackageManager(ctx.cwd),
-        mismatched.map(([name]) => `${name}@${ctx.cliVersion}`),
+        mismatched.map(([name]) => {
+          return `${name}@${ctx.cliVersion}`;
+        }),
       ).display;
       return {
         ...base,
         status: "warn",
         message:
-          `${mismatched.map(([name, version]) => `${name}@${version}`).join(", ")} ` +
+          `${mismatched
+            .map(([name, version]) => {
+              return `${name}@${version}`;
+            })
+            .join(", ")} ` +
           `does not match this CLI's version (${ctx.cliVersion}); scaffolded files and ` +
           `guidance target the CLI's train`,
         details: {
-          mismatched: mismatched.map(([name, version]) => ({
-            name,
-            declared: version,
-            expected: ctx.cliVersion,
-          })),
+          mismatched: mismatched.map(([name, version]) => {
+            return {
+              name,
+              declared: version,
+              expected: ctx.cliVersion,
+            };
+          }),
           remedy_command: remedy,
         },
       };

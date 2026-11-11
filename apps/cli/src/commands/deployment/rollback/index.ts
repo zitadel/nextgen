@@ -3,8 +3,8 @@ import { z } from "zod";
 
 import {
   DeploymentService,
-  ReleaseService,
   type ReleasePointer,
+  ReleaseService,
   type ZitadelClient,
 } from "@/lib/backend";
 import { RollbackDeploymentParams } from "@/lib/backend/schemas";
@@ -88,7 +88,9 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
     "<%= config.bin %> deployment rollback --force",
   ];
   static override args = {
-    deployment_id: Args.custom<string>({ parse: taken(DEPLOYMENT_ID) })({
+    deployment_id: Args.custom<string>({
+      parse: taken(DEPLOYMENT_ID),
+    })({
       required: false,
       description: "The deployment to roll back to. Omit to undo the last deploy.",
     }),
@@ -278,14 +280,26 @@ async function originChanges(
     return undefined;
   }
   const [deployment, project, live] = read;
-  const frozen = deployment.targets.map((target) => target.origin);
+  const frozen = deployment.targets.map((target) => {
+    return target.origin;
+  });
   const listed = (project.origins ?? [])
-    .filter((origin) => origin.kind === "primary")
-    .map((origin) => origin.pattern);
+    .filter((origin) => {
+      return origin.kind === "primary";
+    })
+    .map((origin) => {
+      return origin.pattern;
+    });
   const served = live?.origins ?? [];
   return {
-    dropped: listed.filter((origin) => !frozen.includes(origin)),
-    restored: frozen.filter((origin) => listed.includes(origin) && !served.includes(origin)),
-    unserved: frozen.filter((origin) => !listed.includes(origin)),
+    dropped: listed.filter((origin) => {
+      return !frozen.includes(origin);
+    }),
+    restored: frozen.filter((origin) => {
+      return listed.includes(origin) && !served.includes(origin);
+    }),
+    unserved: frozen.filter((origin) => {
+      return !listed.includes(origin);
+    }),
   };
 }

@@ -24,8 +24,16 @@ export class SignInPresetPrompt implements SetupPrompt {
       name: "sign-in preset",
       message: "Which sign-in method would you like your users to see first?",
       initialValue: answers.preset,
-      options: SETUP_PRESETS.map((preset) => ({ value: preset, label: labels[preset] })),
+      options: SETUP_PRESETS.map((preset) => {
+        return {
+          value: preset,
+          label: labels[preset],
+        };
+      }),
     });
-    return { ...answers, preset };
+    return {
+      ...answers,
+      preset,
+    };
   }
 }

@@ -69,15 +69,17 @@ export default class Console extends Suggestible(BaseCommand) {
     if (this.dryRun) {
       log.info(`Would mint a console sign-in link for ${escapeControlCharacters(admin.email)}.`);
 
+      const title = "Would mint a console sign-in link (dry run)";
+
       return this.emit({
         status: "ok",
         data: {
-          title: "Would mint a console sign-in link (dry run)",
+          title,
           dry_run: true,
           signed_in_as: admin.email,
         },
         summary: {
-          title: "Would mint a console sign-in link (dry run)",
+          title,
           sections: [],
         },
       });
@@ -91,16 +93,18 @@ export default class Console extends Suggestible(BaseCommand) {
     const skipLaunch = flags.noOpen || this.nonInteractive;
     const opened = skipLaunch ? false : (await openInBrowser(signInUrl)).opened;
 
+    const title = "Local console sign-in link";
+
     return this.emit({
       status: "ok",
       data: {
-        title: "Local console sign-in link",
+        title,
         signed_in_as: admin.email,
         sign_in_url: signInUrl,
         browser_opened: opened,
       },
       summary: {
-        title: "Local console sign-in link",
+        title,
         sections: [],
       },
       next: {

@@ -42,7 +42,13 @@ export default class Env extends Tabulatable(EnvironmentCommand) {
         return [];
       }
       const shown = SECRET_KEYS.has(key) ? REDACTED : entry.value;
-      return [{ variable: key, value: shown, source: entry.source }];
+      return [
+        {
+          variable: key,
+          value: shown,
+          source: entry.source,
+        },
+      ];
     });
     const lookups = consulted.map(({ source, present, supplied }) => {
       return {

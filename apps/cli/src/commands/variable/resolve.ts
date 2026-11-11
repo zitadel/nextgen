@@ -73,7 +73,9 @@ export default class VariableResolve extends Tabulatable(EnvironmentCommand) {
     "<%= config.bin %> variable resolve --json",
   ];
   static override args = {
-    deployment_id: Args.custom<string>({ parse: taken(DEPLOYMENT_ID) })({
+    deployment_id: Args.custom<string>({
+      parse: taken(DEPLOYMENT_ID),
+    })({
       required: false,
       description: "The deployment to read; the live one when omitted.",
     }),

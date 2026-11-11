@@ -266,7 +266,10 @@ The server evaluates every case, so the command needs a connection to it. By def
       throw new ZitadelError(
         "E_VALIDATION",
         `${failed} of ${cases.length} policy test cases failed`,
-        { details: data, hint: pretty },
+        {
+          details: data,
+          hint: pretty,
+        },
       );
     }
 
@@ -404,7 +407,11 @@ The server evaluates every case, so the command needs a connection to it. By def
     const runs = tests.flatMap((test, suite) => {
       const operation = test.operation;
       return test.cases.map((testCase): CaseRun => {
-        return { suite, operation, testCase };
+        return {
+          suite,
+          operation,
+          testCase,
+        };
       });
     });
     const outcomes = await mapBounded(
@@ -423,9 +430,15 @@ The server evaluates every case, so the command needs a connection to it. By def
           facts:
             facts === undefined
               ? undefined
-              : { ...facts, history_matches: facts.history_matches?.slice() },
+              : {
+                  ...facts,
+                  history_matches: facts.history_matches?.slice(),
+                },
         });
-        return { suite: run.suite, result: PolicyTest.resultOf(run.testCase, actual) };
+        return {
+          suite: run.suite,
+          result: PolicyTest.resultOf(run.testCase, actual),
+        };
       },
     );
     return tests.map((test, suite): PolicySuiteResult => {

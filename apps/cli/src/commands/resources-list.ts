@@ -1,6 +1,5 @@
-import { type Admitted, BaseCommand, type JsonEnvelope } from "@/lib/oclif";
+import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
 import { describeRegistry } from "@/lib/oclif/crud";
-import { CommandGroups } from "@/lib/oclif/groups";
 import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
 
 import { RESOURCES } from "./resources";

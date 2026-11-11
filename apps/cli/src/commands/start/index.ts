@@ -7,15 +7,15 @@ import { ensureLocalAdmin } from "@/lib/local-server/admin-credential";
 import { EMPTY_SUMMARY, loadProjectEnv } from "@/lib/local-server/env-vars";
 import {
   DEFAULT_LOCAL_SERVER_PORT,
-  PLATFORM_PROJECT_ID,
   defaultLocalServerImageForCliVersion,
   ensureLocalState,
   localContainerName,
   localServerUrl,
+  PLATFORM_PROJECT_ID,
   peekRuntimeMetadata,
-  resolveRuntimeBackend,
   RUNTIME_BACKENDS,
   type RuntimeMetadata,
+  resolveRuntimeBackend,
 } from "@/lib/local-server/runtime";
 import { LocalServer } from "@/lib/local-server/server";
 import {
@@ -108,11 +108,12 @@ export default class Start extends Suggestible(BaseCommand) {
       this.env.ZITADEL_LOCAL_IMAGE ??
       defaultLocalServerImageForCliVersion(this.cliVersion);
     if (this.dryRun) {
+      const title = "Would start the local Zitadel server (dry run)";
       return this.emit({
         status: "ok",
         data: {
           dry_run: true,
-          title: "Would start the local Zitadel server (dry run)",
+          title,
           runtime: {
             backend: runtimeBackend,
             ...(runtimeBackend === "docker"
@@ -129,7 +130,7 @@ export default class Start extends Suggestible(BaseCommand) {
           },
         },
         summary: {
-          title: "Would start the local Zitadel server (dry run)",
+          title,
           sections: [],
         },
         next: { commands: [this.suggest("start")] },
@@ -149,7 +150,10 @@ export default class Start extends Suggestible(BaseCommand) {
     // same merged environment the server receives — the project's env files
     // over the shell — so a `false` in `.env.local` turns both off rather than
     // being overridden by the user file forcing the bootstrap back on.
-    const serverEnv = { ...this.env, ...env.values };
+    const serverEnv = {
+      ...this.env,
+      ...env.values,
+    };
     const local = platformBootstrapEnabled(serverEnv)
       ? await ensureLocalAdmin(this.cwd, serverEnv.NEXTGEN_SCHEMA_BUILTIN_PUBLIC_BASE)
       : undefined;
@@ -158,13 +162,25 @@ export default class Start extends Suggestible(BaseCommand) {
       cliVersion: this.cliVersion,
     }).start(
       runtimeBackend === "docker"
-        ? { backend: "docker", image, env, userFile: local?.userFile }
-        : { backend: "binary", env, userFile: local?.userFile },
+        ? {
+            backend: "docker",
+            image,
+            env,
+            userFile: local?.userFile,
+          }
+        : {
+            backend: "binary",
+            env,
+            userFile: local?.userFile,
+          },
       { port: flags.port },
     );
     // The envelope's `source` named the port guessed before one was chosen; an
     // agent that follows it would target a different server than the one started.
-    this.meta = { ...this.meta, source: runtime.server_url };
+    this.meta = {
+      ...this.meta,
+      source: runtime.server_url,
+    };
 
     // Setup reads the server from the directory start ran in, so a run from
     // elsewhere carries it: `setup --server local` from the shell's directory

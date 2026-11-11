@@ -17,8 +17,13 @@ import { reads, type Refused } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { prose } from "@/lib/oclif/rendering";
 import { readZitadelSecret } from "@/lib/project";
-import { abbreviate, Publisher } from "@/lib/publish";
-import { deployMessage, MESSAGE_MAX_LENGTH, messageTooLong } from "@/lib/publish";
+import {
+  abbreviate,
+  deployMessage,
+  MESSAGE_MAX_LENGTH,
+  messageTooLong,
+  Publisher,
+} from "@/lib/publish";
 import { configIsDirty } from "@/lib/publish/git";
 import { DEPLOY_ARGS, shellCommand, type SuggestedCommand } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
@@ -117,7 +122,9 @@ const NO_PRIMARY_ORIGIN_REFUSAL: Refusal = {
  * deploy ran. It carries the message the deploy used, so it can be run as it is.
  */
 function commitConfig(deployed: string, message: string | undefined): string {
-  const quote = (text: string): string => `'${text.replaceAll("'", "'\\''")}'`;
+  const quote = (text: string): string => {
+    return `'${text.replaceAll("'", "'\\''")}'`;
+  };
   const git = resolve(deployed) === process.cwd() ? "git" : `git -C ${quote(deployed)}`;
   return `${git} add .zitadel && ${git} commit -m ${quote(message ?? "<what changed>")} -- .zitadel`;
 }
@@ -134,7 +141,6 @@ function commitConfig(deployed: string, message: string | undefined): string {
 export default class Deploy extends Destructive(EnvironmentCommand) {
   static override description =
     "Apply your local configuration to Zitadel.\n\nBuilds a release from .zitadel/ and deploys it to the project. Use --dry-run to preview what would change.";
-
   static override group = CommandGroups.configuration;
   static override groupOrder = 1;
 
@@ -211,6 +217,7 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
     }
     const { resourceCount } = prepared;
     this.recordTelemetry({ resources: resourceCount });
+    const resources = `${resourceCount} ${new Intl.PluralRules("en").select(resourceCount) === "one" ? "resource" : "resources"}`;
 
     if (this.dryRun) {
       return this.emit({
@@ -222,7 +229,7 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
           ...prepared.report,
         },
         summary: {
-          title: `Validated ${resourceCount} ${new Intl.PluralRules("en").select(resourceCount) === "one" ? "resource" : "resources"} and deployed nothing (dry run)`,
+          title: `Validated ${resources} and deployed nothing (dry run)`,
           sections: [],
         },
       });
@@ -248,7 +255,10 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
           `This content was already released as ${release.id}, which is revoked`,
           {
             hint: "A revoked release can never be served again. Change the configuration so it builds a new release, then deploy.",
-            details: { release_id: release.id, content_hash: release.content_hash },
+            details: {
+              release_id: release.id,
+              content_hash: release.content_hash,
+            },
           },
         );
       }
@@ -279,7 +289,7 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
     // deployed in git (the warning above says to commit before the next deploy).
     const configUncommitted = prepared.gitDirty && (await configIsDirty(this.cwd));
 
-    const resources = `Deployed ${resourceCount} ${new Intl.PluralRules("en").select(resourceCount) === "one" ? "resource" : "resources"}`;
+    const title = `Deployed ${resources}`;
     let live = `Release ${escapeControlCharacters(abbreviate(release.content_hash))} is now live.`;
     if (servedOrigins.length > 0) {
       live = `Release ${escapeControlCharacters(abbreviate(release.content_hash))} is now live on ${new Intl.ListFormat(
@@ -302,9 +312,9 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
         origins: servedOrigins,
         ...prepared.report,
       },
-      pretty: prose(`${resources}\n${live}`),
+      pretty: prose(`${title}\n${live}`),
       summary: {
-        title: resources,
+        title,
         sections: [],
         lines: [live],
       },

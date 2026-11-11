@@ -1,7 +1,6 @@
 import { access, readFile, rm, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { Flags } from "@oclif/core";
-import { z } from "zod";
 import {
   BRANDING_DESIGNS,
   DEFAULT_FLOW_CONFIG_PATH,
@@ -10,40 +9,41 @@ import {
   DEFAULT_SETUP_USE_CASE,
   flowsReadmeContent,
   policiesReadmeContent,
-  schemasReadmeContent,
   SETUP_PRESETS,
   SETUP_USE_CASES,
   type SetupPreset,
   type SetupUseCase,
+  schemasReadmeContent,
 } from "@zitadel/config/defaults";
-import { META_SCHEMA_DIR } from "@zitadel/config/meta-schemas";
 import {
   type ClientId,
   type ConnectionSlug,
-  credentialVariables,
   CUSTOM_PROVIDER,
+  credentialVariables,
   IDP_PROVIDERS,
+  type Parsed,
+  type ProviderSelection,
   parseClientId,
   parseClientSecret,
   parseConnectionSlug,
   parseDisplayName,
   parseIssuer,
-  type Parsed,
   parseProviderSelection,
   parseScopes,
   providerOf,
-  type ProviderSelection,
   RESERVED_SLUGS,
   selectionName,
 } from "@zitadel/config/idp";
+import { META_SCHEMA_DIR } from "@zitadel/config/meta-schemas";
 import semver from "semver";
+import { z } from "zod";
 
 import {
   type CreatedProject,
+  createZitadelClient,
   ProjectService,
   VariableService,
   VariableWrite,
-  createZitadelClient,
 } from "@/lib/backend";
 import { isDevelopmentBuild } from "@/lib/build-channel";
 import {
@@ -57,22 +57,22 @@ import { Cmd } from "@/lib/cmd";
 import { deployInitialRelease, type InitialDeployment } from "@/lib/environment";
 import { errorMessage, isErrno, toZitadelError, ZitadelError } from "@/lib/errors";
 import {
+  type CustomFlagValues,
   callbackUriFor,
   customExample,
   customFlagText,
-  type CustomFlagValues,
   flagText,
   loopbackIssuerWarning,
-  publishClientId,
   type PublishState,
+  publishClientId,
   reportClientIdOutcome,
   reportSecretOutcome,
   republishCommands,
+  SETUP_FLAG_KEYS,
+  SETUP_FLAG_NAMES,
   type SecretOutcome,
   type SecretPublisher,
   selectionFromFlags,
-  SETUP_FLAG_KEYS,
-  SETUP_FLAG_NAMES,
   ssoEnableArgs,
   storeClientSecret,
 } from "@/lib/idp";
@@ -126,8 +126,8 @@ import { abbreviate } from "@/lib/publish";
 import { writeScaffoldManifest } from "@/lib/scaffold-manifest";
 import { hostUnlessDefault, type ResolvedServer, resolveServer } from "@/lib/server";
 import { id as styleId, path as stylePath, url as styleUrl } from "@/lib/style";
-import { DEPLOY_ARGS } from "@/lib/suggestion";
 import {
+  DEPLOY_ARGS,
   type EnvironmentSelector,
   inShell,
   projectCommand,
@@ -138,19 +138,20 @@ import { escapeControlCharacters } from "@/lib/terminal-text";
 import type { Questions, Step, Summary } from "@/lib/ui";
 import { userAgent } from "@/lib/user-agent";
 import { reportWarning } from "@/lib/warnings";
-import { Connection, type PasswordMinLength, PasswordPolicy } from "@/lib/zitadel";
 import {
   CONFIG_DIRECTORIES,
+  Connection,
   ConnectionExistsError,
   DiskStore,
   FileExistsError,
   PAGE_LAYOUT_HINT,
+  type PasswordMinLength,
+  PasswordPolicy,
   type Scaffold,
   type ScaffoldedConnection,
   ZitadelConfig,
 } from "@/lib/zitadel";
 
-import { installDependenciesForSetup } from "./install";
 import {
   ensureInitialCommit,
   gitReport,
@@ -159,6 +160,7 @@ import {
   unavailableWarning,
   type WorktreeState,
 } from "./initial-commit";
+import { installDependenciesForSetup } from "./install";
 import { moveDevPort } from "./move-dev-port";
 import {
   askCustomSettings,
@@ -173,12 +175,12 @@ import {
   detectProjectFacts,
   fileNameOf,
   formatFrameworkLine,
+  type Row,
   relativeDisplayPath as relativeDisplay,
-  summarySections,
+  type Section,
   type SignIn,
   signInOf,
-  type Row,
-  type Section,
+  summarySections,
 } from "./summary";
 
 /**
@@ -296,8 +298,9 @@ export function setupRetryFlags(opts: SetupRetryOptions): string {
 }
 
 /** Whether `--sso` names a provider this CLI offers. */
-const isKnownSsoName = (name: string): boolean =>
-  name === CUSTOM_PROVIDER || (IDP_PROVIDERS as readonly string[]).includes(name);
+const isKnownSsoName = (name: string): boolean => {
+  return name === CUSTOM_PROVIDER || (IDP_PROVIDERS as readonly string[]).includes(name);
+};
 
 /**
  * Retry options straight from parsed flags, for failures before the wizard
@@ -343,7 +346,9 @@ export function retryOptionsFromFlags(flags: {
   const typed =
     selection === undefined && flags.sso !== undefined && isKnownSsoName(flags.sso)
       ? [`--sso ${flags.sso}`, flagText(customSettingsOf(flags), SETUP_FLAG_NAMES)]
-          .filter((part) => part !== "")
+          .filter((part) => {
+            return part !== "";
+          })
           .join(" ")
       : undefined;
   return {
@@ -392,7 +397,10 @@ export function ssoRecovery(
   const chosen = retry.sso ?? [];
   const remaining = chosen.slice(1);
   if (remaining.length === 0) {
-    return { hint: "", commands: [] };
+    return {
+      hint: "",
+      commands: [],
+    };
   }
   return {
     hint:
@@ -420,9 +428,9 @@ export function ssoRecovery(
     // the production token to the local server. `--env-file` outranks the
     // process environment (unlike `--env`), so it is the one that forces the
     // generated development credential the local project actually expects.
-    commands: remaining.map((selection) =>
-      projectCommand(ssoEnableArgs(selection), localRecoverySelector(retry.cwd), cliVersion),
-    ),
+    commands: remaining.map((selection) => {
+      return projectCommand(ssoEnableArgs(selection), localRecoverySelector(retry.cwd), cliVersion);
+    }),
   };
 }
 
@@ -575,7 +583,10 @@ async function resolveSetupServer(
           recovery.commands.length > 0
             ? `${recovery.hint}${recovery.commands.join(" ")} `
             : recovery.hint,
-        setup: `setup ${setupRetryFlags({ ...retry, cwd: undefined })}`,
+        setup: `setup ${setupRetryFlags({
+          ...retry,
+          cwd: undefined,
+        })}`,
       },
       suggest,
     );
@@ -659,7 +670,10 @@ async function refuseOtherReleasesServer(
         nearest.dir === meta.cwd
           ? ""
           : `Run start in ${nearest.dir}, where the server was started. `,
-      setup: `setup ${setupRetryFlags({ ...retryOptionsOf(flags), cwd: undefined })}`,
+      setup: `setup ${setupRetryFlags({
+        ...retryOptionsOf(flags),
+        cwd: undefined,
+      })}`,
     },
     suggest,
   );
@@ -711,10 +725,26 @@ export async function setupPreflight(
 
 /** The `--sso-*` flags that describe a custom connection, and whether one is needed. */
 const CUSTOM_SETTINGS = [
-  { name: "ssoSlug", flag: "--sso-slug", needed: true },
-  { name: "ssoDisplayName", flag: "--sso-display-name", needed: true },
-  { name: "ssoIssuer", flag: "--sso-issuer", needed: true },
-  { name: "ssoScopes", flag: "--sso-scopes", needed: false },
+  {
+    name: "ssoSlug",
+    flag: "--sso-slug",
+    needed: true,
+  },
+  {
+    name: "ssoDisplayName",
+    flag: "--sso-display-name",
+    needed: true,
+  },
+  {
+    name: "ssoIssuer",
+    flag: "--sso-issuer",
+    needed: true,
+  },
+  {
+    name: "ssoScopes",
+    flag: "--sso-scopes",
+    needed: false,
+  },
 ] as const;
 
 /** The flags {@link refuseUnusableFlags} reads, as a command reads them. */
@@ -810,9 +840,15 @@ export function refuseUnusableFlags(
     });
     if (given.length > 0) {
       throw refusalError(SETTINGS_NEED_CUSTOM_REFUSAL, {
-        names: given.map((setting) => setting.flag).join(", "),
+        names: given
+          .map((setting) => {
+            return setting.flag;
+          })
+          .join(", "),
         them: new Intl.PluralRules("en").select(given.length) === "one" ? "it" : "them",
-        flags: given.map((setting) => setting.flag),
+        flags: given.map((setting) => {
+          return setting.flag;
+        }),
       });
     }
   }
@@ -822,7 +858,9 @@ export function refuseUnusableFlags(
   if (flags.sso === CUSTOM_PROVIDER) {
     const missing = CUSTOM_SETTINGS.filter((setting) => {
       return setting.needed && flags[setting.name] === undefined;
-    }).map((setting) => setting.flag);
+    }).map((setting) => {
+      return setting.flag;
+    });
     if (missing.length > 0) {
       throw refusalError(CUSTOM_CONNECTION_INCOMPLETE_REFUSAL, {
         list: missing.join(", "),
@@ -925,7 +963,9 @@ function settingFlag(flag: string, parse: (value: string) => Parsed<unknown>) {
  */
 const FRAMEWORK_OPTIONS = createOrca()
   .availableFrameworks()
-  .map((framework) => framework.id);
+  .map((framework) => {
+    return framework.id;
+  });
 
 /**
  * `--renderer` offers only ids `getRenderer` will resolve: a
@@ -935,7 +975,9 @@ const FRAMEWORK_OPTIONS = createOrca()
  * guaranteed to fail and an explicit pass is rejected at parse time — before
  * any remote project is created.
  */
-const UNAVAILABLE_RENDERER_IDS = RENDERER_IDS.filter((id) => !AVAILABLE_RENDERER_IDS.includes(id));
+const UNAVAILABLE_RENDERER_IDS = RENDERER_IDS.filter((id) => {
+  return !AVAILABLE_RENDERER_IDS.includes(id);
+});
 const RENDERER_FLAG_DESCRIPTION =
   UNAVAILABLE_RENDERER_IDS.length === 0
     ? "Renderer (default: react)."
@@ -1039,7 +1081,10 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
       description:
         "Overwrite managed files that already exist, scaffold into a non-empty directory, and remove the previous origin when --dev-port moves the app.",
     }),
-    framework: Flags.string({ description: "Framework to target.", options: FRAMEWORK_OPTIONS }),
+    framework: Flags.string({
+      description: "Framework to target.",
+      options: FRAMEWORK_OPTIONS,
+    }),
     renderer: Flags.string({
       description: RENDERER_FLAG_DESCRIPTION,
       options: [...AVAILABLE_RENDERER_IDS],
@@ -1208,7 +1253,10 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
     let scaffoldedBesideFiles = false;
     try {
       detected = await orca.detect(this.cwd, flags.framework);
-      app = { framework: detected.id, devPort: detected.devPort };
+      app = {
+        framework: detected.id,
+        devPort: detected.devPort,
+      };
       detecting.done(
         `Detected ${orca.displayName(detected.id)}${detected.devPort ? ` (dev port ${detected.devPort})` : ""}`,
       );
@@ -1260,7 +1308,10 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
     // different port in vite.config.*/angular.json keeps it — pass --dev-port to
     // match that pin (or remove it) if the origin check rejects requests.
     if (flags.devPort !== undefined) {
-      app = { ...app, devPort: flags.devPort };
+      app = {
+        ...app,
+        devPort: flags.devPort,
+      };
     }
 
     const defaultAnswers: SetupAnswers = {
@@ -1284,8 +1335,13 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
       spinner: (label, options) => {
         return this.ui.spinner(label, options);
       },
-      framework: { id: app.framework, displayName: orca.displayName(app.framework) },
-      suggest: (args: string) => projectCommand(args, recoverySelector(flags.cwd), this.cliVersion),
+      framework: {
+        id: app.framework,
+        displayName: orca.displayName(app.framework),
+      },
+      suggest: (args: string) => {
+        return projectCommand(args, recoverySelector(flags.cwd), this.cliVersion);
+      },
       cwd: this.cwd,
       frameworkChosen: scaffoldedFramework || flags.framework !== undefined,
       serverFlag: this.meta.serverFlag,
@@ -1297,18 +1353,21 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
       developmentBuild: isDevelopmentBuild(),
     };
     const answers = asks
-      ? await SETUP_PROMPTS.reduce(
-          async (previous, prompt) => prompt.ask(await previous, promptCtx),
-          Promise.resolve(defaultAnswers),
-        )
+      ? await SETUP_PROMPTS.reduce(async (previous, prompt) => {
+          return prompt.ask(await previous, promptCtx);
+        }, Promise.resolve(defaultAnswers))
       : defaultAnswers;
     if (!asks && flags.devPort === undefined && !(await LocalServer.isPortFree(answers.devPort))) {
       // The wizard asks for another port when the detected one is taken. A run
       // that asks nothing still pins the dev script to it, so it says so, with
       // the command that puts the app on a free one.
       reportWarning(
-        portInUseWarning(answers.devPort, await LocalServer.nextFreePort(answers.devPort), (args) =>
-          this.suggest(args),
+        portInUseWarning(
+          answers.devPort,
+          await LocalServer.nextFreePort(answers.devPort),
+          (args) => {
+            return this.suggest(args);
+          },
         ),
       );
     }
@@ -1342,18 +1401,20 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
     // Fresh scaffolds keep the widgets' full-page chrome; a pre-existing
     // route-based app gets embeddable cards inside its own layout (ADR 044).
     const posture = derivePosture(app.framework, scaffoldedFramework);
-    const patchContext = (framework: FrameworkFacts, project: CreatedProject): PatchContext => ({
-      framework,
-      rendererId,
-      project,
-      issuer,
-      server: answers.server,
-      cliVersion: this.cliVersion,
-      scaffoldedFramework,
-      posture,
-      preset: answers.preset,
-      useCase: answers.useCase,
-    });
+    const patchContext = (framework: FrameworkFacts, project: CreatedProject): PatchContext => {
+      return {
+        framework,
+        rendererId,
+        project,
+        issuer,
+        server: answers.server,
+        cliVersion: this.cliVersion,
+        scaffoldedFramework,
+        posture,
+        preset: answers.preset,
+        useCase: answers.useCase,
+      };
+    };
     const patcher = orca.patcherFor(app.framework);
     // The schema, flow, connection and policy files setup writes only once the
     // project exists: a conflict on one of those left the project behind, and
@@ -1392,7 +1453,13 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
     // `framework.devPort`, and it must agree with the issuer and the registered
     // origin (both derived from `answers.devPort`).
     const framework =
-      created === undefined ? undefined : { ...created, devPort: answers.devPort, url: issuer };
+      created === undefined
+        ? undefined
+        : {
+            ...created,
+            devPort: answers.devPort,
+            url: issuer,
+          };
 
     // A new app is kept only once its default resources are in place. A
     // failure before that, Ctrl-C included, removes it again and puts back
@@ -1447,7 +1514,9 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
               preset: answers.preset,
               useCase: answers.useCase,
               devPort: answers.devPort,
-              sso: answers.sso.map((answer) => answer.selection),
+              sso: answers.sso.map((answer) => {
+                return answer.selection;
+              }),
               passwordMinLength: answers.passwordMinLength,
             },
           );
@@ -1502,7 +1571,10 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
       }
       try {
         scaffolded = this.dryRun
-          ? { filesWritten: [], passwordMinLength: signInOf(answers).password_min_length }
+          ? {
+              filesWritten: [],
+              passwordMinLength: signInOf(answers).password_min_length,
+            }
           : await this.writeConfiguration(answers);
       } catch (error) {
         // Setup is not atomic: the patcher already wrote `zitadel.json` (the
@@ -1606,7 +1678,10 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
           value: answer.credentials.secret,
           publish,
         });
-        ssoOutcomes.set(slug, { clientId, secret });
+        ssoOutcomes.set(slug, {
+          clientId,
+          secret,
+        });
         if (answer.endpoints?.issuer !== undefined) {
           // Said out loud: a connection pointing somewhere other than the
           // vendor is not what the developer will want in the end, and nothing
@@ -1632,7 +1707,10 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
       try {
         await writeScaffoldManifest({
           cwd: this.cwd,
-          actions: orca.patcherFor(framework.id).artifacts({ framework, rendererId }),
+          actions: orca.patcherFor(framework.id).artifacts({
+            framework,
+            rendererId,
+          }),
           written: [...result.filesWritten, ...result.filesSkipped],
           scaffoldedFramework,
           devPort: answers.devPort,
@@ -1697,9 +1775,15 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
             ],
             commands: [deployCommand],
           }
-        : { actions: [], boxActions: [], commands: [] as SuggestedCommand[] };
+        : {
+            actions: [],
+            boxActions: [],
+            commands: [] as SuggestedCommand[],
+          };
 
-    const writtenRel = allFilesWritten.map((file) => relativeDisplay(this.cwd, file));
+    const writtenRel = allFilesWritten.map((file) => {
+      return relativeDisplay(this.cwd, file);
+    });
     // The nudge rides both surfaces from one decision: the box for humans, the
     // envelope for agents.
     //
@@ -1765,7 +1849,10 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
             team_id: owner.team_id,
             claimed_at: owner.claimed_at,
           });
-          ownedByLocalAdmin = { email: admin.email, team_id: owner.team_id };
+          ownedByLocalAdmin = {
+            email: admin.email,
+            team_id: owner.team_id,
+          };
           this.ui
             .begin("Attaching the project to the local admin")
             .done(
@@ -1782,7 +1869,10 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
     const deadline = this.dryRun ? undefined : claimWindowDeadline(project.created_at);
     const nudgeClaim =
       !ownedByLocalAdmin &&
-      (claimState({ secret: {}, server: answers.server }).kind === "detached" ||
+      (claimState({
+        secret: {},
+        server: answers.server,
+      }).kind === "detached" ||
         (isLocal && (this.dryRun || hostsPlatform)));
     const claimNudge = nudgeClaim
       ? {
@@ -1790,7 +1880,11 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
           boxActions: [claimBoxAction(this.cliVersion, deadline, recoverySelector(flags.cwd))],
           commands: [claimCommand(this.cliVersion, recoverySelector(flags.cwd))],
         }
-      : { actions: [], boxActions: [], commands: [] as SuggestedCommand[] };
+      : {
+          actions: [],
+          boxActions: [],
+          commands: [] as SuggestedCommand[],
+        };
     // Only when the project is the local admin's: the console lists nothing
     // else for them, so the command would open an empty console otherwise.
     // `console` finds the server from its directory up, so a run with `--cwd`
@@ -1809,7 +1903,11 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
           ],
           commands: [consoleCommand],
         }
-      : { actions: [], boxActions: [], commands: [] as SuggestedCommand[] };
+      : {
+          actions: [],
+          boxActions: [],
+          commands: [] as SuggestedCommand[],
+        };
     // A run that skipped social sign-in says how to add it later, the way
     // `consoleStep` says how to open the console.
     const ssoCommand = projectCommand(
@@ -1829,7 +1927,11 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
             ],
             commands: [ssoCommand],
           }
-        : { actions: [], boxActions: [], commands: [] as SuggestedCommand[] };
+        : {
+            actions: [],
+            boxActions: [],
+            commands: [] as SuggestedCommand[],
+          };
     // The structured report is human-only. Under `--json` we let the
     // envelope returned from `this.emit(...)` be the sole stdout
     // payload (oclif requires single-doc JSON).
@@ -1941,7 +2043,9 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
       if (!this.ui.interactive) {
         const [exploreText = "", exploreCommand] = exploreAllCommands(this.cliVersion)
           .split("\n")
-          .map((line) => line.trim());
+          .map((line) => {
+            return line.trim();
+          });
         report = this.ui.ending({
           ...summary,
           next: [
@@ -1969,17 +2073,23 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
         },
         framework: app.framework,
         server: answers.server,
-        files_written: allFilesWritten.map((file) => relativeDisplay(this.cwd, file)),
+        files_written: allFilesWritten.map((file) => {
+          return relativeDisplay(this.cwd, file);
+        }),
         // Typed per-artifact rows for the scaffolded app files (the
         // configuration files continue to report through files_written): one row per
         // touched path with kind (file/dir) and action (create/update), so
         // agents can verify what setup did without parsing narration.
-        files: result.files.map((file) => ({
-          path: relativeDisplay(this.cwd, file.path),
-          kind: file.kind,
-          action: file.action,
-        })),
-        files_skipped: result.filesSkipped.map((file) => relativeDisplay(this.cwd, file)),
+        files: result.files.map((file) => {
+          return {
+            path: relativeDisplay(this.cwd, file.path),
+            kind: file.kind,
+            action: file.action,
+          };
+        }),
+        files_skipped: result.filesSkipped.map((file) => {
+          return relativeDisplay(this.cwd, file);
+        }),
         install: installOutcome.install,
         git: gitReport(commit),
         // What sign-in and registration are configured to do, read off what
@@ -2014,10 +2124,16 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
             // own route, as `auth-method sso enable` reports it.
             callback_uri: callbackUriFor(issuer, slug),
             client_id_variable: outcome
-              ? { variable: credentialVariables(slug).clientId, published: outcome.clientId }
+              ? {
+                  variable: credentialVariables(slug).clientId,
+                  published: outcome.clientId,
+                }
               : null,
             secret: outcome
-              ? { variable: outcome.secret.name, published: outcome.secret.published }
+              ? {
+                  variable: outcome.secret.name,
+                  published: outcome.secret.published,
+                }
               : null,
           };
         }),
@@ -2149,9 +2265,18 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
       });
     const readmes = await Promise.all(
       [
-        { directory: CONFIG_DIRECTORIES.schemas, text: schemasReadmeContent() },
-        { directory: CONFIG_DIRECTORIES.flows, text: flowsReadmeContent() },
-        { directory: CONFIG_DIRECTORIES.policies, text: policiesReadmeContent() },
+        {
+          directory: CONFIG_DIRECTORIES.schemas,
+          text: schemasReadmeContent(),
+        },
+        {
+          directory: CONFIG_DIRECTORIES.flows,
+          text: flowsReadmeContent(),
+        },
+        {
+          directory: CONFIG_DIRECTORIES.policies,
+          text: policiesReadmeContent(),
+        },
       ].map(async (readme): Promise<readonly string[]> => {
         const path = `${readme.directory}/${README}`;
         const text = normalizePublicCliProse(readme.text, this.cliVersion);
@@ -2259,7 +2384,9 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
         narrate: (notices) => {
           this.narrate(notices);
         },
-        suggest: (args) => projectCommand(args, opts.selector, this.cliVersion),
+        suggest: (args) => {
+          return projectCommand(args, opts.selector, this.cliVersion);
+        },
       });
       deploying.done(
         `Deployed ${escapeControlCharacters(abbreviate(deployment.contentHash))} to ${deployment.origins.length} ${new Intl.PluralRules("en").select(deployment.origins.length) === "one" ? "origin" : "origins"}`,
@@ -2297,7 +2424,9 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
       cliVersion: this.cliVersion,
       dryRun,
       signal: this.signal,
-      consent: (gate) => this.consent(gate),
+      consent: (gate) => {
+        return this.consent(gate);
+      },
     }).catch((error: unknown) => {
       moving.fail();
       throw error;
@@ -2311,11 +2440,18 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
     // file, or the server the move used for a project setup gave none, never
     // what the shell has exported.
     const selector = (await access(join(cwd, ".env.development.local")).then(
-      () => true,
-      () => false,
+      () => {
+        return true;
+      },
+      () => {
+        return false;
+      },
     ))
       ? recoverySelector(typedCwd)
-      : environmentSelectorSuffix({ server, cwd: typedCwd });
+      : environmentSelectorSuffix({
+          server,
+          cwd: typedCwd,
+        });
     // Not setup again: the app is on the new port by now, so a rerun moves
     // nothing and never reaches the old origin.
     const cleanup =
@@ -2353,19 +2489,24 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
       moving.done(`Already on ${move.issuer}`);
     }
 
+    const title = moved
+      ? `Moved the app to ${move.issuer}`
+      : `The app is already on ${move.issuer}`;
     return this.emit({
       status: "ok",
       data: {
-        title: moved ? `Moved the app to ${move.issuer}` : `The app is already on ${move.issuer}`,
+        title,
         moved,
         previous_issuer: move.previousIssuer,
         issuer: move.issuer,
         dev_port: devPort,
-        files_written: move.result.filesWritten.map((file) => relativeDisplay(cwd, file)),
+        files_written: move.result.filesWritten.map((file) => {
+          return relativeDisplay(cwd, file);
+        }),
         deployment_id: move.deploymentId ?? null,
       },
       summary: {
-        title: moved ? `Moved the app to ${move.issuer}` : `The app is already on ${move.issuer}`,
+        title,
         sections: [],
         boxed: true,
       },
@@ -2373,7 +2514,11 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
         actions: [`Restart the dev server and open ${move.issuer}/login.`],
         ...(deploy === undefined && cleanup === undefined
           ? {}
-          : { commands: [deploy, cleanup].filter((command) => command !== undefined) }),
+          : {
+              commands: [deploy, cleanup].filter((command) => {
+                return command !== undefined;
+              }),
+            }),
       },
     });
   }
@@ -2391,7 +2536,11 @@ function frameworkDetectionWithScaffoldTarget(
       hint:
         `${target.reason ?? "Directory is not empty."} ` +
         "Pass --force to scaffold into this non-empty directory, run setup from an empty directory, or run setup from an existing supported app project.",
-      details: { cwd, entries: target.entries, reason: target.reason },
+      details: {
+        cwd,
+        entries: target.entries,
+        reason: target.reason,
+      },
     },
   );
 }
@@ -2415,7 +2564,9 @@ async function resolveScaffoldFramework(
     // the error names every choice instead of pointing at a prompt it can't
     // see, and for a local server hands over the exact rerun. Only then:
     // `setupRetryFlags` pins `--server local`.
-    const choices = orca.availableFrameworks().map((choice) => choice.id);
+    const choices = orca.availableFrameworks().map((choice) => {
+      return choice.id;
+    });
     const suggested = choices.includes("next") ? "next" : choices[0];
     throw new ZitadelError("E_FRAMEWORK_NOT_DETECTED", "Empty directory — pass --framework", {
       hint: (
@@ -2426,7 +2577,10 @@ async function resolveScaffoldFramework(
         guidance.serverFlag === "local" && suggested
           ? [
               unscopedCommand(
-                `setup ${setupRetryFlags({ ...guidance.retry, framework: suggested })}`,
+                `setup ${setupRetryFlags({
+                  ...guidance.retry,
+                  framework: suggested,
+                })}`,
                 guidance.cliVersion,
               ),
             ]
@@ -2627,7 +2781,12 @@ function dryRunProject(issuer: string): CreatedProject {
     name: "dry-run",
     project_secret: "sk_proj_dry_run_full",
     preview_secret: "sk_proj_dry_run_preview",
-    origins: [{ pattern: issuer, kind: "primary" }],
+    origins: [
+      {
+        pattern: issuer,
+        kind: "primary",
+      },
+    ],
     created_at: "2026-04-21T14:03:11.000Z",
   };
 }
@@ -2750,7 +2909,10 @@ export async function ssoFromFlags(
     reportWarning(loopback);
   }
   if (flags.ssoClientId === undefined) {
-    return { selection, credentials: {} };
+    return {
+      selection,
+      credentials: {},
+    };
   }
   if (!nonInteractive || dryRun) {
     // The wizard asks for the secret, the way it asks for a client id that
@@ -2758,7 +2920,10 @@ export async function ssoFromFlags(
     // materialises nothing, so demanding a real credential to see what setup
     // would do is a toll for no reason -- and `auth-method sso enable --dry-run`
     // returns before asking for one at all.
-    return { selection, credentials: { clientId: flags.ssoClientId } };
+    return {
+      selection,
+      credentials: { clientId: flags.ssoClientId },
+    };
   }
   // Required, not optional: scaffolding the connection without it writes a
   // sign-in button that fails at the provider with `invalid_client`, long
@@ -2776,7 +2941,13 @@ export async function ssoFromFlags(
       { before: `printf '%s' "$CLIENT_SECRET" | ` },
     ),
   });
-  return { selection, credentials: { clientId: flags.ssoClientId, secret } };
+  return {
+    selection,
+    credentials: {
+      clientId: flags.ssoClientId,
+      secret,
+    },
+  };
 }
 
 /**
@@ -2830,7 +3001,12 @@ async function createProjectWithLocalHint(
     // pull-request build deploys to, which this is not.
     return await projectService.create({
       name: projectName,
-      origins: [{ pattern: issuer, kind: "primary" }],
+      origins: [
+        {
+          pattern: issuer,
+          kind: "primary",
+        },
+      ],
       seed_defaults: false,
     });
   } catch (error) {
@@ -2881,7 +3057,9 @@ function shortPath(absolute: string, env: NodeJS.ProcessEnv): string {
  * write that artifact (e.g. a renderer without a register page).
  */
 function pickWrittenFile(written: string[], suffix: string): string | undefined {
-  return written.find((file) => file.endsWith(suffix));
+  return written.find((file) => {
+    return file.endsWith(suffix);
+  });
 }
 
 /**
@@ -2984,7 +3162,12 @@ export function buildSummary(opts: {
   } = opts;
   const packageJsonHit = pickWrittenFile(writtenRel, "package.json");
 
-  const detected: Row[] = [{ label: "Framework", value: formatFrameworkLine(projectFacts) }];
+  const detected: Row[] = [
+    {
+      label: "Framework",
+      value: formatFrameworkLine(projectFacts),
+    },
+  ];
   if (scaffoldedFramework) {
     detected.push({
       label: "Scaffold",
@@ -3029,14 +3212,22 @@ export function buildSummary(opts: {
   ] as const) {
     const hit = pickWrittenFile(writtenRel, suffix);
     if (hit) {
-      installedRows.push({ label, value: stylePath(hit) });
+      installedRows.push({
+        label,
+        value: stylePath(hit),
+      });
     }
   }
   // The Vite config merge carries the /__nextgen dev proxy; the file name
   // varies (ts/js/mts/mjs), so it can't ride the suffix table above.
-  const viteConfigHit = writtenRel.find((file) => /(^|\/)vite\.config\.[cm]?[jt]s$/.test(file));
+  const viteConfigHit = writtenRel.find((file) => {
+    return /(^|\/)vite\.config\.[cm]?[jt]s$/.test(file);
+  });
   if (viteConfigHit) {
-    installedRows.push({ label: "Dev proxy", value: stylePath(viteConfigHit) });
+    installedRows.push({
+      label: "Dev proxy",
+      value: stylePath(viteConfigHit),
+    });
   }
 
   // The login-customization entry points. These are what a user edits to
@@ -3051,7 +3242,11 @@ export function buildSummary(opts: {
   ] as const) {
     const hit = pickWrittenFile(writtenRel, suffix);
     if (hit) {
-      customizeRows.push({ label, value: stylePath(`${dir}/`), secondary: "see its README.md" });
+      customizeRows.push({
+        label,
+        value: stylePath(`${dir}/`),
+        secondary: "see its README.md",
+      });
     }
   }
   // One row per provider: each has its own connection file, and a developer
@@ -3076,12 +3271,20 @@ export function buildSummary(opts: {
   // it: `password-first` enables passkeys too, and profile fields are optional.
   const { signIn } = opts;
   const signInRows: Row[] = [
-    { label: "Starts with", value: signIn.starts_with },
-    { label: "Methods", value: signIn.methods.join(", ") },
+    {
+      label: "Starts with",
+      value: signIn.starts_with,
+    },
+    {
+      label: "Methods",
+      value: signIn.methods.join(", "),
+    },
     {
       label: "Registration",
       value: signIn.fields
-        .map((field) => `${field.name}${field.required ? "" : " (optional)"}`)
+        .map((field) => {
+          return `${field.name}${field.required ? "" : " (optional)"}`;
+        })
         .join(", "),
     },
     {
@@ -3094,16 +3297,40 @@ export function buildSummary(opts: {
   ];
 
   const projectRows: Row[] = [
-    { label: "Project id", value: styleId(project.id) },
-    { label: "Server", value: styleUrl(server) },
-    { label: "App will run", value: styleUrl(issuer) },
+    {
+      label: "Project id",
+      value: styleId(project.id),
+    },
+    {
+      label: "Server",
+      value: styleUrl(server),
+    },
+    {
+      label: "App will run",
+      value: styleUrl(issuer),
+    },
   ];
 
   return [
-    { title: "Detected", rows: detected },
-    { title: "Installed", rows: installedRows },
-    { title: "Sign-in", rows: signInRows },
-    { title: "Customize", rows: customizeRows },
-    { title: "Project", rows: projectRows },
+    {
+      title: "Detected",
+      rows: detected,
+    },
+    {
+      title: "Installed",
+      rows: installedRows,
+    },
+    {
+      title: "Sign-in",
+      rows: signInRows,
+    },
+    {
+      title: "Customize",
+      rows: customizeRows,
+    },
+    {
+      title: "Project",
+      rows: projectRows,
+    },
   ];
 }

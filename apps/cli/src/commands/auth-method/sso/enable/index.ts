@@ -9,9 +9,9 @@ import {
   type IdpProvider,
   parseClientId,
   parseConnectionSlug,
+  type Parsed,
   parseDisplayName,
   parseIssuer,
-  type Parsed,
   parseScopes,
   type ProviderName,
   providerOf,
@@ -25,8 +25,8 @@ import { z } from "zod";
 import { AuthMethodCommand, type SchemaTarget } from "@/commands/auth-method/command";
 import {
   isCancelled,
-  OriginService,
   Origins,
+  OriginService,
   VariableService,
   VariableWrite,
   type ZitadelClient,
@@ -39,8 +39,8 @@ import {
   type CredentialNames,
   CredentialPrompt,
   customExample,
-  type GivenCredentials,
   ENABLE_FLAG_NAMES,
+  type GivenCredentials,
   loopbackIssuerWarning,
   ProviderChoice,
   type PublishedCredentials,
@@ -310,7 +310,10 @@ type Payload = {
 /**
  * Nothing sent to the project, as a dry run reports it.
  */
-const NOTHING_PUBLISHED: PublishedCredentials = { clientId: undefined, secret: undefined };
+const NOTHING_PUBLISHED: PublishedCredentials = {
+  clientId: undefined,
+  secret: undefined,
+};
 
 /**
  * `zitadel auth-method sso enable` — add a provider to a Project's sign-in
@@ -336,7 +339,10 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     `<%= config.bin %> auth-method sso enable ${customExample(ENABLE_FLAG_NAMES)}`,
     `<%= config.bin %> auth-method sso enable ${customExample(ENABLE_FLAG_NAMES, true)} --client-id abc123 --non-interactive < secret.txt`,
   ];
-  static override baseFlags = { ...AuthMethodCommand.baseFlags, ...environmentFlags };
+  static override baseFlags = {
+    ...AuthMethodCommand.baseFlags,
+    ...environmentFlags,
+  };
   static override flags = {
     provider: Flags.string({
       options: [...IDP_PROVIDERS, CUSTOM_PROVIDER],
@@ -462,8 +468,20 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       this.publisher(remote.client, remote.projectId),
     );
     const written = await this.write(target, change, undefined);
-    this.reportOutcome({ change, written, provider, given, schema: target.schema });
-    return this.result({ summary, change, written, published, delivery });
+    this.reportOutcome({
+      change,
+      written,
+      provider,
+      given,
+      schema: target.schema,
+    });
+    return this.result({
+      summary,
+      change,
+      written,
+      published,
+      delivery,
+    });
   }
 
   /**
@@ -748,7 +766,10 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     }
     const variableService = new VariableService(client, projectId);
     return async (name, value, options) => {
-      const write = VariableWrite.of({ secret: options.secret, preview: false });
+      const write = VariableWrite.of({
+        secret: options.secret,
+        preview: false,
+      });
       await variableService.set(name, value, write);
     };
   }
@@ -1006,7 +1027,10 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     if (published === undefined || names.clientId === undefined) {
       return null;
     }
-    return { variable: names.clientId, published };
+    return {
+      variable: names.clientId,
+      published,
+    };
   }
 
   /**
@@ -1019,6 +1043,9 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     if (secret === undefined) {
       return null;
     }
-    return { variable: secret.name, published: secret.published };
+    return {
+      variable: secret.name,
+      published: secret.published,
+    };
   }
 }

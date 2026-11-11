@@ -2,11 +2,11 @@ import pTimeout from "p-timeout";
 
 import { UserService } from "@/lib/backend";
 import {
+  type ClaimState,
   claimAction,
   claimCommand,
   claimState,
   claimWindowClosedAction,
-  type ClaimState,
 } from "@/lib/claim-state";
 import { Cmd } from "@/lib/cmd";
 import { isCancellation } from "@/lib/errors";
@@ -23,8 +23,8 @@ import {
 import { LocalServer } from "@/lib/local-server/server";
 import {
   type Admitted,
-  type Connection,
   CommandGroups,
+  type Connection,
   EnvironmentCommand,
   type JsonEnvelope,
   type MetaOptions,
@@ -39,12 +39,12 @@ import {
   readZitadelSecret,
 } from "@/lib/project";
 import {
+  DEPLOY_ARGS,
   type EnvironmentSelector,
   projectCommand,
   type SuggestedCommand,
   unscopedCommand,
 } from "@/lib/suggestion";
-import { DEPLOY_ARGS } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 
 /**
@@ -86,7 +86,10 @@ export default class Status extends EnvironmentCommand {
       this.environment.values.ZITADEL_ISSUER?.value,
       this.environment.values.ZITADEL_PROJECT_ID?.value,
       this.environment.envFile !== undefined || this.environment.name.value !== "development"
-        ? { name: this.environment.name.value, envFile: this.environment.envFile }
+        ? {
+            name: this.environment.name.value,
+            envFile: this.environment.envFile,
+          }
         : undefined,
     );
     this.ui.ranAgainst(
@@ -114,10 +117,11 @@ export default class Status extends EnvironmentCommand {
       dockerSaid = `, and Docker could not be asked about it${server.docker.error === undefined ? "" : `: ${escapeControlCharacters(server.docker.error)}`}`;
     }
 
+    const title = "Checked the status of the project";
     return this.emit({
       status: "ok",
       data: {
-        title: "Checked the status of the project",
+        title,
         server: {
           lifecycle: serverLifecycle,
           runtime: runtimeSummary(server.runtime),
@@ -131,7 +135,7 @@ export default class Status extends EnvironmentCommand {
         project,
       },
       summary: {
-        title: "Checked the status of the project",
+        title,
         sections: [],
         lines: [
           `${
@@ -265,7 +269,10 @@ async function projectStatus(
   // not move the project, so the source would answer the wrong question.
   const claim =
     secret !== undefined && projectId === secret.project_id
-      ? claimState({ secret, server: readProjectServer(config) })
+      ? claimState({
+          secret,
+          server: readProjectServer(config),
+        })
       : ({ kind: "not-applicable" } as const);
   return {
     lifecycle: "configured",

@@ -16,8 +16,8 @@ import {
   AmbiguousSchemaError,
   type BrokenFile,
   BrokenFilesError,
-  CONFIG_DIRECTORIES,
   type Change,
+  CONFIG_DIRECTORIES,
   type ConfigStore,
   DiskStore,
   type ForceOptions,
@@ -311,8 +311,14 @@ export type FollowUps = {
  * (`auth-method sso enable`) declares the same flags, only shown.
  */
 const HIDDEN_ENVIRONMENT_FLAGS: Pick<typeof environmentFlags, "env" | "env-file"> = {
-  env: { ...environmentFlags.env, hidden: true },
-  "env-file": { ...environmentFlags["env-file"], hidden: true },
+  env: {
+    ...environmentFlags.env,
+    hidden: true,
+  },
+  "env-file": {
+    ...environmentFlags["env-file"],
+    hidden: true,
+  },
 };
 
 /**
@@ -393,7 +399,13 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
     make: (options: ForceOptions) => Change,
   ): Promise<ConfirmedChange | undefined> {
     try {
-      return { change: make({ force: false, dryRun: this.dryRun }), consent: undefined };
+      return {
+        change: make({
+          force: false,
+          dryRun: this.dryRun,
+        }),
+        consent: undefined,
+      };
     } catch (error) {
       if (!(error instanceof NoSignInLeftError)) {
         throw error;
@@ -412,7 +424,13 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
         });
       }
       if (this.dryRun) {
-        return { change: make({ force: true, dryRun: true }), consent: undefined };
+        return {
+          change: make({
+            force: true,
+            dryRun: true,
+          }),
+          consent: undefined,
+        };
       }
       const consent = await this.consent({
         verb: "disable",
@@ -433,7 +451,13 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
       if (consent === undefined) {
         return undefined;
       }
-      return { change: make({ force: true, dryRun: false }), consent: consent };
+      return {
+        change: make({
+          force: true,
+          dryRun: false,
+        }),
+        consent: consent,
+      };
     }
   }
 
@@ -724,7 +748,10 @@ type SchemaDetail = {
  */
 function detailsOf(schemas: readonly UserSchema[]): readonly SchemaDetail[] {
   return schemas.map((schema) => {
-    return { name: schema.name, object_type: schema.objectType ?? null };
+    return {
+      name: schema.name,
+      object_type: schema.objectType ?? null,
+    };
   });
 }
 

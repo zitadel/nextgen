@@ -1,4 +1,3 @@
-import { Cmd } from "@/lib/cmd";
 import { Flags } from "@oclif/core";
 import pRetry, { AbortError } from "p-retry";
 import { z } from "zod";
@@ -7,6 +6,7 @@ import { ClaimService } from "@/lib/backend";
 import { getClaimStatusQueryChallengeIdRegExp } from "@/lib/backend/schemas";
 import { openInBrowser } from "@/lib/browser";
 import { CLAIM_WINDOW_DAYS, isAttached } from "@/lib/claim-state";
+import { Cmd } from "@/lib/cmd";
 import { requireValue } from "@/lib/environment";
 import { ZitadelError } from "@/lib/errors";
 import { log } from "@/lib/log";
@@ -126,7 +126,6 @@ const CHALLENGE_ID: Refused<string> = {
 export default class Claim extends EnvironmentCommand {
   static override description =
     "Claim this project to make it permanent. Opens a browser to create an account or sign in.";
-
   static override group = CommandGroups.gettingStarted;
   static override groupOrder = 4;
 
@@ -224,16 +223,18 @@ export default class Claim extends EnvironmentCommand {
           ? `${action}, then record the owning team in .zitadel/secret.`
           : `${action}.`;
 
+      const title = "Nothing was claimed (dry run)";
+
       return this.emit({
         status: "ok",
         data: {
           dry_run: true,
-          title: "Nothing was claimed (dry run)",
+          title,
           project_id: projectId,
           would,
         },
         summary: {
-          title: "Nothing was claimed (dry run)",
+          title,
           sections: [],
           lines: [would],
         },
@@ -316,7 +317,10 @@ export default class Claim extends EnvironmentCommand {
       // this run only waits on it.
       waitFor = {
         challengeId: flags.challengeId,
-        deadline: claimDeadline({ timeoutSeconds: flags.timeout, now: Date.now() }),
+        deadline: claimDeadline({
+          timeoutSeconds: flags.timeout,
+          now: Date.now(),
+        }),
       };
     }
     log.start("Waiting for the browser step to finish");
@@ -345,19 +349,24 @@ export default class Claim extends EnvironmentCommand {
     // envelope and .zitadel/secret); the user-facing outcome is permanence.
     log.done("Project claimed");
 
-    this.recordTelemetry({ claim_outcome: "completed", browser_opened: opened });
+    this.recordTelemetry({
+      claim_outcome: "completed",
+      browser_opened: opened,
+    });
+
+    const title = "Your project is now permanent";
 
     return this.emit({
       status: "ok",
       data: {
-        title: "Your project is now permanent",
+        title,
         project_id: projectId,
         team_id: completed.team_id,
         claimed_at: completed.claimed_at,
         dashboard_url: completed.dashboard_url,
       },
       summary: {
-        title: "Your project is now permanent",
+        title,
         sections: [],
         next: [
           {
@@ -404,17 +413,26 @@ export default class Claim extends EnvironmentCommand {
             return progress.claim;
           }
           case "window-expired": {
-            this.recordTelemetry({ claim_outcome: "window_expired", poll_count: attempt });
+            this.recordTelemetry({
+              claim_outcome: "window_expired",
+              poll_count: attempt,
+            });
             throw new AbortError(claimWindowExpiredError(this.cliVersion));
           }
           case "expired": {
-            this.recordTelemetry({ claim_outcome: "expired", poll_count: attempt });
+            this.recordTelemetry({
+              claim_outcome: "expired",
+              poll_count: attempt,
+            });
             throw new AbortError(
               expiredError("The link expired before the browser step finished.", startOver),
             );
           }
           case "not-found": {
-            this.recordTelemetry({ claim_outcome: "not_found", poll_count: attempt });
+            this.recordTelemetry({
+              claim_outcome: "not_found",
+              poll_count: attempt,
+            });
             throw new AbortError(
               new ZitadelError(
                 "E_NOT_FOUND",
@@ -445,7 +463,10 @@ export default class Claim extends EnvironmentCommand {
       if (!(error instanceof NotFinished)) {
         throw error;
       }
-      this.recordTelemetry({ claim_outcome: "timeout", poll_count: error.attempt });
+      this.recordTelemetry({
+        claim_outcome: "timeout",
+        poll_count: error.attempt,
+      });
       throw expiredError("Stopped waiting for the browser step to finish.", startOver);
     });
   }
@@ -462,17 +483,19 @@ export default class Claim extends EnvironmentCommand {
     this.recordTelemetry({ claim_outcome: "link_issued" });
     const wait = this.suggest(`claim --challenge-id ${Cmd.quote(challenge.challenge_id)}`);
 
+    const title = "Open the link in a browser to make your project permanent";
+
     return this.emit({
       status: "ok",
       data: {
-        title: "Open the link in a browser to make your project permanent",
+        title,
         project_id: projectId,
         claim_url: challenge.claim_url,
         challenge_id: challenge.challenge_id,
         expires_at: challenge.expires_at,
       },
       summary: {
-        title: "Open the link in a browser to make your project permanent",
+        title,
         sections: [],
         next: [
           {
@@ -502,15 +525,17 @@ export default class Claim extends EnvironmentCommand {
     this.recordTelemetry({ claim_outcome: "already_claimed" });
     log.info(`This project already belongs to team ${escapeControlCharacters(data.team_id)}.`);
 
+    const title = "This project already belongs to a team";
+
     return this.emit({
       status: "skipped",
       reason: "already-claimed",
       data: {
-        title: "This project already belongs to a team",
+        title,
         ...data,
       },
       summary: {
-        title: "This project already belongs to a team",
+        title,
         sections: [],
       },
     });

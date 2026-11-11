@@ -62,7 +62,10 @@ export default class DeploymentCreate extends EnvironmentCommand {
   static override flags = {
     release: Flags.custom<string>({
       parse: reads(RELEASE),
-    })({ description: "The release id to deploy.", required: true }),
+    })({
+      description: "The release id to deploy.",
+      required: true,
+    }),
     message: Flags.custom<string>({
       parse: reads(MESSAGE),
     })({
@@ -92,7 +95,6 @@ export default class DeploymentCreate extends EnvironmentCommand {
     }
 
     const { client, projectId } = await this.connect();
-
     const deploymentService = new DeploymentService(client, projectId);
     const deployment = await deploymentService.create({
       release_id: flags.release,

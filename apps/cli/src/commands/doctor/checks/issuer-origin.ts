@@ -1,9 +1,9 @@
 import { configuredIssuer } from "@/commands/doctor/patch-context";
 import {
+  createZitadelClient,
   DeploymentService,
   OriginService,
   Origins,
-  createZitadelClient,
   type ZitadelClient,
 } from "@/lib/backend";
 import { errorMessage, isCancellation } from "@/lib/errors";
@@ -55,7 +55,12 @@ export class IssuerOriginCheck implements SanityCheck {
   async run(ctx: CheckContext): Promise<CheckOutcome> {
     const finding = await inspect(ctx.cwd, ctx.signal);
     if (finding.status === "pass") {
-      return { name: this.name, status: "pass", message: finding.message, path: this.path };
+      return {
+        name: this.name,
+        status: "pass",
+        message: finding.message,
+        path: this.path,
+      };
     }
     return {
       name: this.name,
@@ -64,7 +69,10 @@ export class IssuerOriginCheck implements SanityCheck {
         `The project has no primary origin to deploy to: it holds ${finding.pattern} as a ` +
         "preview origin, as setup 0.1.0 registered it. Run " +
         `${projectCommand("doctor --fix", ctx.selector, ctx.cliVersion)} to make it primary.`,
-      details: { pattern: finding.pattern, server: finding.server },
+      details: {
+        pattern: finding.pattern,
+        server: finding.server,
+      },
       path: this.path,
     };
   }
@@ -101,7 +109,9 @@ export class IssuerOriginCheck implements SanityCheck {
     await writeZitadelSecret(ctx.cwd, {
       ...secret,
       primary_origins: [...secret.primary_origins, pattern],
-      preview_origins: secret.preview_origins.filter((recorded) => recorded !== pattern),
+      preview_origins: secret.preview_origins.filter((recorded) => {
+        return recorded !== pattern;
+      }),
     });
     const extended = await new DeploymentService(client, secret.project_id)
       .extendPrimary(pattern, `Made ${pattern} a primary origin`)
@@ -121,10 +131,12 @@ export class IssuerOriginCheck implements SanityCheck {
 
 async function inspect(cwd: string, signal: AbortSignal): Promise<Finding> {
   const records = await readZitadelSecret(cwd)
-    .then(async (secret) => ({
-      secret,
-      server: readProjectServer(await readZitadelConfig(cwd)),
-    }))
+    .then(async (secret) => {
+      return {
+        secret,
+        server: readProjectServer(await readZitadelConfig(cwd)),
+      };
+    })
     .catch(() => undefined);
   if (records === undefined) {
     // A missing or unparseable secret or config is the `secret` and `config`
@@ -137,18 +149,30 @@ async function inspect(cwd: string, signal: AbortSignal): Promise<Finding> {
   const { secret, server } = records;
   const issuer = await configuredIssuer(cwd);
   if (issuer === undefined) {
-    return { status: "pass", message: "Skipped: no file sets ZITADEL_ISSUER" };
+    return {
+      status: "pass",
+      message: "Skipped: no file sets ZITADEL_ISSUER",
+    };
   }
   const recorded = Origins.wrap([
     ...secret.primary_origins.map((pattern) => {
-      return { pattern, kind: "primary" };
+      return {
+        pattern,
+        kind: "primary",
+      };
     }),
     ...secret.preview_origins.map((pattern) => {
-      return { pattern, kind: "preview" };
+      return {
+        pattern,
+        kind: "preview",
+      };
     }),
   ]);
   if (recorded.heldAsPreview(issuer) === undefined) {
-    return { status: "pass", message: `${issuer} is not recorded as a preview origin` };
+    return {
+      status: "pass",
+      message: `${issuer} is not recorded as a preview origin`,
+    };
   }
 
   const client = createZitadelClient({
@@ -180,7 +204,13 @@ async function inspect(cwd: string, signal: AbortSignal): Promise<Finding> {
   const { origins } = read;
   const pattern = origins.heldAsPreview(issuer);
   if (pattern !== undefined) {
-    return { status: "warn", pattern, server, secret, client };
+    return {
+      status: "warn",
+      pattern,
+      server,
+      secret,
+      client,
+    };
   }
   return {
     status: "pass",

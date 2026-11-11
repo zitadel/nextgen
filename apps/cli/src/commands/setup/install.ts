@@ -6,15 +6,15 @@ import {
   devCommandFor,
   inDirectory,
   installCommandFor,
-  runPackageCommand,
   type PackageCommand,
   type PackageManager,
+  runPackageCommand,
 } from "@/lib/package-manager";
 import {
   type EnvironmentSelector,
   projectCommand,
-  shellCommand,
   type SuggestedCommand,
+  shellCommand,
 } from "@/lib/suggestion";
 
 type InstallReason = "dry-run" | "skip-install" | "no-dependency-changes";
@@ -226,7 +226,11 @@ function installFailed(
   return new ZitadelError("E_VALIDATION", `Dependency install failed: ${installCommand.display}`, {
     hint: `Run ${installCommand.display} in ${cwd}, then start the app with ${devCommand.display}.`,
     nextCommands: [shellCommand(shownInstall)],
-    details: { command: installCommand.display, cwd, original: errorShape(error) },
+    details: {
+      command: installCommand.display,
+      cwd,
+      original: errorShape(error),
+    },
   });
 }
 

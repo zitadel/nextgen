@@ -319,7 +319,10 @@ export default class Api extends Suggestible(Destructive(BaseCommand)) {
 
     const target = named ?? resolveTarget(await this.chooseOperation(flags.paginate, secret));
     const { operation } = target;
-    this.recordTelemetry({ operation: operation.id, is_paginated: flags.paginate });
+    this.recordTelemetry({
+      operation: operation.id,
+      is_paginated: flags.paginate,
+    });
 
     const built = await requestOf(target, flags, secret?.project_id);
     refuseUnforced(built, this.meta);
@@ -334,11 +337,12 @@ export default class Api extends Suggestible(Destructive(BaseCommand)) {
     const url = operation.urlOn(this.meta.source, request);
     if (this.dryRun) {
       const curl = prose(this.curlFor(request));
+      const title = `Would call ${operation.id} (dry run)`;
 
       return this.emit({
         status: "ok",
         data: {
-          title: `Would call ${operation.id} (dry run)`,
+          title,
           dry_run: true,
           operation: operation.id,
           method: operation.method,
@@ -351,7 +355,7 @@ export default class Api extends Suggestible(Destructive(BaseCommand)) {
         },
         pretty: curl,
         summary: {
-          title: `Would call ${operation.id} (dry run)`,
+          title,
           sections: [],
           lines: curl.text.split("\n"),
         },

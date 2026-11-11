@@ -5,8 +5,8 @@ import { ForbiddenError, OriginService, type ZitadelClient } from "@/lib/backend
 import {
   type Admitted,
   CommandGroups,
-  CREDENTIALS,
   type CommandResult,
+  CREDENTIALS,
   type JsonEnvelope,
   PREVIEW_CREDENTIAL,
   PreviewCommand,
@@ -284,6 +284,8 @@ export default class Preview extends PreviewCommand {
     // release, no deployment, no preview registration — so a pull-request build
     // can check its `.zitadel/` without publishing, as `deploy --dry-run` does.
     if (this.dryRun) {
+      const title = `Validated the preview for ${urls.length} ${new Intl.PluralRules("en").select(urls.length) === "one" ? "URL" : "URLs"} and deployed nothing (dry run)`;
+
       return this.emit({
         status: "ok",
         data: {
@@ -292,14 +294,14 @@ export default class Preview extends PreviewCommand {
         },
         pretty: prose(
           [
-            `Validated the preview for ${urls.length} ${new Intl.PluralRules("en").select(urls.length) === "one" ? "URL" : "URLs"} and deployed nothing (dry run)`,
+            title,
             ...urls.map((url) => {
               return `  - ${url}`;
             }),
           ].join("\n"),
         ),
         summary: {
-          title: `Validated the preview for ${urls.length} ${new Intl.PluralRules("en").select(urls.length) === "one" ? "URL" : "URLs"} and deployed nothing (dry run)`,
+          title,
           sections: [],
           lines: urls.map((url) => {
             return `  - ${escapeControlCharacters(url)}`;
@@ -331,6 +333,8 @@ export default class Preview extends PreviewCommand {
       };
     });
 
+    const previewUrls = `${previews.length} ${new Intl.PluralRules("en").select(previews.length) === "one" ? "URL" : "URLs"}`;
+
     return this.emit({
       status: "ok",
       data: {
@@ -342,7 +346,7 @@ export default class Preview extends PreviewCommand {
       },
       pretty: prose(
         [
-          `Previewed ${release.content_hash} on ${previews.length} ${new Intl.PluralRules("en").select(previews.length) === "one" ? "URL" : "URLs"}`,
+          `Previewed ${release.content_hash} on ${previewUrls}`,
           ...previews.map((preview) => {
             return preview.expires_at === null
               ? `  - ${preview.url}`
@@ -352,7 +356,7 @@ export default class Preview extends PreviewCommand {
         ].join("\n"),
       ),
       summary: {
-        title: `Previewed ${escapeControlCharacters(release.content_hash)} on ${previews.length} ${new Intl.PluralRules("en").select(previews.length) === "one" ? "URL" : "URLs"}`,
+        title: `Previewed ${escapeControlCharacters(release.content_hash)} on ${previewUrls}`,
         sections: [],
         lines: [
           ...previews.map((preview) => {

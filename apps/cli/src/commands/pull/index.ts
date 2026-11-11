@@ -76,12 +76,21 @@ const TARGET: Refused<PullTarget> = {
       return LATEST_TARGET;
     }
     if (isReleaseId(target)) {
-      return { kind: "release", id: target };
+      return {
+        kind: "release",
+        id: target,
+      };
     }
     if (isDeploymentId(target)) {
-      return { kind: "deployment", id: target };
+      return {
+        kind: "deployment",
+        id: target,
+      };
     }
-    ctx.addIssue({ code: "custom", message: "not a pull target" });
+    ctx.addIssue({
+      code: "custom",
+      message: "not a pull target",
+    });
     return z.NEVER;
   }),
   refusal: {
@@ -238,9 +247,15 @@ export default class Pull extends EnvironmentCommand {
       FETCH_CONCURRENCY,
       async (pointer): Promise<Attempt> => {
         try {
-          return { kind: "done", outcome: await this.fetchOne(configuration, config, pointer) };
+          return {
+            kind: "done",
+            outcome: await this.fetchOne(configuration, config, pointer),
+          };
         } catch (error) {
-          return { kind: "failed", error };
+          return {
+            kind: "failed",
+            error,
+          };
         }
       },
     );
@@ -278,6 +293,8 @@ export default class Pull extends EnvironmentCommand {
       reportSkipped(resource);
     }
 
+    const files = `${pulled.length} ${new Intl.PluralRules("en").select(pulled.length) === "one" ? "file" : "files"}`;
+
     return this.emit({
       status: "ok",
       data: {
@@ -289,8 +306,8 @@ export default class Pull extends EnvironmentCommand {
       summary: {
         title: escapeControlCharacters(
           this.dryRun
-            ? `Would write ${pulled.length} ${new Intl.PluralRules("en").select(pulled.length) === "one" ? "file" : "files"} from ${release.id} (dry run)`
-            : `Pulled ${pulled.length} ${new Intl.PluralRules("en").select(pulled.length) === "one" ? "file" : "files"} from ${release.id}`,
+            ? `Would write ${files} from ${release.id} (dry run)`
+            : `Pulled ${files} from ${release.id}`,
         ),
         sections: [],
         lines: fileList(
@@ -356,13 +373,22 @@ export default class Pull extends EnvironmentCommand {
     config: ZitadelConfig,
     pointer: ReleasePointer,
   ): Promise<PullOutcome> {
-    const resource: PinnedResource = { kind: pointer.kind, handle: pointer.handle };
+    const resource: PinnedResource = {
+      kind: pointer.kind,
+      handle: pointer.handle,
+    };
     if (!isPullable(pointer.kind)) {
-      return { kind: "skipped", resource };
+      return {
+        kind: "skipped",
+        resource,
+      };
     }
     const body = await configuration.fetchRevision(pointer.kind, pointer.revision_id);
     if (!isJsonValue(body) || !isJsonObject(body)) {
-      return { kind: "skipped", resource };
+      return {
+        kind: "skipped",
+        resource,
+      };
     }
     const collection = PULLABLE[pointer.kind](config);
     const change = collection.placeRevision(pointer.handle, body);

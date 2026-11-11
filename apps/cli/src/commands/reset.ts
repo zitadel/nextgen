@@ -71,30 +71,34 @@ export default class Reset extends Suggestible(Destructive(BaseCommand)) {
           `Run ${this.suggest("start")} afterwards to set up a fresh server.`,
         ].join("\n"),
         preview: () => {
+          const title = "Would reset the local Zitadel server runtime (dry run)";
           return {
             status: "ok",
             data: {
               dry_run: true,
-              title: "Would reset the local Zitadel server runtime (dry run)",
+              title,
               runtime: described,
             },
             summary: {
-              title: "Would reset the local Zitadel server runtime (dry run)",
+              title,
               sections: [],
             },
             next: { commands: [this.suggest("reset --force")] },
           };
         },
         apply: async (consent) => {
-          await LocalServer.at(this.cwd, { cliVersion: this.cliVersion }).reset(consent);
+          await LocalServer.at(this.cwd, {
+            cliVersion: this.cliVersion,
+          }).reset(consent);
+          const title = "Local Zitadel server runtime reset";
           return {
             status: "ok",
             data: {
-              title: "Local Zitadel server runtime reset",
+              title,
               runtime: described,
             },
             summary: {
-              title: "Local Zitadel server runtime reset",
+              title,
               sections: [],
             },
           };

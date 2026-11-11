@@ -71,18 +71,30 @@ export class ManagedFilesCheck implements SanityCheck {
     const wiring = await probeConfigWiring(ctx);
     const actions = await resolveArtifacts(ctx);
     const boundaries = actions ? await detectBoundaryConflicts(actions, ctx.cwd, manifest) : [];
-    const missing = rows.filter((row) => row.state === "missing");
-    const missingInfrastructure = missing.filter((row) => row.class === "infrastructure");
-    const detachedInfrastructure = wiring.filter(
-      (s) => s.state === "detached" && s.wiring === "infrastructure",
-    );
-    const detachedConvenience = wiring.filter(
-      (s) => s.state === "detached" && s.wiring === "convenience",
-    );
-    const unverifiable = wiring.filter((s) => s.state === "unknown");
-    const outdated = wiring.filter((s) => s.state === "outdated");
-    const conflicts = boundaries.filter((b) => b.disposition === "conflict");
-    const removable = boundaries.filter((b) => b.disposition === "removable");
+    const missing = rows.filter((row) => {
+      return row.state === "missing";
+    });
+    const missingInfrastructure = missing.filter((row) => {
+      return row.class === "infrastructure";
+    });
+    const detachedInfrastructure = wiring.filter((s) => {
+      return s.state === "detached" && s.wiring === "infrastructure";
+    });
+    const detachedConvenience = wiring.filter((s) => {
+      return s.state === "detached" && s.wiring === "convenience";
+    });
+    const unverifiable = wiring.filter((s) => {
+      return s.state === "unknown";
+    });
+    const outdated = wiring.filter((s) => {
+      return s.state === "outdated";
+    });
+    const conflicts = boundaries.filter((b) => {
+      return b.disposition === "conflict";
+    });
+    const removable = boundaries.filter((b) => {
+      return b.disposition === "removable";
+    });
     const details = {
       mode,
       files: rows,
@@ -98,13 +110,19 @@ export class ManagedFilesCheck implements SanityCheck {
     }
     if (detachedInfrastructure.length > 0) {
       failures.push(
-        `detached managed config wiring: ${detachedInfrastructure.map((s) => s.path).join(", ")}`,
+        `detached managed config wiring: ${detachedInfrastructure
+          .map((s) => {
+            return s.path;
+          })
+          .join(", ")}`,
       );
     }
     if (outdated.length > 0) {
       failures.push(
         `outdated managed config wiring: ${outdated
-          .map((s) => (s.reason ? `${s.path} (${s.reason})` : s.path))
+          .map((s) => {
+            return s.reason ? `${s.path} (${s.reason})` : s.path;
+          })
           .join(", ")}`,
       );
     }
@@ -114,7 +132,12 @@ export class ManagedFilesCheck implements SanityCheck {
       );
     }
     if (failures.length > 0) {
-      return { name: this.name, status: "fail", message: failures.join("; "), details };
+      return {
+        name: this.name,
+        status: "fail",
+        message: failures.join("; "),
+        details,
+      };
     }
 
     const warnings: string[] = [];
@@ -123,13 +146,19 @@ export class ManagedFilesCheck implements SanityCheck {
     }
     if (detachedConvenience.length > 0) {
       warnings.push(
-        `unapplied managed config edit(s): ${detachedConvenience.map((s) => s.path).join(", ")} (doctor --fix applies them)`,
+        `unapplied managed config edit(s): ${detachedConvenience
+          .map((s) => {
+            return s.path;
+          })
+          .join(", ")} (doctor --fix applies them)`,
       );
     }
     if (unverifiable.length > 0) {
       warnings.push(
         `unverifiable managed config wiring (manual review required): ${unverifiable
-          .map((s) => (s.reason ? `${s.path} (${s.reason})` : s.path))
+          .map((s) => {
+            return s.reason ? `${s.path} (${s.reason})` : s.path;
+          })
           .join(", ")}`,
       );
     }
@@ -139,7 +168,12 @@ export class ManagedFilesCheck implements SanityCheck {
       );
     }
     if (warnings.length > 0) {
-      return { name: this.name, status: "warn", message: warnings.join("; "), details };
+      return {
+        name: this.name,
+        status: "warn",
+        message: warnings.join("; "),
+        details,
+      };
     }
 
     let verified = "";
@@ -183,8 +217,12 @@ export class ManagedFilesCheck implements SanityCheck {
     // deletes nothing and keeps the exclusion, so the preview stays safe.
     const boundaries = await detectBoundaryConflicts(actions, ctx.cwd, manifest);
     const excludePaths = boundaries
-      .filter((b) => b.disposition === "conflict")
-      .map((b) => b.current);
+      .filter((b) => {
+        return b.disposition === "conflict";
+      })
+      .map((b) => {
+        return b.current;
+      });
     const removed: string[] = [];
     if (!ctx.dryRun) {
       for (const boundary of boundaries) {
@@ -246,7 +284,10 @@ export class ManagedFilesCheck implements SanityCheck {
       }
       files[path] =
         contents !== undefined && missingBefore.includes(path)
-          ? { ...entry, hash: hashScaffoldFile(contents) }
+          ? {
+              ...entry,
+              hash: hashScaffoldFile(contents),
+            }
           : entry;
     }
     for (const path of actions.markedFiles) {
@@ -261,7 +302,10 @@ export class ManagedFilesCheck implements SanityCheck {
         };
       }
     }
-    await updateScaffold(ctx.cwd, { ...manifest, files });
+    await updateScaffold(ctx.cwd, {
+      ...manifest,
+      files,
+    });
   }
 }
 
@@ -296,7 +340,11 @@ async function detectBoundaryConflicts(
         entry !== undefined &&
         contents.includes(MANAGED_MARKER) &&
         hashScaffoldFile(contents) === entry.hash;
-      conflicts.push({ current, retired, disposition: pristine ? "removable" : "conflict" });
+      conflicts.push({
+        current,
+        retired,
+        disposition: pristine ? "removable" : "conflict",
+      });
     }
   }
   return conflicts;
@@ -354,13 +402,21 @@ async function materializeManifest(
         marked.push(path);
       }
     }
-    const infrastructure = actions.markedFiles.filter(
-      (path) => actions.fileClasses?.[path] === "infrastructure" && !conditional.has(path),
-    );
-    if (!infrastructure.every((path) => marked.includes(path))) {
+    const infrastructure = actions.markedFiles.filter((path) => {
+      return actions.fileClasses?.[path] === "infrastructure" && !conditional.has(path);
+    });
+    if (
+      !infrastructure.every((path) => {
+        return marked.includes(path);
+      })
+    ) {
       return;
     }
-    await writeScaffoldManifest({ cwd: ctx.cwd, actions, written: marked });
+    await writeScaffoldManifest({
+      cwd: ctx.cwd,
+      actions,
+      written: marked,
+    });
   } catch {
     // state.json unreadable or the write raced — stays in template mode.
   }
@@ -373,9 +429,16 @@ async function evaluateManifest(
   const rows: ScaffoldFileRow[] = [];
   for (const [path, entry] of Object.entries(manifest.files)) {
     const contents = await readIfReadable(join(cwd, path));
-    rows.push({ path, class: entry.class, state: stateFor(contents, entry.hash) });
+    rows.push({
+      path,
+      class: entry.class,
+      state: stateFor(contents, entry.hash),
+    });
   }
-  return { mode: "manifest", rows };
+  return {
+    mode: "manifest",
+    rows,
+  };
 }
 
 /**
@@ -405,7 +468,10 @@ async function evaluateTemplates(
       state: stateFor(contents, undefined),
     });
   }
-  return { mode: "template", rows };
+  return {
+    mode: "template",
+    rows,
+  };
 }
 
 /**
@@ -420,7 +486,9 @@ export async function resolveArtifacts(ctx: CheckContext): Promise<EjectActions 
     return undefined;
   }
   try {
-    const config = await readZitadelConfig(ctx.cwd).catch(() => ({}) as Record<string, unknown>);
+    const config = await readZitadelConfig(ctx.cwd).catch(() => {
+      return {} as Record<string, unknown>;
+    });
     return ctx.orca.patcherFor(framework.id).artifacts({
       framework,
       rendererId: readRendererId(config),
@@ -454,5 +522,9 @@ async function missingManifestPaths(cwd: string, manifest: ScaffoldManifest): Pr
 }
 
 function listPaths(rows: ReadonlyArray<ScaffoldFileRow>): string {
-  return rows.map((row) => row.path).join(", ");
+  return rows
+    .map((row) => {
+      return row.path;
+    })
+    .join(", ");
 }

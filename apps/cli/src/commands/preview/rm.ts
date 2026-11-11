@@ -73,8 +73,8 @@ export default class PreviewRm extends Destructive(PreviewCommand) {
           });
         },
         prepare: async () => {
-          const connection = await this.connect();
-          const previewService = new PreviewService(connection.client, connection.projectId);
+          const { client, projectId } = await this.connect();
+          const previewService = new PreviewService(client, projectId);
           const previews = await previewService.list();
           // The server answers 204 whether or not the URL was live, so a typo
           // would otherwise read as a removal. Checked before asking, so
@@ -100,7 +100,7 @@ export default class PreviewRm extends Destructive(PreviewCommand) {
               next: { commands: [this.suggest("preview list")] },
             });
           }
-          return connection;
+          return { client, projectId };
         },
         apply: async (consent, { client, projectId }) => {
           const previewService = new PreviewService(consent.unlock(client), projectId);

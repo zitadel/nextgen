@@ -1,14 +1,13 @@
-import { escapeControlCharacters } from "@/lib/terminal-text";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { Flags } from "@oclif/core";
 import {
-  type BrandingDesign,
   BRANDING_DESIGNS,
+  type BrandingDesign,
+  brandingReadmeContent,
   DEFAULT_BRANDING_CONFIG_PATH,
   DEFAULT_BRANDING_DESIGN,
   DEFAULT_BRANDING_TEMPLATE_PATH,
-  brandingReadmeContent,
   getDefaultBrandingConfig,
 } from "@zitadel/config/defaults";
 import { BRANDING_FILE_SCHEMA_REF, META_SCHEMA_DIR } from "@zitadel/config/meta-schemas";
@@ -24,9 +23,10 @@ import { Suggestible } from "@/lib/oclif/suggestible";
 import { hasZitadelConfig } from "@/lib/project";
 import { normalizePublicCliProse } from "@/lib/public-cli";
 import { DEPLOY_ARGS } from "@/lib/suggestion";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 import {
-  BRANDING_DESIGN_INFO,
   Branding,
+  BRANDING_DESIGN_INFO,
   CONFIG_DIRECTORIES,
   DiskStore,
   FileExistsError,
@@ -121,7 +121,10 @@ export default class BrandingEject extends Suggestible(Promptable(BaseCommand)) 
   static override group = CommandGroups.configuration;
 
   static override flags = {
-    force: Flags.boolean({ char: "f", description: "Overwrite an existing branding file." }),
+    force: Flags.boolean({
+      char: "f",
+      description: "Overwrite an existing branding file.",
+    }),
     // No oclif `options`: a retired design is refused by name, with a pointer
     // to where page layout lives, rather than by oclif's generic "expected one
     // of".
@@ -137,16 +140,18 @@ export default class BrandingEject extends Suggestible(Promptable(BaseCommand)) 
   };
 
   protected async execute({ flags }: Admitted<typeof BrandingEject>): Promise<JsonEnvelope> {
-    const suggest = (next: string) => {
-      return this.suggest(next);
-    };
     if (!(await hasZitadelConfig(this.cwd))) {
-      throw refusalError(NOT_A_PROJECT_REFUSAL, {}, suggest);
+      throw refusalError(NOT_A_PROJECT_REFUSAL, {}, (next) => {
+        return this.suggest(next);
+      });
     }
     // The checks above refused one that is not a design, so a value that got
     // here is either a design or absent, and absent is asked for.
     const design = flags.design ?? (await this.promptDesign(this.nonInteractive));
-    this.recordTelemetry({ design, force: this.force });
+    this.recordTelemetry({
+      design,
+      force: this.force,
+    });
     const { branding, template } = getDefaultBrandingConfig(design);
 
     const filesWritten: string[] = [];
@@ -170,7 +175,10 @@ export default class BrandingEject extends Suggestible(Promptable(BaseCommand)) 
     // The descriptor and its template are configuration, written through it.
     const descriptor = Branding.create({
       path: DEFAULT_BRANDING_CONFIG_PATH,
-      body: { $schema: BRANDING_FILE_SCHEMA_REF, ...branding },
+      body: {
+        $schema: BRANDING_FILE_SCHEMA_REF,
+        ...branding,
+      },
     });
     const change = ZitadelConfig.empty()
       .branding.put(descriptor)
@@ -210,17 +218,17 @@ export default class BrandingEject extends Suggestible(Promptable(BaseCommand)) 
     for (const file of filesWritten) {
       log.info(`Wrote ${escapeControlCharacters(file)}`);
     }
-    const ejected = `Ejected the ${design} design into ${CONFIG_DIRECTORIES.branding}/`;
+    const title = `Ejected the ${design} design into ${CONFIG_DIRECTORIES.branding}/`;
 
     return this.emit({
       status: "ok",
       data: {
-        title: ejected,
+        title,
         design,
         files_written: filesWritten,
       },
       summary: {
-        title: ejected,
+        title,
         sections: [],
         lines: [`Files: ${filesWritten.length} written, 0 unchanged`],
       },
@@ -242,11 +250,13 @@ export default class BrandingEject extends Suggestible(Promptable(BaseCommand)) 
       name: "design",
       message: "Which design would you like to start from?",
       initialValue: DEFAULT_BRANDING_DESIGN,
-      options: BRANDING_DESIGNS.map((design) => ({
-        value: design,
-        label: BRANDING_DESIGN_INFO[design].label,
-        hint: BRANDING_DESIGN_INFO[design].hint,
-      })),
+      options: BRANDING_DESIGNS.map((design) => {
+        return {
+          value: design,
+          label: BRANDING_DESIGN_INFO[design].label,
+          hint: BRANDING_DESIGN_INFO[design].hint,
+        };
+      }),
     });
   }
 }

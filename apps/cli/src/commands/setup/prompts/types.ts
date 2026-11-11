@@ -68,7 +68,13 @@ export function completeSso(drafts: readonly SsoDraft[]): SsoAnswer[] {
     if (clientId === undefined || secret === undefined) {
       throw new Error(`no credentials were collected for ${providerOf(draft.selection).slug}`);
     }
-    return { ...draft, credentials: { clientId, secret } };
+    return {
+      ...draft,
+      credentials: {
+        clientId,
+        secret,
+      },
+    };
   });
 }
 

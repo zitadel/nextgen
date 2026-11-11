@@ -4,7 +4,7 @@ import { execa } from "execa";
 import semver from "semver";
 
 import { Cmd } from "@/lib/cmd";
-import { ZitadelError, errorMessage } from "@/lib/errors";
+import { errorMessage, ZitadelError } from "@/lib/errors";
 import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
 import { painted } from "@/lib/oclif/rendering";
 import { Suggestible } from "@/lib/oclif/suggestible";
@@ -59,9 +59,11 @@ export default class Upgrade extends Suggestible(BaseCommand) {
   };
 
   protected async execute({ flags }: Admitted<typeof Upgrade>): Promise<JsonEnvelope> {
-    const { cliVersion, cwd, dryRun, env } = this;
-
-    const latest = await latestCliVersion({ cliVersion, env, fresh: true });
+    const latest = await latestCliVersion({
+      cliVersion: this.cliVersion,
+      env: this.env,
+      fresh: true,
+    });
     if (latest === undefined) {
       throw new ZitadelError("E_NETWORK", "Could not look up the latest Zitadel release", {
         hint: "Check the connection to the npm registry, then rerun.",
@@ -70,16 +72,32 @@ export default class Upgrade extends Suggestible(BaseCommand) {
     }
     // A CLI ahead of the dist-tag (a prerelease) is what its own files target,
     // so it is never moved back.
-    const target = isNewerVersion(latest, cliVersion) ? latest : cliVersion;
-    const cliBehind = target !== cliVersion;
-    const packages: PackageUpgrade[] = ((await exactZitadelPins(cwd)) ?? [])
-      .filter(([, version]) => semver.lt(version, target))
-      .map(([name, version]) => ({ name, from: version, to: target }));
-    const leftAlone = (await floatingZitadelSpecs(cwd)) ?? [];
+    const target = isNewerVersion(latest, this.cliVersion) ? latest : this.cliVersion;
+    const cliBehind = target !== this.cliVersion;
+    const packages: PackageUpgrade[] = ((await exactZitadelPins(this.cwd)) ?? [])
+      .filter(([, version]) => {
+        return semver.lt(version, target);
+      })
+      .map(([name, version]) => {
+        return {
+          name,
+          from: version,
+          to: target,
+        };
+      });
+    const leftAlone = (await floatingZitadelSpecs(this.cwd)) ?? [];
     const upToDate = !cliBehind && packages.length === 0;
     const breaking = upToDate
       ? []
-      : await breakingChanges(oldestOf([cliVersion, ...packages.map((pkg) => pkg.from)]), target);
+      : await breakingChanges(
+          oldestOf([
+            this.cliVersion,
+            ...packages.map((pkg) => {
+              return pkg.from;
+            }),
+          ]),
+          target,
+        );
 
     // Before anything changes, so the person reads it while they can still stop.
     if (!upToDate) {
@@ -89,38 +107,41 @@ export default class Upgrade extends Suggestible(BaseCommand) {
       packages.length === 0
         ? undefined
         : addExactCommandFor(
-            await detectPackageManager(cwd),
-            packages.map((pkg) => `${pkg.name}@${pkg.to}`),
+            await detectPackageManager(this.cwd),
+            packages.map((pkg) => {
+              return `${pkg.name}@${pkg.to}`;
+            }),
           );
     const installSuggestion =
       install === undefined
         ? undefined
-        : shellCommand(inDirectory(install, flags.cwd, cwd).display);
-    if (install !== undefined && installSuggestion !== undefined && !dryRun) {
+        : shellCommand(inDirectory(install, flags.cwd, this.cwd).display);
+    if (install !== undefined && installSuggestion !== undefined && !this.dryRun) {
       await this.install(install, installSuggestion);
     }
     const refresh: Refresh =
-      install !== undefined && !dryRun && (await hasZitadelConfig(cwd))
-        ? await refreshProject(target, cwd, env, flags.telemetry === false)
+      install !== undefined && !this.dryRun && (await hasZitadelConfig(this.cwd))
+        ? await refreshProject(target, this.cwd, this.env, flags.telemetry === false)
         : "skipped";
 
     // At the new version, and from the shell's directory like every suggestion.
-    const atTarget = (args: string): SuggestedCommand =>
-      unscopedCommand(
+    const atTarget = (args: string): SuggestedCommand => {
+      return unscopedCommand(
         flags.cwd === undefined ? args : `${args} ${Cmd.option("--cwd", flags.cwd)}`,
         target,
       );
+    };
     const commands: SuggestedCommand[] = [
       ...(refresh === "failed" ? [atTarget("doctor --fix")] : []),
       ...(refresh === "issues" ? [atTarget("doctor")] : []),
-      ...(install !== undefined && !dryRun && existsSync(join(cwd, SHARED_SKILLS_DIR))
+      ...(install !== undefined && !this.dryRun && existsSync(join(this.cwd, SHARED_SKILLS_DIR))
         ? [atTarget("skills add")]
         : []),
     ];
     const actions = [
       ...(cliBehind
         ? [
-            `This CLI is still ${cliVersion}. Run the newest with ${newestCliCommand("<command>", cliVersion)}, or if you installed it globally, update it with npm install --global @zitadel/cli@${target}.`,
+            `This CLI is still ${this.cliVersion}. Run the newest with ${newestCliCommand("<command>", this.cliVersion)}, or if you installed it globally, update it with npm install --global @zitadel/cli@${target}.`,
           ]
         : []),
     ];
@@ -128,11 +149,11 @@ export default class Upgrade extends Suggestible(BaseCommand) {
     let said = `Zitadel upgraded to ${target}`;
     if (upToDate) {
       said = `Zitadel is up to date at ${target}`;
-    } else if (dryRun) {
+    } else if (this.dryRun) {
       said = `Zitadel can be upgraded to ${target}`;
     }
-    said = `${said}${dryRun ? " (dry run)" : ""}`;
-    const done = dryRun ? arrow : mark.pass;
+    said = `${said}${this.dryRun ? " (dry run)" : ""}`;
+    const done = this.dryRun ? arrow : mark.pass;
     const rows = [
       // A package's name and versions are what the registry answered, and this
       // line colours only the mark in front of them, so they are spelled out
@@ -140,7 +161,7 @@ export default class Upgrade extends Suggestible(BaseCommand) {
       ...packages.map((pkg) => {
         return `  ${done} ${escapeControlCharacters(`${pkg.name} ${pkg.from} → ${pkg.to}`)}`;
       }),
-      ...(dryRun && installSuggestion !== undefined
+      ...(this.dryRun && installSuggestion !== undefined
         ? [`  Would run ${command(installSuggestion)}`]
         : []),
       ...(refresh === "done" ? [`  ${done} Refreshed generated files with doctor --fix`] : []),
@@ -157,8 +178,8 @@ export default class Upgrade extends Suggestible(BaseCommand) {
       status: "ok",
       data: {
         title: said,
-        ...(dryRun ? { dry_run: true } : {}),
-        current_version: cliVersion,
+        ...(this.dryRun ? { dry_run: true } : {}),
+        current_version: this.cliVersion,
         latest_version: target,
         up_to_date: upToDate,
         packages,
@@ -234,7 +255,10 @@ async function refreshProject(
       ],
       {
         cwd,
-        env: { ...env, ZITADEL_UPDATE_CHECK: "0" },
+        env: {
+          ...env,
+          ZITADEL_UPDATE_CHECK: "0",
+        },
         extendEnv: false,
         reject: false,
         stdin: "ignore",
@@ -249,9 +273,11 @@ async function refreshProject(
 }
 
 function renderBreakingChanges(breaking: readonly BreakingChange[]): string {
-  const notes = breaking.flatMap(({ version, note }) => [
-    `  ${mark.warn} ${strong(escapeControlCharacters(version))}  ${escapeControlCharacters(note)}`,
-  ]);
+  const notes = breaking.flatMap(({ version, note }) => {
+    return [
+      `  ${mark.warn} ${strong(escapeControlCharacters(version))}  ${escapeControlCharacters(note)}`,
+    ];
+  });
   return [
     ...(notes.length > 0 ? [strong("Breaking changes on the way:"), ...notes] : []),
     `Release notes: ${url(RELEASE_NOTES_URL)}`,

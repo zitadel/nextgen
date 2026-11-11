@@ -71,7 +71,6 @@ export default class PreviewList extends Tabulatable(PreviewCommand) {
 
   protected async execute({ flags }: Admitted<typeof PreviewList>): Promise<JsonEnvelope> {
     const { client, projectId } = await this.connect();
-
     const previewService = new PreviewService(client, projectId);
     const listed = await previewService.page(
       {

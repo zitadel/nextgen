@@ -63,20 +63,33 @@ export const CHECK_CATEGORIES: ReadonlyArray<{
   },
 ];
 
-const LABEL_WIDTH = Math.max(...CHECK_CATEGORIES.map((category) => category.label.length));
+const LABEL_WIDTH = Math.max(
+  ...CHECK_CATEGORIES.map((category) => {
+    return category.label.length;
+  }),
+);
 /** Under a category's row: four columns of indent, the mark, and a space. */
 const DETAIL_INDENT = 6;
 
 /** The category a check belongs to. A test holds every check the command runs to this table. */
 export function categoryOf(checkName: string): CheckCategory {
-  return CHECK_CATEGORIES.find((category) => category.checks.includes(checkName))?.id ?? "project";
+  return (
+    CHECK_CATEGORIES.find((category) => {
+      return category.checks.includes(checkName);
+    })?.id ?? "project"
+  );
 }
 
 /** The checks as the envelope carries them. */
 export function withCategories(
   checks: readonly CheckOutcome[],
 ): Array<CheckOutcome & { category: CheckCategory }> {
-  return checks.map((check) => ({ ...check, category: categoryOf(check.name) }));
+  return checks.map((check) => {
+    return {
+      ...check,
+      category: categoryOf(check.name),
+    };
+  });
 }
 
 type RowStatus = CheckOutcome["status"] | "skip";
@@ -126,7 +139,9 @@ export function doctorReport(input: DoctorReportInput): DoctorReport {
   const lines: string[] = [];
   const shownCommands = new Set<string>();
   for (const category of CHECK_CATEGORIES) {
-    const checks = input.checks.filter((check) => categoryOf(check.name) === category.id);
+    const checks = input.checks.filter((check) => {
+      return categoryOf(check.name) === category.id;
+    });
     const skipped = skipReason(category.id, input);
     if (skipped !== undefined) {
       lines.push(row("skip", category.label, skipped.reason));
@@ -153,7 +168,13 @@ export function doctorReport(input: DoctorReportInput): DoctorReport {
     lines.push(dim(`  Run with -v to see all ${checksCount(input.checks.length)}.`));
   }
   const shownActions = new Set(
-    (input.fixes ?? []).filter((fix) => shownCommands.has(fix.command)).map((fix) => fix.action),
+    (input.fixes ?? [])
+      .filter((fix) => {
+        return shownCommands.has(fix.command);
+      })
+      .map((fix) => {
+        return fix.action;
+      }),
   );
   return {
     lines,
@@ -206,10 +227,18 @@ function row(status: RowStatus, label: string, summary: string | undefined): str
 }
 
 function worstOf(checks: readonly CheckOutcome[]): CheckOutcome["status"] {
-  if (checks.some((check) => check.status === "fail")) {
+  if (
+    checks.some((check) => {
+      return check.status === "fail";
+    })
+  ) {
     return "fail";
   }
-  return checks.some((check) => check.status === "warn") ? "warn" : "pass";
+  return checks.some((check) => {
+    return check.status === "warn";
+  })
+    ? "warn"
+    : "pass";
 }
 
 /** The one-line summary a row shows; what needs attention is listed below it instead. */
@@ -219,16 +248,25 @@ function summaryOf(
   input: DoctorReportInput,
 ): string | undefined {
   if (category === "versions") {
-    const latest = detailsOf(checks.find((check) => check.name === "cli-version"))?.latest;
+    const latest = detailsOf(
+      checks.find((check) => {
+        return check.name === "cli-version";
+      }),
+    )?.latest;
     return typeof latest === "string"
       ? `CLI ${input.cliVersion}, ${latest} available`
       : `CLI ${input.cliVersion}`;
   }
   if (category === "local_server") {
-    const running = checks.find((check) => check.name === "runtime")?.status === "pass";
+    const running =
+      checks.find((check) => {
+        return check.name === "runtime";
+      })?.status === "pass";
     return `${running ? "running on " : ""}port ${String(input.port)} (${input.runtime})`;
   }
-  const passed = checks.filter((check) => check.status === "pass").length;
+  const passed = checks.filter((check) => {
+    return check.status === "pass";
+  }).length;
   if (passed !== checks.length) {
     return undefined;
   }
@@ -273,7 +311,9 @@ function detailLines(
       input.verbose ? `${check.name}: ${check.message}` : check.message,
     );
     lines.push(detailLine(check.status, check.status === "pass" ? dim(text) : text, input));
-    const fix = input.fixes?.find((candidate) => candidate.check === check.name);
+    const fix = input.fixes?.find((candidate) => {
+      return candidate.check === check.name;
+    });
     if (check.status !== "pass" && fix !== undefined && !shownCommands.has(fix.command)) {
       lines.push(remedyLine(fix.command));
       shownCommands.add(fix.command);
@@ -293,7 +333,9 @@ function detailLine(
   const [first = "", ...rest] = wrapped.split("\n");
   return [
     `    ${mark[status]} ${first}`,
-    ...rest.map((line) => `${" ".repeat(DETAIL_INDENT)}${line}`),
+    ...rest.map((line) => {
+      return `${" ".repeat(DETAIL_INDENT)}${line}`;
+    }),
   ].join("\n");
 }
 
@@ -304,9 +346,15 @@ function detailLine(
  */
 function remediesOf(category: CheckCategory, checks: readonly CheckOutcome[]): string[] {
   const remedies = checks
-    .filter((check) => check.status !== "pass")
-    .map((check) => detailsOf(check)?.remedy_command)
-    .filter((remedy): remedy is string => typeof remedy === "string");
+    .filter((check) => {
+      return check.status !== "pass";
+    })
+    .map((check) => {
+      return detailsOf(check)?.remedy_command;
+    })
+    .filter((remedy): remedy is string => {
+      return typeof remedy === "string";
+    });
   return category === "versions" ? remedies.slice(0, 1) : [...new Set(remedies)];
 }
 
@@ -315,16 +363,34 @@ function remedyLine(remedy: string): string {
 }
 
 function conclusion(checks: readonly CheckOutcome[]): string {
-  const affected = (status: CheckOutcome["status"]): number =>
-    new Set(checks.filter((check) => check.status === status).map((c) => categoryOf(c.name))).size;
-  const categories = (count: number): string =>
-    new Intl.PluralRules("en").select(count) === "one"
+  const affected = (status: CheckOutcome["status"]): number => {
+    return new Set(
+      checks
+        .filter((check) => {
+          return check.status === status;
+        })
+        .map((c) => {
+          return categoryOf(c.name);
+        }),
+    ).size;
+  };
+  const categories = (count: number): string => {
+    return new Intl.PluralRules("en").select(count) === "one"
       ? "1 category"
       : `${String(count)} categories`;
-  if (checks.some((check) => check.status === "fail")) {
+  };
+  if (
+    checks.some((check) => {
+      return check.status === "fail";
+    })
+  ) {
     return `${mark.fail} Zitadel doctor found issues in ${categories(affected("fail"))}.`;
   }
-  if (checks.some((check) => check.status === "warn")) {
+  if (
+    checks.some((check) => {
+      return check.status === "warn";
+    })
+  ) {
     return `${mark.warn} Zitadel doctor passed with warnings in ${categories(affected("warn"))}.`;
   }
   return `${mark.pass} Zitadel doctor passed.`;

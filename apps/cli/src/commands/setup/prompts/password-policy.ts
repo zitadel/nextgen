@@ -31,8 +31,15 @@ export class PasswordPolicyPrompt implements SetupPrompt {
         label: `${RECOMMENDED_PASSWORD_MIN_LENGTH} characters — recommended`,
         hint: "NIST minimum for password-only sign-in",
       },
-      { value: 8, label: "8 characters", hint: "NIST minimum with a second factor" },
-      { value: null, label: "No minimum" },
+      {
+        value: 8,
+        label: "8 characters",
+        hint: "NIST minimum with a second factor",
+      },
+      {
+        value: null,
+        label: "No minimum",
+      },
     ];
     const passwordMinLength = await ctx.ask.select({
       name: "minimum password length",
@@ -40,6 +47,9 @@ export class PasswordPolicyPrompt implements SetupPrompt {
       initialValue: RECOMMENDED_PASSWORD_MIN_LENGTH,
       options,
     });
-    return { ...answers, passwordMinLength };
+    return {
+      ...answers,
+      passwordMinLength,
+    };
   }
 }

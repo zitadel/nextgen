@@ -37,7 +37,9 @@ export default class DeploymentGet extends Tabulatable(EnvironmentCommand) {
 
   static override examples = ["<%= config.bin %> deployment get dep_01KX5N7C9D2E7F0N9WD3P2E4YM6"];
   static override args = {
-    deployment_id: Args.custom<string>({ parse: taken(DEPLOYMENT_ID) })({
+    deployment_id: Args.custom<string>({
+      parse: taken(DEPLOYMENT_ID),
+    })({
       required: true,
       description: "The deployment to read.",
     }),
@@ -45,7 +47,6 @@ export default class DeploymentGet extends Tabulatable(EnvironmentCommand) {
 
   protected async execute({ args }: Admitted<typeof DeploymentGet>): Promise<JsonEnvelope> {
     const { client, projectId } = await this.connect();
-
     const deploymentService = new DeploymentService(client, projectId);
     const shows = !this.isJson && this.isOnScreen;
     const [deployment, variables] = await Promise.all([

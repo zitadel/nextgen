@@ -2,9 +2,9 @@ import { basename } from "node:path";
 
 import { loadPatchContext } from "@/commands/doctor/patch-context";
 import {
+  createZitadelClient,
   DeploymentService,
   OriginService,
-  createZitadelClient,
   type ZitadelClient,
 } from "@/lib/backend";
 import { type Consent, type Gate, isRefusal } from "@/lib/consent";
@@ -97,19 +97,28 @@ export async function moveDevPort(opts: {
   const ctx = {
     ...context,
     issuer,
-    framework: { ...context.framework, devPort, url: issuer },
+    framework: {
+      ...context.framework,
+      devPort,
+      url: issuer,
+    },
   };
   const patcher = orca.patcherFor(ctx.framework.id);
-  const result = await patcher.moveDevPort(ctx, previousIssuer, { cwd, dryRun, force: false });
+  const result = await patcher.moveDevPort(ctx, previousIssuer, {
+    cwd,
+    dryRun,
+    force: false,
+  });
 
   if (!dryRun) {
     // The app's own origin is primary, so the move rewrites that list. An
     // older secret that still carries the issuer as a preview pattern is
     // rewritten too, so the stale URL is not left behind either way.
-    const rewrite = (patterns: string[]): string[] =>
-      replaceOrigin(patterns, previousIssuer, issuer).filter(
-        (pattern) => typeof pattern === "string",
-      );
+    const rewrite = (patterns: string[]): string[] => {
+      return replaceOrigin(patterns, previousIssuer, issuer).filter((pattern) => {
+        return typeof pattern === "string";
+      });
+    };
     await writeZitadelSecret(cwd, {
       ...secret,
       primary_origins: rewrite(secret.primary_origins),
@@ -117,7 +126,10 @@ export async function moveDevPort(opts: {
     });
     const manifest = await readScaffoldManifest(cwd);
     if (manifest !== undefined) {
-      await updateScaffold(cwd, { ...manifest, dev_port: devPort });
+      await updateScaffold(cwd, {
+        ...manifest,
+        dev_port: devPort,
+      });
     }
   }
   const served =
@@ -224,14 +236,20 @@ async function connectionSlugs(cwd: string): Promise<readonly string[]> {
   const config = await ZitadelConfig.loadKinds(new DiskStore(cwd), ["connections"]);
   const named = [
     ...config.connections.all.map((connection) => {
-      return { path: connection.path, name: connection.slug };
+      return {
+        path: connection.path,
+        name: connection.slug,
+      };
     }),
     ...config.broken
       .filter((file) => {
         return file.kind === "connection";
       })
       .map((file) => {
-        return { path: file.path, name: basename(file.path, ".json") };
+        return {
+          path: file.path,
+          name: basename(file.path, ".json"),
+        };
       }),
   ];
   return named

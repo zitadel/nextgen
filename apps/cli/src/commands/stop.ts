@@ -46,11 +46,12 @@ export default class Stop extends Suggestible(BaseCommand) {
     const containerName =
       runtime?.backend === "docker" ? runtime.container_name : localContainerName(this.cwd);
     if (this.dryRun) {
+      const title = "Would stop the local Zitadel server (dry run)";
       return this.emit({
         status: "ok",
         data: {
           dry_run: true,
-          title: "Would stop the local Zitadel server (dry run)",
+          title,
           runtime: {
             backend: runtime?.backend ?? "missing",
             ...(runtime?.backend === "binary"
@@ -64,7 +65,7 @@ export default class Stop extends Suggestible(BaseCommand) {
           },
         },
         summary: {
-          title: "Would stop the local Zitadel server (dry run)",
+          title,
           sections: [],
         },
         next: { commands: [this.suggest("stop")] },
@@ -75,12 +76,12 @@ export default class Stop extends Suggestible(BaseCommand) {
       cliVersion: this.cliVersion,
     }).stop();
 
-    const said = stopped ? "Local Zitadel server stopped" : "Local Zitadel server was not running";
+    const title = stopped ? "Local Zitadel server stopped" : "Local Zitadel server was not running";
 
     return this.emit({
       status: "ok",
       data: {
-        title: said,
+        title,
         runtime: {
           backend: runtime?.backend ?? "missing",
           ...(runtime?.backend === "binary"
@@ -95,7 +96,7 @@ export default class Stop extends Suggestible(BaseCommand) {
         },
       },
       summary: {
-        title: said,
+        title,
         sections: [],
       },
     });
@@ -104,10 +105,11 @@ export default class Stop extends Suggestible(BaseCommand) {
   private async stopAllManagedRuntimes(): Promise<JsonEnvelope> {
     const sweep = await LocalServer.stopAll(this.localServers());
     if (!sweep.supported) {
+      const title = "Managed local runtime process discovery is unavailable";
       return this.emit({
         status: "ok",
         data: {
-          title: "Managed local runtime process discovery is unavailable",
+          title,
           sweep: {
             supported: false,
             error: sweep.error,
@@ -115,14 +117,14 @@ export default class Stop extends Suggestible(BaseCommand) {
           },
         },
         summary: {
-          title: "Managed local runtime process discovery is unavailable",
+          title,
           sections: [],
         },
         warnings: ["managed-runtime-processes: discovery unavailable"],
       });
     }
 
-    const said =
+    const title =
       sweep.results.length === 0
         ? "No host-wide managed local runtime processes found"
         : "Host-wide managed local runtime processes stopped";
@@ -130,7 +132,7 @@ export default class Stop extends Suggestible(BaseCommand) {
     return this.emit({
       status: "ok",
       data: {
-        title: said,
+        title,
         sweep: {
           supported: true,
           scope: "host",
@@ -139,7 +141,7 @@ export default class Stop extends Suggestible(BaseCommand) {
         },
       },
       summary: {
-        title: said,
+        title,
         sections: [],
       },
     });

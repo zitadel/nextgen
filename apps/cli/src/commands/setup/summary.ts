@@ -10,12 +10,12 @@ import { detectPackageManager, type PackageManager } from "@/lib/package-manager
 import { dim } from "@/lib/style";
 import { type Fact, type Section as UiSection, section as uiSection } from "@/lib/ui";
 import {
+  type PasswordMinLength,
   type ScaffoldedProvider,
   TOGGLEABLE_METHODS,
   type ToggleableMethod,
   ZitadelConfig,
 } from "@/lib/zitadel";
-import type { PasswordMinLength } from "@/lib/zitadel";
 
 /**
  * Structured end-of-command summary: one row per fact, grouped under a
@@ -125,7 +125,9 @@ export function formatFrameworkLine(facts: ProjectFacts): string {
 }
 
 function detectorFor(framework: string): Detector | undefined {
-  return detectors.find((detector) => detector.framework === framework);
+  return detectors.find((detector) => {
+    return detector.framework === framework;
+  });
 }
 
 function depFromFramework(framework: string): string {
@@ -224,7 +226,10 @@ export function signInOf(answers: {
       ...(schema.isSsoEnabled ? ["sso"] : []),
     ],
     fields: schema.propertyNames.map((name) => {
-      return { name, required: required.includes(name) };
+      return {
+        name,
+        required: required.includes(name),
+      };
     }),
     password_min_length: policy.minLength ?? null,
     providers: [...schema.providers],

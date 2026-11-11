@@ -1,8 +1,8 @@
 import { stat } from "node:fs/promises";
-import { z } from "zod";
 import { basename, join } from "node:path";
 import { Args, Flags } from "@oclif/core";
 import type { Parsed } from "@zitadel/config/idp";
+import { z } from "zod";
 
 import { createZitadelClient, ProjectService } from "@/lib/backend";
 import { Cmd } from "@/lib/cmd";
@@ -19,7 +19,7 @@ import {
   nonBlankString,
 } from "@/lib/oclif";
 import { environmentSelectorSuffix, projectEnvFile } from "@/lib/oclif/environment-flags";
-import { reads, type Refused, taken } from "@/lib/oclif/flags";
+import { type Refused, reads, taken } from "@/lib/oclif/flags";
 import { Promptable } from "@/lib/oclif/promptable";
 import { interpolate, type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { Suggestible } from "@/lib/oclif/suggestible";
@@ -175,7 +175,12 @@ export default class EnvAdd extends Suggestible(Promptable(BaseCommand)) {
     // `--server` resolves to an origin as it does everywhere; one that was not
     // given is left to the prompt below.
     const givenServer = this.meta.serverFlag
-      ? (await resolveServer({ cwd, serverFlag: this.meta.serverFlag })).value
+      ? (
+          await resolveServer({
+            cwd,
+            serverFlag: this.meta.serverFlag,
+          })
+        ).value
       : undefined;
 
     const config = await readZitadelConfig(cwd);
@@ -250,12 +255,23 @@ export default class EnvAdd extends Suggestible(Promptable(BaseCommand)) {
     const project =
       flags.project === undefined
         ? await new ProjectService(
-            createZitadelClient({ userAgent: userAgent(), baseUrl: server, signal: this.signal }),
+            createZitadelClient({
+              userAgent: userAgent(),
+              baseUrl: server,
+              signal: this.signal,
+            }),
           ).create({
             name: `${basename(cwd)}-${args.name}`,
             ...(issuer === undefined
               ? {}
-              : { origins: [{ pattern: issuer, kind: "primary" as const }] }),
+              : {
+                  origins: [
+                    {
+                      pattern: issuer,
+                      kind: "primary" as const,
+                    },
+                  ],
+                }),
             seed_defaults: false,
           })
         : {
@@ -283,19 +299,45 @@ export default class EnvAdd extends Suggestible(Promptable(BaseCommand)) {
     log.done(`Wrote ${escapeControlCharacters(environment.file)}`);
 
     const appVariables: PlatformVariable[] = [
-      { name: "ZITADEL_URL", value: server },
-      { name: "ZITADEL_PROJECT_ID", value: projectId },
-      ...(publicVariable === undefined ? [] : [{ name: publicVariable, value: projectId }]),
+      {
+        name: "ZITADEL_URL",
+        value: server,
+      },
+      {
+        name: "ZITADEL_PROJECT_ID",
+        value: projectId,
+      },
+      ...(publicVariable === undefined
+        ? []
+        : [
+            {
+              name: publicVariable,
+              value: projectId,
+            },
+          ]),
     ];
     const serverRendered = typeof frameworkId === "string" && SERVER_RENDERED.includes(frameworkId);
     const platform = {
       production: [
         ...appVariables,
-        ...(serverRendered ? [{ name: "ZITADEL_PROJECT_SECRET", secret: true }] : []),
-        { name: "ZITADEL_ENV", value: "production" },
         ...(serverRendered
           ? [
-              { name: "ZITADEL_ENVIRONMENT", value: "production" },
+              {
+                name: "ZITADEL_PROJECT_SECRET",
+                secret: true,
+              },
+            ]
+          : []),
+        {
+          name: "ZITADEL_ENV",
+          value: "production",
+        },
+        ...(serverRendered
+          ? [
+              {
+                name: "ZITADEL_ENVIRONMENT",
+                value: "production",
+              },
               {
                 name: "ZITADEL_ISSUER",
                 value: issuer ?? "<the URL your production app is served from>",
@@ -305,14 +347,36 @@ export default class EnvAdd extends Suggestible(Promptable(BaseCommand)) {
       ],
       preview: [
         ...appVariables,
-        { name: "ZITADEL_ENV", value: "preview" },
-        ...(serverRendered ? [{ name: "ZITADEL_ENVIRONMENT", value: "preview" }] : []),
-        { name: "ZITADEL_PREVIEW_TOKEN", secret: true },
+        {
+          name: "ZITADEL_ENV",
+          value: "preview",
+        },
+        ...(serverRendered
+          ? [
+              {
+                name: "ZITADEL_ENVIRONMENT",
+                value: "preview",
+              },
+            ]
+          : []),
+        {
+          name: "ZITADEL_PREVIEW_TOKEN",
+          secret: true,
+        },
       ],
       pipeline: [
-        { name: "ZITADEL_URL", value: server },
-        { name: "ZITADEL_PROJECT_ID", value: projectId },
-        { name: "ZITADEL_PROJECT_SECRET", secret: true },
+        {
+          name: "ZITADEL_URL",
+          value: server,
+        },
+        {
+          name: "ZITADEL_PROJECT_ID",
+          value: projectId,
+        },
+        {
+          name: "ZITADEL_PROJECT_SECRET",
+          secret: true,
+        },
       ],
     };
     // Only a secret actually written to the file can be copied from it. When
@@ -340,7 +404,6 @@ export default class EnvAdd extends Suggestible(Promptable(BaseCommand)) {
     // offering it would ask for something that cannot work, and naming it
     // would send the reader to a command that fails the same way.
     const hasSomewhereToLand = createdProject && issuer !== undefined;
-    const { cliVersion } = this.meta;
     // A project this run created has never had a release, so the environment
     // serves the server's own defaults until something is deployed to it.
     // Offer that deploy here, the one moment the project, its secret and its
@@ -480,7 +543,7 @@ export default class EnvAdd extends Suggestible(Promptable(BaseCommand)) {
                 projectCommand(
                   `origin add ${Cmd.quote(issuer)} --kind primary`,
                   newEnvironment,
-                  cliVersion,
+                  this.cliVersion,
                 ),
               ]
             : []),
@@ -490,9 +553,9 @@ export default class EnvAdd extends Suggestible(Promptable(BaseCommand)) {
           // project someone else owns and may already serve a release of
           // their own, so this run does not propose replacing it.
           ...(hasSomewhereToLand && deployment === undefined
-            ? [projectCommand(DEPLOY_ARGS, newEnvironment, cliVersion)]
+            ? [projectCommand(DEPLOY_ARGS, newEnvironment, this.cliVersion)]
             : []),
-          projectCommand("env", newEnvironment, cliVersion),
+          projectCommand("env", newEnvironment, this.cliVersion),
         ],
       },
     });

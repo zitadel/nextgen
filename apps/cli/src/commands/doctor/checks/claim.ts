@@ -26,15 +26,15 @@ export class ClaimCheck implements SanityCheck {
 
   async run(ctx: CheckContext): Promise<CheckOutcome> {
     const state = await readZitadelSecret(ctx.cwd)
-      .then(async (secret) =>
-        claimState({
+      .then(async (secret) => {
+        return claimState({
           secret,
           // From `zitadel.json`, not the command's own source: `doctor` pins its
           // source to the local runtime URL, so asking it where the project lives
           // would report every project as local.
           server: readProjectServer(await readZitadelConfig(ctx.cwd)),
-        }),
-      )
+        });
+      })
       .catch(() => undefined);
     if (state === undefined) {
       // A missing or unparseable secret/config is already reported, loudly and

@@ -41,7 +41,9 @@ export default class ReleaseRevoke extends Destructive(EnvironmentCommand) {
     "<%= config.bin %> release revoke rel_01KX3RG8A7F0N9WD3P2E4YM5C1 --force",
   ];
   static override args = {
-    release_id: Args.custom<string>({ parse: taken(RELEASE_ID) })({
+    release_id: Args.custom<string>({
+      parse: taken(RELEASE_ID),
+    })({
       required: true,
       description: "The release to revoke.",
     }),

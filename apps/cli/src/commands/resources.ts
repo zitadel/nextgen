@@ -1,12 +1,12 @@
 import { isVariableReference } from "@zitadel/config/idp";
 
 import {
-  type ZitadelClient,
-  pagedFunctions,
   BrandingService,
   FlowService,
   PolicyService,
+  pagedFunctions,
   SchemaService,
+  type ZitadelClient,
 } from "@/lib/backend";
 import {
   type GetReleaseById200,
@@ -23,47 +23,45 @@ import {
 } from "@/lib/backend/model";
 import {
   CreateGrantBody,
+  CreateIdpBody,
   CreateTeamBody,
   CreateUserBody,
-  PatchProjectBody,
-  PatchUserByIDBody,
-  QueryGrantsBody,
-  QueryProjectsBody,
-  QuerySessionsBody,
-  QueryTeamsBody,
-  QueryUsersBody,
-  UpdateTeamBody,
-} from "@/lib/backend/schemas";
-import {
-  GetReleaseByIdParams,
-  GetSessionParams,
-  GetUserByIDParams,
   GetBrandingByIdResponse,
   GetFlowDefinitionResponse,
-  CreateIdpBody,
   GetGrantResponse,
-  GetProjectResponse,
-  GetSessionResponse,
-  GetReleaseByIdResponse,
-  GetSchemaByIdResponse,
   GetIdpByIdResponse,
   GetPolicyResponse,
+  GetProjectResponse,
+  GetReleaseByIdParams,
+  GetReleaseByIdResponse,
+  GetSchemaByIdResponse,
+  GetSessionParams,
+  GetSessionResponse,
   GetTeamResponse,
+  GetUserByIDParams,
   GetUserByIDResponse,
   ListBrandingResponse,
   ListEventsResponse,
   ListFlowDefinitionsResponse,
   ListPoliciesResponse,
   ListReleasesResponse,
-  PublishPolicyBody,
   ListSchemasResponse,
+  PatchProjectBody,
+  PatchUserByIDBody,
+  PublishPolicyBody,
+  QueryGrantsBody,
   QueryGrantsResponse,
   QueryIdpsBody,
   QueryIdpsResponse,
+  QueryProjectsBody,
   QueryProjectsResponse,
+  QuerySessionsBody,
   QuerySessionsResponse,
+  QueryTeamsBody,
   QueryTeamsResponse,
+  QueryUsersBody,
   QueryUsersResponse,
+  UpdateTeamBody,
 } from "@/lib/backend/schemas";
 import { ZitadelError } from "@/lib/errors";
 import {
@@ -101,13 +99,25 @@ export const create = <B, C>(
   schema: Schema<B>,
   call: (ctx: Platform, body: B) => Promise<C>,
   shape: WriteShape = {},
-): NoInfer<CreateSpec<Platform, B, C>> => ({ ...shape, schema, call });
+): NoInfer<CreateSpec<Platform, B, C>> => {
+  return {
+    ...shape,
+    schema,
+    call,
+  };
+};
 
 export const update = <B, U>(
   schema: Schema<B>,
   call: (ctx: Platform, id: string, body: B) => Promise<U>,
   shape: WriteShape & Pick<UpdateSpec<Platform, B, U>, "check"> = {},
-): NoInfer<UpdateSpec<Platform, B, U>> => ({ ...shape, schema, call });
+): NoInfer<UpdateSpec<Platform, B, U>> => {
+  return {
+    ...shape,
+    schema,
+    call,
+  };
+};
 
 // Marks a descriptor `resource()` checked; `RESOURCES` takes no other, so an
 // entry written as a plain object cannot skip the checks.
@@ -185,7 +195,13 @@ const ranged = Symbol("ranged");
  */
 export const range = <const M extends { readonly [O in Operation]?: string }>(
   params: M & { readonly [K in Exclude<keyof M, Operation>]: never },
-) => ({ operations: Object.keys(params), params, [ranged]: true as const });
+) => {
+  return {
+    operations: Object.keys(params),
+    params,
+    [ranged]: true as const,
+  };
+};
 
 // A list's filters and sorts, checked against the request it sends. A list with
 // a `body` is a structured query, sorted by a field the body names. A `GET` list
@@ -220,12 +236,16 @@ type Query<K extends keyof ZitadelClient> = Omit<
 // page is known when `items` is read.
 export const list = <B = Json, P = unknown, T = unknown, S extends FieldsOf<T> = FieldsOf<T>>(
   spec: ListSpec<Platform, B, P, T> & { item?: Schema<S> } & (QueryList<B> | GetList<B, T>),
-): NoInfer<ListSpec<Platform, B, P, T>> => spec;
+): NoInfer<ListSpec<Platform, B, P, T>> => {
+  return spec;
+};
 
 // Infers the record `get` answers with, so `sections` reads it typed.
 export const get = <R, S extends FieldsOf<R> = FieldsOf<R>>(
   spec: GetSpec<Platform, R> & { response?: Schema<S> },
-): NoInfer<GetSpec<Platform, R>> => spec;
+): NoInfer<GetSpec<Platform, R>> => {
+  return spec;
+};
 
 // Checks a resource's paths against what its verbs answer with: `columns` name
 // fields of a listed item, `heading` and `detail` fields of the record `get`
@@ -254,18 +274,25 @@ export const resource = <
     heading: NoInfer<FieldPath<R>>;
     detail: readonly NoInfer<FieldPath<R>>[];
   },
-): Checked & { readonly get: GetSpec<Platform, R> } => ({
-  ...descriptor,
-  idOf: (written: Readonly<Record<Id, unknown>>) => written[descriptor.idField],
-  [checked]: true,
-});
+): Checked & { readonly get: GetSpec<Platform, R> } => {
+  return {
+    ...descriptor,
+    idOf: (written: Readonly<Record<Id, unknown>>) => {
+      return written[descriptor.idField];
+    },
+    [checked]: true,
+  };
+};
 
 // The filter operations each `POST /<resource>/query` endpoint takes (ADR 031),
 // from its own body's enum, so a query that gains one offers it. `starts_with`
 // is in every body's enum, but only the fields that name it take it, so those
 // list it themselves.
-const general = <O extends string>(operations: Readonly<Record<string, O>>): O[] =>
-  Object.values(operations).filter((operation) => operation !== "starts_with");
+const general = <O extends string>(operations: Readonly<Record<string, O>>): O[] => {
+  return Object.values(operations).filter((operation) => {
+    return operation !== "starts_with";
+  });
+};
 const USER_OPERATIONS = general(QueryUsersBodyFilterItemOperation);
 const TEAM_OPERATIONS = general(QueryTeamsBodyFilterItemOperation);
 const SESSION_OPERATIONS = general(QuerySessionsBodyFilterItemOperation);
@@ -302,7 +329,9 @@ export const releasePointers = async (
   const { pointers } = release;
   const table = (await tabulate(["kind", "handle", "revision_id"], pointers))
     .split("\n")
-    .map((line) => `  ${line}`);
+    .map((line) => {
+      return `  ${line}`;
+    });
   return ["resources", ...table].join("\n");
 };
 
@@ -340,33 +369,79 @@ export const RESOURCES = {
       body: QueryUsersBody,
       item: QueryUsersResponse.shape.users.element,
       filters: [
-        { field: "created_at", operations: USER_OPERATIONS },
-        { field: "id", operations: USER_OPERATIONS },
-        { field: "identifier", operations: ["starts_with"] },
-        { field: "schema", operations: USER_OPERATIONS },
-        { field: "schema_object_type", operations: ["equals", "not_equals", "contains"] },
-        { field: "status", operations: USER_OPERATIONS },
-        { field: "team_id", operations: USER_OPERATIONS },
-        { field: "lifecycle_owner_team_id", operations: USER_OPERATIONS },
+        {
+          field: "created_at",
+          operations: USER_OPERATIONS,
+        },
+        {
+          field: "id",
+          operations: USER_OPERATIONS,
+        },
+        {
+          field: "identifier",
+          operations: ["starts_with"],
+        },
+        {
+          field: "schema",
+          operations: USER_OPERATIONS,
+        },
+        {
+          field: "schema_object_type",
+          operations: ["equals", "not_equals", "contains"],
+        },
+        {
+          field: "status",
+          operations: USER_OPERATIONS,
+        },
+        {
+          field: "team_id",
+          operations: USER_OPERATIONS,
+        },
+        {
+          field: "lifecycle_owner_team_id",
+          operations: USER_OPERATIONS,
+        },
       ],
       sorts: ["created_at", "id", "schema", "status", "lifecycle_owner_team_id"],
       // No project_id: the users query defaults to the token's own project,
       // which is the only one a project secret can list.
-      call: ({ client }, body) => client.queryUsers(body),
+      call: ({ client }, body) => {
+        return client.queryUsers(body);
+      },
       items: pagedFunctions.queryUsers.items,
       next: pagedFunctions.queryUsers.next,
     }),
-    get: get({ call: ({ client }, id) => client.getUserByID(id), response: GetUserByIDResponse }),
-    create: create(CreateUserBody, ({ client, projectId }, body) =>
-      client.createUser(body, { project_id: projectId }),
-    ),
-    // dry_run is the global --dry-run's, never a body field of its own.
-    update: update(USER_UPDATE_BODY, ({ client }, id, body) => client.patchUserByID(id, body), {
-      // A server from before dry_run refuses the field rather than applying
-      // the patch, so a dry run needs no check of the server first.
-      check: ({ client }, id, body) => client.patchUserByID(id, { ...body, dry_run: true }),
+    get: get({
+      call: ({ client }, id) => {
+        return client.getUserByID(id);
+      },
+      response: GetUserByIDResponse,
     }),
-    delete: { call: ({ client }, id, consent) => consent.unlock(client).deleteUserByID(id) },
+    create: create(CreateUserBody, ({ client, projectId }, body) => {
+      return client.createUser(body, { project_id: projectId });
+    }),
+    // dry_run is the global --dry-run's, never a body field of its own.
+    update: update(
+      USER_UPDATE_BODY,
+      ({ client }, id, body) => {
+        return client.patchUserByID(id, body);
+      },
+      {
+        // A server from before dry_run refuses the field rather than applying
+        // the patch, so a dry run needs no check of the server first.
+        check: ({ client }, id, body) => {
+          return client.patchUserByID(id, {
+            ...body,
+            dry_run: true,
+          });
+        },
+      },
+    ),
+    delete: {
+      call: ({ client }, id, consent) => {
+        return consent.unlock(client).deleteUserByID(id);
+      },
+    },
   }),
 
   teams: resource({
@@ -381,25 +456,45 @@ export const RESOURCES = {
       body: QueryTeamsBody,
       item: QueryTeamsResponse.shape.teams.element,
       filters: [
-        { field: "created_at", operations: TEAM_OPERATIONS },
-        { field: "name", operations: TEAM_OPERATIONS },
-        { field: "status", operations: TEAM_OPERATIONS },
+        {
+          field: "created_at",
+          operations: TEAM_OPERATIONS,
+        },
+        {
+          field: "name",
+          operations: TEAM_OPERATIONS,
+        },
+        {
+          field: "status",
+          operations: TEAM_OPERATIONS,
+        },
       ],
       sorts: ["created_at", "name", "status"],
-      call: ({ client, projectId }, body) => client.queryTeams(body, { project_id: projectId }),
+      call: ({ client, projectId }, body) => {
+        return client.queryTeams(body, { project_id: projectId });
+      },
       items: pagedFunctions.queryTeams.items,
       next: pagedFunctions.queryTeams.next,
     }),
-    get: get({ call: ({ client }, id) => client.getTeam(id), response: GetTeamResponse }),
-    create: create(CreateTeamBody, ({ client, projectId }, body) =>
-      client.createTeam(body, { project_id: projectId }),
-    ),
-    update: update(UpdateTeamBody, ({ client }, id, body) => client.updateTeam(id, body)),
+    get: get({
+      call: ({ client }, id) => {
+        return client.getTeam(id);
+      },
+      response: GetTeamResponse,
+    }),
+    create: create(CreateTeamBody, ({ client, projectId }, body) => {
+      return client.createTeam(body, { project_id: projectId });
+    }),
+    update: update(UpdateTeamBody, ({ client }, id, body) => {
+      return client.updateTeam(id, body);
+    }),
     // A team's DELETE deactivates it and leaves it readable (ADR 024), so the
     // command is named after that rather than claiming the team is gone.
     delete: {
       verb: "deactivate",
-      call: ({ client }, id, consent) => consent.unlock(client).deleteTeam(id),
+      call: ({ client }, id, consent) => {
+        return consent.unlock(client).deleteTeam(id);
+      },
     },
   }),
 
@@ -415,22 +510,43 @@ export const RESOURCES = {
       body: QuerySessionsBody,
       item: QuerySessionsResponse.shape.sessions.element,
       filters: [
-        { field: "created_at", operations: SESSION_OPERATIONS },
-        { field: "user_id", operations: SESSION_OPERATIONS },
-        { field: "state", operations: SESSION_OPERATIONS },
-        { field: "lifecycle_owner_team_id", operations: SESSION_OPERATIONS },
+        {
+          field: "created_at",
+          operations: SESSION_OPERATIONS,
+        },
+        {
+          field: "user_id",
+          operations: SESSION_OPERATIONS,
+        },
+        {
+          field: "state",
+          operations: SESSION_OPERATIONS,
+        },
+        {
+          field: "lifecycle_owner_team_id",
+          operations: SESSION_OPERATIONS,
+        },
       ],
       sorts: ["created_at", "user_id"],
-      call: ({ client, projectId }, body) => client.querySessions(body, { project_id: projectId }),
+      call: ({ client, projectId }, body) => {
+        return client.querySessions(body, { project_id: projectId });
+      },
       items: pagedFunctions.querySessions.items,
       next: pagedFunctions.querySessions.next,
     }),
-    get: get({ call: ({ client }, id) => client.getSession(id), response: GetSessionResponse }),
+    get: get({
+      call: ({ client }, id) => {
+        return client.getSession(id);
+      },
+      response: GetSessionResponse,
+    }),
     // The endpoint terminates the session rather than removing a record, so
     // the command says `revoke`. `delete` would tell the caller it is gone.
     delete: {
       verb: "revoke",
-      call: ({ client }, id, consent) => consent.unlock(client).revokeSession(id),
+      call: ({ client }, id, consent) => {
+        return consent.unlock(client).revokeSession(id);
+      },
     },
   }),
 
@@ -464,15 +580,44 @@ export const RESOURCES = {
           values: Object.values(ListEventsCategoryItem),
           combine: "or",
         },
-        { field: "event_type", operations: ["equals"], combine: "or" },
-        { field: "actor_id", operations: ["equals"] },
-        { field: "session_id", operations: ["equals"] },
-        { field: "flow_id", operations: ["equals"] },
-        { field: "request_id", operations: ["equals"] },
-        { field: "entity_type", operations: ["equals"] },
-        { field: "entity_id", operations: ["equals"] },
-        { field: "team_id", operations: ["equals"] },
-        { field: "operation_id", operations: ["equals"], combine: "or" },
+        {
+          field: "event_type",
+          operations: ["equals"],
+          combine: "or",
+        },
+        {
+          field: "actor_id",
+          operations: ["equals"],
+        },
+        {
+          field: "session_id",
+          operations: ["equals"],
+        },
+        {
+          field: "flow_id",
+          operations: ["equals"],
+        },
+        {
+          field: "request_id",
+          operations: ["equals"],
+        },
+        {
+          field: "entity_type",
+          operations: ["equals"],
+        },
+        {
+          field: "entity_id",
+          operations: ["equals"],
+        },
+        {
+          field: "team_id",
+          operations: ["equals"],
+        },
+        {
+          field: "operation_id",
+          operations: ["equals"],
+          combine: "or",
+        },
         {
           field: "status_class",
           operations: ["equals"],
@@ -481,19 +626,28 @@ export const RESOURCES = {
         },
         {
           field: "created_at",
-          ...range({ greater_than_or_equal: "created_after", less_than: "created_before" }),
+          ...range({
+            greater_than_or_equal: "created_after",
+            less_than: "created_before",
+          }),
         },
       ],
       // The endpoint orders by `occurred_at` and takes only the direction.
       sorts: ["occurred_at"],
       sortParam: "order",
-      call: ({ client, projectId }: Platform, params: Query<"listEvents">) =>
-        client.listEvents({ project_id: projectId, ...params }),
+      call: ({ client, projectId }: Platform, params: Query<"listEvents">) => {
+        return client.listEvents({
+          project_id: projectId,
+          ...params,
+        });
+      },
       items: pagedFunctions.listEvents.items,
       next: pagedFunctions.listEvents.next,
     }),
     get: get({
-      call: ({ client, projectId }, id) => client.getEvent(id, { project_id: projectId }),
+      call: ({ client, projectId }, id) => {
+        return client.getEvent(id, { project_id: projectId });
+      },
     }),
   }),
 
@@ -509,31 +663,53 @@ export const RESOURCES = {
       body: QueryGrantsBody,
       item: QueryGrantsResponse.shape.grants.element,
       filters: [
-        { field: "created_at", operations: GRANT_OPERATIONS },
-        { field: "user_id", operations: GRANT_OPERATIONS },
-        { field: "team_id", operations: GRANT_OPERATIONS },
-        { field: "relation", operations: GRANT_OPERATIONS },
-        { field: "expires_at", operations: GRANT_OPERATIONS },
+        {
+          field: "created_at",
+          operations: GRANT_OPERATIONS,
+        },
+        {
+          field: "user_id",
+          operations: GRANT_OPERATIONS,
+        },
+        {
+          field: "team_id",
+          operations: GRANT_OPERATIONS,
+        },
+        {
+          field: "relation",
+          operations: GRANT_OPERATIONS,
+        },
+        {
+          field: "expires_at",
+          operations: GRANT_OPERATIONS,
+        },
       ],
       sorts: ["created_at", "expires_at", "id"],
-      call: ({ client, projectId }, body) => client.queryGrants(body, { project_id: projectId }),
+      call: ({ client, projectId }, body) => {
+        return client.queryGrants(body, { project_id: projectId });
+      },
       items: pagedFunctions.queryGrants.items,
       next: pagedFunctions.queryGrants.next,
     }),
     get: get({
-      call: ({ client, projectId }, id) => client.getGrant(id, { project_id: projectId }),
+      call: ({ client, projectId }, id) => {
+        return client.getGrant(id, { project_id: projectId });
+      },
       response: GetGrantResponse,
     }),
     create: create(
       CreateGrantBody,
-      ({ client, projectId }, body) => client.createGrant(body, { project_id: projectId }),
+      ({ client, projectId }, body) => {
+        return client.createGrant(body, { project_id: projectId });
+      },
       // A grant names exactly one of `user` and `team`, which the required
       // fields alone cannot say, so the example names the principal itself.
       { example: "--relation viewer --user-identifier alice@acme.com" },
     ),
     delete: {
-      call: ({ client, projectId }, id, consent) =>
-        consent.unlock(client).deleteGrant(id, { project_id: projectId }),
+      call: ({ client, projectId }, id, consent) => {
+        return consent.unlock(client).deleteGrant(id, { project_id: projectId });
+      },
     },
   }),
 
@@ -553,16 +729,26 @@ export const RESOURCES = {
       body: QueryIdpsBody,
       item: QueryIdpsResponse.shape.idps.element,
       filters: [
-        { field: "slug", operations: IDP_OPERATIONS },
-        { field: "created_at", operations: IDP_OPERATIONS },
+        {
+          field: "slug",
+          operations: IDP_OPERATIONS,
+        },
+        {
+          field: "created_at",
+          operations: IDP_OPERATIONS,
+        },
       ],
       sorts: ["slug", "created_at"],
-      call: ({ client, projectId }, body) => client.queryIdps(body, { project_id: projectId }),
+      call: ({ client, projectId }, body) => {
+        return client.queryIdps(body, { project_id: projectId });
+      },
       items: pagedFunctions.queryIdps.items,
       next: pagedFunctions.queryIdps.next,
     }),
     get: get({
-      call: ({ client, projectId }, id) => client.getIdpById(id, { project_id: projectId }),
+      call: ({ client, projectId }, id) => {
+        return client.getIdpById(id, { project_id: projectId });
+      },
       response: GetIdpByIdResponse,
     }),
     // The body nests the connection under `idp`. Rooted there, the flags and
@@ -571,7 +757,9 @@ export const RESOURCES = {
     // that already exists is revised rather than duplicated.
     create: create(
       CreateIdpBody,
-      ({ client, projectId }, body) => client.createIdp(body, { project_id: projectId }),
+      ({ client, projectId }, body) => {
+        return client.createIdp(body, { project_id: projectId });
+      },
       {
         root: "idp",
         // The `oidc` block is optional to the generated schema, which cannot
@@ -592,14 +780,28 @@ export const RESOURCES = {
     list: list({
       body: QueryProjectsBody,
       item: QueryProjectsResponse.shape.projects.element,
-      filters: [{ field: "created_at", operations: PROJECT_OPERATIONS }],
+      filters: [
+        {
+          field: "created_at",
+          operations: PROJECT_OPERATIONS,
+        },
+      ],
       sorts: ["created_at"],
-      call: ({ client }, body) => client.queryProjects(body),
+      call: ({ client }, body) => {
+        return client.queryProjects(body);
+      },
       items: pagedFunctions.queryProjects.items,
       next: pagedFunctions.queryProjects.next,
     }),
-    get: get({ call: ({ client }, id) => client.getProject(id), response: GetProjectResponse }),
-    update: update(PatchProjectBody, ({ client }, id, body) => client.patchProject(id, body)),
+    get: get({
+      call: ({ client }, id) => {
+        return client.getProject(id);
+      },
+      response: GetProjectResponse,
+    }),
+    update: update(PatchProjectBody, ({ client }, id, body) => {
+      return client.patchProject(id, body);
+    }),
   }),
 
   // Configuration resources (ADR 035) are read-only here. They are authored as
@@ -620,8 +822,14 @@ export const RESOURCES = {
     list: list({
       item: ListSchemasResponse.shape.schemas.element,
       filters: [
-        { field: "object_type", operations: ["equals"] },
-        { field: "kind", operations: ["equals"] },
+        {
+          field: "object_type",
+          operations: ["equals"],
+        },
+        {
+          field: "kind",
+          operations: ["equals"],
+        },
         {
           field: "revisions",
           operations: ["equals"],
@@ -672,15 +880,23 @@ export const RESOURCES = {
     ],
     list: list({
       item: ListReleasesResponse.shape.releases.element,
-      call: ({ client, projectId }: Platform, params: Query<"listReleases">) =>
-        client.listReleases({ ...params, project_id: projectId }),
+      call: ({ client, projectId }: Platform, params: Query<"listReleases">) => {
+        return client.listReleases({
+          ...params,
+          project_id: projectId,
+        });
+      },
       items: pagedFunctions.listReleases.items,
       next: pagedFunctions.listReleases.next,
     }),
     get: get({
-      call: ({ client, projectId }, id) => client.getReleaseById(id, { project_id: projectId }),
+      call: ({ client, projectId }, id) => {
+        return client.getReleaseById(id, { project_id: projectId });
+      },
       response: GetReleaseByIdResponse,
-      sections: async (release, tabulate) => [await releasePointers(release, tabulate)],
+      sections: async (release, tabulate) => {
+        return [await releasePointers(release, tabulate)];
+      },
     }),
   }),
 
@@ -698,8 +914,14 @@ export const RESOURCES = {
     list: list({
       item: ListFlowDefinitionsResponse.shape.flow_definitions.element,
       filters: [
-        { field: "name", operations: ["equals"] },
-        { field: "purpose", operations: ["equals"] },
+        {
+          field: "name",
+          operations: ["equals"],
+        },
+        {
+          field: "purpose",
+          operations: ["equals"],
+        },
         {
           field: "revisions",
           operations: ["equals"],
@@ -747,7 +969,9 @@ export const RESOURCES = {
         const brandingService = new BrandingService(client, projectId);
         return brandingService.list();
       },
-      items: (page) => page,
+      items: (page) => {
+        return page;
+      },
     }),
     get: get({
       call: ({ client, projectId }, id) => {
@@ -776,7 +1000,12 @@ export const RESOURCES = {
     detail: ["id", "operation", "config", "revision_id", "project_id", "created_at", "updated_at"],
     list: list({
       item: ListPoliciesResponse.shape.policies.element,
-      filters: [{ field: "operation", operations: ["equals"] }],
+      filters: [
+        {
+          field: "operation",
+          operations: ["equals"],
+        },
+      ],
       call: ({ client, projectId }: Platform, params: Query<"listPolicies">) => {
         const policyService = new PolicyService(client, projectId);
         return policyService.page(params);
@@ -799,11 +1028,14 @@ export const RESOURCES = {
         if (ref.startsWith("pol_")) {
           return policyService.get(ref);
         }
-        const notFound = () =>
-          new ZitadelError("E_NOT_FOUND", `No policy for "${ref}"`, {
+        const notFound = () => {
+          return new ZitadelError("E_NOT_FOUND", `No policy for "${ref}"`, {
             hint: `List the project's policies with the policies list command. A policy is addressed by its id or its operation (${POLICY_OPERATIONS.join(", ")}).`,
           });
-        const operation = POLICY_OPERATIONS.find((known) => known === ref);
+        };
+        const operation = POLICY_OPERATIONS.find((known) => {
+          return known === ref;
+        });
         if (operation === undefined) {
           throw notFound();
         }
@@ -827,9 +1059,15 @@ export const RESOURCE_COMMANDS = buildResourceCommands<Platform>(RESOURCES, {
   // A `${{ NAME }}` reference to a project variable (ADR 062) names a
   // credential without revealing it, and is the only form a connection's
   // `client_secret` takes, so it may stand on a command line.
-  references: { matches: isVariableReference, example: "'${{ NAME }}'" },
+  references: {
+    matches: isVariableReference,
+    example: "'${{ NAME }}'",
+  },
   connect: async (open) => {
     const { client, projectId } = await open();
-    return { client, projectId };
+    return {
+      client,
+      projectId,
+    };
   },
 });

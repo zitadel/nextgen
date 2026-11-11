@@ -9,8 +9,8 @@ import { pathExists } from "@/lib/fs";
 import {
   type Admitted,
   BaseCommand,
-  type CommandResult,
   CommandGroups,
+  type CommandResult,
   type JsonEnvelope,
 } from "@/lib/oclif";
 import { Destructive } from "@/lib/oclif/destructive";
@@ -44,7 +44,9 @@ async function resolveEjectActions(cwd: string): Promise<EjectActions> {
     return fallback;
   }
   try {
-    const config = await readZitadelConfig(cwd).catch(() => ({}) as Record<string, unknown>);
+    const config = await readZitadelConfig(cwd).catch(() => {
+      return {} as Record<string, unknown>;
+    });
     return orca.patcherFor(framework.id).artifacts({
       framework,
       rendererId: readRendererId(config),
@@ -68,14 +70,17 @@ function assembleNextCommands(
   // so a command run from the shell's would miss them or touch another project.
   dir: string | undefined,
 ): ReadonlyArray<SuggestedCommand> {
-  const inDir = (command: string) =>
-    shellCommand(dir === undefined ? command : `cd ${Cmd.quote(dir)} && ${command}`);
+  const inDir = (command: string) => {
+    return shellCommand(dir === undefined ? command : `cd ${Cmd.quote(dir)} && ${command}`);
+  };
   const commands: SuggestedCommand[] = [];
   if (backedUp.length > 0) {
     // Name only the backups eject actually created (each `backedUp` entry is
     // `<rel> -> <backup>`), so this destructive glob can't also sweep up
     // unrelated `.env*.ejected-*` files a user happens to keep.
-    const patterns = backedUp.map((entry) => `${entry.split(" -> ")[0]}.ejected-*`);
+    const patterns = backedUp.map((entry) => {
+      return `${entry.split(" -> ")[0]}.ejected-*`;
+    });
     commands.push(inDir(`rm -f ${patterns.join(" ")}`));
   }
   for (const dep of dependencies) {
@@ -111,7 +116,9 @@ async function ejectProject(cwd: string, permit: "plan" | Consent): Promise<Ejec
     if (!(await pathExists(abs))) {
       continue;
     }
-    const contents = await readFile(abs, "utf8").catch(() => "");
+    const contents = await readFile(abs, "utf8").catch(() => {
+      return "";
+    });
     if (!contents.includes(MANAGED_MARKER)) {
       preserved.push(rel);
       continue;
@@ -154,7 +161,10 @@ async function ejectProject(cwd: string, permit: "plan" | Consent): Promise<Ejec
       continue;
     }
     if (!dryRun) {
-      await rm(abs, { recursive: true, force: true });
+      await rm(abs, {
+        recursive: true,
+        force: true,
+      });
     }
     removed.push(rel);
   }
@@ -169,7 +179,9 @@ async function ejectProject(cwd: string, permit: "plan" | Consent): Promise<Ejec
     if (!(await pathExists(abs))) {
       continue;
     }
-    const contents = await readFile(abs, "utf8").catch(() => "");
+    const contents = await readFile(abs, "utf8").catch(() => {
+      return "";
+    });
     const stripped = removeGuidanceSection(contents);
     if (stripped === contents) {
       continue;
@@ -184,7 +196,12 @@ async function ejectProject(cwd: string, permit: "plan" | Consent): Promise<Ejec
     }
     removed.push(husk ? rel : `${rel} (managed section)`);
   }
-  return { actions, removed, preserved, backedUp };
+  return {
+    actions,
+    removed,
+    preserved,
+    backedUp,
+  };
 }
 
 /** The result of an ejection, or of its plan. */

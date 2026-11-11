@@ -31,11 +31,16 @@ export class UseCasePrompt implements SetupPrompt {
       name: "use case",
       message: "Which fields should registration collect? You can change them later.",
       initialValue: answers.useCase,
-      options: SETUP_USE_CASES.map((useCase) => ({
-        value: useCase,
-        label: labels[useCase],
-      })),
+      options: SETUP_USE_CASES.map((useCase) => {
+        return {
+          value: useCase,
+          label: labels[useCase],
+        };
+      }),
     });
-    return { ...answers, useCase };
+    return {
+      ...answers,
+      useCase,
+    };
   }
 }

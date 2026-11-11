@@ -1,24 +1,24 @@
 import {
-  credentialVariables,
-  CUSTOM_PROVIDER,
   type ClientId,
+  CUSTOM_PROVIDER,
   type CustomOidcInput,
+  credentialVariables,
   DEFAULT_SCOPES,
-  idpProvider,
   IDP_PROVIDERS,
-  RESERVED_SLUGS,
   type IdpProvider,
   type Issuer,
+  idpProvider,
+  type Parsed,
+  type ProviderName,
+  type ProviderSelection,
   parseClientId,
   parseClientSecret,
   parseConnectionSlug,
   parseDisplayName,
   parseIssuer,
   parseScopes,
-  type Parsed,
-  type ProviderName,
-  type ProviderSelection,
   providerOf,
+  RESERVED_SLUGS,
   selectionName,
   slugFromDisplayName,
   validated,
@@ -26,8 +26,8 @@ import {
 
 import {
   askConnectionEndpoints,
-  callbackUriFor,
   type CustomFlagValues,
+  callbackUriFor,
   loopbackIssuerWarning,
   ssoEnableArgs,
 } from "@/lib/idp";
@@ -62,7 +62,9 @@ export async function askCustomSettings(
     name: "connection name",
     message:
       "What would you like to call this connection? It is used in your configuration, for example acme-sso.",
-    parse: (value) => parseConnectionSlug(value, RESERVED_SLUGS),
+    parse: (value) => {
+      return parseConnectionSlug(value, RESERVED_SLUGS);
+    },
     given: given.slug,
     initialValue: slugFromDisplayName(displayName, RESERVED_SLUGS),
   });
@@ -80,7 +82,12 @@ export async function askCustomSettings(
     initialValue: DEFAULT_SCOPES.join(" "),
   });
   // The settings carry the scopes as the one string a flag does.
-  return { slug, displayName, issuer, scopes: scopes.join(" ") };
+  return {
+    slug,
+    displayName,
+    issuer,
+    scopes: scopes.join(" "),
+  };
 }
 
 /**
@@ -109,10 +116,15 @@ export class SocialSignInPrompt implements SetupPrompt {
   async ask(answers: SetupAnswers, ctx: PromptContext): Promise<SetupAnswers> {
     // `--sso` names the set; the wizard asks for it only when no flag did.
     const chosen = ctx.ssoFromFlag
-      ? answers.sso.map((draft) => selectionName(draft.selection))
+      ? answers.sso.map((draft) => {
+          return selectionName(draft.selection);
+        })
       : await this.chooseProviders(ctx.ask);
     if (chosen.length === 0) {
-      return { ...answers, sso: [] };
+      return {
+        ...answers,
+        sso: [],
+      };
     }
 
     // Asked per provider rather than once: each registers its own OAuth
@@ -120,7 +132,9 @@ export class SocialSignInPrompt implements SetupPrompt {
     // secret. A flagged run still gets asked for whatever the flags left out.
     const collected: SsoDraft[] = [];
     for (const name of chosen) {
-      const flagged = answers.sso.find((draft) => selectionName(draft.selection) === name);
+      const flagged = answers.sso.find((draft) => {
+        return selectionName(draft.selection) === name;
+      });
       // A custom connection is described before anything else about it can be
       // said: the announcement names its issuer, and its slug names the secret.
       const selection: ProviderSelection =
@@ -181,9 +195,19 @@ export class SocialSignInPrompt implements SetupPrompt {
           message: `What is the client secret of your ${entry.displayName} OAuth app? It will be stored on the project as ${credentialVariables(providerOf(selection).slug).clientSecret}.`,
           parse: parseClientSecret,
         }));
-      collected.push({ selection, credentials: { clientId, secret }, endpoints });
+      collected.push({
+        selection,
+        credentials: {
+          clientId,
+          secret,
+        },
+        endpoints,
+      });
     }
-    return { ...answers, sso: collected };
+    return {
+      ...answers,
+      sso: collected,
+    };
   }
 
   /**
@@ -206,10 +230,12 @@ export class SocialSignInPrompt implements SetupPrompt {
           "Which external sign-in providers would you like to add? Use Space to select and Enter to continue.",
         required: false,
         options: [
-          ...IDP_PROVIDERS.map((provider) => ({
-            value: provider as ProviderName,
-            label: `${idpProvider(provider).displayName} — requires a ${idpProvider(provider).displayName} OAuth app`,
-          })),
+          ...IDP_PROVIDERS.map((provider) => {
+            return {
+              value: provider as ProviderName,
+              label: `${idpProvider(provider).displayName} — requires a ${idpProvider(provider).displayName} OAuth app`,
+            };
+          }),
           {
             value: CUSTOM_PROVIDER as ProviderName,
             label: "Another OpenID Connect (OIDC) provider — requires provider configuration",
@@ -274,5 +300,10 @@ export class SocialSignInPrompt implements SetupPrompt {
  * either configured with both values or not at all.
  */
 function clientIdOrSkip(value: string): Parsed<ClientId | undefined> {
-  return value.trim() === "" ? { ok: true, value: undefined } : parseClientId(value);
+  return value.trim() === ""
+    ? {
+        ok: true,
+        value: undefined,
+      }
+    : parseClientId(value);
 }

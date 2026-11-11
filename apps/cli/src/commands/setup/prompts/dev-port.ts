@@ -35,6 +35,9 @@ export class DevPortPrompt implements SetupPrompt {
       initialValue: suggested,
       parse: readPort,
     });
-    return { ...answers, devPort };
+    return {
+      ...answers,
+      devPort,
+    };
   }
 }

@@ -58,12 +58,18 @@ export class ServerPrompt implements SetupPrompt {
               hint: "not running — start it first",
               disabled: true,
             },
-        { value: CUSTOM, label: "Custom URL (self-hosted)" },
+        {
+          value: CUSTOM,
+          label: "Custom URL (self-hosted)",
+        },
       ],
       initialValue: detected ?? answers.server ?? DEFAULT_SERVER,
     });
     if (choice !== CUSTOM) {
-      return { ...answers, server: choice };
+      return {
+        ...answers,
+        server: choice,
+      };
     }
     const custom = await ctx.ask.text({
       name: "server URL",
@@ -72,13 +78,22 @@ export class ServerPrompt implements SetupPrompt {
       parse: (value): Parsed<string> => {
         try {
           new URL(value);
-          return { ok: true, value };
+          return {
+            ok: true,
+            value,
+          };
         } catch {
-          return { ok: false, problem: "Must be a valid URL" };
+          return {
+            ok: false,
+            problem: "Must be a valid URL",
+          };
         }
       },
     });
-    return { ...answers, server: custom };
+    return {
+      ...answers,
+      server: custom,
+    };
   }
 }
 

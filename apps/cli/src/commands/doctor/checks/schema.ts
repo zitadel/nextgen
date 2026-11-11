@@ -99,7 +99,12 @@ export class SchemaCheck extends AbstractSanityCheck {
           path: pathOf(warnings),
         };
       }
-      return { name: this.name, status: "pass", message: this.summary, path: this.path };
+      return {
+        name: this.name,
+        status: "pass",
+        message: this.summary,
+        path: this.path,
+      };
     } finally {
       this.inspections.delete(ctx);
     }
@@ -133,7 +138,11 @@ export class SchemaCheck extends AbstractSanityCheck {
   private async inspect(ctx: CheckContext): Promise<Inspection> {
     const store = new DiskStore(ctx.cwd);
     const config = await ZitadelConfig.loadUnchecked(store);
-    return { store, config, issues: config.validate({ store }) };
+    return {
+      store,
+      config,
+      issues: config.validate({ store }),
+    };
   }
 
   /**
