@@ -5,6 +5,7 @@ import { useState } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
@@ -28,9 +29,6 @@ export interface ShellUser {
 
 /** The separators sit flush against the rows, so the default `-mx-1 my-1` comes off. */
 const MENU_SEPARATOR = "mx-0 my-0";
-
-/** A group of rows between separators, inset like the menu's own `p-1`. */
-const MENU_GROUP = "p-1";
 
 /** The footer's second line: the email under a name. */
 const FOOTER_SECOND_LINE = "truncate text-xs font-light text-muted-foreground";
@@ -173,7 +171,7 @@ export function UserMenuItem({ user, onSignOut }: { user?: ShellUser; onSignOut?
 /**
  * The account dropdown, opening to the right of the sidebar's footer row. On
  * a phone the sidebar is a sheet with no room beside it, so the menu opens
- * over the row instead, as shadcn's sidebar account menu does.
+ * above the row instead, which sits at the bottom of the sheet.
  *
  * It follows Vercel's: the person heads it and opens their profile
  * (Settings); then Theme, Documentation and Log out.
@@ -186,12 +184,12 @@ function AccountMenuContent({ user, onSignOut }: { user?: ShellUser; onSignOut?:
 
   return (
     <DropdownMenuContent
-      side={isMobile ? "bottom" : "right"}
+      side={isMobile ? "top" : "right"}
       align="end"
       sideOffset={8}
       className="w-64 border-foreground/10 p-0"
     >
-      <div className={MENU_GROUP}>
+      <DropdownMenuGroup className="p-1">
         <DropdownMenuItem asChild className="flex-col items-start gap-1 py-2">
           <Link to="/settings/profile">
             <span className="max-w-full truncate text-sm font-medium">{name}</span>
@@ -202,26 +200,25 @@ function AccountMenuContent({ user, onSignOut }: { user?: ShellUser; onSignOut?:
             )}
           </Link>
         </DropdownMenuItem>
-      </div>
+      </DropdownMenuGroup>
       <DropdownMenuSeparator className={MENU_SEPARATOR} />
       <ThemeRow />
       <DropdownMenuSeparator className={MENU_SEPARATOR} />
-      <div className={MENU_GROUP}>
+      <DropdownMenuGroup className="p-1">
         <DropdownMenuItem asChild className="h-8">
           <a href={DOCS_URL} target="_blank" rel="noreferrer">
             Documentation
-            {/* Stroke 1 in the label's colour, as styling.md records. */}
-            <ExternalLink className="ml-auto text-current" strokeWidth={1} aria-hidden />
+            <ExternalLink className="ml-auto" strokeWidth={1.5} aria-hidden />
           </a>
         </DropdownMenuItem>
-      </div>
+      </DropdownMenuGroup>
       <DropdownMenuSeparator className={MENU_SEPARATOR} />
-      <div className={MENU_GROUP}>
+      <DropdownMenuGroup className="p-1">
         <DropdownMenuItem onSelect={() => onSignOut?.()} disabled={!onSignOut} className="h-8">
           {/* The design spells it `Logout`, the noun; the action is the verb. */}
           Log out
         </DropdownMenuItem>
-      </div>
+      </DropdownMenuGroup>
     </DropdownMenuContent>
   );
 }

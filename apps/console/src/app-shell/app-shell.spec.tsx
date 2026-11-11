@@ -155,7 +155,7 @@ describe("app shell navigation", () => {
     expect(screen.getByRole("menu")).toHaveAttribute("data-side", "right");
   });
 
-  it("opens the account menu over its row on a phone, where the sidebar is a sheet", async () => {
+  it("opens the account menu above its row on a phone, where the sidebar is a sheet", async () => {
     const matchMedia = window.matchMedia;
     const phone = vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
       ...matchMedia(query),
@@ -165,11 +165,13 @@ describe("app shell navigation", () => {
     renderShell();
     // On a phone the sidebar, and the account row in it, is a sheet opened from the bar.
     await screen.findByRole("button", { name: "Search" });
-    await userEvent.click(document.querySelector('[data-sidebar="trigger"]') as HTMLElement);
+    // The first is the toggle beside the logo; the second, shadcn's edge rail.
+    const [toggle] = screen.getAllByRole("button", { name: "Toggle Sidebar" });
+    await userEvent.click(toggle as HTMLElement);
     await userEvent.click(await screen.findByRole("button", { name: /^Account:/ }));
     // The side asked for; that the menu then fits a 375px screen is a layout
     // fact jsdom cannot measure.
-    expect(await screen.findByRole("menu")).toHaveAttribute("data-side", "bottom");
+    expect(await screen.findByRole("menu")).toHaveAttribute("data-side", "top");
   });
 
   it("lists every screen before a project is selected", async () => {
