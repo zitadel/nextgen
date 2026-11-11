@@ -1,3 +1,4 @@
+import { renderCount } from "@/lib/count";
 import { readFile } from "node:fs/promises";
 import { text } from "node:stream/consumers";
 
@@ -59,7 +60,7 @@ export const pathValuesOf = (
   if (positionals.length > names.length) {
     throw new ZitadelError(
       "E_VALIDATION",
-      `${target.operation.id} takes ${names.length} path parameter${names.length === 1 ? "" : "s"} (${names.join(", ")}), but got ${positionals.length}`,
+      `${target.operation.id} takes ${renderCount(names.length, { singular: "path parameter" })} (${names.join(", ")}), but got ${positionals.length}`,
       { hint: `Give them in the path's order: ${target.operation.path}.` },
     );
   }

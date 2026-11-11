@@ -1,3 +1,4 @@
+import { renderCount } from "@/lib/count";
 import { Args } from "@oclif/core";
 import { z } from "zod";
 
@@ -297,8 +298,8 @@ export default class Pull extends EnvironmentCommand {
       summary: {
         title: escapeControlCharacters(
           this.dryRun
-            ? `Would write ${pulled.length} file${pulled.length === 1 ? "" : "s"} from ${release.id} (dry run)`
-            : `Pulled ${pulled.length} file${pulled.length === 1 ? "" : "s"} from ${release.id}`,
+            ? `Would write ${renderCount(pulled.length, { singular: "file" })} from ${release.id} (dry run)`
+            : `Pulled ${renderCount(pulled.length, { singular: "file" })} from ${release.id}`,
         ),
         sections: [],
         lines: files,

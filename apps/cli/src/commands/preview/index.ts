@@ -1,3 +1,4 @@
+import { renderCount } from "@/lib/count";
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
@@ -295,14 +296,14 @@ export default class Preview extends PreviewCommand {
         // A pipe gets the URLs directly under the sentence, as it always did.
         pretty: prose(
           [
-            `Validated the preview for ${urls.length} URL${urls.length === 1 ? "" : "s"}. Nothing was deployed (dry run).`,
+            `Validated the preview for ${renderCount(urls.length, { singular: "URL" })}. Nothing was deployed (dry run).`,
             ...urls.map((url) => {
               return `  - ${url}`;
             }),
           ].join("\n"),
         ),
         summary: {
-          title: `Validated the preview for ${urls.length} URL${urls.length === 1 ? "" : "s"}. Nothing was deployed (dry run)`,
+          title: `Validated the preview for ${renderCount(urls.length, { singular: "URL" })}. Nothing was deployed (dry run)`,
           sections: [],
           lines: urls.map((url) => {
             return `  - ${escapeControlCharacters(url)}`;
@@ -345,7 +346,7 @@ export default class Preview extends PreviewCommand {
       },
       pretty: prose(
         [
-          `Previewed ${release.content_hash} on ${previews.length} URL${previews.length === 1 ? "" : "s"}`,
+          `Previewed ${release.content_hash} on ${renderCount(previews.length, { singular: "URL" })}`,
           ...previews.map((preview) => {
             return preview.expires_at === null
               ? `  - ${preview.url}`
@@ -355,7 +356,7 @@ export default class Preview extends PreviewCommand {
         ].join("\n"),
       ),
       summary: {
-        title: `Previewed ${escapeControlCharacters(release.content_hash)} on ${previews.length} URL${previews.length === 1 ? "" : "s"}`,
+        title: `Previewed ${escapeControlCharacters(release.content_hash)} on ${renderCount(previews.length, { singular: "URL" })}`,
         sections: [],
         lines: [
           ...previews.map((preview) => {

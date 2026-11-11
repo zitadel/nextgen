@@ -1,3 +1,4 @@
+import { renderCount } from "@/lib/count";
 import { resolve } from "node:path";
 import {
   type Admitted,
@@ -51,7 +52,7 @@ const MESSAGE: Refused<string> = {
 
 /** What the run did, as the one sentence the chain closes on. */
 export function deployed(resources: number): string {
-  return `Deployed ${resources} resource${resources === 1 ? "" : "s"}`;
+  return `Deployed ${renderCount(resources, { singular: "resource" })}`;
 }
 
 /**
@@ -255,7 +256,7 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
           ...prepared.report,
         },
         summary: {
-          title: `Validated ${resourceCount} resource${resourceCount === 1 ? "" : "s"} and deployed nothing (dry run)`,
+          title: `Validated ${renderCount(resourceCount, { singular: "resource" })} and deployed nothing (dry run)`,
           sections: [],
         },
       });

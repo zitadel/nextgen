@@ -1,3 +1,4 @@
+import { renderCount } from "@/lib/count";
 import { rm } from "node:fs/promises";
 import { join } from "node:path";
 
@@ -145,9 +146,7 @@ export class ManagedFilesCheck implements SanityCheck {
       name: this.name,
       status: "pass",
       message: `Scaffolded app files are present (${rows.length} tracked${
-        wiring.length > 0
-          ? `, ${wiring.length} wiring${wiring.length === 1 ? "" : "s"} verified`
-          : ""
+        wiring.length > 0 ? `, ${renderCount(wiring.length, { singular: "wiring" })} verified` : ""
       }${mode === "template" ? ", from templates" : ""})`,
       details,
     };

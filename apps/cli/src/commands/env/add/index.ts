@@ -1,3 +1,4 @@
+import { renderCount } from "@/lib/count";
 import { stat } from "node:fs/promises";
 import { z } from "zod";
 import { basename, join } from "node:path";
@@ -541,7 +542,7 @@ export default class EnvAdd extends Promptable(BaseCommand) {
         },
       });
       log.done(
-        `Deployed ${deployment.contentHash} to ${deployment.origins.length} origin${deployment.origins.length === 1 ? "" : "s"}`,
+        `Deployed ${deployment.contentHash} to ${renderCount(deployment.origins.length, { singular: "origin" })}`,
       );
       return deployment;
     } catch (error) {

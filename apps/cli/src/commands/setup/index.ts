@@ -1,3 +1,4 @@
+import { renderCount } from "@/lib/count";
 import {
   type CreatedProject,
   ProjectService,
@@ -1537,7 +1538,7 @@ export default class Setup extends Destructive(BaseCommand) {
     const allFilesWritten = [...result.filesWritten, ...scaffolded.filesWritten];
     if (framework !== undefined) {
       current?.done(
-        `Patched ${allFilesWritten.length} file${allFilesWritten.length === 1 ? "" : "s"}` +
+        `Patched ${renderCount(allFilesWritten.length, { singular: "file" })}` +
           (result.filesSkipped.length > 0 ? ` (${result.filesSkipped.length} unchanged)` : ""),
       );
     }
@@ -2168,7 +2169,7 @@ export default class Setup extends Destructive(BaseCommand) {
       // with 64 hex digits is wider than one. The envelope carries the hash
       // in full, for whatever matches on it.
       deploying.done(
-        `Deployed ${escapeControlCharacters(abbreviate(deployment.contentHash))} to ${deployment.origins.length} origin${deployment.origins.length === 1 ? "" : "s"}`,
+        `Deployed ${escapeControlCharacters(abbreviate(deployment.contentHash))} to ${renderCount(deployment.origins.length, { singular: "origin" })}`,
       );
       return deployment;
     } catch (error) {
