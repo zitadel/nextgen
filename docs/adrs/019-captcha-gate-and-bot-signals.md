@@ -19,6 +19,17 @@ Enforcement lives in the shared `create_user` handler before password hashing,
 and in the passkey registration before an attestation creates its user;
 proofs are not authentication factors and do not go through `auth_attempts`.
 
+Why PBKDF2 of our own rather than ALTCHA:
+
+- The gate needs what a puzzle format does not give: a proof bound to one
+  project and flow, stored and consumed once in the database, with budgets per
+  flow. That is the larger part of the work with either puzzle.
+- The browser solves it with its own Web Crypto (`deriveBits`), so the widget
+  ships no third-party script, WASM or worker, and the server verifies with one
+  HMAC and no KDF.
+- There is no library or hosted service to depend on and keep current, for the
+  server or for a headless client that implements the exchange.
+
 A proof permits one signup attempt scoped to its project and flow.
 Storage atomically consumes it, including when the subsequent mutation fails.
 Pending challenges are reused across renders and expire after five minutes.
