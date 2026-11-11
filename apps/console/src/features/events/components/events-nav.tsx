@@ -51,10 +51,10 @@ import {
   isNarrowed,
   STATUS_CLASSES,
   type StatusClass,
-  LOG_VIEWS,
-  type LogsSearch,
-  type LogView,
-  parseLogsSearch,
+  EVENT_VIEWS,
+  type EventsSearch,
+  type EventView,
+  parseEventsSearch,
   TIME_RANGE_LABEL,
   TIME_RANGES,
   type TimeRange,
@@ -69,12 +69,12 @@ import {
 } from "../model";
 
 /**
- * The Logs list of the sidebar (D30): what the shell shows in place of the
+ * The Events list of the sidebar (D30): what the shell shows in place of the
  * project's screens on `/events` and under an event's drawer, as Vercel's Logs
  * does. A picker chooses the list's view, and under it sit the filters chosen
  * from a list: the time, the category, the type or the status. Values that
  * are pasted, the ids and the operation, go in the search above the table
- * (`LogSearchField`).
+ * (`EventSearchField`).
  *
  * Both read the filters from the URL and write them back to it, so the list's
  * loader is the only thing that asks the server. An event's drawer opens over
@@ -83,15 +83,15 @@ import {
  */
 
 /** The filters the list is under, or the default ones away from the list. */
-function useLogsSearch(): { current: LogsSearch; onList: boolean } {
+function useEventsSearch(): { current: EventsSearch; onList: boolean } {
   const list = useMatch({ from: "/_authed/events", shouldThrow: false });
   return { current: list ? list.search : NO_FILTERS, onList: !!list };
 }
 
-const NO_FILTERS = parseLogsSearch({});
+const NO_FILTERS = parseEventsSearch({});
 
 /** A glyph per view, which is all the icon rail shows of it. */
-const VIEW_ICON: Record<LogView, LucideIcon> = {
+const VIEW_ICON: Record<EventView, LucideIcon> = {
   audit: ScrollText,
   requests: ArrowLeftRight,
   all: Logs,
@@ -103,8 +103,8 @@ const VIEW_ICON: Record<LogView, LucideIcon> = {
  * is in checked. The trigger names that view; in the icon rail it is its
  * glyph alone.
  */
-export function LogViewPicker() {
-  const { current } = useLogsSearch();
+export function EventViewPicker() {
+  const { current } = useEventsSearch();
   const Icon = VIEW_ICON[current.view];
 
   return (
@@ -124,7 +124,7 @@ export function LogViewPicker() {
           </SidebarMenuButton>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" side="bottom" className="w-72">
-          {LOG_VIEWS.map((view) => {
+          {EVENT_VIEWS.map((view) => {
             const ViewIcon = VIEW_ICON[view];
             const chosen = current.view === view;
             return (
@@ -159,10 +159,10 @@ const ANY = "any";
  * The icon rail has no room for a field: the group leaves with the labels,
  * and the screen's own button opens the sidebar to reach it.
  */
-export function LogFilters() {
-  const { current } = useLogsSearch();
+export function EventFilters() {
+  const { current } = useEventsSearch();
   const navigate = useNavigate();
-  const go = (search: LogsSearch) => void navigate({ to: "/events", search });
+  const go = (search: EventsSearch) => void navigate({ to: "/events", search });
 
   return (
     <SidebarGroup
@@ -243,7 +243,13 @@ const CUSTOM = "custom";
  * Vercel's Logs offers them, everything retained, or a range with fixed ends.
  * Choosing **Custom range** opens two fields, read as they are changed.
  */
-function TimeFilter({ current, go }: { current: LogsSearch; go: (search: LogsSearch) => void }) {
+function TimeFilter({
+  current,
+  go,
+}: {
+  current: EventsSearch;
+  go: (search: EventsSearch) => void;
+}) {
   const custom = hasCustomRange(current);
   const [editing, setEditing] = useState(false);
   const value = custom || editing ? CUSTOM : (current.since ?? ANY);
@@ -455,7 +461,13 @@ const TYPE_LIST: ComboboxGroup[] = [
  * a button outside the list set the same types without showing that it had.
  * Types read the All view with no category beside them.
  */
-function TypeFilter({ current, go }: { current: LogsSearch; go: (search: LogsSearch) => void }) {
+function TypeFilter({
+  current,
+  go,
+}: {
+  current: EventsSearch;
+  go: (search: EventsSearch) => void;
+}) {
   const [open, setOpen] = useState(false);
   const chosen = current.type ?? [];
   const failuresOnly =
@@ -555,7 +567,13 @@ const STATUS_LIST: ComboboxGroup[] = [
  * **Only failed requests**, the list's first row, ticks 4xx and 5xx. Requests recorded before the
  * server indexed the status are not matched.
  */
-function StatusFilter({ current, go }: { current: LogsSearch; go: (search: LogsSearch) => void }) {
+function StatusFilter({
+  current,
+  go,
+}: {
+  current: EventsSearch;
+  go: (search: EventsSearch) => void;
+}) {
   const [open, setOpen] = useState(false);
   const chosen = current.status ?? [];
   const failedOnly =
