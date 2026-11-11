@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "@tests/helpers/platform";
 import { onTerminalReadingAFile } from "@tests/helpers/terminal";
-import { anUndeployedEnvironment, aSetUpApp } from "@tests/helpers/project";
+import {
+  anUndeployedEnvironment,
+  aSetUpApp,
+  type CliResult,
+  type ScaffoldedApp,
+} from "@tests/helpers/project";
 
 const platform = usePlatformMock();
 
@@ -121,22 +126,61 @@ describe("variable resolve", () => {
     });
 
     describe("a named deployment", () => {
-      it("reads the variables that deployment froze, not the ones set since", async () => {
+      /** A deployed project that holds HOST, and sets LATER after the deploy. */
+      async function aDeployedProject() {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();
         await app.setVariable("HOST", "app.acme.com");
         const deployed = await app.deployData();
         await app.setVariable("LATER", "set after the deploy");
+        return { app, deploymentId: deployed.deployment_id ?? "" };
+      }
 
-        const result = await app.resolveVariables({ deploymentId: deployed.deployment_id });
+      /** The names of the variables a `variable resolve --json` listed. */
+      function namesIn(app: ScaffoldedApp, result: CliResult): string[] {
+        return app.envelopeOf<{ items: { name: string }[] }>(result).data.items.map((item) => {
+          return item.name;
+        });
+      }
+
+      it("reports the deployment it was given", async () => {
+        const { app, deploymentId } = await aDeployedProject();
+
+        const result = await app.resolveVariables({ deploymentId });
+
+        expect(app.envelopeOf<{ deployment_id: string }>(result).data.deployment_id).toBe(
+          deploymentId,
+        );
+      });
+
+      it("lists the variables that deployment froze", async () => {
+        const { app, deploymentId } = await aDeployedProject();
+
+        const result = await app.resolveVariables({ deploymentId });
+
+        expect(namesIn(app, result)).toContain("HOST");
+      });
+
+      it("leaves out the variables set since", async () => {
+        const { app, deploymentId } = await aDeployedProject();
+
+        const result = await app.resolveVariables({ deploymentId });
+
+        expect(namesIn(app, result)).not.toContain("LATER");
+      });
+
+      it("reads a deployment that is no longer live", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        const first = await app.deployData();
+        await app.editUserSchema((schema) => {
+          schema.properties.company = { type: "string" };
+        });
+        await app.deployData();
+
+        const result = await app.resolveVariables({ deploymentId: first.deployment_id ?? "" });
 
         expect(result).toSucceed();
-        const data = app.envelopeOf<{ deployment_id: string; items: { name: string }[] }>(
-          result,
-        ).data;
-        expect(data.deployment_id).toBe(deployed.deployment_id);
-        expect(data.items.map((item) => item.name)).toContain("HOST");
-        expect(data.items.map((item) => item.name)).not.toContain("LATER");
       });
 
       it("is a miss for a deployment the project does not have", async () => {
@@ -150,12 +194,10 @@ describe("variable resolve", () => {
       });
 
       it("is refused together with an origin", async () => {
-        const app = await aSetUpApp();
-        await app.addPrimaryOrigin();
-        const deployed = await app.deployData();
+        const { app, deploymentId } = await aDeployedProject();
 
         const result = await app.resolveVariables({
-          deploymentId: deployed.deployment_id,
+          deploymentId,
           origin: "https://app.acme.com",
         });
 

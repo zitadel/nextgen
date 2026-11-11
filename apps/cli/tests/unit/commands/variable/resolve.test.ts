@@ -70,7 +70,13 @@ async function aProject(options: {
         : HttpResponse.json(found);
     }),
     http.get(`${SERVER}/api/v1/deployments/:id/variables`, ({ params }) => {
-      return HttpResponse.json(options.frozen?.[String(params.id)] ?? options.variables ?? {});
+      if (options.frozen === undefined) {
+        return HttpResponse.json(options.variables ?? {});
+      }
+      const held = options.frozen[String(params.id)];
+      return held === undefined
+        ? HttpResponse.json({ code: "not_found", message: "no such deployment" }, { status: 404 })
+        : HttpResponse.json(held);
     }),
   );
   return cwd;
@@ -235,7 +241,7 @@ describe("variable resolve", () => {
     ]);
   });
 
-  it("reads a deployment that is no longer live, which serves no origin", async () => {
+  it("reads a deployment that is no longer live, with the origins it was deployed to", async () => {
     const cwd = await aProject({
       deployments: [aDeployment("dep_new", "https://app.acme.com")],
       earlier: [aDeployment("dep_old", "https://app.acme.com")],
@@ -257,7 +263,7 @@ describe("variable resolve", () => {
 
     expect(exitCode).toBe(0);
     expect(envelope.data.deployment_id).toBe("dep_old");
-    expect(envelope.data.origins).toEqual([]);
+    expect(envelope.data.origins).toEqual(["https://app.acme.com"]);
     expect(envelope.data.items).toMatchObject([
       {
         name: "OLD",
@@ -266,10 +272,10 @@ describe("variable resolve", () => {
     ]);
   });
 
-  it("names no origin in the empty line for a deployment that serves none", async () => {
+  it("names no origin in the empty line for a deployment with no targets", async () => {
     const cwd = await aProject({
       deployments: [],
-      earlier: [aDeployment("dep_old", "https://app.acme.com")],
+      earlier: [{ ...aDeployment("dep_old", "https://app.acme.com"), targets: [] }],
       frozen: {
         dep_old: {},
       },
