@@ -146,6 +146,7 @@ describe("variable resolve", () => {
 
         const result = await app.resolveVariables({ deploymentId });
 
+        expect(result).toSucceed();
         expect(app.envelopeOf<{ deployment_id: string }>(result).data.deployment_id).toBe(
           deploymentId,
         );
@@ -156,6 +157,7 @@ describe("variable resolve", () => {
 
         const result = await app.resolveVariables({ deploymentId });
 
+        expect(result).toSucceed();
         expect(namesIn(app, result)).toContain("HOST");
       });
 
@@ -164,6 +166,7 @@ describe("variable resolve", () => {
 
         const result = await app.resolveVariables({ deploymentId });
 
+        expect(result).toSucceed();
         expect(namesIn(app, result)).not.toContain("LATER");
       });
 
@@ -174,11 +177,24 @@ describe("variable resolve", () => {
         await app.editUserSchema((schema) => {
           schema.properties.company = { type: "string" };
         });
-        await app.deployData();
+        const second = await app.deployData();
+        expect(second.release_id).not.toBe(first.release_id);
 
         const result = await app.resolveVariables({ deploymentId: first.deployment_id ?? "" });
 
         expect(result).toSucceed();
+        expect(app.envelopeOf<{ deployment_id: string }>(result).data.deployment_id).toBe(
+          first.deployment_id,
+        );
+      });
+
+      it("is refused for a credential that may not read variables", async () => {
+        const { app, deploymentId } = await aDeployedProject();
+        platform.refusesVariableReads();
+
+        const result = await app.resolveVariables({ deploymentId });
+
+        expect(result).toFailWith("E_AUTH");
       });
 
       it("is a miss for a deployment the project does not have", async () => {
