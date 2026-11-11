@@ -7,7 +7,7 @@ import {
   useRouteContext,
   useRouter,
 } from "@tanstack/react-router";
-import { Logs, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { useMemo, useState } from "react";
 import { FormError } from "@/components/form-error";
 import { IdText } from "@/components/id-text";
@@ -17,7 +17,6 @@ import {
   RESOURCE_CELL,
   RESOURCE_CELL_MUTED,
   RESOURCE_MENU_CELL_NARROW,
-  RESOURCE_ROW_ICON,
   RESOURCE_ROW_LINK,
   RESOURCE_STICKY_BODY,
   RESOURCE_STICKY_END,
@@ -347,11 +346,6 @@ function EventRow({
           search={search}
           className={`${RESOURCE_ROW_LINK} max-w-full`}
         >
-          <Logs
-            aria-hidden
-            strokeWidth={1.5}
-            className={cn(RESOURCE_ROW_ICON, failure && "text-destructive")}
-          />
           <span className={cn("truncate", failure && "text-destructive")} title={event.event_type}>
             {event.event_type}
           </span>
