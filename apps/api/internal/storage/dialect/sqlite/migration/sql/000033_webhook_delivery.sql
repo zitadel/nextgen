@@ -1,5 +1,5 @@
 -- +goose Up
--- What delivery keeps on a webhook (ADR 088 §4); see the postgres migration.
+-- What delivery keeps on a webhook (ADR 089 §4); see the postgres migration.
 -- Times are unix nanos.
 -- +goose StatementBegin
 ALTER TABLE webhooks ADD COLUMN next_attempt_at INTEGER;

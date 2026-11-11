@@ -172,7 +172,7 @@ export interface CrmRequest {
   body?: unknown;
 }
 
-/** A wake-up: the project has events its webhooks were not sent yet (root ADR 088 §4). */
+/** A wake-up: the project has events its webhooks were not sent yet (root ADR 089 §4). */
 export interface WebhookWake {
   project_id: string;
 }
@@ -188,7 +188,7 @@ export interface WakeSchedule {
 
 /**
  * The queue between the server's wake hook and its delivery path (root
- * ADR 088 §4): it calls back with each wake-up once it is due, and again
+ * ADR 089 §4): it calls back with each wake-up once it is due, and again
  * after a failure (`src/webhook-wake.ts`).
  */
 export interface WakeQueue {

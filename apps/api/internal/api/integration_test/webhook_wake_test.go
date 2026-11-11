@@ -21,7 +21,7 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 )
 
-// TestWebhookWakeUp runs the wake-up on a real database (ADR 088 §4): a
+// TestWebhookWakeUp runs the wake-up on a real database (ADR 089 §4): a
 // mutation's commit, seen by the pool the service writes through, starts the
 // project's round on a shipper whose timer never fires in the test. What only
 // the parts together show: the event is settled and listed by the time the

@@ -29,7 +29,7 @@
 //     trigger once an hour. With WEBHOOK_WAKE_SECRET the server also calls
 //     the cloud's functions (apps/cloud-functions) when a project has
 //     something to deliver, which put the call to the trigger on a queue
-//     (events.webhooks.wake, ADR 088 §4).
+//     (events.webhooks.wake, ADR 089 §4).
 //   - The request audit events. For the same reason a request waits until
 //     its event is written (events.request.flush_wait), where a server that
 //     keeps running writes it up to a second after the response.

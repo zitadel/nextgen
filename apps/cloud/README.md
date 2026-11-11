@@ -15,7 +15,7 @@ deployment as seven [services](https://vercel.com/docs/services):
 | `console` | `apps/console` | the console SPA, built for `/console/` with Vercel Web Analytics and Speed Insights | `/console/*` |
 | `docs` | `apps/docs` | the docs site, Fumadocs on Next.js, with Vercel Web Analytics and Speed Insights | `/docs`, `/docs/*` |
 | `website` | `apps/website` | the front page and the changelog, on Next.js, with Vercel Web Analytics and Speed Insights | `/`, `/changelog`, `/changelog/*`, `/llms.txt`, `/_next/*`, `/favicon.ico`, `/favicons/*` |
-| `cloud-functions` | `apps/cloud-functions` | the hosted cloud's backend on Next.js: the console add-on's calls, BotID's check in front of the sign-in widget, Stripe's webhooks, the workflows ([ADR 084](../../docs/adrs/084-hosted-cloud-business-systems.md)) and the wake-up queue of webhook delivery ([ADR 088](../../docs/adrs/088-project-webhooks.md) §4) | `/cloud/*` |
+| `cloud-functions` | `apps/cloud-functions` | the hosted cloud's backend on Next.js: the console add-on's calls, BotID's check in front of the sign-in widget, Stripe's webhooks, the workflows ([ADR 084](../../docs/adrs/084-hosted-cloud-business-systems.md)) and the wake-up queue of webhook delivery ([ADR 089](../../docs/adrs/089-project-webhooks.md) §4) | `/cloud/*` |
 | `schemas` | `apps/cloud` | the built-in schemas, static files that [`scripts/render-builtin-schemas.mjs`](../../scripts/render-builtin-schemas.mjs) renders from the server's embedded copies | `/schemas/v1/*` |
 | `go-import` | `apps/cloud/go-import` | one static page, Go's vanity-import metadata for the client module (the runbook's [Go import path](../../docs/runbooks/cloud.md#go-import-path)) | every path on the host `go.zitadel.com` |
 

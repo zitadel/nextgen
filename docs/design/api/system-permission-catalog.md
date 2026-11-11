@@ -639,7 +639,7 @@ enforcement. Two related consequences:
 4. **Project configuration endpoint shapes** — permission names are locked
    independently from `project.*`; exact REST operations for domains, features,
    allowed origins and signing keys still need specification. Webhooks have
-   theirs ([ADR 088](../../adrs/088-project-webhooks.md)).
+   theirs ([ADR 089](../../adrs/089-project-webhooks.md)).
 5. **`app_group` product decomposition** — flagged OPEN in resource-map.md.
    Catalog names may change if app_groups are restructured.
 6. **`schema.*` vs `user_schema.*`** — only user schemas exist today; URL is
