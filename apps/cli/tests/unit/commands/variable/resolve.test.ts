@@ -267,7 +267,7 @@ describe("variable resolve", () => {
     });
 
     expect(exitCode).toBe(0);
-    expect(stdout).toContain("dep_old froze no variables.");
+    expect(stdout).toContain("dep_old froze no variables · project");
   });
 
   it("says a deployment the project does not have is not found", async () => {
