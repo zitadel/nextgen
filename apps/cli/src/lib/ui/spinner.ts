@@ -38,9 +38,25 @@ export class QuietSpinner implements Spinner {
 export class DrawnSpinner implements Spinner {
   private readonly handle: ReturnType<typeof spinner>;
 
-  constructor(label: string, guide = true) {
+  /**
+   * @param label - What the work is.
+   * @param guide - Whether the spinner sits in the chain's gutter.
+   * @param input - The terminal Ctrl-C is read from. Clack's spinner switches it
+   *   to raw mode, where Ctrl-C arrives as a key and clack answers it with
+   *   `process.exit(0)`: no `E_CANCELLED`, no rollback, and an exit status that
+   *   says the run succeeded. Raw mode is switched off again, so Ctrl-C is the
+   *   signal the command's own handler turns into a cancellation.
+   */
+  constructor(
+    label: string,
+    guide = true,
+    input: { isTTY?: boolean; setRawMode?: (mode: boolean) => unknown } = process.stdin,
+  ) {
     this.handle = spinner({ withGuide: guide });
     this.handle.start(label);
+    if (input.isTTY === true) {
+      input.setRawMode?.(false);
+    }
   }
 
   message(text: string): void {

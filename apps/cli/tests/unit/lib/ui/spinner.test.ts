@@ -33,6 +33,28 @@ describe("DrawnSpinner", () => {
     expect(spinner).toHaveBeenCalledWith({ withGuide: false });
   });
 
+  it("leaves Ctrl-C as a signal, which clack's raw mode would turn into an exit with status 0", () => {
+    const modes: boolean[] = [];
+
+    new DrawnSpinner("Creating the project", true, {
+      isTTY: true,
+      setRawMode: (mode) => modes.push(mode),
+    });
+
+    expect(modes).toEqual([false]);
+  });
+
+  it("leaves a stream that is not a terminal alone", () => {
+    const modes: boolean[] = [];
+
+    new DrawnSpinner("Creating the project", true, {
+      isTTY: false,
+      setRawMode: (mode) => modes.push(mode),
+    });
+
+    expect(modes).toEqual([]);
+  });
+
   it("renames itself while the work goes on", () => {
     new DrawnSpinner("Fetching users").message("Fetching users — page 2");
 
