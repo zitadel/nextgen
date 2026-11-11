@@ -1655,7 +1655,7 @@ describe("user detail", () => {
       const panel = await openAuthentication();
       expect(panel.getByText(NOTICE)).toBeInTheDocument();
       // The account status is a separate fact and stays as it is.
-      expect(screen.getByText("active")).toBeInTheDocument();
+      expect(screen.getByText("Active")).toBeInTheDocument();
     });
 
     it.each([

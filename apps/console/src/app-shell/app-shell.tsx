@@ -366,10 +366,6 @@ function ContextBar({ view, userId }: { view: NavView; userId?: string }) {
   );
 }
 
-/**
- * 56px, ruled underneath, level with the sidebar's brand header. `z-20`: over
- * a table's pinned columns (`RESOURCE_STICKY_START`, `z-10`), which come later
- * in the page and would otherwise scroll over the bar.
- */
+/** 56px, ruled underneath, level with the sidebar's brand header. */
 const TOP_BAR =
-  "sticky top-0 z-20 flex h-14 shrink-0 items-center gap-4 border-b border-border bg-background px-2 md:px-4";
+  "sticky top-0 z-10 flex h-14 shrink-0 items-center gap-4 border-b border-border bg-background px-2 md:px-4";
