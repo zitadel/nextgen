@@ -1,6 +1,6 @@
 import { Link, useMatch, useMatchRoute } from "@tanstack/react-router";
 import { ChevronLeft } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 
 import {
   Sidebar,
@@ -23,6 +23,7 @@ import { ContextSwitcher } from "./context-switcher";
 import { ZitadelLogo } from "./logo";
 import { SearchDialog, SearchTrigger, useSearchShortcut } from "./search";
 import { accountListItems, useNavItems, useRequestedNavItem } from "./use-nav-items";
+import { cn } from "@/lib/utils";
 import type { NavView } from "@/nav";
 import { SETTINGS_PATH, type ShellUser, UserMenuItem } from "./user-menu";
 
@@ -37,7 +38,9 @@ import { SETTINGS_PATH, type ShellUser, UserMenuItem } from "./user-menu";
  * Every screen is drawn in this one frame (D27). What changes with where the
  * person is is the sidebar's list and what the project pill says
  * (`useShellView`), never the frame, so going from a project to Projects, and
- * from there into Settings, moves nothing but the list.
+ * from there into Settings, moves nothing but the list. Opening a list from a
+ * row of another slides it in from the right, and the way back from the left
+ * (`useListEntrance`).
  */
 export function AppShell({
   children,
@@ -144,7 +147,8 @@ function AppSidebar({
     <Sidebar collapsible="icon">
       <BrandHeader />
 
-      <SidebarContent>
+      {/* Clips sideways so a list sliding in never draws a scrollbar. */}
+      <SidebarContent className="overflow-x-hidden">
         {/* Search heads the list, as Vercel's `Find` does: in the top bar it
             sat a row above a list's own search (D27). */}
         <SidebarGroup className="pt-4 pb-0">
@@ -213,9 +217,11 @@ function NavList({ view }: { view: NavView }) {
   // On Projects' way to a screen (`?next=`), that screen's row is the marked one.
   const requested = useRequestedNavItem(project);
   const matchRoute = useMatchRoute();
+  const entrance = useListEntrance(view);
 
   return (
-    <>
+    // Keyed by the list, so a new one mounts and plays its entrance once.
+    <div key={view} className={cn("flex flex-col gap-2", entrance)}>
       <SidebarGroup role="navigation" aria-label={NAV_LABEL[view]} className="pt-2 pb-0">
         <SidebarMenu className="gap-0.5">
           {/* Projects is the account list's first screen. */}
@@ -245,8 +251,43 @@ function NavList({ view }: { view: NavView }) {
         </SidebarMenu>
       </SidebarGroup>
       {view === "logs" && <LogFilters />}
-    </>
+    </div>
   );
+}
+
+/**
+ * How deep each list sits: Projects' and a project's are where the console
+ * starts; Settings' and Logs' open from a row of one (D29, D30).
+ */
+const LIST_DEPTH: Record<NavView, number> = { portal: 0, account: 0, settings: 1, logs: 1 };
+
+/** A short fade and slide, with the design's motion tokens; none for reduced motion. */
+const LIST_MOTION =
+  "animate-in fade-in-0 duration-(--zl-duration-base) ease-(--zl-easing-decelerate) motion-reduce:animate-none";
+
+/**
+ * The entrance of the list `view` names, as Vercel's sidebar plays it: in from
+ * the right going down into a list, in from the left on the way back up, so
+ * the person sees which way they went. The first list drawn and a swap between
+ * two at one depth (a project's and Projects') stay still. The view it last
+ * saw is state, adjusted while rendering, so the class is there on the new
+ * list's first paint.
+ */
+function useListEntrance(view: NavView): string | undefined {
+  const [shown, setShown] = useState(view);
+  const [entrance, setEntrance] = useState<string>();
+  if (view !== shown) {
+    const step = LIST_DEPTH[view] - LIST_DEPTH[shown];
+    setShown(view);
+    setEntrance(
+      step > 0
+        ? `${LIST_MOTION} slide-in-from-right-4`
+        : step < 0
+          ? `${LIST_MOTION} slide-in-from-left-4`
+          : undefined,
+    );
+  }
+  return entrance;
 }
 
 /**
