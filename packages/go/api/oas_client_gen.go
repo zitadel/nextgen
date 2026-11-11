@@ -509,6 +509,9 @@ type Invoker interface {
 	// - Pre-allocate a `session_id` before the user is known, so device and telemetry signals
 	// can be correlated with the eventual authenticated session from the start.
 	// - Track anonymous state (bot detection, device fingerprint) that survives until authentication.
+	// The session belongs to the project of the project secret. A `project_id` that
+	// names another project answers `403` with `proj.mismatch` and creates nothing:
+	// send the credential's own project.
 	// Creating a session runs on the project credential (`session.write`). The returned
 	// `session_token` is a session credential for the end-user client, not a
 	// management scope. It is delivered as the `__Host-zitadel_session` cookie
@@ -761,7 +764,8 @@ type Invoker interface {
 	// answer `404`.
 	// A project that is not claimed yet also answers `404`: its events are
 	// stored but stay invisible until the
-	// [claim](https://preview.zitadel.com/docs/concepts/project-team-user#claim) succeeds.
+	// [claim](https://preview.zitadel.com/docs/concepts/project-team-user#claim) succeeds. The deployment's
+	// platform operators read them from the start.
 	//
 	// GET /events/{id}
 	GetEvent(ctx context.Context, params GetEventParams) (GetEventRes, error)
@@ -1106,17 +1110,19 @@ type Invoker interface {
 	// first. Requires `events.read`.
 	// A project that is not claimed yet returns an empty list: its events are
 	// stored but stay invisible until the
-	// [claim](https://preview.zitadel.com/docs/concepts/project-team-user#claim) succeeds.
+	// [claim](https://preview.zitadel.com/docs/concepts/project-team-user#claim) succeeds. The deployment's
+	// platform operators read them from the start.
 	// Team-scoped credentials see only the events whose `team_id` matches the
 	// credential's team. Team-scoped credentials are not issued today.
 	// Each item carries an `event_type` that says which type of event it is, and
 	// the matching `payload`. To read one event, pass its `id` to `getEvent` (`GET /events/{id}`).
 	// Filters combine. These are answered from an index and fill their pages: no
-	// filter, `category`, `event_type`, `request_id`, `flow_id`, and `session_id`,
-	// `entity_id` or `actor_id` with or without `category`, each with or without
-	// the time bounds. Any other filter or combination is matched event by
-	// event, over at most a few thousand events per request. Such a page can
-	// hold fewer events than `limit`, or none, and still carry
+	// filter, `category`, `event_type`, `status_class`, `operation_id` with or
+	// without `status_class`, `request_id`, `flow_id`, and `session_id`,
+	// `entity_id`, `actor_id` or `entity_type` with or without `category`, each
+	// with or without the time bounds. Any other filter or combination is
+	// matched event by event, over at most a few thousand events per request.
+	// Such a page can hold fewer events than `limit`, or none, and still carry
 	// `next_page_token`: keep passing the token until a response has none.
 	//
 	// GET /events
@@ -1523,9 +1529,10 @@ type Invoker interface {
 	// it refuses it with `rel.revoked`, including a build that pins its digest.
 	// A release that any origin still serves cannot be revoked. An origin serves
 	// the release of the newest deployment to it, so the call answers `409` with
-	// `rel.in_use`, naming each such origin and that deployment. Deploy another
-	// release there or roll back first, then revoke. Revoking therefore never
-	// takes an origin down. Deployments that named the release earlier stay in
+	// `rel.in_use`, naming each such origin, that deployment and whether the
+	// origin is primary or a preview. Deploy another release to a primary origin
+	// or roll it back, and remove a preview, then revoke. Revoking therefore
+	// never takes an origin down. Deployments that named the release earlier stay in
 	// the history.
 	// The call is idempotent: revoking a release that is already revoked answers
 	// `200` with the release unchanged, and `revoked_at` still names the first
@@ -4785,6 +4792,9 @@ func (c *Client) sendCreateSchema(ctx context.Context, request CreateSchemaReq, 
 // - Pre-allocate a `session_id` before the user is known, so device and telemetry signals
 // can be correlated with the eventual authenticated session from the start.
 // - Track anonymous state (bot detection, device fingerprint) that survives until authentication.
+// The session belongs to the project of the project secret. A `project_id` that
+// names another project answers `403` with `proj.mismatch` and creates nothing:
+// send the credential's own project.
 // Creating a session runs on the project credential (`session.write`). The returned
 // `session_token` is a session credential for the end-user client, not a
 // management scope. It is delivered as the `__Host-zitadel_session` cookie
@@ -7409,7 +7419,8 @@ func (c *Client) sendGetDeploymentVariables(ctx context.Context, params GetDeplo
 // answer `404`.
 // A project that is not claimed yet also answers `404`: its events are
 // stored but stay invisible until the
-// [claim](https://preview.zitadel.com/docs/concepts/project-team-user#claim) succeeds.
+// [claim](https://preview.zitadel.com/docs/concepts/project-team-user#claim) succeeds. The deployment's
+// platform operators read them from the start.
 //
 // GET /events/{id}
 func (c *Client) GetEvent(ctx context.Context, params GetEventParams) (GetEventRes, error) {
@@ -11812,17 +11823,19 @@ func (c *Client) sendListDeployments(ctx context.Context, params ListDeployments
 // first. Requires `events.read`.
 // A project that is not claimed yet returns an empty list: its events are
 // stored but stay invisible until the
-// [claim](https://preview.zitadel.com/docs/concepts/project-team-user#claim) succeeds.
+// [claim](https://preview.zitadel.com/docs/concepts/project-team-user#claim) succeeds. The deployment's
+// platform operators read them from the start.
 // Team-scoped credentials see only the events whose `team_id` matches the
 // credential's team. Team-scoped credentials are not issued today.
 // Each item carries an `event_type` that says which type of event it is, and
 // the matching `payload`. To read one event, pass its `id` to `getEvent` (`GET /events/{id}`).
 // Filters combine. These are answered from an index and fill their pages: no
-// filter, `category`, `event_type`, `request_id`, `flow_id`, and `session_id`,
-// `entity_id` or `actor_id` with or without `category`, each with or without
-// the time bounds. Any other filter or combination is matched event by
-// event, over at most a few thousand events per request. Such a page can
-// hold fewer events than `limit`, or none, and still carry
+// filter, `category`, `event_type`, `status_class`, `operation_id` with or
+// without `status_class`, `request_id`, `flow_id`, and `session_id`,
+// `entity_id`, `actor_id` or `entity_type` with or without `category`, each
+// with or without the time bounds. Any other filter or combination is
+// matched event by event, over at most a few thousand events per request.
+// Such a page can hold fewer events than `limit`, or none, and still carry
 // `next_page_token`: keep passing the token until a response has none.
 //
 // GET /events
@@ -12090,6 +12103,58 @@ func (c *Client) sendListEvents(ctx context.Context, params ListEventsParams) (r
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
 			if val, ok := params.TeamID.Get(); ok {
 				return e.EncodeValue(conv.StringToString(val))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "operation_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "operation_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if params.OperationID != nil {
+				return e.EncodeArray(func(e uri.Encoder) error {
+					for i, item := range params.OperationID {
+						if err := func() error {
+							return e.EncodeValue(conv.StringToString(item))
+						}(); err != nil {
+							return errors.Wrapf(err, "[%d]", i)
+						}
+					}
+					return nil
+				})
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "status_class" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "status_class",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if params.StatusClass != nil {
+				return e.EncodeArray(func(e uri.Encoder) error {
+					for i, item := range params.StatusClass {
+						if err := func() error {
+							return e.EncodeValue(conv.StringToString(string(item)))
+						}(); err != nil {
+							return errors.Wrapf(err, "[%d]", i)
+						}
+					}
+					return nil
+				})
 			}
 			return nil
 		}); err != nil {
@@ -17732,9 +17797,10 @@ func (c *Client) sendRevokeMySession(ctx context.Context, params RevokeMySession
 // it refuses it with `rel.revoked`, including a build that pins its digest.
 // A release that any origin still serves cannot be revoked. An origin serves
 // the release of the newest deployment to it, so the call answers `409` with
-// `rel.in_use`, naming each such origin and that deployment. Deploy another
-// release there or roll back first, then revoke. Revoking therefore never
-// takes an origin down. Deployments that named the release earlier stay in
+// `rel.in_use`, naming each such origin, that deployment and whether the
+// origin is primary or a preview. Deploy another release to a primary origin
+// or roll it back, and remove a preview, then revoke. Revoking therefore
+// never takes an origin down. Deployments that named the release earlier stay in
 // the history.
 // The call is idempotent: revoking a release that is already revoked answers
 // `200` with the release unchanged, and `revoked_at` still names the first

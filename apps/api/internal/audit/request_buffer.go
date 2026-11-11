@@ -2,6 +2,7 @@ package audit
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/instrumentation/metrics"
+	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 // RequestBufferConfig tunes Path A batching (ADR 048).
@@ -22,6 +24,20 @@ type RequestBufferConfig struct {
 	MaxAge          time.Duration
 	Capacity        int
 	ShutdownTimeout time.Duration
+	// FlushWait is RequestConfig.FlushWait.
+	FlushWait time.Duration
+}
+
+// RequestConfig is the part of Path A an operator sets (events.request).
+type RequestConfig struct {
+	// FlushWait makes a request wait, up to this long, until its event is
+	// written, where the server otherwise writes it up to a second after the
+	// response. It is for a server that runs only while it serves a request,
+	// such as a Vercel function: there a write after the response waits for
+	// the next request to wake the instance, and is lost with an instance
+	// that never wakes. Requests in flight together still share one write.
+	// Zero, the default, never waits.
+	FlushWait time.Duration `mapstructure:"flush_wait"`
 }
 
 func DefaultRequestBufferConfig() RequestBufferConfig {
@@ -60,11 +76,15 @@ type bufferedEvent struct {
 	// spanContext is the enqueue span of a sampled request. The flush span
 	// links to it; it is invalid when the request was not sampled.
 	spanContext trace.SpanContext
+	// settled is closed once the flusher is done with the event, written or
+	// given up on. Nil unless a request waits for it (FlushWait).
+	settled chan struct{}
 }
 
 // RequestBuffer is an in-process Path A queue. Flush when the buffer holds at
-// least BatchSize events (a prefix of that many) or the oldest event exceeds
-// MaxAge. A single background flusher owns all inserts.
+// least BatchSize events (a prefix of that many), the oldest event exceeds
+// MaxAge or, with FlushWait, as soon as it holds one. A single background
+// flusher owns all inserts.
 type RequestBuffer struct {
 	cfg     RequestBufferConfig
 	insert  EventBatchInserter
@@ -100,14 +120,28 @@ func (b *RequestBuffer) Enqueue(ev *domain.Event) {
 
 // EnqueueSince records a request event whose forensic occurred_at is startedAt
 // (HTTP middleware entry), not enqueue/flush time. The flush span links to the
-// span in ctx.
+// span in ctx. It drops when full and returns at once, unless FlushWait is
+// set: then it returns once the flusher is done with the event, FlushWait has
+// passed or ctx ends, whichever comes first.
 func (b *RequestBuffer) EnqueueSince(ctx context.Context, ev *domain.Event, startedAt time.Time) {
-	b.enqueue(ev, startedAt, trace.SpanContextFromContext(ctx))
+	settled := b.enqueue(ev, startedAt, trace.SpanContextFromContext(ctx))
+	if settled == nil {
+		return
+	}
+	wait := time.NewTimer(b.cfg.FlushWait)
+	defer wait.Stop()
+	select {
+	case <-settled:
+	case <-wait.C:
+	case <-ctx.Done():
+	}
 }
 
-func (b *RequestBuffer) enqueue(ev *domain.Event, startedAt time.Time, spanContext trace.SpanContext) {
+// enqueue returns the event's settled channel, nil when nothing waits for it:
+// without FlushWait, or when the event was not taken.
+func (b *RequestBuffer) enqueue(ev *domain.Event, startedAt time.Time, spanContext trace.SpanContext) <-chan struct{} {
 	if ev == nil || ev.ProjectID == "" {
-		return
+		return nil
 	}
 	b.mu.Lock()
 	if len(b.buf) >= b.cfg.Capacity {
@@ -117,18 +151,23 @@ func (b *RequestBuffer) enqueue(ev *domain.Event, startedAt time.Time, spanConte
 			slog.Uint64("dropped_total", b.dropped.Load()),
 		)
 		b.mu.Unlock()
-		return
+		return nil
 	}
 	now := time.Now()
 	if startedAt.IsZero() {
 		startedAt = now
 	}
-	b.buf = append(b.buf, bufferedEvent{event: ev, enqueuedAt: now, startedAt: startedAt, spanContext: spanContext})
+	var settled chan struct{}
+	if b.cfg.FlushWait > 0 {
+		settled = make(chan struct{})
+	}
+	b.buf = append(b.buf, bufferedEvent{event: ev, enqueuedAt: now, startedAt: startedAt, spanContext: spanContext, settled: settled})
 	shouldWake := b.shouldFlushLocked()
 	b.mu.Unlock()
 	if shouldWake {
 		b.signal()
 	}
+	return settled
 }
 
 func (b *RequestBuffer) signal() {
@@ -143,7 +182,7 @@ func (b *RequestBuffer) shouldFlushLocked() bool {
 	if n == 0 {
 		return false
 	}
-	if n >= b.cfg.BatchSize {
+	if n >= b.cfg.BatchSize || b.cfg.FlushWait > 0 {
 		return true
 	}
 	return time.Since(b.buf[0].enqueuedAt) >= b.cfg.MaxAge
@@ -207,6 +246,13 @@ func (b *RequestBuffer) flush(batch []bufferedEvent) {
 	if len(batch) == 0 {
 		return
 	}
+	defer func() {
+		for _, item := range batch {
+			if item.settled != nil {
+				close(item.settled)
+			}
+		}
+	}()
 	events := make([]*domain.Event, len(batch))
 	var links []trace.Link
 	for i, item := range batch {
@@ -226,7 +272,7 @@ func (b *RequestBuffer) flush(batch []bufferedEvent) {
 	}
 	const maxAttempts = 3
 	backoff := 50 * time.Millisecond
-	var lastErr error
+	var firstErr, lastErr error
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		// Recompute wait immediately before each insert attempt so retries
 		// include backoff time. startedAt is request begin, not enqueue.
@@ -239,11 +285,30 @@ func (b *RequestBuffer) flush(batch []bufferedEvent) {
 		metrics.RecordAuditInsert(insertCtx, metrics.AuditRequest, time.Since(start))
 		cancel()
 		if lastErr == nil {
-			b.flushed.Add(uint64(len(events)))
-			for _, ev := range events {
-				metrics.RecordAuditEvents(ctx, string(ev.EventType), 1)
-			}
+			b.recordFlushed(ctx, events)
 			return
+		}
+		if _, duplicate := errors.AsType[*database.UniqueError](lastErr); duplicate {
+			// An event keeps the id its first insert minted, and a batch is
+			// written whole or not at all. So a duplicate after a failed
+			// attempt means that attempt was committed and only its answer
+			// was lost, as when the instance is paused mid-insert: the batch
+			// is written. A duplicate on the first attempt stays one however
+			// often it is retried.
+			if firstErr != nil {
+				slog.Warn("request audit event batch was written by an attempt that reported a failure",
+					slog.Int("batch_size", len(events)),
+					slog.Int("attempt", attempt),
+					slog.String("first_error", firstErr.Error()),
+				)
+				b.recordFlushed(ctx, events)
+				return
+			}
+			firstErr = lastErr
+			break
+		}
+		if firstErr == nil {
+			firstErr = lastErr
 		}
 		if attempt < maxAttempts {
 			time.Sleep(backoff)
@@ -254,11 +319,21 @@ func (b *RequestBuffer) flush(batch []bufferedEvent) {
 	span := trace.SpanFromContext(ctx)
 	span.SetStatus(codes.Error, "")
 	span.SetAttributes(semconv.ErrorTypeKey.String(fmt.Sprintf("%T", lastErr)))
+	// The first error is the cause: a later attempt fails on what the first
+	// one left behind.
 	slog.Error("failed to flush request audit event batch; dropping after retries",
 		slog.Int("batch_size", len(events)),
 		slog.Uint64("dropped_total", b.dropped.Load()),
 		slog.String("error", lastErr.Error()),
+		slog.String("first_error", firstErr.Error()),
 	)
+}
+
+func (b *RequestBuffer) recordFlushed(ctx context.Context, events []*domain.Event) {
+	b.flushed.Add(uint64(len(events)))
+	for _, ev := range events {
+		metrics.RecordAuditEvents(ctx, string(ev.EventType), 1)
+	}
 }
 
 // Close drains the buffer and stops the flusher.

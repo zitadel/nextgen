@@ -1968,7 +1968,7 @@ export function setupPlatformHandlers() {
 
       // A release an origin still serves cannot be revoked: the live deployment
       // to any origin must not pin it.
-      const servedBy: { origin: string; deployment_id: string }[] = [];
+      const servedBy: { origin: string; deployment_id: string; kind: "primary" | "preview" }[] = [];
       const origins = new Set(
         [...store.deployments.values()]
           .filter((deployment) => deployment.projectId === release.projectId)
@@ -1977,7 +1977,7 @@ export function setupPlatformHandlers() {
       for (const origin of origins) {
         const newest = newestDeploymentForOrigin(release.projectId, origin);
         if (newest?.releaseId === release.id) {
-          servedBy.push({ origin, deployment_id: newest.id });
+          servedBy.push({ origin, deployment_id: newest.id, kind: deploymentKind(newest) });
         }
       }
       if (servedBy.length > 0) {

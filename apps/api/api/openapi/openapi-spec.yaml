@@ -383,6 +383,14 @@ webhooks:
     $ref: endpoints/events/webhooks/idp-identity_link-created.yaml
   idp.updated:
     $ref: endpoints/events/webhooks/idp-updated.yaml
+  invitation.accepted:
+    $ref: endpoints/events/webhooks/invitation-accepted.yaml
+  invitation.cancelled:
+    $ref: endpoints/events/webhooks/invitation-cancelled.yaml
+  invitation.created:
+    $ref: endpoints/events/webhooks/invitation-created.yaml
+  invitation.rejected:
+    $ref: endpoints/events/webhooks/invitation-rejected.yaml
   origin.added:
     $ref: endpoints/events/webhooks/origin-added.yaml
   origin.removed:

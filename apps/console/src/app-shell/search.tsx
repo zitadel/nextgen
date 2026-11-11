@@ -1,6 +1,9 @@
 import { useNavigate } from "@tanstack/react-router";
-import { Boxes, type LucideIcon, Search } from "lucide-react";
+import { Boxes, Copy, type LucideIcon, Plus, Search } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
+
+import { copyText } from "@/lib/clipboard";
 
 import {
   Command,
@@ -27,6 +30,9 @@ import {
   hasMore,
   hitsFor,
 } from "@/features/search/model";
+import { recentHits, rememberHit } from "@/features/search/recents";
+import { AddTeamSheet } from "@/features/teams/components/add-team-sheet";
+import { AddUserSheet } from "@/features/users/components/add-user-sheet";
 import { cn } from "@/lib/utils";
 
 import type { NavIcon } from "@/nav";
@@ -43,12 +49,14 @@ import { SETTINGS_PATH } from "./user-menu";
  * (D27): in the bar it stacked on a list's own search, two fields a row apart.
  * A row of the sidebar's menu: a field at full width, its glyph in the rail.
  *
- * Groups, top to bottom: pages in the selected project; what `POST /search`
- * finds in it (root ADR 087), which is users, teams and configuration (user
- * schemas, login flows, identity providers), each matched and ranked on the
- * server, an id pasted into the field included; projects, matched on the
- * server across every project the person can act on; and the account
- * (Projects, then Settings' pages, which "Settings" finds too).
+ * Groups, top to bottom: what was opened from here last, until something is
+ * typed; pages in the selected project; actions in it (the drawers its list
+ * screens open, and its id to copy); what `POST /search` finds in it (root ADR
+ * 087), which is users, teams and configuration (user schemas, login flows,
+ * identity providers), each matched and ranked on the server, an id pasted
+ * into the field included; projects, matched on the server across every
+ * project the person can act on; and the account (Projects, then Settings'
+ * pages, which "Settings" finds too).
  */
 export function SearchTrigger({ onOpen }: { onOpen: () => void }) {
   return (
@@ -120,6 +128,8 @@ export function SearchDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const [query, setQuery] = useState("");
+  // The drawer an action opened. It outlives the palette, which closes first.
+  const [adding, setAdding] = useState<"user" | "team" | null>(null);
   const navigate = useNavigate();
   const projectId = useProjectScope();
   // One round of requests per pause in typing, not per keystroke.
@@ -172,9 +182,36 @@ export function SearchDialog({
           go: close(() => void navigate({ to: item.to })),
         }));
 
+    // What the palette does in the selected project: what its list screens'
+    // own buttons do. The server refuses what the person may not do, as it
+    // does there.
+    const actions: Result[] = projectId
+      ? [
+          {
+            id: "action:add-user",
+            icon: Plus,
+            label: "Add user",
+            go: close(() => setAdding("user")),
+          },
+          {
+            id: "action:add-team",
+            icon: Plus,
+            label: "Add team",
+            go: close(() => setAdding("team")),
+          },
+          {
+            id: "action:copy-project-id",
+            icon: Copy,
+            label: "Copy project ID",
+            context: projectId,
+            go: close(() => void copyProjectId(projectId)),
+          },
+        ].filter((action) => matches(action.label))
+      : [];
+
     // A hit wears the glyph of the sidebar page that lists its kind.
-    const iconOf = (path: string): LucideIcon | NavIcon =>
-      pages.find((item) => item.to === path)?.nav.icon ?? Search;
+    const iconOf = (type: SearchResultType): LucideIcon | NavIcon =>
+      pages.find((item) => item.to === LIST_PATH[type])?.nav.icon ?? Search;
     const openHit = (hit: SearchHit) => {
       switch (hit.type) {
         case "user":
@@ -192,18 +229,23 @@ export function SearchDialog({
           return navigate({ to: "/authentication/idps/$idpId", params: { idpId: hit.id } });
       }
     };
+    // A row without a subtitle says which project it is in.
+    const hitResult = (hit: SearchHit, group: string): Result => ({
+      id: `${group}:${hit.type}:${hit.id}`,
+      icon: iconOf(hit.type),
+      label: hit.title,
+      context: hit.subtitle ?? projectName,
+      go: close(() => {
+        if (projectId) rememberHit(projectId, hit);
+        void openHit(hit);
+      }),
+    });
     // What the server found of one type, for the text in the field now
-    // (`hitsFor`). A row without a subtitle says which project it is in.
-    const hitResults = (answer: typeof users, type: SearchResultType, listPath: string): Result[] =>
-      hitsFor(answer ?? NO_ANSWER, query, type).map((hit) => ({
-        id: `${hit.type}:${hit.id}`,
-        icon: iconOf(listPath),
-        label: hit.title,
-        context: hit.subtitle ?? projectName,
-        go: close(() => void openHit(hit)),
-      }));
+    // (`hitsFor`).
+    const hitResults = (answer: typeof users, type: SearchResultType): Result[] =>
+      hitsFor(answer ?? NO_ANSWER, query, type).map((hit) => hitResult(hit, "hit"));
 
-    const userResults = hitResults(users, "user", "/users");
+    const userResults = hitResults(users, "user");
     if (hasMore(users ?? NO_ANSWER, query, "user")) {
       // The palette shows the best few; the Users list searches the same
       // text across every page.
@@ -225,17 +267,26 @@ export function SearchDialog({
 
     return [
       {
+        heading: "Recent",
+        // Until something is typed: then the server's matches take over.
+        results:
+          !q && open && projectId
+            ? recentHits(projectId).map((hit) => hitResult(hit, "recent"))
+            : [],
+      },
+      {
         heading: projectName ? `Pages in ${projectName}` : "Pages",
         results: navResults(pages),
       },
+      { heading: "Actions", results: actions },
       { heading: "Users", results: userResults },
-      { heading: "Teams", results: hitResults(others, "team", "/teams") },
+      { heading: "Teams", results: hitResults(others, "team") },
       {
         heading: "Configuration",
         results: [
-          ...hitResults(others, "schema", "/schemas"),
-          ...hitResults(others, "flow_definition", "/flow-definitions"),
-          ...hitResults(others, "idp", "/authentication"),
+          ...hitResults(others, "schema"),
+          ...hitResults(others, "flow_definition"),
+          ...hitResults(others, "idp"),
         ],
       },
       { heading: "Projects", results: projectResults },
@@ -248,6 +299,7 @@ export function SearchDialog({
         ],
       },
     ].filter((group) => group.results.length > 0);
+    // `open` is here for the recent hits, which are read when the palette opens.
   }, [
     pages,
     account,
@@ -255,19 +307,81 @@ export function SearchDialog({
     users,
     others,
     projects,
+    projectId,
     projectName,
     q,
     query,
+    open,
     navigate,
     onOpenChange,
   ]);
 
   return (
+    <>
+      <SearchPalette
+        open={open}
+        onOpenChange={onOpenChange}
+        query={query}
+        onQueryChange={setQuery}
+        groups={groups}
+      />
+      {projectId && (
+        <>
+          <AddUserSheet
+            open={adding === "user"}
+            onOpenChange={(next) => setAdding(next ? "user" : null)}
+            onCreated={(user) => navigate({ to: "/users/$userId", params: { userId: user.id } })}
+          />
+          <AddTeamSheet
+            open={adding === "team"}
+            onOpenChange={(next) => setAdding(next ? "team" : null)}
+            onCreated={(team) => navigate({ to: "/teams/$teamId", params: { teamId: team.id } })}
+          />
+        </>
+      )}
+    </>
+  );
+}
+
+/** The list screen of each kind of hit: where its glyph comes from. */
+const LIST_PATH: Record<SearchResultType, string> = {
+  user: "/users",
+  team: "/teams",
+  schema: "/schemas",
+  flow_definition: "/flow-definitions",
+  idp: "/authentication",
+};
+
+/**
+ * Puts the project's id on the clipboard and says so. A refused write, or a
+ * missing clipboard on an insecure origin, says that instead of claiming a
+ * copy.
+ */
+async function copyProjectId(projectId: string) {
+  if (await copyText(projectId)) toast.success("Project ID copied");
+  else toast.error("Could not copy the project ID");
+}
+
+/** The palette itself: the field and the groups it is given. */
+function SearchPalette({
+  open,
+  onOpenChange,
+  query,
+  onQueryChange,
+  groups,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  query: string;
+  onQueryChange: (query: string) => void;
+  groups: { heading: string; results: Result[] }[];
+}) {
+  return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent showCloseButton={false} className={PALETTE}>
         <DialogTitle className="sr-only">Go to</DialogTitle>
         <DialogDescription className="sr-only">
-          Search for a page, a user, a team, configuration or a project.
+          Search for a page, an action, a user, a team, configuration or a project.
         </DialogDescription>
         {/* Filtering is ours, not cmdk's: what the server found arrives
             already matched and ranked, and the pages match as a substring,
@@ -276,8 +390,8 @@ export function SearchDialog({
           <div className="relative">
             <CommandInput
               value={query}
-              onValueChange={setQuery}
-              placeholder="Go to a page, user, team or project"
+              onValueChange={onQueryChange}
+              placeholder="Go to a page, user, team or project, or run an action"
               aria-label="Search"
               className="h-12 pr-12 text-[15px]"
             />
