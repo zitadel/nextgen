@@ -96,8 +96,6 @@ export default class VariableResolve extends Tabulatable(EnvironmentCommand) {
     const { client, projectId } = await this.connect();
     const deploymentService = new DeploymentService(client, projectId);
     if (args.deploymentId !== undefined) {
-      // Read first, so an id the project does not have is a miss of its own
-      // rather than whichever of the later reads fails first.
       const deployment = await deploymentService.get(args.deploymentId);
       const items = await deploymentService.variables(deployment.id);
       return this.render(flags, deployment.id, [...deployment.origins].sort(), items);

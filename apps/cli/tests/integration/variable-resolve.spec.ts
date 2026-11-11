@@ -126,7 +126,6 @@ describe("variable resolve", () => {
     });
 
     describe("a named deployment", () => {
-      /** A deployed project that holds HOST, and sets LATER after the deploy. */
       async function aDeployedProject() {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();
@@ -136,7 +135,6 @@ describe("variable resolve", () => {
         return { app, deploymentId: deployed.deployment_id ?? "" };
       }
 
-      /** The names of the variables a `variable resolve --json` listed. */
       function namesIn(app: ScaffoldedApp, result: CliResult): string[] {
         return app.envelopeOf<{ items: { name: string }[] }>(result).data.items.map((item) => {
           return item.name;
