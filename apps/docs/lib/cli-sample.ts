@@ -126,13 +126,9 @@ function listFlags(request: RequestData): string[] {
 // `set` takes no value on the command line: it prompts for it, or reads it
 // from stdin, so a credential stays out of the shell's history. A body sets
 // many variables at once, so it is a command for each, and the `null` that
-// removes one is an `rm`. `kind=preview` is `--preview`, and `resolve` takes
-// an origin rather than the deployment the path names.
+// removes one is an `rm`. `kind=preview` is `--preview`.
 function variables(verb: string | undefined, positionals: string[], request: RequestData): string {
   const preview = request.query.kind?.values[0] === "preview" ? ["--preview"] : [];
-  if (verb === "resolve") {
-    return `${context}\n${cli} variable resolve`;
-  }
   if (verb !== "set") {
     return `${context}\n${line([`${cli} variable ${verb}`, ...positionals], preview)}`;
   }
