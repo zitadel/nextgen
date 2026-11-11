@@ -11,7 +11,8 @@ import { formatRecent } from "@/lib/date";
  * The project's newest audit events, the sign-ins and changes Logs lists
  * first: each its type, what it was about and when, opening the event. The
  * card's action is Logs, where the rest are. A project that is not claimed yet
- * reads none: its events stay hidden until the claim.
+ * reads none, except to a platform operator: its events stay hidden until the
+ * claim.
  */
 export function RecentActivityCard({ activity }: { activity: CardRead<LogEvent[]> }) {
   return (

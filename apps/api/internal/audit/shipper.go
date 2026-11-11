@@ -47,10 +47,12 @@ func DefaultExportConfig() ExportConfig {
 	}
 }
 
-// EventExportSource backs the shipper with the projects whose events ship
-// (claimed ones and the platform project, ADR 049 §4) and sink cursors.
+// EventExportSource backs the shipper with the projects whose events ship and
+// sink cursors. Every sink is deployment-scoped, the platform operators', who
+// see every project's events, claimed or not (ADR 049 §4), so every project
+// ships.
 type EventExportSource interface {
-	ListVisibleProjectIDs(ctx context.Context) ([]string, error)
+	ListProjectIDs(ctx context.Context) ([]string, error)
 	EnsureSink(ctx context.Context, sink *domain.EventSink) error
 	GetEventSinkCursor(ctx context.Context, sinkID, projectID string) (*domain.EventSinkCursor, error)
 	UpsertEventSinkCursor(ctx context.Context, cursor *domain.EventSinkCursor) error
@@ -155,14 +157,14 @@ func (s *Shipper) shipOnce() {
 	}
 }
 
-// listProjects lists the projects whose events ship under a job span of its
-// own, ended before any project is shipped.
+// listProjects lists the projects to ship under a job span of its own, ended
+// before any project is shipped.
 func (s *Shipper) listProjects() ([]string, error) {
-	ctx, span := startJobSpan(context.Background(), "audit.ListVisibleProjects")
+	ctx, span := startJobSpan(context.Background(), "audit.ListProjects")
 	defer span.End()
 	ctx, cancel := context.WithTimeout(ctx, shipListTimeout)
 	defer cancel()
-	projects, err := s.src.ListVisibleProjectIDs(ctx)
+	projects, err := s.src.ListProjectIDs(ctx)
 	if err != nil {
 		failJobSpan(ctx, err)
 	}

@@ -435,7 +435,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	ctx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	exportAdapter := service.EventExportAdapter{Pool: serviceDBPool, PlatformProjectID: cfg.Platform.ResolvedProjectID()}
+	exportAdapter := service.EventExportAdapter{Pool: serviceDBPool}
 	requestEventCfg := audit.DefaultRequestBufferConfig()
 	requestEventCfg.FlushWait = cfg.Events.Request.FlushWait
 	requestEventBuf := audit.NewRequestBuffer(exportAdapter, requestEventCfg)
