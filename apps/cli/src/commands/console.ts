@@ -1,15 +1,15 @@
 import { Flags } from "@oclif/core";
-import { Suggestible } from "@/lib/oclif/suggestible";
-import { log } from "@/lib/log";
-import { escapeControlCharacters } from "@/lib/terminal-text";
 
 import { openInBrowser } from "@/lib/browser";
 import { findLocalAdminDir, readLocalAdmin } from "@/lib/local-server/admin-credential";
-import { consoleSignInUrl } from "@/lib/local-server/sign-in";
 import { DEFAULT_LOCAL_SERVER_URL, readRuntimeMetadata } from "@/lib/local-server/runtime";
 import { LocalServer } from "@/lib/local-server/server";
+import { consoleSignInUrl } from "@/lib/local-server/sign-in";
+import { log } from "@/lib/log";
 import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { Suggestible } from "@/lib/oclif/suggestible";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 
 /** How a directory with no local admin, and no parent holding one, is refused. */
 const NO_LOCAL_ADMIN_REFUSAL: Refusal = {
@@ -26,7 +26,6 @@ const NO_LOCAL_ADMIN_REFUSAL: Refusal = {
 export default class Console extends Suggestible(BaseCommand) {
   static override description =
     "Open the local console, signed in as the local admin.\n\nThe local admin is the one the start command created. Run this in the directory it ran in, or one inside it: the local admin is read from the nearest .zitadel/local/ on the way up.";
-
   static override group = CommandGroups.localDevelopment;
   static override groupOrder = 1;
 
@@ -34,7 +33,6 @@ export default class Console extends Suggestible(BaseCommand) {
     "<%= config.bin %> <%= command.id %>",
     "<%= config.bin %> <%= command.id %> --no-open",
   ];
-
   static override flags = {
     "no-open": Flags.boolean({
       description: "Print the sign-in link instead of opening a browser.",

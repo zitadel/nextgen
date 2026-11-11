@@ -1,3 +1,13 @@
+import { isVariableReference } from "@zitadel/config/idp";
+
+import {
+  type ZitadelClient,
+  pagedFunctions,
+  BrandingService,
+  FlowService,
+  PolicyService,
+  SchemaService,
+} from "@/lib/backend";
 import {
   type GetReleaseById200,
   ListEventsCategoryItem,
@@ -55,17 +65,6 @@ import {
   QueryTeamsResponse,
   QueryUsersResponse,
 } from "@/lib/backend/schemas";
-import { isVariableReference } from "@zitadel/config/idp";
-
-import {
-  type ZitadelClient,
-  pagedFunctions,
-  BrandingService,
-  FlowService,
-  PolicyService,
-  SchemaService,
-} from "@/lib/backend";
-import { CommandGroups } from "@/lib/oclif/groups";
 import { ZitadelError } from "@/lib/errors";
 import {
   buildResourceCommands,
@@ -82,6 +81,7 @@ import {
   type WriteResult,
   type WriteShape,
 } from "@/lib/oclif/crud";
+import { CommandGroups } from "@/lib/oclif/groups";
 import type { Tabulate } from "@/lib/oclif/tabulatable";
 
 /** A user update's body as its flags write it: `--dry-run` sets `dry_run`. */
@@ -537,7 +537,7 @@ export const RESOURCES = {
     },
   }),
 
-  // Identity provider connections (#1217). They carry ADR 063's shape already:
+  // Identity provider connections. They carry ADR 063's shape already:
   // a fixed `id` shared by every revision, and a `revision_id` per revision.
   // The revision routes are not modelled here — the CLI has no grammar for a
   // sub-resource listing yet, so `idps revisions` is deliberately absent.
@@ -568,7 +568,7 @@ export const RESOURCES = {
     // The body nests the connection under `idp`. Rooted there, the flags and
     // `--set` paths address the connection itself (`--oidc-issuer`), and
     // `--file` takes the same document as `.zitadel/idps/<slug>.json`. A slug
-    // that already exists is revised rather than duplicated (#1217).
+    // that already exists is revised rather than duplicated.
     create: create(
       CreateIdpBody,
       ({ client, projectId }, body) => client.createIdp(body, { project_id: projectId }),
@@ -704,7 +704,7 @@ export const RESOURCES = {
           field: "revisions",
           operations: ["equals"],
           values: Object.values(ListFlowDefinitionsRevisions),
-          // Publishing under an existing name mints a new row (#1246), so the
+          // Publishing under an existing name mints a new row, so the
           // unfiltered list is a history of the same flows. Same reasoning as
           // `schemas`: a bare list is the current flows.
           default: ListFlowDefinitionsRevisions.latest,

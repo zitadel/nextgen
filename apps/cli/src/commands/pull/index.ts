@@ -2,11 +2,15 @@ import { Args } from "@oclif/core";
 import { z } from "zod";
 
 import type { ReleasePointer, ReleasePointerKind } from "@/lib/backend";
-import { PublishedConfiguration } from "@/lib/publish";
 import { ZitadelError } from "@/lib/errors";
 import { mapBounded } from "@/lib/map-bounded";
 import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
+import { type Refused, taken } from "@/lib/oclif/flags";
+import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { PublishedConfiguration } from "@/lib/publish";
 import { DEPLOY_ARGS } from "@/lib/suggestion";
+import { escapeControlCharacters } from "@/lib/terminal-text";
+import { reportWarning } from "@/lib/warnings";
 import {
   type Change,
   DiskStore,
@@ -16,10 +20,6 @@ import {
   type Schemas,
   ZitadelConfig,
 } from "@/lib/zitadel";
-import { type Refused, taken } from "@/lib/oclif/flags";
-import { type Refusal, refusalError } from "@/lib/oclif/refusal";
-import { reportWarning } from "@/lib/warnings";
-import { escapeControlCharacters } from "@/lib/terminal-text";
 
 /**
  * A release id, as the platform mints it.
@@ -113,7 +113,7 @@ type PullableKind = Extract<ReleasePointerKind, "schema" | "flow_definition">;
  * the revision a release pins, which places the revision by its handle.
  *
  * @remarks
- * Only `schema` and `flow_definition` qualify (issue #541): their
+ * Only `schema` and `flow_definition` qualify: their
  * `revision_id` is the id their read endpoint takes. A release also pins
  * `branding` and `idp`, but those pin a revision id the per-kind read
  * endpoints do not accept yet, so a release that carries them is pulled for
@@ -193,9 +193,9 @@ type PullOutcome =
 export default class Pull extends EnvironmentCommand {
   static override description =
     "Rebuild your .zitadel/ files from a release.\n\nWrites .zitadel/ from the revisions a released snapshot pins.";
-
   static override group = CommandGroups.configuration;
   static override groupOrder = 2;
+
   static override examples = [
     "<%= config.bin %> pull",
     "<%= config.bin %> pull rel_01KX3RG8A7F0N9WD3P2E4YM5C1",
@@ -217,18 +217,18 @@ export default class Pull extends EnvironmentCommand {
   /**
    * Write each revision the target's release pins into `.zitadel/`.
    *
-   * @param input - The target.
+   * @param input.args - The target.
    * @returns The release, what was written, and what was skipped.
    * @throws {@link ZitadelError} With `E_NOT_FOUND` when `latest` is asked for
    *   and nothing is deployed.
    */
-  protected async execute(input: Admitted<typeof Pull>): Promise<JsonEnvelope> {
+  protected async execute({ args }: Admitted<typeof Pull>): Promise<JsonEnvelope> {
     const { client, projectId } = await this.connect();
     const store = new DiskStore(this.cwd);
     const config = await ZitadelConfig.loadKinds(store, ["schemas", "flows"]);
 
     const configuration = new PublishedConfiguration(client, projectId);
-    const releaseId = await this.resolveReleaseId(configuration, input.args.target);
+    const releaseId = await this.resolveReleaseId(configuration, args.target);
     const release = await configuration.fetchRelease(releaseId);
 
     // Fetched together, but kept in the order the release pins them, so the
@@ -303,7 +303,7 @@ export default class Pull extends EnvironmentCommand {
         lines: files,
       },
       next: {
-        commands: this.dryRun || input.args.target !== undefined ? [] : [this.suggest(DEPLOY_ARGS)],
+        commands: this.dryRun || args.target !== undefined ? [] : [this.suggest(DEPLOY_ARGS)],
       },
     });
   }

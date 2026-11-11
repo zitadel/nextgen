@@ -5,10 +5,6 @@ import { DeploymentService, type Variable } from "@/lib/backend";
 import { GetDeploymentVariablesParams } from "@/lib/backend/schemas";
 import { Cmd } from "@/lib/cmd";
 import { ZitadelError } from "@/lib/errors";
-import { type Refused, taken } from "@/lib/oclif/flags";
-import { type Refusal, refusalError } from "@/lib/oclif/refusal";
-import { DEPLOY_ARGS } from "@/lib/suggestion";
-
 import {
   type Admitted,
   CommandGroups,
@@ -16,7 +12,10 @@ import {
   type JsonEnvelope,
   nonBlankString,
 } from "@/lib/oclif";
+import { type Refused, taken } from "@/lib/oclif/flags";
+import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
+import { DEPLOY_ARGS } from "@/lib/suggestion";
 import { variableCell } from "@/lib/variables";
 
 /**
@@ -57,8 +56,8 @@ const COLUMNS = ["name", "value"] as const;
  * one of the project's origins. Without it, resolving is unambiguous only when
  * a single deployment is live across the project; when several are — a
  * different release or frozen map on each origin — the live origins are named
- * and `--origin` is required rather than resolving from an arbitrary one
- * (#1617). A target with nothing deployed is a miss that says how to reach it:
+ * and `--origin` is required rather than resolving from an arbitrary one.
+ * A target with nothing deployed is a miss that says how to reach it:
  * `deploy` goes to every primary origin, including one added since the last
  * deploy, and a preview origin is only ever served by a pull-request build,
  * never by `deploy`.

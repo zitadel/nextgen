@@ -1,21 +1,21 @@
 import { Args, Flags } from "@oclif/core";
-import { escapeControlCharacters } from "@/lib/terminal-text";
 import { z } from "zod";
 
-import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
-import { Tabulatable } from "@/lib/oclif/tabulatable";
-import { reads, type Refused, taken } from "@/lib/oclif/flags";
-import { RollbackDeploymentParams } from "@/lib/backend/schemas";
 import {
   DeploymentService,
   ReleaseService,
   type ReleasePointer,
   type ZitadelClient,
 } from "@/lib/backend";
-import { MESSAGE_MAX_LENGTH, messageTooLong } from "@/lib/publish";
-import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { RollbackDeploymentParams } from "@/lib/backend/schemas";
 import { isCancellation, toZitadelError } from "@/lib/errors";
+import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { Destructive } from "@/lib/oclif/destructive";
+import { reads, type Refused, taken } from "@/lib/oclif/flags";
+import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { Tabulatable } from "@/lib/oclif/tabulatable";
+import { MESSAGE_MAX_LENGTH, messageTooLong } from "@/lib/publish";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 import { reportWarning } from "@/lib/warnings";
 
 const NOTHING_DEPLOYED_REFUSAL: Refusal = {
@@ -108,8 +108,8 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
   };
 
   protected async execute({
-    flags,
     args,
+    flags,
   }: Admitted<typeof DeploymentRollback>): Promise<JsonEnvelope> {
     const { client, projectId, server } = await this.connect();
     const deploymentService = new DeploymentService(client, projectId);
@@ -118,12 +118,15 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
     };
     const plan = await deploymentService.planRollback(args.deploymentId);
     switch (plan.outcome) {
-      case "nothing-deployed":
+      case "nothing-deployed": {
         throw refusalError(NOTHING_DEPLOYED_REFUSAL, {}, suggest);
-      case "nothing-earlier":
+      }
+      case "nothing-earlier": {
         throw refusalError(NOTHING_EARLIER_REFUSAL, {}, suggest);
-      case "target":
+      }
+      case "target": {
         break;
+      }
     }
     const { target } = plan;
     const changes = await originChanges(client, deploymentService, projectId, target.id);

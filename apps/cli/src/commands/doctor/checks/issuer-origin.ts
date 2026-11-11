@@ -1,3 +1,4 @@
+import { configuredIssuer } from "@/commands/doctor/patch-context";
 import {
   DeploymentService,
   OriginService,
@@ -5,8 +6,7 @@ import {
   createZitadelClient,
   type ZitadelClient,
 } from "@/lib/backend";
-import { projectCommand } from "@/lib/suggestion";
-import { escapeControlCharacters } from "@/lib/terminal-text";
+import { errorMessage, isCancellation } from "@/lib/errors";
 import {
   readProjectServer,
   readZitadelConfig,
@@ -14,11 +14,12 @@ import {
   writeZitadelSecret,
   type ZitadelSecret,
 } from "@/lib/project";
-import { configuredIssuer } from "@/commands/doctor/patch-context";
-import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
-import { errorMessage, isCancellation } from "@/lib/errors";
+import { projectCommand } from "@/lib/suggestion";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 import { userAgent } from "@/lib/user-agent";
 import { reportWarning } from "@/lib/warnings";
+
+import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
 
 /** What {@link inspect} found: a pass, or the preview issuer `fix` makes primary. */
 type Finding =

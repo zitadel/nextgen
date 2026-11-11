@@ -1,6 +1,7 @@
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
+import { ForbiddenError, OriginService, type ZitadelClient } from "@/lib/backend";
 import {
   type Admitted,
   CommandGroups,
@@ -10,17 +11,15 @@ import {
   PREVIEW_CREDENTIAL,
   PreviewCommand,
 } from "@/lib/oclif";
-import { ForbiddenError, OriginService, type ZitadelClient } from "@/lib/backend";
-import { deployMessage, MESSAGE_MAX_LENGTH, messageTooLong, Publisher } from "@/lib/publish";
-
 import { filled, reads, type Refused } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { prose } from "@/lib/oclif/rendering";
 import { detectPreviewUrls } from "@/lib/preview";
+import { deployMessage, MESSAGE_MAX_LENGTH, messageTooLong, Publisher } from "@/lib/publish";
 import { runsInCi } from "@/lib/telemetry/dimensions/ci-provider";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 import { parseTtl, type Ttl } from "@/lib/ttl";
 import { reportWarning } from "@/lib/warnings";
-import { prose } from "@/lib/oclif/rendering";
-import { escapeControlCharacters } from "@/lib/terminal-text";
 
 const CREDENTIAL_REQUIRED_REFUSAL: Refusal = {
   message: "{credential} is not set",
@@ -119,7 +118,7 @@ export type PreviewVerdict =
  * must not take writes. In a CI build `development` is only a platform the
  * resolver cannot read, so it is skipped rather than taken for a preview. A
  * fork pull-request build cannot read the preview credential, so a missing one
- * skips the preview and the build carries on (#1312); `--strict` refuses
+ * skips the preview and the build carries on; `--strict` refuses
  * instead, for a trusted build that expects it.
  */
 export function previewVerdict(input: {
@@ -206,7 +205,7 @@ export async function refusePrimaryOrigins(
  * It authenticates with the narrower preview credential and never falls back
  * to the project secret. A fork pull-request build has no `ZITADEL_PREVIEW_TOKEN`
  * — the secret is not shared with forks — so a missing one warns and exits
- * cleanly rather than failing the build (#1312); `--strict` turns that warning
+ * cleanly rather than failing the build; `--strict` turns that warning
  * into a failure for a trusted build that expects the token. Outside a preview
  * or development environment there is nothing to preview — even with an explicit
  * `--origin` — so it says so and exits cleanly without writing. The last line it
@@ -218,6 +217,7 @@ export default class Preview extends PreviewCommand {
     "Deploy a release from .zitadel/ to a pull-request build's preview URLs.";
   static override group = CommandGroups.configuration;
   static override groupOrder = 2;
+
   static override examples = [
     "<%= config.bin %> preview",
     "<%= config.bin %> preview --origin https://acme-git-sso-acmeinc.vercel.app",
@@ -382,13 +382,15 @@ export default class Preview extends PreviewCommand {
       strict,
     });
     switch (verdict) {
-      case "preview":
+      case "preview": {
         return undefined;
-      case "credential-required":
+      }
+      case "credential-required": {
         throw refusalError(CREDENTIAL_REQUIRED_REFUSAL, {
           credential,
         });
-      case "production-build":
+      }
+      case "production-build": {
         return {
           status: "skipped",
           reason: "nothing-to-preview",
@@ -397,7 +399,8 @@ export default class Preview extends PreviewCommand {
             sections: [],
           },
         };
-      case "unnamed-ci-build":
+      }
+      case "unnamed-ci-build": {
         reportWarning(
           "This CI build names no environment, so the preview is skipped. Set ZITADEL_ENV=preview in the pull-request build that should deploy one.",
         );
@@ -409,7 +412,8 @@ export default class Preview extends PreviewCommand {
             sections: [],
           },
         };
-      case "no-credential":
+      }
+      case "no-credential": {
         reportWarning(
           `No preview credential (${credential}) is set, so the preview is skipped; a fork pull-request build cannot read it. Pass --strict to fail instead.`,
         );
@@ -421,6 +425,7 @@ export default class Preview extends PreviewCommand {
             sections: [],
           },
         };
+      }
     }
   }
 }

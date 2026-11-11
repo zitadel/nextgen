@@ -1,5 +1,5 @@
 /**
- * Dev-runtime secret join (issue #1049).
+ * Dev-runtime secret join.
  *
  * The developer's env files configure the local server. When `zitadel start`
  * spawns it, the CLI reads `.env.local`, then `.env`, and hands every

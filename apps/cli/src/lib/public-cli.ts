@@ -166,7 +166,7 @@ function rewriteCliCodeSpans(content: string, cliVersion: string): string {
  * project's install. Their `description` strings surface as editor tooltips
  * on the scaffolded `.zitadel/**` files, where the bare command does not
  * exist on the user's PATH, so the copy is normalized on the way out instead
- * of the shared source being edited (same fix PR #872 made for the READMEs).
+ * of the shared source being edited.
  *
  * Unlike {@link normalizePublicCliProse} this rewrites inline code spans
  * only: a JSON `description` is prose, so a value that merely begins with

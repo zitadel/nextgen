@@ -1,6 +1,6 @@
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
-import { addSkills, bundledSkills, CLAUDE_SKILLS_DIR, skillDirs } from "@/lib/skills/add";
 import { prose } from "@/lib/oclif/rendering";
+import { addSkills, bundledSkills, CLAUDE_SKILLS_DIR, skillDirs } from "@/lib/skills/add";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 
 /**
@@ -16,6 +16,7 @@ export default class SkillsAdd extends BaseCommand {
     "Add the Zitadel agent skills to this project.\n\nAdds the skills of this CLI's version to .agents/skills, which most coding agents read, and to .claude/skills for Claude Code. Run it again after updating the CLI to replace them with the new version's.";
   static override group = CommandGroups.gettingStarted;
   static override groupOrder = 5;
+
   static override examples = [
     "<%= config.bin %> <%= command.id %>",
     "<%= config.bin %> <%= command.id %> --cwd my-app",

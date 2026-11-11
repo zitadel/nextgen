@@ -1,18 +1,16 @@
 import { stat } from "node:fs/promises";
-import { Suggestible } from "@/lib/oclif/suggestible";
 import { z } from "zod";
 import { basename, join } from "node:path";
-
 import { Args, Flags } from "@oclif/core";
 import type { Parsed } from "@zitadel/config/idp";
-import { log } from "@/lib/log";
 
 import { createZitadelClient, ProjectService } from "@/lib/backend";
+import { Cmd } from "@/lib/cmd";
 import { deployInitialRelease, type InitialDeployment, isEnvironmentName } from "@/lib/environment";
 import { toZitadelError } from "@/lib/errors";
 import { writeManagedEnvFile } from "@/lib/fs-safe";
 import { isObject } from "@/lib/json";
-import { reportWarning } from "@/lib/warnings";
+import { log } from "@/lib/log";
 import {
   type Admitted,
   BaseCommand,
@@ -20,17 +18,18 @@ import {
   type JsonEnvelope,
   nonBlankString,
 } from "@/lib/oclif";
+import { environmentSelectorSuffix, projectEnvFile } from "@/lib/oclif/environment-flags";
+import { reads, type Refused, taken } from "@/lib/oclif/flags";
+import { Promptable } from "@/lib/oclif/promptable";
+import { interpolate, type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { Suggestible } from "@/lib/oclif/suggestible";
 import { PUBLIC_PROJECT_ID_VARIABLE } from "@/lib/orca/patchers/rule/public-project-id";
 import { readZitadelConfig } from "@/lib/project";
 import { DEFAULT_SERVER, parseServer, resolveServer } from "@/lib/server";
-import { Cmd } from "@/lib/cmd";
-import { environmentSelectorSuffix, projectEnvFile } from "@/lib/oclif/environment-flags";
 import { DEPLOY_ARGS, type EnvironmentSelector, projectCommand } from "@/lib/suggestion";
-import { Promptable } from "@/lib/oclif/promptable";
-import { reads, type Refused, taken } from "@/lib/oclif/flags";
-import { interpolate, type Refusal, refusalError } from "@/lib/oclif/refusal";
-import { userAgent } from "@/lib/user-agent";
 import { escapeControlCharacters } from "@/lib/terminal-text";
+import { userAgent } from "@/lib/user-agent";
+import { reportWarning } from "@/lib/warnings";
 
 /** What a `.env.<name>.local` that already exists is refused for. */
 const FILE_EXISTS_REFUSAL: Refusal = {
@@ -343,9 +342,9 @@ export default class EnvAdd extends Suggestible(Promptable(BaseCommand)) {
     const hasSomewhereToLand = createdProject && issuer !== undefined;
     const { cliVersion } = this.meta;
     // A project this run created has never had a release, so the environment
-    // serves the server's own defaults until something is deployed to it
-    // (#1651). Offer that deploy here, the one moment the project, its secret
-    // and its origin are all at hand. A bound project (`--project`) is
+    // serves the server's own defaults until something is deployed to it.
+    // Offer that deploy here, the one moment the project, its secret and its
+    // origin are all at hand. A bound project (`--project`) is
     // someone else's and may already serve a release of its own, so it is
     // never offered one, and a run with nobody to ask gets the suggestion in
     // the envelope instead — there is no flag to deploy without being asked,
@@ -543,7 +542,7 @@ export default class EnvAdd extends Suggestible(Promptable(BaseCommand)) {
       return deployment;
     } catch (error) {
       reportWarning(
-        `The environment was bound but the first deploy failed: ${toZitadelError(error).message}. Run ${projectCommand(DEPLOY_ARGS, opts.selector, this.meta.cliVersion)} to publish it.`,
+        `The environment was bound but the first deploy failed: ${toZitadelError(error).message}. Run ${projectCommand(DEPLOY_ARGS, opts.selector, this.cliVersion)} to publish it.`,
       );
       return undefined;
     }

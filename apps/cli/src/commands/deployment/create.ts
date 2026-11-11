@@ -1,10 +1,9 @@
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
-import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { DeploymentService } from "@/lib/backend";
 import { GetReleaseByIdParams } from "@/lib/backend/schemas";
-
+import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { reads, type Refused } from "@/lib/oclif/flags";
 import { MESSAGE_MAX_LENGTH, messageTooLong } from "@/lib/publish";
 import { escapeControlCharacters } from "@/lib/terminal-text";
@@ -49,6 +48,10 @@ const MESSAGE: Refused<string> = {
   },
 };
 
+/**
+ * `zitadel deployment create` — deploy an existing release to the project's
+ * origins.
+ */
 export default class DeploymentCreate extends EnvironmentCommand {
   static override description = "Deploy an existing release to the project's origins.";
   static override group = CommandGroups.configuration;

@@ -31,9 +31,9 @@ import {
   loopbackIssuerWarning,
   ssoEnableArgs,
 } from "@/lib/idp";
-import { reportWarning } from "@/lib/warnings";
-import type { Questions } from "@/lib/ui";
 import { issuerFromPort } from "@/lib/orca";
+import type { Questions } from "@/lib/ui";
+import { reportWarning } from "@/lib/warnings";
 
 import type { PromptContext, SetupAnswers, SetupPrompt, SsoDraft } from "./types";
 
@@ -87,7 +87,7 @@ export async function askCustomSettings(
  * "Which external sign-in providers would you like to add?" — the one
  * onboarding question that needs something from outside the terminal, so it
  * asks last of the configuration questions and takes "not now" as a
- * first-class answer (#1081).
+ * first-class answer.
  *
  * Registering the OAuth application is the developer's to do and cannot be
  * automated, so the question announces what to register and where before

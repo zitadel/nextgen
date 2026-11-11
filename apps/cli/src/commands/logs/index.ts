@@ -1,15 +1,15 @@
 import { Flags } from "@oclif/core";
-import { Suggestible } from "@/lib/oclif/suggestible";
 import { z } from "zod";
 
+import { startedServer } from "@/commands/local-server/started";
 import { DEFAULT_LOCAL_SERVER_URL, readNearestRuntimeMetadata } from "@/lib/local-server/runtime";
 import { LocalServer } from "@/lib/local-server/server";
-import { startedServer } from "@/commands/local-server/started";
 import { LOG_LEVELS, type LogLine, logText, renderLogLine } from "@/lib/local-server/server-log";
 import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
 import { type Refused, reads, whole } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { painted } from "@/lib/oclif/rendering";
+import { Suggestible } from "@/lib/oclif/suggestible";
 
 /** How many lines `--tail` shows when it is not given. */
 const DEFAULT_TAIL = 200;
@@ -45,10 +45,16 @@ const NOT_STARTED_REFUSAL: Refusal = {
   next: ["start"],
 };
 
+/**
+ * `zitadel logs` — show local Zitadel server logs.
+ *
+ * On a terminal, warnings are yellow and errors red. Run it in the directory
+ * the start command ran in, or one inside it: the server is found from the
+ * nearest .zitadel/local/ on the way up.
+ */
 export default class Logs extends Suggestible(BaseCommand) {
   static override description =
     "Show local Zitadel server logs.\n\nOn a terminal, warnings are yellow and errors red. Run it in the directory the start command ran in, or one inside it: the server is found from the nearest .zitadel/local/ on the way up.";
-
   static override group = CommandGroups.localDevelopment;
   static override groupOrder = 2;
 
@@ -56,7 +62,6 @@ export default class Logs extends Suggestible(BaseCommand) {
     "<%= config.bin %> <%= command.id %> --follow",
     "<%= config.bin %> <%= command.id %> --level warn",
   ];
-
   static override flags = {
     follow: Flags.boolean({ description: "Keep printing lines as the server writes them." }),
     level: Flags.option({

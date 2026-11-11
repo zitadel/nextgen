@@ -11,7 +11,7 @@ declare const suggestedCommand: unique symbol;
  *
  * That decision is the point. A suggestion for a command that talks to a
  * project must carry the run's `--env` / `--env-file` / `--server`, or
- * following it quietly targets the default project instead (#1689). A raw
+ * following it quietly targets the default project instead. A raw
  * string does not typecheck where a suggestion is expected, so forgetting the
  * selector means choosing {@link unscopedCommand} by name, not by accident.
  */

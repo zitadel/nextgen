@@ -134,8 +134,8 @@ export abstract class AbstractCLIScaffolder implements Scaffolder {
    * Runs an external command in `cwd`, throwing a typed {@link ZitadelError} on
    * failure so the cause surfaces as a categorized CLI error. Distinguishes
    * "binary not on PATH" (`ENOENT` from the spawn itself) from "binary ran but
-   * exited non-zero" — the former previously got masked as a generic
-   * `exited with status 1`, leaving users to guess. Tests stub
+   * exited non-zero" — the former is not masked as a generic
+   * `exited with status 1`, which would leave users to guess. Tests stub
    * `execa` to assert the command without spawning.
    */
   protected runCommand(command: string, args: ReadonlyArray<string>, cwd: string): void {

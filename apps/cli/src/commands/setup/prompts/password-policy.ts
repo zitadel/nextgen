@@ -1,5 +1,7 @@
 import { RECOMMENDED_PASSWORD_MIN_LENGTH } from "@zitadel/config/schemas";
+
 import type { PasswordMinLength } from "@/lib/zitadel";
+
 import type { PromptContext, SetupAnswers, SetupPrompt } from "./types";
 
 /**

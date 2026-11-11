@@ -114,9 +114,8 @@ export class Ui {
   }
 
   /**
-   * Where this command runs. Its summary opens with it, in place of the
-   * `ℹ Project` / `ℹ Server` lines a command used to print before its first
-   * question.
+   * Where this command runs. Its summary opens with it, rather than
+   * with separate `ℹ Project` / `ℹ Server` lines before the first question.
    */
   ranAgainst(project: string | undefined, server: string | undefined): void {
     this.chain.ranAgainst(project, server);

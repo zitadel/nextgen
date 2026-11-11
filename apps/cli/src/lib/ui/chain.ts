@@ -3,7 +3,7 @@ import pc from "picocolors";
 
 import { CANCELLED, PromptCancelled, ZitadelError } from "@/lib/errors";
 import { asker } from "@/lib/input";
-import { log as narration } from "@/lib/log";
+import { log as logger } from "@/lib/log";
 import type { Audience } from "./audience";
 import { Ending } from "./ending";
 import { Prose, stripColumnMarks, WIDTH } from "./layout";
@@ -261,7 +261,7 @@ export class Chain implements Drawing, Narratable {
       this.narrate(MARK.info, text);
       return;
     }
-    narration.info(text);
+    logger.info(text);
   }
 
   note(title: string, lines: readonly string[]): void {
@@ -272,7 +272,7 @@ export class Chain implements Drawing, Narratable {
       return;
     }
     for (const line of [title, ...lines]) {
-      narration.info(line);
+      logger.info(line);
     }
   }
 

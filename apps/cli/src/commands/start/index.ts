@@ -1,12 +1,10 @@
 import { Flags } from "@oclif/core";
-import { Suggestible } from "@/lib/oclif/suggestible";
 import { z } from "zod";
 
+import { startedServer } from "@/commands/local-server/started";
 import { serverLogAction } from "@/lib/journey-guidance";
 import { ensureLocalAdmin } from "@/lib/local-server/admin-credential";
 import { EMPTY_SUMMARY, loadProjectEnv } from "@/lib/local-server/env-vars";
-import { startedServer } from "@/commands/local-server/started";
-import { type Refused, reads, whole } from "@/lib/oclif/flags";
 import {
   DEFAULT_LOCAL_SERVER_PORT,
   PLATFORM_PROJECT_ID,
@@ -27,8 +25,10 @@ import {
   type JsonEnvelope,
   nonBlankString,
 } from "@/lib/oclif";
+import { type Refused, reads, whole } from "@/lib/oclif/flags";
 import type { NextSteps } from "@/lib/oclif/next-steps";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { Suggestible } from "@/lib/oclif/suggestible";
 import type { SuggestedCommand } from "@/lib/suggestion";
 
 /**
@@ -59,11 +59,14 @@ const PORT: Refused<number> = {
   },
 };
 
+/**
+ * `zitadel start` — start a local Zitadel server.
+ */
 export default class Start extends Suggestible(BaseCommand) {
   static override description = "Start a local Zitadel server.";
   static override group = CommandGroups.gettingStarted;
-
   static override groupOrder = 2;
+
   static override flags = {
     image: nonBlankString({ description: "Container image to run." }),
     port: Flags.custom<number>({

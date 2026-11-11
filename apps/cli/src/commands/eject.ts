@@ -1,8 +1,9 @@
-import { Flags } from "@oclif/core";
-import { Suggestible } from "@/lib/oclif/suggestible";
 import { readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { Flags } from "@oclif/core";
 
+import { Cmd } from "@/lib/cmd";
+import { Consent } from "@/lib/consent";
 import { CANCELLED } from "@/lib/errors";
 import { pathExists } from "@/lib/fs";
 import {
@@ -12,15 +13,14 @@ import {
   CommandGroups,
   type JsonEnvelope,
 } from "@/lib/oclif";
+import { Destructive } from "@/lib/oclif/destructive";
+import { Suggestible } from "@/lib/oclif/suggestible";
 import { createOrca } from "@/lib/orca";
 import { AGENTS_HEADER, removeGuidanceSection } from "@/lib/orca/patchers/rule/guidance";
 import type { EjectActions } from "@/lib/orca/patchers/types";
 import { MANAGED_MARKER } from "@/lib/paths";
 import { readRendererId, readZitadelConfig } from "@/lib/project";
-import { Cmd } from "@/lib/cmd";
 import { shellCommand, type SuggestedCommand } from "@/lib/suggestion";
-import { Destructive } from "@/lib/oclif/destructive";
-import { Consent } from "@/lib/consent";
 
 /**
  * Asks the framework patcher which artifacts it owns. Falls back to the
@@ -265,8 +265,8 @@ function ejected(
 export default class Eject extends Suggestible(Destructive(BaseCommand)) {
   static override description = "Remove managed files and local Zitadel state.";
   static override group = CommandGroups.localDevelopment;
-
   static override groupOrder = 5;
+
   static override aliases = ["uninstall"];
   static override flags = {
     force: Flags.boolean({

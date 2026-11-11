@@ -1,3 +1,4 @@
+import type { BoxAction } from "@/lib/box";
 import { command, dim, strong } from "@/lib/style";
 import { NEXT_LABEL } from "@/lib/ui/summary";
 import { escapeControlCharacters } from "@/lib/terminal-text";
@@ -23,7 +24,7 @@ export type NextSteps<C extends string = string> = {
 };
 
 /** A step as the ending draws it: a sentence and, when it asks for one, the command. */
-export type EndingStep = { text: string; command?: string };
+export type EndingStep = BoxAction;
 
 /**
  * The next steps as the steps an ending is made of, so a command states them

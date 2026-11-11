@@ -111,11 +111,11 @@ export type SweepResult = Readonly<
  *
  * The rule this class keeps: every directory runs its own server, on its own
  * port, with its own data and its own admin credential, and the CLI only talks
- * to the server that directory's own `.zitadel/local/runtime.json` names. What
- * this replaced (issue #1863) was a second directory silently attaching to the
- * first one's server on port 8080 and signing in with a password that server
- * never imported. So nothing here falls back to a default port, and a recorded
- * URL is never trusted on its own: see {@link LocalServer.resolveUrl}.
+ * to the server that directory's own `.zitadel/local/runtime.json` names. A
+ * second directory never silently attaches to another's server on port 8080
+ * and signs in with a password that server never imported, so nothing here
+ * falls back to a default port, and a recorded URL is never trusted on its own:
+ * see {@link LocalServer.resolveUrl}.
  *
  * A directory has at most one server, a process (`binary`) or a container
  * (`docker`), and the record says which. The commands call this class and

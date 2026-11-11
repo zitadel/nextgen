@@ -3,12 +3,12 @@ import { z } from "zod";
 
 import { DeploymentService } from "@/lib/backend";
 import { GetDeploymentByIdParams } from "@/lib/backend/schemas";
-import { type Refused, taken } from "@/lib/oclif/flags";
 import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
-import { Tabulatable } from "@/lib/oclif/tabulatable";
-import { variableCell } from "@/lib/variables";
+import { type Refused, taken } from "@/lib/oclif/flags";
 import { json } from "@/lib/oclif/rendering";
+import { Tabulatable } from "@/lib/oclif/tabulatable";
 import { escapeControlCharacters } from "@/lib/terminal-text";
+import { variableCell } from "@/lib/variables";
 
 /**
  * The deployment `deployment get` reads. The schema is the API spec's own, so a value that is not one is

@@ -137,8 +137,7 @@ export function claimState(input: {
  * plain `zitadel` command names). Names the claim window because the server
  * enforces it at claim time (`proj.claim_window_expired`), and names the
  * data-loss stake per product decision: temporary projects get purged after
- * the window. That supersedes the no-deletion stance in ADR 046 §Non-goals;
- * amending the ADR is the follow-up tracked on PR #1194.
+ * the window. That supersedes the no-deletion stance in ADR 046 §Non-goals.
  */
 function claimSentence(deadline?: Date): string {
   const when =

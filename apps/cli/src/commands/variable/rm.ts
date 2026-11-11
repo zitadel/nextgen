@@ -1,12 +1,13 @@
 import { Flags } from "@oclif/core";
 
 import { VariableRemoval, VariableService } from "@/lib/backend";
-import { variableNameArg } from "./name";
 import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { dryRunResult } from "@/lib/oclif/crud/shared";
 import { Destructive } from "@/lib/oclif/destructive";
 import { deletedData } from "@/lib/oclif/envelope";
 import { escapeControlCharacters } from "@/lib/terminal-text";
+
+import { variableNameArg } from "./name";
 
 /**
  * `zitadel variable rm NAME` — remove one variable from the project.

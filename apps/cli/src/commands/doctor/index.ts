@@ -2,10 +2,11 @@ import { dirname, join } from "node:path";
 import { existsSync } from "node:fs";
 import { Flags } from "@oclif/core";
 import { z } from "zod";
-import { log } from "@/lib/log";
 
+import { startedServer } from "@/commands/local-server/started";
 import { createZitadelClient } from "@/lib/backend";
 import { claimAction, claimCommand, claimWindowClosedAction } from "@/lib/claim-state";
+import { isRefusal } from "@/lib/consent";
 import { resolveEnvironment } from "@/lib/environment";
 import { ZitadelError, errorMessage } from "@/lib/errors";
 import { serverLogAction } from "@/lib/journey-guidance";
@@ -29,8 +30,7 @@ import {
   type RuntimeMetadata,
 } from "@/lib/local-server/runtime";
 import { LocalServer } from "@/lib/local-server/server";
-import { startedServer } from "@/commands/local-server/started";
-import { type Refused, reads, whole } from "@/lib/oclif/flags";
+import { log } from "@/lib/log";
 import {
   type Admitted,
   BaseCommand,
@@ -39,15 +39,15 @@ import {
   nonBlankString,
 } from "@/lib/oclif";
 import { Destructive } from "@/lib/oclif/destructive";
-import { isRefusal } from "@/lib/consent";
-import { reportWarning } from "@/lib/warnings";
 import {
   environmentFlags,
   environmentSelectorSuffix,
   projectEnvFile,
 } from "@/lib/oclif/environment-flags";
+import { type Refused, reads, whole } from "@/lib/oclif/flags";
+import { asStepsShown, type NextSteps, nextStepsData, stepsOf } from "@/lib/oclif/next-steps";
 import { createOrca } from "@/lib/orca";
-import { isLoopbackUrl } from "@/lib/server";
+import { listenersForPort } from "@/lib/prober/ports";
 import {
   hasZitadelConfig,
   hasZitadelSecret,
@@ -55,9 +55,7 @@ import {
   readZitadelConfig,
   readZitadelSecret,
 } from "@/lib/project";
-import { listenersForPort } from "@/lib/prober/ports";
-import { checkCliVersion, SANITY_CHECKS, type CheckContext, type CheckOutcome } from "./checks";
-import { doctorReport, renderDoctorReport, withCategories } from "./report";
+import { isLoopbackUrl } from "@/lib/server";
 import {
   type EnvironmentSelector,
   portableSuggestions,
@@ -66,8 +64,11 @@ import {
   type SuggestedCommand,
   unscopedCommand,
 } from "@/lib/suggestion";
-import { asStepsShown, type NextSteps, nextStepsData, stepsOf } from "@/lib/oclif/next-steps";
 import { userAgent } from "@/lib/user-agent";
+import { reportWarning } from "@/lib/warnings";
+
+import { checkCliVersion, SANITY_CHECKS, type CheckContext, type CheckOutcome } from "./checks";
+import { doctorReport, renderDoctorReport, withCategories } from "./report";
 
 const LOCAL_RUNTIME_CHECK_NAMES = new Set([
   "server-binary",
@@ -130,11 +131,14 @@ type Checking = Readonly<{
   hostedServer: string | undefined;
 }>;
 
+/**
+ * `zitadel doctor` — verify local runtime and project state.
+ */
 export default class Doctor extends Destructive(BaseCommand) {
   static override description = "Verify local runtime and project state.";
   static override group = CommandGroups.diagnostics;
-
   static override groupOrder = 1;
+
   static override flags = {
     fix: Flags.boolean({ description: "Repair missing files and stale managed wiring." }),
     force: Flags.boolean({
@@ -203,7 +207,7 @@ export default class Doctor extends Destructive(BaseCommand) {
             image,
             port,
             this.localServers(),
-            this.meta.cliVersion,
+            this.cliVersion,
             parentRuntimeDir,
           )
         : [];

@@ -1,12 +1,12 @@
 import { Flags } from "@oclif/core";
-import { reportWarning } from "@/lib/warnings";
 import { z } from "zod";
-import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
-import { Publisher } from "@/lib/publish";
 
+import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { reads, type Refused } from "@/lib/oclif/flags";
+import { Publisher } from "@/lib/publish";
 import { MESSAGE_MAX_LENGTH, messageTooLong } from "@/lib/publish";
 import { escapeControlCharacters } from "@/lib/terminal-text";
+import { reportWarning } from "@/lib/warnings";
 
 /**
  * What `-m/--message` records. It refuses a blank message, which would record
@@ -31,6 +31,9 @@ const MESSAGE: Refused<string> = {
   },
 };
 
+/**
+ * `zitadel release create` — build a release from .zitadel/ without deploying it.
+ */
 export default class ReleaseCreate extends EnvironmentCommand {
   static override description = "Build a release from .zitadel/ without deploying it.";
   static override group = CommandGroups.configuration;

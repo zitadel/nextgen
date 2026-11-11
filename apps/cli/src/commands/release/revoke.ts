@@ -1,12 +1,12 @@
 import { Args, Flags } from "@oclif/core";
 import { z } from "zod";
 
-import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
-import { mutatedData } from "@/lib/oclif/envelope";
 import { ReleaseService } from "@/lib/backend";
 import { RevokeReleaseParams } from "@/lib/backend/schemas";
-import { type Refused, taken } from "@/lib/oclif/flags";
+import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { Destructive } from "@/lib/oclif/destructive";
+import { mutatedData } from "@/lib/oclif/envelope";
+import { type Refused, taken } from "@/lib/oclif/flags";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 
 /**

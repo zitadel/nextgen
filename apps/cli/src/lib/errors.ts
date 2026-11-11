@@ -513,16 +513,6 @@ export function isCancellation(error: unknown): boolean {
   return error instanceof ZitadelError && error.code === "E_CANCELLED";
 }
 
-/**
- * Whether a request reached a server that has no such endpoint: a 404 without
- * the platform's error envelope. A Zitadel API answers a miss it knows about
- * with the envelope, so this is a route the server does not serve, such as one
- * added in a later release.
- */
-export function isMissingEndpoint(error: unknown): boolean {
-  return error instanceof NotFoundError && error.status === 404 && error.serverCode === undefined;
-}
-
 function isErrnoException(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && typeof (error as NodeJS.ErrnoException).code === "string";
 }

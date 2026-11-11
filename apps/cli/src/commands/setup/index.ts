@@ -1,12 +1,4 @@
-import {
-  type CreatedProject,
-  ProjectService,
-  VariableService,
-  VariableWrite,
-  createZitadelClient,
-} from "@/lib/backend";
 import { access, readFile, rm, writeFile } from "node:fs/promises";
-import { Suggestible } from "@/lib/oclif/suggestible";
 import { basename, join } from "node:path";
 import { Flags } from "@oclif/core";
 import { z } from "zod";
@@ -44,6 +36,15 @@ import {
   RESERVED_SLUGS,
   selectionName,
 } from "@zitadel/config/idp";
+import semver from "semver";
+
+import {
+  type CreatedProject,
+  ProjectService,
+  VariableService,
+  VariableWrite,
+  createZitadelClient,
+} from "@/lib/backend";
 import { isDevelopmentBuild } from "@/lib/build-channel";
 import {
   claimAction,
@@ -52,6 +53,8 @@ import {
   claimState,
   claimWindowDeadline,
 } from "@/lib/claim-state";
+import { Cmd } from "@/lib/cmd";
+import { deployInitialRelease, type InitialDeployment } from "@/lib/environment";
 import { errorMessage, isErrno, toZitadelError, ZitadelError } from "@/lib/errors";
 import {
   callbackUriFor,
@@ -74,6 +77,10 @@ import {
   storeClientSecret,
 } from "@/lib/idp";
 import { brandingGuidanceAction, exploreAllCommands } from "@/lib/journey-guidance";
+import { findLocalAdminFor } from "@/lib/local-server/admin-credential";
+import { claimProjectAsAdmin } from "@/lib/local-server/claim-as-admin";
+import { readNearestRuntimeMetadata, readPlatformRuntime } from "@/lib/local-server/runtime";
+import { LocalServer } from "@/lib/local-server/server";
 import {
   type Admitted,
   BaseCommand,
@@ -81,20 +88,15 @@ import {
   type JsonEnvelope,
   nonBlankString,
 } from "@/lib/oclif";
+import { Destructive } from "@/lib/oclif/destructive";
 import { environmentSelectorSuffix, projectEnvFile } from "@/lib/oclif/environment-flags";
+import { filled, type Refused, reads, whole } from "@/lib/oclif/flags";
+import { asStepsShown } from "@/lib/oclif/next-steps";
+import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { painted } from "@/lib/oclif/rendering";
 import { serverKind } from "@/lib/oclif/server-kind";
-import { findLocalAdminFor } from "@/lib/local-server/admin-credential";
-import { claimProjectAsAdmin } from "@/lib/local-server/claim-as-admin";
-import { LocalServer } from "@/lib/local-server/server";
-import { readNearestRuntimeMetadata, readPlatformRuntime } from "@/lib/local-server/runtime";
-import {
-  hasZitadelConfig,
-  hasZitadelSecret,
-  readProjectServer,
-  readZitadelConfig,
-  readZitadelSecret,
-  writeZitadelSecret,
-} from "@/lib/project";
+import { Suggestible } from "@/lib/oclif/suggestible";
+import type { GlobalOptions } from "@/lib/oclif/types";
 import {
   createOrca,
   type FrameworkFacts,
@@ -105,15 +107,38 @@ import {
   type ScaffoldTarget,
   type UndoableScaffold,
 } from "@/lib/orca";
+import { derivePosture } from "@/lib/orca/patchers/posture";
 import {
   AVAILABLE_RENDERER_IDS,
   RENDERER_IDS,
 } from "@/lib/orca/patchers/rule/next/renderers/registry";
 import type { PatchContext } from "@/lib/orca/patchers/types";
-import { Connection, type PasswordMinLength, PasswordPolicy } from "@/lib/zitadel";
-import { derivePosture } from "@/lib/orca/patchers/posture";
-import { writeScaffoldManifest } from "@/lib/scaffold-manifest";
+import {
+  hasZitadelConfig,
+  hasZitadelSecret,
+  readProjectServer,
+  readZitadelConfig,
+  readZitadelSecret,
+  writeZitadelSecret,
+} from "@/lib/project";
 import { normalizePublicCliProse } from "@/lib/public-cli";
+import { abbreviate } from "@/lib/publish";
+import { writeScaffoldManifest } from "@/lib/scaffold-manifest";
+import { hostUnlessDefault, type ResolvedServer, resolveServer } from "@/lib/server";
+import { id as styleId, path as stylePath, url as styleUrl } from "@/lib/style";
+import { DEPLOY_ARGS } from "@/lib/suggestion";
+import {
+  type EnvironmentSelector,
+  inShell,
+  projectCommand,
+  type SuggestedCommand,
+  unscopedCommand,
+} from "@/lib/suggestion";
+import { escapeControlCharacters } from "@/lib/terminal-text";
+import type { Questions, Step, Summary } from "@/lib/ui";
+import { userAgent } from "@/lib/user-agent";
+import { reportWarning } from "@/lib/warnings";
+import { Connection, type PasswordMinLength, PasswordPolicy } from "@/lib/zitadel";
 import {
   CONFIG_DIRECTORIES,
   ConnectionExistsError,
@@ -124,8 +149,7 @@ import {
   type ScaffoldedConnection,
   ZitadelConfig,
 } from "@/lib/zitadel";
-import { DEPLOY_ARGS } from "@/lib/suggestion";
-import { deployInitialRelease, type InitialDeployment } from "@/lib/environment";
+
 import { installDependenciesForSetup } from "./install";
 import {
   ensureInitialCommit,
@@ -156,28 +180,6 @@ import {
   type Row,
   type Section,
 } from "./summary";
-import { Cmd } from "@/lib/cmd";
-import { id as styleId, path as stylePath, url as styleUrl } from "@/lib/style";
-import type { Questions, Step, Summary } from "@/lib/ui";
-import { reportWarning } from "@/lib/warnings";
-import {
-  type EnvironmentSelector,
-  inShell,
-  projectCommand,
-  type SuggestedCommand,
-  unscopedCommand,
-} from "@/lib/suggestion";
-import { asStepsShown } from "@/lib/oclif/next-steps";
-import { Destructive } from "@/lib/oclif/destructive";
-import semver from "semver";
-import { type Refusal, refusalError } from "@/lib/oclif/refusal";
-import type { GlobalOptions } from "@/lib/oclif/types";
-import { hostUnlessDefault, type ResolvedServer, resolveServer } from "@/lib/server";
-import { filled, type Refused, reads, whole } from "@/lib/oclif/flags";
-import { userAgent } from "@/lib/user-agent";
-import { escapeControlCharacters } from "@/lib/terminal-text";
-import { painted } from "@/lib/oclif/rendering";
-import { abbreviate } from "@/lib/publish";
 
 /**
  * {@link recoverySelector} plus `--server local`, for the recovery after a
@@ -1013,15 +1015,20 @@ export function readPort(value: string): Parsed<number> {
       };
 }
 
+/**
+ * `zitadel setup` — create a Zitadel project and scaffold local auth.
+ *
+ * An interactive setup ends with a note about the Zitadel agent skills, shown
+ * once per machine; set `NO_SKILLS_PROMPT=1` to hide it.
+ */
 export default class Setup extends Suggestible(Destructive(BaseCommand)) {
   static override description =
     "Create a Zitadel project and scaffold local auth. An interactive setup ends with a note about the Zitadel agent skills, shown once per machine; set NO_SKILLS_PROMPT=1 to hide it.";
-
-  static override heading = "Setting up Zitadel";
-
-  static override wizard = true;
   static override group = CommandGroups.gettingStarted;
   static override groupOrder = 1;
+  static override heading = "Setting up Zitadel";
+  static override wizard = true;
+
   static override examples = [
     "<%= config.bin %> setup --framework next",
     "<%= config.bin %> setup --framework react --dev-port 3000",
@@ -1062,9 +1069,8 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
         "Use case for the scaffolded schema fields: who signs in to the app (default: minimal).",
       options: [...SETUP_USE_CASES],
     }),
-    // Removed in #1039 — setup no longer applies a login template. Kept
-    // hidden so scripts and agents still passing it get a targeted error
-    // pointing at `branding eject` instead of oclif's unknown-flag error.
+    // Hidden so scripts and agents passing it get a targeted error pointing
+    // at `branding eject` instead of oclif's unknown-flag error.
     design: nonBlankString({ hidden: true }),
     "password-min-length": Flags.custom<PasswordMinLength>({
       parse: readsFilled(
@@ -1181,7 +1187,7 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
       this.nonInteractive,
       this.dryRun,
       wizardQuestions,
-      this.config.version,
+      this.cliVersion,
     );
 
     const orca = createOrca();
@@ -1220,7 +1226,7 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
           await resolveScaffoldFramework(flags.framework, this.nonInteractive, orca, {
             retry: retryOptionsOf(flags),
             serverFlag: this.meta.serverFlag,
-            cliVersion: this.config.version,
+            cliVersion: this.cliVersion,
             ask: wizardQuestions,
           }),
         );
@@ -1660,12 +1666,12 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
 
     // The commit exists so that the release a later `deploy` builds records
     // the commit it came from; without it that deploy has no baseline and the
-    // one after it can show no diff (#1651).
+    // one after it can show no diff.
     const commit = await this.makeInitialCommit(this.cwd, this.dryRun, flags.git !== false);
 
     // Setup publishes what it scaffolded, after the commit so the release
     // records it, so the sign-in setup asks the developer to verify next is
-    // served that release rather than the newest stored revisions (#2331).
+    // served that release rather than the newest stored revisions.
     const deployment = await this.deployScaffoldedProject({
       cwd: this.cwd,
       server: answers.server,

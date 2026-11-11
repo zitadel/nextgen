@@ -1,6 +1,7 @@
 import { rm } from "node:fs/promises";
 import { join } from "node:path";
 
+import { loadPatchContext } from "@/commands/doctor/patch-context";
 import { readIfReadable } from "@/lib/fs";
 import type { ConfigWiringStatus, EjectActions } from "@/lib/orca/patchers/types";
 import { MANAGED_MARKER } from "@/lib/paths";
@@ -12,7 +13,7 @@ import {
 } from "@/lib/scaffold-manifest";
 import { updateScaffold } from "@/lib/sync/state";
 import type { ScaffoldFileClass, ScaffoldFileEntry, ScaffoldManifest } from "@/lib/sync/types";
-import { loadPatchContext } from "@/commands/doctor/patch-context";
+
 import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
 
 /**

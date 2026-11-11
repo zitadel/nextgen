@@ -1,4 +1,10 @@
 import { resolve } from "node:path";
+import { Flags } from "@oclif/core";
+import { z } from "zod";
+
+import { Origins } from "@/lib/backend";
+import { Cmd } from "@/lib/cmd";
+import { CANCELLED, confirmationHint, ZitadelError } from "@/lib/errors";
 import {
   type Admitted,
   CommandGroups,
@@ -6,25 +12,17 @@ import {
   EnvironmentCommand,
   type JsonEnvelope,
 } from "@/lib/oclif";
-import { Origins } from "@/lib/backend";
-import { abbreviate, Publisher } from "@/lib/publish";
-import { Flags } from "@oclif/core";
-import { z } from "zod";
-
-import { Cmd } from "@/lib/cmd";
-import { CANCELLED, confirmationHint, ZitadelError } from "@/lib/errors";
 import { Destructive } from "@/lib/oclif/destructive";
 import { reads, type Refused } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { prose } from "@/lib/oclif/rendering";
 import { readZitadelSecret } from "@/lib/project";
+import { abbreviate, Publisher } from "@/lib/publish";
 import { deployMessage, MESSAGE_MAX_LENGTH, messageTooLong } from "@/lib/publish";
 import { configIsDirty } from "@/lib/publish/git";
 import { DEPLOY_ARGS, shellCommand, type SuggestedCommand } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { reportWarning } from "@/lib/warnings";
-import { prose } from "@/lib/oclif/rendering";
-
-/** How a non-interactive deploy with no message to fall back on is refused. */
 
 /**
  * What `-m/--message` records. It refuses a blank message, which would record
@@ -132,9 +130,6 @@ function commitConfig(deployed: string, message: string | undefined): string {
  * git diff, then creates the release and deploys it to every primary origin
  * (primary origins are never named one by one). `--dry-run` stops after the
  * diff, writing nothing to the server.
- *
- * It replaces `plan` and `apply`: a release is published as one immutable unit
- * and deployed, rather than each resource being synced in place.
  */
 export default class Deploy extends Destructive(EnvironmentCommand) {
   static override description =
@@ -142,6 +137,7 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
 
   static override group = CommandGroups.configuration;
   static override groupOrder = 1;
+
   static override examples = [
     "<%= config.bin %> deploy -m 'add phone_number to human-user'",
     "<%= config.bin %> deploy --dry-run",
@@ -246,7 +242,7 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
       message,
     });
     switch (publication.outcome) {
-      case "revoked":
+      case "revoked": {
         throw new ZitadelError(
           "E_CONFLICT",
           `This content was already released as ${release.id}, which is revoked`,
@@ -255,7 +251,8 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
             details: { release_id: release.id, content_hash: release.content_hash },
           },
         );
-      case "raced":
+      }
+      case "raced": {
         throw new ZitadelError(
           "E_CONFLICT",
           "Another deploy changed the targets since this one was prepared",
@@ -268,8 +265,10 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
             nextCommands: [this.suggest("deployment list --live")],
           },
         );
-      case "deployed":
+      }
+      case "deployed": {
         break;
+      }
     }
     const { deployment } = publication;
 

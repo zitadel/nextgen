@@ -1,8 +1,8 @@
 import { ENVIRONMENT_KEYS, type EnvironmentKey } from "@/lib/environment";
-import { escapeControlCharacters } from "@/lib/terminal-text";
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
-import { Tabulatable } from "@/lib/oclif/tabulatable";
 import { painted } from "@/lib/oclif/rendering";
+import { Tabulatable } from "@/lib/oclif/tabulatable";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 
 /** The values that grant access, never printed — only named and masked. */
 const SECRET_KEYS: ReadonlySet<EnvironmentKey> = new Set([
@@ -25,8 +25,8 @@ const REDACTED = "••••••••";
 export default class Env extends Tabulatable(EnvironmentCommand) {
   static override description =
     "Show which server and project resolve, and where each value came from.";
-
   static override group = CommandGroups.configuration;
+
   static override examples = [
     "<%= config.bin %> env",
     "<%= config.bin %> env --env production",

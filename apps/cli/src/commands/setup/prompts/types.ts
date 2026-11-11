@@ -1,4 +1,3 @@
-import type { PasswordMinLength } from "@/lib/zitadel";
 import type { SetupPreset, SetupUseCase } from "@zitadel/config/defaults";
 import {
   type ConnectionEndpoints,
@@ -10,6 +9,7 @@ import {
 import type { FrameworkChoice } from "@/lib/orca";
 import type { SuggestedCommand } from "@/lib/suggestion";
 import type { Questions, Spinner } from "@/lib/ui";
+import type { PasswordMinLength } from "@/lib/zitadel";
 
 /**
  * The collected wizard state, threaded through every {@link SetupPrompt}. A

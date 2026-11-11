@@ -187,7 +187,7 @@ export abstract class EnvironmentCommand extends Suggestible(BaseCommand) {
     // value still says which credential it was after.
     this.recordTelemetry({ credential, has_env_file: environment.envFile !== undefined });
     // On a terminal a missing value is prompted for and persisted to
-    // `.env.<name>.local` (#1313); non-interactively each still throws, naming
+    // `.env.<name>.local`; non-interactively each still throws, naming
     // the sources consulted, so a scripted run stays deterministic.
     // A dry run writes nothing, and an answer is persisted to a file, so it
     // never asks: a missing value fails it exactly as a scripted run.
@@ -230,7 +230,7 @@ export abstract class EnvironmentCommand extends Suggestible(BaseCommand) {
  * the CLI only chooses which token to present.
  *
  * Which one that is, is {@link PREVIEW_CREDENTIAL}: the project secret for now,
- * because the server does not accept the narrower preview token yet (#1575).
+ * because the server does not accept the narrower preview token yet.
  * Every message naming the variable derives it from there, so moving back to
  * `preview` is this one constant.
  */

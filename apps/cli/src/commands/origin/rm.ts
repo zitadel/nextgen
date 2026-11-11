@@ -1,5 +1,7 @@
 import { Flags } from "@oclif/core";
 
+import { OriginService } from "@/lib/backend";
+import { errorMessage } from "@/lib/errors";
 import {
   type Admitted,
   CommandGroups,
@@ -7,14 +9,12 @@ import {
   type JsonEnvelope,
   nonBlankArg,
 } from "@/lib/oclif";
-import { OriginService } from "@/lib/backend";
 import { dryRunResult } from "@/lib/oclif/crud/shared";
-import { deletedData } from "@/lib/oclif/envelope";
-import { reportWarning } from "@/lib/warnings";
 import { Destructive } from "@/lib/oclif/destructive";
-import { errorMessage } from "@/lib/errors";
+import { deletedData } from "@/lib/oclif/envelope";
 import { prose } from "@/lib/oclif/rendering";
 import { escapeControlCharacters } from "@/lib/terminal-text";
+import { reportWarning } from "@/lib/warnings";
 
 /**
  * `zitadel origin rm <pattern>` — remove one origin pattern from the project.

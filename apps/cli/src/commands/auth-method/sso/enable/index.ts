@@ -20,7 +20,6 @@ import {
   selectionName,
   validated,
 } from "@zitadel/config/idp";
-import { log } from "@/lib/log";
 import { z } from "zod";
 
 import { AuthMethodCommand, type SchemaTarget } from "@/commands/auth-method/command";
@@ -50,13 +49,14 @@ import {
   type SecretPublisher,
 } from "@/lib/idp";
 import { loopbackReach } from "@/lib/local-server/runtime";
+import { log } from "@/lib/log";
 import { type Admitted, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
 import { environmentFlags } from "@/lib/oclif/environment-flags";
 import { filled, reads, type Refused } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { DEPLOY_ARGS } from "@/lib/suggestion";
-import { NEXT_LABEL } from "@/lib/ui/summary";
 import { escapeControlCharacters } from "@/lib/terminal-text";
+import { NEXT_LABEL } from "@/lib/ui/summary";
 import { reportWarning } from "@/lib/warnings";
 import {
   type Change,
@@ -313,8 +313,8 @@ type Payload = {
 const NOTHING_PUBLISHED: PublishedCredentials = { clientId: undefined, secret: undefined };
 
 /**
- * The `auth-method sso enable` command (ADR 070) — add a provider to a
- * Project's sign-in methods. It replaces the former `sso enable`.
+ * `zitadel auth-method sso enable` — add a provider to a Project's sign-in
+ * methods.
  *
  * One direct journey: the developer is told what to register with the
  * provider, gives back the credentials, and the Project's configuration is
@@ -382,13 +382,12 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
    * Add the provider to the schema and its login flows, and publish its
    * credentials to the project.
    *
-   * @param input - The provider, its settings, the schema and the environment flags.
+   * @param input.flags - The provider, its settings, the schema and the environment flags.
    * @returns The result.
    * @throws {@link ZitadelError} When no provider is named, a setting is
    *   refused, the schema cannot be chosen, or no flow can offer the provider.
    */
-  protected async execute(input: Admitted<typeof AuthMethodSsoEnable>): Promise<JsonEnvelope> {
-    const flags = input.flags;
+  protected async execute({ flags }: Admitted<typeof AuthMethodSsoEnable>): Promise<JsonEnvelope> {
     if (flags.provider === undefined) {
       throw refusalError(PROVIDER_IS_NAMED_REFUSAL, {});
     }

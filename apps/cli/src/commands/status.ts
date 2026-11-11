@@ -1,7 +1,6 @@
 import pTimeout from "p-timeout";
-import { UserService } from "@/lib/backend";
-import { isCancellation } from "@/lib/errors";
 
+import { UserService } from "@/lib/backend";
 import {
   claimAction,
   claimCommand,
@@ -9,6 +8,8 @@ import {
   claimWindowClosedAction,
   type ClaimState,
 } from "@/lib/claim-state";
+import { Cmd } from "@/lib/cmd";
+import { isCancellation } from "@/lib/errors";
 import {
   customizeAndPublishActions,
   exploreAllCommands,
@@ -30,8 +31,6 @@ import {
 } from "@/lib/oclif";
 import type { GlobalOptions } from "@/lib/oclif/types";
 import { resolveCwd } from "@/lib/paths";
-import { escapeControlCharacters } from "@/lib/terminal-text";
-import { Cmd } from "@/lib/cmd";
 import {
   hasZitadelConfig,
   hasZitadelSecret,
@@ -46,6 +45,7 @@ import {
   unscopedCommand,
 } from "@/lib/suggestion";
 import { DEPLOY_ARGS } from "@/lib/suggestion";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 
 /**
  * `zitadel status` — summarize the local server and project state.
@@ -57,7 +57,6 @@ import { DEPLOY_ARGS } from "@/lib/suggestion";
 export default class Status extends EnvironmentCommand {
   static override description = "Summarize the local Zitadel server and project state.";
   static override group = CommandGroups.gettingStarted;
-
   static override groupOrder = 3;
 
   protected override async toMeta(

@@ -75,8 +75,7 @@ function ensureDevScript(source: string | undefined): string {
  * Unlike React/Vue (whose dev proxy lives in `vite.config.ts`), Angular owns its
  * Vite config, so the proxy is a separate `proxy.conf.cjs` referenced from the
  * `serve` target. In production the same-origin path comes from a platform
- * rewrite or minimal worker (ADR 036); CLI scaffolding for it is tracked in
- * issue #560.
+ * rewrite or minimal worker (ADR 036).
  */
 export class AngularPatcher extends AbstractRulePatcher {
   canPatch(framework: string): boolean {

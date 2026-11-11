@@ -1,12 +1,13 @@
 import { existsSync } from "node:fs";
-import { Suggestible } from "@/lib/oclif/suggestible";
 import { join } from "node:path";
-
 import { execa } from "execa";
 import semver from "semver";
 
+import { Cmd } from "@/lib/cmd";
 import { ZitadelError, errorMessage } from "@/lib/errors";
 import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
+import { painted } from "@/lib/oclif/rendering";
+import { Suggestible } from "@/lib/oclif/suggestible";
 import {
   addExactCommandFor,
   detectPackageManager,
@@ -14,15 +15,13 @@ import {
   type PackageCommand,
   runPackageCommand,
 } from "@/lib/package-manager";
-import { Cmd } from "@/lib/cmd";
 import { hasZitadelConfig } from "@/lib/project";
 import { newestCliCommand } from "@/lib/public-cli";
 import { type BreakingChange, breakingChanges, RELEASE_NOTES_URL } from "@/lib/release-notes";
 import { SHARED_SKILLS_DIR } from "@/lib/skills/add";
 import { arrow, command, dim, mark, strong, url } from "@/lib/style";
-import { escapeControlCharacters } from "@/lib/terminal-text";
-import { painted } from "@/lib/oclif/rendering";
 import { type SuggestedCommand, shellCommand, unscopedCommand } from "@/lib/suggestion";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 import { isNewerVersion, latestCliVersion } from "@/lib/update-check";
 import { exactZitadelPins, floatingZitadelSpecs } from "@/lib/zitadel-pins";
 
@@ -48,6 +47,7 @@ export default class Upgrade extends Suggestible(BaseCommand) {
     "Upgrade this project to the latest Zitadel release.\n\nRe-pins the project's exactly-pinned @zitadel/* packages with its own package manager, then runs the new release's doctor --fix to refresh generated files. Run it as npx @zitadel/cli@latest upgrade so the newest release does the upgrading.";
   static override group = CommandGroups.diagnostics;
   static override groupOrder = 2;
+
   static override examples = [
     "<%= config.bin %> <%= command.id %>",
     "<%= config.bin %> <%= command.id %> --dry-run",
@@ -191,7 +191,7 @@ export default class Upgrade extends Suggestible(BaseCommand) {
       await runPackageCommand(install, {
         cwd: this.cwd,
         // A package manager's progress would break the one envelope on stdout.
-        redirectStdoutToStderr: this.jsonEnabled(),
+        redirectStdoutToStderr: this.isJson,
       });
     } catch (error) {
       throw new ZitadelError("E_VALIDATION", "Could not install the new packages", {

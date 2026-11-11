@@ -7,7 +7,7 @@
  * Vercel exposes bare hosts, so a scheme is prepended; Netlify exposes the full
  * deployment URL, which is used as-is. Cloudflare Pages is not detected: it
  * sets `CF_PAGES_URL` on production deployments too, and nothing in its build
- * environment marks a preview, so its URLs are passed with `--origin` (#1692).
+ * environment marks a preview, so its URLs are passed with `--origin`.
  *
  * Only a build's preview / per-deploy URLs belong here: a platform's
  * production or canonical-site variable (e.g. `VERCEL_PROJECT_PRODUCTION_URL`,

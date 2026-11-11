@@ -68,7 +68,7 @@ export function customizeAndPublishActions(
 
 /**
  * How to change the login's look after setup. Setup never ejects a template
- * or publishes a branding revision (#1039): the app embeds the maintained
+ * or publishes a branding revision: the app embeds the maintained
  * `<zitadel-login>`, so its look is the app's own CSS (`--zl-*` tokens) and
  * layout around it. Taking ownership of the widget's structure stays the
  * opt-in `branding eject`, surfaced here so it remains discoverable.

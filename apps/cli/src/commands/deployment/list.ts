@@ -1,7 +1,8 @@
-import { DeploymentService } from "@/lib/backend";
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
+import { DeploymentService } from "@/lib/backend";
+import { Cmd } from "@/lib/cmd";
 import {
   type Admitted,
   CommandGroups,
@@ -11,7 +12,6 @@ import {
 } from "@/lib/oclif";
 import { reads, type Refused, whole } from "@/lib/oclif/flags";
 import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
-import { Cmd } from "@/lib/cmd";
 
 /** The page sizes the server accepts, quoted by the refusal and the reference. */
 const LIMIT_MIN = 1;

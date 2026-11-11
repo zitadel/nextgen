@@ -1,21 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
-import { Suggestible } from "@/lib/oclif/suggestible";
 import { dirname, join } from "node:path";
-
-import {
-  BRANDING_DESIGN_INFO,
-  Branding,
-  CONFIG_DIRECTORIES,
-  DiskStore,
-  FileExistsError,
-  PAGE_LAYOUT_HINT,
-  RETIRED_BRANDING_DESIGNS,
-  ZitadelConfig,
-} from "@/lib/zitadel";
-
 import { Flags } from "@oclif/core";
-import { log } from "@/lib/log";
-
 import {
   type BrandingDesign,
   BRANDING_DESIGNS,
@@ -28,14 +13,26 @@ import {
 import { BRANDING_FILE_SCHEMA_REF, META_SCHEMA_DIR } from "@zitadel/config/meta-schemas";
 
 import { isErrno, ZitadelError } from "@/lib/errors";
-import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
-import { hasZitadelConfig } from "@/lib/project";
-import { type Refusal, refusalError } from "@/lib/oclif/refusal";
-import { filled, reads, suggesterOf } from "@/lib/oclif/flags";
+import { log } from "@/lib/log";
 import { projectMetaSchemas, writeMetaSchemas } from "@/lib/meta-schemas";
+import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
+import { filled, reads, suggesterOf } from "@/lib/oclif/flags";
+import { Promptable } from "@/lib/oclif/promptable";
+import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { Suggestible } from "@/lib/oclif/suggestible";
+import { hasZitadelConfig } from "@/lib/project";
 import { normalizePublicCliProse } from "@/lib/public-cli";
 import { DEPLOY_ARGS } from "@/lib/suggestion";
-import { Promptable } from "@/lib/oclif/promptable";
+import {
+  BRANDING_DESIGN_INFO,
+  Branding,
+  CONFIG_DIRECTORIES,
+  DiskStore,
+  FileExistsError,
+  PAGE_LAYOUT_HINT,
+  RETIRED_BRANDING_DESIGNS,
+  ZitadelConfig,
+} from "@/lib/zitadel";
 
 /** The shipped designs, as a list for a hint to offer. */
 const DESIGN_CATALOG = BRANDING_DESIGNS.join(", ");
@@ -48,9 +45,9 @@ const NOT_A_PROJECT_REFUSAL: Refusal = {
 };
 
 /**
- * How a `--design` the eject catalog used to ship is refused, by name, with a
- * pointer to where page layout lives now, so scripts and agents that learned
- * `--design split` get an actionable error instead of oclif's generic one.
+ * How a retired `--design` is refused, by name, with a pointer to where page
+ * layout lives, so scripts and agents that name `--design split` get an
+ * actionable error instead of oclif's generic one.
  */
 const RETIRED_DESIGN_REFUSAL: Refusal = {
   message: "The {design} design was retired: it was page layout, not widget structure",
@@ -100,13 +97,13 @@ function isBrandingDesign(value: string): value is BrandingDesign {
   return (BRANDING_DESIGNS as readonly string[]).includes(value);
 }
 
-/** Whether `value` names a design the CLI used to ship and retired. */
+/** Whether `value` names a retired design. */
 function isRetiredDesign(value: string): boolean {
   return (RETIRED_BRANDING_DESIGNS as readonly string[]).includes(value);
 }
 
 /**
- * The `branding eject` command — take ownership of the login template.
+ * `zitadel branding eject` — take ownership of the login template.
  *
  * Scaffolds `.zitadel/branding/` from a shipped design: the `branding.json`
  * descriptor, the `login.liquid` template it references, a README, and the
@@ -120,13 +117,13 @@ function isRetiredDesign(value: string): boolean {
 export default class BrandingEject extends Suggestible(Promptable(BaseCommand)) {
   static override description =
     "Take ownership of the login template: scaffold .zitadel/branding/ from a shipped design.";
-
   static override group = CommandGroups.configuration;
+
   static override flags = {
     force: Flags.boolean({ char: "f", description: "Overwrite an existing branding file." }),
-    // No oclif `options`: a retired design (#1039) is refused by name, with a
-    // pointer to where page layout lives now, rather than by oclif's generic
-    // "expected one of".
+    // No oclif `options`: a retired design is refused by name, with a pointer
+    // to where page layout lives, rather than by oclif's generic "expected one
+    // of".
     design: Flags.custom<BrandingDesign>({
       parse: readsDesign,
     })({

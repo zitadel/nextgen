@@ -1,4 +1,5 @@
 import { ZitadelError } from "@/lib/errors";
+
 import type { PromptContext, SetupAnswers, SetupPrompt } from "./types";
 
 /**

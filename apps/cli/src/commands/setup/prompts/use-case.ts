@@ -4,10 +4,9 @@ import type { PromptContext, SetupAnswers, SetupPrompt } from "./types";
 
 /**
  * "Which fields should registration collect?" — picks the use case,
- * which owns the schema field set the scaffold collects (#448). Orthogonal to
- * the sign-in preset, so this asks first: what a user *is* before *how* they
- * sign in.
- * `--use-case` is authoritative; non-interactive runs keep the minimal
+ * which owns the schema field set the scaffold collects. Orthogonal to the
+ * sign-in preset, so this asks first: what a user *is* before *how* they sign
+ * in. `--use-case` is authoritative; non-interactive runs keep the minimal
  * default seeded by the command.
  */
 export class UseCasePrompt implements SetupPrompt {

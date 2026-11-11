@@ -1,14 +1,14 @@
-import { escapeControlCharacters } from "@/lib/terminal-text";
 import { Flags } from "@oclif/core";
 import { IDP_PROVIDERS } from "@zitadel/config/idp";
 
 import { AuthMethodCommand } from "@/commands/auth-method/command";
+import { CANCELLED } from "@/lib/errors";
 import { type Admitted, CommandGroups, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
 import { environmentSelectorSuffix } from "@/lib/oclif/environment-flags";
-import { CANCELLED } from "@/lib/errors";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { optionArgs } from "@/lib/public-cli";
 import { projectCommand } from "@/lib/suggestion";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 import type { UnusedConnection, UserSchema } from "@/lib/zitadel";
 
 /**
@@ -33,7 +33,7 @@ type SelectorFlags = {
 };
 
 /**
- * `auth-method sso disable` (ADR 070 §2): remove one provider from a schema
+ * `zitadel auth-method sso disable` — remove one provider from a schema
  * and from the login flows that run against it.
  *
  * The connection file and its published credentials are kept, so enabling the
@@ -65,13 +65,12 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
   /**
    * Remove the provider from the schema and its login flows.
    *
-   * @param input - The provider, the schema and the environment flags.
+   * @param input.flags - The provider, the schema and the environment flags.
    * @returns The result, with how to remove a connection nothing offers any more.
    * @throws {@link ZitadelError} When no provider is named, the schema cannot be
    *   chosen, or the change would leave no way to sign in and nobody agreed to it.
    */
-  protected async execute(input: Admitted<typeof AuthMethodSsoDisable>): Promise<JsonEnvelope> {
-    const flags = input.flags;
+  protected async execute({ flags }: Admitted<typeof AuthMethodSsoDisable>): Promise<JsonEnvelope> {
     const target = await this.loadSchemaTarget(flags);
     const config = target.config;
     const schema = target.schema;

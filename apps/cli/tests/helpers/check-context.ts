@@ -36,7 +36,7 @@ export async function declined(): Promise<undefined> {
  * @param gate - What the repair asked consent for.
  * @returns Never; it always rejects.
  */
-export async function unasked(gate: Parameters<CheckContext["consent"]>[0]): Promise<never> {
+async function unasked(gate: Parameters<CheckContext["consent"]>[0]): Promise<never> {
   throw new Error(`unexpected request to ${gate.name}`);
 }
 

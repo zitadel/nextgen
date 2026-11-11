@@ -477,7 +477,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
         ? { value: options.source ?? "", origin: "default" as const }
         : await resolveServer({ cwd, serverFlag });
     const json = this.jsonEnabled();
-    const isTTY = Boolean(process.stdout.isTTY && process.stdin.isTTY);
+    const isTTY = isTerminal();
     const verbose = Boolean(flags.verbose);
     const debug = Boolean(flags.debug);
     // `--no-color` (or the `NO_COLOR` env) turns colour off; both reach this
@@ -608,7 +608,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
     if (argv.includes("--json") || argv.includes("--non-interactive") || argv.includes("-n")) {
       return false;
     }
-    return Boolean(process.stdout.isTTY && process.stdin.isTTY);
+    return isTerminal();
   }
 
   /**
@@ -737,7 +737,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
    * the way it always ends.
    */
   private rendersForAMachine(): boolean {
-    return this.ui.reported || (!this.summarises() && !process.stdout.isTTY);
+    return this.ui.reported || (!this.summarises() && !this.isOnScreen);
   }
 
   /**
@@ -906,11 +906,16 @@ export abstract class BaseCommand extends Interruptible(Command) {
       verbose: false,
       debug: false,
       env: process.env,
-      isTTY: Boolean(process.stdout.isTTY && process.stdin.isTTY),
+      isTTY: isTerminal(),
       colored: false,
       json: false,
     };
   }
+}
+
+/** Whether a person is at the terminal on both ends: stdout and stdin. */
+function isTerminal(): boolean {
+  return Boolean(process.stdout.isTTY && process.stdin.isTTY);
 }
 
 /**

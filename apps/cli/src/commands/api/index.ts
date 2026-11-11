@@ -1,8 +1,13 @@
 import { Args, Flags } from "@oclif/core";
-import { Suggestible } from "@/lib/oclif/suggestible";
 import { z } from "zod";
-import { log } from "@/lib/log";
 
+import {
+  buildRequest,
+  type PathValues,
+  pathValuesOf,
+  readInput,
+  withPathValues,
+} from "@/lib/api-request";
 import {
   type ApiRequest,
   type ApiResponse,
@@ -13,17 +18,7 @@ import {
   type Target,
 } from "@/lib/backend";
 import { CANCELLED, ZitadelError } from "@/lib/errors";
-import { unscopedCommand } from "@/lib/suggestion";
-import { escapeControlCharacters } from "@/lib/terminal-text";
-import { userAgent } from "@/lib/user-agent";
-import {
-  buildRequest,
-  type PathValues,
-  pathValuesOf,
-  readInput,
-  withPathValues,
-} from "@/lib/api-request";
-import { readZitadelSecret, type ZitadelSecret } from "@/lib/project";
+import { log } from "@/lib/log";
 import {
   type Admitted,
   BaseCommand,
@@ -31,11 +26,16 @@ import {
   type JsonEnvelope,
   nonBlankString,
 } from "@/lib/oclif";
+import { Destructive } from "@/lib/oclif/destructive";
 import { reads, type Refused } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
-import { Destructive } from "@/lib/oclif/destructive";
 import { json, prose, type Rendering } from "@/lib/oclif/rendering";
+import { Suggestible } from "@/lib/oclif/suggestible";
+import { readZitadelSecret, type ZitadelSecret } from "@/lib/project";
+import { unscopedCommand } from "@/lib/suggestion";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 import type { Summary } from "@/lib/ui";
+import { userAgent } from "@/lib/user-agent";
 
 /** The HTTP methods `zitadel api` sends. */
 const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"] as const;
@@ -217,7 +217,7 @@ function quote(value: string): string {
 }
 
 /**
- * The api command — call any operation of the Zitadel API with the server and
+ * `zitadel api` — call any operation of the Zitadel API with the server and
  * project secret every other command uses: the escape hatch for what no
  * resource command covers yet, as `gh api` and `vercel api` are for theirs.
  *
@@ -231,8 +231,8 @@ function quote(value: string): string {
 export default class Api extends Suggestible(Destructive(BaseCommand)) {
   static override description =
     "Call any operation of the Zitadel API, with this project's server and project secret.";
-
   static override group = CommandGroups.diagnostics;
+
   static override examples = [
     "<%= config.bin %> api queryUsers -F limit=5",
     "<%= config.bin %> api GetUserByID user_01JZ8Y3V4Q0K7N2M5P6R8S9T0W",
@@ -295,7 +295,7 @@ export default class Api extends Suggestible(Destructive(BaseCommand)) {
       ...this.meta,
       command: this.id ?? this.meta.command,
     };
-    if (!this.jsonEnabled()) {
+    if (!this.isJson) {
       await this.config.runCommand("help", [Api.id]);
     }
 
@@ -307,7 +307,7 @@ export default class Api extends Suggestible(Destructive(BaseCommand)) {
         title: "Done",
         sections: [],
       },
-      next: this.jsonEnabled() ? { commands: [this.suggest("api ls")] } : undefined,
+      next: this.isJson ? { commands: [this.suggest("api ls")] } : undefined,
     });
   }
 

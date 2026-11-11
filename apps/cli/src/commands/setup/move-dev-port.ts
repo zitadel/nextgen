@@ -1,16 +1,14 @@
 import { basename } from "node:path";
 
+import { loadPatchContext } from "@/commands/doctor/patch-context";
 import {
   DeploymentService,
   OriginService,
   createZitadelClient,
   type ZitadelClient,
 } from "@/lib/backend";
-
 import { type Consent, type Gate, isRefusal } from "@/lib/consent";
-import { escapeControlCharacters } from "@/lib/terminal-text";
 import { errorMessage, isCancellation, toZitadelError, ZitadelError } from "@/lib/errors";
-import { DiskStore, ZitadelConfig } from "@/lib/zitadel";
 import { issuerFromPort, type Orca } from "@/lib/orca";
 import { portFromIssuer } from "@/lib/orca/detectors/port";
 import { replaceOrigin } from "@/lib/orca/patchers/rule/dev-port-move";
@@ -18,8 +16,9 @@ import type { PatchResult } from "@/lib/orca/patchers/types";
 import { readZitadelSecret, writeZitadelSecret } from "@/lib/project";
 import { readScaffoldManifest } from "@/lib/scaffold-manifest";
 import { updateScaffold } from "@/lib/sync/state";
-import { loadPatchContext } from "@/commands/doctor/patch-context";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 import { userAgent } from "@/lib/user-agent";
+import { DiskStore, ZitadelConfig } from "@/lib/zitadel";
 
 /** What {@link moveDevPort} changed. */
 export type DevPortMove = Readonly<{
@@ -185,16 +184,21 @@ async function serveNewOrigin(
   try {
     const extended = await deployments.extendPrimary(issuer, `Moved the dev port to ${devPort}`);
     switch (extended.outcome) {
-      case "deployed":
+      case "deployed": {
         return { deploymentId: extended.deployment.id };
-      case "unchanged":
+      }
+      case "unchanged": {
         return {};
-      case "none":
+      }
+      case "none": {
         return { undeployed: "nothing is deployed to the project yet" };
-      case "raced":
+      }
+      case "raced": {
         return { undeployed: "another deploy landed while the app moved" };
-      case "revoked":
+      }
+      case "revoked": {
         return { undeployed: "the release the previous port ran is revoked" };
+      }
     }
   } catch (error) {
     if (isCancellation(error)) {

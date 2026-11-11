@@ -2,6 +2,7 @@ import semver from "semver";
 
 import { addExactCommandFor, detectPackageManager } from "@/lib/package-manager";
 import { exactZitadelPins } from "@/lib/zitadel-pins";
+
 import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
 
 /**

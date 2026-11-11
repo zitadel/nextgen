@@ -1,21 +1,20 @@
 import { basename, join } from "node:path";
-
 import type { SetupPreset, SetupUseCase } from "@zitadel/config/defaults";
 import semver from "semver";
 
 import { pathExists } from "@/lib/fs";
+import { readPackageJson } from "@/lib/npm";
 import { detectors } from "@/lib/orca/detectors";
+import type { Detector } from "@/lib/orca/detectors/types";
+import { detectPackageManager, type PackageManager } from "@/lib/package-manager";
+import { dim } from "@/lib/style";
+import { type Fact, type Section as UiSection, section as uiSection } from "@/lib/ui";
 import {
   type ScaffoldedProvider,
   TOGGLEABLE_METHODS,
   type ToggleableMethod,
   ZitadelConfig,
 } from "@/lib/zitadel";
-import type { Detector } from "@/lib/orca/detectors/types";
-import { type Fact, type Section as UiSection, section as uiSection } from "@/lib/ui";
-import { readPackageJson } from "@/lib/npm";
-import { detectPackageManager, type PackageManager } from "@/lib/package-manager";
-import { dim } from "@/lib/style";
 import type { PasswordMinLength } from "@/lib/zitadel";
 
 /**
@@ -53,11 +52,8 @@ export function relativeDisplayPath(cwd: string, absolute: string): string {
  * The section list as the facts every other command's box states: a heading,
  * then `label   value` rows the shared layout aligns ({@link UiSection}).
  *
- * Setup used to render these itself, with a green `✓` on every row and
- * SCREAMING headings no other box had, and a `→ secondary` column that only
- * lined up when a group's values happened to be the same width. The facts are
- * the same facts; drawing them through the one layout is what makes setup's
- * ending comparable with every other command's at a glance.
+ * Drawing them through the one layout is what makes setup's ending comparable
+ * with every other command's at a glance.
  */
 export function summarySections(sections: Section[]): UiSection[] {
   return sections

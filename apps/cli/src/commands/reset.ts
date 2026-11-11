@@ -1,8 +1,7 @@
 import { join } from "node:path";
-import { Suggestible } from "@/lib/oclif/suggestible";
-
 import { Flags } from "@oclif/core";
 
+import { startedServer } from "@/commands/local-server/started";
 import { LOCAL_ADMIN_FILE } from "@/lib/local-server/admin-credential";
 import {
   DEFAULT_LOCAL_SERVER_URL,
@@ -11,15 +10,18 @@ import {
   readRuntimeMetadata,
 } from "@/lib/local-server/runtime";
 import { LocalServer } from "@/lib/local-server/server";
-import { startedServer } from "./local-server/started";
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
 import { Destructive } from "@/lib/oclif/destructive";
+import { Suggestible } from "@/lib/oclif/suggestible";
 
+/**
+ * `zitadel reset` — delete the local Zitadel server runtime and data.
+ */
 export default class Reset extends Suggestible(Destructive(BaseCommand)) {
   static override description = "Delete the local Zitadel server runtime and data.";
   static override group = CommandGroups.localDevelopment;
-
   static override groupOrder = 4;
+
   static override flags = {
     force: Flags.boolean({
       char: "f",
@@ -53,8 +55,8 @@ export default class Reset extends Suggestible(Destructive(BaseCommand)) {
       data_deleted: true,
     };
 
-    const dataDir = localRuntimePaths(this.meta.cwd).dataDir;
-    const adminFile = join(this.meta.cwd, LOCAL_ADMIN_FILE);
+    const dataDir = localRuntimePaths(this.cwd).dataDir;
+    const adminFile = join(this.cwd, LOCAL_ADMIN_FILE);
 
     return this.emit(
       await this.confirmed({

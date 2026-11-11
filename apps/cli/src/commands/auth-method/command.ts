@@ -1,15 +1,17 @@
-import { log } from "@/lib/log";
-
 import { Consent } from "@/lib/consent";
 import { CANCELLED, ZitadelError } from "@/lib/errors";
-import { optionArgs } from "@/lib/public-cli";
-import { publishedIds } from "@/lib/sync/state";
-import { reportWarning } from "@/lib/warnings";
+import { log } from "@/lib/log";
+import { Destructive } from "@/lib/oclif/destructive";
 import { EnvironmentCommand } from "@/lib/oclif/environment-command";
 import { environmentFlags } from "@/lib/oclif/environment-flags";
-import { portableSuggestions, type SuggestedCommand } from "@/lib/suggestion";
 import { nonBlankString } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import type { JsonEnvelope } from "@/lib/oclif/types";
+import { optionArgs } from "@/lib/public-cli";
+import { portableSuggestions, type SuggestedCommand } from "@/lib/suggestion";
+import { publishedIds } from "@/lib/sync/state";
+import { escapeControlCharacters } from "@/lib/terminal-text";
+import { reportWarning } from "@/lib/warnings";
 import {
   AmbiguousSchemaError,
   type BrokenFile,
@@ -26,9 +28,6 @@ import {
   type UserSchema,
   ZitadelConfig,
 } from "@/lib/zitadel";
-import type { JsonEnvelope } from "@/lib/oclif/types";
-import { Destructive } from "@/lib/oclif/destructive";
-import { escapeControlCharacters } from "@/lib/terminal-text";
 
 /**
  * What every `auth-method` command reads before changing anything.
@@ -401,7 +400,7 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
       }
       const retry = [...retryArgs, ...target.cwdArgs, "--force"];
       const question = `Disable ${error.disabling} anyway? Nobody will be able to sign in to ${error.schema}.`;
-      if (this.dryRun && this.meta.nonInteractive && this.meta.force !== true) {
+      if (this.dryRun && this.meta.nonInteractive && !this.force) {
         // The re-run stays a preview: --force with --dry-run writes nothing.
         refuseNoSignInLeft({
           target,

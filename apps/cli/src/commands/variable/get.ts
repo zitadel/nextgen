@@ -1,12 +1,13 @@
 import { Flags } from "@oclif/core";
 
 import { VariableService } from "@/lib/backend";
-import { variableNameArg } from "./name";
 import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
-import { Tabulatable } from "@/lib/oclif/tabulatable";
-import { variableCell } from "@/lib/variables";
 import { json } from "@/lib/oclif/rendering";
+import { Tabulatable } from "@/lib/oclif/tabulatable";
 import { escapeControlCharacters } from "@/lib/terminal-text";
+import { variableCell } from "@/lib/variables";
+
+import { variableNameArg } from "./name";
 
 /**
  * `zitadel variable get NAME` — read one variable by name from the project.

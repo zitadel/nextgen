@@ -133,7 +133,7 @@ export async function inspectWorktree(cwd: string): Promise<WorktreeState> {
  *
  * Nothing here prompts, so it behaves the same interactively and in CI, and no
  * failure is fatal: the worst case is the first release carrying no commit,
- * which is what happened before this existed. When the commit fails after
+ * which a later deploy reports as having no baseline. When the commit fails after
  * setup ran `git init`, the outcome says so, since the repository now exists.
  */
 export async function ensureInitialCommit(cwd: string): Promise<InitialCommitOutcome> {

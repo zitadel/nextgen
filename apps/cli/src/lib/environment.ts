@@ -341,7 +341,7 @@ const SECRET_KEYS: ReadonlySet<EnvironmentKey> = new Set([
 /**
  * Like {@link requireValue}, but on an interactive terminal a missing value is
  * asked for and persisted to `.env.<name>.local` before it is returned, so the
- * next run resolves it from the file rather than asking again (#1313). A secret
+ * next run resolves it from the file rather than asking again. A secret
  * is asked for without echo and the file is written `0600`. A run that named
  * its own file with `--env-file` keeps the value for this run only: writing it
  * to `.env.<name>.local` would hand it to every later run of that environment.

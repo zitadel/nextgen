@@ -1,10 +1,11 @@
 import { createZitadelClient, IdpService } from "@/lib/backend";
 import { isCancellation } from "@/lib/errors";
-import { DEPLOYED_DEPENDENT_RULE } from "@/lib/publish/steps/validate";
 import { readProjectServer, readZitadelConfig, readZitadelSecret } from "@/lib/project";
+import { DEPLOYED_DEPENDENT_RULE } from "@/lib/publish/steps/validate";
 import { unscopedCommand } from "@/lib/suggestion";
 import { userAgent } from "@/lib/user-agent";
 import { CONFIG_DIRECTORIES, DiskStore, type Issue, ZitadelConfig } from "@/lib/zitadel";
+
 import { AbstractSanityCheck, type CheckContext, type CheckOutcome } from "./types";
 
 /**

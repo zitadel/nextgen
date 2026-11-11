@@ -1,7 +1,7 @@
-import { PreviewService } from "@/lib/backend";
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
+import { PreviewService } from "@/lib/backend";
 import {
   type Admitted,
   CommandGroups,
@@ -44,6 +44,7 @@ const LIMIT: Refused<number> = {
 export default class PreviewList extends Tabulatable(PreviewCommand) {
   static override description = "List the project's live previews, newest first.";
   static override group = CommandGroups.configuration;
+
   static override examples = [
     "<%= config.bin %> preview list",
     "<%= config.bin %> preview list --all",

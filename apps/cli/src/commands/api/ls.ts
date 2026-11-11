@@ -40,13 +40,13 @@ export default class ApiLs extends Tabulatable(BaseCommand) {
   static override description =
     "List the operations of the Zitadel API that the api command calls.";
   static override group = CommandGroups.diagnostics;
+
   static override examples = [
     "<%= config.bin %> api ls",
     "<%= config.bin %> api ls passkey",
     "<%= config.bin %> api ls --tag Users --json",
     "<%= config.bin %> api ls --json | jq -r '.data.operations[] | select(.command == null) | .id'",
   ];
-
   static override args = {
     filter: Args.string({
       description: "Only operations whose id, path, summary or tag contains this text.",

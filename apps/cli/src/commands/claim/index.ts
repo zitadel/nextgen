@@ -1,23 +1,22 @@
 import { Flags } from "@oclif/core";
-import { z } from "zod";
-import { log } from "@/lib/log";
 import pRetry, { AbortError } from "p-retry";
+import { z } from "zod";
 
 import { ClaimService } from "@/lib/backend";
+import { getClaimStatusQueryChallengeIdRegExp } from "@/lib/backend/schemas";
 import { openInBrowser } from "@/lib/browser";
 import { CLAIM_WINDOW_DAYS, isAttached } from "@/lib/claim-state";
 import { requireValue } from "@/lib/environment";
 import { ZitadelError } from "@/lib/errors";
+import { log } from "@/lib/log";
 import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
-import { hasZitadelSecret, readZitadelSecret, writeZitadelSecret } from "@/lib/project";
-import { getClaimStatusQueryChallengeIdRegExp } from "@/lib/backend/schemas";
-
 import { reads, type Refused, whole } from "@/lib/oclif/flags";
+import { hasZitadelSecret, readZitadelSecret, writeZitadelSecret } from "@/lib/project";
 import { normalizePublicCliCommand } from "@/lib/public-cli";
 import { isLoopbackUrl } from "@/lib/server";
+import { type SuggestedCommand, unscopedCommand } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { reportWarning } from "@/lib/warnings";
-import { type SuggestedCommand, unscopedCommand } from "@/lib/suggestion";
 
 /**
  * Poll cadence while a human completes the browser step. Starts responsive so
@@ -137,7 +136,6 @@ export default class Claim extends EnvironmentCommand {
     "<%= config.bin %> <%= command.id %> --no-wait",
     "<%= config.bin %> <%= command.id %> --challenge-id ch_01J0Z9KX7Y0Q2Y7JX5M9K2YF3C",
   ];
-
   static override flags = {
     "no-open": Flags.boolean({
       description: "Print the link instead of opening a browser.",
@@ -258,17 +256,20 @@ export default class Claim extends EnvironmentCommand {
     if (flags.challengeId === undefined) {
       const started = await claimService.start();
       switch (started.outcome) {
-        case "already-claimed":
+        case "already-claimed": {
           return this.alreadyClaimed({
             project_id: projectId,
             team_id: started.teamId,
             dashboard_url: started.dashboardUrl,
           });
-        case "window-expired":
+        }
+        case "window-expired": {
           this.recordTelemetry({ claim_outcome: "window_expired" });
-          throw claimWindowExpiredError(this.meta.cliVersion);
-        case "started":
+          throw claimWindowExpiredError(this.cliVersion);
+        }
+        case "started": {
           break;
+        }
       }
       const { challenge } = started;
 
@@ -397,18 +398,21 @@ export default class Claim extends EnvironmentCommand {
           throw new AbortError(error instanceof Error ? error : new Error(String(error)));
         });
         switch (progress.outcome) {
-          case "completed":
+          case "completed": {
             this.recordTelemetry({ poll_count: attempt });
             return progress.claim;
-          case "window-expired":
+          }
+          case "window-expired": {
             this.recordTelemetry({ claim_outcome: "window_expired", poll_count: attempt });
-            throw new AbortError(claimWindowExpiredError(this.meta.cliVersion));
-          case "expired":
+            throw new AbortError(claimWindowExpiredError(this.cliVersion));
+          }
+          case "expired": {
             this.recordTelemetry({ claim_outcome: "expired", poll_count: attempt });
             throw new AbortError(
               expiredError("The link expired before the browser step finished.", startOver),
             );
-          case "not-found":
+          }
+          case "not-found": {
             this.recordTelemetry({ claim_outcome: "not_found", poll_count: attempt });
             throw new AbortError(
               new ZitadelError(
@@ -420,8 +424,10 @@ export default class Claim extends EnvironmentCommand {
                 },
               ),
             );
-          case "pending":
+          }
+          case "pending": {
             throw new NotFinished(attempt);
+          }
         }
       },
       {
