@@ -42,7 +42,7 @@ import { AddUserSheet } from "@/features/users/components/add-user-sheet";
 import { cn } from "@/lib/utils";
 
 import type { NavIcon } from "@/nav";
-import { type NavItem, useNavItems } from "./use-nav-items";
+import { type NavItem, PROJECT_SETTINGS_PATH, useNavItems } from "./use-nav-items";
 import { SETTINGS_PATH } from "./user-menu";
 
 /**
@@ -306,6 +306,7 @@ function SearchPalette({
   const pages = useNavItems();
   const account = useNavItems("account");
   const settings = useNavItems("settings");
+  const projectSettings = useNavItems("project-settings");
 
   const selected = useSelectedProject();
   const projectName = selected?.name;
@@ -334,18 +335,27 @@ function SearchPalette({
           id: `page:${item.to}`,
           icon: <item.nav.icon aria-hidden />,
           label: item.nav.label,
-          description: list ?? description,
+          description: [list, description].filter(Boolean).join(" · ") || undefined,
           inProject,
           kind,
           go: close(() => void navigate({ to: item.to })),
         }));
 
     // The project's pages. With none selected, opening one asks for one (D22).
-    const pageResults = navResults(pages, {
+    // Its Settings row is a list (D40): the list's pages stand in for it,
+    // marked Settings as the root Settings' are, then the project.
+    const inProject = {
       description: where(place ?? CHOOSE_A_PROJECT),
       inProject: projectId !== undefined,
       kind: projectId ? KIND.page : KIND.pageOfNoProject,
-    });
+    };
+    const pageResults = [
+      ...navResults(
+        pages.filter((item) => item.to !== PROJECT_SETTINGS_PATH),
+        inProject,
+      ),
+      ...navResults(projectSettings, { ...inProject, list: "Settings" }),
+    ];
 
     // What the palette does in the selected project: what its list screens'
     // own buttons do. The server refuses what the person may not do, as it
@@ -536,6 +546,7 @@ function SearchPalette({
     pages,
     account,
     settings,
+    projectSettings,
     users,
     others,
     found,
@@ -646,7 +657,7 @@ function SearchPalette({
 interface NavPlace {
   /** The list's name, which marks its pages and finds them all. */
   list?: string;
-  /** Beneath a page that has no list's name. */
+  /** Beneath a page, after its list's name when it has one. */
   description?: string;
   inProject: boolean;
   kind: number;

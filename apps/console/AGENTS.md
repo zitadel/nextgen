@@ -70,6 +70,8 @@ between files are the sign the component is missing.
 - Projects (the home) and `/settings` are above every project: Projects lists
   the account's screens (`nav.view: "account"`, D27) around the project's
   (D34); `/settings` its own pages (`nav.view: "settings"`, D29).
+- A project's Settings opens its own list too (`nav.view: "project-settings"`,
+  D40); add a project setting as a page there, never as a tab.
 - Going up to Projects or Settings never drops the selected project (D36):
   never link with `project: undefined`.
 - `/` is the project's Overview (D35): only reads a screen already makes, and no
