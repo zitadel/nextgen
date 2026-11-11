@@ -42,7 +42,7 @@ export type InterruptedRun = Readonly<{
   stderr: string;
 }>;
 import { aBinaryRecord } from "./runtime-record";
-import { parseJson, runCliForTest } from "./run-cli";
+import { parseJson, runCliForTest, stripAnsi } from "./run-cli";
 import { asTerminal, offTerminal, onTerminalReadingAFile } from "./terminal";
 import { assertRunnableSuggestions } from "./suggestions";
 
@@ -1209,6 +1209,7 @@ export class ScaffoldedApp {
   async inEveryRendering(
     run: (how: { json: boolean; env: NodeJS.ProcessEnv }) => Promise<CliResult>,
   ): Promise<void> {
+    const ran: CliResult[] = [];
     for (const how of [
       { json: true, terminal: false, env: {} },
       { json: false, terminal: false, env: {} },
@@ -1227,12 +1228,54 @@ export class ScaffoldedApp {
         return run({ json: how.json, env: how.env });
       };
       const result = await (how.terminal ? onTerminalReadingAFile(once) : offTerminal(once));
+      ran.push(result);
       // A run that named no command would otherwise pass every rendering but
       // the one the envelope is checked in.
       expect(result.stdout + result.stderr, "the command ran").not.toContain(
         "is not a zitadel command",
       );
     }
+    // The two runs on a terminal came last and back to back, so they ended the
+    // same way: what the envelope says, the screen says in the same words.
+    const [onScreen, asEnvelope] = ran.slice(-2);
+    if (onScreen !== undefined && asEnvelope !== undefined) {
+      this.expectOneText(asEnvelope, onScreen);
+    }
+  }
+
+  /**
+   * A message is written once: the envelope's error `message`, or its
+   * `data.title`, is on the screen word for word, never capitalised, trimmed or
+   * ended with a full stop for one of the two. Skipped for a text holding a
+   * control character, which the screen spells out, and for runs that ended
+   * differently.
+   *
+   * @param envelope - The run that printed the envelope.
+   * @param screen - The same run, as a person reads it.
+   */
+  private expectOneText(envelope: CliResult, screen: CliResult): void {
+    if (envelope.exitCode !== screen.exitCode) {
+      return;
+    }
+    const body = parseJsonOrUndefined(stripAnsi(envelope.stdout));
+    const parsed = z
+      .object({
+        status: z.string(),
+        message: z.string().optional(),
+        data: z.object({ title: z.string().optional() }).passthrough().optional(),
+      })
+      .safeParse(body);
+    if (!parsed.success) {
+      return;
+    }
+    const said = parsed.data.status === "error" ? parsed.data.message : parsed.data.data?.title;
+    if (said === undefined || /[\u0000-\u001f\u007f-\u009f]/.test(said)) {
+      return;
+    }
+    expect(
+      stripAnsi(`${screen.stdout}\n${screen.stderr}`),
+      "the screen says what the envelope says",
+    ).toContain(said);
   }
 
   /**
