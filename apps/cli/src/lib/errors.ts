@@ -371,6 +371,9 @@ function listedInDetails(
  * invalid, so without these lines the reason shows only in `--json`. A flow
  * keeps its reason in the resource's own `details.details`, behind a generic
  * message, so that text is appended when the message does not already hold it.
+ * A connection names what it refused there too, as a list: the fields an
+ * `idp.field_immutable` blames, or the endpoints an `idp.endpoints_partial`
+ * reports missing. Those are appended the same way.
  */
 function rejectedResources(body: unknown): string[] {
   const lines: string[] = [];
@@ -398,7 +401,10 @@ function resourceLine(item: unknown): string | undefined {
   const { kind, handle, message, details } = item as Record<string, unknown>;
   const reason = typeof message === "string" ? message : "";
   const nested = isObject(details) ? (details as Record<string, unknown>).details : undefined;
-  const detail = typeof nested === "string" ? nested : "";
+  const detail =
+    typeof nested === "string"
+      ? nested
+      : [...listedInDetails(details, "fields"), ...listedInDetails(details, "missing")].join(", ");
   const text =
     detail === "" || reason.includes(detail) ? reason : [reason, detail].filter(Boolean).join(": ");
   if (text === "") {

@@ -1031,7 +1031,7 @@ func TestFlowSSOIdentityResolver_FindUniqueOwner(t *testing.T) {
 			objectTypes: map[string]string{"sch_older": "customer", ssoSchemaURL: "customer"},
 			want:        "user-9",
 		},
-		// The registry key has no schema: the value can belong to a user of
+		// The unique index has no schema column: the value can belong to a user of
 		// another schema that also marks the property project-unique.
 		"owner of another schema": {
 			user:        &domain.User{ID: "user-9", SchemaURL: otherSchemaURL},

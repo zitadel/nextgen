@@ -24,11 +24,34 @@ type BuildReleaseParams struct {
 	ProjectID ProjectID
 }
 
+// CancelInvitationParams is parameters of cancelInvitation operation.
+type CancelInvitationParams struct {
+	// The invitation ID (`inv_<opaque>`): the `id` that `createInvitation`
+	// (`POST /invitations`) returns or `listInvitations` (`GET /invitations`) lists.
+	ID InvitationID
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	ProjectID ProjectID
+}
+
 // CompleteClaimParams is parameters of completeClaim operation.
 type CompleteClaimParams struct {
 	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup`
 	// also prints as `project_id`.
 	ProjectID ProjectID
+}
+
+// CreateApplicationParams is parameters of createApplication operation.
+type CreateApplicationParams struct {
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	ProjectID ProjectID
+	// Optional retry key for safe retries of the call.
+	// Retries carrying the same key within the call window return the cached
+	// payload without creating a new resource. See details in the endpoint description.
+	IdempotencyKey OptString `json:",omitempty,omitzero"`
 }
 
 // CreateBrandingParams is parameters of createBranding operation.
@@ -77,6 +100,14 @@ type CreateHandoffParams struct {
 
 // CreateIdpParams is parameters of createIdp operation.
 type CreateIdpParams struct {
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	ProjectID ProjectID
+}
+
+// CreateInvitationParams is parameters of createInvitation operation.
+type CreateInvitationParams struct {
 	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
 	// it as "Project id" in its summary and as `project_id` with `--json`, and
 	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
@@ -194,6 +225,16 @@ type FinishUserPasskeyRegistrationParams struct {
 	// The `registration_id` that `beginUserPasskeyRegistration` (`POST
 	// /users/{user_id}/passkeys/registrations`) returns.
 	RegistrationID string
+}
+
+// GetApplicationByIdParams is parameters of getApplicationById operation.
+type GetApplicationByIdParams struct {
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	ProjectID ProjectID
+	// The application ID: the `id` that `createApplication` (`POST /applications`) returns.
+	ID string
 }
 
 // GetAuthAttemptParams is parameters of getAuthAttempt operation.
@@ -320,6 +361,17 @@ type GetIdpRevisionByIdParams struct {
 	// The revision ID: the `revision_id` that `createIdp` (`POST /idps`) returns, or that
 	// `listIdpRevisions` (`GET /idps/{id}/revisions`) lists.
 	RevisionID string
+}
+
+// GetInvitationParams is parameters of getInvitation operation.
+type GetInvitationParams struct {
+	// The invitation ID (`inv_<opaque>`): the `id` that `createInvitation`
+	// (`POST /invitations`) returns or `listInvitations` (`GET /invitations`) lists.
+	ID InvitationID
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	ProjectID ProjectID
 }
 
 // GetMyPasswordStateParams is parameters of getMyPasswordState operation.
@@ -651,6 +703,25 @@ type ListIdpRevisionsParams struct {
 	// Omit to start from the beginning.
 	// Its format is opaque and may change between releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
+}
+
+// ListInvitationsParams is parameters of listInvitations operation.
+type ListInvitationsParams struct {
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	ProjectID ProjectID
+	// Maximum number of items to return.
+	Limit OptLimit `json:",omitempty,omitzero"`
+	// Token for fetching the next page of results.
+	// Obtain this value from `next_page_token` in the previous response.
+	// Omit to start from the beginning.
+	// Its format is opaque and may change between releases.
+	PageToken OptPageToken `json:",omitempty,omitzero"`
+	// Only invitations with this status.
+	Status OptInvitationStatus `json:",omitempty,omitzero"`
+	// Only invitations of this type.
+	Type OptListInvitationsType `json:",omitempty,omitzero"`
 }
 
 // ListMyIdentityLinksParams is parameters of listMyIdentityLinks operation.
@@ -1048,6 +1119,13 @@ type RollbackDeploymentParams struct {
 	// The deployment ID: the `id` that `createDeployment` (`POST /deployments`) returns or
 	// `listDeployments` (`GET /deployments`) lists.
 	DeploymentID DeploymentID
+}
+
+// SearchParams is parameters of search operation.
+type SearchParams struct {
+	// The project the request addresses, by the `id` that `createProject` (`POST /projects`)
+	// returns. Omit it to address the credential's own project.
+	ProjectID OptProjectID `json:",omitempty,omitzero"`
 }
 
 // SetUserPasswordParams is parameters of setUserPassword operation.
