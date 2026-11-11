@@ -2358,6 +2358,16 @@ describe("<zitadel-login> against the typed Flow API", () => {
       }
     });
 
+    it("takes a response whose step carries no gates, as a host's own render may resume one", async () => {
+      const element = await mount(host);
+      const { response } = internals(element);
+      const { gates: _none, ...step } = response.step;
+
+      await expect(
+        internals(element).applyResponse({ ...response, step } as CreateFlow201),
+      ).resolves.toBeUndefined();
+    });
+
     it("waits for a check still running when the passkey ceremony ends", async () => {
       applyPasskey(true);
       const webauthn = holdWebAuthn();

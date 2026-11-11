@@ -1689,7 +1689,10 @@ export class ZitadelLogin extends ZitadelSurface {
    * browser's prompt is not held back for any of it.
    */
   private prepareSignupProof(flowId: string, step: CreateFlow201["step"]): void {
-    const ceremony = step.gates.signup_pow ? step.challenge?.challenge_id : undefined;
+    // Every response passes here, and one a host resumed from its own render
+    // may carry no `gates` at all: that is a step without a check.
+    const gates = step.gates as CreateFlow201["step"]["gates"] | undefined;
+    const ceremony = gates?.signup_pow ? step.challenge?.challenge_id : undefined;
     if (this.signupPrepare && this.signupPrepare.ceremony !== ceremony) {
       this.signupPrepare.controller.abort();
       this.signupPrepare = undefined;
