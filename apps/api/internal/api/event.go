@@ -57,6 +57,15 @@ func (h *Handler) ListEvents(ctx context.Context, params api.ListEventsParams) (
 	if v, ok := params.TeamID.Get(); ok {
 		req.TeamID = v
 	}
+	if len(params.OperationID) > 0 {
+		req.OperationIDs = append([]string(nil), params.OperationID...)
+	}
+	if len(params.StatusClass) > 0 {
+		req.StatusClasses = make([]string, len(params.StatusClass))
+		for i, c := range params.StatusClass {
+			req.StatusClasses[i] = string(c)
+		}
+	}
 	if v, ok := params.CreatedAfter.Get(); ok {
 		t := v
 		req.CreatedAfter = &t
