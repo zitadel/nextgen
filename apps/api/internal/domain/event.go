@@ -172,7 +172,7 @@ const (
 // WrittenEventTypes is every event type the server writes: the Path A and
 // Path B types of docs/design/api/events-catalog.md. A retired type is not in
 // it, since nothing writes it any more. A webhook's filter is checked against
-// it (ADR 088 §1). The catalog's producer test keeps it in step with the
+// it (ADR 089 §1). The catalog's producer test keeps it in step with the
 // catalog.
 func WrittenEventTypes() []EventType {
 	return []EventType{

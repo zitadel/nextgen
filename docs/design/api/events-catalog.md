@@ -239,5 +239,5 @@ Types planned but not yet emitted by a live producer. Follow-up issues:
 | `session.expired` | [#881](https://github.com/zitadel/nextgen/issues/881) session reaper |
 | `preview.expired` | [#2280](https://github.com/zitadel/nextgen/issues/2280) preview expiry sweep |
 | `schema.deleted` | [#882](https://github.com/zitadel/nextgen/issues/882) schema delete API |
-| `webhook.disabled` | [ADR 088 §4](../../adrs/088-project-webhooks.md): the shipper disabling a webhook that failed for 3 days or answered `410`; lands with delivery |
+| `webhook.disabled` | [ADR 089 §4](../../adrs/089-project-webhooks.md): the shipper disabling a webhook that failed for 3 days or answered `410`; lands with delivery |
 | `auth.factor.password.removed` / TOTP enroll+remove / passkey remove / recovery enroll+remove | [#884](https://github.com/zitadel/nextgen/issues/884) factor remove + TOTP/recovery APIs — same `AuthFactorPayload` rules |

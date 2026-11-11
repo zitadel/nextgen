@@ -7,20 +7,20 @@ import (
 )
 
 // PrefixWebhook is the dialect-minted ID prefix for a project's webhooks
-// (hook_<opaque>, ADR 088). The operator's configured sinks keep
+// (hook_<opaque>, ADR 089). The operator's configured sinks keep
 // PrefixEventSink.
 const PrefixWebhook ResourcePrefix = "hook"
 
 // WebhookErrorCodePrefix starts every webhook error code. The codes are
 // webhook.*, not hook.*: the ID prefix is short, the code names the resource
-// (ADR 088 §1).
+// (ADR 089 §1).
 const WebhookErrorCodePrefix = "webhook."
 
-// WebhookProjectLimit is how many webhooks one project holds (ADR 088 §1).
+// WebhookProjectLimit is how many webhooks one project holds (ADR 089 §1).
 const WebhookProjectLimit = 10
 
 // WebhookPreviousSecretTTL is how long the secret a rotation replaced keeps
-// signing deliveries (ADR 088 §3).
+// signing deliveries (ADR 089 §3).
 const WebhookPreviousSecretTTL = 24 * time.Hour
 
 // WebhookSecretPrefix starts every signing secret, as Standard Webhooks
@@ -28,11 +28,11 @@ const WebhookPreviousSecretTTL = 24 * time.Hour
 const WebhookSecretPrefix = "whsec_"
 
 // WebhookAllEventTypes is the event_types entry that stands for every type
-// except request.api (ADR 088 §1).
+// except request.api (ADR 089 §1).
 const WebhookAllEventTypes = "*"
 
 // NewWebhookSecret generates a signing secret: 32 random bytes, shown as
-// whsec_ and their base64 (ADR 088 §3).
+// whsec_ and their base64 (ADR 089 §3).
 func NewWebhookSecret() (string, error) {
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {
@@ -59,7 +59,7 @@ func ErrWebhookLimitReached() Error {
 	return newError("webhook.limit_reached", "the project has reached its limit of 10 webhooks", nil, nil)
 }
 
-// Webhook is a project's webhook (ADR 088 §1). The shipper's configured sinks
+// Webhook is a project's webhook (ADR 089 §1). The shipper's configured sinks
 // stay [EventSink].
 type Webhook struct {
 	ID          string
@@ -71,7 +71,7 @@ type Webhook struct {
 	EventTypes []string
 	Enabled    bool
 	// Secret and PreviousSecret are the signing secrets as the service layer
-	// encrypted them (ADR 088 §3). Storage keeps them as given.
+	// encrypted them (ADR 089 §3). Storage keeps them as given.
 	Secret         string
 	PreviousSecret *string
 	// PreviousSecretExpiresAt is until when PreviousSecret also signs.
