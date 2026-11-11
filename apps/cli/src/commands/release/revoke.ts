@@ -11,7 +11,8 @@ import { type Refused, taken } from "@/lib/oclif/flags";
 import { Destructive } from "@/lib/oclif/destructive";
 import { prose } from "@/lib/oclif/rendering";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
-import { DEPLOY_ARGS } from "@/lib/suggestion";
+import type { ZitadelError } from "@/lib/errors";
+import { DEPLOY_ARGS, type SuggestedCommand } from "@/lib/suggestion";
 
 /**
  * The release `release revoke` revokes. The schema is the API spec's own, so a value that is not one is
@@ -89,23 +90,9 @@ export default class ReleaseRevoke extends Destructive(EnvironmentCommand) {
           const releaseService = new ReleaseService(consent.unlock(client), projectId);
           const revoked = await releaseService.revoke(args.releaseId);
           if (revoked.outcome === "in-use") {
-            const served = revoked.origins.map((one) => {
-              return `${one.origin} (${one.deployment_id})`;
+            throw inUseError(args.releaseId, revoked.origins, (command) => {
+              return this.suggest(command);
             });
-            const { steps, next } = freeing(revoked.origins);
-            throw refusalError(
-              IN_USE_REFUSAL,
-              {
-                release: args.releaseId,
-                served: served.length > 0 ? served.join(", ") : "an origin",
-                origins: revoked.origins,
-                steps,
-                next,
-              },
-              (command) => {
-                return this.suggest(command);
-              },
-            );
           }
           const { release } = revoked;
           return {
@@ -120,6 +107,37 @@ export default class ReleaseRevoke extends Destructive(EnvironmentCommand) {
       }),
     );
   }
+}
+
+/** How many serving origins the message names before it counts the rest. */
+const NAMED_ORIGINS = 3;
+
+/**
+ * The refusal for a release origins still serve: the message names the first
+ * few origins and the deployments that pin them, `details.origins` all of them.
+ *
+ * @param release - The release that was not revoked.
+ * @param origins - The origins that still serve it.
+ * @param suggest - Builds each follow-up command; without it there are none.
+ * @returns The refusal to throw.
+ */
+export function inUseError(
+  release: string,
+  origins: readonly ServingOrigin[],
+  suggest?: (command: string) => SuggestedCommand,
+): ZitadelError {
+  const named = origins.slice(0, NAMED_ORIGINS).map((one) => {
+    return `${one.origin} (${one.deployment_id})`;
+  });
+  const rest = origins.length - named.length;
+  const served =
+    named.length === 0
+      ? "an origin"
+      : rest > 0
+        ? `${named.join(", ")} and ${rest} more`
+        : named.join(", ");
+  const { steps, next } = freeing(origins);
+  return refusalError(IN_USE_REFUSAL, { release, served, origins, steps, next }, suggest);
 }
 
 /**
