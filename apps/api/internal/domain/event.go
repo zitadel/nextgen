@@ -155,6 +155,11 @@ const (
 	EventTypeAuthzGranted EventType = "authz.granted"
 	EventTypeAuthzRevoked EventType = "authz.revoked"
 
+	EventTypeInvitationCreated   EventType = "invitation.created"
+	EventTypeInvitationAccepted  EventType = "invitation.accepted"
+	EventTypeInvitationRejected  EventType = "invitation.rejected"
+	EventTypeInvitationCancelled EventType = "invitation.cancelled"
+
 	EventTypeAuthFactorPasswordSet     EventType = "auth.factor.password.set"
 	EventTypeAuthFactorPasskeyEnrolled EventType = "auth.factor.passkey.enrolled"
 )

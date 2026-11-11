@@ -2,12 +2,14 @@ import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 
 import { fetchSession } from "@/auth/session";
 import { makeTestSession } from "@/test/session.fixture";
 import { scopedPath } from "@/test/project-scope.fixture";
 
+import { MOBILE_QUERY } from "@/hooks/use-mobile";
+import { DOCS_URL } from "@/lib/docs";
 import { THEME_STORAGE_KEY } from "@/theme";
 import { createAppRouter } from "@/router";
 import { server } from "@/test/msw";
@@ -153,6 +155,20 @@ describe("app shell navigation", () => {
     expect(linkedRows).toHaveLength(NAV_ORDER.length);
   });
 
+  it("marks with an arrow the one row that swaps the list for its own", async () => {
+    renderShell();
+    await screen.findByRole("link", { name: /^Users/ });
+    const nav = within(screen.getByRole("navigation", { name: "Primary" }));
+
+    // Logs opens Logs' list. The project's Settings is a screen beside the
+    // others, whatever it shares a name with.
+    const arrowed = nav
+      .getAllByRole("link")
+      .filter((link) => link.querySelector("[data-opens-list]"))
+      .map((link) => link.textContent?.trim());
+    expect(arrowed).toEqual(["Logs"]);
+  });
+
   it("draws the home, Projects, in the frame every screen has", async () => {
     // Several to choose from, so `/` lands on Projects with nothing selected.
     server.use(
@@ -178,6 +194,13 @@ describe("app shell navigation", () => {
     expect(nav.getByRole("link", { name: "Projects" })).toHaveAttribute("data-active", "true");
     // One row for Settings: its pages are its own list's, not repeated here.
     expect(nav.getByRole("link", { name: "Settings" })).toHaveAttribute("href", "/settings");
+    // It and Logs each open a list of their own, and say so with an arrow.
+    expect(
+      nav
+        .getAllByRole("link")
+        .filter((link) => link.querySelector("[data-opens-list]"))
+        .map((link) => link.textContent?.trim()),
+    ).toEqual(["Logs", "Settings"]);
     expect(screen.queryByRole("navigation", { name: "Primary" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Switch project" })).toHaveTextContent(
       "All projects",
@@ -192,6 +215,37 @@ describe("app shell navigation", () => {
 
     await userEvent.click(screen.getByRole("button", { name: /^Account:/ }));
     expect(await screen.findByRole("menuitem", { name: "Log out" })).toBeInTheDocument();
+  });
+
+  it("links the documentation from the account menu, in a new tab", async () => {
+    renderShell();
+    await userEvent.click(await screen.findByRole("button", { name: /^Account:/ }));
+    const docs = await screen.findByRole("menuitem", { name: "Documentation" });
+    expect(docs).toHaveAttribute("href", DOCS_URL);
+    expect(docs).toHaveAttribute("target", "_blank");
+    // Last but one, above Log out.
+    const items = screen.getAllByRole("menuitem").map((item) => item.textContent);
+    expect(items.slice(-2)).toEqual(["Documentation", "Log out"]);
+    expect(screen.getByRole("menu")).toHaveAttribute("data-side", "right");
+  });
+
+  it("opens the account menu above its row on a phone, where the sidebar is a sheet", async () => {
+    const matchMedia = window.matchMedia;
+    const phone = vi.spyOn(window, "matchMedia").mockImplementation((query) => ({
+      ...matchMedia(query),
+      matches: query === MOBILE_QUERY,
+    }));
+    onTestFinished(() => phone.mockRestore());
+    renderShell();
+    // On a phone the sidebar, and the account row in it, is a sheet opened from the bar.
+    await screen.findByRole("button", { name: "Search" });
+    // The first is the toggle beside the logo; the second, shadcn's edge rail.
+    const [toggle] = screen.getAllByRole("button", { name: "Toggle Sidebar" });
+    await userEvent.click(toggle as HTMLElement);
+    await userEvent.click(await screen.findByRole("button", { name: /^Account:/ }));
+    // The side asked for; that the menu then fits a 375px screen is a layout
+    // fact jsdom cannot measure.
+    expect(await screen.findByRole("menu")).toHaveAttribute("data-side", "top");
   });
 
   it("lists every screen before a project is selected", async () => {
@@ -368,6 +422,10 @@ describe("settings view", () => {
       SETTINGS_ORDER,
     );
     expect(nav.getByRole("link", { name: "Profile" })).toHaveAttribute("data-active", "true");
+    // A row of the list it is already in opens no other.
+    expect(
+      nav.getByRole("link", { name: "Profile" }).querySelector("[data-opens-list]"),
+    ).toBeNull();
     // The project's list and the account's are gone rather than sitting
     // underneath it.
     expect(screen.queryByRole("navigation", { name: "Primary" })).not.toBeInTheDocument();
@@ -1444,7 +1502,9 @@ describe("search", () => {
     await user.click(await dialog.findByRole("option", { name: /Copy project ID/ }));
 
     expect(await screen.findByText("Project ID copied")).toBeInTheDocument();
-    expect(await navigator.clipboard.readText()).toBe("proj_1");
+    // Read inside `waitFor`: the closed palette still settles its typing
+    // pause, and a bare await here lets that update land outside act().
+    await waitFor(async () => expect(await navigator.clipboard.readText()).toBe("proj_1"));
   });
 
   it("lists what was opened from it, until something is typed", async () => {

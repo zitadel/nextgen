@@ -752,7 +752,11 @@ When `setup --sso` or `auth-method sso enable` adds a social sign-in provider, t
 must register the connection's redirect URI with the provider themselves: give
 them `data.sso[].callback_uri` from `setup`, or `data.callback_uri` from
 `auth-method sso enable`, verbatim. Each connection has its own URI, so a URI from another
-provider or an older CLI version does not work.
+provider or an older CLI version does not work. `data.callback_uri` is the development URI only. The
+text output of `auth-method sso enable` also lists the URI for each deployed origin, and one pattern for
+each preview origin, since a preview URL is known only when its build runs. A preview pattern is not a
+URI to register: replace it with the concrete preview URL first. A JSON caller reads the project's origins
+with `origin list` and builds the same URIs itself.
 
 The same results carry the connection's `claim_mapping` (user attribute to
 claim), `verified_claims` (what makes an attribute verified: a claim's name, or

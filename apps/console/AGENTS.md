@@ -55,6 +55,10 @@ between files are the sign the component is missing.
   screen `src/components/detail-page.tsx` ("Resource list layout" and
   "Resource detail layout" in `docs/styling.md`). Follow the shipped screens
   under `src/routes/_authed/`: loader-fetched data, `$param` detail routes.
+- Narrow a list through `ResourceFilter` by the "List filters" recipe in
+  `docs/styling.md`, never a select of the screen's own.
+- Keep a filter's value in the URL and send it to the server; never filter the
+  rows already loaded.
 - A screen that acts on one project declares `staticData.scope: "project"`
   and reads the selected project (`?project=`) through
   `src/features/projects/project-scope.ts`: `projectScopeDeps` +
