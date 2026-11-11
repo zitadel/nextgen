@@ -105,10 +105,12 @@ const (
 	EventTypeSessionEstablished EventType = "session.established"
 	EventTypeSessionDeleted     EventType = "session.deleted"
 
-	EventTypeAuthAttemptCreated   EventType = "auth.attempt.created"
-	EventTypeAuthAttemptHandedOff EventType = "auth.attempt.handed_off"
-	EventTypeAuthCheckFailed      EventType = "auth.check.failed"
-	EventTypeAuthCheckSucceeded   EventType = "auth.check.succeeded"
+	EventTypeSignupChallengeIssued   EventType = "flow.signup_challenge.issued"
+	EventTypeSignupChallengeConsumed EventType = "flow.signup_challenge.consumed"
+	EventTypeAuthAttemptCreated      EventType = "auth.attempt.created"
+	EventTypeAuthAttemptHandedOff    EventType = "auth.attempt.handed_off"
+	EventTypeAuthCheckFailed         EventType = "auth.check.failed"
+	EventTypeAuthCheckSucceeded      EventType = "auth.check.succeeded"
 
 	// The SSO callback's outcome, separate from auth.check.*: a succeeded
 	// exchange is not a sign-in, since the identity may still match no account.
@@ -182,6 +184,7 @@ func WrittenEventTypes() []EventType {
 		EventTypeTeamCreated, EventTypeTeamUpdated, EventTypeTeamDeactivated,
 		EventTypeAuthTokenIssued, EventTypeAuthTokenRevoked,
 		EventTypeSessionEstablished, EventTypeSessionDeleted,
+		EventTypeSignupChallengeIssued, EventTypeSignupChallengeConsumed,
 		EventTypeAuthAttemptCreated, EventTypeAuthAttemptHandedOff,
 		EventTypeAuthCheckFailed, EventTypeAuthCheckSucceeded,
 		EventTypeAuthSSOAuthorizationFailed, EventTypeAuthSSOExchangeSucceeded, EventTypeAuthSSOExchangeFailed,

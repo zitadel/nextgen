@@ -19,6 +19,8 @@ oneOf:
   - $ref: types/authz-revoked-event.yaml
   - $ref: types/branding-created-event.yaml
   - $ref: types/deployment-created-event.yaml
+  - $ref: types/flow-signup_challenge-consumed-event.yaml
+  - $ref: types/flow-signup_challenge-issued-event.yaml
   - $ref: types/flowdef-created-event.yaml
   - $ref: types/flowdef-deleted-event.yaml
   - $ref: types/flowdef-updated-event.yaml
@@ -74,6 +76,8 @@ discriminator:
     authz.revoked: types/authz-revoked-event.yaml
     branding.created: types/branding-created-event.yaml
     deployment.created: types/deployment-created-event.yaml
+    flow.signup_challenge.consumed: types/flow-signup_challenge-consumed-event.yaml
+    flow.signup_challenge.issued: types/flow-signup_challenge-issued-event.yaml
     flowdef.created: types/flowdef-created-event.yaml
     flowdef.deleted: types/flowdef-deleted-event.yaml
     flowdef.updated: types/flowdef-updated-event.yaml
