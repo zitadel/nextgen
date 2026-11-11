@@ -448,6 +448,9 @@ export function customSettingsOf(flags: {
   };
 }
 
+/** Joins names as "a, b, and c" in the summary box. */
+const LIST = new Intl.ListFormat("en", { type: "conjunction" });
+
 /** How `--server local` with nothing running is refused. */
 const NO_LOCAL_SERVER_REFUSAL: Refusal = {
   code: "E_LOCAL_SERVER_NOT_RUNNING",
@@ -1817,6 +1820,75 @@ export default class Setup extends Destructive(BaseCommand) {
         message: wrapForBox(
           [
             renderSummary(sections),
+            ...planned.connections.flatMap((entry) => {
+              const connection = entry.connection;
+              const text = (value: string) => {
+                return escapeControlCharacters(value, { keepLayout: false });
+              };
+              const { mappings, verifications, scopes, createsUsers, unmapped, usedBy } =
+                planned.change.after.connections.summarize(connection);
+              const verifiedBy = new Map(
+                verifications.map(({ property, claim }) => {
+                  return [property, claim];
+                }),
+              );
+              const sections = [
+                mappings.length === 0
+                  ? []
+                  : [
+                      createsUsers
+                        ? `When someone signs in with ${text(connection.displayName)} for the first time, Zitadel fills in their new user like this:`
+                        : `${text(connection.displayName)} does not create users in Zitadel, so these claims are not used to fill one:`,
+                      ...mappings.map(({ property, claim }) => {
+                        const how = verifiedBy.get(property);
+                        const verified =
+                          how === true
+                            ? "always counts as verified"
+                            : typeof how === "string"
+                              ? `counts as verified when ${text(how)} is true`
+                              : "is not treated as verified";
+                        return [
+                          `- ${text(property)} comes from the provider's ${text(claim)} claim.`,
+                          `  It ${verified}.`,
+                        ].join("\n");
+                      }),
+                    ],
+                scopes.length === 0
+                  ? []
+                  : [
+                      `Zitadel asks ${text(connection.displayName)} for these scopes: ${LIST.format(scopes.map(text))}.`,
+                    ],
+                unmapped.length === 0
+                  ? []
+                  : [
+                      "These attributes have no claim yet:",
+                      ...unmapped.map(({ property, required }) => {
+                        if (!required) {
+                          return `- ${text(property)} is optional, so it can stay empty.`;
+                        }
+                        return createsUsers
+                          ? `- ${text(property)} is required, so sign-up will have to ask for it.`
+                          : `- ${text(property)} is required, but this connection does not create users.`;
+                      }),
+                    ],
+                usedBy.length === 0
+                  ? []
+                  : [
+                      `This connection is used by ${LIST.format(usedBy.map(text))}, so a change here affects the people who sign in with it.`,
+                    ],
+                [
+                  `To change which claim fills an attribute, edit claim_mapping in ${text(connection.path)} and run deploy.`,
+                ],
+              ].filter((section) => {
+                return section.length > 0;
+              });
+              return [
+                "",
+                ...sections.flatMap((section, at) => {
+                  return at === 0 ? section : ["", ...section];
+                }),
+              ];
+            }),
             "",
             renderBoxActions([
               ...deployStep.boxActions,
@@ -1876,11 +1948,25 @@ export default class Setup extends Destructive(BaseCommand) {
         sso: planned.connections.map((entry) => {
           const slug = providerOf(entry.chosen.selection).slug;
           const outcome = ssoOutcomes.get(slug);
+          const mapped = planned.change.after.connections.summarize(entry.connection);
           return {
             provider: selectionName(entry.chosen.selection),
             slug,
             client_id: entry.chosen.credentials.clientId ?? null,
             connection: entry.connection.path,
+            claim_mapping: Object.fromEntries(
+              mapped.mappings.map(({ property, claim }) => {
+                return [property, claim];
+              }),
+            ),
+            verified_claims: Object.fromEntries(
+              mapped.verifications.map(({ property, claim }) => {
+                return [property, claim];
+              }),
+            ),
+            scopes: mapped.scopes,
+            unmapped: mapped.unmapped,
+            used_by: mapped.usedBy,
             // What the developer registers at the provider: the connection's
             // own route, as `auth-method sso enable` reports it.
             callback_uri: callbackUriFor(issuer, slug),

@@ -92,7 +92,16 @@ reached the project (`stored`, `deferred` or `failed`):
 {
   "provider": "google",
   "schema": "default-human-user",
-  "connection": { "action": "create", "slug": "google", "file": ".zitadel/idps/google.json" },
+  "connection": {
+    "action": "create",
+    "slug": "google",
+    "file": ".zitadel/idps/google.json",
+    "claim_mapping": { "email": "email" },
+    "verified_claims": { "email": "email_verified" },
+    "scopes": ["openid", "profile", "email"],
+    "unmapped": [],
+    "used_by": ["default-human-user"]
+  },
   "callback_uri": "http://localhost:3000/__nextgen/idp/google/callback",
   "changed": [".zitadel/schemas/default-human-user.json", ".zitadel/flows/default-login.json"],
   "client_id": { "variable": "GOOGLE_CLIENT_ID", "published": "stored" },
@@ -168,13 +177,14 @@ scope, such as a `groups` scope. Add each such scope to `oidc.scopes`.
 Claims fill a user at registration only. A user who signed in before keeps their
 attributes, whatever the provider returns on a later sign-in.
 
-For a custom provider, `sso enable` prints the mappings and the file to edit
-them in. With `--json` the same summary is an `info` entry in `data.notices`.
-If the provider returns other claims, edit the
-mappings there, then deploy. `sso enable` warns when the user schema defines
-none of the properties the connection maps by default. The file then has no
-`claim_mapping`, and no sign-in can fill a user. Add the properties your
-provider returns.
+`sso enable` prints which claim fills each user attribute, which attributes no
+claim fills and which schemas sign in through the connection. With `--json` the
+same is in `data.connection` as `claim_mapping`, `verified_claims`, `scopes`,
+`unmapped` and `used_by`. If the provider returns other claims, edit
+`claim_mapping` in the connection file, then deploy. `sso enable` warns when
+the user schema defines none of the properties the connection maps by default.
+The file then has no `claim_mapping`, and no sign-in can fill a user. Add the
+properties your provider returns.
 
 ### Map a claim to a property you add
 
@@ -259,7 +269,10 @@ npx @zitadel/cli@latest setup --server local --framework next \
 
 For a custom provider, use `--sso custom` with `--sso-slug`,
 `--sso-display-name`, `--sso-issuer` and optionally `--sso-scopes`. Setup
-reports each connection under `data.sso[]`, with its `callback_uri` to register.
+reports each connection under `data.sso[]`, with its `callback_uri` to register
+and the same `claim_mapping`, `verified_claims`, `scopes`, `unmapped` and
+`used_by` that `sso enable` reports. Its closing box says which claim fills each
+user attribute.
 
 ## What the command writes
 

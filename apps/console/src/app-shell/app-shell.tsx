@@ -1,6 +1,6 @@
 import { Link, useMatch, useMatchRoute } from "@tanstack/react-router";
-import { ChevronLeft } from "lucide-react";
-import type { ReactNode } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { type ReactNode, useState } from "react";
 
 import {
   Sidebar,
@@ -17,12 +17,13 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 
-import { LogFilters, LogViewRows } from "@/features/events/components/logs-nav";
+import { LogFilters, LogViewPicker } from "@/features/events/components/logs-nav";
 
 import { ContextSwitcher } from "./context-switcher";
 import { ZitadelLogo } from "./logo";
 import { SearchDialog, SearchTrigger, useSearchShortcut } from "./search";
-import { useNavItems } from "./use-nav-items";
+import { accountListItems, useNavItems, useRequestedNavItem } from "./use-nav-items";
+import { cn } from "@/lib/utils";
 import type { NavView } from "@/nav";
 import { SETTINGS_PATH, type ShellUser, UserMenuItem } from "./user-menu";
 
@@ -35,9 +36,11 @@ import { SETTINGS_PATH, type ShellUser, UserMenuItem } from "./user-menu";
  * the sidebar surface uses `background` per the design (see `ui/sidebar.tsx`).
  *
  * Every screen is drawn in this one frame (D27). What changes with where the
- * person is is the sidebar's list and what the project pill says
- * (`useShellView`), never the frame, so going from a project to Projects, and
- * from there into Settings, moves nothing but the list.
+ * person is is the sidebar's list (`useShellView`), never the frame or the
+ * selected project (D36), so going from a project to Projects, and from there
+ * into Settings, moves nothing but the list. Opening a list from a
+ * row of another slides it in from the right, and the way back from the left
+ * (`useListEntrance`).
  */
 export function AppShell({
   children,
@@ -78,7 +81,7 @@ export function AppShell({
 /** The console's home: Projects, the list of every project. */
 const HOME_ROUTE = "/_authed/projects/";
 
-/** Logs, whose list replaces the project's on the screen and on an event's page. */
+/** Logs, whose list replaces the project's on the screen and under an event's drawer. */
 const LOGS_PATH = "/events";
 
 /**
@@ -98,7 +101,11 @@ function useShellView(): NavView {
   return atHome ? "account" : "portal";
 }
 
-/** Home is Projects, the list of every project, from any screen. */
+/**
+ * Home is Projects, the list of every project, from any screen. The selected
+ * project rides along (`_authed` retains `?project=`) and stays selected there
+ * (D36).
+ */
 function HomeLink({ className }: { className: string }) {
   return (
     <Link to="/projects" aria-label="Home" className={`inline-flex items-center ${className}`}>
@@ -116,18 +123,19 @@ function readSidebarOpen(): boolean {
 
 /**
  * The sidebar's top band: the logo with the collapse toggle beside it, 56px
- * tall, level with the top bar. In the icon rail the logo goes and the toggle
- * centres — there is no room for both, and the toggle brings the logo back.
+ * tall, level with the top bar. The logo starts 20px in, on the rows' glyphs.
+ * In the icon rail the logo goes and the toggle centres — there is no room for
+ * both, and the toggle brings the logo back.
  */
 const BRAND_HEADER =
-  "h-14 shrink-0 flex-row items-center justify-between py-0 pr-3 pl-4 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0";
+  "h-14 shrink-0 flex-row items-center justify-between py-0 pr-3 pl-5 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0";
 
 /** The design's `Sidebar / Header Button`: 28px square around a 16px glyph. */
 const HEADER_BUTTON = "size-7! text-sidebar-foreground";
 
 /**
  * The sidebar: the brand header, search, the list `view` names, and the
- * account in the footer. Every list collapses to the same 48px icon rail.
+ * account in the footer. Every list collapses to the same 56px icon rail.
  */
 function AppSidebar({
   view,
@@ -144,7 +152,8 @@ function AppSidebar({
     <Sidebar collapsible="icon">
       <BrandHeader />
 
-      <SidebarContent>
+      {/* Clips sideways so a list sliding in never draws a scrollbar. */}
+      <SidebarContent className="overflow-x-hidden">
         {/* Search heads the list, as Vercel's `Find` does: in the top bar it
             sat a row above a list's own search (D27). */}
         <SidebarGroup className="pt-4 pb-0">
@@ -157,8 +166,6 @@ function AppSidebar({
 
       <SidebarFooter>
         <SidebarMenu>
-          {/* Documentation is parked: it needs a published URL for the docs
-              site to point at, and a row that does nothing reads as broken. */}
           <UserMenuItem user={user} onSignOut={onSignOut} />
         </SidebarMenu>
       </SidebarFooter>
@@ -189,42 +196,64 @@ const NAV_LABEL: Record<NavView, string> = {
 /**
  * The sidebar's nav: one flat list of the view's routes (`staticData.nav`,
  * Console ADR 0001). Portal is the project's screens. Account is what sits
- * above every project: Projects, the home, then what an add-on lists, then
- * Settings. Settings is that row's own list, under a heading that leads back:
+ * above every project: Projects, the home, then the project's screens, then
+ * what an add-on lists, then Settings (D34). A project's screen chosen from it
+ * opens in the selected project (D36); with none selected it asks for one
+ * (D31), marking its row while it asks (D22).
+ * Settings is that row's own list, under a heading that leads back:
  * the person's profile, alone while accounts are not surfaced (Console ADR
  * 0005 §3), then what an add-on lists. A row stays marked on the screens
  * beneath it, so a resource's detail keeps its list marked.
  *
  * Logs is one screen's own list, under a heading that leads back to the
- * project's: its rows are the list's views, not routes, and its filters
- * follow them in a group of their own (D30). The events feature draws both.
+ * project's: a picker of the list's views, not routes, and its filters in a
+ * group of their own (D30). The events feature draws both.
  *
- * Rows keep their height and a 2px gap in both sidebar states, so collapsing
- * moves nothing vertically.
+ * Rows are Vercel's: 36px with a 1px gap, the glyph 12px in and the label 10px
+ * after it. They keep that height in the rail, so collapsing moves nothing
+ * vertically.
  */
 function NavList({ view }: { view: NavView }) {
-  const items = useNavItems(view);
+  const own = useNavItems(view);
+  const project = useNavItems("portal");
+  const items = view === "account" ? accountListItems(own, project) : own;
+  // On Projects' way to a screen (`?next=`), that screen's row is the marked one.
+  const requested = useRequestedNavItem(project);
   const matchRoute = useMatchRoute();
+  const entrance = useListEntrance(view);
 
   return (
-    <>
+    // Keyed by the list, so a new one mounts and plays its entrance once.
+    <div key={view} className={cn("flex flex-col gap-2", entrance)}>
       <SidebarGroup role="navigation" aria-label={NAV_LABEL[view]} className="pt-2 pb-0">
-        <SidebarMenu className="gap-0.5">
+        <SidebarMenu className="gap-px">
           {/* Projects is the account list's first screen. */}
           {view === "settings" && <ListHeading name="Settings" to="/projects" back="Projects" />}
           {/* `/` is where a project lands, whichever screen that is. */}
           {view === "logs" && <ListHeading name="Logs" to="/" back="the project" />}
-          {view === "logs" && <LogViewRows />}
+          {view === "logs" && <LogViewPicker />}
           {items.map(({ to, nav: { icon: Icon, label: name } }) => (
-            <SidebarMenuItem key={name}>
+            <SidebarMenuItem key={to}>
               <SidebarMenuButton
                 asChild
-                isActive={!!matchRoute({ to, fuzzy: to !== "/" })}
+                isActive={requested ? requested.to === to : !!matchRoute({ to, fuzzy: to !== "/" })}
                 tooltip={name}
               >
                 <Link to={to} title={name}>
                   <Icon aria-hidden />
-                  <span>{name}</span>
+                  {/* Cut short itself: with the arrow after it, it is no
+                      longer the button's last child, which is what the
+                      button truncates. */}
+                  <span className="truncate">{name}</span>
+                  {opensList(view, to) && (
+                    // The account row's arrow in the footer, which opens a menu
+                    // as this row opens a list. Not drawn in the rail.
+                    <ChevronRight
+                      aria-hidden
+                      data-opens-list
+                      className="text-sidebar-foreground ml-auto group-data-[collapsible=icon]:hidden"
+                    />
+                  )}
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -232,8 +261,63 @@ function NavList({ view }: { view: NavView }) {
         </SidebarMenu>
       </SidebarGroup>
       {view === "logs" && <LogFilters />}
-    </>
+    </div>
   );
+}
+
+/**
+ * How deep each list sits: Projects' and a project's are where the console
+ * starts; Settings' and Logs' open from a row of one (D29, D30).
+ */
+const LIST_DEPTH: Record<NavView, number> = { portal: 0, account: 0, settings: 1, logs: 1 };
+
+/** The list a row's screen shows, where it is not the project's or the account's. */
+function listOf(to: string): NavView | undefined {
+  const under = (path: string) => to === path || to.startsWith(`${path}/`);
+  if (under(SETTINGS_PATH)) return "settings";
+  if (under(LOGS_PATH)) return "logs";
+  return undefined;
+}
+
+/**
+ * Whether a row of the list `view` names swaps the sidebar for a list one
+ * level down (Logs in a project's list, Settings in the account's), rather
+ * than opening a screen beside it. Such a row carries an arrow, so the swap
+ * is no surprise. A row of the list it is already in (Settings' Profile) does
+ * not: the rule is the depth, so a new list needs no change here.
+ */
+function opensList(view: NavView, to: string): boolean {
+  const target = listOf(to);
+  return target !== undefined && LIST_DEPTH[target] > LIST_DEPTH[view];
+}
+
+/** A short fade and slide, with the design's motion tokens; none for reduced motion. */
+const LIST_MOTION =
+  "animate-in fade-in-0 duration-(--zl-duration-base) ease-(--zl-easing-decelerate) motion-reduce:animate-none";
+
+/**
+ * The entrance of the list `view` names, as Vercel's sidebar plays it: in from
+ * the right going down into a list, in from the left on the way back up, so
+ * the person sees which way they went. The first list drawn and a swap between
+ * two at one depth (a project's and Projects') stay still. The view it last
+ * saw is state, adjusted while rendering, so the class is there on the new
+ * list's first paint.
+ */
+function useListEntrance(view: NavView): string | undefined {
+  const [shown, setShown] = useState(view);
+  const [entrance, setEntrance] = useState<string>();
+  if (view !== shown) {
+    const step = LIST_DEPTH[view] - LIST_DEPTH[shown];
+    setShown(view);
+    setEntrance(
+      step > 0
+        ? `${LIST_MOTION} slide-in-from-right-4`
+        : step < 0
+          ? `${LIST_MOTION} slide-in-from-left-4`
+          : undefined,
+    );
+  }
+  return entrance;
 }
 
 /**
@@ -275,8 +359,8 @@ function ContextBar({ view, userId }: { view: NavView; userId?: string }) {
   return (
     <div className={TOP_BAR}>
       {/* The signed-in person, whose recent projects the switcher keeps. */}
-      {/* Above every project the pill says so, and its list leads into one.
-          Logs is inside a project, like the project's own list. */}
+      {/* Above every project, with none selected, the pill says so, and its
+          list leads into one. */}
       <ContextSwitcher userId={userId} allProjects={view === "account" || view === "settings"} />
     </div>
   );
