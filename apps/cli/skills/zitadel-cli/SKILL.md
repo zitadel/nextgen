@@ -207,7 +207,11 @@ nothing; `data.skills` and `data.directories` say what it added where.
   (a user attribute, a project's own password hash) without asking first.
   `users create` and `users update` refuse an attribute that fails its schema's `format` (`email`, `uri`, `uuid`, `date`, `date-time` and the other standard names). `users update` validates the whole merged user, so a stored value that fails must be corrected in the same request.
 - **Calling an operation no command covers.** `zitadel api <operation>` calls
-  any operation of the API with the resolved server and `.zitadel/secret`. One
+  any operation of the API with the server, project and project secret every
+  project command resolves (`--server`, `--env`, `--env-file`, the `.env`
+  files, `.zitadel/secret`). One that needs the secret fails with
+  `E_VALIDATION` when no `ZITADEL_URL` resolves; one that needs none runs
+  against the cloud where nothing names a server. One
   that deletes, revokes or rolls back asks first and needs `--force` when
   non-interactive, as the command that covers it does. An update is not
   asked about, even one whose `null` removes what it names.
