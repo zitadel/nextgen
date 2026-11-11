@@ -70,7 +70,7 @@ import { cn } from "@/lib/utils";
 
 /**
  * Events: the project's events, newest first, on the shared resource table
- * (D17, D30, D36). An event is what the server recorded of a sign-in step,
+ * (D17, D30, D38). An event is what the server recorded of a sign-in step,
  * a change to a record or an API request (`GET /events`), and the screen, the
  * route, the API and the CLI all call it that.
  *

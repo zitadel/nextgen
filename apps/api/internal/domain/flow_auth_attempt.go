@@ -133,7 +133,9 @@ type FlowPasskeyRegistrationChallengeOutput struct {
 // FlowSubmitPasskeyRegistrationInput carries the attestation plus the
 // ChallengeID returned by IssuePasskeyRegistrationChallenge. UserSchemaURL
 // and UserAttributes feed the user creation that runs inside the verify
-// transaction when the ceremony is provisional.
+// transaction when the ceremony is provisional. That creation is a sign-up:
+// it first spends the proof submitted under [SignupGate] in GateProofs,
+// bound to the flow in State.
 type FlowSubmitPasskeyRegistrationInput struct {
 	ProjectID      string
 	AttemptID      string
@@ -142,6 +144,8 @@ type FlowSubmitPasskeyRegistrationInput struct {
 	Attestation    []byte
 	UserSchemaURL  string
 	UserAttributes map[string]any
+	State          *FlowState
+	GateProofs     map[string]string
 }
 
 type FlowHandoffInput struct {

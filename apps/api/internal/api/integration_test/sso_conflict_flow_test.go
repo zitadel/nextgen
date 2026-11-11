@@ -117,6 +117,9 @@ func newSSOConflictFixture(t *testing.T) *ssoResolutionFixture {
 func (f *ssoResolutionFixture) submitAction(t *testing.T, flow ssoFlow, action string, fields map[string]string) api.SubmitFlowStepRes {
 	t.Helper()
 	req := &api.FlowSubmitRequest{Action: action}
+	if action == "submit" && fields["x-auth-methods#password"] != "" {
+		req.GateProofs = currentSignupProofs(t, f.client, flow.id, flow.zflow)
+	}
 	if fields != nil {
 		raw := api.FlowSubmitRequestFields{}
 		for name, value := range fields {

@@ -466,3 +466,6 @@ func IDPConnectionPayloadDelta(previous, next *IDPConnection) (IDPConnectionPayl
 	}
 	return payload, nil
 }
+
+// SignupChallengePayload is empty: challenge and flow IDs live on event columns.
+type SignupChallengePayload struct{}

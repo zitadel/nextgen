@@ -335,6 +335,8 @@ type CapturingPlatform = {
   readonly deployments: RequestedDeployment[];
   /** Makes `POST /releases/build` fail, so setup's first deploy fails. */
   rejectsReleases(): void;
+  /** Refuses a sign-up policy's evaluation as malformed, as a server from before the policy does. */
+  predatesTheSignupPolicy(): void;
 };
 
 /**
@@ -408,7 +410,7 @@ async function aCapturingPlatform(
   const createBodies: unknown[] = [];
   const projects: CreatedOnPlatform[] = [];
   const deployments: RequestedDeployment[] = [];
-  const failing = { releases: false };
+  const failing = { releases: false, signupPolicy: false };
   const url = await serve(async (req, res) => {
     const path = new URL(req.url ?? "/", "http://localhost").pathname;
     requests.push(`${req.method ?? "GET"} ${path}`);
@@ -427,6 +429,12 @@ async function aCapturingPlatform(
           created_at: "2026-06-01T00:00:00.000Z",
         }),
       );
+      return;
+    }
+    if (req.method === "POST" && path === "/api/v1/policies/evaluate" && failing.signupPolicy) {
+      res
+        .writeHead(400, { "content-type": "application/json" })
+        .end(JSON.stringify({ code: "req.invalid", message: "the request is invalid" }));
       return;
     }
     if (req.method === "POST" && path === "/api/v1/releases/build") {
@@ -469,6 +477,9 @@ async function aCapturingPlatform(
     deployments,
     rejectsReleases() {
       failing.releases = true;
+    },
+    predatesTheSignupPolicy() {
+      failing.signupPolicy = true;
     },
   };
 }
@@ -1911,6 +1922,53 @@ describe("setup", () => {
         expect(parseJson(res.stdout)).toMatchObject({
           warnings: [expect.stringContaining(`No local admin for ${LOCAL_SERVER}`)],
         });
+      });
+    });
+  });
+
+  describe("against a server that does not take a sign-up policy yet", () => {
+    it("warns that it wrote none, and how to add one once the server does", async ({
+      dir,
+      serve,
+    }) => {
+      await aNextApp(dir);
+      const platform = await aCapturingPlatform(serve);
+      platform.predatesTheSignupPolicy();
+
+      const res = await runCliForTest(
+        scriptedAgainst(dir, platform.url, "--no-git", ...PINNED_DEV_PORT),
+      );
+
+      expect(parseJson(res.stdout)).toMatchObject({
+        warnings: [
+          expect.stringContaining(
+            "so setup wrote none. Upgrade the server, then add .zitadel/policies/user.create.json and run `zitadel deploy`",
+          ),
+        ],
+      });
+    });
+
+    it("warns that a sign-up policy --force keeps fails every deploy", async ({ dir, serve }) => {
+      await aNextApp(dir);
+      await write(dir, {
+        ".zitadel/policies/user.create.json": JSON.stringify({
+          operation: "user.create",
+          config: {},
+        }),
+      });
+      const platform = await aCapturingPlatform(serve);
+      platform.predatesTheSignupPolicy();
+
+      const res = await runCliForTest(
+        scriptedAgainst(dir, platform.url, "--no-git", "--force", ...PINNED_DEV_PORT),
+      );
+
+      expect(parseJson(res.stdout)).toMatchObject({
+        warnings: [
+          expect.stringContaining(
+            "every `zitadel deploy` fails while .zitadel/policies/user.create.json is there",
+          ),
+        ],
       });
     });
   });

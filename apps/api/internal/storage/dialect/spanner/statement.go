@@ -5,6 +5,7 @@ import (
 )
 
 type statements struct {
+	signupProtectionStatements
 	projectStatements
 	originStatements
 	flowDefinitionStatements
@@ -49,6 +50,7 @@ func (s statements) IsStatements() {}
 func newStatements(db queryExecutor) statements {
 	db = traced(db)
 	return statements{
+		signupProtectionStatements:    newSignupProtectionStatements(db),
 		projectStatements:             newProjectStatements(db),
 		originStatements:              newOriginStatements(db),
 		flowDefinitionStatements:      newFlowDefinitionStatements(db),
