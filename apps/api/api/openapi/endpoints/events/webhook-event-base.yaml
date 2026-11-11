@@ -1,0 +1,98 @@
+# The body of every request to a project's webhook. gen_event_schemas writes
+# webhook-event.yaml from it: per event type, `allOf` this schema plus a
+# `const` `type` and that type's payload as the required `data`. `data` is
+# declared only there: ogen cannot merge a `data` declared here with a payload
+# that is a union.
+type: object
+description: |
+  The fields of every request to a project's webhook, each always present.
+  `type` says which event type it is, and with it what `data` holds: the
+  event's `payload` as `getEvent` (`GET /events/{id}`) returns it, redacted
+  the same way, and `{}` when the event type has none. `data` is what the
+  event recorded, not the resource.
+required:
+  - id
+  - type
+  - created_at
+  - project_id
+  - actor
+  - entity
+properties:
+  id:
+    type: string
+    description: |
+      The event ID, in the form `evt_<opaque>`. It is the same on every
+      retry, and the `id` that `getEvent` (`GET /events/{id}`) takes.
+    example: evt_01HZYABCDEFGHJKMNPQRSTVWXY
+  type:
+    type: string
+    description: |
+      The event type, dot-separated: the event's `event_type`. It says what
+      `data` holds.
+    example: user.created
+  created_at:
+    type: string
+    format: date-time
+    description: When the event was stored, on the server's clock, in UTC.
+    example: '2026-11-11T10:00:00Z'
+  project_id:
+    $ref: ../../components/schemas/project-id.yaml
+  actor:
+    description: |
+      Who triggered the event: the event's `actor_type` and `actor_id`.
+      `null` when the event has neither. When it has only one, the other is
+      `null`: a project token acting for no user gives a `type` of `service`
+      and an `id` of `null`.
+    oneOf:
+      - type: object
+        required:
+          - type
+          - id
+        properties:
+          type:
+            description: The kind of actor.
+            oneOf:
+              - type: string
+                enum:
+                  - human
+                  - service
+                  - system
+                  - agent
+              - type: 'null'
+          id:
+            description: The ID of the actor, a user's for a `human`.
+            oneOf:
+              - type: string
+              - type: 'null'
+      - type: 'null'
+    example:
+      type: human
+      id: user_01HZYABCDEFGHJKMNPQRSTVWXY
+  entity:
+    description: |
+      The resource the event affected: the event's `entity_type` and
+      `entity_id`. `null` when the event has neither. When it has only one,
+      the other is `null`: deleting a session revokes its tokens with a
+      `type` of `token` and an `id` of `null`. To read the resource as it is
+      now, pass `id` to the operation that reads its type, such as
+      `GetUserByID` (`GET /users/{user_id}`).
+    oneOf:
+      - type: object
+        required:
+          - type
+          - id
+        properties:
+          type:
+            description: The type of resource, for example `user`.
+            oneOf:
+              - type: string
+              - type: 'null'
+          id:
+            description: The ID of the resource.
+            oneOf:
+              - type: string
+              - type: 'null'
+      - type: 'null'
+    example:
+      type: user
+      id: user_01HZYABCDEFGHJKMNPQRSTVWXZ

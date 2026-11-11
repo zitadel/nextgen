@@ -29,12 +29,13 @@ Authority (do not duplicate payload rules or the catalog table here):
 - Types: [`internal/domain/event.go`](../domain/event.go) `EventType`
   constants.
 - Payloads: [`internal/domain/event_payload.go`](../domain/event_payload.go).
-- OpenAPI: payload YAML under `api/openapi/endpoints/events/payloads/`, the
+- OpenAPI: payload YAML under `api/openapi/endpoints/events/payloads/` and the
   type's entries in `payloadByEventType` and `webhookByEventType`
-  ([`api/cmd/gen_event_schemas/main.go`](../../api/cmd/gen_event_schemas/main.go)),
-  and its webhook in the root `webhooks:` list of
-  [`api/openapi/openapi-spec.yaml`](../../api/openapi/openapi-spec.yaml),
-  which the generator checks. Regenerate with `moon run server:generate`.
+  ([`api/cmd/gen_event_schemas/main.go`](../../api/cmd/gen_event_schemas/main.go)).
+  Regenerate with `moon run server:generate`.
+- Write a `webhookByEventType` sentence to be true of the webhook's body
+  (`api/openapi/endpoints/events/webhook-event-base.yaml`): say `data`, not
+  "the payload", and name no other event field.
 - Producer allowlist:
   [`internal/audit/catalog_producers_test.go`](../audit/catalog_producers_test.go)
   — live catalog types must have a producer; do not list deferred types as

@@ -84,7 +84,7 @@
         "$TURBO_ROOT$/apps/api/api/openapi/endpoints/**/*-error-response.yaml",
         "$TURBO_ROOT$/apps/api/api/openapi/endpoints/events/event.yaml",
         "$TURBO_ROOT$/apps/api/api/openapi/endpoints/events/types/*.yaml",
-        "$TURBO_ROOT$/apps/api/api/openapi/endpoints/events/webhooks/*.yaml",
+        "$TURBO_ROOT$/apps/api/api/openapi/endpoints/events/webhook-event.yaml",
         "$TURBO_ROOT$/apps/api/api/openapi/endpoints/schemas/*.json",
         "$TURBO_ROOT$/apps/api/api/openapi/bundled/openapi.json",
         "$TURBO_ROOT$/apps/api/internal/**/*_enumer.go",

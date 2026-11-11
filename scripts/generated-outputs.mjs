@@ -18,12 +18,12 @@ export const GENERATED_GLOBS = [
   "apps/api/api/openapi/components/schemas/errors/**/*.yaml",
   "apps/api/api/openapi/components/examples/errors/*.yaml",
   "apps/api/api/openapi/endpoints/**/*-error-response.yaml",
-  // gen_event_schemas: the Event union, a schema per event type, and a
-  // webhook per event type. The payloads and event-base.yaml beside them are
+  // gen_event_schemas: the Event union, a schema per event type, and the
+  // webhook's body. The payloads and the other files beside them are
   // hand-written.
   "apps/api/api/openapi/endpoints/events/event.yaml",
   "apps/api/api/openapi/endpoints/events/types/*.yaml",
-  "apps/api/api/openapi/endpoints/events/webhooks/*.yaml",
+  "apps/api/api/openapi/endpoints/events/webhook-event.yaml",
   // JSON meta-schemas, generated from the OpenAPI YAML next to them by
   // scripts/generate-meta-schemas.ts. Single-segment `*` on purpose: the
   // `examples/` subdirectory holds hand-written documents.

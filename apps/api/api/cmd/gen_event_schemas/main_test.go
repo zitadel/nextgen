@@ -97,37 +97,8 @@ func TestWebhookDocsCoverDomainEventTypes(t *testing.T) {
 	require.NoError(t, validateWebhookDocs(eventTypes))
 }
 
-func TestSpecWebhooksMatchDomain(t *testing.T) {
-	t.Parallel()
-	_, filename, _, ok := runtime.Caller(0)
-	require.True(t, ok)
-	specPath := filepath.Join(filepath.Dir(filename), "../../openapi/openapi-spec.yaml")
-
-	require.NoError(t, checkSpecWebhooks(specPath, domainEventTypes(t)))
-}
-
-func TestCheckSpecWebhooksReportsDrift(t *testing.T) {
-	t.Parallel()
-	specPath := filepath.Join(t.TempDir(), "openapi-spec.yaml")
-	require.NoError(t, os.WriteFile(specPath, []byte(`webhooks:
-  user.created:
-    $ref: endpoints/events/webhooks/user-created.yaml
-  user.deleted:
-    $ref: endpoints/events/webhooks/user-removed.yaml
-  user.renamed:
-    $ref: endpoints/events/webhooks/user-renamed.yaml
-`), 0o644))
-
-	err := checkSpecWebhooks(specPath, []string{"user.created", "user.deleted", "user.updated"})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "missing user.updated, with $ref: endpoints/events/webhooks/user-updated.yaml")
-	assert.Contains(t, err.Error(), "user.deleted has $ref: endpoints/events/webhooks/user-removed.yaml")
-	assert.Contains(t, err.Error(), "user.renamed is not a domain event type")
-	assert.NotContains(t, err.Error(), "user.created")
-}
-
 // The webhook statuses must say what the catalog's Retired and Contracted
-// sections say, since a webhook page tells a receiver whether to expect it.
+// sections say, since the webhook's page tells a receiver whether to expect it.
 func TestWebhookStatusesMatchCatalog(t *testing.T) {
 	t.Parallel()
 	_, filename, _, ok := runtime.Caller(0)
@@ -157,58 +128,44 @@ func TestWebhookStatusesMatchCatalog(t *testing.T) {
 	}
 }
 
-func TestWebhookYAML(t *testing.T) {
+func TestWebhookEventYAML(t *testing.T) {
 	t.Parallel()
-	for _, et := range domainEventTypes(t) {
-		doc := webhookByEventType[et]
-		var webhook struct {
-			Post struct {
-				OperationID string                `yaml:"operationId"`
-				Summary     string                `yaml:"summary"`
-				Description string                `yaml:"description"`
-				Tags        []string              `yaml:"tags"`
-				Deprecated  bool                  `yaml:"deprecated"`
-				Security    []map[string][]string `yaml:"security"`
-				RequestBody struct {
-					Required bool `yaml:"required"`
-					Content  map[string]struct {
-						Schema struct {
-							Ref string `yaml:"$ref"`
-						} `yaml:"schema"`
-					} `yaml:"content"`
-				} `yaml:"requestBody"`
-				Responses map[string]struct {
-					Description string `yaml:"description"`
-				} `yaml:"responses"`
-			} `yaml:"post"`
-		}
-		require.NoErrorf(t, yaml.Unmarshal([]byte(webhookYAML(et, doc)), &webhook), "webhook %s", et)
-
-		post := webhook.Post
-		assert.Equal(t, et, post.Summary)
-		assert.Equal(t, webhookOperationID(et), post.OperationID)
-		assert.Equal(t, []string{webhookTag}, post.Tags)
-		assert.Equal(t, doc.status == statusRetired, post.Deprecated, et)
-		assert.NotNil(t, post.Security, "%s: security must be declared empty", et)
-		assert.Empty(t, post.Security, et)
-		assert.True(t, post.RequestBody.Required, et)
-		assert.Equal(t, "../types/"+eventTypeSlug(et)+".yaml", post.RequestBody.Content["application/json"].Schema.Ref)
-		assert.Contains(t, post.Responses, "2XX", et)
-		assert.Contains(t, post.Responses, "default", et)
-		// The description reflows at spaces only, so its words survive intact.
-		assert.Contains(t, strings.Join(strings.Fields(post.Description), " "), doc.description, et)
+	eventTypes := domainEventTypes(t)
+	var union struct {
+		OneOf []struct {
+			Title       string `yaml:"title"`
+			Description string `yaml:"description"`
+			Deprecated  bool   `yaml:"deprecated"`
+			AllOf       []struct {
+				Ref        string `yaml:"$ref"`
+				Properties struct {
+					Type struct {
+						Const string `yaml:"const"`
+					} `yaml:"type"`
+					Data struct {
+						Ref string `yaml:"$ref"`
+					} `yaml:"data"`
+				} `yaml:"properties"`
+			} `yaml:"allOf"`
+		} `yaml:"oneOf"`
+		Discriminator struct {
+			PropertyName string `yaml:"propertyName"`
+		} `yaml:"discriminator"`
 	}
-}
+	require.NoError(t, yaml.Unmarshal([]byte(webhookEventYAML(eventTypes)), &union))
 
-func TestWebhookOperationID(t *testing.T) {
-	t.Parallel()
-	for et, want := range map[string]string{
-		"user.created":              "userCreated",
-		"request.api":               "requestApi",
-		"auth.attempt.handed_off":   "authAttemptHandedOff",
-		"idp.identity_link.created": "idpIdentityLinkCreated",
-	} {
-		assert.Equal(t, want, webhookOperationID(et), et)
+	assert.Equal(t, "type", union.Discriminator.PropertyName)
+	require.Len(t, union.OneOf, len(eventTypes))
+	for i, et := range eventTypes {
+		member, doc := union.OneOf[i], webhookByEventType[et]
+		assert.Equal(t, et, member.Title)
+		assert.Equal(t, doc.status == statusRetired, member.Deprecated, et)
+		// The description reflows at spaces only, so its words survive intact.
+		assert.Contains(t, strings.Join(strings.Fields(member.Description), " "), doc.description, et)
+		require.Len(t, member.AllOf, 2, et)
+		assert.Equal(t, "webhook-event-base.yaml", member.AllOf[0].Ref, et)
+		assert.Equal(t, et, member.AllOf[1].Properties.Type.Const)
+		assert.Equal(t, "payloads/"+payloadByEventType[et], member.AllOf[1].Properties.Data.Ref, et)
 	}
 }
 

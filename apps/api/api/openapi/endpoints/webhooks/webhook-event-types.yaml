@@ -6,7 +6,8 @@ description: |
 
   Each entry is an event type as `listEvents` (`GET /events`) filters by it,
   such as `user.created`; the
-  [event webhooks](/docs/reference/api/event-webhooks) list them. When a
+  [event webhook](/docs/reference/api/event-webhooks/eventStored) lists
+  them, in its request body. When a
   webhook is created or updated, the server refuses a type it does not
   write with `400` `webhook.invalid`. A type it stops writing later stays in
   the list and matches nothing.

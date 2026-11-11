@@ -151,9 +151,8 @@ tags:
       A webhook names the event types it receives, or `*` for all of them
       except `request.api`. The server POSTs each matching event to the
       webhook's `url` as it stores it, one event per request and in the order
-      they were stored. The body is the event as `GET /events` returns it; the
-      Event Webhooks pages describe it per event type. Any `2xx` status
-      acknowledges the event. Delivery is at least once.
+      they were stored. The Event Webhooks section describes the request's
+      body and its delivery.
 
       Every request to a project's webhook is signed, following
       [Standard Webhooks](https://www.standardwebhooks.com/). It carries three
@@ -172,17 +171,20 @@ tags:
         space, one per secret; accept the request when either matches.
 
       Verify the signature over the raw body before parsing it, and compare
-      in constant time. Only a project's webhooks are signed: the sinks an
-      operator sets in the server's configuration, under `events.export`, get
-      the same requests without these headers.
+      in constant time.
   - name: Event Webhooks
     description: |
-      Event webhooks are the requests the server POSTs to a webhook sink as it
-      stores events, one event per request and, within a project, in the order they were
-      stored. The body is the event as `GET /events` returns it; `event_type`
-      tells the webhooks apart. Delivery is at least once, so drop duplicates
-      by `id`. The sink is set in the server's configuration, under
-      `events.export`.
+      The event webhook is the request the server POSTs to a project's
+      webhook for each event the webhook receives. Its body is the same for
+      every event type: `id`, `type`, `created_at`, `project_id`, `actor`,
+      `entity` and `data`, where `type` is the event type and `data` its
+      payload as `getEvent` (`GET /events/{id}`) returns it. Any `2xx` status
+      acknowledges the event. Delivery is at least once, so drop duplicates
+      by `id`.
+
+      The sinks an operator sets in the server's configuration, under
+      `events.export`, are not a project's webhooks: they get each event
+      whole, as `getEvent` returns it, and unsigned.
   - name: Variables
     description: |
       Named values a project enters and references from configuration documents
@@ -374,105 +376,11 @@ paths:
   /deployments/{deployment_id}/variables:
     $ref: endpoints/deployments/by_id/variables/methods.yaml
 
-# One per domain event type, keyed by its event_type. gen_event_schemas writes
-# the files and fails until this list names exactly the domain's event types.
+# One webhook for every event type: its body (endpoints/events/webhook-event.yaml,
+# written by gen_event_schemas) has a member per type.
 webhooks:
-  auth.attempt.created:
-    $ref: endpoints/events/webhooks/auth-attempt-created.yaml
-  auth.attempt.handed_off:
-    $ref: endpoints/events/webhooks/auth-attempt-handed_off.yaml
-  auth.check.failed:
-    $ref: endpoints/events/webhooks/auth-check-failed.yaml
-  auth.check.succeeded:
-    $ref: endpoints/events/webhooks/auth-check-succeeded.yaml
-  auth.factor.passkey.enrolled:
-    $ref: endpoints/events/webhooks/auth-factor-passkey-enrolled.yaml
-  auth.factor.password.set:
-    $ref: endpoints/events/webhooks/auth-factor-password-set.yaml
-  auth.sso.authorization.failed:
-    $ref: endpoints/events/webhooks/auth-sso-authorization-failed.yaml
-  auth.sso.exchange.failed:
-    $ref: endpoints/events/webhooks/auth-sso-exchange-failed.yaml
-  auth.sso.exchange.succeeded:
-    $ref: endpoints/events/webhooks/auth-sso-exchange-succeeded.yaml
-  auth.token.issued:
-    $ref: endpoints/events/webhooks/auth-token-issued.yaml
-  auth.token.revoked:
-    $ref: endpoints/events/webhooks/auth-token-revoked.yaml
-  authz.granted:
-    $ref: endpoints/events/webhooks/authz-granted.yaml
-  authz.revoked:
-    $ref: endpoints/events/webhooks/authz-revoked.yaml
-  branding.created:
-    $ref: endpoints/events/webhooks/branding-created.yaml
-  deployment.created:
-    $ref: endpoints/events/webhooks/deployment-created.yaml
-  flowdef.created:
-    $ref: endpoints/events/webhooks/flowdef-created.yaml
-  flowdef.deleted:
-    $ref: endpoints/events/webhooks/flowdef-deleted.yaml
-  flowdef.updated:
-    $ref: endpoints/events/webhooks/flowdef-updated.yaml
-  idp.created:
-    $ref: endpoints/events/webhooks/idp-created.yaml
-  idp.identity_link.created:
-    $ref: endpoints/events/webhooks/idp-identity_link-created.yaml
-  idp.updated:
-    $ref: endpoints/events/webhooks/idp-updated.yaml
-  invitation.accepted:
-    $ref: endpoints/events/webhooks/invitation-accepted.yaml
-  invitation.cancelled:
-    $ref: endpoints/events/webhooks/invitation-cancelled.yaml
-  invitation.created:
-    $ref: endpoints/events/webhooks/invitation-created.yaml
-  invitation.rejected:
-    $ref: endpoints/events/webhooks/invitation-rejected.yaml
-  origin.added:
-    $ref: endpoints/events/webhooks/origin-added.yaml
-  origin.removed:
-    $ref: endpoints/events/webhooks/origin-removed.yaml
-  policy.created:
-    $ref: endpoints/events/webhooks/policy-created.yaml
-  policy.updated:
-    $ref: endpoints/events/webhooks/policy-updated.yaml
-  preview.removed:
-    $ref: endpoints/events/webhooks/preview-removed.yaml
-  project.created:
-    $ref: endpoints/events/webhooks/project-created.yaml
-  project.deleted:
-    $ref: endpoints/events/webhooks/project-deleted.yaml
-  project.updated:
-    $ref: endpoints/events/webhooks/project-updated.yaml
-  release.created:
-    $ref: endpoints/events/webhooks/release-created.yaml
-  release.revoked:
-    $ref: endpoints/events/webhooks/release-revoked.yaml
-  request.api:
-    $ref: endpoints/events/webhooks/request-api.yaml
-  schema.created:
-    $ref: endpoints/events/webhooks/schema-created.yaml
-  session.deleted:
-    $ref: endpoints/events/webhooks/session-deleted.yaml
-  session.established:
-    $ref: endpoints/events/webhooks/session-established.yaml
-  team.created:
-    $ref: endpoints/events/webhooks/team-created.yaml
-  team.deactivated:
-    $ref: endpoints/events/webhooks/team-deactivated.yaml
-  team.updated:
-    $ref: endpoints/events/webhooks/team-updated.yaml
-  user.create.failed:
-    $ref: endpoints/events/webhooks/user-create-failed.yaml
-  user.created:
-    $ref: endpoints/events/webhooks/user-created.yaml
-  user.deleted:
-    $ref: endpoints/events/webhooks/user-deleted.yaml
-  user.updated:
-    $ref: endpoints/events/webhooks/user-updated.yaml
-  variable.removed:
-    $ref: endpoints/events/webhooks/variable-removed.yaml
-  variable.set:
-    $ref: endpoints/events/webhooks/variable-set.yaml
+  event:
+    $ref: endpoints/events/event-webhook.yaml
 
 components:
   securitySchemes:

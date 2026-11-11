@@ -117,7 +117,7 @@ tasks:
       - "/apps/api/api/openapi/endpoints/**/*-error-response.yaml"
       - "/apps/api/api/openapi/endpoints/events/event.yaml"
       - "/apps/api/api/openapi/endpoints/events/types/*.yaml"
-      - "/apps/api/api/openapi/endpoints/events/webhooks/*.yaml"
+      - "/apps/api/api/openapi/endpoints/events/webhook-event.yaml"
       - "/apps/api/api/openapi/endpoints/schemas/*.json"
       - "/apps/api/api/openapi/bundled/openapi.json"
       - "/apps/api/internal/**/*_enumer.go"

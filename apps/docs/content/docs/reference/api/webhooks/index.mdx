@@ -14,9 +14,8 @@ These operations are not available yet: each answers `501` with the code
 ## What a webhook receives
 
 The server sends one `POST` per event, in the order the events were stored.
-The body is the event as `GET /events` returns it. The
-[event webhooks](/docs/reference/api/event-webhooks) pages describe it per
-event type.
+The body is the same for every event type;
+[Event webhooks](/docs/reference/api/event-webhooks) describes it.
 
 - `event_types` lists the types the webhook receives. The single entry `*`
   stands for every type except `request.api`. To receive that type, name it.
@@ -60,7 +59,7 @@ separated by a space, one per secret. Accept the request when either
 matches.
 
 Only a project's webhooks are signed. The sinks an operator sets in the
-server's configuration, under `events.export`, get the same requests without
-these headers.
+server's configuration, under `events.export`, are
+[a different thing](/docs/reference/api/event-webhooks#the-operators-export-sink).
 
 <Operations />
