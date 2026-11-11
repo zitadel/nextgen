@@ -244,6 +244,9 @@ test("every API operation shows its call through @zitadel/api, its CLI command a
     if (/npx @zitadel\/cli@latest variable[^`]*--(?:data|project-level)/.test(markdown)) {
       return `${markdownUrl(url)}: a \`variable\` command with a flag it does not have`;
     }
+    if (/npx @zitadel\/cli@latest variable resolve \S/.test(markdown)) {
+      return `${markdownUrl(url)}: \`variable resolve\` with an argument it does not take`;
+    }
     if (named) {
       // The command's page links back to the operation (lib/cli-reference.ts).
       const commandPage = markdownUrl(`/docs/reference/cli/${named.split(" ").join("/")}`);
