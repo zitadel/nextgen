@@ -762,7 +762,9 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       mappings.length === 0
         ? []
         : [
-            `When someone signs in with ${text(connection.displayName)}, Zitadel fills in their user like this:`,
+            createsUsers
+              ? `When someone signs in with ${text(connection.displayName)} for the first time, Zitadel fills in their new user like this:`
+              : `${text(connection.displayName)} does not create users in Zitadel, so these claims are not used to fill one:`,
             ...mappings.map(({ property, claim }) => {
               const how = verifiedBy.get(property);
               const verified =

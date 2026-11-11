@@ -786,6 +786,9 @@ describe("auth-method sso enable", () => {
       expect(result.stdout).toContain(
         "- companyName is required, but this connection does not create users.",
       );
+      expect(result.stdout).toContain(
+        "Acme SSO does not create users in Zitadel, so these claims are not used to fill one:",
+      );
     });
   });
 
@@ -830,7 +833,7 @@ describe("auth-method sso enable", () => {
         return runCliForTest(authMethodText(cwd, ...CUSTOM, ...ACME_FLAGS));
       });
 
-      expect(result.stdout).not.toContain("Zitadel fills in their user like this");
+      expect(result.stdout).not.toContain("fills in their new user like this");
     });
 
     it("prints a claim name holding a newline on one line", async ({ dir }) => {
@@ -931,7 +934,7 @@ describe("auth-method sso enable", () => {
 
   describe("with --provider custom in a script", () => {
     it.for([
-      "When someone signs in with Acme SSO, Zitadel fills in their user like",
+      "When someone signs in with Acme SSO for the first time, Zitadel fills in their new user",
       "- email comes from the provider's email claim.",
       "It counts as verified",
       "email_verified is true.",
