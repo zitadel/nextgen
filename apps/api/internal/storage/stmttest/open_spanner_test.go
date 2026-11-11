@@ -29,6 +29,9 @@ func init() {
 		func(ctx context.Context, pool dbtest.Pool, projectID, id, userID, encodedHash string, createdAt time.Time) error {
 			return spanner.InsertUserPasswordAt(ctx, pool, projectID, id, userID, encodedHash, createdAt)
 		},
+		func(ctx context.Context, pool dbtest.Pool, projectID, userID string) error {
+			return spanner.ReactivateUser(ctx, pool, projectID, userID)
+		},
 		spanner.SchemaColumnNullability(),
 		func(ctx context.Context, pool dbtest.Pool) (map[string]map[string]bool, error) {
 			return spanner.LiveColumnNullability(ctx, pool)

@@ -1,0 +1,14 @@
+title: InvitationRejectedPayload
+type: object
+description: |
+  Payload for `invitation.rejected`. The invitation ID is the event's
+  `entity_id`, and `user_id` is the user who declined it.
+required:
+  - journey_id
+  - user_id
+properties:
+  journey_id:
+    type: string
+    description: Shared by an invitation and every invitation that replaces it.
+  user_id:
+    type: string

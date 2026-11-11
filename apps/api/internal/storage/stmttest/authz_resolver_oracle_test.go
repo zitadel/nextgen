@@ -19,7 +19,7 @@ func TestAuthzResolver_OracleAgreement(t *testing.T) {
 		persisted, err := d.stmts.LoadCatalogMutations(t.Context(), domain.SystemCatalogID)
 		require.NoError(t, err)
 
-		projectID := ensureProject(t, d.stmts)
+		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
 		teamA := "team_ora_a_" + uniqueSuffix(t)
 		teamB := "team_ora_b_" + uniqueSuffix(t)
 		require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, teamA)))
@@ -28,7 +28,7 @@ func TestAuthzResolver_OracleAgreement(t *testing.T) {
 		rng := rand.New(rand.NewSource(42))
 		users := make([]string, 6)
 		for i := range users {
-			users[i] = fmt.Sprintf("user_ora_%d_%s", i, uniqueSuffix(t))
+			users[i] = newPrincipalUser(t, d.stmts, projectID, schemaURL, fmt.Sprintf("user_ora_%d_%s", i, uniqueSuffix(t)))
 		}
 
 		var assignments []*domain.AuthzAssignment
@@ -80,11 +80,42 @@ func TestAuthzResolver_OracleAgreement(t *testing.T) {
 		require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(), aScoped))
 		assignments = append(assignments, aScoped)
 
+		// Deactivate two users through the product statement: it deletes their
+		// membership edges and leaves their assignments, users[0]'s direct
+		// team-scoped grant among them, which only the status read stops.
+		deactivated := map[string]bool{users[0]: true, users[3]: true}
+		for u := range deactivated {
+			require.NoError(t, d.stmts.DeactivateUser(t.Context(), projectID, u))
+		}
+		active := map[resolver.UserKey]bool{}
+		for _, u := range users {
+			if !deactivated[u] {
+				active[resolver.UserKey{ProjectID: projectID, UserID: u}] = true
+			}
+		}
+		kept := memberships[:0]
+		for _, e := range memberships {
+			if !deactivated[e.MemberID] {
+				kept = append(kept, e)
+			}
+		}
+
 		g := resolver.GraphFromPersisted(persisted)
 		g.Assignments = assignments
-		g.Memberships = memberships
+		g.Memberships = kept
 		g.Resources = resources
+		g.ActiveUsers = active
 
+		// Agreement on denials alone would prove nothing: the deactivated
+		// user's grant must be one that allows while the user is active.
+		asIfActive := g
+		asIfActive.ActiveUsers = map[resolver.UserKey]bool{{ProjectID: projectID, UserID: scopedUser}: true}
+		require.True(t, asIfActive.OracleCheckParams(domain.AuthzCheckParams{
+			ProjectID: projectID, PrincipalType: domain.AuthzPrincipalTypeUser, PrincipalID: scopedUser,
+			ObjectType: "project", Relation: "viewer", ResourceID: users[1], ResourceTeamID: teamA,
+		}), "the deactivated user's team-scoped grant covers users[1]")
+
+		allowedAny := false
 		r := resolver.New()
 		for _, u := range users {
 			wantAllow := g.OracleCheck(projectID, projectID, domain.AuthzPrincipalTypeUser, u, "project", "viewer")
@@ -98,6 +129,7 @@ func TestAuthzResolver_OracleAgreement(t *testing.T) {
 			require.NoError(t, err)
 			gotAllow := dec == resolver.DecisionAllow
 			assert.Equalf(t, wantAllow, gotAllow, "check viewer user=%s decision=%s", u, dec)
+			allowedAny = allowedAny || gotAllow
 
 			if !gotAllow {
 				wantFoot := g.OracleFoothold(projectID, "", domain.AuthzPrincipalTypeUser, u)
@@ -122,6 +154,8 @@ func TestAuthzResolver_OracleAgreement(t *testing.T) {
 			require.NoError(t, err)
 			assert.ElementsMatchf(t, wantList, gotList, "list user=%s", u)
 		}
+
+		require.True(t, allowedAny, "some active user must be allowed, or agreement proves nothing")
 
 		// By id: the foothold narrows to the target (#2112), so the decision on
 		// every RSI row and team, for a relation held and one not held, must
@@ -188,6 +222,7 @@ func TestAuthzResolver_OracleAgreementForeignTeamGrant(t *testing.T) {
 		require.NoError(t, err)
 		g.Memberships = memberships
 		g.Resources = []*domain.ResourceScope{domain.NewUserResourceScope(grant.customer, res)}
+		g.ActiveUsers = map[resolver.UserKey]bool{{ProjectID: grant.platform, UserID: grant.userID}: true}
 
 		r := resolver.New()
 		viewer := resolver.Request{
@@ -200,6 +235,7 @@ func TestAuthzResolver_OracleAgreementForeignTeamGrant(t *testing.T) {
 		}
 
 		wantAllow := g.OracleCheck(grant.customer, grant.platform, domain.AuthzPrincipalTypeUser, grant.userID, "project", "viewer")
+		require.True(t, wantAllow, "the fixture must allow, or agreement proves nothing")
 		dec, err := r.Check(t.Context(), d.stmts, viewer)
 		require.NoError(t, err)
 		assert.Equal(t, wantAllow, dec == resolver.DecisionAllow)
