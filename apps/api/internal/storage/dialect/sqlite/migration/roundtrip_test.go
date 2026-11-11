@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/pressly/goose/v3"
 	"github.com/stretchr/testify/require"
 
 	_ "modernc.org/sqlite" // registers the "sqlite" database/sql driver the dialect migrates through
@@ -21,8 +22,38 @@ import (
 // No build tag: SQLite needs no container, so the walk is as cheap as any
 // unit test and runs with them.
 func TestMigrationsRoundTrip(t *testing.T) {
-	// Opened as the dialect opens it: the same pragmas, foreign keys on
-	// among them, and one connection.
+	p, snap := openRoundTrip(t)
+	migrationtest.RoundTrip(t, p, snap, known)
+}
+
+// TestMigrationsRoundTripClaimed walks the migrations in two databases that
+// take them in turns, as the Spanner walks share them on Spanner Omni, and
+// proves the two together round-trip every migration once.
+func TestMigrationsRoundTripClaimed(t *testing.T) {
+	inTurns := func(first int) func() int {
+		next := first - 2
+		return func() int {
+			next += 2
+			return next
+		}
+	}
+	even, evenSnap := openRoundTrip(t)
+	odd, oddSnap := openRoundTrip(t)
+	walked := migrationtest.RoundTripClaimed(t, even, evenSnap, known, inTurns(0))
+	walked = append(walked, migrationtest.RoundTripClaimed(t, odd, oddSnap, known, inTurns(1))...)
+
+	var all []int64
+	for _, source := range even.ListSources() {
+		all = append(all, source.Version)
+	}
+	require.ElementsMatch(t, all, walked)
+}
+
+// openRoundTrip opens a database as the dialect opens it (the same pragmas,
+// foreign keys on among them, and one connection) and returns a provider over
+// it and the snapshot of its schema.
+func openRoundTrip(t *testing.T) (*goose.Provider, func(t *testing.T) migrationtest.Schema) {
+	t.Helper()
 	dsn := &url.URL{
 		Scheme:   "file",
 		Path:     filepath.ToSlash(filepath.Join(t.TempDir(), "roundtrip.db")),
@@ -36,10 +67,7 @@ func TestMigrationsRoundTrip(t *testing.T) {
 
 	p, err := newProvider(db)
 	require.NoError(t, err)
-
-	migrationtest.RoundTrip(t, p, func(t *testing.T) migrationtest.Schema {
-		return snapshot(t, db)
-	}, known)
+	return p, func(t *testing.T) migrationtest.Schema { return snapshot(t, db) }
 }
 
 // known: SQLite's ALTER TABLE ADD COLUMN takes NOT NULL only with a non-NULL
