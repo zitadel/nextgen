@@ -12,6 +12,23 @@ import { DEFAULT_SERVER } from "@zitadel/config/server";
  */
 export { DEFAULT_SERVER } from "@zitadel/config/server";
 
+/**
+ * The host of a server, for an ending that says where a run happened, or
+ * `undefined` for the default server, which a reader does not need told, and
+ * for an address that is not a URL.
+ *
+ * @param server - The server's address.
+ * @returns The host, or `undefined` when there is nothing to say.
+ */
+export function hostUnlessDefault(server: string): string | undefined {
+  try {
+    const { host } = new URL(server);
+    return host === new URL(DEFAULT_SERVER).host ? undefined : host;
+  } catch {
+    return undefined;
+  }
+}
+
 /** The variable {@link resolveServer} reads when `--server` is not given. */
 export const SERVER_VARIABLE: FlagVariable = {
   name: "ZITADEL_API_BASE",

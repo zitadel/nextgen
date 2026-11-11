@@ -172,7 +172,7 @@ import { Destructive } from "@/lib/oclif/destructive";
 import semver from "semver";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import type { GlobalOptions } from "@/lib/oclif/types";
-import { DEFAULT_SERVER, type ResolvedServer, resolveServer } from "@/lib/server";
+import { hostUnlessDefault, type ResolvedServer, resolveServer } from "@/lib/server";
 import { filled, type Refused, reads, whole } from "@/lib/oclif/flags";
 import { userAgent } from "@/lib/user-agent";
 import { escapeControlCharacters } from "@/lib/terminal-text";
@@ -1163,7 +1163,7 @@ export default class Setup extends Destructive(BaseCommand) {
           sections: [],
           lines: ["Nothing was changed."],
           boxed: true,
-          ...ranOn(preflight.server.value),
+          ...ranOn(hostUnlessDefault(preflight.server.value)),
         },
       });
     }
@@ -2254,7 +2254,6 @@ export default class Setup extends Destructive(BaseCommand) {
         title: moved ? `Moved the app to ${move.issuer}` : `The app is already on ${move.issuer}`,
         sections: [],
         boxed: true,
-        ...ranOn(this.meta.source),
       },
       data: {
         title: moved ? `Moved the app to ${move.issuer}.` : `The app is already on ${move.issuer}.`,
@@ -3002,18 +3001,9 @@ export function buildSummary(opts: {
   ];
 }
 
-/**
- * Where an ending says the run happened, for a run that never learned its
- * project: the server's host, and nothing for the default one, which a reader
- * does not need told.
- */
-function ranOn(server: string): { ran?: string } {
-  try {
-    const { host } = new URL(server);
-    return host === new URL(DEFAULT_SERVER).host ? {} : { ran: host };
-  } catch {
-    return {};
-  }
+/** The `ran` of a summary, for a run that never learned its project: nothing for the default server. */
+function ranOn(host: string | undefined): { ran?: string } {
+  return host === undefined ? {} : { ran: host };
 }
 
 /** The command overview as a step of the summary, split from its sentence. */

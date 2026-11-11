@@ -13,7 +13,7 @@ import { isObject } from "@/lib/json";
 import { type LocalServers, PsLocalServers } from "@/lib/local-server/processes";
 import { resolveCwd } from "@/lib/paths";
 import { normalizePublicCliCommands, publicCliCommand, spellOutCommands } from "@/lib/public-cli";
-import { DEFAULT_SERVER, resolveServer, SERVER_VARIABLE } from "@/lib/server";
+import { hostUnlessDefault, resolveServer, SERVER_VARIABLE } from "@/lib/server";
 import { statusColor } from "@/lib/style";
 import { type SuggestedCommand, unscopedCommand } from "@/lib/suggestion";
 import { type Properties, Telemetry, type TelemetryDeps } from "@/lib/telemetry";
@@ -713,12 +713,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
     if (this.meta.dryRun) {
       return undefined;
     }
-    try {
-      const { host } = new URL(this.meta.source);
-      return host === new URL(DEFAULT_SERVER).host ? undefined : host;
-    } catch {
-      return undefined;
-    }
+    return hostUnlessDefault(this.meta.source);
   }
 
   /**
