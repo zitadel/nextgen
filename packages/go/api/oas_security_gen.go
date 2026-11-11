@@ -168,6 +168,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	GetTeamOperation: []string{
 		"team.read",
 	},
+	GetUsageOperation: []string{
+		"usage.read",
+	},
 	GetUserByIDOperation: []string{
 		"user.read",
 	},
@@ -346,6 +349,7 @@ var operationRolesSessionCookie = map[string][]string{
 	GetReleaseByIdOperation:        []string{},
 	GetSchemaByIdOperation:         []string{},
 	GetTeamOperation:               []string{},
+	GetUsageOperation:              []string{},
 	GetUserByIDOperation:           []string{},
 	GetUserPasswordStateOperation:  []string{},
 	GetVariableOperation:           []string{},

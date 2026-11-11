@@ -14,6 +14,9 @@ const listProjectIDsPageSize = 500
 // EventExportAdapter adapts AllStatements to audit retention/shipper interfaces.
 type EventExportAdapter struct {
 	Pool *DB
+	// CountsUsage is set where the usage projector runs (usage.enabled): the
+	// purge then keeps every event it has not counted (ADR 088 §6).
+	CountsUsage bool
 }
 
 // ListProjectIDs returns every project, the ones the shipper's deployment
@@ -64,6 +67,9 @@ func (a EventExportAdapter) DeleteEventsOlderThan(ctx context.Context, createdBe
 	ctx, end := startSpan(ctx, "EventExportAdapter.DeleteEventsOlderThan")
 	defer end(&err)
 
+	if a.CountsUsage {
+		return a.Pool.Statements().DeleteCountedEventsOlderThan(ctx, createdBefore)
+	}
 	return a.Pool.Statements().DeleteEventsOlderThan(ctx, createdBefore)
 }
 

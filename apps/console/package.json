@@ -39,6 +39,7 @@
     "radix-ui": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
+    "recharts": "catalog:",
     "shiki": "catalog:",
     "sonner": "catalog:",
     "tailwind-merge": "catalog:",

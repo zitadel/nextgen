@@ -141,6 +141,11 @@ tags:
       Events are the project's audit trail: identity, session, admin and entity
       events. These operations list and read them; filter the list by `category`
       or `event_type`. An event's `event_type` selects its typed payload.
+  - name: Usage
+    description: |
+      Usage is a project's count per meter, by UTC day or hour (ADR 088). The
+      server's usage projector counts it from the project's events and keeps it
+      after the events age out; a hosted cloud prices the counts.
   - name: Event Webhooks
     description: |
       Event webhooks are the requests the server POSTs to a webhook sink as it
@@ -321,6 +326,8 @@ paths:
     $ref: endpoints/events/methods.yaml
   /events/{id}:
     $ref: endpoints/events/by_id/methods.yaml
+  /usage:
+    $ref: endpoints/usage/methods.yaml
   /variables:
     $ref: endpoints/variables/methods.yaml
   /variables/{variable_name}:

@@ -45,6 +45,8 @@ each route's `staticData.nav` ([`src/nav.ts`](src/nav.ts)).
 - **Branding** (`/branding`).
 - **Authentication** (`/authentication`).
 - **Logs** (`/events`, `/events/$eventId`): the project's events.
+- **Usage** (`/usage`), the project's usage this UTC month, which the hosted
+  cloud's add-on prices (`usagePrices`, Console ADR 0006).
 - **Project settings** (`/project`).
 - **Profile** (`/settings/profile`), your profile, under Settings in the
   account sidebar.

@@ -7,13 +7,15 @@ import { billingScreen } from "./screens/billing";
 import { emailScreen } from "./screens/email";
 import { signUpScreen } from "./screens/sign-up";
 import { supportScreen } from "./screens/support";
+import { usagePrices } from "./usage-prices";
 
 /**
  * What waits for its functions to go live or for its check on a preview
  * (root ADR 084 §9): previews and local runs get it, production does not.
  * Billing and Support are in both, since each shows its preview state while
  * the functions answer `cloud.not_live`; Email has none, as nothing sends
- * marketing email yet. Sign-up calls no function, and the provisioning call
+ * marketing email yet. Prices on the console's Usage screen wait for the
+ * proposed pricing. Sign-up calls no function, and the provisioning call
  * only starts onboarding, which records what it would send, so production has
  * both too. The build inlines the stage, so a production bundle carries none
  * of what it leaves out.
@@ -30,8 +32,9 @@ if (import.meta.env.CLOUD_STAGE === "preview") startBotCheck();
  * The hosted cloud's add-on to the console (Console ADR 0006): what only the
  * cloud's console build carries, through the slots of the console's contract.
  * Vercel's insights and the account provisioning on every page; Billing,
- * Support and Email in Settings; the sign-up page; and the sign-in widget's
- * calls through the functions' bot check. All backed by `apps/cloud-functions`.
+ * Support and Email in Settings; prices on the console's own Usage screen;
+ * the sign-up page; and the sign-in widget's calls through the functions' bot
+ * check. All backed by `apps/cloud-functions`.
  */
 export const addon: ConsoleAddon = unreleased
   ? {
@@ -40,6 +43,7 @@ export const addon: ConsoleAddon = unreleased
       screens: [billingScreen, supportScreen, emailScreen],
       signedOutScreens: [signUpScreen],
       signInApiBase: "/cloud/zitadel",
+      usagePrices,
     }
   : {
       Root: CloudRoot,

@@ -36,6 +36,10 @@ func (s *stubDB) ReadRow(context.Context, string, spanner.Key, []string) (*spann
 	return nil, errors.New("not implemented")
 }
 
+func (s *stubDB) QueryStrong(context.Context, spanner.Statement, func(*spanner.RowIterator) error) (time.Time, error) {
+	return time.Time{}, errors.New("not implemented")
+}
+
 func TestWithTransaction_alreadyInTxnRunsDirectly(t *testing.T) {
 	t.Parallel()
 	// tx is the unexported RW-txn wrapper; withTransaction must not open another.

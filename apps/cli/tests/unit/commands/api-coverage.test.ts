@@ -54,6 +54,9 @@ const NOT_RESOURCES: Readonly<Record<string, string>> = {
   // history is that command's to read. Registry CRUD would offer a `create`
   // that skips the release construction the command exists to do.
   deployments: "created and read through `zitadel deploy` orchestration, not registry CRUD (#529)",
+  // A report of counts the server keeps, not a resource to create or edit;
+  // no command reads it yet (ADR 088).
+  usage: "a project's usage report, read by the console; no `zitadel usage` command yet",
   // Registered applications are written through the API by other systems,
   // not from `.zitadel/`; the CLI has no command for them yet (#2788).
   applications: "registered applications are written through the API, not the CLI (#2788)",

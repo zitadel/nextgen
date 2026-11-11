@@ -98,6 +98,10 @@
       "description": "Events are the project's audit trail: identity, session, admin and entity\nevents. These operations list and read them; filter the list by `category`\nor `event_type`. An event's `event_type` selects its typed payload.\n"
     },
     {
+      "name": "Usage",
+      "description": "Usage is a project's count per meter, by UTC day or hour (ADR 088). The\nserver's usage projector counts it from the project's events and keeps it\nafter the events age out; a hosted cloud prices the counts.\n"
+    },
+    {
       "name": "Event Webhooks",
       "description": "Event webhooks are the requests the server POSTs to a webhook sink as it\nstores events, one event per request and, within a project, in the order they were\nstored. The body is the event as `GET /events` returns it; `event_type`\ntells the webhooks apart. Delivery is at least once, so drop duplicates\nby `id`. The sink is set in the server's configuration, under\n`events.export`.\n"
     },
@@ -9669,6 +9673,129 @@
         }
       }
     },
+    "/usage": {
+      "get": {
+        "operationId": "getUsage",
+        "summary": "Get a project's usage",
+        "description": "Returns a project's usage per meter, by UTC day or hour, over a range of\nup to 31 days. The range starts at `from` and ends before `to`. These are\ncounts only, which the hosted cloud prices and a self-hosted deployment\nreads as they are (ADR 088). A `users` meter such as\n`monthly_active_users` counts each user once a month, in the hour of their\nfirst activity, so a month's buckets add up to its count.\n\nA bucket that counted nothing is left out. One that starts at or after\n`sealed_through` is still open and may grow; the ones before it never\nchange. A project nobody has claimed answers its usage too, with no\n`team_id`: the counts carry no event content.\n\nFailures:\n- `400 usage.invalid`: `from` or `to` is not on a UTC day boundary (`day`)\n  or hour boundary (`hour`), `to` is not after `from`, they are more than\n  31 days apart, or a `meter` is unknown.\n- `404 usage.disabled`: this deployment does not count usage.\n",
+        "tags": [
+          "Usage"
+        ],
+        "security": [
+          {
+            "oauth2": [
+              "usage.read"
+            ]
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project-id"
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "description": "The first bucket's start, in UTC.",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "example": "2026-10-01T00:00:00Z"
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "description": "Where the buckets end, exclusive; at most 31 days after `from`.",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "example": "2026-11-01T00:00:00Z"
+          },
+          {
+            "name": "granularity",
+            "in": "query",
+            "description": "The bucket a count covers. Default `day`.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "day",
+                "hour"
+              ],
+              "default": "day"
+            }
+          },
+          {
+            "name": "meter",
+            "in": "query",
+            "description": "Only these meters. Repeatable (OR within the parameter); every meter\nwhen left out.\n",
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The project's usage.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/cache-control-private-no-store"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/usage-response"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request (e.g., a range off its boundaries or too long).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permissions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/getUsage-error-response"
+          }
+        }
+      }
+    },
     "/variables": {
       "get": {
         "operationId": "getVariables",
@@ -12059,6 +12186,7 @@
               "deployment.read": "Permission to read deployments",
               "deployment.write": "Permission to create deployments (deploy, roll back)",
               "events.read": "Permission to list and get project audit events",
+              "usage.read": "Permission to read project usage",
               "variable.read": "Permission to read project variables (a secret's value is never returned)",
               "variable.write": "Permission to create and manage project variables and secrets",
               "domain.read": "Permission to read project domains (reserved; endpoints not yet available)",
@@ -12113,6 +12241,7 @@
               "deployment.read": "Permission to read deployments",
               "deployment.write": "Permission to create deployments (deploy, roll back)",
               "events.read": "Permission to list and get project audit events",
+              "usage.read": "Permission to read project usage",
               "variable.read": "Permission to read project variables (a secret's value is never returned)",
               "variable.write": "Permission to create and manage project variables and secrets",
               "domain.read": "Permission to read project domains (reserved; endpoints not yet available)",
@@ -23825,6 +23954,156 @@
           }
         }
       },
+      "usage-disabled": {
+        "description": "Usage: this deployment does not count usage\n\nError code: usage.disabled\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "usage.disabled"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "usage-invalid": {
+        "description": "Usage: invalid request\n\nError code: usage.invalid\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "usage.invalid"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "usage-not_found": {
+        "description": "Usage: project not found\n\nError code: usage.not_found\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "usage.not_found"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "usage-permission_denied": {
+        "description": "Usage: permission denied\n\nError code: usage.permission_denied\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "usage.permission_denied"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "usage-bucket": {
+        "type": "object",
+        "description": "What one meter counted in one day or hour.",
+        "required": [
+          "meter",
+          "start",
+          "value"
+        ],
+        "properties": {
+          "meter": {
+            "type": "string",
+            "description": "The meter's name.",
+            "example": "monthly_active_users"
+          },
+          "start": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The bucket's start, in UTC.",
+            "example": "2026-10-05T00:00:00Z"
+          },
+          "value": {
+            "type": "integer",
+            "format": "int64",
+            "description": "What the meter counted in the bucket.",
+            "example": 412
+          }
+        }
+      },
+      "usage-response": {
+        "type": "object",
+        "description": "A project's usage per meter and bucket (ADR 088).",
+        "required": [
+          "data",
+          "sealed_through",
+          "team_id"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "description": "One bucket per meter and day or hour that counted something, ordered\nby meter, then start.\n",
+            "items": {
+              "$ref": "#/components/schemas/usage-bucket"
+            }
+          },
+          "sealed_through": {
+            "description": "The start of the first hour that is not sealed yet: every bucket that\nstarts before it is final. Null until the project's events are first\ncounted.\n",
+            "oneOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "example": "2026-10-30T14:00:00Z"
+          },
+          "team_id": {
+            "description": "The team that has claimed the project (ADR 046), which a hosted cloud\nbills the project's usage to. Null for a project nobody has claimed.\n",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/team-id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
       "variable-kind": {
         "type": "string",
         "description": "Which deployments a value reaches: `primary` for primary origins,\n`preview` for preview URLs. There is no fallback between kinds.\n",
@@ -25611,6 +25890,34 @@
         "value": {
           "code": "evt.permission_denied",
           "message": "event: permission denied"
+        }
+      },
+      "usage-disabled": {
+        "summary": "usage.disabled",
+        "value": {
+          "code": "usage.disabled",
+          "message": "usage: this deployment does not count usage"
+        }
+      },
+      "usage-invalid": {
+        "summary": "usage.invalid",
+        "value": {
+          "code": "usage.invalid",
+          "message": "usage: invalid request"
+        }
+      },
+      "usage-not_found": {
+        "summary": "usage.not_found",
+        "value": {
+          "code": "usage.not_found",
+          "message": "usage: project not found"
+        }
+      },
+      "usage-permission_denied": {
+        "summary": "usage.permission_denied",
+        "value": {
+          "code": "usage.permission_denied",
+          "message": "usage: permission denied"
         }
       },
       "var-not_found": {
@@ -34377,6 +34684,87 @@
               },
               "unavailable": {
                 "$ref": "#/components/examples/unavailable"
+              }
+            }
+          }
+        }
+      },
+      "getUsage-error-response": {
+        "description": "Error response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/auth-unauthorized"
+                },
+                {
+                  "$ref": "#/components/schemas/internal"
+                },
+                {
+                  "$ref": "#/components/schemas/not_implemented"
+                },
+                {
+                  "$ref": "#/components/schemas/req-invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/unavailable"
+                },
+                {
+                  "$ref": "#/components/schemas/usage-disabled"
+                },
+                {
+                  "$ref": "#/components/schemas/usage-invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/usage-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/usage-permission_denied"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "code",
+                "mapping": {
+                  "auth.unauthorized": "#/components/schemas/auth-unauthorized",
+                  "internal": "#/components/schemas/internal",
+                  "not_implemented": "#/components/schemas/not_implemented",
+                  "req.invalid": "#/components/schemas/req-invalid",
+                  "unavailable": "#/components/schemas/unavailable",
+                  "usage.disabled": "#/components/schemas/usage-disabled",
+                  "usage.invalid": "#/components/schemas/usage-invalid",
+                  "usage.not_found": "#/components/schemas/usage-not_found",
+                  "usage.permission_denied": "#/components/schemas/usage-permission_denied"
+                }
+              }
+            },
+            "examples": {
+              "auth.unauthorized": {
+                "$ref": "#/components/examples/auth-unauthorized"
+              },
+              "internal": {
+                "$ref": "#/components/examples/internal"
+              },
+              "not_implemented": {
+                "$ref": "#/components/examples/not_implemented"
+              },
+              "req.invalid": {
+                "$ref": "#/components/examples/req-invalid"
+              },
+              "unavailable": {
+                "$ref": "#/components/examples/unavailable"
+              },
+              "usage.disabled": {
+                "$ref": "#/components/examples/usage-disabled"
+              },
+              "usage.invalid": {
+                "$ref": "#/components/examples/usage-invalid"
+              },
+              "usage.not_found": {
+                "$ref": "#/components/examples/usage-not_found"
+              },
+              "usage.permission_denied": {
+                "$ref": "#/components/examples/usage-permission_denied"
               }
             }
           }

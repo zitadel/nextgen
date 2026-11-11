@@ -40,6 +40,7 @@ const NAV_ORDER = [
   "Deployments",
   "Authentication",
   "Logs",
+  "Usage",
   "Settings",
 ];
 // What sits above every project: the home, the project's screens, which ask

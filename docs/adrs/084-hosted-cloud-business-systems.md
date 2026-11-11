@@ -266,11 +266,30 @@ website's catch-all.
 
 ### 6. Pricing and billing (priority 4)
 
-- **Stripe Billing Meters.** One `sum` meter per metric, the first being
-  `monthly_active_users`. Stripe now steers new usage-based billing to
-  Metronome. Meters stay supported, work with Checkout and the Customer
-  Portal, and are enough for one metric. If pricing outgrows them, only the
-  `Billing` port changes.
+- **Pricing boundary** (revised 2026-11-02). Core resources and basic MFA,
+  including requiring MFA for everyone, are free: CISA's Secure by Design
+  principles count charging for MFA as a hidden tax, and a charge would push
+  apps to enforce MFA outside Zitadel. Bot checks are free too: the built-in
+  Altcha challenge, a project's own Turnstile, hCaptcha or reCAPTCHA keys, and
+  an edge verdict such as BotID's (ADR 078 §5). None costs Zitadel per check,
+  and a customer's own provider bills the customer. Risk-based challenges and
+  MFA prompts on Zitadel's own signals and the customer's are free, and rules
+  on them belong to Governance. Only opt-in threat intelligence, feeds Zitadel
+  licenses (IP reputation, leaked credentials), is metered per user checked.
+  Free runs Zitadel's secure defaults; changing lockout, password rules, the
+  captcha (a project's own provider included) or session and token lifetimes,
+  or adding stricter rate limits, needs Pro, which includes custom security
+  settings. Turning protection on, incident response and setup stay free on
+  every plan. MAU is an
+  analytics gauge, never a billable meter or upgrade trigger. Paid Governance is an
+  account-wide package included in Pro; Compliance is quoted per account
+  with agreed retention, retained-event volume and SIEM destinations.
+  Neither package charges per user or per policy. The proposed catalog in
+  `apps/cloud-functions/src/pricing/catalog.json` is the source for both
+  the estimator and the website; package capabilities are still planned.
+- **Stripe Billing Meters.** One `sum` meter per priced integration or
+  consumption metric. The usage workflow excludes core gauges and retired
+  metrics. If pricing outgrows Billing Meters, only the `Billing` port changes.
 - **Usage is pulled as counts, never pushed per event.**
   - An hourly cron workflow (`report-usage`) reads each team's usage for the
     last complete hours from Zitadel (§8.3).
@@ -279,21 +298,34 @@ website's catch-all.
   - Each run sends the last three hours again, and Stripe counts an
     identifier once for at least 24 hours. A skipped or doubled cron run
     therefore changes nothing.
-  - MAU becomes a sum: an hour's count is the users whose first activity of
-    the month falls in it, so the month's events add up to its MAU.
+  - A user meter becomes a sum: an hour's count is the users first counted
+    that month in it, so the month's events add up to the month's count.
   - Stripe's grace period goes to 24 hours, so a late hour still reaches its
     invoice.
   - Why not one queue message per event: every sign-in would become a
     message when billing needs one count, and the server would carry Vercel's
     queue client and the outbox behind it. A count can be read again safely.
 - **Plans.**
-  - Free: monthly active users up to the included amount, no card.
-  - Pro: a base fee plus a graduated metered price, with the included amount
-    at 0.
+  - Free: core identity and basic security, no card, subject to published
+    capacity limits rather than active-user thresholds.
+  - Pro: Governance and operational tools for a monthly base fee, plus
+    metered integrations and consumption beyond included allowances. The base
+    fee is not usage credit. Branding removal requires a paid plan.
+  - Capacity: API requests are never billed (decided 2026-11-03); each
+    plan's per-project rate limit protects shared capacity, so a bill grows
+    with the integrations and consumption a team chooses, never with traffic.
+  - Compliance: a separate quote accepted before activation. Extended audit
+    retention is scoped by event volume and duration, never user count.
 
   A team gets a subscription when an admin chooses Pro in Checkout, and none
-  before (decided 2026-10-29): until then its usage is metered on its
-  customer and shown, never billed.
+  before (decided 2026-10-29): until then eligible usage is metered on its
+  customer and shown, never billed. Core MAU stays in Zitadel analytics.
+
+  Every plan includes versioned releases, previews and rollbacks, and each
+  project chooses any available region at no charge (decided 2026-11-02): a
+  region's database is a fixed cost for Zitadel, not one per customer. Free and Pro publish their rate
+  limits in the catalog, and Enterprise capacity is contracted. Custom agreements, indemnification and regulatory
+  addenda are Enterprise-only, as distinct from quoted audit capabilities.
 - **Entitlements.** Stripe's `customer.subscription.*` and `invoice.*`
   webhooks are checked by signature and start `sync-entitlements`. It reads
   the subscription's state at that moment, so a duplicate or out-of-order
@@ -355,9 +387,11 @@ website's catch-all.
 2. **Email:** verification and sending.
 3. **Usage and limits.**
    - Usage aggregates per project and hour, counting active users by their
-     first activity in the month.
+     first activity in the month: [ADR 088](088-usage-rollups-and-api.md)
+     counts them and serves them per project (`GET /usage`).
    - A platform operator's machine credential that reads them for the whole
-     deployment.
+     deployment. ADR 088 proposes a secret-guarded feed instead, as operators
+     are users only (ADR 075).
    - Quotas per team, which a plan sets.
 4. **Team roles:** who may manage a team, billing included.
 5. **Team names a person reads.** A team's name stops being unique in its

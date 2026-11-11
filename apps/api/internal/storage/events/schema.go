@@ -2,6 +2,7 @@ package events
 
 import (
 	"encoding/json"
+	"time"
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -131,6 +132,36 @@ func CreatedAtDesc() database.OrderBy[domain.EventField] {
 func ListOptions(projectID string, limit uint32) *database.ListOptions[domain.EventField] {
 	return &database.ListOptions[domain.EventField]{
 		Filter: database.Equal(database.Col(domain.EventFieldProjectID), projectID),
+		Pagination: database.Page[domain.EventField]{
+			Limit:   limit,
+			OrderBy: CreatedAtAsc(),
+		},
+	}
+}
+
+// UsageReadOptions lists the project's events of the given types after the
+// usage cursor, oldest first, stamped before bound unless bound is zero
+// (ReadUsageEvents in each dialect).
+func UsageReadOptions(projectID string, after *domain.UsageCursor, types []domain.EventType, bound time.Time, limit uint32) *database.ListOptions[domain.EventField] {
+	byType := make([]database.Filter[domain.EventField], 0, len(types))
+	for _, eventType := range types {
+		byType = append(byType, database.Equal(database.Col(domain.EventFieldEventType), string(eventType)))
+	}
+	filters := []database.Filter[domain.EventField]{
+		database.Equal(database.Col(domain.EventFieldProjectID), projectID),
+		database.Or(byType...),
+	}
+	if !bound.IsZero() {
+		filters = append(filters, database.LessThan(database.Col(domain.EventFieldCreatedAt), bound.UTC()))
+	}
+	if after != nil {
+		filters = append(filters, database.CompareGreater(
+			database.Term(database.Col(domain.EventFieldCreatedAt), after.CountedBefore.UTC()),
+			database.Term(database.Col(domain.EventFieldID), after.LastEventID),
+		))
+	}
+	return &database.ListOptions[domain.EventField]{
+		Filter: database.And(filters...),
 		Pagination: database.Page[domain.EventField]{
 			Limit:   limit,
 			OrderBy: CreatedAtAsc(),

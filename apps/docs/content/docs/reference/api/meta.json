@@ -28,6 +28,7 @@
     "invitations",
     "events",
     "event-webhooks",
+    "usage",
     "---System---",
     "system",
     "..."

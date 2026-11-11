@@ -2,6 +2,10 @@
 
 package api
 
+import (
+	"time"
+)
+
 // AddOriginParams is parameters of addOrigin operation.
 type AddOriginParams struct {
 	// The project ID: the `id` that `createProject` (`POST /projects`) returns, which `zitadel setup`
@@ -513,6 +517,23 @@ type GetTeamParams struct {
 	// The team ID: the `id` that `createTeam` (`POST /teams`) or `queryTeams` (`POST /teams/query`)
 	// returns.
 	TeamID TeamID
+}
+
+// GetUsageParams is parameters of getUsage operation.
+type GetUsageParams struct {
+	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
+	ProjectID ProjectID
+	// The first bucket's start, in UTC.
+	From time.Time
+	// Where the buckets end, exclusive; at most 31 days after `from`.
+	To time.Time
+	// The bucket a count covers. Default `day`.
+	Granularity OptGetUsageGranularity `json:",omitempty,omitzero"`
+	// Only these meters. Repeatable (OR within the parameter); every meter
+	// when left out.
+	Meter []string `json:",omitempty"`
 }
 
 // GetUserByIDParams is parameters of GetUserByID operation.
