@@ -26,10 +26,8 @@ func Marshal(s *domain.OAuthSettings) ([]byte, error) {
 // into a domain.OAuthSettings.
 func ToDomain(projectID, id string, createdAt time.Time, definition []byte) (*domain.OAuthSettings, error) {
 	var def Definition
-	if len(definition) > 0 {
-		if err := json.Unmarshal(definition, &def); err != nil {
-			return nil, err
-		}
+	if err := json.Unmarshal(definition, &def); err != nil {
+		return nil, err
 	}
 	return &domain.OAuthSettings{
 		ProjectID: projectID,

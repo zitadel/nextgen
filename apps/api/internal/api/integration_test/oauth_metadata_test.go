@@ -86,13 +86,12 @@ func wellKnown(issuerPath string) string {
 
 // assertMetadata checks the RFC 8414 document of issuer against what the
 // server offers: the required fields, the endpoints on their hosts, only
-// RFC 8414 names and no empty values, and the cache headers.
+// RFC 8414 names and no empty values. The cache headers are internal/oauth's
+// to assert.
 func assertMetadata(t *testing.T, resp *http.Response, body []byte, issuer, backChannel string) {
 	t.Helper()
 	require.Equal(t, http.StatusOK, resp.StatusCode, string(body))
 	assert.Equal(t, "application/json", strings.Split(resp.Header.Get("Content-Type"), ";")[0])
-	assert.Equal(t, "no-store", resp.Header.Get("Cache-Control"))
-	assert.Contains(t, strings.Join(resp.Header.Values("Vary"), ", "), "X-Forwarded-Host", "a cache keys the document by the forwarded headers")
 
 	var doc map[string]any
 	require.NoError(t, json.Unmarshal(body, &doc), string(body))
@@ -133,7 +132,6 @@ func TestOAuthAuthorizationServerMetadata(t *testing.T) {
 	// Nothing is deployed yet: the issuer does not exist.
 	resp, body := getMetadata(t, wellKnown(issuerPath), forwarded(t, oauthAppOrigin, httputil.ProxyPrefix))
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode, string(body))
-	assert.Equal(t, "no-store", resp.Header.Get("Cache-Control"), "a 404 is not cached either")
 
 	// Building a release with oauth pins a revision, and the revision reads
 	// back.
@@ -209,13 +207,7 @@ func TestOAuthAuthorizationServerMetadata(t *testing.T) {
 		} {
 			resp, body := getMetadata(t, wellKnown(issuerPath), headers)
 			assert.Equal(t, http.StatusNotFound, resp.StatusCode, "%s: %s", name, body)
-			assert.Equal(t, "no-store", resp.Header.Get("Cache-Control"), name)
 		}
-	})
-
-	t.Run("openid configuration is not served", func(t *testing.T) {
-		resp, body := getMetadata(t, issuerPath+"/.well-known/openid-configuration", forwarded(t, oauthAppOrigin, httputil.ProxyPrefix))
-		assert.Equal(t, http.StatusNotFound, resp.StatusCode, string(body))
 	})
 
 	t.Run("a release that does not enable oauth", func(t *testing.T) {

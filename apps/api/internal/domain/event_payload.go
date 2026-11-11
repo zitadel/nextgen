@@ -207,9 +207,6 @@ type OAuthSettingsPayload struct {
 	Enabled bool `json:"enabled"`
 }
 
-// OAuthSettingsCreatedPayload is an alias for oauth_settings.created.
-type OAuthSettingsCreatedPayload = OAuthSettingsPayload
-
 // PolicyPayload records a published policy revision for policy.created (the
 // first publish of an operation) and policy.updated (every later one). The
 // policy id is the event's entity_id. Config holds the instance's settings,

@@ -122,11 +122,11 @@ var brandingAccess = resourceAccess{
 
 // oauthSettingsAccess gates the OAuth settings revision read. A revision's
 // own id resolves through RSI, like branding's; a release is the only writer,
-// so no write path uses it.
+// so no write path reaches writeMiss.
 var oauthSettingsAccess = resourceAccess{
 	kind:      domain.ResourceKindOAuthSettings,
 	readMiss:  domain.ErrOAuthSettingsNotFound,
-	writeMiss: func() domain.Error { return domain.ErrOAuthSettingsInvalid("project does not exist", nil) },
+	writeMiss: domain.ErrOAuthSettingsNotFound,
 	denied:    domain.ErrOAuthSettingsPermissionDenied,
 }
 

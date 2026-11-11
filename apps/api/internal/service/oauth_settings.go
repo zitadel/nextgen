@@ -27,10 +27,6 @@ func NewOAuthSettingsService(v2Pool *DB) *OAuthSettingsService {
 	return &OAuthSettingsService{v2Pool: v2Pool}
 }
 
-func prepareOAuthSettings(input CreateOAuthSettingsInput) (*domain.OAuthSettings, error) {
-	return domain.NewOAuthSettings(input.ProjectID, input.Enabled)
-}
-
 // createOAuthSettings inserts a prepared revision and emits its event on
 // stmts.
 func (s *OAuthSettingsService) createOAuthSettings(ctx context.Context, stmts AllStatements, entity *domain.OAuthSettings) error {

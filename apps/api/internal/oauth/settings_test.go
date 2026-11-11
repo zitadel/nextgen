@@ -63,7 +63,7 @@ func customerIssuer(t *testing.T) Issuer {
 func TestReleaseSettingsReadsThePinnedRevision(t *testing.T) {
 	t.Parallel()
 	rt := &runtime{resolution: releaseWith(oauthPin("oauthset_on"))}
-	source := newReleaseSettings(rt, revisions{"oauthset_on": {ID: "oauthset_on", Enabled: true}})
+	source := NewReleaseSettings(rt, revisions{"oauthset_on": {ID: "oauthset_on", Enabled: true}})
 
 	got, err := source.Get(t.Context(), customerIssuer(t))
 	require.NoError(t, err)
@@ -74,7 +74,7 @@ func TestReleaseSettingsReadsThePinnedRevision(t *testing.T) {
 func TestReleaseSettingsPlatformUsesThePrimaryDeployment(t *testing.T) {
 	t.Parallel()
 	rt := &runtime{resolution: releaseWith(oauthPin("oauthset_on"))}
-	source := newReleaseSettings(rt, revisions{"oauthset_on": {ID: "oauthset_on", Enabled: true}})
+	source := NewReleaseSettings(rt, revisions{"oauthset_on": {ID: "oauthset_on", Enabled: true}})
 
 	got, err := source.Get(t.Context(), Issuer{ProjectID: domain.PlatformProjectID, Platform: true, URL: mustParseURL(t, "https://api.example.com/oauth")})
 	require.NoError(t, err)
@@ -99,7 +99,7 @@ func TestReleaseSettingsOff(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			source := newReleaseSettings(tt.rt, revisions{"oauthset_off": {ID: "oauthset_off"}})
+			source := NewReleaseSettings(tt.rt, revisions{"oauthset_off": {ID: "oauthset_off"}})
 			got, err := source.Get(t.Context(), customerIssuer(t))
 			require.NoError(t, err)
 			assert.False(t, got.Enabled)
@@ -131,7 +131,7 @@ func TestReleaseSettingsOffUnlessDeployedToTheIssuer(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			source := newReleaseSettings(&runtime{resolution: tt.resolution}, revisions{"oauthset_on": {ID: "oauthset_on", Enabled: true}})
+			source := NewReleaseSettings(&runtime{resolution: tt.resolution}, revisions{"oauthset_on": {ID: "oauthset_on", Enabled: true}})
 			got, err := source.Get(t.Context(), customerIssuer(t))
 			require.NoError(t, err)
 			assert.False(t, got.Enabled)
@@ -139,7 +139,7 @@ func TestReleaseSettingsOffUnlessDeployedToTheIssuer(t *testing.T) {
 	}
 
 	// The platform issuer is the one served by the default, as its own origin.
-	platform := newReleaseSettings(&runtime{resolution: defaultServed}, revisions{"oauthset_on": {ID: "oauthset_on", Enabled: true}})
+	platform := NewReleaseSettings(&runtime{resolution: defaultServed}, revisions{"oauthset_on": {ID: "oauthset_on", Enabled: true}})
 	got, err := platform.Get(t.Context(), Issuer{ProjectID: domain.PlatformProjectID, Platform: true, URL: mustParseURL(t, "https://api.example.com/oauth")})
 	require.NoError(t, err)
 	assert.True(t, got.Enabled)
@@ -150,21 +150,21 @@ func TestReleaseSettingsFaults(t *testing.T) {
 
 	t.Run("resolver fault", func(t *testing.T) {
 		t.Parallel()
-		source := newReleaseSettings(&runtime{err: domain.ErrInternal(errors.New("db down"))}, revisions{})
+		source := NewReleaseSettings(&runtime{err: domain.ErrInternal(errors.New("db down"))}, revisions{})
 		_, err := source.Get(t.Context(), customerIssuer(t))
 		assert.True(t, domain.IsServerFault(err))
 	})
 
 	t.Run("unclassified resolver error", func(t *testing.T) {
 		t.Parallel()
-		source := newReleaseSettings(&runtime{err: errors.New("connection reset")}, revisions{})
+		source := NewReleaseSettings(&runtime{err: errors.New("connection reset")}, revisions{})
 		_, err := source.Get(t.Context(), customerIssuer(t))
 		assert.True(t, domain.IsServerFault(err))
 	})
 
 	t.Run("pinned revision missing", func(t *testing.T) {
 		t.Parallel()
-		source := newReleaseSettings(&runtime{resolution: releaseWith(oauthPin("oauthset_gone"))}, revisions{})
+		source := NewReleaseSettings(&runtime{resolution: releaseWith(oauthPin("oauthset_gone"))}, revisions{})
 		_, err := source.Get(t.Context(), customerIssuer(t))
 		assert.True(t, domain.IsServerFault(err))
 	})

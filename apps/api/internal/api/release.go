@@ -217,12 +217,6 @@ func bundleValidationBadRequest(ctx context.Context, err *service.BundleValidati
 		}
 		resources = append(resources, item)
 	}
-	return buildReleaseBadRequest(resources)
-}
-
-// buildReleaseBadRequest wraps the refused resources in the rel.invalid
-// envelope the 400 of POST /releases/build carries.
-func buildReleaseBadRequest(resources []api.BundleResourceError) *api.BuildReleaseBadRequest {
 	return &api.BuildReleaseBadRequest{
 		Code:    api.ErrorCode(domain.ErrReleaseInvalid(nil, nil).Code),
 		Message: domain.ErrReleaseInvalid(nil, nil).Message,
