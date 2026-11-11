@@ -16,6 +16,16 @@ export function downloadEvents(events: readonly LogEvent[], format: "json" | "cs
   const link = document.createElement("a");
   link.href = url;
   link.download = `events-${new Date().toISOString().replace(/[:.]/g, "-")}.${format}`;
+  // In the document for the click: Firefox starts no download from a detached
+  // link.
+  link.hidden = true;
+  document.body.append(link);
   link.click();
-  URL.revokeObjectURL(url);
+  link.remove();
+  // Not at once: a browser that has not started reading the blob yet would
+  // find it gone and save nothing.
+  setTimeout(() => URL.revokeObjectURL(url), REVOKE_AFTER_MS);
 }
+
+/** How long a saved file's blob stays readable after the click that saves it. */
+const REVOKE_AFTER_MS = 10_000;
