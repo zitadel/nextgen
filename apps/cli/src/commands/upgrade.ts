@@ -1,4 +1,5 @@
 import { existsSync } from "node:fs";
+import { Suggestible } from "@/lib/oclif/suggestible";
 import { join } from "node:path";
 
 import { execa } from "execa";
@@ -42,7 +43,7 @@ type PackageUpgrade = { name: string; from: string; to: string };
  * choice the user made, as `doctor`'s `dependency-version` check also holds, so
  * it is reported and left alone.
  */
-export default class Upgrade extends BaseCommand {
+export default class Upgrade extends Suggestible(BaseCommand) {
   static override description =
     "Upgrade this project to the latest Zitadel release.\n\nRe-pins the project's exactly-pinned @zitadel/* packages with its own package manager, then runs the new release's doctor --fix to refresh generated files. Run it as npx @zitadel/cli@latest upgrade so the newest release does the upgrading.";
   static override group = CommandGroups.diagnostics;
@@ -64,7 +65,7 @@ export default class Upgrade extends BaseCommand {
     if (latest === undefined) {
       throw new ZitadelError("E_NETWORK", "Could not look up the latest Zitadel release", {
         hint: "Check the connection to the npm registry, then rerun.",
-        nextCommands: [this.suggestUnscoped("upgrade")],
+        nextCommands: [this.suggest("upgrade")],
       });
     }
     // A CLI ahead of the dist-tag (a prerelease) is what its own files target,
@@ -195,7 +196,7 @@ export default class Upgrade extends BaseCommand {
     } catch (error) {
       throw new ZitadelError("E_VALIDATION", "Could not install the new packages", {
         hint: `${errorMessage(error)}. Nothing else changed; fix that and rerun.`,
-        nextCommands: [suggestion, this.suggestUnscoped("upgrade")],
+        nextCommands: [suggestion, this.suggest("upgrade")],
       });
     }
   }

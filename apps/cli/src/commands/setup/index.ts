@@ -6,6 +6,7 @@ import {
   createZitadelClient,
 } from "@/lib/backend";
 import { access, readFile, rm, writeFile } from "node:fs/promises";
+import { Suggestible } from "@/lib/oclif/suggestible";
 import { basename, join } from "node:path";
 import { Flags } from "@oclif/core";
 import { z } from "zod";
@@ -1012,7 +1013,7 @@ export function readPort(value: string): Parsed<number> {
       };
 }
 
-export default class Setup extends Destructive(BaseCommand) {
+export default class Setup extends Suggestible(Destructive(BaseCommand)) {
   static override description =
     "Create a Zitadel project and scaffold local auth. An interactive setup ends with a note about the Zitadel agent skills, shown once per machine; set NO_SKILLS_PROMPT=1 to hide it.";
 
@@ -1138,10 +1139,10 @@ export default class Setup extends Destructive(BaseCommand) {
 
   protected async execute({ flags }: Admitted<typeof Setup>): Promise<JsonEnvelope> {
     refuseUnusableFlags(flags, this.nonInteractive, (next) => {
-      return this.suggestUnscoped(next);
+      return this.suggest(next);
     });
     const preflight = await setupPreflight(flags, this.meta, (next) => {
-      return this.suggestUnscoped(next);
+      return this.suggest(next);
     });
     this.meta = {
       ...this.meta,
@@ -1298,7 +1299,7 @@ export default class Setup extends Destructive(BaseCommand) {
       // the command that puts the app on a free one.
       reportWarning(
         portInUseWarning(answers.devPort, await LocalServer.nextFreePort(answers.devPort), (args) =>
-          this.suggestUnscoped(args),
+          this.suggest(args),
         ),
       );
     }
@@ -1511,8 +1512,7 @@ export default class Setup extends Destructive(BaseCommand) {
         throw new ZitadelError(cause.code, `Default configuration setup failed: ${cause.message}`, {
           hint: this.configurationFailureHint(cause, newApp !== undefined),
           nextCommands:
-            cause.nextCommands ??
-            (newApp === undefined ? [this.suggestUnscoped("setup --force")] : []),
+            cause.nextCommands ?? (newApp === undefined ? [this.suggest("setup --force")] : []),
           details: cause.details,
         });
       }
@@ -1736,7 +1736,7 @@ export default class Setup extends Destructive(BaseCommand) {
           // so an unattached project is one the local admin never sees. A
           // server started by hand has no local admin anywhere, hence the "if".
           reportWarning(
-            `No local admin for ${answers.server} in ${this.cwd} or its parents, so the project is not attached to a team and the local console will not list it. If ${this.suggestUnscoped("start")} started this server, run setup from the directory it ran in, or one inside it.`,
+            `No local admin for ${answers.server} in ${this.cwd} or its parents, so the project is not attached to a team and the local console will not list it. If ${this.suggest("start")} started this server, run setup from the directory it ran in, or one inside it.`,
           );
         }
         if (admin) {
@@ -1784,7 +1784,7 @@ export default class Setup extends Destructive(BaseCommand) {
     // else for them, so the command would open an empty console otherwise.
     // `console` finds the server from its directory up, so a run with `--cwd`
     // passes it on.
-    const consoleCommand = this.suggestUnscoped("console");
+    const consoleCommand = this.suggest("console");
     const consoleStep = ownedByLocalAdmin
       ? {
           actions: [
@@ -2098,7 +2098,7 @@ export default class Setup extends Destructive(BaseCommand) {
     }
     return (
       "The project was created but its default configuration (schema, login flow, " +
-      `password policy) was not all written. Rerun ${this.suggestUnscoped("setup")} to start over; ` +
+      `password policy) was not all written. Rerun ${this.suggest("setup")} to start over; ` +
       "--force overwrites the schema and flow files setup scaffolds and keeps an " +
       "existing password policy file. It does not cover a connection under .zitadel/idps/ -- those are " +
       "yours, so setup never replaces or removes one; delete it to scaffold a fresh " +

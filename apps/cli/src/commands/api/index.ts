@@ -1,4 +1,5 @@
 import { Args, Flags } from "@oclif/core";
+import { Suggestible } from "@/lib/oclif/suggestible";
 import { z } from "zod";
 import { log } from "@/lib/log";
 
@@ -227,7 +228,7 @@ function quote(value: string): string {
  * it. An operation that deletes, revokes or rolls back asks first, as the
  * command that covers it does.
  */
-export default class Api extends Destructive(BaseCommand) {
+export default class Api extends Suggestible(Destructive(BaseCommand)) {
   static override description =
     "Call any operation of the Zitadel API, with this project's server and project secret.";
 
@@ -306,7 +307,7 @@ export default class Api extends Destructive(BaseCommand) {
         title: "Done",
         sections: [],
       },
-      next: this.jsonEnabled() ? { commands: [this.suggestUnscoped("api ls")] } : undefined,
+      next: this.jsonEnabled() ? { commands: [this.suggest("api ls")] } : undefined,
     });
   }
 
@@ -469,7 +470,7 @@ export default class Api extends Destructive(BaseCommand) {
         (operation.auth !== "secret" || secret !== undefined)
       );
     });
-    const retry = this.suggestUnscoped("api ls --json");
+    const retry = this.suggest("api ls --json");
     const tags = [
       ...new Set(
         callable.map((operation) => {
@@ -521,7 +522,7 @@ export default class Api extends Destructive(BaseCommand) {
       filled[name] = await this.ask.text({
         name,
         message: `What is the value of ${name}?`,
-        retry: this.suggestUnscoped(`api ${target.operation.id} ${spelled}`),
+        retry: this.suggest(`api ${target.operation.id} ${spelled}`),
         parse: (value: string) => {
           const typed = value.trim();
           if (typed === "") {

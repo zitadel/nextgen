@@ -1,4 +1,5 @@
 import { Flags } from "@oclif/core";
+import { Suggestible } from "@/lib/oclif/suggestible";
 
 import {
   DEFAULT_LOCAL_SERVER_URL,
@@ -9,7 +10,7 @@ import { LocalServer } from "@/lib/local-server/server";
 import { startedServer } from "./local-server/started";
 import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
 
-export default class Stop extends BaseCommand {
+export default class Stop extends Suggestible(BaseCommand) {
   static override description = "Stop the local Zitadel server.";
   static override group = CommandGroups.localDevelopment;
 
@@ -63,7 +64,7 @@ export default class Stop extends BaseCommand {
           title: "Would stop the local Zitadel server (dry run)",
           sections: [],
         },
-        next: { commands: [this.suggestUnscoped("stop")] },
+        next: { commands: [this.suggest("stop")] },
       });
     }
 

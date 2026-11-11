@@ -2,6 +2,7 @@ import { createZitadelClient } from "@/lib/backend";
 import { type Environment, requireValueInteractive, resolveEnvironment } from "@/lib/environment";
 import { resolveCwd } from "@/lib/paths";
 import { BaseCommand, type MetaOptions } from "./base";
+import { Suggestible } from "./suggestible";
 import { byName } from "./names";
 import { CREDENTIALS, type CredentialKind } from "./credentials";
 import {
@@ -12,7 +13,7 @@ import {
 import type { ConnectOptions, Connection, GlobalOptions } from "./types";
 
 export type { Connection } from "./types";
-import { type EnvironmentSelector, projectCommand, type SuggestedCommand } from "@/lib/suggestion";
+import type { EnvironmentSelector, SuggestedCommand } from "@/lib/suggestion";
 import { optionArgs } from "@/lib/public-cli";
 import { Cmd } from "@/lib/cmd";
 import { userAgent } from "@/lib/user-agent";
@@ -27,7 +28,7 @@ import { userAgent } from "@/lib/user-agent";
  * Which credential it authenticates with is `static credential`; the project
  * secret unless a subclass says otherwise.
  */
-export abstract class EnvironmentCommand extends BaseCommand {
+export abstract class EnvironmentCommand extends Suggestible(BaseCommand) {
   static override baseFlags = { ...BaseCommand.baseFlags, ...environmentFlags };
 
   static credential: CredentialKind = "project";
@@ -37,7 +38,7 @@ export abstract class EnvironmentCommand extends BaseCommand {
   /** What the invocation resolved to; set by {@link toMeta}. */
   protected environment!: Environment;
 
-  /** `--cwd` as typed, reproduced by {@link environmentSelector}. */
+  /** `--cwd` as typed, reproduced by {@link selector}. */
   private cwdFlag: string | undefined;
 
   /**
@@ -101,6 +102,10 @@ export abstract class EnvironmentCommand extends BaseCommand {
     });
   }
 
+  protected override selector(): EnvironmentSelector {
+    return this.environmentSelector();
+  }
+
   /**
    * {@link environmentSelector} as arguments, for a result that reports its
    * follow-ups as argument lists too (`next_args`).
@@ -118,16 +123,6 @@ export abstract class EnvironmentCommand extends BaseCommand {
         : []),
       ...(this.cwdFlag === undefined ? [] : optionArgs("--cwd", this.cwdFlag)),
     ];
-  }
-
-  /**
-   * A `zitadel` command aimed at this run's project: `args` with this run's
-   * {@link environmentSelector} appended, in the public `npx` form. Use it for
-   * every suggestion a project command makes; a command that deliberately
-   * leaves the project uses {@link BaseCommand.suggestUnscoped}.
-   */
-  protected suggest(args: string): SuggestedCommand {
-    return projectCommand(args, this.environmentSelector(), this.meta.cliVersion);
   }
 
   /** A follow-up the framework suggests, such as a list's next page, aimed at this project. */

@@ -1,4 +1,5 @@
 import { mkdir, writeFile } from "node:fs/promises";
+import { Suggestible } from "@/lib/oclif/suggestible";
 import { dirname, join } from "node:path";
 
 import {
@@ -116,7 +117,7 @@ function isRetiredDesign(value: string): boolean {
  * override ladder (docs/design/branding/override-ladder.md); unrelated to
  * `zitadel eject`, which removes the Zitadel integration.
  */
-export default class BrandingEject extends Promptable(BaseCommand) {
+export default class BrandingEject extends Suggestible(Promptable(BaseCommand)) {
   static override description =
     "Take ownership of the login template: scaffold .zitadel/branding/ from a shipped design.";
 
@@ -139,7 +140,7 @@ export default class BrandingEject extends Promptable(BaseCommand) {
 
   protected async execute({ flags }: Admitted<typeof BrandingEject>): Promise<JsonEnvelope> {
     const suggest = (next: string) => {
-      return this.suggestUnscoped(next);
+      return this.suggest(next);
     };
     if (!(await hasZitadelConfig(this.cwd))) {
       throw refusalError(NOT_A_PROJECT_REFUSAL, {}, suggest);
@@ -230,7 +231,7 @@ export default class BrandingEject extends Promptable(BaseCommand) {
           `Edit ${DEFAULT_BRANDING_TEMPLATE_PATH} — the login UI is yours now.`,
           "Validate the template and see the diff with a dry run, then publish it.",
         ],
-        commands: [this.suggestUnscoped("deploy --dry-run"), this.suggestUnscoped(DEPLOY_ARGS)],
+        commands: [this.suggest("deploy --dry-run"), this.suggest(DEPLOY_ARGS)],
       },
     });
   }

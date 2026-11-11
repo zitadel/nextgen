@@ -1,4 +1,5 @@
 import { stat } from "node:fs/promises";
+import { Suggestible } from "@/lib/oclif/suggestible";
 import { z } from "zod";
 import { basename, join } from "node:path";
 
@@ -135,7 +136,7 @@ export function readAppUrl(answer: string): Parsed<string | undefined> {
  * platform builds from git), so the command ends by printing exactly which
  * values the platform and the pipeline need.
  */
-export default class EnvAdd extends Promptable(BaseCommand) {
+export default class EnvAdd extends Suggestible(Promptable(BaseCommand)) {
   static override description = "Bind an environment to a project, creating the project if needed.";
   static override group = CommandGroups.configuration;
 
@@ -195,7 +196,7 @@ export default class EnvAdd extends Promptable(BaseCommand) {
         parse: parseServer,
         // The rerun keeps every choice this run made, so binding a project
         // (`--project`) stays a bind rather than creating a new project.
-        retry: this.suggestUnscoped(
+        retry: this.suggest(
           [
             `env add ${Cmd.quote(args.name)}`,
             "--server https://api.zitadel.cloud",

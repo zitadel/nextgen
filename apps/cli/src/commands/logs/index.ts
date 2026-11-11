@@ -1,4 +1,5 @@
 import { Flags } from "@oclif/core";
+import { Suggestible } from "@/lib/oclif/suggestible";
 import { z } from "zod";
 
 import { DEFAULT_LOCAL_SERVER_URL, readNearestRuntimeMetadata } from "@/lib/local-server/runtime";
@@ -44,7 +45,7 @@ const NOT_STARTED_REFUSAL: Refusal = {
   next: ["start"],
 };
 
-export default class Logs extends BaseCommand {
+export default class Logs extends Suggestible(BaseCommand) {
   static override description =
     "Show local Zitadel server logs.\n\nOn a terminal, warnings are yellow and errors red. Run it in the directory the start command ran in, or one inside it: the server is found from the nearest .zitadel/local/ on the way up.";
 
@@ -91,7 +92,7 @@ export default class Logs extends BaseCommand {
     const started = await this.started.of(this.cwd);
     if (started === undefined) {
       throw refusalError(NOT_STARTED_REFUSAL, {}, (next) => {
-        return this.suggestUnscoped(next);
+        return this.suggest(next);
       });
     }
     const server = LocalServer.at(started.dir, {

@@ -1,4 +1,5 @@
 import { Flags } from "@oclif/core";
+import { Suggestible } from "@/lib/oclif/suggestible";
 import { readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
@@ -261,7 +262,7 @@ function ejected(
  * (user-replaced files are preserved); `zitadel.json` is removed; `.env.local`
  * is renamed to a timestamped backup; and `.zitadel/` is removed wholesale.
  */
-export default class Eject extends Destructive(BaseCommand) {
+export default class Eject extends Suggestible(Destructive(BaseCommand)) {
   static override description = "Remove managed files and local Zitadel state.";
   static override group = CommandGroups.localDevelopment;
 
@@ -281,7 +282,7 @@ export default class Eject extends Destructive(BaseCommand) {
 
   protected async execute({ flags }: Admitted<typeof Eject>): Promise<JsonEnvelope> {
     const dir = typeof flags.cwd === "string" ? flags.cwd : undefined;
-    const setItUp = this.suggestUnscoped("setup");
+    const setItUp = this.suggest("setup");
 
     const result = await this.confirmed({
       verb: "eject",
@@ -305,7 +306,7 @@ export default class Eject extends Destructive(BaseCommand) {
               next: [
                 {
                   text: "Remove it whenever you like:",
-                  command: this.suggestUnscoped("eject"),
+                  command: this.suggest("eject"),
                 },
               ],
             },

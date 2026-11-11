@@ -15,7 +15,12 @@ import { resolveCwd } from "@/lib/paths";
 import { normalizePublicCliCommands, publicCliCommand, spellOutCommands } from "@/lib/public-cli";
 import { hostUnlessDefault, resolveServer, SERVER_VARIABLE } from "@/lib/server";
 import { statusColor } from "@/lib/style";
-import { type SuggestedCommand, unscopedCommand } from "@/lib/suggestion";
+import {
+  asEnvironmentSelector,
+  type EnvironmentSelector,
+  type SuggestedCommand,
+  unscopedCommand,
+} from "@/lib/suggestion";
 import { type Properties, Telemetry, type TelemetryDeps } from "@/lib/telemetry";
 import { DO_NOT_TRACK, ZITADEL_TELEMETRY } from "@/lib/telemetry/consent";
 import { processUserAgent, useUserAgent } from "@/lib/user-agent";
@@ -400,12 +405,12 @@ export abstract class BaseCommand extends Interruptible(Command) {
   /**
    * This run again with `words`, as a destructive command's `--force` retry
    * suggests it: `words` are its arguments as typed, and the directory goes on as
-   * {@link suggestUnscoped} puts it. A project command keeps its environment
+   * {@link cwdSelector} puts it. A project command keeps its environment
    * selector instead (`EnvironmentCommand`).
    */
   protected retryCommand(words: readonly string[]): SuggestedCommand {
     const line = Cmd.of(words).without(CWD_OPTIONS);
-    return this.suggestUnscoped(line.toString());
+    return unscopedCommand(`${line}${this.cwdSelector()}`, this.meta.cliVersion);
   }
 
   /**
@@ -420,18 +425,13 @@ export abstract class BaseCommand extends Interruptible(Command) {
   }
 
   /**
-   * A `zitadel` command that does not target a project, in the public `npx`
-   * form: `setup`, `start`, `doctor`, the local runtime. A command that talks
-   * to a project suggests through `EnvironmentCommand.suggest` instead, which
-   * keeps the run's environment selector; reaching for this one is the
-   * deliberate opt-out.
+   * The directory this run addressed, as the flag that puts it back. A
+   * follow-up run from the shell's directory would act on whatever project is
+   * there.
    */
-  protected suggestUnscoped(args: string): SuggestedCommand {
-    // A follow-up run from the shell's directory would act on whatever project
-    // is there, so the directory this run addressed goes with it.
-    return unscopedCommand(
-      this.typedCwd === undefined ? args : `${args} ${Cmd.option("--cwd", this.typedCwd)}`,
-      this.meta.cliVersion,
+  protected cwdSelector(): EnvironmentSelector {
+    return asEnvironmentSelector(
+      this.typedCwd === undefined ? "" : ` ${Cmd.option("--cwd", this.typedCwd)}`,
     );
   }
 

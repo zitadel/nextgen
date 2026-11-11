@@ -1,4 +1,5 @@
 import { Flags } from "@oclif/core";
+import { Suggestible } from "@/lib/oclif/suggestible";
 import { log } from "@/lib/log";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 
@@ -22,7 +23,7 @@ const NO_LOCAL_ADMIN_REFUSAL: Refusal = {
  * admin `zitadel start` created. Every run mints a fresh one-time link, so the
  * command is also how you get back in after the session ends.
  */
-export default class Console extends BaseCommand {
+export default class Console extends Suggestible(BaseCommand) {
   static override description =
     "Open the local console, signed in as the local admin.\n\nThe local admin is the one the start command created. Run this in the directory it ran in, or one inside it: the local admin is read from the nearest .zitadel/local/ on the way up.";
 
@@ -60,7 +61,7 @@ export default class Console extends BaseCommand {
     const admin = await readLocalAdmin(localDir);
     if (admin === undefined) {
       throw refusalError(NO_LOCAL_ADMIN_REFUSAL, {}, (next) => {
-        return this.suggestUnscoped(next);
+        return this.suggest(next);
       });
     }
 
@@ -106,7 +107,7 @@ export default class Console extends BaseCommand {
       },
       next: {
         actions: [
-          `The link signs you in once. Run ${this.suggestUnscoped("console")} again for a fresh one.`,
+          `The link signs you in once. Run ${this.suggest("console")} again for a fresh one.`,
         ],
       },
     });

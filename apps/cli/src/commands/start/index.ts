@@ -1,4 +1,5 @@
 import { Flags } from "@oclif/core";
+import { Suggestible } from "@/lib/oclif/suggestible";
 import { z } from "zod";
 
 import { serverLogAction } from "@/lib/journey-guidance";
@@ -58,7 +59,7 @@ const PORT: Refused<number> = {
   },
 };
 
-export default class Start extends BaseCommand {
+export default class Start extends Suggestible(BaseCommand) {
   static override description = "Start a local Zitadel server.";
   static override group = CommandGroups.gettingStarted;
 
@@ -129,7 +130,7 @@ export default class Start extends BaseCommand {
           title: "Would start the local Zitadel server (dry run)",
           sections: [],
         },
-        next: { commands: [this.suggestUnscoped("start")] },
+        next: { commands: [this.suggest("start")] },
       });
     }
 
@@ -175,7 +176,7 @@ export default class Start extends BaseCommand {
           : "Local Zitadel server is ready",
         sections: [],
       },
-      next: readyNext(this.cliVersion, this.suggestUnscoped("setup --server local")),
+      next: readyNext(this.cliVersion, this.suggest("setup --server local")),
     });
   }
 

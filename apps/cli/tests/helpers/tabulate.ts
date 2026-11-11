@@ -1,3 +1,4 @@
+import { unscopedCommand } from "@/lib/suggestion";
 import type { Config } from "@oclif/core";
 
 import { BaseCommand } from "@/lib/oclif/base";
@@ -24,7 +25,7 @@ class Unscoped extends Tabulatable(BaseCommand) {
 
 class Drawing extends Unscoped {
   protected override suggestFollowUp(args: string) {
-    return this.suggestUnscoped(args);
+    return unscopedCommand(args, "0.0.0-test");
   }
 
   draw: Tabulate = (columns, items) => this.tabulate(columns, items);

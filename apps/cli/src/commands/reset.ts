@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { Suggestible } from "@/lib/oclif/suggestible";
 
 import { Flags } from "@oclif/core";
 
@@ -14,7 +15,7 @@ import { startedServer } from "./local-server/started";
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
 import { Destructive } from "@/lib/oclif/destructive";
 
-export default class Reset extends Destructive(BaseCommand) {
+export default class Reset extends Suggestible(Destructive(BaseCommand)) {
   static override description = "Delete the local Zitadel server runtime and data.";
   static override group = CommandGroups.localDevelopment;
 
@@ -65,7 +66,7 @@ export default class Reset extends Destructive(BaseCommand) {
           "It stops and removes the local server if one is running, so the status command no longer reports it.",
           "It deletes the server's database: every organization, user, application and setting you created. This cannot be undone.",
           `Kept: ${adminFile}, the local admin sign-in, and everything else in your project.`,
-          `Run ${this.suggestUnscoped("start")} afterwards to set up a fresh server.`,
+          `Run ${this.suggest("start")} afterwards to set up a fresh server.`,
         ].join("\n"),
         preview: () => ({
           status: "ok",
@@ -78,7 +79,7 @@ export default class Reset extends Destructive(BaseCommand) {
             title: "Would reset the local Zitadel server runtime (dry run)",
             sections: [],
           },
-          next: { commands: [this.suggestUnscoped("reset --force")] },
+          next: { commands: [this.suggest("reset --force")] },
         }),
         apply: async (consent) => {
           await LocalServer.at(this.cwd, { cliVersion: this.cliVersion }).reset(consent);
