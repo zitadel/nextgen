@@ -28,8 +28,8 @@ test("shows the bootstrapped project in the list and detail views", async ({
   await expect(page.getByRole("heading", { name: "Projects", exact: true })).toBeVisible();
 
   // The directory lists name and creation date. A row opens the project —
-  // selects it and lands on its Overview (D35) — and the project's settings
-  // page is `Settings` in the sidebar that selection fills.
+  // selects it and lands on its Overview (D35) — and the project's Settings,
+  // in the sidebar that selection fills, open on General (D39).
   const projectLink = page.getByRole("table").getByRole("link").first();
   await expect(projectLink).toBeVisible();
   await projectLink.click();
@@ -45,7 +45,9 @@ test("shows the bootstrapped project in the list and detail views", async ({
     .getByRole("navigation", { name: "Primary" })
     .getByRole("link", { name: "Settings" })
     .click();
-  await expect(page).toHaveURL(new RegExp(`/project\\?project=${zitadel.handle.projectId}$`));
+  await expect(page).toHaveURL(
+    new RegExp(`/project/general\\?project=${zitadel.handle.projectId}$`),
+  );
   await expect(page.getByText(zitadel.handle.projectId, { exact: true })).toBeVisible();
   await expectNoErrorBoundary(page);
   expect(pageErrors).toEqual([]);
