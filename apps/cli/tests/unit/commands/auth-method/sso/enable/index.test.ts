@@ -14,7 +14,12 @@ import AuthMethodSsoEnable from "@/commands/auth-method/sso/enable";
 import { ZitadelError } from "@/lib/errors";
 import type { JsonObject } from "@/lib/zitadel";
 import { authMethodJson, authMethodText } from "@tests/helpers/auth-method";
-import { anOidcConnection, type DocumentsByName } from "@tests/helpers/config";
+import {
+  anOidcConnection,
+  authMethods,
+  aUserSchema,
+  type DocumentsByName,
+} from "@tests/helpers/config";
 import { it } from "@tests/helpers/fixtures";
 import { withStep } from "@tests/helpers/flows";
 import { parseFlag } from "@tests/helpers/inputs";
@@ -44,6 +49,36 @@ const ACME = {
   secret: "acme-secret",
   file: ".zitadel/idps/acme-sso.json",
 };
+
+/**
+ * The flags that make the custom connection {@link ACME}, after `--provider custom`.
+ */
+const ACME_FLAGS = [
+  "--slug",
+  ACME.slug,
+  "--display-name",
+  ACME.displayName,
+  "--issuer",
+  ACME.issuer,
+  "--client-id",
+  ACME.clientId,
+] as const;
+
+/**
+ * A user schema with the attributes given besides the email it signs in by,
+ * which the {@link ACME} connection maps.
+ *
+ * @param properties - The attributes to add.
+ * @param required - The attributes the schema requires.
+ * @returns The schema.
+ */
+function aSchemaWith(properties: JsonObject, required: string[] = []): JsonObject {
+  return aUserSchema({
+    "x-auth-methods": authMethods("password", "passkey"),
+    properties: { email: { type: "string", "x-unique": "project" }, ...properties },
+    required,
+  });
+}
 
 /**
  * A connection under another slug, written at the file {@link ACME}'s slug names.
@@ -692,11 +727,179 @@ describe("auth-method sso enable", () => {
     });
   });
 
+  describe("with attributes the connection does not map", () => {
+    it.for([
+      [
+        "an optional one",
+        { nickname: { type: "string" } },
+        [],
+        "- nickname (optional) - fine to leave empty.",
+      ],
+      [
+        "a required one",
+        { companyName: { type: "string" } },
+        ["companyName"],
+        "- companyName (required) - sign-up has to collect it.",
+      ],
+      [
+        "an object whose members are required",
+        {
+          address: {
+            type: "object",
+            properties: { street: { type: "string" } },
+            required: ["street"],
+          },
+        },
+        ["address"],
+        "- address (required) - sign-up has to collect it.",
+      ],
+    ] as const)("lists %s", async ([, properties, required, line], { dir }) => {
+      const cwd = await setUpProject(dir, {
+        "default-human-user": aSchemaWith(properties, [...required]),
+      });
+
+      const result = await withStdin(ACME.secret, () => {
+        return runCliForTest(authMethodText(cwd, ...CUSTOM, ...ACME_FLAGS));
+      });
+
+      expect(result.stdout).toContain(line);
+    });
+
+    it("says a required one is not filled when the connection creates no users", async ({
+      dir,
+    }) => {
+      const cwd = await setUpProject(dir, {
+        "default-human-user": aSchemaWith({ companyName: { type: "string" } }, ["companyName"]),
+      });
+      await withStdin(ACME.secret, () => {
+        return runCliForTest(authMethodText(cwd, ...CUSTOM, ...ACME_FLAGS));
+      });
+      await writeJson(cwd, ACME.file, {
+        ...(await readJson(cwd, ACME.file)),
+        provisioning: { creation: "disabled" },
+      });
+
+      const result = await withStdin(ACME.secret, () => {
+        return runCliForTest(authMethodText(cwd, ...CUSTOM, ...ACME_FLAGS));
+      });
+
+      expect(result.stdout).toContain("- companyName (required) - not filled by this connection.");
+    });
+  });
+
+  describe("with a connection file edited by hand", () => {
+    it("says a verification that always holds is always trusted", async ({ dir }) => {
+      const cwd = await aProjectWithAcme(dir);
+      await writeJson(cwd, ACME.file, {
+        ...(await readJson(cwd, ACME.file)),
+        verified_claims: { email: true },
+      });
+
+      const result = await withStdin(ACME.secret, () => {
+        return runCliForTest(authMethodText(cwd, ...CUSTOM, ...ACME_FLAGS));
+      });
+
+      expect(result.stdout).toContain("It is always trusted.");
+    });
+
+    it("draws no mapping lines for a connection that maps nothing", async ({ dir }) => {
+      const cwd = await aProjectWithAcme(dir);
+      await writeJson(cwd, ACME.file, {
+        ...(await readJson(cwd, ACME.file)),
+        claim_mapping: {},
+        verified_claims: {},
+      });
+
+      const result = await withStdin(ACME.secret, () => {
+        return runCliForTest(authMethodText(cwd, ...CUSTOM, ...ACME_FLAGS));
+      });
+
+      expect(result.stdout).not.toContain("Each user attribute is filled");
+    });
+
+    it("prints a claim name holding a newline on one line", async ({ dir }) => {
+      const cwd = await aProjectWithAcme(dir);
+      await writeJson(cwd, ACME.file, {
+        ...(await readJson(cwd, ACME.file)),
+        claim_mapping: { email: "mail\n- password (required) - injected" },
+      });
+
+      const result = await withStdin(ACME.secret, () => {
+        return runCliForTest(authMethodText(cwd, ...CUSTOM, ...ACME_FLAGS));
+      });
+
+      expect(result.stdout).toContain("mail\\x0a-");
+    });
+  });
+
+  describe("with a name that carries a control character", () => {
+    it("prints an attribute name as text in the summary box", async ({ dir }) => {
+      const cwd = await setUpProject(dir, {
+        "default-human-user": aSchemaWith({ "nick\u001b[2Jname": { type: "string" } }),
+      });
+
+      const result = await withStdin(ACME.secret, () => {
+        return runCliForTest(authMethodText(cwd, ...CUSTOM, ...ACME_FLAGS));
+      });
+
+      expect(result.stdout).toContain("- nick\\x1b[2Jname (optional)");
+    });
+
+    it("prints a display name as text in the title", async ({ dir }) => {
+      const cwd = await setUpProject(dir);
+
+      const result = await withStdin(ACME.secret, () => {
+        return runCliForTest(
+          authMethodText(
+            cwd,
+            ...CUSTOM,
+            "--slug",
+            ACME.slug,
+            "--display-name",
+            "Evil\u001b[2J SSO",
+            "--issuer",
+            ACME.issuer,
+            "--client-id",
+            ACME.clientId,
+          ),
+        );
+      });
+
+      expect(result.stdout).toContain("SIGN IN WITH EVIL\\X1B[2J SSO");
+    });
+  });
+
+  describe("with --provider custom and --json", () => {
+    it("reports what the connection maps and who signs in through it", async ({ dir }) => {
+      const cwd = await setUpProject(dir, {
+        "default-human-user": aSchemaWith({ nickname: { type: "string" } }),
+      });
+
+      const result = await withStdin(ACME.secret, () => {
+        return runCliForTest(authMethodJson(cwd, ...CUSTOM, ...ACME_FLAGS));
+      });
+
+      expect(parseJson(result.stdout)).toMatchObject({
+        data: {
+          connection: {
+            claim_mapping: { email: "email" },
+            verified_claims: { email: "email_verified" },
+            scopes: ["openid", "profile", "email"],
+            unmapped: [{ property: "nickname", required: false }],
+            used_by: ["default-human-user"],
+          },
+        },
+      });
+    });
+  });
+
   describe("with --provider custom in a script", () => {
     it.for([
       "SIGN IN WITH ACME SSO",
       "Each user attribute is filled from a claim your provider returns:",
-      "email comes from the email claim",
+      "- email comes from the email claim.",
+      "It is verified when email_verified is true.",
+      "It asks your provider for the openid, profile, and email scopes.",
       "default-human-user signs in",
     ])("says %s", async (line, { dir }) => {
       const cwd = await setUpProject(dir);

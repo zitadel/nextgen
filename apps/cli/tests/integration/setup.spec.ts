@@ -815,6 +815,33 @@ describe("setup", () => {
           expect(data.sso[0]?.verified_claims).toEqual({ email: "email_verified" });
         });
 
+        it("reports the scopes the connection asks for", async () => {
+          const app = await anApp();
+
+          const result = await provider.setUp(app);
+
+          const { data } = app.envelopeOf<{ sso: { scopes: string[] }[] }>(result);
+          expect(data.sso[0]?.scopes).toEqual(["openid", "profile", "email"]);
+        });
+
+        it("reports the attributes no claim fills", async () => {
+          const app = await anApp();
+
+          const result = await provider.setUp(app);
+
+          const { data } = app.envelopeOf<{ sso: { unmapped: unknown[] }[] }>(result);
+          expect(data.sso[0]?.unmapped).toEqual([]);
+        });
+
+        it("reports the schemas that sign in through the connection", async () => {
+          const app = await anApp();
+
+          const result = await provider.setUp(app);
+
+          const { data } = app.envelopeOf<{ sso: { used_by: string[] }[] }>(result);
+          expect(data.sso[0]?.used_by).toEqual(["default-human-user"]);
+        });
+
         it("publishes the client id as a readable project variable", async () => {
           const app = await anApp();
 
@@ -956,12 +983,28 @@ describe("setup", () => {
       });
 
       describe("rendered for a terminal", () => {
-        it("ends with a box that summarises the connection", async () => {
+        it("heads the connection's box with the provider", async () => {
           const app = await anApp();
 
           const result = await app.setupWithCustomSsoRendered(ACME, ACME_CREDENTIALS);
 
           expect(result).toPrint("SIGN IN WITH ACME SSO");
+        });
+
+        it("says which claim fills each attribute", async () => {
+          const app = await anApp();
+
+          const result = await app.setupWithCustomSsoRendered(ACME, ACME_CREDENTIALS);
+
+          expect(result).toPrint("- email comes from the email claim.");
+        });
+
+        it("says which schemas sign in through the connection", async () => {
+          const app = await anApp();
+
+          const result = await app.setupWithCustomSsoRendered(ACME, ACME_CREDENTIALS);
+
+          expect(result).toPrint("default-human-user signs in");
         });
       });
 

@@ -331,20 +331,24 @@ export class Connections extends Collection<Connection> {
    * through it.
    *
    * @remarks
-   * An unmapped property is one a schema that lists the connection defines at
-   * its top level and no claim fills. One the schema requires is marked, as a
-   * sign-up through the connection then has to collect it in a step.
+   * Only a schema that lists the connection and has SSO enabled signs in
+   * through it. An unmapped property is one such a schema defines at its top
+   * level and no claim fills. One the schema requires, at its own level or
+   * through a required object's members, is marked, as a sign-up through the
+   * connection then has to collect it in a step.
    *
    * @param connection - The connection.
    * @returns The summary.
    */
   summarize(connection: Connection): ConnectionSummary {
     const schemas = this.config.schemas.all.filter((schema) => {
-      return schema.lists(connection.slug);
+      return schema.isSsoEnabled && schema.lists(connection.slug);
     });
     const required = new Set(
       schemas.flatMap((schema) => {
-        return schema.requiredByServer.map(String);
+        return schema.requiredPaths.map((path) => {
+          return path.split(".")[0];
+        });
       }),
     );
     const properties = [
@@ -366,6 +370,7 @@ export class Connections extends Collection<Connection> {
       mappings: connection.mappings,
       verifications: connection.verifications,
       scopes: connection.scopes ?? [],
+      createsUsers: connection.createsUsers,
       unmapped,
       usedBy: schemas.map((schema) => {
         return schema.name;

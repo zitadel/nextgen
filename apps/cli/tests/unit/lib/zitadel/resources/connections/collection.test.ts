@@ -460,6 +460,74 @@ describe("Connections.summarize", () => {
   it("names no schema for a connection none lists", () => {
     expect(aConfig(CUSTOMERS_PROJECT).connections.summarize(ACME_SSO).usedBy).toEqual([]);
   });
+
+  it("marks an object required when only its members are required", () => {
+    const body = aUserSchema({
+      objectType: "customers",
+      properties: {
+        email: { type: "string" },
+        address: {
+          type: "object",
+          properties: { street: { type: "string" } },
+          required: ["street"],
+        },
+      },
+      required: ["address"],
+    });
+    const config = aConfig({ ...CUSTOMERS_PROJECT, schemas: { "customers.json": body } });
+    const schema = UserSchema.of(aFile("schemas", "customers.json", body));
+    const change = config.connections.enable(schema, ACME_SSO);
+
+    const summary = change.after.connections.summarize(change.document);
+
+    expect(summary.unmapped).toEqual([{ property: "address", required: true }]);
+  });
+
+  it("marks the identifier a password signs in with as required", () => {
+    const body = aUserSchema({
+      objectType: "customers",
+      properties: { email: { type: "string" }, username: { type: "string" } },
+      "x-identifier": "username",
+    });
+    const config = aConfig({ ...CUSTOMERS_PROJECT, schemas: { "customers.json": body } });
+    const schema = UserSchema.of(aFile("schemas", "customers.json", body));
+    const change = config.connections.enable(schema, ACME_SSO);
+
+    const summary = change.after.connections.summarize(change.document);
+
+    expect(summary.unmapped).toEqual([{ property: "username", required: true }]);
+  });
+
+  it("names no schema that lists the connection with SSO switched off", () => {
+    const body = aUserSchema({
+      objectType: "customers",
+      "x-auth-methods": {
+        password: { enabled: true },
+        sso: { enabled: false, providers: ["acme-sso"] },
+      },
+    });
+    const config = aConfig({ schemas: { "customers.json": body } });
+
+    expect(config.connections.summarize(ACME_SSO).usedBy).toEqual([]);
+  });
+
+  it("says a connection that creates users does", () => {
+    expect(enabled().createsUsers).toBe(true);
+  });
+
+  it("says a connection whose creation is disabled creates none", () => {
+    const quiet = Connection.create(
+      aFile(
+        "connections",
+        "acme-sso.json",
+        anAcmeSsoConnection({ provisioning: { creation: "disabled" } }),
+      ),
+    );
+
+    const change = aConfig(CUSTOMERS_PROJECT).connections.enable(CUSTOMERS_SCHEMA, quiet);
+
+    expect(change.after.connections.summarize(change.document).createsUsers).toBe(false);
+  });
 });
 
 describe("Connections.enable for a preview", () => {

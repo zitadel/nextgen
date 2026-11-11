@@ -588,29 +588,6 @@ describe("auth-method sso enable", () => {
     });
   });
 
-  describe("when a property name carries a control character", () => {
-    it("prints it as text in the summary box", async ({ dir }) => {
-      const cwd = await aProject(dir, {
-        "default-human-user": {
-          ...defaultSchema,
-          properties: { staffNumber: { type: "string" }, "nick\u001b[2Jname": { type: "string" } },
-        },
-      });
-      const flow = withStep(
-        withStep(loginFlow("default-human-user"), "identifier", collectingStaffNumber),
-        "register",
-        collectingStaffNumber,
-      );
-      await writeJson(cwd, LOGIN_FLOW_FILE, flow);
-
-      const result = await withStdin(SECRET, () => {
-        return runCliForTest(authMethodText(cwd, ...ACME, "--client-id", ACME_CLIENT_ID));
-      });
-
-      expect(result.stdout).not.toContain("\u001b");
-    });
-  });
-
   describe("when rerun on a configured Project", () => {
     it("reuses the connection", async ({ dir }) => {
       const cwd = await aProjectWithGoogle(dir);

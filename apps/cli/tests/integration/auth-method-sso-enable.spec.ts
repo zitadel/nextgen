@@ -852,13 +852,12 @@ describe("auth-method sso enable", () => {
         expect(result).toPrint("SIGN IN WITH GOOGLE");
       });
 
-      it("prints no mapping on a dry run, which writes no connection", async () => {
+      it("shows what the connection would map on a dry run", async () => {
         const app = await aSetUpApp();
 
         const result = await app.enableSsoDryRun(GOOGLE, CREDENTIALS);
 
-        expect(result).toSucceed();
-        expect(result).not.toPrint("comes from the");
+        expect(result).toPrint("email comes from the email claim");
       });
 
       it("shows the mapping a developer edited when enabled again, not a regenerated one", async () => {
@@ -871,19 +870,6 @@ describe("auth-method sso enable", () => {
         const result = await app.enableSsoRendered(GOOGLE, CREDENTIALS);
 
         expect(result).toPrint("email comes from the mail claim");
-      });
-
-      it("leaves a mapping the developer edited in the file when enabled again", async () => {
-        const app = await aSetUpApp();
-        await app.enableSsoRendered(GOOGLE, CREDENTIALS);
-        await app.editConnection("google", (connection) => {
-          connection.claim_mapping = { email: "mail" };
-        });
-        await app.enableSsoRendered(GOOGLE, CREDENTIALS);
-
-        expect(await app.connectionOf("google")).toMatchObject({
-          claim_mapping: { email: "mail" },
-        });
       });
     });
   });

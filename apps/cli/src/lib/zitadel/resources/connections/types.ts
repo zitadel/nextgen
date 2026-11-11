@@ -265,13 +265,21 @@ export type ConnectionSummary = {
   readonly scopes: readonly string[];
 
   /**
+   * Whether a sign-up through the connection can create a user, so a property
+   * no claim fills has to be collected by a step. False when its
+   * `provisioning.creation` is `disabled`.
+   */
+  readonly createsUsers: boolean;
+
+  /**
    * The top-level properties of the schemas that sign in through it that no
    * claim fills, sorted by name, each once.
    */
   readonly unmapped: readonly UnmappedProperty[];
 
   /**
-   * The names of the schemas that list the connection, in file order.
+   * The names of the schemas that list the connection with SSO enabled, in
+   * file order.
    */
   readonly usedBy: readonly string[];
 };

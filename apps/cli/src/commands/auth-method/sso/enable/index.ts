@@ -269,6 +269,8 @@ type Payload = {
     readonly claim_mapping: Readonly<Record<string, string>>;
     readonly verified_claims: Readonly<Record<string, string | boolean>>;
     readonly scopes: readonly string[];
+    readonly unmapped: readonly { readonly property: string; readonly required: boolean }[];
+    readonly used_by: readonly string[];
   };
   readonly callback_uri: string;
   readonly changed: readonly string[];
@@ -538,7 +540,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       consola.info(`Schema    ${schema.path}`);
     }
     if (!summary.reused) {
-      consola.info(`${provider.displayName} needs an OAuth application.`);
+      consola.info(`${escapeControlCharacters(provider.displayName)} needs an OAuth application.`);
     }
     consola.info(`Callback URI   ${summary.callbackUri}`);
     // A custom provider has no console to send the developer to: it is
@@ -568,6 +570,9 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     givenClientId: ClientId | undefined,
   ): JsonEnvelope {
     this.report(change);
+    if (!this.isJson) {
+      this.drawMapping(change, summary.displayName);
+    }
     const toStore = this.wouldStore(summary.reused, names, givenClientId);
     const writes = change.changedPaths.map((file) => {
       return `Would write ${file}`;
@@ -674,7 +679,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     }
     if (outcome.written.length === 0 && outcome.change.notices.length === 0) {
       consola.info(
-        `${outcome.schema.name} and its login flow already offer ${provider.displayName}`,
+        `${outcome.schema.name} and its login flow already offer ${escapeControlCharacters(provider.displayName)}`,
       );
     }
   }
@@ -714,59 +719,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       : { commands: followUps.commands };
 
     if (!this.isJson) {
-      const connection = input.change.document;
-      const { mappings, verifications, scopes, unmapped, usedBy } =
-        input.change.after.connections.summarize(connection);
-      const verifiedBy = new Map(
-        verifications.map(({ property, claim }) => {
-          return [property, claim];
-        }),
-      );
-      const lines = [
-        ...(mappings.length === 0
-          ? [
-              `No attribute is filled from a claim yet. Add pairs to claim_mapping in ${connection.path}.`,
-            ]
-          : [
-              "Each user attribute is filled from a claim your provider returns:",
-              ...mappings.map(({ property, claim }) => {
-                const how = verifiedBy.get(property);
-                const trust =
-                  how === true
-                    ? ", and is always trusted"
-                    : typeof how === "string"
-                      ? `, verified when ${how} is true`
-                      : "";
-                return `- ${property} comes from the ${claim} claim${trust}.`;
-              }),
-            ]),
-        ...(scopes.length === 0
-          ? []
-          : [
-              "",
-              `It asks your provider for the ${LIST.format(scopes)} ${PLURAL.select(scopes.length) === "one" ? "scope" : "scopes"}.`,
-            ]),
-        ...(unmapped.length === 0
-          ? []
-          : [
-              "",
-              "Some attributes have no claim yet:",
-              ...unmapped.map(({ property, required }) => {
-                return required
-                  ? `- ${property} (required) - not filled by this connection, so sign-up has to collect it.`
-                  : `- ${property} (optional) - fine to leave empty.`;
-              }),
-            ]),
-        "",
-        usedBy.length === 0
-          ? "No user schema signs in through this connection yet, so changing it affects nothing today."
-          : `${LIST.format(usedBy)} ${PLURAL.select(usedBy.length) === "one" ? "signs" : "sign"} in through this connection, so changes here affect ${PLURAL.select(usedBy.length) === "one" ? "it" : "them"}.`,
-      ];
-      consola.box({
-        title: `SIGN IN WITH ${name.toUpperCase()}`,
-        message: wrapForBox(escapeControlCharacters(lines.join("\n"))),
-        style: BOX_STYLE.info,
-      });
+      this.drawMapping(input.change, name);
     }
 
     return this.emit({
@@ -777,6 +730,86 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         next_args: followUps.args,
       },
       next,
+    });
+  }
+
+  /**
+   * Draw what the connection maps in a box: which claim fills each user
+   * attribute and what verifies it, the scopes it asks for, the attributes no
+   * claim fills, and the schemas that sign in through it.
+   *
+   * @remarks
+   * Every value read from a file is escaped on its own, newlines included, so a
+   * name cannot drive the terminal or forge a line of the box. A connection
+   * with nothing to say draws no box.
+   *
+   * @param change - The change that adds the connection.
+   * @param name - The provider's display name.
+   */
+  private drawMapping(change: DocumentChange<Connection>, name: string): void {
+    const text = (value: string) => {
+      return escapeControlCharacters(value, { keepLayout: false });
+    };
+    const { mappings, verifications, scopes, createsUsers, unmapped, usedBy } =
+      change.after.connections.summarize(change.document);
+    const verifiedBy = new Map(
+      verifications.map(({ property, claim }) => {
+        return [property, claim];
+      }),
+    );
+    const sections = [
+      mappings.length === 0
+        ? []
+        : [
+            "Each user attribute is filled from a claim your provider returns:",
+            ...mappings.flatMap(({ property, claim }) => {
+              const how = verifiedBy.get(property);
+              return [
+                `- ${text(property)} comes from the ${text(claim)} claim.`,
+                ...(how === true ? ["  It is always trusted."] : []),
+                ...(typeof how === "string" ? [`  It is verified when ${text(how)} is true.`] : []),
+              ];
+            }),
+          ],
+      scopes.length === 0
+        ? []
+        : [
+            `It asks your provider for the ${LIST.format(scopes.map(text))} ${PLURAL.select(scopes.length) === "one" ? "scope" : "scopes"}.`,
+          ],
+      unmapped.length === 0
+        ? []
+        : [
+            "Some attributes have no claim yet:",
+            ...unmapped.map(({ property, required }) => {
+              if (!required) {
+                return `- ${text(property)} (optional) - fine to leave empty.`;
+              }
+              return createsUsers
+                ? `- ${text(property)} (required) - sign-up has to collect it.`
+                : `- ${text(property)} (required) - not filled by this connection.`;
+            }),
+          ],
+      usedBy.length === 0
+        ? []
+        : [
+            `${LIST.format(usedBy.map(text))} ${PLURAL.select(usedBy.length) === "one" ? "signs" : "sign"} in through this connection, so changes here affect ${PLURAL.select(usedBy.length) === "one" ? "it" : "them"}.`,
+          ],
+    ].filter((section) => {
+      return section.length > 0;
+    });
+    if (sections.length === 0) {
+      return;
+    }
+    consola.box({
+      title: `SIGN IN WITH ${text(name).toUpperCase()}`,
+      message: wrapForBox(
+        sections
+          .flatMap((section, at) => {
+            return at === 0 ? section : ["", ...section];
+          })
+          .join("\n"),
+      ),
+      style: BOX_STYLE.info,
     });
   }
 
@@ -829,6 +862,8 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
           }),
         ),
         scopes: mapped.scopes,
+        unmapped: mapped.unmapped,
+        used_by: mapped.usedBy,
       },
       callback_uri: summary.callbackUri,
       changed: [...input.change.changedPaths],

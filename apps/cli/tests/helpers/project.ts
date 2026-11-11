@@ -1846,13 +1846,6 @@ export class ScaffoldedApp {
     );
   }
 
-  /** A connection file as it is on disk. */
-  async connectionOf(slug: string): Promise<ConnectionDocument> {
-    return JSON.parse(
-      await this.readProjectFile(`.zitadel/idps/${slug}.json`),
-    ) as ConnectionDocument;
-  }
-
   /** The project-relative path of a connection's file, as a command reports it. */
   connectionFile(slug: string): string {
     return `.zitadel/idps/${slug}.json`;

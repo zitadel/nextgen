@@ -1823,57 +1823,67 @@ export default class Setup extends Destructive(BaseCommand) {
             renderSummary(sections),
             ...planned.connections.flatMap((entry) => {
               const connection = entry.connection;
-              const { mappings, verifications, scopes, unmapped, usedBy } =
+              const text = (value: string) => {
+                return escapeControlCharacters(value, { keepLayout: false });
+              };
+              const { mappings, verifications, scopes, createsUsers, unmapped, usedBy } =
                 planned.change.after.connections.summarize(connection);
               const verifiedBy = new Map(
                 verifications.map(({ property, claim }) => {
                   return [property, claim];
                 }),
               );
-              const lines = [
-                ...(mappings.length === 0
-                  ? [
-                      `No attribute is filled from a claim yet. Add pairs to claim_mapping in ${connection.path}.`,
-                    ]
+              const sections = [
+                mappings.length === 0
+                  ? []
                   : [
                       "Each user attribute is filled from a claim your provider returns:",
-                      ...mappings.map(({ property, claim }) => {
+                      ...mappings.flatMap(({ property, claim }) => {
                         const how = verifiedBy.get(property);
-                        const trust =
-                          how === true
-                            ? ", and is always trusted"
-                            : typeof how === "string"
-                              ? `, verified when ${how} is true`
-                              : "";
-                        return `- ${property} comes from the ${claim} claim${trust}.`;
+                        return [
+                          `- ${text(property)} comes from the ${text(claim)} claim.`,
+                          ...(how === true ? ["  It is always trusted."] : []),
+                          ...(typeof how === "string"
+                            ? [`  It is verified when ${text(how)} is true.`]
+                            : []),
+                        ];
                       }),
-                    ]),
-                ...(scopes.length === 0
+                    ],
+                scopes.length === 0
                   ? []
                   : [
-                      "",
-                      `It asks your provider for the ${LIST.format(scopes)} ${PLURAL.select(scopes.length) === "one" ? "scope" : "scopes"}.`,
-                    ]),
-                ...(unmapped.length === 0
+                      `It asks your provider for the ${LIST.format(scopes.map(text))} ${PLURAL.select(scopes.length) === "one" ? "scope" : "scopes"}.`,
+                    ],
+                unmapped.length === 0
                   ? []
                   : [
-                      "",
                       "Some attributes have no claim yet:",
                       ...unmapped.map(({ property, required }) => {
-                        return required
-                          ? `- ${property} (required) - not filled by this connection, so sign-up has to collect it.`
-                          : `- ${property} (optional) - fine to leave empty.`;
+                        if (!required) {
+                          return `- ${text(property)} (optional) - fine to leave empty.`;
+                        }
+                        return createsUsers
+                          ? `- ${text(property)} (required) - sign-up has to collect it.`
+                          : `- ${text(property)} (required) - not filled by this connection.`;
                       }),
-                    ]),
-                "",
+                    ],
                 usedBy.length === 0
-                  ? "No user schema signs in through this connection yet, so changing it affects nothing today."
-                  : `${LIST.format(usedBy)} ${PLURAL.select(usedBy.length) === "one" ? "signs" : "sign"} in through this connection, so changes here affect ${PLURAL.select(usedBy.length) === "one" ? "it" : "them"}.`,
-              ];
+                  ? []
+                  : [
+                      `${LIST.format(usedBy.map(text))} ${PLURAL.select(usedBy.length) === "one" ? "signs" : "sign"} in through this connection, so changes here affect ${PLURAL.select(usedBy.length) === "one" ? "it" : "them"}.`,
+                    ],
+              ].filter((section) => {
+                return section.length > 0;
+              });
+              if (sections.length === 0) {
+                return [];
+              }
               return [
                 "",
                 dim(`SIGN IN WITH ${connection.displayName.toUpperCase()}`),
-                escapeControlCharacters(lines.join("\n")),
+                ...sections.flatMap((section, at) => {
+                  return at === 0 ? section : ["", ...section];
+                }),
               ];
             }),
             "",
@@ -1951,6 +1961,8 @@ export default class Setup extends Destructive(BaseCommand) {
               }),
             ),
             scopes: entry.connection.scopes ?? [],
+            unmapped: planned.change.after.connections.summarize(entry.connection).unmapped,
+            used_by: planned.change.after.connections.summarize(entry.connection).usedBy,
             // What the developer registers at the provider: the connection's
             // own route, as `auth-method sso enable` reports it.
             callback_uri: callbackUriFor(issuer, slug),

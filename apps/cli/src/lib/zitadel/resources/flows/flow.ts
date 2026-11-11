@@ -10,7 +10,6 @@ import {
   type SchemaReference,
   schemaReference,
   type StepName,
-  stepName,
 } from "@/lib/zitadel/names";
 import type { BrokenFile } from "@/lib/zitadel/resources/broken";
 import {
@@ -243,17 +242,6 @@ export class Flow extends ConfigDocument<FlowValue> {
       return false;
     }
     return PLATFORM_SCHEMA_ID.test(reference) || SCHEMA_URL.test(reference);
-  }
-
-  /**
-   * The steps the flow starts at, one per purpose.
-   *
-   * @returns The entry step names, in the order the purposes are written.
-   */
-  get entrySteps(): readonly StepName[] {
-    return Object.values(this.value.purposes).map((entry) => {
-      return stepName(entry);
-    });
   }
 
   /**
