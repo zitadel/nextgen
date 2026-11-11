@@ -1238,6 +1238,48 @@ func TestConsoleSessionRevokedStopsAuthorizing(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, queryUsers(), "the revoked session's cookie must not authorize")
 }
 
+// TestConsoleSessionDeactivatedUserStopsAuthorizing pins ADR 053 §4 (#1234)
+// end to end, for a user of the project and for a platform user granted on it:
+// deactivating a user leaves their sessions alive (#553) and their direct
+// grants in place, so only the resolver's read of the user's status in their
+// home project stops the next request. A deactivated user then gets what an
+// unknown project gets.
+func TestConsoleSessionDeactivatedUserStopsAuthorizing(t *testing.T) {
+	t.Parallel()
+	stmts := harness.EnsureServiceDB(t).Statements()
+
+	home, localID, local := ownSessionUser(t)
+	harness.SeedProjectAdmin(t, home.ID, localID)
+
+	platform := harness.EnsurePlatformProject(t)
+	customer, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	foreignID := platformUser(t)
+	harness.SeedProjectAdmin(t, customer.ID, foreignID)
+	foreign := platformSessionCookie(t, foreignID)
+
+	for name, tc := range map[string]struct {
+		cookie                    *http.Cookie
+		homeID, userID, projectID string
+	}{
+		"a user of the project":         {local, home.ID, localID, home.ID},
+		"a platform user granted on it": {foreign, platform.ID, foreignID, customer.ID},
+	} {
+		t.Run(name, func(t *testing.T) {
+			status, body := consoleCall(t, tc.cookie, http.MethodGet, "/projects/"+tc.projectID, "")
+			require.Equal(t, http.StatusOK, status, body)
+
+			require.NoError(t, stmts.DeactivateUser(t.Context(), tc.homeID, tc.userID))
+
+			status, body = consoleCall(t, tc.cookie, http.MethodGet, "/projects/"+tc.projectID, "")
+			assert.Equal(t, http.StatusNotFound, status, body)
+			unknownStatus, unknownBody := consoleCall(t, tc.cookie, http.MethodGet, "/projects/"+unknownLike(tc.projectID), "")
+			assert.Equal(t, unknownStatus, status, "same status as an unknown project")
+			assert.Equal(t, unknownBody, body, "same body as an unknown project")
+		})
+	}
+}
+
 // requireUsersNotFound pins a refused users list to its not-found shape: 404
 // user.not_found, the same answer as a project that does not exist.
 func requireUsersNotFound(t *testing.T, resp api.QueryUsersRes) {
