@@ -42,6 +42,7 @@ const NAV_ORDER = [
   "Deployments",
   "Authentication",
   "Logs",
+  "Webhooks",
   "Settings",
 ];
 // What sits above every project: the home, the project's screens (D34), then

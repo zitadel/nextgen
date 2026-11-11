@@ -44,7 +44,7 @@ import {
 import {
   AUDIT_CATEGORIES,
   type AuditCategory,
-  EVENT_TYPES,
+  EVENT_TYPE_GROUPS,
   FAILED_STATUS,
   FAILURE_TYPES,
   hasCustomRange,
@@ -414,16 +414,6 @@ function CustomRange({
   );
 }
 
-/** The type list's captions: the first word of a type, as `auth` in `auth.check.failed`. */
-const TYPE_GROUPS: ComboboxGroup[] = EVENT_TYPES.reduce<ComboboxGroup[]>((groups, type) => {
-  const heading = type.split(".")[0] ?? type;
-  const option = { value: type, label: type };
-  const last = groups.at(-1);
-  if (last?.heading === heading) last.options.push(option);
-  else groups.push({ heading, options: [option] });
-  return groups;
-}, []);
-
 /** The list's first row, which is no type: it stands for all the failure types. */
 const FAILURES = "preset:failures";
 
@@ -444,7 +434,7 @@ const TYPE_LIST: ComboboxGroup[] = [
       },
     ],
   },
-  ...TYPE_GROUPS,
+  ...EVENT_TYPE_GROUPS,
 ];
 
 /**

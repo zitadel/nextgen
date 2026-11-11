@@ -34,6 +34,8 @@ import { Route as AuthedTeamsIndexRouteImport } from './routes/_authed/teams/ind
 import { Route as AuthedTeamsTeamIdRouteImport } from './routes/_authed/teams/$teamId'
 import { Route as AuthedUsersIndexRouteImport } from './routes/_authed/users/index'
 import { Route as AuthedUsersUserIdRouteImport } from './routes/_authed/users/$userId'
+import { Route as AuthedWebhooksIndexRouteImport } from './routes/_authed/webhooks/index'
+import { Route as AuthedWebhooksWebhookIdRouteImport } from './routes/_authed/webhooks/$webhookId'
 import { Route as AuthedAuthenticationIdpsIdpIdRouteImport } from './routes/_authed/authentication/idps/$idpId'
 
 const AuthedRoute = AuthedRouteImport.update({
@@ -163,6 +165,16 @@ const AuthedUsersUserIdRoute = AuthedUsersUserIdRouteImport.update({
   path: '/users/$userId',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedWebhooksIndexRoute = AuthedWebhooksIndexRouteImport.update({
+  id: '/webhooks/',
+  path: '/webhooks/',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedWebhooksWebhookIdRoute = AuthedWebhooksWebhookIdRouteImport.update({
+  id: '/webhooks/$webhookId',
+  path: '/webhooks/$webhookId',
+  getParentRoute: () => AuthedRoute,
+} as any)
 const AuthedAuthenticationIdpsIdpIdRoute =
   AuthedAuthenticationIdpsIdpIdRouteImport.update({
     id: '/authentication/idps/$idpId',
@@ -183,6 +195,7 @@ export interface FileRoutesByFullPath {
   '/settings/profile': typeof AuthedSettingsProfileRoute
   '/teams/$teamId': typeof AuthedTeamsTeamIdRoute
   '/users/$userId': typeof AuthedUsersUserIdRoute
+  '/webhooks/$webhookId': typeof AuthedWebhooksWebhookIdRoute
   '/authentication/': typeof AuthedAuthenticationIndexRoute
   '/branding/': typeof AuthedBrandingIndexRoute
   '/deployments/': typeof AuthedDeploymentsIndexRoute
@@ -195,6 +208,7 @@ export interface FileRoutesByFullPath {
   '/system/': typeof AuthedSystemIndexRoute
   '/teams/': typeof AuthedTeamsIndexRoute
   '/users/': typeof AuthedUsersIndexRoute
+  '/webhooks/': typeof AuthedWebhooksIndexRoute
   '/authentication/idps/$idpId': typeof AuthedAuthenticationIdpsIdpIdRoute
 }
 export interface FileRoutesByTo {
@@ -209,6 +223,7 @@ export interface FileRoutesByTo {
   '/settings/profile': typeof AuthedSettingsProfileRoute
   '/teams/$teamId': typeof AuthedTeamsTeamIdRoute
   '/users/$userId': typeof AuthedUsersUserIdRoute
+  '/webhooks/$webhookId': typeof AuthedWebhooksWebhookIdRoute
   '/authentication': typeof AuthedAuthenticationIndexRoute
   '/branding': typeof AuthedBrandingIndexRoute
   '/deployments': typeof AuthedDeploymentsIndexRoute
@@ -221,6 +236,7 @@ export interface FileRoutesByTo {
   '/system': typeof AuthedSystemIndexRoute
   '/teams': typeof AuthedTeamsIndexRoute
   '/users': typeof AuthedUsersIndexRoute
+  '/webhooks': typeof AuthedWebhooksIndexRoute
   '/authentication/idps/$idpId': typeof AuthedAuthenticationIdpsIdpIdRoute
 }
 export interface FileRoutesById {
@@ -238,6 +254,7 @@ export interface FileRoutesById {
   '/_authed/settings/profile': typeof AuthedSettingsProfileRoute
   '/_authed/teams/$teamId': typeof AuthedTeamsTeamIdRoute
   '/_authed/users/$userId': typeof AuthedUsersUserIdRoute
+  '/_authed/webhooks/$webhookId': typeof AuthedWebhooksWebhookIdRoute
   '/_authed/authentication/': typeof AuthedAuthenticationIndexRoute
   '/_authed/branding/': typeof AuthedBrandingIndexRoute
   '/_authed/deployments/': typeof AuthedDeploymentsIndexRoute
@@ -250,6 +267,7 @@ export interface FileRoutesById {
   '/_authed/system/': typeof AuthedSystemIndexRoute
   '/_authed/teams/': typeof AuthedTeamsIndexRoute
   '/_authed/users/': typeof AuthedUsersIndexRoute
+  '/_authed/webhooks/': typeof AuthedWebhooksIndexRoute
   '/_authed/authentication/idps/$idpId': typeof AuthedAuthenticationIdpsIdpIdRoute
 }
 export interface FileRouteTypes {
@@ -267,6 +285,7 @@ export interface FileRouteTypes {
     | '/settings/profile'
     | '/teams/$teamId'
     | '/users/$userId'
+    | '/webhooks/$webhookId'
     | '/authentication/'
     | '/branding/'
     | '/deployments/'
@@ -279,6 +298,7 @@ export interface FileRouteTypes {
     | '/system/'
     | '/teams/'
     | '/users/'
+    | '/webhooks/'
     | '/authentication/idps/$idpId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -293,6 +313,7 @@ export interface FileRouteTypes {
     | '/settings/profile'
     | '/teams/$teamId'
     | '/users/$userId'
+    | '/webhooks/$webhookId'
     | '/authentication'
     | '/branding'
     | '/deployments'
@@ -305,6 +326,7 @@ export interface FileRouteTypes {
     | '/system'
     | '/teams'
     | '/users'
+    | '/webhooks'
     | '/authentication/idps/$idpId'
   id:
     | '__root__'
@@ -321,6 +343,7 @@ export interface FileRouteTypes {
     | '/_authed/settings/profile'
     | '/_authed/teams/$teamId'
     | '/_authed/users/$userId'
+    | '/_authed/webhooks/$webhookId'
     | '/_authed/authentication/'
     | '/_authed/branding/'
     | '/_authed/deployments/'
@@ -333,6 +356,7 @@ export interface FileRouteTypes {
     | '/_authed/system/'
     | '/_authed/teams/'
     | '/_authed/users/'
+    | '/_authed/webhooks/'
     | '/_authed/authentication/idps/$idpId'
   fileRoutesById: FileRoutesById
 }
@@ -519,6 +543,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedUsersUserIdRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/webhooks/': {
+      id: '/_authed/webhooks/'
+      path: '/webhooks'
+      fullPath: '/webhooks/'
+      preLoaderRoute: typeof AuthedWebhooksIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/webhooks/$webhookId': {
+      id: '/_authed/webhooks/$webhookId'
+      path: '/webhooks/$webhookId'
+      fullPath: '/webhooks/$webhookId'
+      preLoaderRoute: typeof AuthedWebhooksWebhookIdRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/authentication/idps/$idpId': {
       id: '/_authed/authentication/idps/$idpId'
       path: '/authentication/idps/$idpId'
@@ -552,6 +590,7 @@ interface AuthedRouteChildren {
   AuthedSettingsProfileRoute: typeof AuthedSettingsProfileRoute
   AuthedTeamsTeamIdRoute: typeof AuthedTeamsTeamIdRoute
   AuthedUsersUserIdRoute: typeof AuthedUsersUserIdRoute
+  AuthedWebhooksWebhookIdRoute: typeof AuthedWebhooksWebhookIdRoute
   AuthedAuthenticationIndexRoute: typeof AuthedAuthenticationIndexRoute
   AuthedBrandingIndexRoute: typeof AuthedBrandingIndexRoute
   AuthedDeploymentsIndexRoute: typeof AuthedDeploymentsIndexRoute
@@ -563,6 +602,7 @@ interface AuthedRouteChildren {
   AuthedSystemIndexRoute: typeof AuthedSystemIndexRoute
   AuthedTeamsIndexRoute: typeof AuthedTeamsIndexRoute
   AuthedUsersIndexRoute: typeof AuthedUsersIndexRoute
+  AuthedWebhooksIndexRoute: typeof AuthedWebhooksIndexRoute
   AuthedAuthenticationIdpsIdpIdRoute: typeof AuthedAuthenticationIdpsIdpIdRoute
 }
 
@@ -577,6 +617,7 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedSettingsProfileRoute: AuthedSettingsProfileRoute,
   AuthedTeamsTeamIdRoute: AuthedTeamsTeamIdRoute,
   AuthedUsersUserIdRoute: AuthedUsersUserIdRoute,
+  AuthedWebhooksWebhookIdRoute: AuthedWebhooksWebhookIdRoute,
   AuthedAuthenticationIndexRoute: AuthedAuthenticationIndexRoute,
   AuthedBrandingIndexRoute: AuthedBrandingIndexRoute,
   AuthedDeploymentsIndexRoute: AuthedDeploymentsIndexRoute,
@@ -588,6 +629,7 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedSystemIndexRoute: AuthedSystemIndexRoute,
   AuthedTeamsIndexRoute: AuthedTeamsIndexRoute,
   AuthedUsersIndexRoute: AuthedUsersIndexRoute,
+  AuthedWebhooksIndexRoute: AuthedWebhooksIndexRoute,
   AuthedAuthenticationIdpsIdpIdRoute: AuthedAuthenticationIdpsIdpIdRoute,
 }
 

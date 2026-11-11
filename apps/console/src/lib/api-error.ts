@@ -15,7 +15,8 @@ import { ApiError } from "@zitadel/api/runtime/fetch";
  * a network failure or a non-JSON response.
  *
  * When the server names the fields a request failed on (`details.details.fields`,
- * as a `400 req.invalid` or a taken unique value does), they are appended after
+ * as a `400 req.invalid` or a taken unique value does, or the one `field` a
+ * resource's own check stopped at), they are appended after
  * the message: the `req.invalid` message tells the reader to check them. They
  * are listed as the server named them, minus the `attributes.` prefix of the
  * request body, and never guessed from the schema's `x-unique` markers.
@@ -31,6 +32,17 @@ export function describeError(cause: unknown, fallback: string): string {
     return fallback;
   }
   return cause instanceof Error ? cause.message : fallback;
+}
+
+/**
+ * The server's own message for a failed request, without the fields it names:
+ * for a form that shows the message on the field instead of listing it.
+ * `fallback` as in {@link describeError}.
+ */
+export function errorMessage(cause: unknown, fallback: string): string {
+  if (!(cause instanceof ApiError)) return cause instanceof Error ? cause.message : fallback;
+  const message = errorBody(cause)?.message;
+  return typeof message === "string" && message.trim() !== "" ? message : fallback;
 }
 
 /** The fields a failed request names, as {@link describeError} lists them. */
@@ -51,9 +63,10 @@ function namedFields(body: Record<string, unknown>): string[] {
   if (!details || typeof details !== "object") return [];
   const producer = (details as Record<string, unknown>).details;
   if (!producer || typeof producer !== "object") return [];
-  const fields = (producer as Record<string, unknown>).fields;
-  if (!Array.isArray(fields)) return [];
-  return fields
+  // A refusal names several fields (`fields`) or the one it stopped at (`field`).
+  const { fields, field } = producer as Record<string, unknown>;
+  const named = Array.isArray(fields) ? fields : [field];
+  return named
     .filter((field): field is string => typeof field === "string" && field !== "")
     .map((field) => field.replace(/^attributes\./, ""));
 }
