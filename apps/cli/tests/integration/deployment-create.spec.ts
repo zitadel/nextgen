@@ -91,8 +91,6 @@ describe("deployment create", () => {
         expect(data.origins).toEqual([SETUP_ORIGIN.pattern, "https://app.acme.com"]);
       });
 
-      // The summary counts the origins and does not name them, so an escape
-      // sequence in one never reaches the terminal at all.
       it("keeps an escape sequence the server put in an origin off the terminal", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin("https://app.acme.com");
@@ -108,6 +106,41 @@ describe("deployment create", () => {
         ]);
 
         expect(result.stdout + result.stderr).not.toContain("\u001b[2J");
+      });
+
+      it("titles its answer with the title a terminal shows", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin("https://app.acme.com");
+        const releaseId = await aRelease(app);
+
+        const result = await app.run([
+          "deployment",
+          "create",
+          "--release",
+          releaseId,
+          "--non-interactive",
+          "--json",
+        ]);
+
+        expect(app.envelopeOf<{ title: string }>(result).data.title).toBe(`Deployed ${releaseId}`);
+      });
+
+      it("suggests the deployment it planned", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin("https://app.acme.com");
+        const releaseId = await aRelease(app);
+
+        const result = await app.run([
+          "deployment",
+          "create",
+          "--release",
+          releaseId,
+          "--dry-run",
+          "--non-interactive",
+          "--json",
+        ]);
+
+        expect(result).toSuggest(`deployment create --release ${releaseId}`);
       });
 
       it("writes no deployment on a dry run", async () => {
@@ -164,6 +197,24 @@ describe("deployment create", () => {
         ]);
 
         expect(result).toFailWith("E_VALIDATION");
+      });
+    });
+
+    describe("rendered for a terminal", () => {
+      it("names every origin it deployed to", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin("https://app.acme.com");
+        const releaseId = await aRelease(app);
+
+        const result = await app.run([
+          "deployment",
+          "create",
+          "--release",
+          releaseId,
+          "--non-interactive",
+        ]);
+
+        expect(result).toPrint("https://app.acme.com");
       });
     });
   });

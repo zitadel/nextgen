@@ -323,6 +323,22 @@ describe("a normal command's chain, which is no chain at all", () => {
     running.clear();
   });
 
+  it("clears a running spinner before it draws a note and draws it again after", () => {
+    const order: string[] = [];
+    const chain = watching();
+    const running = chain.spinner("Deploying");
+    const handle = vi.mocked(spinner).mock.results.at(-1)?.value as ReturnType<typeof spinner>;
+    vi.mocked(handle.clear).mockImplementation(() => void order.push("clear"));
+    vi.mocked(note).mockImplementationOnce(() => void order.push("note"));
+
+    chain.note("Register an app", ["open the console"]);
+
+    const drawnAgain = vi.mocked(spinner).mock.results.at(-1)?.value as ReturnType<typeof spinner>;
+    expect(order).toEqual(["clear", "note"]);
+    expect(drawnAgain.start).toHaveBeenCalledWith("Deploying");
+    running.clear();
+  });
+
   it("clears a running spinner before a question is drawn and draws it again after the answer", async () => {
     const order: string[] = [];
     const chain = watching();

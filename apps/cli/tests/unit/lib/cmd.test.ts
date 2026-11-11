@@ -36,20 +36,26 @@ describe("Cmd.quote", () => {
     expect(Cmd.quote(value)).toBe(quoted);
   });
 
-  it.each([
-    "my\tdir",
-    "a\nb",
-    "a\rb",
-    "a\u001bb",
-    "a\u007fb",
-    "a\u009bb",
-    "a‮b",
-    "a\u{e0041}b",
-    "it's\t",
-    "a\\b\t",
-    "$(whoami)\n",
-  ])("is read back by bash as the value it quoted (%j)", (value) => {
-    const read = execFileSync("bash", ["-c", `printf '%s' ${Cmd.quote(value)}`], {
+  it.each(
+    ["bash", "zsh"].flatMap((shell) => {
+      return [
+        [shell, "my\tdir"],
+        [shell, "a\nb"],
+        [shell, "a\rb"],
+        [shell, "a\u001bb"],
+        [shell, "a\u007fb"],
+        [shell, "a\u009bb"],
+        [shell, "a‮b"],
+        [shell, "a\u{e0041}b"],
+        [shell, "it's\t"],
+        [shell, "a\\b\t"],
+        [shell, "$(whoami)\n"],
+        [shell, "my dir"],
+        [shell, "it's"],
+      ];
+    }),
+  )("is read back by %s as the value it quoted (%j)", (shell, value) => {
+    const read = execFileSync(shell, ["-c", `printf '%s' ${Cmd.quote(value)}`], {
       encoding: "utf8",
     });
 

@@ -3,9 +3,16 @@ import { describe, expect, it } from "vitest";
 import { useLocalServers } from "@tests/helpers/local-server";
 import { usePlatformMock } from "@tests/helpers/platform";
 import { anApp, aSetUpApp } from "@tests/helpers/project";
+import { asTerminal, offTerminal } from "@tests/helpers/terminal";
 
 const platform = usePlatformMock();
 useLocalServers();
+
+/** The two ways a person reads a run, which must say the same thing. */
+const SHOWN = [
+  ["on a terminal", asTerminal],
+  ["piped", offTerminal],
+] as const;
 
 describe("stop", () => {
   describe("against an invalid server", () => {
@@ -85,6 +92,42 @@ describe("stop", () => {
         const result = await app.run(["stop", "--json"]);
 
         expect(result).toSucceed();
+      });
+
+      it("suggests the stop it planned", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["stop", "--dry-run", "--json"]);
+
+        expect(result).toSuggestExactly(`stop --cwd ${app.path}`);
+      });
+
+      it("suggests the sweep it planned", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["stop", "--all", "--dry-run", "--json"]);
+
+        expect(result).toSuggestExactly(`stop --all --cwd ${app.path}`);
+      });
+    });
+
+    describe.each(SHOWN)("rendered %s", (_how, shown) => {
+      it("names the process it stopped", async () => {
+        const app = await aSetUpApp();
+        const started = await app.startLocalServer();
+
+        const result = await shown(() => app.run(["stop"]));
+
+        expect(result).toPrint(String(app.localPidOf(started)));
+      });
+
+      it("names the process it would stop", async () => {
+        const app = await aSetUpApp();
+        const started = await app.startLocalServer();
+
+        const result = await shown(() => app.run(["stop", "--dry-run"]));
+
+        expect(result).toPrint(String(app.localPidOf(started)));
       });
     });
   });

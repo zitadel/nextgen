@@ -100,6 +100,19 @@ class SelectorProbe extends EnvironmentCommand {
   }
 }
 
+/** A command that edits files only, so it resolves no environment. */
+class FilesOnlyProbe extends EnvironmentCommand {
+  protected async execute(): Promise<never> {
+    throw new Error("unused");
+  }
+
+  async probe() {
+    const { flags } = await this.parse(FilesOnlyProbe);
+    await this.toMeta(flags, { environment: false });
+    return { selector: this.environmentSelector(), args: this.environmentSelectorArgs() };
+  }
+}
+
 const config = await Config.load(cliPackageRoot);
 
 async function envFile(dir: string, contents: string): Promise<string> {
@@ -295,6 +308,20 @@ describe("EnvironmentCommand.environmentSelector", () => {
     ).probe();
 
     expect(selector).toBe(` --env-file ${file} --cwd ${dir}`);
+  });
+
+  it("keeps only --cwd in a command that resolved no environment", async ({ dir }) => {
+    const { selector } = await new FilesOnlyProbe(["--cwd", dir], config).probe();
+
+    expect(selector).toBe(` --cwd ${dir}`);
+  });
+
+  it("keeps only --cwd in the arguments of a command that resolved no environment", async ({
+    dir,
+  }) => {
+    const { args } = await new FilesOnlyProbe(["--cwd", dir], config).probe();
+
+    expect(args).toEqual(["--cwd", dir]);
   });
 
   it("reflects --server as the resolved origin", async ({ dir }) => {

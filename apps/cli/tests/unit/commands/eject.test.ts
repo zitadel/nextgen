@@ -313,6 +313,40 @@ describe("eject command", () => {
     expect(json.status).toBe("skipped");
     expect(json.reason).toBe("nothing-to-eject");
   });
+
+  it("suggests setup in the envelope when there is nothing to eject", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "zitadel-eject-empty-"));
+    tempDirs.push(cwd);
+
+    const res = await eject(cwd, ["--force"]);
+
+    expect(parseJson(res.stdout)).toMatchObject({
+      next_commands: [expect.stringContaining("setup")],
+    });
+  });
+
+  it("suggests setup in the envelope on a dry run with nothing to eject", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "zitadel-eject-empty-"));
+    tempDirs.push(cwd);
+
+    const res = await eject(cwd, ["--dry-run"]);
+
+    expect(parseJson(res.stdout)).toMatchObject({
+      data: { next_commands: [expect.stringContaining("setup")] },
+    });
+  });
+
+  it.for(["zitadel.json", ".env.local", "Remove the Zitadel configuration block from vite.config"])(
+    "tells a person on the terminal about %s",
+    async (line) => {
+      const cwd = await makeManagedViteProject();
+      await writeFile(join(cwd, ".env.local"), "ZITADEL_PROJECT_ID=proj-001\n");
+
+      const res = await runCliForTest(["eject", "--cwd", cwd, "--force"]);
+
+      expect(stripAnsi(res.stdout)).toContain(line);
+    },
+  );
 });
 
 describe("eject asked on a terminal", () => {
@@ -378,6 +412,16 @@ describe("eject asked on a terminal", () => {
 
     expect(stripAnsi(shown)).toContain("Remove it whenever you like:");
     expect(stripAnsi(shown)).toMatch(/\$ .* eject --cwd /);
+  });
+
+  it("offers the eject command again in the envelope when the answer is no", async () => {
+    const cwd = await makeManagedProject();
+
+    const { result } = await ejecting(cwd, false);
+
+    expect(JSON.parse(JSON.stringify(result))).toMatchObject({
+      next_commands: [expect.stringContaining("eject")],
+    });
   });
 
   it("ends a declined run on the one dim footer", async () => {

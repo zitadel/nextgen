@@ -31,6 +31,7 @@ import type { NextSteps } from "@/lib/oclif/next-steps";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { Suggestible } from "@/lib/oclif/suggestible";
 import type { SuggestedCommand } from "@/lib/suggestion";
+import { type Fact, section } from "@/lib/ui";
 
 /**
  * How an image beside the binary runtime is refused: an image is a container's,
@@ -110,6 +111,7 @@ export default class Start extends Suggestible(BaseCommand) {
       defaultLocalServerImageForCliVersion(this.cliVersion);
     if (this.dryRun) {
       const title = "Would start the local Zitadel server (dry run)";
+      const imaged: Fact[] = runtimeBackend === "docker" ? [["Image", image]] : [];
 
       return this.emit({
         status: "ok",
@@ -133,7 +135,16 @@ export default class Start extends Suggestible(BaseCommand) {
         },
         summary: {
           title,
-          sections: [],
+          sections: [
+            section(
+              undefined,
+              ["Runtime", runtimeBackend],
+              ...imaged,
+              ["Port", String(port)],
+              ["API", serverUrl],
+              ["Console", `${serverUrl}/ui/console/`],
+            ),
+          ],
         },
         next: {
           commands: [
@@ -205,7 +216,17 @@ export default class Start extends Suggestible(BaseCommand) {
         title: alreadyRunning
           ? "Local Zitadel server is already running"
           : "Local Zitadel server is ready",
-        sections: [],
+        sections: [
+          section(
+            undefined,
+            runtime.backend === "binary"
+              ? ["Process", String(runtime.pid)]
+              : ["Container", runtime.container_name],
+            ["API", runtime.server_url],
+            ["Console", `${runtime.server_url}/ui/console/`],
+            ["Data", runtime.data_dir],
+          ),
+        ],
       },
       next: readyNext(this.cliVersion, this.suggest("setup --server local")),
     });
@@ -223,16 +244,6 @@ export default class Start extends Suggestible(BaseCommand) {
   }
 }
 
-/**
- * The start a dry run stands in for: the same command with the port, runtime
- * and image as they were typed, so running it does what the dry run said.
- *
- * @param flags - The flags this run was given.
- * @param flags.port - The port, when one was named.
- * @param flags.runtime - The runtime, when one was named.
- * @param flags.image - The image, when one was named.
- * @returns The command and its arguments, for `suggest`.
- */
 /**
  * Whether this start boots the platform project, and with it the local admin.
  * On by default; an explicit `NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=false` opts

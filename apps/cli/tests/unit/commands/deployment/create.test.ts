@@ -133,18 +133,17 @@ describe("deployment create at a terminal", () => {
 
       expect(res.exitCode).toBe(0);
       const shown = stripAnsi(res.stdout);
-      expect(shown).toContain("Deployed rel_1 to 1 origin · project proj_test");
+      expect(shown).toContain("Deployed rel_1 · project proj_test");
       expect(shown).not.toContain("- https://app.acme.com");
     });
 
-    it("counts the origins rather than spelling out as many as the project has", async () => {
+    it("names the origins in one sentence, not a list", async () => {
       const cwd = await aProject(["https://app.acme.com", "https://admin.acme.com"]);
 
       const res = await deploy(cwd);
 
       const shown = stripAnsi(res.stdout);
-      expect(shown).toContain("Deployed rel_1 to 2 origins");
-      expect(shown).not.toContain("https://admin.acme.com");
+      expect(shown).toContain("Live on https://app.acme.com and https://admin.acme.com.");
     });
   });
 });

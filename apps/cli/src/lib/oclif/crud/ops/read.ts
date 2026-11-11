@@ -67,7 +67,7 @@ export class GetOperation<Ctx> extends ResourceCommand<Ctx, GetSpec<Ctx>, ReadIn
     const item = await spec.call(await this.context(), idValue(resource, args));
     const fields = chosenColumns(flags.fields, resource.detail ?? resource.columns, [item], shape);
     const heading = headingOf(resource.heading ?? resource.idField, item);
-    const title = `Read ${escapeControlCharacters(heading ?? resource.singular)}`;
+    const title = `Read ${escapeControlCharacters(heading ?? resource.singular, { keepLayout: false })}`;
 
     if (!this.isOnScreen) {
       return {

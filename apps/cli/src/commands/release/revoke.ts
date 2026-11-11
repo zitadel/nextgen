@@ -4,6 +4,7 @@ import { z } from "zod";
 import { ReleaseService } from "@/lib/backend";
 import { RevokeReleaseParams } from "@/lib/backend/schemas";
 import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
+import { Cmd } from "@/lib/cmd";
 import { Destructive } from "@/lib/oclif/destructive";
 import { mutatedData } from "@/lib/oclif/envelope";
 import { type Refused, taken } from "@/lib/oclif/flags";
@@ -63,18 +64,24 @@ export default class ReleaseRevoke extends Destructive(EnvironmentCommand) {
         name: `revoke ${args.releaseId}`,
         message: async () => {
           const { projectId, server } = await this.connect();
-          return `Revoke ${args.releaseId} in project ${escapeControlCharacters(projectId)} on ${escapeControlCharacters(server.replace(/^https?:\/\//, ""))} so its content can never be served again?`;
+          return `Revoke ${args.releaseId} in project ${projectId} on ${server.replace(/^https?:\/\//, "")} so its content can never be served again?`;
         },
         preview: () => {
+          const title = `Would revoke ${escapeControlCharacters(args.releaseId)} (dry run)`;
+
           return {
             status: "ok",
             data: {
               dry_run: true,
+              title,
               release_id: args.releaseId,
             },
             summary: {
-              title: `Would revoke ${escapeControlCharacters(args.releaseId)} (dry run)`,
+              title,
               sections: [],
+            },
+            next: {
+              commands: [this.suggest(`release revoke ${Cmd.quote(args.releaseId)} --force`)],
             },
           };
         },
@@ -84,14 +91,17 @@ export default class ReleaseRevoke extends Destructive(EnvironmentCommand) {
         apply: async (consent, { client, projectId }) => {
           const releaseService = new ReleaseService(consent.unlock(client), projectId);
           const release = await releaseService.revoke(args.releaseId);
+          const title = `Revoked ${escapeControlCharacters(release.id)}`;
+
           return {
             status: "ok",
             data: {
+              title,
               ...mutatedData({ release_id: release.id }, "revoked"),
               revoked_at: release.revoked_at,
             },
             summary: {
-              title: `Revoked ${escapeControlCharacters(release.id)}`,
+              title,
               sections: [],
             },
           };

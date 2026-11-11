@@ -93,6 +93,10 @@ export abstract class EnvironmentCommand extends Suggestible(BaseCommand) {
    * invocation used no selector.
    */
   protected environmentSelector(): EnvironmentSelector {
+    // A command that resolved no environment has only its directory to put back.
+    if ((this.environment as Environment | undefined) === undefined) {
+      return this.cwdSelector();
+    }
     const { environment } = this;
 
     return environmentSelectorSuffix({
@@ -115,6 +119,9 @@ export abstract class EnvironmentCommand extends Suggestible(BaseCommand) {
    * follow-ups as argument lists too (`next_args`).
    */
   protected environmentSelectorArgs(): string[] {
+    if ((this.environment as Environment | undefined) === undefined) {
+      return this.cwdFlag === undefined ? [] : optionArgs("--cwd", this.cwdFlag);
+    }
     const { environment } = this;
 
     return [

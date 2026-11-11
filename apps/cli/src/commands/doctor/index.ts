@@ -368,14 +368,17 @@ export default class Doctor extends Destructive(BaseCommand) {
           : undefined,
     });
     // One text, the same in the envelope and on the terminal.
-    const title =
+    const planned = flags.fix === true && this.dryRun;
+    const verdict =
       failed.length > 0
         ? "Zitadel doctor found issues"
         : warnings.length > 0
           ? "Checks passed with warnings"
           : "All checks passed";
+    const title = planned ? `${verdict} (dry run)` : verdict;
     const data = {
       title,
+      ...(planned ? { dry_run: true } : {}),
       ok: failed.length === 0,
       ...(hostedServer === undefined
         ? {
@@ -391,7 +394,22 @@ export default class Doctor extends Destructive(BaseCommand) {
     };
     const next: NextSteps<SuggestedCommand> = {
       ...(nextActions.length > 0 ? { actions: nextActions } : {}),
-      ...(warningAdvice ? { commands: warningAdvice.nextCommands } : {}),
+      ...(warningAdvice || planned
+        ? {
+            commands: [
+              ...(warningAdvice?.nextCommands ?? []),
+              ...(planned
+                ? [
+                    projectCommand(
+                      flags.force ? "doctor --fix --force" : "doctor --fix",
+                      selector,
+                      this.cliVersion,
+                    ),
+                  ]
+                : []),
+            ],
+          }
+        : {}),
     };
     const reportInput = {
       checks,

@@ -152,6 +152,15 @@ describe("variable rm", () => {
         expect(result).toFailWith("E_CONFIRMATION_REQUIRED");
       });
 
+      it("says it is the preview value it would remove, with --preview", async () => {
+        const app = await aSetUpApp();
+        expect(await app.setVariable("FOO", "bar", { preview: true })).toSucceed();
+
+        const result = await app.run(["variable", "rm", "FOO", "--preview", "--json"]);
+
+        expect(result).toExplain("Cannot remove the preview value of FOO from the project");
+      });
+
       it("says to pass --force", async () => {
         const app = await aSetUpApp();
         expect(await app.setVariable("FOO", "bar")).toSucceed();

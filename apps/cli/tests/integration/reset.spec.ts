@@ -1,9 +1,18 @@
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "@tests/helpers/platform";
+import { useLocalServers } from "@tests/helpers/local-server";
 import { anApp, aSetUpApp } from "@tests/helpers/project";
+import { asTerminal, offTerminal } from "@tests/helpers/terminal";
 
 const platform = usePlatformMock();
+useLocalServers();
+
+/** The two ways a person reads a run, which must say the same thing. */
+const SHOWN = [
+  ["on a terminal", asTerminal],
+  ["piped", offTerminal],
+] as const;
 
 describe("reset", () => {
   describe("against an invalid server", () => {
@@ -110,6 +119,38 @@ describe("reset", () => {
         const { removed } = await before.changes();
         expect(removed).not.toContain("zitadel.json");
         expect(removed).not.toContain(".zitadel/schemas/default-human-user.json");
+      });
+
+      it("does not claim in a dry run that the data was deleted", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["reset", "--dry-run", "--json"]);
+
+        expect(
+          app.envelopeOf<{ runtime: { data_deleted: boolean } }>(result).data.runtime,
+        ).toMatchObject({
+          data_deleted: false,
+        });
+      });
+    });
+
+    describe.each(SHOWN)("rendered %s", (_how, shown) => {
+      it("names the process it reset", async () => {
+        const app = await aSetUpApp();
+        const started = await app.startLocalServer();
+
+        const result = await shown(() => app.run(["reset", "--force"]));
+
+        expect(result).toPrint(String(app.localPidOf(started)));
+      });
+
+      it("names the process it would reset", async () => {
+        const app = await aSetUpApp();
+        const started = await app.startLocalServer();
+
+        const result = await shown(() => app.run(["reset", "--dry-run"]));
+
+        expect(result).toPrint(String(app.localPidOf(started)));
       });
     });
   });

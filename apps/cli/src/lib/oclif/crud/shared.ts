@@ -104,6 +104,8 @@ export const parseOrThrow = <B>(
 export type DryRun = Readonly<{
   verb: string;
   topic: string;
+  /** What the subject line calls the resource, as the prompt does; the topic when absent. */
+  noun?: string;
   id?: string;
   /** What the subject line ends with: "from the project", "on the project (secret)". */
   clause?: string;
@@ -116,6 +118,7 @@ export type DryRun = Readonly<{
 export const dryRunResult = ({
   verb,
   topic,
+  noun,
   id,
   clause,
   body,
@@ -129,7 +132,7 @@ export const dryRunResult = ({
   // send later comes from (ADR 071 §8).
   const shown = body === undefined ? undefined : (redactCredentials(body, context) as Json);
   const result = checked === undefined ? undefined : (redactCredentials(checked, context) as Json);
-  const subject = [topic, id, clause].filter(Boolean).join(" ");
+  const subject = [noun ?? topic, id, clause].filter(Boolean).join(" ");
   // The document keeps the spelling JSON spells a control character with, as
   // the cells of a table are spelled where they are read: the line around it
   // is prose, but the block itself is a document a reader copies, and the
@@ -140,10 +143,13 @@ export const dryRunResult = ({
     shown === undefined ? "" : `\n${escapeJsonControlCharacters(JSON.stringify(shown, null, 2))}`;
   const verdict = result === undefined ? "" : "\nThe server would accept this. Nothing changed.";
 
+  const title = `Would ${verb} ${escapeControlCharacters(subject, { keepLayout: false })} (dry run)`;
+
   return {
     status: "ok",
     data: {
       dry_run: true,
+      title,
       verb,
       topic,
       id,
@@ -152,7 +158,7 @@ export const dryRunResult = ({
     },
     pretty: prose(`Would ${verb} ${subject} (dry run)${printed}${verdict}`),
     summary: {
-      title: `Would ${verb} ${escapeControlCharacters(subject)} (dry run)`,
+      title,
       sections: [],
       lines: [...printed.split("\n"), ...verdict.split("\n")].filter((line) => {
         return line !== "";

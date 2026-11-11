@@ -51,6 +51,13 @@ export type SchemaTarget = {
    * The `--schema` value that names the schema and no other.
    */
   readonly schemaFlag: string;
+
+  /**
+   * `--schema` as the run was given it: empty when the schema was the
+   * Project's only one, so a command that repeats the run does not pin a
+   * choice nobody made.
+   */
+  readonly schemaArgs: readonly string[];
 };
 
 /**
@@ -214,13 +221,15 @@ export async function readSchemaTarget(input: SchemaTargetInput): Promise<Schema
   const published = await publishedIds(input.cwd, [schema.path]);
   const config = loaded.withOptions({ published }).refuseBroken(store);
   const cwdArgs = input.cwdGiven ? optionArgs("--cwd", input.cwd) : [];
+  const schemaFlag = config.schemas.nameUniquely(schema);
   return {
     cwd: input.cwd,
     cwdArgs,
     config,
     store,
     schema,
-    schemaFlag: config.schemas.nameUniquely(schema),
+    schemaFlag,
+    schemaArgs: input.schema === undefined ? [] : optionArgs("--schema", schemaFlag),
   };
 }
 
@@ -643,37 +652,44 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
 
     if (this.dryRun) {
       this.report(change);
+      const wouldTitle = escapeControlCharacters(
+        change.changed
+          ? `Would ${verb} ${method} for ${schema.name} (dry run)`
+          : `${unchanged} (dry run)`,
+      );
+      const real = ["auth-method", method, verb, ...target.schemaArgs, ...target.cwdArgs];
 
       return this.emit({
         status: "ok",
         data: {
           ...data,
+          title: wouldTitle,
           dry_run: true,
+          next_args: [real],
         },
         summary: {
-          title: escapeControlCharacters(
-            change.changed
-              ? `Would ${verb} ${method} for ${schema.name} (dry run)`
-              : `${unchanged} (dry run)`,
-          ),
+          title: wouldTitle,
           sections: [],
         },
+        next: { commands: portableSuggestions([real], this.cliVersion) },
       });
     }
     await this.write(target, change, confirmed.consent);
     this.report(change);
     const followUps = this.followUps(change.changed, target.cwdArgs);
+    const title = escapeControlCharacters(
+      change.changed ? `${done} ${method} for ${schema.name}` : unchanged,
+    );
 
     return this.emit({
       status: "ok",
       data: {
         ...data,
+        title,
         next_args: followUps.args,
       },
       summary: {
-        title: escapeControlCharacters(
-          change.changed ? `${done} ${method} for ${schema.name}` : unchanged,
-        ),
+        title,
         sections: [],
       },
       next: { commands: followUps.commands },

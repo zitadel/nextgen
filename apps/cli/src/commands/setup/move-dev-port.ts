@@ -16,7 +16,6 @@ import type { PatchResult } from "@/lib/orca/patchers/types";
 import { readZitadelSecret, writeZitadelSecret } from "@/lib/project";
 import { readScaffoldManifest } from "@/lib/scaffold-manifest";
 import { updateScaffold } from "@/lib/sync/state";
-import { escapeControlCharacters } from "@/lib/terminal-text";
 import { userAgent } from "@/lib/user-agent";
 import { DiskStore, ZitadelConfig } from "@/lib/zitadel";
 
@@ -150,7 +149,7 @@ export async function moveDevPort(opts: {
         .consent({
           verb: "replace",
           name: `remove ${previousIssuer} from the project's origins`,
-          message: `Remove ${previousIssuer}, the app's previous origin, from project ${escapeControlCharacters(secret.project_id)} on ${escapeControlCharacters(source.replace(/^https?:\/\//, ""))}, now that ${issuer} replaces it?`,
+          message: `Remove ${previousIssuer}, the app's previous origin, from project ${secret.project_id} on ${source.replace(/^https?:\/\//, "")}, now that ${issuer} replaces it?`,
         })
         .catch((error: unknown) => {
           if (isRefusal(error)) {
@@ -172,7 +171,11 @@ export async function moveDevPort(opts: {
           () => {
             return undefined;
           },
-          () => {
+          (error: unknown) => {
+            if (isCancellation(error)) {
+              throw error;
+            }
+
             return previousIssuer;
           },
         );

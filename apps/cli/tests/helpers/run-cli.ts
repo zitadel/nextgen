@@ -96,6 +96,19 @@ export function aMachineRunning(
   };
 }
 
+/** A machine whose processes cannot be listed, as one without `ps` is. */
+export function aMachineThatCannotBeRead(): LocalServers {
+  return {
+    current: () => {
+      return Promise.resolve({
+        supported: false,
+        processes: [],
+        error: "spawn ps ENOENT",
+      });
+    },
+  };
+}
+
 /** The source command that asks `machine` which servers run, for the commands that ask. */
 async function commandSeeing(
   name: string | undefined,

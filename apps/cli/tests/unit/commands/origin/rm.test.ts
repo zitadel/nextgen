@@ -160,7 +160,7 @@ describe("origin rm", () => {
     ]);
   });
 
-  it("spells out a control character in the pattern in the question it asks a person", async () => {
+  it("keeps a control character in the pattern as it was typed, in the question it carries as data", async () => {
     const cwd = await anAppDir();
 
     const result = await runCliForTest([
@@ -177,8 +177,7 @@ describe("origin rm", () => {
 
     const envelope = parseJson(result.stdout) as { code: string; hint: string };
     expect(envelope.code).toBe("E_CONFIRMATION_REQUIRED");
-    expect(envelope.hint).toContain("\\x1b[31m");
-    expect(envelope.hint).not.toContain("\u001b");
+    expect(envelope.hint).toContain("\u001b[31m");
   });
 
   it("quotes a wildcard pattern in the suggested retry, so the shell cannot expand it", async () => {
@@ -222,6 +221,19 @@ describe("origin rm asked on a terminal", () => {
 
     expect(talk.asked()).toEqual([
       "Remove https://app.acme.com from project proj_unit on api.zitadel.example?",
+    ]);
+  });
+
+  it("spells out a control character in the pattern in the question it draws", async () => {
+    const cwd = await anAppDir();
+    const talk = answering(prompts as unknown as ReturnType<typeof clackDouble>, false);
+
+    await asPerson(() => {
+      return OriginRm.run(["https://app\u001b[31m.acme.com", "--cwd", cwd, "--server", SERVER]);
+    });
+
+    expect(talk.asked()).toEqual([
+      "Remove https://app\\x1b[31m.acme.com from project proj_unit on api.zitadel.example?",
     ]);
   });
 

@@ -237,6 +237,11 @@ export type SetupRetryOptions = {
    * file still loses its minimum on the retry.
    */
   passwordMinLength?: PasswordMinLength;
+  /**
+   * The server as the developer typed it. Left out, a retry pins the local
+   * server; `null` leaves it to the default, as a run that typed none did.
+   */
+  server?: string | null;
 };
 
 /**
@@ -296,7 +301,9 @@ export function setupRetryFlags(opts: SetupRetryOptions): string {
   if (opts.nonInteractive && firstSso === undefined && opts.ssoTyped === undefined) {
     parts.push("--non-interactive");
   }
-  parts.push("--server local");
+  if (opts.server !== null) {
+    parts.push(`--server ${opts.server === undefined ? "local" : Cmd.quote(opts.server)}`);
+  }
   return `${parts.join(" ")}${cwdArg(opts)}`;
 }
 
@@ -1219,17 +1226,31 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
       }
 
       const skippedHost = hostUnlessDefault(preflight.server.value);
+      const alreadyTitle = this.dryRun
+        ? "Zitadel is already set up in this app (dry run)"
+        : "Zitadel is already set up in this app";
+      const alreadySummary = {
+        title: alreadyTitle,
+        sections: [],
+        lines: ["Nothing was changed."],
+        ...(skippedHost === undefined ? {} : { ran: skippedHost }),
+        boxed: true as const,
+      };
+      if (this.dryRun) {
+        return this.emit({
+          status: "ok",
+          data: {
+            title: alreadyTitle,
+            dry_run: true,
+          },
+          summary: alreadySummary,
+        });
+      }
 
       return this.emit({
         status: "skipped",
         reason: "already-initialized",
-        summary: {
-          title: "Zitadel is already set up in this app",
-          sections: [],
-          lines: ["Nothing was changed."],
-          ...(skippedHost === undefined ? {} : { ran: skippedHost }),
-          boxed: true,
-        },
+        summary: alreadySummary,
       });
     }
 
@@ -1441,7 +1462,7 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
     let current: Step | undefined;
     if (detected === undefined && this.dryRun) {
       this.ui
-        .begin(`Scaffolding a new ${app.framework} project`)
+        .begin(`Scaffolding a new ${app.framework} project (dry run)`)
         .done(`Would scaffold a new ${app.framework} project (dry run)`);
     }
     if (scaffolding) {
@@ -1497,6 +1518,20 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
       // `POST /projects` is unauthenticated. CLI-managed projects opt out of
       // server fallback defaults; setup writes the default configuration files
       // and the first deploy publishes them.
+      // Resolved values, not raw flags: the wizard may have picked the preset,
+      // use case, or dev port interactively, and a retry must reproduce those
+      // choices — the issuer registered with the project derives from the port.
+      const retry: SetupRetryOptions = {
+        ...retryOptionsOf(flags),
+        framework: app.framework,
+        preset: answers.preset,
+        useCase: answers.useCase,
+        devPort: answers.devPort,
+        sso: answers.sso.map((answer) => {
+          return answer.selection;
+        }),
+        passwordMinLength: answers.passwordMinLength,
+      };
       current = this.ui.begin(
         `Creating project on ${escapeControlCharacters(answers.server)}${this.dryRun ? " (dry run)" : ""}`,
       );
@@ -1516,23 +1551,13 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
             this.cliVersion,
             projectName,
             issuer,
-            {
-              // Resolved values, not raw flags: the wizard may have picked the
-              // preset, use case, or dev port interactively, and the retry must
-              // reproduce those choices — the issuer registered with the
-              // project derives from the port.
-              ...retryOptionsOf(flags),
-              framework: app.framework,
-              preset: answers.preset,
-              useCase: answers.useCase,
-              devPort: answers.devPort,
-              sso: answers.sso.map((answer) => {
-                return answer.selection;
-              }),
-              passwordMinLength: answers.passwordMinLength,
-            },
+            retry,
           );
-      current.done(`Created project ${escapeControlCharacters(project.id)}`);
+      current.done(
+        this.dryRun
+          ? "Would create a project (dry run)"
+          : `Created project ${escapeControlCharacters(project.id)}`,
+      );
       this.recordTelemetry({ step: "project_created" });
 
       // `.env.local` as it is before the patch merges this project's id and
@@ -1602,10 +1627,15 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
         await removeSetupMarkers(this.cwd);
         await restoreCredentialEnvFiles(this.cwd, envFilesBefore);
         const cause = toZitadelError(error);
+        const rerun = `setup ${setupRetryFlags({
+          ...retry,
+          cwd: undefined,
+          server: this.meta.serverFlag ?? null,
+        })}`;
         throw new ZitadelError(cause.code, `Default configuration setup failed: ${cause.message}`, {
-          hint: this.configurationFailureHint(cause, newApp !== undefined),
+          hint: this.configurationFailureHint(cause, newApp !== undefined, rerun),
           nextCommands:
-            cause.nextCommands ?? (newApp === undefined ? [this.suggest("setup --force")] : []),
+            cause.nextCommands ?? (newApp === undefined ? [this.suggest(`${rerun} --force`)] : []),
           details: cause.details,
         });
       }
@@ -1635,7 +1665,7 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
     const allFilesWritten = [...result.filesWritten, ...scaffolded.filesWritten];
     if (framework !== undefined) {
       current?.done(
-        `Patched ${allFilesWritten.length} ${new Intl.PluralRules("en").select(allFilesWritten.length) === "one" ? "file" : "files"}${result.filesSkipped.length > 0 ? ` (${result.filesSkipped.length} unchanged)` : ""}`,
+        `${this.dryRun ? "Would patch" : "Patched"} ${allFilesWritten.length} ${new Intl.PluralRules("en").select(allFilesWritten.length) === "one" ? "file" : "files"}${result.filesSkipped.length > 0 ? ` (${result.filesSkipped.length} unchanged)` : ""}${this.dryRun ? " (dry run)" : ""}`,
       );
     }
     this.recordTelemetry({
@@ -1690,6 +1720,9 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
           value: answer.credentials.secret,
           publish,
         });
+        // A publish that failed because of Ctrl-C reads as a refusal below, so
+        // the cancellation is raised here instead of being reported as one.
+        this.signal.throwIfAborted();
         ssoOutcomes.set(slug, {
           clientId,
           secret,
@@ -2229,9 +2262,14 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
    *
    * @param cause - What stopped the write.
    * @param removedNewApp - Whether setup removed the new app it made.
+   * @param rerun - The setup command that starts over with the flags this run had.
    * @returns The hint to show.
    */
-  private configurationFailureHint(cause: ZitadelError, removedNewApp: boolean): string {
+  private configurationFailureHint(
+    cause: ZitadelError,
+    removedNewApp: boolean,
+    rerun: string,
+  ): string {
     if (removedNewApp) {
       const removed =
         "The project was created but its default configuration (schema, login flow, " +
@@ -2246,7 +2284,7 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
     }
     return (
       "The project was created but its default configuration (schema, login flow, " +
-      `password and sign-up policies) was not all written. Rerun ${this.suggest("setup")} to start over; ` +
+      `password and sign-up policies) was not all written. Rerun ${this.suggest(rerun)} to start over; ` +
       "--force overwrites the schema and flow files setup scaffolds and keeps an " +
       "existing password or sign-up policy file. It does not cover a connection under .zitadel/idps/ -- those are " +
       "yours, so setup never replaces or removes one; delete it to scaffold a fresh " +
@@ -2391,7 +2429,7 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
     }
     if (dryRun) {
       this.ui
-        .begin("Committing the scaffolded project")
+        .begin("Committing the scaffolded project (dry run)")
         .done("Would initialise a git repository and commit the project (dry run)");
       return { kind: "skipped" };
     }
@@ -2439,7 +2477,7 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
   }): Promise<InitialDeployment | undefined> {
     if (opts.dryRun) {
       this.ui
-        .begin("Deploying .zitadel/ to the project")
+        .begin("Deploying .zitadel/ to the project (dry run)")
         .done("Would deploy .zitadel/ to the project (dry run)");
       return undefined;
     }
@@ -2519,7 +2557,7 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
           moving.done(`Already on ${moved.issuer}`);
         } else {
           moving.done(
-            `${dryRun ? "Would move" : "Moved"} from ${moved.previousIssuer} to ${moved.issuer}`,
+            `${dryRun ? "Would move" : "Moved"} from ${escapeControlCharacters(moved.previousIssuer)} to ${moved.issuer}`,
           );
         }
         ended = true;
@@ -2568,7 +2606,7 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
     }
     if (move.staleOrigin !== undefined) {
       reportWarning(
-        `${move.staleOrigin} is still among the project's origins; it admits a port nothing serves any more.${cleanup === undefined ? "" : ` Remove it with ${cleanup}.`}`,
+        `${escapeControlCharacters(move.staleOrigin)} is still among the project's origins; it admits a port nothing serves any more.${cleanup === undefined ? "" : ` Remove it with ${cleanup}.`}`,
       );
     }
     for (const slug of move.ssoProviders) {

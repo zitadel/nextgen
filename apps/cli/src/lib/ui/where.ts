@@ -35,6 +35,9 @@ export class Where {
 
   /** The same sentence every time, as the last line of the summary. */
   render(): string {
+    if (this.project !== undefined && this.server === undefined) {
+      return pc.dim(`Using project ${this.project}.`);
+    }
     const target = this.project === undefined ? "" : ` project ${this.project} on`;
     return pc.dim(`Using${target} ${this.describeServer()}.`);
   }

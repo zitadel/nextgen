@@ -4,8 +4,10 @@ import { join } from "node:path";
 import { describe, expect } from "vitest";
 
 import { moveDevPort } from "@/commands/setup/move-dev-port";
+import { ZitadelError } from "@/lib/errors";
 import { createOrca } from "@/lib/orca";
 import { readZitadelSecret } from "@/lib/project";
+import { forced } from "@tests/helpers/check-context";
 import { aGoogleConnection } from "@tests/helpers/config";
 import { it } from "@tests/helpers/fixtures";
 import { usePlatformServer } from "@tests/helpers/platform-project";
@@ -138,6 +140,31 @@ describe("moveDevPort", () => {
       expect(asked).toEqual([
         `Remove http://localhost:3000, the app's previous origin, from project ${project_id} on api.zitadel.cloud, now that http://localhost:3101 replaces it?`,
       ]);
+    });
+  });
+
+  describe("when Ctrl-C is pressed while it removes the previous origin", () => {
+    it("stops cancelled, rather than reporting the origin as left behind", async ({ dir }) => {
+      await setUpApp(dir);
+      const controller = new AbortController();
+
+      const error = await rejectionOf(() => {
+        return moveDevPort({
+          cwd: dir,
+          devPort: 3101,
+          source: CLOUD,
+          orca: createOrca(),
+          cliVersion: "0.0.0",
+          dryRun: false,
+          signal: controller.signal,
+          consent: (gate) => {
+            controller.abort(new ZitadelError("E_CANCELLED", "Cancelled"));
+            return forced()(gate);
+          },
+        });
+      });
+
+      expect(error).toMatchObject({ code: "E_CANCELLED" });
     });
   });
 

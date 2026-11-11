@@ -1001,6 +1001,36 @@ describe("auth-method sso enable", () => {
       expect(parseJson(result.stdout)).toMatchObject({ status: "ok", data: { dry_run: true } });
     });
 
+    it("carries the headline it draws as data.title", async ({ dir }) => {
+      const cwd = await aProject(dir);
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID, "--dry-run"));
+      });
+
+      expect(parseJson(result.stdout)).toMatchObject({
+        data: { title: `Would write ${SCHEMA_FILE} (dry run)` },
+      });
+    });
+
+    it("suggests the real command", async ({ dir }) => {
+      const cwd = await aProject(dir);
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID, "--dry-run"));
+      });
+
+      expect(parseJson(result.stdout)).toMatchObject({
+        data: {
+          next_commands: [
+            expect.stringContaining(
+              `auth-method sso enable --provider google --client-id ${CLIENT_ID}`,
+            ),
+          ],
+        },
+      });
+    });
+
     it("writes no connection", async ({ dir }) => {
       const cwd = await aProject(dir);
 

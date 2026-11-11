@@ -149,6 +149,14 @@ describe("pull", () => {
         expect(result).toFailWith("E_NOT_FOUND");
       });
 
+      it("says nothing is deployed without a full stop", async () => {
+        const project = await anUndeployedEnvironment();
+
+        const result = await project.run(["pull", "--env", "staging", "--json"]);
+
+        expect(result).toExplainExactly("Nothing is deployed to a primary origin yet");
+      });
+
       it("rejects a target that is neither latest nor an id", async () => {
         const project = await aSetUpApp();
 

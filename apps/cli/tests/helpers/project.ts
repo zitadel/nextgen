@@ -17,7 +17,7 @@ import { join } from "node:path";
 import { Readable } from "node:stream";
 import { parseEnv, promisify } from "node:util";
 
-import { expect } from "vitest";
+import { expect, vi } from "vitest";
 import { z } from "zod";
 
 import { aFakeAppGeneratorPath } from "./app-generator";
@@ -42,7 +42,7 @@ export type InterruptedRun = Readonly<{
   stderr: string;
 }>;
 import { aBinaryRecord } from "./runtime-record";
-import { parseJson, runCliForTest, stripAnsi } from "./run-cli";
+import { parseJson, pressCtrlC, runCliForTest, stripAnsi } from "./run-cli";
 import { asTerminal, offTerminal, onTerminalReadingAFile } from "./terminal";
 import { assertRunnableSuggestions } from "./suggestions";
 
@@ -778,10 +778,36 @@ export class ScaffoldedApp {
   /** Runs `upgrade --json` against a fake npm and npx on PATH. */
   upgrade(
     extraArgs: string[] = [],
-    behavior: { refresh?: "done" | "issues" | "broken"; install?: "fails" } = {},
+    behavior: UpgradeBehavior = {},
     env: NodeJS.ProcessEnv = {},
   ): Promise<CliResult> {
     return this.upgradeWith(["--json", ...extraArgs], behavior, env);
+  }
+
+  /**
+   * `upgrade --json` with Ctrl-C pressed once its install or its refresh is
+   * running, against fakes slow enough to still be running when it is.
+   *
+   * @param during - Which of the two the keypress lands in.
+   * @returns What the interrupted run ended with.
+   */
+  async upgradeInterrupted(during: "install" | "refresh"): Promise<CliResult> {
+    const running = this.upgrade(
+      [],
+      during === "install" ? { install: "slow" } : { refresh: "slow" },
+    );
+    await vi.waitFor(
+      async () => {
+        const started = during === "install" ? this.installLogPath : this.refreshLogPath;
+        if (started === undefined) {
+          throw new Error("upgrade has not reached the fakes");
+        }
+        await stat(started);
+      },
+      { timeout: 30_000 },
+    );
+    pressCtrlC();
+    return running;
   }
 
   /** Runs `upgrade` for a person, against the same fakes. */
@@ -810,10 +836,13 @@ export class ScaffoldedApp {
 
   private async upgradeWith(
     args: string[],
-    behavior: { refresh?: "done" | "issues" | "broken"; install?: "fails" },
+    behavior: UpgradeBehavior,
     env: NodeJS.ProcessEnv = {},
   ): Promise<CliResult> {
-    const npm = await fakePackageManager(behavior.install === "fails" ? 1 : 0);
+    const npm = await fakePackageManager(
+      behavior.install === "fails" ? 1 : 0,
+      behavior.install === "slow",
+    );
     const npx = await fakeNpx(behavior.refresh ?? "done");
     this.installLogPath = npm.logPath;
     this.refreshLogPath = npx.logPath;
@@ -881,12 +910,14 @@ export class ScaffoldedApp {
   async startLocalServer({
     shape = "plain",
     port = nextPort(),
+    json = true,
   }: {
     shape?: ServerShape;
     port?: number;
+    json?: boolean;
   } = {}): Promise<CliResult> {
     trackLocalServerDir(this.path);
-    return this.cli(["start", "--port", String(port), "--json"], {
+    return this.cli(["start", "--port", String(port), ...(json ? ["--json"] : [])], {
       ZITADEL_SERVER_BINARY: await aFakeServerBinary(shape),
     });
   }
@@ -1291,49 +1322,7 @@ export class ScaffoldedApp {
     // same way: what the envelope says, the screen says in the same words.
     const [onScreen, asEnvelope] = ran.slice(-2);
     if (onScreen !== undefined && asEnvelope !== undefined) {
-      this.expectOneText(asEnvelope, onScreen);
-    }
-  }
-
-  /**
-   * A message is written once: the envelope's error `message`, or its
-   * `data.title`, is on the screen word for word, never capitalised, trimmed or
-   * ended with a full stop for one of the two. Skipped for a text holding a
-   * control character, which the screen spells out, and for runs that ended
-   * differently.
-   *
-   * @param envelope - The run that printed the envelope.
-   * @param screen - The same run, as a person reads it.
-   */
-  private expectOneText(envelope: CliResult, screen: CliResult): void {
-    if (envelope.exitCode !== screen.exitCode) {
-      return;
-    }
-    const body = parseJsonOrUndefined(stripAnsi(envelope.stdout));
-    const parsed = z
-      .object({
-        status: z.string(),
-        message: z.string().optional(),
-        warnings: z.array(z.string()).optional(),
-        data: z.object({ title: z.string().optional() }).passthrough().optional(),
-      })
-      .safeParse(body);
-    if (!parsed.success) {
-      return;
-    }
-    const said = parsed.data.status === "error" ? parsed.data.message : parsed.data.data?.title;
-    if (said === undefined || hasControlCharacter(said)) {
-      return;
-    }
-    const printed = stripAnsi(`${screen.stdout}\n${screen.stderr}`);
-    expect(printed, "the screen says what the envelope says").toContain(said);
-    for (const warning of parsed.data.warnings ?? []) {
-      if (!hasControlCharacter(warning)) {
-        expect(
-          printed.split(warning).length - 1,
-          `the warning "${warning}" is said once on the screen`,
-        ).toBeLessThanOrEqual(1);
-      }
+      assertOneText(asEnvelope, onScreen);
     }
   }
 
@@ -2475,23 +2464,69 @@ function hasControlCharacter(text: string): boolean {
 }
 
 /**
+ * A message is written once: the envelope's error `message`, or its
+ * `data.title`, is on the screen word for word, never capitalised, trimmed or
+ * ended with a full stop for one of the two, and each warning is said exactly
+ * once. Skipped for a text holding a control character, which the screen spells
+ * out. The two runs must have ended the same way and the envelope must parse:
+ * a check that skips on either would pass on what it was meant to catch.
+ *
+ * @param envelope - The run that printed the envelope.
+ * @param screen - The same run, as a person reads it.
+ */
+export function assertOneText(envelope: CliResult, screen: CliResult): void {
+  expect(envelope.exitCode, "the envelope run and the screen run ended the same way").toBe(
+    screen.exitCode,
+  );
+  const body = parseJsonOrUndefined(stripAnsi(envelope.stdout));
+  const parsed = z
+    .object({
+      status: z.string(),
+      message: z.string().optional(),
+      warnings: z.array(z.string()).optional(),
+      data: z.object({ title: z.string().optional() }).passthrough().optional(),
+    })
+    .safeParse(body);
+  expect(parsed.success, "the envelope run printed an envelope that parses").toBe(true);
+  if (!parsed.success) {
+    return;
+  }
+  const said = parsed.data.status === "error" ? parsed.data.message : parsed.data.data?.title;
+  const printed = stripAnsi(`${screen.stdout}\n${screen.stderr}`);
+  if (said !== undefined && !hasControlCharacter(said)) {
+    expect(printed, "the screen says what the envelope says").toContain(said);
+  }
+  for (const warning of parsed.data.warnings ?? []) {
+    if (!hasControlCharacter(warning)) {
+      expect(
+        printed.split(warning).length - 1,
+        `the warning "${warning}" is said exactly once on the screen`,
+      ).toBe(1);
+    }
+  }
+}
+
+/**
  * A dry run answers `ok` with `data.dry_run: true` and a headline ending in
  * `(dry run)`; it is never `skipped`, which means a person said no. Checked on
  * every spec's `--dry-run --json` run, so a command that breaks the rule fails
  * in its own spec. A refusal is an error, and a skip for another reason keeps
- * its own token.
+ * its own token. The headline is `data.title`, the words the terminal draws.
  *
  * @param where - The command, for the failure message.
  * @param parsed - The parsed envelope.
  */
-function assertDryRun(where: string, parsed: unknown): void {
+export function assertDryRun(where: string, parsed: unknown): void {
   const shape = z
     .looseObject({
       status: z.string(),
       reason: z.string().optional(),
-      data: z.looseObject({ dry_run: z.unknown(), title: z.unknown() }).optional(),
+      data: z
+        .looseObject({ dry_run: z.unknown().optional(), title: z.unknown().optional() })
+        .optional(),
     })
     .safeParse(parsed);
+  expect(shape.success, `${where}: a dry run answers an envelope that parses`).toBe(true);
   if (!shape.success) {
     return;
   }
@@ -2503,9 +2538,10 @@ function assertDryRun(where: string, parsed: unknown): void {
     return;
   }
   expect(data?.dry_run, `${where}: a dry run says data.dry_run`).toBe(true);
-  if (typeof data?.title === "string") {
-    expect(data.title, `${where}: a dry run's headline ends in (dry run)`).toMatch(/\(dry run\)$/);
-  }
+  expect(typeof data?.title, `${where}: a dry run carries its headline as data.title`).toBe(
+    "string",
+  );
+  expect(data?.title, `${where}: a dry run's headline ends in (dry run)`).toMatch(/\(dry run\)$/);
 }
 
 /**
@@ -2732,7 +2768,10 @@ export async function aCommittedApp(): Promise<ScaffoldedApp> {
 }
 
 /** A fake `npm` on PATH that records its invocation instead of installing. */
-async function fakePackageManager(exitCode = 0): Promise<{ binDir: string; logPath: string }> {
+async function fakePackageManager(
+  exitCode = 0,
+  slow = false,
+): Promise<{ binDir: string; logPath: string }> {
   const binDir = await mkdtemp(join(tmpdir(), "zitadel-fake-pm-"));
   const logPath = join(binDir, "package-manager.log");
   const binPath = join(binDir, "npm");
@@ -2746,22 +2785,31 @@ fs.appendFileSync(
 );
 process.stdout.write("fake npm stdout\\n");
 process.stderr.write("fake npm stderr\\n");
-process.exitCode = ${String(exitCode)};
+${slow ? "setTimeout(() => { process.exitCode = 1; }, 700);" : `process.exitCode = ${String(exitCode)};`}
 `,
   );
   await chmod(binPath, 0o755);
   return { binDir, logPath };
 }
 
+/** How the fake npm and npx an `upgrade` run is given behave. */
+type UpgradeBehavior = {
+  refresh?: "done" | "issues" | "broken" | "slow";
+  install?: "fails" | "slow";
+};
+
 /** A fake `npx` on PATH that records its invocation and answers as the new release's doctor. */
 async function fakeNpx(
-  outcome: "done" | "issues" | "broken",
+  outcome: "done" | "issues" | "broken" | "slow",
 ): Promise<{ binDir: string; logPath: string }> {
   const binDir = await mkdtemp(join(tmpdir(), "zitadel-fake-npx-"));
   const logPath = join(binDir, "npx.log");
-  const answer = { done: '{"status":"ok"}', issues: '{"status":"error"}', broken: "not json" }[
-    outcome
-  ];
+  const answer = {
+    done: '{"status":"ok"}',
+    issues: '{"status":"error"}',
+    broken: "not json",
+    slow: '{"status":"ok"}',
+  }[outcome];
   const binPath = join(binDir, "npx");
   await writeFile(
     binPath,
@@ -2770,7 +2818,7 @@ require("node:fs").appendFileSync(
   process.env.FAKE_NPX_LOG,
   JSON.stringify({ args: process.argv.slice(2) }) + "\\n",
 );
-process.stdout.write(${JSON.stringify(answer)});
+${outcome === "slow" ? "setTimeout(() => {" : ""}process.stdout.write(${JSON.stringify(answer)});${outcome === "slow" ? "}, 700);" : ""}
 `,
   );
   await chmod(binPath, 0o755);

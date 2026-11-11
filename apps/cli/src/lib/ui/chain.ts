@@ -284,7 +284,9 @@ export class Chain implements Drawing, Narratable {
   note(title: string, lines: readonly string[]): void {
     if (this.drawsAChain) {
       this.open();
-      note(new Prose(lines.join("\n"), WIDTH - 8).render(), title);
+      DrawnSpinner.around(() => {
+        return note(new Prose(lines.join("\n"), WIDTH - 8).render(), title);
+      });
       this.gap = true;
       return;
     }

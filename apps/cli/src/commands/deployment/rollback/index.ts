@@ -144,6 +144,15 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
     if (restored.length > 0) {
       effects.push(`${escapeControlCharacters(restored.join(", "))} serve it again`);
     }
+    // Left out when the check failed: an empty list would claim it passed.
+    const reported =
+      changes === undefined
+        ? {}
+        : {
+            dropped_origins: changes.dropped,
+            restored_origins: changes.restored,
+            unserved_origins: changes.unserved,
+          };
     let consequence = "";
     if (effects.length > 0) {
       consequence = `, which makes ${new Intl.ListFormat("en", { type: "conjunction" }).format(effects)}`;
@@ -153,7 +162,7 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
       await this.confirmed({
         verb: "rollback",
         name: `roll back to ${target.id}`,
-        message: `Roll back to ${escapeControlCharacters(target.id)} in project ${escapeControlCharacters(projectId)} on ${escapeControlCharacters(server.replace(/^https?:\/\//, ""))} so its release goes live again${consequence}?`,
+        message: `Roll back to ${target.id} in project ${projectId} on ${server.replace(/^https?:\/\//, "")} so its release goes live again${consequence}?`,
         // A bare rollback resolved its target, which a retry must not resolve
         // again: a deploy landing in between would name another.
         arguments: [target.id],
@@ -161,16 +170,31 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
         // resolved: a rollback re-serves an earlier release, and a dry run
         // must leave what is served untouched.
         preview: () => {
+          const title = `Would roll back to ${escapeControlCharacters(target.id)} (dry run)`;
+          if (dropped.length > 0) {
+            reportWarning(
+              `Rolling back to ${target.id} restores origins that leave out ${dropped.join(", ")}: they would refuse sign-in until the next deploy.`,
+            );
+          }
+          if (restored.length > 0) {
+            reportWarning(
+              `Rolling back to ${target.id} includes ${restored.join(", ")}: they would serve its release again.`,
+            );
+          }
+
           return {
             status: "ok",
             data: {
               dry_run: true,
+              title,
               deployment_id: target.id,
+              ...reported,
             },
             summary: {
-              title: `Would roll back to ${escapeControlCharacters(target.id)} (dry run)`,
+              title,
               sections: [],
             },
+            next: { commands: [this.suggest(`deployment rollback ${target.id} --force`)] },
           };
         },
         // The deployment the caller currently sees live: the project's newest
@@ -220,27 +244,33 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
               `Rolled back to origins that include ${restored.join(", ")}: they serve ${deployment.release_id} again.`,
             );
           }
+          const title = `Rolled back to ${escapeControlCharacters(deployment.release_id)}`;
+
           return {
             status: "ok",
             data: {
+              title,
               deployment_id: deployment.id,
               release_id: deployment.release_id,
               rolled_back_to: deployment.metadata.rollback_to,
               origins: deployment.origins,
-              // Left out when the check failed: an empty list would claim it passed.
-              ...(changes === undefined
-                ? {}
-                : {
-                    dropped_origins: changes.dropped,
-                    restored_origins: changes.restored,
-                    unserved_origins: changes.unserved,
-                  }),
+              ...reported,
               ...(pointers === undefined ? {} : { pointers }),
             },
             summary: {
-              title: `Rolled back to ${escapeControlCharacters(deployment.release_id)} on ${deployment.origins.length} ${new Intl.PluralRules("en").select(deployment.origins.length) === "one" ? "origin" : "origins"}`,
+              title,
               sections: [],
               lines: [
+                ...(deployment.origins.length === 0
+                  ? []
+                  : [
+                      `Live on ${new Intl.ListFormat("en", { type: "conjunction" }).format(
+                        deployment.origins.map((origin) => {
+                          return escapeControlCharacters(origin);
+                        }),
+                      )}.`,
+                      "",
+                    ]),
                 ...(pointerTable === undefined ? [] : [...pointerTable.split("\n"), ""]),
                 "Users keep the schema revision and attributes they have: a rollback does not migrate them back.",
               ],

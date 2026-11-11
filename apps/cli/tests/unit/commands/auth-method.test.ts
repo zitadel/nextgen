@@ -212,6 +212,16 @@ describe("auth-method password and passkey", () => {
       });
     });
 
+    it("carries the headline it draws as data.title", async ({ dir }) => {
+      await writeProject(dir, aProject(BOTH, aPasswordFlow()));
+
+      const result = await runCliForTest(authMethodJson(dir, "passkey", "disable"));
+
+      expect(parseJson(result.stdout)).toMatchObject({
+        data: { title: "Disabled passkey for default-human-user" },
+      });
+    });
+
     it("hands over the follow-ups as argument lists when the path needs quoting", async ({
       dir,
     }) => {
@@ -866,6 +876,28 @@ describe("auth-method password and passkey", () => {
       expect(parseJson(result.stdout)).toMatchObject({ status: "ok", data: { dry_run: true } });
     });
 
+    it("carries the headline it draws as data.title", async ({ dir }) => {
+      await writeProject(dir, aProject(BOTH, aPasswordFlow()));
+
+      const result = await runCliForTest(authMethodJson(dir, "passkey", "disable", "--dry-run"));
+
+      expect(parseJson(result.stdout)).toMatchObject({
+        data: { title: "Would disable passkey for default-human-user (dry run)" },
+      });
+    });
+
+    it("suggests the real command", async ({ dir }) => {
+      await writeProject(dir, aProject(BOTH, aPasswordFlow()));
+
+      const result = await runCliForTest(authMethodJson(dir, "passkey", "disable", "--dry-run"));
+
+      expect(parseJson(result.stdout)).toMatchObject({
+        data: {
+          next_commands: [expectedPublicCliCommand(`auth-method passkey disable --cwd ${dir}`)],
+        },
+      });
+    });
+
     it("writes nothing", async ({ dir }) => {
       await writeProject(dir, aProject(BOTH, aPasswordFlow()));
 
@@ -954,6 +986,7 @@ describe("auth-method password and passkey", () => {
 
     const result = await runCliForTest(authMethodText(dir, "password", "enable"));
 
+    expect(stripAnsi(result.stdout).split("default-human-user")).toHaveLength(2);
     expect(stripAnsi(result.stdout)).not.toContain("password is already enabled for");
   });
 

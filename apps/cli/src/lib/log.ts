@@ -11,12 +11,14 @@ export type LogLevel = "info" | "done" | "start" | "warn" | "fail" | "plain" | "
 /** Whatever draws a command's narration: the UI the base command hands it to. */
 export type LogSink = (level: LogLevel, text: string) => void;
 
-let sink: LogSink | undefined;
+/** Every sink still installed, oldest first; the newest draws. */
+const sinks: Array<{ draw: LogSink }> = [];
 
 function emit(level: LogLevel, args: readonly unknown[]): void {
   const text = format(...args);
+  const sink = sinks.at(-1);
   if (sink !== undefined) {
-    sink(level, text);
+    sink.draw(level, text);
     return;
   }
   if (level !== "debug") {
@@ -32,14 +34,16 @@ function emit(level: LogLevel, args: readonly unknown[]): void {
  * one process.
  *
  * @param next - Where narration goes while it is installed.
- * @returns A function that puts back whatever was installed before.
+ * @returns A function that removes this sink, whatever order sinks are removed
+ *   in, so one that has ended is never drawn into again.
  */
 export function installLogSink(next: LogSink): () => void {
-  const previous = sink;
-  sink = next;
+  const installed = { draw: next };
+  sinks.push(installed);
   return () => {
-    if (sink === next) {
-      sink = previous;
+    const at = sinks.indexOf(installed);
+    if (at !== -1) {
+      sinks.splice(at, 1);
     }
   };
 }

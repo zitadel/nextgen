@@ -295,20 +295,23 @@ export default class Pull extends EnvironmentCommand {
 
     const files = `${pulled.length} ${new Intl.PluralRules("en").select(pulled.length) === "one" ? "file" : "files"}`;
 
+    const title = escapeControlCharacters(
+      this.dryRun
+        ? `Would write ${files} from ${release.id} (dry run)`
+        : `Pulled ${files} from ${release.id}`,
+    );
+
     return this.emit({
       status: "ok",
       data: {
+        title,
         release_id: release.id,
         pulled,
         skipped,
         ...(this.dryRun ? { dry_run: true } : {}),
       },
       summary: {
-        title: escapeControlCharacters(
-          this.dryRun
-            ? `Would write ${files} from ${release.id} (dry run)`
-            : `Pulled ${files} from ${release.id}`,
-        ),
+        title,
         sections: [],
         lines: fileList(
           pulled.map((entry) => {
@@ -318,7 +321,11 @@ export default class Pull extends EnvironmentCommand {
         ),
       },
       next: {
-        commands: this.dryRun || args.target.kind !== "latest" ? [] : [this.suggest(DEPLOY_ARGS)],
+        commands: this.dryRun
+          ? [this.suggest(args.target.kind === "latest" ? "pull" : `pull ${args.target.id}`)]
+          : args.target.kind !== "latest"
+            ? []
+            : [this.suggest(DEPLOY_ARGS)],
       },
     });
   }
@@ -428,7 +435,7 @@ export default class Pull extends EnvironmentCommand {
       case "latest": {
         const releaseId = await configuration.fetchLiveReleaseId();
         if (releaseId === undefined) {
-          throw new ZitadelError("E_NOT_FOUND", "Nothing is deployed to a primary origin yet.", {
+          throw new ZitadelError("E_NOT_FOUND", "Nothing is deployed to a primary origin yet", {
             hint: `Deploy first with ${this.suggest(DEPLOY_ARGS)}, then pull.`,
           });
         }

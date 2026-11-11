@@ -2,20 +2,25 @@ import type { Config } from "@oclif/core";
 import { describe, expect, it } from "vitest";
 
 import { BaseCommand } from "@/lib/oclif/base";
-import { prose } from "@/lib/oclif/rendering";
+import { prose, rows } from "@/lib/oclif/rendering";
 import type { CommandResult, JsonEnvelope } from "@/lib/oclif/types";
 import { reportWarning, takeReportedWarnings } from "@/lib/warnings";
+import { offTerminal } from "@tests/helpers/terminal";
 
 /** A command that records what `emit` prints instead of writing it. */
 class WarningCommand extends BaseCommand {
   public static override readonly id = "warnings-test";
   public readonly printed: string[] = [];
+  public readonly aside: string[] = [];
 
   public override jsonEnabled(): boolean {
     return false;
   }
   public override log(message?: string): void {
     this.printed.push(message ?? "");
+  }
+  public override logToStderr(message?: string): void {
+    this.aside.push(message ?? "");
   }
 
   protected async execute(): Promise<never> {
@@ -89,6 +94,24 @@ describe("BaseCommand warnings", () => {
 
     expect(cmd.printed.join("\n")).not.toContain("\u001b");
     expect(cmd.printed).toEqual(["Deployed\nWarning: schema \\x1b[2Jwiped has no identifier"]);
+  });
+
+  it("keeps a warning and the footer off the stdout a script reads", async () => {
+    const cmd = makeCommand();
+
+    await offTerminal(() => {
+      return cmd.finish({
+        summary: { title: "Done", sections: [] },
+        status: "ok",
+        data: {},
+        warnings: ["careful"],
+        pretty: rows("row"),
+        footer: "See also",
+      });
+    });
+
+    expect(cmd.printed).toEqual(["row"]);
+    expect(cmd.aside).toEqual(["Warning: careful", "\nSee also"]);
   });
 
   it("carries a reported warning into the envelope", async () => {

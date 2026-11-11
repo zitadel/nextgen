@@ -88,6 +88,31 @@ describe("dryRunResult summary", () => {
     );
   });
 
+  it("gives the envelope the title the terminal draws", () => {
+    const result = dryRunResult({ verb: "create", topic: "users" });
+
+    expect(result).toMatchObject({ data: { title: "Would create users (dry run)" } });
+  });
+
+  it("names the resource by its noun in the title and keeps the topic in the data", () => {
+    const result = dryRunResult({
+      verb: "delete",
+      topic: "idps",
+      noun: "identity provider",
+      id: "i1",
+    });
+
+    expect(result).toMatchObject({
+      data: { topic: "idps", title: "Would delete identity provider i1 (dry run)" },
+    });
+  });
+
+  it("draws the title as one line when the id has a line break in it", () => {
+    const title = dryRunResult({ verb: "remove", topic: "origin", id: "a\nb" }).summary?.title;
+
+    expect(title).toBe("Would remove origin a\\x0ab (dry run)");
+  });
+
   it("spells out an escape byte in the title", () => {
     const title = dryRunResult({ verb: "create", topic: "users\u001b[2J" }).summary?.title;
 
@@ -108,6 +133,7 @@ describe("dryRunResult redaction", () => {
     });
     expect(result.data).toEqual({
       dry_run: true,
+      title: "Would create users (dry run)",
       verb: "create",
       topic: "users",
       id: undefined,

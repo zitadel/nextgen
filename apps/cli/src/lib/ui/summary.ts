@@ -1,4 +1,5 @@
 import type { BoxAction } from "@/lib/box";
+import { Facts } from "@/lib/ui/layout";
 
 /**
  * How a command ends. Every command ends the same way: one line saying what
@@ -78,9 +79,14 @@ export type Summary = {
  * A summary as plain text, for a run nobody is drawing into: the headline, then
  * what it produced under it. This is what a pipe is given for a command that
  * states its ending and says nothing else of its own, so the words are the same
- * ones the terminal ends on and cannot drift from them. Its fields are already
+ * ones the terminal ends on and cannot drift from them: the facts are drawn by
+ * the same layout, so a pipe is told what the terminal is. Its fields are already
  * spelled out where they were read, so none is spelled out again here.
  */
 export const textOf = (summary: Summary): string => {
-  return [summary.title, ...(summary.lines === undefined ? [] : ["", ...summary.lines])].join("\n");
+  return [
+    summary.title,
+    ...(summary.sections.length === 0 ? [] : ["", new Facts(summary.sections).render()]),
+    ...(summary.lines === undefined ? [] : ["", ...summary.lines]),
+  ].join("\n");
 };

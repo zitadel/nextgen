@@ -208,6 +208,24 @@ describe("preview", () => {
         expect(app.envelopeOf<Published>(result).data.dry_run).toBe(true);
       });
 
+      it("says on a dry run what it validated, as the headline it draws", async () => {
+        const app = await anAppAdmittingPreviews();
+
+        const result = await app.run(["preview", "--origin", PREVIEW_URL, "--dry-run", "--json"]);
+
+        expect(app.envelopeOf(result).data).toMatchObject({
+          title: "Validated the preview for 1 URL and deployed nothing (dry run)",
+        });
+      });
+
+      it("suggests the real command on a dry run", async () => {
+        const app = await anAppAdmittingPreviews();
+
+        const result = await app.run(["preview", "--origin", PREVIEW_URL, "--dry-run", "--json"]);
+
+        expect(result).toSuggest(`preview --origin ${PREVIEW_URL}`);
+      });
+
       it("registers no preview on a dry run", async () => {
         const app = await anAppAdmittingPreviews();
 

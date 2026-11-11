@@ -10,6 +10,7 @@ import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "@/
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { Suggestible } from "@/lib/oclif/suggestible";
 import { escapeControlCharacters } from "@/lib/terminal-text";
+import { section } from "@/lib/ui";
 
 /** How a directory with no local admin, and no parent holding one, is refused. */
 const NO_LOCAL_ADMIN_REFUSAL: Refusal = {
@@ -67,8 +68,6 @@ export default class Console extends Suggestible(BaseCommand) {
     // handoff token on the server — a mutation, so a dry run only reports who
     // it would sign in as.
     if (this.dryRun) {
-      log.info(`Would mint a console sign-in link for ${escapeControlCharacters(admin.email)}.`);
-
       const title = "Would mint a console sign-in link (dry run)";
 
       return this.emit({
@@ -80,8 +79,9 @@ export default class Console extends Suggestible(BaseCommand) {
         },
         summary: {
           title,
-          sections: [],
+          sections: [section(undefined, ["Signed in as", escapeControlCharacters(admin.email)])],
         },
+        next: { commands: [this.suggest("console")] },
       });
     }
 

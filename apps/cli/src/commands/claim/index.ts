@@ -17,6 +17,7 @@ import { normalizePublicCliCommand } from "@/lib/public-cli";
 import { isLoopbackUrl } from "@/lib/server";
 import { type SuggestedCommand, unscopedCommand } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
+import { section } from "@/lib/ui";
 import { reportWarning } from "@/lib/warnings";
 
 /**
@@ -164,7 +165,15 @@ export default class Claim extends EnvironmentCommand {
     // the two-step flow suggests the step that hands the link back, so
     // following the suggestion never blocks with the link out of sight.
     const startOver = this.suggest(
-      flags.noWait || flags.challengeId !== undefined ? "claim --no-wait" : "claim",
+      flags.noWait || flags.challengeId !== undefined
+        ? "claim --no-wait"
+        : [
+            "claim",
+            ...(flags.noOpen ? ["--no-open"] : []),
+            ...(flags.timeout === undefined
+              ? []
+              : [Cmd.option("--timeout", String(flags.timeout))]),
+          ].join(" "),
     );
 
     // The project to claim is the one the resolved environment points at — the
@@ -239,7 +248,7 @@ export default class Claim extends EnvironmentCommand {
           commands: [
             flags.challengeId === undefined
               ? startOver
-              : this.suggest(`claim --challenge-id ${flags.challengeId}`),
+              : this.suggest(`claim --challenge-id ${Cmd.quote(flags.challengeId)}`),
           ],
         },
       });
@@ -520,8 +529,6 @@ export default class Claim extends EnvironmentCommand {
     dashboard_url?: string;
   }): JsonEnvelope {
     this.recordTelemetry({ claim_outcome: "already_claimed" });
-    log.info(`This project already belongs to team ${escapeControlCharacters(data.team_id)}.`);
-
     const title = "This project already belongs to a team";
 
     return this.emit({
@@ -533,7 +540,7 @@ export default class Claim extends EnvironmentCommand {
       },
       summary: {
         title,
-        sections: [],
+        sections: [section(undefined, ["Team", escapeControlCharacters(data.team_id)])],
       },
     });
   }

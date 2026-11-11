@@ -21,6 +21,7 @@ import type { EjectActions } from "@/lib/orca/patchers/types";
 import { MANAGED_MARKER } from "@/lib/paths";
 import { readRendererId, readZitadelConfig } from "@/lib/project";
 import { shellCommand, type SuggestedCommand } from "@/lib/suggestion";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 
 /**
  * Asks the framework patcher which artifacts it owns. Falls back to the
@@ -252,6 +253,7 @@ function ejected(
             },
           ],
         },
+        next: { commands: [setItUp] },
       };
     }
 
@@ -270,8 +272,26 @@ function ejected(
           },
         ],
       },
+      next: { commands: [setItUp] },
     };
   }
+
+  const dry = ejectForReal !== undefined;
+  // What the terminal draws, since a person reads no envelope.
+  const lines = [
+    ...removed.map((file) => {
+      return `${dry ? "Would remove" : "Removed"} ${escapeControlCharacters(file)}`;
+    }),
+    ...preserved.map((file) => {
+      return `Kept ${escapeControlCharacters(file)}`;
+    }),
+    ...backedUp.map((entry) => {
+      return `${dry ? "Would back up" : "Backed up"} ${escapeControlCharacters(entry)}`;
+    }),
+    ...manualSteps.map((step) => {
+      return escapeControlCharacters(step);
+    }),
+  ];
 
   if (ejectForReal !== undefined) {
     const title =
@@ -290,6 +310,7 @@ function ejected(
       summary: {
         title,
         sections: [],
+        lines,
       },
       next: { commands: [ejectForReal] },
     };
@@ -309,6 +330,7 @@ function ejected(
     summary: {
       title,
       sections: [],
+      lines,
     },
     next: { commands: assembleNextCommands(backedUp, actions.dependencies, dir) },
   };
@@ -370,6 +392,7 @@ export default class Eject extends Suggestible(Destructive(BaseCommand)) {
       result.status === "skipped" && result.reason === "eject-cancelled"
         ? {
             ...result,
+            next: { commands: [this.suggest("eject")] },
             summary: {
               title: CANCELLED,
               sections: [],

@@ -202,7 +202,9 @@ export class Prose implements Renderable {
     }
     const lead = /^\s*/.exec(line)?.[0] ?? "";
     const item = /^(\[\w+\]|\$|-|\d+\.) /.test(line.trimStart()) ? "  " : "";
-    return wrapAnsi(line.trimStart(), Math.max(1, this.width - lead.length - item.length))
+    return wrapAnsi(line.trimStart(), Math.max(1, this.width - lead.length - item.length), {
+      hard: true,
+    })
       .split("\n")
       .map((part, index) => {
         return `${index === 0 ? lead : `${lead}${item}`}${part}`;
@@ -253,21 +255,27 @@ export class Facts implements Renderable {
  * A quote only opens one where something closes it. An apostrophe reaches here
  * on its own — a sentence that names a command carries the words after it into
  * the command (`nextSteps`), and `the app's config` is one quote — and reading
- * it as an opening quote left the whole rest of the line unbreakable and widened
- * the box for it.
+ * it as an opening quote inverted the quote state for the rest
+ * of the line. A quote does not open inside a word, so `it's` is not one.
  */
 const argumentBreaks = (command: string): number[] => {
   const at: number[] = [];
   let quote: string | undefined;
   let escaped = false;
-  for (const [index, character] of [...command].entries()) {
+  // Indexes are UTF-16 units, as `slice` reads them; quotes and spaces are never half a pair.
+  for (let index = 0; index < command.length; index += 1) {
+    const character = command.charAt(index);
     if (escaped) {
       escaped = false;
     } else if (character === "\\" && quote !== "'") {
       escaped = true;
     } else if (quote !== undefined) {
       quote = character === quote ? undefined : quote;
-    } else if ((character === "'" || character === '"') && command.includes(character, index + 1)) {
+    } else if (
+      (character === "'" || character === '"') &&
+      !/[\p{L}\p{N}]/u.test(command.charAt(index - 1)) &&
+      command.includes(character, index + 1)
+    ) {
       quote = character;
     } else if (character === " ") {
       at.push(index);

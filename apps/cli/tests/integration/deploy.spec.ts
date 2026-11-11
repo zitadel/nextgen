@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "@tests/helpers/platform";
+import { offTerminal } from "@tests/helpers/terminal";
 import {
   aCommittedApp,
   anUndeployedEnvironment,
@@ -479,6 +480,15 @@ describe("deploy", () => {
         expect(result).toSuggest("doctor --fix");
       });
 
+      it("names the repair for a missing primary origin once", async () => {
+        const app = await aSetUpApp();
+        await app.hasItsIssuerAsAPreviewOrigin();
+
+        const result = await app.deployRendered();
+
+        expect(result).toSayOnce("doctor --fix");
+      });
+
       it("checks for a primary origin before syncing IdP connections", async () => {
         const app = await aSetUpApp();
         await app.removeOrigin(SETUP_ORIGIN.pattern);
@@ -849,6 +859,15 @@ describe("deploy", () => {
         const result = await app.deployRendered();
 
         expect(result).toPrint("is now live on http://localhost:3000 and https://app.acme.com.");
+      });
+
+      it("sets the release line apart from the title when piped, as the terminal does", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin("https://app.acme.com");
+
+        const result = await offTerminal(() => app.deployRendered());
+
+        expect(result).toPrintExactly("resources\n\nRelease ");
       });
 
       it("diffs a deploy right after setup against the release setup deployed", async () => {

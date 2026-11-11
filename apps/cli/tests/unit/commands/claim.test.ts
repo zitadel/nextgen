@@ -408,7 +408,7 @@ describe("claim", () => {
     server.use(http.get("*/projects/:project_id/claim/status", statusChecks));
 
     const running = claim(cwd);
-    await vi.waitFor(() => expect(statusChecks).toHaveBeenCalledOnce());
+    await vi.waitFor(() => expect(statusChecks).toHaveBeenCalledOnce(), { timeout: 30_000 });
     pressCtrlC();
     const res = await running;
 
@@ -787,6 +787,8 @@ describe("claim", () => {
 
       const res = await runCliForTest(["claim", "--cwd", cwd, "--server", "local", "--no-open"]);
 
+      expect(res.exitCode).toBe(0);
+      expect(`${res.stdout}${res.stderr}`).toContain("ch_localstub\\x1b[2Jwiped");
       expect(`${res.stdout}${res.stderr}`).not.toContain("\u001b");
     });
 

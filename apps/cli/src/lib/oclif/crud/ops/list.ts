@@ -247,7 +247,8 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>, List
     // page: asking for one with --limit or --page-token is asking for one.
     const asked = flags.limit !== undefined || flags.pageToken !== undefined;
     const all = paged && (flags.all === true || (spec.drains === true && !asked));
-    const progress = all ? this.ui.spinner(`Fetching ${topic}`) : undefined;
+    const plural = resource.plural ?? topic;
+    const progress = all ? this.ui.spinner(`Fetching ${plural}`) : undefined;
     const paging = new Paging({
       items: (response) => {
         return spec.items(response);
@@ -259,7 +260,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>, List
     const walk = paging.walk(async (token, number) => {
       // The walk begins at the page --page-token names, if any.
       const page = await request(token ?? flags.pageToken);
-      progress?.message(`Fetching ${topic} — page ${number}`);
+      progress?.message(`Fetching ${plural} — page ${number}`);
 
       return page;
     });
@@ -271,7 +272,6 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>, List
       throw error;
     });
     const { items, next } = collected;
-    const plural = resource.plural ?? topic;
     progress?.stop(
       `Fetched ${items.length} ${new Intl.PluralRules("en").select(items.length) === "one" ? resource.singular : plural}`,
     );
@@ -306,8 +306,8 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>, List
 
 /**
  * The flags a follow-up page has to carry: a cursor is only valid with the
- * sorting and filters that produced it, and the page size is part of what the
- * caller asked for. Values are re-emitted exactly as they were typed.
+ * sorting and filters that produced it, and the page size and the columns are
+ * part of what the caller asked for. Values are re-emitted exactly as they were typed.
  */
 const repeatedFlags = (flags: ListFlags): readonly string[] => {
   const limit = flags.limit === undefined ? [] : [`--limit ${flags.limit}`];
@@ -315,8 +315,9 @@ const repeatedFlags = (flags: ListFlags): readonly string[] => {
   const filters = (flags.filter ?? []).map((filter) => {
     return Cmd.option("--filter", filter.raw);
   });
+  const fields = flags.fields === undefined ? [] : [Cmd.option("--fields", flags.fields.join(","))];
 
-  return [...limit, ...sort, ...filters];
+  return [...limit, ...fields, ...sort, ...filters];
 };
 
 /**

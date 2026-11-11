@@ -30,6 +30,8 @@ const LIMIT: Refused<number> = {
   },
 };
 
+const COLUMNS = ["id", "release_id", "reason", "origins", "deployed_at"] as const;
+
 /**
  * `zitadel deployment list` — show the project's deployment history.
  *
@@ -95,7 +97,7 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
         deployed_at: deployment.deployed_at,
       };
     });
-    const columns = ["id", "release_id", "reason", "origins", "deployed_at"];
+    const columns = COLUMNS;
     const empty = "No deployments found";
     const footer: string[] = [];
     const page = {

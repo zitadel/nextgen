@@ -7,14 +7,25 @@ vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).cla
 
 import { spinner } from "@clack/prompts";
 
+import { stripVTControlCharacters as plain } from "node:util";
+
 import { DrawnSpinner, QuietSpinner, type Spinner } from "@/lib/ui/spinner";
 
 /** The handle clack handed back to the last spinner that was started. */
 const handle = () => vi.mocked(spinner).mock.results.at(-1)?.value as ReturnType<typeof spinner>;
 
-/** A terminal to read keys from, `isTTY` or not. */
-const terminal = (isTTY: boolean): EventEmitter & { isTTY: boolean } => {
-  return Object.assign(new EventEmitter(), { isTTY });
+/** A terminal to read keys from, `isTTY` or not, that remembers each raw mode it was put in. */
+const terminal = (
+  isTTY: boolean,
+): EventEmitter & { isTTY: boolean; setRawMode(mode: boolean): void; rawModes: boolean[] } => {
+  const rawModes: boolean[] = [];
+  return Object.assign(new EventEmitter(), {
+    isTTY,
+    rawModes,
+    setRawMode: (mode: boolean) => {
+      rawModes.push(mode);
+    },
+  });
 };
 
 /** A terminal to draw on that keeps what was written to it, as `written()`. */
@@ -50,6 +61,7 @@ const interrupts = (act: () => void): number => {
 };
 
 afterEach(() => {
+  vi.unstubAllEnvs();
   vi.clearAllMocks();
   // A spinner no test stopped must not be drawn again by the next test's line.
   DrawnSpinner.active.clear();
@@ -238,6 +250,82 @@ describe("DrawnSpinner.around", () => {
     DrawnSpinner.around(() => undefined);
 
     expect(spinner).not.toHaveBeenCalled();
+  });
+});
+
+describe("a terminal given back", () => {
+  // Clack never leaves raw mode on win32, so Ctrl-C stays a key nobody reads.
+  it.each([
+    ["cleared", (running: DrawnSpinner) => running.clear()],
+    ["stopped", (running: DrawnSpinner) => running.stop("Done")],
+    ["paused", () => DrawnSpinner.pause()],
+  ])("is cooked again once the spinner is %s", (_how, end) => {
+    const input = terminal(true);
+    const running = new DrawnSpinner("Installing", true, input, screen());
+
+    end(running);
+
+    expect(input.rawModes.at(-1)).toBe(false);
+  });
+
+  it("is left alone when it is not a terminal", () => {
+    const input = terminal(false);
+
+    new DrawnSpinner("Installing", true, input, screen()).clear();
+
+    expect(input.rawModes).toEqual([]);
+  });
+});
+
+describe("a spinner stopped while paused", () => {
+  it("still leaves its line once the pause is over", () => {
+    const output = screen();
+    const running = new DrawnSpinner("Deploying", true, terminal(true), output);
+    const resume = DrawnSpinner.pause();
+    output.written();
+
+    running.stop("Deployed");
+    resume();
+
+    expect(plain(output.written())).toContain("Deployed");
+  });
+
+  it("leaves the label it started with when it was given no text", () => {
+    const output = screen();
+    const running = new DrawnSpinner("Deploying", true, terminal(true), output);
+    const resume = DrawnSpinner.pause();
+
+    running.stop();
+    resume();
+
+    expect(plain(output.written())).toContain("Deploying");
+  });
+
+  it("leaves nothing for one that was cleared", () => {
+    const output = screen();
+    const running = new DrawnSpinner("Deploying", true, terminal(true), output);
+    const resume = DrawnSpinner.pause();
+    const before = output.written();
+
+    running.clear();
+    resume();
+
+    expect(output.written()).toBe(before);
+  });
+});
+
+describe("DrawnSpinner on a CI terminal", () => {
+  // Clack leaves its frame line behind there and ends it with a newline, so
+  // the guide is two lines up, not one.
+  it("erases the guide line two lines up", () => {
+    vi.stubEnv("CI", "true");
+    const output = screen();
+    const running = new DrawnSpinner("Deploying", true, terminal(true), output);
+
+    DrawnSpinner.around(() => undefined);
+
+    expect(output.written()).toBe("\u001b[2A\u001b[0J");
+    running.clear();
   });
 });
 

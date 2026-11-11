@@ -445,6 +445,76 @@ describe("asker", () => {
     });
   });
 
+  describe("a question that names something the server answered", () => {
+    const raw = "Remove a\u001b]0;x\u0007 from the project?";
+    const spelled = "Remove a\\x1b]0;x\\x07 from the project?";
+
+    it("keeps it exact in the refusal a script reads", async () => {
+      await expect(
+        asker(scripted).confirm({ name: "remove a", message: raw }),
+      ).rejects.toMatchObject({
+        hint: `Ask a person first: ${raw} Pass --force only once they agree.`,
+        details: { question: raw },
+      });
+    });
+
+    it.each([
+      [
+        "confirm",
+        () => asker(ask).confirm({ name: "x", message: raw }),
+        () => vi.mocked(confirm).mock.calls[0]?.[0],
+      ],
+      [
+        "yes-no",
+        () => asker(ask).yesNo({ name: "x", message: raw }),
+        () => vi.mocked(confirm).mock.calls[0]?.[0],
+      ],
+      [
+        "text",
+        () => asker(ask).text({ name: "x", message: raw, parse: upper }),
+        () => vi.mocked(text).mock.calls[0]?.[0],
+      ],
+      [
+        "secret",
+        () => asker(ask).secret({ name: "x", message: raw, parse: upper }),
+        () => vi.mocked(password).mock.calls[0]?.[0],
+      ],
+      [
+        "select",
+        () => asker(ask).select({ name: "x", message: raw, options }),
+        () => vi.mocked(select).mock.calls[0]?.[0],
+      ],
+      [
+        "multiselect",
+        () => asker(ask).multiselect({ name: "x", message: raw, options }),
+        () => vi.mocked(multiselect).mock.calls[0]?.[0],
+      ],
+    ])("spells it out when a %s prompt draws it", async (_kind, act, drawn) => {
+      vi.mocked(confirm).mockResolvedValue(true as never);
+      vi.mocked(text).mockResolvedValue("a" as never);
+      vi.mocked(password).mockResolvedValue("a" as never);
+      vi.mocked(select).mockResolvedValue("a" as never);
+      vi.mocked(multiselect).mockResolvedValue(["a"] as never);
+
+      await act();
+
+      expect(drawn()).toMatchObject({ message: spelled });
+    });
+  });
+
+  describe("the hooks around a prompt", () => {
+    it("runs the one after it even when the prompt throws", async () => {
+      vi.mocked(confirm).mockRejectedValueOnce(new Error("boom"));
+      const after = vi.fn();
+
+      await asker({ ...ask, after })
+        .confirm({ name: "x", message: "X?" })
+        .catch(() => undefined);
+
+      expect(after).toHaveBeenCalledOnce();
+    });
+  });
+
   describe("yes-no", () => {
     const question = {
       name: "deploy it now",

@@ -1,3 +1,4 @@
+import { Cmd } from "@/lib/cmd";
 import { Args, Flags } from "@oclif/core";
 import { z } from "zod";
 
@@ -33,7 +34,12 @@ import { Destructive } from "@/lib/oclif/destructive";
 import { reads, type Refused } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { json, prose, type Rendering } from "@/lib/oclif/rendering";
-import { type SuggestedCommand, unscopedCommand } from "@/lib/suggestion";
+import {
+  asEnvironmentSelector,
+  projectCommand,
+  type SuggestedCommand,
+  unscopedCommand,
+} from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import type { Summary } from "@/lib/ui";
 import { userAgent } from "@/lib/user-agent";
@@ -73,9 +79,9 @@ const FORCE_REQUIRED_REFUSAL: Refusal = {
   code: "E_CONFIRMATION_REQUIRED",
   message: "Cannot call {operation} without --force in non-interactive mode",
   hint:
-    "Ask a person first: Call {operation}? Once they agree, run the same command again, " +
+    "Ask a person first: {question} Once they agree, run the same command again, " +
     "with its --field values or the pipe into --input, and add --force.",
-  details: { question: "Call {operation}?" },
+  details: { question: "{question}" },
 };
 
 /**
@@ -190,10 +196,15 @@ export async function requestOf(
  * retry, since a body can hold a secret or have come from a pipe a rerun of
  * the command alone would not have, so the refusal says what to do instead. A
  * dry run calls nothing, so it asks nothing.
+ *
+ * @param request - The call.
+ * @param run - Whether the run may be asked, forced or only previews.
+ * @param question - What a person would be asked, which the refusal repeats.
  */
 export function refuseUnforced(
   request: ApiRequest,
   run: { dryRun: boolean; nonInteractive: boolean; force: boolean },
+  question: string,
 ): void {
   const asks =
     request.operation.destructive &&
@@ -204,6 +215,7 @@ export function refuseUnforced(
   if (asks) {
     throw refusalError(FORCE_REQUIRED_REFUSAL, {
       operation: request.operation.id,
+      question,
     });
   }
 }
@@ -284,7 +296,7 @@ export default class Api extends Destructive(EnvironmentCommand) {
    * requires would refuse `help` as a name it does not know.
    */
   override async run(): Promise<JsonEnvelope> {
-    const { args } = await this.parseOnce();
+    const { args, flags } = await this.parseOnce();
     if (args.operation?.toLowerCase() !== "help") {
       return super.run();
     }
@@ -306,7 +318,20 @@ export default class Api extends Destructive(EnvironmentCommand) {
         title: "Done",
         sections: [],
       },
-      next: this.jsonEnabled() ? { commands: [this.suggest("api ls")] } : undefined,
+      // Built here, as the run was not admitted: it has no directory of its own to put back.
+      next: this.jsonEnabled()
+        ? {
+            commands: [
+              projectCommand(
+                "api ls",
+                asEnvironmentSelector(
+                  typeof flags.cwd === "string" ? ` ${Cmd.option("--cwd", flags.cwd)}` : "",
+                ),
+                this.config.version,
+              ),
+            ],
+          }
+        : undefined,
     });
   }
 
@@ -325,7 +350,14 @@ export default class Api extends Destructive(EnvironmentCommand) {
     const { server, projectId, client } = await this.reach(operation);
 
     const built = await requestOf(target, flags, projectId);
-    refuseUnforced(built, this.meta);
+    // The question a person is asked, and the one a refusal hands to whoever must ask them.
+    const question = [
+      `Call ${operation.id}${
+        projectId === undefined ? "" : ` in project ${projectId}`
+      } on ${server.replace(/^https?:\/\//, "")}?`,
+      ...(operation.summary === "" ? [] : [`${operation.summary}.`]),
+    ].join(" ");
+    refuseUnforced(built, this.meta, question);
     const request = withPathValues(
       built,
       await this.pathValues(
@@ -372,12 +404,7 @@ export default class Api extends Destructive(EnvironmentCommand) {
       ? await this.consent({
           verb: "call",
           name: `call ${operation.id}`,
-          message: [
-            `Call ${operation.id}${
-              projectId === undefined ? "" : ` in project ${escapeControlCharacters(projectId)}`
-            } on ${escapeControlCharacters(server.replace(/^https?:\/\//, ""))}?`,
-            ...(operation.summary === "" ? [] : [`${operation.summary}.`]),
-          ].join(" "),
+          message: question,
           // A body is not repeated in a suggestion: it can hold a secret, or
           // have come from a pipe a rerun of the command alone would not have.
           ...(request.body === undefined

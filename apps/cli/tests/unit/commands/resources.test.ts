@@ -1622,6 +1622,7 @@ describe("dry runs", () => {
     expect(res.exitCode).toBe(0);
     expect((parseJson(res.stdout) as { data: unknown }).data).toEqual({
       dry_run: true,
+      title: "Would deactivate team team_1 (dry run)",
       verb: "deactivate",
       topic: "teams",
       id: "team_1",

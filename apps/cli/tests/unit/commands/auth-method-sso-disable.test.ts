@@ -243,6 +243,18 @@ describe("auth-method sso disable", () => {
       expect(await readJson(dir, LOGIN_FLOW_FILE)).not.toHaveProperty(ENTRY_PROVIDERS);
     });
 
+    it("carries the headline it draws as data.title", async ({ dir }) => {
+      await writeProject(dir, GOOGLE_OFFERED);
+
+      const result = await runCliForTest(
+        authMethodJson(dir, "sso", "disable", "--provider", "google"),
+      );
+
+      expect(parseJson(result.stdout)).toMatchObject({
+        data: { title: expect.stringMatching(/^Removed google from /) },
+      });
+    });
+
     it("reports the files it changed and what is left", async ({ dir }) => {
       await writeProject(dir, GOOGLE_OFFERED);
 
@@ -330,6 +342,34 @@ describe("auth-method sso disable", () => {
       );
 
       expect(parseJson(result.stdout)).toMatchObject({ status: "ok", data: { dry_run: true } });
+    });
+
+    it("carries the headline it draws as data.title", async ({ dir }) => {
+      await writeProject(dir, GOOGLE_OFFERED);
+
+      const result = await runCliForTest(
+        authMethodJson(dir, "sso", "disable", "--provider", "google", "--dry-run"),
+      );
+
+      expect(parseJson(result.stdout)).toMatchObject({
+        data: { title: expect.stringMatching(/^Would remove google from .* \(dry run\)$/) },
+      });
+    });
+
+    it("suggests the real command", async ({ dir }) => {
+      await writeProject(dir, GOOGLE_OFFERED);
+
+      const result = await runCliForTest(
+        authMethodJson(dir, "sso", "disable", "--provider", "google", "--dry-run"),
+      );
+
+      expect(parseJson(result.stdout)).toMatchObject({
+        data: {
+          next_commands: [
+            expectedPublicCliCommand(`auth-method sso disable --provider google --cwd ${dir}`),
+          ],
+        },
+      });
     });
 
     it.for(GOOGLE_OFFERED_IN)(

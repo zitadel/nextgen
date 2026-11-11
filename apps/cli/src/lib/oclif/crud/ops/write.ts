@@ -212,6 +212,7 @@ abstract class WriteOperation<
       return dryRunResult({
         verb: this.verb,
         topic,
+        noun: resource.singular,
         id,
         body,
         checked: (await this.check(body, id)) ?? undefined,
@@ -231,7 +232,7 @@ abstract class WriteOperation<
     };
     if (result !== undefined) {
       summary = {
-        title: `${this.verb === "create" ? "Created" : "Updated"} ${resource.singular} ${escapeControlCharacters(String(resource.idOf(result)))}`,
+        title: `${this.verb === "create" ? "Created" : "Updated"} ${resource.singular} ${escapeControlCharacters(String(resource.idOf(result)), { keepLayout: false })}`,
         sections: [],
         lines: escapeJsonControlCharacters(JSON.stringify(result, null, 2)).split("\n"),
       };

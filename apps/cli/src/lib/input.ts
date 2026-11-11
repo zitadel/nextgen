@@ -5,6 +5,7 @@ import type { Parsed } from "@zitadel/config/idp";
 import { CANCELLED, confirmationHint, PromptCancelled, ZitadelError } from "./errors";
 import { flatOutput } from "./flat-output";
 import type { SuggestedCommand } from "./suggestion";
+import { escapeControlCharacters } from "./terminal-text";
 import type {
   Choice,
   Confirmer,
@@ -67,6 +68,15 @@ export type Session = {
   after?: () => void;
 };
 
+/**
+ * A question as a terminal draws it. The question is kept as it came wherever a
+ * script reads it (the refusal's hint and `details.question`), so what it names
+ * from the server is spelled out here, where it reaches a screen.
+ */
+function spelled(question: AnyQuestion): string {
+  return escapeControlCharacters(question.message);
+}
+
 /** How a typed answer is refused as it is typed: the problem, or nothing. */
 type Validate = (value: string | undefined) => string | undefined;
 
@@ -122,7 +132,7 @@ class DrawnPrompter implements Prompter {
   async text(question: AnyQuestion, validate: Validate): Promise<string> {
     return this.answered(
       await text({
-        message: question.message,
+        message: spelled(question),
         validate,
         initialValue: question.initialValue as string | undefined,
         placeholder: question.placeholder,
@@ -134,7 +144,7 @@ class DrawnPrompter implements Prompter {
   async secret(question: AnyQuestion, validate: Validate): Promise<string> {
     return this.answered(
       await password({
-        message: question.message,
+        message: spelled(question),
         validate,
         ...this.drawing,
       }),
@@ -144,7 +154,7 @@ class DrawnPrompter implements Prompter {
   async select(question: AnyQuestion): Promise<unknown> {
     return this.chosen(
       await select({
-        message: question.message,
+        message: spelled(question),
         options: question.options ?? [],
         initialValue: question.initialValue,
         ...this.drawing,
@@ -155,7 +165,7 @@ class DrawnPrompter implements Prompter {
   async multiselect(question: AnyQuestion): Promise<unknown[]> {
     return this.chosen(
       await multiselect({
-        message: question.message,
+        message: spelled(question),
         options: question.options ?? [],
         required: question.required,
         ...this.drawing,
@@ -173,7 +183,7 @@ class DrawnPrompter implements Prompter {
     if (this.guide) {
       return this.chosen(
         await confirm({
-          message: question.message,
+          message: spelled(question),
           initialValue,
           ...this.drawing,
         }),
@@ -181,7 +191,7 @@ class DrawnPrompter implements Prompter {
     }
     return this.chosen(
       await select<boolean>({
-        message: question.message,
+        message: spelled(question),
         options: [
           {
             value: false,
@@ -317,30 +327,27 @@ async function askOne(
         },
       );
     }
-    session.before?.();
-    const confirmed = await prompt.confirm(q);
-    session.after?.();
-    return confirmed;
+    return drawn(session, () => {
+      return prompt.confirm(q);
+    });
   }
 
   if (kind === "yes-no") {
     if (!session.interactive) {
       throw unsupplied();
     }
-    session.before?.();
-    const answered = await prompt.confirm(q);
-    session.after?.();
-    return answered;
+    return drawn(session, () => {
+      return prompt.confirm(q);
+    });
   }
 
   if (kind === "select" || kind === "multiselect") {
     if (!session.interactive) {
       throw unsupplied();
     }
-    session.before?.();
-    const chosen = kind === "select" ? await prompt.select(q) : await prompt.multiselect(q);
-    session.after?.();
-    return chosen;
+    return drawn(session, () => {
+      return kind === "select" ? prompt.select(q) : prompt.multiselect(q);
+    });
   }
 
   const parse =
@@ -381,11 +388,23 @@ async function askOne(
     const parsed = parse(value ?? "");
     return parsed.ok ? undefined : parsed.problem;
   };
-  session.before?.();
-  const typed =
-    kind === "secret" ? await prompt.secret(q, validate) : await prompt.text(q, validate);
-  session.after?.();
+  const typed = await drawn(session, () => {
+    return kind === "secret" ? prompt.secret(q, validate) : prompt.text(q, validate);
+  });
   return accept(typed);
+}
+
+/**
+ * Draws a prompt between the session's hooks. The one after it runs when the
+ * prompt throws too, so a spinner paused for the prompt is never left paused.
+ */
+async function drawn<T>(session: Session, draw: () => Promise<T>): Promise<T> {
+  session.before?.();
+  try {
+    return await draw();
+  } finally {
+    session.after?.();
+  }
 }
 
 /**

@@ -73,7 +73,7 @@ describe("preview rm", () => {
 });
 
 describe("preview rm asked about a URL with a control character", () => {
-  it("spells the character out in the question it asks a person", async () => {
+  it("keeps the character as it was typed, in the question it carries as data", async () => {
     const { cwd } = await aProjectWithPreviewsOnTwoPages();
     server.use(
       http.get("*/api/v1/projects/:project_id/previews", () => {
@@ -104,8 +104,7 @@ describe("preview rm asked about a URL with a control character", () => {
 
     const envelope = parseJson(result.stdout) as { code: string; hint: string };
     expect(envelope.code).toBe("E_CONFIRMATION_REQUIRED");
-    expect(envelope.hint).toContain("\\x1b[31m");
-    expect(envelope.hint).not.toContain("\u001b");
+    expect(envelope.hint).toContain("\u001b[31m");
   });
 });
 
@@ -130,6 +129,39 @@ describe("preview rm asked on a terminal", () => {
 
     expect(talk.asked()).toEqual([
       "Stop serving https://pr-1.app.acme.com for project proj_test on preview.zitadel.com?",
+    ]);
+  });
+
+  it("spells out a control character in the URL in the question it draws", async () => {
+    const { cwd } = await aProjectWithPreviewsOnTwoPages();
+    server.use(
+      http.get("*/api/v1/projects/:project_id/previews", () => {
+        return HttpResponse.json({
+          previews: [
+            {
+              origin: "https://pr-1\u001b[31m.app.acme.com",
+              expires_at: "2026-02-01T00:00:00.000Z",
+              created_at: "2026-01-01T00:00:00.000Z",
+            },
+          ],
+          next_page_token: null,
+        });
+      }),
+    );
+    const talk = answering(prompts as unknown as ReturnType<typeof clackDouble>, false);
+
+    await asPerson(() => {
+      return PreviewRm.run([
+        "https://pr-1\u001b[31m.app.acme.com",
+        "--cwd",
+        cwd,
+        "--server",
+        SERVER,
+      ]);
+    });
+
+    expect(talk.asked()).toEqual([
+      "Stop serving https://pr-1\\x1b[31m.app.acme.com for project proj_test on preview.zitadel.com?",
     ]);
   });
 

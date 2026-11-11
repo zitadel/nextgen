@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { DeploymentService } from "@/lib/backend";
 import { GetReleaseByIdParams } from "@/lib/backend/schemas";
+import { Cmd } from "@/lib/cmd";
 import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { reads, type Refused } from "@/lib/oclif/flags";
 import { MESSAGE_MAX_LENGTH, messageTooLong } from "@/lib/publish";
@@ -80,16 +81,30 @@ export default class DeploymentCreate extends EnvironmentCommand {
     // literal: deploying an existing release writes a deployment record, and a
     // dry run must write none.
     if (this.dryRun) {
+      const title = `Would deploy ${escapeControlCharacters(flags.release)} to primary (dry run)`;
+
       return this.emit({
         status: "ok",
         data: {
           dry_run: true,
+          title,
           release_id: flags.release,
           targets: "primary",
         },
         summary: {
-          title: `Would deploy ${escapeControlCharacters(flags.release)} to primary (dry run)`,
+          title,
           sections: [],
+        },
+        next: {
+          commands: [
+            this.suggest(
+              [
+                "deployment create",
+                Cmd.option("--release", flags.release),
+                ...(flags.message === undefined ? [] : [Cmd.option("--message", flags.message)]),
+              ].join(" "),
+            ),
+          ],
         },
       });
     }
@@ -102,16 +117,29 @@ export default class DeploymentCreate extends EnvironmentCommand {
       message: flags.message,
     });
 
+    const title = `Deployed ${escapeControlCharacters(deployment.release_id)}`;
+
     return this.emit({
       status: "ok",
       data: {
+        title,
         deployment_id: deployment.id,
         release_id: deployment.release_id,
         origins: deployment.origins,
       },
       summary: {
-        title: `Deployed ${escapeControlCharacters(deployment.release_id)} to ${deployment.origins.length} ${new Intl.PluralRules("en").select(deployment.origins.length) === "one" ? "origin" : "origins"}`,
+        title,
         sections: [],
+        lines:
+          deployment.origins.length === 0
+            ? []
+            : [
+                `Live on ${new Intl.ListFormat("en", { type: "conjunction" }).format(
+                  deployment.origins.map((origin) => {
+                    return escapeControlCharacters(origin);
+                  }),
+                )}.`,
+              ],
       },
       next: { commands: [this.suggest("deployment list")] },
     });

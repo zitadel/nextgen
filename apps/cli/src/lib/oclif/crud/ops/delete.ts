@@ -65,12 +65,13 @@ export class DeleteOperation<Ctx> extends ResourceCommand<Ctx, DeleteSpec<Ctx>, 
       message: async () => {
         const { projectId, server } = await this.connect();
 
-        return `${capitalize(verb)} ${resource.singular} ${escapeControlCharacters(id)} in project ${escapeControlCharacters(projectId)} on ${escapeControlCharacters(server.replace(/^https?:\/\//, ""))}?`;
+        return `${capitalize(verb)} ${resource.singular} ${id} in project ${projectId} on ${server.replace(/^https?:\/\//, "")}?`;
       },
       preview: () => {
         return dryRunResult({
           verb,
           topic,
+          noun: resource.singular,
           id,
         });
       },
@@ -85,7 +86,7 @@ export class DeleteOperation<Ctx> extends ResourceCommand<Ctx, DeleteSpec<Ctx>, 
           data: past === "deleted" ? deletedData({ id }) : mutatedData({ id }, past),
           pretty: prose(`${capitalize(past)} ${resource.singular} ${id}`),
           summary: {
-            title: `${capitalize(past)} ${resource.singular} ${escapeControlCharacters(id)}`,
+            title: `${capitalize(past)} ${resource.singular} ${escapeControlCharacters(id, { keepLayout: false })}`,
             sections: [],
           },
         };

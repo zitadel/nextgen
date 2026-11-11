@@ -13,6 +13,7 @@ import { LocalServer } from "@/lib/local-server/server";
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
 import { Destructive } from "@/lib/oclif/destructive";
 import { Suggestible } from "@/lib/oclif/suggestible";
+import { type Fact, section } from "@/lib/ui";
 
 /**
  * `zitadel reset` — delete the local Zitadel server runtime and data.
@@ -55,8 +56,12 @@ export default class Reset extends Suggestible(Destructive(BaseCommand)) {
             log_path: runtime.log_path,
           }
         : { container_name: containerName }),
-      data_deleted: true,
     };
+    const owner: Fact =
+      runtime?.backend === "binary"
+        ? ["Process", String(runtime.pid)]
+        : ["Container", containerName];
+    const facts = section(undefined, ["Runtime", runtime?.backend ?? "missing"], owner);
 
     return this.emit(
       await this.confirmed({
@@ -77,11 +82,14 @@ export default class Reset extends Suggestible(Destructive(BaseCommand)) {
             data: {
               dry_run: true,
               title,
-              runtime: described,
+              runtime: {
+                ...described,
+                data_deleted: false,
+              },
             },
             summary: {
               title,
-              sections: [],
+              sections: [facts],
             },
             next: { commands: [this.suggest("reset --force")] },
           };
@@ -95,11 +103,14 @@ export default class Reset extends Suggestible(Destructive(BaseCommand)) {
             status: "ok",
             data: {
               title,
-              runtime: described,
+              runtime: {
+                ...described,
+                data_deleted: true,
+              },
             },
             summary: {
               title,
-              sections: [],
+              sections: [facts],
             },
           };
         },

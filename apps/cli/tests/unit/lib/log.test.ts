@@ -79,4 +79,26 @@ describe("log", () => {
 
     expect(outer.said).toEqual([{ level: "info", text: "back to the outer" }]);
   });
+
+  it("does not draw into a sink that was removed out of order", () => {
+    const first = recordLog();
+    const second = recordLog();
+
+    first.stop();
+    second.stop();
+    log.debug("after both ended");
+
+    expect(first.said).toEqual([]);
+  });
+
+  it("keeps drawing into the newest sink when an older one is removed", () => {
+    const first = recordLog();
+    const second = recordLog();
+
+    first.stop();
+    log.info("still running");
+    second.stop();
+
+    expect(second.said).toEqual([{ level: "info", text: "still running" }]);
+  });
 });

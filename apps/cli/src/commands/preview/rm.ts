@@ -58,17 +58,17 @@ export default class PreviewRm extends Destructive(PreviewCommand) {
     return this.emit(
       await this.confirmed({
         verb: "remove",
-        name: `stop serving ${escapeControlCharacters(args.url)}`,
+        name: `stop serving ${args.url}`,
         message: async () => {
           const { projectId, server } = await this.connect();
-          return `Stop serving ${escapeControlCharacters(args.url)} for project ${escapeControlCharacters(projectId)} on ${escapeControlCharacters(server.replace(/^https?:\/\//, ""))}?`;
+          return `Stop serving ${args.url} for project ${projectId} on ${server.replace(/^https?:\/\//, "")}?`;
         },
         preview: () => {
           return dryRunResult({
-            verb: "remove",
+            verb: "stop",
             topic: "preview",
+            noun: "serving",
             id: args.url,
-            clause: "from the project",
           });
         },
         prepare: async () => {

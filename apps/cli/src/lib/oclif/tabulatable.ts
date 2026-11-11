@@ -213,13 +213,12 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
       // screen to draw a table on.
       const plain = flags.plain === true || !this.isOnScreen;
       // The cursor is opaque text from the server: `Cmd.option` quotes it so
-      // whitespace or shell metacharacters cannot run from a copied command,
-      // and it is spelled out so what drives a terminal cannot either. The
-      // data keeps the cursor as it came, so paging with it still works.
+      // whitespace, shell metacharacters and control characters cannot run from
+      // a copied command, and spelling it out first would change what it reads
+      // back as. The data keeps the cursor as it came, so paging with it works.
       const token = view.page?.token || null;
-      const shown = token === null ? null : escapeControlCharacters(token);
       const more =
-        shown === null ? [] : [`More available: ${Cmd.option("--page-token", shown)} (or --all)`];
+        token === null ? [] : [`More available: ${Cmd.option("--page-token", token)} (or --all)`];
       // A paged list asks for its follow-up command whether or not there is a
       // next page, so a command that cannot suggest one fails on its first run
       // and not on the first result that spans two pages.

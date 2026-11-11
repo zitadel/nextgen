@@ -3,6 +3,7 @@ import { describe, expect, vi } from "vitest";
 import { installDependenciesForSetup, type SetupInstallInput } from "@/commands/setup/install";
 import type { BoxAction } from "@/lib/box";
 import { ZitadelError } from "@/lib/errors";
+import { installLogSink } from "@/lib/log";
 import { environmentSelectorSuffix } from "@/lib/oclif/environment-flags";
 import type { runPackageCommand } from "@/lib/package-manager";
 import { it } from "@tests/helpers/fixtures";
@@ -26,11 +27,16 @@ const CWD_FLAG = "shop";
 
 /**
  * The ways setup leaves the install to the reader: the flag, the input that
- * sets it, and the reason the outcome gives.
+ * sets it, and what the outcome reports: skipped with its reason, or, for a
+ * dry run, the install it would run.
  */
 const SKIPS = [
-  ["--skip-install", { skipInstall: true }, "skip-install"],
-  ["--dry-run", { dryRun: true }, "dry-run"],
+  ["--skip-install", { skipInstall: true }, { status: "skipped", reason: "skip-install" }],
+  [
+    "--dry-run",
+    { dryRun: true },
+    { status: "would-run", package_manager: "npm", command: "npm install" },
+  ],
 ] as const;
 
 /**
@@ -324,15 +330,18 @@ describe("installDependenciesForSetup", () => {
       expect(run).not.toHaveBeenCalled();
     });
 
-    it.for(SKIPS)("reports the install skipped with %s", async ([, skip, reason], { dir }) => {
-      await aProject(dir);
+    it.for(SKIPS)(
+      "reports the install it left to the reader with %s",
+      async ([, skip, reported], { dir }) => {
+        await aProject(dir);
 
-      const result = await installDependenciesForSetup(
-        anInstallInput({ cwd: dir, run: aRunner(), ...skip }),
-      );
+        const result = await installDependenciesForSetup(
+          anInstallInput({ cwd: dir, run: aRunner(), ...skip }),
+        );
 
-      expect(result.install).toMatchObject({ status: "skipped", reason });
-    });
+        expect(result.install).toMatchObject(reported);
+      },
+    );
 
     it.for(SKIPS)("suggests installing first with %s", async ([, skip], { dir }) => {
       await aProject(dir);
@@ -422,6 +431,30 @@ describe("installDependenciesForSetup", () => {
       );
 
       expect(result.nextCommands).toEqual(["npm run dev", PLAN_COMMAND]);
+    });
+  });
+
+  describe("when the install writes to the terminal itself", () => {
+    // A spinner redrawing over the package manager's own output mixes the two,
+    // and its raw mode keeps Ctrl-C from reaching the child.
+    it("says a plain line first and runs no step around it", async ({ dir }) => {
+      await aProject(dir);
+      const steps: string[] = [];
+      const said: string[] = [];
+      const restore = installLogSink((level, text) => {
+        said.push(`${level} ${text}`);
+      });
+
+      await installDependenciesForSetup(
+        anInstallInput({ cwd: dir, json: false, run: aRunner(), task: recordingTask(steps) }),
+      );
+      restore();
+
+      expect(steps).toEqual([]);
+      expect(said).toEqual([
+        "start Installing dependencies with npm install",
+        "done Installed dependencies",
+      ]);
     });
   });
 

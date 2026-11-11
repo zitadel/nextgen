@@ -7,7 +7,7 @@ import { z } from "zod";
 
 vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
 
-import { cancel, confirm, isCancel, spinner } from "@clack/prompts";
+import { cancel, confirm, isCancel, outro, spinner } from "@clack/prompts";
 
 import { asTerminal, offTerminal } from "@tests/helpers/terminal";
 import { EXIT_CODES } from "@/lib/errors";
@@ -418,6 +418,28 @@ describe("write results", () => {
     expect(JSON.parse(JSON.stringify(envelope))).toHaveProperty("data", {});
   });
 
+  it("draws what it wrote as one line when the id has a line break in it", async () => {
+    const odd: CreateSpec<Ctx> = { schema, call: async () => ({ id: "a\nb", name: "a" }) };
+    const command = bindOperation(
+      CreateOperation as OperationClass<Ctx, CreateSpec<Ctx>>,
+      definition(odd),
+    );
+    const written: string[] = [];
+    vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+      written.push(String(chunk));
+      return true;
+    });
+    vi.spyOn(console, "log").mockImplementation((...args) => {
+      written.push(`${args.join(" ")}\n`);
+    });
+
+    await asTerminal(() =>
+      (command as unknown as { run(a: string[]): Promise<unknown> }).run(["--name", "a"]),
+    );
+
+    expect(written.join("")).toContain("Created team a\\x0ab");
+  });
+
   it("says the command completed when the server answers without a body, not that it wrote {}", async () => {
     // `grants create` by identifier answers 202 with no body, so there is no
     // record to print and the generic rendering is the honest one.
@@ -503,6 +525,18 @@ describe("write results", () => {
         result: { id: "team_1", name: "a" },
       },
     });
+  });
+
+  it("names the resource a dry run would write as the prompt does, not the topic", async () => {
+    const command = bindOperation(CreateOperation as OperationClass<Ctx, CreateSpec<Ctx>>, {
+      ...definition(create),
+      topic: "idps",
+      resource: { ...resource, singular: "identity provider" },
+    });
+
+    const { stdout } = await printed(command, ["--name", "a", "--dry-run"]);
+
+    expect(stdout.join("\n")).toContain("Would create identity provider (dry run)");
   });
 
   it("lets a server's refusal of a dry run fail the command", async () => {
@@ -616,6 +650,17 @@ describe("output a script reads", () => {
     expect(stderr.join("\n")).toContain("teams list --page-token p2 --json");
   });
 
+  it("carries --fields into the next page it suggests", async () => {
+    const command = bindOperation(
+      ListOperation as OperationClass<Ctx, ListSpec<Ctx>>,
+      definition(paged),
+    );
+
+    const { stderr } = await printed(command, ["--plain", "--fields", "name"]);
+
+    expect(stderr.join("\n")).toContain("teams list --fields name --page-token p2 --json");
+  });
+
   it("leaves a created resource's JSON body as the only thing on stdout", async () => {
     const command = bindOperation(
       CreateOperation as OperationClass<Ctx, CreateSpec<Ctx>>,
@@ -679,6 +724,31 @@ describe("list paging", () => {
       "ask p2",
       "say Fetching teams — page 2",
     ]);
+  });
+
+  it("names the descriptor's plural in the drain's spinner, not the topic", async () => {
+    const messages: string[] = [];
+    vi.mocked(spinner).mockReturnValueOnce({
+      start: vi.fn(),
+      stop: vi.fn(),
+      clear: vi.fn(),
+      message: (text?: string) => {
+        messages.push(String(text));
+      },
+    } as unknown as ReturnType<typeof spinner>);
+    const command = bindOperation(ListOperation as OperationClass<Ctx, ListSpec<Ctx>>, {
+      ...definition({
+        ...list,
+        body: z.object({}).passthrough(),
+        call: async () => ({ teams: [] }),
+      }),
+      topic: "idps",
+      resource: { ...resource, singular: "identity provider", plural: "identity providers" },
+    });
+
+    await asTerminal(() => printed(command, ["--all", "--plain"]));
+
+    expect(messages).toEqual(["Fetching identity providers — page 1"]);
   });
 
   it.each([
@@ -861,6 +931,24 @@ describe("get sections", () => {
   it("leaves them out when --fields picks the view", async () => {
     expect(await printed(["team_1", "--fields", "name"])).not.toContain("members");
   });
+
+  it("draws a heading with a line break in it as one line", async () => {
+    const odd = bindOperation(GetOperation as OperationClass<Ctx, GetSpec<Ctx>>, {
+      ...definition<GetSpec<Ctx>>({ call: async () => ({ id: "a\nb", name: "core" }) }),
+    }) as unknown as { run(argv: string[]): Promise<unknown> };
+    const written: string[] = [];
+    vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+      written.push(String(chunk));
+      return true;
+    });
+    vi.spyOn(console, "log").mockImplementation((...args) => {
+      written.push(`${args.join(" ")}\n`);
+    });
+
+    await asTerminal(() => odd.run(["x"]));
+
+    expect(written.join("")).toContain("Read a\\x0ab");
+  });
 });
 
 describe("delete confirmation", () => {
@@ -945,6 +1033,16 @@ describe("delete confirmation", () => {
     },
   );
 
+  it("keeps the id exact in the question a --json refusal carries", async () => {
+    const failure = JSON.parse(
+      (await printedByFailing(() => deleting("delete").run(["team\u001bx", "--json"]))).stdout,
+    );
+
+    expect(failure.details.question).toBe(
+      "Delete team team\u001bx in project proj_env on api.zitadel.example?",
+    );
+  });
+
   it("asks the question with the verb, the resource, the id and the place", async () => {
     vi.mocked(confirm).mockResolvedValueOnce(true as never);
 
@@ -974,6 +1072,15 @@ describe("delete confirmation", () => {
     expect(vi.mocked(confirm).mock.calls[0]?.[0]).toMatchObject({
       message: "Delete team team\\x1b]0;x\\x07 in project proj_env on api.zitadel.example?",
     });
+  });
+
+  it("closes on what it deleted as one line when the id has a line break in it", async () => {
+    vi.mocked(confirm).mockResolvedValueOnce(true as never);
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await asTerminal(() => deleting("delete").run(["a\nb"]));
+
+    expect(outro).toHaveBeenCalledWith("Deleted team a\\x0ab");
   });
 
   it("is skipped when the answer is no", async () => {

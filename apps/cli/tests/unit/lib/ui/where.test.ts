@@ -28,6 +28,10 @@ describe("Where", () => {
     );
   });
 
+  it("names the project alone when the command reached no server", () => {
+    expect(plain(new Where("proj-1").render())).toBe("Using project proj-1.");
+  });
+
   describe("as the place in a footer that has its own wording", () => {
     it("names the project and the server", () => {
       expect(new Where("proj-1", "api.zitadel.cloud").plain).toBe(

@@ -15,7 +15,6 @@ import {
 import { Destructive } from "@/lib/oclif/destructive";
 import { reads, type Refused } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
-import { prose } from "@/lib/oclif/rendering";
 import { readZitadelSecret } from "@/lib/project";
 import {
   abbreviate,
@@ -25,7 +24,7 @@ import {
   Publisher,
 } from "@/lib/publish";
 import { configIsDirty } from "@/lib/publish/git";
-import { DEPLOY_ARGS, shellCommand, type SuggestedCommand } from "@/lib/suggestion";
+import { DEPLOY_ARGS, shellCommand } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { reportWarning } from "@/lib/warnings";
 
@@ -65,7 +64,6 @@ export function missingPrimaryOrigin(input: {
   origins: Origins;
   issuer: string | undefined;
   setupProject: boolean;
-  suggest: (command: string) => SuggestedCommand;
 }): { hint: string; next: readonly string[] } {
   const preview =
     input.issuer === undefined ? undefined : input.origins.heldAsPreview(input.issuer);
@@ -73,14 +71,14 @@ export function missingPrimaryOrigin(input: {
     const held = `It holds its issuer ${preview} as a preview origin, as setup 0.1.0 registered it, so adding it as primary conflicts.`;
     if (input.setupProject) {
       return {
-        hint: `${held} Run ${input.suggest("doctor --fix")} to make it primary, then deploy.`,
+        hint: `${held} Make it primary, then deploy.`,
         next: ["doctor --fix"],
       };
     }
     const remove = `origin rm ${Cmd.quote(preview)} --force`;
     const add = `origin add ${Cmd.quote(preview)} --kind primary`;
     return {
-      hint: `${held} Remove it with ${input.suggest(remove)}, add it back with ${input.suggest(add)}, then deploy.`,
+      hint: `${held} Remove it and add it back as primary, then deploy.`,
       // Both steps, in the order they must run: removing the pattern leaves
       // the project admitting every origin until it is added back.
       next: [remove, add],
@@ -89,12 +87,12 @@ export function missingPrimaryOrigin(input: {
   if (input.issuer !== undefined) {
     const add = `origin add ${Cmd.quote(Origins.originOf(input.issuer))} --kind primary`;
     return {
-      hint: `Add the URL the app serves from with ${input.suggest(add)}, then deploy.`,
+      hint: "Add the URL the app serves from as a primary origin, then deploy.",
       next: [add],
     };
   }
   return {
-    hint: `Add one with ${input.suggest("origin add '<your-app-url>' --kind primary")}, then deploy.`,
+    hint: "Add a primary origin for the URL the app serves from, then deploy.",
     next: ["origin list"],
   };
 }
@@ -211,7 +209,6 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
         summary: {
           title: CANCELLED,
           sections: [],
-          lines: ["Nothing was deployed."],
         },
       });
     }
@@ -220,17 +217,32 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
     const resources = `${resourceCount} ${new Intl.PluralRules("en").select(resourceCount) === "one" ? "resource" : "resources"}`;
 
     if (this.dryRun) {
+      const title = `Validated ${resources} and deployed nothing (dry run)`;
+
       return this.emit({
         status: "ok",
         data: {
           dry_run: true,
+          title,
           resources: resourceCount,
           targets: "primary",
           ...prepared.report,
         },
         summary: {
-          title: `Validated ${resources} and deployed nothing (dry run)`,
+          title,
           sections: [],
+        },
+        next: {
+          commands: [
+            this.suggest(
+              [
+                flags.message === undefined
+                  ? DEPLOY_ARGS
+                  : `deploy ${Cmd.option("-m", flags.message)}`,
+                ...(flags.force ? ["--force"] : []),
+              ].join(" "),
+            ),
+          ],
         },
       });
     }
@@ -305,6 +317,7 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
     return this.emit({
       status: "ok",
       data: {
+        title,
         release_id: release.id,
         content_hash: release.content_hash,
         deployment_id: deployment.id,
@@ -312,7 +325,6 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
         origins: servedOrigins,
         ...prepared.report,
       },
-      pretty: prose(`${title}\n${live}`),
       summary: {
         title,
         sections: [],
@@ -351,7 +363,7 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
       reportWarning(lockout);
     }
     const { projectId, server } = await this.connect();
-    const question = `Deploy to project ${escapeControlCharacters(projectId)} on ${escapeControlCharacters(server.replace(/^https?:\/\//, ""))} even though the users above will not be able to sign in?`;
+    const question = `Deploy to project ${projectId} on ${server.replace(/^https?:\/\//, "")} even though the users above will not be able to sign in?`;
     if (!this.dryRun) {
       const consent = await this.consent({
         verb: "deploy",
@@ -401,9 +413,6 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
         origins,
         issuer: environment.values.ZITADEL_ISSUER?.value,
         setupProject: setupProject === projectId,
-        suggest: (command) => {
-          return this.suggest(command);
-        },
       }),
       (next) => {
         return this.suggest(next);

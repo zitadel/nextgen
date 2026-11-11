@@ -313,7 +313,8 @@ Each invocation prints one JSON object:
   `nothing-to-eject`). `skipped` means nothing was done because a person
   declined or there was nothing to do.
 - A dry run (`--dry-run`) answers `ok` with `data.dry_run: true` and a headline
-  ending in `(dry run)`, never `skipped`.
+  ending in `(dry run)` as `data.title`, never `skipped`, and `next_commands` holds
+  the real command to run.
 - On failure: `code` (e.g. `E_VALIDATION`, `E_NETWORK`, `E_NOT_FOUND`,
   `E_CONFLICT`) and `message`, usually with a `hint`, and `details` when there
   is structured context.
@@ -904,8 +905,9 @@ The commands change only local files, apart from
 project. A provider added by `sso enable` is configured locally, not live: its
 `data.title` says so, `data.next_actions` says to deploy, and `data.next_commands`
 holds `deploy --dry-run` then `deploy`. Only run those once the provider's OAuth
-application exists. `data.title` claims the credentials are stored on the project
-only when they reached it. When they refuse, they write and publish nothing, on a dry run too.
+application exists. `data.client_id.published` and `data.secret.published` say whether the
+credentials reached the project; `data.title` says only that the provider is configured locally.
+When they refuse, they write and publish nothing, on a dry run too.
 They refuse to run while any file under `.zitadel/` does not parse, fails its
 contract or fails the per-file checks `deploy` makes (a literal `client_secret`,
 a branding template or `$file` that cannot be read or breaks the template

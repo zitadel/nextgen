@@ -3,6 +3,8 @@ import type { Writable } from "node:stream";
 
 import { spinner } from "@clack/prompts";
 
+import { MARK } from "./marks";
+
 /**
  * A spinner the caller drives itself: it runs while something takes a moment
  * and is then either replaced by a line that says how it ended, or cleared,
@@ -34,7 +36,10 @@ export class QuietSpinner implements Spinner {
 }
 
 /** The terminal a spinner reads keys from: a TTY switched to raw mode while it draws. */
-export type SpinnerInput = EventEmitter & { isTTY?: boolean };
+export type SpinnerInput = EventEmitter & {
+  isTTY?: boolean;
+  setRawMode?: (mode: boolean) => unknown;
+};
 
 /** The terminal a spinner draws on. */
 export type SpinnerOutput = Writable & { isTTY?: boolean };
@@ -55,6 +60,9 @@ export class DrawnSpinner implements Spinner {
 
   private handle: ReturnType<typeof spinner>;
   private text: string;
+  /** What `stop` was given while the spinner was paused, to be written when the pause ends. */
+  private stoppedWhilePaused: { text: string } | undefined;
+  private paused = false;
   private readonly guide: boolean;
   private readonly input: SpinnerInput;
   private readonly output: SpinnerOutput;
@@ -108,12 +116,17 @@ export class DrawnSpinner implements Spinner {
     for (const one of running) {
       one.release();
       one.eraseGuide();
+      one.paused = true;
     }
     return () => {
-      // A spinner stopped or cleared while paused stays stopped.
       for (const one of running) {
+        one.paused = false;
         if (DrawnSpinner.active.has(one)) {
           one.handle = one.spin();
+        } else if (one.stoppedWhilePaused !== undefined) {
+          // Stopped while paused: nothing was drawn to stop, so its line is written now.
+          one.output.write(`${MARK.done}  ${one.stoppedWhilePaused.text}\n`);
+          one.stoppedWhilePaused = undefined;
         }
       }
     };
@@ -134,7 +147,12 @@ export class DrawnSpinner implements Spinner {
   stop(text?: string): void {
     DrawnSpinner.active.delete(this);
     this.input.off("data", this.onKeys);
+    if (this.paused) {
+      this.stoppedWhilePaused = { text: text ?? this.text };
+      return;
+    }
     this.handle.stop(text);
+    this.cook();
   }
 
   clear(): void {
@@ -146,6 +164,14 @@ export class DrawnSpinner implements Spinner {
   private release(): void {
     this.input.off("data", this.onKeys);
     this.handle.clear();
+    this.cook();
+  }
+
+  /** Puts the terminal back in cooked mode, which clack leaves raw on win32, so Ctrl-C is a signal again. */
+  private cook(): void {
+    if (this.input.isTTY === true) {
+      this.input.setRawMode?.(false);
+    }
   }
 
   /**
@@ -155,8 +181,8 @@ export class DrawnSpinner implements Spinner {
    */
   private eraseGuide(): void {
     if (this.guide && this.output.isTTY === true) {
-      // Up one line, then erase from there down.
-      this.output.write("\u001b[1A\u001b[0J");
+      // Up to the guide line, then erase from there down; on CI clack leaves its frame line and a newline under it.
+      this.output.write(`\u001b[${process.env.CI === "true" ? 2 : 1}A\u001b[0J`);
     }
   }
 

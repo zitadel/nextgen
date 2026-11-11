@@ -29,6 +29,7 @@ import type { Presentation, Summary } from "@/lib/ui";
 import { NEXT_LABEL, textOf } from "@/lib/ui/summary";
 import { Ui } from "@/lib/ui";
 import { stripColumnMarks } from "@/lib/ui/layout";
+import { DrawnSpinner } from "@/lib/ui/spinner";
 import { takeReportedWarnings } from "@/lib/warnings";
 import {
   CLI_COMMAND_COMPLETED,
@@ -642,7 +643,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
     // out the colour too.
     // An empty rendering is written as nothing, not as a blank line: a piped
     // list of no records must leave stdout empty, so `wc -l` reports 0.
-    const rendered = renderPretty(normalized, beside ? "" : next);
+    const rendered = renderPretty(normalized, beside ? "" : next, !beside);
     const footer = normalized.status === "ok" ? normalized.footer : undefined;
     const ending = this.endingOf(normalized, footer);
     if (beside) {
@@ -654,8 +655,12 @@ export abstract class BaseCommand extends Interruptible(Command) {
         // result is not on screen to be set apart from.
         this.logAside(rendered !== "" && this.isOnScreen ? `\n${next}` : next);
       }
+      // Only the script's own output stays on stdout; what the CLI adds goes beside it.
+      for (const warning of warningsOf(normalized)) {
+        this.logAside(warningLine(warning));
+      }
       if (footer !== undefined) {
-        this.log(`\n${stripColumnMarks(footer)}`);
+        this.logAside(`\n${stripColumnMarks(footer)}`);
       }
     } else if (this.ui.interactive) {
       this.ui.finish(ending);
@@ -840,7 +845,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
     const reason: unknown = this.signal.reason;
     const cancelled =
       this.signal.aborted && reason instanceof ZitadelError && reason.code === "E_CANCELLED";
-    const zitadelError = cancelled ? reason : toZitadelError(error);
+    const zitadelError = presentedFailure(cancelled ? reason : toZitadelError(error), meta);
     this.meta = meta;
     this.openTelemetry(process.argv.includes("--no-telemetry") ? false : undefined);
     if (this.telemetry?.enabled) {
@@ -860,6 +865,8 @@ export abstract class BaseCommand extends Interruptible(Command) {
     } else if (zitadelError.code === "E_CANCELLED") {
       this.ui.stop(zitadelError);
     } else {
+      // A step left running must not keep drawing under the failure.
+      DrawnSpinner.clearAll();
       // An open chain is closed on its own line, but the failure goes to stderr
       // like every other failure, so `2>errors.log` keeps a wizard's too.
       if (this.ui.interactive && this.ui.opened) {
@@ -1039,9 +1046,10 @@ function toErrorEnvelope(error: ZitadelError, meta: GlobalOptions): ErrorEnvelop
  * Renders a {@link CommandResult} as human-facing text for non-JSON mode: the
  * command's own rendering, or the one its summary gives (`normalizeCommandResult`
  * settles which). `next` is the rendered next-step block, which follows the
- * rendering, and comes before the warnings.
+ * rendering, and comes before the warnings, which `withWarnings` leaves out for
+ * output a script reads.
  */
-function renderPretty(result: CommandResult, next: string): string {
+function renderPretty(result: CommandResult, next: string, withWarnings: boolean): string {
   // A command's own rendering arrives spelled out, because the factory that
   // made it knew which spelling its shape takes, so interpolating what the
   // server answered is safe wherever a command does it.
@@ -1049,14 +1057,17 @@ function renderPretty(result: CommandResult, next: string): string {
   return [
     next === "" || own === "" ? own : `${own.replace(/\n+$/, "")}\n`,
     next,
-    ...(result.status === "ok" && !result.warningsShown ? (result.warnings ?? []) : []).map(
-      warningLine,
-    ),
+    ...(withWarnings ? warningsOf(result).map(warningLine) : []),
   ]
     .filter((line) => {
       return line !== "";
     })
     .join("\n");
+}
+
+/** The warnings a result still has to show: those its own output did not. */
+function warningsOf(result: CommandResult): readonly string[] {
+  return result.status === "ok" && !result.warningsShown ? (result.warnings ?? []) : [];
 }
 
 /**
@@ -1067,21 +1078,14 @@ function renderPretty(result: CommandResult, next: string): string {
  * or oclif refusing the command line.
  */
 function failureSummary(error: ZitadelError, meta: GlobalOptions): Summary {
-  const { sentence, misuse } = failureText(error.message);
   // A failure names what it failed on — an origin, an id, a value — so the
   // message and the hint carry what the server answered as readily as a
   // success's rendering does, and are spelled out here for the same reason.
   // The envelope keeps them as they came, so a reader parses the real text.
   // Only the label is coloured, so there is nothing for the spelling to undo.
-  const suggested = normalizePublicCliCommands(error.nextCommands, meta.cliVersion) ?? [];
-  let commands: readonly string[] = [];
-  if (suggested.length > 0) {
-    commands = suggested;
-  } else if (misuse) {
-    commands = [helpFor(meta)];
-  }
+  const commands = normalizePublicCliCommands(error.nextCommands, meta.cliVersion) ?? [];
   return {
-    title: `Error: ${escapeControlCharacters(spellOutCommands(sentence, meta.cliVersion))} (${error.code})`,
+    title: `Error: ${escapeControlCharacters(spellOutCommands(error.message, meta.cliVersion))} (${error.code})`,
     sections: [],
     lines: error.hint
       ? [escapeControlCharacters(spellOutCommands(error.hint, meta.cliVersion))]
@@ -1101,10 +1105,25 @@ function failureSummary(error: ZitadelError, meta: GlobalOptions): Summary {
   };
 }
 
-/** `zitadel <command> --help`: the step a refused command line ends on. */
-function helpFor(meta: GlobalOptions): string {
+/**
+ * A failure as every rendering of it states it. oclif refuses a command line
+ * in its own words, so the sentence is its first line and the step is the
+ * command's help, in the envelope and on the terminal alike.
+ */
+function presentedFailure(error: ZitadelError, meta: GlobalOptions): ZitadelError {
+  const { sentence, misuse } = failureText(error.message);
+  if (!misuse) {
+    return error;
+  }
   const command = meta.command.replaceAll(":", " ").trim();
-  return publicCliCommand(command === "" ? "--help" : `${command} --help`, meta.cliVersion);
+
+  return new ZitadelError(error.code, sentence, {
+    hint: error.hint,
+    nextCommands: error.nextCommands?.length
+      ? error.nextCommands
+      : [unscopedCommand(command === "" ? "--help" : `${command} --help`, meta.cliVersion)],
+    details: error.details,
+  });
 }
 
 /**

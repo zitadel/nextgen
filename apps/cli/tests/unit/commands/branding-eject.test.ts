@@ -186,6 +186,26 @@ describe("branding eject", () => {
     expect(json.hint).toBe("Pick one of: centered, minimal.");
   });
 
+  it("--dry-run names the files it would write on the terminal", async () => {
+    const cwd = await makeProject();
+
+    const res = await runCliForTest(["branding", "eject", "--cwd", cwd, "--dry-run"]);
+
+    expect(res.stdout).toContain(".zitadel/branding/login.liquid");
+  });
+
+  it("--dry-run suggests the real command, with the design it was given", async () => {
+    const cwd = await makeProject();
+
+    const res = await eject(cwd, "--dry-run", "--design", "minimal");
+
+    expect(parseJson(res.stdout)).toMatchObject({
+      data: {
+        next_commands: [expect.stringContaining("branding eject --design minimal")],
+      },
+    });
+  });
+
   it("--dry-run writes no file and says what it would eject", async () => {
     const cwd = await makeProject();
 

@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { mkdir, readdir, readFile, rm } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import type { IncomingMessage } from "node:http";
 import { join } from "node:path";
 import { parseEnv } from "node:util";
@@ -893,6 +893,17 @@ describe("setup", () => {
       expect(res).toBeSkipped();
       expect(parseJson(res.stdout)).toMatchObject({ reason: "already-initialized" });
     });
+
+    it("answers a dry run ok, as a dry run that changes nothing", async ({ dir }) => {
+      await write(dir, { "zitadel.json": JSON.stringify({ project: "proj_x" }) });
+
+      const res = await runCliForTest(setupIn(dir, ...SCRIPTED, "--dry-run", "--json"));
+
+      expect(parseJson(res.stdout)).toMatchObject({
+        status: "ok",
+        data: { dry_run: true, title: "Zitadel is already set up in this app (dry run)" },
+      });
+    });
   });
 
   describe("with .zitadel/secret but no zitadel.json", () => {
@@ -1428,7 +1439,7 @@ describe("setup", () => {
     );
 
     it.for(FRAMEWORK_APPS)(
-      "skips the install of a $framework app as a dry run",
+      "reports the install of a $framework app as one it would run, never as skipped",
       async ({ framework, files }, { dir }) => {
         await write(dir, files);
 
@@ -1436,8 +1447,11 @@ describe("setup", () => {
           onTheCloud(dir, "--dry-run", "--skip-install", "--framework", framework),
         );
 
-        expect(parseJson(res.stdout)).toMatchObject({
-          data: { install: { status: "skipped", reason: "dry-run", command: "npm install" } },
+        const { data } = parseJson(res.stdout) as { data: { install: unknown } };
+        expect(data.install).toEqual({
+          status: "would-run",
+          package_manager: "npm",
+          command: "npm install",
         });
       },
     );
@@ -1541,6 +1555,36 @@ describe("setup", () => {
       expect(stripAnsi(res.stdout)).toMatch(/^Would set up Zitadel in this app \(dry run\)$/m);
       expect(res.stdout).not.toContain("✓");
       expect(res.stdout).not.toContain("DETECTED");
+    });
+
+    it("narrates no step as done that a dry run does not do", async ({ dir }) => {
+      await aNextApp(dir);
+
+      const res = await runCliForTest(
+        setupIn(dir, "--server", CLOUD, "--non-interactive", "--skip-install", ...DRY_RUN_NEXT),
+      );
+
+      expect(stripAnsi(res.stdout)).not.toMatch(/^✔\s+(Created project|Patched \d+ file)/m);
+    });
+
+    it("marks every step it starts as a dry run, but for the reads", async ({ dir }) => {
+      const cwd = await aNewAppDirectory(dir);
+
+      const res = await runCliForTest(
+        setupIn(cwd, "--server", CLOUD, "--non-interactive", "--skip-install", ...DRY_RUN_NEXT),
+        { PATH: await aFakeAppGeneratorPath() },
+      );
+
+      expect(
+        stripAnsi(res.stdout)
+          .split("\n")
+          .filter((line) => {
+            return line.startsWith("◐") && !line.includes("Detecting");
+          })
+          .filter((line) => {
+            return !line.endsWith("(dry run)");
+          }),
+      ).toEqual([]);
     });
 
     it("names no project it ran against, since a dry run creates none", async ({ dir }) => {
@@ -2246,6 +2290,23 @@ describe("setup", () => {
       expect(await readFile(join(dir, ".env.local"), "utf8")).toBe(own);
     });
 
+    it("suggests rerunning with the flags it was given, and --force", async ({ dir, serve }) => {
+      await aNextApp(dir);
+      const platform = await aCapturingPlatform(serve, {
+        onCreateProject: () => {
+          return blockThePolicies(dir);
+        },
+      });
+
+      const res = await runCliForTest(
+        scriptedAgainst(dir, platform.url, "--dev-port", "3001", "--json"),
+      );
+
+      expect(suggestedCommands(res.stdout)).toEqual([
+        expect.stringMatching(/ setup --framework next --dev-port 3001 .*--force/),
+      ]);
+    });
+
     describe("and is rerun with --force once it can be", () => {
       it("succeeds", async ({ dir, serve }) => {
         await aNextApp(dir);
@@ -2726,6 +2787,31 @@ describe("setup", () => {
             moved: true,
           },
         });
+      });
+
+      it("draws the previous issuer a file held without its control characters", async ({
+        dir,
+      }) => {
+        await aNextApp(dir, { scripts: { dev: "next dev" } });
+        await runCliForTest(onTheCloud(dir, "--non-interactive", "--skip-install"));
+        for (const file of [".env.local", ".env.development.local"]) {
+          const text = await readFile(join(dir, file), "utf8");
+          await writeFile(
+            join(dir, file),
+            text.replace(
+              /^ZITADEL_ISSUER=.*$/m,
+              'ZITADEL_ISSUER="http://localhost:3000\u001b]0;pwned\u0007"',
+            ),
+          );
+        }
+
+        const res = await runCliForTest(
+          onTheCloud(dir, ...MOVE_TO_3101, "--dry-run").filter((flag) => {
+            return flag !== "--json";
+          }),
+        );
+
+        expect(`${res.stdout}${res.stderr}`).not.toContain("\u001b]0;pwned");
       });
 
       it("does not tell the developer to restart the dev server", async ({ dir }) => {

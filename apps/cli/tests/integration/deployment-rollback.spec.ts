@@ -290,6 +290,87 @@ describe("deployment rollback", () => {
         expect(await app.liveDeploymentCount()).toBe(before);
       });
 
+      it("titles its answer with the title a terminal shows", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        const first = await app.deployData();
+        await app.editUserSchema((schema) => {
+          schema.properties.company = { type: "string" };
+        });
+        await app.deployData();
+
+        const result = await app.run([
+          "deployment",
+          "rollback",
+          "--force",
+          "--non-interactive",
+          "--json",
+        ]);
+
+        expect(app.envelopeOf<{ title: string }>(result).data.title).toBe(
+          `Rolled back to ${first.release_id}`,
+        );
+      });
+
+      it("suggests the rollback it planned, to the deployment it resolved", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        const first = await app.deployData();
+        await app.editUserSchema((schema) => {
+          schema.properties.company = { type: "string" };
+        });
+        await app.deployData();
+
+        const result = await app.run([
+          "deployment",
+          "rollback",
+          "--dry-run",
+          "--non-interactive",
+          "--json",
+        ]);
+
+        expect(result).toSuggestExactly(
+          app.againAsRun(`deployment rollback ${first.deployment_id ?? ""} --force`),
+        );
+      });
+
+      it("reports on a dry run a listed origin the restored deployment leaves out", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin("https://a.example.com");
+        const first = await app.deployData();
+        await app.addPrimaryOrigin("https://c.example.com");
+
+        const result = await app.run([
+          "deployment",
+          "rollback",
+          first.deployment_id ?? "",
+          "--dry-run",
+          "--non-interactive",
+          "--json",
+        ]);
+
+        const { dropped_origins } = app.envelopeOf<{ dropped_origins: string[] }>(result).data;
+        expect(dropped_origins).toContain("https://c.example.com");
+      });
+
+      it("warns on a dry run of a listed origin the restored deployment leaves out", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin("https://a.example.com");
+        const first = await app.deployData();
+        await app.addPrimaryOrigin("https://c.example.com");
+
+        const result = await app.run([
+          "deployment",
+          "rollback",
+          first.deployment_id ?? "",
+          "--dry-run",
+          "--non-interactive",
+          "--json",
+        ]);
+
+        expect(result).toSay("leave out https://c.example.com");
+      });
+
       it("fails when there is no earlier deployment", async () => {
         // Setup's deployment is the only one.
         const app = await aSetUpApp();
@@ -323,6 +404,25 @@ describe("deployment rollback", () => {
         const result = await app.run(["deployment", "rollback", first.release_id ?? "", "--json"]);
 
         expect(result).toSuggest("deployment list");
+      });
+
+      describe("rendered for a terminal", () => {
+        it("names every origin it rolled back to", async () => {
+          const app = await aSetUpApp();
+          await app.addPrimaryOrigin("https://a.example.com");
+          const first = await app.deployData();
+          await app.addPrimaryOrigin("https://c.example.com");
+
+          const result = await app.run([
+            "deployment",
+            "rollback",
+            first.deployment_id ?? "",
+            "--force",
+            "--non-interactive",
+          ]);
+
+          expect(result).toPrint("https://a.example.com");
+        });
       });
 
       describe("without --force when no one can be asked", () => {

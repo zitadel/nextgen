@@ -159,6 +159,14 @@ describe("Prose", () => {
   });
 });
 
+describe("Prose with a word wider than the width", () => {
+  it("breaks the word so no line outgrows the width", () => {
+    const rendered = new Prose(`see ${"x".repeat(100)} now`, 30).render();
+
+    expect(widest(rendered)).toBeLessThanOrEqual(30);
+  });
+});
+
 describe("wrapCommand", () => {
   it("leaves a command that already fits on one line", () => {
     expect(wrapCommand("zitadel deploy", 40)).toEqual(["zitadel deploy"]);
@@ -199,6 +207,20 @@ describe("wrapCommand", () => {
     const lines = wrapCommand('zitadel x --note "a double quoted phrase here" --yes', 30);
 
     expect(lines).toEqual(["zitadel x --note \\", '"a double quoted phrase here" --yes']);
+  });
+
+  // The sentence a command is carried in can hold an apostrophe of its own.
+  it("does not read an apostrophe inside a word as the start of a quote", () => {
+    const lines = wrapCommand("zitadel say it's 'a b c d e f' --yes", 22);
+
+    expect(lines).toEqual(["zitadel say it's \\", "'a b c d e f' --yes"]);
+  });
+
+  it("breaks where it says to when the command holds an emoji before the break", () => {
+    const command = "zitadel say 🎉🎉🎉 now --yes";
+
+    expect(pasted(wrapCommand(command, 20))).toBe(command);
+    expect(wrapCommand(command, 20).every((line) => !line.startsWith(" "))).toBe(true);
   });
 
   it("pastes back as itself with a quoted argument in it", () => {

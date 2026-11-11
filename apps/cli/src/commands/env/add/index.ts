@@ -225,9 +225,14 @@ export default class EnvAdd extends Suggestible(Promptable(BaseCommand)) {
     const issuer = appUrl === undefined ? undefined : new URL(appUrl).origin;
 
     if (dryRun) {
+      const title = escapeControlCharacters(
+        `Would add the ${args.name} environment, bound to ${flags.project ?? "a new project"} (dry run)`,
+      );
+
       return this.emit({
         status: "ok",
         data: {
+          title,
           dry_run: true,
           environment: args.name,
           file: environment.file,
@@ -236,9 +241,7 @@ export default class EnvAdd extends Suggestible(Promptable(BaseCommand)) {
           issuer,
         },
         summary: {
-          title: escapeControlCharacters(
-            `Would add the ${args.name} environment, bound to ${flags.project ?? "a new project"} (dry run)`,
-          ),
+          title,
           sections: [],
           lines: [
             escapeControlCharacters(
@@ -247,6 +250,19 @@ export default class EnvAdd extends Suggestible(Promptable(BaseCommand)) {
                 : `Would bind the existing project ${flags.project}`,
             ),
             escapeControlCharacters(`Would write ${environment.file}`),
+          ],
+        },
+        next: {
+          commands: [
+            this.suggest(
+              [
+                `env add ${Cmd.quote(args.name)}`,
+                `--server ${Cmd.quote(server)}`,
+                ...(flags.project === undefined ? [] : [Cmd.option("--project", flags.project)]),
+                ...(flags.appUrl === undefined ? [] : [Cmd.option("--app-url", flags.appUrl)]),
+                ...(flags.force ? ["--force"] : []),
+              ].join(" "),
+            ),
           ],
         },
       });

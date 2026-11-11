@@ -1,5 +1,6 @@
 import type { BoxAction } from "@/lib/box";
 import { ZitadelError } from "@/lib/errors";
+import { log } from "@/lib/log";
 import { customizeAndPublishActions, verifyLoginAction } from "@/lib/journey-guidance";
 import {
   detectPackageManager,
@@ -20,7 +21,7 @@ import {
 type InstallReason = "dry-run" | "skip-install" | "no-dependency-changes";
 
 export type SetupInstall = {
-  status: "completed" | "skipped" | "not-needed";
+  status: "completed" | "would-run" | "skipped" | "not-needed";
   package_manager: PackageManager;
   command: string;
   reason?: InstallReason;
@@ -112,12 +113,18 @@ export async function installDependenciesForSetup(
 
   if (input.dryRun || input.skipInstall) {
     return outcome({
-      install: {
-        status: "skipped",
-        package_manager: packageManager,
-        command: installCommand.display,
-        reason: input.dryRun ? "dry-run" : "skip-install",
-      },
+      install: input.dryRun
+        ? {
+            status: "would-run",
+            package_manager: packageManager,
+            command: installCommand.display,
+          }
+        : {
+            status: "skipped",
+            package_manager: packageManager,
+            command: installCommand.display,
+            reason: "skip-install",
+          },
       devCommand: shownDev,
       installCommand: shownInstall,
       cliVersion: input.cliVersion,
@@ -127,23 +134,29 @@ export async function installDependenciesForSetup(
     });
   }
 
-  await input.task(
-    `Installing dependencies with ${installCommand.display}`,
-    async () => {
-      try {
-        await (input.run ?? runPackageCommand)(installCommand, {
-          cwd: input.cwd,
-          env: input.env,
-          redirectStdoutToStderr: input.json,
-        });
-      } catch (error) {
-        throw installFailed(error, installCommand, devCommand, shownInstall, input.cwd);
-      }
-    },
-    () => {
+  const label = `Installing dependencies with ${installCommand.display}`;
+  const install = async (): Promise<void> => {
+    try {
+      await (input.run ?? runPackageCommand)(installCommand, {
+        cwd: input.cwd,
+        env: input.env,
+        redirectStdoutToStderr: input.json,
+      });
+    } catch (error) {
+      throw installFailed(error, installCommand, devCommand, shownInstall, input.cwd);
+    }
+  };
+
+  if (input.json) {
+    await input.task(label, install, () => {
       return "Installed dependencies";
-    },
-  );
+    });
+  } else {
+    // The package manager writes to the terminal itself, so no spinner may draw over it.
+    log.start(label);
+    await install();
+    log.done("Installed dependencies");
+  }
 
   return outcome({
     install: {

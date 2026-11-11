@@ -7,6 +7,7 @@ import { intro, outro } from "@clack/prompts";
 
 import { ZitadelError } from "@/lib/errors";
 import { BaseCommand } from "@/lib/oclif/base";
+import { DrawnSpinner } from "@/lib/ui/spinner";
 import { asTerminal } from "@tests/helpers/terminal";
 
 /** A command that fails with a given error and records what it prints. */
@@ -121,6 +122,15 @@ describe("BaseCommand errors", () => {
     expect(cmd.stderr.join("\n")).toContain("Bad port");
   });
 
+  it("stops a spinner the failed command left drawing", async () => {
+    const cmd = new FailingCommand(false);
+    new DrawnSpinner("Fetching users");
+
+    await asTerminal(() => cmd.fail(new ZitadelError("E_VALIDATION", "Bad port")));
+
+    expect(DrawnSpinner.active.size).toBe(0);
+  });
+
   it("prints nothing for Ctrl-C, which the terminal already shows, and still exits 130", async () => {
     const cmd = new FailingCommand(false);
 
@@ -202,7 +212,7 @@ describe("the one block every failure is shown as", () => {
     );
   });
 
-  it("keeps oclif's rendering whole in the envelope", async () => {
+  it("gives the envelope the sentence and help command the terminal shows", async () => {
     const cmd = new FailingCommand(true);
 
     await cmd.fail(
@@ -213,8 +223,8 @@ describe("the one block every failure is shown as", () => {
 
     expect(cmd.json).toEqual([
       expect.objectContaining({
-        message:
-          "The following error occurred:\n  Missing required flag kind\nSee more help with --help",
+        message: "Missing required flag kind",
+        next_commands: ["npx @zitadel/cli@test errors-test --help"],
       }),
     ]);
   });

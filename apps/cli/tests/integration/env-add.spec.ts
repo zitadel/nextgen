@@ -191,6 +191,24 @@ describe("env add", () => {
         expect(await boundEnvironments(app)).toEqual(["development"]);
       });
 
+      it("says on a dry run what it would add, as the headline it draws", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run([...ADD, "--dry-run"]);
+
+        expect(app.envelopeOf(result).data).toMatchObject({
+          title: "Would add the production environment, bound to a new project (dry run)",
+        });
+      });
+
+      it("suggests the real command on a dry run", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run([...ADD, "--dry-run"]);
+
+        expect(result).toSuggest("env add production");
+      });
+
       it("refuses to guess a server when it cannot ask", async () => {
         const app = await aSetUpApp();
 

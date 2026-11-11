@@ -253,6 +253,22 @@ describe("doctor", () => {
         });
       });
 
+      it("answers a planned repair as a dry run", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.doctor(["--fix", "--dry-run"]);
+
+        expect(result).toSucceed();
+      });
+
+      it("suggests the repair it planned", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.doctor(["--fix", "--dry-run"]);
+
+        expect(result).toSuggest("doctor --fix");
+      });
+
       it("refuses --force without --fix", async () => {
         const app = await aSetUpApp();
 
@@ -287,7 +303,15 @@ describe("doctor", () => {
 
         const result = await app.doctorRendered();
 
-        expect(result).not.toPrint("Zitadel doctor passed");
+        expect(result).toSayOnce("All checks passed");
+      });
+
+      it("says in the title that a repair was only planned", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.doctorRendered(["--fix", "--dry-run"]);
+
+        expect(result).toPrint("All checks passed (dry run)");
       });
 
       it("closes on its verdict", async () => {

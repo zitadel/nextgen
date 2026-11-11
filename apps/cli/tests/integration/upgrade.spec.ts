@@ -136,6 +136,33 @@ describe("upgrade", () => {
         expect(result).toSuggest(`npx @zitadel/cli@${NEWEST} doctor --fix`);
       });
 
+      it("suggests the upgrade it planned", async () => {
+        const app = await aSetUpApp();
+        platform.publishesCli(NEWEST);
+
+        const result = await app.upgrade(["--dry-run"]);
+
+        expect(result).toSuggest("upgrade");
+      });
+
+      it("ends cancelled when Ctrl-C lands in the install", async () => {
+        const app = await aSetUpApp();
+        platform.publishesCli(NEWEST);
+
+        const result = await app.upgradeInterrupted("install");
+
+        expect(result).toFailWith("E_CANCELLED");
+      });
+
+      it("ends cancelled when Ctrl-C lands in the refresh", async () => {
+        const app = await aSetUpApp();
+        platform.publishesCli(NEWEST);
+
+        const result = await app.upgradeInterrupted("refresh");
+
+        expect(result).toFailWith("E_CANCELLED");
+      });
+
       it("changes nothing under --dry-run", async () => {
         const app = await aSetUpApp();
         platform.publishesCli(NEWEST);
@@ -210,12 +237,13 @@ describe("upgrade", () => {
         expect(result).toPrint(`→ ${NEWEST}`);
       });
 
-      it("titles its answer as --json does, with no full stop added", async () => {
+      it("says its title once, as --json does, with no full stop added", async () => {
         const app = await aSetUpApp();
         platform.publishesCli(NEWEST);
 
         const result = await app.upgradeRendered();
 
+        expect(result).toSayOnce(`Zitadel upgraded to ${NEWEST}`);
         expect(result).not.toPrint(`Zitadel upgraded to ${NEWEST}.`);
       });
 

@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { runCliForTest, stripAnsi } from "@tests/helpers/run-cli";
+import { parseJson, runCliForTest, stripAnsi } from "@tests/helpers/run-cli";
 import { asTerminal } from "@tests/helpers/terminal";
 
 const SERVER = "https://api.zitadel.cloud";
@@ -47,6 +47,25 @@ describe("zitadel env list", () => {
     const out = await listed(await aProjectWithNothingBound());
 
     expect(out).toContain("No environments found");
+  });
+
+  it("points at env add in the envelope when nothing is bound", async () => {
+    const cwd = await aProjectWithNothingBound();
+
+    const res = await runCliForTest([
+      "env",
+      "list",
+      "--cwd",
+      cwd,
+      "--server",
+      SERVER,
+      "--no-telemetry",
+      "--json",
+    ]);
+
+    expect(parseJson(res.stdout)).toMatchObject({
+      data: { next_commands: [expect.stringContaining("env add '<name>'")] },
+    });
   });
 
   it("orders nobody about in that sentence", async () => {

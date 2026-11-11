@@ -62,7 +62,7 @@ describe("api", () => {
 
       expect(app.envelopeOf(result)).toMatchObject({
         command: "api",
-        data: { next_commands: [expect.stringMatching(/ api ls$/)] },
+        data: { next_commands: [expect.stringMatching(/ api ls --cwd \S+$/)] },
       });
     });
   });

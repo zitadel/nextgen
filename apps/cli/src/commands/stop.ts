@@ -9,6 +9,7 @@ import {
 import { LocalServer } from "@/lib/local-server/server";
 import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
 import { Suggestible } from "@/lib/oclif/suggestible";
+import { type Fact, section } from "@/lib/ui";
 
 /**
  * `zitadel stop` — stop the local Zitadel server.
@@ -45,6 +46,12 @@ export default class Stop extends Suggestible(BaseCommand) {
 
     const containerName =
       runtime?.backend === "docker" ? runtime.container_name : localContainerName(this.cwd);
+    const owner: Fact =
+      runtime?.backend === "binary"
+        ? ["Process", String(runtime.pid)]
+        : ["Container", containerName];
+    const kept: Fact[] = runtime?.data_dir === undefined ? [] : [["Data", runtime.data_dir]];
+    const facts: Fact[] = [["Runtime", runtime?.backend ?? "missing"], owner, ...kept];
     if (this.dryRun) {
       const title = "Would stop the local Zitadel server (dry run)";
 
@@ -67,7 +74,7 @@ export default class Stop extends Suggestible(BaseCommand) {
         },
         summary: {
           title,
-          sections: [],
+          sections: [section(undefined, ...facts)],
         },
         next: { commands: [this.suggest("stop")] },
       });
@@ -98,7 +105,7 @@ export default class Stop extends Suggestible(BaseCommand) {
       },
       summary: {
         title,
-        sections: [],
+        sections: [section(undefined, ...facts)],
       },
     });
   }
@@ -124,7 +131,7 @@ export default class Stop extends Suggestible(BaseCommand) {
         },
         summary: {
           title,
-          sections: [],
+          sections: [section(undefined, ["Error", sweep.error ?? "unknown"])],
         },
         warnings: ["managed-runtime-processes: discovery unavailable"],
       });
@@ -148,7 +155,14 @@ export default class Stop extends Suggestible(BaseCommand) {
       },
       summary: {
         title,
-        sections: [],
+        sections: [
+          section(
+            undefined,
+            ...sweep.results.map((result): Fact => {
+              return ["Process", String(result.process.pid)];
+            }),
+          ),
+        ],
       },
     });
   }
@@ -156,6 +170,11 @@ export default class Stop extends Suggestible(BaseCommand) {
   private async wouldStopAllManagedRuntimes(): Promise<JsonEnvelope> {
     const discovery = await this.localServers().current();
     const title = "Would stop host-wide managed local runtime processes (dry run)";
+    const found: Fact[] = discovery.supported
+      ? discovery.processes.map((one): Fact => {
+          return ["Process", String(one.pid)];
+        })
+      : [["Error", discovery.error ?? "unknown"]];
 
     return this.emit({
       status: "ok",
@@ -177,8 +196,12 @@ export default class Stop extends Suggestible(BaseCommand) {
       },
       summary: {
         title,
-        sections: [],
+        sections: [section(undefined, ...found)],
       },
+      next: { commands: [this.suggest("stop --all")] },
+      ...(discovery.supported
+        ? {}
+        : { warnings: ["managed-runtime-processes: discovery unavailable"] }),
     });
   }
 }

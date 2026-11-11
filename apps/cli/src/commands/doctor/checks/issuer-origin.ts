@@ -15,7 +15,6 @@ import {
   type ZitadelSecret,
 } from "@/lib/project";
 import { projectCommand } from "@/lib/suggestion";
-import { escapeControlCharacters } from "@/lib/terminal-text";
 import { userAgent } from "@/lib/user-agent";
 import { reportWarning } from "@/lib/warnings";
 
@@ -99,7 +98,7 @@ export class IssuerOriginCheck implements SanityCheck {
     const consent = await ctx.consent({
       verb: "replace",
       name: `replace the preview origin ${pattern} with a primary one`,
-      message: `Replace the preview origin ${pattern} with a primary one in project ${escapeControlCharacters(secret.project_id)} on ${escapeControlCharacters(server.replace(/^https?:\/\//, ""))}?`,
+      message: `Replace the preview origin ${pattern} with a primary one in project ${secret.project_id} on ${server.replace(/^https?:\/\//, "")}?`,
     });
     if (consent === undefined) {
       return;

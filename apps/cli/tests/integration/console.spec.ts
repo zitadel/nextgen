@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 
+import { useLocalServers } from "@tests/helpers/local-server";
 import { usePlatformMock } from "@tests/helpers/platform";
 import { anApp, aSetUpApp } from "@tests/helpers/project";
 
 const platform = usePlatformMock();
+useLocalServers();
 
 describe("console", () => {
   describe("against an invalid server", () => {
@@ -73,6 +75,26 @@ describe("console", () => {
         const result = await app.run(["console", "--json"]);
 
         expect(result).toFail();
+      });
+
+      it("suggests the sign-in it planned", async () => {
+        const app = await aSetUpApp();
+        await app.startLocalServer();
+
+        const result = await app.run(["console", "--dry-run", "--json"]);
+
+        expect(result).toSuggestExactly(`console --cwd ${app.path}`);
+      });
+    });
+
+    describe("rendered for a terminal", () => {
+      it("says what a dry run would do once", async () => {
+        const app = await aSetUpApp();
+        await app.startLocalServer();
+
+        const result = await app.run(["console", "--dry-run"]);
+
+        expect(result).toSayOnce("Would mint a console sign-in link");
       });
     });
   });

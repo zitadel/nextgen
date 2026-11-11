@@ -77,15 +77,28 @@ export default class ReleaseCreate extends EnvironmentCommand {
     // under `--dry-run`: validate the bundle the same way, then stop before the
     // release is posted so nothing is written server-side.
     if (this.dryRun) {
+      const title = `Validated ${prepared.resourceCount} ${new Intl.PluralRules("en").select(prepared.resourceCount) === "one" ? "resource" : "resources"} and created no release (dry run)`;
+
       return this.emit({
         status: "ok",
         data: {
           dry_run: true,
+          title,
           resources: prepared.resourceCount,
         },
         summary: {
-          title: `Validated ${prepared.resourceCount} ${new Intl.PluralRules("en").select(prepared.resourceCount) === "one" ? "resource" : "resources"} and created no release (dry run)`,
+          title,
           sections: [],
+        },
+        next: {
+          commands: [
+            this.suggest(
+              [
+                "release create",
+                ...(flags.message === undefined ? [] : [Cmd.option("--message", flags.message)]),
+              ].join(" "),
+            ),
+          ],
         },
       });
     }
@@ -95,15 +108,18 @@ export default class ReleaseCreate extends EnvironmentCommand {
       message: flags.message,
     });
 
+    const title = `Created ${escapeControlCharacters(release.id)}`;
+
     return this.emit({
       status: "ok",
       data: {
+        title,
         release_id: release.id,
         content_hash: release.content_hash,
         resources: prepared.resourceCount,
       },
       summary: {
-        title: `Created ${escapeControlCharacters(release.id)}`,
+        title,
         sections: [],
       },
       next: { commands: [this.suggest(`deployment create --release ${Cmd.quote(release.id)}`)] },

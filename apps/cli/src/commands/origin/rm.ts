@@ -48,10 +48,10 @@ export default class OriginRm extends Destructive(EnvironmentCommand) {
     return this.emit(
       await this.confirmed({
         verb: "remove",
-        name: `remove ${escapeControlCharacters(args.pattern)} from the project`,
+        name: `remove ${args.pattern} from the project`,
         message: async () => {
           const { projectId, server } = await this.connect();
-          return `Remove ${escapeControlCharacters(args.pattern)} from project ${escapeControlCharacters(projectId)} on ${escapeControlCharacters(server.replace(/^https?:\/\//, ""))}?`;
+          return `Remove ${args.pattern} from project ${projectId} on ${server.replace(/^https?:\/\//, "")}?`;
         },
         preview: () => {
           return dryRunResult({

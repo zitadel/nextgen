@@ -136,6 +136,14 @@ describe("claim", () => {
       expect(result).toSucceed();
     }, 30000);
 
+    it("suggests a dry run's claim with the flags it was given", async () => {
+      const app = await aSetUpApp();
+
+      const result = await app.run(["claim", "--no-open", "--timeout", "5", "--dry-run", "--json"]);
+
+      expect(result).toSuggest("claim --no-open --timeout 5");
+    });
+
     it("reports nothing minted on a dry run", async () => {
       const app = await aSetUpApp();
 
@@ -145,6 +153,16 @@ describe("claim", () => {
     });
 
     describe("rendered for a terminal", () => {
+      it("says a project already claimed once", async () => {
+        const app = await aSetUpApp();
+        platform.completesTheNextClaim();
+        await app.run(WAITING_FOR_A_BROWSER);
+
+        const result = await app.run(["claim", "--no-open"]);
+
+        expect(result).toSayOnce("already belongs to");
+      }, 30000);
+
       it("prints the command that waits for a handed-over link", async () => {
         const app = await aSetUpApp();
 

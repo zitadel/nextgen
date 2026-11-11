@@ -248,8 +248,8 @@ describe("pull of a release pinning two handles that resolve to one file", () =>
 
 describe("pull's --json envelope", () => {
   it.each([
-    [[], ["release_id", "pulled", "skipped", "next_commands"]],
-    [["--dry-run"], ["release_id", "pulled", "skipped", "dry_run", "next_commands"]],
+    [[], ["title", "release_id", "pulled", "skipped", "next_commands"]],
+    [["--dry-run"], ["title", "release_id", "pulled", "skipped", "dry_run", "next_commands"]],
   ])("holds exactly the keys of a run with flags %j", async (flags, keys) => {
     const project = await aProjectWithTwoDeploys("zitadel-pull-");
     dirs.push(project.cwd);

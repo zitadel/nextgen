@@ -1,3 +1,4 @@
+import { Cmd } from "@/lib/cmd";
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
@@ -289,6 +290,7 @@ export default class Preview extends PreviewCommand {
       return this.emit({
         status: "ok",
         data: {
+          title,
           dry_run: true,
           targets: urls,
         },
@@ -306,6 +308,21 @@ export default class Preview extends PreviewCommand {
           lines: urls.map((url) => {
             return `  - ${escapeControlCharacters(url)}`;
           }),
+        },
+        next: {
+          commands: [
+            this.suggest(
+              [
+                "preview",
+                ...urls.map((url) => {
+                  return Cmd.option("--origin", url);
+                }),
+                ...(flags.ttl === undefined ? [] : [Cmd.option("--ttl", flags.ttl.canonical)]),
+                ...(flags.message === undefined ? [] : [Cmd.option("-m", flags.message)]),
+                ...(flags.strict ? ["--strict"] : []),
+              ].join(" "),
+            ),
+          ],
         },
       });
     }

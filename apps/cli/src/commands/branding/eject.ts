@@ -244,7 +244,17 @@ export default class BrandingEject extends Suggestible(Promptable(BaseCommand)) 
         summary: {
           title: wouldTitle,
           sections: [],
-          lines: [`Files: ${filesWritten.length} would be written, ${unchanged} unchanged`],
+          lines: [
+            `Files: ${filesWritten.length} would be written, ${unchanged} unchanged`,
+            ...filesWritten.map((file) => {
+              return `Would write ${escapeControlCharacters(file)}`;
+            }),
+          ],
+        },
+        next: {
+          commands: [
+            this.suggest(`branding eject --design ${design}${this.force ? " --force" : ""}`),
+          ],
         },
       });
     }

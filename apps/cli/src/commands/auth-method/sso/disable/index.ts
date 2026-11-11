@@ -7,7 +7,7 @@ import { type Admitted, CommandGroups, type JsonEnvelope, nonBlankString } from 
 import { environmentSelectorSuffix } from "@/lib/oclif/environment-flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { optionArgs } from "@/lib/public-cli";
-import { projectCommand } from "@/lib/suggestion";
+import { portableSuggestions, projectCommand } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import type { UnusedConnection, UserSchema } from "@/lib/zitadel";
 
@@ -121,21 +121,33 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
 
     if (this.dryRun) {
       this.report(change);
+      const wouldTitle = escapeControlCharacters(
+        change.changed
+          ? `Would remove ${provider} from ${where} (dry run)`
+          : `${schema.name} does not offer ${provider}, so nothing would change (dry run)`,
+      );
+      const real = [
+        "auth-method",
+        "sso",
+        "disable",
+        ...optionArgs("--provider", provider),
+        ...target.schemaArgs,
+        ...target.cwdArgs,
+      ];
 
       return this.emit({
         status: "ok",
         data: {
           ...data,
+          title: wouldTitle,
           dry_run: true,
+          next_args: [real],
         },
         summary: {
-          title: escapeControlCharacters(
-            change.changed
-              ? `Would remove ${provider} from ${where} (dry run)`
-              : `${schema.name} does not offer ${provider}, so nothing would change (dry run)`,
-          ),
+          title: wouldTitle,
           sections: [],
         },
+        next: { commands: portableSuggestions([real], this.cliVersion) },
       });
     }
     await this.write(target, change, confirmed.consent);
@@ -144,16 +156,19 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
     const unused = change.changed ? change.after.connections.findUnused(provider) : undefined;
     const actions = unused === undefined ? [] : this.removalActions(unused, flags);
 
+    const title = escapeControlCharacters(
+      change.changed ? `Removed ${provider} from ${where}` : unchanged,
+    );
+
     return this.emit({
       status: "ok",
       data: {
         ...data,
+        title,
         next_args: followUps.args,
       },
       summary: {
-        title: escapeControlCharacters(
-          change.changed ? `Removed ${provider} from ${where}` : unchanged,
-        ),
+        title,
         sections: [],
       },
       next:

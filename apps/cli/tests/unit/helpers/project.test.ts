@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { assertEndingIsWellFormed } from "@tests/helpers/project";
+import { assertDryRun, assertEndingIsWellFormed, assertOneText } from "@tests/helpers/project";
 
 const run = (stdout: string, stderr = "") => ({ stdout, stderr });
 
@@ -75,5 +75,70 @@ describe("assertEndingIsWellFormed", () => {
     expect(() =>
       assertEndingIsWellFormed(run("Next:\n  $ npx @zitadel/cli@0.5.0 start\n"), "origin add"),
     ).not.toThrow();
+  });
+});
+
+describe("assertDryRun", () => {
+  const dryRun = { status: "ok", data: { dry_run: true, title: "Would remove x (dry run)" } };
+
+  it("lets a dry run that says so, with its headline, through", () => {
+    expect(() => assertDryRun("origin rm", dryRun)).not.toThrow();
+  });
+
+  it("refuses a dry run without a headline in data.title", () => {
+    const untitled = { status: "ok", data: { dry_run: true } };
+
+    expect(() => assertDryRun("origin rm", untitled)).toThrow(/data\.title/);
+  });
+
+  it("refuses a headline that does not end in (dry run)", () => {
+    const plain = { status: "ok", data: { dry_run: true, title: "Would remove x" } };
+
+    expect(() => assertDryRun("origin rm", plain)).toThrow(/\(dry run\)/);
+  });
+
+  it("refuses an answer that is not an envelope", () => {
+    expect(() => assertDryRun("origin rm", "not json")).toThrow(/parses/);
+  });
+});
+
+describe("assertOneText", () => {
+  const envelope = (body: unknown, exitCode = 0) => ({
+    exitCode,
+    stdout: JSON.stringify(body),
+    stderr: "",
+  });
+  const said = { status: "ok", data: { title: "Removed x" }, warnings: ["careful"] };
+
+  it("lets a screen that says the headline and each warning once through", () => {
+    const screen = { exitCode: 0, stdout: "Removed x\n", stderr: "Warning: careful\n" };
+
+    expect(() => assertOneText(envelope(said), screen)).not.toThrow();
+  });
+
+  it("refuses a warning the screen never shows", () => {
+    const screen = { exitCode: 0, stdout: "Removed x\n", stderr: "" };
+
+    expect(() => assertOneText(envelope(said), screen)).toThrow(/exactly once/);
+  });
+
+  it("refuses a warning the screen shows twice", () => {
+    const screen = { exitCode: 0, stdout: "Removed x\n", stderr: "careful\ncareful\n" };
+
+    expect(() => assertOneText(envelope(said), screen)).toThrow(/exactly once/);
+  });
+
+  it("refuses runs that ended differently", () => {
+    const screen = { exitCode: 1, stdout: "Removed x\n", stderr: "careful\n" };
+
+    expect(() => assertOneText(envelope(said), screen)).toThrow(/ended the same way/);
+  });
+
+  it("refuses an envelope run that printed no envelope", () => {
+    const screen = { exitCode: 0, stdout: "Removed x\n", stderr: "" };
+
+    expect(() => assertOneText({ exitCode: 0, stdout: "oops", stderr: "" }, screen)).toThrow(
+      /parses/,
+    );
   });
 });

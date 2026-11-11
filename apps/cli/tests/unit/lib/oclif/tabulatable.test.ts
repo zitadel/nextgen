@@ -484,6 +484,19 @@ describe("emitList", () => {
     });
   });
 
+  it("quotes a cursor holding a control character so a shell reads it back as it is", async () => {
+    const result = await asTerminal(() =>
+      draw().drawList(
+        { plain: false },
+        { ...view, page: { token: "a\u001bb", command: "thing list", flags: [] } },
+      ),
+    );
+
+    expect(result).toMatchObject({
+      summary: { extras: ["More available: --page-token $'a\\x1bb' (or --all)"] },
+    });
+  });
+
   it("joins a cursor that starts with a dash to its option, so it stays one option", async () => {
     const result = await asTerminal(() =>
       draw().drawList(
@@ -568,5 +581,20 @@ describe("Tabulatable", () => {
     }
 
     expect(importing).toEqual([]);
+  });
+
+  it("is given its columns by a COLUMNS constant in every list command", async () => {
+    const root = fileURLToPath(new URL("../../../../src/commands", import.meta.url));
+    const without: string[] = [];
+
+    for (const file of await readdir(root, { recursive: true })) {
+      if (!file.endsWith(".ts")) continue;
+      const source = await readFile(join(root, file), "utf8");
+      if (source.includes("emitList(") && !source.includes("const COLUMNS")) {
+        without.push(file);
+      }
+    }
+
+    expect(without).toEqual([]);
   });
 });

@@ -67,7 +67,7 @@ export default class EnvList extends Tabulatable(EnvironmentCommand) {
       },
     };
 
-    return this.emitList(flags, {
+    const listed = await this.listResult(flags, {
       columns,
       rows,
       items,
@@ -77,5 +77,11 @@ export default class EnvList extends Tabulatable(EnvironmentCommand) {
       page,
       extra,
     });
+
+    return this.emit(
+      items.length === 0
+        ? { ...listed, next: { commands: [this.suggest("env add '<name>'")] } }
+        : listed,
+    );
   }
 }

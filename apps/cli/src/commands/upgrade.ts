@@ -121,7 +121,7 @@ export default class Upgrade extends Suggestible(BaseCommand) {
     }
     const refresh: Refresh =
       install !== undefined && !this.dryRun && (await hasZitadelConfig(this.cwd))
-        ? await refreshProject(target, this.cwd, this.env, flags.telemetry === false)
+        ? await refreshProject(target, this.cwd, this.env, flags.telemetry === false, this.signal)
         : "skipped";
 
     // At the new version, and from the shell's directory like every suggestion.
@@ -132,6 +132,7 @@ export default class Upgrade extends Suggestible(BaseCommand) {
       );
     };
     const commands: SuggestedCommand[] = [
+      ...(this.dryRun && !upToDate ? [this.suggest("upgrade")] : []),
       ...(refresh === "failed" ? [atTarget("doctor --fix")] : []),
       ...(refresh === "issues" ? [atTarget("doctor")] : []),
       ...(install !== undefined && !this.dryRun && existsSync(join(this.cwd, SHARED_SKILLS_DIR))
@@ -240,6 +241,8 @@ async function refreshProject(
   env: NodeJS.ProcessEnv,
   /** `--no-telemetry` was given: it reaches this run only, not the child, without being passed on. */
   noTelemetry: boolean,
+  /** Ctrl-C: it ends the child and the upgrade with it, rather than a refresh that merely failed. */
+  signal: AbortSignal,
 ): Promise<Refresh> {
   try {
     const result = await execa(
@@ -263,11 +266,14 @@ async function refreshProject(
         reject: false,
         stdin: "ignore",
         timeout: REFRESH_TIMEOUT_MS,
+        cancelSignal: signal,
       },
     );
+    signal.throwIfAborted();
     const envelope = JSON.parse(result.stdout) as { status?: unknown };
     return envelope.status === "ok" ? "done" : "issues";
   } catch {
+    signal.throwIfAborted();
     return "failed";
   }
 }

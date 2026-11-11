@@ -54,7 +54,8 @@ import { type Admitted, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
 import { environmentFlags } from "@/lib/oclif/environment-flags";
 import { filled, reads, type Refused } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
-import type { SuggestedCommand } from "@/lib/suggestion";
+import { optionArgs } from "@/lib/public-cli";
+import { portableSuggestions, type SuggestedCommand } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { reportWarning } from "@/lib/warnings";
 import {
@@ -447,7 +448,26 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     });
     this.introduce(summary, target.schema, provider);
     if (this.dryRun) {
-      return this.previewResult(summary, preview, delivery.names, flags.clientId);
+      // What the developer typed, so the real run is one command away.
+      const real = [
+        "auth-method",
+        "sso",
+        "enable",
+        ...optionArgs("--provider", flags.provider),
+        ...target.schemaArgs,
+        ...[
+          ["--slug", flags.slug],
+          ["--display-name", flags.displayName],
+          ["--issuer", flags.issuer],
+          ["--scopes", flags.scopes],
+          ["--client-id", flags.clientId],
+        ].flatMap(([option, value]) => {
+          return value === undefined ? [] : optionArgs(String(option), String(value));
+        }),
+        ...this.environmentSelectorArgs(),
+      ];
+
+      return this.previewResult(summary, preview, delivery.names, flags.clientId, real);
     }
 
     const given = await prompt.ask(flags.clientId);
@@ -649,13 +669,15 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
    * @param change - The change worked out before anything was asked.
    * @param names - The variables the credentials would go to.
    * @param givenClientId - The client id `--client-id` gave, if any.
-   * @returns The skipped result.
+   * @param real - The arguments of the real run, as the developer typed them.
+   * @returns The dry run's result.
    */
   private previewResult(
     summary: Summary,
     change: DocumentChange<Connection>,
     names: CredentialNames,
     givenClientId: ClientId | undefined,
+    real: readonly string[],
   ): JsonEnvelope {
     this.report(change);
     if (!this.isJson) {
@@ -665,11 +687,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     const stores =
       toStore.length > 0
         ? [
-            `Would store ${new Intl.ListFormat("en", { type: "conjunction" }).format(
-              toStore.filter((name) => {
-                return name !== undefined;
-              }),
-            )} on the project`,
+            `Would store ${new Intl.ListFormat("en", { type: "conjunction" }).format(toStore)} on the project`,
           ]
         : [];
     const said = [
@@ -678,6 +696,10 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       }),
       ...stores,
     ];
+
+    const title = escapeControlCharacters(
+      said[0] === undefined ? "Nothing would change (dry run)" : `${said[0]} (dry run)`,
+    );
 
     return this.emit({
       status: "ok",
@@ -688,18 +710,19 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
           published: NOTHING_PUBLISHED,
           names,
         }),
+        title,
         would_store: toStore,
         dry_run: true,
+        next_args: [real],
       },
       summary: {
-        title: escapeControlCharacters(
-          said[0] === undefined ? "Nothing would change (dry run)" : `${said[0]} (dry run)`,
-        ),
+        title,
         sections: [],
         lines: said.slice(1).map((line) => {
           return escapeControlCharacters(line);
         }),
       },
+      next: { commands: portableSuggestions([real], this.cliVersion) },
     });
   }
 
@@ -719,9 +742,12 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     reused: boolean,
     names: CredentialNames,
     givenClientId: ClientId | undefined,
-  ): readonly (ClientIdVariable | ClientSecretVariable | undefined)[] {
+  ): readonly (ClientIdVariable | ClientSecretVariable)[] {
+    // A credential the file holds as a value names no variable, so it is left out.
     if (!reused) {
-      return [names.clientId, names.clientSecret];
+      return [names.clientId, names.clientSecret].filter((name) => {
+        return name !== undefined;
+      });
     }
     if (givenClientId !== undefined && names.clientId !== undefined) {
       return [names.clientId];

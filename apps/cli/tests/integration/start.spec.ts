@@ -3,9 +3,16 @@ import { describe, expect, it } from "vitest";
 import { useLocalServers } from "@tests/helpers/local-server";
 import { usePlatformMock } from "@tests/helpers/platform";
 import { aSetUpApp } from "@tests/helpers/project";
+import { asTerminal, offTerminal } from "@tests/helpers/terminal";
 
 const platform = usePlatformMock();
 useLocalServers();
+
+/** The two ways a person reads a run, which must say the same thing. */
+const SHOWN = [
+  ["on a terminal", asTerminal],
+  ["piped", offTerminal],
+] as const;
 
 describe("start", () => {
   describe("against an invalid server", () => {
@@ -174,6 +181,49 @@ describe("start", () => {
         ]);
 
         expect(result).toSuggest("start --port 9000 --runtime binary");
+      });
+    });
+
+    describe.each(SHOWN)("rendered %s", (_how, shown) => {
+      it("prints where the console is", async () => {
+        const app = await aSetUpApp();
+
+        const result = await shown(() => app.startLocalServer({ json: false }));
+
+        expect(result).toPrint("/ui/console/");
+      });
+
+      it("prints the process it started", async () => {
+        const app = await aSetUpApp();
+
+        const result = await shown(() => app.startLocalServer({ json: false }));
+
+        expect(result).toPrint("Process");
+      });
+
+      it("prints the port it would use in a dry run", async () => {
+        const app = await aSetUpApp();
+
+        const result = await shown(() => app.run(["start", "--port", "9000", "--dry-run"]));
+
+        expect(result).toPrint("localhost:9000");
+      });
+
+      it("prints the image it would use in a dry run", async () => {
+        const app = await aSetUpApp();
+
+        const result = await shown(() =>
+          app.run([
+            "start",
+            "--runtime",
+            "docker",
+            "--image",
+            "example.test/zitadel:1",
+            "--dry-run",
+          ]),
+        );
+
+        expect(result).toPrintRow("Image", "example.test/zitadel:1");
       });
     });
   });

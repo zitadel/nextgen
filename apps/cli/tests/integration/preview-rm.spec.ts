@@ -95,6 +95,16 @@ describe("preview rm", () => {
         expect(result).toSucceed();
       });
 
+      it("says on a dry run it would stop serving the preview, as the real run does", async () => {
+        const app = await anApp();
+
+        const result = await app.run(["preview", "rm", PREVIEW_URL, "--dry-run", "--json"]);
+
+        expect(app.envelopeOf(result).data).toMatchObject({
+          title: `Would stop serving ${PREVIEW_URL} (dry run)`,
+        });
+      });
+
       it("removes a live preview, so it stops being listed", async () => {
         const app = await anAppWithAPreview();
 
