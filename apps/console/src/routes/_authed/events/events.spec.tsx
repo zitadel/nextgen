@@ -82,18 +82,23 @@ function isRequestRead(query: URLSearchParams): boolean {
   return query.get("order") === "asc" && query.has("request_id");
 }
 
+/** Whether a `GET /events` is the drawer's read of one login flow's events, oldest first. */
+function isFlowRead(query: URLSearchParams): boolean {
+  return query.get("order") === "asc" && query.has("flow_id") && !query.has("created_after");
+}
+
 /**
  * `GET /events`, answering each of the list's calls with the next of `pages`;
- * records their queries. The drawer's read of a request's events is answered
- * apart, with none unless `serveRequestEvents` says otherwise, and is not
- * recorded: it is not the list's.
+ * records their queries. The drawer's read of a request's or a login flow's
+ * events is answered apart, with none unless `serveRequestEvents` or
+ * `serveFlowEvents` says otherwise, and is not recorded: it is not the list's.
  */
 function serveEvents(...pages: { data: unknown[]; next_page_token?: string }[]) {
   const queries: URLSearchParams[] = [];
   server.use(
     http.get(EVENTS_URL, ({ request: call }) => {
       const query = new URL(call.url).searchParams;
-      if (isRequestRead(query)) return HttpResponse.json({ data: [] });
+      if (isRequestRead(query) || isFlowRead(query)) return HttpResponse.json({ data: [] });
       queries.push(query);
       const page = pages[Math.min(queries.length, pages.length) - 1];
       return HttpResponse.json(page);
@@ -109,6 +114,20 @@ function serveRequestEvents(data: unknown[], more = false) {
     http.get(EVENTS_URL, ({ request: call }) => {
       const query = new URL(call.url).searchParams;
       if (!isRequestRead(query)) return undefined;
+      queries.push(query);
+      return HttpResponse.json({ data, next_page_token: more ? "more" : undefined });
+    }),
+  );
+  return queries;
+}
+
+/** The drawer's read of one login flow's events: these, oldest first; records the queries. */
+function serveFlowEvents(data: unknown[], more = false) {
+  const queries: URLSearchParams[] = [];
+  server.use(
+    http.get(EVENTS_URL, ({ request: call }) => {
+      const query = new URL(call.url).searchParams;
+      if (!isFlowRead(query)) return undefined;
       queries.push(query);
       return HttpResponse.json({ data, next_page_token: more ? "more" : undefined });
     }),
@@ -459,6 +478,77 @@ describe("logs", () => {
     await userEvent.click(within(steps[1] as HTMLElement).getByRole("link"));
     expect(await panel.findByRole("heading", { name: "request.api" })).toBeVisible();
     expect(panel.getByText("12 ms")).toBeInTheDocument();
+  });
+
+  it("lists the whole login flow of a sign-in event in the drawer, in place of its one request", async () => {
+    const signIn = { flow_id: "flow_1", session_id: "sess_1", actor_id: null, actor_type: null };
+    const attempt = event("evt_attempt", {
+      ...signIn,
+      event_type: "auth.attempt.created",
+      category: "auth",
+      entity_type: "auth_attempt",
+      entity_id: "att_1",
+      request_id: "req_create",
+    });
+    const check = event("evt_check", {
+      ...signIn,
+      event_type: "auth.check.succeeded",
+      category: "auth",
+      entity_type: "check",
+      entity_id: "ch_1",
+      request_id: "req_submit",
+      payload: { check_id: "ch_1", check_type: "Password", auth_attempt_id: "att_1" },
+    });
+    // The exchange is another request, by a service: only the flow ties it in.
+    const established = event("evt_session", {
+      ...signIn,
+      event_type: "session.established",
+      category: "session",
+      actor_type: "service",
+      entity_type: "session",
+      entity_id: "sess_1",
+      request_id: "req_exchange",
+      payload: { user_id: "user_admin" },
+    });
+    serveEvents({ data: [established, check, attempt] });
+    serveEvent(attempt, check, established);
+    const requestQueries = serveRequestEvents([attempt]);
+    const flowQueries = serveFlowEvents([attempt, check, established], true);
+    await renderAt("/events/evt_attempt");
+
+    const panel = await drawer();
+    const section = within(
+      (await panel.findByRole("heading", { name: "This login flow" })).closest(
+        "section",
+      ) as HTMLElement,
+    );
+    // One range of the flow index, oldest first, and no read of the request.
+    expect(flowQueries[0]?.get("flow_id")).toBe("flow_1");
+    expect(flowQueries[0]?.get("order")).toBe("asc");
+    expect(flowQueries[0]?.has("category")).toBe(false);
+    expect(requestQueries).toHaveLength(0);
+    expect(panel.queryByRole("heading", { name: "This request" })).toBeNull();
+
+    const steps = section.getAllByRole("listitem");
+    expect(steps.map((step) => within(step).getByText(/^(auth|session)\./).textContent)).toEqual([
+      "auth.attempt.created",
+      "auth.check.succeeded",
+      "session.established",
+    ]);
+    expect(
+      within(steps[0] as HTMLElement)
+        .getByText("auth.attempt.created")
+        .closest("[aria-current]"),
+    ).not.toBeNull();
+    // More than the drawer holds: the list under the flow, in every view.
+    expect(
+      section.getByRole("link", { name: "List all of this login flow’s events" }),
+    ).toHaveAttribute("href", expect.stringContaining("flow=flow_1"));
+
+    // A later step of the flow opens in the drawer, under the same timeline.
+    await userEvent.click(within(steps[2] as HTMLElement).getByRole("link"));
+    expect(await panel.findByRole("heading", { name: "session.established" })).toBeVisible();
+    expect(panel.getByRole("heading", { name: "This login flow" })).toBeVisible();
   });
 
   it("closes the drawer back to the list, under the same filters", async () => {

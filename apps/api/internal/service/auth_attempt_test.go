@@ -200,8 +200,10 @@ func TestAuthAttemptService_Create(t *testing.T) {
 		got, err := svc.Create(ctx, service.CreateAuthAttemptInput{
 			ProjectID:      "proj",
 			RequiredChecks: []domain.AuthCheckType{domain.AuthCheckTypeUser},
+			FlowID:         "flow_ctx",
 		})
 		require.NoError(t, err)
+		require.Equal(t, "flow_ctx", created.FlowID, "the stored attempt names its flow")
 		require.Equal(t, "dep_ctx", got.DeploymentID)
 		require.Equal(t, "rel_ctx", got.ReleaseID)
 		require.Equal(t, "dep_ctx", created.DeploymentID)

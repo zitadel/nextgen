@@ -264,6 +264,7 @@ func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (res doma
 	audit.BindPublicRequest(ctx, req.Definition.ProjectID, flowID, sessionID)
 
 	in := domain.FlowStartInput{
+		ID:            flowID,
 		Definition:    req.Definition,
 		Purpose:       req.Purpose,
 		Session:       domain.FlowSessionRef{ID: sessionID},

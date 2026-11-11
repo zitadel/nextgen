@@ -96,6 +96,18 @@ func BindPublicRequest(ctx context.Context, projectID, flowID, sessionID string)
 	}
 }
 
+// BindFlow stamps the login flow onto the actor slot of a request that names
+// none itself, so its request.api event joins the flow's. No-op when flowID is
+// empty or there is no slot.
+func BindFlow(ctx context.Context, flowID string) {
+	if flowID == "" {
+		return
+	}
+	if slot, ok := ActorSlotFromContext(ctx); ok && slot != nil {
+		slot.FlowID = &flowID
+	}
+}
+
 // MarkAuthorization records which path authorized the request, after the
 // security handler stamped its actor. Every event the request emits from then
 // on, Path A and Path B alike, carries it. Outside a request no mark is

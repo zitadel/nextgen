@@ -51,7 +51,7 @@ func (s *tokenService) GenerateJWE(ctx context.Context, data *domain.Token) (_ s
 		if err := tx.Statements().CreateToken(ctx, data); err != nil {
 			return err
 		}
-		return emitAuthTokenIssued(ctx, tx.Statements(), data.ProjectID, data.TokenID, data.SessionID, tokenUserID(data), data.Scope)
+		return emitAuthTokenIssued(ctx, tx.Statements(), data.ProjectID, data.TokenID, data.SessionID, nil, tokenUserID(data), data.Scope)
 	})
 	if err != nil {
 		if de, ok := errors.AsType[domain.Error](err); ok {

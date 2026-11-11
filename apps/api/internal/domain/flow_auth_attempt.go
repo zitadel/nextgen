@@ -54,6 +54,7 @@ type FlowAuthAttemptService interface {
 // default when pinned.
 type FlowCreateAttemptInput struct {
 	ProjectID      string
+	FlowID         string
 	SessionID      *string
 	RequiredChecks []AuthCheckType
 }

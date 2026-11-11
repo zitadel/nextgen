@@ -17,7 +17,10 @@ type EmitSpec struct {
 	EntityID   string
 	Payload    any
 	SessionID  *string
-	TokenID    string
+	// FlowID names the login flow when the request carries none: the handoff
+	// exchange is a service call, and its flow is the consumed attempt's.
+	FlowID  *string
+	TokenID string
 	// Optional actor overrides when the request ActorContext is empty
 	// (anonymous session mint, token issue before AuthGate, etc.).
 	ActorID   *string
@@ -36,6 +39,9 @@ func Emit(ctx context.Context, stmts EventInserter, spec EmitSpec) error {
 	}
 	if spec.SessionID != nil {
 		ev.SessionID = spec.SessionID
+	}
+	if spec.FlowID != nil && *spec.FlowID != "" {
+		ev.FlowID = spec.FlowID
 	}
 	if spec.TokenID != "" {
 		ev.TokenID = spec.TokenID

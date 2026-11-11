@@ -12,6 +12,8 @@ import (
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
+	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/events"
 	api "go.zitadel.com/zitadel/v5/api"
 )
 
@@ -36,7 +38,7 @@ func TestPasswordLoginFlow(t *testing.T) {
 	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
 
 	const (
-		userID    = "pwlogin-user-01"
+		userID    = "user_pwlogin01"
 		userEmail = "pwlogin@example.com"
 		userPass  = "correct-horse-battery-staple"
 	)
@@ -123,6 +125,28 @@ func TestPasswordLoginFlow(t *testing.T) {
 	handoffToken, hasToken := pwOK.Response.HandoffToken.Get()
 	require.True(t, hasToken, "expected handoff token after successful password login")
 	require.NotEmpty(t, handoffToken)
+
+	// The exchange is a service call that names no flow, yet the session and
+	// the token it mints end the sign-in: they carry the flow's ID, read from
+	// the attempt the exchange consumed, so one flow_id reads the whole
+	// sign-in. The steps before them take it from the request's actor slot,
+	// which only the server's request-event middleware plants, not this one.
+	exchanged, err := client.ExchangeHandoff(t.Context(), &api.ExchangeRequest{HandoffToken: handoffToken},
+		api.ExchangeHandoffParams{ProjectID: api.ProjectID(project.ID)})
+	require.NoError(t, err)
+	require.IsType(t, &api.SessionWithTokenResponseHeaders{}, exchanged, "the exchange was refused")
+
+	opts := events.ListOptions(project.ID, 100)
+	opts.Filter = database.And(opts.Filter, database.Equal(database.Col(domain.EventFieldFlowID), flowID))
+	page, err := harness.EnsureServiceDB(t).Statements().ListEvents(t.Context(), opts)
+	require.NoError(t, err)
+	inFlow := map[domain.EventType]bool{}
+	for _, ev := range page.Items {
+		inFlow[ev.EventType] = true
+	}
+	for _, want := range []domain.EventType{domain.EventTypeSessionEstablished, domain.EventTypeAuthTokenIssued} {
+		require.True(t, inFlow[want], "%s must carry the flow's ID; the flow has %v", want, inFlow)
+	}
 }
 
 // TestPasswordLoginFlow_UnknownEmail confirms an unknown identifier routes to

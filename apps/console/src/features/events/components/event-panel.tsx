@@ -11,6 +11,7 @@ import { Sheet, SheetContent, SheetDescription } from "@/components/ui/sheet";
 import { formatClockTime, formatLogTime } from "@/lib/date";
 import { cn } from "@/lib/utils";
 
+import type { EventTimeline } from "../api";
 import {
   around,
   eventFields,
@@ -99,9 +100,9 @@ function typing(target: EventTarget | null): boolean {
 
 /**
  * One event in the drawer: its type over its time and id, then what it was
- * about, the other events of its request in the order they happened, the
- * values its envelope carries, where it leads on to, and the event as the API
- * returns it.
+ * about, the events it belongs with in the order they happened (its login
+ * flow's, or else its request's), the values its envelope carries, where it
+ * leads on to, and the event as the API returns it.
  *
  * The arrows in its header, and ↑ and ↓ (or k and j) anywhere but a field,
  * open the previous and next row of the list. At the last row loaded they
@@ -110,10 +111,13 @@ function typing(target: EventTarget | null): boolean {
 export function EventPanel({
   event,
   request,
+  flow,
 }: {
   event: LogEvent;
   /** Its request's events, oldest first, when it was made by one. */
-  request?: { items: LogEvent[]; more: boolean };
+  request?: EventTimeline;
+  /** Its login flow's events, oldest first, when it is part of one; drawn in place of the request's. */
+  flow?: EventTimeline;
 }) {
   const { rows, search } = useContext(LogRowsContext);
   const navigate = useNavigate();
@@ -199,23 +203,33 @@ export function EventPanel({
           </dd>
         </dl>
 
-        {request && request.items.length > 0 && (
-          <PanelSection title="This request">
-            <ol className="flex flex-col">
-              {request.items.map((step) => (
-                <RequestStep key={step.id} event={step} current={step.id === event.id} />
-              ))}
-            </ol>
-            {request.more && event.request_id && (
-              <Link
-                to="/events"
-                search={sharing("request", event.request_id)}
-                className="text-sm underline underline-offset-4"
-              >
-                List all of this request’s events
-              </Link>
-            )}
-          </PanelSection>
+        {flow && flow.items.length > 0 && event.flow_id ? (
+          <Timeline
+            title="This login flow"
+            timeline={flow}
+            current={event.id}
+            all={{
+              search: sharing("flow", event.flow_id),
+              label: "List all of this login flow’s events",
+            }}
+          />
+        ) : (
+          request &&
+          request.items.length > 0 && (
+            <Timeline
+              title="This request"
+              timeline={request}
+              current={event.id}
+              all={
+                event.request_id
+                  ? {
+                      search: sharing("request", event.request_id),
+                      label: "List all of this request’s events",
+                    }
+                  : undefined
+              }
+            />
+          )
         )}
 
         {fields.length > 0 && (
@@ -286,11 +300,44 @@ function PanelSection({ title, children }: { title: string; children: ReactNode 
 }
 
 /**
- * One event of the request, as a line of its timeline: when, to the
- * millisecond, what, and what it was about. The open event is marked and not
- * a link; the others open in the drawer.
+ * The events the open one belongs with, oldest first, and a way to the rest
+ * when the drawer does not hold them all.
  */
-function RequestStep({ event, current }: { event: LogEvent; current: boolean }) {
+function Timeline({
+  title,
+  timeline,
+  current,
+  all,
+}: {
+  title: string;
+  timeline: EventTimeline;
+  /** The open event's id. */
+  current: string;
+  /** The list under the filter that holds them all. */
+  all?: { search: LogsSearch; label: string };
+}) {
+  return (
+    <PanelSection title={title}>
+      <ol className="flex flex-col">
+        {timeline.items.map((step) => (
+          <TimelineStep key={step.id} event={step} current={step.id === current} />
+        ))}
+      </ol>
+      {timeline.more && all && (
+        <Link to="/events" search={all.search} className="text-sm underline underline-offset-4">
+          {all.label}
+        </Link>
+      )}
+    </PanelSection>
+  );
+}
+
+/**
+ * One event of a timeline, as a line of it: when, to the millisecond, what,
+ * and what it was about. The open event is marked and not a link; the others
+ * open in the drawer.
+ */
+function TimelineStep({ event, current }: { event: LogEvent; current: boolean }) {
   const { search } = useContext(LogRowsContext);
   const line = (
     <>

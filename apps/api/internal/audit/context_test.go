@@ -112,6 +112,24 @@ func TestBindPublicRequest_NoSlotIsNoop(t *testing.T) {
 	BindPublicRequest(t.Context(), "proj_1", "flow_1", "sess_1")
 }
 
+func TestBindFlow_StampsOnlyTheFlow(t *testing.T) {
+	ctx := WithActorSlot(t.Context())
+	slot, ok := ActorSlotFromContext(ctx)
+	require.True(t, ok)
+	slot.ProjectID = "proj_1"
+
+	BindFlow(ctx, "")
+	assert.Nil(t, slot.FlowID)
+
+	BindFlow(ctx, "flow_1")
+	require.NotNil(t, slot.FlowID)
+	assert.Equal(t, "flow_1", *slot.FlowID)
+	assert.Equal(t, "proj_1", slot.ProjectID)
+	assert.Nil(t, slot.SessionID)
+
+	BindFlow(t.Context(), "flow_1") // no slot: a no-op
+}
+
 func TestWithPayload(t *testing.T) {
 	ev := FromContext(t.Context(), domain.EventTypeUserCreated, domain.EventCategoryEntity)
 	ev, err := WithPayload(ev, domain.UserCreatedPayload{SchemaID: "sch_1", AttributeKeys: []string{"email"}})

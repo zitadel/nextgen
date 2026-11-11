@@ -227,12 +227,14 @@ func TestFlowStateMachine_Start_RendersInitialStep(t *testing.T) {
 
 	w.authAttemptService.EXPECT().
 		Start(gomock.Any(), gomock.Cond(func(in domain.FlowCreateAttemptInput) bool {
-			return in.ProjectID == testProject && in.SessionID != nil && *in.SessionID == "sess-1"
+			// The attempt records the flow, or the exchange's events lose it.
+			return in.ProjectID == testProject && in.FlowID == "flow_01TEST" && in.SessionID != nil && *in.SessionID == "sess-1"
 		})).
 		Return("att_01TEST", nil).
 		Times(1)
 
 	result, err := w.sm.Start(t.Context(), domain.FlowStartInput{
+		ID:            "flow_01TEST",
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeRegister,
 		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
