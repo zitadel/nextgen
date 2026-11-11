@@ -47,21 +47,6 @@ type SettingsSource interface {
 	Get(ctx context.Context, issuer Issuer) (Settings, error)
 }
 
-// NotEnabled is the SettingsSource of a server that has OAuth enabled for
-// no project.
-type NotEnabled struct{}
-
-func (NotEnabled) Get(context.Context, Issuer) (Settings, error) {
-	return Settings{}, nil
-}
-
-// DenyAll is the Admission of a server that admits no origin as an issuer.
-type DenyAll struct{}
-
-func (DenyAll) Admit(context.Context, string, string) error {
-	return domain.ErrOriginNotFound()
-}
-
 // issuerKey is the context key of the issuerState withIssuer records.
 type issuerKey struct{}
 
