@@ -7,10 +7,9 @@ import type {
   GetReleaseById200PointersItemKind,
   RevokeRelease409DetailsOriginsItem,
 } from "@zitadel/api/generated/model";
-import { isCancelled, type ZitadelClient } from "@/lib/backend/client";
+import type { ZitadelClient } from "@/lib/backend/client";
 import { ApiService } from "@/lib/backend/api-service";
 import { ConflictError } from "@/lib/backend/errors";
-import { type Origins, OriginService } from "./origin";
 
 /** What building a release takes: the bundle, a message and the commit it was built from. */
 export type ReleaseInput = Readonly<BuildReleaseBody>;
@@ -30,13 +29,11 @@ export type ReleasePointer = GetReleaseById200PointersItem;
 /** The kind of resource a release pins a revision of. */
 export type ReleasePointerKind = GetReleaseById200PointersItemKind;
 
-/** An origin that still serves a release, and the deployment that pins it there. */
-export type ServingOrigin = Readonly<
-  RevokeRelease409DetailsOriginsItem & {
-    /** What the origin is to the project; `unknown` when its origins could not be read. */
-    kind: ReturnType<Origins["kindOf"]>;
-  }
->;
+/**
+ * An origin that still serves a release, whether it serves it as the primary
+ * origin or a preview, and the deployment that pins it there.
+ */
+export type ServingOrigin = Readonly<RevokeRelease409DetailsOriginsItem>;
 
 /**
  * What revoking a release came to: `revoked`, or `in-use` when origins still
@@ -140,37 +137,27 @@ export class ReleaseService extends ApiService {
       if (!(error instanceof ConflictError) || error.serverCode !== "rel.in_use") {
         throw error;
       }
-      const served = servingOrigins(error.body);
-      // The kinds only shape what to do next; a read that fails here leaves
-      // them unknown rather than replacing the refusal with its own error.
-      const origins = await new OriginService(this.client, this.projectId)
-        .list()
-        .catch((cause: unknown): undefined => {
-          if (isCancelled(this.client)) {
-            throw cause;
-          }
-          return undefined;
-        });
       return {
         outcome: "in-use",
-        origins: served.map((one) => {
-          return { ...one, kind: origins?.kindOf(one.origin) ?? "unknown" };
-        }),
+        origins: servingOrigins(error.body),
       };
     }
   }
 }
 
 /** The origins a `rel.in_use` refusal names under `details.origins`. */
-function servingOrigins(body: unknown): RevokeRelease409DetailsOriginsItem[] {
+function servingOrigins(body: unknown): ServingOrigin[] {
   const details = isObject(body) ? body.details : undefined;
   const origins = isObject(details) ? details.origins : undefined;
   if (!Array.isArray(origins)) {
     return [];
   }
-  return origins.filter((item): item is RevokeRelease409DetailsOriginsItem => {
+  return origins.filter((item): item is ServingOrigin => {
     return (
-      isObject(item) && typeof item.origin === "string" && typeof item.deployment_id === "string"
+      isObject(item) &&
+      typeof item.origin === "string" &&
+      typeof item.deployment_id === "string" &&
+      (item.kind === "primary" || item.kind === "preview")
     );
   });
 }

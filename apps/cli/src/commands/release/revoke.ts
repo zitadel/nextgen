@@ -124,8 +124,7 @@ export default class ReleaseRevoke extends Destructive(EnvironmentCommand) {
 
 /**
  * What frees the origins that serve a release: a preview is removed, while a
- * primary origin takes another deploy or a rollback. An origin whose kind could
- * not be read is treated as primary, the steps that apply to most projects.
+ * primary origin takes another deploy or a rollback.
  */
 function freeing(origins: readonly ServingOrigin[]): { steps: string; next: string[] } {
   const previews = origins.filter((one) => {

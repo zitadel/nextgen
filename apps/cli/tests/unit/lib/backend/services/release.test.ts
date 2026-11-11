@@ -9,7 +9,7 @@ const INPUT = {
   git_dirty: false,
 };
 
-const SERVED = { origin: "https://app.acme.com", deployment_id: "dep_1" };
+const SERVED = { origin: "https://app.acme.com", deployment_id: "dep_1", kind: "primary" };
 
 /** The server refusing to revoke a release origins still serve. */
 function inUse(details: unknown): ConflictError {
@@ -82,63 +82,24 @@ describe("ReleaseService.revoke", () => {
     });
   });
 
-  it("names the origins the refusal says still serve it", async () => {
-    const revokeRelease = vi.fn(async () => {
-      throw inUse({ origins: [SERVED] });
-    });
-    const releaseService = new ReleaseService(
-      fakeClient({ revokeRelease, getProject: async () => ({ origins: [] }) }),
-      "proj_1",
-    );
-
-    await expect(releaseService.revoke("rel_1")).resolves.toMatchObject({
-      outcome: "in-use",
-      origins: [SERVED],
-    });
-  });
-
-  it("says which origins are primary and which are previews", async () => {
-    const preview = { origin: "https://x-acme.vercel.app", deployment_id: "dep_2" };
+  it("names the origins the refusal says still serve it, and how", async () => {
+    const preview = {
+      origin: "https://x-acme.vercel.app",
+      deployment_id: "dep_2",
+      kind: "preview",
+    };
     const releaseService = new ReleaseService(
       fakeClient({
         revokeRelease: async () => {
           throw inUse({ origins: [SERVED, preview] });
         },
-        getProject: async () => ({
-          origins: [
-            { pattern: SERVED.origin, kind: "primary" },
-            { pattern: "https://*-acme.vercel.app", kind: "preview" },
-          ],
-        }),
       }),
       "proj_1",
     );
 
     await expect(releaseService.revoke("rel_1")).resolves.toEqual({
       outcome: "in-use",
-      origins: [
-        { ...SERVED, kind: "primary" },
-        { ...preview, kind: "preview" },
-      ],
-    });
-  });
-
-  it("leaves the kinds unknown when the project's origins cannot be read", async () => {
-    const releaseService = new ReleaseService(
-      fakeClient({
-        revokeRelease: async () => {
-          throw inUse({ origins: [SERVED] });
-        },
-        getProject: async () => {
-          throw new Error("down");
-        },
-      }),
-      "proj_1",
-    );
-
-    await expect(releaseService.revoke("rel_1")).resolves.toEqual({
-      outcome: "in-use",
-      origins: [{ ...SERVED, kind: "unknown" }],
+      origins: [SERVED, preview],
     });
   });
 

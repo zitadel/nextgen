@@ -416,9 +416,9 @@ Each invocation prints one JSON object:
   read.
 - `release revoke` on a release an origin still serves fails `E_CONFLICT`
   naming each origin and the deployment that pins it (`details.origins`, each
-  `{origin, deployment_id, kind}`, `kind` being `primary`, `preview` or
-  `unknown`). It suggests `preview rm <url>` for each preview, and `deploy` or
-  `deployment rollback` when any other origin serves it.
+  `{origin, deployment_id, kind}`, `kind` being `primary` or `preview`). It
+  suggests `preview rm <url>` for each preview, and `deploy` or
+  `deployment rollback` when a primary origin serves it.
 - `deploy --dry-run` and `deploy` emit `data.diff`, the git diff the terminal
   shows, against the live release's commit (`diff.against`): `diff.files` holds
   one `{path, status, previous_path?, patch}` per changed file (`status` is

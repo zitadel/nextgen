@@ -168,7 +168,7 @@ export interface PlatformMock {
 
   /**
    * Refuses a release revoke as `rel.in_use` for a preview origin holding a
-   * shell substitution, and answers the project read with it as a preview.
+   * shell substitution.
    *
    * @returns The origin it will answer with.
    */
@@ -479,19 +479,11 @@ export function usePlatformMock(): PlatformMock {
             {
               code: "rel.in_use",
               message: "release: still served by an origin",
-              details: { origins: [{ origin, deployment_id: "dep_1" }] },
+              details: { origins: [{ origin, deployment_id: "dep_1", kind: "preview" }] },
             },
             { status: 409 },
           );
         }),
-        http.get("*/projects/:id", ({ params }) =>
-          HttpResponse.json({
-            id: String(params.id),
-            name: "hostile",
-            lifecycle: "active",
-            origins: [{ pattern: origin, kind: "preview" }],
-          }),
-        ),
       );
       return origin;
     },
