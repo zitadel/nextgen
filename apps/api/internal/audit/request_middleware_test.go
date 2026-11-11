@@ -19,7 +19,7 @@ import (
 func startPathA(t *testing.T) (*channelInserter, *RequestBuffer) {
 	t.Helper()
 	ins := &channelInserter{}
-	buf := NewRequestBuffer(ins, RequestBufferConfig{
+	buf := startRequestBuffer(ins, RequestBufferConfig{
 		BatchSize: 1,
 		Capacity:  10,
 		MaxAge:    time.Hour,

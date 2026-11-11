@@ -5,7 +5,7 @@
  * apps/server/moon.yml. Moon keeps its own until the cutover, so a change to
  * the checks goes into both.
  *
- * The analyzers (today egresslint, ADR 061) run directly rather than through
+ * The analyzers (egresslint, ADR 061; backgroundlint, ADR 089) run directly rather than through
  * `go vet`, so the built-in vet analyzers keep running alongside (the `vet`
  * task). They run once per build configuration: the default set, then each
  * integration tag on its own, because the tagged files are invisible to the

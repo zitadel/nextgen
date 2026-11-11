@@ -88,12 +88,21 @@ each response carries security headers:
   of its own.
 
 The launcher pins what follows from this layout (listen address from
-`PORT`, console off with its links at `/console`, idle connections kept
-open) and defaults the rest (platform project bootstrapped, JSON logs, public
-base from Vercel's URL, a request waiting for its audit event).
+`PORT`, console off with its links at `/console`) and defaults the rest
+(platform project bootstrapped, JSON logs, public base from Vercel's URL).
 Any `NEXTGEN_*` variable overrides a default. The URLs Vercel serves a
 deployment at are added to `NEXTGEN_SERVER_CONSOLE_ORIGINS`, never replaced
 by it.
+
+A function is paused between requests. The launcher tells a deployment's
+server so with `server.lifecycle: request_only`, and nothing else: what the
+server does differently is its own
+([ADR 089](../adrs/089-server-lifecycle.md),
+[configuration](../quick-start/configuration.md#where-the-server-runs)).
+A setting that needs background work the server cannot do there, such as
+`NEXTGEN_SERVICE_PING_ENABLED` or `NEXTGEN_EVENTS_EXPORT_ENABLED`, fails the
+function's start, not its build: set it on a preview first. A local run
+(`pnpm run cloud`) keeps running and stays `always_on`.
 
 In production, Vercel's URL is `VERCEL_PROJECT_PRODUCTION_URL`, which Vercel
 sets to the project's shortest production domain. The public base is where
@@ -600,7 +609,9 @@ Where it differs from a deployment:
 
 The server re-wraps every project key to the current master key at startup
 (`MigrateToLatestMasterKey`), as long as the key being rotated out is still
-configured for decryption. The launcher renders both: the current key from
+configured for decryption. A function does it before it serves its first
+request, so every cold start is slower until the previous key is removed.
+The launcher renders both: the current key from
 `MASTER_KEY_PEM_B64` and `MASTER_KEY_ID`, the previous one from
 `MASTER_KEY_PREVIOUS_PEM_B64` and `MASTER_KEY_PREVIOUS_ID`.
 
@@ -610,7 +621,9 @@ configured for decryption. The launcher renders both: the current key from
    The root admin is untouched; its password changes in the console.
 2. Deploy: push, or redeploy the **current** deployment, never an older one,
    whose code may predate the schema. The first start re-wraps every project
-   key; the launcher's log line names both keys.
+   key; the launcher's log line names both keys. An `ERROR` line
+   `error during master key migration` is a re-wrap that did not finish:
+   keep the previous key and fix the cause first.
 3. Remove the previous key for that environment:
    `vercel env rm MASTER_KEY_PREVIOUS_PEM_B64 <environment> --yes`, the same
    for `MASTER_KEY_PREVIOUS_ID`. The next deployment runs on the new key only.
@@ -704,15 +717,16 @@ project and imports the root admin.
   start, a long handler time is sharing.
 - **Idle connections:** Vercel's proxy in the instance reuses its
   connections to the server, and an instance wakes from a pause with every
-  idle timer expired, so the launcher has the server never close an idle
-  connection (`server.idle_timeout` `0`). A `502` whose only line is
-  `http: proxy error` is that proxy failing to reach the server; it sends a
-  GET again by itself, never a POST.
+  idle timer expired, so a `request_only` server never closes an idle
+  connection (`server.idle_timeout` defaults to `0`). A `502` whose only
+  line is `http: proxy error` is that proxy failing to reach the server; it
+  sends a GET again by itself, never a POST.
 - **Request audit events:** a request ends once its audit event is written,
   or two seconds later when the database does not answer
-  (`events.request.flush_wait`): a write after the response would wait for
-  the instance's next request, and be lost with an instance that gets none.
-  The requests an instance has in flight together share the write.
+  (`events.request.flush_wait`, a `request_only` server's default): a write
+  after the response would wait for the instance's next request, and be lost
+  with an instance that gets none. The requests an instance has in flight
+  together share the write.
   - An `ERROR` line `failed to flush request audit event batch` is a batch
     that was lost; its `first_error` is the cause.
   - A `WARN` line `request audit event batch was written by an attempt that
@@ -729,7 +743,7 @@ project and imports the root admin.
   - A bigger pool multiplies across instances against the same
     `max_connections`, and handler time alone does not say whether
     connection waits or the shared vCPU stretched it.
-- **Event retention:** a function runs only while it serves a request, so
+- **Event retention:** a function is paused between requests, so
   the server's own hourly purge is off here. A Vercel Cron Job (`crons` in
   `vercel.json`) calls `/cron/events-retention` on the production deployment
   at 17 minutes past every hour, with `CRON_SECRET` as its bearer token, and

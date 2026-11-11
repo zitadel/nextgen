@@ -436,7 +436,9 @@ while connecting to the database.
 **Trigger.** `events.retention.trigger_secret` hands the schedule to a
 scheduler outside the process.
 
-- Unset, the default, a server purges on its own timer as before.
+- Unset, the default, a server purges on its own timer as before. A server
+  that says it is paused between requests (`server.lifecycle: request_only`,
+  [ADR 089](089-server-lifecycle.md)) does not start without it.
 - Set, the server keeps no timer. Each `GET` or `POST` to
   `/cron/events-retention` that carries the secret as a bearer token runs one
   purge; any other request to the path gets 401.

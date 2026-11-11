@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/zitadel/nextgen/internal/background"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/instrumentation/errlog"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
@@ -117,13 +118,29 @@ func NewRetentionJob(purge EventPurger, cfg RetentionConfig) *RetentionJob {
 	}
 }
 
+// Task is the purge as background work. Where instances come and go it purges
+// as each one starts and on its timer while one is up. A process paused
+// between requests runs no timer, so there it runs from its trigger and the
+// start fails without a trigger secret.
+func (j *RetentionJob) Task() background.Task {
+	return background.Task{
+		Name:        "event retention",
+		Disabled:    !j.cfg.Enabled,
+		Start:       func(context.Context) error { j.Start(); return nil },
+		Stop:        j.Close,
+		ScaleToZero: background.WhileUp(),
+		RequestOnly: background.OnTrigger(j.Trigger(),
+			"set events.retention.trigger_secret and have a scheduler call "+RetentionTriggerPath+", or turn the purge off with events.retention.enabled"),
+	}
+}
+
 // Start starts the loop, unless retention is off or a trigger runs it.
 func (j *RetentionJob) Start() {
 	if !j.cfg.Enabled || j.cfg.TriggerSecret != "" {
 		close(j.done)
 		return
 	}
-	go j.loop()
+	go j.loop() //background:allow the task "event retention"
 }
 
 func (j *RetentionJob) loop() {

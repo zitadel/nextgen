@@ -17,6 +17,8 @@ import (
 	"runtime"
 	"sync"
 	"time"
+
+	"github.com/zitadel/nextgen/internal/background"
 )
 
 // EventName is the event every ping sends.
@@ -160,13 +162,31 @@ func New(cfg Config, facts Facts) *Pinger {
 	}
 }
 
+// pingsPerStart is why the ping is off where instances come and go.
+const pingsPerStart = "it pings at each start, which would count starts and not deployments, and it has no trigger; turn it off with service_ping.enabled"
+
+// Task is the pinger as background work. It pings as it starts and then on a
+// timer, and has no trigger. Where the platform starts and stops instances
+// that would count starts, not deployments, so the server refuses to start
+// there with the ping on.
+func (p *Pinger) Task() background.Task {
+	return background.Task{
+		Name:        "service ping",
+		Disabled:    !p.cfg.Enabled,
+		Start:       func(context.Context) error { p.Start(); return nil },
+		Stop:        p.Close,
+		ScaleToZero: background.Unsupported(pingsPerStart),
+		RequestOnly: background.Unsupported(pingsPerStart),
+	}
+}
+
 // Start begins pinging in the background.
 func (p *Pinger) Start() {
 	if !p.cfg.Enabled {
 		close(p.done)
 		return
 	}
-	go p.loop()
+	go p.loop() //background:allow the task "service ping"
 }
 
 func (p *Pinger) loop() {

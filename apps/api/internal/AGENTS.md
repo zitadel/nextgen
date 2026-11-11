@@ -51,6 +51,18 @@ through any wrapping.
   `internal/errorpage`, never HTML of its own; an API path answers the
   envelope even to a browser ([ADR 076](../docs/adrs/076-error-pages-and-unmatched-routes.md)).
 
+## Background work
+
+Work outside a request (a timer, a flusher, work at start) may never run
+where the platform pauses the process or stops its last instance
+([ADR 089](../../../docs/adrs/089-server-lifecycle.md)).
+
+- Start it as a `background.Task` through the group in `cmd/server`, with an
+  answer for each `server.lifecycle`; never with a bare `go`.
+- `server:lint` (`backgroundlint`) reports a `go` statement elsewhere.
+- Add `//background:allow <reason>` only to name the goroutine's task, or to
+  say why it is not background work.
+
 ## Format before push
 
 Run `moon run server:format` before pushing Go changes. It only checks

@@ -68,7 +68,7 @@ func TestRequestBuffer_flush_metrics(t *testing.T) {
 	otherBefore := metricsReader.CounterSum(t, metrics.AuditEventsWritten, eventType(domain.EventTypeUserCreated))
 
 	ins := &channelInserter{}
-	buf := NewRequestBuffer(ins, RequestBufferConfig{BatchSize: 3, Capacity: 100, MaxAge: time.Hour})
+	buf := startRequestBuffer(ins, RequestBufferConfig{BatchSize: 3, Capacity: 100, MaxAge: time.Hour})
 	defer buf.Close()
 	// The buffer does not care about the type; a second one shows the count
 	// is split by it.
@@ -92,7 +92,7 @@ func TestRequestBuffer_flush_metrics_dropped(t *testing.T) {
 	written := metricstest.GrewOnly(t, metricsReader, metrics.AuditEventsWritten, nil, metrics.EventTypeKey, domain.EventTypeRequestAPI)
 
 	ins := &failingInserter{}
-	buf := NewRequestBuffer(ins, RequestBufferConfig{BatchSize: 1, Capacity: 100, MaxAge: time.Hour})
+	buf := startRequestBuffer(ins, RequestBufferConfig{BatchSize: 1, Capacity: 100, MaxAge: time.Hour})
 	defer buf.Close()
 	buf.Enqueue(&domain.Event{ProjectID: "proj_1", EventType: domain.EventTypeRequestAPI, Category: domain.EventCategoryRequest})
 	require.Eventually(t, func() bool { return buf.Dropped() >= 1 }, 5*time.Second, 10*time.Millisecond)

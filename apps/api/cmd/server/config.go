@@ -9,6 +9,7 @@ import (
 
 	"github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/audit"
+	"github.com/zitadel/nextgen/internal/background"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/httputil"
@@ -209,11 +210,23 @@ type ServerConfig struct {
 	// request it sends as the server closes the connection is lost, and one
 	// that is not safe to send twice, a POST, ends as the proxy's 502. Zero
 	// or less never closes an idle connection, for a server whose only client
-	// is such a proxy.
+	// is such a proxy. The default is a minute, or zero where Lifecycle is
+	// request_only.
 	IdleTimeout time.Duration `mapstructure:"idle_timeout"`
+	// Lifecycle states how the platform keeps the server's process running:
+	// always_on (the default), scale_to_zero where it stops the last
+	// instance when no request comes, or request_only where it pauses the
+	// process between requests. It turns nothing on by itself. Each
+	// background task says what it does in each (internal/background), and
+	// the settings a pause changes take their defaults from it: IdleTimeout
+	// and events.request.flush_wait (ADR 089).
+	Lifecycle background.Lifecycle `mapstructure:"lifecycle"`
 }
 
 func (c ServerConfig) Validate() error {
+	if err := c.Lifecycle.Validate(); err != nil {
+		return err
+	}
 	// Checked here rather than at startup, so `migrate` refuses an entry the
 	// server could not serve with, before anything is written. It applies with
 	// the embedded console off too.

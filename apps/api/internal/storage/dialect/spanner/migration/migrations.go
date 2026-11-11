@@ -74,6 +74,7 @@ func Migrate(ctx context.Context, db *sql.DB) (err error) {
 
 	fenced, cancel := context.WithCancelCause(ctx)
 	renewerDone := make(chan struct{})
+	//background:allow renews the migration lease only while the migration below runs
 	go renewLease(fenced, db, holder, cancel, renewerDone)
 	defer func() {
 		cancel(nil)

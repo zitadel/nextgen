@@ -207,7 +207,8 @@ tasks:
   # built-in vet analyzers (task "vet") keep running alongside. Today this is
   # egresslint, which enforces the single egress-client invariant (ADR 061):
   # outbound HTTP or TCP clients may only be built in internal/httputil, and
-  # any other site needs an //egress:allow <reason> directive. Further
+  # any other site needs an //egress:allow <reason> directive. backgroundlint
+  # holds background work to internal/background (ADR 089). Further
   # analyzers join the same binary (apps/api/tools/analyzers/cmd/analyzers).
   #
   # Runs once per build configuration: the default set, then each integration
