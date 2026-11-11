@@ -11421,7 +11421,7 @@
       "post": {
         "operationId": "invitationCancelled",
         "summary": "invitation.cancelled",
-        "description": "A pending invitation was cancelled by an administrator, or by a\nreplacement.\n\nNot sent yet: the contract is published ahead of the code that sends it.\n\nThe body is the event as `GET /events` returns it.\n",
+        "description": "A pending invitation was cancelled by an administrator, or an unaccepted\none was deleted by its replacement.\n\nThe body is the event as `GET /events` returns it.\n",
         "tags": [
           "Event Webhooks"
         ],
@@ -11450,7 +11450,7 @@
       "post": {
         "operationId": "invitationCreated",
         "summary": "invitation.created",
-        "description": "An invitation was created, new or as the replacement of another.\n\nNot sent yet: the contract is published ahead of the code that sends it.\n\nThe body is the event as `GET /events` returns it.\n",
+        "description": "An invitation was created, new or as the replacement of another.\n\nThe body is the event as `GET /events` returns it.\n",
         "tags": [
           "Event Webhooks"
         ],
@@ -34342,6 +34342,9 @@
                   "$ref": "#/components/schemas/enc_key-not_found"
                 },
                 {
+                  "$ref": "#/components/schemas/evt-invalid"
+                },
+                {
                   "$ref": "#/components/schemas/internal"
                 },
                 {
@@ -34386,6 +34389,7 @@
                   "enc_key.decrypt_failed": "#/components/schemas/enc_key-decrypt_failed",
                   "enc_key.encrypt_failed": "#/components/schemas/enc_key-encrypt_failed",
                   "enc_key.not_found": "#/components/schemas/enc_key-not_found",
+                  "evt.invalid": "#/components/schemas/evt-invalid",
                   "internal": "#/components/schemas/internal",
                   "tkn.invalid": "#/components/schemas/tkn-invalid",
                   "inv.invalid": "#/components/schemas/inv-invalid",
@@ -34416,6 +34420,9 @@
               },
               "enc_key.not_found": {
                 "$ref": "#/components/examples/enc_key-not_found"
+              },
+              "evt.invalid": {
+                "$ref": "#/components/examples/evt-invalid"
               },
               "internal": {
                 "$ref": "#/components/examples/internal"
@@ -34759,6 +34766,9 @@
                   "$ref": "#/components/schemas/auth-unauthorized"
                 },
                 {
+                  "$ref": "#/components/schemas/evt-invalid"
+                },
+                {
                   "$ref": "#/components/schemas/internal"
                 },
                 {
@@ -34782,6 +34792,7 @@
                 "mapping": {
                   "auth.csrf_invalid": "#/components/schemas/auth-csrf_invalid",
                   "auth.unauthorized": "#/components/schemas/auth-unauthorized",
+                  "evt.invalid": "#/components/schemas/evt-invalid",
                   "internal": "#/components/schemas/internal",
                   "inv.not_found": "#/components/schemas/inv-not_found",
                   "inv.permission_denied": "#/components/schemas/inv-permission_denied",
@@ -34797,6 +34808,9 @@
               },
               "auth.unauthorized": {
                 "$ref": "#/components/examples/auth-unauthorized"
+              },
+              "evt.invalid": {
+                "$ref": "#/components/examples/evt-invalid"
               },
               "internal": {
                 "$ref": "#/components/examples/internal"

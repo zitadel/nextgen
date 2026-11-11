@@ -17584,6 +17584,22 @@ func (s CancelInvitationErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case EvtInvalidCancelInvitationErrorResponse:
+		e.FieldStart("code")
+		e.Str("evt.invalid")
+		{
+			s := s.EvtInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case InternalCancelInvitationErrorResponse:
 		e.FieldStart("code")
 		e.Str("internal")
@@ -17712,6 +17728,9 @@ func (s *CancelInvitationErrorResponse) Decode(d *jx.Decoder) error {
 				case "auth.unauthorized":
 					s.Type = AuthUnauthorizedCancelInvitationErrorResponse
 					found = true
+				case "evt.invalid":
+					s.Type = EvtInvalidCancelInvitationErrorResponse
+					found = true
 				case "internal":
 					s.Type = InternalCancelInvitationErrorResponse
 					found = true
@@ -17750,6 +17769,10 @@ func (s *CancelInvitationErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case AuthUnauthorizedCancelInvitationErrorResponse:
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
+			return err
+		}
+	case EvtInvalidCancelInvitationErrorResponse:
+		if err := s.EvtInvalid.Decode(d); err != nil {
 			return err
 		}
 	case InternalCancelInvitationErrorResponse:
@@ -27210,6 +27233,22 @@ func (s CreateInvitationErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case EvtInvalidCreateInvitationErrorResponse:
+		e.FieldStart("code")
+		e.Str("evt.invalid")
+		{
+			s := s.EvtInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case InternalCreateInvitationErrorResponse:
 		e.FieldStart("code")
 		e.Str("internal")
@@ -27443,6 +27482,9 @@ func (s *CreateInvitationErrorResponse) Decode(d *jx.Decoder) error {
 				case "enc_key.not_found":
 					s.Type = EncKeyNotFoundCreateInvitationErrorResponse
 					found = true
+				case "evt.invalid":
+					s.Type = EvtInvalidCreateInvitationErrorResponse
+					found = true
 				case "internal":
 					s.Type = InternalCreateInvitationErrorResponse
 					found = true
@@ -27511,6 +27553,10 @@ func (s *CreateInvitationErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case EncKeyNotFoundCreateInvitationErrorResponse:
 		if err := s.EncKeyNotFound.Decode(d); err != nil {
+			return err
+		}
+	case EvtInvalidCreateInvitationErrorResponse:
+		if err := s.EvtInvalid.Decode(d); err != nil {
 			return err
 		}
 	case InternalCreateInvitationErrorResponse:

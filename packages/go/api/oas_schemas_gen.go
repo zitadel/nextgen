@@ -11088,6 +11088,7 @@ type CancelInvitationErrorResponse struct {
 	Type                CancelInvitationErrorResponseType // switch on this field
 	AuthCsrfInvalid     AuthCsrfInvalid
 	AuthUnauthorized    AuthUnauthorized
+	EvtInvalid          EvtInvalid
 	Internal            Internal
 	InvNotFound         InvNotFound
 	InvPermissionDenied InvPermissionDenied
@@ -11103,6 +11104,7 @@ type CancelInvitationErrorResponseType string
 const (
 	AuthCsrfInvalidCancelInvitationErrorResponse     CancelInvitationErrorResponseType = "auth.csrf_invalid"
 	AuthUnauthorizedCancelInvitationErrorResponse    CancelInvitationErrorResponseType = "auth.unauthorized"
+	EvtInvalidCancelInvitationErrorResponse          CancelInvitationErrorResponseType = "evt.invalid"
 	InternalCancelInvitationErrorResponse            CancelInvitationErrorResponseType = "internal"
 	InvNotFoundCancelInvitationErrorResponse         CancelInvitationErrorResponseType = "inv.not_found"
 	InvPermissionDeniedCancelInvitationErrorResponse CancelInvitationErrorResponseType = "inv.permission_denied"
@@ -11119,6 +11121,11 @@ func (s CancelInvitationErrorResponse) IsAuthCsrfInvalid() bool {
 // IsAuthUnauthorized reports whether CancelInvitationErrorResponse is AuthUnauthorized.
 func (s CancelInvitationErrorResponse) IsAuthUnauthorized() bool {
 	return s.Type == AuthUnauthorizedCancelInvitationErrorResponse
+}
+
+// IsEvtInvalid reports whether CancelInvitationErrorResponse is EvtInvalid.
+func (s CancelInvitationErrorResponse) IsEvtInvalid() bool {
+	return s.Type == EvtInvalidCancelInvitationErrorResponse
 }
 
 // IsInternal reports whether CancelInvitationErrorResponse is Internal.
@@ -11190,6 +11197,27 @@ func (s CancelInvitationErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized
 func NewAuthUnauthorizedCancelInvitationErrorResponse(v AuthUnauthorized) CancelInvitationErrorResponse {
 	var s CancelInvitationErrorResponse
 	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetEvtInvalid sets CancelInvitationErrorResponse to EvtInvalid.
+func (s *CancelInvitationErrorResponse) SetEvtInvalid(v EvtInvalid) {
+	s.Type = EvtInvalidCancelInvitationErrorResponse
+	s.EvtInvalid = v
+}
+
+// GetEvtInvalid returns EvtInvalid and true boolean if CancelInvitationErrorResponse is EvtInvalid.
+func (s CancelInvitationErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
+	if !s.IsEvtInvalid() {
+		return v, false
+	}
+	return s.EvtInvalid, true
+}
+
+// NewEvtInvalidCancelInvitationErrorResponse returns new CancelInvitationErrorResponse from EvtInvalid.
+func NewEvtInvalidCancelInvitationErrorResponse(v EvtInvalid) CancelInvitationErrorResponse {
+	var s CancelInvitationErrorResponse
+	s.SetEvtInvalid(v)
 	return s
 }
 
@@ -17707,6 +17735,7 @@ type CreateInvitationErrorResponse struct {
 	EncKeyDecryptFailed EncKeyDecryptFailed
 	EncKeyEncryptFailed EncKeyEncryptFailed
 	EncKeyNotFound      EncKeyNotFound
+	EvtInvalid          EvtInvalid
 	Internal            Internal
 	TknInvalid          TknInvalid
 	InvInvalid          InvInvalid
@@ -17731,6 +17760,7 @@ const (
 	EncKeyDecryptFailedCreateInvitationErrorResponse CreateInvitationErrorResponseType = "enc_key.decrypt_failed"
 	EncKeyEncryptFailedCreateInvitationErrorResponse CreateInvitationErrorResponseType = "enc_key.encrypt_failed"
 	EncKeyNotFoundCreateInvitationErrorResponse      CreateInvitationErrorResponseType = "enc_key.not_found"
+	EvtInvalidCreateInvitationErrorResponse          CreateInvitationErrorResponseType = "evt.invalid"
 	InternalCreateInvitationErrorResponse            CreateInvitationErrorResponseType = "internal"
 	TknInvalidCreateInvitationErrorResponse          CreateInvitationErrorResponseType = "tkn.invalid"
 	InvInvalidCreateInvitationErrorResponse          CreateInvitationErrorResponseType = "inv.invalid"
@@ -17768,6 +17798,11 @@ func (s CreateInvitationErrorResponse) IsEncKeyEncryptFailed() bool {
 // IsEncKeyNotFound reports whether CreateInvitationErrorResponse is EncKeyNotFound.
 func (s CreateInvitationErrorResponse) IsEncKeyNotFound() bool {
 	return s.Type == EncKeyNotFoundCreateInvitationErrorResponse
+}
+
+// IsEvtInvalid reports whether CreateInvitationErrorResponse is EvtInvalid.
+func (s CreateInvitationErrorResponse) IsEvtInvalid() bool {
+	return s.Type == EvtInvalidCreateInvitationErrorResponse
 }
 
 // IsInternal reports whether CreateInvitationErrorResponse is Internal.
@@ -17932,6 +17967,27 @@ func (s CreateInvitationErrorResponse) GetEncKeyNotFound() (v EncKeyNotFound, ok
 func NewEncKeyNotFoundCreateInvitationErrorResponse(v EncKeyNotFound) CreateInvitationErrorResponse {
 	var s CreateInvitationErrorResponse
 	s.SetEncKeyNotFound(v)
+	return s
+}
+
+// SetEvtInvalid sets CreateInvitationErrorResponse to EvtInvalid.
+func (s *CreateInvitationErrorResponse) SetEvtInvalid(v EvtInvalid) {
+	s.Type = EvtInvalidCreateInvitationErrorResponse
+	s.EvtInvalid = v
+}
+
+// GetEvtInvalid returns EvtInvalid and true boolean if CreateInvitationErrorResponse is EvtInvalid.
+func (s CreateInvitationErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
+	if !s.IsEvtInvalid() {
+		return v, false
+	}
+	return s.EvtInvalid, true
+}
+
+// NewEvtInvalidCreateInvitationErrorResponse returns new CreateInvitationErrorResponse from EvtInvalid.
+func NewEvtInvalidCreateInvitationErrorResponse(v EvtInvalid) CreateInvitationErrorResponse {
+	var s CreateInvitationErrorResponse
+	s.SetEvtInvalid(v)
 	return s
 }
 

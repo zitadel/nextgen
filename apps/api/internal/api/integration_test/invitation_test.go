@@ -3,6 +3,7 @@
 package integration_test
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -95,6 +96,12 @@ func TestInvitationLifecycle(t *testing.T) {
 		again, err := client.CancelInvitation(t.Context(), api.CancelInvitationParams{ID: created.ID, ProjectID: projectID})
 		require.NoError(t, err)
 		require.IsType(t, &api.CancelInvitationNotFound{}, again, helpers.MustMarshal(t, again))
+
+		events := invitationEvents(t, client, projectID, created.ID)
+		require.ElementsMatch(t, []string{"invitation.created", "invitation.cancelled"}, eventTypes(events))
+		for _, event := range events {
+			assert.NotContains(t, string(event.Payload), "John Doe")
+		}
 	})
 
 	t.Run("replace keeps the journey and moves the metadata", func(t *testing.T) {
@@ -110,6 +117,14 @@ func TestInvitationLifecycle(t *testing.T) {
 		assert.Equal(t, "Jane Doe", replacement.Metadata.Value.Name)
 		assert.NotEqual(t, original.Link.Path, replacement.Link.Path)
 		require.IsType(t, &api.GetInvitationNotFound{}, get(t, original.ID))
+
+		events := invitationEvents(t, client, projectID, original.ID)
+		require.ElementsMatch(t, []string{"invitation.created", "invitation.cancelled"}, eventTypes(events))
+		for _, event := range events {
+			if event.EventType == "invitation.cancelled" {
+				assert.JSONEq(t, `{"journey_id":"`+original.JourneyID+`","reason":"replaced","replaced_by_invitation_id":"`+string(replacement.ID)+`"}`, string(event.Payload))
+			}
+		}
 	})
 
 	t.Run("replacing an unknown invitation", func(t *testing.T) {
@@ -139,4 +154,38 @@ func TestInvitationCreate_UnclaimedProject(t *testing.T) {
 	conflict, ok := resp.(*api.CreateInvitationConflict)
 	require.True(t, ok, helpers.MustMarshal(t, resp))
 	assert.Equal(t, "inv.project_unclaimed", string(conflict.Code))
+}
+
+type invitationEvent struct {
+	EventType string          `json:"event_type"`
+	Payload   json.RawMessage `json:"payload"`
+}
+
+// invitationEvents lists the events recorded for one invitation.
+func invitationEvents(t *testing.T, client *helpers.ApiClient, projectID api.ProjectID, invitationID api.InvitationID) []invitationEvent {
+	t.Helper()
+	resp, err := client.ListEvents(t.Context(), api.ListEventsParams{
+		ProjectID: projectID,
+		EntityID:  api.NewOptString(string(invitationID)),
+	})
+	require.NoError(t, err)
+	page, ok := resp.(*api.ListEventsResponse)
+	require.True(t, ok, helpers.MustMarshal(t, resp))
+	events := make([]invitationEvent, 0, len(page.Data))
+	for _, event := range page.Data {
+		raw, err := event.MarshalJSON()
+		require.NoError(t, err)
+		var decoded invitationEvent
+		require.NoError(t, json.Unmarshal(raw, &decoded))
+		events = append(events, decoded)
+	}
+	return events
+}
+
+func eventTypes(events []invitationEvent) []string {
+	types := make([]string, 0, len(events))
+	for _, event := range events {
+		types = append(types, event.EventType)
+	}
+	return types
 }

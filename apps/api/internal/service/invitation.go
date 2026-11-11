@@ -129,11 +129,13 @@ func (s *InvitationService) Create(ctx context.Context, input CreateInvitationIn
 		entity.CreatedBy = actor.ActorID
 		entity.CreatedByType = actor.ActorType
 
+		var replaced *domain.Invitation
 		if input.ReplacesInvitationID != "" {
 			original, err := s.releaseReplaced(ctx, stmts, input.ProjectID, input.ReplacesInvitationID)
 			if err != nil {
 				return err
 			}
+			replaced = original
 			entity.JourneyID = original.JourneyID
 			if entity.EncryptedMetadata == nil && original.EncryptedMetadata != nil {
 				// Decrypted before the insert: the link is lost if Create fails after it.
@@ -156,9 +158,14 @@ func (s *InvitationService) Create(ctx context.Context, input CreateInvitationIn
 		if err := stmts.CreateInvitation(ctx, entity); err != nil {
 			return err
 		}
-		// TODO(#2850): emit invitation.created for entity, with
-		// replaces_invitation_id, and invitation.cancelled (reason replaced,
-		// replaced_by entity.ID) for the deleted original.
+		if err := emitInvitationCreated(ctx, stmts, entity, input.ReplacesInvitationID); err != nil {
+			return err
+		}
+		if replaced != nil {
+			if err := emitInvitationCancelled(ctx, stmts, replaced, domain.InvitationCancelReasonReplaced, entity.ID); err != nil {
+				return err
+			}
+		}
 		created = entity
 		return nil
 	})
@@ -233,14 +240,14 @@ func (s *InvitationService) Cancel(ctx context.Context, projectID, id string) (e
 	now := time.Now().UTC()
 	err = s.db.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		stmts := tx.Statements()
-		if _, err := stmts.GetInvitationByID(ctx, projectID, id); err != nil {
+		entity, err := stmts.GetInvitationByID(ctx, projectID, id)
+		if err != nil {
 			return err
 		}
 		if err := stmts.DeletePendingInvitation(ctx, projectID, id, now); err != nil {
 			return notPendingOnMiss(err)
 		}
-		// TODO(#2850): emit invitation.cancelled with reason cancelled.
-		return nil
+		return emitInvitationCancelled(ctx, stmts, entity, domain.InvitationCancelReasonCancelled, "")
 	})
 	if err != nil {
 		return mapInvitationError(err, "failed to cancel invitation")
@@ -323,4 +330,39 @@ func mapInvitationError(err error, internalMsg string) error {
 		return de
 	}
 	return domain.ErrInternal(err).WithMessage(internalMsg)
+}
+
+func emitInvitationCreated(ctx context.Context, stmts EventStatements, entity *domain.Invitation, replacesID string) error {
+	payload := domain.InvitationCreatedPayload{
+		Type:                 string(entity.Type),
+		JourneyID:            entity.JourneyID,
+		ReplacesInvitationID: replacesID,
+		ExpiresAt:            entity.ExpiresAt,
+	}
+	if entity.ProjectMember != nil {
+		payload.ProjectMember = &domain.InvitationProjectMemberPayload{Relation: entity.ProjectMember.Relation}
+	}
+	return audit.Emit(ctx, stmts, audit.EmitSpec{
+		Type:       domain.EventTypeInvitationCreated,
+		Category:   domain.EventCategoryAdmin,
+		ProjectID:  entity.ProjectID,
+		EntityType: "invitation",
+		EntityID:   entity.ID,
+		Payload:    payload,
+	})
+}
+
+func emitInvitationCancelled(ctx context.Context, stmts EventStatements, entity *domain.Invitation, reason, replacedBy string) error {
+	return audit.Emit(ctx, stmts, audit.EmitSpec{
+		Type:       domain.EventTypeInvitationCancelled,
+		Category:   domain.EventCategoryAdmin,
+		ProjectID:  entity.ProjectID,
+		EntityType: "invitation",
+		EntityID:   entity.ID,
+		Payload: domain.InvitationCancelledPayload{
+			JourneyID:              entity.JourneyID,
+			Reason:                 reason,
+			ReplacedByInvitationID: replacedBy,
+		},
+	})
 }

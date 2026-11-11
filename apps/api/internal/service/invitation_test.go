@@ -25,7 +25,7 @@ const (
 	invitationConsole   = "https://console.example.com/ui/console"
 )
 
-func newMockedInvitationService(t *testing.T, platformProjectID string) (*service.InvitationService, *servicemocks.MockAllStatements, *servicemocks.MockKeyService) {
+func newMockedInvitationService(t *testing.T, platformProjectID string) (*service.InvitationService, *servicemocks.MockAllStatements, *servicemocks.MockKeyService, *[]*domain.Event) {
 	t.Helper()
 	ctrl := gomock.NewController(t)
 	pool := servicemocks.NewMockPool(ctrl)
@@ -38,8 +38,29 @@ func newMockedInvitationService(t *testing.T, platformProjectID string) (*servic
 			return fn(ctx, statementer)
 		},
 	).AnyTimes()
+	events := new([]*domain.Event)
+	statements.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ context.Context, event *domain.Event) error {
+			*events = append(*events, event)
+			return nil
+		},
+	).AnyTimes()
 	keys := servicemocks.NewMockKeyService(ctrl)
-	return service.NewInvitationService(service.NewPool(pool), keys, invitationConsole+"/", platformProjectID), statements, keys
+	return service.NewInvitationService(service.NewPool(pool), keys, invitationConsole+"/", platformProjectID), statements, keys, events
+}
+
+// invitationEvent decodes one recorded event's payload into T.
+func invitationEvent[T any](t *testing.T, event *domain.Event, typ domain.EventType, entityID string) T {
+	t.Helper()
+	assert.Equal(t, typ, event.EventType)
+	assert.Equal(t, domain.EventCategoryAdmin, event.Category)
+	require.NotNil(t, event.EntityType)
+	assert.Equal(t, "invitation", *event.EntityType)
+	require.NotNil(t, event.EntityID)
+	assert.Equal(t, entityID, *event.EntityID)
+	var payload T
+	require.NoError(t, json.Unmarshal(event.Payload, &payload))
+	return payload
 }
 
 func encryptedInvitationMetadata(t *testing.T, name string) *string {
@@ -81,7 +102,7 @@ func TestInvitationService_Create(t *testing.T) {
 
 	t.Run("mints a link, encrypts the metadata and records the creator", func(t *testing.T) {
 		t.Parallel()
-		svc, s, keys := newMockedInvitationService(t, grantPlatformProjID)
+		svc, s, keys, events := newMockedInvitationService(t, grantPlatformProjID)
 		expectClaimedProject(s, invitationProjectID)
 		keys.EXPECT().GetProjectCrypter(gomock.Any(), invitationProjectID, domain.EncryptionKeyPurposeSecret).Return(testCrypter(invitationKeyID), nil)
 		written := expectInvitationInsert(s, 0)
@@ -108,11 +129,21 @@ func TestInvitationService_Create(t *testing.T) {
 		require.NoError(t, err)
 		assert.JSONEq(t, `{"name":"John Doe"}`, plain)
 		assert.Equal(t, &domain.InvitationMetadata{Name: "John Doe"}, got.Metadata)
+
+		require.Len(t, *events, 1)
+		assert.NotContains(t, string((*events)[0].Payload), "John")
+		assert.NotContains(t, string((*events)[0].Payload), token)
+		created := invitationEvent[domain.InvitationCreatedPayload](t, (*events)[0], domain.EventTypeInvitationCreated, "inv_new")
+		assert.Equal(t, "project_member", created.Type)
+		require.NotNil(t, created.ProjectMember)
+		assert.Equal(t, "editor", created.ProjectMember.Relation)
+		assert.Equal(t, written.JourneyID, created.JourneyID)
+		assert.Empty(t, created.ReplacesInvitationID)
 	})
 
 	t.Run("the platform project needs no claim", func(t *testing.T) {
 		t.Parallel()
-		svc, s, _ := newMockedInvitationService(t, invitationProjectID)
+		svc, s, _, _ := newMockedInvitationService(t, invitationProjectID)
 		expectInvitationInsert(s, 0)
 
 		_, err := svc.Create(t.Context(), projectMemberInput("admin"))
@@ -179,7 +210,7 @@ func TestInvitationService_Create(t *testing.T) {
 	for _, tc := range refusals {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			svc, s, _ := newMockedInvitationService(t, tc.platform)
+			svc, s, _, _ := newMockedInvitationService(t, tc.platform)
 			if tc.setup != nil {
 				tc.setup(s)
 			}
@@ -214,7 +245,7 @@ func TestInvitationService_Replace(t *testing.T) {
 
 	t.Run("deletes the original and moves its journey and metadata", func(t *testing.T) {
 		t.Parallel()
-		svc, s, keys := newMockedInvitationService(t, grantPlatformProjID)
+		svc, s, keys, events := newMockedInvitationService(t, grantPlatformProjID)
 		keys.EXPECT().GetCrypter(gomock.Any(), invitationKeyID, jose.A256GCM).Return(testCrypter(invitationKeyID), nil)
 		expectClaimedProject(s, invitationProjectID)
 		metadata := encryptedInvitationMetadata(t, "John Doe")
@@ -240,11 +271,22 @@ func TestInvitationService_Replace(t *testing.T) {
 		assert.Equal(t, "journey_old", written.JourneyID)
 		assert.Equal(t, metadata, written.EncryptedMetadata)
 		assert.Equal(t, "editor", written.ProjectMember.Relation)
+
+		require.Len(t, *events, 2)
+		created := invitationEvent[domain.InvitationCreatedPayload](t, (*events)[0], domain.EventTypeInvitationCreated, "inv_new")
+		assert.Equal(t, "inv_old", created.ReplacesInvitationID)
+		assert.Equal(t, "journey_old", created.JourneyID)
+		cancelled := invitationEvent[domain.InvitationCancelledPayload](t, (*events)[1], domain.EventTypeInvitationCancelled, "inv_old")
+		assert.Equal(t, domain.InvitationCancelledPayload{
+			JourneyID:              "journey_old",
+			Reason:                 domain.InvitationCancelReasonReplaced,
+			ReplacedByInvitationID: "inv_new",
+		}, cancelled)
 	})
 
 	t.Run("deletes an expired original", func(t *testing.T) {
 		t.Parallel()
-		svc, s, keys := newMockedInvitationService(t, grantPlatformProjID)
+		svc, s, keys, _ := newMockedInvitationService(t, grantPlatformProjID)
 		keys.EXPECT().GetCrypter(gomock.Any(), invitationKeyID, jose.A256GCM).Return(testCrypter(invitationKeyID), nil)
 		expectClaimedProject(s, invitationProjectID)
 		s.EXPECT().LockProject(gomock.Any(), invitationProjectID).Return(nil)
@@ -260,7 +302,7 @@ func TestInvitationService_Replace(t *testing.T) {
 
 	t.Run("deletes a rejected original, whose metadata is already gone", func(t *testing.T) {
 		t.Parallel()
-		svc, s, _ := newMockedInvitationService(t, grantPlatformProjID)
+		svc, s, _, _ := newMockedInvitationService(t, grantPlatformProjID)
 		expectClaimedProject(s, invitationProjectID)
 		s.EXPECT().LockProject(gomock.Any(), invitationProjectID).Return(nil)
 		s.EXPECT().GetInvitationByID(gomock.Any(), invitationProjectID, "inv_old").
@@ -308,7 +350,7 @@ func TestInvitationService_Replace(t *testing.T) {
 	for _, tc := range refusals {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			svc, s, _ := newMockedInvitationService(t, grantPlatformProjID)
+			svc, s, _, _ := newMockedInvitationService(t, grantPlatformProjID)
 			expectClaimedProject(s, invitationProjectID)
 			s.EXPECT().LockProject(gomock.Any(), invitationProjectID).Return(nil)
 			tc.setup(s)
@@ -330,7 +372,7 @@ func TestInvitationService_Cancel(t *testing.T) {
 		{
 			name: "deletes a pending invitation",
 			setup: func(s *servicemocks.MockAllStatements) {
-				s.EXPECT().GetInvitationByID(gomock.Any(), invitationProjectID, "inv_1").Return(&domain.Invitation{ID: "inv_1"}, nil)
+				s.EXPECT().GetInvitationByID(gomock.Any(), invitationProjectID, "inv_1").Return(&domain.Invitation{ProjectID: invitationProjectID, ID: "inv_1", JourneyID: "journey_1"}, nil)
 				s.EXPECT().DeletePendingInvitation(gomock.Any(), invitationProjectID, "inv_1", gomock.Any()).Return(nil)
 			},
 		},
@@ -344,7 +386,7 @@ func TestInvitationService_Cancel(t *testing.T) {
 		{
 			name: "finished or expired invitation",
 			setup: func(s *servicemocks.MockAllStatements) {
-				s.EXPECT().GetInvitationByID(gomock.Any(), invitationProjectID, "inv_1").Return(&domain.Invitation{ID: "inv_1"}, nil)
+				s.EXPECT().GetInvitationByID(gomock.Any(), invitationProjectID, "inv_1").Return(&domain.Invitation{ProjectID: invitationProjectID, ID: "inv_1", JourneyID: "journey_1"}, nil)
 				s.EXPECT().DeletePendingInvitation(gomock.Any(), invitationProjectID, "inv_1", gomock.Any()).Return(database.NewNoRowFoundError(nil))
 			},
 			wantErr: domain.ErrInvitationNotPending(),
@@ -353,14 +395,21 @@ func TestInvitationService_Cancel(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			svc, s, _ := newMockedInvitationService(t, grantPlatformProjID)
+			svc, s, _, events := newMockedInvitationService(t, grantPlatformProjID)
 			tc.setup(s)
 			err := svc.Cancel(t.Context(), invitationProjectID, "inv_1")
 			if tc.wantErr != nil {
 				require.ErrorIs(t, err, tc.wantErr)
+				assert.Empty(t, *events)
 				return
 			}
 			require.NoError(t, err)
+			require.Len(t, *events, 1)
+			cancelled := invitationEvent[domain.InvitationCancelledPayload](t, (*events)[0], domain.EventTypeInvitationCancelled, "inv_1")
+			assert.Equal(t, domain.InvitationCancelledPayload{
+				JourneyID: "journey_1",
+				Reason:    domain.InvitationCancelReasonCancelled,
+			}, cancelled)
 		})
 	}
 }
@@ -370,7 +419,7 @@ func TestInvitationService_Get(t *testing.T) {
 
 	t.Run("decrypts the metadata with the key that wrote it", func(t *testing.T) {
 		t.Parallel()
-		svc, s, keys := newMockedInvitationService(t, grantPlatformProjID)
+		svc, s, keys, _ := newMockedInvitationService(t, grantPlatformProjID)
 		s.EXPECT().GetInvitationByID(gomock.Any(), invitationProjectID, "inv_1").Return(&domain.Invitation{
 			ID:                "inv_1",
 			EncryptedMetadata: encryptedInvitationMetadata(t, "John Doe"),
@@ -384,8 +433,8 @@ func TestInvitationService_Get(t *testing.T) {
 
 	t.Run("no metadata after accept or decline", func(t *testing.T) {
 		t.Parallel()
-		svc, s, _ := newMockedInvitationService(t, grantPlatformProjID)
-		s.EXPECT().GetInvitationByID(gomock.Any(), invitationProjectID, "inv_1").Return(&domain.Invitation{ID: "inv_1"}, nil)
+		svc, s, _, _ := newMockedInvitationService(t, grantPlatformProjID)
+		s.EXPECT().GetInvitationByID(gomock.Any(), invitationProjectID, "inv_1").Return(&domain.Invitation{ProjectID: invitationProjectID, ID: "inv_1", JourneyID: "journey_1"}, nil)
 
 		got, err := svc.Get(t.Context(), invitationProjectID, "inv_1")
 		require.NoError(t, err)
@@ -394,7 +443,7 @@ func TestInvitationService_Get(t *testing.T) {
 
 	t.Run("unknown invitation", func(t *testing.T) {
 		t.Parallel()
-		svc, s, _ := newMockedInvitationService(t, grantPlatformProjID)
+		svc, s, _, _ := newMockedInvitationService(t, grantPlatformProjID)
 		s.EXPECT().GetInvitationByID(gomock.Any(), invitationProjectID, "inv_1").Return(nil, database.NewNoRowFoundError(nil))
 
 		_, err := svc.Get(t.Context(), invitationProjectID, "inv_1")
@@ -405,7 +454,7 @@ func TestInvitationService_Get(t *testing.T) {
 func TestInvitationService_List(t *testing.T) {
 	t.Parallel()
 
-	svc, s, _ := newMockedInvitationService(t, grantPlatformProjID)
+	svc, s, _, _ := newMockedInvitationService(t, grantPlatformProjID)
 	s.EXPECT().ListInvitations(gomock.Any(), gomock.Any()).DoAndReturn(
 		func(_ context.Context, opts *database.ListOptions[domain.InvitationField]) (*database.ListResult[*domain.Invitation], error) {
 			assert.Equal(t, []byte("cursor_1"), opts.Pagination.Cursor)
