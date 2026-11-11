@@ -18,7 +18,7 @@ func (h *Handler) WithOAuthSettingsService(s *service.OAuthSettingsService) *Han
 	return h
 }
 
-func (h *Handler) GetOAuthSettingsById(ctx context.Context, params api.GetOAuthSettingsByIdParams) (api.GetOAuthSettingsByIdRes, error) {
+func (h *Handler) GetOAuthSettings(ctx context.Context, params api.GetOAuthSettingsParams) (api.GetOAuthSettingsRes, error) {
 	projectID, err := h.requireResourceAccess(ctx, params.OAuthSettingsID, oauthSettingsAccess, opRead)
 	if err != nil {
 		return nil, err

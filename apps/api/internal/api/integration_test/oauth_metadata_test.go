@@ -155,7 +155,7 @@ func TestOAuthAuthorizationServerMetadata(t *testing.T) {
 	revisionID := release.Pointers[0].RevisionID
 	assert.True(t, domain.PrefixOAuthSettings.Matches(revisionID), revisionID)
 
-	read, err := client.GetOAuthSettingsById(t.Context(), api.GetOAuthSettingsByIdParams{OAuthSettingsID: revisionID})
+	read, err := client.GetOAuthSettings(t.Context(), api.GetOAuthSettingsParams{OAuthSettingsID: revisionID})
 	require.NoError(t, err)
 	require.IsType(t, &api.OAuthSettingsRevisionResponse{}, read, helpers.MustMarshal(t, read))
 	revision := read.(*api.OAuthSettingsRevisionResponse)
@@ -176,7 +176,7 @@ func TestOAuthAuthorizationServerMetadata(t *testing.T) {
 	foreign, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
 	harness.SetProjectSecretOnApiClient(t, foreign, other)
-	denied, err := foreign.GetOAuthSettingsById(t.Context(), api.GetOAuthSettingsByIdParams{OAuthSettingsID: revisionID})
+	denied, err := foreign.GetOAuthSettings(t.Context(), api.GetOAuthSettingsParams{OAuthSettingsID: revisionID})
 	require.NoError(t, err)
 	require.IsType(t, &api.ErrorDetails{}, denied, helpers.MustMarshal(t, denied))
 	assert.Equal(t, api.ErrorCode(domain.ErrOAuthSettingsNotFound().Code), denied.(*api.ErrorDetails).Code)
