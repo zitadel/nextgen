@@ -283,9 +283,10 @@ On PKCE and `iss`, ADR 082 §2 decides (#2864): PKCE is required for public
 clients, recommended for confidential ones and supported for every client,
 so an existing confidential client on the OAuth 2.0 code flow connects
 unchanged; `S256` only, and a `code_verifier` is refused when the request
-carried no challenge, as the OAuth security BCP (RFC 9700) asks. `iss` on the authorization response stays required
-and may ship after the first step, since adding it breaks no client: the
-metadata advertises it only once it is there. So #2794 keeps `iss` out of
+carried no challenge, as the OAuth security BCP (RFC 9700) asks. `iss` on
+the authorization response stays required and may ship after the first
+step, since adding it breaks no client: the metadata advertises it only
+once it is there. So #2794 keeps `iss` out of
 its first scope, and #2795's acceptance criterion, which returns `iss`,
 should move with it. #2451 has both working (open question 2, answered).
 
@@ -480,8 +481,8 @@ with the reason and the way out when:
 
 With the server on, the customer sees what its origins now mean (D1):
 
-- `settings oauth enable` and `origin list` say which origins are issuers, and that
-  an issuer is permanent for the clients that pin it;
+- `settings oauth enable` and `origin list` say which origins are issuers,
+  and that an issuer is permanent for the clients that pin it;
 - `origin add` says the new primary origin becomes an issuer;
 - `origin rm` warns before it removes one, since its clients stop working
   and its tokens end;
