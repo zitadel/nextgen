@@ -283,7 +283,7 @@ On PKCE and `iss`, ADR 082 §2 decides (#2864): PKCE is required for public
 clients, recommended for confidential ones and supported for every client,
 so an existing confidential client on the OAuth 2.0 code flow connects
 unchanged; `S256` only, and a `code_verifier` is refused when the request
-carried no challenge. `iss` on the authorization response stays required
+carried no challenge, as the OAuth security BCP (RFC 9700) asks. `iss` on the authorization response stays required
 and may ship after the first step, since adding it breaks no client: the
 metadata advertises it only once it is there. So #2794 keeps `iss` out of
 its first scope, and #2795's acceptance criterion, which returns `iss`,
@@ -467,9 +467,9 @@ client id, its secret and its redirect URI.
 
 ### What the CLI guards
 
-`zitadel oauth enable`, and `zitadel application create`, which turns the
-issuer on when it is off (ADR 082 §12, open question 3), refuse with the
-reason and the way out when:
+`zitadel settings oauth enable`, and `zitadel application create`, which
+turns the issuer on when it is off (ADR 082 §12, open question 3), refuse
+with the reason and the way out when:
 
 - the app is an SPA, or sits under a base path, since the metadata has to be
   at the host's root: the answer names the generated login app;
@@ -480,7 +480,7 @@ reason and the way out when:
 
 With the server on, the customer sees what its origins now mean (D1):
 
-- `oauth enable` and `origin list` say which origins are issuers, and that
+- `settings oauth enable` and `origin list` say which origins are issuers, and that
   an issuer is permanent for the clients that pin it;
 - `origin add` says the new primary origin becomes an issuer;
 - `origin rm` warns before it removes one, since its clients stop working
@@ -689,9 +689,10 @@ OpenID Connect comes later. This is the epic's first scope:
    client from the web preset, and generates the client id. When the
    project's authorization server is off, it writes `oauth.json` to turn it
    on and says so (ADR 082 §12, #2864). It deploys nothing.
-2. `zitadel oauth enable` does that alone, for a project that already has
-   its applications. Either way the CLI prints the origins that are now
-   issuers (D1).
+2. `zitadel settings oauth enable` does that alone, for a project that
+   already has its applications. The `settings` group is new with it, and
+   later protocol switches share it (#2864). Either way the CLI prints the
+   origins that are now issuers (D1).
 3. The developer sets the client's secret with
    `zitadel variable set <NAME> --secret`, puts the same value in the
    backend, and runs `zitadel deploy`. The CLI neither generates nor prints
@@ -741,7 +742,7 @@ What blocks the later paths today:
 
 Each of these is owned by an ADR or an issue, not by this note; the note
 proposes an answer and names where it belongs. The last column is the state
-on 2026-11-10.
+on 2026-11-11.
 
 | | Decision | Belongs in | Proposal | State |
 | --- | --- | --- | --- | --- |
@@ -807,7 +808,7 @@ to 7 are this note's proposal for what follows.
 
 ## Open questions
 
-Each names where it was raised, as of 2026-11-10. Questions 2 and 3 are
+Each names where it was raised, as of 2026-11-11. Questions 2 and 3 are
 answered; the rest have no answer yet.
 
 1. #2785 takes #2452 as a reference only. Is #2451 one too, and which of its
@@ -819,9 +820,9 @@ answered; the rest have no answer yet.
    required for public clients and recommended for confidential ones;
    `iss` stays required and may ship after the first step.*
 3. Does `application create` turn the project's issuer on when it is off, or
-   does only `zitadel oauth enable` (#2793)? *Raised on #2785. Answered in
-   #2864: it does, writing `oauth.json` and saying so; `oauth enable` stays
-   for doing that alone.*
+   does only the switch command (#2793)? *Raised on #2785. Answered in
+   #2864: it does, writing `oauth.json` and saying so; the switch command
+   stays for doing that alone, as `zitadel settings oauth enable`.*
 4. #2795 lists the Vite and Angular dev proxy entries. If no SPA is an issuer
    for now, do they still ship as a reservation, or wait for #560?
    *Raised on #2795.*
