@@ -318,7 +318,7 @@ export default class Pull extends EnvironmentCommand {
         ),
       },
       next: {
-        commands: this.dryRun || args.target !== undefined ? [] : [this.suggest(DEPLOY_ARGS)],
+        commands: this.dryRun || args.target.kind !== "latest" ? [] : [this.suggest(DEPLOY_ARGS)],
       },
     });
   }
