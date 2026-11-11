@@ -307,7 +307,9 @@ export const releasePointers = async (
 };
 
 /** The operations a policy can guard, as the generated publish body names them. */
-const POLICY_OPERATIONS = PublishPolicyBody.shape.operation.options;
+const POLICY_OPERATIONS = PublishPolicyBody.options.flatMap(
+  (branch) => branch.shape.operation.options,
+);
 
 /**
  * The runtime resources the CLI manages imperatively — one entry per topic.

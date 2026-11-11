@@ -109,6 +109,8 @@ export {
   POLICY_FILE_SUFFIX,
   POLICY_TEST_SUFFIX,
   PolicyTest,
+  SignupPolicy,
+  USER_CREATE_POLICY_OPERATION,
   type PasswordMinLength,
   type PolicyCase,
   type PolicyCaseResult,

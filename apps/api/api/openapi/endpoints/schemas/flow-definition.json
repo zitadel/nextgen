@@ -619,7 +619,7 @@
         "kind",
         "provider"
       ],
-      "description": "A gate is a security check, such as a captcha, that must be satisfied\nbefore this step's submission is accepted. The server may also inject gates\nat runtime based on policy or risk evaluation.\n",
+      "description": "A reserved gate declaration. Gates declared in a flow definition are not\ncurrently enforced. Required signup gates are attached by the server based\non `on_success: create_user`, independently of this declaration.\n",
       "properties": {
         "kind": {
           "type": "string",
@@ -633,20 +633,12 @@
         },
         "provider": {
           "type": "string",
-          "description": "The provider within the gate kind, for example `altcha`, `turnstile` or\n`hcaptcha`. The server looks up an implementation in its provider\nregistry.\n",
-          "examples": [
-            "altcha"
-          ]
+          "description": "Reserved implementation identifier. Declaring a provider does not enable it.\n"
         },
         "config": {
           "type": "object",
-          "description": "Provider-specific configuration consumed by the implementation when\nissuing the per-render challenge. Opaque to the server.\n",
-          "additionalProperties": true,
-          "examples": [
-            {
-              "site_key": "0x4AAAAAAA-example-site-key"
-            }
-          ]
+          "description": "Reserved provider-specific configuration. It has no runtime effect.\n",
+          "additionalProperties": true
         }
       }
     }

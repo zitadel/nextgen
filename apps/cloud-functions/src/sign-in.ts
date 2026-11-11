@@ -1,9 +1,7 @@
 import { API_PREFIX } from "@zitadel/api/runtime/base-url";
 
+import { SIGN_IN_PREFIX } from "./contract";
 import { passProtection, zitadelServer } from "./zitadel";
-
-/** Where the console's add-on points the sign-in widget (`signInApiBase`). */
-export const SIGN_IN_PREFIX = "/cloud/zitadel";
 
 /** A BotID verdict, as `checkBotId()` answers it. */
 export interface BotVerdict {

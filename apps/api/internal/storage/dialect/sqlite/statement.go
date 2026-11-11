@@ -16,6 +16,7 @@ type queryExecutor interface {
 }
 
 type statements struct {
+	signupProtectionStatements
 	projectStatements
 	originStatements
 	flowDefinitionStatements
@@ -60,6 +61,7 @@ func (s statements) IsStatements() {}
 func newStatements(client queryExecutor) statements {
 	client = traced(client)
 	return statements{
+		signupProtectionStatements:    newSignupProtectionStatements(client),
 		projectStatements:             newProjectStatements(client),
 		originStatements:              newOriginStatements(client),
 		flowDefinitionStatements:      newFlowDefinitionStatements(client),
