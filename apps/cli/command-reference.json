@@ -3471,8 +3471,13 @@
     {
       "id": "variable resolve",
       "group": "Configuration and releases",
-      "description": "Show the variables the live deployment froze for a target.",
-      "args": [],
+      "description": "Show the variables a deployment froze, the live one by default.",
+      "args": [
+        {
+          "name": "deployment_id",
+          "description": "The deployment to read; the live one when omitted."
+        }
+      ],
       "flags": [
         {
           "name": "origin",
@@ -3502,6 +3507,9 @@
         },
         {
           "command": "variable resolve --origin https://app.acme.com"
+        },
+        {
+          "command": "variable resolve dep_01KX5N7C9D2E7F0N9WD3P2E4YM6"
         },
         {
           "command": "variable resolve --json"

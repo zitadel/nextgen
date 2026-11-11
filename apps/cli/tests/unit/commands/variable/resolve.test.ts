@@ -56,6 +56,14 @@ async function aProject(options: {
         origins: options.origins ?? [],
       });
     }),
+    http.get(`${SERVER}/api/v1/deployments/:id`, ({ params }) => {
+      const found = options.deployments.find((deployment) => {
+        return deployment.id === params.id;
+      });
+      return found === undefined
+        ? HttpResponse.json({ code: "not_found", message: "no such deployment" }, { status: 404 })
+        : HttpResponse.json(found);
+    }),
     http.get(`${SERVER}/api/v1/deployments/:id/variables`, () => {
       return HttpResponse.json(options.variables ?? {});
     }),
@@ -183,6 +191,77 @@ describe("variable resolve", () => {
     expect(parseJson(stdout)).toMatchObject({
       status: "error",
       message: "https://typo.acme.com is not an origin of the project.",
+    });
+  });
+
+  it("reads the variables of the deployment it is given", async () => {
+    const cwd = await aProject({
+      deployments: [
+        aDeployment("dep_b", "https://b.acme.com"),
+        aDeployment("dep_a", "https://a.acme.com"),
+      ],
+      variables: {
+        API_URL: {
+          value: "https://api.acme.com",
+        },
+      },
+    });
+
+    const { exitCode, stdout } = await resolve(cwd, "dep_a");
+    const envelope = parseJson(stdout) as {
+      data: { deployment_id: string; origins: string[]; items: { name: string }[] };
+    };
+
+    expect(exitCode).toBe(0);
+    expect(envelope.data.deployment_id).toBe("dep_a");
+    expect(envelope.data.origins).toEqual(["https://a.acme.com"]);
+    expect(envelope.data.items).toMatchObject([
+      {
+        name: "API_URL",
+      },
+    ]);
+  });
+
+  it("says a deployment the project does not have is not found", async () => {
+    const cwd = await aProject({
+      deployments: [],
+    });
+
+    const { exitCode, stdout } = await resolve(cwd, "dep_missing");
+
+    expect(exitCode).not.toBe(0);
+    expect(parseJson(stdout)).toMatchObject({
+      status: "error",
+      code: "E_NOT_FOUND",
+    });
+  });
+
+  it("refuses a deployment together with an origin", async () => {
+    const cwd = await aProject({
+      deployments: [aDeployment("dep_a", "https://a.acme.com")],
+    });
+
+    const { exitCode, stdout } = await resolve(cwd, "dep_a", "--origin", "https://a.acme.com");
+
+    expect(exitCode).toBe(3);
+    expect(parseJson(stdout)).toMatchObject({
+      status: "error",
+      code: "E_VALIDATION",
+      message: "Name a deployment or an origin, not both.",
+    });
+  });
+
+  it("refuses a value that is not a deployment id", async () => {
+    const cwd = await aProject({
+      deployments: [],
+    });
+
+    const { exitCode, stdout } = await resolve(cwd, "not a deployment!");
+
+    expect(exitCode).toBe(3);
+    expect(parseJson(stdout)).toMatchObject({
+      status: "error",
+      code: "E_VALIDATION",
     });
   });
 });
