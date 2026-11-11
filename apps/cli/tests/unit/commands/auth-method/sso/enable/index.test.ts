@@ -801,7 +801,7 @@ describe("auth-method sso enable", () => {
         return runCliForTest(authMethodText(cwd, ...CUSTOM, ...ACME_FLAGS));
       });
 
-      expect(result.stdout).toContain("and always counts as");
+      expect(result.stdout).toContain("It always counts as");
     });
 
     it("says a mapped attribute nothing verifies is not verified", async ({ dir }) => {
@@ -815,7 +815,7 @@ describe("auth-method sso enable", () => {
         return runCliForTest(authMethodText(cwd, ...CUSTOM, ...ACME_FLAGS));
       });
 
-      expect(result.stdout).toContain("and is not treated as");
+      expect(result.stdout).toContain("It is not treated as");
     });
 
     it("draws no mapping lines for a connection that maps nothing", async ({ dir }) => {
@@ -932,8 +932,8 @@ describe("auth-method sso enable", () => {
   describe("with --provider custom in a script", () => {
     it.for([
       "When someone signs in with Acme SSO, Zitadel fills in their user like",
-      "- email comes from the provider's email claim,",
-      "and counts as verified",
+      "- email comes from the provider's email claim.",
+      "It counts as verified",
       "email_verified is true.",
       "Zitadel asks Acme SSO for these scopes: openid, profile, and email.",
       "This connection is used by default-human-user",

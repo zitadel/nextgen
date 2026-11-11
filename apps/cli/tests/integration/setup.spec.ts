@@ -1054,7 +1054,7 @@ describe("setup", () => {
 
         const result = await app.setupWithCustomSsoRendered(ACME, ACME_CREDENTIALS);
 
-        expect(result).toPrint("- email comes from the provider's email claim,");
+        expect(result).toPrint("- email comes from the provider's email claim.");
       });
 
       it("says which schemas sign in through the connection", async () => {

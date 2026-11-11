@@ -769,11 +769,14 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
               const how = verifiedBy.get(property);
               const verified =
                 how === true
-                  ? "and always counts as verified"
+                  ? "always counts as verified"
                   : typeof how === "string"
-                    ? `and counts as verified when ${text(how)} is true`
-                    : "and is not treated as verified";
-              return `- ${text(property)} comes from the provider's ${text(claim)} claim, ${verified}.`;
+                    ? `counts as verified when ${text(how)} is true`
+                    : "is not treated as verified";
+              return [
+                `- ${text(property)} comes from the provider's ${text(claim)} claim.`,
+                `  It ${verified}.`,
+              ].join("\n");
             }),
           ],
       scopes.length === 0
