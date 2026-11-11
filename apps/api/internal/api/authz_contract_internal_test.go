@@ -66,8 +66,8 @@ type gateRow struct {
 	// cookie pins whether the spec lets the Console session cookie call it.
 	cookie   bool
 	relation string
-	// why explains a relation that is not the one the HTTP method implies
-	// (methodRelation); it must be empty on a row that follows the rule.
+	// why explains a relation that is not the one the operation implies
+	// (impliedRelation); it must be empty on a row that follows the rule.
 	why    string
 	target gateTarget
 	// idField is the params field that carries the path id (onResource, onTarget).
@@ -119,14 +119,15 @@ const (
 	openCredentialTier   = "credential-tier: the catalog keeps user.set_password to admin bundles (system-permission-catalog.md:175), but this asks editor; only the bearer-only plane keeps a platform-project editor off an operator's credential"
 )
 
-// Why a relation is not the one its method implies.
+// Why a relation is not the one its operation implies.
 const (
 	whyQuery           = "a query sent as POST: it reads"
 	whyGrantEscalation = "a grant can carry any role up to admin, so an editor minting one could escalate itself (grant.go)"
 	whyInvitationGrant = "an invitation offers a project role, so it asks what creating a grant asks (ADR 086)"
 	whyInvitationRead  = "ADR 086 asks admin for every invitation operation, reads included"
 	whyEvaluate        = "evaluates a policy against the request's input and changes nothing"
-	whyRemoveOrigin    = "removes an origin, so it asks what a delete asks (origin.delete is its own permission)"
+	whyPreviewRemoval  = "ends a preview early and keeps its deployments in the history; the spec scopes it to deployment.write"
+	whyReleaseRevoke   = "marks the release revoked and keeps it; the spec scopes it to release.write"
 	whyVariableDelete  = "a variable is configuration: whoever may overwrite one can already destroy it (variable.go)"
 )
 
@@ -145,7 +146,7 @@ var gateRows = []gateRow{
 	{op: "RollbackDeployment", cookie: true, relation: editor, target: onProject, denied: deploymentCodes.denied, miss: deploymentCodes.writeMiss},
 	{op: "GetDeploymentVariables", relation: viewer, target: onProject, denied: deploymentCodes.denied, miss: deploymentCodes.readMiss},
 	{op: "ListPreviews", relation: viewer, target: onProject, denied: deploymentCodes.denied, miss: deploymentCodes.readMiss},
-	{op: "RemovePreview", relation: editor, target: onProject, denied: deploymentCodes.denied, miss: deploymentCodes.writeMiss, open: openWriteIsNotDelete},
+	{op: "RemovePreview", relation: editor, why: whyPreviewRemoval, target: onProject, denied: deploymentCodes.denied, miss: deploymentCodes.writeMiss, open: openWriteIsNotDelete},
 
 	// Events.
 	{op: "ListEvents", cookie: true, relation: viewer, target: onProject, denied: eventCodes.denied, miss: eventCodes.readMiss},
@@ -207,14 +208,14 @@ var gateRows = []gateRow{
 	{op: "InitClaim", relation: editor, target: onProject, denied: projectCodes.denied, miss: projectCodes.writeMiss},
 	{op: "GetClaimStatus", relation: viewer, target: onProject, denied: projectCodes.denied, miss: projectCodes.readMiss},
 	{op: "AddOrigin", cookie: true, relation: editor, target: onProject, denied: originCodes.denied, miss: originCodes.writeMiss},
-	{op: "RemoveOrigin", cookie: true, relation: admin, why: whyRemoveOrigin, target: onProject, denied: originCodes.denied, miss: originCodes.readMiss},
+	{op: "RemoveOrigin", cookie: true, relation: admin, target: onProject, denied: originCodes.denied, miss: originCodes.readMiss},
 
 	// Releases.
 	{op: "ListReleases", cookie: true, relation: viewer, target: onProject, list: true, miss: releaseCodes.readMiss},
 	{op: "CreateRelease", relation: editor, target: onProject, denied: releaseCodes.denied, miss: releaseCodes.writeMiss},
 	{op: "BuildRelease", relation: editor, target: onProject, denied: releaseCodes.denied, miss: releaseCodes.writeMiss},
 	{op: "GetReleaseById", cookie: true, relation: viewer, target: onProject, denied: releaseCodes.denied, miss: releaseCodes.readMiss},
-	{op: "RevokeRelease", cookie: true, relation: editor, target: onProject, denied: releaseCodes.denied, miss: releaseCodes.writeMiss, open: openWriteIsNotDelete},
+	{op: "RevokeRelease", cookie: true, relation: editor, why: whyReleaseRevoke, target: onProject, denied: releaseCodes.denied, miss: releaseCodes.writeMiss, open: openWriteIsNotDelete},
 
 	// User schemas.
 	{op: "ListSchemas", cookie: true, relation: viewer, target: onProject, list: true, miss: schemaCodes.readMiss},
@@ -781,22 +782,28 @@ func TestGateContractCoversEveryOperation(t *testing.T) {
 	}
 }
 
-// methodRelation is the relation an operation's HTTP method implies: a read
-// asks viewer, a delete admin, anything else editor.
-func methodRelation(method string) string {
-	switch method {
-	case "GET":
-		return viewer
-	case "DELETE":
+// removalVerb matches an operation name that removes something, whatever its
+// method: a removal can travel as POST when what it names does not fit a path
+// (an origin, a preview's URL) or when it keeps a record (a revoked release).
+var removalVerb = regexp.MustCompile(`^(Delete|Remove|Revoke|Cancel)([A-Z]|$)`)
+
+// impliedRelation is the relation an operation implies by what it does: a
+// removal (DELETE, or a removal verb) asks admin, any other read (GET) viewer,
+// anything else editor.
+func impliedRelation(op string, spec specOperation) string {
+	switch {
+	case spec.method == "DELETE" || removalVerb.MatchString(op):
 		return admin
+	case spec.method == "GET":
+		return viewer
 	default:
 		return editor
 	}
 }
 
-// TestGateRelationsFollowTheMethod makes every relation that is not the one
-// its method implies say why, and fails a why that no longer explains one.
-func TestGateRelationsFollowTheMethod(t *testing.T) {
+// TestGateRelationsFollowTheOperation makes every relation that is not the one
+// its operation implies say why, and fails a why that no longer explains one.
+func TestGateRelationsFollowTheOperation(t *testing.T) {
 	t.Parallel()
 	ops := bundledOperations(t)
 
@@ -805,12 +812,12 @@ func TestGateRelationsFollowTheMethod(t *testing.T) {
 		if !ok {
 			continue // TestGateContractCoversEveryOperation reports it
 		}
-		rule := methodRelation(spec.method)
+		rule := impliedRelation(row.op, spec)
 		if row.relation == rule {
-			assert.Empty(t, row.why, "%s: %s asks %s, as its method implies, so its why is stale", rowName(row), spec.method, rule)
+			assert.Empty(t, row.why, "%s: %s %s asks %s, as it implies, so its why is stale", rowName(row), spec.method, spec.path, rule)
 			continue
 		}
-		assert.NotEmpty(t, row.why, "%s: %s %s asks %s, where its method implies %s: say why in the row",
+		assert.NotEmpty(t, row.why, "%s: %s %s asks %s, where it implies %s: say why in the row",
 			rowName(row), spec.method, spec.path, row.relation, rule)
 	}
 }
