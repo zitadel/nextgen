@@ -3,10 +3,7 @@ import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import * as prompts from "@clack/prompts";
 import { afterEach, describe, expect, vi } from "vitest";
-
-vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
 
 import { LOCAL_ADMIN_FILE } from "@/lib/local-server/admin-credential";
 import {
@@ -27,7 +24,7 @@ import {
   runCliForTest,
 } from "@tests/helpers/run-cli";
 import { it } from "@tests/helpers/fixtures";
-import { answering, type clackDouble } from "@tests/helpers/clack";
+import { type Answer, answering } from "@tests/helpers/keyboard";
 import { asOneLine, asTerminal } from "@tests/helpers/terminal";
 
 const tempDirs: string[] = [];
@@ -164,7 +161,7 @@ describe("local runtime commands", () => {
     expect(envelope.data.next_actions.join("\n")).toContain("managed local runtime");
     expect(envelope.data.next_actions.join("\n")).toContain("--server <url>");
     expect(envelope.data.next_commands).toContain("docker version");
-    expect(envelope.data.next_commands).toContain(expectedPublicCliCommand("doctor"));
+    expect(envelope.data.next_commands).toContain(expectedPublicCliCommand(`doctor --cwd ${cwd}`));
     expect(envelope.data.checks.find((check) => check.name === "docker-cli")).toMatchObject({
       status: "warn",
     });
@@ -251,8 +248,10 @@ describe("local runtime commands", () => {
     };
     expect(envelope.status).toBe("error");
     expect(envelope.hint).toContain("Existing local runtime metadata");
-    expect(envelope.next_commands).toContain(expectedPublicCliCommand("start"));
-    expect(envelope.next_commands).toContain(expectedPublicCliCommand("reset --force"));
+    expect(envelope.next_commands).toContain(expectedPublicCliCommand(`start --cwd ${cwd}`));
+    expect(envelope.next_commands).toContain(
+      expectedPublicCliCommand(`reset --force --cwd ${cwd}`),
+    );
     expect(envelope.details.checks.find((check) => check.name === "runtime")).toMatchObject({
       status: "fail",
     });
@@ -348,7 +347,7 @@ describe("local runtime commands", () => {
     expect(envelope.hint).toContain("managed local runtime");
     expect(envelope.hint).toContain("--server <url>");
     expect(envelope.next_commands).toContain("docker version");
-    expect(envelope.next_commands).toContain(expectedPublicCliCommand("start"));
+    expect(envelope.next_commands).toContain(expectedPublicCliCommand(`start --cwd ${cwd}`));
     expect(envelope.details.message).toContain("remote or cloud setup can continue");
 
     const dockerCalls = await readDockerCalls(fake.logPath);
@@ -605,7 +604,7 @@ describe("local runtime commands", () => {
     expect(envelope.code).toBe("E_PORT_IN_USE");
     expect(envelope.details.port).toBe(port);
     expect(envelope.details.listeners.length).toBeGreaterThan(0);
-    expect(envelope.next_commands).toContain(expectedPublicCliCommand("stop --all"));
+    expect(envelope.next_commands).toContain(expectedPublicCliCommand(`stop --all --cwd ${cwd}`));
   });
 
   // The platform project and the local admin travel together: a harness that
@@ -982,13 +981,13 @@ describe("local runtime commands", () => {
   describe("reset asked on a terminal", () => {
     // The built CLI bundles its own prompts, so it can only be answered by
     // running the command from source.
-    const resetting = async (answers: unknown[]) => {
+    const resetting = async (answers: Answer[]) => {
       const cwd = await tempProject("zitadel-reset-asked-");
       const paths = localRuntimePaths(cwd);
       await mkdir(paths.dataDir, { recursive: true });
       await writeFile(join(cwd, LOCAL_ADMIN_FILE), "{}");
       await writeRuntimeMetadata(cwd, runtimeFor(cwd, "http://localhost:8080"));
-      const talk = answering(prompts as unknown as ReturnType<typeof clackDouble>, ...answers);
+      const talk = answering(...answers);
       const outcome = await asTerminal(() =>
         Reset.run(["--cwd", cwd]).then(
           (envelope) => ({ envelope: JSON.parse(JSON.stringify(envelope)) as unknown }),

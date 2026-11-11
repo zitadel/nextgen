@@ -22,6 +22,7 @@ describe("api ls", () => {
           command: "api:ls",
           source: "",
           data: {
+            title: "Found 1 operation",
             operations: [
               {
                 id: "getLive",
@@ -59,6 +60,7 @@ describe("api ls", () => {
           command: "api:ls",
           source: "",
           data: {
+            title: "Found 1 operation",
             operations: [
               {
                 id: "getLive",
@@ -104,6 +106,7 @@ describe("api ls", () => {
           command: "api:ls",
           source: "",
           data: {
+            title: "Found 2 operations",
             operations: [
               {
                 id: "getLive",
@@ -150,6 +153,7 @@ describe("api ls", () => {
           command: "api:ls",
           source: "",
           data: {
+            title: "Found 1 operation",
             operations: [
               {
                 id: "getReady",
@@ -183,6 +187,7 @@ describe("api ls", () => {
           command: "api:ls",
           source: "",
           data: {
+            title: "No operations found",
             operations: [],
             count: 0,
             next_commands: [expectedPublicCliCommand(`api ls --cwd ${app.path}`)],
@@ -202,6 +207,7 @@ describe("api ls", () => {
           command: "api:ls",
           source: "",
           data: {
+            title: "No operations found",
             operations: [],
             count: 0,
             next_commands: [expectedPublicCliCommand(`api ls --cwd ${app.path}`)],

@@ -78,6 +78,7 @@ export default class Status extends EnvironmentCommand {
   protected async execute({ flags }: Admitted<typeof Status>): Promise<JsonEnvelope> {
     const server = await LocalServer.at(this.cwd, {
       cliVersion: this.cliVersion,
+      selector: this.cwdSelector(),
     }).status();
     const serverLifecycle = server.lifecycle;
 

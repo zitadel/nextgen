@@ -18,6 +18,7 @@ import { statusColor } from "@/lib/style";
 import {
   asEnvironmentSelector,
   type EnvironmentSelector,
+  inShell,
   type SuggestedCommand,
   unscopedCommand,
 } from "@/lib/suggestion";
@@ -61,6 +62,15 @@ import { Cmd } from "@/lib/cmd";
  */
 /** The spellings of the option that names the project directory. */
 const CWD_OPTIONS: readonly string[] = ["--cwd", "-c"];
+
+/** Flags that say how a run answers, not what it does, so a rebuilt command leaves them out. */
+export const ANSWERING: ReadonlySet<string> = new Set(["force", "json", "non-interactive"]);
+
+/**
+ * The `user:password@` of a URL, which a rebuilt command never prints:
+ * everything in the authority up to its last `@`, since a password may hold one.
+ */
+const CREDENTIALS = /(\w+:\/\/)[^/?#\s]*@/g;
 
 const NO_COLOR: FlagVariable = {
   name: "NO_COLOR",
@@ -296,6 +306,9 @@ export abstract class BaseCommand extends Interruptible(Command) {
   /** `--cwd` as typed, carried into the unscoped follow-ups this run suggests. */
   private typedCwd: string | undefined;
 
+  /** Whether the flags were read and the run's context settled, as opposed to a failure before it. */
+  private settled = false;
+
   /** Correlates the started/completed pair; minted at instance construction. */
   private readonly telemetryInvocationId = randomUUID();
 
@@ -416,6 +429,72 @@ export abstract class BaseCommand extends Interruptible(Command) {
   }
 
   /**
+   * This run as a command to type, rebuilt from the command line as oclif
+   * parsed it rather than as typed: its arguments (or `arguments` in their
+   * place), then `add`, then each flag but the ones in `leave`, with a URL's
+   * credentials left out and the selector put back on by {@link retryCommand}.
+   * Arguments that read as flags go last, after a `--`.
+   *
+   * @param options.add - Words the command gains, such as `--force`.
+   * @param options.leave - Flags that only say how this run answered.
+   * @param options.arguments - The arguments to name, where they are not the ones typed.
+   */
+  protected async typedRun(options: {
+    add: readonly string[];
+    leave: ReadonlySet<string>;
+    arguments?: readonly string[];
+  }): Promise<SuggestedCommand> {
+    const { raw } = await this.parseOnce();
+    const definitions: Record<string, { type: string } | undefined> = {
+      ...this.ctor.baseFlags,
+      ...this.ctor.flags,
+    };
+    const redact = (word: string) => {
+      return word.replace(CREDENTIALS, "$1");
+    };
+    const positional = (
+      options.arguments ??
+      raw.flatMap((token) => {
+        return token.type === "arg" ? [token.input] : [];
+      })
+    ).map(redact);
+    const flags = raw.flatMap((token) => {
+      if (token.type !== "flag" || options.leave.has(token.flag)) {
+        return [];
+      }
+      // A boolean's input is the flag as typed (`--no-color`, `-v`). A value
+      // that starts with `-` stays one word with its flag, or it reads as one.
+      const value = redact(token.input);
+      if (definitions[token.flag]?.type === "boolean") {
+        return [token.input];
+      }
+
+      return value.startsWith("-") ? [`--${token.flag}=${value}`] : [`--${token.flag}`, value];
+    });
+    const delimited = positional.some((word) => {
+      return word.startsWith("-");
+    });
+    const command = this.retryCommand([
+      ...(this.id ?? "").split(":").filter((word) => {
+        return word !== "";
+      }),
+      ...(delimited ? [] : positional),
+      ...options.add,
+      ...flags,
+    ]);
+
+    return delimited ? inShell(command, { after: ` -- ${Cmd.of(positional)}` }) : command;
+  }
+
+  /**
+   * The command a dry run offers next: this run again with `--dry-run` taken
+   * off, every typed flag kept but the ones that only say how it answered.
+   */
+  protected async realRun(): Promise<SuggestedCommand> {
+    return this.typedRun({ add: [], leave: new Set(["json", "non-interactive", "dry-run"]) });
+  }
+
+  /**
    * The suggestion for a follow-up the framework builds on a command's behalf,
    * such as a list's next page. A command that talks to a project overrides it
    * to keep the run's environment selector, so the framework never has to
@@ -474,10 +553,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
     const cwd = resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined);
     this.typedCwd = typeof flags.cwd === "string" ? flags.cwd : undefined;
     const serverFlag = typeof flags.server === "string" ? flags.server : undefined;
-    const source =
-      options.resolveServer === false
-        ? { value: options.source ?? "", origin: "default" as const }
-        : await resolveServer({ cwd, serverFlag });
+    const source = await this.serverOf(cwd, serverFlag, options);
     const json = this.jsonEnabled();
     const isTTY = isTerminal();
     const debug = Boolean(flags.debug);
@@ -533,8 +609,67 @@ export abstract class BaseCommand extends Interruptible(Command) {
             cliVersion: this.config.version,
           })
         : false;
+    this.settled = true;
     this.openTelemetry(typeof flags.telemetry === "boolean" ? flags.telemetry : undefined);
     return this.meta;
+  }
+
+  /**
+   * The server a run is about, as {@link toMeta} and a failure that came before
+   * it both state it: `--server` or the cloud default, the one a command's own
+   * `source` names, or nothing for a command that never talks to a server.
+   */
+  private async serverOf(
+    cwd: string,
+    serverFlag: string | undefined,
+    options: MetaOptions,
+  ): Promise<{ value: string }> {
+    return options.resolveServer === false
+      ? { value: options.source ?? "" }
+      : await resolveServer({ cwd, serverFlag });
+  }
+
+  /**
+   * What the command line says of the run before any flag was parsed, for a
+   * failure that came from parsing: the directory and server it named, so the
+   * failure's envelope names the same `source` and its follow-ups carry the
+   * same `--cwd` as one raised later. A value that cannot be read is left as
+   * the failure's own to report.
+   */
+  private async metaFromArgv(meta: GlobalOptions): Promise<GlobalOptions> {
+    const typed = argvValue(this.argv, "--cwd", "-c");
+    const serverFlag = argvValue(this.argv, "--server");
+    this.typedCwd = typed;
+    const cwd = resolveCwd(typed);
+    try {
+      const source = await this.serverOf(cwd, serverFlag, this.command.meta);
+      return { ...meta, cwd, serverFlag, source: source.value };
+    } catch {
+      return { ...meta, cwd, serverFlag };
+    }
+  }
+
+  /**
+   * A failure's follow-ups written bare (`zitadel start`), aimed at the
+   * directory the run was given: raised below the command, where the run's
+   * `--cwd` is not known, they would otherwise act on whatever project the
+   * shell is in. One that already names its directory is left alone.
+   */
+  private scopedFailure(error: ZitadelError): ZitadelError {
+    const selector = this.cwdSelector();
+    if (selector === "" || error.nextCommands === undefined) {
+      return error;
+    }
+
+    return new ZitadelError(error.code, error.message, {
+      hint: error.hint,
+      nextCommands: error.nextCommands.map((command) => {
+        return command.startsWith("zitadel ") && !/\s(--cwd|-c)[\s=]/.test(command)
+          ? (`${command}${selector}` as SuggestedCommand)
+          : command;
+      }),
+      details: error.details,
+    });
   }
 
   /**
@@ -841,11 +976,15 @@ export abstract class BaseCommand extends Interruptible(Command) {
    * argv.
    */
   protected override async catch(error: unknown): Promise<never> {
-    const meta: GlobalOptions = { ...this.meta, command: this.id ?? this.meta.command };
+    const known = this.settled ? this.meta : await this.metaFromArgv(this.meta);
+    const meta: GlobalOptions = { ...known, command: this.id ?? known.command };
     const reason: unknown = this.signal.reason;
     const cancelled =
       this.signal.aborted && reason instanceof ZitadelError && reason.code === "E_CANCELLED";
-    const zitadelError = presentedFailure(cancelled ? reason : toZitadelError(error), meta);
+    const zitadelError = presentedFailure(
+      this.scopedFailure(cancelled ? reason : toZitadelError(error)),
+      meta,
+    );
     this.meta = meta;
     this.openTelemetry(process.argv.includes("--no-telemetry") ? false : undefined);
     if (this.telemetry?.enabled) {
@@ -929,6 +1068,25 @@ export abstract class BaseCommand extends Interruptible(Command) {
   }
 }
 
+/**
+ * The value an option has on the command line, as `--name value` or
+ * `--name=value`, for a failure that came before oclif had parsed any.
+ */
+function argvValue(argv: readonly string[], ...names: string[]): string | undefined {
+  for (const [index, word] of argv.entries()) {
+    for (const name of names) {
+      if (word === name) {
+        return argv[index + 1];
+      }
+      if (word.startsWith(`${name}=`)) {
+        return word.slice(name.length + 1);
+      }
+    }
+  }
+
+  return undefined;
+}
+
 /** Whether a person is at the terminal on both ends: stdout and stdin. */
 function isTerminal(): boolean {
   return Boolean(process.stdout.isTTY && process.stdin.isTTY);
@@ -975,6 +1133,19 @@ function normalizeCommandResult(result: CommandResult, meta: GlobalOptions): Com
 }
 
 /**
+ * The data with the headline the terminal draws as its `title`, so a script
+ * reads the very words a person does (see {@link CommandResult.summary}).
+ * Data that is not an object, or that already has a `title` of its own, is
+ * left as it is.
+ */
+function withHeadline(data: unknown, title: string): unknown {
+  // An entity answers the record it stands for through `toJSON`, which spreading it would lose.
+  const record = isObject(data) && typeof data.toJSON === "function" ? data.toJSON() : data;
+
+  return isObject(record) && !("title" in record) && title !== "" ? { title, ...record } : data;
+}
+
+/**
  * The data with its next steps written in. Data that is not an object (a
  * write the server answered without a body) has nowhere to hold them.
  */
@@ -1013,7 +1184,10 @@ function toEnvelope(result: CommandResult, meta: GlobalOptions): JsonEnvelope {
     return {
       ...base,
       status: "ok",
-      data: withNextSteps(result.data, result.next),
+      data: withNextSteps(
+        result.verbatim === true ? result.data : withHeadline(result.data, result.summary.title),
+        result.next,
+      ),
       warnings: result.warnings ? [...result.warnings] : [],
     };
   }
@@ -1022,7 +1196,7 @@ function toEnvelope(result: CommandResult, meta: GlobalOptions): JsonEnvelope {
     ...base,
     status: "skipped",
     reason: result.reason,
-    data: result.data,
+    data: withHeadline(result.data ?? {}, result.summary.title),
     next_commands: result.next?.commands ? [...result.next.commands] : undefined,
   };
 }

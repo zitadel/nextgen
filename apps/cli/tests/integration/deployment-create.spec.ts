@@ -236,12 +236,12 @@ describe("deployment create", () => {
           status: "error",
           cli_version: cliVersion.version,
           command: "deployment:create",
-          source: "",
+          source: MOCK_SERVER_URL,
           code: "E_VALIDATION",
           message:
             "Invalid --release: must be a release ID: rel_ followed by letters, digits, _ or -",
-          hint: `Find one with ${expectedPublicCliCommand("release list")}.`,
-          next_commands: [expectedPublicCliCommand("release list")],
+          hint: "List the releases to find one.",
+          next_commands: [expectedPublicCliCommand(`release list --cwd ${app.path}`)],
           details: { argument: "--release" },
         });
       });
@@ -262,12 +262,12 @@ describe("deployment create", () => {
           status: "error",
           cli_version: cliVersion.version,
           command: "deployment:create",
-          source: "",
+          source: MOCK_SERVER_URL,
           code: "E_VALIDATION",
           message:
             "Invalid --release: must be a release ID: rel_ followed by letters, digits, _ or -",
-          hint: `Find one with ${expectedPublicCliCommand("release list")}.`,
-          next_commands: [expectedPublicCliCommand("release list")],
+          hint: "List the releases to find one.",
+          next_commands: [expectedPublicCliCommand(`release list --cwd ${app.path}`)],
           details: { argument: "--release" },
         });
       });
@@ -291,7 +291,7 @@ describe("deployment create", () => {
           status: "error",
           cli_version: cliVersion.version,
           command: "deployment:create",
-          source: "",
+          source: MOCK_SERVER_URL,
           code: "E_VALIDATION",
           message: "the value is empty",
           hint: "Pass a shorter summary with -m.",
@@ -319,7 +319,7 @@ describe("deployment create", () => {
           status: "error",
           cli_version: cliVersion.version,
           command: "deployment:create",
-          source: "",
+          source: MOCK_SERVER_URL,
           code: "E_VALIDATION",
           message: "Nonexistent flag: --origin",
           next_commands: [expectedPublicCliCommand("deployment create --help")],

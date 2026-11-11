@@ -1,40 +1,32 @@
 import { stripVTControlCharacters as stripAnsi } from "node:util";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
-
-import * as prompts from "@clack/prompts";
-import { confirm, intro, log, note, outro, select, spinner } from "@clack/prompts";
-
 import { PromptCancelled, ZitadelError } from "@/lib/errors";
 import { Chain } from "@/lib/ui/chain";
+import { DrawnSpinner } from "@/lib/ui/spinner";
 import { GUIDE, MARK } from "@/lib/ui/marks";
-import { answering, type clackDouble } from "@tests/helpers/clack";
+import { answering, atTerminal, type Terminal } from "@tests/helpers/keyboard";
 import { asTerminal } from "@tests/helpers/terminal";
 
 const watching = () => new Chain({ interactive: true, force: false });
 const normally = () => new Chain({ interactive: true, force: false }, "plain");
 const scripted = () => new Chain({ interactive: false, force: false });
 
-let written: string[] = [];
+/** How long clack waits between one frame of a spinner and the next. */
+const FRAME = 100;
+
+let screen: Terminal;
 
 beforeEach(() => {
-  written = [];
-  vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
-    written.push(stripAnsi(String(chunk)));
-    return true;
-  });
+  screen = atTerminal();
 });
 
 afterEach(() => {
-  vi.restoreAllMocks();
-  vi.clearAllMocks();
+  vi.useRealTimers();
+  DrawnSpinner.active.clear();
 });
 
-const printed = () => written.join("");
-
-/** The mocked `@clack/prompts`, which is a {@link clackDouble}, for `answering` to script. */
-const clack = () => prompts as unknown as ReturnType<typeof clackDouble>;
+const printed = () => stripAnsi(screen.plain());
 
 describe("Chain", () => {
   it("draws nothing at all when nobody is watching", () => {
@@ -42,8 +34,6 @@ describe("Chain", () => {
     chain.describe("Listing origins");
     chain.finish({ title: "Found 1 origin", sections: [] });
 
-    expect(intro).not.toHaveBeenCalled();
-    expect(outro).not.toHaveBeenCalled();
     expect(printed()).toBe("");
   });
 
@@ -62,16 +52,10 @@ describe("Chain", () => {
     ["a warning", MARK.warning],
     ["a failure", MARK.failed],
   ])("writes %s to stderr, where a normal command puts it", (_kind, mark) => {
-    const errors: string[] = [];
-    vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
-      errors.push(stripAnsi(String(chunk)));
-      return true;
-    });
-
     scripted().narrate(mark, "the flow was edited by hand");
 
     expect(printed()).toBe("");
-    expect(errors.join("")).toContain("the flow was edited by hand");
+    expect(stripAnsi(screen.errors())).toContain("the flow was edited by hand");
   });
 
   // `│` is what a line that carries no mark of its own is given, and off a
@@ -98,18 +82,18 @@ describe("Chain", () => {
   ])("draws no gutter for %s nobody is watching", (_shape, make) => {
     make().narrate("i", "something happened");
 
-    expect(log.message).not.toHaveBeenCalled();
+    expect(printed()).not.toContain("│");
   });
 
   it("opens on the first thing drawn, not when it is named", () => {
     const chain = watching();
     chain.describe("Listing origins");
 
-    expect(intro).not.toHaveBeenCalled();
+    expect(printed()).toBe("");
 
     chain.narrate("i", "first line");
 
-    expect(intro).toHaveBeenCalledWith("Listing origins");
+    expect(printed()).toContain("┌  Listing origins");
   });
 
   it("closes once, however many times it is asked to", () => {
@@ -119,8 +103,8 @@ describe("Chain", () => {
     chain.finish({ title: "Found 1 origin", sections: [] });
     chain.finish({ title: "Found 2 origins", sections: [] });
 
-    expect(outro).toHaveBeenCalledTimes(1);
-    expect(outro).toHaveBeenCalledWith("Found 1 origin");
+    expect(printed().split("└").length - 1).toBe(1);
+    expect(printed()).toContain("└  Found 1 origin");
   });
 
   it("prints a listing as it is, with no frame around it", () => {
@@ -164,15 +148,16 @@ describe("Chain", () => {
     chain.describe("Enabling single sign-on");
     chain.note("Register an app", ["x ".repeat(120).trim()]);
 
-    expect(note).toHaveBeenCalledOnce();
-    const [body] = vi.mocked(note).mock.calls[0] ?? [""];
-    expect(
-      Math.max(
-        ...String(body)
-          .split("\n")
-          .map((line) => line.length),
-      ),
-    ).toBeLessThanOrEqual(72);
+    const widest = Math.max(
+      ...printed()
+        .split("\n")
+        .filter((line) => line.includes("x x"))
+        .map((line) => {
+          return line.replace(/^│ {2}/, "").replace(/\s*│$/, "").length;
+        }),
+    );
+    expect(printed().split("Register an app").length - 1).toBe(1);
+    expect(widest).toBeLessThanOrEqual(72);
   });
 
   // The base command renders a failure as an error block through `finish`, so
@@ -186,8 +171,8 @@ describe("Chain", () => {
     chain.abort(new Error("boom"));
     chain.finish({ title: "Could not remove the origin", sections: [] });
 
-    expect(outro).toHaveBeenCalledOnce();
-    expect(outro).toHaveBeenCalledWith("Could not remove the origin");
+    expect(printed().split("└").length - 1).toBe(1);
+    expect(printed()).toContain("└  Could not remove the origin");
   });
 
   it("stays quiet when the person cancelled, because the prompt already said so", () => {
@@ -197,7 +182,7 @@ describe("Chain", () => {
 
     chain.abort(new PromptCancelled());
 
-    expect(outro).not.toHaveBeenCalled();
+    expect(printed()).not.toContain("└");
   });
 
   it("closes the chain for a cancellation that was not a prompt's, whatever it says", () => {
@@ -207,7 +192,7 @@ describe("Chain", () => {
 
     chain.abort(new ZitadelError("E_CANCELLED", "Cancelled by user"));
 
-    expect(outro).toHaveBeenCalled();
+    expect(printed()).toContain("└");
   });
 
   // Ctrl-C in the middle of the work closes nothing by itself, so without
@@ -219,7 +204,7 @@ describe("Chain", () => {
 
     chain.abort(new ZitadelError("E_CANCELLED", "Cancelled"));
 
-    expect(outro).toHaveBeenCalledWith(expect.stringContaining("Cancelled"));
+    expect(printed()).toMatch(/└ +Cancelled/);
   });
 
   it("closes nothing when the interrupt arrived before anything was drawn", () => {
@@ -228,7 +213,7 @@ describe("Chain", () => {
 
     chain.abort(new ZitadelError("E_CANCELLED", "Cancelled"));
 
-    expect(outro).not.toHaveBeenCalled();
+    expect(printed()).not.toContain("└");
   });
 
   it("closes on the one cancellation sentence, which claims nothing about what changed", () => {
@@ -238,7 +223,7 @@ describe("Chain", () => {
 
     chain.abort(new ZitadelError("E_CANCELLED", "Cancelled"));
 
-    expect(stripAnsi(String(vi.mocked(outro).mock.calls[0]?.[0]))).toBe("Cancelled");
+    expect(printed().split("└").at(-1)?.trim()).toBe("Cancelled");
   });
 
   it("leaves a bridged line that already fits on one line", () => {
@@ -247,7 +232,11 @@ describe("Chain", () => {
 
     chain.narrate("!", "a short warning");
 
-    expect(vi.mocked(log.message).mock.calls[0]?.[0]).toBe("a short warning");
+    expect(
+      printed()
+        .split("\n")
+        .filter((line) => line.includes("a short warning")),
+    ).toHaveLength(1);
   });
 });
 
@@ -267,8 +256,8 @@ describe("a normal command's chain, which is no chain at all", () => {
     chain.say("the project is in development");
     chain.finish(removed);
 
-    expect(intro).not.toHaveBeenCalled();
-    expect(outro).not.toHaveBeenCalled();
+    expect(printed()).not.toContain("┌");
+    expect(printed()).not.toContain("└");
   });
 
   it("ends on its answer and one footer line", () => {
@@ -296,78 +285,78 @@ describe("a normal command's chain, which is no chain at all", () => {
     removing(chain);
     chain.finish({ title: "Error: No such variable (E_NOT_FOUND)", sections: [], failed: true });
 
-    expect(outro).not.toHaveBeenCalled();
+    expect(printed()).not.toContain("└");
     expect(printed()).toContain("Error: No such variable (E_NOT_FOUND)");
   });
 
   it("keeps a spinner out of the gutter it does not have", () => {
     normally().spinner("Fetching users");
 
-    expect(intro).not.toHaveBeenCalled();
-    expect(spinner).toHaveBeenCalledWith(expect.objectContaining({ withGuide: false }));
+    expect(printed()).not.toContain("┌");
+    expect(printed()).not.toContain("│");
   });
 
+  /**
+   * Everything drawn, in order, with the frames of a spinner running under
+   * `label` where they fell, which is how a person sees it clear and come back.
+   */
+  const aSpinnerRunning = (chain: Chain, label: string) => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+    const running = chain.spinner(label);
+    vi.advanceTimersByTime(FRAME);
+    return running;
+  };
+
   it("clears a running spinner before it narrates a line and draws it again after", () => {
-    const order: string[] = [];
     const chain = watching();
-    const running = chain.spinner("Deploying");
-    const handle = vi.mocked(spinner).mock.results.at(-1)?.value as ReturnType<typeof spinner>;
-    vi.mocked(handle.clear).mockImplementation(() => void order.push("clear"));
-    vi.mocked(log.message).mockImplementation(() => void order.push("line"));
+    const running = aSpinnerRunning(chain, "Deploying");
 
     chain.narrate("i", "halfway there");
+    vi.advanceTimersByTime(FRAME);
 
-    const drawnAgain = vi.mocked(spinner).mock.results.at(-1)?.value as ReturnType<typeof spinner>;
-    expect(order).toEqual(["clear", "line"]);
-    expect(drawnAgain.start).toHaveBeenCalledWith("Deploying");
+    const shown = printed();
+    expect(shown.indexOf("Deploying")).toBeLessThan(shown.indexOf("halfway there"));
+    expect(shown.lastIndexOf("Deploying")).toBeGreaterThan(shown.indexOf("halfway there"));
     running.clear();
   });
 
   it("clears a running spinner before it draws a note and draws it again after", () => {
-    const order: string[] = [];
     const chain = watching();
-    const running = chain.spinner("Deploying");
-    const handle = vi.mocked(spinner).mock.results.at(-1)?.value as ReturnType<typeof spinner>;
-    vi.mocked(handle.clear).mockImplementation(() => void order.push("clear"));
-    vi.mocked(note).mockImplementationOnce(() => void order.push("note"));
+    const running = aSpinnerRunning(chain, "Deploying");
 
     chain.note("Register an app", ["open the console"]);
+    vi.advanceTimersByTime(FRAME);
 
-    const drawnAgain = vi.mocked(spinner).mock.results.at(-1)?.value as ReturnType<typeof spinner>;
-    expect(order).toEqual(["clear", "note"]);
-    expect(drawnAgain.start).toHaveBeenCalledWith("Deploying");
+    const shown = printed();
+    expect(shown.indexOf("Deploying")).toBeLessThan(shown.indexOf("Register an app"));
+    expect(shown.lastIndexOf("Deploying")).toBeGreaterThan(shown.indexOf("Register an app"));
     running.clear();
   });
 
   it("clears a running spinner before a question is drawn and draws it again after the answer", async () => {
-    const order: string[] = [];
+    const person = answering(true);
+    screen = person;
     const chain = watching();
-    const running = chain.spinner("Deploying");
-    const handle = vi.mocked(spinner).mock.results.at(-1)?.value as ReturnType<typeof spinner>;
-    vi.mocked(handle.clear).mockImplementation(() => void order.push("clear"));
-    vi.mocked(confirm).mockImplementationOnce(async () => {
-      order.push("prompt");
-      return true;
-    });
+    const running = aSpinnerRunning(chain, "Deploying");
 
     await asTerminal(() => {
       return chain.questions().yesNo({ name: "deploy it", message: "Deploy it now?" });
     });
+    vi.advanceTimersByTime(FRAME);
 
-    const drawnAgain = vi.mocked(spinner).mock.results.at(-1)?.value as ReturnType<typeof spinner>;
-    expect(order).toEqual(["clear", "prompt"]);
-    expect(drawnAgain.start).toHaveBeenCalledWith("Deploying");
+    const shown = printed();
+    expect(shown.indexOf("Deploying")).toBeLessThan(shown.indexOf("Deploy it now?"));
+    expect(shown.lastIndexOf("Deploying")).toBeGreaterThan(shown.lastIndexOf("Deploy it now?"));
     running.clear();
   });
 
   it("clears a spinner still running when the run is cancelled, before Cancelled is said", () => {
     const chain = watching();
     chain.spinner("Deploying");
-    const handle = vi.mocked(spinner).mock.results.at(-1)?.value as ReturnType<typeof spinner>;
 
     chain.abort(new ZitadelError("E_CANCELLED", "Cancelled"));
 
-    expect(handle.clear).toHaveBeenCalled();
+    expect(DrawnSpinner.active.size).toBe(0);
   });
 
   // `task` and `begin` got the gutter that `spinner` was taught to keep out
@@ -375,14 +364,14 @@ describe("a normal command's chain, which is no chain at all", () => {
   it("keeps a step out of the gutter it does not have", async () => {
     await normally().task("Fetching variables", async () => undefined);
 
-    expect(intro).not.toHaveBeenCalled();
-    expect(log.message).not.toHaveBeenCalled();
+    expect(printed()).not.toContain("┌");
+    expect(printed()).not.toContain("│");
   });
 
   it("keeps a hand-ended step out of it too", () => {
     normally().begin("Fetching variables").done();
 
-    expect(log.message).not.toHaveBeenCalled();
+    expect(printed()).not.toContain("│");
   });
 
   // Ctrl-C at a plain prompt left the line it was typing on, with nothing but
@@ -401,29 +390,32 @@ describe("a normal command's chain, which is no chain at all", () => {
   // to what a person sees is that the question is absent.
   it("looks the same forced as it does answering, but for the question", async () => {
     const run = (force: boolean) => async () => {
-      written = [];
       const chain = new Chain({ interactive: true, force }, "plain");
       removing(chain);
       await chain.questions().confirm({
         name: "remove the variable",
         message: "Remove B from the project?",
       });
+      const before = screen.plain().length;
       chain.finish(removed);
-      return printed();
+      return stripAnsi(screen.plain().slice(before));
     };
 
+    const forcing = answering();
+    screen = forcing;
     const forced = await asTerminal(run(true));
-    const asked = vi.mocked(confirm).mock.calls.length;
-    answering(clack(), true);
+    const answerer = answering(true);
+    screen = answerer;
     const answered = await asTerminal(run(false));
 
     expect(forced).toBe("Removed B from the project · project proj-1 on localhost:8111\n");
     expect(answered).toBe(forced);
-    expect(asked).toBe(0);
+    expect(forcing.asked()).toEqual([]);
+    expect(answerer.asked()).toEqual(["Remove B from the project?"]);
   });
 
   it("asks its questions without the guide a wizard draws", async () => {
-    answering(clack(), true);
+    const person = answering(true);
 
     await asTerminal(() =>
       normally().questions().confirm({
@@ -432,13 +424,12 @@ describe("a normal command's chain, which is no chain at all", () => {
       }),
     );
 
-    expect(vi.mocked(select)).toHaveBeenCalledWith(
-      expect.objectContaining({ message: "Remove B from the project?", withGuide: false }),
-    );
+    expect(person.asked()).toEqual(["Remove B from the project?"]);
+    expect(stripAnsi(person.plain())).not.toContain("│");
   });
 
   it("asks a wizard's questions with the guide", async () => {
-    answering(clack(), true);
+    const person = answering(true);
 
     await asTerminal(() =>
       watching().questions().confirm({
@@ -447,7 +438,7 @@ describe("a normal command's chain, which is no chain at all", () => {
       }),
     );
 
-    expect(vi.mocked(confirm)).toHaveBeenCalledWith(expect.objectContaining({ withGuide: true }));
+    expect(stripAnsi(person.plain())).toContain("│");
   });
 
   // A run nothing can be drawn into used to fall through to a third rendering

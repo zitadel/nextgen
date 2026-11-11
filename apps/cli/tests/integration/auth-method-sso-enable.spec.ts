@@ -418,7 +418,14 @@ describe("auth-method sso enable", () => {
               next_actions: [
                 `Deploy it to make ${provider.displayName} sign-in available in your app, then reload the app and test it`,
               ],
-              next_commands: [],
+              next_commands: [
+                expectedPublicCliCommand(
+                  `deploy --dry-run --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+                ),
+                expectedPublicCliCommand(
+                  `deploy -m '<what changed>' --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+                ),
+              ],
             },
             warnings: [],
           });
@@ -701,7 +708,14 @@ describe("auth-method sso enable", () => {
               next_actions: [
                 "Deploy it to make Google sign-in available in your app, then reload the app and test it",
               ],
-              next_commands: [],
+              next_commands: [
+                expectedPublicCliCommand(
+                  `deploy --dry-run --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+                ),
+                expectedPublicCliCommand(
+                  `deploy -m '<what changed>' --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+                ),
+              ],
             },
             warnings: [HAND_EDITED_WARNING],
           });
@@ -750,7 +764,14 @@ describe("auth-method sso enable", () => {
               next_actions: [
                 "Deploy it to make Google sign-in available in your app, then reload the app and test it",
               ],
-              next_commands: [],
+              next_commands: [
+                expectedPublicCliCommand(
+                  `deploy --dry-run --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+                ),
+                expectedPublicCliCommand(
+                  `deploy -m '<what changed>' --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+                ),
+              ],
             },
             warnings: [],
           });
@@ -1025,7 +1046,7 @@ describe("auth-method sso enable", () => {
             status: "error",
             cli_version: cliVersion.version,
             command: "auth-method:sso:enable",
-            source: "",
+            source: MOCK_SERVER_URL,
             code: "E_VALIDATION",
             message:
               '--slug: "google" is a built-in provider. Choose another name for this connection.',
@@ -1045,7 +1066,7 @@ describe("auth-method sso enable", () => {
             status: "error",
             cli_version: cliVersion.version,
             command: "auth-method:sso:enable",
-            source: "",
+            source: MOCK_SERVER_URL,
             code: "E_VALIDATION",
             message: "Expected --provider=gogle to be one of: google, custom",
             next_commands: [expectedPublicCliCommand("auth-method sso enable --help")],
@@ -1123,7 +1144,14 @@ describe("auth-method sso enable", () => {
               next_actions: [
                 `Deploy it to make ${HOSTILE_DISPLAY_NAME} sign-in available in your app, then reload the app and test it`,
               ],
-              next_commands: [],
+              next_commands: [
+                expectedPublicCliCommand(
+                  `deploy --dry-run --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+                ),
+                expectedPublicCliCommand(
+                  `deploy -m '<what changed>' --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+                ),
+              ],
             },
             warnings: [],
           });
@@ -1298,7 +1326,11 @@ describe("auth-method sso enable", () => {
                   app.path,
                 ],
               ],
-              next_commands: [],
+              next_commands: [
+                expectedPublicCliCommand(
+                  `auth-method sso enable --provider ${GOOGLE} --client-id ${CREDENTIALS.clientId} --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+                ),
+              ],
             },
             warnings: [],
           });

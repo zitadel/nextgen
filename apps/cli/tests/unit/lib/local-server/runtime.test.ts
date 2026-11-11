@@ -316,23 +316,28 @@ describe("retargetMalformedRuntime", () => {
     details: { x: 1 },
   });
 
-  it.for<[string, string]>([
-    ["a Windows path with a space", "C:\\work\\my app"],
-    ["a Windows path with an apostrophe", "C:\\work\\it's"],
-    ["a POSIX path with a space", "/home/dev/my app"],
-  ])("hands over %s as arguments, not as commands", ([_name, dir]) => {
-    const retargeted = retargetMalformedRuntime(malformed, dir) as ZitadelError;
+  it.for<[string, string, string]>([
+    ["a Windows path with a space", "C:\\work\\my app", "'C:\\work\\my app'"],
+    ["a Windows path with an apostrophe", "C:\\work\\it's", "'C:\\work\\it'\\''s'"],
+    ["a POSIX path with a space", "/home/dev/my app", "'/home/dev/my app'"],
+  ])(
+    "quotes %s in the commands and hands it over as it is in the arguments",
+    ([_name, dir, quoted]) => {
+      const retargeted = retargetMalformedRuntime(malformed, dir) as ZitadelError;
 
-    expect(retargeted.nextCommands).toBeUndefined();
-    expect(retargeted.details).toEqual({
-      x: 1,
-      suggested_args: [
-        ["reset", "--force", "--cwd", dir],
-        ["start", "--cwd", dir],
-      ],
-    });
-    expect(retargeted.hint).toContain("details.suggested_args");
-  });
+      expect(retargeted.nextCommands).toEqual([
+        `zitadel reset --force --cwd ${quoted}`,
+        `zitadel start --cwd ${quoted}`,
+      ]);
+      expect(retargeted.details).toEqual({
+        x: 1,
+        suggested_args: [
+          ["reset", "--force", "--cwd", dir],
+          ["start", "--cwd", dir],
+        ],
+      });
+    },
+  );
 
   it("writes the commands out for a path that needs no quoting", () => {
     const retargeted = retargetMalformedRuntime(malformed, "/home/dev/app") as ZitadelError;

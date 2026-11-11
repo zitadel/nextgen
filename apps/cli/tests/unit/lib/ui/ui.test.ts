@@ -1,59 +1,46 @@
 import { stripVTControlCharacters as stripAnsi } from "node:util";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
-
-import { confirm, intro, outro, spinner } from "@clack/prompts";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { log } from "@/lib/log";
 import { PromptCancelled, ZitadelError } from "@/lib/errors";
+import { DrawnSpinner } from "@/lib/ui/spinner";
 import { Ui } from "@/lib/ui/ui";
+import { answering, atTerminal, type Terminal } from "@tests/helpers/keyboard";
 
 const watched = () => new Ui({ interactive: true, force: false });
 const normally = () => new Ui({ interactive: true, force: false }, "plain");
 const forced = () => new Ui({ interactive: true, force: true });
 const scripted = () => new Ui({ interactive: false, force: false });
 
-let written: string[] = [];
-let errors: string[] = [];
+let screen: Terminal;
 
 beforeEach(() => {
-  written = [];
-  errors = [];
-  vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
-    errors.push(stripAnsi(String(chunk)));
-    return true;
-  });
-  vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
-    written.push(stripAnsi(String(chunk)));
-    return true;
-  });
+  screen = atTerminal();
 });
 
 afterEach(() => {
-  vi.restoreAllMocks();
-  vi.clearAllMocks();
+  DrawnSpinner.active.clear();
 });
 
-const printed = () => written.join("");
+const printed = () => stripAnsi(screen.plain());
+const errors = () => stripAnsi(screen.errors());
 
 describe("Ui", () => {
   describe("the questions a command may ask", () => {
     it("opens the chain the question is drawn in", async () => {
-      vi.mocked(confirm).mockResolvedValueOnce(true as never);
+      screen = answering(true);
       const ui = watched();
       ui.describe("Removing an origin");
 
       await ui.questions().yesNo({ name: "remove the origin", message: "Remove it?" });
 
-      expect(intro).toHaveBeenCalledWith("Removing an origin");
+      expect(printed()).toContain("┌  Removing an origin");
     });
 
     it("is never asked when nobody is watching", async () => {
       await expect(
         scripted().questions().yesNo({ name: "remove the origin", message: "Remove it?" }),
       ).rejects.toMatchObject({ code: "E_VALIDATION" });
-      expect(confirm).not.toHaveBeenCalled();
       expect(printed()).toBe("");
     });
 
@@ -63,18 +50,19 @@ describe("Ui", () => {
         .confirm({ name: "remove the origin", message: "Remove it?" });
 
       expect(answer).toBe(true);
-      expect(confirm).not.toHaveBeenCalled();
+      expect(printed()).toBe("");
     });
 
     it("asks a plain yes or no anyway, whatever the command's --force means", async () => {
-      vi.mocked(confirm).mockResolvedValueOnce(false as never);
+      const person = answering(false);
+      screen = person;
 
       const answer = await forced()
         .questions()
         .yesNo({ name: "scaffold the app", message: "Scaffold?" });
 
       expect(answer).toBe(false);
-      expect(confirm).toHaveBeenCalled();
+      expect(person.asked()).toEqual(["Scaffold?"]);
     });
   });
 
@@ -86,7 +74,7 @@ describe("Ui", () => {
 
       ui.stop(new PromptCancelled());
 
-      expect(outro).not.toHaveBeenCalled();
+      expect(printed()).not.toContain("└");
     });
 
     it("closes the chain when the person interrupted the work", () => {
@@ -96,7 +84,7 @@ describe("Ui", () => {
 
       ui.stop(new ZitadelError("E_CANCELLED", "Cancelled"));
 
-      expect(outro).toHaveBeenCalledWith(expect.stringContaining("Cancelled"));
+      expect(printed()).toMatch(/└ +Cancelled/);
     });
   });
 
@@ -123,7 +111,7 @@ describe("Ui", () => {
       ui.describe("Listing origins");
       ui.say("something happened");
 
-      expect(intro).toHaveBeenCalledWith("Listing origins");
+      expect(printed()).toContain("┌  Listing origins");
     });
 
     it("says where the command ran, as the last line of its summary", () => {
@@ -178,13 +166,13 @@ describe("Ui", () => {
     it("hands out a spinner that draws nothing when nobody is watching", () => {
       scripted().spinner("Fetching users").stop("Fetched 3 users");
 
-      expect(spinner).not.toHaveBeenCalled();
+      expect(printed()).toBe("");
     });
 
     it("hands out a spinner that draws when somebody is", () => {
       watched().spinner("Fetching users");
 
-      expect(spinner).toHaveBeenCalled();
+      expect(DrawnSpinner.active.size).toBe(1);
     });
   });
 
@@ -197,7 +185,7 @@ describe("Ui", () => {
       log.info("Looking for a project");
       ui.releaseNarration();
 
-      expect(intro).toHaveBeenCalledWith("Listing origins");
+      expect(printed()).toContain("┌  Listing origins");
     });
 
     // What a line of narration says belongs to the command, so a wizard's
@@ -224,7 +212,7 @@ describe("Ui", () => {
       expect(printed()).toBe(
         "Wrote .zitadel/idps/google.json\nCallback URI   https://example.com/callback\n",
       );
-      expect(intro).not.toHaveBeenCalled();
+      expect(printed()).not.toContain("┌");
     });
 
     it("says a normal command's warning on stderr, named, so it is not taken for the answer", () => {
@@ -234,7 +222,7 @@ describe("Ui", () => {
       log.warn("the flow was edited by hand");
       ui.releaseNarration();
 
-      expect([errors.join(""), printed()]).toEqual(["Warning: the flow was edited by hand\n", ""]);
+      expect([errors(), printed()]).toEqual(["Warning: the flow was edited by hand\n", ""]);
     });
 
     it("keeps debug detail back unless it was asked for", () => {

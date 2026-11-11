@@ -1,6 +1,5 @@
 import { Args, Flags } from "@oclif/core";
 
-import { Cmd } from "@/lib/cmd";
 import { PreviewService } from "@/lib/backend";
 import { type Admitted, CommandGroups, type JsonEnvelope, PreviewCommand } from "@/lib/oclif";
 import { dryRunResult } from "@/lib/oclif/crud/shared";
@@ -55,7 +54,7 @@ export default class PreviewRm extends Destructive(PreviewCommand) {
     }),
   };
 
-  protected async execute({ args, flags }: Admitted<typeof PreviewRm>): Promise<JsonEnvelope> {
+  protected async execute({ args }: Admitted<typeof PreviewRm>): Promise<JsonEnvelope> {
     return this.emit(
       await this.confirmed({
         verb: "remove",
@@ -64,24 +63,14 @@ export default class PreviewRm extends Destructive(PreviewCommand) {
           const { projectId, server } = await this.connect();
           return `Stop serving ${args.url} for project ${projectId} on ${server.replace(/^https?:\/\//, "")}?`;
         },
-        preview: () => {
-          return {
-            ...dryRunResult({
-              verb: "stop",
-              topic: "preview",
-              noun: "serving",
-              id: args.url,
-            }),
-            next: {
-              commands: [
-                this.suggest(
-                  ["preview rm", Cmd.quote(args.url), ...(flags.force ? ["--force"] : [])].join(
-                    " ",
-                  ),
-                ),
-              ],
-            },
-          };
+        preview: async () => {
+          return dryRunResult({
+            verb: "stop",
+            topic: "preview",
+            noun: "serving",
+            id: args.url,
+            next: await this.realRun(),
+          });
         },
         prepare: async () => {
           const { client, projectId } = await this.connect();

@@ -157,7 +157,12 @@ describe("preview list", () => {
           cli_version: expect.any(String),
           command: "preview:list",
           source: "http://mock.zitadel.test",
-          data: { items: [], count: 0, next_page_token: null },
+          data: {
+            title: "No previews found",
+            items: [],
+            count: 0,
+            next_page_token: null,
+          },
           warnings: [],
         });
       });
@@ -173,6 +178,7 @@ describe("preview list", () => {
           command: "preview:list",
           source: "http://mock.zitadel.test",
           data: {
+            title: "Found 1 preview",
             items: [
               {
                 origin: PREVIEW_URL,
@@ -198,6 +204,7 @@ describe("preview list", () => {
           command: "preview:list",
           source: "http://mock.zitadel.test",
           data: {
+            title: "Found 2 previews",
             items: [
               {
                 origin: OTHER_URL,
@@ -228,6 +235,7 @@ describe("preview list", () => {
           command: "preview:list",
           source: "http://mock.zitadel.test",
           data: {
+            title: "Found 1 preview",
             items: [
               {
                 origin: OTHER_URL,
@@ -257,7 +265,7 @@ describe("preview list", () => {
           status: "error",
           cli_version: expect.any(String),
           command: "preview:list",
-          source: "",
+          source: "http://mock.zitadel.test",
           code: "E_VALIDATION",
           message: "101 is not a valid --limit",
           hint: "Use a whole number from 1 to 100.",

@@ -423,11 +423,11 @@ describe("claim", () => {
           status: "error",
           cli_version: CLI_VERSION,
           command: "claim",
-          source: "",
+          source: MOCK_SERVER_URL,
           code: "E_VALIDATION",
           message:
             "--challenge-id takes the challenge_id that the --no-wait run returned, which starts with ch_",
-          next_commands: [expectedPublicCliCommand("claim --no-wait")],
+          next_commands: [expectedPublicCliCommand(`claim --no-wait --cwd ${app.path}`)],
         });
       });
     });

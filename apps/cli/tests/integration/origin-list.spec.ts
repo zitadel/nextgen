@@ -153,7 +153,12 @@ describe("origin list", () => {
           cli_version: expect.any(String),
           command: "origin:list",
           source: "http://mock.zitadel.test",
-          data: { items: [SETUP_ORIGIN], count: 1, next_page_token: null },
+          data: {
+            title: "Found 1 origin",
+            items: [SETUP_ORIGIN],
+            count: 1,
+            next_page_token: null,
+          },
           warnings: [],
         });
       });
@@ -169,7 +174,12 @@ describe("origin list", () => {
           cli_version: expect.any(String),
           command: "origin:list",
           source: "http://mock.zitadel.test",
-          data: { items: [], count: 0, next_page_token: null },
+          data: {
+            title: "No origins found",
+            items: [],
+            count: 0,
+            next_page_token: null,
+          },
           warnings: [],
         });
       });
@@ -187,6 +197,7 @@ describe("origin list", () => {
           command: "origin:list",
           source: "http://mock.zitadel.test",
           data: {
+            title: "Found 3 origins",
             items: [
               SETUP_ORIGIN,
               { pattern: "https://app.acme.com", kind: "primary" },
@@ -211,6 +222,7 @@ describe("origin list", () => {
           command: "origin:list",
           source: "http://mock.zitadel.test",
           data: {
+            title: "Found 1 origin",
             items: [{ pattern: "https://admitted.acme.com\u001b[2Jwiped", kind: "primary" }],
             count: 1,
             next_page_token: null,

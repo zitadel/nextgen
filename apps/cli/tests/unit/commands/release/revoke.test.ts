@@ -1,12 +1,7 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
-
-vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
-
-import * as prompts from "@clack/prompts";
-import { confirm, isCancel } from "@clack/prompts";
+import { describe, expect, it } from "vitest";
 
 import ReleaseRevoke from "@/commands/release/revoke";
-import { answering, type clackDouble } from "@tests/helpers/clack";
+import { answering } from "@tests/helpers/keyboard";
 import { parseArg } from "@tests/helpers/inputs";
 import {
   aProjectDirectory,
@@ -37,7 +32,7 @@ describe("release_id", () => {
     ).rejects.toMatchObject({
       code: "E_VALIDATION",
       message: expect.stringContaining("must be a release ID"),
-      hint: "Find one with `zitadel release list`.",
+      hint: "List the releases to find one.",
     });
   });
 });
@@ -49,16 +44,10 @@ describe("release revoke asked on a terminal", () => {
       secret: "ps",
     });
     dirs.push(cwd);
-    const talk = answering(prompts as unknown as ReturnType<typeof clackDouble>, false);
+    const talk = answering(false);
     await asPerson(() => ReleaseRevoke.run([RELEASE, "--cwd", cwd, "--server", serverUrl]));
     return talk;
   };
-
-  afterEach(() => {
-    vi.mocked(confirm).mockReset();
-    vi.mocked(isCancel).mockReset();
-    vi.mocked(isCancel).mockReturnValue(false);
-  });
 
   it("asks whether to revoke the release, naming the project and a remote server", async () => {
     const talk = await revokingOn(PLATFORM_URL);

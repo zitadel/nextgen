@@ -67,12 +67,13 @@ export class DeleteOperation<Ctx> extends ResourceCommand<Ctx, DeleteSpec<Ctx>, 
 
         return `${capitalize(verb)} ${resource.singular} ${id} in project ${projectId} on ${server.replace(/^https?:\/\//, "")}?`;
       },
-      preview: () => {
+      preview: async () => {
         return dryRunResult({
           verb,
           topic,
           noun: resource.singular,
           id,
+          next: await this.realRun(),
         });
       },
       prepare: () => {

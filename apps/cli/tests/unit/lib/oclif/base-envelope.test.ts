@@ -218,3 +218,82 @@ describe("BaseCommand.logJson", () => {
     expect(written[0]).toBe(written[1]);
   });
 });
+
+describe("BaseCommand envelope headline", () => {
+  it("gives a success the headline the terminal draws as data.title", async () => {
+    const envelope = await makeCommand().finish({
+      summary: { title: "Set variable FOO", sections: [] },
+      status: "ok",
+      data: { name: "FOO" },
+    });
+
+    expect(envelope).toMatchObject({ data: { title: "Set variable FOO", name: "FOO" } });
+  });
+
+  it("gives a skip the headline it draws, with no data of its own", async () => {
+    const envelope = await makeCommand().finish({
+      summary: { title: "Nothing was removed", sections: [] },
+      status: "skipped",
+      reason: "not-live",
+    });
+
+    expect(envelope).toMatchObject({ data: { title: "Nothing was removed" } });
+  });
+
+  it("keeps the data a skip had beside its headline", async () => {
+    const envelope = await makeCommand().finish({
+      summary: { title: "Nothing was removed", sections: [] },
+      status: "skipped",
+      reason: "not-live",
+      data: { url: "https://a.test" },
+    });
+
+    expect(envelope).toMatchObject({
+      data: { title: "Nothing was removed", url: "https://a.test" },
+    });
+  });
+
+  it("keeps the record an entity stands for beside the headline", async () => {
+    const envelope = await makeCommand().finish({
+      summary: { title: "Deployment dep_1", sections: [] },
+      status: "ok",
+      data: Deployment.of(RECORD as never),
+    });
+
+    expect(JSON.parse(JSON.stringify(envelope))).toMatchObject({
+      data: { title: "Deployment dep_1", ...RECORD },
+    });
+  });
+
+  it("keeps a title the data already has", async () => {
+    const envelope = await makeCommand().finish({
+      summary: { title: "Got it", sections: [] },
+      status: "ok",
+      data: { title: "Mr" },
+    });
+
+    expect(envelope).toMatchObject({ data: { title: "Mr" } });
+  });
+
+  it("leaves data that is not an object as it is", async () => {
+    const envelope = await makeCommand().finish({
+      summary: { title: "Got it", sections: [] },
+      status: "ok",
+      data: ["a"],
+    });
+
+    expect(envelope).toMatchObject({ data: ["a"] });
+  });
+
+  it("adds no headline to what a server answered, passed through as it came", async () => {
+    const envelope = await makeCommand().finish({
+      summary: { title: "Done", sections: [] },
+      status: "ok",
+      data: { id: "1" },
+      verbatim: true,
+    });
+
+    expect(envelope).toMatchObject({ data: { id: "1" } });
+    expect(envelope).not.toMatchObject({ data: { title: "Done" } });
+  });
+});

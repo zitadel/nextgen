@@ -3,11 +3,6 @@ import { join } from "node:path";
 
 import { beforeEach, describe, expect, vi } from "vitest";
 
-vi.mock("@clack/prompts", async () => {
-  return (await import("@tests/helpers/clack")).clackDouble();
-});
-
-import * as prompts from "@clack/prompts";
 import { Config, Errors } from "@oclif/core";
 
 import { readSchemaTarget, type SchemaTarget } from "@/commands/auth-method/command";
@@ -17,7 +12,7 @@ import { Consent } from "@/lib/consent";
 import { ZitadelError } from "@/lib/errors";
 import { unscopedCommand } from "@/lib/suggestion";
 import { BrokenFilesError, type Change, DiskStore, Schemas, UserSchema } from "@/lib/zitadel";
-import { answering, type clackDouble } from "@tests/helpers/clack";
+import { answering, type Person } from "@tests/helpers/keyboard";
 import { recordLog } from "@tests/helpers/log";
 import { aSchema, SCHEMA_FILE } from "@tests/helpers/auth-method";
 import { aLoginFlow, anOidcConnection, aUserSchema } from "@tests/helpers/config";
@@ -177,24 +172,21 @@ function target(
 }
 
 /**
- * The mocked `@clack/prompts`, which is a {@link clackDouble}, for `answering` to script.
- */
-const clack = () => prompts as unknown as ReturnType<typeof clackDouble>;
-
-/**
  * Everything the command wrote to the terminal and the console so far.
+ *
+ * @param talk - The person at the keyboard, who saw what was drawn on the terminal.
+ * @returns What was drawn, then what went to stderr and the console.
  */
-function printed(): string {
+function printed(talk: Person): string {
   return [
-    ...vi.mocked(process.stdout.write).mock.calls,
-    ...vi.mocked(process.stderr.write).mock.calls,
-    ...vi.mocked(console.log).mock.calls,
-    ...vi.mocked(console.error).mock.calls,
-  ]
-    .map((call) => {
-      return String(call[0]);
-    })
-    .join("\n");
+    talk.shown(),
+    talk.errors(),
+    ...[...vi.mocked(console.log).mock.calls, ...vi.mocked(console.error).mock.calls].map(
+      (call) => {
+        return String(call[0]);
+      },
+    ),
+  ].join("\n");
 }
 
 useTerminal();
@@ -212,7 +204,6 @@ beforeEach(() => {
   vi.spyOn(console, "error").mockImplementation(() => {
     return undefined;
   });
-  clack().confirm.mockReset();
 });
 
 describe("AuthMethodCommand", () => {
@@ -220,7 +211,7 @@ describe("AuthMethodCommand", () => {
     it("asks before going on", async ({ dir }) => {
       const cwd = await aPasskeyOnlyProject(dir);
 
-      const talk = answering(clack(), false);
+      const talk = answering(false);
       await asTerminal(() => {
         return AuthMethodPasskeyDisable.run(passkeyDisable(cwd), CONFIG);
       });
@@ -235,7 +226,7 @@ describe("AuthMethodCommand", () => {
     it("asks, naming the provider and the schema", async ({ dir }) => {
       const cwd = await aGoogleOnlyProject(dir);
 
-      const talk = answering(clack(), false);
+      const talk = answering(false);
       await asTerminal(() => {
         return AuthMethodSsoDisable.run(googleDisable(cwd), CONFIG);
       });
@@ -250,7 +241,7 @@ describe("AuthMethodCommand", () => {
     it("ends as skipped", async ({ dir }) => {
       const cwd = await aPasskeyOnlyProject(dir);
 
-      answering(clack(), false);
+      answering(false);
       const result = await asTerminal(() => {
         return AuthMethodPasskeyDisable.run(passkeyDisable(cwd), CONFIG);
       });
@@ -261,12 +252,12 @@ describe("AuthMethodCommand", () => {
     it("says the schema is unchanged", async ({ dir }) => {
       const cwd = await aPasskeyOnlyProject(dir);
 
-      answering(clack(), false);
+      const talk = answering(false);
       await asTerminal(() => {
         return AuthMethodPasskeyDisable.run(passkeyDisable(cwd), CONFIG);
       });
 
-      expect(asOneLine(printed())).toContain(
+      expect(asOneLine(printed(talk))).toContain(
         ".zitadel/schemas/default-human-user.json is unchanged, so passkey is still enabled for default-human-user.",
       );
     });
@@ -274,7 +265,7 @@ describe("AuthMethodCommand", () => {
     it("leaves passkey enabled", async ({ dir }) => {
       const cwd = await aPasskeyOnlyProject(dir);
 
-      answering(clack(), false);
+      answering(false);
       await asTerminal(() => {
         return AuthMethodPasskeyDisable.run(passkeyDisable(cwd), CONFIG);
       });
@@ -289,7 +280,7 @@ describe("AuthMethodCommand", () => {
     it("ends ok, warning that nobody can sign in", async ({ dir }) => {
       const cwd = await aPasskeyOnlyProject(dir);
 
-      answering(clack(), true);
+      answering(true);
       const result = await asTerminal(() => {
         return AuthMethodPasskeyDisable.run(passkeyDisable(cwd), CONFIG);
       });
@@ -300,7 +291,7 @@ describe("AuthMethodCommand", () => {
     it("disables passkey", async ({ dir }) => {
       const cwd = await aPasskeyOnlyProject(dir);
 
-      answering(clack(), true);
+      answering(true);
       await asTerminal(() => {
         return AuthMethodPasskeyDisable.run(passkeyDisable(cwd), CONFIG);
       });
@@ -315,7 +306,7 @@ describe("AuthMethodCommand", () => {
     it("ends as skipped", async ({ dir }) => {
       const cwd = await aGoogleOnlyProject(dir);
 
-      answering(clack(), false);
+      answering(false);
       const result = await asTerminal(() => {
         return AuthMethodSsoDisable.run(googleDisable(cwd), CONFIG);
       });
@@ -326,12 +317,12 @@ describe("AuthMethodCommand", () => {
     it("says the schema is unchanged", async ({ dir }) => {
       const cwd = await aGoogleOnlyProject(dir);
 
-      answering(clack(), false);
+      const talk = answering(false);
       await asTerminal(() => {
         return AuthMethodSsoDisable.run(googleDisable(cwd), CONFIG);
       });
 
-      expect(asOneLine(printed())).toContain(
+      expect(asOneLine(printed(talk))).toContain(
         ".zitadel/schemas/default-human-user.json is unchanged, so google is still offered to default-human-user.",
       );
     });
@@ -339,7 +330,7 @@ describe("AuthMethodCommand", () => {
     it("leaves Google enabled", async ({ dir }) => {
       const cwd = await aGoogleOnlyProject(dir);
 
-      answering(clack(), false);
+      answering(false);
       await asTerminal(() => {
         return AuthMethodSsoDisable.run(googleDisable(cwd), CONFIG);
       });
@@ -355,7 +346,7 @@ describe("AuthMethodCommand", () => {
     it("ends ok, warning that nobody can sign in", async ({ dir }) => {
       const cwd = await aGoogleOnlyProject(dir);
 
-      answering(clack(), true);
+      answering(true);
       const result = await asTerminal(() => {
         return AuthMethodSsoDisable.run(googleDisable(cwd), CONFIG);
       });
@@ -366,7 +357,7 @@ describe("AuthMethodCommand", () => {
     it("removes the provider", async ({ dir }) => {
       const cwd = await aGoogleOnlyProject(dir);
 
-      answering(clack(), true);
+      answering(true);
       await asTerminal(() => {
         return AuthMethodSsoDisable.run(googleDisable(cwd), CONFIG);
       });
@@ -382,7 +373,7 @@ describe("AuthMethodCommand", () => {
       const cwd = await aPasskeyOnlyProject(dir);
 
       const error = await rejectionOf(() => {
-        answering(clack());
+        answering();
         return asTerminal(() => {
           return AuthMethodPasskeyDisable.run(passkeyDisable(cwd), CONFIG);
         });
@@ -396,7 +387,7 @@ describe("AuthMethodCommand", () => {
       const cwd = await aPasskeyOnlyProject(dir);
 
       await rejectionOf(() => {
-        answering(clack());
+        answering();
         return asTerminal(() => {
           return AuthMethodPasskeyDisable.run(passkeyDisable(cwd), CONFIG);
         });
@@ -412,7 +403,7 @@ describe("AuthMethodCommand", () => {
     it("does not ask", async ({ dir }) => {
       const cwd = await aPasskeyOnlyProject(dir);
 
-      const talk = answering(clack());
+      const talk = answering();
       await asTerminal(() => {
         return AuthMethodPasskeyDisable.run(passkeyDisable(cwd, "--dry-run"), CONFIG);
       });
@@ -423,7 +414,7 @@ describe("AuthMethodCommand", () => {
     it("previews the change and warns, rather than refusing", async ({ dir }) => {
       const cwd = await aPasskeyOnlyProject(dir);
 
-      answering(clack());
+      answering();
       const result = await asTerminal(() => {
         return AuthMethodPasskeyDisable.run(passkeyDisable(cwd, "--dry-run"), CONFIG);
       });
@@ -438,7 +429,7 @@ describe("AuthMethodCommand", () => {
     it("leaves passkey enabled", async ({ dir }) => {
       const cwd = await aPasskeyOnlyProject(dir);
 
-      answering(clack());
+      answering();
       await asTerminal(() => {
         return AuthMethodPasskeyDisable.run(passkeyDisable(cwd, "--dry-run"), CONFIG);
       });
@@ -453,7 +444,7 @@ describe("AuthMethodCommand", () => {
     it("does not ask", async ({ dir }) => {
       const cwd = await aPasskeyOnlyProject(dir);
 
-      const talk = answering(clack());
+      const talk = answering();
       await asTerminal(() => {
         return AuthMethodPasskeyDisable.run(passkeyDisable(cwd, "--force"), CONFIG);
       });
@@ -464,7 +455,7 @@ describe("AuthMethodCommand", () => {
     it("ends ok", async ({ dir }) => {
       const cwd = await aPasskeyOnlyProject(dir);
 
-      answering(clack());
+      answering();
       const result = await asTerminal(() => {
         return AuthMethodPasskeyDisable.run(passkeyDisable(cwd, "--force"), CONFIG);
       });
@@ -565,6 +556,7 @@ describe("AuthMethodCommand", () => {
     it("raises that failure as it is, without asking", async ({ dir }) => {
       const cwd = await aPasskeyOnlyProject(dir);
       const read = await target(cwd);
+      const talk = answering();
       const unrelated = new Error("the flows are broken");
 
       const error = await rejectionOf(() => {
@@ -574,7 +566,7 @@ describe("AuthMethodCommand", () => {
       });
 
       expect(error).toBe(unrelated);
-      expect(clack().confirm).not.toHaveBeenCalled();
+      expect(talk.asked()).toEqual([]);
     });
   });
 

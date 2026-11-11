@@ -92,7 +92,12 @@ describe("deployment list", () => {
           command: "deployment:list",
           source: MOCK_SERVER_URL,
           status: "ok",
-          data: { items: [], count: 0, next_page_token: null },
+          data: {
+            title: "No deployments found",
+            items: [],
+            count: 0,
+            next_page_token: null,
+          },
           warnings: [],
         });
       });
@@ -111,6 +116,7 @@ describe("deployment list", () => {
           source: MOCK_SERVER_URL,
           status: "ok",
           data: {
+            title: "Found 2 deployments",
             items: [
               {
                 id: deployed.deployment_id,
@@ -164,6 +170,7 @@ describe("deployment list", () => {
           source: MOCK_SERVER_URL,
           status: "ok",
           data: {
+            title: "Found 1 deployment",
             items: [
               {
                 id: expect.stringMatching(DEPLOYMENT_ID),
@@ -196,6 +203,7 @@ describe("deployment list", () => {
           source: MOCK_SERVER_URL,
           status: "ok",
           data: {
+            title: "Found 1 deployment",
             items: [
               {
                 id: deployed.deployment_id,
@@ -280,6 +288,7 @@ describe("deployment list", () => {
           source: MOCK_SERVER_URL,
           status: "ok",
           data: {
+            title: "Found 2 deployments",
             items: [
               {
                 id: deployed.deployment_id,
@@ -331,7 +340,7 @@ describe("deployment list", () => {
           status: "error",
           cli_version: cliVersion.version,
           command: "deployment:list",
-          source: "",
+          source: MOCK_SERVER_URL,
           code: "E_VALIDATION",
           message: "many is not a valid --limit",
           hint: "Use a whole number from 1 to 100.",

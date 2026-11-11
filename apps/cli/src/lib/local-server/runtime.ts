@@ -5,7 +5,8 @@ import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
 import { isErrno, ZitadelError, errorMessage } from "@/lib/errors";
-import { isPortableShellWord, isTrainVersion } from "@/lib/public-cli";
+import { Cmd } from "@/lib/cmd";
+import { isTrainVersion } from "@/lib/public-cli";
 import { unscopedCommand } from "@/lib/suggestion";
 import { readIfExists } from "@/lib/fs";
 import { parseJsonObject } from "@/lib/json";
@@ -582,9 +583,8 @@ function malformedRuntime(input: Record<string, unknown>): ZitadelError {
 
 /**
  * The malformed-record error again, with its recovery aimed at `dir`. The
- * commands are written out only when `dir` can sit in them unquoted on every
- * shell (POSIX, PowerShell, cmd.exe quote differently); otherwise the
- * arguments are handed over as `details.suggested_args`, which no shell reads.
+ * commands quote `dir` where it needs it, and `details.suggested_args` holds
+ * the same arguments as they are.
  */
 export function retargetMalformedRuntime(error: unknown, dir: string): unknown {
   if (!(error instanceof ZitadelError) || error.message !== `${LOCAL_RUNTIME_FILE} is malformed`) {
@@ -592,25 +592,22 @@ export function retargetMalformedRuntime(error: unknown, dir: string): unknown {
   }
   const resetArgs = ["reset", "--force", "--cwd", dir];
   const startArgs = ["start", "--cwd", dir];
-  const suggestedArgs = [resetArgs, startArgs];
-  const portable = suggestedArgs.every((args) => {
-    return args.every(isPortableShellWord);
-  });
-  const reset = `zitadel ${resetArgs.join(" ")}`;
-  const start = `zitadel ${startArgs.join(" ")}`;
+  const reset = resetArgs
+    .map((word) => {
+      return Cmd.quote(word);
+    })
+    .join(" ");
+  const start = startArgs
+    .map((word) => {
+      return Cmd.quote(word);
+    })
+    .join(" ");
   return new ZitadelError(error.code, error.message, {
-    hint: portable
-      ? `Run \`${reset}\`, then \`${start}\`.`
-      : `Run \`zitadel reset --force\`, then \`zitadel start\`, each with --cwd ${dir} ` +
-        "(details.suggested_args holds the exact arguments).",
-    ...(portable
-      ? {
-          nextCommands: [
-            unscopedCommand(resetArgs.join(" ")),
-            unscopedCommand(startArgs.join(" ")),
-          ],
-        }
-      : {}),
-    details: { ...(error.details as Record<string, unknown>), suggested_args: suggestedArgs },
+    hint: "Reset the local runtime, then start it again, each with the --cwd of the directory that holds it.",
+    nextCommands: [unscopedCommand(reset), unscopedCommand(start)],
+    details: {
+      ...(error.details as Record<string, unknown>),
+      suggested_args: [resetArgs, startArgs],
+    },
   });
 }

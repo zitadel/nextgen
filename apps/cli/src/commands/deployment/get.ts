@@ -18,7 +18,7 @@ const DEPLOYMENT_ID: Refused<string> = {
   schema: z.string().trim().pipe(GetDeploymentByIdParams.shape.deployment_id),
   refusal: {
     message: "Invalid {input}: {problem}",
-    hint: "Find one with `zitadel deployment list`.",
+    hint: "List the deployments to find one.",
     next: ["deployment list"],
     details: {
       argument: "{input}",

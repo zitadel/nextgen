@@ -64,6 +64,7 @@ import {
 } from "@/lib/project";
 import { isLoopbackUrl } from "@/lib/server";
 import {
+  asEnvironmentSelector,
   type EnvironmentSelector,
   portableSuggestions,
   projectCommand,
@@ -574,7 +575,11 @@ export function failureAdvice(
   }
 
   if (failedNames.has("docker-cli")) {
-    const advice = dockerRuntimeGuidance("doctor", cliVersion);
+    const advice = dockerRuntimeGuidance(
+      "doctor",
+      cliVersion,
+      asEnvironmentSelector(cwdFlag === undefined ? "" : ` ${Cmd.option("--cwd", cwdFlag)}`),
+    );
     return {
       hint: advice.hint,
       nextCommands: advice.nextCommands,
@@ -617,34 +622,23 @@ export function failureAdvice(
 
   if (failedNames.has("runtime")) {
     // `start` and `reset` act on their working directory, so a runtime found
-    // in a parent is named explicitly. The directory comes from the file
-    // system and quoting differs between POSIX shells, PowerShell and cmd.exe,
-    // so a path that needs quoting leaves the strings out and the argument
-    // lists in `details.suggested_args` carry the recovery. A `start` without
-    // the parent's `--cwd` gives the working directory a server of its own:
-    // `start` does not look in parents.
-    const startHere = cwdFlag === undefined ? ["start"] : ["start", "--cwd", cwdFlag];
+    // in a parent is named explicitly, its path quoted where it needs it, and
+    // the argument lists in `details.suggested_args` carry the same recovery. A
+    // `start` without the parent's `--cwd` gives the working directory a server
+    // of its own: `start` does not look in parents.
+    const here = cwdFlag === undefined ? [] : ["--cwd", cwdFlag];
+    const startHere = ["start", ...here];
     const suggestedArgs =
       runtimeDir === undefined
-        ? [["start"], ["reset", "--force"]]
+        ? [startHere, ["reset", "--force", ...here]]
         : [["start", "--cwd", runtimeDir], startHere, ["reset", "--force", "--cwd", runtimeDir]];
-    // One list at a time, so a parent that needs quoting costs only the
-    // commands that name it, not the `start` that does not.
-    const nextCommands = suggestedArgs.flatMap((args) => {
-      return portableSuggestions([args], cliVersion);
-    });
-    const quotingNote =
-      nextCommands.length < suggestedArgs.length
-        ? ` The runtime is in ${runtimeDir ?? "the working directory"}, a directory that needs shell quoting, so the commands that name it are left out; run ${unscopedCommand("doctor --json", cliVersion)} and use details.suggested_args for the exact arguments.`
-        : "";
     return {
       hint:
         runtimeDir === undefined
-          ? "Existing local runtime metadata was found, but the local Zitadel server is not healthy. Start it again or reset stale local data." +
-            quotingNote
+          ? "Existing local runtime metadata was found, but the local Zitadel server is not healthy. Start it again or reset stale local data."
           : `This folder has no Zitadel server of its own, so doctor checked the one in the parent folder, ${runtimeDir}, and found a problem with it. ` +
-            `To keep using it, fix it or start it again. To give this folder its own server, run start here instead. Resetting deletes the local data in ${runtimeDir}, not in this folder.${quotingNote}`,
-      nextCommands,
+            `To keep using it, fix it or start it again. To give this folder its own server, run start here instead. Resetting deletes the local data in ${runtimeDir}, not in this folder.`,
+      nextCommands: portableSuggestions(suggestedArgs, cliVersion),
       suggestedArgs,
     };
   }
@@ -726,7 +720,7 @@ export function advisoryForWarnings(
       return check.name === "docker-cli";
     })
   ) {
-    const advice = dockerRuntimeGuidance("doctor", cliVersion);
+    const advice = dockerRuntimeGuidance("doctor", cliVersion, selector);
     nextActions.push(...advice.nextActions);
     nextCommands.push(...advice.nextCommands);
   }

@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import { environmentSelectorSuffix } from "@/lib/oclif/environment-flags";
-import { inShell, projectCommand, shellCommand, unscopedCommand } from "@/lib/suggestion";
+import {
+  inShell,
+  portableSuggestions,
+  projectCommand,
+  shellCommand,
+  unscopedCommand,
+} from "@/lib/suggestion";
 
 const VERSION = "1.0.0-alpha.25";
 
@@ -62,5 +68,25 @@ describe("inShell", () => {
     expect(inShell(command, { after: " < value.txt" })).toBe(
       "npx @zitadel/cli@1.0.0-alpha.25 variables set TOKEN --secret --env ci < value.txt",
     );
+  });
+});
+
+describe("portableSuggestions", () => {
+  it("keeps a command whose argument holds a colon", () => {
+    expect(
+      portableSuggestions([["variable", "list", "--server", "http://localhost:3000"]], VERSION),
+    ).toEqual(["npx @zitadel/cli@1.0.0-alpha.25 variable list --server http://localhost:3000"]);
+  });
+
+  it("quotes an argument a shell would interpret", () => {
+    expect(portableSuggestions([["origin", "rm", "http://a.example/$(whoami)"]], VERSION)).toEqual([
+      "npx @zitadel/cli@1.0.0-alpha.25 origin rm 'http://a.example/$(whoami)'",
+    ]);
+  });
+
+  it("quotes a placeholder the caller fills in", () => {
+    expect(portableSuggestions([["deploy", "-m", "<what changed>"]], VERSION)).toEqual([
+      "npx @zitadel/cli@1.0.0-alpha.25 deploy -m '<what changed>'",
+    ]);
   });
 });

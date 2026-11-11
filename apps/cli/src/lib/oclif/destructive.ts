@@ -1,24 +1,13 @@
-import { Cmd } from "@/lib/cmd";
 import { Consent, type Gate } from "@/lib/consent";
 import { CANCELLED } from "@/lib/errors";
-import { inShell } from "@/lib/suggestion";
 
-import type { BaseCommand } from "./base";
+import { ANSWERING, type BaseCommand } from "./base";
 import { Promptable } from "./promptable";
 import type { CommandResult } from "./types";
 
 /** A class that can be extended, abstract or not, whatever arguments it takes. */
 // biome-ignore lint/suspicious/noExplicitAny: the constructor of any command, which a mixin cannot name
 type CommandClass<T extends BaseCommand> = abstract new (...args: any[]) => T;
-
-/** Flags that say how a run answers, not what it does, so a retry leaves them out. */
-const ANSWERING = new Set(["force", "json", "non-interactive"]);
-
-/**
- * The `user:password@` of a URL, which a retry never prints: everything in the
- * authority up to its last `@`, since a password may hold one.
- */
-const CREDENTIALS = /(\w+:\/\/)[^/?#\s]*@/g;
 
 /** A result that ends a run before anyone is asked, from {@link DestructiveChange.prepare}. */
 export class Settled {
@@ -117,47 +106,14 @@ export function Destructive<TBase extends CommandClass<BaseCommand>>(Base: TBase
      * `arguments` in their place), `--force`, then each flag but the ones that
      * only say how to answer, with a URL's credentials left out and the
      * selector put back on by {@link BaseCommand.retryCommand}. Arguments that
-     * read as flags go last, after a `--`.
+     * read as flags go last, after a `--` ({@link BaseCommand.typedRun}).
      */
     protected async consent(gate: Gate): Promise<Consent | undefined> {
-      const { raw } = await this.parse();
-      const definitions: Record<string, { type: string } | undefined> = {
-        ...this.ctor.baseFlags,
-        ...this.ctor.flags,
-      };
-      const redact = (word: string) => {
-        return word.replace(CREDENTIALS, "$1");
-      };
-      const positional = (
-        gate.arguments ??
-        raw.flatMap((token) => {
-          return token.type === "arg" ? [token.input] : [];
-        })
-      ).map(redact);
-      const flags = raw.flatMap((token) => {
-        if (token.type !== "flag" || ANSWERING.has(token.flag)) {
-          return [];
-        }
-        // A boolean's input is the flag as typed (`--no-color`, `-v`). A value
-        // that starts with `-` stays one word with its flag, or it reads as one.
-        const value = redact(token.input);
-        if (definitions[token.flag]?.type === "boolean") {
-          return [token.input];
-        }
-
-        return value.startsWith("-") ? [`--${token.flag}=${value}`] : [`--${token.flag}`, value];
+      const retry = await this.typedRun({
+        add: ["--force"],
+        leave: ANSWERING,
+        arguments: gate.arguments,
       });
-      const delimited = positional.some((word) => {
-        return word.startsWith("-");
-      });
-      const command = this.retryCommand([
-        ...(this.id ?? "").split(":").filter((word) => {
-          return word !== "";
-        }),
-        ...(delimited ? [] : positional),
-        "--force",
-        ...flags,
-      ]);
       const session = {
         interactive: !this.nonInteractive,
         force: this.force,
@@ -169,7 +125,7 @@ export function Destructive<TBase extends CommandClass<BaseCommand>>(Base: TBase
           ? gate
           : {
               ...gate,
-              retry: delimited ? inShell(command, { after: ` -- ${Cmd.of(positional)}` }) : command,
+              retry,
             },
         {
           ...session,

@@ -287,6 +287,51 @@ describe("a list for a script", () => {
     expect(await printed({ plain: true }, { ...view, rows: [] })).toBe("");
   });
 
+  it("says what the footer says beside the rows, not in them", async () => {
+    const result = await draw().drawList(
+      { plain: true },
+      { ...view, footer: ["Deployment dep_1", "Origins: https://a.example"] },
+    );
+
+    expect(result).toMatchObject({
+      pretty: { kind: "piped", text: "a" },
+      footer: "Deployment dep_1\nOrigins: https://a.example",
+    });
+  });
+
+  it("says the list is empty beside the rows, so a pipe still hears it", async () => {
+    const result = await draw().drawList(
+      { plain: true },
+      { ...view, rows: [], items: [], empty: "No things" },
+    );
+
+    expect(result).toMatchObject({ pretty: { kind: "piped", text: "" }, footer: "No things" });
+  });
+
+  it("names the next page beside the rows", async () => {
+    const result = await draw().drawList(
+      { plain: true },
+      { ...view, page: { token: "p2", command: "thing list", flags: [] } },
+    );
+
+    expect(result).toMatchObject({ footer: "More available: --page-token p2 (or --all)" });
+  });
+
+  it("says nothing beside the rows when there is nothing to add", async () => {
+    const result = await draw().drawList({ plain: true }, view);
+
+    expect(result).not.toHaveProperty("footer");
+  });
+
+  it("adds no footer under --json, which has an envelope for it", async () => {
+    const result = await draw(["--json"]).drawList(
+      { plain: true },
+      { ...view, footer: ["Deployment dep_1"] },
+    );
+
+    expect(result).not.toHaveProperty("footer");
+  });
+
   it("emits one tab-separated record per line, with no header", async () => {
     const rows = await printed(
       { plain: true },
@@ -444,7 +489,18 @@ describe("emitList", () => {
 
     expect(result).toMatchObject({
       data: { next_page_token: "p2" },
-      next: { commands: [expect.stringContaining("thing list --limit 1 --page-token p2 --json")] },
+      next: { commands: [expect.stringMatching(/thing list --limit 1 --page-token p2$/)] },
+    });
+  });
+
+  it("asks for the next page as JSON when the run was JSON", async () => {
+    const result = await draw(["--json"]).drawList(
+      { plain: false },
+      { ...view, page: { token: "p2", command: "thing list", flags: [] } },
+    );
+
+    expect(result).toMatchObject({
+      next: { commands: [expect.stringMatching(/thing list --page-token p2 --json$/)] },
     });
   });
 

@@ -12,7 +12,6 @@ import {
   npmDistTagForCliVersion,
   npmSelectorForCliVersion,
   optionArgs,
-  portableCommands,
   publicCliCommand,
   sdkVersionForCli,
   spellOutCommands,
@@ -176,46 +175,6 @@ describe("maskPublicCliVersion", () => {
   it("keeps everything but the version", () => {
     expect(maskPublicCliVersion({ a: "`npx @zitadel/cli@1.2.0 deploy` and @zitadel/sdk" })).toEqual(
       { a: "`npx @zitadel/cli@* deploy` and @zitadel/sdk" },
-    );
-  });
-});
-
-describe("portableCommands", () => {
-  it("prefixes every command when every argument is portable", () => {
-    expect(portableCommands([["plan"], ["apply", "--cwd", "/home/dev/app"]], "1.0.0")).toEqual([
-      expect.stringMatching(/ plan$/),
-      expect.stringMatching(/ apply --cwd \/home\/dev\/app$/),
-    ]);
-  });
-
-  it("accepts a plain value and a POSIX-style path", () => {
-    expect(
-      portableCommands(
-        [["plan", "--schema", "default-human-user", "--cwd", "/home/dev/my-app"]],
-        "1.0.0",
-      ),
-    ).toHaveLength(1);
-  });
-
-  it("rejects anything a POSIX shell, PowerShell or cmd.exe could read differently", () => {
-    for (const value of [
-      "my users",
-      "x;y",
-      "$(id)",
-      "a&b",
-      "%PATH%",
-      "it's",
-      "a|b",
-      "a`b",
-      "C:\\dev",
-    ]) {
-      expect(portableCommands([["plan", "--cwd", value]], "1.0.0"), value).toEqual([]);
-    }
-  });
-
-  it("returns none when any argument in any command needs quoting", () => {
-    expect(portableCommands([["plan"], ["apply", "--cwd", "/home/dev/my app"]], "1.0.0")).toEqual(
-      [],
     );
   });
 });

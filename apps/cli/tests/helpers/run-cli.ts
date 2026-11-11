@@ -29,13 +29,7 @@ export async function runCliForTest(
   root: string = cliPackageRoot,
   machine: LocalServers = aMachineRunning(),
 ) {
-  // The patched stream writers below append to these as the command prints.
-  let stdout = "";
-  let stderr = "";
-  const originalOut = process.stdout.write.bind(process.stdout);
-  const originalErr = process.stderr.write.bind(process.stderr);
-  const originalLog = console.log;
-  const originalConsoleError = console.error;
+  const output = captureStreams();
   // Colour is settled for the run rather than inherited: whether the runner
   // was started with `FORCE_COLOR` set, or under a terminal, is nothing to do
   // with the output being asserted. A test that is about colour overlays them
@@ -45,8 +39,42 @@ export async function runCliForTest(
   const previous = new Map(overlaid.map((key) => [key, process.env[key]]));
   Object.assign(process.env, settled);
 
-  // Capture both direct stream writes (e.g. the narration) and oclif's `ux.stdout`/
-  // `ux.stderr`, which go through `console.log`/`console.error`.
+  const exitCode = await commandSeeing(argv[0], machine)
+    .then((command) => (command ? command.run(argv.slice(1), root) : run(argv, root)))
+    .then(() => 0, exitCodeOf)
+    .finally(() => {
+      output.restore();
+      for (const key of overlaid) {
+        const prior = previous.get(key);
+        if (prior === undefined) {
+          delete process.env[key];
+        } else {
+          process.env[key] = prior;
+        }
+      }
+    });
+
+  return { exitCode, ...output.read() };
+}
+
+/**
+ * Starts keeping what the process prints: direct writes to stdout and stderr,
+ * and `console.log` and `console.error`, which oclif's `ux` goes through. It is
+ * what {@link runCliForTest} reads a run by, for a test that runs a command in
+ * process and reads what it said.
+ *
+ * @returns `read` for what was printed so far and `restore` to print as before.
+ */
+export function captureStreams(): {
+  read(): { stdout: string; stderr: string };
+  restore(): void;
+} {
+  let stdout = "";
+  let stderr = "";
+  const originalOut = process.stdout.write.bind(process.stdout);
+  const originalErr = process.stderr.write.bind(process.stderr);
+  const originalLog = console.log;
+  const originalConsoleError = console.error;
   process.stdout.write = ((chunk: string | Uint8Array): boolean => {
     stdout += typeof chunk === "string" ? chunk : Buffer.from(chunk).toString();
     return true;
@@ -61,26 +89,36 @@ export async function runCliForTest(
   console.error = (...args: unknown[]): void => {
     stderr += `${format(...args)}\n`;
   };
-
-  const exitCode = await commandSeeing(argv[0], machine)
-    .then((command) => (command ? command.run(argv.slice(1), root) : run(argv, root)))
-    .then(() => 0, exitCodeOf)
-    .finally(() => {
+  return {
+    read: () => {
+      return { stdout, stderr };
+    },
+    restore: () => {
       process.stdout.write = originalOut;
       process.stderr.write = originalErr;
       console.log = originalLog;
       console.error = originalConsoleError;
-      for (const key of overlaid) {
-        const prior = previous.get(key);
-        if (prior === undefined) {
-          delete process.env[key];
-        } else {
-          process.env[key] = prior;
-        }
-      }
-    });
+    },
+  };
+}
 
-  return { exitCode, stdout, stderr };
+/**
+ * Runs `run` in process and gives back what it printed beside what it returned,
+ * for a command built by a test rather than one the built CLI has.
+ *
+ * @param run - What to run, typically a command's `run`.
+ * @returns What `run` returned, and what it printed to stdout and to stderr.
+ */
+export async function printing<T>(
+  run: () => Promise<T>,
+): Promise<{ result: T; stdout: string; stderr: string }> {
+  const output = captureStreams();
+  try {
+    const result = await run();
+    return { result, ...output.read() };
+  } finally {
+    output.restore();
+  }
 }
 
 /** A machine that runs exactly the given servers, whatever it really runs. */

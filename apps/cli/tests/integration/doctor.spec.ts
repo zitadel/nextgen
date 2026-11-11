@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { Cmd } from "@/lib/cmd";
 import { useLocalServers } from "@tests/helpers/local-server";
 import { usePlatformMock } from "@tests/helpers/platform";
 import {
@@ -14,6 +15,9 @@ const platform = usePlatformMock();
 useLocalServers();
 
 const CLI_VERSION = cliVersion.version;
+
+const RESET_AND_START_HINT =
+  "Reset the local runtime, then start it again, each with the --cwd of the directory that holds it.";
 
 /** Any absolute path, for the checks that name a directory of the app they ran in. */
 const A_PATH = "(?:/[^/]+)+";
@@ -1002,7 +1006,7 @@ describe("doctor", () => {
           source: "http://localhost:8080",
           code: "E_VALIDATION",
           message: ".zitadel/local/runtime.json is malformed",
-          hint: `Run ${expectedPublicCliCommand(`reset --force --cwd ${parent.path}`)}, then ${expectedPublicCliCommand(`start --cwd ${parent.path}`)}.`,
+          hint: RESET_AND_START_HINT,
           next_commands: [
             expectedPublicCliCommand(`reset --force --cwd ${parent.path}`),
             expectedPublicCliCommand(`start --cwd ${parent.path}`),
@@ -1025,7 +1029,7 @@ describe("doctor", () => {
       }
 
       it.each(["my app", "it's"])(
-        "hands over where to start it again and reset it as arguments, suggesting no command a shell would split (%s)",
+        "quotes the directory in the commands that start it again and reset it, and hands it over as it is in the arguments (%s)",
         async (name) => {
           const parent = await parentNamed(name);
           await parent.writeStoppedServerRecord();
@@ -1040,8 +1044,12 @@ describe("doctor", () => {
             source: expect.stringMatching(/^http:\/\/localhost:\d+$/),
             code: "E_VALIDATION",
             message: "Zitadel doctor found issues",
-            hint: `This folder has no Zitadel server of its own, so doctor checked the one in the parent folder, ${parent.path}, and found a problem with it. To keep using it, fix it or start it again. To give this folder its own server, run start here instead. Resetting deletes the local data in ${parent.path}, not in this folder. The runtime is in ${parent.path}, a directory that needs shell quoting, so the commands that name it are left out; run ${expectedPublicCliCommand("doctor --json")} and use details.suggested_args for the exact arguments.`,
-            next_commands: [],
+            hint: `This folder has no Zitadel server of its own, so doctor checked the one in the parent folder, ${parent.path}, and found a problem with it. To keep using it, fix it or start it again. To give this folder its own server, run start here instead. Resetting deletes the local data in ${parent.path}, not in this folder.`,
+            next_commands: [
+              expectedPublicCliCommand(`start --cwd ${Cmd.quote(parent.path)}`),
+              expectedPublicCliCommand(`start --cwd ${Cmd.quote(app.path)}`),
+              expectedPublicCliCommand(`reset --force --cwd ${Cmd.quote(parent.path)}`),
+            ],
             details: {
               title: "Zitadel doctor found issues",
               ok: false,
@@ -1079,7 +1087,7 @@ describe("doctor", () => {
       );
 
       it.each(["my app", "it's"])(
-        "hands over where to reset a malformed record as arguments (%s)",
+        "quotes the directory in the commands that reset a malformed record and start it again (%s)",
         async (name) => {
           const parent = await parentNamed(name);
           await parent.writeMalformedServerRecord();
@@ -1094,7 +1102,11 @@ describe("doctor", () => {
             source: "http://localhost:8080",
             code: "E_VALIDATION",
             message: ".zitadel/local/runtime.json is malformed",
-            hint: expect.stringContaining(parent.path),
+            hint: RESET_AND_START_HINT,
+            next_commands: [
+              expectedPublicCliCommand(`reset --force --cwd ${Cmd.quote(parent.path)}`),
+              expectedPublicCliCommand(`start --cwd ${Cmd.quote(parent.path)}`),
+            ],
             details: {
               x: 1,
               suggested_args: [

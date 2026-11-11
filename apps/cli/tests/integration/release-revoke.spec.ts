@@ -166,12 +166,12 @@ describe("release revoke", () => {
           status: "error",
           cli_version: cliVersion.version,
           command: "release:revoke",
-          source: "",
+          source: MOCK_SERVER_URL,
           code: "E_VALIDATION",
           message:
             "Invalid release_id: must be a release ID: rel_ followed by letters, digits, _ or -",
-          hint: `Find one with ${expectedPublicCliCommand("release list")}.`,
-          next_commands: [expectedPublicCliCommand("release list")],
+          hint: "List the releases to find one.",
+          next_commands: [expectedPublicCliCommand(`release list --cwd ${app.path}`)],
           details: { argument: "release_id" },
         });
       });
@@ -185,12 +185,12 @@ describe("release revoke", () => {
           status: "error",
           cli_version: cliVersion.version,
           command: "release:revoke",
-          source: "",
+          source: MOCK_SERVER_URL,
           code: "E_VALIDATION",
           message:
             "Invalid release_id: must be a release ID: rel_ followed by letters, digits, _ or -",
-          hint: `Find one with ${expectedPublicCliCommand("release list")}.`,
-          next_commands: [expectedPublicCliCommand("release list")],
+          hint: "List the releases to find one.",
+          next_commands: [expectedPublicCliCommand(`release list --cwd ${app.path}`)],
           details: { argument: "release_id" },
         });
       });

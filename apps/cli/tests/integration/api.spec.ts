@@ -117,7 +117,10 @@ describe("api", () => {
         cli_version: expect.any(String),
         command: "api",
         source: "",
-        data: { next_commands: [expectedPublicCliCommand(`api ls --cwd ${app.path}`)] },
+        data: {
+          title: "Done",
+          next_commands: [expectedPublicCliCommand(`api ls --cwd ${app.path}`)],
+        },
         warnings: [],
       });
     });
@@ -408,7 +411,7 @@ describe("api", () => {
           code: "E_VALIDATION",
           message: "No operation is called nopeOp",
           hint: `List them with ${expectedPublicCliCommand("api ls")}, or give a path such as /users/query.`,
-          next_commands: [expectedPublicCliCommand("api ls --json")],
+          next_commands: [expectedPublicCliCommand(`api ls --json --cwd ${app.path}`)],
         });
       });
 
@@ -425,7 +428,7 @@ describe("api", () => {
           code: "E_VALIDATION",
           message: "No operation is called a\u001b[2Jb",
           hint: `List them with ${expectedPublicCliCommand("api ls")}, or give a path such as /users/query.`,
-          next_commands: [expectedPublicCliCommand("api ls --json")],
+          next_commands: [expectedPublicCliCommand(`api ls --json --cwd ${app.path}`)],
         });
       });
 

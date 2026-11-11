@@ -2,17 +2,14 @@ import { access, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:f
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import * as prompts from "@clack/prompts";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import Eject from "@/commands/eject";
 import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
-import { answering, type clackDouble } from "@tests/helpers/clack";
+import { type Answer, answering } from "@tests/helpers/keyboard";
 import { asTerminal } from "@tests/helpers/terminal";
 import { MANAGED_MARKER } from "@/lib/paths";
 import { stripAnsi } from "@tests/helpers/run-cli";
-
-vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
 
 function eject(cwd: string, extra: string[] = []) {
   return runCliForTest([
@@ -351,19 +348,10 @@ describe("eject command", () => {
 
 describe("eject asked on a terminal", () => {
   /** Runs eject in `cwd` with a person at the terminal giving `answers`. */
-  const ejecting = async (cwd: string, ...answers: unknown[]) => {
-    const talk = answering(prompts as unknown as ReturnType<typeof clackDouble>, ...answers);
-    const written: string[] = [];
-    const capture = vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
-      written.push(String(chunk));
-      return true;
-    });
-    try {
-      const result = await asTerminal(() => Eject.run(["--cwd", cwd]));
-      return { result, shown: written.join(""), talk };
-    } finally {
-      capture.mockRestore();
-    }
+  const ejecting = async (cwd: string, ...answers: Answer[]) => {
+    const talk = answering(...answers);
+    const result = await asTerminal(() => Eject.run(["--cwd", cwd]));
+    return { result, shown: talk.shown(), talk };
   };
 
   it("asks whether to remove the managed files and local state", async () => {
@@ -463,7 +451,7 @@ describe("eject asked on a terminal", () => {
   it("does not ask on a dry run, which removes nothing", async () => {
     const cwd = await makeManagedProject();
 
-    const talk = answering(prompts as unknown as ReturnType<typeof clackDouble>);
+    const talk = answering();
 
     await asTerminal(() => Eject.run(["--cwd", cwd, "--dry-run"]));
 

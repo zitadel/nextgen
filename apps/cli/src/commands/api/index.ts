@@ -437,6 +437,7 @@ export default class Api extends Destructive(EnvironmentCommand) {
     return this.emit({
       status: "ok",
       data: response.body ?? null,
+      verbatim: true,
       ...(answer.pretty === undefined ? {} : { pretty: answer.pretty }),
       summary: answer.summary,
     });

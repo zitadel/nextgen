@@ -142,6 +142,11 @@ export type CommandResult =
       readonly nextShown?: StepsShown;
       /** Set when {@link pretty} already says every warning, so none is printed again below it. */
       readonly warningsShown?: boolean;
+      /**
+       * Set when {@link data} is what a server answered, passed through as it
+       * came: the envelope adds no headline to it.
+       */
+      readonly verbatim?: true;
       /** Printed in human mode after everything else, and never part of the envelope. */
       readonly footer?: string;
       /**

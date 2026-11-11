@@ -74,7 +74,7 @@ describe("readZitadelConfig", () => {
       const zerr = error as ZitadelError;
       expect(zerr.code).toBe("E_VALIDATION");
       expect(zerr.message).toContain("zitadel.json was not found");
-      expect(zerr.hint).toBe("Run `zitadel setup` first.");
+      expect(zerr.hint).toBe("Set the project up first.");
       expect(zerr.nextCommands).toEqual(["zitadel setup"]);
     }
   });

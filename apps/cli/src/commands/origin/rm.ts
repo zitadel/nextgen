@@ -1,6 +1,5 @@
 import { Flags } from "@oclif/core";
 
-import { Cmd } from "@/lib/cmd";
 import { OriginService } from "@/lib/backend";
 import { errorMessage } from "@/lib/errors";
 import {
@@ -45,7 +44,7 @@ export default class OriginRm extends Destructive(EnvironmentCommand) {
     }),
   };
 
-  protected async execute({ args, flags }: Admitted<typeof OriginRm>): Promise<JsonEnvelope> {
+  protected async execute({ args }: Admitted<typeof OriginRm>): Promise<JsonEnvelope> {
     return this.emit(
       await this.confirmed({
         verb: "remove",
@@ -54,24 +53,14 @@ export default class OriginRm extends Destructive(EnvironmentCommand) {
           const { projectId, server } = await this.connect();
           return `Remove ${args.pattern} from project ${projectId} on ${server.replace(/^https?:\/\//, "")}?`;
         },
-        preview: () => {
-          return {
-            ...dryRunResult({
-              verb: "remove",
-              topic: "origin",
-              id: args.pattern,
-              clause: "from the project",
-            }),
-            next: {
-              commands: [
-                this.suggest(
-                  ["origin rm", Cmd.quote(args.pattern), ...(flags.force ? ["--force"] : [])].join(
-                    " ",
-                  ),
-                ),
-              ],
-            },
-          };
+        preview: async () => {
+          return dryRunResult({
+            verb: "remove",
+            topic: "origin",
+            id: args.pattern,
+            clause: "from the project",
+            next: await this.realRun(),
+          });
         },
         prepare: () => {
           return this.connect();

@@ -26,7 +26,7 @@ describe("variable get", () => {
         status: "error",
         cli_version: cliVersion.version,
         command: "variable:get",
-        source: "",
+        source: "http://mock.zitadel.test",
         code: "E_VALIDATION",
         message,
         hint: "A variable name contains only letters, digits and underscores.",
@@ -42,7 +42,7 @@ describe("variable get", () => {
         status: "error",
         cli_version: cliVersion.version,
         command: "variable:get",
-        source: "",
+        source: "http://mock.zitadel.test",
         code: "E_VALIDATION",
         message: "Variable name is 256 characters; the limit is 255.",
         hint: "Shorten the name.",
@@ -58,7 +58,7 @@ describe("variable get", () => {
         status: "error",
         cli_version: cliVersion.version,
         command: "variable:get",
-        source: "",
+        source: "http://mock.zitadel.test",
         code: "E_VALIDATION",
         message: 'Invalid variable name "GOOGLE-CLIENT".',
         hint: "A variable name contains only letters, digits and underscores.",
@@ -204,7 +204,12 @@ describe("variable get", () => {
           cli_version: cliVersion.version,
           command: "variable:get",
           source: "http://mock.zitadel.test",
-          data: { name: "FOO", secret: false, value: "bar" },
+          data: {
+            title: "Read FOO",
+            name: "FOO",
+            secret: false,
+            value: "bar",
+          },
           warnings: [],
         });
       });
@@ -223,7 +228,12 @@ describe("variable get", () => {
           cli_version: cliVersion.version,
           command: "variable:get",
           source: "http://mock.zitadel.test",
-          data: { name: "API_URL", secret: false, value: "https://preview.acme.com" },
+          data: {
+            title: "Read API_URL",
+            name: "API_URL",
+            secret: false,
+            value: "https://preview.acme.com",
+          },
           warnings: [],
         });
       });
@@ -239,7 +249,12 @@ describe("variable get", () => {
           cli_version: cliVersion.version,
           command: "variable:get",
           source: "http://mock.zitadel.test",
-          data: { name: "BANNER", secret: false, value: "a\u001b[2Jwiped" },
+          data: {
+            title: "Read BANNER",
+            name: "BANNER",
+            secret: false,
+            value: "a\u001b[2Jwiped",
+          },
           warnings: [],
         });
       });
@@ -302,7 +317,11 @@ describe("variable get", () => {
           cli_version: cliVersion.version,
           command: "variable:get",
           source: "http://mock.zitadel.test",
-          data: { name: "TOKEN", secret: true },
+          data: {
+            title: "Read TOKEN",
+            name: "TOKEN",
+            secret: true,
+          },
           warnings: [],
         });
       });

@@ -56,7 +56,7 @@ import {
   parseSort,
   type ResourceDescriptor,
 } from "@/lib/oclif/crud";
-import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
+import { expectedPublicCliCommand, parseJson, runCliForTest } from "@tests/helpers/run-cli";
 
 const SERVER = "https://api.zitadel.cloud";
 const OPERATIONS = ["equals", "greater_than"] as const;
@@ -927,6 +927,7 @@ describe("users get / create / update / delete", () => {
     expect(res.exitCode).toBe(0);
     expect(hits.length > 0).toBe(true);
     expect((parseJson(res.stdout) as { data: unknown }).data).toEqual({
+      title: "Deleted user user_1",
       id: "user_1",
       deleted: true,
     });
@@ -1626,6 +1627,9 @@ describe("dry runs", () => {
       verb: "deactivate",
       topic: "teams",
       id: "team_1",
+      next_commands: [
+        expectedPublicCliCommand(`teams deactivate team_1 --server ${SERVER} --cwd ${cwd}`),
+      ],
     });
   });
 
@@ -1683,6 +1687,7 @@ describe("delete outcomes", () => {
     expect(res.exitCode).toBe(0);
     // ADR 024: the API deactivates the team and leaves it readable.
     expect((parseJson(res.stdout) as { data: unknown }).data).toEqual({
+      title: "Deactivated team team_1",
       id: "team_1",
       deactivated: true,
     });
@@ -1696,6 +1701,7 @@ describe("delete outcomes", () => {
 
     const res = await run(cwd, ["users", "delete", "user_1", "--force"]);
     expect((parseJson(res.stdout) as { data: unknown }).data).toEqual({
+      title: "Deleted user user_1",
       id: "user_1",
       deleted: true,
     });
@@ -1729,6 +1735,7 @@ describe("other resources", () => {
     const res = await run(cwd, ["sessions", "revoke", "sess_1", "--force"]);
     expect(res.exitCode).toBe(0);
     expect((parseJson(res.stdout) as { data: unknown }).data).toEqual({
+      title: "Revoked session sess_1",
       id: "sess_1",
       revoked: true,
     });
@@ -2673,7 +2680,7 @@ describe("the id of a resource whose id has a format", () => {
     await expect(parseArg(positional(topic), value, "id")).rejects.toMatchObject({
       code: "E_VALIDATION",
       message: expect.stringContaining(`must be ${IDS[topic][1]} ID`),
-      hint: `Find one with \`zitadel ${topic} list\`.`,
+      hint: "List them to find one.",
     });
   });
 
@@ -2686,7 +2693,7 @@ describe("the id of a resource whose id has a format", () => {
     expect(positionals.length).toBeGreaterThan(0);
     for (const arg of positionals) {
       await expect(parseArg(arg, "nope", "id")).rejects.toMatchObject({
-        hint: `Find one with \`zitadel ${topic} list\`.`,
+        hint: "List them to find one.",
       });
     }
   });

@@ -164,6 +164,7 @@ describe("variable resolve", () => {
           command: "variable:resolve",
           source: "http://mock.zitadel.test",
           data: {
+            title: "Found 1 variable",
             items: [{ name: "HOST", secret: false, value: "app.acme.com" }],
             count: 1,
             next_page_token: null,
@@ -188,6 +189,7 @@ describe("variable resolve", () => {
           command: "variable:resolve",
           source: "http://mock.zitadel.test",
           data: {
+            title: "Found 1 variable",
             items: [{ name: "HOST", secret: false, value: "app.acme.com" }],
             count: 1,
             next_page_token: null,
@@ -212,6 +214,7 @@ describe("variable resolve", () => {
           command: "variable:resolve",
           source: "http://mock.zitadel.test",
           data: {
+            title: "Found 1 variable",
             items: [{ name: "TOKEN", secret: true }],
             count: 1,
             next_page_token: null,
@@ -236,6 +239,7 @@ describe("variable resolve", () => {
           command: "variable:resolve",
           source: "http://mock.zitadel.test",
           data: {
+            title: `${deployed.deployment_id} froze no variables for ${LIVE_ORIGINS.join(", ")}`,
             items: [],
             count: 0,
             next_page_token: null,
@@ -260,6 +264,7 @@ describe("variable resolve", () => {
           command: "variable:resolve",
           source: "http://mock.zitadel.test",
           data: {
+            title: "Found 1 variable",
             items: [{ name: "BANNER", secret: false, value: "a\u001b[2Jwiped" }],
             count: 1,
             next_page_token: null,
@@ -284,6 +289,7 @@ describe("variable resolve", () => {
           command: "variable:resolve",
           source: "http://mock.zitadel.test",
           data: {
+            title: expect.stringMatching(/^dep_\w+ froze no variables for /),
             items: [],
             count: 0,
             next_page_token: null,
@@ -407,6 +413,7 @@ describe("variable resolve", () => {
           command: "variable:resolve",
           source: "http://mock.zitadel.test",
           data: {
+            title: "Found 1 variable",
             items: [{ name: "HOST", secret: false, value: "app.acme.com" }],
             count: 1,
             next_page_token: null,
@@ -427,6 +434,7 @@ describe("variable resolve", () => {
           command: "variable:resolve",
           source: "http://mock.zitadel.test",
           data: {
+            title: `${firstDeploymentId} froze no variables`,
             items: [],
             count: 0,
             next_page_token: null,
@@ -500,12 +508,12 @@ describe("variable resolve", () => {
           status: "error",
           cli_version: cliVersion.version,
           command: "variable:resolve",
-          source: "",
+          source: "http://mock.zitadel.test",
           code: "E_VALIDATION",
           message:
             "Invalid deployment_id: must be a deployment ID: dep_ followed by letters, digits, _ or -",
-          hint: `Find one with ${expectedPublicCliCommand("deployment list")}, or omit it to read the live deployment.`,
-          next_commands: [expectedPublicCliCommand("deployment list")],
+          hint: "List the deployments to find one, or omit it to read the live deployment.",
+          next_commands: [expectedPublicCliCommand(`deployment list --cwd ${app.path}`)],
           details: { argument: "deployment_id" },
         });
       });

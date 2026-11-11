@@ -184,6 +184,7 @@ export default class Start extends Suggestible(BaseCommand) {
 
     const { runtime, alreadyRunning } = await LocalServer.at(this.cwd, {
       cliVersion: this.cliVersion,
+      selector: this.cwdSelector(),
     }).start(
       runtimeBackend === "docker"
         ? {

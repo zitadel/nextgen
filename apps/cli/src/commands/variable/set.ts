@@ -118,6 +118,9 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
       //
       // The resource commands' dry-run contract, plus what this write would
       // store. Never the value: it may be a credential.
+      // The real write, with what this run was given: a value typed here is
+      // kept, and one that was to be piped is piped again.
+      const real = pipeArgs(args.name, write, flags.as, args.value);
       const preview = dryRunResult({
         verb: "set",
         topic: "variable",
@@ -128,11 +131,13 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
           ...(flags.as === "string" ? [] : [`as ${flags.as}`]),
           ...(write.preview ? ["(preview)"] : []),
         ].join(" "),
+        next:
+          args.value === undefined
+            ? inShell(this.suggest(real), {
+                after: " < value.txt",
+              })
+            : this.suggest(real),
       });
-
-      // The real write, with what this run was given: a value typed here is
-      // kept, and one that was to be piped is piped again.
-      const real = pipeArgs(args.name, write, flags.as, args.value);
 
       return this.emit({
         ...preview,
@@ -142,15 +147,6 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
           type: flags.as,
           secret: write.secret,
           kinds: write.kinds,
-        },
-        next: {
-          commands: [
-            args.value === undefined
-              ? inShell(this.suggest(real), {
-                  after: " < value.txt",
-                })
-              : this.suggest(real),
-          ],
         },
       });
     }

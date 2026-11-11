@@ -1,19 +1,17 @@
 import type { Config } from "@oclif/core";
 import { stripVTControlCharacters as stripAnsi } from "node:util";
-import { mkdtempSync } from "node:fs";
+import { mkdirSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-
-const rosie = vi.hoisted(() => ({ agents: vi.fn() }));
-vi.mock("rosie-skills", () => rosie);
 
 import { BaseCommand } from "@/lib/oclif/base";
 import type { SuggestedCommand } from "@/lib/suggestion";
 import { COLUMN_MARK } from "@/lib/ui/layout";
 import { painted, rows } from "@/lib/oclif/rendering";
 import type { CommandResult, JsonEnvelope } from "@/lib/oclif/types";
+import { printing } from "@tests/helpers/run-cli";
 import { asTerminal } from "@tests/helpers/terminal";
 
 /** A command that ends on a summary, so its box is what the assertions read. */
@@ -58,20 +56,11 @@ class AnsweringCommand extends SummarisingCommand {
 
 /** Runs `result` through `emit` at a terminal and returns what was drawn. */
 async function drawn(result: CommandResult): Promise<string> {
-  const chunks: string[] = [];
-  const write = vi
-    .spyOn(process.stdout, "write")
-    .mockImplementation((chunk: string | Uint8Array) => {
-      chunks.push(typeof chunk === "string" ? chunk : Buffer.from(chunk).toString());
-      return true;
-    });
-  try {
-    const command = new SummarisingCommand([], { version: "0.0.0-test" } as unknown as Config);
-    await asTerminal(() => command.finish(result));
-  } finally {
-    write.mockRestore();
-  }
-  return stripAnsi(chunks.join(""));
+  const command = new SummarisingCommand([], { version: "0.0.0-test" } as unknown as Config);
+
+  const { stdout } = await printing(() => asTerminal(() => command.finish(result)));
+
+  return stripAnsi(stdout);
 }
 
 /**
@@ -155,9 +144,8 @@ describe("BaseCommand endings for a skip", () => {
 
   it("keeps the summary out of the envelope, which still carries the reason", async () => {
     const command = new SummarisingCommand([], { version: "0.0.0-test" } as unknown as Config);
-    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
 
-    const envelope = await asTerminal(() => command.finish(CANCELLED));
+    const { result: envelope } = await printing(() => asTerminal(() => command.finish(CANCELLED)));
 
     expect(envelope).toEqual(
       expect.objectContaining({ status: "skipped", reason: "test-cancelled" }),
@@ -261,60 +249,63 @@ describe("the ending of a run nothing is drawn into", () => {
 });
 
 describe("looking for the skills offer", () => {
-  const CLAUDE = { name: "claude", display: "Claude Code", detected: true, installPath: "/x" };
-
-  /** How often a run looked for an installed agent, on a machine that has not been offered. */
-  async function looked(Command: typeof SummarisingCommand, flags: Record<string, unknown> = {}) {
-    rosie.agents.mockReset();
-    rosie.agents.mockResolvedValue([CLAUDE]);
+  /**
+   * Gives the machine an installed agent, which is a `.claude` directory in its home, and
+   * a config directory that has never been offered the skills.
+   */
+  function aMachineNeverOffered(): void {
+    const home = mkdtempSync(join(tmpdir(), "zitadel-home-"));
+    mkdirSync(join(home, ".claude"));
+    vi.stubEnv("HOME", home);
     vi.stubEnv("CI", "");
     vi.stubEnv("NO_SKILLS_PROMPT", "");
     vi.stubEnv("XDG_CONFIG_HOME", mkdtempSync(join(tmpdir(), "zitadel-skills-")));
-    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
-    const command = new Command([], { version: "0.0.0-test" } as unknown as Config);
-    await asTerminal(() =>
-      command.finish({ summary: { title: "Done", sections: [] }, status: "ok", data: "x" }, flags),
-    );
-    vi.unstubAllEnvs();
-    return rosie.agents.mock.calls.length;
   }
 
+  /** What a run at a terminal drew, on the machine as it now is. */
+  async function ran(
+    Command: typeof SummarisingCommand,
+    result: CommandResult,
+    flags: Record<string, unknown> = {},
+  ): Promise<string> {
+    const command = new Command([], { version: "0.0.0-test" } as unknown as Config);
+    const { stdout } = await printing(() => asTerminal(() => command.finish(result, flags)));
+    return stripAnsi(stdout);
+  }
+
+  const DONE: CommandResult = { summary: { title: "Done", sections: [] }, status: "ok", data: "x" };
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it("is done by a command that draws a box, which is the one that carries the offer", async () => {
-    expect(await looked(SummarisingCommand)).toBe(1);
+    aMachineNeverOffered();
+
+    expect(await ran(SummarisingCommand, DONE)).toContain("skills add");
   });
 
   it("is not done by a normal command, which would pay for a scan it never uses", async () => {
-    expect(await looked(AnsweringCommand)).toBe(0);
+    aMachineNeverOffered();
+
+    expect(await ran(AnsweringCommand, DONE)).not.toContain("skills add");
   });
 
   it("is not done on a dry run, which must not spend the one offer a machine gets", async () => {
-    expect(await looked(SummarisingCommand, { "dry-run": true })).toBe(0);
+    aMachineNeverOffered();
+
+    expect(await ran(SummarisingCommand, DONE, { "dry-run": true })).not.toContain("skills add");
   });
 
   it("is not spent by a run that changed nothing, so the next one that does still offers it", async () => {
-    rosie.agents.mockReset();
-    rosie.agents.mockResolvedValue([CLAUDE]);
-    vi.stubEnv("CI", "");
-    vi.stubEnv("NO_SKILLS_PROMPT", "");
-    vi.stubEnv("XDG_CONFIG_HOME", mkdtempSync(join(tmpdir(), "zitadel-skills-")));
-    const run = async (result: CommandResult) => {
-      const chunks: string[] = [];
-      vi.spyOn(process.stdout, "write").mockImplementation((chunk: string | Uint8Array) => {
-        chunks.push(typeof chunk === "string" ? chunk : Buffer.from(chunk).toString());
-        return true;
-      });
-      const command = new SummarisingCommand([], { version: "0.0.0-test" } as unknown as Config);
-      await asTerminal(() => command.finish(result));
-      return stripAnsi(chunks.join(""));
-    };
+    aMachineNeverOffered();
 
-    await run({
+    await ran(SummarisingCommand, {
       status: "skipped",
       reason: "already-initialized",
       summary: { title: "Nothing was changed", sections: [] },
     });
-    const next = await run({ summary: { title: "Done", sections: [] }, status: "ok", data: "x" });
-    vi.unstubAllEnvs();
+    const next = await ran(SummarisingCommand, DONE);
 
     expect(next).toContain("skills add");
   });

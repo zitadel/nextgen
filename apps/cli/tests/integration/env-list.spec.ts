@@ -23,6 +23,7 @@ describe("env list", () => {
           command: "env:list",
           source: MOCK_SERVER_URL,
           data: {
+            title: "Found 1 environment",
             items: [
               {
                 name: "development",
@@ -55,6 +56,7 @@ describe("env list", () => {
           command: "env:list",
           source: MOCK_SERVER_URL,
           data: {
+            title: "Found 1 environment",
             items: [
               {
                 name: "development",
@@ -102,6 +104,7 @@ describe("env list", () => {
           command: "env:list",
           source: MOCK_SERVER_URL,
           data: {
+            title: "Found 2 environments",
             items: [
               {
                 name: "development",
@@ -139,6 +142,7 @@ describe("env list", () => {
           command: "env:list",
           source: MOCK_SERVER_URL,
           data: {
+            title: "Found 1 environment",
             items: [
               {
                 name: "development",
@@ -172,6 +176,7 @@ describe("env list", () => {
           command: "env:list",
           source: MOCK_SERVER_URL,
           data: {
+            title: "Found 2 environments",
             items: [
               {
                 name: "development",
@@ -208,6 +213,7 @@ describe("env list", () => {
           command: "env:list",
           source: MOCK_SERVER_URL,
           data: {
+            title: "Found 2 environments",
             items: [
               {
                 name: "development",
@@ -244,6 +250,7 @@ describe("env list", () => {
           command: "env:list",
           source: MOCK_SERVER_URL,
           data: {
+            title: "No environments found",
             items: [],
             count: 0,
             next_page_token: null,

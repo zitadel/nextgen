@@ -1,49 +1,19 @@
-import { EventEmitter } from "node:events";
-import { Writable } from "node:stream";
+import { PassThrough } from "node:stream";
+import { stripVTControlCharacters as plain } from "node:util";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
-
-import { spinner } from "@clack/prompts";
-
-import { stripVTControlCharacters as plain } from "node:util";
-
 import { DrawnSpinner, QuietSpinner, type Spinner } from "@/lib/ui/spinner";
+import { atTerminal } from "@tests/helpers/keyboard";
 
-/** The handle clack handed back to the last spinner that was started. */
-const handle = () => vi.mocked(spinner).mock.results.at(-1)?.value as ReturnType<typeof spinner>;
+/** What clack writes as a spinner starts, and as it ends. */
+const HIDE_CURSOR = "\u001b[?25l";
 
-/** A terminal to read keys from, `isTTY` or not, that remembers each raw mode it was put in. */
-const terminal = (
-  isTTY: boolean,
-): EventEmitter & { isTTY: boolean; setRawMode(mode: boolean): void; rawModes: boolean[] } => {
-  const rawModes: boolean[] = [];
-  return Object.assign(new EventEmitter(), {
-    isTTY,
-    rawModes,
-    setRawMode: (mode: boolean) => {
-      rawModes.push(mode);
-    },
-  });
-};
+/** The guide clack draws above a spinner that sits in a chain's gutter. */
+const GUIDE_LINE = "│\n";
 
-/** A terminal to draw on that keeps what was written to it, as `written()`. */
-const screen = (): Writable & { isTTY: boolean; written(): string } => {
-  const chunks: string[] = [];
-  const stream = new Writable({
-    write(chunk, _encoding, done) {
-      chunks.push(String(chunk));
-      done();
-    },
-  });
-  return Object.assign(stream, {
-    isTTY: true,
-    written: () => {
-      return chunks.join("");
-    },
-  });
-};
+/** A stream that is not a terminal, as a pipe is: it has no `isTTY` and no raw mode. */
+const pipe = (): PassThrough => new PassThrough();
 
 /** Runs `act` and returns how many SIGINTs reached the process meanwhile. */
 const interrupts = (act: () => void): number => {
@@ -60,75 +30,81 @@ const interrupts = (act: () => void): number => {
   return count;
 };
 
+/** How long clack waits between one frame of a spinner and the next. */
+const FRAME = 100;
+
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllEnvs();
-  vi.clearAllMocks();
   // A spinner no test stopped must not be drawn again by the next test's line.
   DrawnSpinner.active.clear();
 });
 
 describe("DrawnSpinner", () => {
-  it("is spinning as soon as it exists, under the label it was given", () => {
+  it("is spinning as soon as it exists", () => {
+    const screen = atTerminal();
+
     new DrawnSpinner("Fetching users");
 
-    expect(handle().start).toHaveBeenCalledWith("Fetching users");
+    expect(screen.shown().startsWith(HIDE_CURSOR)).toBe(true);
+    expect(DrawnSpinner.active.size).toBe(1);
   });
 
   it("runs in the chain's gutter unless it is told not to", () => {
+    const screen = atTerminal();
+
     new DrawnSpinner("Fetching users");
 
-    expect(spinner).toHaveBeenCalledWith(expect.objectContaining({ withGuide: true }));
+    expect(plain(screen.shown())).toContain(GUIDE_LINE);
   });
 
   it("stays out of the gutter for work that clears itself", () => {
     // A cleared spinner that drew a guide line leaves that line behind.
+    const screen = atTerminal();
+
     new DrawnSpinner("Checking for a local Zitadel server", false);
 
-    expect(spinner).toHaveBeenCalledWith(expect.objectContaining({ withGuide: false }));
+    expect(plain(screen.shown())).not.toContain(GUIDE_LINE);
   });
 
   it("raises Ctrl-C, a key in raw mode, as SIGINT", () => {
-    const input = terminal(true);
-    new DrawnSpinner("Creating the project", true, input);
+    const screen = atTerminal();
+    new DrawnSpinner("Creating the project");
 
-    expect(interrupts(() => input.emit("data", Buffer.from("\u0003")))).toBe(1);
+    expect(interrupts(() => screen.keyboard.emit("data", Buffer.from("\u0003")))).toBe(1);
   });
 
   it("raises nothing for any other key", () => {
-    const input = terminal(true);
-    new DrawnSpinner("Creating the project", true, input);
+    const screen = atTerminal();
+    new DrawnSpinner("Creating the project");
 
-    expect(interrupts(() => input.emit("data", Buffer.from("q")))).toBe(0);
+    expect(interrupts(() => screen.keyboard.emit("data", Buffer.from("q")))).toBe(0);
   });
 
   it("takes off the key handler clack added, which exits 0 on Ctrl-C", () => {
-    const input = terminal(true);
-    const clacks = vi.mocked(spinner).getMockImplementation();
-    vi.mocked(spinner).mockImplementationOnce((options) => {
-      input.on("keypress", () => undefined);
-      return clacks?.(options) as ReturnType<typeof spinner>;
-    });
+    const screen = atTerminal();
 
-    new DrawnSpinner("Creating the project", true, input);
+    new DrawnSpinner("Creating the project");
 
-    expect(input.listenerCount("keypress")).toBe(0);
+    expect(screen.keyboard.listenerCount("keypress")).toBe(0);
   });
 
   it("stops reading keys once it is cleared", () => {
-    const input = terminal(true);
-    new DrawnSpinner("Creating the project", true, input).clear();
+    const screen = atTerminal();
+    new DrawnSpinner("Creating the project").clear();
 
-    expect(input.listenerCount("data")).toBe(0);
+    expect(interrupts(() => screen.keyboard.emit("data", Buffer.from("\u0003")))).toBe(0);
   });
 
   it("stops reading keys once it is stopped", () => {
-    const input = terminal(true);
-    new DrawnSpinner("Creating the project", true, input).stop("Created");
+    const screen = atTerminal();
+    new DrawnSpinner("Creating the project").stop("Created");
 
-    expect(input.listenerCount("data")).toBe(0);
+    expect(interrupts(() => screen.keyboard.emit("data", Buffer.from("\u0003")))).toBe(0);
   });
 
   it("registers one SIGTERM listener of its own, however many spinners start", () => {
+    atTerminal();
     const hooks = DrawnSpinner as unknown as { exitHooked: boolean };
     hooks.exitHooked = false;
     const before = new Set(process.listeners("SIGTERM"));
@@ -146,110 +122,139 @@ describe("DrawnSpinner", () => {
   });
 
   it("reads nothing from a stream that is not a terminal", () => {
-    const input = terminal(false);
+    atTerminal();
+    const input = pipe();
     new DrawnSpinner("Creating the project", true, input);
 
     expect(input.listenerCount("data")).toBe(0);
   });
 
   it("renames itself while the work goes on", () => {
-    new DrawnSpinner("Fetching users").message("Fetching users — page 2");
+    vi.useFakeTimers();
+    const screen = atTerminal();
+    const running = new DrawnSpinner("Fetching users");
 
-    expect(handle().message).toHaveBeenCalledWith("Fetching users — page 2");
+    running.message("Fetching users — page 2");
+    vi.advanceTimersByTime(FRAME);
+
+    expect(plain(screen.shown())).toContain("Fetching users — page 2");
+    running.clear();
   });
 
   it("leaves a line when it is stopped", () => {
+    const screen = atTerminal();
+
     new DrawnSpinner("Fetching users").stop("Fetched 3 users");
 
-    expect(handle().stop).toHaveBeenCalledWith("Fetched 3 users");
+    expect(plain(screen.shown())).toContain("Fetched 3 users");
   });
 
   it("leaves nothing behind when it is cleared", () => {
-    new DrawnSpinner("Fetching users").clear();
+    const screen = atTerminal();
+    const running = new DrawnSpinner("Fetching users");
+    const before = plain(screen.shown());
 
-    expect(handle().clear).toHaveBeenCalled();
+    running.clear();
+
+    expect(plain(screen.shown())).toBe(before);
+    expect(DrawnSpinner.active.size).toBe(0);
   });
 });
 
 describe("DrawnSpinner.around", () => {
   it("clears a running spinner before the line and draws it again after", () => {
-    const order: string[] = [];
+    const screen = atTerminal();
     const running = new DrawnSpinner("Deploying");
-    vi.mocked(handle().clear).mockImplementation(() => void order.push("clear"));
+    const started = screen.shown().split(HIDE_CURSOR).length;
 
-    DrawnSpinner.around(() => order.push("line"));
+    DrawnSpinner.around(() => {
+      process.stdout.write("a line\n");
+    });
 
-    expect(order).toEqual(["clear", "line"]);
-    expect(handle().start).toHaveBeenCalledWith("Deploying");
-    expect(vi.mocked(spinner)).toHaveBeenCalledTimes(2);
+    const after = screen.shown().split("a line\n");
+    expect(after[1]?.includes(HIDE_CURSOR)).toBe(true);
+    expect(after[0]?.split(HIDE_CURSOR).length).toBe(started);
     running.clear();
   });
 
   it("draws it again under the name it was last given", () => {
+    vi.useFakeTimers();
+    const screen = atTerminal();
     const running = new DrawnSpinner("Deploying");
     running.message("Deploying — 2 of 3");
 
     DrawnSpinner.around(() => undefined);
+    const before = plain(screen.shown()).split("Deploying — 2 of 3").length;
+    vi.advanceTimersByTime(FRAME);
 
-    expect(handle().start).toHaveBeenCalledWith("Deploying — 2 of 3");
+    expect(plain(screen.shown()).split("Deploying — 2 of 3").length).toBeGreaterThan(before);
     running.clear();
   });
 
   it("starts nothing when no spinner is running", () => {
+    const screen = atTerminal();
+
     DrawnSpinner.around(() => undefined);
 
-    expect(spinner).not.toHaveBeenCalled();
+    expect(screen.shown()).toBe("");
   });
 
   it("erases the guide line a running spinner drew, so a pause adds no empty line", () => {
-    const output = screen();
-    const running = new DrawnSpinner("Deploying", true, terminal(true), output);
+    const screen = atTerminal();
+    const running = new DrawnSpinner("Deploying");
+    const before = screen.shown().length;
 
-    DrawnSpinner.around(() => undefined);
+    const resume = DrawnSpinner.pause();
 
-    expect(output.written()).toBe("\u001b[1A\u001b[0J");
+    expect(screen.shown().slice(before)).toContain("\u001b[1A\u001b[0J");
+    resume();
     running.clear();
   });
 
   it("erases no line above a spinner kept out of the gutter", () => {
-    const output = screen();
-    const running = new DrawnSpinner("Checking", false, terminal(true), output);
+    const screen = atTerminal();
+    const running = new DrawnSpinner("Checking", false);
+    const before = screen.shown().length;
 
-    DrawnSpinner.around(() => undefined);
+    const resume = DrawnSpinner.pause();
 
-    expect(output.written()).toBe("");
+    expect(screen.shown().slice(before)).not.toContain("\u001b[1A");
+    resume();
     running.clear();
   });
 
   it("does not read keys while it is paused", () => {
-    const input = terminal(true);
-    const running = new DrawnSpinner("Deploying", true, input, screen());
+    const screen = atTerminal();
+    const running = new DrawnSpinner("Deploying");
 
-    DrawnSpinner.around(() => {
-      expect(input.listenerCount("data")).toBe(0);
+    const heard = interrupts(() => {
+      DrawnSpinner.around(() => screen.keyboard.emit("data", Buffer.from("\u0003")));
     });
 
+    expect(heard).toBe(0);
     running.clear();
   });
 
   it("does not bring back a spinner stopped while it was paused", () => {
+    const screen = atTerminal();
     const running = new DrawnSpinner("Deploying");
     const resume = DrawnSpinner.pause();
     running.stop("Deployed");
-    vi.mocked(spinner).mockClear();
+    const before = screen.shown().split(HIDE_CURSOR).length;
 
     resume();
 
-    expect(spinner).not.toHaveBeenCalled();
+    expect(screen.shown().split(HIDE_CURSOR).length).toBe(before);
   });
 
   it("does not bring back a spinner that has stopped", () => {
+    const screen = atTerminal();
     new DrawnSpinner("Deploying").stop("Deployed");
-    vi.mocked(spinner).mockClear();
+    const before = screen.shown().length;
 
     DrawnSpinner.around(() => undefined);
 
-    expect(spinner).not.toHaveBeenCalled();
+    expect(screen.shown().length).toBe(before);
   });
 });
 
@@ -260,57 +265,59 @@ describe("a terminal given back", () => {
     ["stopped", (running: DrawnSpinner) => running.stop("Done")],
     ["paused", () => DrawnSpinner.pause()],
   ])("is cooked again once the spinner is %s", (_how, end) => {
-    const input = terminal(true);
-    const running = new DrawnSpinner("Installing", true, input, screen());
+    const screen = atTerminal();
+    const running = new DrawnSpinner("Installing");
 
     end(running);
 
-    expect(input.rawModes.at(-1)).toBe(false);
+    expect(screen.rawModes().at(-1)).toBe(false);
   });
 
   it("is left alone when it is not a terminal", () => {
-    const input = terminal(false);
+    atTerminal();
+    const input = pipe();
+    const raw = vi.fn();
+    Object.assign(input, { setRawMode: raw });
 
-    new DrawnSpinner("Installing", true, input, screen()).clear();
+    new DrawnSpinner("Installing", true, input).clear();
 
-    expect(input.rawModes).toEqual([]);
+    expect(raw).not.toHaveBeenCalled();
   });
 });
 
 describe("a spinner stopped while paused", () => {
   it("still leaves its line once the pause is over", () => {
-    const output = screen();
-    const running = new DrawnSpinner("Deploying", true, terminal(true), output);
+    const screen = atTerminal();
+    const running = new DrawnSpinner("Deploying");
     const resume = DrawnSpinner.pause();
-    output.written();
 
     running.stop("Deployed");
     resume();
 
-    expect(plain(output.written())).toContain("Deployed");
+    expect(plain(screen.shown())).toContain("Deployed");
   });
 
   it("leaves the label it started with when it was given no text", () => {
-    const output = screen();
-    const running = new DrawnSpinner("Deploying", true, terminal(true), output);
+    const screen = atTerminal();
+    const running = new DrawnSpinner("Deploying");
     const resume = DrawnSpinner.pause();
 
     running.stop();
     resume();
 
-    expect(plain(output.written())).toContain("Deploying");
+    expect(plain(screen.shown())).toContain("Deploying");
   });
 
   it("leaves nothing for one that was cleared", () => {
-    const output = screen();
-    const running = new DrawnSpinner("Deploying", true, terminal(true), output);
+    const screen = atTerminal();
+    const running = new DrawnSpinner("Deploying");
     const resume = DrawnSpinner.pause();
-    const before = output.written();
+    const before = screen.shown();
 
     running.clear();
     resume();
 
-    expect(output.written()).toBe(before);
+    expect(screen.shown()).toBe(before);
   });
 });
 
@@ -319,43 +326,47 @@ describe("DrawnSpinner on a CI terminal", () => {
   // the guide is two lines up, not one.
   it("erases the guide line two lines up", () => {
     vi.stubEnv("CI", "true");
-    const output = screen();
-    const running = new DrawnSpinner("Deploying", true, terminal(true), output);
+    const screen = atTerminal();
+    const running = new DrawnSpinner("Deploying");
+    const before = screen.shown().length;
 
     DrawnSpinner.around(() => undefined);
 
-    expect(output.written()).toBe("\u001b[2A\u001b[0J");
+    expect(screen.shown().slice(before)).toContain("\u001b[2A\u001b[0J");
     running.clear();
   });
 });
 
 describe("DrawnSpinner.clearAll", () => {
   it("clears a spinner nobody ended", () => {
+    atTerminal();
     new DrawnSpinner("Committing");
 
     DrawnSpinner.clearAll();
 
-    expect(handle().clear).toHaveBeenCalled();
+    expect(DrawnSpinner.active.size).toBe(0);
   });
 
   it("leaves nothing for a later line to draw again", () => {
+    const screen = atTerminal();
     new DrawnSpinner("Committing");
     DrawnSpinner.clearAll();
-    vi.mocked(spinner).mockClear();
+    const before = screen.shown().length;
 
     DrawnSpinner.around(() => undefined);
 
-    expect(spinner).not.toHaveBeenCalled();
+    expect(screen.shown().length).toBe(before);
   });
 });
 
 describe("QuietSpinner", () => {
   it("draws nothing, whatever it is asked to do", () => {
+    const screen = atTerminal();
     const quiet: Spinner = new QuietSpinner();
     quiet.message("Fetching users — page 2");
     quiet.stop("Fetched 3 users");
     quiet.clear();
 
-    expect(spinner).not.toHaveBeenCalled();
+    expect(screen.shown()).toBe("");
   });
 });

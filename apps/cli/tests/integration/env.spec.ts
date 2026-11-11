@@ -23,6 +23,7 @@ describe("env", () => {
           command: "env",
           source: "http://mock.zitadel.test",
           data: {
+            title: "Using the development environment (from default)",
             environment: { name: "development", source: "default" },
             values: [
               { variable: "ZITADEL_URL", value: "http://mock.zitadel.test", source: "--server" },
@@ -85,6 +86,7 @@ describe("env", () => {
           command: "env",
           source: "http://mock.zitadel.test",
           data: {
+            title: "Using the development environment (from default)",
             environment: { name: "development", source: "default" },
             values: [
               { variable: "ZITADEL_URL", value: "http://mock.zitadel.test", source: "--server" },
@@ -158,6 +160,7 @@ describe("env", () => {
           command: "env",
           source: "http://mock.zitadel.test",
           data: {
+            title: "Using the development environment (from default)",
             environment: { name: "development", source: "default" },
             values: [
               {
@@ -225,6 +228,7 @@ describe("env", () => {
           command: "env",
           source: "https://prod.example",
           data: {
+            title: "Using the production environment (from --env)",
             environment: { name: "production", source: "--env" },
             values: [
               {
@@ -269,6 +273,7 @@ describe("env", () => {
           command: "env",
           source: "https://staging.example",
           data: {
+            title: "Using the development environment (from default)",
             environment: { name: "development", source: "default" },
             values: [
               {
@@ -307,6 +312,7 @@ describe("env", () => {
           command: "env",
           source: "",
           data: {
+            title: "Using the nothere environment (from --env)",
             environment: { name: "nothere", source: "--env" },
             values: [],
             consulted: [
@@ -332,7 +338,7 @@ describe("env", () => {
           status: "error",
           cli_version: cliVersion.version,
           command: "env",
-          source: "",
+          source: "http://mock.zitadel.test",
           code: "E_VALIDATION",
           message: "--env and --env-file cannot be used together",
           hint: "--env picks the .env.<name>.local files; --env-file names one file outright.",

@@ -1148,29 +1148,33 @@ describe("failureAdvice for a runtime found in a parent directory", () => {
   const failed = [{ name: "runtime", status: "fail" as const, message: "not healthy" }];
 
   it.each([
-    ["a Windows path with a space", "C:\\work\\my app"],
-    ["a Windows path with an apostrophe", "C:\\work\\it's"],
-    ["a POSIX path with a space", "/home/dev/my app"],
-  ])("hands over %s as arguments, not as commands", (_name, dir) => {
-    const advice = failureAdvice(
-      failed,
-      "image",
-      8080,
-      "1.0.0",
-      environmentSelectorSuffix({}),
-      dir,
-    );
+    ["a Windows path with a space", "C:\\work\\my app", "'C:\\work\\my app'"],
+    ["a Windows path with an apostrophe", "C:\\work\\it's", "'C:\\work\\it'\\''s'"],
+    ["a POSIX path with a space", "/home/dev/my app", "'/home/dev/my app'"],
+  ])(
+    "quotes %s in the commands and hands it over as it is in the arguments",
+    (_name, dir, quoted) => {
+      const advice = failureAdvice(
+        failed,
+        "image",
+        8080,
+        "1.0.0",
+        environmentSelectorSuffix({}),
+        dir,
+      );
 
-    expect(advice.nextCommands).toEqual([publicCliCommand("start", "1.0.0")]);
-    expect(advice.suggestedArgs).toEqual([
-      ["start", "--cwd", dir],
-      ["start"],
-      ["reset", "--force", "--cwd", dir],
-    ]);
-    expect(advice.hint).toContain("details.suggested_args");
-    expect(advice.hint).toContain(dir);
-    expect(advice.hint).toContain("--json");
-  });
+      expect(advice.nextCommands).toEqual([
+        publicCliCommand(`start --cwd ${quoted}`, "1.0.0"),
+        publicCliCommand("start", "1.0.0"),
+        publicCliCommand(`reset --force --cwd ${quoted}`, "1.0.0"),
+      ]);
+      expect(advice.suggestedArgs).toEqual([
+        ["start", "--cwd", dir],
+        ["start"],
+        ["reset", "--force", "--cwd", dir],
+      ]);
+    },
+  );
 
   it("writes the commands out for a path that needs no quoting", () => {
     const advice = failureAdvice(

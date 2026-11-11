@@ -5,10 +5,9 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
-
-import { cancel, confirm, isCancel, outro, spinner } from "@clack/prompts";
-
+import { answering, atTerminal } from "@tests/helpers/keyboard";
+import { DrawnSpinner } from "@/lib/ui/spinner";
+import { printing } from "@tests/helpers/run-cli";
 import { asTerminal, offTerminal } from "@tests/helpers/terminal";
 import { EXIT_CODES } from "@/lib/errors";
 import { BaseCommand } from "@/lib/oclif";
@@ -30,6 +29,9 @@ import {
   UpdateOperation,
   type UpdateSpec,
 } from "@/lib/oclif/crud";
+
+/** How long clack waits between one frame of a spinner and the next. */
+const FRAME = 100;
 
 type Ctx = { token: string };
 
@@ -379,15 +381,10 @@ describe("list nouns", () => {
       options: { connect: async () => ({ token: "t" }), operations: ["equals"] },
     };
     const command = bindOperation(ListOperation as OperationClass<Ctx, ListSpec<Ctx>>, named);
-    const written: string[] = [];
-    vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
-      written.push(String(chunk));
-      return true;
-    });
-    await asTerminal(() =>
-      (command as unknown as { run(argv: string[]): Promise<unknown> }).run([]),
+    const { stdout } = await printing(() =>
+      asTerminal(() => (command as unknown as { run(argv: string[]): Promise<unknown> }).run([])),
     );
-    return written.join("");
+    return stdout;
   };
 
   it("says the descriptor's plural when nothing is found", async () => {
@@ -415,7 +412,9 @@ describe("write results", () => {
     ]);
 
     // Round-tripped as printed: JSON drops a key whose value is undefined.
-    expect(JSON.parse(JSON.stringify(envelope))).toHaveProperty("data", {});
+    expect(JSON.parse(JSON.stringify(envelope))).toHaveProperty("data", {
+      title: "Command completed",
+    });
   });
 
   it("draws what it wrote as one line when the id has a line break in it", async () => {
@@ -424,20 +423,14 @@ describe("write results", () => {
       CreateOperation as OperationClass<Ctx, CreateSpec<Ctx>>,
       definition(odd),
     );
-    const written: string[] = [];
-    vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
-      written.push(String(chunk));
-      return true;
-    });
-    vi.spyOn(console, "log").mockImplementation((...args) => {
-      written.push(`${args.join(" ")}\n`);
-    });
 
-    await asTerminal(() =>
-      (command as unknown as { run(a: string[]): Promise<unknown> }).run(["--name", "a"]),
+    const { stdout } = await printing(() =>
+      asTerminal(() =>
+        (command as unknown as { run(a: string[]): Promise<unknown> }).run(["--name", "a"]),
+      ),
     );
 
-    expect(written.join("")).toContain("Created team a\\x0ab");
+    expect(stdout).toContain("Created team a\\x0ab");
   });
 
   it("says the command completed when the server answers without a body, not that it wrote {}", async () => {
@@ -471,30 +464,15 @@ describe("write results", () => {
       );
       const argv = [...ids, "--name", "a"];
 
-      const drawn: string[] = [];
-      vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
-        drawn.push(String(chunk));
-        return true;
-      });
-      vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
-        drawn.push(String(chunk));
-        return true;
-      });
-      vi.spyOn(console, "log").mockImplementation((...args) => {
-        drawn.push(`${args.join(" ")}\n`);
-      });
-      await asTerminal(() =>
-        (command as unknown as { run(a: string[]): Promise<unknown> }).run(argv),
+      const onScreen = await printing(() =>
+        asTerminal(() => (command as unknown as { run(a: string[]): Promise<unknown> }).run(argv)),
       );
-      const onScreen = drawn.join("");
-      drawn.length = 0;
-      await offTerminal(() =>
-        (command as unknown as { run(a: string[]): Promise<unknown> }).run(argv),
+      const piped = await printing(() =>
+        offTerminal(() => (command as unknown as { run(a: string[]): Promise<unknown> }).run(argv)),
       );
-      const piped = drawn.join("");
 
-      expect(onScreen).toContain(`${verb === "create" ? "Created" : "Updated"} team team_1`);
-      expect(piped).toContain('"id": "team_1"');
+      expect(onScreen.stdout).toContain(`${verb === "create" ? "Created" : "Updated"} team team_1`);
+      expect(piped.stdout).toContain('"id": "team_1"');
     },
   );
 
@@ -524,6 +502,25 @@ describe("write results", () => {
         body: { name: "a" },
         result: { id: "team_1", name: "a" },
       },
+    });
+  });
+
+  it("offers the same write without --dry-run as the next command, keeping what was typed", async () => {
+    const command = bindOperation(
+      UpdateOperation as OperationClass<Ctx, UpdateSpec<Ctx>>,
+      definition({ schema, call: async () => ({ id: "team_1" }) }),
+    );
+
+    const envelope = await (command as unknown as { run(argv: string[]): Promise<unknown> }).run([
+      "team_1",
+      "--name",
+      "a",
+      "--dry-run",
+      "--json",
+    ]);
+
+    expect(JSON.parse(JSON.stringify(envelope))).toMatchObject({
+      data: { next_commands: [expect.stringMatching(/ bound team_1 --name a$/)] },
     });
   });
 
@@ -647,7 +644,7 @@ describe("output a script reads", () => {
 
     const { stderr } = await printed(command, ["--plain"]);
 
-    expect(stderr.join("\n")).toContain("teams list --page-token p2 --json");
+    expect(stderr.join("\n")).toContain("teams list --page-token p2");
   });
 
   it("carries --fields into the next page it suggests", async () => {
@@ -658,7 +655,7 @@ describe("output a script reads", () => {
 
     const { stderr } = await printed(command, ["--plain", "--fields", "name"]);
 
-    expect(stderr.join("\n")).toContain("teams list --fields name --page-token p2 --json");
+    expect(stderr.join("\n")).toContain("teams list --fields name --page-token p2");
   });
 
   it("leaves a created resource's JSON body as the only thing on stdout", async () => {
@@ -674,6 +671,10 @@ describe("output a script reads", () => {
 });
 
 describe("list paging", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("asks for the page --page-token names first", async () => {
     const sent: unknown[] = [];
     const command = bindOperation(
@@ -694,53 +695,44 @@ describe("list paging", () => {
   });
 
   it("reports each page of a drain once it has it", async () => {
-    const events: string[] = [];
-    vi.mocked(spinner).mockReturnValueOnce({
-      start: vi.fn(),
-      stop: vi.fn(),
-      clear: vi.fn(),
-      message: (text?: string) => {
-        events.push(`say ${text}`);
-      },
-    } as unknown as ReturnType<typeof spinner>);
+    vi.useFakeTimers();
+    const screen = atTerminal();
+    const seen: string[] = [];
     const command = bindOperation(
       ListOperation as OperationClass<Ctx, ListSpec<Ctx>>,
       definition({
         ...list,
         body: z.object({}).passthrough(),
         call: async (_ctx, body) => {
+          vi.advanceTimersByTime(FRAME);
           const token = (body as { page_token?: string }).page_token;
-          events.push(`ask ${token ?? "first"}`);
-          return token === undefined ? { teams: [], next_page_token: "p2" } : { teams: [] };
+          seen.push(`${token ?? "first"} asked after ${screen.plain().includes("page 1")}`);
+          if (token === undefined) {
+            return { teams: [], next_page_token: "p2" };
+          }
+          return token === "p2" ? { teams: [], next_page_token: "p3" } : { teams: [] };
         },
       }),
     );
 
     await asTerminal(() => printed(command, ["--all", "--plain"]));
 
-    expect(events).toEqual([
-      "ask first",
-      "say Fetching teams — page 1",
-      "ask p2",
-      "say Fetching teams — page 2",
-    ]);
+    expect(seen).toEqual(["first asked after false", "p2 asked after true", "p3 asked after true"]);
+    expect(screen.plain()).toContain("Fetching teams — page 2");
   });
 
   it("names the descriptor's plural in the drain's spinner, not the topic", async () => {
-    const messages: string[] = [];
-    vi.mocked(spinner).mockReturnValueOnce({
-      start: vi.fn(),
-      stop: vi.fn(),
-      clear: vi.fn(),
-      message: (text?: string) => {
-        messages.push(String(text));
-      },
-    } as unknown as ReturnType<typeof spinner>);
+    vi.useFakeTimers();
+    const screen = atTerminal();
     const command = bindOperation(ListOperation as OperationClass<Ctx, ListSpec<Ctx>>, {
       ...definition({
         ...list,
         body: z.object({}).passthrough(),
-        call: async () => ({ teams: [] }),
+        call: async (_ctx, body) => {
+          vi.advanceTimersByTime(FRAME);
+          const token = (body as { page_token?: string }).page_token;
+          return token === undefined ? { teams: [], next_page_token: "p2" } : { teams: [] };
+        },
       }),
       topic: "idps",
       resource: { ...resource, singular: "identity provider", plural: "identity providers" },
@@ -748,20 +740,14 @@ describe("list paging", () => {
 
     await asTerminal(() => printed(command, ["--all", "--plain"]));
 
-    expect(messages).toEqual(["Fetching identity providers — page 1"]);
+    expect(screen.plain()).toContain("Fetching identity providers — page 1");
   });
 
   it.each([
     [1, "Fetched 1 team"],
     [2, "Fetched 2 teams"],
   ])("stops the drain's spinner on how many it found: %i", async (found, text) => {
-    const stop = vi.fn();
-    vi.mocked(spinner).mockReturnValueOnce({
-      start: vi.fn(),
-      stop,
-      clear: vi.fn(),
-      message: vi.fn(),
-    } as unknown as ReturnType<typeof spinner>);
+    const person = answering();
     const command = bindOperation(
       ListOperation as OperationClass<Ctx, ListSpec<Ctx>>,
       definition({
@@ -775,18 +761,11 @@ describe("list paging", () => {
 
     await asTerminal(() => printed(command, ["--all", "--plain"]));
 
-    expect(stop).toHaveBeenCalledWith(text);
+    expect(person.plain()).toContain(text);
   });
 
   it("clears the drain's spinner when a page throws", async () => {
-    const clear = vi.fn();
-    const stop = vi.fn();
-    vi.mocked(spinner).mockReturnValueOnce({
-      start: vi.fn(),
-      stop,
-      clear,
-      message: vi.fn(),
-    } as unknown as ReturnType<typeof spinner>);
+    const person = answering();
     const command = bindOperation(
       ListOperation as OperationClass<Ctx, ListSpec<Ctx>>,
       definition({
@@ -800,8 +779,8 @@ describe("list paging", () => {
 
     await asTerminal(() => printed(command, ["--all", "--plain"])).catch(() => undefined);
 
-    expect(clear).toHaveBeenCalled();
-    expect(stop).not.toHaveBeenCalled();
+    expect(DrawnSpinner.active.size).toBe(0);
+    expect(person.plain()).not.toContain("Fetched");
   });
 });
 
@@ -912,16 +891,8 @@ describe("get sections", () => {
 
   /** What a run prints on a terminal. */
   const printed = async (argv: string[]): Promise<string> => {
-    const written: string[] = [];
-    vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
-      written.push(String(chunk));
-      return true;
-    });
-    vi.spyOn(console, "log").mockImplementation((...args) => {
-      written.push(`${args.join(" ")}\n`);
-    });
-    await asTerminal(() => getting.run(argv));
-    return written.join("");
+    const { stdout } = await printing(() => asTerminal(() => getting.run(argv)));
+    return stdout;
   };
 
   it("shows a spec's sections under the fields", async () => {
@@ -936,18 +907,10 @@ describe("get sections", () => {
     const odd = bindOperation(GetOperation as OperationClass<Ctx, GetSpec<Ctx>>, {
       ...definition<GetSpec<Ctx>>({ call: async () => ({ id: "a\nb", name: "core" }) }),
     }) as unknown as { run(argv: string[]): Promise<unknown> };
-    const written: string[] = [];
-    vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
-      written.push(String(chunk));
-      return true;
-    });
-    vi.spyOn(console, "log").mockImplementation((...args) => {
-      written.push(`${args.join(" ")}\n`);
-    });
 
-    await asTerminal(() => odd.run(["x"]));
+    const { stdout } = await printing(() => asTerminal(() => odd.run(["x"])));
 
-    expect(written.join("")).toContain("Read a\\x0ab");
+    expect(stdout).toContain("Read a\\x0ab");
   });
 });
 
@@ -966,33 +929,14 @@ describe("delete confirmation", () => {
   const printedByFailing = async (
     run: () => Promise<unknown>,
   ): Promise<{ stdout: string; stderr: string }> => {
-    const written: string[] = [];
-    const errors: string[] = [];
-    vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
-      written.push(String(chunk));
-      return true;
-    });
-    vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
-      errors.push(String(chunk));
-      return true;
-    });
-    vi.spyOn(console, "log").mockImplementation((...args) => {
-      written.push(`${args.join(" ")}\n`);
-    });
-    await run().catch(() => undefined);
-    return { stdout: written.join(""), stderr: errors.join("") };
+    const { stdout, stderr } = await printing(() => run().catch(() => undefined));
+    return { stdout, stderr };
   };
 
   beforeEach(() => {
     vi.stubEnv("ZITADEL_URL", "https://api.zitadel.example");
     vi.stubEnv("ZITADEL_PROJECT_ID", "proj_env");
     vi.stubEnv("ZITADEL_PROJECT_SECRET", "sk_proj_env");
-  });
-
-  afterEach(() => {
-    vi.mocked(confirm).mockReset();
-    vi.mocked(isCancel).mockReset();
-    vi.mocked(isCancel).mockReturnValue(false);
   });
 
   it.each(["delete", "revoke", "deactivate"] as const)(
@@ -1024,7 +968,7 @@ describe("delete confirmation", () => {
   it.each(["delete", "revoke", "deactivate"] as const)(
     "sends no %s when the answer is no",
     async (verb) => {
-      vi.mocked(confirm).mockResolvedValueOnce(false as never);
+      answering(false);
       const call = vi.fn(async () => undefined);
 
       await asTerminal(() => deleting(verb, call).run(["team_1"]));
@@ -1044,47 +988,44 @@ describe("delete confirmation", () => {
   });
 
   it("asks the question with the verb, the resource, the id and the place", async () => {
-    vi.mocked(confirm).mockResolvedValueOnce(true as never);
+    const talk = answering(true);
 
     await asTerminal(() => deleting("revoke").run(["team_1"]));
 
-    expect(vi.mocked(confirm).mock.calls[0]?.[0]).toMatchObject({
-      message: "Revoke team team_1 in project proj_env on api.zitadel.example?",
-    });
+    expect(talk.asked()).toEqual([
+      "Revoke team team_1 in project proj_env on api.zitadel.example?",
+    ]);
   });
 
   it("names a local server by its host and port", async () => {
     vi.stubEnv("ZITADEL_URL", "http://localhost:8112");
-    vi.mocked(confirm).mockResolvedValueOnce(true as never);
+    const talk = answering(true);
 
     await asTerminal(() => deleting("delete").run(["team_1"]));
 
-    expect(vi.mocked(confirm).mock.calls[0]?.[0]).toMatchObject({
-      message: "Delete team team_1 in project proj_env on localhost:8112?",
-    });
+    expect(talk.asked()).toEqual(["Delete team team_1 in project proj_env on localhost:8112?"]);
   });
 
   it("spells out a control character in the id it asks about", async () => {
-    vi.mocked(confirm).mockResolvedValueOnce(true as never);
+    const talk = answering(true);
 
     await asTerminal(() => deleting("delete").run(["team\u001b]0;x\u0007"]));
 
-    expect(vi.mocked(confirm).mock.calls[0]?.[0]).toMatchObject({
-      message: "Delete team team\\x1b]0;x\\x07 in project proj_env on api.zitadel.example?",
-    });
+    expect(talk.asked()).toEqual([
+      "Delete team team\\x1b]0;x\\x07 in project proj_env on api.zitadel.example?",
+    ]);
   });
 
   it("closes on what it deleted as one line when the id has a line break in it", async () => {
-    vi.mocked(confirm).mockResolvedValueOnce(true as never);
-    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    const talk = answering(true);
 
     await asTerminal(() => deleting("delete").run(["a\nb"]));
 
-    expect(outro).toHaveBeenCalledWith("Deleted team a\\x0ab");
+    expect(talk.plain()).toContain("Deleted team a\\x0ab");
   });
 
   it("is skipped when the answer is no", async () => {
-    vi.mocked(confirm).mockResolvedValueOnce(false as never);
+    answering(false);
 
     const envelope = await asTerminal(() => deleting("delete").run(["team_1"]));
 
@@ -1095,11 +1036,10 @@ describe("delete confirmation", () => {
   });
 
   it("fails instead of skipping on Ctrl-C", async () => {
-    vi.mocked(isCancel).mockReturnValue(true);
-    vi.mocked(confirm).mockResolvedValueOnce(Symbol("cancel") as never);
+    const talk = answering();
 
     await expect(asTerminal(() => deleting("delete").run(["team_1"]))).rejects.toThrow();
 
-    expect(cancel).toHaveBeenCalledWith("Cancelled");
+    expect(talk.plain()).toContain("Cancelled");
   });
 });

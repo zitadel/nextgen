@@ -136,7 +136,12 @@ describe("variable list", () => {
           cli_version: cliVersion.version,
           command: "variable:list",
           source: "http://mock.zitadel.test",
-          data: { items: [], count: 0, next_page_token: null },
+          data: {
+            title: "No variables found",
+            items: [],
+            count: 0,
+            next_page_token: null,
+          },
           warnings: [],
         });
       });
@@ -157,6 +162,7 @@ describe("variable list", () => {
           command: "variable:list",
           source: "http://mock.zitadel.test",
           data: {
+            title: "Found 3 variables",
             items: [
               {
                 name: "API_URL",
@@ -193,6 +199,7 @@ describe("variable list", () => {
           command: "variable:list",
           source: "http://mock.zitadel.test",
           data: {
+            title: "Found 1 variable",
             items: [{ name: "API_URL", secret: false, value: "https://preview.acme.com" }],
             count: 1,
             next_page_token: null,
@@ -212,7 +219,12 @@ describe("variable list", () => {
           cli_version: cliVersion.version,
           command: "variable:list",
           source: "http://mock.zitadel.test",
-          data: { items: [], count: 0, next_page_token: null },
+          data: {
+            title: "No preview variables found",
+            items: [],
+            count: 0,
+            next_page_token: null,
+          },
           warnings: [],
         });
       });
@@ -229,6 +241,7 @@ describe("variable list", () => {
           command: "variable:list",
           source: "http://mock.zitadel.test",
           data: {
+            title: "Found 1 variable",
             items: [
               {
                 name: "BANNER",
@@ -256,6 +269,7 @@ describe("variable list", () => {
           command: "variable:list",
           source: "http://mock.zitadel.test",
           data: {
+            title: "Found 1 variable",
             items: [{ name: "TOKEN", secret: true }],
             count: 1,
             next_page_token: null,

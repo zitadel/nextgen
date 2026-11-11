@@ -222,7 +222,7 @@ describe("auth-method password and passkey", () => {
       });
     });
 
-    it("hands over the follow-ups as argument lists when the path needs quoting", async ({
+    it("quotes the path in the follow-ups, and hands it over as it is in the argument lists", async ({
       dir,
     }) => {
       const cwd = join(dir, "my project");
@@ -232,7 +232,10 @@ describe("auth-method password and passkey", () => {
 
       expect(parseJson(result.stdout)).toMatchObject({
         data: {
-          next_commands: [],
+          next_commands: [
+            expect.stringMatching(/ deploy --dry-run --cwd '[^']+my project'$/),
+            expect.stringMatching(/ deploy -m '<what changed>' --cwd '[^']+my project'$/),
+          ],
           next_args: [
             ["deploy", "--dry-run", "--cwd", cwd],
             ["deploy", "-m", "<what changed>", "--cwd", cwd],
@@ -713,16 +716,21 @@ describe("auth-method password and passkey", () => {
         });
       });
 
-      it.for(["my users&calc", "--force"])(
-        "leaves the schema name %s out of runnable commands",
-        async (name, { dir }) => {
-          await writeProject(dir, { schemas: { [`${name}.json`]: aSchema(PASSKEY_ONLY, name) } });
+      it.for([
+        ["my users&calc", "--schema 'my users&calc'"],
+        ["--force", "--schema=--force"],
+      ])("quotes the schema name %s in the runnable commands", async ([name, option], { dir }) => {
+        await writeProject(dir, { schemas: { [`${name}.json`]: aSchema(PASSKEY_ONLY, name) } });
 
-          const result = await runCliForTest(authMethodJson(dir, "passkey", "disable"));
+        const result = await runCliForTest(authMethodJson(dir, "passkey", "disable"));
 
-          expect(parseJson(result.stdout)).toMatchObject({ next_commands: [] });
-        },
-      );
+        expect(parseJson(result.stdout)).toMatchObject({
+          next_commands: [
+            expectedPublicCliCommand(`auth-method passkey disable ${option} --cwd ${dir} --force`),
+            expectedPublicCliCommand(`auth-method password enable ${option} --cwd ${dir}`),
+          ],
+        });
+      });
 
       it("hands over the re-runs as argument lists for a schema name that needs quoting", async ({
         dir,

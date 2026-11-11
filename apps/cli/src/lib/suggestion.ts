@@ -1,5 +1,5 @@
 import { Cmd } from "./cmd";
-import { isPortableShellWord, newestCliCommand, publicCliCommand } from "./public-cli";
+import { newestCliCommand, publicCliCommand } from "./public-cli";
 
 declare const suggestedCommand: unique symbol;
 
@@ -66,31 +66,21 @@ export function unscopedCommand(args: string, cliVersion?: string): SuggestedCom
 
 /**
  * Commands built from argument lists, for a caller that also reports the lists
- * (`next_args`). Every argument must be a portable shell word, or none is
- * returned and the lists stand alone, which no shell interprets. The lists
- * carry whatever selector the command needs: they are the arguments as run.
+ * (`next_args`). Each argument is quoted as a shell word where it needs it
+ * (`Cmd.quote`), so a URL with a port stays as it is and a value with shell
+ * metacharacters or a placeholder to fill in (`<what changed>`) is wrapped.
+ * The lists carry whatever selector the command needs: they are the arguments
+ * as run.
  */
 export function portableSuggestions(
   argLists: readonly (readonly string[])[],
   cliVersion: string,
-  /** Arguments the caller fills in (`<what changed>`): quoted in the command, not portable words. */
-  placeholders: readonly string[] = [],
 ): SuggestedCommand[] {
-  const allowed = (word: string) => {
-    return placeholders.includes(word) || isPortableShellWord(word);
-  };
-  if (
-    !argLists.every((args) => {
-      return args.every(allowed);
-    })
-  ) {
-    return [];
-  }
   return argLists.map((args) => {
     return publicCliCommand(
       args
         .map((word) => {
-          return placeholders.includes(word) ? `'${word}'` : word;
+          return Cmd.quote(word);
         })
         .join(" "),
       cliVersion,

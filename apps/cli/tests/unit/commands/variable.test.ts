@@ -3,14 +3,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Readable } from "node:stream";
 
-import { stripVTControlCharacters as stripAnsi } from "node:util";
 import { HttpResponse, http } from "msw";
 import { afterEach, describe, expect, it, vi } from "vitest";
-
-vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
-
-import * as prompts from "@clack/prompts";
-import { confirm, isCancel } from "@clack/prompts";
 
 import VariableRm from "@/commands/variable/rm";
 import VariableSet from "@/commands/variable/set";
@@ -18,7 +12,7 @@ import { DEFAULT_SERVER } from "@/lib/server";
 import { usePlatformServer } from "@tests/helpers/platform-project";
 import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
 import { asTerminal as asPerson } from "@tests/helpers/terminal";
-import { answering, type clackDouble } from "@tests/helpers/clack";
+import { type Answer, answering } from "@tests/helpers/keyboard";
 
 const { server } = usePlatformServer();
 
@@ -325,6 +319,7 @@ describe("variable get", () => {
       data: { name: string; secret: boolean; value: string };
     };
     expect(json.data).toEqual({
+      title: "Read GOOGLE_CLIENT_ID",
       name: "GOOGLE_CLIENT_ID",
       secret: false,
       value: "999-prod",
@@ -997,27 +992,21 @@ describe("variable set --as", () => {
   });
 });
 
+/** The line a run ended on, as a person read it. */
+const lastLine = (shown: string): string | undefined => shown.trimEnd().split("\n").at(-1);
+
 describe("variable rm asked on a terminal", () => {
   // The built CLI bundles its own prompts, so a prompt can only be answered
   // by running the command from source, where `input` is the one module asked.
   let extraFlags: string[] = [];
-  const removingOn = async (serverUrl: string, cwd: string, ...answers: unknown[]) => {
-    const talk = answering(prompts as unknown as ReturnType<typeof clackDouble>, ...answers);
-    const written: string[] = [];
-    const capture = vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
-      written.push(String(chunk));
-      return true;
-    });
-    try {
-      const result = await asPerson(() =>
-        VariableRm.run(["SUPPORT_EMAIL", "--cwd", cwd, "--server", serverUrl, ...extraFlags]),
-      );
-      return { result, shown: written.join(""), talk };
-    } finally {
-      capture.mockRestore();
-    }
+  const removingOn = async (serverUrl: string, cwd: string, ...answers: Answer[]) => {
+    const talk = answering(...answers);
+    const result = await asPerson(() =>
+      VariableRm.run(["SUPPORT_EMAIL", "--cwd", cwd, "--server", serverUrl, ...extraFlags]),
+    );
+    return { result, shown: talk.shown(), talk };
   };
-  const removing = (cwd: string, ...answers: unknown[]) =>
+  const removing = (cwd: string, ...answers: Answer[]) =>
     removingOn(DEFAULT_SERVER, cwd, ...answers);
   const watchingDeletes = () => {
     const seen = { deleted: false };
@@ -1032,9 +1021,6 @@ describe("variable rm asked on a terminal", () => {
 
   afterEach(() => {
     extraFlags = [];
-    vi.mocked(confirm).mockReset();
-    vi.mocked(isCancel).mockReset();
-    vi.mocked(isCancel).mockReturnValue(false);
   });
 
   it("asks whether to remove the variable, naming the project and a remote server", async () => {
@@ -1074,7 +1060,7 @@ describe("variable rm asked on a terminal", () => {
   it("asks nothing when forced", async () => {
     const cwd = await makeProject();
     watchingDeletes();
-    const talk = answering(prompts as unknown as ReturnType<typeof clackDouble>);
+    const talk = answering();
 
     await asPerson(() =>
       VariableRm.run(["SUPPORT_EMAIL", "--cwd", cwd, "--server", DEFAULT_SERVER, "--force"]),
@@ -1088,20 +1074,12 @@ describe("variable rm asked on a terminal", () => {
     watchingDeletes();
 
     const answered = await removing(cwd, true);
-    const written: string[] = [];
-    const capture = vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
-      written.push(String(chunk));
-      return true;
-    });
-    try {
-      await asPerson(() =>
-        VariableRm.run(["SUPPORT_EMAIL", "--cwd", cwd, "--server", DEFAULT_SERVER, "--force"]),
-      );
-    } finally {
-      capture.mockRestore();
-    }
+    const forced = answering();
+    await asPerson(() =>
+      VariableRm.run(["SUPPORT_EMAIL", "--cwd", cwd, "--server", DEFAULT_SERVER, "--force"]),
+    );
 
-    expect(stripAnsi(answered.shown)).toBe(stripAnsi(written.join("")));
+    expect(lastLine(answered.talk.plain())).toBe(lastLine(forced.plain()));
   });
 
   it("is skipped, removing nothing, when the answer is no", async () => {
@@ -1130,10 +1108,7 @@ describe("variable rm asked on a terminal", () => {
 describe("variable set asked on a terminal", () => {
   it("asks what the value should be, as a question", async () => {
     const cwd = await makeProject();
-    const talk = answering(
-      prompts as unknown as ReturnType<typeof clackDouble>,
-      "support@acme.example",
-    );
+    const talk = answering("support@acme.example");
 
     await asPerson(() =>
       VariableSet.run(["SUPPORT_EMAIL", "--cwd", cwd, "--server", DEFAULT_SERVER]),
@@ -1201,6 +1176,7 @@ describe("variable rm", () => {
     expect(kinds.at(-1)).toBeNull();
     const json = parseJson(res.stdout) as { data: Record<string, unknown> };
     expect(json.data).toEqual({
+      title: "Removed SUPPORT_EMAIL from the project",
       name: "SUPPORT_EMAIL",
       deleted: true,
       kinds: ["primary", "preview"],

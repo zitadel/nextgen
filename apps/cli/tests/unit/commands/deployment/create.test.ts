@@ -62,7 +62,7 @@ describe("--release", () => {
       {
         code: "E_VALIDATION",
         message: expect.stringContaining("must be a release ID"),
-        hint: "Find one with `zitadel release list`.",
+        hint: "List the releases to find one.",
       },
     );
   });

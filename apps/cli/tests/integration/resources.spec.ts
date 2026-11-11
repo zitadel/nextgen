@@ -72,7 +72,12 @@ describe("resources", () => {
           command: "resources",
           source: "",
           status: "ok",
-          data: { items: expect.any(Array), count: expect.any(Number), next_page_token: null },
+          data: {
+            title: "Found 12 resources",
+            items: expect.any(Array),
+            count: expect.any(Number),
+            next_page_token: null,
+          },
           warnings: [],
         });
       });
@@ -91,7 +96,12 @@ describe("resources", () => {
           command: "resources",
           source: "",
           status: "ok",
-          data: { items: expect.any(Array), count: expect.any(Number), next_page_token: null },
+          data: {
+            title: "Found 12 resources",
+            items: expect.any(Array),
+            count: expect.any(Number),
+            next_page_token: null,
+          },
           warnings: [],
         });
       });
@@ -110,7 +120,12 @@ describe("resources", () => {
           command: "resources",
           source: "",
           status: "ok",
-          data: { items: expect.any(Array), count: expect.any(Number), next_page_token: null },
+          data: {
+            title: "Found 12 resources",
+            items: expect.any(Array),
+            count: expect.any(Number),
+            next_page_token: null,
+          },
           warnings: [],
         });
       });
@@ -190,7 +205,12 @@ describe("resources", () => {
           command: "resources",
           source: "",
           status: "ok",
-          data: { items: expect.any(Array), count: expect.any(Number), next_page_token: null },
+          data: {
+            title: "Found 12 resources",
+            items: expect.any(Array),
+            count: expect.any(Number),
+            next_page_token: null,
+          },
           warnings: [],
         });
       });
@@ -369,6 +389,7 @@ describe("resources", () => {
           source: MOCK_SERVER_URL,
           status: "ok",
           data: {
+            title: expect.stringMatching(/^Created identity provider connection idp_/),
             id: expect.stringMatching(/^idp_/),
             revision_id: expect.stringMatching(/^idprev_/),
             slug: "acme-sso",
@@ -420,6 +441,7 @@ describe("resources", () => {
           source: MOCK_SERVER_URL,
           status: "ok",
           data: {
+            title: "Read auth.factor.password.set",
             id: expect.stringMatching(/^pol_/),
             revision_id: expect.stringMatching(/^polrev_/),
             project_id: expect.stringMatching(/^proj-/),
@@ -446,6 +468,7 @@ describe("resources", () => {
           source: MOCK_SERVER_URL,
           status: "ok",
           data: {
+            title: "Found 1 user",
             items: [{ id: "usr_1", attributes: {} }],
             count: 1,
             next_page_token: cursor,
@@ -471,6 +494,7 @@ describe("resources", () => {
           source: MOCK_SERVER_URL,
           status: "ok",
           data: {
+            title: "Found 1 user",
             items: [{ id: "usr_1", attributes: {} }],
             count: 1,
             next_page_token: "cur-\u001b[2Jwiped",
@@ -518,11 +542,11 @@ describe("resources", () => {
           status: "error",
           cli_version: cliVersion.version,
           command: `${args[0]}:${args[1]}`,
-          source: "",
+          source: MOCK_SERVER_URL,
           code: "E_VALIDATION",
           message,
-          hint: `Find one with ${expectedPublicCliCommand(list)}.`,
-          next_commands: [expectedPublicCliCommand(list)],
+          hint: "List them to find one.",
+          next_commands: [expectedPublicCliCommand(`${list} --cwd ${app.path}`)],
           details: { argument: "id" },
         });
       });

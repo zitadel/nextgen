@@ -571,9 +571,9 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
     ];
     const args = changed ? [...leading, ...deploys] : leading;
     return {
-      // The message is a placeholder the caller fills in, so it is quoted in
-      // the command string and listed as written in `next_args`.
-      commands: portableSuggestions(args, this.cliVersion, [DEPLOY_MESSAGE]),
+      // The message is a placeholder the caller fills in: quoted in the
+      // command string and listed as written in `next_args`.
+      commands: portableSuggestions(args, this.cliVersion),
       args,
     };
   }
@@ -733,9 +733,8 @@ function refuseNoSignInLeft(input: NoSignInLeftRefusal): never {
   const cwdArgs = input.target.cwdArgs;
   const error = input.error;
   // Every suggestion as an argument list, the re-run first. The schema name
-  // comes from a file name and the --cwd path from the user; one that would
-  // need quoting leaves the strings out, because quoting differs between POSIX
-  // shells, PowerShell and cmd.exe and none is safe on all of them.
+  // comes from a file name and the --cwd path from the user, so the commands
+  // quote what needs it and the lists carry the words as they are.
   const alternatives = error.alternatives.map((method) => {
     return ["auth-method", method, "enable", ...optionArgs("--schema", schemaFlag), ...cwdArgs];
   });

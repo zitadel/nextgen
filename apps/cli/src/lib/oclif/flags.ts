@@ -26,7 +26,8 @@ export type Refused<T> = Readonly<{
  * `--server` a scoped suggestion repeats: the environment is resolved from the
  * flags, so there is none to repeat until they have all been read. The
  * command is whatever oclif hands a `parse`, so one invoked outside a run
- * suggests nothing rather than guessing a version.
+ * suggests nothing. The suggestion is the bare spelling, which the command's
+ * failure handler writes out in full with the `--cwd` the run was given.
  */
 export function suggesterOf(command: unknown): ((next: string) => SuggestedCommand) | undefined {
   const version = (command as { config?: { version?: unknown } } | undefined)?.config?.version;
@@ -34,7 +35,7 @@ export function suggesterOf(command: unknown): ((next: string) => SuggestedComma
     return undefined;
   }
   return (next) => {
-    return unscopedCommand(next, version);
+    return unscopedCommand(next);
   };
 }
 

@@ -97,6 +97,7 @@ export default class Reset extends Suggestible(Destructive(BaseCommand)) {
         apply: async (consent) => {
           await LocalServer.at(this.cwd, {
             cliVersion: this.cliVersion,
+            selector: this.cwdSelector(),
           }).reset(consent);
           const title = "Local Zitadel server runtime reset";
           return {

@@ -1,37 +1,26 @@
 import { stripVTControlCharacters as stripAnsi } from "node:util";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
-
-import { log, spinner } from "@clack/prompts";
-
+import { Chain } from "@/lib/ui/chain";
+import { Progress } from "@/lib/ui/progress";
 import { recordLog } from "@tests/helpers/log";
-import { type Drawing, Progress } from "@/lib/ui/progress";
+import { atTerminal, type Terminal } from "@tests/helpers/keyboard";
 
-/** A chain that remembers what progress asked of it, and draws nothing. */
-const chain = (
-  interactive: boolean,
-  chained = true,
-): Drawing & { opened: number; gaps: number } => ({
-  interactive,
-  chained,
-  opened: 0,
-  gaps: 0,
-  open() {
-    this.opened += 1;
-  },
-  closeGap() {
-    this.gaps += 1;
-  },
-});
+/** The chain progress draws into, as a person watching a wizard or a normal command sees it. */
+const chain = (interactive: boolean, chained = true): Chain =>
+  new Chain({ interactive, force: false }, chained ? "wizard" : "plain");
 
-/** Every line drawn in the chain, in order, with its mark. */
+let screen: Terminal;
+
+/**
+ * Every line drawn but the chain's heading, in order, with its mark, and the gutter left
+ * out. Clack puts two spaces after a mark; one reads the same here.
+ */
 const drawn = (): string[] =>
-  vi
-    .mocked(log.message)
-    .mock.calls.map(([text, options]) =>
-      `${stripAnsi(String(options?.symbol ?? ""))} ${stripAnsi(String(text))}`.trim(),
-    );
+  stripAnsi(screen.shown())
+    .split("\n")
+    .map((line) => line.trimEnd().replace(/^(\S) {2}/, "$1 "))
+    .filter((line) => line !== "" && line !== "│" && !line.startsWith("┌"));
 
 let recorded = recordLog();
 
@@ -40,13 +29,12 @@ const at = (level: string): string[] =>
   recorded.said.filter((line) => line.level === level).map((line) => line.text);
 
 beforeEach(() => {
+  screen = atTerminal();
   recorded = recordLog();
 });
 
 afterEach(() => {
   recorded.stop();
-  vi.restoreAllMocks();
-  vi.clearAllMocks();
 });
 
 describe("Progress", () => {
@@ -69,7 +57,6 @@ describe("Progress", () => {
     it("spins while it runs and says so when it is done", async () => {
       await new Progress(chain(true)).run("Removing the origin", async () => undefined);
 
-      expect(spinner).toHaveBeenCalled();
       expect(drawn()).toEqual(["✔ Removing the origin"]);
     });
 
@@ -120,11 +107,9 @@ describe("Progress", () => {
     });
 
     it("opens the chain before it draws into it", async () => {
-      const drawing = chain(true);
+      await new Progress(chain(true)).run("Fetching", async () => undefined);
 
-      await new Progress(drawing).run("Fetching", async () => undefined);
-
-      expect(drawing.opened).toBe(1);
+      expect(stripAnsi(screen.shown()).startsWith("┌")).toBe(true);
     });
 
     it("narrates as plain lines when nobody is watching", async () => {
@@ -132,7 +117,7 @@ describe("Progress", () => {
         report.done("Wrote", ".env.local");
       });
 
-      expect(spinner).not.toHaveBeenCalled();
+      expect(screen.shown()).toBe("");
       expect(at("start")).toEqual(["Fetching users"]);
       expect(at("info")).toEqual(["Wrote .env.local"]);
       expect(at("done")).toEqual(["Fetching users"]);
@@ -196,7 +181,7 @@ describe("Progress", () => {
       step.detail("package.json");
       step.done("Detected Next.js");
 
-      expect(spinner).not.toHaveBeenCalled();
+      expect(screen.shown()).toBe("");
       expect(at("info")).toEqual(["package.json"]);
       expect(at("done")).toEqual(["Detected Next.js"]);
     });
@@ -223,7 +208,7 @@ describe("progress for a command that draws no chain", () => {
   it("draws no gutter for work as a callback", async () => {
     await new Progress(chain(true, false)).run("Fetching variables", async () => undefined);
 
-    expect(log.message).not.toHaveBeenCalled();
+    expect(stripAnsi(screen.shown())).not.toContain("│");
   });
 
   it("says what the work ended on, as a plain line", async () => {
@@ -235,7 +220,7 @@ describe("progress for a command that draws no chain", () => {
   it("keeps its spinner out of the gutter too", async () => {
     await new Progress(chain(true, false)).run("Fetching variables", async () => undefined);
 
-    expect(spinner).toHaveBeenCalledWith(expect.objectContaining({ withGuide: false }));
+    expect(stripAnsi(screen.shown())).not.toContain("│");
   });
 
   it("indents what the work reported under its result", async () => {
@@ -249,12 +234,12 @@ describe("progress for a command that draws no chain", () => {
   it("draws no gutter for a hand-ended step either", () => {
     new Progress(chain(true, false)).begin("Fetching variables").done();
 
-    expect(log.message).not.toHaveBeenCalled();
+    expect(stripAnsi(screen.shown())).not.toContain("│");
   });
 
   it("still narrates with nobody watching, whatever the shape", async () => {
     await new Progress(chain(false, false)).run("Fetching variables", async () => undefined);
 
-    expect(spinner).not.toHaveBeenCalled();
+    expect(screen.shown()).toBe("");
   });
 });

@@ -39,7 +39,7 @@ const DEPLOYMENT_ID: Refused<string> = {
   schema: z.string().trim().pipe(RollbackDeploymentParams.shape.deployment_id),
   refusal: {
     message: "Invalid {input}: {problem}",
-    hint: "Find one with `zitadel deployment list`, or omit it to undo the last deploy.",
+    hint: "List the deployments to find one, or omit it to undo the last deploy.",
     next: ["deployment list"],
     details: {
       argument: "{input}",

@@ -1601,14 +1601,21 @@ describe("auth-method sso enable", () => {
   });
 
   describe("when the Project's path needs quoting", () => {
-    it("leaves the follow-ups out of next_commands", async ({ dir }) => {
+    it("quotes the path in the next_commands", async ({ dir }) => {
       const cwd = await aProject(join(dir, "my project"));
 
       const result = await withStdin(SECRET, () => {
         return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
       });
 
-      expect(parseJson(result.stdout)).toMatchObject({ data: { next_commands: [] } });
+      expect(parseJson(result.stdout)).toMatchObject({
+        data: {
+          next_commands: [
+            expect.stringMatching(/ deploy --dry-run --cwd '[^']+my project'$/),
+            expect.stringMatching(/ deploy -m '<what changed>' --cwd '[^']+my project'$/),
+          ],
+        },
+      });
     });
 
     it("still lists them as next_args", async ({ dir }) => {

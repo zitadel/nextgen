@@ -8,7 +8,6 @@ import {
   expireClaimWindow,
   snapshotPlatformStore,
 } from "@zitadel/api-mock/platform";
-import * as prompts from "@clack/prompts";
 import { HttpResponse, http, passthrough } from "msw";
 import { beforeEach, describe, expect, vi } from "vitest";
 
@@ -22,12 +21,10 @@ import {
 import Claim from "@/commands/claim";
 import { usePlatformServer } from "@tests/helpers/platform-project";
 import { parseJson, pressCtrlC, runCliForTest } from "@tests/helpers/run-cli";
-import { answering, type clackDouble } from "@tests/helpers/clack";
+import { answering } from "@tests/helpers/keyboard";
 import { asTerminal } from "@tests/helpers/terminal";
 
 import { aBinaryRecord } from "@tests/helpers/runtime-record";
-
-vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
 
 /**
  * `zitadel claim` against the api-mock, which is the only working claim
@@ -515,7 +512,7 @@ describe("claim", () => {
 
     // The built CLI bundles its own prompts, so a prompt can only be answered
     // by running the command from source, where `input` is the one module asked.
-    const talk = answering(prompts as unknown as ReturnType<typeof clackDouble>, envProject.id);
+    const talk = answering(envProject.id);
     await Promise.all([
       asTerminal(() => Claim.run(["--cwd", cwd, "--no-open", "--env", "production"])),
       onChallengeMinted((challengeId) => completeClaimChallenge(challengeId, envProject.id)),

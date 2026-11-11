@@ -18,7 +18,7 @@ const RELEASE: Refused<string> = {
   schema: z.string().trim().pipe(GetReleaseByIdParams.shape.release_id),
   refusal: {
     message: "Invalid {input}: {problem}",
-    hint: "Find one with `zitadel release list`.",
+    hint: "List the releases to find one.",
     next: ["release list"],
     details: {
       argument: "{input}",

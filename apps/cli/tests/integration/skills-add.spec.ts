@@ -46,7 +46,7 @@ describe("skills add", () => {
   describe("against an invalid server", () => {
     describe("that is not a zitadel api", () => {
       it("still succeeds", async () => {
-        const app = await anApp();
+        const app = await anApp({ usesClaudeCode: true });
         platform.isNotZitadel();
 
         const result = await app.run(["skills", "add", "--json"]);
@@ -57,7 +57,7 @@ describe("skills add", () => {
 
     describe("that is down", () => {
       it("still succeeds", async () => {
-        const app = await anApp();
+        const app = await anApp({ usesClaudeCode: true });
         platform.isUnavailable();
 
         const result = await app.run(["skills", "add", "--json"]);
@@ -68,7 +68,7 @@ describe("skills add", () => {
 
     describe("that refuses connections", () => {
       it("still succeeds", async () => {
-        const app = await anApp();
+        const app = await anApp({ usesClaudeCode: true });
         platform.refusesConnections();
 
         const result = await app.run(["skills", "add", "--json"]);
@@ -80,7 +80,7 @@ describe("skills add", () => {
 
   describe("against a valid server", () => {
     it("holds its invariants in every rendering", async () => {
-      const app = await anApp();
+      const app = await anApp({ usesClaudeCode: true });
       platform.servesAHostileOrigin();
       const args = ["skills", "add"];
 
@@ -89,7 +89,7 @@ describe("skills add", () => {
 
     describe("--json", () => {
       it("reports the skills it added", async () => {
-        const app = await anApp();
+        const app = await anApp({ usesClaudeCode: true });
 
         const result = await app.run(["skills", "add", "--json"]);
 
@@ -104,7 +104,7 @@ describe("skills add", () => {
       });
 
       it("reports the same again when the skills are already this version's", async () => {
-        const app = await anApp();
+        const app = await anApp({ usesClaudeCode: true });
         await app.run(["skills", "add", "--json"]);
 
         const result = await app.run(["skills", "add", "--json"]);
@@ -120,7 +120,7 @@ describe("skills add", () => {
       });
 
       it("reports a dry run, with the real command to run next", async () => {
-        const app = await anApp();
+        const app = await anApp({ usesClaudeCode: true });
 
         const result = await app.run(["skills", "add", "--dry-run", "--json"]);
 
@@ -141,7 +141,7 @@ describe("skills add", () => {
       });
 
       it("adds the skills the CLI ships, with the files they reference", async () => {
-        const app = await anApp();
+        const app = await anApp({ usesClaudeCode: true });
         const before = await app.snapshot();
 
         expect(await app.run(["skills", "add", "--json"])).toSucceed();
@@ -159,7 +159,7 @@ describe("skills add", () => {
       });
 
       it("changes nothing when the skills are already this version's", async () => {
-        const app = await anApp();
+        const app = await anApp({ usesClaudeCode: true });
         await app.run(["skills", "add", "--json"]);
         const before = await app.snapshot();
 
@@ -170,7 +170,7 @@ describe("skills add", () => {
       });
 
       it("adds nothing on a dry run", async () => {
-        const app = await anApp();
+        const app = await anApp({ usesClaudeCode: true });
         const before = await app.snapshot();
 
         expect(await app.run(["skills", "add", "--dry-run", "--json"])).toSucceed();
@@ -182,7 +182,7 @@ describe("skills add", () => {
 
     describe("rendered for a terminal", () => {
       it("heads the text with the headline the envelope carries", async () => {
-        const app = await anApp();
+        const app = await anApp({ usesClaudeCode: true });
 
         const result = await app.run(["skills", "add"]);
 
@@ -190,7 +190,7 @@ describe("skills add", () => {
       });
 
       it("heads a dry run with the headline the envelope carries", async () => {
-        const app = await anApp();
+        const app = await anApp({ usesClaudeCode: true });
 
         const result = await app.run(["skills", "add", "--dry-run"]);
 
@@ -198,7 +198,7 @@ describe("skills add", () => {
       });
 
       it("names the folder agents read the skills from", async () => {
-        const app = await anApp();
+        const app = await anApp({ usesClaudeCode: true });
 
         const result = await app.run(["skills", "add"]);
 
@@ -206,7 +206,7 @@ describe("skills add", () => {
       });
 
       it("names the folder Claude Code reads the skills from", async () => {
-        const app = await anApp();
+        const app = await anApp({ usesClaudeCode: true });
 
         const result = await app.run(["skills", "add"]);
 
@@ -214,7 +214,7 @@ describe("skills add", () => {
       });
 
       it("names the real command after a dry run", async () => {
-        const app = await anApp();
+        const app = await anApp({ usesClaudeCode: true });
 
         const result = await app.run(["skills", "add", "--dry-run"]);
 
@@ -222,7 +222,7 @@ describe("skills add", () => {
       });
 
       it("says each skill folder once", async () => {
-        const app = await anApp();
+        const app = await anApp({ usesClaudeCode: true });
 
         const result = await app.run(["skills", "add"]);
 

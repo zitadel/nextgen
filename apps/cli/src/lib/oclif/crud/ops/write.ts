@@ -220,6 +220,7 @@ abstract class WriteOperation<
           schema: spec.schema as ZodLike,
           references: options.references,
         },
+        next: await this.realRun(),
       });
     }
 

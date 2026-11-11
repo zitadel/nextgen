@@ -113,6 +113,7 @@ describe("policies test", () => {
           source: MOCK_SERVER_URL,
           status: "ok",
           data: {
+            title: "2 passed",
             source: "files",
             operations: [
               {
@@ -197,6 +198,7 @@ describe("policies test", () => {
           source: MOCK_SERVER_URL,
           status: "ok",
           data: {
+            title: "1 passed",
             source: "release",
             release_id: releaseId,
             operations: [
@@ -236,6 +238,7 @@ describe("policies test", () => {
           source: MOCK_SERVER_URL,
           status: "ok",
           data: {
+            title: "1 passed",
             source: "release",
             release_id: releaseId,
             operations: [
@@ -273,6 +276,7 @@ describe("policies test", () => {
           source: MOCK_SERVER_URL,
           status: "ok",
           data: {
+            title: "1 passed",
             source: "files",
             operations: [
               {
@@ -332,6 +336,7 @@ describe("policies test", () => {
           source: MOCK_SERVER_URL,
           status: "skipped",
           reason: "no-policy-tests",
+          data: { title: "No policy test files in .zitadel/policies" },
         });
       });
 

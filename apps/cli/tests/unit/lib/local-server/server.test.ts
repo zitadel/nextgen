@@ -15,6 +15,7 @@ import {
   writeRuntimeMetadata,
 } from "@/lib/local-server/runtime";
 import { LocalServer } from "@/lib/local-server/server";
+import { asEnvironmentSelector } from "@/lib/suggestion";
 import { aFakeServerBinary, trackLocalServer, useLocalServers } from "@tests/helpers/local-server";
 import { forcedConsent } from "@tests/helpers/consent";
 import { it } from "@tests/helpers/fixtures";
@@ -44,7 +45,9 @@ async function directory(): Promise<string> {
   return dir;
 }
 
-const at = (cwd: string) => LocalServer.at(cwd, { cliVersion: "0.0.0-test" });
+const at = (cwd: string) => {
+  return LocalServer.at(cwd, { cliVersion: "0.0.0-test", selector: asEnvironmentSelector("") });
+};
 
 /** A record whose process is long gone, in a directory that has data. */
 async function directoryWithAGoneServer(): Promise<string> {

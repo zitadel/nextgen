@@ -265,7 +265,7 @@ describe("preview", () => {
           status: "error",
           cli_version: expect.any(String),
           command: "preview",
-          source: "",
+          source: "http://mock.zitadel.test",
           code: "E_VALIDATION",
           message: `${ttl} is outside the allowed range`,
           hint: "A preview lives between 60s and 365d.",
@@ -524,6 +524,7 @@ describe("preview", () => {
           command: "preview",
           source: "http://mock.zitadel.test",
           reason: "nothing-to-preview",
+          data: { title: "nothing to preview — set ZITADEL_ENV=preview in the pull-request build" },
           warnings: [UNNAMED_CI_WARNING],
         });
       });
@@ -544,6 +545,7 @@ describe("preview", () => {
           command: "preview",
           source: "http://mock.zitadel.test",
           reason: "nothing-to-preview",
+          data: { title: "nothing to preview — set ZITADEL_ENV=preview in the pull-request build" },
           warnings: [UNNAMED_CI_WARNING],
         });
       });
@@ -649,7 +651,7 @@ describe("preview", () => {
           status: "error",
           cli_version: expect.any(String),
           command: "preview",
-          source: "",
+          source: "http://mock.zitadel.test",
           code: "E_VALIDATION",
           message: "A preview cannot target the primary origins",
           hint: "Pass the preview URLs with --origin; production is deployed after merge.",
@@ -708,7 +710,7 @@ describe("preview", () => {
           status: "error",
           cli_version: expect.any(String),
           command: "preview",
-          source: "",
+          source: "http://mock.zitadel.test",
           code: "E_VALIDATION",
           message: "400d is outside the allowed range",
           hint: "A preview lives between 60s and 365d.",
@@ -743,6 +745,7 @@ describe("preview", () => {
           command: "preview",
           source: "http://mock.zitadel.test",
           reason: "nothing-to-preview",
+          data: { title: "nothing to preview — production is deployed after merge" },
         });
       });
 
@@ -764,6 +767,7 @@ describe("preview", () => {
           command: "preview",
           source: "http://mock.zitadel.test",
           reason: "nothing-to-preview",
+          data: { title: "nothing to preview — production is deployed after merge" },
         });
       });
 
@@ -794,6 +798,7 @@ describe("preview", () => {
           command: "preview",
           source: "http://mock.zitadel.test",
           reason: "no-preview-credential",
+          data: { title: "no preview credential (ZITADEL_PROJECT_SECRET) — preview skipped" },
           warnings: [
             `No preview credential (${CREDENTIALS[PREVIEW_CREDENTIAL]}) is set, so the preview is skipped; a fork pull-request build cannot read it. Pass --strict to fail instead.`,
           ],

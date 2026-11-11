@@ -308,10 +308,12 @@ Each invocation prints one JSON object:
 
 - `status`: `ok` | `skipped` | `error`.
 - `cli_version`, `command`, `source`: always present.
-- On success: `data` with the command-specific payload.
+- On success: `data` with the command-specific payload, and the headline the
+  terminal draws as `data.title` (except `api`, whose `data` is the response
+  body as it came).
 - On a no-op: `reason` (e.g. `already-initialized`, `already-claimed`,
-  `nothing-to-eject`). `skipped` means nothing was done because a person
-  declined or there was nothing to do.
+  `nothing-to-eject`) and the headline it draws as `data.title`. `skipped` means
+  nothing was done because a person declined or there was nothing to do.
 - A dry run (`--dry-run`) answers `ok` with `data.dry_run: true` and a headline
   ending in `(dry run)` as `data.title`, never `skipped`, and `next_commands` holds
   the real command to run.
@@ -509,7 +511,9 @@ ran. Every other command ends on its result, with any next steps under `Next:`
 and one dim footer line saying what it amounts to and where it ran; `status`
 also ends on `Explore all commands:`. Where stdout is data a script reads (a
 piped or `--plain` list, a resource's created or updated JSON) the next steps go
-to stderr under `Next:`, so stdout holds only that data. A failure is written to
+to stderr under `Next:`, so stdout holds only that data; so do a piped list's footer
+and its empty-list line. A list's next-page command carries `--json` only when
+the run was `--json`. A failure is written to
 stderr, except inside a chain that is already drawn.
 
 Text the server returns cannot drive the reader's terminal, in `--json` as in
@@ -750,9 +754,8 @@ directory or the nearest parent that has it (up to the home directory), so
 `mkdir my-app && cd my-app` after `start` works too. `doctor` checks that
 server and its port, but runs its project checks in the working directory, so run
 it from the app. When that server is unhealthy it suggests `start` and
-`reset --force` with `--cwd` set to the directory that holds it (when that path needs
-shell quoting the commands are left out, the hint names the directory, and
-`doctor --json` returns the argument lists in `details.suggested_args` to run as they are).
+`reset --force` with `--cwd` set to the directory that holds it (quoted where the path
+needs it; `doctor --json` also returns the argument lists in `details.suggested_args`).
 The hint says the server is the parent's and that `reset --force` deletes the data in that
 directory, and it adds a plain `start`, which gives the working directory a server of its own
 because `start` does not look in parents; a healthy parent server is reported in the `runtime`

@@ -321,7 +321,7 @@ describe("deployment_id", () => {
     ).rejects.toMatchObject({
       code: "E_VALIDATION",
       message: expect.stringContaining("must be a deployment ID"),
-      hint: "Find one with `zitadel deployment list`, or omit it to read the live deployment.",
+      hint: "List the deployments to find one, or omit it to read the live deployment.",
     });
   });
 });

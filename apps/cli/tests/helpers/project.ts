@@ -417,6 +417,18 @@ function customFlags(connection: CustomConnection, prefix: string): string[] {
  * and not how it stores things: a corrupt file matters only insofar as a later
  * command surfaces it. Sync state and the mock's own store are never read.
  */
+/**
+ * The identity the developer committed with, as `git -c` gives it: setup commits
+ * as the developer on every machine, a CI runner with no git identity included.
+ */
+const DEVELOPER_GIT = {
+  GIT_CONFIG_COUNT: "2",
+  GIT_CONFIG_KEY_0: "user.name",
+  GIT_CONFIG_VALUE_0: "Dev",
+  GIT_CONFIG_KEY_1: "user.email",
+  GIT_CONFIG_VALUE_1: "dev@example.com",
+};
+
 export class ScaffoldedApp {
   readonly path: string;
   readonly committed: CommittedFiles;
@@ -432,14 +444,15 @@ export class ScaffoldedApp {
     env: NodeJS.ProcessEnv = {},
   ): Promise<CliResult> {
     if (!install) {
-      return this.cli(
-        ["setup", "--non-interactive", "--json", "--skip-install", ...extraArgs],
-        env,
-      );
+      return this.cli(["setup", "--non-interactive", "--json", "--skip-install", ...extraArgs], {
+        ...DEVELOPER_GIT,
+        ...env,
+      });
     }
     const npm = await fakePackageManager();
     this.installLogPath = npm.logPath;
     return this.cli(["setup", "--non-interactive", "--json", ...extraArgs], {
+      ...DEVELOPER_GIT,
       PACKAGE_MANAGER_LOG: npm.logPath,
       PATH: `${npm.binDir}:${process.env.PATH ?? ""}`,
     });
@@ -542,7 +555,10 @@ export class ScaffoldedApp {
 
   /** `setup` without `--json`, for a spec asserting what the developer reads. */
   setupRendered(extraArgs: string[] = [], env: NodeJS.ProcessEnv = {}): Promise<CliResult> {
-    return this.cli(["setup", "--non-interactive", "--skip-install", ...extraArgs], env);
+    return this.cli(["setup", "--non-interactive", "--skip-install", ...extraArgs], {
+      ...DEVELOPER_GIT,
+      ...env,
+    });
   }
 
   /**
@@ -560,7 +576,10 @@ export class ScaffoldedApp {
         "next",
         ...extraArgs,
       ],
-      { PATH: await aFakeAppGeneratorPath() },
+      {
+        ...DEVELOPER_GIT,
+        PATH: await aFakeAppGeneratorPath(),
+      },
     );
   }
 
@@ -2661,10 +2680,15 @@ function assertDataShape(where: string, envelope: ContractEnvelope): void {
  */
 export async function anApp({
   nextVersion = "^16.0.0",
+  usesClaudeCode = false,
 }: {
   nextVersion?: string;
+  usesClaudeCode?: boolean;
 } = {}): Promise<ScaffoldedApp> {
   const path = await mkdtemp(join(tmpdir(), "zitadel-next-"));
+  if (usesClaudeCode) {
+    await mkdir(join(path, ".claude"), { recursive: true });
+  }
 
   await mkdir(join(path, "app"), { recursive: true });
   await writeFile(

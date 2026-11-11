@@ -59,30 +59,19 @@ export default class VariableRm extends Destructive(EnvironmentCommand) {
           const what = removal.preview ? "the preview value of " : "";
           return `Remove ${what}${args.name} from project ${projectId} on ${server.replace(/^https?:\/\//, "")}?`;
         },
-        preview: () => {
+        preview: async () => {
           const result = dryRunResult({
             verb: "remove",
             topic: "variable",
             id: args.name,
             clause: `from the project${suffix}`,
+            next: await this.realRun(),
           });
           return {
             ...result,
             data: {
               ...(result.data as object),
               kinds: removal.kinds,
-            },
-            next: {
-              commands: [
-                this.suggest(
-                  [
-                    "variable rm",
-                    args.name,
-                    ...(flags.force ? ["--force"] : []),
-                    ...(removal.preview ? ["--preview"] : []),
-                  ].join(" "),
-                ),
-              ],
             },
           };
         },

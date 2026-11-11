@@ -31,7 +31,7 @@ describe("variable set", () => {
         status: "error",
         cli_version: cliVersion.version,
         command: "variable:set",
-        source: "",
+        source: "http://mock.zitadel.test",
         code: "E_VALIDATION",
         message,
         hint: "A variable name contains only letters, digits and underscores.",
@@ -47,7 +47,7 @@ describe("variable set", () => {
         status: "error",
         cli_version: cliVersion.version,
         command: "variable:set",
-        source: "",
+        source: "http://mock.zitadel.test",
         code: "E_VALIDATION",
         message: "Variable name is 256 characters; the limit is 255.",
         hint: "Shorten the name.",
@@ -63,7 +63,7 @@ describe("variable set", () => {
         status: "error",
         cli_version: cliVersion.version,
         command: "variable:set",
-        source: "",
+        source: "http://mock.zitadel.test",
         code: "E_VALIDATION",
         message: 'Invalid variable name "GOOGLE-CLIENT".',
         hint: "A variable name contains only letters, digits and underscores.",
@@ -419,6 +419,7 @@ describe("variable set", () => {
           command: "variable:set",
           source: "http://mock.zitadel.test",
           data: {
+            title: "Set FOO on the project",
             name: "FOO",
             type: "string",
             kinds: ["primary", "preview"],
@@ -442,6 +443,7 @@ describe("variable set", () => {
           command: "variable:set",
           source: "http://mock.zitadel.test",
           data: {
+            title: "Set FOO on the project",
             name: "FOO",
             type: "string",
             kinds: ["primary", "preview"],
@@ -467,6 +469,7 @@ describe("variable set", () => {
           command: "variable:set",
           source: "http://mock.zitadel.test",
           data: {
+            title: "Set RETRIES on the project",
             name: "RETRIES",
             type: "number",
             kinds: ["primary", "preview"],
@@ -490,6 +493,7 @@ describe("variable set", () => {
           command: "variable:set",
           source: "http://mock.zitadel.test",
           data: {
+            title: "Set TOKEN on the project",
             name: "TOKEN",
             type: "string",
             kinds: ["primary"],
@@ -514,6 +518,7 @@ describe("variable set", () => {
           command: "variable:set",
           source: "http://mock.zitadel.test",
           data: {
+            title: "Set BANNER on the project",
             name: "BANNER",
             type: "string",
             kinds: ["primary", "preview"],
@@ -540,6 +545,7 @@ describe("variable set", () => {
           command: "variable:set",
           source: "http://mock.zitadel.test",
           data: {
+            title: "Set API_URL on the project",
             name: "API_URL",
             type: "string",
             kinds: ["preview"],
@@ -588,6 +594,7 @@ describe("variable set", () => {
           command: "variable:set",
           source: "http://mock.zitadel.test",
           data: {
+            title: "Set FOO on the project",
             name: "FOO",
             type: "string",
             kinds: ["preview"],
@@ -616,6 +623,7 @@ describe("variable set", () => {
           command: "variable:set",
           source: "http://mock.zitadel.test",
           data: {
+            title: "Set FOO on the project",
             name: "FOO",
             type: "string",
             kinds: ["preview"],

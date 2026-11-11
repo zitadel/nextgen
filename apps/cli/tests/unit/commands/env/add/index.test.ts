@@ -4,9 +4,8 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import * as prompts from "@clack/prompts";
 import { HttpResponse, http } from "msw";
-import { afterEach, describe, expect, vi } from "vitest";
+import { afterEach, describe, expect } from "vitest";
 
 import { it } from "@tests/helpers/fixtures";
 
@@ -17,13 +16,10 @@ import {
   runCliForTest,
   stripAnsi,
 } from "@tests/helpers/run-cli";
-import { answering, type clackDouble } from "@tests/helpers/clack";
+import { type Answer, answering } from "@tests/helpers/keyboard";
 import { asOneLine, asTerminal } from "@tests/helpers/terminal";
 
-vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
-
-const personAnswering = (...answers: unknown[]) =>
-  answering(prompts as unknown as ReturnType<typeof clackDouble>, ...answers);
+const personAnswering = (...answers: Answer[]) => answering(...answers);
 
 const SERVER = "https://api.zitadel.example";
 
@@ -752,30 +748,21 @@ describe("env add asked on a terminal", () => {
   const OFFER = "Would you like to deploy .zitadel/ to it now?";
 
   /** Adds `staging` with a person at the terminal giving `answers`. */
-  const adding = async (cwd: string, answers: readonly unknown[], ...extra: string[]) => {
+  const adding = async (cwd: string, answers: readonly Answer[], ...extra: string[]) => {
     const talk = personAnswering(...answers);
-    const written: string[] = [];
-    const capture = vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
-      written.push(String(chunk));
-      return true;
-    });
-    try {
-      const result = await asTerminal(() =>
-        EnvAdd.run([
-          "staging",
-          "--cwd",
-          cwd,
-          "--server",
-          SERVER,
-          "--app-url",
-          "https://app.acme.com",
-          ...extra,
-        ]),
-      );
-      return { envelope: result, shown: stripAnsi(written.join("")), asked: talk.asked() };
-    } finally {
-      capture.mockRestore();
-    }
+    const result = await asTerminal(() =>
+      EnvAdd.run([
+        "staging",
+        "--cwd",
+        cwd,
+        "--server",
+        SERVER,
+        "--app-url",
+        "https://app.acme.com",
+        ...extra,
+      ]),
+    );
+    return { envelope: result, shown: talk.plain(), asked: talk.asked() };
   };
 
   it("deploys the project when the offer is accepted", async ({ server }) => {

@@ -295,6 +295,7 @@ describe("preview rm", () => {
           command: "preview:rm",
           source: "http://mock.zitadel.test",
           reason: "not-live",
+          data: { title: "Nothing was removed" },
           next_commands: [expectedPublicCliCommand(app.againAsRun("preview list"))],
         });
       });
@@ -319,6 +320,7 @@ describe("preview rm", () => {
           command: "preview:rm",
           source: "http://mock.zitadel.test",
           reason: "not-live",
+          data: { title: "Nothing was removed" },
           next_commands: [expectedPublicCliCommand(app.againAsRun("preview list --env preview"))],
         });
       });

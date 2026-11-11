@@ -82,6 +82,7 @@ export default class Stop extends Suggestible(BaseCommand) {
 
     const { stopped, outcome } = await LocalServer.at(this.cwd, {
       cliVersion: this.cliVersion,
+      selector: this.cwdSelector(),
     }).stop();
 
     const title = stopped ? "Local Zitadel server stopped" : "Local Zitadel server was not running";

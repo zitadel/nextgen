@@ -6,6 +6,7 @@ import { nonBlankArg, taken } from "@/lib/oclif/flags";
 import { named } from "@/lib/oclif/names";
 import { prose } from "@/lib/oclif/rendering";
 import type { CommandResult } from "@/lib/oclif/types";
+import type { SuggestedCommand } from "@/lib/suggestion";
 import { escapeControlCharacters, escapeJsonControlCharacters } from "@/lib/terminal-text";
 
 import { type CredentialContext, redactCredentials } from "./secrets";
@@ -34,9 +35,7 @@ export const idArg = <Ctx>(resource: ResourceDescriptor<Ctx>, topic?: string) =>
             schema: z.string().trim().pipe(resource.idSchema),
             refusal: {
               message: "Invalid {input}: {problem}",
-              hint: lists
-                ? `Find one with \`zitadel ${topic} list\`.`
-                : "Pass the id exactly as it was listed.",
+              hint: lists ? "List them to find one." : "Pass the id exactly as it was listed.",
               next: lists ? [`${topic} list`] : undefined,
               details: {
                 argument: "{input}",
@@ -113,6 +112,8 @@ export type DryRun = Readonly<{
   /** What the server answered when asked to check the write; absent when it was not asked. */
   checked?: Json;
   context?: CredentialContext;
+  /** The real command: this run again without `--dry-run`, which the command builds (`realRun`). */
+  next: SuggestedCommand;
 }>;
 
 export const dryRunResult = ({
@@ -124,6 +125,7 @@ export const dryRunResult = ({
   body,
   checked,
   context,
+  next,
 }: DryRun): CommandResult => {
   // A body that came from a file may legitimately hold a credential; a preview
   // of it must not put that value on screen or into a CI log. Only the
@@ -157,6 +159,7 @@ export const dryRunResult = ({
       ...(result === undefined ? {} : { result }),
     },
     pretty: prose(`Would ${verb} ${subject} (dry run)${printed}${verdict}`),
+    next: { commands: [next] },
     summary: {
       title,
       sections: [],

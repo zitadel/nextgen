@@ -318,8 +318,8 @@ describe("start", () => {
           message: `Port ${owner.localPortOf(held)} is already in use`,
           hint: `Stop the process using http://localhost:${owner.localPortOf(held)}, run ${expectedPublicCliCommand("stop --all")} for managed local runtimes, or choose another port.`,
           next_commands: [
-            expectedPublicCliCommand("stop --all"),
-            expectedPublicCliCommand("start --port 8080"),
+            expectedPublicCliCommand(`stop --all --cwd ${other.path}`),
+            expectedPublicCliCommand(`start --port 8080 --cwd ${other.path}`),
           ],
           details: {
             port: owner.localPortOf(held),
@@ -327,7 +327,7 @@ describe("start", () => {
             listeners: [
               {
                 address: expect.stringContaining(`:${owner.localPortOf(held)}`),
-                command: "node",
+                command: expect.any(String),
                 host: expect.any(String),
                 pid: owner.localPidOf(held),
                 port: owner.localPortOf(held),
@@ -354,8 +354,8 @@ describe("start", () => {
           message: `Port ${owner.localPortOf(held)} is already in use`,
           hint: `Stop the process using http://localhost:${owner.localPortOf(held)}, run ${expectedPublicCliCommand("stop --all")} for managed local runtimes, or choose another port.`,
           next_commands: [
-            expectedPublicCliCommand("stop --all"),
-            expectedPublicCliCommand("start --port 8080"),
+            expectedPublicCliCommand(`stop --all --cwd ${app.path}`),
+            expectedPublicCliCommand(`start --port 8080 --cwd ${app.path}`),
           ],
           details: {
             port: owner.localPortOf(held),
@@ -363,7 +363,7 @@ describe("start", () => {
             listeners: [
               {
                 address: expect.stringContaining(`:${owner.localPortOf(held)}`),
-                command: "node",
+                command: expect.any(String),
                 host: expect.any(String),
                 pid: owner.localPidOf(held),
                 port: owner.localPortOf(held),

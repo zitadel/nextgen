@@ -105,7 +105,9 @@
   `this.suggest(...)` in where one names a follow-up: a refusal raised without
   a suggester goes without its follow-ups.
   - A refusal raised while a flag parses names its follow-ups too, unscoped —
-    the environment comes from the flags, so there is none to repeat yet. A
+    the environment comes from the flags, so there is none to repeat yet, but
+    the failure handler puts the `--cwd` read from the command line on any bare
+    `zitadel …` follow-up, as it does for one raised below a command. A
     flag whose own `parse` refuses in more than one way passes
     `suggesterOf(command)` (`src/lib/oclif/flags.ts`), as `--design` does.
   - A `next` entry that is only a placeholder takes its value as it is, so a

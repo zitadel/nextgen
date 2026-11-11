@@ -31,7 +31,7 @@ describe("variable rm", () => {
         status: "error",
         cli_version: cliVersion.version,
         command: "variable:rm",
-        source: "",
+        source: "http://mock.zitadel.test",
         code: "E_VALIDATION",
         message,
         hint: "A variable name contains only letters, digits and underscores.",
@@ -47,7 +47,7 @@ describe("variable rm", () => {
         status: "error",
         cli_version: cliVersion.version,
         command: "variable:rm",
-        source: "",
+        source: "http://mock.zitadel.test",
         code: "E_VALIDATION",
         message: "Variable name is 256 characters; the limit is 255.",
         hint: "Shorten the name.",
@@ -63,7 +63,7 @@ describe("variable rm", () => {
         status: "error",
         cli_version: cliVersion.version,
         command: "variable:rm",
-        source: "",
+        source: "http://mock.zitadel.test",
         code: "E_VALIDATION",
         message: 'Invalid variable name "GOOGLE-CLIENT".',
         hint: "A variable name contains only letters, digits and underscores.",
@@ -209,7 +209,12 @@ describe("variable rm", () => {
           cli_version: cliVersion.version,
           command: "variable:rm",
           source: "http://mock.zitadel.test",
-          data: { name: "FOO", deleted: true, kinds: ["primary", "preview"] },
+          data: {
+            title: "Removed FOO from the project",
+            name: "FOO",
+            deleted: true,
+            kinds: ["primary", "preview"],
+          },
           warnings: [],
         });
       });
@@ -225,7 +230,12 @@ describe("variable rm", () => {
           cli_version: cliVersion.version,
           command: "variable:rm",
           source: "http://mock.zitadel.test",
-          data: { name: "FOO", deleted: true, kinds: ["preview"] },
+          data: {
+            title: "Removed FOO from the project (preview)",
+            name: "FOO",
+            deleted: true,
+            kinds: ["preview"],
+          },
           warnings: [],
         });
       });
@@ -241,7 +251,12 @@ describe("variable rm", () => {
           cli_version: cliVersion.version,
           command: "variable:rm",
           source: "http://mock.zitadel.test",
-          data: { name: "TOKEN", deleted: true, kinds: ["primary", "preview"] },
+          data: {
+            title: "Removed TOKEN from the project",
+            name: "TOKEN",
+            deleted: true,
+            kinds: ["primary", "preview"],
+          },
           warnings: [],
         });
         expect(result.stdout + result.stderr).not.toContain("s3cret");

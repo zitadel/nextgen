@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { unscopedCommand } from "@/lib/suggestion";
 import { article, capitalize, dryRunResult, idArg, parseOrThrow } from "@/lib/oclif/crud/shared";
+
+const REAL = unscopedCommand("users delete user_1");
 
 describe("parseOrThrow", () => {
   const schema = z.object({ name: z.string() }).strict();
@@ -26,7 +29,12 @@ describe("parseOrThrow", () => {
 
 describe("dryRunResult", () => {
   it("describes a write with its body", () => {
-    const result = dryRunResult({ verb: "create", topic: "users", body: { schema: "s" } });
+    const result = dryRunResult({
+      verb: "create",
+      topic: "users",
+      body: { schema: "s" },
+      next: REAL,
+    });
     expect(result).toMatchObject({
       status: "ok",
       data: { dry_run: true, verb: "create", topic: "users", body: { schema: "s" } },
@@ -36,6 +44,7 @@ describe("dryRunResult", () => {
 
   it("reports what the server answered when it was asked", () => {
     const result = dryRunResult({
+      next: REAL,
       verb: "update",
       topic: "users",
       id: "user_1",
@@ -50,6 +59,7 @@ describe("dryRunResult", () => {
 
   it("masks a credential in the server's answer as it does in the body", () => {
     const result = dryRunResult({
+      next: REAL,
       verb: "update",
       topic: "users",
       id: "user_1",
@@ -59,17 +69,20 @@ describe("dryRunResult", () => {
   });
 
   it("leaves the answer out when the server was not asked", () => {
-    expect(dryRunResult({ verb: "create", topic: "users" }).data).not.toHaveProperty("result");
+    expect(dryRunResult({ verb: "create", topic: "users", next: REAL }).data).not.toHaveProperty(
+      "result",
+    );
   });
 
   it("describes a delete by id without a body", () => {
-    expect(dryRunResult({ verb: "revoke", topic: "sessions", id: "sess_1" }).pretty?.text).toBe(
-      "Would revoke sessions sess_1 (dry run)",
-    );
+    expect(
+      dryRunResult({ verb: "revoke", topic: "sessions", id: "sess_1", next: REAL }).pretty?.text,
+    ).toBe("Would revoke sessions sess_1 (dry run)");
   });
 
   it("spells the body the way JSON does, so the block a reader copies parses", () => {
     const result = dryRunResult({
+      next: REAL,
       verb: "create",
       topic: "users",
       body: { attributes: { nickname: "a\u009bb" } },
@@ -81,21 +94,30 @@ describe("dryRunResult", () => {
   });
 });
 
+describe("dryRunResult next step", () => {
+  it("offers the real command as the one next command", () => {
+    const result = dryRunResult({ verb: "delete", topic: "users", id: "user_1", next: REAL });
+
+    expect(result).toMatchObject({ next: { commands: [REAL] } });
+  });
+});
+
 describe("dryRunResult summary", () => {
   it("titles the summary with what would happen", () => {
-    expect(dryRunResult({ verb: "create", topic: "users" }).summary?.title).toBe(
+    expect(dryRunResult({ verb: "create", topic: "users", next: REAL }).summary?.title).toBe(
       "Would create users (dry run)",
     );
   });
 
   it("gives the envelope the title the terminal draws", () => {
-    const result = dryRunResult({ verb: "create", topic: "users" });
+    const result = dryRunResult({ verb: "create", topic: "users", next: REAL });
 
     expect(result).toMatchObject({ data: { title: "Would create users (dry run)" } });
   });
 
   it("names the resource by its noun in the title and keeps the topic in the data", () => {
     const result = dryRunResult({
+      next: REAL,
       verb: "delete",
       topic: "idps",
       noun: "identity provider",
@@ -108,13 +130,15 @@ describe("dryRunResult summary", () => {
   });
 
   it("draws the title as one line when the id has a line break in it", () => {
-    const title = dryRunResult({ verb: "remove", topic: "origin", id: "a\nb" }).summary?.title;
+    const title = dryRunResult({ verb: "remove", topic: "origin", id: "a\nb", next: REAL }).summary
+      ?.title;
 
     expect(title).toBe("Would remove origin a\\x0ab (dry run)");
   });
 
   it("spells out an escape byte in the title", () => {
-    const title = dryRunResult({ verb: "create", topic: "users\u001b[2J" }).summary?.title;
+    const title = dryRunResult({ verb: "create", topic: "users\u001b[2J", next: REAL }).summary
+      ?.title;
 
     expect(title).toBe("Would create users\\x1b[2J (dry run)");
     expect(title).not.toContain("\u001b");
@@ -124,6 +148,7 @@ describe("dryRunResult summary", () => {
 describe("dryRunResult redaction", () => {
   it("masks a credential that reached the body legitimately, from a file", () => {
     const result = dryRunResult({
+      next: REAL,
       verb: "create",
       topic: "users",
       body: {

@@ -92,6 +92,7 @@ describe("deployment get", () => {
           source: MOCK_SERVER_URL,
           status: "ok",
           data: {
+            title: `Read ${deployed.deployment_id}`,
             id: deployed.deployment_id,
             project_id: expect.stringMatching(/^proj-/),
             release_id: deployed.release_id,
@@ -126,6 +127,7 @@ describe("deployment get", () => {
           source: MOCK_SERVER_URL,
           status: "ok",
           data: {
+            title: `Read ${deployed.deployment_id}`,
             id: deployed.deployment_id,
             project_id: expect.stringMatching(/^proj-/),
             release_id: deployed.release_id,
@@ -159,6 +161,7 @@ describe("deployment get", () => {
           source: MOCK_SERVER_URL,
           status: "ok",
           data: {
+            title: `Read ${deployed.deployment_id}`,
             id: deployed.deployment_id,
             project_id: "proj_1",
             release_id: "rel_1",
@@ -182,12 +185,12 @@ describe("deployment get", () => {
           status: "error",
           cli_version: cliVersion.version,
           command: "deployment:get",
-          source: "",
+          source: MOCK_SERVER_URL,
           code: "E_VALIDATION",
           message:
             "Invalid deployment_id: must be a deployment ID: dep_ followed by letters, digits, _ or -",
-          hint: `Find one with ${expectedPublicCliCommand("deployment list")}.`,
-          next_commands: [expectedPublicCliCommand("deployment list")],
+          hint: "List the deployments to find one.",
+          next_commands: [expectedPublicCliCommand(`deployment list --cwd ${app.path}`)],
           details: { argument: "deployment_id" },
         });
       });
@@ -202,12 +205,12 @@ describe("deployment get", () => {
           status: "error",
           cli_version: cliVersion.version,
           command: "deployment:get",
-          source: "",
+          source: MOCK_SERVER_URL,
           code: "E_VALIDATION",
           message:
             "Invalid deployment_id: must be a deployment ID: dep_ followed by letters, digits, _ or -",
-          hint: `Find one with ${expectedPublicCliCommand("deployment list")}.`,
-          next_commands: [expectedPublicCliCommand("deployment list")],
+          hint: "List the deployments to find one.",
+          next_commands: [expectedPublicCliCommand(`deployment list --cwd ${app.path}`)],
           details: { argument: "deployment_id" },
         });
       });

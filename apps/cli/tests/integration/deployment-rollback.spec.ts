@@ -413,11 +413,11 @@ describe("deployment rollback", () => {
           status: "error",
           cli_version: cliVersion.version,
           command: "deployment:rollback",
-          source: "",
+          source: MOCK_SERVER_URL,
           code: "E_VALIDATION",
           message: INVALID_DEPLOYMENT_ID,
-          hint: `Find one with ${expectedPublicCliCommand("deployment list")}, or omit it to undo the last deploy.`,
-          next_commands: [expectedPublicCliCommand("deployment list")],
+          hint: "List the deployments to find one, or omit it to undo the last deploy.",
+          next_commands: [expectedPublicCliCommand(`deployment list --cwd ${app.path}`)],
           details: { argument: "deployment_id" },
         });
       });
@@ -686,11 +686,11 @@ describe("deployment rollback", () => {
           status: "error",
           cli_version: cliVersion.version,
           command: "deployment:rollback",
-          source: "",
+          source: MOCK_SERVER_URL,
           code: "E_VALIDATION",
           message: INVALID_DEPLOYMENT_ID,
-          hint: `Find one with ${expectedPublicCliCommand("deployment list")}, or omit it to undo the last deploy.`,
-          next_commands: [expectedPublicCliCommand("deployment list")],
+          hint: "List the deployments to find one, or omit it to undo the last deploy.",
+          next_commands: [expectedPublicCliCommand(`deployment list --cwd ${app.path}`)],
           details: { argument: "deployment_id" },
         });
       });
@@ -705,11 +705,11 @@ describe("deployment rollback", () => {
           status: "error",
           cli_version: cliVersion.version,
           command: "deployment:rollback",
-          source: "",
+          source: MOCK_SERVER_URL,
           code: "E_VALIDATION",
           message: INVALID_DEPLOYMENT_ID,
-          hint: `Find one with ${expectedPublicCliCommand("deployment list")}, or omit it to undo the last deploy.`,
-          next_commands: [expectedPublicCliCommand("deployment list")],
+          hint: "List the deployments to find one, or omit it to undo the last deploy.",
+          next_commands: [expectedPublicCliCommand(`deployment list --cwd ${app.path}`)],
           details: { argument: "deployment_id" },
         });
       });
@@ -731,7 +731,7 @@ describe("deployment rollback", () => {
           status: "error",
           cli_version: cliVersion.version,
           command: "deployment:rollback",
-          source: "",
+          source: MOCK_SERVER_URL,
           code: "E_VALIDATION",
           message: "the value is empty",
           hint: "Pass a shorter summary with -m.",

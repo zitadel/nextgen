@@ -102,6 +102,7 @@ export default class Logs extends Suggestible(BaseCommand) {
     }
     const server = LocalServer.at(started.dir, {
       cliVersion: this.cliVersion,
+      selector: this.cwdSelector(),
     });
     if (flags.follow) {
       await server.followLogs({

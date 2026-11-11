@@ -2,18 +2,12 @@ import { chmod, mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { Errors } from "@oclif/core";
-import { describe, expect, vi } from "vitest";
-
-vi.mock("@clack/prompts", async () => {
-  return (await import("@tests/helpers/clack")).clackDouble();
-});
-
-import * as prompts from "@clack/prompts";
+import { describe, expect } from "vitest";
 
 import AuthMethodSsoEnable from "@/commands/auth-method/sso/enable";
 import { ZitadelError } from "@/lib/errors";
 import type { JsonObject } from "@/lib/zitadel";
-import { answering, type clackDouble } from "@tests/helpers/clack";
+import { answering } from "@tests/helpers/keyboard";
 import { authMethodJson, authMethodText } from "@tests/helpers/auth-method";
 import {
   anOidcConnection,
@@ -34,7 +28,7 @@ import {
   writeJson,
 } from "@tests/helpers/local-project";
 import { usePlatformServer } from "@tests/helpers/platform-project";
-import { parseJson, runCliForTest, stripAnsi } from "@tests/helpers/run-cli";
+import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
 import { asOneLine, asTerminal } from "@tests/helpers/terminal";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
@@ -139,42 +133,6 @@ function customArgs(cwd: string, ...flags: string[]): string[] {
 }
 
 /**
- * The mocked `@clack/prompts`, which is a {@link clackDouble}, for `answering` to script.
- */
-const clack = () => prompts as unknown as ReturnType<typeof clackDouble>;
-
-/**
- * A question a text prompt asks, as far as the person's answer is concerned.
- */
-interface TextPrompt {
-  message: string;
-  validate?: (value: string) => string | undefined;
-}
-
-/**
- * Makes the text prompts of `double` do what the drawn prompt does with an
- * answer its question refuses: say why, and ask again.
- *
- * @param double - The mocked `@clack/prompts`, already scripted by `answering`.
- * @returns What the prompts said in refusing, as the run goes on.
- */
-function refusingWhatTheQuestionRefuses(double: ReturnType<typeof clackDouble>): string[] {
-  const refusals: string[] = [];
-  const answer = double.text.getMockImplementation();
-  double.text.mockImplementation(async (prompt: TextPrompt) => {
-    for (;;) {
-      const value = await answer?.(prompt);
-      const problem = typeof value === "string" ? prompt.validate?.(value) : undefined;
-      if (problem === undefined) {
-        return value;
-      }
-      refusals.push(problem);
-    }
-  });
-  return refusals;
-}
-
-/**
  * `auth-method sso enable --provider custom` run by a person at a terminal who
  * answers the questions in the order they come. A run that is refused does not
  * throw out of here: its failure is handed back beside the questions the person
@@ -191,28 +149,14 @@ async function enterCustom(
   answers: readonly string[],
   ...flags: string[]
 ): Promise<{ failure: unknown; shown: string; asked: string[] }> {
-  const talk = answering(clack(), ...answers);
-  const refusals = refusingWhatTheQuestionRefuses(clack());
-  const write = vi.spyOn(process.stdout, "write").mockImplementation(() => {
-    return true;
-  });
+  const talk = answering(...answers);
   let failure: unknown;
-  try {
-    await asTerminal(async () => {
-      failure = await rejectionOf(() => {
-        return AuthMethodSsoEnable.run(customArgs(cwd, ...flags));
-      });
+  await asTerminal(async () => {
+    failure = await rejectionOf(() => {
+      return AuthMethodSsoEnable.run(customArgs(cwd, ...flags));
     });
-    const shown = [
-      ...write.mock.calls.map((call) => {
-        return String(call[0]);
-      }),
-      ...refusals,
-    ].join("");
-    return { failure, shown: stripAnsi(shown), asked: talk.asked() };
-  } finally {
-    write.mockRestore();
-  }
+  });
+  return { failure, shown: talk.plain(), asked: talk.asked() };
 }
 
 /**
@@ -400,13 +344,9 @@ describe("auth-method sso enable", () => {
     it("asks for the slug again", async ({ dir }) => {
       const cwd = await setUpProject(dir);
 
-      const { asked } = await enterCustom(cwd, ["google"]);
+      const { shown } = await enterCustom(cwd, ["google", "google"]);
 
-      expect(
-        asked.filter((question) => {
-          return question === QUESTION.slug;
-        }),
-      ).toHaveLength(2);
+      expect(shown.split('"google" is a built-in provider').length - 1).toBe(2);
     });
 
     it("ends the run when nobody answers again", async ({ dir }) => {

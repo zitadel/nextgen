@@ -1,14 +1,11 @@
 import { Args, type Config, Flags } from "@oclif/core";
-import { afterEach, describe, expect, it, vi } from "vitest";
-
-vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
-
-import { confirm } from "@clack/prompts";
+import { describe, expect, it, vi } from "vitest";
 
 import { Consent } from "@/lib/consent";
 import { BaseCommand } from "@/lib/oclif/base";
 import { Destructive, type DestructiveChange, Settled } from "@/lib/oclif/destructive";
 import type { CommandResult } from "@/lib/oclif/types";
+import { answering } from "@tests/helpers/keyboard";
 
 const GATE: Omit<DestructiveChange<string | undefined>, "apply"> = {
   verb: "remove",
@@ -91,10 +88,6 @@ class Unnamed extends Removing {
   public static override readonly args = Removing.args;
 }
 
-afterEach(() => {
-  vi.mocked(confirm).mockReset();
-});
-
 describe("Destructive", () => {
   describe("confirmed", () => {
     it("answers a dry run with the preview", async () => {
@@ -112,9 +105,11 @@ describe("Destructive", () => {
     });
 
     it("never asks on a dry run", async () => {
+      const talk = answering(true);
+
       await new Removing({ dryRun: true, interactive: true }).remove();
 
-      expect(confirm).not.toHaveBeenCalled();
+      expect(talk.asked()).toEqual([]);
     });
 
     it("acts with consent when --force is given", async () => {
@@ -133,7 +128,7 @@ describe("Destructive", () => {
     });
 
     it("acts with consent when the person says yes", async () => {
-      vi.mocked(confirm).mockResolvedValueOnce(true as never);
+      answering(true);
       const command = new Removing({ interactive: true });
 
       await command.remove();
@@ -142,7 +137,7 @@ describe("Destructive", () => {
     });
 
     it("is skipped as <verb>-cancelled when the person says no", async () => {
-      vi.mocked(confirm).mockResolvedValueOnce(false as never);
+      answering(false);
 
       expect(await new Removing({ interactive: true }).remove()).toMatchObject({
         status: "skipped",
@@ -152,7 +147,7 @@ describe("Destructive", () => {
     });
 
     it("does not act when the person says no", async () => {
-      vi.mocked(confirm).mockResolvedValueOnce(false as never);
+      answering(false);
       const command = new Removing({ interactive: true });
 
       await command.remove();
@@ -217,14 +212,15 @@ describe("Destructive", () => {
     });
 
     it("prepares before it asks", async () => {
-      vi.mocked(confirm).mockResolvedValueOnce(false as never);
-      const prepare = vi.fn(async () => "read");
+      const talk = answering(false);
+      const askedWhenPrepared: number[] = [];
 
-      await new Removing({ interactive: true }).remove(prepare);
+      await new Removing({ interactive: true }).remove(async () => {
+        askedWhenPrepared.push(talk.asked().length);
+        return "read";
+      });
 
-      expect(prepare.mock.invocationCallOrder[0]).toBeLessThan(
-        vi.mocked(confirm).mock.invocationCallOrder[0] ?? 0,
-      );
+      expect(askedWhenPrepared).toEqual([0]);
     });
 
     it("ends the run with a settled result, without asking", async () => {
@@ -240,6 +236,8 @@ describe("Destructive", () => {
     });
 
     it("does not ask when prepare settles the run", async () => {
+      const talk = answering(true);
+
       await new Removing({ interactive: true }).remove(
         async () =>
           new Settled({
@@ -249,7 +247,7 @@ describe("Destructive", () => {
           }),
       );
 
-      expect(confirm).not.toHaveBeenCalled();
+      expect(talk.asked()).toEqual([]);
     });
 
     it("leaves a URL's credentials out of the suggestion", async () => {

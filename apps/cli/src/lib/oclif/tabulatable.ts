@@ -35,7 +35,8 @@ export type ListFlags = { readonly plain: boolean | undefined };
 
 /**
  * The next page of a paged list. A page token only works with the flags that
- * issued it, so `flags` repeats them: `emitList` appends the token and `--json`.
+ * issued it, so `flags` repeats them: `emitList` appends the token, and `--json`
+ * when the run was JSON.
  */
 export type ListPage = {
   token: string | null;
@@ -233,10 +234,21 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
                 // script reads it to page, and `renderNextSteps` spells it out
                 // for the copy a person sees.
                 Cmd.option("--page-token", token ?? ""),
-                "--json",
+                ...(this.jsonEnabled() ? ["--json"] : []),
               ].join(" "),
             );
       const nextCommand = token === null ? undefined : followUp;
+      // What a script's rows leave out, said beside them on stderr: the empty
+      // line and the footer would break `cut`, `awk` and `wc -l` on stdout, but
+      // a deployment id or an origin list is not the script's to lose.
+      const aside = [
+        ...(view.rows.length === 0
+          ? [escapeControlCharacters(view.empty)]
+          : view.footer.map((line) => {
+              return escapeControlCharacters(line);
+            })),
+        ...more,
+      ];
       let rendered: { pretty?: Rendering } = {};
       if (plain) {
         rendered = { pretty: rows(await this.renderList(plain, view)) };
@@ -247,6 +259,7 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
         status: "ok",
         data: view.items === undefined ? view.data : this.canonicalData(view, token),
         ...rendered,
+        ...(plain && !this.jsonEnabled() && aside.length > 0 ? { footer: aside.join("\n") } : {}),
         summary: await this.listSummary(view, more, !plain && !this.jsonEnabled()),
         ...(nextCommand === undefined ? {} : { next: { commands: [nextCommand] } }),
       };
