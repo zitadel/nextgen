@@ -3,125 +3,406 @@
   "$id": "https://zitadel.com/schemas/cloud-price-catalog.schema.json",
   "title": "Zitadel price catalog",
   "type": "object",
-  "required": ["id", "version", "status", "currency", "plans", "meters", "licensed", "self_hosted", "core", "packages"],
+  "required": [
+    "id",
+    "version",
+    "status",
+    "currency",
+    "plans",
+    "meters",
+    "licensed",
+    "self_hosted",
+    "core",
+    "hubs",
+    "hub_includes",
+    "default_hub"
+  ],
   "additionalProperties": false,
   "properties": {
-    "$schema": { "type": "string" },
-    "id": { "type": "string" },
-    "version": { "type": "string", "description": "Date of the price list, plus a revision number" },
-    "status": { "enum": ["proposal", "decided", "live"] },
-    "source": { "type": "string", "format": "uri" },
-    "currency": { "const": "usd" },
-    "decided": { "type": "array", "items": { "type": "string" }, "description": "Paths of the entries the owner has settled" },
-    "conventions": { "type": "object", "additionalProperties": { "type": "string" } },
+    "$schema": {
+      "type": "string"
+    },
+    "id": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string",
+      "description": "Date of the price list, plus a revision number"
+    },
+    "status": {
+      "enum": [
+        "proposal",
+        "decided",
+        "live"
+      ]
+    },
+    "source": {
+      "type": "string",
+      "format": "uri"
+    },
+    "currency": {
+      "const": "usd"
+    },
+    "decided": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Paths of the entries the owner has settled"
+    },
+    "conventions": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
     "plans": {
       "type": "object",
-      "required": ["free", "pro", "enterprise"],
+      "required": [
+        "free",
+        "pro",
+        "enterprise"
+      ],
       "additionalProperties": false,
       "properties": {
-        "free": { "$ref": "#/$defs/plan" },
-        "pro": { "$ref": "#/$defs/plan" },
-        "enterprise": { "$ref": "#/$defs/plan" }
+        "free": {
+          "$ref": "#/$defs/plan"
+        },
+        "pro": {
+          "$ref": "#/$defs/plan"
+        },
+        "enterprise": {
+          "$ref": "#/$defs/plan"
+        }
       }
     },
-    "meters": { "type": "array", "items": { "$ref": "#/$defs/meter" }, "minItems": 1 },
-    "licensed": { "type": "array", "items": { "$ref": "#/$defs/licensed" } },
-    "self_hosted": { "$ref": "#/$defs/self_hosted" },
-    "future": { "type": "array", "items": { "$ref": "#/$defs/future" } },
+    "meters": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/meter"
+      },
+      "minItems": 1
+    },
+    "licensed": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/licensed"
+      }
+    },
+    "self_hosted": {
+      "$ref": "#/$defs/self_hosted"
+    },
+    "future": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/future"
+      }
+    },
     "core": {
       "type": "object",
-      "required": ["platform", "resources", "authentication", "security", "billing"],
+      "required": [
+        "platform",
+        "resources",
+        "authentication",
+        "security",
+        "billing"
+      ],
       "additionalProperties": false,
       "properties": {
-        "platform": {"type": "array", "items": {"type": "string"}},
-        "resources": {"type": "array", "items": {"type": "string"}},
-        "authentication": {"type": "array", "minItems": 1, "items": {"type": "string"}},
-        "security": {"type": "array", "items": {"type": "string"}},
-        "billing": {"type": "string"}
+        "platform": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "resources": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "authentication": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "security": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "billing": {
+          "type": "string"
+        }
       }
     },
-    "packages": {"type": "array", "items": {"$ref": "#/$defs/package"}}
+    "hub_includes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "What every hub includes, whichever is turned on"
+    },
+    "default_hub": {
+      "$ref": "#/$defs/hub_id",
+      "description": "The hub an estimate turns on for a paid need no single hub owns"
+    },
+    "hubs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/hub"
+      },
+      "minItems": 1
+    }
   },
   "$defs": {
-    "plan_id": { "enum": ["free", "pro", "enterprise"] },
-    "money": { "type": ["number", "null"], "minimum": 0 },
+    "plan_id": {
+      "enum": [
+        "free",
+        "pro",
+        "enterprise"
+      ]
+    },
+    "money": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0
+    },
     "plan": {
       "type": "object",
-      "required": ["label", "minimum", "delivery_modes", "support"],
+      "required": [
+        "label",
+        "minimum",
+        "delivery_modes",
+        "support"
+      ],
       "properties": {
-        "label": { "type": "string" },
+        "label": {
+          "type": "string"
+        },
         "minimum": {
           "oneOf": [
-            { "type": "null" },
+            {
+              "type": "null"
+            },
             {
               "type": "object",
-              "required": ["is_credit", "credit_applies_to"],
+              "required": [
+                "is_credit",
+                "credit_applies_to"
+              ],
               "properties": {
-                "amount": { "$ref": "#/$defs/money" },
-                "interval": { "enum": ["month", "year"] },
-                "tiers_per_year": { "type": "object", "additionalProperties": { "type": "number" } },
-                "is_credit": { "type": "boolean" },
-                "credit_applies_to": { "enum": ["metered", null] }
+                "amount": {
+                  "$ref": "#/$defs/money"
+                },
+                "interval": {
+                  "enum": [
+                    "month",
+                    "year"
+                  ]
+                },
+                "tiers_per_year": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "number"
+                  }
+                },
+                "is_credit": {
+                  "type": "boolean"
+                },
+                "credit_applies_to": {
+                  "enum": [
+                    "metered",
+                    null
+                  ]
+                }
               }
             }
           ]
         },
-        "annual": { "type": "object" },
-        "card_required": { "type": "boolean" },
-        "limits": { "type": "object" },
-        "over_allowance": { "type": "string" },
-        "event_retention_days": { "type": "integer" },
-        "attribution_mark": { "enum": ["shown", "hideable"] },
-        "delivery_modes": { "type": "array", "items": { "enum": ["dev_inbox", "own_provider", "managed"] } },
-        "support": { "type": "string" },
-        "sla": { "type": ["object", "null"] },
-        "rates": { "type": "string" },
+        "annual": {
+          "type": "object"
+        },
+        "card_required": {
+          "type": "boolean"
+        },
+        "limits": {
+          "type": "object"
+        },
+        "over_allowance": {
+          "type": "string"
+        },
+        "event_retention_days": {
+          "type": "integer"
+        },
+        "attribution_mark": {
+          "enum": [
+            "shown",
+            "hideable"
+          ]
+        },
+        "delivery_modes": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "dev_inbox",
+              "own_provider",
+              "managed"
+            ]
+          }
+        },
+        "support": {
+          "type": "string"
+        },
+        "sla": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "rates": {
+          "type": "string"
+        },
         "regions": {
           "type": "object",
-          "required": ["scope", "selection"],
+          "required": [
+            "scope",
+            "selection"
+          ],
           "additionalProperties": false,
           "properties": {
-            "scope": { "const": "project" },
+            "scope": {
+              "const": "project"
+            },
             "selection": {
               "oneOf": [
-                { "type": "array", "items": { "type": "string", "pattern": "^[a-z]{2,}$" }, "minItems": 1 },
-                { "const": "all_available" }
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "pattern": "^[a-z]{2,}$"
+                  },
+                  "minItems": 1
+                },
+                {
+                  "const": "all_available"
+                }
               ],
               "description": "The regions a plan's projects may choose from, at no charge"
             }
           }
+        },
+        "preview": {
+          "type": "string",
+          "description": "What the plan offers while Zitadel's next version is in preview"
+        },
+        "tiers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "required": [
+              "support_response",
+              "sla_percent",
+              "tam_hours_per_week"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "support_response": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "sla_percent": {
+                "type": "number"
+              },
+              "tam_hours_per_week": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            }
+          },
+          "description": "What each commitment tier in minimum.tiers_per_year buys; null while not set"
+        },
+        "compliance": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The compliance features the plan includes, by label"
         }
       }
     },
     "price": {
       "oneOf": [
-        { "type": "null" },
+        {
+          "type": "null"
+        },
         {
           "type": "object",
-          "required": ["model", "unit_amount"],
+          "required": [
+            "model",
+            "unit_amount"
+          ],
           "properties": {
-            "model": { "const": "per_unit" },
-            "unit_amount": { "type": "number", "minimum": 0 },
-            "display": { "type": "string" },
-            "note": { "type": "string" }
+            "model": {
+              "const": "per_unit"
+            },
+            "unit_amount": {
+              "type": "number",
+              "minimum": 0
+            },
+            "display": {
+              "type": "string"
+            },
+            "note": {
+              "type": "string"
+            }
           },
           "additionalProperties": false
         },
         {
           "type": "object",
-          "required": ["model", "bands"],
+          "required": [
+            "model",
+            "bands"
+          ],
           "properties": {
-            "model": {"const": "per_band"},
+            "model": {
+              "const": "per_band"
+            },
             "bands": {
               "type": "array",
               "items": {
                 "type": "object",
-                "required": ["id", "unit_amount"],
+                "required": [
+                  "id",
+                  "unit_amount"
+                ],
                 "properties": {
-                  "id": {"type": "string"},
-                  "countries": {"type": "array", "items": {"type": "string", "pattern": "^[A-Z]{2}$"}},
-                  "note": {"type": "string"},
-                  "unit_amount": {"$ref": "#/$defs/money"}
+                  "id": {
+                    "type": "string"
+                  },
+                  "countries": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[A-Z]{2}$"
+                    }
+                  },
+                  "note": {
+                    "type": "string"
+                  },
+                  "unit_amount": {
+                    "$ref": "#/$defs/money"
+                  }
                 }
               }
             }
@@ -132,132 +413,495 @@
     },
     "meter": {
       "type": "object",
-      "required": ["id", "label", "kind", "counts", "dedupe", "allowance", "price", "security", "source"],
+      "required": [
+        "id",
+        "label",
+        "kind",
+        "counts",
+        "dedupe",
+        "allowance",
+        "price",
+        "source",
+        "free_allowance",
+        "hub"
+      ],
       "additionalProperties": false,
       "properties": {
-        "id": { "type": "string", "pattern": "^[a-z0-9_]+$", "description": "Also the Stripe meter's event name" },
-        "label": { "type": "string" },
-        "unit": { "type": "string", "description": "One counted unit, singular: user, token, check" },
-        "kind": { "enum": ["users", "activity", "gauge"] },
-        "counts": { "type": "string" },
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9_]+$",
+          "description": "Also the Stripe meter's event name"
+        },
+        "label": {
+          "type": "string"
+        },
+        "unit": {
+          "type": "string",
+          "description": "One counted unit, singular: user, token, check"
+        },
+        "kind": {
+          "enum": [
+            "users",
+            "activity",
+            "configured",
+            "gauge"
+          ]
+        },
+        "counts": {
+          "type": "string"
+        },
         "dedupe": {
           "oneOf": [
-            { "type": "null" },
-            { "type": "array", "items": { "enum": ["project", "connection", "directory", "user", "policy", "band", "month"] }, "contains": { "const": "month" } }
+            {
+              "type": "null"
+            },
+            {
+              "type": "array",
+              "items": {
+                "enum": [
+                  "account",
+                  "project",
+                  "connection",
+                  "directory",
+                  "team",
+                  "theme",
+                  "agent",
+                  "destination",
+                  "domain",
+                  "user",
+                  "policy",
+                  "band",
+                  "month"
+                ]
+              },
+              "contains": {
+                "const": "month"
+              }
+            }
           ],
           "description": "The key a subject is counted once by; null for activity meters"
         },
         "counted_per": {
           "type": "object",
-          "required": ["key", "at_most"],
-          "properties": { "key": { "enum": ["connection", "directory"] }, "at_most": { "type": "integer", "minimum": 1 } },
+          "required": [
+            "key",
+            "at_most"
+          ],
+          "properties": {
+            "key": {
+              "enum": [
+                "connection",
+                "directory"
+              ]
+            },
+            "at_most": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
           "additionalProperties": false,
           "description": "Counts at most this many users per connection or directory a month, so one large tenant costs at most at_most times the unit price"
         },
-        "allowance": { "type": ["integer", "null"], "minimum": 0, "description": "Free per account and month, on every plan" },
-        "price": { "$ref": "#/$defs/price" },
-        "plans": { "type": "array", "items": { "$ref": "#/$defs/plan_id" }, "description": "Plans that may use it; every plan when absent" },
-        "security": { "type": "boolean", "description": "A cap on it alerts and never switches enforcement off" },
-        "availability": { "enum": ["available", "planned"], "description": "planned while the feature it counts doesn't exist yet; available when absent" },
-        "planned_part": { "type": "string", "description": "The part still planned, when the rest works today" },
-        "tag": { "enum": ["minimum spend", "metered feature", "delivered cost", "scale", "compliance", "certification", "support", null] },
+        "allowance": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "description": "Included per account and month once the meter's hub is on; for a shared meter, once any hub is"
+        },
+        "hub_allowance": {
+          "type": "object",
+          "propertyNames": {
+            "$ref": "#/$defs/hub_id"
+          },
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "description": "A shared meter's included amount where a particular hub is on, when that hub includes more"
+        },
+        "price": {
+          "$ref": "#/$defs/price"
+        },
+        "plans": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/plan_id"
+          },
+          "description": "Plans that may use it; every plan when absent"
+        },
+        "security": {
+          "type": "boolean",
+          "description": "A cap on it alerts and never switches enforcement off"
+        },
+        "tag": {
+          "enum": [
+            "metered feature",
+            "configured",
+            "delivered cost",
+            "scale",
+            "compliance",
+            "certification",
+            "support",
+            null
+          ]
+        },
         "source": {
           "type": "object",
-          "required": ["where", "exists"],
-          "properties": { "where": { "type": "string" }, "exists": { "type": "string" } }
+          "required": [
+            "where",
+            "exists"
+          ],
+          "properties": {
+            "where": {
+              "type": "string"
+            },
+            "exists": {
+              "type": "string"
+            }
+          }
         },
         "stripe": {
           "oneOf": [
-            { "type": "null" },
+            {
+              "type": "null"
+            },
             {
               "type": "object",
-              "required": ["event_name", "aggregation", "price_lookup_key"],
+              "required": [
+                "event_name",
+                "aggregation",
+                "price_lookup_key"
+              ],
               "properties": {
-                "event_name": { "type": "string" },
-                "aggregation": { "const": "sum" },
-                "price_lookup_key": { "type": "string" }
+                "event_name": {
+                  "type": "string"
+                },
+                "aggregation": {
+                  "enum": [
+                    "sum",
+                    "last"
+                  ]
+                },
+                "price_lookup_key": {
+                  "type": "string"
+                }
               }
             }
           ]
+        },
+        "free_allowance": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "description": "Free in Core, with no hub on; null when Core doesn't offer it"
+        },
+        "hub": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/hub_id"
+            }
+          ],
+          "description": "The hub that sells it; null for a gauge or a meter every hub offers"
         }
       }
     },
     "licensed": {
       "type": "object",
-      "required": ["id", "label", "amount", "interval", "plans", "tag"],
+      "required": [
+        "id",
+        "label",
+        "amount",
+        "interval",
+        "plans",
+        "tag",
+        "stripe"
+      ],
       "properties": {
-        "id": { "type": "string", "pattern": "^[a-z0-9_]+$" },
-        "label": { "type": "string" },
-        "amount": { "$ref": "#/$defs/money" },
-        "interval": { "enum": ["month", "year", "hour"] },
-        "per": { "type": "string" },
-        "plans": { "type": "array", "items": { "$ref": "#/$defs/plan_id" } },
-        "included_in": { "type": "array", "items": { "$ref": "#/$defs/plan_id" } },
-        "grants_credit": { "$ref": "#/$defs/money" },
-        "note": { "type": "string" },
-        "tag": { "enum": ["minimum spend", "metered feature", "delivered cost", "scale", "compliance", "certification", "support"] }
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9_]+$"
+        },
+        "label": {
+          "type": "string"
+        },
+        "amount": {
+          "$ref": "#/$defs/money"
+        },
+        "interval": {
+          "enum": [
+            "month",
+            "year",
+            "hour"
+          ]
+        },
+        "per": {
+          "type": "string"
+        },
+        "plans": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/plan_id"
+          }
+        },
+        "included_in": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/plan_id"
+          }
+        },
+        "grants_credit": {
+          "$ref": "#/$defs/money"
+        },
+        "note": {
+          "type": "string"
+        },
+        "tag": {
+          "enum": [
+            "capacity",
+            "metered feature",
+            "delivered cost",
+            "scale",
+            "compliance",
+            "certification",
+            "support"
+          ]
+        },
+        "stripe": {
+          "$ref": "#/$defs/stripe_price"
+        }
       }
     },
     "self_hosted": {
       "type": "object",
-      "required": ["unit", "metered", "free", "pro", "enterprise"],
+      "required": [
+        "unit",
+        "metered",
+        "free",
+        "hubs",
+        "enterprise"
+      ],
       "properties": {
-        "unit": { "type": "string" },
-        "metered": { "const": false, "description": "Rule 8: self-hosting is never metered" },
-        "free": { "type": "object" },
-        "pro": {
+        "unit": {
+          "type": "string"
+        },
+        "metered": {
+          "type": "boolean",
+          "description": "Hubs are metered from the installation's own usage counts"
+        },
+        "free": {
+          "type": "object"
+        },
+        "base": {
           "type": "object",
-          "required": ["prices", "includes", "ticket_cap_per_year"],
+          "required": ["label", "amount", "interval", "per", "billed", "includes"],
           "properties": {
+            "label": { "type": "string" },
+            "amount": { "$ref": "#/$defs/money" },
+            "interval": { "enum": ["month", "year"] },
+            "per": { "type": "string" },
+            "billed": { "enum": ["monthly", "yearly"] },
+            "includes": { "type": "array", "items": { "type": "string" } }
+          },
+          "description": "What every self-hosted production installation pays before add-ons: the commercial license, our builds and support tickets"
+        },
+        "hubs": {
+          "type": "object",
+          "required": [
+            "license",
+            "prices",
+            "metering",
+            "includes"
+          ],
+          "properties": {
+            "license": {
+              "type": "string"
+            },
             "prices": {
+              "type": "string"
+            },
+            "metering": {
+              "type": "string"
+            },
+            "per": {
+              "type": "string",
+              "description": "What one base fee covers"
+            },
+            "includes": {
               "type": "array",
               "items": {
-                "type": "object",
-                "required": ["installations_up_to", "amount", "interval"],
-                "properties": {
-                  "installations_up_to": { "type": "integer", "minimum": 1 },
-                  "amount": { "type": "number" },
-                  "interval": { "const": "year" }
-                }
+                "type": "string"
               }
-            },
-            "includes": { "type": "array", "items": { "type": "string" } },
-            "ticket_cap_per_year": { "type": "integer" },
-            "purchase": { "type": "string" }
+            }
           }
         },
-        "enterprise": { "type": "object" }
+        "support": {
+          "type": "object",
+          "required": [
+            "label",
+            "amount",
+            "interval",
+            "per"
+          ],
+          "properties": {
+            "label": {
+              "type": "string"
+            },
+            "amount": {
+              "$ref": "#/$defs/money"
+            },
+            "interval": {
+              "enum": [
+                "month",
+                "year"
+              ]
+            },
+            "per": {
+              "type": "string"
+            },
+            "note": {
+              "type": "string"
+            }
+          },
+          "description": "Support tickets for self-hosting, billed apart from the hubs"
+        },
+        "enterprise": {
+          "type": "object"
+        }
       }
     },
     "future": {
       "type": "object",
-      "required": ["id", "label", "price"],
+      "required": [
+        "id",
+        "label",
+        "price"
+      ],
       "properties": {
-        "id": { "type": "string" },
-        "label": { "type": "string" },
-        "free_part": { "type": "string" },
-        "paid_part": { "type": "string" },
-        "price": { "$ref": "#/$defs/price" },
-        "needs": { "type": "array", "items": { "type": "string" } }
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "free_part": {
+          "type": "string"
+        },
+        "paid_part": {
+          "type": "string"
+        },
+        "price": {
+          "$ref": "#/$defs/price"
+        },
+        "needs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
       }
     },
-    "package": {
+    "hub_id": {
+      "enum": [
+        "consumer",
+        "multi_tenancy",
+        "agentic",
+        "security_analytics",
+        "extensibility"
+      ]
+    },
+    "hub": {
       "type": "object",
-      "required": ["id", "label", "pricing", "scope", "plans", "included_in", "features", "availability", "note"],
+      "required": [
+        "id",
+        "label",
+        "line",
+        "base",
+        "pricing",
+        "plans",
+        "features",
+        "stripe"
+      ],
       "additionalProperties": false,
       "properties": {
-        "id": {"enum": ["governance", "security_settings", "compliance"]},
-        "label": {"type": "string"},
-        "pricing": {"enum": ["included_in_plan", "quoted"]},
-        "scope": {"const": "account"},
-        "plans": {"type": "array", "items": {"$ref": "#/$defs/plan_id"}},
-        "included_in": {"type": "array", "items": {"$ref": "#/$defs/plan_id"}},
-        "features": {"type": "array", "items": {"type": "string"}},
-        "availability": {"enum": ["planned", "available"]},
-        "note": {"type": "string"},
-        "retention_days": {"type": "array", "items": {"type": "integer", "minimum": 1}},
-        "volume_unit": {"type": "string"}
+        "id": {
+          "$ref": "#/$defs/hub_id"
+        },
+        "label": {
+          "type": "string"
+        },
+        "line": {
+          "type": "string"
+        },
+        "base": {
+          "type": "object",
+          "required": [
+            "amount",
+            "interval"
+          ],
+          "properties": {
+            "amount": {
+              "$ref": "#/$defs/money"
+            },
+            "interval": {
+              "enum": [
+                "month",
+                "year"
+              ]
+            }
+          },
+          "additionalProperties": false,
+          "description": "The monthly base fee; amount is null while quoted. Hubs stack at full price"
+        },
+        "pricing": {
+          "enum": [
+            "listed",
+            "quoted"
+          ]
+        },
+        "plans": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/plan_id"
+          }
+        },
+        "features": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "stripe": {
+          "$ref": "#/$defs/stripe_price"
+        }
       }
+    },
+    "stripe_price": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "required": [
+            "price_lookup_key"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "price_lookup_key": {
+              "type": "string",
+              "pattern": "^[a-z0-9_]+$"
+            }
+          }
+        }
+      ],
+      "description": "The Stripe price this flat price becomes, found by its lookup key; null while it is quoted. Nothing syncs it to Stripe yet"
     }
   }
 }

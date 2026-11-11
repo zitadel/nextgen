@@ -14,19 +14,20 @@ const count = (n: number, metric: string, value: number, project_id = "proj_a"):
 
 describe("a day's price", () => {
   it("is nothing while the allowance lasts, then the marginal price", () => {
-    const days = pricedDays([1, 2, 3].map((n) => count(n, "sso_users", 600)));
+    // The Consumer hub includes 100,000 social users, then $0.004 each.
+    const days = pricedDays([1, 2, 3].map((n) => count(n, "social_users", 60_000)));
     expect(days.map(({ entries }) => entries.map((entry) => entry.amount))).toEqual([
       [0],
-      [2_000],
-      [6_000],
+      [8_000],
+      [24_000],
     ]);
   });
 
   it("adds up to the period's bill for integrations and consumption", () => {
     const counts = [
-      count(1, "sso_users", 900),
+      count(1, "sso_connections", 2),
       count(1, "email_messages", 1_200),
-      count(2, "sso_users", 700, "proj_b"),
+      count(2, "sso_connections", 3, "proj_b"),
       count(3, "email_messages", 900),
       count(3, "m2m_tokens", 1_500_000),
     ];
@@ -49,13 +50,13 @@ describe("a day's price", () => {
 
   it("splits a day between projects by their counts, in whole cents that add up", () => {
     const [first] = pricedDays([
-      count(1, "sso_users", 1_401, "proj_a"),
-      count(1, "sso_users", 400, "proj_b"),
-      count(1, "sso_users", 202, "proj_c"),
+      count(1, "social_users", 140_100, "proj_a"),
+      count(1, "social_users", 40_000, "proj_b"),
+      count(1, "social_users", 20_200, "proj_c"),
     ]);
     const parts = first?.entries.map((entry) => entry.amount) ?? [];
     expect(parts.every(Number.isInteger)).toBe(true);
-    expect(parts.reduce((sum, part) => sum + part, 0)).toBe(10_030);
+    expect(parts.reduce((sum, part) => sum + part, 0)).toBe(40_120);
   });
 });
 

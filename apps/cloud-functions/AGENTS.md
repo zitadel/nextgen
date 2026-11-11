@@ -21,6 +21,10 @@ takes Stripe's webhooks and runs the workflows that talk to Stripe and HubSpot.
   whose recorders send nothing; everything else refuses until it is live.
 - Have a mocked write's step return the calls it would send; log ids, never
   an email.
+- Change a price only in `src/pricing/catalog.json`; the website's `/pricing`
+  shows the same file (`apps/website/app/pricing/catalog.ts`).
+- Give a listed price its Stripe lookup key in the catalog, a quoted one
+  `null`; `src/pricing/catalog.spec.ts` fails otherwise. Nothing syncs to Stripe yet.
 - Local loop:
 
   ```sh

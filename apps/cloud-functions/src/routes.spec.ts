@@ -181,41 +181,41 @@ describe("Settings → Usage", () => {
     const team = await usage({ systems: mockSystems(), provisionOnce: vi.fn() });
     const days = team.days.flatMap(({ entries }) => entries);
     expect(team.days).toHaveLength(31);
-    expect(days.reduce((sum, entry) => sum + entry.amount, 0)).toBe(140_000);
+    expect(days.reduce((sum, entry) => sum + entry.amount, 0)).toBe(75_000);
     expect(team.projects.map((project) => project.name)).toEqual([
       "Customer portal",
       "Partner API",
     ]);
   });
 
-  it("bills nothing on Free, saying what Pro would", async () => {
+  it("bills nothing in core, saying what the hubs it needs would", async () => {
     const team = await usage({ systems: mockSystems(), provisionOnce: vi.fn() });
     expect(team).toMatchObject({
       credit: { amount: 0, used: 0 },
       on_demand_amount: 0,
-      estimate: { plan: "pro", total_amount: 150_000 },
+      estimate: { plan: "pro", total_amount: 95_000 },
     });
   });
 
-  it("adds Pro's base fee to usage without a usage credit", async () => {
+  it("adds the hubs' base fees to usage without a usage credit", async () => {
     const systems = mockSystems();
     await systems.zitadel.applyEntitlements(MOCK_TEAM.id, entitlementsFor("pro"));
     const team = await usage({ systems, provisionOnce: vi.fn() });
     expect(team).toMatchObject({
       credit: { amount: 0, used: 0 },
-      on_demand_amount: 140_000,
-      estimate: { plan: "pro", total_amount: 150_000 },
+      on_demand_amount: 75_000,
+      estimate: { plan: "pro", total_amount: 95_000 },
     });
   });
 
-  it("applies an Enterprise contract's credit without adding the Pro base fee", async () => {
+  it("applies an Enterprise contract's credit covering the hubs' base fees", async () => {
     const systems = mockSystems();
     await systems.zitadel.applyEntitlements(MOCK_TEAM.id, entitlementsFor("enterprise"));
     const team = await usage({ systems, provisionOnce: vi.fn() });
     expect(team).toMatchObject({
-      credit: { amount: 300_000, used: 140_000 },
+      credit: { amount: 200_000, used: 75_000 },
       on_demand_amount: 0,
-      estimate: { plan: "enterprise", total_amount: 300_000 },
+      estimate: { plan: "enterprise", total_amount: 200_000 },
     });
   });
 });

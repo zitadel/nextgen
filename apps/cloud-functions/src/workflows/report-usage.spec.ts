@@ -17,7 +17,7 @@ it("keeps core analytics, requests and retired policy and bot meters out of Stri
     "api_requests",
     "policy_users",
     "retained_users_400d",
-    "sso_users",
+    "sso_connections",
     "sms_messages_us_ca",
     "sms_messages_other",
     "bot_checks",

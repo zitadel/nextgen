@@ -47,6 +47,8 @@ tasks:
       - "/.changeset/config.json"
       - "/apps/*/CHANGELOG.md"
       - "/packages/*/CHANGELOG.md"
+      # The prices the pricing page shows (app/pricing/catalog.ts).
+      - "/apps/cloud-functions/src/pricing/catalog.json"
     outputs:
       - ".next/**/*"
     options:

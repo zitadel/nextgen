@@ -231,6 +231,7 @@ test("the website's pages list a hash for each of their inline scripts", async (
     { path: "/", status: 200 },
     { path: "/changelog", status: 200 },
     { path: entry ?? "", status: 200 },
+    { path: "/pricing", status: 200 },
     { path: "/no-such-page-routes-spec", status: 404 },
   ];
   for (const { path, status } of pages) {
