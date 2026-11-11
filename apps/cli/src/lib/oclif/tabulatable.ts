@@ -237,9 +237,13 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
         data: view.items === undefined ? view.data : this.canonicalData(view, token),
         ...(nextCommand === undefined ? {} : { next: { commands: [nextCommand] } }),
         // Plain records are what a script reads, so they keep stdout to
-        // themselves; the aligned table is painted. Either way every fragment
-        // the rendering is composed of was spelled out where it was read.
-        pretty: (plain ? rows : painted)(await this.renderList(plain, view, more)),
+        // themselves, and every fragment of them was spelled out where it was
+        // read. A person at a terminal is drawn the summary below, which is
+        // where the table is built: building it here as well would do the work
+        // twice for a text nothing prints.
+        ...(plain || this.jsonEnabled()
+          ? { pretty: (plain ? rows : painted)(await this.renderList(plain, view)) }
+          : {}),
         summary: await this.listSummary(view, more),
       };
     }
@@ -285,40 +289,15 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
     }
 
     /**
-     * The terminal rendering of a list: a pipe (or `--plain`) gets tab-separated
-     * rows with no header and nothing when empty, so `cut`, `awk` and `wc -l`
-     * work; a terminal gets the aligned table, a blank line, a
-     * `${n} ${singular|plural}` count and the footer lines. Nothing under
-     * `--json`.
+     * What a script reads of a list: tab-separated rows with no header and
+     * nothing when empty, so `cut`, `awk` and `wc -l` work. Nothing under
+     * `--json`. A terminal is not drawn from this but from the summary.
      */
-    private async renderList(
-      plain: boolean,
-      view: ListView,
-      more: readonly string[],
-    ): Promise<string> {
-      if (this.jsonEnabled()) {
+    private async renderList(plain: boolean, view: ListView): Promise<string> {
+      if (this.jsonEnabled() || !plain) {
         return "";
       }
-      if (plain) {
-        return tabulateRows(view.columns, view.rows);
-      }
-      // A view's words carry what the server answered as readily as a cell
-      // does — an id in the empty line, the origins a footer names — so they
-      // are spelled out here, where the cells and the cursor already are.
-      if (view.rows.length === 0) {
-        // A page can be empty while more remain: the events list matches some
-        // filters over a bounded number of events per request.
-        return [escapeControlCharacters(view.empty), ...more].join("\n");
-      }
-      const plural = view.plural ?? `${view.singular}s`;
-      const count = `${view.rows.length} ${view.rows.length === 1 ? view.singular : plural}`;
-      return [
-        await this.tabulate(view.columns, view.rows),
-        "",
-        count,
-        ...view.footer.map((line) => escapeControlCharacters(line)),
-        ...more,
-      ].join("\n");
+      return tabulateRows(view.columns, view.rows);
     }
 
     /**
