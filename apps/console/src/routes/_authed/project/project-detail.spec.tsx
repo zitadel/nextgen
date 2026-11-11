@@ -59,7 +59,7 @@ describe("project detail", () => {
   it("opens the page a project link names, with that project selected", async () => {
     // `/projects/{id}` is kept for links that name a project; the page lives at
     // the scoped `/project`, so the sidebar and switcher follow the one named.
-    // Its Settings open on their first page, General (D39).
+    // Its Settings open on their first page, General (D40).
     server.use(http.get(PROJECT_URL, () => HttpResponse.json(project())));
     const router = await renderDetail(`/projects/${PROJECT_ID}`);
 

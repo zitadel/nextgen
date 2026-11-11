@@ -5,13 +5,26 @@ import { type SearchAnswer, closeness, hasMore, hitsFor, ranked } from "./model"
 const answer: SearchAnswer = {
   term: "ann",
   hits: [
-    { type: "user", id: "user_1", title: "Ann Lee", subtitle: "ann@example.com" },
-    { type: "user", id: "user_2", title: "Jo Bloggs", subtitle: "joann@example.com" },
+    {
+      type: "user",
+      id: "user_1",
+      projectId: "proj_1",
+      title: "Ann Lee",
+      subtitle: "ann@example.com",
+    },
+    {
+      type: "user",
+      id: "user_2",
+      projectId: "proj_1",
+      title: "Jo Bloggs",
+      subtitle: "joann@example.com",
+    },
     // Matched by the server on something the row does not show.
-    { type: "user", id: "user_3", title: "Zed" },
-    { type: "team", id: "team_1", title: "Annex" },
+    { type: "user", id: "user_3", projectId: "proj_1", title: "Zed" },
+    { type: "team", id: "team_1", projectId: "proj_1", title: "Annex" },
   ],
   incomplete: ["user"],
+  moreProjects: false,
 };
 
 describe("hitsFor", () => {

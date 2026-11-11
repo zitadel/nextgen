@@ -72,7 +72,7 @@ test("a platform operator reaches every management screen without an error", asy
 
   // The granted customer project: listed on Projects, where a row opens the
   // project (selects it, lands on its Overview, D35); its Settings open on
-  // their first page, General (D39).
+  // their first page, General (D40).
   await page.goto("/ui/console/projects");
   const projectLink = page.getByRole("table").getByRole("link").first();
   await expect(projectLink).toBeVisible();

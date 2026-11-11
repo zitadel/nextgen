@@ -648,7 +648,7 @@ describe("project admins", () => {
 
 describe("project settings nav", () => {
   it("lists Admins among the project's Settings, not its screens", async () => {
-    // Admins is a page of the project's Settings (D39), not a list screen
+    // Admins is a page of the project's Settings (D40), not a list screen
     // beside Users: the project's list is not drawn while its Settings are.
     stubProject();
     await renderProject();

@@ -44,7 +44,7 @@ import { SETTINGS_PATH, type ShellUser, UserMenuItem } from "./user-menu";
  * person is is the sidebar's list (`useShellView`), never the frame or the
  * selected project (D36), so going from a project to Projects, and from there
  * into Settings, moves nothing but the list. Both Settings rows open a list of
- * their own: Projects' the root settings, a project's that project's (D39).
+ * their own: Projects' the root settings, a project's that project's (D40).
  * Opening a list from a row of another slides it in from the right, and the
  * way back from the left (`useListEntrance`).
  */
@@ -64,7 +64,12 @@ export function AppShell({
 
   return (
     <SidebarProvider defaultOpen={readSidebarOpen()}>
-      <SearchDialog open={searchOpen} onOpenChange={setSearchOpen} userId={user?.userId} />
+      <SearchDialog
+        open={searchOpen}
+        onOpenChange={setSearchOpen}
+        userId={user?.userId}
+        allProjects={view === "account" || view === "settings"}
+      />
       <AppSidebar
         view={view}
         user={user}
@@ -94,7 +99,7 @@ const EVENTS_PATH = "/events";
  * Which of the sidebar's lists is showing, and the **route** decides:
  * Projects is above every project, so it lists the account's screens;
  * `/settings` with anything beneath it lists Settings' pages (D29); `/project`
- * with anything beneath it lists the selected project's Settings pages (D39);
+ * with anything beneath it lists the selected project's Settings pages (D40);
  * `/events` with anything beneath it lists Events' views and filters (D30);
  * everything else lists the selected project's. Deriving it from the route
  * rather than from component state is what lets a settings or events URL
@@ -215,7 +220,7 @@ const NAV_LABEL: Record<NavView, string> = {
  * 0005 §3), then what an add-on lists. A row stays marked on the screens
  * beneath it, so a resource's detail keeps its list marked. The project's
  * Settings row opens a list the same way, under a heading that leads back to
- * the project: its General and Admins pages (D39).
+ * the project: its General and Admins pages (D40).
  *
  * Events is one screen's own list, under a heading that leads back to the
  * project's: a picker of the list's views, not routes, and its filters in a
@@ -280,7 +285,7 @@ function NavList({ view }: { view: NavView }) {
 
 /**
  * How deep each list sits: Projects' and a project's are where the console
- * starts; both Settings' and Events' open from a row of one (D29, D30, D39).
+ * starts; both Settings' and Events' open from a row of one (D29, D30, D40).
  */
 const LIST_DEPTH: Record<NavView, number> = {
   portal: 0,

@@ -29,7 +29,7 @@ test("shows the bootstrapped project in the list and detail views", async ({
 
   // The directory lists name and creation date. A row opens the project —
   // selects it and lands on its Overview (D35) — and the project's Settings,
-  // in the sidebar that selection fills, open on General (D39).
+  // in the sidebar that selection fills, open on General (D40).
   const projectLink = page.getByRole("table").getByRole("link").first();
   await expect(projectLink).toBeVisible();
   await projectLink.click();

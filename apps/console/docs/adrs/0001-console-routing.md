@@ -277,7 +277,7 @@ the sidebar.
 > named Events, as the route, the API and the CLI are, and the list's
 > `NavView` is `"events"`.
 
-> **Amendment (2026-11-11, design decision D39):** a project's Settings row
+> **Amendment (2026-11-11, design decision D40):** a project's Settings row
 > opens a list of its own, as the root Settings row on Projects does (D29) and
 > as Vercel's project Settings does: both Settings rows carry the arrow and
 > swap the list. `/project` is a layout route (`routes/_authed/project/route.tsx`)
