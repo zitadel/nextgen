@@ -152,8 +152,11 @@ wake-up only says that a project has something new:
 - A server that runs until it is stopped wakes its own shipper when a
   request has written an event, and checks on a timer besides.
 - A server that runs only while it serves a request, as the hosted cloud's
-  does, publishes a message to a queue, which calls the server's delivery
-  path. A retry is a delayed message.
+  does, calls a wake hook the operator configures. On the hosted cloud that
+  hook is a function beside the server
+  ([ADR 084](084-hosted-cloud-business-systems.md)): it publishes a message
+  to a queue, whose consumer calls the server's delivery path for the
+  project. A retry is a delayed message. The server itself knows no queue.
 - A lost wake-up loses no event: the next one in the project delivers
   everything after the cursor. The hosted cloud also has a scheduler call
   the delivery path once an hour, so a quiet project does not wait for its
@@ -242,8 +245,8 @@ disable it and rotate its secret.
 
 ## Open questions
 
-- **The hosted cloud's queue.** Vercel Queues is in beta, publishing needs
-  the platform's OIDC token from a Go function, and
+- **The hosted cloud's queue.** Vercel Queues is in beta, nothing has run
+  against it yet, and
   [ADR 084](084-hosted-cloud-business-systems.md) decided against a queue of
   our own for usage. Here it is one message per project with something new,
   not one per event.
