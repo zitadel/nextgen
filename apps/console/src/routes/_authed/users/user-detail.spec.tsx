@@ -1641,6 +1641,66 @@ describe("user detail", () => {
     expect(within(screen.getByRole("tabpanel")).getByText("Not set up")).toBeInTheDocument();
   });
 
+  describe("the no sign-in method notice", () => {
+    const NOTICE = "This user cannot sign in because no sign-in method is configured.";
+
+    async function openAuthentication() {
+      await renderDetail();
+      await userEvent.click(await screen.findByRole("tab", { name: "Authentication" }));
+      return within(screen.getByRole("tabpanel"));
+    }
+
+    it("says so when the user holds no password, passkey or linked provider", async () => {
+      stub({ password: {}, passkeys: [], identityLinks: [] });
+      const panel = await openAuthentication();
+      expect(panel.getByText(NOTICE)).toBeInTheDocument();
+      // The account status is a separate fact and stays as it is.
+      expect(screen.getByText("active")).toBeInTheDocument();
+    });
+
+    it.each([
+      [
+        "a password",
+        { password: { set_at: "2026-04-28T13:32:00Z" }, passkeys: [], identityLinks: [] },
+      ],
+      [
+        "a passkey",
+        {
+          password: {},
+          passkeys: [{ id: "pk_1", name: "MacBook", created_at: "2026-07-01T00:00:00Z" }],
+          identityLinks: [],
+        },
+      ],
+      [
+        "a linked provider",
+        {
+          password: {},
+          passkeys: [],
+          identityLinks: [
+            { id: "idplink_1", connection_id: "idp_google", created_at: "2026-07-03T00:00:00Z" },
+          ],
+        },
+      ],
+    ])("stays out once the user holds %s", async (_, credentials) => {
+      stub(credentials);
+      server.use(http.post(IDPS_QUERY_URL, () => HttpResponse.json({ idps: [] })));
+      const panel = await openAuthentication();
+      expect(panel.getByText("Password")).toBeInTheDocument();
+      expect(panel.queryByText(NOTICE)).not.toBeInTheDocument();
+    });
+
+    it.each([
+      ["the password", { passwordStatus: 500 }],
+      ["the passkeys", { passkeysStatus: 500 }],
+      ["the linked providers", { identityLinksStatus: 500 }],
+    ])("makes no claim when %s could not be read", async (_, failure) => {
+      stub({ password: {}, passkeys: [], identityLinks: [], ...failure });
+      const panel = await openAuthentication();
+      expect(panel.getByText("Could not be loaded")).toBeInTheDocument();
+      expect(panel.queryByText(NOTICE)).not.toBeInTheDocument();
+    });
+  });
+
   it("still renders the screen when the passkey list fails", async () => {
     // The passkey call is chrome for the record, not the record — a failure
     // must cost the row, not the page.
