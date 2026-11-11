@@ -47,11 +47,6 @@ export function parseUserStatus(value: unknown): string | undefined {
   return (USER_STATUSES as readonly unknown[]).includes(value) ? (value as string) : undefined;
 }
 
-/** Whether the list is narrowed by anything but the search term. */
-export function isFiltered(search: UsersSearch): boolean {
-  return !!(search.schema || search.status || search.created);
-}
-
 export type UserFilter = NonNullable<Parameters<typeof api.queryUsers>[0]["filter"]>;
 
 /** One schema as the Users filter offers it: its object type, title and newest revision. */

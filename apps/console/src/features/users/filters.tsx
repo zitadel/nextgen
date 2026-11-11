@@ -1,5 +1,9 @@
-import { StatusDot } from "@/components/status-badge";
-import { RevisionOption, RevisionValue } from "@/features/schemas/components/revision-select";
+import { statusOptions } from "@/components/status-badge";
+import {
+  REVISION_MENU,
+  RevisionOption,
+  RevisionValue,
+} from "@/features/schemas/components/revision-select";
 import type { SchemaRevision } from "@/features/schemas/model";
 import type { FilterDefinition } from "@/lib/resource-filter";
 
@@ -47,8 +51,7 @@ export function usersFilters({
         : revisions.length === 0
           ? "None to choose"
           : undefined,
-      // Wide enough for a date and both badges on one line.
-      menuClassName: "w-81",
+      menuClassName: REVISION_MENU,
       display: (value) =>
         value === OLDER_REVISIONS ? (
           <span className="truncate">Older revisions</span>
@@ -67,31 +70,7 @@ export function usersFilters({
         })),
       ],
     },
-    {
-      type: "options",
-      key: "status",
-      label: "Status",
-      options: USER_STATUSES.map((status) => ({
-        value: status,
-        label: STATUS_LABEL[status],
-        // The table's dot beside the name, not its pill: the pill's fill is
-        // the popover's own on the dark theme, and shows only under a hover.
-        content: (
-          <span className="flex min-w-0 flex-1 items-center gap-2 leading-5">
-            <StatusDot status={status} />
-            <span className="truncate">{STATUS_LABEL[status]}</span>
-          </span>
-        ),
-      })),
-    },
+    { type: "options", key: "status", label: "Status", options: statusOptions(USER_STATUSES) },
     { type: "date", key: "created", label: "Created" },
   ];
 }
-
-/** The API's own values in words, as `StatusBadge` shows them. */
-const STATUS_LABEL: Record<(typeof USER_STATUSES)[number], string> = {
-  active: "Active",
-  suspended: "Suspended",
-  deactivated: "Deactivated",
-  pending_purge: "Pending purge",
-};

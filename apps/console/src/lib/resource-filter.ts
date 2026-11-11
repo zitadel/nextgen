@@ -33,8 +33,6 @@ export interface FilterOption {
   value: string;
   /** The value's name, and what typing finds it by. */
   label: string;
-  /** More to find the row by. */
-  keywords?: string[];
   /** The row in place of the label alone. */
   content?: ReactNode;
   /** The row's `title`, for a value its row cuts short. */
@@ -60,9 +58,14 @@ export interface DateFilter extends FilterBase {
 
 export type FilterDefinition = OptionsFilter | DateFilter;
 
-/** A filter's name in accessible names. */
-export function filterName(filter: FilterDefinition): string {
-  return filter.name ?? filter.label.toLowerCase();
+/** Whether any of the filters is set: what a screen's "no match" state and its Clear button ask. */
+export function isFiltered(filters: FilterDefinition[], values: FilterValues): boolean {
+  return filters.some((filter) => !!values[filter.key]);
+}
+
+/** Every filter unset, as a patch for the screen's search. */
+export function clearedFilters(filters: FilterDefinition[]): Record<string, undefined> {
+  return Object.fromEntries(filters.map((filter) => [filter.key, undefined]));
 }
 
 /** The ranges a date filter offers, counted back from when the list is read. */

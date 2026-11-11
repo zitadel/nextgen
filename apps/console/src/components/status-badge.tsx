@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import type { FilterOption } from "@/lib/resource-filter";
 import { cn } from "@/lib/utils";
 
 /**
@@ -64,11 +65,8 @@ const TONE_DOT: Record<StatusTone, string> = {
   neutral: "bg-muted-foreground",
 };
 
-/**
- * The pill's dot on its own, for a status named where the pill's fill would
- * not show: a menu row, whose popover is the fill's own colour on the dark theme.
- */
-export function StatusDot({ status }: { status: string }) {
+/** The pill's dot on its own. */
+function StatusDot({ status }: { status: string }) {
   const tone = statusTone(status);
   return (
     <span
@@ -77,6 +75,29 @@ export function StatusDot({ status }: { status: string }) {
       className={cn("size-2.5 shrink-0 rounded-full", TONE_DOT[tone])}
     />
   );
+}
+
+/** A status in words, as the pill shows it: `pending_purge` → `Pending Purge`. */
+function statusLabel(status: string): string {
+  return status.replace(/_/g, " ").replace(/\b[a-z]/g, (letter) => letter.toUpperCase());
+}
+
+/**
+ * A resource's statuses as a `ResourceFilter`'s options: the pill's dot beside
+ * the name, not the pill, whose fill is the popover's own on the dark theme
+ * and shows only under a hover.
+ */
+export function statusOptions(statuses: readonly string[]): FilterOption[] {
+  return statuses.map((status) => ({
+    value: status,
+    label: statusLabel(status),
+    content: (
+      <span className="flex min-w-0 flex-1 items-center gap-2 leading-5">
+        <StatusDot status={status} />
+        <span className="truncate">{statusLabel(status)}</span>
+      </span>
+    ),
+  }));
 }
 
 export function StatusBadge({ status }: { status?: string }) {

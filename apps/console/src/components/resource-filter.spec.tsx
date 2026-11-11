@@ -15,7 +15,7 @@ const FILTERS: FilterDefinition[] = [
     clears: ["size"],
     options: [
       { value: "fruit", label: "Fruit" },
-      { value: "veg", label: "Vegetable", keywords: ["greens"] },
+      { value: "veg", label: "Vegetable" },
     ],
   },
   {
@@ -79,7 +79,7 @@ describe("ResourceFilter", () => {
     await userEvent.keyboard("{Enter}");
 
     // The values' own field takes the focus the properties' field held.
-    await userEvent.keyboard("greens");
+    await userEvent.keyboard("veg");
     expect(screen.getAllByRole("option").map((option) => option.textContent)).toEqual([
       "Vegetable",
     ]);

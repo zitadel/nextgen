@@ -108,7 +108,7 @@ Canonical examples:
 | --- | --- |
 | Nav chrome | `Sidebar` (`collapsible="icon"`; mobile = persistent icon rail) |
 | Org/project picker | `Popover` + `Badge` |
-| List filters | `ResourceFilter` (`src/components/resource-filter.tsx`) in `ResourceTitle`'s `below` row, under the search: **Add filter** lists the resource's properties, then the chosen one's values by its type; each set filter is a chip. A screen describes its properties as `FilterDefinition`s (`src/lib/resource-filter.ts`) and keeps the values in its URL: copy `src/features/users/filters.tsx`. A revision row is `RevisionOption` (`src/features/schemas/components/revision-select.tsx`), shared with the schema detail's picker |
+| List filters | `ResourceFilter` (`src/components/resource-filter.tsx`) in `ResourceTitle`'s `below` row, under the search: **Add filter** lists the resource's properties, then the chosen one's values by its type; each set filter is a chip. A screen describes its properties as `FilterDefinition`s (`src/lib/resource-filter.ts`) and keeps the values in its URL: copy `src/features/users/filters.tsx`; a status property takes `statusOptions` (`status-badge.tsx`), and the screen's empty state asks `isFiltered` and clears with `clearedFilters`. A revision row is `RevisionOption` (`src/features/schemas/components/revision-select.tsx`), shared with the schema detail's picker |
 | Users table | `Table`, `Avatar`, `Badge`, `DropdownMenu`, `Button`; `HoverCard` (identity), `Popover` (attributes) |
 | Panel around a screen's content | `Card` |
 | Attribute chip / CLI command in prose | `InlineCode` |

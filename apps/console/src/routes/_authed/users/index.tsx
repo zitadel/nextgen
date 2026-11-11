@@ -32,7 +32,7 @@ import { IdText } from "@/components/id-text";
 import { SearchField } from "@/components/search-field";
 import { ResourceFilter } from "@/components/resource-filter";
 import { usersFilters } from "@/features/users/filters";
-import { parseDateFilter } from "@/lib/resource-filter";
+import { clearedFilters, isFiltered, parseDateFilter } from "@/lib/resource-filter";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table";
 import { useLoadMore } from "@/hooks/use-load-more";
@@ -44,7 +44,6 @@ import {
   type UsersSearch,
   attributeSummary,
   columnsBeyondIdentity,
-  isFiltered,
   parseUserStatus,
   pinnedColumns,
   toUserRow,
@@ -200,16 +199,17 @@ function UsersScreen() {
   const showAttributes = summaries.some(
     ({ summary }) => summary.entries.length > 0 || summary.more > 0,
   );
-  // Latched for the screen's lifetime, as on Projects: a cleared search drops
-  // `?q=` before the full list is back, and the field must not unmount in
-  // between. A project with no users has nothing to search.
-  const [searchable, setSearchable] = useState(false);
-  if (!searchable && (rows.length > 0 || search.q || isFiltered(search))) setSearchable(true);
-  const scroll = useScrollEdges();
   const filters = useMemo(
     () => usersFilters({ options: loaded.options, revisions: loaded.revisions, search }),
     [loaded.options, loaded.revisions, search],
   );
+  // Latched for the screen's lifetime, as on Projects: a cleared search drops
+  // `?q=` before the full list is back, and the field must not unmount in
+  // between. A project with no users has nothing to search.
+  const [searchable, setSearchable] = useState(false);
+  const filtered = isFiltered(filters, search);
+  if (!searchable && (rows.length > 0 || search.q || filtered)) setSearchable(true);
+  const scroll = useScrollEdges();
   // Each row's schema, for the identity card's title and the attributes
   // popover's field labels.
   const schemas = useMemo(
@@ -221,17 +221,15 @@ function UsersScreen() {
     <Page>
       <ResourceTitle
         filter={
-          <>
-            {searchable && (
-              <SearchField
-                inputRef={searchField}
-                query={search.q ?? ""}
-                onSearch={onSearch}
-                label="Search by identifier"
-                className="grow basis-48 @3xl/title-row:max-w-48"
-              />
-            )}
-          </>
+          searchable && (
+            <SearchField
+              inputRef={searchField}
+              query={search.q ?? ""}
+              onSearch={onSearch}
+              label="Search by identifier"
+              className="grow basis-48 @3xl/title-row:max-w-48"
+            />
+          )
         }
         below={
           <ResourceFilter
@@ -299,7 +297,7 @@ function UsersScreen() {
                 <ResourceEmptyRow
                   colSpan={pinned.length + (showAttributes ? 1 : 0) + (teamsExpanded ? 6 : 5)}
                 >
-                  {loaded.q || isFiltered(search) ? (
+                  {loaded.q || filtered ? (
                     // On a phone the empty table still scrolls sideways, so the
                     // message and its control hold to the visible edge rather
                     // than center on a width that is partly out of view.
@@ -315,10 +313,7 @@ function UsersScreen() {
                             search: (prev) => ({
                               ...prev,
                               q: undefined,
-                              schema: undefined,
-                              revision: undefined,
-                              status: undefined,
-                              created: undefined,
+                              ...clearedFilters(filters),
                             }),
                           });
                         }}

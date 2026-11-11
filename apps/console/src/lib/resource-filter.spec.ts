@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
 
 import { formatDate } from "./date";
-import { dateFilterLabel, dateFilterStart, parseDateFilter, today } from "./resource-filter";
+import {
+  clearedFilters,
+  dateFilterLabel,
+  dateFilterStart,
+  type FilterDefinition,
+  isFiltered,
+  parseDateFilter,
+  today,
+} from "./resource-filter";
 
 describe("date filter values", () => {
   it("keeps a range or a real day, and nothing else", () => {
@@ -30,5 +38,22 @@ describe("date filter values", () => {
 
   it("writes today as a date field holds it", () => {
     expect(today(new Date(2026, 0, 5, 23, 59))).toBe("2026-01-05");
+  });
+});
+
+describe("a screen's filters as a whole", () => {
+  const filters: FilterDefinition[] = [
+    { type: "options", key: "kind", label: "Kind", options: [] },
+    { type: "date", key: "picked", label: "Picked" },
+  ];
+
+  it("is filtered once any of them is set, whatever else the search carries", () => {
+    expect(isFiltered(filters, { q: "pear" })).toBe(false);
+    expect(isFiltered(filters, { picked: "7d" })).toBe(true);
+  });
+
+  it("clears every one of them, and nothing else", () => {
+    expect(clearedFilters(filters)).toEqual({ kind: undefined, picked: undefined });
+    expect(Object.keys(clearedFilters(filters))).toEqual(["kind", "picked"]);
   });
 });

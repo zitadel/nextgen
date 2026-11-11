@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { StatusBadge, statusTone } from "./status-badge";
+import { StatusBadge, statusOptions, statusTone } from "./status-badge";
 
 describe("status tones", () => {
   it("gives a status the tone of what it means", () => {
@@ -30,5 +30,15 @@ describe("status tones", () => {
   it("draws no pill for a record without a status", () => {
     render(<StatusBadge />);
     expect(screen.getByText("—")).toBeInTheDocument();
+  });
+
+  it("offers statuses to a filter in the pill's words, each with its dot", () => {
+    const [purge] = statusOptions(["pending_purge"]);
+    expect(purge).toMatchObject({ value: "pending_purge", label: "Pending Purge" });
+    render(<div>{purge?.content}</div>);
+    expect(screen.getByText("Pending Purge").previousElementSibling).toHaveAttribute(
+      "data-tone",
+      "critical",
+    );
   });
 });

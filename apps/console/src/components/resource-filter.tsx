@@ -1,5 +1,5 @@
 import { Check, ChevronLeft, ChevronRight, ListFilter, X } from "lucide-react";
-import { type ReactElement, useId, useRef, useState } from "react";
+import { Fragment, type ReactElement, useId, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -11,17 +11,16 @@ import {
   CommandList,
   CommandSeparator,
 } from "@/components/ui/command";
+import { COMBOBOX_ROW, COMBOBOX_SURFACE } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   DATE_RANGE_LABEL,
   DATE_RANGES,
-  type DateFilter,
   dateFilterLabel,
   type FilterDefinition,
+  type FilterOption,
   type FilterValues,
-  filterName,
-  type OptionsFilter,
   parseDateFilter,
   today,
 } from "@/lib/resource-filter";
@@ -72,7 +71,7 @@ export function ResourceFilter({
       {filters.map((filter) => {
         const value = values[filter.key];
         if (!value) return null;
-        const name = filterName(filter);
+        const name = filter.name ?? filter.label.toLowerCase();
         return (
           // The Add button's own surface, as one control. Its two parts are
           // inset in it, so each one's hover fill is a rounded box of its own
@@ -124,9 +123,9 @@ function FilterValue({ filter, value }: { filter: FilterDefinition; value: strin
   return <span className="truncate">{label ?? value}</span>;
 }
 
-/** The menu's surface and rows: the Combobox list's (`ui/combobox.tsx`). */
-const MENU = "border-foreground/10 w-64 rounded-md p-0";
-const ITEM = "min-h-8 gap-1.5 rounded-sm py-1.5 pr-8 pl-2";
+/** The menu's surface and rows are the Combobox list's. */
+const MENU = `w-64 ${COMBOBOX_SURFACE}`;
+const ITEM = `min-h-8 ${COMBOBOX_ROW}`;
 
 /**
  * The popover behind the Add button and behind each chip. From the button it
@@ -208,13 +207,14 @@ function FilterMenu({
             )}
             {current.type === "options" ? (
               <OptionValues
-                filter={current}
+                label={current.label}
+                options={current.options}
                 value={values[current.key]}
                 onPick={(value) => pick(current, value)}
               />
             ) : (
               <DateValues
-                filter={current}
+                label={current.label}
                 value={values[current.key]}
                 onPick={(value) => pick(current, value)}
               />
@@ -226,30 +226,47 @@ function FilterMenu({
   );
 }
 
-/** A set of options: a searchable list, the chosen one checked. */
-function OptionValues({
-  filter,
-  value,
-  onPick,
-}: {
-  filter: OptionsFilter;
+interface ValuesProps {
+  /** The property's label, which names the list and its search field. */
+  label: string;
   value: string | undefined;
   onPick: (value: string) => void;
-}) {
+}
+
+/** A set of options: a searchable list, the chosen one checked. */
+function OptionValues({
+  label,
+  options,
+  value,
+  onPick,
+}: ValuesProps & { options: FilterOption[] }) {
   return (
-    <Command label={filter.label}>
+    <Command label={label}>
       {/* Stepping in replaces the properties' field, which held the focus. */}
-      <CommandInput autoFocus variant="boxed" placeholder={`${filter.label}…`} />
+      <CommandInput autoFocus variant="boxed" placeholder={`${label}…`} />
       <CommandList>
         <CommandEmpty>Nothing to choose.</CommandEmpty>
         <CommandGroup>
-          {filter.options.map((option) => (
-            <FilterRow
-              key={option.value}
-              option={option}
-              chosen={option.value === value}
-              onPick={onPick}
-            />
+          {options.map((option) => (
+            <Fragment key={option.value}>
+              <CommandItem
+                value={option.value}
+                keywords={[option.label]}
+                title={option.title}
+                // A row of two lines keeps the check mark on its first.
+                className={cn(ITEM, "items-start")}
+                onSelect={() => onPick(option.value)}
+              >
+                {option.content ?? (
+                  <span className="min-w-0 flex-1 truncate leading-5">{option.label}</span>
+                )}
+                {option.value === value && (
+                  <Check aria-hidden className="absolute top-2 right-2 size-4" />
+                )}
+              </CommandItem>
+              {/* `foreground/10`, as the Combobox's footer: `border` does not show on a dark popover. */}
+              {option.separated && <CommandSeparator className="bg-foreground/10 my-1" />}
+            </Fragment>
           ))}
         </CommandGroup>
       </CommandList>
@@ -257,74 +274,27 @@ function OptionValues({
   );
 }
 
-function FilterRow({
-  option,
-  chosen,
-  onPick,
-}: {
-  option: OptionsFilter["options"][number];
-  chosen: boolean;
-  onPick: (value: string) => void;
-}) {
-  return (
-    <>
-      <CommandItem
-        value={option.value}
-        keywords={[option.label, ...(option.keywords ?? [])]}
-        title={option.title}
-        // A row of two lines keeps the check mark on its first.
-        className={cn(ITEM, "items-start")}
-        onSelect={() => onPick(option.value)}
-      >
-        {option.content ?? (
-          <span className="min-w-0 flex-1 truncate leading-5">{option.label}</span>
-        )}
-        {chosen && <Check aria-hidden className="absolute top-2 right-2 size-4" />}
-      </CommandItem>
-      {/* `foreground/10`, as the Combobox's footer: `border` does not show on a dark popover. */}
-      {option.separated && <CommandSeparator className="bg-foreground/10 my-1" />}
-    </>
-  );
-}
+const RANGE_OPTIONS: FilterOption[] = DATE_RANGES.map((range) => ({
+  value: range,
+  label: DATE_RANGE_LABEL[range],
+}));
 
 /**
- * A date: the ranges that end now, and under them a day to start from. The
- * day's form sits outside the list, whose Enter picks the highlighted range.
+ * A date: the ranges that end now as a list of options, and under them a day
+ * to start from. The day's form sits outside the list, whose Enter picks the
+ * highlighted range.
  */
-function DateValues({
-  filter,
-  value,
-  onPick,
-}: {
-  filter: DateFilter;
-  value: string | undefined;
-  onPick: (value: string) => void;
-}) {
+function DateValues({ label, value, onPick }: ValuesProps) {
   const fieldId = useId();
   const [day, setDay] = useState(() =>
-    value && !(DATE_RANGES as readonly string[]).includes(value) ? value : "",
+    value && !RANGE_OPTIONS.some((range) => range.value === value) ? value : "",
   );
   const latest = today();
   const valid = parseDateFilter(day) !== undefined && day <= latest;
 
   return (
     <>
-      <Command label={filter.label}>
-        <CommandInput autoFocus variant="boxed" placeholder={`${filter.label}…`} />
-        <CommandList>
-          <CommandEmpty>No such range.</CommandEmpty>
-          <CommandGroup>
-            {DATE_RANGES.map((range) => (
-              <FilterRow
-                key={range}
-                option={{ value: range, label: DATE_RANGE_LABEL[range] }}
-                chosen={range === value}
-                onPick={onPick}
-              />
-            ))}
-          </CommandGroup>
-        </CommandList>
-      </Command>
+      <OptionValues label={label} options={RANGE_OPTIONS} value={value} onPick={onPick} />
       <form
         className="border-foreground/10 flex flex-col gap-1.5 border-t p-2"
         onSubmit={(event) => {
