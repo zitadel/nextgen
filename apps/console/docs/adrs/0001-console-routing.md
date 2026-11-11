@@ -231,6 +231,12 @@ the sidebar.
 > link with `project: undefined`, so `_authed` does not retain the selection
 > and the guard asks for a project as D22 has it.
 
+> **Amendment (2026-11-11, design decision D36):** a selected project stays
+> selected above every project. This replaces D34's `project: undefined` links
+> and D27's pill: on Projects and `/settings` the account list's rows open in
+> the selected project, and the pill names it. With none selected the pill
+> says `All projects` and a project's row asks for one (D22, D31).
+
 > **Amendment (2026-11-10, design decision D35):** `/` is a screen again, the
 > project's Overview, declaring `scope: "project"` and the portal list's first
 > entry. The `_authed` guard sends it to Projects without `?next=` when no
@@ -258,6 +264,14 @@ the sidebar.
 > the drawer's URL carries the list's filters. A loader that must not rerun
 > when a child changes belongs to the layout route, keyed on the search it
 > reads.
+
+> **Amendment (2026-11-11, D30):** Logs' list chooses the view from a picker
+> (each view's glyph, name and what it holds), as Vercel's Logs chooses its
+> kind of log, rather than one row per view, and keeps only the filters chosen
+> from a list (time, category, type or status). The values a person pastes
+> (the ids, the operation, the resource type, My activity) are set in the
+> search above the table and shown there as chips. The URL keeps every filter
+> as before.
 
 ## Consequences
 

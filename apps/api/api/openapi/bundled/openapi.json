@@ -2023,7 +2023,7 @@
       "get": {
         "operationId": "getFlowStep",
         "summary": "Get the current step of a flow",
-        "description": "Returns the current step of a flow without advancing it. Use it to render\nthe step again after a page reload or a network error.\n\nThe flow endpoints are the runtime calls the login component\n(`<zitadel-login>`) makes, step by step. `createFlow` (`POST /flow`) starts a flow, and\n`submitFlowStep` (`POST /flow/{id}/submit`) advances it.\n\nReuses the deployment sealed into `_zflow` at `createFlow`; it does not\nre-resolve from `Origin`. If that release was revoked since the attempt\nstarted, the response is `409` with `rel.revoked`.\n",
+        "description": "Returns the current step of a flow without advancing it. Use it to render\nthe step again after a page reload or a network error.\n\nThe flow endpoints are the runtime calls the login component\n(`<zitadel-login>`) makes, step by step. `createFlow` (`POST /flow`) starts a flow, and\n`submitFlowStep` (`POST /flow/{id}/submit`) advances it.\n\nFor a password-signup step, prepares `step.gates.signup_pow.challenge`.\nReuses challenges with more than a minute remaining; otherwise issues a\nnew one. If this render resolves parked SSO state, it first returns the\nupdated cookie; fetch the step again to obtain its puzzle.\n\nReuses the deployment sealed into `_zflow` at `createFlow`; it does not\nre-resolve from `Origin`. If that release was revoked since the attempt\nstarted, the response is `409` with `rel.revoked`.\n",
         "tags": [
           "Flows"
         ],
@@ -2104,7 +2104,7 @@
       "post": {
         "operationId": "submitFlowStep",
         "summary": "Submit a flow step",
-        "description": "Submits the user's input for the current step of a flow. The server\nvalidates it, processes it (for example, verifies a credential), advances\nthe flow through any invisible steps, and returns the next visible step.\nThe flow endpoints are the runtime calls the login component\n(`<zitadel-login>`) makes, step by step; `createFlow` (`POST /flow`) starts a flow.\n\nThe response sets an updated encrypted `HttpOnly` cookie (`_zflow`)\nwith the new flow state. The server is stateless: all orchestration\nstate is carried in this cookie between requests.\n\n**Important:** The `id` in the response may differ from the `id` used in\nthe request. This happens when a flow pivots (pushes a new flow onto the\nstack) or when a stacked flow completes (auto-pops to the parent flow).\nAlways use the `id` from the latest response for the next request.\n\n## Flow completion\n\nWhen `step.type` is `complete`, the flow is terminal. The `step.behavior`\nfield tells the frontend what to do:\n\n| `behavior`   | Action                                                     |\n|------------- |------------------------------------------------------------|\n| `redirect`   | Navigate to `redirect_uri` (OIDC/SAML auth request done). |\n| `show`       | Render the step as a success screen, such as registration. |\n\nA `complete` step is only returned when the **entire flow stack** is done.\nIf a stacked flow (for example, recovery pivoted from login) finishes, the\nserver auto-pops to the parent flow and returns the parent's next step.\nThe frontend never sees a `complete` for intermediate flows.\n\n## External sign-in\n\n`{action: \"sso\", sso_provider_id, return_target}` on a step that offers\n`sso_providers` returns the server-emitted `sso-redirect` step, whose\n`redirect_url` the frontend navigates to.\n\n- The flow state does not change, but `_zflow` is re-sealed like on\n  every response, so its ten-minute window restarts at this submission;\n  the external sign-in and the return must complete within it.\n- A second `Set-Cookie` line carries the browser-binding cookie the\n  callback checks: `HttpOnly`, `Path=/`, `SameSite=Lax`.\n- On every host except http loopback it is `__Host-_zsso` with `Secure`.\n- When the request host is http loopback (local development, where\n  Safari rejects `Secure`), it is `_zsso` with no `Secure`; the\n  `__Host-` prefix is dropped because it requires `Secure`.\n\nAn identity provider (an external sign-in such as Google) whose\n`client_id` is a `${{ NAME }}` reference has it filled from the project's\nvariables. A provider the server cannot start a sign-in with, including a\nreference with no variable behind it, re-renders the step with\n`error.sso_unavailable`.\n\nReuses the deployment sealed into `_zflow` at `createFlow`; it does not\nre-resolve from `Origin`. If that release was revoked since the attempt\nstarted, the response is `409` with `rel.revoked`.\n",
+        "description": "Submits the user's input for the current step of a flow. The server\nvalidates it, processes it (for example, verifies a credential), advances\nthe flow through any invisible steps, and returns the next visible step.\nThe flow endpoints are the runtime calls the login component\n(`<zitadel-login>`) makes, step by step; `createFlow` (`POST /flow`) starts a flow.\n\nThe response sets an updated encrypted `HttpOnly` cookie (`_zflow`)\nwith the new flow state. The server is stateless: all orchestration\nstate is carried in this cookie between requests.\n\nPassword signup (`create_user`) additionally requires a single-use\n`gate_proofs.signup_pow` solution for `step.gates.signup_pow`. Pending\nchallenges and rate counters are stored on the server. Invalid or spent\nproofs return `403 flow.proof_invalid`; exhausted per-flow budgets return\n`429 flow.rate_limited`. GET the current step to obtain or refresh its\nchallenge before solving. Start and Submit announce the gate without a puzzle.\n\n**Important:** The `id` in the response may differ from the `id` used in\nthe request. This happens when a flow pivots (pushes a new flow onto the\nstack) or when a stacked flow completes (auto-pops to the parent flow).\nAlways use the `id` from the latest response for the next request.\n\n## Flow completion\n\nWhen `step.type` is `complete`, the flow is terminal. The `step.behavior`\nfield tells the frontend what to do:\n\n| `behavior`   | Action                                                     |\n|------------- |------------------------------------------------------------|\n| `redirect`   | Navigate to `redirect_uri` (OIDC/SAML auth request done). |\n| `show`       | Render the step as a success screen, such as registration. |\n\nA `complete` step is only returned when the **entire flow stack** is done.\nIf a stacked flow (for example, recovery pivoted from login) finishes, the\nserver auto-pops to the parent flow and returns the parent's next step.\nThe frontend never sees a `complete` for intermediate flows.\n\n## External sign-in\n\n`{action: \"sso\", sso_provider_id, return_target}` on a step that offers\n`sso_providers` returns the server-emitted `sso-redirect` step, whose\n`redirect_url` the frontend navigates to.\n\n- The flow state does not change, but `_zflow` is re-sealed like on\n  every response, so its ten-minute window restarts at this submission;\n  the external sign-in and the return must complete within it.\n- A second `Set-Cookie` line carries the browser-binding cookie the\n  callback checks: `HttpOnly`, `Path=/`, `SameSite=Lax`.\n- On every host except http loopback it is `__Host-_zsso` with `Secure`.\n- When the request host is http loopback (local development, where\n  Safari rejects `Secure`), it is `_zsso` with no `Secure`; the\n  `__Host-` prefix is dropped because it requires `Secure`.\n\nAn identity provider (an external sign-in such as Google) whose\n`client_id` is a `${{ NAME }}` reference has it filled from the project's\nvariables. A provider the server cannot start a sign-in with, including a\nreference with no variable behind it, re-renders the step with\n`error.sso_unavailable`.\n\nReuses the deployment sealed into `_zflow` at `createFlow`; it does not\nre-resolve from `Origin`. If that release was revoked since the attempt\nstarted, the response is `409` with `rel.revoked`.\n",
         "tags": [
           "Flows"
         ],
@@ -7225,6 +7225,15 @@
                       "history_depth": 4
                     }
                   }
+                },
+                "signupPolicy": {
+                  "summary": "The default sign-up policy",
+                  "value": {
+                    "operation": "user.create",
+                    "config": {
+                      "challenge": "zitadel_pow"
+                    }
+                  }
                 }
               }
             }
@@ -7324,6 +7333,18 @@
                         false,
                         true
                       ]
+                    }
+                  }
+                },
+                "signup": {
+                  "summary": "A sign-up that solved the built-in proof of work",
+                  "value": {
+                    "operation": "user.create",
+                    "config": {
+                      "challenge": "zitadel_pow"
+                    },
+                    "input": {
+                      "solved_challenge": "zitadel_pow"
                     }
                   }
                 }
@@ -8265,7 +8286,7 @@
         "x-zitadel-cli": "release revoke",
         "x-zitadel-destructive": true,
         "summary": "Revoke a release",
-        "description": "Revokes a release, so that its content is never served again. Pass the\n`id` that `createRelease` (`POST /releases`), `buildRelease` (`POST /releases/build`) or `listReleases` (`GET /releases`) returns. It\nrecords a `release.revoked` event.\n\nFrom then on the release cannot be deployed. Every path that would serve\nit refuses it with `rel.revoked`, including a build that pins its digest.\n\nA release that any origin still serves cannot be revoked. An origin serves\nthe release of the newest deployment to it, so the call answers `409` with\n`rel.in_use`, naming each such origin and that deployment. Deploy another\nrelease there or roll back first, then revoke. Revoking therefore never\ntakes an origin down. Deployments that named the release earlier stay in\nthe history.\n\nThe call is idempotent: revoking a release that is already revoked answers\n`200` with the release unchanged, and `revoked_at` still names the first\nrevocation. There is no un-revoke. To serve that configuration again,\nchange it and build a new release: rebuilding unchanged content returns\nthe same revoked release.\n\nThe call takes no body. The lookup is scoped to the project in\n`project_id`, so a release ID of another project answers not found exactly\nas an unknown ID does.\n",
+        "description": "Revokes a release, so that its content is never served again. Pass the\n`id` that `createRelease` (`POST /releases`), `buildRelease` (`POST /releases/build`) or `listReleases` (`GET /releases`) returns. It\nrecords a `release.revoked` event.\n\nFrom then on the release cannot be deployed. Every path that would serve\nit refuses it with `rel.revoked`, including a build that pins its digest.\n\nA release that any origin still serves cannot be revoked. An origin serves\nthe release of the newest deployment to it, so the call answers `409` with\n`rel.in_use`, naming each such origin, that deployment and whether the\norigin is primary or a preview. Deploy another release to a primary origin\nor roll it back, and remove a preview, then revoke. Revoking therefore\nnever takes an origin down. Deployments that named the release earlier stay in\nthe history.\n\nThe call is idempotent: revoking a release that is already revoked answers\n`200` with the release unchanged, and `revoked_at` still names the first\nrevocation. There is no un-revoke. To serve that configuration again,\nchange it and build a new release: rebuilding unchanged content returns\nthe same revoked release.\n\nThe call takes no body. The lookup is scoped to the project in\n`project_id`, so a release ID of another project answers not found exactly\nas an unknown ID does.\n",
         "tags": [
           "Releases"
         ],
@@ -8336,7 +8357,7 @@
             }
           },
           "409": {
-            "description": "At least one origin still serves the release. `details.origins`\nnames each such origin and the newest deployment to it.\n",
+            "description": "At least one origin still serves the release. `details.origins`\nnames each such origin, the newest deployment to it and whether it\nserves the release as a primary origin or a preview.\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -8345,7 +8366,7 @@
                 "examples": {
                   "stillServed": {
                     "summary": "Two origins still serve the release",
-                    "description": "Deploy another release to these origins, or roll them back,\nthen revoke.\n",
+                    "description": "Deploy another release to the primary origin or roll it back,\nremove the preview, then revoke.\n",
                     "value": {
                       "code": "rel.in_use",
                       "message": "release: still served by an origin",
@@ -8353,11 +8374,13 @@
                         "origins": [
                           {
                             "origin": "https://app.acme.com",
-                            "deployment_id": "dep_01KX4SB9C8E1F0N9WD3P2E4YM5"
+                            "deployment_id": "dep_01KX4SB9C8E1F0N9WD3P2E4YM5",
+                            "kind": "primary"
                           },
                           {
                             "origin": "https://acme-git-sso-acmeinc.vercel.app",
-                            "deployment_id": "dep_01KX4SD2F7H3F0N9WD3P2E4YM5"
+                            "deployment_id": "dep_01KX4SD2F7H3F0N9WD3P2E4YM5",
+                            "kind": "preview"
                           }
                         ]
                       }
@@ -10775,6 +10798,64 @@
     }
   },
   "webhooks": {
+    "flow.signup_challenge.issued": {
+      "post": {
+        "operationId": "flowSignupChallengeIssued",
+        "summary": "flow.signup_challenge.issued",
+        "description": "A password signup proof-of-work challenge was issued.\n\nThe body is the event as `GET /events` returns it.\n",
+        "tags": [
+          "Event Webhooks"
+        ],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/flow-signup_challenge-issued-event"
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "$ref": "#/components/responses/webhook-delivered"
+          },
+          "default": {
+            "$ref": "#/components/responses/webhook-not-delivered"
+          }
+        }
+      }
+    },
+    "flow.signup_challenge.consumed": {
+      "post": {
+        "operationId": "flowSignupChallengeConsumed",
+        "summary": "flow.signup_challenge.consumed",
+        "description": "A signup proof was spent before attempting user creation.\n\nThe body is the event as `GET /events` returns it.\n",
+        "tags": [
+          "Event Webhooks"
+        ],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/flow-signup_challenge-consumed-event"
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "$ref": "#/components/responses/webhook-delivered"
+          },
+          "default": {
+            "$ref": "#/components/responses/webhook-not-delivered"
+          }
+        }
+      }
+    },
     "auth.attempt.created": {
       "post": {
         "operationId": "authAttemptCreated",
@@ -11372,6 +11453,122 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/idp-updated-event"
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "$ref": "#/components/responses/webhook-delivered"
+          },
+          "default": {
+            "$ref": "#/components/responses/webhook-not-delivered"
+          }
+        }
+      }
+    },
+    "invitation.accepted": {
+      "post": {
+        "operationId": "invitationAccepted",
+        "summary": "invitation.accepted",
+        "description": "An invitation was accepted. Grant events the acceptance writes carry\nthis event's `request_id`; there are none when the user already holds an\nidentical active grant.\n\nNot sent yet: the contract is published ahead of the code that sends it.\n\nThe body is the event as `GET /events` returns it.\n",
+        "tags": [
+          "Event Webhooks"
+        ],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/invitation-accepted-event"
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "$ref": "#/components/responses/webhook-delivered"
+          },
+          "default": {
+            "$ref": "#/components/responses/webhook-not-delivered"
+          }
+        }
+      }
+    },
+    "invitation.cancelled": {
+      "post": {
+        "operationId": "invitationCancelled",
+        "summary": "invitation.cancelled",
+        "description": "A pending invitation was cancelled by an administrator, or by a\nreplacement.\n\nNot sent yet: the contract is published ahead of the code that sends it.\n\nThe body is the event as `GET /events` returns it.\n",
+        "tags": [
+          "Event Webhooks"
+        ],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/invitation-cancelled-event"
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "$ref": "#/components/responses/webhook-delivered"
+          },
+          "default": {
+            "$ref": "#/components/responses/webhook-not-delivered"
+          }
+        }
+      }
+    },
+    "invitation.created": {
+      "post": {
+        "operationId": "invitationCreated",
+        "summary": "invitation.created",
+        "description": "An invitation was created, new or as the replacement of another.\n\nNot sent yet: the contract is published ahead of the code that sends it.\n\nThe body is the event as `GET /events` returns it.\n",
+        "tags": [
+          "Event Webhooks"
+        ],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/invitation-created-event"
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "$ref": "#/components/responses/webhook-delivered"
+          },
+          "default": {
+            "$ref": "#/components/responses/webhook-not-delivered"
+          }
+        }
+      }
+    },
+    "invitation.rejected": {
+      "post": {
+        "operationId": "invitationRejected",
+        "summary": "invitation.rejected",
+        "description": "An invitation was declined.\n\nNot sent yet: the contract is published ahead of the code that sends it.\n\nThe body is the event as `GET /events` returns it.\n",
+        "tags": [
+          "Event Webhooks"
+        ],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/invitation-rejected-event"
               }
             }
           }
@@ -14430,14 +14627,61 @@
           }
         }
       },
-      "gate": {
+      "pow-challenge": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "protocol",
+          "challenge_id",
+          "profile_id",
+          "salt",
+          "nonce",
+          "key_prefix",
+          "expires_at"
+        ],
+        "description": "A short-lived, single-use signup challenge scoped to this project and flow.\nFor pbkdf2_sha256_5000_l1, try counters 0 through 511, deriving 32 bytes with\nPBKDF2-HMAC-SHA256 (5000 iterations), password nonce || uint32_be(counter),\nand the supplied salt. Match the first 16 derived bytes to key_prefix.\nSubmit gate_proofs.signup_pow as a JSON string containing protocol,\nchallenge_id and derived_key (the full 32 bytes in lowercase hex).\nThe proof is spent before password hashing, even if user creation fails.\n",
+        "properties": {
+          "protocol": {
+            "type": "string",
+            "example": "zitadel_pow_poc_v1"
+          },
+          "challenge_id": {
+            "type": "string",
+            "example": "ch_example"
+          },
+          "profile_id": {
+            "type": "string",
+            "example": "pbkdf2_sha256_5000_l1"
+          },
+          "salt": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{32}$",
+            "x-zitadel-pattern-message": "must be 32 lowercase hex digits"
+          },
+          "nonce": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{32}$",
+            "x-zitadel-pattern-message": "must be 32 lowercase hex digits"
+          },
+          "key_prefix": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{32}$",
+            "x-zitadel-pattern-message": "must be 32 lowercase hex digits"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "runtime-gate": {
         "type": "object",
         "additionalProperties": false,
         "required": [
           "kind",
           "provider"
         ],
-        "description": "A gate is a security check, such as a captcha, that must be satisfied\nbefore this step's submission is accepted. The server may also inject gates\nat runtime based on policy or risk evaluation.\n",
+        "description": "A runtime security challenge that must be satisfied before this step's submission\nis accepted. The engine may also inject gates at runtime based on policy\nor risk evaluation.\n",
         "properties": {
           "kind": {
             "type": "string",
@@ -14445,20 +14689,20 @@
               "captcha"
             ],
             "example": "captcha",
-            "description": "The gate category. Only `captcha` is defined today. Authenticator\nceremonies, such as passkey, are not gates: they are modeled as\ncredential authentication attempts (`auth_attempts`) with `x-credential`\non a field.\n"
+            "description": "The gate category. Only `captcha` is currently defined. Authenticator\nceremonies (e.g. passkey) are modelled as credential auth_attempts via\n`x-credential` on a field, not as gates.\n"
           },
           "provider": {
             "type": "string",
-            "description": "The provider within the gate kind, for example `altcha`, `turnstile` or\n`hcaptcha`. The server looks up an implementation in its provider\nregistry.\n",
-            "example": "altcha"
+            "description": "Implementation identifier. `zitadel_pow` protects password signup with\nthe built-in proof-of-work solver. External providers are not supported.\n",
+            "example": "zitadel_pow"
+          },
+          "challenge": {
+            "$ref": "#/components/schemas/pow-challenge"
           },
           "config": {
             "type": "object",
-            "description": "Provider-specific configuration consumed by the implementation when\nissuing the per-render challenge. Opaque to the server.\n",
-            "additionalProperties": true,
-            "example": {
-              "site_key": "0x4AAAAAAA-example-site-key"
-            }
+            "description": "Reserved provider-specific configuration. The built-in signup gate uses\n`challenge` and does not accept caller-selected cost parameters.\n",
+            "additionalProperties": true
           }
         }
       },
@@ -14658,7 +14902,7 @@
             "type": "object",
             "description": "Security gates, the security checks that must be satisfied before the\nstep can be submitted.\nThe server injects gates dynamically based on policy, even if they\nare not declared in the flow definition.\n",
             "additionalProperties": {
-              "$ref": "#/components/schemas/gate"
+              "$ref": "#/components/schemas/runtime-gate"
             },
             "default": {}
           },
@@ -15116,6 +15360,26 @@
           }
         ]
       },
+      "flow-rate_limited": {
+        "description": "Signup request limit reached; retry after one minute\n\nError code: flow.rate_limited\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "flow.rate_limited"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
       "flow-restart_required": {
         "description": "The flow must be restarted\n\nError code: flow.restart_required\n",
         "allOf": [
@@ -15302,7 +15566,7 @@
           },
           "gate_proofs": {
             "type": "object",
-            "description": "Solutions for security gates. Keys match gate names from the step's `gates` dictionary.\nThe login component collects these from `<zl-captcha>` component events.\n",
+            "description": "Solutions for security gates. Keys match gate names from the step's `gates` dictionary.\nFor password signup, the login component solves the built-in challenge\nwith Web Crypto and submits its JSON proof under `signup_pow`.\n",
             "additionalProperties": {
               "type": "string"
             }
@@ -15338,6 +15602,26 @@
             "example": "https://login.example.com/login?flow=flow_2"
           }
         }
+      },
+      "flow-proof_invalid": {
+        "description": "Signup proof is missing, invalid, expired or already used; refresh the step\n\nError code: flow.proof_invalid\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "flow.proof_invalid"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
       },
       "session-id": {
         "type": "string",
@@ -17793,6 +18077,34 @@
           }
         }
       },
+      "gate": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "provider"
+        ],
+        "description": "A reserved gate declaration. Gates declared in a flow definition are not\ncurrently enforced. Required signup gates are attached by the server based\non `on_success: create_user`, independently of this declaration.\n",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "captcha"
+            ],
+            "example": "captcha",
+            "description": "The gate category. Only `captcha` is defined today. Authenticator\nceremonies, such as passkey, are not gates: they are modeled as\ncredential authentication attempts (`auth_attempts`) with `x-credential`\non a field.\n"
+          },
+          "provider": {
+            "type": "string",
+            "description": "Reserved implementation identifier. Declaring a provider does not enable it.\n"
+          },
+          "config": {
+            "type": "object",
+            "description": "Reserved provider-specific configuration. It has no runtime effect.\n",
+            "additionalProperties": true
+          }
+        }
+      },
       "flow-definition-step": {
         "type": "object",
         "required": [
@@ -19620,7 +19932,8 @@
         "type": "string",
         "description": "An operation a policy can guard; the policy catalog lists them.",
         "enum": [
-          "auth.factor.password.set"
+          "auth.factor.password.set",
+          "user.create"
         ]
       },
       "pol-not_found": {
@@ -19756,18 +20069,90 @@
           }
         }
       },
+      "user-create-config": {
+        "title": "UserCreatePolicyConfig",
+        "type": "object",
+        "additionalProperties": false,
+        "description": "The settings of a `user.create` policy, checked before a sign-up creates a\nuser. Every setting is optional; a setting left out switches its rule off,\nand `{}` switches every rule off. Zitadel's own sign-up protection, a proof\nof work on every password sign-up and limits per sign-up flow, applies\neither way: a policy chooses among challenges and never switches it off.\nSign-ups with a passkey or through a sign-in provider are not challenged.\n",
+        "properties": {
+          "challenge": {
+            "type": "string",
+            "enum": [
+              "zitadel_pow"
+            ],
+            "description": "The challenge a password sign-up must solve before the user is\ncreated. `zitadel_pow` is Zitadel's built-in proof of work, which every\npassword sign-up solves when no policy names a challenge.\n"
+          }
+        }
+      },
+      "user-create-policy": {
+        "title": "UserCreatePolicy",
+        "type": "object",
+        "description": "One revision of a project's `user.create` policy. `id` is shared by every\nrevision of the operation's policy; `revision_id` names this revision.\n",
+        "required": [
+          "id",
+          "revision_id",
+          "project_id",
+          "operation",
+          "config",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "id": {
+            "readOnly": true,
+            "$ref": "#/components/schemas/policy-id"
+          },
+          "revision_id": {
+            "readOnly": true,
+            "$ref": "#/components/schemas/policy-revision-id"
+          },
+          "project_id": {
+            "readOnly": true,
+            "description": "The project the policy belongs to.",
+            "$ref": "#/components/schemas/project-id"
+          },
+          "operation": {
+            "type": "string",
+            "enum": [
+              "user.create"
+            ],
+            "readOnly": true,
+            "description": "The operation the policy guards."
+          },
+          "config": {
+            "readOnly": true,
+            "$ref": "#/components/schemas/user-create-config"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true,
+            "description": "When the operation's policy was first published."
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true,
+            "description": "When this revision was published."
+          }
+        }
+      },
       "policy": {
         "title": "Policy",
         "description": "One revision of a project's policy for an operation, typed by `operation`.\n`id` is shared by every revision of the operation's policy; `revision_id`\nnames this revision.\n",
         "oneOf": [
           {
             "$ref": "#/components/schemas/password-set-policy"
+          },
+          {
+            "$ref": "#/components/schemas/user-create-policy"
           }
         ],
         "discriminator": {
           "propertyName": "operation",
           "mapping": {
-            "auth.factor.password.set": "#/components/schemas/password-set-policy"
+            "auth.factor.password.set": "#/components/schemas/password-set-policy",
+            "user.create": "#/components/schemas/user-create-policy"
           }
         }
       },
@@ -19818,18 +20203,43 @@
           }
         }
       },
+      "user-create-policy-input": {
+        "title": "UserCreatePolicyInput",
+        "type": "object",
+        "description": "A publish of the sign-up policy, checked before a sign-up creates a user.",
+        "required": [
+          "operation",
+          "config"
+        ],
+        "properties": {
+          "operation": {
+            "type": "string",
+            "enum": [
+              "user.create"
+            ],
+            "description": "The operation the policy guards."
+          },
+          "config": {
+            "$ref": "#/components/schemas/user-create-config"
+          }
+        }
+      },
       "publish-policy-request": {
         "title": "PublishPolicyRequest",
         "description": "One publish of the project's policy for an operation. `operation` selects\nthe operation's template, and `config` sets that template's settings. A\nsetting left out is off, and `{}` switches every rule off. The policy catalog\nlists the settings each operation accepts.\n",
         "oneOf": [
           {
             "$ref": "#/components/schemas/password-set-policy-input"
+          },
+          {
+            "$ref": "#/components/schemas/user-create-policy-input"
           }
         ],
         "discriminator": {
           "propertyName": "operation",
           "mapping": {
-            "auth.factor.password.set": "#/components/schemas/password-set-policy-input"
+            "auth.factor.password.set": "#/components/schemas/password-set-policy-input",
+            "user.create": "#/components/schemas/user-create-policy-input"
           }
         }
       },
@@ -19941,18 +20351,65 @@
           }
         }
       },
+      "user-create-evaluate-input": {
+        "title": "UserCreateEvaluateInput",
+        "type": "object",
+        "additionalProperties": false,
+        "description": "The sign-up as it reaches the server. A real sign-up proves the challenge\nit solved; a dry run names it.\n",
+        "required": [
+          "solved_challenge"
+        ],
+        "properties": {
+          "solved_challenge": {
+            "type": "string",
+            "enum": [
+              "zitadel_pow"
+            ],
+            "description": "The challenge the sign-up solved. `zitadel_pow` is Zitadel's built-in\nproof of work.\n"
+          }
+        }
+      },
+      "user-create-evaluate-request": {
+        "title": "UserCreateEvaluateRequest",
+        "type": "object",
+        "description": "A dry run of the sign-up policy for one sign-up.",
+        "required": [
+          "operation",
+          "config",
+          "input"
+        ],
+        "properties": {
+          "operation": {
+            "type": "string",
+            "enum": [
+              "user.create"
+            ],
+            "description": "The operation the policy guards."
+          },
+          "config": {
+            "$ref": "#/components/schemas/user-create-config"
+          },
+          "input": {
+            "$ref": "#/components/schemas/user-create-evaluate-input"
+          }
+        }
+      },
       "evaluate-policy-request": {
         "title": "EvaluatePolicyRequest",
         "description": "One dry run of an operation's policy. `operation` selects the operation's\ntemplate. `config` is the policy to evaluate, checked exactly as a publish\nchecks it. `input` is what the operation's request carries, in the\noperation's own terms. `facts` states what the operation would look up at\nruntime. The policy catalog lists the fields each operation accepts.\n",
         "oneOf": [
           {
             "$ref": "#/components/schemas/password-set-evaluate-request"
+          },
+          {
+            "$ref": "#/components/schemas/user-create-evaluate-request"
           }
         ],
         "discriminator": {
           "propertyName": "operation",
           "mapping": {
-            "auth.factor.password.set": "#/components/schemas/password-set-evaluate-request"
+            "auth.factor.password.set": "#/components/schemas/password-set-evaluate-request",
+            "user.create": "#/components/schemas/user-create-evaluate-request"
           }
         }
       },
@@ -19970,7 +20427,7 @@
           },
           "code": {
             "type": "string",
-            "description": "The error code an API call of the operation would answer with, set\nonly when it would refuse, for example `user.password_empty` or\n`user.password_policy_violation`.\n"
+            "description": "The error code an API call of the operation would answer with, set\nonly when it would refuse, for example `user.password_empty`,\n`user.password_policy_violation` or, for a sign-up, `flow.proof_invalid`.\n"
           },
           "violations": {
             "type": "object",
@@ -20619,6 +21076,16 @@
         "x-zitadel-pattern-message": "must be a deployment ID: dep_ followed by letters, digits, _ or -",
         "example": "dep_01KX4SB9C8E1F0N9WD3P2E4YM5"
       },
+      "deployment-kind": {
+        "title": "DeploymentKind",
+        "type": "string",
+        "description": "`primary` for the project's primary origins, `preview` for preview URLs.\n",
+        "enum": [
+          "primary",
+          "preview"
+        ],
+        "example": "primary"
+      },
       "revoke-release-conflict": {
         "title": "RevokeReleaseConflict",
         "type": "object",
@@ -20650,7 +21117,8 @@
                   "type": "object",
                   "required": [
                     "origin",
-                    "deployment_id"
+                    "deployment_id",
+                    "kind"
                   ],
                   "properties": {
                     "origin": {
@@ -20659,6 +21127,10 @@
                     "deployment_id": {
                       "$ref": "#/components/schemas/deployment-id",
                       "description": "The newest deployment to the origin, which pins the release."
+                    },
+                    "kind": {
+                      "$ref": "#/components/schemas/deployment-kind",
+                      "description": "Whether the origin serves the release as a primary origin or as\na preview. A deploy or a rollback frees a primary origin;\nremoving the preview frees a preview.\n"
                     }
                   }
                 }
@@ -22554,6 +23026,56 @@
           }
         ]
       },
+      "flow-signup_challenge-consumed-event": {
+        "title": "FlowSignupChallengeConsumedEvent",
+        "description": "An event of type flow.signup_challenge.consumed, with the shared event fields and its own payload.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/event-base"
+          },
+          {
+            "type": "object",
+            "required": [
+              "event_type",
+              "payload"
+            ],
+            "properties": {
+              "event_type": {
+                "type": "string",
+                "const": "flow.signup_challenge.consumed"
+              },
+              "payload": {
+                "$ref": "#/components/schemas/empty-event-payload"
+              }
+            }
+          }
+        ]
+      },
+      "flow-signup_challenge-issued-event": {
+        "title": "FlowSignupChallengeIssuedEvent",
+        "description": "An event of type flow.signup_challenge.issued, with the shared event fields and its own payload.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/event-base"
+          },
+          {
+            "type": "object",
+            "required": [
+              "event_type",
+              "payload"
+            ],
+            "properties": {
+              "event_type": {
+                "type": "string",
+                "const": "flow.signup_challenge.issued"
+              },
+              "payload": {
+                "$ref": "#/components/schemas/empty-event-payload"
+              }
+            }
+          }
+        ]
+      },
       "flowdef-payload": {
         "title": "FlowdefPayload",
         "type": "object",
@@ -22784,6 +23306,377 @@
               },
               "payload": {
                 "$ref": "#/components/schemas/idp-payload"
+              }
+            }
+          }
+        ]
+      },
+      "invitation-accepted-common-payload": {
+        "title": "InvitationAcceptedCommonPayload",
+        "description": "Fields every `invitation.accepted` payload carries, whatever its `type`.\n",
+        "type": "object",
+        "required": [
+          "journey_id",
+          "user_id"
+        ],
+        "properties": {
+          "journey_id": {
+            "type": "string",
+            "description": "Shared by an invitation and every invitation that replaces it."
+          },
+          "user_id": {
+            "type": "string"
+          }
+        }
+      },
+      "invitation-accepted-project-member-payload": {
+        "title": "InvitationAcceptedProjectMemberPayload",
+        "description": "An `invitation.accepted` payload for a `project_member` invitation.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/invitation-accepted-common-payload"
+          },
+          {
+            "type": "object",
+            "required": [
+              "type",
+              "project_member"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "project_member"
+                ]
+              },
+              "project_member": {
+                "$ref": "#/components/schemas/invitation-project-member-payload"
+              }
+            }
+          }
+        ]
+      },
+      "invitation-accepted-team-member-payload": {
+        "title": "InvitationAcceptedTeamMemberPayload",
+        "description": "An `invitation.accepted` payload for a `team_member` invitation.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/invitation-accepted-common-payload"
+          },
+          {
+            "type": "object",
+            "required": [
+              "type",
+              "team_member"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "team_member"
+                ]
+              },
+              "team_member": {
+                "$ref": "#/components/schemas/invitation-team-member-payload"
+              }
+            }
+          }
+        ]
+      },
+      "invitation-accepted-payload": {
+        "title": "InvitationAcceptedPayload",
+        "description": "Payload for `invitation.accepted`. The invitation ID is the event's\n`entity_id`, and `user_id` is the user who redeemed the link. Discriminate\non `type`; the object named after it says what the invitation granted. Grant\nevents the acceptance writes, such as `authz.granted`, carry this event's\n`request_id`. There are none when the user already holds an identical\nactive grant.\n",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/invitation-accepted-project-member-payload"
+          },
+          {
+            "$ref": "#/components/schemas/invitation-accepted-team-member-payload"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "project_member": "#/components/schemas/invitation-accepted-project-member-payload",
+            "team_member": "#/components/schemas/invitation-accepted-team-member-payload"
+          }
+        }
+      },
+      "invitation-accepted-event": {
+        "title": "InvitationAcceptedEvent",
+        "description": "An event of type invitation.accepted, with the shared event fields and its own payload.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/event-base"
+          },
+          {
+            "type": "object",
+            "required": [
+              "event_type",
+              "payload"
+            ],
+            "properties": {
+              "event_type": {
+                "type": "string",
+                "const": "invitation.accepted"
+              },
+              "payload": {
+                "$ref": "#/components/schemas/invitation-accepted-payload"
+              }
+            }
+          }
+        ]
+      },
+      "invitation-cancelled-by-administrator-payload": {
+        "title": "InvitationCancelledByAdministratorPayload",
+        "description": "An `invitation.cancelled` payload for an invitation an administrator\ncancelled.\n",
+        "type": "object",
+        "required": [
+          "journey_id",
+          "reason"
+        ],
+        "properties": {
+          "journey_id": {
+            "type": "string",
+            "description": "Shared by an invitation and every invitation that replaces it."
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "cancelled"
+            ]
+          }
+        }
+      },
+      "invitation-cancelled-by-replacement-payload": {
+        "title": "InvitationCancelledByReplacementPayload",
+        "description": "An `invitation.cancelled` payload for an invitation a replacement\ncancelled.\n",
+        "type": "object",
+        "required": [
+          "journey_id",
+          "reason",
+          "replaced_by_invitation_id"
+        ],
+        "properties": {
+          "journey_id": {
+            "type": "string",
+            "description": "Shared by an invitation and every invitation that replaces it."
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "replaced"
+            ]
+          },
+          "replaced_by_invitation_id": {
+            "type": "string",
+            "description": "The invitation that replaced this one."
+          }
+        }
+      },
+      "invitation-cancelled-payload": {
+        "title": "InvitationCancelledPayload",
+        "description": "Payload for `invitation.cancelled`. The invitation ID is the event's\n`entity_id`. Discriminate on `reason`: `cancelled` when an administrator\ncancelled it, `replaced` when a replacement cancelled it, which then names\nthe replacement in `replaced_by_invitation_id`.\n",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/invitation-cancelled-by-administrator-payload"
+          },
+          {
+            "$ref": "#/components/schemas/invitation-cancelled-by-replacement-payload"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "reason",
+          "mapping": {
+            "cancelled": "#/components/schemas/invitation-cancelled-by-administrator-payload",
+            "replaced": "#/components/schemas/invitation-cancelled-by-replacement-payload"
+          }
+        }
+      },
+      "invitation-cancelled-event": {
+        "title": "InvitationCancelledEvent",
+        "description": "An event of type invitation.cancelled, with the shared event fields and its own payload.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/event-base"
+          },
+          {
+            "type": "object",
+            "required": [
+              "event_type",
+              "payload"
+            ],
+            "properties": {
+              "event_type": {
+                "type": "string",
+                "const": "invitation.cancelled"
+              },
+              "payload": {
+                "$ref": "#/components/schemas/invitation-cancelled-payload"
+              }
+            }
+          }
+        ]
+      },
+      "invitation-created-common-payload": {
+        "title": "InvitationCreatedCommonPayload",
+        "description": "Fields every `invitation.created` payload carries, whatever its `type`.\n",
+        "type": "object",
+        "required": [
+          "journey_id",
+          "expires_at"
+        ],
+        "properties": {
+          "journey_id": {
+            "type": "string",
+            "description": "Shared by an invitation and every invitation that replaces it."
+          },
+          "replaces_invitation_id": {
+            "type": "string",
+            "description": "The invitation this one replaces, when it was created as a replacement."
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "invitation-created-project-member-payload": {
+        "title": "InvitationCreatedProjectMemberPayload",
+        "description": "An `invitation.created` payload for a `project_member` invitation.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/invitation-created-common-payload"
+          },
+          {
+            "type": "object",
+            "required": [
+              "type",
+              "project_member"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "project_member"
+                ]
+              },
+              "project_member": {
+                "$ref": "#/components/schemas/invitation-project-member-payload"
+              }
+            }
+          }
+        ]
+      },
+      "invitation-created-team-member-payload": {
+        "title": "InvitationCreatedTeamMemberPayload",
+        "description": "An `invitation.created` payload for a `team_member` invitation.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/invitation-created-common-payload"
+          },
+          {
+            "type": "object",
+            "required": [
+              "type",
+              "team_member"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "team_member"
+                ]
+              },
+              "team_member": {
+                "$ref": "#/components/schemas/invitation-team-member-payload"
+              }
+            }
+          }
+        ]
+      },
+      "invitation-created-payload": {
+        "title": "InvitationCreatedPayload",
+        "description": "Payload for `invitation.created`. The invitation ID is the event's\n`entity_id`. Discriminate on `type`; the object named after it says what\nthe invitation's link grants. The metadata entered at creation and the\nlink's token never appear.\n",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/invitation-created-project-member-payload"
+          },
+          {
+            "$ref": "#/components/schemas/invitation-created-team-member-payload"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "project_member": "#/components/schemas/invitation-created-project-member-payload",
+            "team_member": "#/components/schemas/invitation-created-team-member-payload"
+          }
+        }
+      },
+      "invitation-created-event": {
+        "title": "InvitationCreatedEvent",
+        "description": "An event of type invitation.created, with the shared event fields and its own payload.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/event-base"
+          },
+          {
+            "type": "object",
+            "required": [
+              "event_type",
+              "payload"
+            ],
+            "properties": {
+              "event_type": {
+                "type": "string",
+                "const": "invitation.created"
+              },
+              "payload": {
+                "$ref": "#/components/schemas/invitation-created-payload"
+              }
+            }
+          }
+        ]
+      },
+      "invitation-rejected-payload": {
+        "title": "InvitationRejectedPayload",
+        "type": "object",
+        "description": "Payload for `invitation.rejected`. The invitation ID is the event's\n`entity_id`, and `user_id` is the user who declined it.\n",
+        "required": [
+          "journey_id",
+          "user_id"
+        ],
+        "properties": {
+          "journey_id": {
+            "type": "string",
+            "description": "Shared by an invitation and every invitation that replaces it."
+          },
+          "user_id": {
+            "type": "string"
+          }
+        }
+      },
+      "invitation-rejected-event": {
+        "title": "InvitationRejectedEvent",
+        "description": "An event of type invitation.rejected, with the shared event fields and its own payload.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/event-base"
+          },
+          {
+            "type": "object",
+            "required": [
+              "event_type",
+              "payload"
+            ],
+            "properties": {
+              "event_type": {
+                "type": "string",
+                "const": "invitation.rejected"
+              },
+              "payload": {
+                "$ref": "#/components/schemas/invitation-rejected-payload"
               }
             }
           }
@@ -23695,6 +24588,12 @@
             "$ref": "#/components/schemas/deployment-created-event"
           },
           {
+            "$ref": "#/components/schemas/flow-signup_challenge-consumed-event"
+          },
+          {
+            "$ref": "#/components/schemas/flow-signup_challenge-issued-event"
+          },
+          {
             "$ref": "#/components/schemas/flowdef-created-event"
           },
           {
@@ -23711,6 +24610,18 @@
           },
           {
             "$ref": "#/components/schemas/idp-updated-event"
+          },
+          {
+            "$ref": "#/components/schemas/invitation-accepted-event"
+          },
+          {
+            "$ref": "#/components/schemas/invitation-cancelled-event"
+          },
+          {
+            "$ref": "#/components/schemas/invitation-created-event"
+          },
+          {
+            "$ref": "#/components/schemas/invitation-rejected-event"
           },
           {
             "$ref": "#/components/schemas/origin-added-event"
@@ -23800,12 +24711,18 @@
             "authz.revoked": "#/components/schemas/authz-revoked-event",
             "branding.created": "#/components/schemas/branding-created-event",
             "deployment.created": "#/components/schemas/deployment-created-event",
+            "flow.signup_challenge.consumed": "#/components/schemas/flow-signup_challenge-consumed-event",
+            "flow.signup_challenge.issued": "#/components/schemas/flow-signup_challenge-issued-event",
             "flowdef.created": "#/components/schemas/flowdef-created-event",
             "flowdef.deleted": "#/components/schemas/flowdef-deleted-event",
             "flowdef.updated": "#/components/schemas/flowdef-updated-event",
             "idp.created": "#/components/schemas/idp-created-event",
             "idp.identity_link.created": "#/components/schemas/idp-identity_link-created-event",
             "idp.updated": "#/components/schemas/idp-updated-event",
+            "invitation.accepted": "#/components/schemas/invitation-accepted-event",
+            "invitation.cancelled": "#/components/schemas/invitation-cancelled-event",
+            "invitation.created": "#/components/schemas/invitation-created-event",
+            "invitation.rejected": "#/components/schemas/invitation-rejected-event",
             "origin.added": "#/components/schemas/origin-added-event",
             "origin.removed": "#/components/schemas/origin-removed-event",
             "policy.created": "#/components/schemas/policy-created-event",
@@ -24142,16 +25059,6 @@
         "enum": [
           "release"
         ]
-      },
-      "deployment-kind": {
-        "title": "DeploymentKind",
-        "type": "string",
-        "description": "`primary` for the project's primary origins, `preview` for preview URLs.\n",
-        "enum": [
-          "primary",
-          "preview"
-        ],
-        "example": "primary"
       },
       "deployment-target": {
         "title": "DeploymentTarget",
@@ -25024,6 +25931,13 @@
           "message": "flow not found"
         }
       },
+      "flow-rate_limited": {
+        "summary": "flow.rate_limited",
+        "value": {
+          "code": "flow.rate_limited",
+          "message": "signup request limit reached; retry after one minute"
+        }
+      },
       "flow-restart_required": {
         "summary": "flow.restart_required",
         "value": {
@@ -25078,6 +25992,13 @@
         "value": {
           "code": "idp.scopes_missing_openid",
           "message": "identity provider connection: OIDC scopes must contain openid"
+        }
+      },
+      "flow-proof_invalid": {
+        "summary": "flow.proof_invalid",
+        "value": {
+          "code": "flow.proof_invalid",
+          "message": "signup proof is missing, invalid, expired or already used; refresh the step"
         }
       },
       "proj-mismatch": {
@@ -27690,6 +28611,9 @@
                   "$ref": "#/components/schemas/flow-not_found"
                 },
                 {
+                  "$ref": "#/components/schemas/flow-rate_limited"
+                },
+                {
                   "$ref": "#/components/schemas/flow-restart_required"
                 },
                 {
@@ -27783,6 +28707,7 @@
                   "flow.integrity": "#/components/schemas/flow-integrity",
                   "flow.invalid_action": "#/components/schemas/flow-invalid_action",
                   "flow.not_found": "#/components/schemas/flow-not_found",
+                  "flow.rate_limited": "#/components/schemas/flow-rate_limited",
                   "flow.restart_required": "#/components/schemas/flow-restart_required",
                   "flow.sso_user_schema_mismatch": "#/components/schemas/flow-sso_user_schema_mismatch",
                   "flow.unsupported": "#/components/schemas/flow-unsupported",
@@ -27856,6 +28781,9 @@
               },
               "flow.not_found": {
                 "$ref": "#/components/examples/flow-not_found"
+              },
+              "flow.rate_limited": {
+                "$ref": "#/components/examples/flow-rate_limited"
               },
               "flow.restart_required": {
                 "$ref": "#/components/examples/flow-restart_required"
@@ -27991,6 +28919,12 @@
                   "$ref": "#/components/schemas/flow-not_found"
                 },
                 {
+                  "$ref": "#/components/schemas/flow-proof_invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/flow-rate_limited"
+                },
+                {
                   "$ref": "#/components/schemas/flow-restart_required"
                 },
                 {
@@ -28088,6 +29022,8 @@
                   "flow.integrity": "#/components/schemas/flow-integrity",
                   "flow.invalid_action": "#/components/schemas/flow-invalid_action",
                   "flow.not_found": "#/components/schemas/flow-not_found",
+                  "flow.proof_invalid": "#/components/schemas/flow-proof_invalid",
+                  "flow.rate_limited": "#/components/schemas/flow-rate_limited",
                   "flow.restart_required": "#/components/schemas/flow-restart_required",
                   "flow.sso_user_schema_mismatch": "#/components/schemas/flow-sso_user_schema_mismatch",
                   "flow.unsupported": "#/components/schemas/flow-unsupported",
@@ -28165,6 +29101,12 @@
               },
               "flow.not_found": {
                 "$ref": "#/components/examples/flow-not_found"
+              },
+              "flow.proof_invalid": {
+                "$ref": "#/components/examples/flow-proof_invalid"
+              },
+              "flow.rate_limited": {
+                "$ref": "#/components/examples/flow-rate_limited"
               },
               "flow.restart_required": {
                 "$ref": "#/components/examples/flow-restart_required"

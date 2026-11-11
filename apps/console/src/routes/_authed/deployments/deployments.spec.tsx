@@ -132,12 +132,12 @@ describe("deployments list", () => {
     // The origins are counted, with the kind under the count.
     expect(first.getByRole("button", { name: "1 origin" })).toBeInTheDocument();
     expect(first.getByText("Preview")).toBeInTheDocument();
-    expect(first.getByText("live")).toBeInTheDocument();
+    expect(first.getByText("Live")).toBeInTheDocument();
 
     const second = within(secondRow);
     expect(second.getByRole("link", { name: "rel_1" })).toBeInTheDocument();
     expect(second.getByText("Primary")).toBeInTheDocument();
-    expect(second.getByText("inactive")).toBeInTheDocument();
+    expect(second.getByText("Inactive")).toBeInTheDocument();
     // Older than a day: the calendar date, not "ago".
     expect(second.getByText(formatDateTime(DEPLOYED_AT))).toBeInTheDocument();
   });

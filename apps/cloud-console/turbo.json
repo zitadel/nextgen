@@ -20,7 +20,10 @@
     },
     // The tests run the functions' contract and read the platform flow's
     // steps (src/attribution.spec.ts), outside the package for the same reason.
+    // The contract builds the sign-in widget's paths with @zitadel/api, which
+    // the specs resolve to its dist/.
     "test": {
+      "dependsOn": ["@zitadel/api#build"],
       "inputs": [
         "$TURBO_EXTENDS$",
         "$TURBO_ROOT$/apps/cloud-functions/src/contract.ts",

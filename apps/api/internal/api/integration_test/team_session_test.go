@@ -103,7 +103,12 @@ func TestTeamReadsAcceptSession(t *testing.T) {
 
 	console := harness.EnsurePlatformProject(t)
 	claimerID, claimerTeamID := harness.CreateUserOwnedByTeam(t, console.ID)
-	harness.SeedOwningTeam(t, console.ID, claimerTeamID)
+	// The platform project outlives the test and holds one active owning
+	// team, so a rerun (-count) could not seed its own without this revoke.
+	owning := harness.SeedOwningTeam(t, console.ID, claimerTeamID)
+	t.Cleanup(func() {
+		require.NoError(t, harness.EnsureServiceDB(t).Statements().RevokeAuthzAssignment(context.Background(), owning.ProjectID, owning.ID))
+	})
 
 	session := sessionClientForUser(t, claimerID)
 

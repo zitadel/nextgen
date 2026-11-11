@@ -16,13 +16,14 @@
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"]
     },
     // The drift tests also read the events catalog and the configuration
-    // guide's metrics table.
+    // guide's metrics table, and the proof-of-work tests its vectors.
     "go-tests": {
       "inputs": [
         "$TURBO_ROOT$/apps/api/**/*_test.go",
         "$TURBO_ROOT$/apps/api/**/testdata/**",
         "$TURBO_ROOT$/docs/design/api/events-catalog.md",
         "$TURBO_ROOT$/docs/quick-start/configuration.md",
+        "$TURBO_ROOT$/docs/design/flowengine/testdata/pow-v1-vectors.json",
         "!$TURBO_ROOT$/apps/api/**/node_modules/**",
         "!$TURBO_ROOT$/.claude/**",
         "!$TURBO_ROOT$/.codex/**",
@@ -89,10 +90,10 @@
     },
     // The custom go/analysis checks and the Biome lint of the JavaScript
     // launcher in bin/: scripts/go-lint.mjs. It also stands for the package's
-    // other static checks (vet, format, openapi, check-generate), so `turbo
-    // run lint` runs them all.
+    // other static checks (vet, format, openapi, check-generate,
+    // check-pow-vectors), so `turbo run lint` runs them all.
     "lint": {
-      "dependsOn": ["go-sources", "go-tests", "check-generate", "@zitadel/console#build", "vet", "format", "openapi"],
+      "dependsOn": ["go-sources", "go-tests", "check-generate", "check-pow-vectors", "@zitadel/console#build", "vet", "format", "openapi"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "inputs": [
         "$TURBO_ROOT$/scripts/go-lint.mjs",
@@ -102,11 +103,33 @@
         "$TURBO_ROOT$/biome-plugins/*.grit"
       ]
     },
+    // The proof-of-work vectors and the component's solver fixture match what
+    // their generator derives.
+    "check-pow-vectors": {
+      "inputs": [
+        "$TURBO_ROOT$/docs/design/flowengine/testdata/generate-pow-v1-vectors.mjs",
+        "$TURBO_ROOT$/docs/design/flowengine/testdata/pow-v1-vectors.json",
+        "$TURBO_ROOT$/packages/components/src/orchestrator/__fixtures__/signup-pow-vector.json"
+      ]
+    },
+    // The proof-of-work package needs no generated API, database or embedded
+    // UI, so a focused race and fuzz run keeps its feedback loop short.
+    "test:pow": {
+      "cache": false,
+      "dependsOn": ["check-pow-vectors"],
+      "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
+      "inputs": [
+        "$TURBO_ROOT$/apps/api/internal/crypto/pow/**",
+        "$TURBO_ROOT$/docs/design/flowengine/testdata/**",
+        "$TURBO_ROOT$/apps/api/go.mod",
+        "$TURBO_ROOT$/apps/api/go.sum"
+      ]
+    },
     // The test binary embeds the console's dist. The checks (format, vet,
-    // lint, openapi, check-generate) read nothing test writes and gate
-    // nothing: they run beside it. Go's result cache stays off (-count=1 in
-    // the script): the drift tests read files outside the module, which
-    // turbo's key holds (`go-tests`). A hit prints its hash, not the
+    // lint, openapi, check-generate, check-pow-vectors) read nothing test
+    // writes and gate nothing: they run beside it. Go's result cache stays off
+    // (-count=1 in the script): the drift tests read files outside the module,
+    // which turbo's key holds (`go-tests`). A hit prints its hash, not the
     // replayed -v log.
     "test:unit": {
       "outputLogs": "new-only",

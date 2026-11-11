@@ -1,10 +1,10 @@
 # ADR 002: Multi-package Release Strategy
 
-> **Status:** Accepted (superseded in part by ADR 088)
+> **Status:** Accepted (superseded in part by ADR 089)
 > **Date:** 2026-04-25 (revised 2026-06-23)
 > **Context:** nextgen monorepo release pipelines
 
-> **Superseded in part.** [ADR 088](088-turborepo-task-runner.md) replaces
+> **Superseded in part.** [ADR 089](089-turborepo-task-runner.md) replaces
 > Moon with Turborepo as the task runner: decisions 1 and 3 below now run
 > through turbo tasks. Changesets' half (decision 2, release execution) is
 > unchanged.

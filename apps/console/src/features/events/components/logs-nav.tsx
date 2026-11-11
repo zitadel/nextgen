@@ -1,6 +1,13 @@
 import { Link, useMatch, useNavigate } from "@tanstack/react-router";
-import { ArrowLeftRight, CornerDownLeft, Logs, type LucideIcon, ScrollText, X } from "lucide-react";
-import { type ReactNode, useId, useState } from "react";
+import {
+  ArrowLeftRight,
+  Check,
+  ChevronsUpDown,
+  Logs,
+  type LucideIcon,
+  ScrollText,
+} from "lucide-react";
+import { type ReactNode, useCallback, useEffect, useId, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -12,6 +19,12 @@ import {
   ComboboxTrigger,
   ComboboxValue,
 } from "@/components/ui/combobox";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -41,13 +54,11 @@ import {
   LOG_VIEWS,
   type LogsSearch,
   type LogView,
-  narrowedBy,
   parseLogsSearch,
   TIME_RANGE_LABEL,
   TIME_RANGES,
   type TimeRange,
-  VALUE_FILTERS,
-  type ValueFilter,
+  VIEW_DESCRIPTION,
   VIEW_LABEL,
   withCategory,
   withCustomRange,
@@ -59,8 +70,11 @@ import {
 
 /**
  * The Logs list of the sidebar (D30): what the shell shows in place of the
- * project's screens on `/events` and on an event's page, as Vercel's Logs
- * does. Its rows are the list's views, and under them sit the list's filters.
+ * project's screens on `/events` and under an event's drawer, as Vercel's Logs
+ * does. A picker chooses the list's view, and under it sit the filters chosen
+ * from a list: the time, the category, the type or the status. Values that
+ * are pasted, the ids and the operation, go in the search above the table
+ * (`LogSearchField`).
  *
  * Both read the filters from the URL and write them back to it, so the list's
  * loader is the only thing that asks the server. An event's drawer opens over
@@ -84,35 +98,63 @@ const VIEW_ICON: Record<LogView, LucideIcon> = {
 };
 
 /**
- * The views as rows of the sidebar's menu: the audit events, the API
- * requests, and both. The view the list is in is the marked row.
+ * The list's view, chosen from a menu as Vercel's Logs chooses its kind of
+ * log: each view by its glyph, its name and what it holds, the one the list
+ * is in checked. The trigger names that view; in the icon rail it is its
+ * glyph alone.
  */
-export function LogViewRows() {
-  const { current, onList } = useLogsSearch();
-  return LOG_VIEWS.map((view) => {
-    const Icon = VIEW_ICON[view];
-    const label = VIEW_LABEL[view];
-    return (
-      <SidebarMenuItem key={view}>
-        <SidebarMenuButton asChild isActive={onList && current.view === view} tooltip={label}>
-          <Link to="/events" search={withView(current, view)} title={label}>
+export function LogViewPicker() {
+  const { current } = useLogsSearch();
+  const Icon = VIEW_ICON[current.view];
+
+  return (
+    <SidebarMenuItem className="mt-1">
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <SidebarMenuButton
+            // The sidebar's outlined row, as search above it: one width, one
+            // radius, one height.
+            variant="outline"
+            tooltip={`View: ${VIEW_LABEL[current.view]}`}
+            aria-label={`View: ${VIEW_LABEL[current.view]}`}
+          >
             <Icon aria-hidden />
-            <span>{label}</span>
-          </Link>
-        </SidebarMenuButton>
-      </SidebarMenuItem>
-    );
-  });
+            <span className="flex-1">{VIEW_LABEL[current.view]}</span>
+            <ChevronsUpDown aria-hidden className="text-muted-foreground ml-auto size-3.5!" />
+          </SidebarMenuButton>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" side="bottom" className="w-72">
+          {LOG_VIEWS.map((view) => {
+            const ViewIcon = VIEW_ICON[view];
+            const chosen = current.view === view;
+            return (
+              // The router marks the view the list is in `aria-current="page"`.
+              <DropdownMenuItem key={view} asChild className="items-start gap-3 py-2">
+                <Link to="/events" search={withView(current, view)}>
+                  <ViewIcon aria-hidden className="mt-0.5" />
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span className="text-sm">{VIEW_LABEL[view]}</span>
+                    <span className="text-muted-foreground text-xs">{VIEW_DESCRIPTION[view]}</span>
+                  </span>
+                  {chosen && <Check aria-hidden className="mt-0.5" />}
+                </Link>
+              </DropdownMenuItem>
+            );
+          })}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </SidebarMenuItem>
+  );
 }
 
 /** `Select` cannot hold an empty value, so "no choice" has a name of its own. */
 const ANY = "any";
 
 /**
- * The list's filters, under the views. The time range and the category are
- * chosen from the few values there are. The rest match one value an event
- * carries, typed or pasted: the API has no list of the values a project
- * holds, and no count of the events behind one, so none is drawn.
+ * The list's filters, under the view: the time range, and the category and
+ * the type, or the requests' status, each chosen from the values there are.
+ * A value that is pasted is the search's. The API has no count of the events
+ * behind a value, so none is drawn.
  *
  * The icon rail has no room for a field: the group leaves with the labels,
  * and the screen's own button opens the sidebar to reach it.
@@ -128,8 +170,26 @@ export function LogFilters() {
       aria-label="Filters"
       className="pt-4 group-data-[collapsible=icon]:hidden"
     >
-      <SidebarGroupLabel>Filters</SidebarGroupLabel>
-      <SidebarGroupContent className="flex flex-col gap-3 px-2 pb-2">
+      {/* The group's name, a step above its fields' labels: at one size the
+          heading read as the first of them. Clearing is the group's action,
+          so it sits on the heading. */}
+      <div className="flex h-9 items-center justify-between pr-1 pl-2">
+        <SidebarGroupLabel className="text-sidebar-foreground h-auto px-0 text-sm">
+          Filters
+        </SidebarGroupLabel>
+        {isNarrowed(current) && (
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-label="Clear filters"
+            className="text-muted-foreground h-7 px-2 text-xs"
+            onClick={() => go({ view: current.view })}
+          >
+            Clear
+          </Button>
+        )}
+      </div>
+      <SidebarGroupContent className="flex flex-col gap-4 px-2 pb-2">
         <TimeFilter current={current} go={go} />
 
         {/* The requests are one category themselves. */}
@@ -147,7 +207,7 @@ export function LogFilters() {
                   )
                 }
               >
-                <SelectTrigger size="sm" aria-labelledby={labelId} className={CONTROL}>
+                <SelectTrigger aria-labelledby={labelId} className={CONTROL}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -170,30 +230,6 @@ export function LogFilters() {
         ) : (
           <TypeFilter current={current} go={go} />
         )}
-
-        {VALUE_FILTERS.map((filter) =>
-          // The operation is a request's: its field is the requests view's.
-          filter.key === "type" ||
-          (filter.key === "operation" && current.view !== "requests") ? null : (
-            <ValueField
-              key={filter.key}
-              filter={filter}
-              value={current[filter.key]}
-              onCommit={(value) => go(narrowedBy(current, filter.key, value))}
-            />
-          ),
-        )}
-
-        {isNarrowed(current) && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="self-start px-2 text-xs"
-            onClick={() => go({ view: current.view })}
-          >
-            Clear filters
-          </Button>
-        )}
       </SidebarGroupContent>
     </SidebarGroup>
   );
@@ -205,7 +241,7 @@ const CUSTOM = "custom";
 /**
  * The time the list reads: a range counted back from when it loads, as
  * Vercel's Logs offers them, everything retained, or a range with fixed ends.
- * Choosing **Custom range** opens two fields, applied together.
+ * Choosing **Custom range** opens two fields, read as they are changed.
  */
 function TimeFilter({ current, go }: { current: LogsSearch; go: (search: LogsSearch) => void }) {
   const custom = hasCustomRange(current);
@@ -227,7 +263,7 @@ function TimeFilter({ current, go }: { current: LogsSearch; go: (search: LogsSea
               go(withTimeRange(current, choice === ANY ? undefined : (choice as TimeRange)));
             }}
           >
-            <SelectTrigger size="sm" aria-labelledby={labelId} className={CONTROL}>
+            <SelectTrigger aria-labelledby={labelId} className={CONTROL}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -244,8 +280,6 @@ function TimeFilter({ current, go }: { current: LogsSearch; go: (search: LogsSea
       </Field>
       {(custom || editing) && (
         <CustomRange
-          // A range set elsewhere (a row's "Events around this one") refills the fields.
-          key={`${current.from ?? ""}/${current.to ?? ""}`}
           from={current.from}
           to={current.to}
           onApply={(from, to) => {
@@ -274,10 +308,14 @@ function fromLocalInput(value: string): string | undefined {
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
 }
 
+/** How long the fields rest before the range they hold is read. */
+const RANGE_PAUSE_MS = 600;
+
 /**
  * A range with fixed ends, in the viewer's local time: from, to, or both. A
- * new range starts at the last hour, so Apply alone reads something. A start
- * that is not before the end cannot be applied.
+ * new range starts at the last hour. It is read as it is changed, after a
+ * pause, as every other filter is on being chosen; Enter reads it at once. A
+ * start that is not before the end is not read, and says so.
  */
 function CustomRange({
   from,
@@ -293,18 +331,48 @@ function CustomRange({
     localInput(fresh ? new Date(Date.now() - 60 * 60 * 1000).toISOString() : from),
   );
   const [end, setEnd] = useState(() => localInput(fresh ? new Date().toISOString() : to));
+  // Only what the person set is read: a range from elsewhere carries seconds
+  // the fields do not show, and reading the fields back would round it.
+  const [edited, setEdited] = useState(fresh);
   const startAt = fromLocalInput(start);
   const endAt = fromLocalInput(end);
-  const valid = (startAt || endAt) && !(startAt && endAt && startAt >= endAt);
+  const backwards = !!startAt && !!endAt && startAt >= endAt;
+  const valid = (startAt || endAt) && !backwards;
   const fromId = useId();
   const toId = useId();
+
+  // A range set elsewhere (a row's "Events around this one") refills the
+  // fields; the one these fields sent is theirs already, and typing goes on.
+  const sent = useRef<{ from?: string; to?: string }>(undefined);
+  const [seen, setSeen] = useState({ from, to });
+  if (seen.from !== from || seen.to !== to) {
+    setSeen({ from, to });
+    if (sent.current?.from !== from || sent.current?.to !== to) {
+      setStart(localInput(from));
+      setEnd(localInput(to));
+      setEdited(false);
+    }
+  }
+
+  const apply = useRef(onApply);
+  apply.current = onApply;
+  const read = useCallback(() => {
+    sent.current = { from: startAt, to: endAt };
+    apply.current(startAt, endAt);
+  }, [startAt, endAt]);
+  const pending = edited && valid && (startAt !== from || endAt !== to);
+  useEffect(() => {
+    if (!pending) return;
+    const timer = setTimeout(read, RANGE_PAUSE_MS);
+    return () => clearTimeout(timer);
+  }, [pending, read]);
 
   return (
     <form
       className="flex flex-col gap-2"
       onSubmit={(event) => {
         event.preventDefault();
-        if (valid) onApply(startAt, endAt);
+        if (pending) read();
       }}
     >
       <label htmlFor={fromId} className={FIELD_LABEL}>
@@ -314,8 +382,12 @@ function CustomRange({
         id={fromId}
         type="datetime-local"
         value={start}
-        onChange={(event) => setStart(event.target.value)}
-        className="h-8 text-xs md:text-xs"
+        aria-invalid={backwards || undefined}
+        onChange={(event) => {
+          setStart(event.target.value);
+          setEdited(true);
+        }}
+        className={CONTROL}
       />
       <label htmlFor={toId} className={FIELD_LABEL}>
         To
@@ -324,12 +396,20 @@ function CustomRange({
         id={toId}
         type="datetime-local"
         value={end}
-        onChange={(event) => setEnd(event.target.value)}
-        className="h-8 text-xs md:text-xs"
+        aria-invalid={backwards || undefined}
+        onChange={(event) => {
+          setEnd(event.target.value);
+          setEdited(true);
+        }}
+        className={CONTROL}
       />
-      <Button type="submit" size="sm" variant="secondary" disabled={!valid} className="self-start">
-        Apply range
-      </Button>
+      {backwards && (
+        <p role="alert" className="text-destructive text-xs leading-4">
+          The start must be before the end.
+        </p>
+      )}
+      {/* Enter in a field submits only through a submit control. */}
+      <button type="submit" hidden />
     </form>
   );
 }
@@ -344,78 +424,93 @@ const TYPE_GROUPS: ComboboxGroup[] = EVENT_TYPES.reduce<ComboboxGroup[]>((groups
   return groups;
 }, []);
 
+/** The list's first row, which is no type: it stands for all the failure types. */
+const FAILURES = "preset:failures";
+
+/**
+ * The shortcut heads the list it ticks, so what it chose shows beneath it. A
+ * chip in the failures' own tint over a rule, with no caption: under one it
+ * read as one more prefix of the types (`auth`, `user`).
+ */
+const TYPE_LIST: ComboboxGroup[] = [
+  {
+    ruled: true,
+    options: [
+      {
+        value: FAILURES,
+        label: "Only failures",
+        description: `${FAILURE_TYPES.length} types`,
+        chip: "destructive",
+      },
+    ],
+  },
+  ...TYPE_GROUPS,
+];
+
 /**
  * The event types the list is narrowed to, chosen from the types the server
  * writes rather than typed: several at once, each one range of the type
- * index, so any choice fills its pages. **Only failures** chooses the failure
- * types. Types read the All view with no category beside them.
+ * index, so any choice fills its pages. **Only failures**, the list's first
+ * row, ticks the failure types in the list under it, and unticks them again:
+ * a button outside the list set the same types without showing that it had.
+ * Types read the All view with no category beside them.
  */
 function TypeFilter({ current, go }: { current: LogsSearch; go: (search: LogsSearch) => void }) {
   const [open, setOpen] = useState(false);
   const chosen = current.type ?? [];
   const failuresOnly =
     chosen.length === FAILURE_TYPES.length && FAILURE_TYPES.every((type) => chosen.includes(type));
-  const toggle = (type: string) =>
+  const toggle = (type: string) => {
+    if (type === FAILURES) return go(withTypes(current, failuresOnly ? [] : FAILURE_TYPES));
     go(
       withTypes(
         current,
         chosen.includes(type) ? chosen.filter((known) => known !== type) : [...chosen, type],
       ),
     );
+  };
 
   return (
     <Field label="Type">
       {() => (
-        <div className="flex flex-col gap-1.5">
-          <Combobox open={open} onOpenChange={setOpen}>
-            <ComboboxAnchor asChild>
-              <ComboboxTrigger
-                label="Event types"
-                open={open}
-                onOpen={() => setOpen(true)}
-                className="h-8 w-full text-xs"
-              >
-                {chosen.length === 0 ? (
-                  <ComboboxPlaceholder>Any type</ComboboxPlaceholder>
-                ) : (
-                  <ComboboxValue>
-                    {failuresOnly
-                      ? "Failures"
-                      : chosen.length === 1
-                        ? chosen[0]
-                        : `${chosen.length} types`}
-                  </ComboboxValue>
-                )}
-              </ComboboxTrigger>
-            </ComboboxAnchor>
-            <ComboboxContent
-              groups={TYPE_GROUPS}
-              selected={chosen}
-              searchPlaceholder="Find a type"
-              emptyLabel="No type matches."
+        <Combobox open={open} onOpenChange={setOpen}>
+          <ComboboxAnchor asChild>
+            <ComboboxTrigger
               label="Event types"
-              closeOnSelect={false}
-              onSelect={toggle}
-              onClose={() => setOpen(false)}
-              footer={
-                chosen.length > 0
-                  ? { label: "Any type", onSelect: () => go(withTypes(current, [])) }
-                  : undefined
-              }
-              className="w-64"
-            />
-          </Combobox>
-          {!failuresOnly && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="self-start px-2 text-xs"
-              onClick={() => go(withTypes(current, FAILURE_TYPES))}
+              open={open}
+              onOpen={() => setOpen(true)}
+              className={CONTROL}
             >
-              Only failures
-            </Button>
-          )}
-        </div>
+              {chosen.length === 0 ? (
+                <ComboboxPlaceholder>Any type</ComboboxPlaceholder>
+              ) : (
+                <ComboboxValue>
+                  {failuresOnly
+                    ? "Only failures"
+                    : chosen.length === 1
+                      ? chosen[0]
+                      : `${chosen.length} types`}
+                </ComboboxValue>
+              )}
+            </ComboboxTrigger>
+          </ComboboxAnchor>
+          <ComboboxContent
+            groups={TYPE_LIST}
+            selected={failuresOnly ? [FAILURES, ...chosen] : chosen}
+            searchPlaceholder="Find a type"
+            emptyLabel="No type matches."
+            label="Event types"
+            closeOnSelect={false}
+            onSelect={toggle}
+            onClose={() => setOpen(false)}
+            footer={
+              chosen.length > 0
+                ? { label: "Any type", onSelect: () => go(withTypes(current, [])) }
+                : undefined
+            }
+            className="w-64"
+          />
+        </Combobox>
       )}
     </Field>
   );
@@ -429,16 +524,35 @@ const STATUS_MEANING: Record<StatusClass, string> = {
   "5xx": "Failed: the server's error",
 };
 
-const STATUS_OPTIONS = STATUS_CLASSES.map((status) => ({
-  value: status,
-  label: status,
-  description: STATUS_MEANING[status],
-}));
+/** The list's first row, which is no class: it stands for the failed ones. */
+const FAILED = "preset:failed";
+
+/** As the type list: the shortcut heads the classes it ticks. */
+const STATUS_LIST: ComboboxGroup[] = [
+  {
+    ruled: true,
+    options: [
+      {
+        value: FAILED,
+        label: "Only failed requests",
+        description: FAILED_STATUS.join(", "),
+        chip: "destructive",
+      },
+    ],
+  },
+  {
+    options: STATUS_CLASSES.map((status) => ({
+      value: status,
+      label: status,
+      description: STATUS_MEANING[status],
+    })),
+  },
+];
 
 /**
  * The API requests narrowed by the class of their response status, several
  * at once: one range of the status index each, so any choice fills its pages.
- * **Only failed requests** chooses 4xx and 5xx. Requests recorded before the
+ * **Only failed requests**, the list's first row, ticks 4xx and 5xx. Requests recorded before the
  * server indexed the status are not matched.
  */
 function StatusFilter({ current, go }: { current: LogsSearch; go: (search: LogsSearch) => void }) {
@@ -448,6 +562,7 @@ function StatusFilter({ current, go }: { current: LogsSearch; go: (search: LogsS
     chosen.length === FAILED_STATUS.length &&
     FAILED_STATUS.every((status) => chosen.includes(status));
   const toggle = (status: string) => {
+    if (status === FAILED) return go(withStatus(current, failedOnly ? [] : FAILED_STATUS));
     const known = STATUS_CLASSES.find((candidate) => candidate === status);
     if (!known) return;
     go(
@@ -461,63 +576,53 @@ function StatusFilter({ current, go }: { current: LogsSearch; go: (search: LogsS
   return (
     <Field label="Status">
       {() => (
-        <div className="flex flex-col gap-1.5">
-          <Combobox open={open} onOpenChange={setOpen}>
-            <ComboboxAnchor asChild>
-              <ComboboxTrigger
-                label="Status classes"
-                open={open}
-                onOpen={() => setOpen(true)}
-                className="h-8 w-full text-xs"
-              >
-                {chosen.length === 0 ? (
-                  <ComboboxPlaceholder>Any status</ComboboxPlaceholder>
-                ) : (
-                  <ComboboxValue>{chosen.join(", ")}</ComboboxValue>
-                )}
-              </ComboboxTrigger>
-            </ComboboxAnchor>
-            <ComboboxContent
-              options={STATUS_OPTIONS}
-              selected={chosen}
-              searchPlaceholder="Find a status"
-              emptyLabel="No status matches."
+        <Combobox open={open} onOpenChange={setOpen}>
+          <ComboboxAnchor asChild>
+            <ComboboxTrigger
               label="Status classes"
-              closeOnSelect={false}
-              onSelect={toggle}
-              onClose={() => setOpen(false)}
-              footer={
-                chosen.length > 0
-                  ? { label: "Any status", onSelect: () => go(withStatus(current, [])) }
-                  : undefined
-              }
-              className="w-64"
-            />
-          </Combobox>
-          {!failedOnly && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="self-start px-2 text-xs"
-              onClick={() => go(withStatus(current, FAILED_STATUS))}
+              open={open}
+              onOpen={() => setOpen(true)}
+              className={CONTROL}
             >
-              Only failed requests
-            </Button>
-          )}
-        </div>
+              {chosen.length === 0 ? (
+                <ComboboxPlaceholder>Any status</ComboboxPlaceholder>
+              ) : (
+                <ComboboxValue>
+                  {failedOnly ? "Only failed requests" : chosen.join(", ")}
+                </ComboboxValue>
+              )}
+            </ComboboxTrigger>
+          </ComboboxAnchor>
+          <ComboboxContent
+            groups={STATUS_LIST}
+            selected={failedOnly ? [FAILED, ...chosen] : chosen}
+            searchPlaceholder="Find a status"
+            emptyLabel="No status matches."
+            label="Status classes"
+            closeOnSelect={false}
+            onSelect={toggle}
+            onClose={() => setOpen(false)}
+            footer={
+              chosen.length > 0
+                ? { label: "Any status", onSelect: () => go(withStatus(current, [])) }
+                : undefined
+            }
+            className="w-64"
+          />
+        </Combobox>
       )}
     </Field>
   );
 }
 
-/** A filter's control at the sidebar's width: 32px tall, 12px text. */
-const CONTROL = "w-full text-xs";
+/** A filter's control: the sidebar's width, and its rows' 36px and 14px. */
+const CONTROL = "h-9 w-full text-sm md:text-sm";
 
 /** One filter: its name over its control. The sidebar renders twice on a phone, so ids are per instance. */
 function Field({ label, children }: { label: string; children: (labelId: string) => ReactNode }) {
   const labelId = useId();
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-1.5">
       <span id={labelId} className={FIELD_LABEL}>
         {label}
       </span>
@@ -527,82 +632,3 @@ function Field({ label, children }: { label: string; children: (labelId: string)
 }
 
 const FIELD_LABEL = "text-xs leading-4 text-muted-foreground";
-
-/**
- * A filter by one value: a field that is typed or pasted into. The value is
- * matched whole, so it is applied when the person says it is complete, with
- * Enter or the field's button, never as they type. While it is applied the
- * button clears it.
- */
-function ValueField({
-  filter,
-  value,
-  onCommit,
-}: {
-  filter: ValueFilter;
-  /** The value the list is narrowed to. */
-  value: string | undefined;
-  onCommit: (value: string | undefined) => void;
-}) {
-  const id = useId();
-  const [draft, setDraft] = useState(value ?? "");
-  // The URL holds the filter: a value set or cleared anywhere else (a row's
-  // menu, the search, another filter it gives way to) replaces what was typed.
-  const [seen, setSeen] = useState(value);
-  if (value !== seen) {
-    setSeen(value);
-    setDraft(value ?? "");
-  }
-  const typed = draft.trim();
-  const pending = typed !== (value ?? "");
-
-  return (
-    <form
-      className="flex flex-col gap-1"
-      onSubmit={(event) => {
-        event.preventDefault();
-        if (pending) onCommit(typed || undefined);
-      }}
-    >
-      <label htmlFor={id} className={FIELD_LABEL}>
-        {filter.label}
-      </label>
-      <div className="relative">
-        <Input
-          id={id}
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          placeholder={filter.placeholder}
-          autoComplete="off"
-          autoCapitalize="off"
-          spellCheck={false}
-          className="h-8 pr-8 text-xs md:text-xs"
-        />
-        {pending && typed ? (
-          <button
-            type="submit"
-            aria-label={`Apply the ${filter.name} filter`}
-            className={FIELD_BUTTON}
-          >
-            <CornerDownLeft aria-hidden className="size-3.5" />
-          </button>
-        ) : (
-          value && (
-            <button
-              type="button"
-              aria-label={`Clear the ${filter.name} filter`}
-              className={FIELD_BUTTON}
-              onClick={() => onCommit(undefined)}
-            >
-              <X aria-hidden className="size-3.5" />
-            </button>
-          )
-        )}
-      </div>
-    </form>
-  );
-}
-
-/** The button inside a field's trailing edge: 24px around a 14px glyph. */
-const FIELD_BUTTON =
-  "text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 absolute top-1/2 right-1 flex size-6 -translate-y-1/2 items-center justify-center rounded-sm outline-none focus-visible:ring-[3px]";

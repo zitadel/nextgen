@@ -479,7 +479,7 @@ To cut or recover a release, follow the
 artifacts and the draft GitHub Release; Changesets owns versions, npm
 publishing, and release notes — see
 [ADR 002](docs/adrs/002-multi-package-release-strategy.md),
-[ADR 088](docs/adrs/088-turborepo-task-runner.md) and
+[ADR 089](docs/adrs/089-turborepo-task-runner.md) and
 [`.changeset/README.md`](.changeset/README.md).
 
 ### Building a Docker image from source

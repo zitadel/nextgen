@@ -3,7 +3,7 @@
 > **Status:** Accepted
 > **Date:** 2026-10-03
 > **Context:** [#1095](https://github.com/zitadel/nextgen/issues/1095), the first decision of the benchmark epic [#1094](https://github.com/zitadel/nextgen/issues/1094); the decision and its evidence were posted on the issue on 2026-10-03 and are pinned here
-> **Builds on:** [ADR 088](088-turborepo-task-runner.md) (Turborepo owns the task graph, after [ADR 002](002-multi-package-release-strategy.md)), [ADR 028](028-storage-v2-statements-and-dialects.md) (SQLite is the local default and not a production peer)
+> **Builds on:** [ADR 089](089-turborepo-task-runner.md) (Turborepo owns the task graph, after [ADR 002](002-multi-package-release-strategy.md)), [ADR 028](028-storage-v2-statements-and-dialects.md) (SQLite is the local default and not a production peer)
 > **Related:** [#1096](https://github.com/zitadel/nextgen/issues/1096), [#1104](https://github.com/zitadel/nextgen/issues/1104), [#1105](https://github.com/zitadel/nextgen/issues/1105), [#1107](https://github.com/zitadel/nextgen/issues/1107), [LICENSING.md](../../LICENSING.md)
 
 ## Context
