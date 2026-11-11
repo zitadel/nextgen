@@ -71,8 +71,8 @@ between files are the sign the component is missing.
   figures, since the API has no counts.
 - Screens outside every project (billing, operators) go in one of those lists,
   never beside a project's screens; every screen keeps the one frame.
-- `/events` swaps the project's list for Logs' (`NavView` `"logs"`, D30): its
-  rows are views and filters the events feature draws, not `nav` routes.
+- `/events` swaps the project's list for Logs' (`NavView` `"logs"`, D30): a view
+  picker and the filters chosen from a list; a pasted value belongs in the search.
 - An event opens in a drawer over Logs' list: `/events/$eventId` is the list
   route's child, so it never reads the list again (D30).
 - Send any combination of Logs' filters: the server bounds every read (root

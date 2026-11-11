@@ -53,8 +53,6 @@ const ACCOUNT_ORDER = [
 ];
 // Settings' list: the heading that leads back, then the person's profile.
 const SETTINGS_ORDER = ["Settings", "Profile"];
-// Logs' list: the heading that leads back, then the list's views.
-const LOGS_ORDER = ["Logs", "Audit events", "API requests", "All"];
 // Absent for two different reasons, both deliberate:
 //   - the first four have no endpoint at all
 //   - Sessions was built, but `POST /sessions/query` answers 501 (#699)
@@ -413,9 +411,10 @@ describe("logs view", () => {
   it("swaps the project's list for Logs' on a logs URL", async () => {
     renderShell("/events");
     const nav = within(await screen.findByRole("navigation", { name: "Logs" }));
-    expect(nav.getAllByRole("link").map((link) => link.textContent?.trim())).toEqual(LOGS_ORDER);
-    expect(nav.getByRole("link", { name: "Audit events" })).toHaveAttribute("data-active", "true");
-    // The list's filters follow its views, in a group of their own.
+    // The heading back, then the view, chosen from a menu as Vercel's is.
+    expect(nav.getAllByRole("link").map((link) => link.textContent?.trim())).toEqual(["Logs"]);
+    expect(nav.getByRole("button", { name: "View: Audit events" })).toBeInTheDocument();
+    // The list's filters follow the view, in a group of their own.
     expect(screen.getByRole("group", { name: "Filters" })).toBeInTheDocument();
     // The project's list is gone rather than sitting underneath it.
     expect(screen.queryByRole("navigation", { name: "Primary" })).not.toBeInTheDocument();
@@ -426,7 +425,7 @@ describe("logs view", () => {
     renderShell("/events/evt_1");
     expect(await screen.findByRole("heading", { name: "user.deleted" })).toBeInTheDocument();
     const nav = within(screen.getByRole("navigation", { name: "Logs" }));
-    expect(nav.getAllByRole("link").map((link) => link.textContent?.trim())).toEqual(LOGS_ORDER);
+    expect(nav.getByRole("button", { name: "View: Audit events" })).toBeInTheDocument();
     expect(screen.queryByRole("navigation", { name: "Primary" })).not.toBeInTheDocument();
   });
 

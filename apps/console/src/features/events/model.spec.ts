@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   AROUND_MINUTES,
   AUDIT_CATEGORIES,
+  chipFilters,
   around,
   EVENT_TYPES,
   eventFields,
@@ -754,6 +755,18 @@ describe("searchMeanings", () => {
     expect(meanings("admin")).toEqual(["actor admin", "resource admin"]);
   });
 
+  it("reads a filter named before its value, whatever the value's shape", () => {
+    expect(meanings("actor:user_1")).toEqual(["actor user_1"]);
+    expect(meanings("resource:user_1")).toEqual(["resource user_1"]);
+    expect(meanings("resource_type:user")).toEqual(["resource_type user"]);
+    expect(meanings("device:fp_1")).toEqual(["device fp_1"]);
+    expect(meanings("app:x")).toEqual(["client x"]);
+    expect(meanings("application:x")).toEqual(["client x"]);
+    expect(meanings("operation:getProject")).toEqual(["operation getProject"]);
+    // A name the search does not know is no name: the term is read whole.
+    expect(meanings("owner:user_1")).toEqual(["actor owner:user_1", "resource owner:user_1"]);
+  });
+
   it("reads 32 hex digits as a request: its trace ID", () => {
     expect(meanings("0af7651916cd43dd8448eb211c80319c")).toEqual([
       "request 0af7651916cd43dd8448eb211c80319c",
@@ -914,5 +927,32 @@ describe("the API requests by operation and status", () => {
       view: "requests",
       operation: "createUser",
     });
+  });
+});
+
+describe("chipFilters", () => {
+  it("lists the pasted filters in the filters' order, by their search names, and never the type", () => {
+    const search = parseLogsSearch({
+      view: "all",
+      type: "user.created",
+      device: "fp_1",
+      actor: "user_1",
+      client: "app_1",
+      request: "req_1",
+    });
+    expect(chipFilters(search).map(({ filter, value }) => `${filter.prefix}:${value}`)).toEqual([
+      "actor:user_1",
+      "app:app_1",
+      "request:req_1",
+      "device:fp_1",
+    ]);
+    // Each name reads back as the filter it came from.
+    for (const { filter, value } of chipFilters(search)) {
+      expect(
+        searchMeanings(`${filter.prefix}:${value}`).map((meaning) =>
+          meaning.kind === "filter" ? meaning.filter.key : meaning.kind,
+        ),
+      ).toEqual([filter.key]);
+    }
   });
 });

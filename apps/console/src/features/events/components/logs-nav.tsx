@@ -1,5 +1,12 @@
 import { Link, useMatch, useNavigate } from "@tanstack/react-router";
-import { ArrowLeftRight, CornerDownLeft, Logs, type LucideIcon, ScrollText, X } from "lucide-react";
+import {
+  ArrowLeftRight,
+  Check,
+  ChevronsUpDown,
+  Logs,
+  type LucideIcon,
+  ScrollText,
+} from "lucide-react";
 import { type ReactNode, useId, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -12,6 +19,12 @@ import {
   ComboboxTrigger,
   ComboboxValue,
 } from "@/components/ui/combobox";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -41,13 +54,11 @@ import {
   LOG_VIEWS,
   type LogsSearch,
   type LogView,
-  narrowedBy,
   parseLogsSearch,
   TIME_RANGE_LABEL,
   TIME_RANGES,
   type TimeRange,
-  VALUE_FILTERS,
-  type ValueFilter,
+  VIEW_DESCRIPTION,
   VIEW_LABEL,
   withCategory,
   withCustomRange,
@@ -60,7 +71,10 @@ import {
 /**
  * The Logs list of the sidebar (D30): what the shell shows in place of the
  * project's screens on `/events` and on an event's page, as Vercel's Logs
- * does. Its rows are the list's views, and under them sit the list's filters.
+ * does. A picker chooses the list's view, and under it sit the filters chosen
+ * from a list: the time, the category, the type or the status. Values that
+ * are pasted, the ids and the operation, go in the search above the table
+ * (`EventSearch`).
  *
  * Both read the filters from the URL and write them back to it, so the list's
  * loader is the only thing that asks the server. An event's drawer opens over
@@ -84,35 +98,61 @@ const VIEW_ICON: Record<LogView, LucideIcon> = {
 };
 
 /**
- * The views as rows of the sidebar's menu: the audit events, the API
- * requests, and both. The view the list is in is the marked row.
+ * The list's view, chosen from a menu as Vercel's Logs chooses its kind of
+ * log: each view by its glyph, its name and what it holds, the one the list
+ * is in checked. The trigger names that view; in the icon rail it is its
+ * glyph alone.
  */
-export function LogViewRows() {
-  const { current, onList } = useLogsSearch();
-  return LOG_VIEWS.map((view) => {
-    const Icon = VIEW_ICON[view];
-    const label = VIEW_LABEL[view];
-    return (
-      <SidebarMenuItem key={view}>
-        <SidebarMenuButton asChild isActive={onList && current.view === view} tooltip={label}>
-          <Link to="/events" search={withView(current, view)} title={label}>
+export function LogViewPicker() {
+  const { current } = useLogsSearch();
+  const Icon = VIEW_ICON[current.view];
+
+  return (
+    <SidebarMenuItem className="mt-1">
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <SidebarMenuButton
+            tooltip={`View: ${VIEW_LABEL[current.view]}`}
+            aria-label={`View: ${VIEW_LABEL[current.view]}`}
+            className="border-sidebar-border h-10 border group-data-[collapsible=icon]:border-0"
+          >
             <Icon aria-hidden />
-            <span>{label}</span>
-          </Link>
-        </SidebarMenuButton>
-      </SidebarMenuItem>
-    );
-  });
+            <span className="flex-1">{VIEW_LABEL[current.view]}</span>
+            <ChevronsUpDown aria-hidden className="text-muted-foreground ml-auto size-3.5!" />
+          </SidebarMenuButton>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" side="bottom" className="w-72">
+          {LOG_VIEWS.map((view) => {
+            const ViewIcon = VIEW_ICON[view];
+            const chosen = current.view === view;
+            return (
+              // The router marks the view the list is in `aria-current="page"`.
+              <DropdownMenuItem key={view} asChild className="items-start gap-3 py-2">
+                <Link to="/events" search={withView(current, view)}>
+                  <ViewIcon aria-hidden className="mt-0.5" />
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span className="text-sm">{VIEW_LABEL[view]}</span>
+                    <span className="text-muted-foreground text-xs">{VIEW_DESCRIPTION[view]}</span>
+                  </span>
+                  {chosen && <Check aria-hidden className="mt-0.5" />}
+                </Link>
+              </DropdownMenuItem>
+            );
+          })}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </SidebarMenuItem>
+  );
 }
 
 /** `Select` cannot hold an empty value, so "no choice" has a name of its own. */
 const ANY = "any";
 
 /**
- * The list's filters, under the views. The time range and the category are
- * chosen from the few values there are. The rest match one value an event
- * carries, typed or pasted: the API has no list of the values a project
- * holds, and no count of the events behind one, so none is drawn.
+ * The list's filters, under the view: the time range, and the category and
+ * the type, or the requests' status, each chosen from the values there are.
+ * A value that is pasted is the search's. The API has no count of the events
+ * behind a value, so none is drawn.
  *
  * The icon rail has no room for a field: the group leaves with the labels,
  * and the screen's own button opens the sidebar to reach it.
@@ -169,19 +209,6 @@ export function LogFilters() {
           <StatusFilter current={current} go={go} />
         ) : (
           <TypeFilter current={current} go={go} />
-        )}
-
-        {VALUE_FILTERS.map((filter) =>
-          // The operation is a request's: its field is the requests view's.
-          filter.key === "type" ||
-          (filter.key === "operation" && current.view !== "requests") ? null : (
-            <ValueField
-              key={filter.key}
-              filter={filter}
-              value={current[filter.key]}
-              onCommit={(value) => go(narrowedBy(current, filter.key, value))}
-            />
-          ),
         )}
 
         {isNarrowed(current) && (
@@ -527,82 +554,3 @@ function Field({ label, children }: { label: string; children: (labelId: string)
 }
 
 const FIELD_LABEL = "text-xs leading-4 text-muted-foreground";
-
-/**
- * A filter by one value: a field that is typed or pasted into. The value is
- * matched whole, so it is applied when the person says it is complete, with
- * Enter or the field's button, never as they type. While it is applied the
- * button clears it.
- */
-function ValueField({
-  filter,
-  value,
-  onCommit,
-}: {
-  filter: ValueFilter;
-  /** The value the list is narrowed to. */
-  value: string | undefined;
-  onCommit: (value: string | undefined) => void;
-}) {
-  const id = useId();
-  const [draft, setDraft] = useState(value ?? "");
-  // The URL holds the filter: a value set or cleared anywhere else (a row's
-  // menu, the search, another filter it gives way to) replaces what was typed.
-  const [seen, setSeen] = useState(value);
-  if (value !== seen) {
-    setSeen(value);
-    setDraft(value ?? "");
-  }
-  const typed = draft.trim();
-  const pending = typed !== (value ?? "");
-
-  return (
-    <form
-      className="flex flex-col gap-1"
-      onSubmit={(event) => {
-        event.preventDefault();
-        if (pending) onCommit(typed || undefined);
-      }}
-    >
-      <label htmlFor={id} className={FIELD_LABEL}>
-        {filter.label}
-      </label>
-      <div className="relative">
-        <Input
-          id={id}
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          placeholder={filter.placeholder}
-          autoComplete="off"
-          autoCapitalize="off"
-          spellCheck={false}
-          className="h-8 pr-8 text-xs md:text-xs"
-        />
-        {pending && typed ? (
-          <button
-            type="submit"
-            aria-label={`Apply the ${filter.name} filter`}
-            className={FIELD_BUTTON}
-          >
-            <CornerDownLeft aria-hidden className="size-3.5" />
-          </button>
-        ) : (
-          value && (
-            <button
-              type="button"
-              aria-label={`Clear the ${filter.name} filter`}
-              className={FIELD_BUTTON}
-              onClick={() => onCommit(undefined)}
-            >
-              <X aria-hidden className="size-3.5" />
-            </button>
-          )
-        )}
-      </div>
-    </form>
-  );
-}
-
-/** The button inside a field's trailing edge: 24px around a 14px glyph. */
-const FIELD_BUTTON =
-  "text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 absolute top-1/2 right-1 flex size-6 -translate-y-1/2 items-center justify-center rounded-sm outline-none focus-visible:ring-[3px]";
