@@ -211,6 +211,8 @@ function ejected(
   // `--cwd` as typed, for the follow-up commands.
   dir: string | undefined,
   setItUp: SuggestedCommand,
+  // Given only for a dry run, whose one follow-up is the ejection itself.
+  ejectForReal?: SuggestedCommand,
 ): CommandResult {
   // In-place config merges (vite.config.ts / angular.json / nuxt.config.ts)
   // can't be auto-reverted, so surface them as manual cleanup steps.
@@ -230,6 +232,29 @@ function ejected(
   });
 
   if (removed.length === 0 && backedUp.length === 0 && manualSteps.length === 0) {
+    if (ejectForReal !== undefined) {
+      const title = "Nothing would be removed (dry run)";
+
+      return {
+        status: "ok",
+        data: {
+          dry_run: true,
+          title,
+        },
+        summary: {
+          title,
+          sections: [],
+          lines: ["Zitadel is not set up in this app, so nothing would be removed."],
+          next: [
+            {
+              text: "Set it up whenever you like:",
+              command: setItUp,
+            },
+          ],
+        },
+      };
+    }
+
     return {
       status: "skipped",
       reason: "nothing-to-eject",
@@ -245,6 +270,28 @@ function ejected(
           },
         ],
       },
+    };
+  }
+
+  if (ejectForReal !== undefined) {
+    const title =
+      "Would remove Zitadel from this app, leaving the remote project untouched (dry run)";
+
+    return {
+      status: "ok",
+      data: {
+        dry_run: true,
+        title,
+        files_removed: removed,
+        files_preserved: preserved,
+        backed_up: backedUp,
+        manual_steps: manualSteps,
+      },
+      summary: {
+        title,
+        sections: [],
+      },
+      next: { commands: [ejectForReal] },
     };
   }
 
@@ -306,7 +353,13 @@ export default class Eject extends Suggestible(Destructive(BaseCommand)) {
       name: "remove the managed files and local state",
       message: "Remove the managed files and local Zitadel state?",
       preview: async () => {
-        return ejected(this.cwd, await ejectProject(this.cwd, "plan"), dir, setItUp);
+        return ejected(
+          this.cwd,
+          await ejectProject(this.cwd, "plan"),
+          dir,
+          setItUp,
+          this.suggest("eject --force"),
+        );
       },
       apply: async (consent) => {
         return ejected(this.cwd, await ejectProject(this.cwd, consent), dir, setItUp);

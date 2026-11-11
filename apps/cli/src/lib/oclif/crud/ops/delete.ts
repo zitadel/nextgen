@@ -65,7 +65,7 @@ export class DeleteOperation<Ctx> extends ResourceCommand<Ctx, DeleteSpec<Ctx>, 
       message: async () => {
         const { projectId, server } = await this.connect();
 
-        return `${capitalize(verb)} ${resource.singular} ${id} in project ${escapeControlCharacters(projectId)} on ${escapeControlCharacters(server.replace(/^https?:\/\//, ""))}?`;
+        return `${capitalize(verb)} ${resource.singular} ${escapeControlCharacters(id)} in project ${escapeControlCharacters(projectId)} on ${escapeControlCharacters(server.replace(/^https?:\/\//, ""))}?`;
       },
       preview: () => {
         return dryRunResult({

@@ -367,13 +367,15 @@ export default class Doctor extends Destructive(BaseCommand) {
               .join(",")
           : undefined,
     });
+    // One text, the same in the envelope and on the terminal.
+    const title =
+      failed.length > 0
+        ? "Zitadel doctor found issues"
+        : warnings.length > 0
+          ? "Checks passed with warnings"
+          : "All checks passed";
     const data = {
-      title:
-        failed.length > 0
-          ? "Zitadel doctor found issues."
-          : warnings.length > 0
-            ? "Zitadel doctor passed with warnings."
-            : "Zitadel doctor passed.",
+      title,
       ok: failed.length === 0,
       ...(hostedServer === undefined
         ? {
@@ -455,7 +457,7 @@ export default class Doctor extends Destructive(BaseCommand) {
       status: "ok",
       data,
       summary: {
-        title: warnings.length > 0 ? "Checks passed with warnings" : "All checks passed",
+        title,
         sections: [],
         lines: [...report.lines, ...(piped === "" ? [] : ["", ...piped.split("\n")])],
         ...(this.isOnScreen ? { next: stepsOf(report.next) } : {}),

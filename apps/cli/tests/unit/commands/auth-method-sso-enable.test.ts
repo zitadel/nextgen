@@ -377,7 +377,7 @@ describe("auth-method sso enable", () => {
     it.for([
       "Google sign-in is configured locally",
       "Its credentials are stored in your project.",
-      "Deploy it to make Google sign-in available in your app, then reload the app and test it:",
+      "Deploy it to make Google sign-in available in your app, then reload the app and test it",
       expectedPublicCliCommand("deploy --dry-run"),
     ])("says %s", async (line, { dir }) => {
       const cwd = await aProject(dir);
@@ -387,6 +387,21 @@ describe("auth-method sso enable", () => {
       });
 
       expect(asOneLine(result.stdout)).toContain(line);
+    });
+
+    it.for([
+      { output: "piped text", command: "deploy --dry-run", run: authMethodText },
+      { output: "piped text", command: "deploy -m", run: authMethodText },
+      { output: "--json", command: "deploy --dry-run", run: authMethodJson },
+      { output: "--json", command: "deploy -m", run: authMethodJson },
+    ])("names $command once in $output", async ({ command, run }, { dir }) => {
+      const cwd = await aProject(dir);
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(run(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(asOneLine(result.stdout).split(expectedPublicCliCommand(command))).toHaveLength(2);
     });
   });
 
@@ -573,7 +588,7 @@ describe("auth-method sso enable", () => {
   });
 
   describe("with a custom provider", () => {
-    it.for(["Acme SSO sign-in is configured locally", "then reload the app and test it:"])(
+    it.for(["Acme SSO sign-in is configured locally", "then reload the app and test it"])(
       "says %s",
       async (line, { dir }) => {
         const cwd = await aProject(dir);

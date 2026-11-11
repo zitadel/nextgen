@@ -206,8 +206,17 @@ describe("upgrade", () => {
 
         const result = await app.upgradeRendered();
 
-        expect(result).toPrint(`Zitadel upgraded to ${NEWEST}.`);
+        expect(result).toPrint(`Zitadel upgraded to ${NEWEST}`);
         expect(result).toPrint(`→ ${NEWEST}`);
+      });
+
+      it("titles its answer as --json does, with no full stop added", async () => {
+        const app = await aSetUpApp();
+        platform.publishesCli(NEWEST);
+
+        const result = await app.upgradeRendered();
+
+        expect(result).not.toPrint(`Zitadel upgraded to ${NEWEST}.`);
       });
 
       it("shows a breaking change before it installs", async () => {

@@ -652,7 +652,9 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
         },
         summary: {
           title: escapeControlCharacters(
-            change.changed ? `Would ${verb} ${method} for ${schema.name} (dry run)` : unchanged,
+            change.changed
+              ? `Would ${verb} ${method} for ${schema.name} (dry run)`
+              : `${unchanged} (dry run)`,
           ),
           sections: [],
         },
@@ -720,7 +722,7 @@ function refuseNoSignInLeft(input: NoSignInLeftRefusal): never {
     : ".";
   // Its --force retry is a consent only a person may give, as every gate's is.
   throw new ZitadelError("E_CONFIRMATION_REQUIRED", error.message, {
-    hint: `Enable another method first, such as auth-method sso enable --provider <name>. If the schema's users are only managed through the API, ask a person first: ${input.question} Re-run with --force only once they agree${where}`,
+    hint: `Enable another method first, such as \`zitadel auth-method sso enable --provider <name>\`. If the schema's users are only managed through the API, ask a person first: ${input.question} Re-run with --force only once they agree${where}`,
     details: {
       question: input.question,
       file: error.path,

@@ -134,11 +134,12 @@ export default class Logs extends Suggestible(BaseCommand) {
     const shown = lines.map((line) => {
       return renderLogLine(line, this.isColored);
     });
+    const title = "Local Zitadel server logs";
 
     return this.emit({
       status: "ok",
       data: {
-        title: "Local Zitadel server logs",
+        title,
         runtime:
           runtime.backend === "binary"
             ? {
@@ -154,7 +155,7 @@ export default class Logs extends Suggestible(BaseCommand) {
       },
       pretty: painted(shown.join("\n")),
       summary: {
-        title: "Done",
+        title,
         sections: [],
         lines: shown,
       },

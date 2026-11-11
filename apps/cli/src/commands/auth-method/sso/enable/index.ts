@@ -54,9 +54,8 @@ import { type Admitted, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
 import { environmentFlags } from "@/lib/oclif/environment-flags";
 import { filled, reads, type Refused } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
-import { DEPLOY_ARGS, type SuggestedCommand } from "@/lib/suggestion";
+import type { SuggestedCommand } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
-import { NEXT_LABEL } from "@/lib/ui/summary";
 import { reportWarning } from "@/lib/warnings";
 import {
   type Change,
@@ -824,7 +823,6 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     const unpublished = !summary.reused || input.written.length > 0;
     const stored = input.delivery.areStored(input.published);
     const followUps = this.followUps(unpublished, scopeArgs, recovery);
-    const leading = this.followUps(false, scopeArgs, recovery).commands;
     const payload = this.payload({
       summary,
       change: input.change,
@@ -849,29 +847,12 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         title: escapeControlCharacters(title),
         sections: [],
         lines: unpublished && stored ? ["Its credentials are stored in your project."] : [],
-        next: [
-          ...(leading.length === 0
-            ? []
-            : [
-                {
-                  text: NEXT_LABEL,
-                  command: leading.join("\n"),
-                },
-              ]),
-          ...(unpublished
-            ? [
-                {
-                  text: `Deploy it to make ${name} sign-in available in your app, then reload the app and test it:`,
-                  command: this.suggest(DEPLOY_ARGS),
-                },
-              ]
-            : []),
-        ],
       },
+      // The deploy commands are listed once, in `commands`, so the prose names none.
       next: unpublished
         ? {
             actions: [
-              `Deploy it to make ${name} sign-in available in your app, then reload the app and test it: ${this.suggest(DEPLOY_ARGS)}`,
+              `Deploy it to make ${name} sign-in available in your app, then reload the app and test it`,
             ],
             commands: followUps.commands,
           }

@@ -885,6 +885,32 @@ console.log(["p4242", "cnode", "n127.0.0.1:" + process.env.LSOF_FIXTURE_PORT].jo
     );
     expect(stripAnsi(res.stdout)).not.toContain("Using project proj-001");
   });
+
+  it("titles its --json answer with the title a terminal shows", async () => {
+    const cwd = await makeHealthyProject();
+
+    const res = await doctor(cwd);
+
+    expect(parseJson(res.stdout)).toMatchObject({
+      data: {
+        title: "All checks passed",
+      },
+    });
+  });
+
+  it("says its verdict on a terminal once, in its title", async () => {
+    const cwd = await makeHealthyProject();
+    const fake = await fakeDocker();
+
+    const res = await asTerminal(() =>
+      runCliForTest(["doctor", "--cwd", cwd, "--port", String(nextPort())], {
+        PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
+        DOCKER_LOG: fake.logPath,
+      }),
+    );
+
+    expect(stripAnsi(res.stdout)).not.toContain("Zitadel doctor passed");
+  });
 });
 
 async function fakeDocker(): Promise<{ binDir: string; logPath: string }> {

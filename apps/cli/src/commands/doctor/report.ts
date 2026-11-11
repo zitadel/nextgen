@@ -123,7 +123,7 @@ export type DoctorReportInput = {
 
 /** What the report says under its title: the rows and the next steps no row already shows. */
 export type DoctorReport = {
-  /** The rows, what needs attention under them, and the conclusion. */
+  /** The rows, what needs attention under them, and the conclusion of a failed run. */
   readonly lines: string[];
   /** The next steps not already shown under a row. */
   readonly next: NextSteps;
@@ -163,8 +163,19 @@ export function doctorReport(input: DoctorReportInput): DoctorReport {
       }
     }
   }
-  lines.push("", conclusion(input.checks));
-  if (!input.verbose && input.checks.length > 0) {
+  // A run that passed closes on its title, so only a failure, which has
+  // none, says its verdict here.
+  const failed = input.checks.some((check) => {
+    return check.status === "fail";
+  });
+  const showsHint = !input.verbose && input.checks.length > 0;
+  if (failed || showsHint) {
+    lines.push("");
+  }
+  if (failed) {
+    lines.push(conclusion(input.checks));
+  }
+  if (showsHint) {
     lines.push(dim(`  Run with -v to see all ${checksCount(input.checks.length)}.`));
   }
   const shownActions = new Set(
@@ -379,19 +390,5 @@ function conclusion(checks: readonly CheckOutcome[]): string {
       ? "1 category"
       : `${String(count)} categories`;
   };
-  if (
-    checks.some((check) => {
-      return check.status === "fail";
-    })
-  ) {
-    return `${mark.fail} Zitadel doctor found issues in ${categories(affected("fail"))}.`;
-  }
-  if (
-    checks.some((check) => {
-      return check.status === "warn";
-    })
-  ) {
-    return `${mark.warn} Zitadel doctor passed with warnings in ${categories(affected("warn"))}.`;
-  }
-  return `${mark.pass} Zitadel doctor passed.`;
+  return `${mark.fail} Zitadel doctor found issues in ${categories(affected("fail"))}.`;
 }

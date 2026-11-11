@@ -42,7 +42,7 @@ cd myapp
 npx @zitadel/cli@latest doctor
 ```
 
-Before setup, `doctor` checks local runtime prerequisites. After setup, it also verifies generated app files and local config. It prints `Zitadel doctor passed.` or `Zitadel doctor passed with warnings.` first, then each check. When a check fails, it prints `Error <CODE>: Zitadel doctor found issues` and a hint with the fix, and exits non-zero. `doctor --json` names the failed check. Apply the fix and run `doctor` again.
+Before setup, `doctor` checks local runtime prerequisites. After setup, it also verifies generated app files and local config. It prints each check, then `All checks passed` or `Checks passed with warnings`. When a check fails, it prints `Error <CODE>: Zitadel doctor found issues` and a hint with the fix, and exits non-zero. `doctor --json` names the failed check. Apply the fix and run `doctor` again.
 
 ## Start Zitadel locally
 

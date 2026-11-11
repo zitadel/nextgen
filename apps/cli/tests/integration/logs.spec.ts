@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { LOGGED_LINES, useLocalServers } from "@tests/helpers/local-server";
 import { usePlatformMock } from "@tests/helpers/platform";
-import { aSetUpApp } from "@tests/helpers/project";
+import { aSetUpApp, asTerminal } from "@tests/helpers/project";
 
 const platform = usePlatformMock();
 useLocalServers();
@@ -106,6 +106,15 @@ describe("logs", () => {
         const result = await app.run(["logs", "--level", "warn"]);
 
         expect(result).toPrint(LOGGED_LINES.warning);
+      });
+
+      it("titles the lines as --json does", async () => {
+        const app = await aSetUpApp();
+        await app.startLocalServer({ shape: "logging" });
+
+        const result = await asTerminal(() => app.run(["logs"]));
+
+        expect(result).toPrint("Local Zitadel server logs");
       });
     });
   });

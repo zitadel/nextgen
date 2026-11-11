@@ -18,7 +18,12 @@ import {
 import { authMethods, type ConfigDocuments } from "@tests/helpers/config";
 import { it } from "@tests/helpers/fixtures";
 import { readJson } from "@tests/helpers/local-project";
-import { expectedPublicCliCommand, parseJson, runCliForTest } from "@tests/helpers/run-cli";
+import {
+  expectedPublicCliCommand,
+  parseJson,
+  runCliForTest,
+  stripAnsi,
+} from "@tests/helpers/run-cli";
 
 /**
  * A schema that signs in with a password or with Google.
@@ -458,6 +463,18 @@ describe("auth-method sso disable", () => {
           "default-human-user does not offer github, so nothing changed",
         ),
       ).toHaveLength(2);
+    });
+
+    it("closes a dry run on a headline that says it is one", async ({ dir }) => {
+      await writeProject(dir, GITHUB_NOT_OFFERED);
+
+      const result = await runCliForTest(
+        authMethodText(dir, "sso", "disable", "--provider", "github", "--dry-run"),
+      );
+
+      expect(stripAnsi(result.stdout)).toContain(
+        "default-human-user does not offer github, so nothing would change (dry run)",
+      );
     });
   });
 

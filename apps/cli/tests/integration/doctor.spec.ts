@@ -85,6 +85,14 @@ describe("doctor", () => {
         expect(checks.every((check) => check.category !== undefined)).toBe(true);
       });
 
+      it("titles its answer with the title a terminal shows", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.doctor();
+
+        expect(app.envelopeOf<{ title: string }>(result).data.title).toBe("All checks passed");
+      });
+
       it("warns and suggests upgrading when a newer CLI exists", async () => {
         const app = await aSetUpApp();
         platform.publishesCli("99.0.0");
@@ -272,7 +280,14 @@ describe("doctor", () => {
 
         expect(result).toPrint("Versions");
         expect(result).toPrint("Credentials");
-        expect(result).toPrint("Zitadel doctor passed");
+      });
+
+      it("says its verdict once, in its title", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.doctorRendered();
+
+        expect(result).not.toPrint("Zitadel doctor passed");
       });
 
       it("closes on its verdict", async () => {

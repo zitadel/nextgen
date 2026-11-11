@@ -966,6 +966,16 @@ describe("delete confirmation", () => {
     });
   });
 
+  it("spells out a control character in the id it asks about", async () => {
+    vi.mocked(confirm).mockResolvedValueOnce(true as never);
+
+    await asTerminal(() => deleting("delete").run(["team\u001b]0;x\u0007"]));
+
+    expect(vi.mocked(confirm).mock.calls[0]?.[0]).toMatchObject({
+      message: "Delete team team\\x1b]0;x\\x07 in project proj_env on api.zitadel.example?",
+    });
+  });
+
   it("is skipped when the answer is no", async () => {
     vi.mocked(confirm).mockResolvedValueOnce(false as never);
 

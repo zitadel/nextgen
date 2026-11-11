@@ -124,7 +124,7 @@ const LAST_WAY_REFUSAL = {
   code: "E_CONFIRMATION_REQUIRED",
   message: ".zitadel/schemas/default-human-user.json would have no way to sign in left",
   hint:
-    "Enable another method first, such as auth-method sso enable --provider <name>. " +
+    `Enable another method first, such as ${expectedPublicCliCommand("auth-method sso enable --provider <name>")}. ` +
     "If the schema's users are only managed through the API, ask a person first: Disable passkey anyway? " +
     "Nobody will be able to sign in to default-human-user. " +
     "Re-run with --force only once they agree (the first of details.suggested_args holds the exact arguments).",
@@ -964,4 +964,22 @@ describe("auth-method password and passkey", () => {
 
     expect(stripAnsi(result.stdout)).toContain("Nothing to enable for default-human-user");
   });
+
+  it.for([
+    { method: "password", verb: "enable", methods: BOTH, flow: aPasswordFlow() },
+    { method: "passkey", verb: "enable", methods: BOTH, flow: aPasswordFlow() },
+    { method: "password", verb: "disable", methods: PASSKEY_ONLY, flow: PASSKEY_FLOW },
+    { method: "passkey", verb: "disable", methods: PASSWORD_ONLY, flow: aPasswordFlow() },
+  ])(
+    "closes a dry run of $method $verb that changes nothing on a headline that says it is one",
+    async ({ method, verb, methods, flow }, { dir }) => {
+      await writeProject(dir, aProject(methods, flow));
+
+      const result = await runCliForTest(authMethodText(dir, method, verb, "--dry-run"));
+
+      expect(stripAnsi(result.stdout)).toContain(
+        `Nothing to ${verb} for default-human-user (dry run)`,
+      );
+    },
+  );
 });

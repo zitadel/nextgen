@@ -201,6 +201,21 @@ describe("eject command", () => {
     );
   });
 
+  it("answers a dry run as one, saying what it would do", async () => {
+    const cwd = await makeManagedProject();
+
+    const res = await eject(cwd, ["--dry-run"]);
+
+    expect(parseJson(res.stdout)).toMatchObject({
+      status: "ok",
+      data: {
+        dry_run: true,
+        title: "Would remove Zitadel from this app, leaving the remote project untouched (dry run)",
+        next_commands: [expect.stringContaining("eject --force")],
+      },
+    });
+  });
+
   it("reports what would be removed in dry-run without touching the filesystem", async () => {
     const cwd = await makeManagedProject();
 

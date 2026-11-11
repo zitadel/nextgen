@@ -159,6 +159,22 @@ describe("start", () => {
 
         expect(result).toSucceed();
       });
+
+      it("suggests the start it planned, with the flags it was given", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run([
+          "start",
+          "--port",
+          "9000",
+          "--runtime",
+          "binary",
+          "--dry-run",
+          "--json",
+        ]);
+
+        expect(result).toSuggest("start --port 9000 --runtime binary");
+      });
     });
   });
 });

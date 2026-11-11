@@ -2,6 +2,7 @@ import { Flags } from "@oclif/core";
 import { z } from "zod";
 
 import { startedServer } from "@/commands/local-server/started";
+import { Cmd } from "@/lib/cmd";
 import { serverLogAction } from "@/lib/journey-guidance";
 import { ensureLocalAdmin } from "@/lib/local-server/admin-credential";
 import { EMPTY_SUMMARY, loadProjectEnv } from "@/lib/local-server/env-vars";
@@ -134,7 +135,18 @@ export default class Start extends Suggestible(BaseCommand) {
           title,
           sections: [],
         },
-        next: { commands: [this.suggest("start")] },
+        next: {
+          commands: [
+            this.suggest(
+              [
+                "start",
+                ...(flags.port === undefined ? [] : [Cmd.option("--port", String(flags.port))]),
+                ...(flags.runtime === undefined ? [] : [Cmd.option("--runtime", flags.runtime)]),
+                ...(flags.image === undefined ? [] : [Cmd.option("--image", flags.image)]),
+              ].join(" "),
+            ),
+          ],
+        },
       });
     }
 
@@ -211,6 +223,16 @@ export default class Start extends Suggestible(BaseCommand) {
   }
 }
 
+/**
+ * The start a dry run stands in for: the same command with the port, runtime
+ * and image as they were typed, so running it does what the dry run said.
+ *
+ * @param flags - The flags this run was given.
+ * @param flags.port - The port, when one was named.
+ * @param flags.runtime - The runtime, when one was named.
+ * @param flags.image - The image, when one was named.
+ * @returns The command and its arguments, for `suggest`.
+ */
 /**
  * Whether this start boots the platform project, and with it the local admin.
  * On by default; an explicit `NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=false` opts

@@ -194,7 +194,7 @@ export default class Upgrade extends Suggestible(BaseCommand) {
         refresh,
         ...(installSuggestion === undefined ? {} : { install_command: installSuggestion }),
       },
-      pretty: painted([strong(`${said}.`), ...rows].join("\n")),
+      pretty: painted([strong(said), ...rows].join("\n")),
       summary: {
         title: said,
         sections: [],

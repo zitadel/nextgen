@@ -130,7 +130,9 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
         },
         summary: {
           title: escapeControlCharacters(
-            change.changed ? `Would remove ${provider} from ${where} (dry run)` : unchanged,
+            change.changed
+              ? `Would remove ${provider} from ${where} (dry run)`
+              : `${schema.name} does not offer ${provider}, so nothing would change (dry run)`,
           ),
           sections: [],
         },
