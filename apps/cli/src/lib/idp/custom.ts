@@ -197,9 +197,9 @@ export function loopbackIssuerWarning(
     return undefined;
   }
   if (reach === "container") {
-    return `${issuer} is on this machine, but the local server runs in Docker, where localhost is the container itself, so sign-in will fail. Start the server with \`zitadel start --runtime binary\` instead.`;
+    return `${issuer} is on this machine, but the local server runs in Docker, where localhost is the container itself, so sign-in will fail. Start the local server with its binary runtime instead.`;
   }
-  return `${issuer} is on this machine, and a server blocks requests to localhost unless NEXTGEN_HTTPCLIENT_ALLOW_LIST allows it, so sign-in will fail until it does. A server \`zitadel start\` runs allows it by default.`;
+  return `${issuer} is on this machine, and a server blocks requests to localhost unless NEXTGEN_HTTPCLIENT_ALLOW_LIST allows it, so sign-in will fail until it does. A local server the CLI starts allows it by default.`;
 }
 
 /**

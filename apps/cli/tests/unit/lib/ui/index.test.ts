@@ -84,7 +84,7 @@ describe("the UI package", () => {
 
     expect(drawing.sort()).toEqual([
       "lib/ui/chain.ts",
-      "lib/ui/narration.ts",
+      "lib/ui/plain.ts",
       "lib/ui/progress.ts",
       "lib/ui/spinner.ts",
     ]);

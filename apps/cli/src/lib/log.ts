@@ -1,5 +1,7 @@
 import { format } from "node:util";
 
+import { writePlain } from "./ui/plain";
+
 /**
  * What a line of narration is. The level decides the mark it carries in a
  * wizard's chain; a normal command draws every level as a plain line.
@@ -20,10 +22,9 @@ function emit(level: LogLevel, args: readonly unknown[]): void {
   // Nothing is drawing: code that runs outside a command, such as the root help
   // page, still has to be heard. `--json` is silent because it installs a sink
   // that draws nothing, not because there is none.
-  if (level === "debug") {
-    return;
+  if (level !== "debug") {
+    writePlain(level, text);
   }
-  (level === "warn" || level === "fail" ? process.stderr : process.stdout).write(`${text}\n`);
 }
 
 /**

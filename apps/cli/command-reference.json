@@ -2282,14 +2282,14 @@
       "args": [
         {
           "name": "deployment_id",
-          "description": "The deployment to re-apply. Omit to undo the last deploy."
+          "description": "The deployment to roll back to. Omit to undo the last deploy."
         }
       ],
       "flags": [
         {
           "name": "force",
           "char": "f",
-          "description": "Re-apply the deployment without the confirmation prompt. Required when non-interactive.",
+          "description": "Roll back to the deployment without the confirmation prompt. Required when non-interactive.",
           "type": "boolean"
         },
         {

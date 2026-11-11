@@ -1,5 +1,6 @@
 import { installLogSink, type LogLevel } from "@/lib/log";
 import { GUIDE, MARK } from "./marks";
+import { writePlain } from "./plain";
 
 /**
  * Draws the narration that library code and commands write with `log`.
@@ -79,12 +80,6 @@ export class Narration {
       this.chain.narrate(MARKS[level], body);
       return;
     }
-    // What went wrong goes where errors go, and a warning says so, because a
-    // line with no mark cannot otherwise be told apart from the answer.
-    if (level === "warn") {
-      process.stderr.write(`Warning: ${body}\n`);
-      return;
-    }
-    (level === "fail" ? process.stderr : process.stdout).write(`${body}\n`);
+    writePlain(level, body);
   }
 }

@@ -126,11 +126,6 @@ export function missingPrimaryOrigin(input: {
 }
 
 /**
- * What a deploy that would leave existing users unable to sign in asks.
- */
-const LOCKOUT_QUESTION = "Deploy anyway? The users above will not be able to sign in.";
-
-/**
  * The action a lockout refusal names: "Cannot … without --force".
  */
 const LOCKOUT_ACTION = "deploy a release that leaves existing users unable to sign in";
@@ -360,11 +355,14 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
     for (const lockout of lockouts) {
       reportWarning(lockout);
     }
+    // What a deploy that would leave existing users unable to sign in asks.
+    const { projectId, server } = await this.connect();
+    const question = `Deploy to project ${escapeControlCharacters(projectId)} on ${escapeControlCharacters(server.replace(/^https?:\/\//, ""))} even though the users above will not be able to sign in?`;
     if (!this.dryRun) {
       const consent = await this.consent({
         verb: "deploy",
         name: LOCKOUT_ACTION,
-        message: LOCKOUT_QUESTION,
+        message: question,
       });
       return consent !== undefined;
     }
@@ -373,8 +371,8 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
         "E_CONFIRMATION_REQUIRED",
         `Cannot ${LOCKOUT_ACTION} without --force in non-interactive mode`,
         {
-          hint: confirmationHint(LOCKOUT_QUESTION),
-          details: { question: LOCKOUT_QUESTION },
+          hint: confirmationHint(question),
+          details: { question },
           nextCommands: [this.suggest("deploy --dry-run --force")],
         },
       );

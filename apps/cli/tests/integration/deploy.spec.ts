@@ -13,6 +13,11 @@ import {
   SETUP_ORIGIN,
 } from "@tests/helpers/project";
 
+const SERVERS = [
+  ["a remote server", "http://mock.zitadel.test"],
+  ["a local server", "http://localhost:8112"],
+];
+
 const platform = usePlatformMock();
 
 describe("deploy", () => {
@@ -262,6 +267,27 @@ describe("deploy", () => {
 
         expect(result).toFailWith("E_CONFIRMATION_REQUIRED");
       });
+
+      it.each(SERVERS)(
+        "names the project and the server in the lockout question, for %s",
+        async (_kind, server) => {
+          const app = await aSetUpApp();
+          await app.addPrimaryOrigin();
+          platform.holdsAUserWithoutAnEmail();
+
+          const result = await app.runWithoutServer([
+            "deploy",
+            "-m",
+            "a lockout",
+            "--server",
+            server,
+            "--non-interactive",
+            "--json",
+          ]);
+
+          expect(result).toHintAt(await app.projectPlace(server));
+        },
+      );
 
       it("deploys nothing when it refuses a lockout", async () => {
         const app = await aSetUpApp();

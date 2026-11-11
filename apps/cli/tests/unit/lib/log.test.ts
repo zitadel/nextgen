@@ -36,7 +36,11 @@ describe("log", () => {
       process.stderr.write = err;
     }
 
-    expect(written).toEqual(["out:the skills offer\n", "out:a statement\n", "err:a warning\n"]);
+    expect(written).toEqual([
+      "out:the skills offer\n",
+      "out:a statement\n",
+      "err:Warning: a warning\n",
+    ]);
   });
 
   it.each([

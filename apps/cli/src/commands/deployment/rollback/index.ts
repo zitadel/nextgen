@@ -27,7 +27,7 @@ const NOTHING_DEPLOYED_REFUSAL: Refusal = {
 
 const NOTHING_EARLIER_REFUSAL: Refusal = {
   message: "There is no earlier deployment to roll back to",
-  hint: "Name a deployment to re-apply, or list the deployments to see which there are.",
+  hint: "Name a deployment to roll back to, or list the deployments to see which there are.",
   next: ["deployment list"],
 };
 
@@ -71,7 +71,7 @@ const MESSAGE: Refused<string> = {
 };
 
 /**
- * `zitadel deployment rollback [<deployment_id>]` — re-apply an earlier
+ * `zitadel deployment rollback [<deployment_id>]` — roll back to an earlier
  * deployment.
  *
  * Bare, it undoes the last deploy: it re-applies the deployment that was live
@@ -91,14 +91,14 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
   static override args = {
     deployment_id: Args.custom<string>({ parse: taken(DEPLOYMENT_ID) })({
       required: false,
-      description: "The deployment to re-apply. Omit to undo the last deploy.",
+      description: "The deployment to roll back to. Omit to undo the last deploy.",
     }),
   };
   static override flags = {
     force: Flags.boolean({
       char: "f",
       description:
-        "Re-apply the deployment without the confirmation prompt. Required when non-interactive.",
+        "Roll back to the deployment without the confirmation prompt. Required when non-interactive.",
     }),
     message: Flags.custom<string>({
       char: "m",
@@ -135,11 +135,16 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
       await this.confirmed({
         verb: "rollback",
         name: `roll back to ${target.id}`,
-        message: `Roll back to ${target.id} in project ${escapeControlCharacters(projectId)} on ${escapeControlCharacters(server.replace(/^https?:\/\//, ""))} so its release goes live again?${
-          dropped.length === 0
+        message: `Roll back to ${target.id} in project ${escapeControlCharacters(projectId)} on ${escapeControlCharacters(server.replace(/^https?:\/\//, ""))} so its release goes live again${
+          dropped.length === 0 && restored.length === 0
             ? ""
-            : ` ${dropped.join(", ")} will refuse sign-in until the next deploy.`
-        }${restored.length === 0 ? "" : ` ${restored.join(", ")} will serve it again.`}`,
+            : `, which makes ${[
+                ...(dropped.length === 0
+                  ? []
+                  : [`${dropped.join(", ")} refuse sign-in until the next deploy`]),
+                ...(restored.length === 0 ? [] : [`${restored.join(", ")} serve it again`]),
+              ].join(" and ")}`
+        }?`,
         // A bare rollback resolved its target, which a retry must not resolve
         // again: a deploy landing in between would name another.
         arguments: [target.id],

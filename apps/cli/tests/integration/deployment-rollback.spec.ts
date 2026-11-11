@@ -165,6 +165,43 @@ describe("deployment rollback", () => {
         expect(restored_origins).toEqual(["https://b.example.com"]);
       });
 
+      it("says in the question which listed origin the rollback would stop serving", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin("https://a.example.com");
+        const first = await app.deployData();
+        await app.addPrimaryOrigin("https://c.example.com");
+
+        const result = await app.run([
+          "deployment",
+          "rollback",
+          first.deployment_id ?? "",
+          "--non-interactive",
+          "--json",
+        ]);
+
+        expect(result).toHintAt("https://c.example.com refuse sign-in until the next deploy");
+      });
+
+      it("says in the question which listed origin the rollback would serve again", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin("https://a.example.com");
+        await app.addPrimaryOrigin("https://b.example.com");
+        const first = await app.deployData();
+        await app.removeOrigin("https://b.example.com");
+        await app.deployData();
+        await app.addPrimaryOrigin("https://b.example.com");
+
+        const result = await app.run([
+          "deployment",
+          "rollback",
+          first.deployment_id ?? "",
+          "--non-interactive",
+          "--json",
+        ]);
+
+        expect(result).toHintAt("https://b.example.com serve it again");
+      });
+
       it("keeps an origin the project no longer lists among the deployment's origins", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin("https://a.example.com");
