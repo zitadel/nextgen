@@ -982,32 +982,6 @@ describe("setup", () => {
         });
       });
 
-      describe("rendered for a terminal", () => {
-        it("heads the connection's box with the provider", async () => {
-          const app = await anApp();
-
-          const result = await app.setupWithCustomSsoRendered(ACME, ACME_CREDENTIALS);
-
-          expect(result).toPrint("SIGN IN WITH ACME SSO");
-        });
-
-        it("says which claim fills each attribute", async () => {
-          const app = await anApp();
-
-          const result = await app.setupWithCustomSsoRendered(ACME, ACME_CREDENTIALS);
-
-          expect(result).toPrint("- email comes from the email claim.");
-        });
-
-        it("says which schemas sign in through the connection", async () => {
-          const app = await anApp();
-
-          const result = await app.setupWithCustomSsoRendered(ACME, ACME_CREDENTIALS);
-
-          expect(result).toPrint("default-human-user signs in");
-        });
-      });
-
       describe("with a custom provider but not both credentials", () => {
         it("will not set up the provider without a client secret", async () => {
           const app = await anApp();
@@ -1063,6 +1037,32 @@ describe("setup", () => {
 
           expect(await before.changes()).toMatchObject(NO_CHANGES);
         });
+      });
+    });
+
+    describe("rendered for a terminal", () => {
+      it("heads the connection's box with the provider", async () => {
+        const app = await anApp();
+
+        const result = await app.setupWithCustomSsoRendered(ACME, ACME_CREDENTIALS);
+
+        expect(result).toPrint("SIGN IN WITH ACME SSO");
+      });
+
+      it("says which claim fills each attribute", async () => {
+        const app = await anApp();
+
+        const result = await app.setupWithCustomSsoRendered(ACME, ACME_CREDENTIALS);
+
+        expect(result).toPrint("- email comes from the email claim.");
+      });
+
+      it("says which schemas sign in through the connection", async () => {
+        const app = await anApp();
+
+        const result = await app.setupWithCustomSsoRendered(ACME, ACME_CREDENTIALS);
+
+        expect(result).toPrint("default-human-user signs in");
       });
     });
   });

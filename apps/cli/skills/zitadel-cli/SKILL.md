@@ -711,8 +711,9 @@ named there, then run `deploy`; the connection is not tested until a real
 sign-in. `deploy` refuses a mapping that cannot work and names the file, the
 problem and the fix: a target no schema defines (with a "Did you mean" when one
 is close), an empty `claim_mapping`, a `verified_claims` key with no mapping, and
-a claim name with a space at its start or end. Mistakes that almost certainly do not do what was meant warn but
-do not stop, so `deploy` carries on: a standard claim of a type the property
+a claim name with a space at its start or end. Mistakes that almost certainly
+do not do what was meant warn but do not stop, so `deploy` carries on: a
+standard claim of a type the property
 cannot hold, a verification that reads a claim that is not a boolean, a
 `subject_claim` that is a profile claim (only until the connection is first
 deployed, after which it cannot change), and a connection that reads a

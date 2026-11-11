@@ -181,10 +181,10 @@ attributes, whatever the provider returns on a later sign-in.
 claim fills and which schemas sign in through the connection. With `--json` the
 same is in `data.connection` as `claim_mapping`, `verified_claims`, `scopes`,
 `unmapped` and `used_by`. If the provider returns other claims, edit
-`claim_mapping` in the connection file, then deploy. `sso enable` warns when the user schema defines
-none of the properties the connection maps by default. The file then has no
-`claim_mapping`, and no sign-in can fill a user. Add the properties your
-provider returns.
+`claim_mapping` in the connection file, then deploy. `sso enable` warns when
+the user schema defines none of the properties the connection maps by default.
+The file then has no `claim_mapping`, and no sign-in can fill a user. Add the
+properties your provider returns.
 
 ### Map a claim to a property you add
 
@@ -269,7 +269,10 @@ npx @zitadel/cli@latest setup --server local --framework next \
 
 For a custom provider, use `--sso custom` with `--sso-slug`,
 `--sso-display-name`, `--sso-issuer` and optionally `--sso-scopes`. Setup
-reports each connection under `data.sso[]`, with its `callback_uri` to register.
+reports each connection under `data.sso[]`, with its `callback_uri` to register
+and the same `claim_mapping`, `verified_claims`, `scopes`, `unmapped` and
+`used_by` that `sso enable` reports. Its closing box says which claim fills each
+user attribute.
 
 ## What the command writes
 
