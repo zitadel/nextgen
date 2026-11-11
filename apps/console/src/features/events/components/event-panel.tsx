@@ -8,7 +8,7 @@ import { SECTION_HEADING } from "@/components/typography";
 import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/components/ui/copy-button";
 import { Sheet, SheetContent, SheetDescription } from "@/components/ui/sheet";
-import { formatClockTime, formatLogTime } from "@/lib/date";
+import { formatClockTime, formatEventTime } from "@/lib/date";
 import { cn } from "@/lib/utils";
 
 import {
@@ -16,25 +16,25 @@ import {
   eventFields,
   eventFilterValues,
   isFailure,
-  type LogEvent,
-  type LogsSearch,
+  type ProjectEvent,
+  type EventsSearch,
   sharing,
 } from "../model";
 import { EventSubject } from "./event-subject";
 
 /**
- * The rows the Logs list draws, in its order, and the filters it is under:
+ * The rows the Events list draws, in its order, and the filters it is under:
  * what the event panel steps through and keeps when it opens another event.
  * The list provides it; the panel beside it reads it.
  */
-export const LogRowsContext = createContext<{ rows: LogEvent[]; search: LogsSearch }>({
+export const EventRowsContext = createContext<{ rows: ProjectEvent[]; search: EventsSearch }>({
   rows: [],
   search: { view: "audit" },
 });
 
 /**
- * The drawer an event opens in, over the right of the Logs list, as Vercel's
- * Logs opens a request: the list stays where it was, scrolled and paged, and
+ * The drawer an event opens in, over the right of the Events list, as Vercel's
+ * Events opens a request: the list stays where it was, scrolled and paged, and
  * a click on another row opens that one in the same drawer. So it is not
  * modal, no overlay dims the list, and a click outside it does not close it;
  * the close button and Escape do.
@@ -111,17 +111,17 @@ export function EventPanel({
   event,
   request,
 }: {
-  event: LogEvent;
+  event: ProjectEvent;
   /** Its request's events, oldest first, when it was made by one. */
-  request?: { items: LogEvent[]; more: boolean };
+  request?: { items: ProjectEvent[]; more: boolean };
 }) {
-  const { rows, search } = useContext(LogRowsContext);
+  const { rows, search } = useContext(EventRowsContext);
   const navigate = useNavigate();
   const index = rows.findIndex((row) => row.id === event.id);
   const previous = index > 0 ? rows[index - 1] : undefined;
   const next = index >= 0 && index < rows.length - 1 ? rows[index + 1] : undefined;
 
-  const open = (target: LogEvent | undefined) => {
+  const open = (target: ProjectEvent | undefined) => {
     if (!target) return;
     void navigate({ to: "/events/$eventId", params: { eventId: target.id }, search });
   };
@@ -176,7 +176,7 @@ export function EventPanel({
         }
       />
       <SheetDescription className="sr-only">
-        The event {event.id}, recorded {formatLogTime(event.occurred_at)}.
+        The event {event.id}, recorded {formatEventTime(event.occurred_at)}.
       </SheetDescription>
 
       <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-6">
@@ -188,7 +188,7 @@ export function EventPanel({
           </dd>
           <dt className={FIELD_LABEL}>Occurred</dt>
           <dd className={FIELD_VALUE}>
-            <time dateTime={event.occurred_at}>{formatLogTime(event.occurred_at)}</time>
+            <time dateTime={event.occurred_at}>{formatEventTime(event.occurred_at)}</time>
           </dd>
           <dt className={FIELD_LABEL}>About</dt>
           <dd className={FIELD_VALUE}>
@@ -290,8 +290,8 @@ function PanelSection({ title, children }: { title: string; children: ReactNode 
  * millisecond, what, and what it was about. The open event is marked and not
  * a link; the others open in the drawer.
  */
-function RequestStep({ event, current }: { event: LogEvent; current: boolean }) {
-  const { search } = useContext(LogRowsContext);
+function RequestStep({ event, current }: { event: ProjectEvent; current: boolean }) {
+  const { search } = useContext(EventRowsContext);
   const line = (
     <>
       <time dateTime={event.occurred_at} className="text-muted-foreground shrink-0 tabular-nums">

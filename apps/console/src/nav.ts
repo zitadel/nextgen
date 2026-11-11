@@ -22,11 +22,11 @@ export type NavIcon = ComponentType<{
  * `accountListItems`), `settings` the pages Settings opens (the person's
  * profile, what an add-on adds beside it).
  *
- * `logs` is the list Logs opens, in place of the project's (D30). No route
+ * `events` is the list Events opens, in place of the project's (D30). No route
  * belongs to it: its rows are the views and filters of one screen, which the
- * events feature draws (`LogViewPicker`, `LogFilters`).
+ * events feature draws (`EventViewPicker`, `EventFilters`).
  */
-export type NavView = "portal" | "account" | "settings" | "logs";
+export type NavView = "portal" | "account" | "settings" | "events";
 
 export interface NavMeta {
   /** Sidebar label. */
