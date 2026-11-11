@@ -1596,9 +1596,10 @@ type Handler interface {
 	// `project_id` names the project to search. Without it, a project secret
 	// searches its own project, and a console session searches the projects the
 	// person can act on: the ones `listMyProjects` (`GET /users/me/projects`)
-	// lists, at most the first 10 in its order. `more_projects` says the person
-	// can act on more than that; search one of the others by naming it. A caller
-	// with access to part of a project finds only what that access covers.
+	// lists, at most the newest 10 by when each was created (`order=desc`).
+	// `more_projects` says the person can act on more than that; search one of
+	// the others by naming it. A caller with access to part of a project finds
+	// only what that access covers.
 	// Authenticate with the project secret (`oauth2`) or a console session cookie
 	// (`sessionCookie`). A preview secret is refused, as on every management
 	// operation.

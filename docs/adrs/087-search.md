@@ -174,13 +174,16 @@ amends §1 and §4.
   the ones the person's project-scoped grants reach, and every project for a
   platform operator ([ADR 075](075-platform-operators.md)). A grant scoped to
   one team lists no project, there or here.
-- A search reads the first 10 of them in that list's order, so a platform
-  operator's search costs what a person's with 10 projects does. The response
-  says `more_projects` when there are more, and lists every requested type in
-  `incomplete_types`; naming a project searches that one.
+- A search reads the newest 10 of them, by when each project was created, as
+  the console's Projects list reads them. `projects (created_at, id)` serves
+  that order on all three dialects, so a platform operator's search costs what
+  a person's with 10 projects does. The response says `more_projects` when
+  there are more, and lists every requested type in `incomplete_types`; naming
+  a project searches that one.
 - Each project costs one access check, and its decision gates every type read
   in it, as that type's own list would gate it. A listed project the person
-  cannot read is left out.
+  cannot read is left out. Projects are checked and read side by side, at most
+  4 at a time, each read with a context of its own.
 - `limit_per_type` counts the matches of all projects together, and every
   result carries its `project_id`.
 - A project secret, and any request naming `project_id`, searches one project
@@ -201,14 +204,21 @@ resource, in their transaction, as the resource scope index is:
 - The primary key is `(project_id, resource_kind, search_text,
   resource_key)`. A search is one range of it, read in key order to a fixed
   limit, so it costs the same in a project of three teams and in one of a
-  million. Each dialect compares the text by code point (Postgres collation
+  million. A caller whose grant covers part of the project reads the same
+  rows: whether it may see a row is a column of the read, not a condition of
+  it, so the grant drops rows from the page and never walks the range for the
+  ones it may see. A range that held the limit leaves the type incomplete. Each dialect compares the text by code point (Postgres collation
   `C`, Spanner's STRING order, SQLite's bytes), and Spanner reads the table
   itself.
 - A row carries what search answers with: the id, the title and the subtitle.
   `resource_key` is what a newer revision replaces an entry by (a schema's
   object type, a flow's name, else the id), so an entry always names the
-  newest revision; deleting that revision points it at the newest left.
-- An id is still read by its primary key, through the type's list.
+  newest revision; deleting that revision points it at the newest left. Its
+  texts are upserted, so two revisions of one key written at once both
+  commit, and the entry names the later one.
+- An id is still read by its primary key, through the type's list, and only
+  text shaped like one is tried: an id with the type's prefix, or for a schema
+  an absolute URI.
 
 What changes for the person typing: these types match from the start of a
 name or of a word in it, no longer inside a word. `staff` finds "Partner
@@ -228,8 +238,17 @@ A session's search without `project_id`, for every type, at the default
 | An id | 1 by primary key | 1 |
 
 Before them, two reads: the session's user, by primary key, and the projects,
-from the person's grants or, for an operator, the first 11 projects by id. Nothing grows with the number of users,
-teams or configuration rows a project holds. Two costs stay: the user read
-lists every user schema revision of the project to learn which properties are
-searched, and a caller whose grant covers part of a project reads each row
-through that grant's filter, as on the type's own list.
+from the person's grants or, for an operator, the newest 11 from
+`idx_projects_created_at`. Nothing grows with the number of users, teams or
+configuration rows a project holds, or with how narrow the caller's grant is
+for those four types. Measured on Postgres with 10 projects and every type,
+one search is 107 statements. Read 4 projects at a time, the longest chain
+of them run one after another is about 40, where reading every project in
+turn ran all 107 in a row (locally a median of 3.3 ms against 5.8 ms).
+
+Two costs stay. The user read lists every user schema revision of the project
+to learn which properties are searched. And its index ranges keep a narrow
+grant's filter in their condition, as the users list does
+([ADR 058](058-user-identity-designation-and-references.md)), so a caller
+whose grant covers part of a project reads past the users it may not see.
+

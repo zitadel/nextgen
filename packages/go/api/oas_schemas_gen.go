@@ -90388,9 +90388,9 @@ type SearchResponse struct {
 	// `more_projects` is true. Empty when every requested type is complete.
 	IncompleteTypes []SearchResultType `json:"incomplete_types"`
 	// True when a session searched without `project_id` and the person can act
-	// on more projects than one search reads: the results come from the first
-	// of them. Search another by naming it in `project_id`. Always false when
-	// the request names a project or uses a project secret.
+	// on more projects than one search reads: the results come from the
+	// newest 10 of them. Search another by naming it in `project_id`. Always
+	// false when the request names a project or uses a project secret.
 	MoreProjects bool `json:"more_projects"`
 }
 

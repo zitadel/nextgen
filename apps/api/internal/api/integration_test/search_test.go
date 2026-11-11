@@ -564,7 +564,7 @@ func TestSearchAcrossProjects(t *testing.T) {
 		assert.False(t, got.MoreProjects)
 	})
 
-	t.Run("reads at most the first ten projects and says there are more", func(t *testing.T) {
+	t.Run("reads the newest ten projects and says there are more", func(t *testing.T) {
 		t.Parallel()
 		many := harness.CreateUserWithTeam(t, platform.ID)
 		var first, last string
@@ -580,10 +580,10 @@ func TestSearchAcrossProjects(t *testing.T) {
 		got := searchResults(t, sessionClientForUser(t, many), &api.SearchRequest{Query: "nebula", Types: teams, LimitPerType: api.NewOptInt(20)},
 			api.SearchParams{})
 
-		// Projects list oldest first, so the eleventh is the one left out.
+		// The newest ten are searched, so the first one made is left out.
 		assert.Len(t, got.Results, 10)
-		assert.Contains(t, searchResultIDs(got.Results), first)
-		assert.NotContains(t, searchResultIDs(got.Results), last)
+		assert.Contains(t, searchResultIDs(got.Results), last)
+		assert.NotContains(t, searchResultIDs(got.Results), first)
 		assert.True(t, got.MoreProjects)
 		assert.Equal(t, teams, got.IncompleteTypes)
 	})

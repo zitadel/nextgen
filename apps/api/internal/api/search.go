@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"slices"
-	"strings"
-	"unicode"
+
+	"golang.org/x/sync/errgroup"
 
 	api "github.com/zitadel/nextgen/internal/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -13,18 +13,28 @@ import (
 )
 
 // searchProjectLimit is how many projects a session's search without
-// project_id reads (ADR 087 §6): the first of the projects listMyProjects
+// project_id reads (ADR 087 §6): the newest of the projects listMyProjects
 // lists. A platform operator can act on every project of the deployment, so
 // the search is bounded by this, not by the person's grants.
 const searchProjectLimit = 10
+
+// searchProjectOrder reads the newest projects first, as the console's
+// Projects list does (D28), from idx_projects_created_at.
+const searchProjectOrder = "desc"
+
+// searchConcurrency is how many projects a search reads at once. Each holds a
+// database connection while it reads, so the bound keeps one search from
+// taking every connection of the pool.
+const searchConcurrency = 4
 
 // Search finds the resources that match a text in one project, or in the
 // projects the person behind a session can act on (ADR 087).
 //
 // Each requested type is read through the list gate of its project, decided
 // once per project, so a caller finds exactly what that type's list would show
-// them. The reads run one after another: a list gate marks its context for one
-// statement, and that mark is not safe to share between goroutines.
+// them. Projects are read side by side, the types of one project one after
+// another. A list gate marks the context of one read, so every read gets a
+// context of its own, derived from the request's.
 func (h *Handler) Search(ctx context.Context, req *api.SearchRequest, params api.SearchParams) (api.SearchRes, error) {
 	gates, moreProjects, err := h.searchGates(ctx, params.ProjectID)
 	if err != nil {
@@ -43,30 +53,45 @@ func (h *Handler) Search(ctx context.Context, req *api.SearchRequest, params api
 	limit := req.LimitPerType.Or(searchDefaultLimitPerType)
 
 	var (
-		types   []domain.SearchResultType
-		results []domain.SearchResult
+		types     []domain.SearchResultType
+		requested []api.SearchResultType
 	)
-	for _, requested := range req.Types {
-		resultType := domain.SearchResultType(requested)
-		if slices.Contains(types, resultType) {
-			continue
+	for _, t := range req.Types {
+		if resultType := domain.SearchResultType(t); !slices.Contains(types, resultType) {
+			types = append(types, resultType)
+			requested = append(requested, t)
 		}
-		types = append(types, resultType)
+	}
 
+	// found[project][type] is what one project holds of one type.
+	found := make([][]searchFinds, len(gates))
+	if err := forEachConcurrently(ctx, len(gates), func(ctx context.Context, i int) error {
+		finds := make([]searchFinds, len(types))
+		for j, resultType := range types {
+			results, more, err := h.searchProjectType(ctx, gates[i], resultType, query, limit)
+			if err != nil {
+				return err
+			}
+			finds[j] = searchFinds{results: results, more: more}
+		}
+		found[i] = finds
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+
+	var results []domain.SearchResult
+	for j := range types {
 		var candidates []domain.SearchResult
 		incomplete := moreProjects
-		for _, gate := range gates {
-			found, more, err := h.searchProjectType(ctx, gate, resultType, query, limit)
-			if err != nil {
-				return nil, err
-			}
-			candidates = append(candidates, found...)
-			incomplete = incomplete || more
+		for i := range gates {
+			candidates = append(candidates, found[i][j].results...)
+			incomplete = incomplete || found[i][j].more
 		}
 		best, more := domain.BestSearchResults(candidates, limit)
 		results = append(results, best...)
 		if incomplete || more {
-			resp.IncompleteTypes = append(resp.IncompleteTypes, requested)
+			resp.IncompleteTypes = append(resp.IncompleteTypes, requested[j])
 		}
 	}
 
@@ -75,6 +100,27 @@ func (h *Handler) Search(ctx context.Context, req *api.SearchRequest, params api
 		resp.Results = append(resp.Results, searchResultToAPI(result))
 	}
 	return resp, nil
+}
+
+// forEachConcurrently calls fn for every index below n, at most
+// searchConcurrency at once, each with a context of its own, and returns the
+// first error one returns. It takes the callback in one call so the API's
+// error analysis counts the callback's errors as this call's, as it does a
+// transaction's.
+func forEachConcurrently(ctx context.Context, n int, fn func(ctx context.Context, i int) error) error {
+	group, groupCtx := errgroup.WithContext(ctx)
+	group.SetLimit(searchConcurrency)
+	for i := range n {
+		group.Go(func() error { return fn(groupCtx, i) })
+	}
+	return group.Wait()
+}
+
+// searchFinds is what one project holds of one type: its candidates, and
+// whether it has more than were read.
+type searchFinds struct {
+	results []domain.SearchResult
+	more    bool
 }
 
 // searchDefaultLimitPerType is the contract's default. The decoder fills it in
@@ -113,6 +159,7 @@ func (h *Handler) searchSessionGates(ctx context.Context, stmts service.AuthzRes
 	req := service.ListAuthorizedProjectsRequest{
 		HomeProjectID: self.ProjectID(),
 		UserID:        self.UserID(),
+		Order:         searchProjectOrder,
 		Limit:         searchProjectLimit,
 	}
 	var listed *service.ListProjectsResponse
@@ -130,19 +177,29 @@ func (h *Handler) searchSessionGates(ctx context.Context, stmts service.AuthzRes
 		return nil, false, err
 	}
 
-	gates := make([]projectListGate, 0, len(listed.Projects))
-	for _, project := range listed.Projects {
-		gate, err := decideProjectListGate(ctx, stmts, project.ID, projectAccess)
+	// One access check per project, side by side.
+	decided := make([]*projectListGate, len(listed.Projects))
+	if err := forEachConcurrently(ctx, len(listed.Projects), func(ctx context.Context, i int) error {
+		gate, err := decideProjectListGate(ctx, stmts, listed.Projects[i].ID, projectAccess)
 		if err != nil {
 			// A grant can list a project without reaching its lists, and a
 			// project can go between the two reads: either has nothing to
 			// search. Anything else is a fault, not an answer.
 			if errors.Is(err, domain.ErrProjectNotFound()) || errors.Is(err, domain.ErrProjectPermissionDenied()) {
-				continue
+				return nil
 			}
-			return nil, false, err
+			return err
 		}
-		gates = append(gates, gate)
+		decided[i] = &gate
+		return nil
+	}); err != nil {
+		return nil, false, err
+	}
+	gates := make([]projectListGate, 0, len(decided))
+	for _, gate := range decided {
+		if gate != nil {
+			gates = append(gates, *gate)
+		}
 	}
 	return gates, listed.NextPageToken != "", nil
 }
@@ -302,10 +359,10 @@ func (h *Handler) searchTeams(ctx context.Context, gate projectListGate, query s
 // searchSchemas finds the user schema whose newest revision's id the text is,
 // else the user schemas whose title or object type it starts, or a word in
 // them, at their newest revision. A schema's id can be the URI its document
-// names as `$id`, so any text without a space is tried as one: a read of one
+// names as `$id`, so text shaped like one is read by it first: a read of one
 // primary key.
 func (h *Handler) searchSchemas(ctx context.Context, gate projectListGate, query string, limit int) ([]domain.SearchResult, bool, error) {
-	if !strings.ContainsFunc(query, unicode.IsSpace) {
+	if domain.IsSearchSchemaID(query) {
 		kind := domain.JSONSchemaKindUserSchema
 		listed, err := h.schemaService.ListSchemas(gate.listContext(ctx, domain.ResourceKindSchema), service.ListSchemasInput{
 			ProjectID:                   gate.projectID,
