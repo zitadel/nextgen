@@ -277,10 +277,26 @@ over reading `<resource> --help` one at a time. A `list` verb's envelope carries
 you pass `--all`, so a "how many …?" question is one `list --all --json` call:
 read the count, do not page and tally.
 
+To find a user by their identifier, the value a user carries as `identifier`:
+`users list --filter identifier=starts_with:<start> --json` matches its start,
+ignoring case. Name the operation: `starts_with` is the only one, so a part from
+the middle of an identifier (the domain of an email) finds nothing. The users
+come back ordered by identifier, and `--sort` cannot be combined with the
+filter. The property comes from the revision the user is on, so a user who signs
+in through a flow on a newer revision that designates another property does not
+match on that property. Only string identifiers match, not a number or a
+boolean. Other attributes are not filterable.
+
 To find the users still on an older revision of a schema, filter on the
 schema's object type and exclude the newest revision's URL:
 `users list --filter schema_object_type=equals:<type> --filter
 schema=not_equals:<newest-url> --all --json`.
+
+To find the API requests that failed: `events list --filter status_class=4xx
+--filter status_class=5xx --json`, and add `--filter operation_id=<operation>`
+(such as `createUser`) for one operation. Only requests recorded by a server
+that has these filters match, so an older request is found by its
+`request_id`, not by them.
 
 ## Reading the envelope
 
@@ -302,14 +318,20 @@ Each invocation prints one JSON object:
   success: a warning usually means a follow-up step is needed.
 - A `list` verb emits `data: { items, count, next_page_token }`; when a page
   remains, `data.next_commands` carries the exact command for the next page.
+- A filtered `events list` page can hold fewer items than `--limit`, or none,
+  and still carry `next_page_token`: the server matches some filters over a
+  bounded number of events per request. Follow the token, or pass `--all`,
+  before you report that nothing matched.
 - `deploy` emits `data.content_hash` (the release digest), `data.origins`
   (the origins it went live on) and `data.resources` (how many it pinned). A
   re-run on unchanged config returns the same digest. Use it to confirm what
   went live.
 - When the server refuses a release, `deploy` fails with `E_VALIDATION` and
   the `hint` lists each refused resource as `<kind> <handle>: <reason>`, such
-  as `schema human-user: …` or `flow default-login: …`. Read the hint, not
-  only `message` (`release: invalid`); the same entries are in
+  as `schema human-user: …` or `flow default-login: …`. A connection's line
+  ends with the fields it may not change or the endpoints it left out, as in
+  `idp acme-sso: …: oidc.issuer`. Read the hint, not only `message`
+  (`release: invalid`); the same entries are in
   `details.body.details.resources`.
 - `deploy`, `deploy --dry-run` and `doctor` check each user schema against
   the meta-schema the server uses. On the schema's root or a property, a key
@@ -354,9 +376,32 @@ Each invocation prints one JSON object:
   blank `-m` is refused. A release keeps the message of
   the run that first built its content, usually the pull request's `preview`.
   `deployment rollback -m` records why on the rollback.
+- `deployment get`, `deployment rollback`, `deployment create --release`,
+  `release revoke` and the `users`, `sessions` and `release` commands that take
+  an id refuse a value that is not that kind of id (surrounding whitespace is
+  trimmed) before they ask or call the server, saying what one looks like and
+  suggesting the list command. `claim --challenge-id` refuses a malformed
+  challenge id the same way.
 - `deployment get <id>` emits the deployment as the API serves it; on a
   terminal it also shows the variables the deployment froze, secrets masked.
-  Read them as JSON with `variable resolve`.
+  Read them as JSON with `variable resolve <id>`.
+- `variable resolve` reads the variables a deployment froze: the one live on the
+  project (narrowed with `--origin` when several are live), or any deployment
+  named by `variable resolve <deployment_id>`. A deployment id together with
+  `--origin` is refused, since the id already says which deployment. Only the
+  live form's envelope carries `data.origins`, the origins that deployment
+  serves; a named read has none.
+- `variable set` stores the value on the project, but a sign-in keeps using the
+  variables the last `deploy` froze, so the change applies after the next
+  `deploy`. The envelope's `data.next_actions` says so and `data.next_commands`
+  holds `deploy -m '<what changed>'`. With `--preview` it points to
+  `preview --origin '<preview-url>' -m '<what changed>'` instead, since a primary
+  `deploy` leaves the preview value unapplied; a pull-request build that sets its
+  own preview URL can drop `--origin`. In an environment other than
+  `preview` or `development`, where `preview` skips, no command is suggested; nor in a
+  CI build that names no environment, where it says to pass `--env preview`.
+  A secret written without `--preview` clears the name's preview value; set it again
+  with `variable set <name> --secret --preview`.
 - `deployment rollback` emits `data.release_id` (the release live again),
   `data.origins` (the origins that deployment froze) and `data.pointers`, the
   `{kind, handle, revision_id}` revisions that release pins; the `schema` one
@@ -425,6 +470,11 @@ Common error codes point at their own fix in `next_commands`:
 
 - `E_VALIDATION`: the body or flags are wrong; `message` names what, and
   `details` often lists the missing or available values.
+  A file under `.zitadel/` that cannot be written because a directory it needs
+  is a file fails with `<path> cannot be written (ENOTDIR)`; `details.blocker`
+  is that file. Remove it, then run the command again. A directory where a
+  file is to be removed fails with `<path> cannot be removed (EISDIR)`; remove
+  the directory, then run the command again.
 - `E_CONFIRMATION_REQUIRED`: a destructive change waits for the user's yes;
   see "Ask the user before `--force`" above. Never add `--force` on your own.
 - `E_CREDENTIAL_MISSING`: a connection's `client_id` or `client_secret` names a
@@ -485,7 +535,10 @@ Ask about:
   sign-on. If they want SSO, which providers? A provider the CLI does not list
   by name is still possible: run `zitadel auth-method sso enable --help` to see
   whether the installed CLI takes one, and which settings it needs, and ask for
-  those too.
+  those too. In an interactive `setup`, Space ticks a provider and Enter
+  continues; pressing Enter with none ticked asks whether to continue without
+  setting up SSO, where No goes back to the list, so nothing is skipped by accident.
+  A non-interactive run names the providers with `--sso` instead.
 - **Profile fields** — which attributes sign-up collects. The starting field
   set depends on the use-case you pick (see *Presets and use-cases* below) —
   the default (`minimal`) is the login identifier only, **not** names. Confirm
@@ -718,6 +771,14 @@ cannot hold, a verification that reads a claim that is not a boolean, a
 `subject_claim` that is a profile claim (only until the connection is first
 deployed, after which it cannot change), and a connection that reads a
 standard claim without the scope that returns it. Fix the file named.
+
+In a terminal, `setup --sso custom` asks for the name the sign-in button shows
+first, then offers a connection name made from it (`Zitadel Cloud` offers
+`zitadel-cloud`) for the user to accept or edit; a name that would be a built-in
+provider's (`google`, `custom`) is offered empty. A scripted, `--json` or
+`--non-interactive` run asks nothing and still needs `--sso-slug`,
+`--sso-display-name` and `--sso-issuer`. `auth-method sso enable` keeps asking for
+the connection name first.
 
 After `setup`, follow `data.next_commands` to start the app. Prove the generated
 auth flow in a visible browser by registering a unique user at `/register`,

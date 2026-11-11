@@ -78,8 +78,8 @@ func TestBuildCreateAttributes_uniquenessFollowsSchema(t *testing.T) {
 		// From the schema's x-unique annotations.
 		"email":    domain.AttributeUniquenessProject,
 		"employee": domain.AttributeUniquenessTeam,
-		// Unannotated properties and the bootstrap markers stay out of the
-		// unique registry.
+		// Unannotated properties and the bootstrap markers are not unique
+		// claims.
 		"nickname":             domain.AttributeUniquenessUnspecified,
 		"zitadel.source":       domain.AttributeUniquenessUnspecified,
 		"zitadel.default_user": domain.AttributeUniquenessUnspecified,

@@ -232,6 +232,19 @@ describe("deploy", () => {
         );
       });
 
+      it("names the field the server refused to change on a connection", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        platform.rejectsAConnection();
+
+        const result = await app.deploy();
+
+        expect(result).toFailWith("E_VALIDATION");
+        expect(result).toHintAt(
+          "idp google: identity provider connection: the field is fixed for the life of the connection: oidc.issuer",
+        );
+      });
+
       it("does not warn about the scaffolded login flow", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();

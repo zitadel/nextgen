@@ -45,6 +45,8 @@ import {
   update,
 } from "@/commands/resources";
 import { COMMANDS } from "@/index";
+import { idArg } from "@/lib/oclif/crud/shared";
+import { parseArg } from "@tests/helpers/inputs";
 import { tabulate } from "@tests/helpers/tabulate";
 import {
   definitionOf,
@@ -1767,6 +1769,12 @@ describe("other resources", () => {
       "category=auth",
       "--filter",
       "created_at=greater_than_or_equal:2026-01-01T00:00:00Z",
+      "--filter",
+      "operation_id=createUser",
+      "--filter",
+      "status_class=4xx",
+      "--filter",
+      "status_class=5xx",
       "--limit",
       "5",
     ]);
@@ -1774,6 +1782,8 @@ describe("other resources", () => {
     const params = new URL(urls.at(-1) ?? "").searchParams;
     expect(params.get("project_id")).toBe("proj_test");
     expect(params.getAll("category")).toEqual(["entity", "auth"]);
+    expect(params.getAll("operation_id")).toEqual(["createUser"]);
+    expect(params.getAll("status_class")).toEqual(["4xx", "5xx"]);
     expect(params.get("created_after")).toBe("2026-01-01T00:00:00Z");
     expect(params.get("limit")).toBe("5");
     const json = parseJson(res.stdout) as { data: { items: Array<{ id: string }> } };
@@ -2162,11 +2172,26 @@ describe("the query resources' filters", () => {
     ["idps", QueryIdpsBodyFilterItemOperation],
     ["projects", QueryProjectsBodyFilterItemOperation],
   ] as const)("offer the operations the %s query takes, and no other", (topic, operations) => {
-    const offered = new Set(
+    const offered = new Set<string>(
       (RESOURCES[topic].list?.filters ?? []).flatMap((filter) => filter.operations),
     );
+    // Every query's enum holds `starts_with`, but only a field an index answers
+    // it for takes it, so a resource without such a field offers it nowhere.
+    const expected = Object.values(operations).filter(
+      (operation) => operation !== "starts_with" || offered.has(operation),
+    );
 
-    expect([...offered].sort()).toEqual(Object.values(operations).sort());
+    expect([...offered].sort()).toEqual(expected.sort());
+  });
+
+  it("offer starts_with on the fields an index answers it for, and no other", () => {
+    const fields = Object.entries(RESOURCES).flatMap(([topic, resource]) =>
+      (resource.list?.filters ?? [])
+        .filter((filter) => (filter.operations as readonly string[]).includes("starts_with"))
+        .map((filter) => `${topic}.${filter.field}`),
+    );
+
+    expect(fields).toEqual(["users.identifier"]);
   });
 });
 
@@ -2386,8 +2411,8 @@ describe("the registry builders", () => {
   it("refuses an operation the query body does not take", () => {
     list({
       body: QueryUsersBody,
-      // @ts-expect-error a user query takes no `starts_with` operation
-      filters: [{ field: "status", operations: ["starts_with"] }],
+      // @ts-expect-error a user query takes no `ends_with` operation
+      filters: [{ field: "status", operations: ["ends_with"] }],
       call: ({ client }, body) => client.queryUsers(body),
       items: (page: QueryUsers200) => page.users,
       next: (page: QueryUsers200) => page.next_page_token,
@@ -2597,5 +2622,71 @@ describe("the paged resources' lists", () => {
     const list = RESOURCES[topic].list;
 
     expect([list?.items, list?.next]).toEqual([readers.items, readers.next]);
+  });
+});
+
+describe("the id of a resource whose id has a format", () => {
+  const IDS = {
+    users: ["user_01KX5N7C9D2E7F0N9WD3P2E4YM6", "a user"],
+    sessions: ["sess_01KX5N7C9D2E7F0N9WD3P2E4YM6", "a session"],
+    release: ["rel_01M6KPFXAE68N6G2X1HN5XD29R", "a release"],
+  } as const;
+  const TOPICS = Object.keys(IDS) as Array<keyof typeof IDS>;
+
+  /**
+   * The positional a resource's verbs take for its id.
+   *
+   * @param topic - The resource the positional belongs to.
+   * @returns The positional as the resource declares it.
+   */
+  function positional(topic: keyof typeof IDS) {
+    const arg = idArg(RESOURCES[topic], topic).id;
+    if (arg === undefined) {
+      throw new Error(`${topic} declares no id positional`);
+    }
+    return arg;
+  }
+
+  it.each(TOPICS)("takes a %s id, trimmed", async (topic) => {
+    const [id] = IDS[topic];
+
+    await expect(parseArg(positional(topic), ` ${id}\n`, "id")).resolves.toBe(id);
+  });
+
+  it.each(
+    TOPICS.flatMap((topic) => {
+      const prefix = IDS[topic][0].split("_")[0];
+      const others = TOPICS.filter((other) => {
+        return other !== topic;
+      }).map((other) => {
+        return [topic, `a ${other} id`, IDS[other][0]] as const;
+      });
+      return [
+        ...others,
+        [topic, "a blank", "   "] as const,
+        [topic, "a prefix alone", `${prefix}_`] as const,
+        [topic, "a space inside", `${prefix}_has space`] as const,
+      ];
+    }),
+  )("%s refuses %s, saying what its id is", async (topic, _, value) => {
+    await expect(parseArg(positional(topic), value, "id")).rejects.toMatchObject({
+      code: "E_VALIDATION",
+      message: expect.stringContaining(`must be ${IDS[topic][1]} ID`),
+      hint: `Find one with \`zitadel ${topic} list\`.`,
+    });
+  });
+
+  it.each(TOPICS)("%s gives every verb that takes an id the list hint", async (topic) => {
+    const positionals = Object.entries(COMMANDS).flatMap(([id, command]) => {
+      const arg = command.args?.id;
+      return id.startsWith(`${topic}:`) && arg !== undefined ? [arg] : [];
+    });
+
+    expect(positionals.length).toBeGreaterThan(0);
+    for (const arg of positionals) {
+      await expect(parseArg(arg, "nope", "id")).rejects.toMatchObject({
+        hint: `Find one with \`zitadel ${topic} list\`.`,
+      });
+    }
   });
 });

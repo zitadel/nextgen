@@ -42,15 +42,19 @@ const SHEET_LAYOUT: SchemaFieldsLayout = { orientation: "vertical", labelRow: LA
  */
 export function AddUserSheet({
   children,
+  open,
+  onOpenChange,
   onCreated,
 }: {
-  /** The trigger — the Users toolbar's `Add` button. */
-  children: ReactNode;
-  /** Called after a successful create so the caller can refresh its list. */
-  onCreated: () => void | Promise<void>;
+  /** The trigger — the Users toolbar's `Add` button. Without one, `open` opens it. */
+  children?: ReactNode;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  /** Called with the new user after a successful create, so the caller can refresh or open them. */
+  onCreated: (user: { id: string }) => void | Promise<void>;
 }) {
   return (
-    <FormSheet trigger={children}>
+    <FormSheet trigger={children} open={open} onOpenChange={onOpenChange}>
       {(close) => <AddUserForm onCreated={onCreated} onClose={close} />}
     </FormSheet>
   );
@@ -60,7 +64,7 @@ function AddUserForm({
   onCreated,
   onClose,
 }: {
-  onCreated: () => void | Promise<void>;
+  onCreated: (user: { id: string }) => void | Promise<void>;
   onClose: () => void;
 }) {
   const projectId = useRequiredProjectScope();
@@ -117,13 +121,14 @@ function AddUserForm({
     // Built from the field descriptors rather than the raw values so a
     // property's declared type survives (`attributeValue`).
     const attributes = draftValue(root, form.draft, "create") as Record<string, unknown>;
+    let user: { id: string };
     try {
-      await api.createUser({ schema: selected.id, attributes }, { project_id: projectId });
+      user = await api.createUser({ schema: selected.id, attributes }, { project_id: projectId });
     } catch (cause) {
       form.applyServerError(cause);
       throw cause;
     }
-    await onCreated();
+    await onCreated(user);
     onClose();
   }, "Could not create the user.");
 

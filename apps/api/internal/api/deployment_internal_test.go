@@ -128,7 +128,7 @@ func TestDeploymentInvalidCarriesItsExplanationAsMessage(t *testing.T) {
 // missing and a read reports the deployment as missing, so neither confirms
 // the other project exists.
 func TestDeploymentAccessRow(t *testing.T) {
-	stmts := stubAuthzStmts{}
+	stmts := stubAuthzStmts{granted: []string{"proj_a"}}
 	operator := WithScopeContext(context.Background(), ScopeContext{
 		ProjectID:     "proj_a",
 		Scope:         []string{"project.write", "project.read"},

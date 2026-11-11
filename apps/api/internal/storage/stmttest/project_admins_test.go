@@ -18,7 +18,7 @@ import (
 
 // ListProjectAdmins reads who administers a project the way the
 // authorization check decides it: active members of the owning team and of
-// teams granted admin, and existing users granted admin, through unrevoked,
+// teams granted admin, and active users granted admin, through unrevoked,
 // unexpired admin grants on that project only.
 func TestAuthzAssignmentStatements_ListProjectAdmins(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
@@ -72,6 +72,7 @@ func TestAuthzAssignmentStatements_ListProjectAdmins(t *testing.T) {
 		revoked := user("h")
 		elsewhere := user("i")
 		left := user("j")
+		deactivated := user("k")
 
 		owningTeam := team("owners", owner)
 		opsTeam := team("ops", teamMember, owner, left)
@@ -99,7 +100,9 @@ func TestAuthzAssignmentStatements_ListProjectAdmins(t *testing.T) {
 		require.NoError(t, d.stmts.RevokeAuthzAssignment(t.Context(), projectID,
 			grant(projectID, domain.AuthzPrincipalTypeUser, revoked, "admin", nil)))
 		grant(otherProjectID, domain.AuthzPrincipalTypeUser, elsewhere, "admin", nil)
+		grant(projectID, domain.AuthzPrincipalTypeUser, deactivated, "admin", nil)
 		require.NoError(t, d.stmts.DeleteUserByID(t.Context(), home, deleted))
+		require.NoError(t, d.stmts.DeactivateUser(t.Context(), home, deactivated))
 		require.NoError(t, d.stmts.DeleteAuthzMembershipEdges(t.Context(), edgeFilter(home, domain.AuthzSetTypeTeam, opsTeam, domain.AuthzMemberTypeUser, left)))
 
 		// Every source, then as a viewer in the given teams sees it: a grant to
@@ -157,7 +160,7 @@ func TestAuthzAssignmentStatements_ListProjectAdmins(t *testing.T) {
 		want := seenBy()
 		got := list("", 100, byUserID, nil)
 		assert.Equal(t, want, got.Items,
-			"by user id, sources owning team, team grants and user grants; deleted, viewer, editor, expired, revoked, foreign and departed left out")
+			"by user id, sources owning team, team grants and user grants; deleted, viewer, editor, expired, revoked, foreign, departed and deactivated left out")
 		assert.Empty(t, got.NextCursor)
 		assert.NotContains(t, adminUserIDs(got.Items), teamMember, "a person only in a team the viewer is not in is left out")
 
@@ -202,12 +205,13 @@ func TestAuthzAssignmentStatements_ListProjectAdmins(t *testing.T) {
 
 		// The list must say what the authorization check says: everyone the
 		// owner sees (both admin teams) is exactly who CheckAuthz allows admin
-		// on the project. The deleted user is left out of the comparison: the
-		// check reads only assignments, and a deleted user cannot sign in.
+		// on the project. The check reads the user's status in their home
+		// project, so the deleted and the deactivated user count for nothing
+		// in either.
 		catalogID, err := d.stmts.ActiveSystemCatalogID(t.Context())
 		require.NoError(t, err)
 		var allowed []string
-		for _, userID := range []string{owner, teamMember, direct, expiring, viewer, expired, revoked, elsewhere, left} {
+		for _, userID := range []string{owner, teamMember, direct, expiring, deleted, viewer, expired, revoked, elsewhere, left, deactivated} {
 			ok, _, err := d.stmts.CheckAuthz(t.Context(), domain.AuthzCheckParams{
 				CatalogID: catalogID, ProjectID: projectID, PrincipalHomeProjectID: home,
 				PrincipalType: domain.AuthzPrincipalTypeUser, PrincipalID: userID,

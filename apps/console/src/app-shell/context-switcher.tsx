@@ -460,14 +460,14 @@ function Switcher({
 }
 
 /**
- * The bar's switcher: a borderless 32px button — glyph, name, chevrons — that
- * fills only on hover or while open. Height, padding, radius and the hover fill
- * are the sidebar rows' (`SidebarMenuButton`), so the bar and the sidebar read
- * as one set of controls rather than two contrasts. Capped so a long name
- * truncates rather than running the bar's width.
+ * The bar's switcher: a borderless 36px button — glyph, name, chevrons — that
+ * fills only on hover or while open. Height, padding, gap, radius and the
+ * hover fill are the sidebar rows' (`SidebarMenuButton`), so the bar and the
+ * sidebar read as one set of controls rather than two contrasts. Capped so a
+ * long name truncates rather than running the bar's width.
  */
 const TRIGGER =
-  "flex h-8 max-w-64 min-w-0 items-center gap-2 rounded-md px-2 text-sm transition-colors outline-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring data-[state=open]:bg-sidebar-accent";
+  "flex h-9 max-w-64 min-w-0 items-center gap-2.5 rounded-md px-3 text-sm transition-colors outline-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring data-[state=open]:bg-sidebar-accent";
 
 /**
  * A list row: 32px, glyph, name, and a check on the current one. The focus

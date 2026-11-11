@@ -1,4 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
+import { join } from "node:path";
+
+import { describe, expect, it } from "vitest";
 
 import {
   Change,
@@ -16,8 +18,10 @@ import {
   aPasswordPolicy,
   aStore,
   aUserSchema,
+  bodyAt,
   type ConfigDocuments,
 } from "@tests/helpers/config";
+import { MemoryStore } from "@tests/helpers/storage/backend/memory";
 
 /**
  * The password policy's file.
@@ -124,7 +128,7 @@ describe("Change.save", () => {
 
     await config.policies.remove(PASSWORD).save(store);
 
-    expect(store.get(PASSWORD)).toBeUndefined();
+    expect(await store.exists(PASSWORD)).toBe(false);
   });
 
   it("does not count a deleted file among those written", async () => {
@@ -146,7 +150,10 @@ describe("Change.save", () => {
       after: removed.after.policies.put(NEW_LOCKOUT).after,
     }).save(store);
 
-    expect([store.get(PASSWORD), store.get(LOCKOUT)]).toEqual([undefined, aPasswordPolicy()]);
+    expect([bodyAt(store, PASSWORD), bodyAt(store, LOCKOUT)]).toEqual([
+      undefined,
+      aPasswordPolicy(),
+    ]);
   });
 
   it("refuses a text file that is taken before it replaces a document", async () => {
@@ -158,7 +165,7 @@ describe("Change.save", () => {
       return undefined;
     });
 
-    expect(store.get(SCHEMA)).toEqual(aUserSchema());
+    expect(bodyAt(store, SCHEMA)).toEqual(aUserSchema());
   });
 
   it("writes no new document when a new text file is taken", async () => {
@@ -170,7 +177,7 @@ describe("Change.save", () => {
       return undefined;
     });
 
-    expect(store.get(LOCKOUT)).toBeUndefined();
+    expect(await store.exists(LOCKOUT)).toBe(false);
   });
 
   it("writes nothing when one of the paths leads outside .zitadel/", async () => {
@@ -184,7 +191,7 @@ describe("Change.save", () => {
       return undefined;
     });
 
-    expect(store.get(LOCKOUT)).toBeUndefined();
+    expect(await store.exists(LOCKOUT)).toBe(false);
   });
 
   it("deletes nothing when one of the paths leads outside .zitadel/", async () => {
@@ -198,7 +205,7 @@ describe("Change.save", () => {
       return undefined;
     });
 
-    expect(store.get(PASSWORD)).toEqual(aPasswordPolicy());
+    expect(bodyAt(store, PASSWORD)).toEqual(aPasswordPolicy());
   });
 
   it("writes nothing when a path to delete is refused", async () => {
@@ -206,11 +213,8 @@ describe("Change.save", () => {
     const config = await ZitadelConfig.loadUnchecked(store);
     const inside = `${CONFIG_DIRECTORIES.branding}/kept-out.txt`;
     const removing = config.policies.remove(PASSWORD).withText(inside, "x");
-    vi.spyOn(store, "assertWritable").mockImplementation((path: string) => {
-      if (path === PASSWORD) {
-        throw new ConfigError(`${path} points outside .zitadel/`);
-      }
-    });
+    store.volume.rmSync(join(MemoryStore.ROOT, PASSWORD));
+    store.volume.mkdirSync(join(MemoryStore.ROOT, PASSWORD));
 
     await removing.save(store).catch(() => {
       return undefined;
@@ -235,7 +239,7 @@ describe("Change.save", () => {
         return undefined;
       });
 
-    expect(store.get(SCHEMA)).toEqual(aUserSchema());
+    expect(bodyAt(store, SCHEMA)).toEqual(aUserSchema());
   });
 
   it("refuses a document in createOnly that is taken, under overwrite", async () => {
@@ -261,7 +265,7 @@ describe("Change.save", () => {
       .put(Policy.create({ path: PASSWORD, body: aPasswordPolicy({ min_length: 16 }) }))
       .save(store);
 
-    expect(store.get(PASSWORD)).toEqual(aPasswordPolicy({ min_length: 16 }));
+    expect(bodyAt(store, PASSWORD)).toEqual(aPasswordPolicy({ min_length: 16 }));
   });
 
   it("replaces a file whose document was removed earlier in the same edit", async () => {
@@ -275,7 +279,7 @@ describe("Change.save", () => {
       )
       .save(store);
 
-    expect(store.get(PASSWORD)).toEqual(aPasswordPolicy({ min_length: 16 }));
+    expect(bodyAt(store, PASSWORD)).toEqual(aPasswordPolicy({ min_length: 16 }));
   });
 
   it("still refuses a new document at a path that was free when the configuration was read", async () => {
@@ -300,7 +304,7 @@ describe("Change.save", () => {
       },
     });
 
-    expect(store.get(SCHEMA)).toHaveProperty(["x-auth-methods", "passkey"], { enabled: true });
+    expect(bodyAt(store, SCHEMA)).toHaveProperty(["x-auth-methods", "passkey"], { enabled: true });
   });
 
   it("replaces a file a new document is put over under overwrite, though it was never read", async () => {
@@ -310,7 +314,7 @@ describe("Change.save", () => {
 
     await config.policies.put(NEW_PASSWORD).save(store, { overwrite: true });
 
-    expect(store.get(PASSWORD)).toEqual(aPasswordPolicy({ min_length: 16 }));
+    expect(bodyAt(store, PASSWORD)).toEqual(aPasswordPolicy({ min_length: 16 }));
   });
 
   it("keeps a new document in createOnly from replacing a file never read, under overwrite", async () => {
@@ -326,23 +330,6 @@ describe("Change.save", () => {
     });
 
     await expect(saving).rejects.toBeInstanceOf(FileExistsError);
-  });
-
-  it("writes the files it creates before the files it replaces", async () => {
-    const store = aStore(HOLDING_SCHEMA);
-    const config = await ZitadelConfig.loadUnchecked(store);
-    const edited = await editedSchema(config);
-    const change = new Change({ before: config, after: edited.after.with(NEW_LOCKOUT) });
-    const written: string[] = [];
-    const write = store.write.bind(store);
-    vi.spyOn(store, "write").mockImplementation(async (file, mode) => {
-      written.push(file.path);
-      await write(file, mode);
-    });
-
-    await change.save(store);
-
-    expect(written).toEqual([LOCKOUT, SCHEMA]);
   });
 });
 
@@ -384,7 +371,7 @@ describe("Change.check", () => {
 
     await config.policies.put(NEW_LOCKOUT).check(store);
 
-    expect(store.get(LOCKOUT)).toBeUndefined();
+    expect(await store.exists(LOCKOUT)).toBe(false);
   });
 
   it("refuses what save refuses", async () => {

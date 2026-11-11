@@ -34,7 +34,7 @@ func TestOriginErrorResponseStatuses(t *testing.T) {
 // TestDeploymentAccessRow: a foreign-project write reports the origin as
 // missing and a denied credential gets permission_denied.
 func TestOriginAccessRow(t *testing.T) {
-	stmts := stubAuthzStmts{}
+	stmts := stubAuthzStmts{granted: []string{"proj_a"}}
 	operator := WithScopeContext(context.Background(), ScopeContext{
 		ProjectID:     "proj_a",
 		Scope:         []string{"project.write", "project.read"},
