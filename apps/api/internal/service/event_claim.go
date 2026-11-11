@@ -49,3 +49,19 @@ func projectIsClaimed(ctx context.Context, stmts claimStateStatements, projectID
 	claim, err := loadProjectClaim(ctx, stmts, projectID)
 	return claim == projectClaimed, err
 }
+
+// requireClaimedProject refuses an unclaimed project with unclaimed. The
+// platform project, and every project on a server without one, are exempt.
+func requireClaimedProject(ctx context.Context, stmts claimStateStatements, platformProjectID, projectID string, unclaimed func() domain.Error) error {
+	if platformProjectID == "" || projectID == platformProjectID {
+		return nil
+	}
+	claimed, err := projectIsClaimed(ctx, stmts, projectID)
+	if err != nil {
+		return err
+	}
+	if !claimed {
+		return unclaimed()
+	}
+	return nil
+}

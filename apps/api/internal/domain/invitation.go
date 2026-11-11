@@ -1,10 +1,6 @@
 package domain
 
-import (
-	"crypto/rand"
-	"encoding/base64"
-	"time"
-)
+import "time"
 
 // InvitationExpiration is how long an invitation's link can be redeemed.
 const InvitationExpiration = 72 * time.Hour
@@ -12,9 +8,9 @@ const InvitationExpiration = 72 * time.Hour
 // NewInvitationToken mints a link token: 16 random bytes, of which only the
 // HashSecret is stored.
 func NewInvitationToken() (plain, hash string, err error) {
-	plain, err = randomURLString(16)
+	plain, err = randomSecret(16)
 	if err != nil {
-		return "", "", ErrInternal(err).WithMessage("failed to generate invitation token")
+		return "", "", err
 	}
 	return plain, HashSecret(plain), nil
 }
@@ -22,19 +18,7 @@ func NewInvitationToken() (plain, hash string, err error) {
 // NewInvitationJourneyID mints the random id that ties an invitation to its
 // replacements. It names no resource.
 func NewInvitationJourneyID() (string, error) {
-	id, err := randomURLString(16)
-	if err != nil {
-		return "", ErrInternal(err).WithMessage("failed to generate invitation journey id")
-	}
-	return id, nil
-}
-
-func randomURLString(n int) (string, error) {
-	b := make([]byte, n)
-	if _, err := rand.Read(b); err != nil {
-		return "", err
-	}
-	return base64.RawURLEncoding.EncodeToString(b), nil
+	return randomSecret(16)
 }
 
 // PrefixInvitation is the dialect-minted ID prefix for invitations (inv_<opaque>)

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/zitadel/nextgen/internal/audit"
+	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/invitation"
@@ -20,8 +21,9 @@ const invitationMetadataMaxLen = 200
 
 // InvitationService manages a project's invitations (ADR 086).
 type InvitationService struct {
-	db                *DB
-	keys              KeyService
+	db   *DB
+	keys KeyService
+	// consoleBaseURL never ends in a slash.
 	consoleBaseURL    string
 	platformProjectID string
 }
@@ -30,7 +32,7 @@ func NewInvitationService(db *DB, keys KeyService, consoleBaseURL, platformProje
 	return &InvitationService{
 		db:                db,
 		keys:              keys,
-		consoleBaseURL:    strings.TrimRight(consoleBaseURL, "/"),
+		consoleBaseURL:    consoleBaseURL,
 		platformProjectID: platformProjectID,
 	}
 }
@@ -80,17 +82,11 @@ func (s *InvitationService) Create(ctx context.Context, input CreateInvitationIn
 	if s.platformProjectID == "" {
 		return nil, domain.ErrInvitationPlatformRequired()
 	}
-	if input.ProjectID != s.platformProjectID {
-		claimed, err := projectIsClaimed(ctx, s.db.Statements(), input.ProjectID)
-		if err != nil {
-			return nil, err
-		}
-		if !claimed {
-			return nil, domain.ErrInvitationProjectUnclaimed()
-		}
+	if err := requireClaimedProject(ctx, s.db.Statements(), s.platformProjectID, input.ProjectID, domain.ErrInvitationProjectUnclaimed); err != nil {
+		return nil, err
 	}
 
-	// Minted before the transaction, so a retried callback writes the same row.
+	// Minted before the transaction, so a retried callback reuses them.
 	token, tokenHash, err := domain.NewInvitationToken()
 	if err != nil {
 		return nil, err
@@ -106,10 +102,23 @@ func (s *InvitationService) Create(ctx context.Context, input CreateInvitationIn
 			return nil, err
 		}
 	}
+	// The metadata a replace moves is decrypted here: key lookups use the
+	// pool, which inside the transaction can deadlock on SQLite's one connection.
+	var moved *Invitation
+	if input.ReplacesInvitationID != "" && input.Metadata == nil {
+		original, err := s.db.Statements().GetInvitationByID(ctx, input.ProjectID, input.ReplacesInvitationID)
+		if err != nil {
+			return nil, mapInvitationError(err, "failed to create invitation")
+		}
+		if moved, err = decryptInvitation(decrypterOfWritingKey(ctx, s.keys), original); err != nil {
+			return nil, err
+		}
+	}
 	now := time.Now().UTC()
+	actor, _ := audit.ActorFromContext(ctx)
 
 	var created *domain.Invitation
-	metadata := input.Metadata
+	var metadata *domain.InvitationMetadata
 	err = s.db.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		stmts := tx.Statements()
 		// The cap holds only under this lock.
@@ -124,27 +133,23 @@ func (s *InvitationService) Create(ctx context.Context, input CreateInvitationIn
 			ExpiresAt:         now.Add(domain.InvitationExpiration),
 			JourneyID:         journeyID,
 			TokenHash:         tokenHash,
+			CreatedBy:         actor.ActorID,
+			CreatedByType:     actor.ActorType,
 		}
-		actor, _ := audit.ActorFromContext(ctx)
-		entity.CreatedBy = actor.ActorID
-		entity.CreatedByType = actor.ActorType
+		metadata = input.Metadata
 
 		var replaced *domain.Invitation
 		if input.ReplacesInvitationID != "" {
-			original, err := s.releaseReplaced(ctx, stmts, input.ProjectID, input.ReplacesInvitationID)
+			var err error
+			replaced, err = s.releaseReplaced(ctx, stmts, input.ProjectID, input.ReplacesInvitationID)
 			if err != nil {
 				return err
 			}
-			replaced = original
-			entity.JourneyID = original.JourneyID
-			if entity.EncryptedMetadata == nil && original.EncryptedMetadata != nil {
-				// Decrypted before the insert: the link is lost if Create fails after it.
-				moved, err := s.decrypt(ctx, original)
-				if err != nil {
-					return err
-				}
-				entity.EncryptedMetadata = original.EncryptedMetadata
-				metadata = moved[0].Metadata
+			entity.JourneyID = replaced.JourneyID
+			// Metadata is never rewritten, only cleared, so the earlier read still matches.
+			if moved != nil && moved.Metadata != nil && replaced.EncryptedMetadata != nil {
+				entity.EncryptedMetadata = replaced.EncryptedMetadata
+				metadata = moved.Metadata
 			}
 		}
 
@@ -158,13 +163,13 @@ func (s *InvitationService) Create(ctx context.Context, input CreateInvitationIn
 		if err := stmts.CreateInvitation(ctx, entity); err != nil {
 			return err
 		}
-		if err := emitInvitationCreated(ctx, stmts, entity, input.ReplacesInvitationID); err != nil {
-			return err
-		}
 		if replaced != nil {
 			if err := emitInvitationCancelled(ctx, stmts, replaced, domain.InvitationCancelReasonReplaced, entity.ID); err != nil {
 				return err
 			}
+		}
+		if err := emitInvitationCreated(ctx, stmts, entity, input.ReplacesInvitationID); err != nil {
+			return err
 		}
 		created = entity
 		return nil
@@ -202,11 +207,7 @@ func (s *InvitationService) Get(ctx context.Context, projectID, id string) (_ *I
 	if err != nil {
 		return nil, mapInvitationError(err, "failed to get invitation")
 	}
-	invitations, err := s.decrypt(ctx, entity)
-	if err != nil {
-		return nil, err
-	}
-	return invitations[0], nil
+	return decryptInvitation(decrypterOfWritingKey(ctx, s.keys), entity)
 }
 
 // List returns a project's invitations newest first.
@@ -222,9 +223,14 @@ func (s *InvitationService) List(ctx context.Context, req ListInvitationsRequest
 	if err != nil {
 		return nil, mapListError(err, "failed to list invitations")
 	}
-	invitations, err := s.decrypt(ctx, result.Items...)
-	if err != nil {
-		return nil, err
+	decrypter := decrypterOfWritingKey(ctx, s.keys)
+	invitations := make([]*Invitation, 0, len(result.Items))
+	for _, entity := range result.Items {
+		item, err := decryptInvitation(decrypter, entity)
+		if err != nil {
+			return nil, err
+		}
+		invitations = append(invitations, item)
 	}
 	return &ListInvitationsResponse{
 		Invitations:   invitations,
@@ -294,25 +300,21 @@ func (s *InvitationService) encryptMetadata(ctx context.Context, projectID strin
 	return &encrypted, nil
 }
 
-// decrypt reads each invitation's metadata with the key that wrote it.
-func (s *InvitationService) decrypt(ctx context.Context, entities ...*domain.Invitation) ([]*Invitation, error) {
-	decrypter := decrypterOfWritingKey(ctx, s.keys)
-	invitations := make([]*Invitation, 0, len(entities))
-	for _, entity := range entities {
-		item := &Invitation{Invitation: entity}
-		if entity.EncryptedMetadata != nil {
-			plain, err := decrypter.Decrypt(*entity.EncryptedMetadata)
-			if err != nil {
-				return nil, domain.ErrInternal(err).WithMessage("failed to decrypt invitation metadata")
-			}
-			item.Metadata = new(domain.InvitationMetadata)
-			if err := json.Unmarshal([]byte(plain), item.Metadata); err != nil {
-				return nil, domain.ErrInternal(err).WithMessage("failed to decode invitation metadata")
-			}
-		}
-		invitations = append(invitations, item)
+// decryptInvitation reads an invitation's metadata with the key that wrote it.
+func decryptInvitation(decrypter crypto.Decrypter, entity *domain.Invitation) (*Invitation, error) {
+	item := &Invitation{Invitation: entity}
+	if entity.EncryptedMetadata == nil {
+		return item, nil
 	}
-	return invitations, nil
+	plain, err := decrypter.Decrypt(*entity.EncryptedMetadata)
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to decrypt invitation metadata")
+	}
+	item.Metadata = new(domain.InvitationMetadata)
+	if err := json.Unmarshal([]byte(plain), item.Metadata); err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to decode invitation metadata")
+	}
+	return item, nil
 }
 
 func notPendingOnMiss(err error) error {
