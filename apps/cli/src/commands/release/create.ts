@@ -6,7 +6,7 @@ import { Publisher } from "@/lib/publish";
 
 import { reads, type Refused } from "@/lib/oclif/flags";
 import { MESSAGE_MAX_LENGTH, messageTooLong } from "@/lib/publish";
-import { escapeControlCharacters, renderCount } from "@/lib/terminal-text";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 
 /**
  * What `-m/--message` records. It refuses a blank message, which would record
@@ -81,7 +81,7 @@ export default class ReleaseCreate extends EnvironmentCommand {
           resources: prepared.resourceCount,
         },
         summary: {
-          title: `Validated ${renderCount(prepared.resourceCount, { singular: "resource" })} and created no release (dry run)`,
+          title: `Validated ${prepared.resourceCount} ${new Intl.PluralRules("en").select(prepared.resourceCount) === "one" ? "resource" : "resources"} and created no release (dry run)`,
           sections: [],
         },
       });

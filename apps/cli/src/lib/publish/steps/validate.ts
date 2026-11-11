@@ -1,5 +1,4 @@
 import { ZitadelError } from "@/lib/errors";
-import { PLURALS } from "@/lib/terminal-text";
 import { mapBounded } from "@/lib/map-bounded";
 import type { Step, StepContext, StepResult } from "@/lib/publish/pipeline";
 import { CONFIG_DIRECTORIES, type Issue, type RuleId, UserSchema } from "@/lib/zitadel";
@@ -100,7 +99,7 @@ function refuseErrors(ctx: StepContext, findings: readonly (Issue | ServerFindin
   if (errors.length === 0) {
     return;
   }
-  const noun = PLURALS.select(errors.length) === "one" ? "issue" : "issues";
+  const noun = new Intl.PluralRules("en").select(errors.length) === "one" ? "issue" : "issues";
   const literalSecret = errors.some((finding) => {
     return finding.rule === "connection/literal-secret";
   });

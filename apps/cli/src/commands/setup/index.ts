@@ -174,7 +174,7 @@ import type { GlobalOptions } from "@/lib/oclif/types";
 import { hostUnlessDefault, type ResolvedServer, resolveServer } from "@/lib/server";
 import { filled, type Refused, reads, whole } from "@/lib/oclif/flags";
 import { userAgent } from "@/lib/user-agent";
-import { escapeControlCharacters, renderCount, PLURALS, renderList } from "@/lib/terminal-text";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 import { painted } from "@/lib/oclif/rendering";
 import { abbreviate } from "@/lib/publish";
 
@@ -536,7 +536,7 @@ type PreflightFlags = Readonly<{
 }>;
 
 function plural(list: readonly unknown[]): string {
-  return PLURALS.select(list.length) === "one" ? "" : "s";
+  return new Intl.PluralRules("en").select(list.length) === "one" ? "" : "s";
 }
 
 /**
@@ -610,7 +610,7 @@ function refuseWorktree(state: WorktreeState): void {
     return part !== undefined;
   });
   throw refusalError(WORKTREE_DIRTY_REFUSAL, {
-    parts: renderList(parts),
+    parts: new Intl.ListFormat("en", { type: "conjunction" }).format(parts),
     modified: state.modified,
     untracked: state.untracked,
   });
@@ -810,7 +810,7 @@ export function refuseUnusableFlags(
     if (given.length > 0) {
       throw refusalError(SETTINGS_NEED_CUSTOM_REFUSAL, {
         names: given.map((setting) => setting.flag).join(", "),
-        them: PLURALS.select(given.length) === "one" ? "it" : "them",
+        them: new Intl.PluralRules("en").select(given.length) === "one" ? "it" : "them",
         flags: given.map((setting) => setting.flag),
       });
     }
@@ -1318,7 +1318,7 @@ export default class Setup extends Destructive(BaseCommand) {
       sso:
         answers.sso.length === 0
           ? "none"
-          : PLURALS.select(answers.sso.length) === "one"
+          : new Intl.PluralRules("en").select(answers.sso.length) === "one"
             ? answers.sso[0]
               ? selectionName(answers.sso[0].selection)
               : "none"
@@ -1545,7 +1545,7 @@ export default class Setup extends Destructive(BaseCommand) {
     const allFilesWritten = [...result.filesWritten, ...scaffolded.filesWritten];
     if (framework !== undefined) {
       current?.done(
-        `Patched ${renderCount(allFilesWritten.length, { singular: "file" })}` +
+        `Patched ${allFilesWritten.length} ${new Intl.PluralRules("en").select(allFilesWritten.length) === "one" ? "file" : "files"}` +
           (result.filesSkipped.length > 0 ? ` (${result.filesSkipped.length} unchanged)` : ""),
       );
     }
@@ -1889,7 +1889,7 @@ export default class Setup extends Destructive(BaseCommand) {
           scopes.length === 0
             ? []
             : [
-                `Zitadel asks ${text(connection.displayName)} for these scopes: ${renderList(scopes.map(text))}.`,
+                `Zitadel asks ${text(connection.displayName)} for these scopes: ${new Intl.ListFormat("en", { type: "conjunction" }).format(scopes.map(text))}.`,
               ],
           unmapped.length === 0
             ? []
@@ -1907,7 +1907,7 @@ export default class Setup extends Destructive(BaseCommand) {
           usedBy.length === 0
             ? []
             : [
-                `This connection is used by ${renderList(usedBy.map(text))}, so a change here affects the people who sign in with it.`,
+                `This connection is used by ${new Intl.ListFormat("en", { type: "conjunction" }).format(usedBy.map(text))}, so a change here affects the people who sign in with it.`,
               ],
           [
             `To change which claim fills an attribute, edit claim_mapping in ${text(connection.path)} and run deploy.`,
@@ -2252,7 +2252,7 @@ export default class Setup extends Destructive(BaseCommand) {
         suggest: (args) => projectCommand(args, opts.selector, this.cliVersion),
       });
       deploying.done(
-        `Deployed ${escapeControlCharacters(abbreviate(deployment.contentHash))} to ${renderCount(deployment.origins.length, { singular: "origin" })}`,
+        `Deployed ${escapeControlCharacters(abbreviate(deployment.contentHash))} to ${deployment.origins.length} ${new Intl.PluralRules("en").select(deployment.origins.length) === "one" ? "origin" : "origins"}`,
       );
       return deployment;
     } catch (error) {

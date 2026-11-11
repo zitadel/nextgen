@@ -20,7 +20,7 @@ import { readZitadelSecret } from "@/lib/project";
 import { deployMessage, MESSAGE_MAX_LENGTH, messageTooLong } from "@/lib/publish";
 import { configIsDirty } from "@/lib/publish/git";
 import { DEPLOY_ARGS, shellCommand, type SuggestedCommand } from "@/lib/suggestion";
-import { escapeControlCharacters, renderCount, renderList } from "@/lib/terminal-text";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 import { reportWarning } from "@/lib/warnings";
 import { prose } from "@/lib/oclif/rendering";
 
@@ -51,7 +51,7 @@ const MESSAGE: Refused<string> = {
 
 /** What the run did, as the one sentence the chain closes on. */
 export function deployed(resources: number): string {
-  return `Deployed ${renderCount(resources, { singular: "resource" })}`;
+  return `Deployed ${resources} ${new Intl.PluralRules("en").select(resources) === "one" ? "resource" : "resources"}`;
 }
 
 /**
@@ -68,7 +68,7 @@ export function liveOn(hash: string, origins: readonly string[]): string {
     return `${release}.`;
   }
   const named = origins.map((origin) => escapeControlCharacters(origin));
-  return `${release} on ${renderList(named)}.`;
+  return `${release} on ${new Intl.ListFormat("en", { type: "conjunction" }).format(named)}.`;
 }
 
 /**
@@ -248,7 +248,7 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
           ...prepared.report,
         },
         summary: {
-          title: `Validated ${renderCount(resourceCount, { singular: "resource" })} and deployed nothing (dry run)`,
+          title: `Validated ${resourceCount} ${new Intl.PluralRules("en").select(resourceCount) === "one" ? "resource" : "resources"} and deployed nothing (dry run)`,
           sections: [],
         },
       });

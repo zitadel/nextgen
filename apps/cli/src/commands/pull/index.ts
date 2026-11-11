@@ -19,7 +19,7 @@ import {
 import { type Refused, taken } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { reportWarning } from "@/lib/warnings";
-import { escapeControlCharacters, renderCount } from "@/lib/terminal-text";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 
 /**
  * A release id, as the platform mints it.
@@ -300,8 +300,8 @@ export default class Pull extends EnvironmentCommand {
       summary: {
         title: escapeControlCharacters(
           this.dryRun
-            ? `Would write ${renderCount(pulled.length, { singular: "file" })} from ${release.id} (dry run)`
-            : `Pulled ${renderCount(pulled.length, { singular: "file" })} from ${release.id}`,
+            ? `Would write ${pulled.length} ${new Intl.PluralRules("en").select(pulled.length) === "one" ? "file" : "files"} from ${release.id} (dry run)`
+            : `Pulled ${pulled.length} ${new Intl.PluralRules("en").select(pulled.length) === "one" ? "file" : "files"} from ${release.id}`,
         ),
         sections: [],
         lines: files,

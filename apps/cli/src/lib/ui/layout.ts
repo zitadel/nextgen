@@ -24,7 +24,7 @@ export interface Renderable {
  * out in columns — {@link Facts}, the resource tables, a step's detail line —
  * separates them by at least this much, and {@link columnRows} looks for it.
  */
-export const COLUMN_GAP = 2;
+const COLUMN_GAP = 2;
 
 /**
  * The mark a column builder puts on a row it aligned itself.

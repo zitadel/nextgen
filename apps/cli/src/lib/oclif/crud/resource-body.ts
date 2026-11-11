@@ -1,5 +1,4 @@
 import { isObject } from "@/lib/json";
-import { PLURALS, renderList } from "@/lib/terminal-text";
 import { refusalError, type Refusal } from "@/lib/oclif/refusal";
 import { type Assignment, fragmentOf } from "./assign";
 import { readRawBody } from "./body";
@@ -125,10 +124,10 @@ export const resourceBody = async (source: ResourceBodySource, flags: Json): Pro
     const flagNames = missing.map(spelling);
     throw refusalError(MISSING_FIELDS_REFUSAL, {
       command: `${source.topic} ${source.verb}`,
-      noun: PLURALS.select(missing.length) === "one" ? "field" : "fields",
-      pronoun: PLURALS.select(missing.length) === "one" ? "it" : "them",
+      noun: new Intl.PluralRules("en").select(missing.length) === "one" ? "field" : "fields",
+      pronoun: new Intl.PluralRules("en").select(missing.length) === "one" ? "it" : "them",
       spellings: flagNames.join(", "),
-      alternatives: renderList(flagNames),
+      alternatives: new Intl.ListFormat("en", { type: "conjunction" }).format(flagNames),
       names: missing.map((field) => field.name),
     });
   }

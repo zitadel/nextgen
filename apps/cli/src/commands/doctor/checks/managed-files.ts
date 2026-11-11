@@ -1,5 +1,4 @@
 import { rm } from "node:fs/promises";
-import { renderCount } from "@/lib/terminal-text";
 import { join } from "node:path";
 
 import { readIfReadable } from "@/lib/fs";
@@ -146,7 +145,9 @@ export class ManagedFilesCheck implements SanityCheck {
       name: this.name,
       status: "pass",
       message: `Scaffolded app files are present (${rows.length} tracked${
-        wiring.length > 0 ? `, ${renderCount(wiring.length, { singular: "wiring" })} verified` : ""
+        wiring.length > 0
+          ? `, ${wiring.length} ${new Intl.PluralRules("en").select(wiring.length) === "one" ? "wiring" : "wirings"} verified`
+          : ""
       }${mode === "template" ? ", from templates" : ""})`,
       details,
     };

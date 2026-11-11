@@ -20,7 +20,7 @@ import { runsInCi } from "@/lib/telemetry/dimensions/ci-provider";
 import { parseTtl, type Ttl } from "@/lib/ttl";
 import { reportWarning } from "@/lib/warnings";
 import { prose } from "@/lib/oclif/rendering";
-import { escapeControlCharacters, renderCount } from "@/lib/terminal-text";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 
 const CREDENTIAL_REQUIRED_REFUSAL: Refusal = {
   message: "{credential} is not set",
@@ -292,14 +292,14 @@ export default class Preview extends PreviewCommand {
         },
         pretty: prose(
           [
-            `Validated the preview for ${renderCount(urls.length, { singular: "URL" })} and deployed nothing (dry run)`,
+            `Validated the preview for ${urls.length} ${new Intl.PluralRules("en").select(urls.length) === "one" ? "URL" : "URLs"} and deployed nothing (dry run)`,
             ...urls.map((url) => {
               return `  - ${url}`;
             }),
           ].join("\n"),
         ),
         summary: {
-          title: `Validated the preview for ${renderCount(urls.length, { singular: "URL" })} and deployed nothing (dry run)`,
+          title: `Validated the preview for ${urls.length} ${new Intl.PluralRules("en").select(urls.length) === "one" ? "URL" : "URLs"} and deployed nothing (dry run)`,
           sections: [],
           lines: urls.map((url) => {
             return `  - ${escapeControlCharacters(url)}`;
@@ -342,7 +342,7 @@ export default class Preview extends PreviewCommand {
       },
       pretty: prose(
         [
-          `Previewed ${release.content_hash} on ${renderCount(previews.length, { singular: "URL" })}`,
+          `Previewed ${release.content_hash} on ${previews.length} ${new Intl.PluralRules("en").select(previews.length) === "one" ? "URL" : "URLs"}`,
           ...previews.map((preview) => {
             return preview.expires_at === null
               ? `  - ${preview.url}`
@@ -352,7 +352,7 @@ export default class Preview extends PreviewCommand {
         ].join("\n"),
       ),
       summary: {
-        title: `Previewed ${escapeControlCharacters(release.content_hash)} on ${renderCount(previews.length, { singular: "URL" })}`,
+        title: `Previewed ${escapeControlCharacters(release.content_hash)} on ${previews.length} ${new Intl.PluralRules("en").select(previews.length) === "one" ? "URL" : "URLs"}`,
         sections: [],
         lines: [
           ...previews.map((preview) => {

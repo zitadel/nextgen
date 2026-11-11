@@ -1,7 +1,7 @@
 import type { Summary } from "@/lib/ui";
 import { Flags } from "@oclif/core";
 
-import { type EscapeOptions, escapeControlCharacters, PLURALS } from "@/lib/terminal-text";
+import { type EscapeOptions, escapeControlCharacters } from "@/lib/terminal-text";
 import { isObject } from "@/lib/json";
 import { Cmd } from "@/lib/cmd";
 import type { BaseCommand } from "./base";
@@ -250,7 +250,7 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
       }
       const plural = view.plural ?? `${view.singular}s`;
       return {
-        title: `Found ${view.rows.length} ${PLURALS.select(view.rows.length) === "one" ? view.singular : plural}`,
+        title: `Found ${view.rows.length} ${new Intl.PluralRules("en").select(view.rows.length) === "one" ? view.singular : plural}`,
         sections: [],
         lines: (await this.tabulate(view.columns, view.rows)).split("\n"),
         extras: [

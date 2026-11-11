@@ -1,4 +1,4 @@
-import { escapeControlCharacters, renderList } from "@/lib/terminal-text";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 import { Flags } from "@oclif/core";
 import { IDP_PROVIDERS } from "@zitadel/config/idp";
 
@@ -212,6 +212,9 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
     const commands = unused.variables.map((name) => {
       return projectCommand(`variable rm ${name}`, selector, this.cliVersion);
     });
-    return [deletion, `Once that deploy is live, remove its credentials: ${renderList(commands)}`];
+    return [
+      deletion,
+      `Once that deploy is live, remove its credentials: ${new Intl.ListFormat("en", { type: "conjunction" }).format(commands)}`,
+    ];
   }
 }

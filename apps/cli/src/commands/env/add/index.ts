@@ -29,7 +29,7 @@ import { Promptable } from "@/lib/oclif/promptable";
 import { reads, type Refused, taken } from "@/lib/oclif/flags";
 import { interpolate, type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { userAgent } from "@/lib/user-agent";
-import { escapeControlCharacters, renderCount } from "@/lib/terminal-text";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 
 /** What a `.env.<name>.local` that already exists is refused for. */
 const FILE_EXISTS_REFUSAL: Refusal = {
@@ -532,7 +532,7 @@ export default class EnvAdd extends Promptable(BaseCommand) {
         },
       });
       log.done(
-        `Deployed ${deployment.contentHash} to ${renderCount(deployment.origins.length, { singular: "origin" })}`,
+        `Deployed ${deployment.contentHash} to ${deployment.origins.length} ${new Intl.PluralRules("en").select(deployment.origins.length) === "one" ? "origin" : "origins"}`,
       );
       return deployment;
     } catch (error) {

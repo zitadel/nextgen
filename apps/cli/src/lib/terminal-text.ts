@@ -99,29 +99,3 @@ export function escapeJsonControlCharacters(json: string): string {
     }).join("");
   });
 }
-
-/** English plural rules: which form a count takes. */
-export const PLURALS = new Intl.PluralRules("en");
-
-const CONJUNCTION = new Intl.ListFormat("en", { style: "long", type: "conjunction" });
-
-/**
- * How many of something, as a clause: `1 schema`, `12 resources`.
- *
- * @param count - The count.
- * @param opts - The noun in the singular, and its plural when it is not the singular with an `s`.
- * @returns The count and the noun in the form the count calls for.
- */
-export function renderCount(count: number, opts: { singular: string; plural?: string }): string {
-  return `${count} ${PLURALS.select(count) === "one" ? opts.singular : (opts.plural ?? `${opts.singular}s`)}`;
-}
-
-/**
- * Items as one phrase: `a`, `a and b`, `a, b, and c`.
- *
- * @param items - The items, in order.
- * @returns The phrase.
- */
-export function renderList(items: readonly string[]): string {
-  return CONJUNCTION.format(items);
-}

@@ -7,7 +7,7 @@ import { GetReleaseByIdParams } from "@/lib/backend/schemas";
 
 import { reads, type Refused } from "@/lib/oclif/flags";
 import { MESSAGE_MAX_LENGTH, messageTooLong } from "@/lib/publish";
-import { escapeControlCharacters, renderCount } from "@/lib/terminal-text";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 
 /**
  * The release `--release` deploys. The schema is the API spec's own, so a
@@ -105,7 +105,7 @@ export default class DeploymentCreate extends EnvironmentCommand {
         origins: deployment.origins,
       },
       summary: {
-        title: `Deployed ${escapeControlCharacters(deployment.release_id)} to ${renderCount(deployment.origins.length, { singular: "origin" })}`,
+        title: `Deployed ${escapeControlCharacters(deployment.release_id)} to ${deployment.origins.length} ${new Intl.PluralRules("en").select(deployment.origins.length) === "one" ? "origin" : "origins"}`,
         sections: [],
       },
       next: {

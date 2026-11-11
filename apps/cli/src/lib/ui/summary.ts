@@ -75,20 +75,6 @@ export type Summary = {
 };
 
 /**
- * What a command's work returns: the payload of the `--json` envelope, and what
- * a person sees. Both are required, so a command cannot produce one without the
- * other.
- */
-export type Outcome<D> = { readonly data: D; readonly summary: Summary };
-
-export const outcome = <D>(data: D, summary: Summary): Outcome<D> => {
-  return {
-    data,
-    summary,
-  };
-};
-
-/**
  * A summary as plain text, for a run nobody is drawing into: the headline, then
  * what it produced under it. This is what a pipe is given for a command that
  * states its ending and says nothing else of its own, so the words are the same

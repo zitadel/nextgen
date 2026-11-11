@@ -1,5 +1,5 @@
 import { Args, Flags } from "@oclif/core";
-import { escapeControlCharacters, renderCount, renderList } from "@/lib/terminal-text";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 import { z } from "zod";
 
 import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
@@ -137,15 +137,17 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
         message: `Roll back to ${escapeControlCharacters(target.id)} in project ${escapeControlCharacters(projectId)} on ${escapeControlCharacters(server.replace(/^https?:\/\//, ""))} so its release goes live again${
           dropped.length === 0 && restored.length === 0
             ? ""
-            : `, which makes ${renderList([
+            : `, which makes ${new Intl.ListFormat("en", { type: "conjunction" }).format([
                 ...(dropped.length === 0
                   ? []
                   : [
-                      `${escapeControlCharacters(renderList(dropped))} refuse sign-in until the next deploy`,
+                      `${escapeControlCharacters(new Intl.ListFormat("en", { type: "conjunction" }).format(dropped))} refuse sign-in until the next deploy`,
                     ]),
                 ...(restored.length === 0
                   ? []
-                  : [`${escapeControlCharacters(renderList(restored))} serve it again`]),
+                  : [
+                      `${escapeControlCharacters(new Intl.ListFormat("en", { type: "conjunction" }).format(restored))} serve it again`,
+                    ]),
               ])}`
         }?`,
         // A bare rollback resolved its target, which a retry must not resolve
@@ -232,7 +234,7 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
               ...(pointers === undefined ? {} : { pointers }),
             },
             summary: {
-              title: `Rolled back to ${escapeControlCharacters(deployment.release_id)} on ${renderCount(deployment.origins.length, { singular: "origin" })}`,
+              title: `Rolled back to ${escapeControlCharacters(deployment.release_id)} on ${deployment.origins.length} ${new Intl.PluralRules("en").select(deployment.origins.length) === "one" ? "origin" : "origins"}`,
               sections: [],
               lines: [
                 ...(pointerTable === undefined ? [] : [...pointerTable.split("\n"), ""]),

@@ -56,7 +56,7 @@ import { filled, reads, type Refused } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { DEPLOY_ARGS } from "@/lib/suggestion";
 import { NEXT_LABEL } from "@/lib/ui/summary";
-import { escapeControlCharacters, renderList } from "@/lib/terminal-text";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 import { reportWarning } from "@/lib/warnings";
 import {
   type Change,
@@ -650,7 +650,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     const stores =
       toStore.length > 0
         ? [
-            `Would store ${renderList(
+            `Would store ${new Intl.ListFormat("en", { type: "conjunction" }).format(
               toStore.filter((name) => {
                 return name !== undefined;
               }),
@@ -894,7 +894,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       scopes.length === 0
         ? []
         : [
-            `Zitadel asks ${text(connection.displayName)} for these scopes: ${renderList(scopes.map(text))}.`,
+            `Zitadel asks ${text(connection.displayName)} for these scopes: ${new Intl.ListFormat("en", { type: "conjunction" }).format(scopes.map(text))}.`,
           ],
       unmapped.length === 0
         ? []
@@ -912,7 +912,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       usedBy.length === 0
         ? []
         : [
-            `This connection is used by ${renderList(usedBy.map(text))}, so a change here affects the people who sign in with it.`,
+            `This connection is used by ${new Intl.ListFormat("en", { type: "conjunction" }).format(usedBy.map(text))}, so a change here affects the people who sign in with it.`,
           ],
       [
         `To change which claim fills an attribute, edit claim_mapping in ${text(connection.path)} and run deploy.`,

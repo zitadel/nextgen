@@ -44,8 +44,6 @@
  *   never a `kind` string. A command reaches it as `this.ask`.
  * - {@link Ui.note} something the person must act on, and {@link Ui.task} for
  *   work that takes a moment.
- * - {@link Outcome} — what the command returns: the `--json` payload and the
- *   {@link Summary} the chain closes on.
  *
  * What is not exported is not for callers. The layout (how a box is framed,
  * how facts are aligned, which glyph a mark is), the chain, the narration
@@ -68,6 +66,6 @@ export type {
   YesNoQuestion,
 } from "./questions";
 export type { Spinner } from "./spinner";
-export type { Fact, Outcome, Section, Summary } from "./summary";
-export { outcome, section } from "./summary";
+export type { Fact, Section, Summary } from "./summary";
+export { section } from "./summary";
 export { Ui } from "./ui";
