@@ -207,10 +207,10 @@ describe("Ui", () => {
       const ui = scripted();
 
       ui.bridgeNarration();
-      log.warn("the flow was edited by hand");
+      log.info("the flow was edited by hand");
       ui.releaseNarration();
 
-      expect(printed()).toContain("!  the flow was edited by hand");
+      expect(printed()).toContain("the flow was edited by hand");
     });
 
     it("says a normal command's lines plainly, with no mark and no chain", () => {

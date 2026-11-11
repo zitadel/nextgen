@@ -31,7 +31,7 @@ describe("dryRunResult", () => {
       status: "ok",
       data: { dry_run: true, verb: "create", topic: "users", body: { schema: "s" } },
     });
-    expect(result.pretty?.text).toBe('Dry run: would create users\n{\n  "schema": "s"\n}');
+    expect(result.pretty?.text).toBe('Would create users (dry run)\n{\n  "schema": "s"\n}');
   });
 
   it("reports what the server answered when it was asked", () => {
@@ -44,7 +44,7 @@ describe("dryRunResult", () => {
     });
     expect(result.data).toMatchObject({ result: { id: "user_1", schema: "s" } });
     expect(result.pretty?.text).toBe(
-      'Dry run: would update users user_1\n{\n  "schema": "s"\n}\nThe server would accept this. Nothing changed.',
+      'Would update users user_1 (dry run)\n{\n  "schema": "s"\n}\nThe server would accept this. Nothing changed.',
     );
   });
 
@@ -64,7 +64,7 @@ describe("dryRunResult", () => {
 
   it("describes a delete by id without a body", () => {
     expect(dryRunResult({ verb: "revoke", topic: "sessions", id: "sess_1" }).pretty?.text).toBe(
-      "Dry run: would revoke sessions sess_1",
+      "Would revoke sessions sess_1 (dry run)",
     );
   });
 

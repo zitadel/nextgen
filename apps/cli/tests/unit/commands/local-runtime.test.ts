@@ -418,7 +418,7 @@ describe("local runtime commands", () => {
     expect(again.exitCode).toBe(0);
     expect(parseJson(again.stdout)).toMatchObject({
       data: {
-        title: "Local Zitadel server is already running.",
+        title: "Local Zitadel server is already running",
         runtime: { env: envelope.data.runtime.env },
       },
     });
@@ -450,7 +450,7 @@ describe("local runtime commands", () => {
 
     expect(result.exitCode).toBe(0);
     expect(parseJson(result.stdout)).toMatchObject({
-      data: { title: "Local Zitadel server is already running.", runtime: { env: recorded } },
+      data: { title: "Local Zitadel server is already running", runtime: { env: recorded } },
     });
     expect((await readRuntimeMetadata(cwd))?.env).toEqual(recorded);
     const dockerCalls = await readDockerCalls(fake.logPath);

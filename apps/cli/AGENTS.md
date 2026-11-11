@@ -62,6 +62,9 @@
   why it is there, or when to run it — ending in a colon, one fact per
   sentence. `Explore all commands:` is the exception: it closes every box by
   pointing at the command index, not at this run's next step.
+- One text per message: the envelope's `message` and `data.title` are the very
+  strings the terminal draws. Never capitalise, trim or add a full stop for one
+  rendering; write the sentence once, without a trailing full stop.
 - Read [`docs/styling.md`](docs/styling.md) before changing human output. Style
   it with `src/lib/style.ts`, not `picocolors`; a unit test fails on another import.
 - Read a command top-down: its description, group and flags, then what it

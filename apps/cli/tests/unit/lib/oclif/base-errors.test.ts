@@ -145,12 +145,12 @@ describe("BaseCommand errors", () => {
 describe("the one block every failure is shown as", () => {
   const refused = (message: string) => Object.assign(new Error(message), { oclif: { exit: 2 } });
 
-  it("states a server's lowercase fragment as a sentence", async () => {
+  it("says a server's lowercase fragment as it was thrown", async () => {
     const cmd = new FailingCommand(false);
 
     await cmd.fail(new ZitadelError("E_NOT_FOUND", "variable not found"));
 
-    expect(cmd.stderr).toEqual(["Error: Variable not found (E_NOT_FOUND)"]);
+    expect(cmd.stderr).toEqual(["Error: variable not found (E_NOT_FOUND)"]);
   });
 
   it("leaves the thrown message alone in the envelope", async () => {
