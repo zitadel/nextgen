@@ -184,3 +184,55 @@ func TestResolveOAuthSettings(t *testing.T) {
 		assert.True(t, domain.IsServerFault(err), "the cause stays in the chain, but the answer is a fault")
 	})
 }
+
+// A new revision is recorded as oauth_settings.created with the whole of
+// the settings as its payload.
+func TestBuildRelease_EmitsOAuthSettingsCreated(t *testing.T) {
+	t.Parallel()
+	ctrl := gomock.NewController(t)
+	pool := servicemocks.NewMockPool(ctrl)
+	statements := servicemocks.NewMockAllStatements(ctrl)
+	statementer := servicemocks.NewMockStatementer[service.AllStatements](ctrl)
+	pool.EXPECT().Statements().Return(statements).AnyTimes()
+	pool.EXPECT().Transaction(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(ctx context.Context, fn func(context.Context, service.Statementer[service.AllStatements]) error) error {
+			return fn(ctx, statementer)
+		},
+	).AnyTimes()
+	statementer.EXPECT().Statements().Return(statements).AnyTimes()
+
+	var events []*domain.Event
+	statements.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ context.Context, ev *domain.Event) error {
+			events = append(events, ev)
+			return nil
+		},
+	).AnyTimes()
+	statements.EXPECT().ListOAuthSettings(gomock.Any(), gomock.Any()).Return(&database.ListResult[*domain.OAuthSettings]{}, nil)
+	statements.EXPECT().CreateOAuthSettings(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ context.Context, entity *domain.OAuthSettings) error {
+			entity.ID = "oauthset_new"
+			return nil
+		},
+	)
+	statements.EXPECT().GetReleaseByContentHash(gomock.Any(), "proj_1", gomock.Any()).Return(nil, new(database.NoRowFoundError))
+	statements.EXPECT().CreateRelease(gomock.Any(), gomock.Any()).Return(nil)
+
+	svc := service.NewReleaseService(service.NewPool(pool), nil, nil, nil, nil, nil, service.NewOAuthSettingsService(service.NewPool(pool)), testBuiltinBases)
+	_, err := svc.Build(t.Context(), service.BuildReleaseInput{
+		ProjectID: "proj_1",
+		OAuth:     &service.CreateOAuthSettingsInput{ProjectID: "proj_1", Enabled: true},
+	})
+	require.NoError(t, err)
+
+	var created *domain.Event
+	for _, ev := range events {
+		if ev.EventType == domain.EventTypeOAuthSettingsCreated {
+			created = ev
+		}
+	}
+	require.NotNil(t, created, "no oauth_settings.created among %d events", len(events))
+	require.NotNil(t, created.EntityID)
+	assert.Equal(t, "oauthset_new", *created.EntityID)
+	assert.JSONEq(t, `{"enabled":true}`, string(created.Payload))
+}
