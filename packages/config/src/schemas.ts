@@ -69,9 +69,9 @@ export const schemaConfigSchema = z.discriminatedUnion("kind", [
 ]);
 
 /**
- * A `.zitadel/flows/*.json` body, strict about its own keys as the server is:
- * the generated Zod drops an unknown key, so one the server refuses would
- * pass `deploy --dry-run` and fail the deploy.
+ * A `.zitadel/flows/*.json` body, strict about its top-level keys as the
+ * server is: the generated Zod drops an unknown key, so one the server refuses
+ * would pass `deploy --dry-run` and fail the deploy.
  */
 export const flowConfigSchema = z.strictObject({
   $schema: z.string().optional(),

@@ -646,8 +646,8 @@ policy evaluation.
 ## Definition Lifecycle
 
 A revision is immutable and carries no state of its own: it is served when
-the deployed release pins it. There are no lifecycle verbs in the shipped spec — you change a flow by publishing a new
-revision under the same `name`, and create already runs the definition
-validator. A standalone `POST .../validate` (dead-end and reachability checks
-on demand) and `POST .../simulate` (dry-run with mock input) are planned, not
-shipped — see [flow-engine.md](flow-engine.md#flow-definitions).
+the deployed release pins it. There are no lifecycle verbs in the shipped
+spec — you change a flow by publishing a new revision under the same `name`,
+and create already runs the definition validator. A standalone
+`POST .../validate` (dead-end and reachability checks on demand) and
+`POST .../simulate` (dry-run with mock input) are planned, not shipped — see [flow-engine.md](flow-engine.md#flow-definitions).

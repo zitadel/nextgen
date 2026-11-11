@@ -160,8 +160,7 @@ func TestBuildRelease(t *testing.T) {
 		require.NoError(t, err)
 		require.IsType(t, &api.BuildReleaseCreated{}, resp, helpers.MustMarshal(t, resp))
 
-		// The target now has a revision in the project, but a release
-		// without it would pin nothing to switch to.
+		// A project revision of the target does not count; the bundle must carry it.
 		resp, err = client.BuildRelease(t.Context(), &api.BuildReleaseRequest{
 			Bundle: api.ConfigurationBundle{FlowDefinitions: []api.FlowDefinition{source}},
 		}, params)

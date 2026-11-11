@@ -23,7 +23,7 @@ Validation runs in two layers:
 | `audience` | optional | `app_ids[]`, `team_ids[]`. Empty = project default. Specificity for resolution is app > team > default. |
 | `steps` | ✓ | Ordered list of `FlowDefinitionStep`. Order doesn't drive runtime; transitions do. |
 
-`name`, `schema_version`, `status`, and `purposes` are top-level columns on `flow_definitions`; everything else is JSONB. Promote audience columns when in-memory filtering stops being good enough.
+`name`, `schema_version`, and `purposes` are top-level columns on `flow_definitions`; everything else is JSONB. Promote audience columns when in-memory filtering stops being good enough.
 
 ## Step shape
 
