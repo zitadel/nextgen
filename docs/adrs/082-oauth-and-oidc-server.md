@@ -109,15 +109,9 @@ writes. Each path has one writer: a declared resource is read-only outside
   and the SDK and `setup --sign-in-with` always send it. OAuth 2.1 requires
   PKCE for every client; this profile does not require it for confidential
   clients, so that an existing confidential client on the OAuth 2.0 code flow
-  connects without a change. A code issued for a `code_challenge` is redeemed
-  only with its verifier, and a token request with a `code_verifier` is
-  refused when its authorization request carried no `code_challenge`. The
-  metadata lists `code_challenge_methods_supported`, and
-  advertises `authorization_response_iss_parameter_supported` only once `iss`
-  ships ([RFC 9207 §3](https://www.rfc-editor.org/rfc/rfc9207#section-3)).
-  Redirect URIs match exactly; a native application's loopback redirect may
-  use any port (RFC 8252). Responses carry `iss`
-  ([RFC 9207](https://www.rfc-editor.org/rfc/rfc9207), ADR 081 §9).
+  connects without a change. Redirect URIs match exactly; a native
+  application's loopback redirect may use any port (RFC 8252). Responses carry
+  `iss` ([RFC 9207](https://www.rfc-editor.org/rfc/rfc9207), ADR 081 §9).
 - **Refresh tokens** rotate on every use (ADR 037). A third-party client gets
   one only when the user consents to `offline_access`.
 - **Client credentials** for service applications.
@@ -425,7 +419,7 @@ schemas.
 
 | To | File | Command | SDK or element |
 |---|---|---|---|
-| Become an issuer | `.zitadel/oauth.json`, a singleton like branding: the switch (ADR 081 §7), the login-only declaration and the registration switches (§9), scope claim rules (§6) and token defaults | `zitadel oauth enable`, or `zitadel application create` when the issuer is off, which says so; `deploy` ships it; `doctor` checks the reserved paths and that a login-only issuer serves only the login | Nothing: the SDK already forwards the paths, and sets a login-only issuer's content security policy |
+| Become an issuer | `.zitadel/oauth.json`, a singleton like branding: the switch (ADR 081 §7), the login-only declaration and the registration switches (§9), scope claim rules (§6) and token defaults | `zitadel settings oauth enable`, or `zitadel application create` when the issuer is off, which says so; `deploy` ships it; `doctor` checks the reserved paths and that a login-only issuer serves only the login | Nothing: the SDK already forwards the paths, and sets a login-only issuer's content security policy |
 | Declare an application | `.zitadel/applications/<slug>.json` (§3) | `zitadel application create`, which writes the file and does not deploy, or `setup --sign-in-with` for a relying party (ADR 081 §12); `deploy --dry-run` and `deploy` | A relying party configures its proxy with the issuer and its client id; `auth()` and the session elements are unchanged |
 | Register an application | None | `zitadel application create --registered`, or `POST /applications` | The product's own UI calls `POST /applications` through the proxy with the admin's session |
 | Protect an API | The `apis` entry of the application's file (§5) | `zitadel application get` reads it; edit the file, then `deploy` | `protectResource({ api })` verifies bearers and serves the API's metadata |
@@ -449,7 +443,8 @@ schemas.
    with an OAuth library, with and without PKCE. `iss` may ship after step 2,
    since adding it later breaks no client; the lane asserts `iss` once it
    ships and, until then, asserts that the metadata does not advertise
-   `authorization_response_iss_parameter_supported`.
+   `authorization_response_iss_parameter_supported`
+   ([RFC 9207 §3](https://www.rfc-editor.org/rfc/rfc9207#section-3)).
 3. OpenID Connect: the ID token with `nonce`, `auth_time` and `sid`;
    `openid-configuration`; RS256; the standard scopes released by `x-claim`;
    userinfo; the conformance suite as an e2e lane.
@@ -611,7 +606,8 @@ Decided on 2026-11-06 and 2026-11-09 in
 - `iss` on authorization responses (§2) stays required, as the review asked.
   It may ship after step 2, since adding it breaks no client.
 - `zitadel application create` writes `.zitadel/oauth.json` when the issuer
-  is off, and `zitadel oauth enable` stays for doing that alone (§12).
+  is off, and `zitadel settings oauth enable` stays for doing that alone
+  (§12), under a `settings` group that later protocol switches share.
 - A request without `resource` (§5) gets an access token for the client's
   own backend, and for userinfo once OpenID Connect ships, where the proposal
   made it a userinfo-only token.
@@ -646,7 +642,8 @@ Decided on 2026-11-06 and 2026-11-09 in
 ADR 081 is amended separately. Its follow-up must change:
 
 - the old app directory and command names in §7 and §12, which read as
-  `.zitadel/applications/<slug>.json` and `zitadel application create`;
+  `.zitadel/applications/<slug>.json`, `zitadel application create` and
+  `zitadel settings oauth enable`;
 - §7's "the §6 documents exist only while it is on", since
   `openid-configuration` answers 404 until step 3 here (§2);
 - §7's rule that turning the switch on declares the login application, which
