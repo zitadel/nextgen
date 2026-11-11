@@ -5,7 +5,7 @@ import type { SearchAnswer, SearchResultType } from "./model";
 /**
  * Up to `limit` of each of `types` that match `query`, best match first, from
  * `POST /search` (root ADR 087): in `projectId`, or with none in the projects
- * the person can act on, the first ten of them (`moreProjects` says there are
+ * the person can act on, the newest ten of them (`moreProjects` says there are
  * more). Each hit says which project it is in. The server matches and ranks; a
  * caller only names what it wants to hear about.
  */
