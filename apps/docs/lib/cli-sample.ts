@@ -59,7 +59,11 @@ export function cliSample(
   const [topic, verb] = command.split(" ");
   const positionals = pathParameterNames(path).map((name) => word(request.path[name]?.value ?? ""));
 
-  if (topic === "variable") return variables(verb, positionals, request);
+  if (topic === "variable") {
+    return variableFits(verb, request)
+      ? variables(verb, positionals, request)
+      : apiSample(operation, path, request);
+  }
 
   const flags: string[] = [];
   if (verb === "list") {
@@ -120,6 +124,19 @@ function listFlags(request: RequestData): string[] {
   const page = body.page_token ?? request.query.page_token?.values[0];
   if (typeof page === "string" && page !== "") flags.push(`--page-token ${word(page)}`);
   return flags;
+}
+
+// Whether the variable command says what the request does. `set` and `rm`
+// write both kinds unless `--preview`, so a primary-only request has no command,
+// and `set` takes only a string for a secret.
+function variableFits(verb: string | undefined, request: RequestData): boolean {
+  if ((verb === "set" || verb === "rm") && request.query.kind?.values[0] === "primary") {
+    return false;
+  }
+  return !Object.values(record(request.body)).some((value) => {
+    const { secret, value: scalar } = record(value);
+    return secret === true && typeof scalar !== "string";
+  });
 }
 
 // The variable commands act on the project the directory was set up for.
