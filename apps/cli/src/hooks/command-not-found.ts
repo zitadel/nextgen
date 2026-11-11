@@ -1,4 +1,5 @@
 import { type Hook, ux } from "@oclif/core";
+import { distance } from "fastest-levenshtein";
 
 import { ZitadelError } from "@/lib/errors";
 import { renderError, toErrorEnvelope } from "@/lib/oclif/base";
@@ -23,7 +24,7 @@ export type UnknownCommand = Readonly<{
  * a topic, and the one word after it that is not a command there. Whatever
  * follows may be an argument, which a refusal never repeats.
  *
- * The follow-ups are the one word the last of those most likely meant, as the
+ * The follow-ups are the one word the last of those is a single edit from, as the
  * command or topic that would run it, and the help of the topic the first words
  * name. A command that merely resembles another is never one of them, so a
  * destructive command is not offered for a different one's name.
@@ -42,7 +43,32 @@ export function unknownCommand(
       return command.length > name.length && name.every((word, index) => command[index] === word);
     });
   };
-  const words = id.split(":");
+  const words = id.split(":").filter((word) => word !== "");
+  if (words[0] === undefined || words[0].startsWith("-")) {
+    return {
+      typed: [],
+      error: new ZitadelError("E_VALIDATION", "That is not a zitadel command.", {
+        nextCommands: [unscopedCommand("--help")],
+      }),
+    };
+  }
+  for (let length = words.length - 1; length > 0; length -= 1) {
+    const command = words.slice(0, length);
+    if (
+      commands.some(
+        (known) => known.length === length && command.every((word, index) => known[index] === word),
+      )
+    ) {
+      return {
+        typed: command,
+        error: new ZitadelError(
+          "E_VALIDATION",
+          `${command.join(" ")} does not take the argument typed after it.`,
+          { nextCommands: [unscopedCommand(`${command.join(" ")} --help`)] },
+        ),
+      };
+    }
+  }
   let topicDepth = 0;
   while (topicDepth < words.length - 1 && isTopic(words.slice(0, topicDepth + 1))) {
     topicDepth += 1;
@@ -56,7 +82,9 @@ export function unknownCommand(
       );
     })
     .map((command) => command[parent.length] as string);
-  const meant = closest(typed[topicDepth] as string, siblings);
+  const wrote = typed[topicDepth] as string;
+  const guess = closest(wrote, siblings);
+  const meant = guess !== undefined && distance(wrote, guess) <= 1 ? guess : undefined;
   const next: SuggestedCommand[] = [];
   if (meant !== undefined) {
     const meantWords = [...parent, meant];
@@ -103,13 +131,16 @@ export function wantsJson(argv: readonly string[], contentType: string | undefin
  * --dry-run` became an offer to run `grants delete`.
  */
 const hook: Hook<"command_not_found"> = async function ({ id, argv, config }) {
-  const named = id.startsWith("-") ? (argv ?? []).find((word) => !word.startsWith("-")) : undefined;
   const { error, typed } = unknownCommand(
-    named ?? id,
+    id,
     config.commandIDs.map((commandId) => commandId.split(":")),
   );
   const meta = { cliVersion: config.version, command: typed.join(" "), source: "" };
-  if (wantsJson([...id.split(":"), ...(argv ?? [])], config.scopedEnvVar("CONTENT_TYPE"))) {
+  const contentType = config.scopedEnvVar("CONTENT_TYPE");
+  if (
+    wantsJson([...id.split(":"), ...(argv ?? [])], contentType) ||
+    wantsJson(process.argv.slice(2), contentType)
+  ) {
     ux.stdout(
       escapeJsonControlCharacters(
         ux.colorizeJson(toErrorEnvelope(error, meta), {

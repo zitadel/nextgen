@@ -403,7 +403,7 @@ catalogs:
       version: 1.16.0
     lucide-react:
       specifier: ^1.16.0
-      version: 1.61.0
+      version: 1.20.0
     marked:
       specifier: ^18.0.14
       version: 18.0.14

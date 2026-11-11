@@ -50,11 +50,33 @@ describe("unknownCommand", () => {
     });
   });
 
+  describe("with a command that exists and an argument it does not take", () => {
+    it.each([
+      ["doctor:extra", ["doctor"]],
+      ["variable:list:extra", ["variable", "list"]],
+    ])("%s names the command, not the argument", (id, command) => {
+      const { error, typed } = unknownCommand(id, KNOWN);
+
+      expect({ typed, message: error.message }).toEqual({
+        typed: command,
+        message: `${command.join(" ")} does not take the argument typed after it.`,
+      });
+    });
+  });
+
+  describe("with nothing usable typed", () => {
+    it.each([["--json"], ["-x"], [""]])("%j names no command", (id) => {
+      const { error } = unknownCommand(id, KNOWN);
+
+      expect(error.message).toBe("That is not a zitadel command.");
+    });
+  });
+
   describe("with a misspelled command", () => {
     it.each([
       ["variable:lst", "zitadel variable list", "zitadel variable --help"],
       ["teams:lst:extra", "zitadel teams list", "zitadel teams --help"],
-      ["deplyo", "zitadel deploy", undefined],
+      ["deplo", "zitadel deploy", undefined],
       ["usrs:list", "zitadel users --help", undefined],
     ])("%s suggests the one it meant", (id, meant, help) => {
       const { error } = unknownCommand(id, KNOWN);
