@@ -66,7 +66,7 @@ import {
   type SuggestedCommand,
   unscopedCommand,
 } from "@/lib/suggestion";
-import { type NextSteps, nextStepsData, stepsOf } from "@/lib/oclif/next-steps";
+import { asStepsShown, type NextSteps, nextStepsData, stepsOf } from "@/lib/oclif/next-steps";
 import { userAgent } from "@/lib/user-agent";
 
 const LOCAL_RUNTIME_CHECK_NAMES = new Set([
@@ -406,6 +406,9 @@ export default class Doctor extends Destructive(BaseCommand) {
       // The report's rows already say each warning, so the ending must not say
       // them again underneath.
       warningsShown: true,
+      // The rows say the steps they repair, and the summary lists only the ones
+      // they do not, so the full list is not printed again under them.
+      nextShown: asStepsShown(),
       summary: {
         title: warnings.length > 0 ? "Checks passed with warnings" : "All checks passed",
         sections: [],

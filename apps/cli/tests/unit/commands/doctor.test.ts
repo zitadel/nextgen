@@ -387,6 +387,21 @@ describe("doctor command", () => {
     );
   });
 
+  it("says each next step once when its output is read by a pipe", async () => {
+    const cwd = await makeHealthyProject();
+    await writeDetachedSecret(cwd, "2026-01-01T00:00:00.000Z");
+    const fake = await fakeDocker();
+
+    const res = await runCliForTest(["doctor", "--cwd", cwd, "--port", String(nextPort())], {
+      PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
+      DOCKER_LOG: fake.logPath,
+    });
+
+    const claim = expectedPublicCliCommand(`claim --server https://api.zitadel.cloud --cwd ${cwd}`);
+    expect(stripAnsi(res.stdout).split(claim)).toHaveLength(2);
+    expect(stripAnsi(res.stdout)).not.toContain("Next:");
+  });
+
   // Claiming needs a human in a browser, so --fix has nothing safe to do. The
   // warning has to survive it rather than being silently "repaired".
   it("leaves the claim warning (and the secret) alone under --fix", async () => {
