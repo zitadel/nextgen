@@ -58,7 +58,7 @@ export default class DeploymentGet extends Tabulatable(EnvironmentCommand) {
       variables === undefined
         ? undefined
         : variables.length === 0
-          ? "variables  none"
+          ? ["variables  none"]
           : [
               "variables",
               ...(
@@ -73,7 +73,7 @@ export default class DeploymentGet extends Tabulatable(EnvironmentCommand) {
                 .map((line) => {
                   return `  ${line}`;
                 }),
-            ].join("\n");
+            ];
     const title = `Read ${escapeControlCharacters(deployment.id)}`;
     if (!shows) {
       return this.emit({
@@ -93,11 +93,11 @@ export default class DeploymentGet extends Tabulatable(EnvironmentCommand) {
         title,
         sections: [],
         lines: [
-          this.tabulateDetail(undefined, DEPLOYMENT_FIELDS, deploymentRow(deployment)),
-          ...(frozen === undefined ? [] : ["", frozen]),
-        ]
-          .join("\n")
-          .split("\n"),
+          ...this.tabulateDetail(undefined, DEPLOYMENT_FIELDS, deploymentRow(deployment)).split(
+            "\n",
+          ),
+          ...(frozen === undefined ? [] : ["", ...frozen]),
+        ],
       },
     });
   }

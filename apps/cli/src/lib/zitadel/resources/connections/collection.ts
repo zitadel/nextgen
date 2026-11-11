@@ -1,4 +1,5 @@
 import { basename } from "node:path";
+import { renderList } from "@/lib/terminal-text";
 
 import { credentialVariables, IDP_PROVIDERS, parseConnectionSlug } from "@zitadel/config/idp";
 
@@ -256,7 +257,7 @@ export class Connections extends Collection<Connection> {
       .map((flow): Notice => {
         return {
           severity: "info",
-          message: `The steps ${flow.generatedSsoSteps.join(" and ")} stay in ${flow.path} for the next provider you enable.`,
+          message: `The steps ${renderList(flow.generatedSsoSteps)} stay in ${flow.path} for the next provider you enable.`,
         };
       });
     return new Change({
@@ -452,7 +453,7 @@ export class Connections extends Collection<Connection> {
     if (unapplied.length === 0) {
       return [];
     }
-    const settings = unapplied.join(" and ");
+    const settings = renderList(unapplied);
     if (unapplied.length === 1) {
       return [
         {
@@ -497,7 +498,7 @@ export class Connections extends Collection<Connection> {
     const variables = this.findUnsharedVariables(connection);
     const kept =
       variables.length > 0
-        ? `${connection.path} and the project variables ${variables.join(" and ")}`
+        ? `${connection.path} and the project variables ${renderList(variables)}`
         : connection.path;
     return [
       {

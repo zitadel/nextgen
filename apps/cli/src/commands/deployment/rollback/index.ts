@@ -1,5 +1,5 @@
 import { Args, Flags } from "@oclif/core";
-import { escapeControlCharacters } from "@/lib/terminal-text";
+import { escapeControlCharacters, renderCount, renderList } from "@/lib/terminal-text";
 import { z } from "zod";
 
 import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
@@ -17,7 +17,6 @@ import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { isCancellation, toZitadelError } from "@/lib/errors";
 import { Destructive } from "@/lib/oclif/destructive";
 import { reportWarning } from "@/lib/warnings";
-import { renderCount } from "@/lib/count";
 
 const NOTHING_DEPLOYED_REFUSAL: Refusal = {
   message: "There is no deployment to roll back",
@@ -138,16 +137,16 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
         message: `Roll back to ${escapeControlCharacters(target.id)} in project ${escapeControlCharacters(projectId)} on ${escapeControlCharacters(server.replace(/^https?:\/\//, ""))} so its release goes live again${
           dropped.length === 0 && restored.length === 0
             ? ""
-            : `, which makes ${[
+            : `, which makes ${renderList([
                 ...(dropped.length === 0
                   ? []
                   : [
-                      `${escapeControlCharacters(dropped.join(", "))} refuse sign-in until the next deploy`,
+                      `${escapeControlCharacters(renderList(dropped))} refuse sign-in until the next deploy`,
                     ]),
                 ...(restored.length === 0
                   ? []
-                  : [`${escapeControlCharacters(restored.join(", "))} serve it again`]),
-              ].join(" and ")}`
+                  : [`${escapeControlCharacters(renderList(restored))} serve it again`]),
+              ])}`
         }?`,
         // A bare rollback resolved its target, which a retry must not resolve
         // again: a deploy landing in between would name another.

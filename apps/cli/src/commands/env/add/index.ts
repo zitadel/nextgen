@@ -1,4 +1,3 @@
-import { renderCount } from "@/lib/count";
 import { stat } from "node:fs/promises";
 import { z } from "zod";
 import { basename, join } from "node:path";
@@ -30,7 +29,7 @@ import { Promptable } from "@/lib/oclif/promptable";
 import { reads, type Refused, taken } from "@/lib/oclif/flags";
 import { interpolate, type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { userAgent } from "@/lib/user-agent";
-import { escapeControlCharacters } from "@/lib/terminal-text";
+import { escapeControlCharacters, renderCount } from "@/lib/terminal-text";
 
 /** What a `.env.<name>.local` that already exists is refused for. */
 const FILE_EXISTS_REFUSAL: Refusal = {

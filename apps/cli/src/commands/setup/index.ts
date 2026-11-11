@@ -1,4 +1,3 @@
-import { renderCount } from "@/lib/count";
 import {
   type CreatedProject,
   ProjectService,
@@ -175,7 +174,7 @@ import type { GlobalOptions } from "@/lib/oclif/types";
 import { hostUnlessDefault, type ResolvedServer, resolveServer } from "@/lib/server";
 import { filled, type Refused, reads, whole } from "@/lib/oclif/flags";
 import { userAgent } from "@/lib/user-agent";
-import { escapeControlCharacters } from "@/lib/terminal-text";
+import { escapeControlCharacters, renderCount, PLURALS, renderList } from "@/lib/terminal-text";
 import { painted } from "@/lib/oclif/rendering";
 import { abbreviate } from "@/lib/publish";
 
@@ -445,7 +444,6 @@ export function customSettingsOf(flags: {
 }
 
 /** Joins names as "a, b, and c" in the summary box. */
-const LIST = new Intl.ListFormat("en", { type: "conjunction" });
 
 /** How `--server local` with nothing running is refused. */
 const NO_LOCAL_SERVER_REFUSAL: Refusal = {
@@ -538,7 +536,7 @@ type PreflightFlags = Readonly<{
 }>;
 
 function plural(list: readonly unknown[]): string {
-  return list.length === 1 ? "" : "s";
+  return PLURALS.select(list.length) === "one" ? "" : "s";
 }
 
 /**
@@ -612,7 +610,7 @@ function refuseWorktree(state: WorktreeState): void {
     return part !== undefined;
   });
   throw refusalError(WORKTREE_DIRTY_REFUSAL, {
-    parts: parts.join(" and "),
+    parts: renderList(parts),
     modified: state.modified,
     untracked: state.untracked,
   });
@@ -812,7 +810,7 @@ export function refuseUnusableFlags(
     if (given.length > 0) {
       throw refusalError(SETTINGS_NEED_CUSTOM_REFUSAL, {
         names: given.map((setting) => setting.flag).join(", "),
-        them: given.length === 1 ? "it" : "them",
+        them: PLURALS.select(given.length) === "one" ? "it" : "them",
         flags: given.map((setting) => setting.flag),
       });
     }
@@ -1320,7 +1318,7 @@ export default class Setup extends Destructive(BaseCommand) {
       sso:
         answers.sso.length === 0
           ? "none"
-          : answers.sso.length === 1
+          : PLURALS.select(answers.sso.length) === "one"
             ? answers.sso[0]
               ? selectionName(answers.sso[0].selection)
               : "none"
@@ -1891,7 +1889,7 @@ export default class Setup extends Destructive(BaseCommand) {
           scopes.length === 0
             ? []
             : [
-                `Zitadel asks ${text(connection.displayName)} for these scopes: ${LIST.format(scopes.map(text))}.`,
+                `Zitadel asks ${text(connection.displayName)} for these scopes: ${renderList(scopes.map(text))}.`,
               ],
           unmapped.length === 0
             ? []
@@ -1909,7 +1907,7 @@ export default class Setup extends Destructive(BaseCommand) {
           usedBy.length === 0
             ? []
             : [
-                `This connection is used by ${LIST.format(usedBy.map(text))}, so a change here affects the people who sign in with it.`,
+                `This connection is used by ${renderList(usedBy.map(text))}, so a change here affects the people who sign in with it.`,
               ],
           [
             `To change which claim fills an attribute, edit claim_mapping in ${text(connection.path)} and run deploy.`,

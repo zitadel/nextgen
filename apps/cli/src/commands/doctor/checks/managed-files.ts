@@ -1,5 +1,5 @@
-import { renderCount } from "@/lib/count";
 import { rm } from "node:fs/promises";
+import { renderCount } from "@/lib/terminal-text";
 import { join } from "node:path";
 
 import { readIfReadable } from "@/lib/fs";

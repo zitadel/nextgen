@@ -15,6 +15,7 @@ import {
 } from "@zitadel/config/idp";
 
 import { ZitadelError } from "@/lib/errors";
+import { PLURALS } from "@/lib/terminal-text";
 
 /**
  * The settings that describe a custom connection, in the order a command line
@@ -322,7 +323,7 @@ export function selectionFromFlags(
     // A catalog provider knows its own name, issuer and scopes, so a setting
     // given alongside it would be ignored, and an ignored flag reads as honoured.
     if (given.length > 0) {
-      const pronoun = given.length === 1 ? "it" : "them";
+      const pronoun = PLURALS.select(given.length) === "one" ? "it" : "them";
       throw new ZitadelError(
         "E_VALIDATION",
         `${given.join(", ")} only applies to a custom connection`,

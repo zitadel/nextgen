@@ -1,4 +1,3 @@
-import { renderCount } from "@/lib/count";
 import { resolve } from "node:path";
 import {
   type Admitted,
@@ -21,7 +20,7 @@ import { readZitadelSecret } from "@/lib/project";
 import { deployMessage, MESSAGE_MAX_LENGTH, messageTooLong } from "@/lib/publish";
 import { configIsDirty } from "@/lib/publish/git";
 import { DEPLOY_ARGS, shellCommand, type SuggestedCommand } from "@/lib/suggestion";
-import { escapeControlCharacters } from "@/lib/terminal-text";
+import { escapeControlCharacters, renderCount, renderList } from "@/lib/terminal-text";
 import { reportWarning } from "@/lib/warnings";
 import { prose } from "@/lib/oclif/rendering";
 
@@ -69,9 +68,7 @@ export function liveOn(hash: string, origins: readonly string[]): string {
     return `${release}.`;
   }
   const named = origins.map((origin) => escapeControlCharacters(origin));
-  const where =
-    named.length === 1 ? named[0] : `${named.slice(0, -1).join(", ")} and ${named.at(-1)}`;
-  return `${release} on ${where}.`;
+  return `${release} on ${renderList(named)}.`;
 }
 
 /**

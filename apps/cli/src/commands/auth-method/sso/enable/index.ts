@@ -56,7 +56,7 @@ import { filled, reads, type Refused } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { DEPLOY_ARGS } from "@/lib/suggestion";
 import { NEXT_LABEL } from "@/lib/ui/summary";
-import { escapeControlCharacters } from "@/lib/terminal-text";
+import { escapeControlCharacters, renderList } from "@/lib/terminal-text";
 import { reportWarning } from "@/lib/warnings";
 import {
   type Change,
@@ -310,7 +310,6 @@ type Payload = {
 /**
  * Joins names as "a, b, and c" in the summary box.
  */
-const LIST = new Intl.ListFormat("en", { type: "conjunction" });
 
 /**
  * Nothing sent to the project, as a dry run reports it.
@@ -649,7 +648,15 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       return `Would write ${file}`;
     });
     const stores =
-      toStore.length > 0 ? [`Would store ${toStore.join(" and ")} on the project`] : [];
+      toStore.length > 0
+        ? [
+            `Would store ${renderList(
+              toStore.filter((name) => {
+                return name !== undefined;
+              }),
+            )} on the project`,
+          ]
+        : [];
     const said = [...writes, ...stores];
     const payload = this.payload({ summary, change, published: NOTHING_PUBLISHED, names });
     return this.emit({
@@ -887,7 +894,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       scopes.length === 0
         ? []
         : [
-            `Zitadel asks ${text(connection.displayName)} for these scopes: ${LIST.format(scopes.map(text))}.`,
+            `Zitadel asks ${text(connection.displayName)} for these scopes: ${renderList(scopes.map(text))}.`,
           ],
       unmapped.length === 0
         ? []
@@ -905,7 +912,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       usedBy.length === 0
         ? []
         : [
-            `This connection is used by ${LIST.format(usedBy.map(text))}, so a change here affects the people who sign in with it.`,
+            `This connection is used by ${renderList(usedBy.map(text))}, so a change here affects the people who sign in with it.`,
           ],
       [
         `To change which claim fills an attribute, edit claim_mapping in ${text(connection.path)} and run deploy.`,

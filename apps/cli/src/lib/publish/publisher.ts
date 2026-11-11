@@ -1,4 +1,5 @@
 import { BuildReleaseBody as BuildReleaseBodySchema } from "@/lib/backend/schemas";
+import { PLURALS } from "@/lib/terminal-text";
 
 import {
   type Deployment,
@@ -427,7 +428,7 @@ export class Publisher {
       return bundle;
     }
     const issues = BuildReleaseBodySchema.shape.bundle.safeParse(bundle).error?.issues ?? [];
-    const noun = issues.length === 1 ? "issue" : "issues";
+    const noun = PLURALS.select(issues.length) === "one" ? "issue" : "issues";
     const lines = issues.map((issue) => {
       const field = issue.path.join(".") || "(root)";
       return `  - bundle.${field} ${issue.message}`;

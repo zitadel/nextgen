@@ -1,4 +1,5 @@
 import { refusalError } from "@/lib/oclif/refusal";
+import { PLURALS } from "@/lib/terminal-text";
 import { allows, type FieldPaths, observedPaths, suggestable } from "./paths";
 
 function refuseMissing(chosen: readonly string[], paths: FieldPaths): void {
@@ -17,7 +18,7 @@ function refuseMissing(chosen: readonly string[], paths: FieldPaths): void {
       },
     },
     {
-      noun: missing.length === 1 ? "column" : "columns",
+      noun: PLURALS.select(missing.length) === "one" ? "column" : "columns",
       missing: missing.join(", "),
       available: available.join(", "),
       missingList: missing,

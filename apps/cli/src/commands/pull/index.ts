@@ -1,4 +1,3 @@
-import { renderCount } from "@/lib/count";
 import { Args } from "@oclif/core";
 import { z } from "zod";
 
@@ -20,7 +19,7 @@ import {
 import { type Refused, taken } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { reportWarning } from "@/lib/warnings";
-import { escapeControlCharacters } from "@/lib/terminal-text";
+import { escapeControlCharacters, renderCount } from "@/lib/terminal-text";
 
 /**
  * A release id, as the platform mints it.

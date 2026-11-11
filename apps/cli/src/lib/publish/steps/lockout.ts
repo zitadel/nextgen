@@ -1,4 +1,5 @@
 import type { Credential, QueriedUser, UserQuery } from "@/lib/backend";
+import { PLURALS } from "@/lib/terminal-text";
 import { isCancellation } from "@/lib/errors";
 import { isObject } from "@/lib/json";
 import { mapBounded } from "@/lib/map-bounded";
@@ -489,7 +490,7 @@ async function lookupWarnings(
       const missingCount = count(missing.length, read.truncated);
       const userCount = count(read.users.length, read.truncated);
       const users = plural(read.users.length, "user");
-      const verb = missing.length === 1 ? "has" : "have";
+      const verb = PLURALS.select(missing.length) === "one" ? "has" : "have";
       const fix = ctx.suggest(
         `users update <user_id> --schema <revision_id> --set attributes.${identifier}=<value>`,
       );
@@ -593,8 +594,8 @@ function strandedWarning(entry: Stranded, truncated: boolean, linksUnsure: boole
   const label =
     typeof entry.name === "string" ? quote(entry.name) : "schemas whose names could not be read";
   const users = `${count(entry.users, truncated)} existing ${plural(entry.users, "user")}`;
-  const verb = entry.users === 1 ? "is" : "are";
-  const linkedVerb = entry.linked === 1 ? "has" : "have";
+  const verb = PLURALS.select(entry.users) === "one" ? "is" : "are";
+  const linkedVerb = PLURALS.select(entry.linked) === "one" ? "has" : "have";
   const sso =
     entry.linked > 0
       ? ` (${count(entry.linked, linksUnsure)} of them ${linkedVerb} an SSO link)`
@@ -813,7 +814,7 @@ async function credentialWarnings(
       const strandedCount = count(stranded, partial || failed);
       const userCount = count(read.users.length, read.truncated);
       const users = plural(read.users.length, "user");
-      const keep = disabled.length === 1 ? methods : "them";
+      const keep = PLURALS.select(disabled.length) === "one" ? methods : "them";
       return {
         warnings: [
           `${strandedCount} of ${userCount} existing ${users} of ${quote(objectType)} can only sign in with ${methods}, which this release disables, so they cannot sign in after it. Keep ${keep} enabled until they have another way in.`,
@@ -1047,7 +1048,7 @@ function quote(value: string): string {
  * @returns The noun, with an `s` unless the count is one.
  */
 function plural(n: number, noun: string): string {
-  if (new Intl.PluralRules("en").select(n) === "one") {
+  if (PLURALS.select(n) === "one") {
     return noun;
   }
   return `${noun}s`;

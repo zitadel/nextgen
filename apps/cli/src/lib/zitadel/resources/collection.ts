@@ -1,4 +1,5 @@
 import { isDeepStrictEqual } from "node:util";
+import { renderList } from "@/lib/terminal-text";
 
 import { Change } from "@/lib/zitadel/change";
 import type { AnyDocument, ZitadelConfig } from "@/lib/zitadel/config";
@@ -238,7 +239,7 @@ export abstract class PinnedCollection<T extends Pinned> extends Collection<T> {
       const paths = holders.map((file) => {
         return file.path;
       });
-      throw new ConflictError(`${paths.join(" and ")} both hold ${handle}`, {
+      throw new ConflictError(`${renderList(paths)} both hold ${handle}`, {
         hint: "Remove or fix all but one of them, then run the command again.",
         details: { handle, paths },
       });

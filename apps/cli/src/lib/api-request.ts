@@ -1,5 +1,5 @@
-import { renderCount } from "@/lib/count";
 import { readFile } from "node:fs/promises";
+import { renderCount } from "@/lib/terminal-text";
 import { text } from "node:stream/consumers";
 
 import { ZitadelError } from "./errors";

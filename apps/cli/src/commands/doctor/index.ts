@@ -1,4 +1,5 @@
 import { dirname, join } from "node:path";
+import { PLURALS } from "@/lib/terminal-text";
 import { existsSync } from "node:fs";
 import { Flags } from "@oclif/core";
 import { z } from "zod";
@@ -938,7 +939,7 @@ async function checkManagedRuntimeProcesses(
     name: "managed-runtime-processes",
     status: "warn",
     message:
-      processes.length === 1
+      PLURALS.select(processes.length) === "one"
         ? "1 other local Zitadel server is running on this machine."
         : `${String(processes.length)} other local Zitadel servers are running on this machine.`,
     details: { supported: true, scope: "host", processes },

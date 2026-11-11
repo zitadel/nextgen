@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { escapeControlCharacters, escapeJsonControlCharacters } from "@/lib/terminal-text";
+import {
+  escapeControlCharacters,
+  escapeJsonControlCharacters,
+  renderCount,
+  renderList,
+} from "@/lib/terminal-text";
 
 describe("escapeControlCharacters", () => {
   it("escapes C0, DEL, C1, format and separator characters", () => {
@@ -101,5 +106,35 @@ describe("the format characters a word is spelled with", () => {
 
   it("still spells out a tag character, which hides text rather than spelling it", () => {
     expect(escapeControlCharacters("a\u{E0001}b")).toBe("a\\u{e0001}b");
+  });
+});
+
+describe("renderCount", () => {
+  it("uses the singular for one", () => {
+    expect(renderCount(1, { singular: "schema" })).toBe("1 schema");
+  });
+
+  it("adds an s when the noun names no plural", () => {
+    expect(renderCount(12, { singular: "resource" })).toBe("12 resources");
+  });
+
+  it("uses the noun's own plural when it has one", () => {
+    expect(renderCount(2, { singular: "flow definition", plural: "flow definitions" })).toBe(
+      "2 flow definitions",
+    );
+  });
+
+  it("counts none in the plural", () => {
+    expect(renderCount(0, { singular: "operation" })).toBe("0 operations");
+  });
+});
+
+describe("renderList", () => {
+  it.each([
+    [["a"], "a"],
+    [["a", "b"], "a and b"],
+    [["a", "b", "c"], "a, b, and c"],
+  ])("writes %j as %s", (items, phrase) => {
+    expect(renderList(items)).toBe(phrase);
   });
 });

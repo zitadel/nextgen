@@ -8,6 +8,7 @@ import {
   type UnavailableReason,
 } from "./backend";
 import { stripVTControlCharacters as stripAnsi } from "node:util";
+import { PLURALS } from "@/lib/terminal-text";
 import { isObject } from "./json";
 import type { SuggestedCommand } from "./suggestion";
 import {
@@ -398,12 +399,12 @@ function fromBackendError(error: BackendError): ZitadelError {
     ...(resources.length > 0 ? [`${resources.join("; ")}.`] : []),
     ...(fields.length > 0
       ? [
-          `The server rejected ${fields.length === 1 ? "this field" : "these fields"}: ${fields.join(", ")}.`,
+          `The server rejected ${PLURALS.select(fields.length) === "one" ? "this field" : "these fields"}: ${fields.join(", ")}.`,
         ]
       : []),
     ...(missing.length > 0
       ? [
-          `The server reports ${missing.length === 1 ? "this endpoint" : "these endpoints"} missing: ${missing.join(", ")}.`,
+          `The server reports ${PLURALS.select(missing.length) === "one" ? "this endpoint" : "these endpoints"} missing: ${missing.join(", ")}.`,
         ]
       : []),
   ].join(" ");

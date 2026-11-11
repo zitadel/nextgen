@@ -1,4 +1,3 @@
-import { renderCount } from "@/lib/count";
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
@@ -21,7 +20,7 @@ import { runsInCi } from "@/lib/telemetry/dimensions/ci-provider";
 import { parseTtl, type Ttl } from "@/lib/ttl";
 import { reportWarning } from "@/lib/warnings";
 import { prose } from "@/lib/oclif/rendering";
-import { escapeControlCharacters } from "@/lib/terminal-text";
+import { escapeControlCharacters, renderCount } from "@/lib/terminal-text";
 
 const CREDENTIAL_REQUIRED_REFUSAL: Refusal = {
   message: "{credential} is not set",

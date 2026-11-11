@@ -4,7 +4,7 @@ import { type NextSteps, renderNextSteps } from "@/lib/oclif/next-steps";
 import { Cmd } from "@/lib/cmd";
 import { publicCliCommand } from "@/lib/public-cli";
 import { arrow, command, dim, mark, statusColor, strong } from "@/lib/style";
-import { escapeControlCharacters } from "@/lib/terminal-text";
+import { escapeControlCharacters, PLURALS } from "@/lib/terminal-text";
 import type { CheckOutcome } from "./checks";
 
 /** The question a check answers, which also tells who fixes it and how. On the wire, so `snake_case`. */
@@ -235,7 +235,7 @@ function summaryOf(
 }
 
 function checksCount(count: number): string {
-  return count === 1 ? "1 check" : `${String(count)} checks`;
+  return PLURALS.select(count) === "one" ? "1 check" : `${String(count)} checks`;
 }
 
 function detailsOf(check: CheckOutcome | undefined): Record<string, unknown> | undefined {
@@ -317,7 +317,7 @@ function conclusion(checks: readonly CheckOutcome[]): string {
   const affected = (status: CheckOutcome["status"]): number =>
     new Set(checks.filter((check) => check.status === status).map((c) => categoryOf(c.name))).size;
   const categories = (count: number): string =>
-    count === 1 ? "1 category" : `${String(count)} categories`;
+    PLURALS.select(count) === "one" ? "1 category" : `${String(count)} categories`;
   if (checks.some((check) => check.status === "fail")) {
     return `${mark.fail} Zitadel doctor found issues in ${categories(affected("fail"))}.`;
   }

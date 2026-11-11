@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { PLURALS } from "@/lib/terminal-text";
 import { Flags } from "@oclif/core";
 import { Paging } from "@/lib/backend/transport";
 
@@ -261,7 +262,9 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>, List
     const { items } = collected;
     const plural = resource.plural ?? topic;
     const next = collected.next;
-    progress?.stop(`Fetched ${items.length} ${items.length === 1 ? resource.singular : plural}`);
+    progress?.stop(
+      `Fetched ${items.length} ${PLURALS.select(items.length) === "one" ? resource.singular : plural}`,
+    );
 
     const rows = items;
     const columns = chosenColumns(flags.fields, resource.columns, items, shape);

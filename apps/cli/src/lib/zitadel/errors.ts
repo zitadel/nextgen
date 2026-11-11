@@ -1,4 +1,5 @@
 import type { ProviderSelection } from "@zitadel/config/idp";
+import { PLURALS } from "@/lib/terminal-text";
 
 import type { FlowIssue, FlowMethodUse } from "@/lib/zitadel/rules/types";
 import type { UserSchema } from "@/lib/zitadel/resources/schemas/schema";
@@ -99,7 +100,7 @@ export class BrokenFilesError extends ConfigError {
         return entry.path;
       }),
     );
-    const files = paths.size === 1 ? "file is" : "files are";
+    const files = PLURALS.select(paths.size) === "one" ? "file is" : "files are";
     const lines = problems.map((entry) => {
       return `  - ${entry.path}: ${entry.problem}`;
     });

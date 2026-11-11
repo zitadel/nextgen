@@ -1,14 +1,13 @@
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
-import { renderCount } from "@/lib/count";
 import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { DeploymentService } from "@/lib/backend";
 import { GetReleaseByIdParams } from "@/lib/backend/schemas";
 
 import { reads, type Refused } from "@/lib/oclif/flags";
 import { MESSAGE_MAX_LENGTH, messageTooLong } from "@/lib/publish";
-import { escapeControlCharacters } from "@/lib/terminal-text";
+import { escapeControlCharacters, renderCount } from "@/lib/terminal-text";
 
 /**
  * The release `--release` deploys. The schema is the API spec's own, so a
