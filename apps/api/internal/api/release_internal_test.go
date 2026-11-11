@@ -18,7 +18,7 @@ import (
 // missing and a read reports the release as missing, so neither confirms that
 // the other project exists.
 func TestReleaseAccessRow(t *testing.T) {
-	stmts := stubAuthzStmts{}
+	stmts := stubAuthzStmts{granted: []string{"proj_a"}}
 	operator := WithScopeContext(context.Background(), ScopeContext{
 		ProjectID:     "proj_a",
 		Scope:         []string{"project.write", "project.read"},
