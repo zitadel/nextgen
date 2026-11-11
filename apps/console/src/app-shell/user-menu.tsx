@@ -138,13 +138,13 @@ export function UserMenuItem({ user, onSignOut }: { user?: ShellUser; onSignOut?
             size="lg"
             tooltip={name}
             aria-label={`Account: ${name}`}
-            // The avatar holds still while the sidebar collapses: it stays at
-            // the row's 4px left inset in both states (in the rail's 32px
-            // square that centres it), so the label going first moves nothing.
-            // The row is a fixed 48px, not a minimum, so its height animates
-            // to the rail's 32px; the 8px lift animates with it (`margin`), so
-            // the avatar keeps its height throughout.
-            className="avatar-host h-12 py-1.5 pl-1 transition-[width,height,padding,margin] group-data-[collapsible=icon]:mb-2 group-data-[collapsible=icon]:p-1!"
+            // The avatar holds still while the sidebar collapses: it sits 16px
+            // from the sidebar's edge in both states (the row's 8px inset here,
+            // centred in the rail's 36px square there), so the label going
+            // first moves nothing. The row is a fixed 48px, not a minimum, so
+            // its height animates to the rail's 36px; the 8px lift animates
+            // with it (`margin`), so the avatar keeps its height throughout.
+            className="avatar-host h-12 py-1.5 pl-2 transition-[width,height,padding,margin] group-data-[collapsible=icon]:mb-2 group-data-[collapsible=icon]:p-1.5!"
             {...avatar.host}
           >
             {/* 24px in the footer row, generated from the identifier. */}
