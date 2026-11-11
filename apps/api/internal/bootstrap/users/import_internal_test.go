@@ -24,6 +24,34 @@ func scopesOf(t *testing.T, attrs domain.CreateAttributes) map[domain.AttributeK
 	return scopes
 }
 
+func TestBuildCreateAttributes_assertsFormat(t *testing.T) {
+	schema := map[string]any{
+		"properties": map[string]any{
+			"email": map[string]any{"type": "string", "format": "email"},
+			"phone": map[string]any{"type": "string", "format": "phone"},
+			"age":   map[string]any{"type": "number", "format": "email"},
+			"contact": map[string]any{
+				"type":       "object",
+				"properties": map[string]any{"email": map[string]any{"type": "string", "format": "email"}},
+			},
+		},
+	}
+	build := func(key domain.AttributeKey, raw string) error {
+		_, err := buildCreateAttributes(map[domain.AttributeKey]json.RawMessage{key: json.RawMessage(raw)}, schema, "")
+		return err
+	}
+
+	require.ErrorContains(t, build("email", `"not-an-email"`), `"email"`)
+	require.ErrorContains(t, build("contact.email", `"nope"`), `"contact.email"`)
+	require.NotContains(t, build("email", `"not-an-email"`).Error(), "not-an-email", "the value stays out of the start-up error")
+
+	require.NoError(t, build("email", `"admin@zitadel.localhost"`), "the address `zitadel start` writes")
+	require.NoError(t, build("contact.email", `"admin@example.com"`))
+	require.NoError(t, build("phone", `"call me"`), "a format nobody asserts")
+	require.NoError(t, build("age", `42`), "a format only reads strings")
+	require.NoError(t, build("zitadel.source", `"cli"`), "a marker the schema does not declare")
+}
+
 func TestBuildCreateAttributes_uniquenessFollowsSchema(t *testing.T) {
 	schema := map[string]any{
 		"properties": map[string]any{
@@ -50,8 +78,8 @@ func TestBuildCreateAttributes_uniquenessFollowsSchema(t *testing.T) {
 		// From the schema's x-unique annotations.
 		"email":    domain.AttributeUniquenessProject,
 		"employee": domain.AttributeUniquenessTeam,
-		// Unannotated properties and the bootstrap markers stay out of the
-		// unique registry.
+		// Unannotated properties and the bootstrap markers are not unique
+		// claims.
 		"nickname":             domain.AttributeUniquenessUnspecified,
 		"zitadel.source":       domain.AttributeUniquenessUnspecified,
 		"zitadel.default_user": domain.AttributeUniquenessUnspecified,

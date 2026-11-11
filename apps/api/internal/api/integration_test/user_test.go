@@ -1,4 +1,4 @@
-//go:build postgres_integration || spanner_integration
+//go:build postgres_integration || spanner_integration || sqlite_integration
 
 // TODO: enable spanner tests once user repository supports it
 
@@ -360,7 +360,7 @@ func TestDeleteUser(t *testing.T) {
 			require.NoError(t, err)
 			userID := user.ID
 
-			err = userService.SetPassword(t.Context(), service.SetPasswordInput{
+			err = userService.SetPassword(releaseContext(t), service.SetPasswordInput{
 				ProjectID: project.ID,
 				UserID:    userID,
 				Password:  password,
@@ -420,6 +420,7 @@ func TestGetUserPasswordState(t *testing.T) {
 	}
 	assert.False(t, setAt(t).IsSet(), "a user without a password has no set_at")
 
+	deployPrimary(t, project.ID)
 	resp, err := client.SetUserPassword(t.Context(), &api.SetUserPasswordRequest{Password: "fake-password"},
 		api.SetUserPasswordParams{UserID: params.UserID})
 	require.NoError(t, err)
@@ -443,6 +444,7 @@ func TestSetUserPassword(t *testing.T) {
 
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
+	deployPrimary(t, project.ID)
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
@@ -914,7 +916,7 @@ func patchUserRequest(t *testing.T, body map[string]any) *api.PatchUserRequest {
 // attributes nor its schema reference. Three of the failures are decided in
 // Prepare, before the write transaction, so nothing is written for them; the
 // unknown schema reference is kept to match #1659 one to one, its 400 is also
-// covered by TestPatchUser. The unique collision is decided by the registry
+// covered by TestPatchUser. The unique collision is decided by the attribute
 // insert inside the transaction, after the old rows were already deleted, so
 // it is the case that would leak a partial write.
 func TestPatchUserFailedMigration(t *testing.T) {
@@ -1063,8 +1065,8 @@ func TestPatchUserFailedMigration(t *testing.T) {
 			assert.Equal(t, before.attributes, after.attributes, "attributes")
 			assert.True(t, before.updatedAt.Equal(after.updatedAt), "updated_at moved from %s to %s", before.updatedAt, after.updatedAt)
 
-			// The unique attribute registry must still hold the original
-			// username for this user, so a second user cannot take it.
+			// The original username must still be this user's unique
+			// claim, so a second user cannot take it.
 			_, err = createUser(t, map[string]any{"username": username})
 			assert.ErrorIs(t, err, domain.ErrUserAlreadyExists(), "the original username must still be claimed")
 		})
@@ -1091,7 +1093,7 @@ func TestPatchMyUser(t *testing.T) {
 		require.NoError(t, err)
 
 		const password = "fake-password"
-		require.NoError(t, userService.SetPassword(t.Context(), service.SetPasswordInput{
+		require.NoError(t, userService.SetPassword(releaseContext(t), service.SetPasswordInput{
 			ProjectID: project.ID,
 			UserID:    user.ID,
 			Password:  password,
@@ -1276,7 +1278,7 @@ func TestGetMyUser(t *testing.T) {
 		userEmail := user.StringAttribute("email")
 
 		const password = "fake-password"
-		err = userService.SetPassword(t.Context(), service.SetPasswordInput{
+		err = userService.SetPassword(releaseContext(t), service.SetPasswordInput{
 			ProjectID: project.ID,
 			UserID:    userID,
 			Password:  password,
@@ -1363,7 +1365,7 @@ func TestMyUser_HoldsTheSessionToTheNamedProject(t *testing.T) {
 	})
 	require.NoError(t, err)
 	const password = "fake-password"
-	require.NoError(t, userService.SetPassword(t.Context(), service.SetPasswordInput{
+	require.NoError(t, userService.SetPassword(releaseContext(t), service.SetPasswordInput{
 		ProjectID: project.ID,
 		UserID:    user.ID,
 		Password:  password,

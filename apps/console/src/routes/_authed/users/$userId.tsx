@@ -44,8 +44,17 @@ export const Route = createFileRoute("/_authed/users/$userId")({
 });
 
 function UserDetail() {
-  const { user, schema, latestSchemaId, passkeys, identityLinks, idps, passwordSetAt } =
-    Route.useLoaderData();
+  const {
+    user,
+    schema,
+    ownRevisionId,
+    latestSchemaId,
+    revisions,
+    passkeys,
+    identityLinks,
+    idps,
+    passwordSetAt,
+  } = Route.useLoaderData();
   const { userId } = Route.useParams();
   const router = useRouter();
   const attributes = userAttributes(user);
@@ -97,7 +106,9 @@ function UserDetail() {
             userId={userId}
             schema={schema}
             schemaId={field(user, "schema")}
+            ownRevisionId={ownRevisionId}
             latestSchemaId={latestSchemaId}
+            revisions={revisions}
             attributes={attributes}
             onSaved={() => router.invalidate()}
           />

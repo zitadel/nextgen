@@ -32,35 +32,46 @@ function project(id: string, name: string) {
   };
 }
 
+/** What a project's Overview reads (D35), recording which project it read. */
+function overviewReads(projectReads: string[]) {
+  return [
+    http.get("http://localhost/api/v1/projects/:projectId", ({ params }) => {
+      const id = String(params.projectId);
+      projectReads.push(id);
+      return HttpResponse.json({ ...project(id, "Acme"), origins: [], owning_team_id: null });
+    }),
+    http.get("http://localhost/api/v1/deployments", () => HttpResponse.json({ deployments: [] })),
+    http.get("http://localhost/api/v1/events", () => HttpResponse.json({ data: [] })),
+  ];
+}
+
 /**
- * Neither `/` nor `/settings` has a screen of its own; each lands on the first
- * one behind it.
+ * `/` is a project's Overview, and Projects itself when no project is chosen;
+ * `/settings` has no screen of its own and lands on the first one behind it.
  *
  * Worth its own spec because these are the two paths nobody navigates to
  * deliberately: `/` is where sign-in, the logo and the claim flow's "Open the
- * console" all arrive, and `/settings` is where the account dropdown goes.
+ * console" all arrive, and `/settings` is where the sidebar's Settings row goes.
  */
 describe("landing routes", () => {
-  // `/` lands on Users, a project-scoped screen, so with no `?project=` the
-  // `_authed` guard picks one (`resolveDefaultProjectScope`). Users, because
-  // whoever just signed up through the developer's app is listed there.
-  it("lands on Users in the only project the person can act on", async () => {
-    const userQueries: string[] = [];
+  // `/` is the project's Overview (D35), a project-scoped screen, so with no
+  // `?project=` the `_authed` guard picks one (`resolveDefaultProjectScope`).
+  it("lands on the Overview of the only project the person can act on", async () => {
+    const projectReads: string[] = [];
     server.use(
       http.get("http://localhost/api/v1/users/me/projects", () =>
         HttpResponse.json({ projects: [project("proj_1", "Acme")] }),
       ),
-      http.post("http://localhost/api/v1/users/query", ({ request }) => {
-        userQueries.push(new URL(request.url).searchParams.get("project_id") ?? "");
-        return HttpResponse.json({ users: [] });
-      }),
+      ...overviewReads(projectReads),
     );
     const router = await renderAt("/");
 
-    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/users"));
-    expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_1" });
-    expect(await screen.findByRole("heading", { name: "Users" })).toBeInTheDocument();
-    expect(userQueries).toEqual(["proj_1"]);
+    await waitFor(() =>
+      expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_1" }),
+    );
+    expect(router.state.resolvedLocation?.pathname).toBe("/");
+    expect(await screen.findByRole("heading", { name: "Acme", level: 1 })).toBeInTheDocument();
+    expect(projectReads).toEqual(["proj_1"]);
   });
 
   it("lands on Projects when there are several to choose from", async () => {
@@ -73,7 +84,7 @@ describe("landing routes", () => {
 
     await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
     expect(router.state.resolvedLocation?.search).not.toHaveProperty("project");
-    // Projects itself rather than the way to Users: arriving at the console
+    // Projects itself rather than the way to Overview: arriving at the console
     // asked for no screen (D22).
     expect(router.state.resolvedLocation?.search).not.toHaveProperty("next");
     expect(await screen.findByRole("heading", { name: "Projects" })).toBeInTheDocument();
@@ -151,16 +162,20 @@ describe("landing routes", () => {
     // project, which the developer who just claimed a project cannot manage:
     // their project is the default.
     _setRuntimeForTesting({ mode: "standalone", console_project_id: "proj_platform" });
+    const projectReads: string[] = [];
     server.use(
       http.get("http://localhost/api/v1/users/me/projects", () =>
         HttpResponse.json({ projects: [project("proj_1", "Acme")] }),
       ),
-      http.post("http://localhost/api/v1/users/query", () => HttpResponse.json({ users: [] })),
+      ...overviewReads(projectReads),
     );
     const router = await renderAt("/");
 
-    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/users"));
-    expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_1" });
+    await waitFor(() =>
+      expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_1" }),
+    );
+    expect(router.state.resolvedLocation?.pathname).toBe("/");
+    await waitFor(() => expect(projectReads).toEqual(["proj_1"]));
   });
 
   it("does not take one listed project as the only one while more pages follow", async () => {
@@ -188,7 +203,9 @@ describe("landing routes", () => {
 
     await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
     expect(router.state.resolvedLocation?.search).not.toHaveProperty("project");
-    expect(await screen.findByText("No projects yet.")).toBeInTheDocument();
+    expect(
+      await screen.findByRole("region", { name: "Create your first project" }),
+    ).toBeInTheDocument();
   });
 
   it("selects nothing when the person's projects cannot be read", async () => {
@@ -205,9 +222,9 @@ describe("landing routes", () => {
     expect(router.state.resolvedLocation?.search).not.toHaveProperty("project");
   });
 
-  it("lands on Settings from settings", async () => {
-    // Settings has no landing page of its own; the account dropdown's target
-    // forwards to the profile, its only screen.
+  it("lands on the profile from settings", async () => {
+    // Settings has no landing page of its own: the sidebar's row forwards to
+    // the profile, its list's first page.
     server.use(
       http.get("http://localhost/api/v1/users/me", () =>
         HttpResponse.json({ id: "user_1", attributes: { email: "maya@example.com" } }),
@@ -216,7 +233,7 @@ describe("landing routes", () => {
     const router = await renderAt("/settings");
 
     await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/settings/profile"));
-    expect(await screen.findByRole("heading", { name: "Settings" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Profile" })).toBeInTheDocument();
     // No Admins row survives from when that screen lived here.
     expect(screen.queryByRole("link", { name: /Admins/ })).not.toBeInTheDocument();
   });

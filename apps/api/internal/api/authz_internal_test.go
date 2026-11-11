@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 
@@ -13,12 +14,18 @@ import (
 )
 
 // stubAuthzStmts is a minimal AuthzResolverStatements for gate unit tests.
-// It treats principal_id == project_id as a foothold with CheckAuthz success
-// (mirroring the CreateProject sk_proj seed), and no foothold otherwise.
+// It denies every Check, without a foothold, unless the test says otherwise.
+// It answers every relation, target and home alike; what the gate asks is
+// pinned by the recording fake in authz_contract_internal_test.go.
 type stubAuthzStmts struct {
-	// allowCheck overrides CheckAuthz when set; nil means default foothold rule.
+	// granted lists the projects the principal holds a grant on: the Check
+	// allows there, with a foothold, as the sk_proj admin assignment
+	// CreateProject seeds allows a project secret on its own project.
+	granted []string
+	// allowCheck overrides CheckAuthz's answer when set.
 	allowCheck *bool
-	foothold   *bool
+	// foothold overrides the foothold when set.
+	foothold *bool
 	// scopes maps resource_id → project_id for GetResourceScope; missing → NoRowFoundError.
 	scopes map[string]string
 	// kinds maps resource_id → ResourceKind; when absent, ResourceKindUser is used.
@@ -37,11 +44,11 @@ func (s stubAuthzStmts) ActiveSystemCatalogID(context.Context) (string, error) {
 	return domain.SystemCatalogID, nil
 }
 
-func (s stubAuthzStmts) HasAuthzProjectFoothold(_ context.Context, projectID, _ string, _ domain.AuthzPrincipalType, principalID string) (bool, error) {
+func (s stubAuthzStmts) HasAuthzProjectFoothold(_ context.Context, projectID, _ string, _ domain.AuthzPrincipalType, _ string) (bool, error) {
 	if s.foothold != nil {
 		return *s.foothold, nil
 	}
-	return principalID == projectID, nil
+	return slices.Contains(s.granted, projectID), nil
 }
 
 func (s stubAuthzStmts) CheckAuthz(ctx context.Context, params domain.AuthzCheckParams) (bool, bool, error) {
@@ -52,7 +59,7 @@ func (s stubAuthzStmts) CheckAuthz(ctx context.Context, params domain.AuthzCheck
 	if s.allowCheck != nil {
 		return *s.allowCheck, foothold, nil
 	}
-	return params.PrincipalID == params.ProjectID, foothold, nil
+	return slices.Contains(s.granted, params.ProjectID), foothold, nil
 }
 
 func (s stubAuthzStmts) CheckPlatformOperator(_ context.Context, params domain.AuthzPlatformCheckParams) (bool, error) {
@@ -63,10 +70,6 @@ func (s stubAuthzStmts) CheckPlatformOperator(_ context.Context, params domain.A
 }
 
 func (s stubAuthzStmts) ListAuthzObjectIDs(context.Context, domain.AuthzListObjectsParams) ([]string, error) {
-	return nil, nil
-}
-
-func (stubAuthzStmts) ListClaimedProjectIDs(context.Context, string, uint32) ([]string, error) {
 	return nil, nil
 }
 
@@ -291,7 +294,7 @@ func TestMapAuthzDecision(t *testing.T) {
 }
 
 func TestRequireProjectAccess(t *testing.T) {
-	stmts := stubAuthzStmts{}
+	stmts := stubAuthzStmts{granted: []string{"proj_a"}}
 	operator := WithScopeContext(context.Background(), ScopeContext{
 		ProjectID:     "proj_a",
 		Scope:         []string{"project.write", "project.read"},
@@ -355,6 +358,11 @@ func TestRequireProjectAccess(t *testing.T) {
 			name: "grants", res: grantAccess,
 			readMiss: domain.ErrGrantNotFound().Code, writeMiss: domain.ErrGrantNotFound().Code,
 			denied: domain.ErrGrantPermissionDenied().Code,
+		},
+		{
+			name: "invitations", res: invitationAccess,
+			readMiss: domain.ErrInvitationNotFound().Code, writeMiss: domain.ErrInvitationNotFound().Code,
+			denied: domain.ErrInvitationPermissionDenied().Code,
 		},
 	}
 
@@ -533,7 +541,7 @@ func TestCredentialCeiling(t *testing.T) {
 }
 
 func TestRequireProjectListAccess(t *testing.T) {
-	stmts := stubAuthzStmts{}
+	stmts := stubAuthzStmts{granted: []string{"proj_a"}}
 	operator := WithScopeContext(context.Background(), ScopeContext{
 		ProjectID: "proj_a", Scope: []string{"project.write", "project.read"},
 		PrincipalType: domain.AuthzPrincipalTypeSKProj, PrincipalID: "proj_a",
@@ -717,7 +725,7 @@ func TestWithAuthzListFilterCopiesConstraintTeamID(t *testing.T) {
 }
 
 func TestListUserTeamsGateShape(t *testing.T) {
-	stmts := stubAuthzStmts{}
+	stmts := stubAuthzStmts{granted: []string{"proj_a"}}
 	both := WithScopeContext(context.Background(), ScopeContext{
 		ProjectID: "proj_a", Scope: []string{"project.write", "project.read"},
 		PrincipalType: domain.AuthzPrincipalTypeSKProj, PrincipalID: "proj_a",
@@ -736,7 +744,7 @@ func TestListUserTeamsGateShape(t *testing.T) {
 }
 
 func TestRequireTeamDelete(t *testing.T) {
-	stmts := stubAuthzStmts{}
+	stmts := stubAuthzStmts{granted: []string{"proj_a"}}
 	operator := WithScopeContext(context.Background(), ScopeContext{
 		ProjectID: "proj_a", Scope: []string{"project.write", "project.read"},
 		PrincipalType: domain.AuthzPrincipalTypeSKProj, PrincipalID: "proj_a",
@@ -774,7 +782,7 @@ func TestRequireTeamDelete(t *testing.T) {
 }
 
 func TestRequireResourceAccess(t *testing.T) {
-	stmts := stubAuthzStmts{scopes: map[string]string{"usr_a": "proj_a", "usr_b": "proj_b"}}
+	stmts := stubAuthzStmts{granted: []string{"proj_a"}, scopes: map[string]string{"usr_a": "proj_a", "usr_b": "proj_b"}}
 	operator := WithScopeContext(context.Background(), ScopeContext{
 		ProjectID: "proj_a", Scope: []string{"project.write", "project.read"},
 		PrincipalType: domain.AuthzPrincipalTypeSKProj, PrincipalID: "proj_a",
@@ -833,8 +841,9 @@ func TestRequireResourceAccessAmong(t *testing.T) {
 	const stored = "https://schemas.test/builtin/v1/default-human-user.json"
 	const asked = "https://schemas.test/builtin/v0/default-human-user.json"
 	stmts := stubAuthzStmts{
-		scopes: map[string]string{stored: "proj_a"},
-		kinds:  map[string]domain.ResourceKind{stored: domain.ResourceKindSchema},
+		granted: []string{"proj_a"},
+		scopes:  map[string]string{stored: "proj_a"},
+		kinds:   map[string]domain.ResourceKind{stored: domain.ResourceKindSchema},
 	}
 	operator := WithScopeContext(context.Background(), ScopeContext{
 		ProjectID: "proj_a", Scope: []string{"project.write", "project.read"},
@@ -862,8 +871,9 @@ func TestRequireResourceAccessAmong(t *testing.T) {
 // stays in its own project whatever the hint says.
 func TestRequireResourceAccessHonoursTheNamedProject(t *testing.T) {
 	stmts := stubAuthzStmts{
-		scopes: map[string]string{"pol_a": "proj_a"},
-		kinds:  map[string]domain.ResourceKind{"pol_a": domain.ResourceKindPolicy},
+		granted: []string{"proj_a"},
+		scopes:  map[string]string{"pol_a": "proj_a"},
+		kinds:   map[string]domain.ResourceKind{"pol_a": domain.ResourceKindPolicy},
 	}
 	operator := WithScopeContext(context.Background(), ScopeContext{
 		ProjectID: "proj_a", Scope: []string{"project.write", "project.read"},

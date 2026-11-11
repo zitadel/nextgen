@@ -31,6 +31,7 @@ content:
         - $ref: '../../../components/schemas/errors/tkn-invalid.yaml'
         - $ref: '../../../components/schemas/errors/not_implemented.yaml'
         - $ref: '../../../components/schemas/errors/proj-last_owner.yaml'
+        - $ref: '../../../components/schemas/errors/rel-not_deployed.yaml'
         - $ref: '../../../components/schemas/errors/rel-not_found.yaml'
         - $ref: '../../../components/schemas/errors/rel-revoked.yaml'
         - $ref: '../../../components/schemas/errors/req-invalid.yaml'
@@ -73,6 +74,7 @@ content:
           tkn.invalid: '../../../components/schemas/errors/tkn-invalid.yaml'
           not_implemented: '../../../components/schemas/errors/not_implemented.yaml'
           proj.last_owner: '../../../components/schemas/errors/proj-last_owner.yaml'
+          rel.not_deployed: '../../../components/schemas/errors/rel-not_deployed.yaml'
           rel.not_found: '../../../components/schemas/errors/rel-not_found.yaml'
           rel.revoked: '../../../components/schemas/errors/rel-revoked.yaml'
           req.invalid: '../../../components/schemas/errors/req-invalid.yaml'
@@ -140,6 +142,8 @@ content:
         $ref: '../../../components/examples/errors/not_implemented.yaml'
       proj.last_owner:
         $ref: '../../../components/examples/errors/proj-last_owner.yaml'
+      rel.not_deployed:
+        $ref: '../../../components/examples/errors/rel-not_deployed.yaml'
       rel.not_found:
         $ref: '../../../components/examples/errors/rel-not_found.yaml'
       rel.revoked:

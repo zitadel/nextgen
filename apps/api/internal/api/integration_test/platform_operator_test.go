@@ -1,4 +1,4 @@
-//go:build postgres_integration || spanner_integration
+//go:build postgres_integration || spanner_integration || sqlite_integration
 
 package integration_test
 
@@ -160,5 +160,73 @@ func TestPlatformOperatorConsoleSession(t *testing.T) {
 		require.NoError(t, harness.EnsureServiceDB(t).Statements().DeactivateUser(t.Context(), platform.ID, goneID))
 		status, body = consoleCall(t, gone, http.MethodGet, "/projects/"+customer.ID, "")
 		assert.Equal(t, http.StatusNotFound, status, body)
+	})
+}
+
+// TestPlatformOperatorReadsUnclaimedEvents pins ADR 049 §4 as amended on
+// 2026-11-10: a platform operator reads the events of a project nobody has
+// claimed, while the project's own secret and a platform user with a grant on
+// it, who is no operator, still read none until the claim.
+func TestPlatformOperatorReadsUnclaimedEvents(t *testing.T) {
+	t.Parallel()
+
+	customer, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	stored, err := harness.EnsureServiceDB(t).Statements().ListEvents(t.Context(), events.ListOptions(customer.ID, 1))
+	require.NoError(t, err)
+	require.NotEmpty(t, stored.Items, "creating the project stores its first events")
+	eventID := stored.Items[0].ID
+	list := "/events?project_id=" + customer.ID
+	get := "/events/" + eventID + "?project_id=" + customer.ID
+
+	listed := func(t *testing.T, status int, raw string) []string {
+		t.Helper()
+		require.Equal(t, http.StatusOK, status, raw)
+		var page struct {
+			Data []struct {
+				ID string `json:"id"`
+			} `json:"data"`
+		}
+		require.NoError(t, json.Unmarshal([]byte(raw), &page))
+		ids := make([]string, 0, len(page.Data))
+		for _, ev := range page.Data {
+			ids = append(ids, ev.ID)
+		}
+		return ids
+	}
+
+	t.Run("an operator reads them", func(t *testing.T) {
+		operatorID := platformUser(t)
+		grantPlatformOperator(t, operatorID)
+		operator := platformSessionCookie(t, operatorID)
+
+		status, raw := consoleCall(t, operator, http.MethodGet, list, "")
+		assert.Contains(t, listed(t, status, raw), eventID)
+
+		status, raw = consoleCall(t, operator, http.MethodGet, get, "")
+		require.Equal(t, http.StatusOK, status, raw)
+		assert.Contains(t, raw, eventID)
+	})
+
+	t.Run("the project's own secret reads none", func(t *testing.T) {
+		bearer := map[string]string{"Authorization": "Bearer " + harness.ProjectSecret(t, customer)}
+
+		status, raw := cookieRequest(t, nil, http.MethodGet, list, "", bearer)
+		assert.Empty(t, listed(t, status, raw))
+
+		status, raw = cookieRequest(t, nil, http.MethodGet, get, "", bearer)
+		assert.Equal(t, http.StatusNotFound, status, raw)
+	})
+
+	t.Run("a platform user with a grant, who is no operator, reads none", func(t *testing.T) {
+		peerID := platformUser(t)
+		harness.SeedProjectViewer(t, customer.ID, peerID)
+		peer := platformSessionCookie(t, peerID)
+
+		status, raw := consoleCall(t, peer, http.MethodGet, list, "")
+		assert.Empty(t, listed(t, status, raw))
+
+		status, raw = consoleCall(t, peer, http.MethodGet, get, "")
+		assert.Equal(t, http.StatusNotFound, status, raw)
 	})
 }

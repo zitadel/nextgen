@@ -18,7 +18,7 @@ import (
 // missing and a read reports the release as missing, so neither confirms that
 // the other project exists.
 func TestReleaseAccessRow(t *testing.T) {
-	stmts := stubAuthzStmts{}
+	stmts := stubAuthzStmts{granted: []string{"proj_a"}}
 	operator := WithScopeContext(context.Background(), ScopeContext{
 		ProjectID:     "proj_a",
 		Scope:         []string{"project.write", "project.read"},
@@ -130,6 +130,8 @@ func decodeBuildReleaseRequest(body string) (api.BuildReleaseRequest, error) {
 // A revoked release and one still served are both conflicts.
 func TestReleaseErrorResponseConflicts(t *testing.T) {
 	assert.Equal(t, http.StatusConflict, releaseErrorResponse(domain.ErrReleaseRevoked()).StatusCode)
+	assert.Equal(t, http.StatusConflict, releaseErrorResponse(domain.ErrReleaseNotDeployed(nil)).StatusCode)
+	assert.Equal(t, http.StatusConflict, releaseErrorResponse(domain.ErrReleaseNoDefault()).StatusCode)
 	assert.Equal(t, http.StatusConflict, releaseErrorResponse(domain.ErrReleaseInUse(domain.ReleaseInUseDetails{})).StatusCode)
 }
 

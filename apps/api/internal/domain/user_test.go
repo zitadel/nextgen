@@ -2,6 +2,7 @@ package domain_test
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -9,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ianlancetaylor/jsonschema"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -370,28 +372,47 @@ func TestNewPatchUser(t *testing.T) {
 		assert.Equal(t, "https://example.test/schema-v2.json", got.SchemaURL)
 	})
 
-	t.Run("team scope follows the lifecycle owner", func(t *testing.T) {
+	t.Run("new team-unique claim follows the lifecycle owner", func(t *testing.T) {
+		const teamUniqueSchema = `{
+			"$schema": "https://json-schema.org/draft/2020-12/schema",
+			"type": "object",
+			"properties": {
+				"email": {"type": "string", "format": "email", "x-unique": "project"},
+				"givenName": {"type": "string"},
+				"nickname": {"type": "string", "x-unique": "team"}
+			}
+		}`
+		nicknameScope := func(t *testing.T, got *domain.PatchUser) string {
+			t.Helper()
+			for i, a := range got.Attributes {
+				if a.Key == "nickname" {
+					return got.UniqueTeamScopes[i]
+				}
+			}
+			t.Fatal("nickname missing from the patch")
+			return ""
+		}
+
 		current := patchTestCurrentUser()
 		current.LifecycleOwnerTeamID = new("team_1")
-
 		got, err := domain.NewPatchUser(domain.PatchUserParams{
 			Current:         current,
 			SchemaURL:       current.SchemaURL,
-			Schema:          []byte(minimalUserSchema),
-			AttributesPatch: map[string]any{"givenName": "Alicia"},
+			Schema:          []byte(teamUniqueSchema),
+			AttributesPatch: map[string]any{"nickname": "ali"},
 		})
 		require.NoError(t, err)
-		assert.Equal(t, "team_1", got.AttributeTeamScope)
+		assert.Equal(t, "team_1", nicknameScope(t, got))
 
 		selfOwned := patchTestCurrentUser()
 		got, err = domain.NewPatchUser(domain.PatchUserParams{
 			Current:         selfOwned,
 			SchemaURL:       selfOwned.SchemaURL,
-			Schema:          []byte(minimalUserSchema),
-			AttributesPatch: map[string]any{"givenName": "Alicia"},
+			Schema:          []byte(teamUniqueSchema),
+			AttributesPatch: map[string]any{"nickname": "ali"},
 		})
 		require.NoError(t, err)
-		assert.Empty(t, got.AttributeTeamScope)
+		assert.Empty(t, nicknameScope(t, got))
 	})
 }
 
@@ -556,17 +577,38 @@ func TestNewCreateUser_SchemaFailureNamesFields(t *testing.T) {
 			fields: []string{"nickname"},
 		},
 		{
-			name:   "array element names the array",
+			name:   "array element names its index",
 			attrs:  map[string]any{"email": "a@example.com", "country": "CH", "department": "x", "tags": []any{"ok", 5}},
-			fields: []string{"tags"},
+			fields: []string{"tags.1"},
 		},
 		{
-			name: "property of an array element names the array",
+			name: "property of an array element names its index",
 			attrs: map[string]any{
 				"email": "a@example.com", "country": "CH", "department": "x",
 				"addresses": []any{map[string]any{"zip": "secret-value"}},
 			},
-			fields: []string{"addresses"},
+			fields: []string{"addresses.0.zip"},
+		},
+		{
+			name: "every failing element is named, not only the first",
+			attrs: map[string]any{
+				"email": "a@example.com", "country": "CH", "department": "x",
+				"tags": []any{1, "ok", 2},
+				"addresses": []any{
+					map[string]any{"zip": "secret-value"},
+					map[string]any{"zip": "3000"},
+					map[string]any{"zip": "secret-value"},
+				},
+			},
+			fields: []string{"addresses.0.zip", "addresses.2.zip", "tags.0", "tags.2"},
+		},
+		{
+			name: "array elements beside a failure elsewhere",
+			attrs: map[string]any{
+				"email": "a@example.com", "department": "x",
+				"tags": []any{5},
+			},
+			fields: []string{"country", "tags.0"},
 		},
 		{
 			// The rejected name is the value, so the object holding it is
@@ -640,4 +682,232 @@ func logLine(t *testing.T, attrs ...slog.Attr) string {
 
 func TestInvalidAttributeKeys(t *testing.T) {
 	assert.Nil(t, domain.InvalidAttributeKeys(errors.New("not a validation error"), nil))
+}
+
+// Every way a schema can reach an array names a failing item the same way,
+// and a failure of the array as a whole stays on the array.
+func TestNewPatchUser_SchemaFailureNamesArrayItems(t *testing.T) {
+	const preamble = `"$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "https://example.test/schema.json", "type": "object",`
+	phone := map[string]any{"number": "1"}
+
+	tests := []struct {
+		name   string
+		schema string
+		patch  map[string]any
+		fields []string
+	}{
+		{
+			name:   "a property an item requires",
+			schema: `"properties": {"phones": {"type": "array", "items": {"type": "object", "required": ["fax"]}}}`,
+			patch:  map[string]any{"phones": []any{map[string]any{"fax": "1"}, phone}},
+			fields: []string{"phones.1.fax"},
+		},
+		{
+			name: "an item behind a reference",
+			schema: `"$defs": {"phone": {"type": "object", "required": ["fax"]}},
+				"properties": {"phones": {"type": "array", "items": {"$ref": "#/$defs/phone"}}}`,
+			patch:  map[string]any{"phones": []any{phone}},
+			fields: []string{"phones.0.fax"},
+		},
+		{
+			name: "an array behind a reference",
+			schema: `"$defs": {"phones": {"type": "array", "items": {"type": "object", "required": ["fax"]}}},
+				"properties": {"phones": {"$ref": "#/$defs/phones"}}`,
+			patch:  map[string]any{"phones": []any{phone}},
+			fields: []string{"phones.0.fax"},
+		},
+		{
+			name:   "an array allOf applies",
+			schema: `"allOf": [{"properties": {"phones": {"items": {"required": ["fax"]}}}}]`,
+			patch:  map[string]any{"phones": []any{phone}},
+			fields: []string{"phones.0.fax"},
+		},
+		{
+			name:   "an array inside an array",
+			schema: `"properties": {"grid": {"type": "array", "items": {"type": "array", "items": {"type": "integer"}}}}`,
+			patch:  map[string]any{"grid": []any{[]any{1}, []any{1, "x"}}},
+			fields: []string{"grid.1.1"},
+		},
+		{
+			name:   "an array in an array item",
+			schema: `"properties": {"teams": {"type": "array", "items": {"properties": {"members": {"type": "array", "items": {"required": ["id"]}}}}}}`,
+			patch: map[string]any{"teams": []any{
+				map[string]any{"members": []any{map[string]any{"id": "1"}}},
+				map[string]any{"members": []any{map[string]any{}, map[string]any{}}},
+			}},
+			fields: []string{"teams.1.members.0.id", "teams.1.members.1.id"},
+		},
+		{
+			name:   "items by position, and the rest after them",
+			schema: `"properties": {"pair": {"type": "array", "prefixItems": [{"type": "string"}, {"type": "integer"}], "items": {"type": "boolean"}}}`,
+			patch:  map[string]any{"pair": []any{"a", "b", true, "c"}},
+			fields: []string{"pair.1", "pair.3"},
+		},
+		{
+			name:   "too few items names the array",
+			schema: `"properties": {"tags": {"type": "array", "minItems": 2, "items": {"type": "string"}}}`,
+			patch:  map[string]any{"tags": []any{"a"}},
+			fields: []string{"tags"},
+		},
+		{
+			name:   "too few items and a failing item name both",
+			schema: `"properties": {"tags": {"type": "array", "minItems": 2, "items": {"type": "string"}}}`,
+			patch:  map[string]any{"tags": []any{1}},
+			fields: []string{"tags", "tags.0"},
+		},
+		{
+			name:   "a repeated item names the array",
+			schema: `"properties": {"tags": {"type": "array", "uniqueItems": true}}`,
+			patch:  map[string]any{"tags": []any{"a", "a"}},
+			fields: []string{"tags"},
+		},
+		{
+			name:   "an item no anyOf branch accepts",
+			schema: `"properties": {"ids": {"type": "array", "items": {"anyOf": [{"type": "string"}, {"type": "boolean"}]}}}`,
+			patch:  map[string]any{"ids": []any{"a", 1}},
+			fields: []string{"ids.1"},
+		},
+		{
+			// items evaluated them, so unevaluatedItems has nothing left to refuse.
+			name:   "items keeps what unevaluatedItems reads",
+			schema: `"properties": {"tags": {"type": "array", "items": {"type": "string"}, "unevaluatedItems": false}}`,
+			patch:  map[string]any{"tags": []any{"a", 1}},
+			fields: []string{"tags.1"},
+		},
+		{
+			name:   "prefixItems keeps what unevaluatedItems reads",
+			schema: `"properties": {"pair": {"type": "array", "prefixItems": [{"type": "string"}], "unevaluatedItems": false}}`,
+			patch:  map[string]any{"pair": []any{1}},
+			fields: []string{"pair.0"},
+		},
+		{
+			name:   "unevaluatedItems still refuses what prefixItems leaves",
+			schema: `"properties": {"pair": {"type": "array", "prefixItems": [{"type": "string"}], "unevaluatedItems": false}}`,
+			patch:  map[string]any{"pair": []any{1, "b"}},
+			fields: []string{"pair", "pair.0"},
+		},
+		{
+			// unevaluatedItems is left to the library, which names no index.
+			name:   "unevaluated items name the array",
+			schema: `"properties": {"tags": {"type": "array", "unevaluatedItems": {"type": "string"}}}`,
+			patch:  map[string]any{"tags": []any{1}},
+			fields: []string{"tags"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := domain.NewPatchUser(domain.PatchUserParams{
+				Current:         &domain.User{ProjectID: "proj_1", ID: "user_1"},
+				SchemaURL:       "https://example.test/schema.json",
+				Schema:          []byte("{" + preamble + tt.schema + "}"),
+				AttributesPatch: tt.patch,
+			})
+			requireInvalidFields(t, err, tt.fields...)
+		})
+	}
+}
+
+// A schema a user schema refers to but does not hold, such as a json-schema.org
+// metaschema the library shares between requests, is left as it is: reporting
+// every item of it would change it for every other request.
+func TestNewPatchUser_LeavesSharedSchemasAlone(t *testing.T) {
+	const schema = `{
+		"$schema": "https://json-schema.org/draft/2020-12/schema",
+		"$id": "https://example.test/schema.json",
+		"properties": {"meta": {"$ref": "https://json-schema.org/draft/2020-12/schema"}}
+	}`
+	doc := map[string]any{"meta": map[string]any{"required": []any{"a", 5}}}
+	locations := func() []string {
+		var compiled jsonschema.Schema
+		require.NoError(t, json.Unmarshal([]byte(schema), &compiled))
+		var out []string
+		for _, failure := range domain.ValidationFailures(compiled.Validate(doc)) {
+			out = append(out, domain.ValidationLocation(failure))
+		}
+		require.NotEmpty(t, out)
+		return out
+	}
+	before := locations()
+
+	_, err := domain.NewPatchUser(domain.PatchUserParams{
+		Current:         &domain.User{ProjectID: "proj_1", ID: "user_1"},
+		SchemaURL:       "https://example.test/schema.json",
+		Schema:          []byte(schema),
+		AttributesPatch: doc,
+	})
+	requireInvalidFields(t, err, "meta.required")
+
+	assert.Equal(t, before, locations(), "the shared schema reports as it did")
+}
+
+// Each level of nesting checks its items once. Checking them twice per level
+// doubles the work with each level, and this depth would not finish.
+func TestNewPatchUser_NestedArraysAreCheckedOnce(t *testing.T) {
+	const depth = 40
+	schema := `{"type": "integer"}`
+	var value any = "not an integer"
+	want := domain.AttributeKey("grid")
+	for range depth {
+		schema = `{"type": "array", "items": ` + schema + `}`
+		value = []any{value}
+		want = want.AppendNode("0")
+	}
+	_, err := domain.NewPatchUser(domain.PatchUserParams{
+		Current:         &domain.User{ProjectID: "proj_1", ID: "user_1"},
+		SchemaURL:       "https://example.test/schema.json",
+		Schema:          []byte(`{"$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "https://example.test/schema.json", "properties": {"grid": ` + schema + `}}`),
+		AttributesPatch: map[string]any{"grid": value},
+	})
+	requireInvalidFields(t, err, string(want))
+}
+
+// A failure inside an array item is named, but no flow field can collect it,
+// so it does not read as a field the flow failed to ask for.
+func TestValidationErrAttributeKey(t *testing.T) {
+	const schema = `{
+		"$schema": "https://json-schema.org/draft/2020-12/schema",
+		"$id": "https://example.test/schema.json",
+		"type": "object",
+		"properties": {
+			"address": {"type": "object", "required": ["zip"]},
+			"phones": {"type": "array", "items": {"type": "object", "required": ["fax"]}}
+		}
+	}`
+	tests := []struct {
+		name     string
+		patch    map[string]any
+		key      domain.AttributeKey
+		complete bool
+	}{
+		{"a property", map[string]any{"address": map[string]any{}}, "address.zip", true},
+		{"a property of an array item", map[string]any{"phones": []any{map[string]any{}}}, "phones.0.fax", false},
+		{"an array item", map[string]any{"phones": []any{"not an object"}}, "phones.0", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := domain.NewPatchUser(domain.PatchUserParams{
+				Current:         &domain.User{ProjectID: "proj_1", ID: "user_1"},
+				SchemaURL:       "https://example.test/schema.json",
+				Schema:          []byte(schema),
+				AttributesPatch: tt.patch,
+			})
+			failures := domain.ValidationFailures(err)
+			require.NotEmpty(t, failures)
+			key, complete := domain.ValidationErrAttributeKey(failures[0], tt.patch)
+			assert.Equal(t, tt.key, key)
+			assert.Equal(t, tt.complete, complete)
+		})
+	}
+
+	// The library's own failure, without the index, stays on the array.
+	t.Run("an item the library does not locate", func(t *testing.T) {
+		var compiled jsonschema.Schema
+		require.NoError(t, json.Unmarshal([]byte(schema), &compiled))
+		doc := map[string]any{"phones": []any{map[string]any{}}}
+		failures := domain.ValidationFailures(compiled.Validate(doc))
+		require.NotEmpty(t, failures)
+		key, complete := domain.ValidationErrAttributeKey(failures[0], doc)
+		assert.Equal(t, domain.AttributeKey("phones"), key)
+		assert.False(t, complete)
+	})
 }

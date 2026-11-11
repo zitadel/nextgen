@@ -5,32 +5,64 @@ import { aSetUpApp, type CustomConnection, type ScaffoldedApp } from "@tests/hel
 
 const platform = usePlatformMock();
 
+/**
+ * The catalog provider the project serves.
+ */
 const GOOGLE = "google";
+
+/**
+ * Google's client id and secret.
+ */
 const CREDENTIALS = {
   clientId: "1234-abc.apps.googleusercontent.com",
   secret: "the-client-secret",
 };
 
+/**
+ * A connection the catalog does not list, described by the developer.
+ */
 const ACME: CustomConnection = {
   slug: "acme-sso",
   displayName: "Acme SSO",
   issuer: "https://sso.acme.example",
 };
+
+/**
+ * The custom connection's client id and secret.
+ */
 const ACME_CREDENTIALS = { clientId: "acme-client-id", secret: "acme-client-secret" };
 
-/** A set-up project serving a custom connection, published. */
-async function anAppServingAcme(): Promise<ScaffoldedApp> {
+/**
+ * A provider neither the catalog nor a connection names.
+ */
+const UNKNOWN_PROVIDER = "gogle";
+
+/**
+ * What a project's files look like after a command that wrote nothing.
+ */
+const NO_CHANGES = { added: [], modified: [], removed: [] };
+
+/**
+ * A set-up project serving Google, deployed.
+ *
+ * @returns The project.
+ */
+async function anAppServingGoogle(): Promise<ScaffoldedApp> {
   const app = await aSetUpApp();
-  expect(await app.enableCustomSso(ACME, ACME_CREDENTIALS)).toSucceed();
-  expect(await app.publish()).toSucceed();
+  await app.hasEnabledSso(GOOGLE, CREDENTIALS);
+  await app.publishData();
   return app;
 }
 
-/** A set-up project serving Google, published. */
-async function anAppServingGoogle(): Promise<ScaffoldedApp> {
+/**
+ * A set-up project serving a custom connection, deployed.
+ *
+ * @returns The project.
+ */
+async function anAppServingAcme(): Promise<ScaffoldedApp> {
   const app = await aSetUpApp();
-  expect(await app.enableSso(GOOGLE, CREDENTIALS)).toSucceed();
-  expect(await app.publish()).toSucceed();
+  await app.hasEnabledCustomSso(ACME, ACME_CREDENTIALS);
+  await app.publishData();
   return app;
 }
 
@@ -41,7 +73,9 @@ describe("auth-method sso disable", () => {
         const app = await anAppServingGoogle();
         platform.isNotZitadel();
 
-        expect(await app.disableSso(GOOGLE)).toSucceed();
+        const result = await app.disableSso(GOOGLE);
+
+        expect(result).toSucceed();
       });
     });
 
@@ -50,7 +84,9 @@ describe("auth-method sso disable", () => {
         const app = await anAppServingGoogle();
         platform.isUnavailable();
 
-        expect(await app.disableSso(GOOGLE)).toSucceed();
+        const result = await app.disableSso(GOOGLE);
+
+        expect(result).toSucceed();
       });
     });
   });
@@ -59,12 +95,30 @@ describe("auth-method sso disable", () => {
     it("holds its invariants in every rendering", async () => {
       const app = await aSetUpApp();
       platform.servesAHostileOrigin();
-      const args = ["auth-method", "sso", "disable", "--provider", "google", "--force"];
+      const args = ["auth-method", "sso", "disable", "--provider", GOOGLE, "--force"];
 
-      await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));
+      await app.inEveryRendering((how) => {
+        return app.run(how.json ? [...args, "--json"] : args, how.env);
+      });
     });
 
     describe("--json", () => {
+      it("removes the provider", async () => {
+        const app = await anAppServingGoogle();
+
+        const result = await app.disableSso(GOOGLE);
+
+        expect(result).toSucceed();
+      });
+
+      it("leaves the change for deploy to publish", async () => {
+        const app = await anAppServingGoogle();
+
+        await app.disableSso(GOOGLE);
+
+        expect(await app.publishedAuthMethods()).toHaveProperty("sso.enabled", true);
+      });
+
       describe("removing the last way to sign in without --force when no one can be asked", () => {
         it("is refused", async () => {
           const app = await anAppServingGoogle();
@@ -72,7 +126,7 @@ describe("auth-method sso disable", () => {
 
           const result = await app.disableSso(GOOGLE);
 
-          expect(result).toFailWith("E_VALIDATION");
+          expect(result).toFailWith("E_CONFIRMATION_REQUIRED");
         });
 
         it("says to pass --force", async () => {
@@ -102,109 +156,109 @@ describe("auth-method sso disable", () => {
 
           await app.disableSso(GOOGLE);
 
-          expect(await files.changes()).toMatchObject({ added: [], modified: [], removed: [] });
+          expect(await files.changes()).toMatchObject(NO_CHANGES);
         });
       });
 
-      it("leaves the change for deploy to publish", async () => {
-        const app = await anAppServingGoogle();
+      describe("a catalog provider the project does not offer", () => {
+        it("succeeds", async () => {
+          const app = await aSetUpApp();
 
-        expect(await app.disableSso(GOOGLE)).toSucceed();
+          const result = await app.disableSso(GOOGLE);
 
-        const { schema } = await app.publishedSchema();
-        expect(schema["x-auth-methods"]?.sso).toMatchObject({ enabled: true });
-      });
+          expect(result).toSucceed();
+        });
 
-      it("changes nothing for a catalog provider the project does not offer", async () => {
-        const app = await aSetUpApp();
-        const files = await app.snapshot();
+        it("changes nothing", async () => {
+          const app = await aSetUpApp();
+          const files = await app.snapshot();
 
-        expect(await app.disableSso(GOOGLE)).toSucceed();
+          await app.disableSso(GOOGLE);
 
-        expect(await files.changes()).toMatchObject({ added: [], modified: [], removed: [] });
+          expect(await files.changes()).toMatchObject(NO_CHANGES);
+        });
       });
 
       describe("a provider neither the catalog nor a connection names", () => {
         it("is refused", async () => {
           const app = await anAppServingGoogle();
 
-          expect(await app.disableSso("gogle")).toFailWith("E_NOT_FOUND");
+          const result = await app.disableSso(UNKNOWN_PROVIDER);
+
+          expect(result).toFailWith("E_NOT_FOUND");
         });
 
         it("changes nothing", async () => {
           const app = await anAppServingGoogle();
           const files = await app.snapshot();
 
-          await app.disableSso("gogle");
+          await app.disableSso(UNKNOWN_PROVIDER);
 
-          expect(await files.changes()).toMatchObject({ added: [], modified: [], removed: [] });
+          expect(await files.changes()).toMatchObject(NO_CHANGES);
         });
       });
 
       describe("a provider already disabled", () => {
         it("succeeds again", async () => {
           const app = await anAppServingGoogle();
-          expect(await app.disableSso(GOOGLE)).toSucceed();
+          await app.hasDisabledSso(GOOGLE);
 
-          expect(await app.disableSso(GOOGLE)).toSucceed();
+          const result = await app.disableSso(GOOGLE);
+
+          expect(result).toSucceed();
         });
 
         it("changes nothing", async () => {
           const app = await anAppServingGoogle();
-          expect(await app.disableSso(GOOGLE)).toSucceed();
+          await app.hasDisabledSso(GOOGLE);
           const files = await app.snapshot();
 
           await app.disableSso(GOOGLE);
 
-          expect(await files.changes()).toMatchObject({ added: [], modified: [], removed: [] });
+          expect(await files.changes()).toMatchObject(NO_CHANGES);
         });
       });
 
       describe("once deployed", () => {
         it("publishes SSO as off", async () => {
           const app = await anAppServingGoogle();
-          expect(await app.disableSso(GOOGLE)).toSucceed();
-          expect(await app.publish()).toSucceed();
 
-          const { schema } = await app.publishedSchema();
+          await app.disableSso(GOOGLE);
 
-          expect(schema["x-auth-methods"]?.sso).toEqual({ enabled: false });
+          expect(await app.authMethodsOnceDeployed()).toHaveProperty("sso", { enabled: false });
         });
 
         it("stops offering the provider on any step", async () => {
           const app = await anAppServingGoogle();
-          expect(await app.disableSso(GOOGLE)).toSucceed();
-          expect(await app.publish()).toSucceed();
 
-          expect(await app.stepsOfferingSso()).toEqual([]);
+          await app.disableSso(GOOGLE);
+
+          expect(await app.stepsOfferingSsoOnceDeployed()).toEqual([]);
         });
 
         it("keeps the connection, so enabling it again needs no credentials", async () => {
           const app = await anAppServingGoogle();
-          expect(await app.disableSso(GOOGLE)).toSucceed();
-          expect(await app.publish()).toSucceed();
 
-          const registered = await app.registeredIdps();
+          await app.disableSso(GOOGLE);
 
-          expect(registered.map((idp) => idp.slug)).toEqual([GOOGLE]);
+          expect(await app.registeredIdpSlugsOnceDeployed()).toEqual([GOOGLE]);
         });
 
         it("removes a custom connection named by its slug", async () => {
           const app = await anAppServingAcme();
-          expect(await app.disableSso(ACME.slug)).toSucceed();
-          expect(await app.publish()).toSucceed();
 
-          expect(await app.stepsOfferingSso()).toEqual([]);
+          await app.disableSso(ACME.slug);
+
+          expect(await app.stepsOfferingSsoOnceDeployed()).toEqual([]);
         });
 
         it("leaves nothing left to deploy", async () => {
           const app = await anAppServingGoogle();
-          expect(await app.disableSso(GOOGLE)).toSucceed();
-          const first = await app.publishData();
 
-          const again = await app.deployData();
+          await app.disableSso(GOOGLE);
 
-          expect(again.release_id).toBe(first.release_id);
+          const [first, again] = await app.releasesOfTwoDeploys();
+          expect(again).toBe(first);
         });
       });
     });

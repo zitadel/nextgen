@@ -48,6 +48,32 @@ describe("release revoke", () => {
     });
 
     describe("--json", () => {
+      it("refuses a deployment id, which is not a release id, without asking", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run([
+          "release",
+          "revoke",
+          "dep_01KX5N7C9D2E7F0N9WD3P2E4YM6",
+          "--json",
+        ]);
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
+
+      it("suggests listing releases when given a deployment id", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run([
+          "release",
+          "revoke",
+          "dep_01KX5N7C9D2E7F0N9WD3P2E4YM6",
+          "--json",
+        ]);
+
+        expect(result).toSuggest("release list");
+      });
+
       it("revokes a release nothing serves", async () => {
         const app = await aSetUpApp();
         const releaseId = await aRelease(app);
@@ -157,7 +183,7 @@ describe("release revoke", () => {
 
           const result = await app.run(["release", "revoke", releaseId, "--json"]);
 
-          expect(result).toFailWith("E_VALIDATION");
+          expect(result).toFailWith("E_CONFIRMATION_REQUIRED");
         });
 
         it("says to pass --force", async () => {

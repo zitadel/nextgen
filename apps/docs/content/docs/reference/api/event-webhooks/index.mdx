@@ -40,9 +40,10 @@ events:
         url: https://siem.example.com/zitadel/events
 ```
 
-The server delivers the events of claimed projects only. A project's events
-from before its claim go out once it is claimed, and a new webhook URL starts
-with the oldest event still retained.
+The server delivers the events of every project, including projects nobody
+has claimed yet: the webhook is the deployment's, like its platform
+operators, who read every project's events. A new webhook URL starts with the
+oldest event still retained.
 
 ## Event types
 

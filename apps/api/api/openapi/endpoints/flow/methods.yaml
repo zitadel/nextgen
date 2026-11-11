@@ -14,7 +14,9 @@ post:
 
     The browser `Origin` header selects which deployment serves this attempt.
     The server checks the origin against the project's origin patterns and live
-    previews, and the newest deployment to that exact origin is the target. A
+    previews, and the deployment that origin serves is the target: the
+    project's newest primary deployment when it names a primary origin, or the
+    newest live deployment to a preview URL. A
     deployment is a release, the immutable bundle of the project's
     configuration, made live at an origin. The deployment's release supplies
     flow definitions, user schemas and branding. The resolved deployment is
@@ -22,18 +24,25 @@ post:
     configuration.
 
     - An origin that matches no pattern answers `403` with
-      `proj.origin_not_allowed`. Add the origin with `zitadel origin add`.
+      `proj.origin_not_allowed`, including when the project lists no origins.
+      Add the origin with `zitadel origin add`.
     - An origin that matches a preview pattern with no live preview answers
       `403` with `proj.preview_not_live`. Run `zitadel preview` on the branch.
-    - Nothing deployed to the target answers `409` with `rel.not_deployed`.
-      Run `zitadel deploy`.
+    - Nothing deployed to a listed origin or a live preview answers `409`
+      with `rel.not_deployed`. Run `zitadel deploy`: a primary origin added
+      since the last deploy serves nothing until the next one.
+    - A loopback origin the project does not list answers `409` with
+      `rel.not_deployed` too, as no deployment can name it. Add it with
+      `zitadel origin add <origin> --kind primary`, then run `zitadel deploy`.
     - A revoked release answers `409` with `rel.revoked`.
 
-    A request with no `Origin` passes the check and still needs a deployment
-    target. A loopback origin passes it too, and so does the server's own
-    origin, from which its console previews a project's login. A step
-    submitted from the server's own origin is still refused unless the project
-    lists it.
+    A request with no `Origin` passes the check, and so does the server's own
+    origin, from which its console previews a project's login. Both are served
+    the project's newest primary deployment unless the project lists that
+    origin; with no primary deployment they answer `409` with
+    `rel.no_default`. A loopback origin passes the check and is its own
+    target. A step submitted from the server's own origin is still refused
+    unless the project lists it.
 
     The response contains an `id` field, the flow handle. Use it as the path
     parameter for all subsequent `/flow/{id}/submit` calls.
@@ -52,7 +61,7 @@ post:
       description: |
         Standard browser `Origin` header. Selects the deployment that serves
         this attempt: matched against the project's origin patterns and live
-        previews, then against the newest deployment to that exact origin.
+        previews, then against the deployment that origin serves.
         Browsers send it automatically; no client action is required. Absent
         when the caller is not a browser.
       schema:
@@ -105,8 +114,10 @@ post:
                 message: 'no live preview for https://acme-k3x9v2-acmeinc.vercel.app; run zitadel preview on this branch'
     '409':
       description: |
-        Nothing is deployed to the resolved target (`rel.not_deployed`), or the
-        release of that deployment is revoked (`rel.revoked`).
+        Nothing is deployed to the resolved target (`rel.not_deployed`), the
+        request needs a primary deployment and the project has none
+        (`rel.no_default`), or the release of that deployment is revoked
+        (`rel.revoked`).
       content:
         application/json:
           schema:
@@ -117,6 +128,11 @@ post:
               value:
                 code: rel.not_deployed
                 message: 'nothing is deployed to https://www.acme.com'
+            no_default:
+              summary: No primary deployment
+              value:
+                code: rel.no_default
+                message: 'the project has no primary deployment'
             revoked:
               summary: The release is revoked
               value:

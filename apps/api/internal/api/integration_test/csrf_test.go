@@ -1,4 +1,4 @@
-//go:build postgres_integration || spanner_integration
+//go:build postgres_integration || spanner_integration || sqlite_integration
 
 package integration_test
 
@@ -143,6 +143,22 @@ func TestSessionCSRF(t *testing.T) {
 			requireCSRFRefused(t, status, body)
 		})
 	}
+
+	// Invitation lookup is a read (ADR 086 CSRF-on-writes): same-origin may
+	// omit the token and reaches the stub; cross-site is still refused.
+	t.Run("invitation lookup needs no token but must be same-origin", func(t *testing.T) {
+		t.Parallel()
+		status, body := raw(t, http.MethodPost, "/invitations/lookup", `{"token":"t"}`, map[string]string{
+			"Sec-Fetch-Site": "same-origin",
+		})
+		assert.Equal(t, http.StatusNotImplemented, status, body)
+
+		status, body = raw(t, http.MethodPost, "/invitations/lookup", `{"token":"t"}`, map[string]string{
+			"Sec-Fetch-Site": "cross-site",
+			"Origin":         "https://evil.example",
+		})
+		requireCSRFRefused(t, status, body)
+	})
 
 	// Logout needs the token like every other write, so a forged sign-out is
 	// refused even from the same site. It signs out its own session, so a

@@ -11,11 +11,14 @@ import type { DiffOptions } from "@/lib/git/types";
  * everything under it too, so a file replaced by a directory took in the
  * directory's files, and hundreds of files meant hundreds of processes, which
  * ran out of open files. Nothing is left out of the diff: the paths are the
- * caller's to choose, and whatever they name, a secret included, is shown.
+ * caller's to choose, and whatever they or `options.globs` name, a secret
+ * included, is shown, unless `options.excluded` leaves it out.
  */
 export class DiffSince implements Operation<string | null> {
   private readonly commit: string;
   private readonly paths: readonly string[];
+  private readonly globs: readonly string[];
+  private readonly excluded: readonly string[];
   private readonly format: readonly string[];
 
   /** Diffs `paths` since `commit`, coloured as `options` say, with `extra` added to git's format. */
@@ -27,6 +30,8 @@ export class DiffSince implements Operation<string | null> {
   ) {
     this.commit = commit;
     this.paths = paths;
+    this.globs = options.globs ?? [];
+    this.excluded = options.excluded ?? [];
     if (options.color) {
       this.format = ["--color=always", ...extra];
     } else {
@@ -54,7 +59,9 @@ export class DiffSince implements Operation<string | null> {
    *
    * `--no-ext-diff` keeps a configured external diff tool out, `--relative`
    * names paths from the directory, and each path is taken literally
-   * ({@link Git.literal}), so `app/[id].tsx` does not also diff `app/i.tsx`.
+   * ({@link Git.literal}), so `app/[id].tsx` does not also diff `app/i.tsx`;
+   * `globs` are taken as globs ({@link Git.glob}). An excluded file may still
+   * be marked as added; the diff leaves it out.
    */
   async run(git: Git): Promise<string> {
     const diff = [
@@ -65,11 +72,13 @@ export class DiffSince implements Operation<string | null> {
       this.commit,
       "--",
       ...this.paths.map(Git.literal),
+      ...this.globs.map(Git.glob),
+      ...this.excluded.map(Git.excluded),
     ];
     return StagingArea.temporary(git, async (staging) => {
       try {
         await staging.startFromDevelopers(git);
-        await staging.markAsAdded(this.paths);
+        await staging.markAsAdded(this.paths, this.globs);
         return (await staging.git.run(diff)).stdout;
       } catch {
         return (await git.run(diff)).stdout;

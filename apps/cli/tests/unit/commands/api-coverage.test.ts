@@ -54,6 +54,12 @@ const NOT_RESOURCES: Readonly<Record<string, string>> = {
   // history is that command's to read. Registry CRUD would offer a `create`
   // that skips the release construction the command exists to do.
   deployments: "created and read through `zitadel deploy` orchestration, not registry CRUD (#529)",
+  // Registered applications are written through the API by other systems,
+  // not from `.zitadel/`; the CLI has no command for them yet (#2788).
+  applications: "registered applications are written through the API, not the CLI (#2788)",
+  // OpenAPI contract lands first (#2849); CLI commands follow in #2858.
+  invitations: "not yet exposed — `zitadel invitation` lands with #2858",
+  search: "finds resources across types (ADR 087); a `zitadel search` command is not built yet",
 };
 
 /**
@@ -123,7 +129,7 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   getPolicyRevision: "reads one revision by revision id; same shape question as above",
   getIdpRevisionById: "reads one revision by revision id; same shape question as above",
   evaluatePolicy:
-    "a dry run `policies test` sends per case from lib/policies/tests.ts; no registry verb evaluates",
+    "a dry run `policies test` sends per case from commands/policies/test.ts; no registry verb evaluates",
 
   // Known gaps, recorded rather than hidden. These are additive and tracked as
   // a follow-up; they are listed here so adding one is a deliberate act.
@@ -136,6 +142,13 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   removeOrigin:
     "not yet exposed — `zitadel origin remove` lands with the origins CLI surface (#1578)",
   listProjectAdmins: "not yet exposed; a project sub-resource listing, no command reads it yet",
+  createInvitation: "not yet exposed — `zitadel invitation create` lands with #2858",
+  listInvitations: "not yet exposed — `zitadel invitation list` lands with #2858",
+  getInvitation: "not yet exposed — `zitadel invitation get` lands with #2858",
+  cancelInvitation: "not yet exposed — `zitadel invitation cancel` lands with #2858",
+  lookupInvitation: "token redeem; CLI exempt (ADR 086 §8)",
+  acceptInvitation: "token redeem; CLI exempt (ADR 086 §8)",
+  rejectInvitation: "token redeem; CLI exempt (ADR 086 §8)",
 };
 
 const capitalize = (word: string): string => `${word[0]?.toUpperCase() ?? ""}${word.slice(1)}`;

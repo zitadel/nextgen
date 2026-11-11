@@ -7304,28 +7304,8 @@
     {
       "kind": "javascript-module",
       "path": "src/orchestrator/sanitiser.ts",
-      "declarations": [
-        {
-          "kind": "function",
-          "name": "createSanitiser",
-          "return": {
-            "type": {
-              "text": "(html: string) => string"
-            }
-          },
-          "description": "Returns a sanitiser bound to the current manifest registry. Callers should\ncache the result; rebuilding is cheap but allocates a fresh DOMPurify config."
-        }
-      ],
-      "exports": [
-        {
-          "kind": "js",
-          "name": "createSanitiser",
-          "declaration": {
-            "name": "createSanitiser",
-            "module": "src/orchestrator/sanitiser.ts"
-          }
-        }
-      ]
+      "declarations": [],
+      "exports": []
     },
     {
       "kind": "javascript-module",

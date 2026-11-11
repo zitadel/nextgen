@@ -94,7 +94,7 @@ see [§ Drift notes](#drift-notes).
 | `import` | job-lifecycle | Start job (`create`); poll status (`read`). |
 | `events` | read-only | Unified audit stream (`GET /events`); replaces retired `event` / `audit_event` split (ADR 049). |
 | `session`, `auth_attempt` | runtime | App-plane `*.write` only (no separate `*.create` — OpenAPI `*.write` covers start + mutate). Operator: `session.read` / `session.delete`. |
-| `app`, `idp`, `app_group`, `schema`, `flow_definition` | manage | No create/write split — `write` = create + update; `delete` where exposed. Matches OpenAPI. Class implies the full CRUD *set*; permissions remain `read` / `write` / `delete` (no `*.manage`). |
+| `application`, `idp`, `app_group`, `schema`, `flow_definition` | manage | No create/write split — `write` = create + update; `delete` where exposed. Matches OpenAPI. Class implies the full CRUD *set*; permissions remain `read` / `write` / `delete` (no `*.manage`). |
 
 ---
 
@@ -242,15 +242,15 @@ grant them via `team.write`.
 |---|---|---|
 | `platform.operator` | Every operation `project.admin` allows, on every project of the deployment; `GET /users/me/projects` lists every project | [ADR 075](../../adrs/075-platform-operators.md). Users of the platform project only, never a team or a secret; issued only by the `platform.operators` configuration. Not a role on the platform project: `project.admin` there grants none of it ([ADR 053 §9](../../adrs/053-cross-project-principals.md#9-deployment-wide-operators-are-a-separate-authority)). |
 
-### Apps
+### Applications
 
-> **Verb model:** manage — `write` = create + update (no `app.create`); `delete` separate. No `app.manage` permission.
+> **Verb model:** manage — `write` = create + update (no `application.create`); `delete` separate. No `application.manage` permission. Update is a revise: an application is a chain of immutable revisions, so `write` publishes one rather than editing in place.
 
 | Permission | Endpoints | Notes |
 |---|---|---|
-| `app.read` | `GET /apps/{id}` | |
-| `app.write` | `POST /apps`, `PATCH /apps/{id}` | Create + manage. |
-| `app.delete` | `DELETE /apps/{id}` | |
+| `application.read` | `GET /applications/{id}`; `POST /applications/query` (#2789), `GET /applications/{id}/revisions` and `GET /applications/revisions/{revision_id}` **not yet exposed** | Never returns a client secret. ADR 063 §4 requires the revision reads before a release can pin an application (#2790); they carry the same scope as the get. |
+| `application.write` | `POST /applications` | Create + revise: the `slug` in the submitted document decides whether it creates a registered application or appends a revision to an existing one in the project. A new client's secret is returned once. |
+| `application.delete` | `DELETE /applications/{id}` | **Not yet exposed** — target shape. |
 
 ### Identity providers
 
@@ -277,15 +277,15 @@ grant them via `team.write`.
 > **Verb model:** soft split — `create` vs `write` useful for delegation; default bundles grant full CRUD.
 
 A **grant** is an explicit access record: who may access what, at which scope
-(user ↔ app, team ↔ project, user ↔ role in an app_group, or a raw permission
+(user ↔ application, team ↔ project, user ↔ role in an app_group, or a raw permission
 assignment). This is the `/grants` management resource — **not** OAuth
 `grant_type` on `/oauth/token`.
 
 | Permission | Endpoints | Notes |
 |---|---|---|
-| `grant.create` | `POST /grants` | Bind a principal to an app, role, or permission at a scope. |
+| `grant.create` | `POST /grants` | Bind a principal to an application, role, or permission at a scope. |
 | `grant.read` | `GET /grants/{id}` | |
-| `grant.write` | `PATCH /grants/{id}` | Update an existing binding (e.g. role change on an app grant). |
+| `grant.write` | `PATCH /grants/{id}` | Update an existing binding (e.g. role change on an application grant). |
 | `grant.delete` | `DELETE /grants/{id}` | Revoke access. |
 
 ### Schemas (user schemas)
@@ -381,7 +381,7 @@ Replacements:
 | `team.events.read` | `events.read` | **Yes.** Filter to the team via grant/credential scope. |
 | `team.scim.sync` | TBD (`scim.sync` or similar) | **Parked** — SCIM interop exists (`/scim/v2/*` in resource-map); no management-permission mapping yet. |
 | `origins.write`, `signing_keys.*` | `origin.write`, `signing_key.*` | **Yes.** Flat resource permissions; the project grant carries scope. |
-| `apps.write` / `idps.write` | `app.write` / `idp.write` | **Yes.** Plural → singular. |
+| `apps.write` / `idps.write` | `application.write` / `idp.write` | **Yes.** Plural → singular; `apps` also becomes `application`. |
 | `projects.settings.write` | `project.write` | **Yes.** No separate “settings” resource. |
 
 ---
@@ -407,7 +407,7 @@ webhook.read, webhook.write, webhook.delete,
 team.create, team.read, team.write, team.delete,
 user.create, user.read, user.write, user.set_password, user.delete,
 team_membership.create, team_membership.read, team_membership.write, team_membership.delete,
-app.read, app.write, app.delete,
+application.read, application.write, application.delete,
 idp.read, idp.write, idp.delete,
 app_group.read, app_group.write, app_group.delete,
 grant.create, grant.read, grant.write, grant.delete,
@@ -441,7 +441,7 @@ webhook.read,
 team.read,
 user.read,
 team_membership.read,
-app.read,
+application.read,
 idp.read,
 app_group.read,
 grant.read,
@@ -528,7 +528,7 @@ MUST NEVER:
                                       own-team team.read is under MAY)
   billing.*
   idp.*
-  app.*
+  application.*
   app_group.*
   grant.*
   schema.*
@@ -556,7 +556,7 @@ The remaining behavioral and endpoint gaps below are follow-up work.
 **Verb model.** OpenAPI scopes for several resources use only `.read` and
 `.write`, where `.write` means “create and update,” plus a separate `.delete`
 where exposed. This catalog keeps that model for **manage**-class resources
-(`app`, `idp`, `app_group`, `schema`, `flow_definition`, `branding`, `domain`,
+(`application`, `idp`, `app_group`, `schema`, `flow_definition`, `branding`, `domain`,
 `origin`, `webhook`): no separate `.create`, and **no grantable
 `manage` verb** — the class name means the resource’s full lifecycle
 (`write` + `delete` where an endpoint exists); grants still name `write` or

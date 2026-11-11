@@ -37,7 +37,7 @@ var (
 		` WHERE t.project_id = $1 AND t.origin = ANY($2) AND NOT ` + deployment.NewerOriginRowExists(originsTable)
 	liveOriginsStmt    = originsQuery + ` AND ` + deployment.RowServes(deploymentTables, "$3")
 	liveDeploymentStmt = deploymentQuery + ` WHERE project_id = $1 AND id = (SELECT t.deployment_id FROM ` + originsTable + ` t` +
-		` WHERE t.project_id = $1 AND t.origin = $2 AND ` + deployment.RowServes(deploymentTables, "$3") + `)`
+		` WHERE t.project_id = $1 AND t.origin = $2 AND ` + deployment.OriginRowServes(deploymentTables, "$3") + `)`
 )
 
 type deploymentStatements struct{ statement }

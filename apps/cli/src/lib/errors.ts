@@ -9,6 +9,11 @@ import {
 } from "./backend";
 import { isObject } from "./json";
 import type { SuggestedCommand } from "./suggestion";
+import {
+  ConfigError,
+  ConflictError as ConfigConflictError,
+  NotFoundError as ConfigNotFoundError,
+} from "./zitadel";
 
 /**
  * Closed set of failure categories the CLI can surface. Every error the
@@ -27,6 +32,12 @@ export type ZitadelErrorCode =
   | "E_NOT_FOUND"
   | "E_PORT_IN_USE"
   | "E_VALIDATION"
+  /**
+   * A destructive action stopped for want of `--force` with nobody to ask.
+   * Only a person can agree to it, so an agent asks them before it adds the
+   * `--force` its suggested retry carries.
+   */
+  | "E_CONFIRMATION_REQUIRED"
   | "E_CREDENTIAL_MISSING"
   | "E_NOT_IMPLEMENTED"
   | "E_CANCELLED";
@@ -47,11 +58,21 @@ export const EXIT_CODES: Record<ZitadelErrorCode, number> = {
   E_NOT_FOUND: 4,
   E_PORT_IN_USE: 5,
   E_VALIDATION: 3,
+  E_CONFIRMATION_REQUIRED: 3,
   E_CREDENTIAL_MISSING: 3,
   E_NOT_IMPLEMENTED: 2,
   // 128 + SIGINT, what a shell reports for a command stopped by Ctrl-C.
   E_CANCELLED: 130,
 };
+
+/**
+ * The hint of an `E_CONFIRMATION_REQUIRED` refusal: the question the prompt
+ * would have asked, for whoever runs the CLI to put to a person, and when
+ * `--force` may follow.
+ */
+export function confirmationHint(question: string): string {
+  return `Ask a person first: ${question} Pass --force only once they agree.`;
+}
 
 /**
  * Optional, user-facing extras attached to a {@link ZitadelError}. Kept
@@ -111,6 +132,31 @@ const NETWORK_HINTS: Record<UnavailableReason, string> = {
 };
 
 /**
+ * The error code a configuration error is reported with.
+ *
+ * @remarks
+ * A file or directory the OS refused to read carries its errno in
+ * `details.code`; a permission failure is `E_AUTH`, as it is for any other
+ * file the CLI reads.
+ *
+ * @param error - The error.
+ * @returns The code it is reported with.
+ */
+function configErrorCode(error: ConfigError): ZitadelErrorCode {
+  const errno = error.details?.code;
+  if (errno === "EACCES" || errno === "EPERM") {
+    return "E_AUTH";
+  }
+  if (error instanceof ConfigConflictError) {
+    return "E_CONFLICT";
+  }
+  if (error instanceof ConfigNotFoundError) {
+    return "E_NOT_FOUND";
+  }
+  return "E_VALIDATION";
+}
+
+/**
  * Normalises any thrown value into a {@link ZitadelError}. Inspection is
  * ordered most-specific-first (already-normalised, HTTP status, then
  * errno/filesystem, no response, Zod-like, generic `Error`, then a
@@ -128,6 +174,15 @@ export function toZitadelError(error: unknown): ZitadelError {
 
   if (error instanceof BackendError) {
     return fromBackendError(error);
+  }
+
+  // Configuration that cannot be read or edited as asked is the developer's
+  // to fix, with the hint and details the configuration library gave.
+  if (error instanceof ConfigError) {
+    return new ZitadelError(configErrorCode(error), error.message, {
+      ...(error.hint === undefined ? {} : { hint: error.hint }),
+      ...(error.details === undefined ? {} : { details: error.details }),
+    });
   }
 
   if (isErrnoException(error)) {
@@ -316,6 +371,9 @@ function listedInDetails(
  * invalid, so without these lines the reason shows only in `--json`. A flow
  * keeps its reason in the resource's own `details.details`, behind a generic
  * message, so that text is appended when the message does not already hold it.
+ * A connection names what it refused there too, as a list: the fields an
+ * `idp.field_immutable` blames, or the endpoints an `idp.endpoints_partial`
+ * reports missing. Those are appended the same way.
  */
 function rejectedResources(body: unknown): string[] {
   const lines: string[] = [];
@@ -343,7 +401,10 @@ function resourceLine(item: unknown): string | undefined {
   const { kind, handle, message, details } = item as Record<string, unknown>;
   const reason = typeof message === "string" ? message : "";
   const nested = isObject(details) ? (details as Record<string, unknown>).details : undefined;
-  const detail = typeof nested === "string" ? nested : "";
+  const detail =
+    typeof nested === "string"
+      ? nested
+      : [...listedInDetails(details, "fields"), ...listedInDetails(details, "missing")].join(", ");
   const text =
     detail === "" || reason.includes(detail) ? reason : [reason, detail].filter(Boolean).join(": ");
   if (text === "") {

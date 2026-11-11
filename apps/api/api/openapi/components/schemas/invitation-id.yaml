@@ -1,0 +1,7 @@
+type: string
+pattern: '^[a-zA-Z0-9_-]+$'
+x-zitadel-pattern-message: "must be one or more letters, digits, _ or -"
+description: |
+  The invitation ID (`inv_<opaque>`): the `id` that `createInvitation`
+  (`POST /invitations`) returns or `listInvitations` (`GET /invitations`) lists.
+example: inv_01JD3B7K2M9P4R6T8V0X2Z4C6E

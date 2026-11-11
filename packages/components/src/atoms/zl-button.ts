@@ -183,12 +183,12 @@ export class ZlButton extends LitElement {
       // event alone). Non-submit and form-less buttons still emit `zl-submit`
       // below for SPA/orchestrator listeners.
       event.preventDefault();
-      form.requestSubmit();
+      HTMLFormElement.prototype.requestSubmit.call(form);
       return;
     }
     if (type === "reset" && form) {
       event.preventDefault();
-      form.reset();
+      HTMLFormElement.prototype.reset.call(form);
     }
     emit<ZlSubmitDetail>(this, "zl-submit", { action: action ?? null });
   }

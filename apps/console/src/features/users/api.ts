@@ -1,6 +1,6 @@
 import { api } from "@/api/zitadel";
 import { fetchAllIdps, fetchUserIdentityLinks } from "@/features/authentication/api";
-import { fetchLatestSchemaId } from "@/features/schemas/api";
+import { fetchLatestSchemaId, fetchSchemaRevisions } from "@/features/schemas/api";
 import type { UserSchema } from "@/features/schemas/model";
 import { field, isPresent } from "@/lib/record";
 import { ApiError } from "@zitadel/api/runtime/fetch";
@@ -190,28 +190,37 @@ export async function fetchUserDetail(userId: string, projectId: string) {
     ? api
         // Schema ids are unique per project only, so name the selected one.
         .getSchemaById(schemaId, { project_id: projectId })
-        .then((value) => value.schema as UserSchema)
+        .then((value) => ({ id: value.id, schema: value.schema as UserSchema }))
         .catch(() => undefined)
     : Promise.resolve(undefined);
-  const [schema, latestSchemaId, passkeys, identityLinks, passwordSetAt] = await Promise.all([
-    readingSchema,
-    // The schema's name opens the schema at its newest revision; the user
-    // may be on an older one, which the revision box opens. Unreadable, the
-    // name opens the user's own revision.
-    readingSchema.then((value) => {
-      const objectType = value && field(value, "objectType");
-      return objectType
-        ? fetchLatestSchemaId(projectId, objectType).catch(() => undefined)
-        : undefined;
-    }),
-    api.listUserPasskeys.all(userId, { limit: 100 }).catch(() => undefined),
-    fetchUserIdentityLinks(userId).catch(() => undefined),
-    // `null`: the user has no password; `undefined`: it could not be read.
-    api
-      .getUserPasswordState(userId)
-      .then((result) => result.set_at ?? null)
-      .catch(() => undefined),
-  ]);
+  const objectTypeOf = (read: Awaited<typeof readingSchema>) =>
+    read && field(read.schema, "objectType");
+  const [own, latestSchemaId, revisions, passkeys, identityLinks, passwordSetAt] =
+    await Promise.all([
+      readingSchema,
+      // The schema's name opens the schema at its newest revision; the user
+      // may be on an older one, which the revision box opens. Unreadable, the
+      // name opens the user's own revision.
+      readingSchema.then((value) => {
+        const objectType = objectTypeOf(value);
+        return objectType
+          ? fetchLatestSchemaId(projectId, objectType).catch(() => undefined)
+          : undefined;
+      }),
+      // What the user can be moved to. A schema stored without an `objectType` is a
+      // revision of nothing, so it has no history and the server refuses any move.
+      readingSchema.then((value) => {
+        const objectType = objectTypeOf(value);
+        return objectType ? fetchSchemaRevisions(projectId, objectType).catch(() => []) : [];
+      }),
+      api.listUserPasskeys.all(userId, { limit: 100 }).catch(() => undefined),
+      fetchUserIdentityLinks(userId).catch(() => undefined),
+      // `null`: the user has no password; `undefined`: it could not be read.
+      api
+        .getUserPasswordState(userId)
+        .then((result) => result.set_at ?? null)
+        .catch(() => undefined),
+    ]);
 
   // A link names its connection by id; the connections give it a name. Only
   // read them when there is something to name, and fall back to the id when
@@ -221,5 +230,16 @@ export async function fetchUserDetail(userId: string, projectId: string) {
       ? await fetchAllIdps(projectId).catch(() => null)
       : null;
 
-  return { user, schema, latestSchemaId, passkeys, identityLinks, idps, passwordSetAt };
+  return {
+    user,
+    schema: own?.schema,
+    // The row's own id, which a built-in schema's `user.schema` may spell differently.
+    ownRevisionId: own?.id,
+    latestSchemaId,
+    revisions,
+    passkeys,
+    identityLinks,
+    idps,
+    passwordSetAt,
+  };
 }

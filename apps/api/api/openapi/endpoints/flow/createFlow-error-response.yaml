@@ -20,6 +20,7 @@ content:
         - $ref: '../../components/schemas/errors/proj-not_found.yaml'
         - $ref: '../../components/schemas/errors/proj-origin_not_allowed.yaml'
         - $ref: '../../components/schemas/errors/proj-preview_not_live.yaml'
+        - $ref: '../../components/schemas/errors/rel-no_default.yaml'
         - $ref: '../../components/schemas/errors/rel-not_deployed.yaml'
         - $ref: '../../components/schemas/errors/rel-not_found.yaml'
         - $ref: '../../components/schemas/errors/rel-revoked.yaml'
@@ -45,6 +46,7 @@ content:
           proj.not_found: '../../components/schemas/errors/proj-not_found.yaml'
           proj.origin_not_allowed: '../../components/schemas/errors/proj-origin_not_allowed.yaml'
           proj.preview_not_live: '../../components/schemas/errors/proj-preview_not_live.yaml'
+          rel.no_default: '../../components/schemas/errors/rel-no_default.yaml'
           rel.not_deployed: '../../components/schemas/errors/rel-not_deployed.yaml'
           rel.not_found: '../../components/schemas/errors/rel-not_found.yaml'
           rel.revoked: '../../components/schemas/errors/rel-revoked.yaml'
@@ -84,6 +86,8 @@ content:
         $ref: '../../components/examples/errors/proj-origin_not_allowed.yaml'
       proj.preview_not_live:
         $ref: '../../components/examples/errors/proj-preview_not_live.yaml'
+      rel.no_default:
+        $ref: '../../components/examples/errors/rel-no_default.yaml'
       rel.not_deployed:
         $ref: '../../components/examples/errors/rel-not_deployed.yaml'
       rel.not_found:

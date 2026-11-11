@@ -23,7 +23,7 @@ import { escapeControlCharacters } from "@/lib/terminal-text";
 import { painted } from "@/lib/oclif/rendering";
 import { type SuggestedCommand, shellCommand, unscopedCommand } from "@/lib/suggestion";
 import { isNewerVersion, latestCliVersion } from "@/lib/update-check";
-import { exactZitadelPins, floatingZitadelSpecs } from "./doctor/checks/dependency-version";
+import { exactZitadelPins, floatingZitadelSpecs } from "@/lib/zitadel-pins";
 
 const REFRESH_TIMEOUT_MS = 5 * 60 * 1000;
 

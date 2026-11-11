@@ -190,6 +190,32 @@ func TestLoadConfigEventRetention(t *testing.T) {
 	assert.ErrorContains(t, err, "events.retention.trigger_secret must be at least 16 printable ASCII characters")
 }
 
+// The two settings the cloud's launcher makes for a server that runs only
+// while it serves a request, read as it writes them into the environment.
+func TestLoadConfigForAServerThatRunsOnlyWhileItServes(t *testing.T) {
+	t.Setenv("NEXTGEN_SERVER_DATA_DIR", t.TempDir())
+	t.Setenv("NEXTGEN_SERVER_IDLE_TIMEOUT", "")
+	t.Setenv("NEXTGEN_EVENTS_REQUEST_FLUSH_WAIT", "")
+	configPath := filepath.Join(t.TempDir(), "nextgen.yaml")
+	require.NoError(t, os.WriteFile(configPath, nil, 0o600))
+
+	cfg, err := loadConfig(configPath)
+	require.NoError(t, err)
+	assert.Equal(t, time.Minute, cfg.Server.IdleTimeout)
+	assert.Equal(t, time.Minute, idleTimeout(cfg.Server.IdleTimeout))
+	assert.Zero(t, cfg.Events.Request.FlushWait, "a request does not wait for its event")
+
+	t.Setenv("NEXTGEN_SERVER_IDLE_TIMEOUT", "0")
+	t.Setenv("NEXTGEN_EVENTS_REQUEST_FLUSH_WAIT", "2s")
+	cfg, err = loadConfig(configPath)
+	require.NoError(t, err)
+	assert.Zero(t, cfg.Server.IdleTimeout)
+	// net/http reads zero as "as long as ReadTimeout"; only a negative
+	// timeout never closes an idle connection.
+	assert.Negative(t, idleTimeout(cfg.Server.IdleTimeout))
+	assert.Equal(t, 2*time.Second, cfg.Events.Request.FlushWait)
+}
+
 // TestLoadConfigErrorDefaults pins the error capture defaults of ADR 030
 // Decision 5: the report location is on and the stack trace is off.
 func TestLoadConfigErrorDefaults(t *testing.T) {

@@ -103,6 +103,11 @@ type User struct {
 	// Attributes are populated by user read statements.
 	Attributes Attributes
 
+	// MatchedText is the search text this user was found by, set only on a
+	// search read ([UserFieldSearchText]). It is the read's sort key, so the
+	// page token is built from it; it is never part of a response.
+	MatchedText string
+
 	// Ref is the derived identity of ADR 058 §3a, resolved live from the
 	// schema's x-identifier/x-display designations. Populated by service
 	// reads that resolve it; nil on plain statement-level reads.
@@ -239,15 +244,12 @@ type PatchUser struct {
 	ExpectedUpdatedAt time.Time
 	// Attributes is the complete desired attribute set after the merge.
 	Attributes CreateAttributes
-	// AttributeTeamScope is the team_id recorded on rewritten attribute rows,
-	// and the scope fallback RegistryTeamScopes was computed with.
-	AttributeTeamScope string
-	// RegistryTeamScopes is the resolved team scope of each registry row,
+	// UniqueTeamScopes is the resolved team scope of each unique claim,
 	// index-aligned with Attributes: existing claims keep their stored scope,
-	// new team-unique claims fall back to AttributeTeamScope (see
-	// [CreateAttributes.RegistryTeamScopes]). Resolved here once so the
+	// new team-unique claims fall back to the lifecycle owner team, else ""
+	// (see [CreateAttributes.UniqueTeamScopes]). Resolved here once so the
 	// dialects stay pure writers.
-	RegistryTeamScopes []string
+	UniqueTeamScopes []string
 }
 
 // PatchUserParams are the inputs to [NewPatchUser].
@@ -262,13 +264,13 @@ type PatchUserParams struct {
 	// AttributesPatch is merged into the current attributes per
 	// [MergeAttributesPatch]; nil values delete.
 	AttributesPatch map[string]any
-	// StoredRegistryScopes is the stored registry team scope per key (from
+	// StoredUniqueTeamScopes is the stored unique team scope per key (from
 	// [service.UserStatements].GetUserUniqueAttributeScopes), so existing
 	// claims keep the scope create gave them. Reading it outside the write
-	// transaction is safe: every registry mutation moves the user's
+	// transaction is safe: every unique claim change moves the user's
 	// updated_at, so the patch statement's guard catches interleaved changes
 	// and the caller re-merges from a fresh read.
-	StoredRegistryScopes map[AttributeKey]string
+	StoredUniqueTeamScopes map[AttributeKey]string
 }
 
 // NewPatchUser merges the patch into the user's current attributes and
@@ -292,7 +294,7 @@ func NewPatchUser(params PatchUserParams) (*PatchUser, error) {
 		return nil, err
 	}
 
-	// Fallback scope for team-unique claims not yet in the registry:
+	// Fallback scope for team-unique claims not yet stored:
 	// lifecycle owner team, else "" (project-wide). Existing claims keep
 	// their stored team scope, because create may have scoped them to an
 	// initial membership team this patch knows nothing about (see
@@ -303,13 +305,12 @@ func NewPatchUser(params PatchUserParams) (*PatchUser, error) {
 	}
 
 	return &PatchUser{
-		ProjectID:          params.Current.ProjectID,
-		UserID:             params.Current.ID,
-		SchemaURL:          params.SchemaURL,
-		ExpectedUpdatedAt:  params.Current.Metadata.UpdatedAt,
-		Attributes:         patchAttrs,
-		AttributeTeamScope: teamScope,
-		RegistryTeamScopes: patchAttrs.RegistryTeamScopes(params.StoredRegistryScopes, teamScope),
+		ProjectID:         params.Current.ProjectID,
+		UserID:            params.Current.ID,
+		SchemaURL:         params.SchemaURL,
+		ExpectedUpdatedAt: params.Current.Metadata.UpdatedAt,
+		Attributes:        patchAttrs,
+		UniqueTeamScopes:  patchAttrs.UniqueTeamScopes(params.StoredUniqueTeamScopes, teamScope),
 	}, nil
 }
 
@@ -323,8 +324,9 @@ func validateAndFlattenAttributes(schema []byte, doc map[string]any, emptyMessag
 	if err := json.Unmarshal(schema, &jschema); err != nil {
 		return nil, ErrInternal(err).WithMessage("failed to unmarshal json schema")
 	}
-	if err := jschema.Validate(doc); err != nil {
+	if err := jschema.ValidateWithOpts(doc, attributeValidation); err != nil {
 		if jsonschema.IsValidationError(err) {
+			err = locateItemFailures(&jschema, doc, err)
 			return nil, ErrUserAttributesInvalid(err).
 				WithDetails(UserAttributesDetails{Keys: InvalidAttributeKeys(err, doc)})
 		}
@@ -339,6 +341,7 @@ func validateAndFlattenAttributes(schema []byte, doc map[string]any, emptyMessag
 	if err != nil {
 		return nil, ErrInternal(err).WithMessage("failed to flatten user attributes")
 	}
+	attrs.MarkSearchable(SearchableAttributeKeys(mschema))
 	if len(attrs) == 0 {
 		return nil, ErrUserInvalid().WithMessage(emptyMessage)
 	}
@@ -372,4 +375,10 @@ const (
 	UserFieldCreatedAt
 	UserFieldUpdatedAt
 	UserFieldSchemaObjectType
+	// UserFieldSearchText and UserFieldSearchUserID order a search read: the
+	// search text a user matched on, then the user's id as the attribute row
+	// holds it. They name columns of the search index, not of the user row, so
+	// they are valid only on a read that searches.
+	UserFieldSearchText
+	UserFieldSearchUserID
 )

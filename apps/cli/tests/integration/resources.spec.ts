@@ -131,7 +131,7 @@ describe("resources", () => {
 
           const result = await app.run([topic, verb, id, "--json"]);
 
-          expect(result).toFailWith("E_VALIDATION");
+          expect(result).toFailWith("E_CONFIRMATION_REQUIRED");
         });
 
         it.each(DESTRUCTIVE)("says to pass --force for %s %s", async (topic, verb, id) => {
@@ -196,6 +196,32 @@ describe("resources", () => {
 
         expect(result.stdout + result.stderr).not.toContain("\u001b[2J");
         expect(result.stdout + result.stderr).toContain("\\x1b[2Jwiped");
+      });
+    });
+
+    describe("a resource id of the wrong kind", () => {
+      it.each([
+        [["users", "get", "rel_01M6KPFXAE68N6G2X1HN5XD29R"]],
+        [["sessions", "get", "user_01KX5N7C9D2E7F0N9WD3P2E4YM6"]],
+        [["release", "get", "sess_01KX5N7C9D2E7F0N9WD3P2E4YM6"]],
+      ])("is refused by %j", async (args) => {
+        const app = await aSetUpApp();
+
+        const result = await app.run([...args, "--json"]);
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
+
+      it.each([
+        [["users", "get", "rel_01M6KPFXAE68N6G2X1HN5XD29R"], "users list"],
+        [["sessions", "get", "user_01KX5N7C9D2E7F0N9WD3P2E4YM6"], "sessions list"],
+        [["release", "get", "sess_01KX5N7C9D2E7F0N9WD3P2E4YM6"], "release list"],
+      ])("by %j suggests %s", async (args, list) => {
+        const app = await aSetUpApp();
+
+        const result = await app.run([...args, "--json"]);
+
+        expect(result).toSuggest(list);
       });
     });
 

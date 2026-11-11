@@ -47,7 +47,9 @@ import {
  * it opens on a search field, matched on the server across every project the
  * person can act on, above the selected project and the ones they opened
  * recently, and, while all their projects fit on one page, every other one by
- * name. Its footer opens Projects. The team switcher is a `Popover` over the
+ * name. Its footer opens Projects. Above every project (Projects, Settings)
+ * the pill says so, `All projects`, rather than naming the one the selection
+ * still holds, and its list is the way back into one (D27). The team switcher is a `Popover` over the
  * project's active teams; its footer adds a team, opening the Add team drawer
  * and then the new team.
  */
@@ -60,6 +62,9 @@ const NO_PROJECTS = "No projects";
 
 /** What the project pill says while projects exist but none is selected. */
 const NO_SELECTION = "Select a project";
+
+/** What it says above every project, and what its footer opens. */
+const ALL_PROJECTS = "All projects";
 
 /** The project list's search field, label and placeholder alike. */
 const FIND_PROJECT = "Find a project";
@@ -86,7 +91,14 @@ interface SwitcherOption {
   link: Pick<LinkProps, "to" | "params" | "search">;
 }
 
-export function ContextSwitcher({ userId }: { userId?: string }) {
+export function ContextSwitcher({
+  userId,
+  allProjects = false,
+}: {
+  userId?: string;
+  /** The screen is above every project, so the pill names none. */
+  allProjects?: boolean;
+}) {
   // The pill shows the selected project (`?project=`, `src/features/projects/project-scope.ts`),
   // never `getConsoleProjectId()`: that is the project the console signs into —
   // the platform project on a platform deployment — which is not what anybody
@@ -99,15 +111,10 @@ export function ContextSwitcher({ userId }: { userId?: string }) {
   useRememberRecentProject(userId, current);
   const selected = useProjectScope();
   const teamId = useParams({ strict: false, select: (params) => params.teamId });
-  // Projects is the switcher's list with room to read it, and has its own
-  // search, so a pill there would only offer a second way to find a project,
-  // naming one above the list of all of them (D21). That list marks the
-  // selected project instead.
-  const onProjects = useMatch({ from: "/_authed/projects/", shouldThrow: false });
 
   return (
     <nav aria-label="Context" className="flex min-w-0 items-center gap-2">
-      {!onProjects && <ProjectSwitcher userId={userId} current={current} />}
+      <ProjectSwitcher userId={userId} current={current} allProjects={allProjects} />
       {/* The team switcher joins the bar once a team is open — the team is the
           context then, and following another team from the list switches it.
           Teams are not a standing selection the way projects are: no screen
@@ -132,10 +139,12 @@ export function ContextSwitcher({ userId }: { userId?: string }) {
 function ProjectSwitcher({
   userId,
   current,
+  allProjects,
 }: {
   userId: string | undefined;
   /** The selected project, named once it is read. */
   current: SelectedProject | undefined;
+  allProjects: boolean;
 }) {
   // The first page says whether there are more projects than it shows, and so
   // whether the list can open on all of them.
@@ -182,12 +191,14 @@ function ProjectSwitcher({
     <Combobox open={open} onOpenChange={changeOpen}>
       <ComboboxAnchor asChild>
         <button type="button" aria-label="Switch project" className={TRIGGER}>
-          {selected ? (
+          {selected && !allProjects ? (
             <ProjectMark projectId={selected} className="size-4" />
           ) : (
             <Boxes size={16} className="shrink-0 text-foreground" aria-hidden />
           )}
-          {mine === undefined ? (
+          {allProjects ? (
+            <span className="min-w-0 truncate leading-5 text-foreground">{ALL_PROJECTS}</span>
+          ) : mine === undefined ? (
             <Skeleton className="h-4 w-24" />
           ) : label === undefined ? (
             <span className="min-w-0 truncate text-muted-foreground">
@@ -206,7 +217,7 @@ function ProjectSwitcher({
         emptyLabel={emptyLabel}
         search={{ query, onQueryChange: setQuery }}
         footer={{
-          label: "All projects",
+          label: ALL_PROJECTS,
           icon: <Boxes aria-hidden />,
           onSelect: () => void navigate({ to: "/projects" }),
         }}
@@ -449,14 +460,14 @@ function Switcher({
 }
 
 /**
- * The bar's switcher: a borderless 32px button — glyph, name, chevrons — that
- * fills only on hover or while open. Height, padding, radius and the hover fill
- * are the sidebar rows' (`SidebarMenuButton`), so the bar and the sidebar read
- * as one set of controls rather than two contrasts. Capped so a long name
- * truncates rather than pushing search off the bar.
+ * The bar's switcher: a borderless 36px button — glyph, name, chevrons — that
+ * fills only on hover or while open. Height, padding, gap, radius and the
+ * hover fill are the sidebar rows' (`SidebarMenuButton`), so the bar and the
+ * sidebar read as one set of controls rather than two contrasts. Capped so a
+ * long name truncates rather than running the bar's width.
  */
 const TRIGGER =
-  "flex h-8 max-w-64 min-w-0 items-center gap-2 rounded-md px-2 text-sm transition-colors outline-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring data-[state=open]:bg-sidebar-accent";
+  "flex h-9 max-w-64 min-w-0 items-center gap-2.5 rounded-md px-3 text-sm transition-colors outline-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring data-[state=open]:bg-sidebar-accent";
 
 /**
  * A list row: 32px, glyph, name, and a check on the current one. The focus

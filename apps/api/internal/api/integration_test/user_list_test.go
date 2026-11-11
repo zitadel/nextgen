@@ -1,4 +1,4 @@
-//go:build postgres_integration || spanner_integration
+//go:build postgres_integration || spanner_integration || sqlite_integration
 
 package integration_test
 
@@ -122,6 +122,87 @@ func TestQueryUsers(t *testing.T) {
 	require.NoError(t, err)
 	require.IsType(t, &api.QueryUsersResponse{}, otherRes, helpers.MustMarshal(t, otherRes))
 	assert.Empty(t, otherRes.(*api.QueryUsersResponse).Users)
+}
+
+// The identifier filter end to end: the schema designates the property, the
+// service stores its search text when the user is written, and the query
+// answers from the search index, ordered by identifier and paged in that
+// order.
+func TestQueryUsersByIdentifier(t *testing.T) {
+	t.Parallel()
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
+	users := harness.EnsureUserService(t)
+	for _, email := range []string{"Zoe.Ann@example.com", "ann.b@example.com", "Ann.A@Example.com", "bob@example.com"} {
+		_, err := users.CreateUser(t.Context(), service.CreateUserInput{
+			ProjectID:  project.ID,
+			SchemaURL:  schemaURL,
+			Attributes: map[string]any{"email": email},
+		})
+		require.NoError(t, err)
+	}
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+
+	identifier := func(operation api.FilterOperation, value string) []api.QueryUsersRequestFilterItem {
+		return []api.QueryUsersRequestFilterItem{{
+			Field:     api.UserFilterFieldIdentifier,
+			Operation: operation,
+			Value:     api.NewOptFilterValue(api.NewStringFilterValue(value)),
+		}}
+	}
+	query := func(t *testing.T, req *api.QueryUsersRequest) *api.QueryUsersResponse {
+		t.Helper()
+		res, err := client.QueryUsers(t.Context(), req, api.QueryUsersParams{})
+		require.NoError(t, err)
+		require.IsType(t, &api.QueryUsersResponse{}, res, helpers.MustMarshal(t, res))
+		return res.(*api.QueryUsersResponse)
+	}
+	emails := func(t *testing.T, res *api.QueryUsersResponse) []string {
+		t.Helper()
+		out := make([]string, 0, len(res.Users))
+		for _, user := range res.Users {
+			out = append(out, userProp(t, user, "email"))
+		}
+		return out
+	}
+
+	// The start of the value, whatever its case; not a part inside it.
+	found := query(t, &api.QueryUsersRequest{Filter: identifier(api.FilterOperationStartsWith, "ANN")})
+	assert.Equal(t, []string{"Ann.A@Example.com", "ann.b@example.com"}, emails(t, found), "ordered by identifier")
+	assert.False(t, found.NextPageToken.IsSet())
+
+	first := query(t, &api.QueryUsersRequest{Filter: identifier(api.FilterOperationStartsWith, "ann"), Limit: api.NewOptLimit(1)})
+	assert.Equal(t, []string{"Ann.A@Example.com"}, emails(t, first))
+	token, ok := first.NextPageToken.Get()
+	require.True(t, ok, "a full page carries a cursor")
+	second := query(t, &api.QueryUsersRequest{
+		Filter:    identifier(api.FilterOperationStartsWith, "ann"),
+		Limit:     api.NewOptLimit(1),
+		PageToken: api.NewOptNilPageToken(token),
+	})
+	assert.Equal(t, []string{"ann.b@example.com"}, emails(t, second))
+	assert.False(t, second.NextPageToken.IsSet(), "the final page carries no cursor")
+
+	assert.Empty(t, query(t, &api.QueryUsersRequest{Filter: identifier(api.FilterOperationStartsWith, "example")}).Users)
+
+	// No index answers a substring match, and a search has one order.
+	for name, req := range map[string]*api.QueryUsersRequest{
+		"contains": {Filter: identifier(api.FilterOperationContains, "ann")},
+		"sorting": {
+			Filter:  identifier(api.FilterOperationStartsWith, "ann"),
+			Sorting: api.NewOptQueryUsersRequestSorting(api.QueryUsersRequestSorting{Field: api.UserSortFieldCreatedAt, Direction: api.SortDirectionAsc}),
+		},
+	} {
+		res, err := client.QueryUsers(t.Context(), req, api.QueryUsersParams{})
+		require.NoError(t, err, name)
+		require.IsType(t, &api.QueryUsersBadRequest{}, res, name)
+		assert.Equal(t, api.ErrorCode(domain.ErrRequestInvalid().Code), res.(*api.QueryUsersBadRequest).Code, name)
+	}
 }
 
 // userID reads the listed user's id, which the API carries on the envelope

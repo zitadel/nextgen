@@ -124,7 +124,7 @@ export function deployToPrimary(
   return api.createDeployment(
     {
       release_id: releaseId,
-      targets: [PRIMARY_TARGET],
+      targets: PRIMARY_TARGET,
       ...(input.message ? { message: input.message } : {}),
       ...(input.expectedDeploymentId ? { expected_deployment_id: input.expectedDeploymentId } : {}),
     },
@@ -133,28 +133,70 @@ export function deployToPrimary(
 }
 
 /**
+ * Whether rolling back to the deployment changes nothing: it restores the
+ * live release on the origins the live deployment serves.
+ */
+export function rollbackChangesNothing(deployment: Deployment, live?: Deployment): boolean {
+  if (live === undefined || deployment.release_id !== live.release_id) {
+    return false;
+  }
+  const frozen = new Set(deployment.targets.map((target) => target.origin));
+  const served = new Set(live.targets.map((target) => target.origin));
+  return frozen.size === served.size && [...frozen].every((origin) => served.has(origin));
+}
+
+/**
  * What the Rollback drawer offers: the primary deployment that is live, and
- * the superseded primary deployments it can go back to, newest first. A
- * deployment of the live release is left out, since rolling back to it
- * changes nothing; so is one of a revoked release, which the server refuses.
+ * the superseded primary deployments it can go back to, newest first. One
+ * that would change nothing is left out; so is one of a revoked release,
+ * which the server refuses.
  * Previews are not rolled back; they are deployed to again.
  */
 export interface RollbackTargets {
   current?: Deployment;
   options: Deployment[];
+  primaryOrigins: string[];
+}
+
+/**
+ * The project's primary origins a rollback to the deployment leaves out. A
+ * rollback restores the origins that deployment froze, so these refuse sign-in
+ * until the next deploy.
+ */
+export function droppedOrigins(deployment: Deployment, primaryOrigins: string[]): string[] {
+  const frozen = deployment.targets.map((target) => target.origin);
+  return primaryOrigins.filter((origin) => !frozen.includes(origin));
+}
+
+/**
+ * The project's primary origins the live deployment leaves out that a rollback
+ * to the deployment serves again, since it restores the origins it froze.
+ */
+export function returningOrigins(
+  deployment: Deployment,
+  live: Deployment | undefined,
+  primaryOrigins: string[],
+): string[] {
+  const served = live?.targets.map((target) => target.origin) ?? [];
+  return deployment.targets
+    .map((target) => target.origin)
+    .filter((origin) => primaryOrigins.includes(origin) && !served.includes(origin));
 }
 
 export async function listRollbackTargets(projectId: string): Promise<RollbackTargets> {
-  const history = await listAllDeployments({ project_id: projectId, expand: EXPAND_RELEASE });
+  const [history, primaryOrigins] = await Promise.all([
+    listAllDeployments({ project_id: projectId, expand: EXPAND_RELEASE }),
+    listPrimaryOrigins(projectId),
+  ]);
   const primary = history.filter((deployment) => deployment.kind === "primary");
   const current = primary.find((deployment) => deployment.status === "live");
   const options = primary.filter(
     (deployment) =>
       deployment.status !== "live" &&
-      deployment.release_id !== current?.release_id &&
+      !rollbackChangesNothing(deployment, current) &&
       !releaseRevoked(deployment),
   );
-  return { current, options };
+  return { current, options, primaryOrigins };
 }
 
 /**

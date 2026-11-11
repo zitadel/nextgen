@@ -34,6 +34,34 @@ describe("dryRunResult", () => {
     expect(result.pretty?.text).toBe('Dry run: would create users\n{\n  "schema": "s"\n}');
   });
 
+  it("reports what the server answered when it was asked", () => {
+    const result = dryRunResult({
+      verb: "update",
+      topic: "users",
+      id: "user_1",
+      body: { schema: "s" },
+      checked: { id: "user_1", schema: "s" },
+    });
+    expect(result.data).toMatchObject({ result: { id: "user_1", schema: "s" } });
+    expect(result.pretty?.text).toBe(
+      'Dry run: would update users user_1\n{\n  "schema": "s"\n}\nThe server would accept this. Nothing changed.',
+    );
+  });
+
+  it("masks a credential in the server's answer as it does in the body", () => {
+    const result = dryRunResult({
+      verb: "update",
+      topic: "users",
+      id: "user_1",
+      checked: { attributes: { password: "hunter2" } },
+    });
+    expect(JSON.stringify(result.data)).not.toContain("hunter2");
+  });
+
+  it("leaves the answer out when the server was not asked", () => {
+    expect(dryRunResult({ verb: "create", topic: "users" }).data).not.toHaveProperty("result");
+  });
+
   it("describes a delete by id without a body", () => {
     expect(dryRunResult({ verb: "revoke", topic: "sessions", id: "sess_1" }).pretty?.text).toBe(
       "Dry run: would revoke sessions sess_1",

@@ -119,6 +119,7 @@ Canonical examples:
 | Button that is submitting | `Button` with `loading` |
 | Row actions menu | `RowMenu` (`src/components/resource-list.tsx`) |
 | Screen outside the app shell (sign-in, claim, server unavailable) | `StandaloneScreen` + `StandaloneMessage` (`src/components/standalone-screen.tsx`) |
+| Centred state in place of a screen's content (the project picker) | `Empty` (`src/components/ui/empty.tsx`) |
 
 Shared text styles (`PAGE_TITLE`, `SECTION_HEADING`, `SUBSECTION_HEADING`,
 `OVERLINE`, `EYEBROW`, the panel table cells) live in
@@ -154,10 +155,6 @@ own. Do not add a per-screen wrapper with its own padding.
 | Page bottom | 32px |
 | Title row | 36px, title centred — `PAGE_TITLE_ROW` in `typography.ts`, used by lists, details, settings and System |
 | Fill | `fill`: at `lg`, exactly the height under the 56px top bar, as a column; the part that should take the rest uses `flex-1 min-h-0` (Branding's preview). Never a `100vh` offset |
-
-Projects, the home, has no sidebar (D24), so its content sits in `HomeColumn`
-inside `Page`: capped and centred, so the table does not stretch across the
-window.
 
 `inset="panel"` is for the configuration-panel screens (Login flows, Identity
 providers, Releases), whose single card the design insets by 24px on the

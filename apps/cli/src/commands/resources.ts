@@ -1,6 +1,7 @@
 import {
   type GetReleaseById200,
   ListEventsCategoryItem,
+  ListEventsStatusClassItem,
   ListFlowDefinitionsRevisions,
   ListSchemasRevisions,
   QueryGrantsBodyFilterItemOperation,
@@ -24,6 +25,9 @@ import {
   UpdateTeamBody,
 } from "@/lib/backend/schemas";
 import {
+  GetReleaseByIdParams,
+  GetSessionParams,
+  GetUserByIDParams,
   GetBrandingByIdResponse,
   GetFlowDefinitionResponse,
   CreateIdpBody,
@@ -80,6 +84,9 @@ import {
 } from "@/lib/oclif/crud";
 import type { Tabulate } from "@/lib/oclif/tabulatable";
 
+/** A user update's body as its flags write it: `--dry-run` sets `dry_run`. */
+const USER_UPDATE_BODY = PatchUserByIDBody.omit({ dry_run: true });
+
 /**
  * The platform connection every resource verb calls through: the typed
  * client bound to the resolved server, plus the project the credential
@@ -99,7 +106,7 @@ export const create = <B, C>(
 export const update = <B, U>(
   schema: Schema<B>,
   call: (ctx: Platform, id: string, body: B) => Promise<U>,
-  shape: WriteShape = {},
+  shape: WriteShape & Pick<UpdateSpec<Platform, B, U>, "check"> = {},
 ): NoInfer<UpdateSpec<Platform, B, U>> => ({ ...shape, schema, call });
 
 // Marks a descriptor `resource()` checked; `RESOURCES` takes no other, so an
@@ -254,13 +261,17 @@ export const resource = <
 });
 
 // The filter operations each `POST /<resource>/query` endpoint takes (ADR 031),
-// from its own body's enum, so a query that gains one offers it.
-const USER_OPERATIONS = Object.values(QueryUsersBodyFilterItemOperation);
-const TEAM_OPERATIONS = Object.values(QueryTeamsBodyFilterItemOperation);
-const SESSION_OPERATIONS = Object.values(QuerySessionsBodyFilterItemOperation);
-const GRANT_OPERATIONS = Object.values(QueryGrantsBodyFilterItemOperation);
-const IDP_OPERATIONS = Object.values(QueryIdpsBodyFilterItemOperation);
-const PROJECT_OPERATIONS = Object.values(QueryProjectsBodyFilterItemOperation);
+// from its own body's enum, so a query that gains one offers it. `starts_with`
+// is in every body's enum, but only the fields that name it take it, so those
+// list it themselves.
+const general = <O extends string>(operations: Readonly<Record<string, O>>): O[] =>
+  Object.values(operations).filter((operation) => operation !== "starts_with");
+const USER_OPERATIONS = general(QueryUsersBodyFilterItemOperation);
+const TEAM_OPERATIONS = general(QueryTeamsBodyFilterItemOperation);
+const SESSION_OPERATIONS = general(QuerySessionsBodyFilterItemOperation);
+const GRANT_OPERATIONS = general(QueryGrantsBodyFilterItemOperation);
+const IDP_OPERATIONS = general(QueryIdpsBodyFilterItemOperation);
+const PROJECT_OPERATIONS = general(QueryProjectsBodyFilterItemOperation);
 
 /** A filter operation any of the API's structured queries takes. */
 type Operation =
@@ -273,13 +284,13 @@ type Operation =
 
 /** Every filter operation the API knows, so `--filter` tells one from a value. */
 const OPERATIONS: readonly Operation[] = [
-  ...new Set([
-    ...USER_OPERATIONS,
-    ...TEAM_OPERATIONS,
-    ...SESSION_OPERATIONS,
-    ...GRANT_OPERATIONS,
-    ...IDP_OPERATIONS,
-    ...PROJECT_OPERATIONS,
+  ...new Set<Operation>([
+    ...Object.values(QueryUsersBodyFilterItemOperation),
+    ...Object.values(QueryTeamsBodyFilterItemOperation),
+    ...Object.values(QuerySessionsBodyFilterItemOperation),
+    ...Object.values(QueryGrantsBodyFilterItemOperation),
+    ...Object.values(QueryIdpsBodyFilterItemOperation),
+    ...Object.values(QueryProjectsBodyFilterItemOperation),
   ]),
 ];
 
@@ -310,6 +321,7 @@ export const RESOURCES = {
     group: CommandGroups.usersAndTeams,
     groupOrder: 1,
     singular: "user",
+    idSchema: GetUserByIDParams.shape.user_id,
     idField: "id",
     // `identifier` is the user's login handle (their email under the default
     // schema); the schema URL it replaced is identical on every row.
@@ -330,6 +342,7 @@ export const RESOURCES = {
       filters: [
         { field: "created_at", operations: USER_OPERATIONS },
         { field: "id", operations: USER_OPERATIONS },
+        { field: "identifier", operations: ["starts_with"] },
         { field: "schema", operations: USER_OPERATIONS },
         { field: "schema_object_type", operations: ["equals", "not_equals", "contains"] },
         { field: "status", operations: USER_OPERATIONS },
@@ -347,7 +360,12 @@ export const RESOURCES = {
     create: create(CreateUserBody, ({ client, projectId }, body) =>
       client.createUser(body, { project_id: projectId }),
     ),
-    update: update(PatchUserByIDBody, ({ client }, id, body) => client.patchUserByID(id, body)),
+    // dry_run is the global --dry-run's, never a body field of its own.
+    update: update(USER_UPDATE_BODY, ({ client }, id, body) => client.patchUserByID(id, body), {
+      // A server from before dry_run refuses the field rather than applying
+      // the patch, so a dry run needs no check of the server first.
+      check: ({ client }, id, body) => client.patchUserByID(id, { ...body, dry_run: true }),
+    }),
     delete: { call: ({ client }, id, consent) => consent.unlock(client).deleteUserByID(id) },
   }),
 
@@ -388,6 +406,7 @@ export const RESOURCES = {
   sessions: resource({
     group: CommandGroups.authentication,
     singular: "session",
+    idSchema: GetSessionParams.shape.session_id,
     idField: "session_id",
     columns: ["session_id", "state", "user_id", "created_at", "expires_at"],
     heading: "session_id",
@@ -453,6 +472,13 @@ export const RESOURCES = {
         { field: "entity_type", operations: ["equals"] },
         { field: "entity_id", operations: ["equals"] },
         { field: "team_id", operations: ["equals"] },
+        { field: "operation_id", operations: ["equals"], combine: "or" },
+        {
+          field: "status_class",
+          operations: ["equals"],
+          values: Object.values(ListEventsStatusClassItem),
+          combine: "or",
+        },
         {
           field: "created_at",
           ...range({ greater_than_or_equal: "created_after", less_than: "created_before" }),
@@ -629,6 +655,7 @@ export const RESOURCES = {
   release: resource({
     group: CommandGroups.configuration,
     singular: "release",
+    idSchema: GetReleaseByIdParams.shape.release_id,
     idField: "id",
     columns: ["id", "metadata.message", "metadata.git_sha", "revoked_at", "metadata.created_at"],
     heading: "id",
