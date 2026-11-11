@@ -105,7 +105,9 @@ describe("origin rm", () => {
 
         const result = await app.removeOrigin("https://app.acme.com");
 
-        expect(result).toSay(expectedPublicCliCommand("origin add <url> --kind primary"));
+        expect(result).toSay(
+          expectedPublicCliCommand("origin add '<your-app-url>' --kind primary"),
+        );
       });
 
       it("does not warn while other origins remain", async () => {

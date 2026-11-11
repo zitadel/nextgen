@@ -156,7 +156,7 @@ describe("origin rm", () => {
     const result = await remove(cwd, ["--env", "production", "--force"]);
 
     expect((parseJson(result.stdout) as { warnings?: string[] }).warnings).toEqual([
-      expect.stringContaining("origin add <url> --kind primary --env production"),
+      expect.stringContaining("origin add '<your-app-url>' --kind primary --env production"),
     ]);
   });
 

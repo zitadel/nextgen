@@ -11,7 +11,7 @@ import { aCheckContext, declined, forced } from "@tests/helpers/check-context";
 import { it } from "@tests/helpers/fixtures";
 import { write } from "@tests/helpers/git-repo";
 import { usePlatformServer } from "@tests/helpers/platform-project";
-import { unscopedCommand } from "@/lib/suggestion";
+import { asEnvironmentSelector, projectCommand, unscopedCommand } from "@/lib/suggestion";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
 /**
@@ -184,6 +184,17 @@ describe("IssuerOriginCheck.run", () => {
       const outcome = await check.run(aCheckContext(dir));
 
       expect(outcome.message).toContain(unscopedCommand("doctor --fix", "0.1.0-alpha.0"));
+    });
+
+    it("carries the run's environment selection into the doctor --fix it names", async ({
+      dir,
+    }) => {
+      await aProject(dir, AS_PREVIEW);
+      const selector = asEnvironmentSelector(" --env staging");
+
+      const outcome = await check.run(aCheckContext(dir, { selector }));
+
+      expect(outcome.message).toContain(projectCommand("doctor --fix", selector, "0.1.0-alpha.0"));
     });
 
     it("matches an issuer written with a trailing slash", async ({ dir }) => {

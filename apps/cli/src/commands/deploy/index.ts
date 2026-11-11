@@ -120,7 +120,7 @@ export function missingPrimaryOrigin(input: {
     };
   }
   return {
-    hint: `Add one with ${input.suggest("origin add <url> --kind primary")}, then deploy.`,
+    hint: `Add one with ${input.suggest("origin add '<your-app-url>' --kind primary")}, then deploy.`,
     next: ["origin list"],
   };
 }

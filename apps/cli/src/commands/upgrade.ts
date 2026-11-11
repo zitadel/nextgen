@@ -137,7 +137,7 @@ export default class Upgrade extends BaseCommand {
     return this.emit({
       status: "ok",
       data: {
-        title: `${said}.`,
+        title: said,
         current_version: cliVersion,
         latest_version: target,
         up_to_date: upToDate,

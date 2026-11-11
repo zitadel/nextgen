@@ -693,6 +693,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     const unpublished = !summary.reused || input.written.length > 0;
     const stored = input.delivery.areStored(input.published);
     const followUps = this.followUps(unpublished, scopeArgs, recovery);
+    const leading = this.followUps(false, scopeArgs, recovery).commands;
     const actions = [
       `Deploy it to make ${name} sign-in available in your app, then reload the app and test it: ${this.suggest(DEPLOY_ARGS)}`,
     ];
@@ -719,9 +720,12 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         sections: [],
         // The headline stays one line; what else it would have said goes under it.
         lines: unpublished && stored ? ["Its credentials are stored in your project."] : [],
-        // The deploy is a step with its command on a line of its own, so it can
-        // be copied; the envelope's action carries it inline, as a script reads it.
+        // A credential that did not reach the project is published first, and
+        // the deploy comes after it: the deploy is a step with its command on a
+        // line of its own, so it can be copied; the envelope's action carries it
+        // inline, as a script reads it.
         next: [
+          ...(leading.length === 0 ? [] : [{ text: NEXT_LABEL, command: leading.join("\n") }]),
           ...(unpublished
             ? [
                 {
@@ -730,9 +734,6 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
                 },
               ]
             : []),
-          ...(followUps.commands.length === 0
-            ? []
-            : [{ text: NEXT_LABEL, command: followUps.commands.join("\n") }]),
         ],
       },
     });

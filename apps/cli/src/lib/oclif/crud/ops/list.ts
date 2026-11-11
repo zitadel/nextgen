@@ -258,7 +258,9 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>, List
     // page that fails mid-drain has to stop it too; otherwise the error prints
     // under a live spinner and the handler outlives the command.
     const collected = await paging.collect(walk, { all }).catch((error: unknown) => {
-      progress?.stop(`Fetching ${topic} failed`);
+      // Cleared rather than stopped with text: a stop draws the success mark,
+      // and the error that follows says what failed.
+      progress?.clear();
       throw error;
     });
     const { items } = collected;

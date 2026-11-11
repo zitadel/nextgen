@@ -598,22 +598,13 @@ describe("isCancellation", () => {
 });
 
 // Every failure the CLI reports is one grammar: `Error: <sentence> (E_CODE)`,
-// said once. These are the two places the sentence a person reads differs
-// from the one `--json` carries, which is never touched.
+// said once, with the sentence the envelope's `message` carries.
 describe("a failure as a person is shown it", () => {
-  describe("a message that opens on a plain word", () => {
+  describe("an ordinary message", () => {
     it.each([
-      ["variable not found", "Variable not found"],
-      ["release: still served by an origin", "Release: still served by an origin"],
-      ["cancelled", "Cancelled"],
-    ])("reads %j as a sentence", (message, sentence) => {
-      expect(failureText(message).sentence).toBe(sentence);
-    });
-  });
-
-  // Capitalising the first letter of these would rename what they point at.
-  describe("a message that opens on something that is not a word", () => {
-    it.each([
+      ["variable not found"],
+      ["release: still served by an origin"],
+      ["npm install failed"],
       ["http://localhost:9/users/query got no response"],
       ["usr_1 was not found on the project"],
       [".zitadel/state.json could not be read"],

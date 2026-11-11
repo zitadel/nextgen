@@ -294,14 +294,14 @@ export default class Preview extends PreviewCommand {
         // A pipe gets the URLs directly under the sentence, as it always did.
         pretty: prose(
           [
-            `Validated the preview for ${renderCount(urls.length, { singular: "URL" })}. Nothing was deployed (dry run).`,
+            `Validated the preview for ${renderCount(urls.length, { singular: "URL" })} and deployed nothing (dry run)`,
             ...urls.map((url) => {
               return `  - ${url}`;
             }),
           ].join("\n"),
         ),
         summary: {
-          title: `Validated the preview for ${renderCount(urls.length, { singular: "URL" })}. Nothing was deployed (dry run)`,
+          title: `Validated the preview for ${renderCount(urls.length, { singular: "URL" })} and deployed nothing (dry run)`,
           sections: [],
           lines: urls.map((url) => {
             return `  - ${escapeControlCharacters(url)}`;

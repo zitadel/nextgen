@@ -8,7 +8,7 @@ import { confirm, intro, log, note, outro, select, spinner } from "@clack/prompt
 
 import { PromptCancelled, ZitadelError } from "@/lib/errors";
 import { Chain } from "@/lib/ui/chain";
-import { GUIDE } from "@/lib/ui/marks";
+import { GUIDE, MARK } from "@/lib/ui/marks";
 import { answering, type clackDouble } from "@tests/helpers/clack";
 import { asTerminal } from "@tests/helpers/terminal";
 
@@ -53,9 +53,25 @@ describe("Chain", () => {
   // step as a glyph of consola's choosing, which is the chain's marks in name
   // only.
   it("writes a wizard's narration, with the mark it would have drawn", () => {
-    scripted().narrate("!", "the flow was edited by hand");
+    scripted().narrate("i", "the flow was edited by hand");
 
-    expect(printed()).toBe("!  the flow was edited by hand\n");
+    expect(printed()).toBe("i  the flow was edited by hand\n");
+  });
+
+  it.each([
+    ["a warning", MARK.warning],
+    ["a failure", MARK.failed],
+  ])("writes %s to stderr, where a normal command puts it", (_kind, mark) => {
+    const errors: string[] = [];
+    vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
+      errors.push(stripAnsi(String(chunk)));
+      return true;
+    });
+
+    scripted().narrate(mark, "the flow was edited by hand");
+
+    expect(printed()).toBe("");
+    expect(errors.join("")).toContain("the flow was edited by hand");
   });
 
   // `│` is what a line that carries no mark of its own is given, and off a

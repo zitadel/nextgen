@@ -110,7 +110,9 @@ describe("missingPrimaryOrigin", () => {
   });
 
   it("names origin add with a URL to fill in when no issuer resolves", () => {
-    expect(outcomeFor({ issuer: undefined }).hint).toContain("origin add <url> --kind primary");
+    expect(outcomeFor({ issuer: undefined }).hint).toContain(
+      "origin add '<your-app-url>' --kind primary",
+    );
   });
 
   it("suggests origin list when no issuer resolves", () => {

@@ -5,7 +5,7 @@ import {
   createZitadelClient,
   type ZitadelClient,
 } from "@/lib/backend";
-import { unscopedCommand } from "@/lib/suggestion";
+import { projectCommand } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import {
   readProjectServer,
@@ -62,7 +62,7 @@ export class IssuerOriginCheck implements SanityCheck {
       message:
         `The project has no primary origin to deploy to: it holds ${finding.pattern} as a ` +
         "preview origin, as setup 0.1.0 registered it. Run " +
-        `${unscopedCommand("doctor --fix", ctx.cliVersion)} to make it primary.`,
+        `${projectCommand("doctor --fix", ctx.selector, ctx.cliVersion)} to make it primary.`,
       details: { pattern: finding.pattern, server: finding.server },
       path: this.path,
     };

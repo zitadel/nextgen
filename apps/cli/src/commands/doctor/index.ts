@@ -207,11 +207,21 @@ export default class Doctor extends Destructive(BaseCommand) {
             parentRuntimeDir,
           )
         : [];
+    // `doctor` is not an EnvironmentCommand but honours --env/--env-file/--server
+    // to check a chosen environment, so a suggested rerun of a failed check has
+    // to carry that same selection or it would check the default project.
+    const selector = environmentSelectorSuffix({
+      cwd: flags.cwd,
+      envFile: flags.envFile,
+      envName: flags.env,
+      server: flags.server,
+    });
     const hasConfig = await hasZitadelConfig(this.cwd);
     const ctx: CheckContext = {
       cwd: this.cwd,
       orca: createOrca(),
       cliVersion: this.cliVersion,
+      selector,
       dryRun: this.dryRun,
       signal: this.signal,
       consent: (gate) => this.consent(gate),
@@ -262,15 +272,6 @@ export default class Doctor extends Destructive(BaseCommand) {
     const checks = [versionCheck, ...runtimeChecks, ...projectChecks, ...environmentChecks];
     const failed = checks.filter((check) => check.status === "fail");
     const warnings = checks.filter((check) => check.status === "warn");
-    // `doctor` is not an EnvironmentCommand but honours --env/--env-file/--server
-    // to check a chosen environment, so a suggested rerun of a failed check has
-    // to carry that same selection or it would check the default project.
-    const selector = environmentSelectorSuffix({
-      cwd: flags.cwd,
-      envFile: flags.envFile,
-      envName: flags.env,
-      server: flags.server,
-    });
     // The claim check reads the local `.zitadel/secret`, which is setup's
     // project, so a claim is suggested only pinned to the file setup wrote for
     // it, as setup's own claim suggestion is: `--env-file` outranks the

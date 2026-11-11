@@ -121,7 +121,7 @@ export default class Status extends EnvironmentCommand {
     return this.emit({
       status: "ok",
       data: {
-        title: "Zitadel status.",
+        title: "Checked the status of the project",
         server: {
           lifecycle: serverLifecycle,
           runtime: runtimeSummary(server.runtime),

@@ -141,9 +141,9 @@ export const dryRunResult = ({
       body: shown,
       ...(result === undefined ? {} : { result }),
     },
-    pretty: prose(`Dry run: would ${verb} ${subject}${printed}${verdict}`),
+    pretty: prose(`Would ${verb} ${subject} (dry run)${printed}${verdict}`),
     summary: {
-      title: `Dry run: would ${verb} ${escapeControlCharacters(subject)}`,
+      title: `Would ${verb} ${escapeControlCharacters(subject)} (dry run)`,
       sections: [],
       lines: [...printed.split("\n"), ...verdict.split("\n")].filter((line) => line !== ""),
     },

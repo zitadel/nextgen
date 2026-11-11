@@ -135,14 +135,18 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
       await this.confirmed({
         verb: "rollback",
         name: `roll back to ${target.id}`,
-        message: `Roll back to ${target.id} in project ${escapeControlCharacters(projectId)} on ${escapeControlCharacters(server.replace(/^https?:\/\//, ""))} so its release goes live again${
+        message: `Roll back to ${escapeControlCharacters(target.id)} in project ${escapeControlCharacters(projectId)} on ${escapeControlCharacters(server.replace(/^https?:\/\//, ""))} so its release goes live again${
           dropped.length === 0 && restored.length === 0
             ? ""
             : `, which makes ${[
                 ...(dropped.length === 0
                   ? []
-                  : [`${dropped.join(", ")} refuse sign-in until the next deploy`]),
-                ...(restored.length === 0 ? [] : [`${restored.join(", ")} serve it again`]),
+                  : [
+                      `${escapeControlCharacters(dropped.join(", "))} refuse sign-in until the next deploy`,
+                    ]),
+                ...(restored.length === 0
+                  ? []
+                  : [`${escapeControlCharacters(restored.join(", "))} serve it again`]),
               ].join(" and ")}`
         }?`,
         // A bare rollback resolved its target, which a retry must not resolve

@@ -1885,7 +1885,7 @@ export default class Setup extends Destructive(BaseCommand) {
       summary,
       ...(report === "" ? {} : { pretty: painted(report) }),
       data: {
-        title: "Zitadel is ready.",
+        title: "Zitadel is ready",
         project: { project_id: project.id, issuer },
         framework: app.framework,
         server: answers.server,
@@ -2268,7 +2268,7 @@ export default class Setup extends Destructive(BaseCommand) {
         boxed: true,
       },
       data: {
-        title: moved ? `Moved the app to ${move.issuer}.` : `The app is already on ${move.issuer}.`,
+        title: moved ? `Moved the app to ${move.issuer}` : `The app is already on ${move.issuer}`,
         moved,
         previous_issuer: move.previousIssuer,
         issuer: move.issuer,

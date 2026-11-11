@@ -391,7 +391,7 @@ export default class EnvAdd extends Promptable(BaseCommand) {
     return this.emit({
       status: "ok",
       data: {
-        title: `Bound ${args.name} to ${projectId}.`,
+        title: `Bound ${args.name} to ${projectId}`,
         environment: args.name,
         file: environment.file,
         server,

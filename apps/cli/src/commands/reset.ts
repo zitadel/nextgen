@@ -69,7 +69,7 @@ export default class Reset extends Destructive(BaseCommand) {
         ].join("\n"),
         preview: () => ({
           status: "ok",
-          data: { title: "Local Zitadel server runtime reset plan.", runtime: described },
+          data: { title: "Local Zitadel server runtime reset plan", runtime: described },
           summary: { title: "Local Zitadel server runtime reset plan", sections: [] },
           next: { commands: [this.suggestUnscoped("reset --force")] },
         }),
@@ -77,7 +77,7 @@ export default class Reset extends Destructive(BaseCommand) {
           await LocalServer.at(this.cwd, { cliVersion: this.cliVersion }).reset(consent);
           return {
             status: "ok",
-            data: { title: "Local Zitadel server runtime reset.", runtime: described },
+            data: { title: "Local Zitadel server runtime reset", runtime: described },
             summary: { title: "Local Zitadel server runtime reset", sections: [] },
           };
         },

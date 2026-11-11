@@ -108,7 +108,7 @@ export default class Start extends BaseCommand {
       return this.emit({
         status: "ok",
         data: {
-          title: "Local Zitadel server start plan.",
+          title: "Local Zitadel server start plan",
           runtime: {
             backend: runtimeBackend,
             ...(runtimeBackend === "docker"
@@ -206,8 +206,8 @@ function platformBootstrapEnabled(env: NodeJS.ProcessEnv): boolean {
 function readyData(metadata: RuntimeMetadata, alreadyRunning: boolean) {
   return {
     title: alreadyRunning
-      ? "Local Zitadel server is already running."
-      : "Local Zitadel server is ready.",
+      ? "Local Zitadel server is already running"
+      : "Local Zitadel server is ready",
     runtime: {
       backend: metadata.backend,
       ...(metadata.backend === "docker"

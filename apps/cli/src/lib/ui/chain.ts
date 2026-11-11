@@ -110,7 +110,11 @@ export class Chain implements Drawing, Narratable {
     const body = stripColumnMarks(text);
     if (!this.audience.interactive) {
       // A blank line is a gap, so it carries no mark.
-      process.stdout.write(body === "" ? "\n" : `${symbol === GUIDE ? " " : symbol}  ${body}\n`);
+      // A warning and a failure go where a normal command puts them, so a
+      // script that captures stdout reads the report alone.
+      const stream =
+        symbol === MARK.warning || symbol === MARK.failed ? process.stderr : process.stdout;
+      stream.write(body === "" ? "\n" : `${symbol === GUIDE ? " " : symbol}  ${body}\n`);
       return;
     }
     this.open();

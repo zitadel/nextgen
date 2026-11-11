@@ -72,7 +72,7 @@ export default class Console extends BaseCommand {
       return this.emit({
         status: "ok",
         data: {
-          title: "Local console sign-in link.",
+          title: "Local console sign-in link",
           signed_in_as: admin.email,
           dry_run: true,
         },
@@ -91,7 +91,7 @@ export default class Console extends BaseCommand {
     return this.emit({
       status: "ok",
       data: {
-        title: "Local console sign-in link.",
+        title: "Local console sign-in link",
         signed_in_as: admin.email,
         sign_in_url: signInUrl,
         browser_opened: opened,

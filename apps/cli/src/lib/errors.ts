@@ -191,14 +191,6 @@ const OCLIF_HELP = /\n *See more help with --help\s*$/;
 /** The heading oclif puts over the flags it rejected, which nothing else writes. */
 const OCLIF_PREAMBLE = /^The following errors? occurred:\n/;
 
-/**
- * The first word of a message, when it is a plain one: letters, and at most a
- * comma or colon after them. A message that opens on a URL, a path, a flag, an
- * id or a verbatim HTTP verb is left exactly as its source wrote it, because
- * capitalising `http://…` or `usr_1` would change what it names.
- */
-const PLAIN_WORD = /^[a-z]+[:,]?(\s|$)/;
-
 /** A failure's message as one sentence, which is how a person is shown it. */
 export type FailureText = {
   /** What `Error: ` introduces, before the code in brackets. Said once, wherever the failure is drawn. */
@@ -213,11 +205,9 @@ export type FailureText = {
  * It is the human rendering alone: `--json` carries `message` exactly as it
  * was thrown, so a script that matches on it is unaffected by anything here.
  *
- * Two things are settled. A message that opens on a plain lowercase word is a
- * sentence, so it starts with a capital: the platform writes fragments
- * (`variable not found`, `release: still served by an origin`) and the CLI
- * writes sentences, and the reader should not be able to tell which one
- * answered. And oclif's own rendering of a refused command line — a heading,
+ * The message is said as it was thrown: a failure reads the same in the
+ * envelope's `message` and on a terminal, so nothing is capitalised or trimmed
+ * on the way. Only oclif's own rendering of a refused command line — a heading,
  * an indented reason and a `--help` footer — is folded back into the one
  * sentence the CLI states every other failure as, with the footer handed to
  * the caller as {@link FailureText.misuse} so it can be offered under `Next:`
@@ -225,7 +215,7 @@ export type FailureText = {
  */
 export function failureText(message: string): FailureText {
   if (!OCLIF_HELP.test(message)) {
-    return { sentence: capitalised(message), misuse: false };
+    return { sentence: message, misuse: false };
   }
   const [head = "", ...rest] = stripAnsi(message.replace(OCLIF_HELP, ""))
     .replace(OCLIF_PREAMBLE, "")
@@ -237,17 +227,11 @@ export function failureText(message: string): FailureText {
   // one sentence; a column of descriptions under a closing line does not.
   const listed = rest.map((line) => line.split(/\s{2,}/)[0] ?? line);
   return {
-    sentence: capitalised(
-      head.endsWith(":") ? `${head} ${listed.join(", ")}`.trim() : [head, ...rest].join("; "),
-    ),
+    sentence: head.endsWith(":")
+      ? `${head} ${listed.join(", ")}`.trim()
+      : [head, ...rest].join("; "),
     misuse: true,
   };
-}
-
-function capitalised(message: string): string {
-  return PLAIN_WORD.test(message)
-    ? `${message[0]?.toUpperCase() ?? ""}${message.slice(1)}`
-    : message;
 }
 
 /**

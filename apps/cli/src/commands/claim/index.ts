@@ -229,11 +229,11 @@ export default class Claim extends EnvironmentCommand {
         status: "skipped",
         reason: "dry-run",
         data: {
-          title: "Zitadel claim was not started.",
+          title: "Nothing was claimed (dry run)",
           project_id: projectId,
           would,
         },
-        summary: { title: "Dry run, nothing was claimed", sections: [], lines: [would] },
+        summary: { title: "Nothing was claimed (dry run)", sections: [], lines: [would] },
         next: {
           commands: [
             flags.challengeId === undefined
@@ -347,7 +347,7 @@ export default class Claim extends EnvironmentCommand {
     return this.emit({
       status: "ok",
       data: {
-        title: "Your project is now permanent.",
+        title: "Your project is now permanent",
         project_id: projectId,
         team_id: completed.team_id,
         claimed_at: completed.claimed_at,
@@ -458,7 +458,7 @@ export default class Claim extends EnvironmentCommand {
     return this.emit({
       status: "ok",
       data: {
-        title: "Open the link in a browser to make your project permanent.",
+        title: "Open the link in a browser to make your project permanent",
         project_id: projectId,
         claim_url: challenge.claim_url,
         challenge_id: challenge.challenge_id,
@@ -499,7 +499,7 @@ export default class Claim extends EnvironmentCommand {
     return this.emit({
       status: "skipped",
       reason: "already-claimed",
-      data: { title: "Zitadel project already belongs to a team.", ...data },
+      data: { title: "This project already belongs to a team", ...data },
       summary: { title: "This project already belongs to a team", sections: [] },
     });
   }

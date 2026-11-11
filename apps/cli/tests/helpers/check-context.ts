@@ -1,6 +1,7 @@
 import type { CheckContext } from "@/commands/doctor/checks";
 import { Consent } from "@/lib/consent";
 import { createOrca } from "@/lib/orca";
+import { asEnvironmentSelector } from "@/lib/suggestion";
 
 /**
  * The CLI version a doctor check runs as unless a test says otherwise.
@@ -52,6 +53,7 @@ export function aCheckContext(cwd: string, overrides: Partial<CheckContext> = {}
     cwd,
     orca: createOrca(),
     cliVersion: CHECK_CLI_VERSION,
+    selector: asEnvironmentSelector(""),
     dryRun: false,
     signal: new AbortController().signal,
     consent: unasked,

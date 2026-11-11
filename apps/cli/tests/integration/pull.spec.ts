@@ -100,6 +100,16 @@ describe("pull", () => {
         expect(result).toSucceed();
       });
 
+      it("suggests no deploy after pulling a release it was named", async () => {
+        const project = await aSetUpApp();
+        const deployed = await project.deployData();
+        const checkout = await aFreshCheckoutOf(project);
+
+        const result = await checkout.run(["pull", deployed.release_id ?? "", "--json"]);
+
+        expect(result).not.toSuggest("deploy");
+      });
+
       it("pulls the release a deployment id names", async () => {
         const project = await aSetUpApp();
         const deployed = await project.deployData();

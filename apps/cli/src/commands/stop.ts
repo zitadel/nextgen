@@ -45,7 +45,7 @@ export default class Stop extends BaseCommand {
       return this.emit({
         status: "ok",
         data: {
-          title: "Local Zitadel server stop plan.",
+          title: "Local Zitadel server stop plan",
           runtime: {
             backend: runtime?.backend ?? "missing",
             ...(runtime?.backend === "binary"
@@ -69,7 +69,7 @@ export default class Stop extends BaseCommand {
     return this.emit({
       status: "ok",
       data: {
-        title: `${said}.`,
+        title: said,
         runtime: {
           backend: runtime?.backend ?? "missing",
           ...(runtime?.backend === "binary"
@@ -93,7 +93,7 @@ export default class Stop extends BaseCommand {
       return this.emit({
         status: "ok",
         data: {
-          title: "Managed local runtime process discovery is unavailable.",
+          title: "Managed local runtime process discovery is unavailable",
           sweep: { supported: false, error: sweep.error, stopped: [] },
         },
         summary: {
@@ -112,7 +112,7 @@ export default class Stop extends BaseCommand {
     return this.emit({
       status: "ok",
       data: {
-        title: `${said}.`,
+        title: said,
         sweep: {
           supported: true,
           scope: "host",

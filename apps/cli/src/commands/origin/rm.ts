@@ -84,9 +84,9 @@ export default class OriginRm extends Destructive(EnvironmentCommand) {
             }
             case "emptied": {
               // Named in the text, not as a next command: the URL is the developer's
-              // to fill in, and a `<url>` placeholder is a shell redirection.
+              // to fill in, and an unquoted `<url>` placeholder is a shell redirection, so the placeholder is quoted.
               reportWarning(
-                `${removal.pattern} was the project's last origin, so the project now admits no origin except a loopback origin. Add the ones it should admit with ${this.suggest("origin add <url> --kind primary")}.`,
+                `${removal.pattern} was the project's last origin, so the project now admits no origin except a loopback origin. Add the ones it should admit with ${this.suggest("origin add '<your-app-url>' --kind primary")}.`,
               );
               return {
                 status: "ok",
