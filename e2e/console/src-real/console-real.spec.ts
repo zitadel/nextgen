@@ -194,7 +194,10 @@ test("gives a colleague admin access to the project, and takes it away", async (
 
     await signIn(page, zitadel, operator);
     await page.goto(`/projects/${zitadel.handle.projectId}`);
-    await page.getByRole("tab", { name: "Admins" }).click();
+    await page
+      .getByRole("navigation", { name: "Project settings" })
+      .getByRole("link", { name: "Admins" })
+      .click();
     await expect(page.getByRole("region", { name: "Admins" })).toBeVisible();
 
     // The operator's own grant (the one `signIn` wrote) comes back through
@@ -274,7 +277,10 @@ test("lists a team's grant as the team's own row, and revokes it from there", as
 
     await signIn(page, zitadel, operator);
     await page.goto(`/projects/${projectId}`);
-    await page.getByRole("tab", { name: "Admins" }).click();
+    await page
+      .getByRole("navigation", { name: "Project settings" })
+      .getByRole("link", { name: "Admins" })
+      .click();
     const row = page.getByRole("row").filter({ hasText: team.name });
     await expect(row.getByText("Admin grant", { exact: true })).toBeVisible();
     await expect(row.getByText("Team", { exact: true })).toBeVisible();
@@ -320,7 +326,10 @@ test("answers the same way for an address that belongs to nobody", async ({
   await signIn(page, zitadel, operator);
 
   await page.goto(`/projects/${zitadel.handle.projectId}`);
-  await page.getByRole("tab", { name: "Admins" }).click();
+  await page
+    .getByRole("navigation", { name: "Project settings" })
+    .getByRole("link", { name: "Admins" })
+    .click();
   await page.getByRole("button", { name: "Add admin", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Add admin" });
   await dialog.getByRole("textbox", { name: "Email address" }).fill(unknown);

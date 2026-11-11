@@ -29,11 +29,11 @@ type Grant = Awaited<ReturnType<typeof api.queryGrants>>["grants"][number];
 
 /**
  * A project's admins: who administers it, how each of them holds that access,
- * and how it is given and taken away (#1025, journey in #769). The Admins tab
- * of the project's own page, because a grant is project-level data (#1238):
- * the project id comes from the route, and every request made from here
- * carries it. The Add button is `AddAdminButton`, which the page draws on the
- * tab row.
+ * and how it is given and taken away (#1025, journey in #769). The Admins page
+ * of the project's Settings (D37), because a grant is project-level data
+ * (#1238): the project id comes from the route, and every request made from
+ * here carries it. The Add button is `AddAdminButton`, which the page draws on
+ * its heading's row.
  *
  * **People come from `GET /projects/{id}/admins`** (#1462). It lists each person
  * once with every way they hold admin access: membership in the owning team,
@@ -140,8 +140,8 @@ export function ProjectAdmins({
 }
 
 /**
- * The tab's one action, drawn on the tab row rather than in the table: the
- * secondary small button the design places beside the tabs.
+ * The page's one action, drawn on its heading's row rather than in the table:
+ * the secondary small button the design placed beside the tabs.
  */
 export function AddAdminButton({ projectId, onAdded }: { projectId: string; onAdded: () => void }) {
   return (

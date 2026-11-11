@@ -55,6 +55,8 @@ const ACCOUNT_ORDER = [
 ];
 // Settings' list: the heading that leads back, then the person's profile.
 const SETTINGS_ORDER = ["Settings", "Profile"];
+// The project's Settings list (D37): the heading that leads back, then its pages.
+const PROJECT_SETTINGS_ORDER = ["Settings", "General", "Admins"];
 // Absent for two different reasons, both deliberate:
 //   - the first four have no endpoint at all
 //   - Sessions was built, but `POST /sessions/query` answers 501 (#699)
@@ -139,18 +141,18 @@ describe("app shell navigation", () => {
     expect(linkedRows).toHaveLength(NAV_ORDER.length);
   });
 
-  it("marks with an arrow the one row that swaps the list for its own", async () => {
+  it("marks with an arrow the rows that swap the list for their own", async () => {
     renderShell();
     await screen.findByRole("link", { name: /^Users/ });
     const nav = within(screen.getByRole("navigation", { name: "Primary" }));
 
-    // Logs opens Logs' list. The project's Settings is a screen beside the
-    // others, whatever it shares a name with.
+    // Logs opens Logs' list, and the project's Settings its own (D37), as
+    // Settings does above every project.
     const arrowed = nav
       .getAllByRole("link")
       .filter((link) => link.querySelector("[data-opens-list]"))
       .map((link) => link.textContent?.trim());
-    expect(arrowed).toEqual(["Logs"]);
+    expect(arrowed).toEqual(["Logs", "Settings"]);
   });
 
   it("draws the home, Projects, in the frame every screen has", async () => {
@@ -562,6 +564,78 @@ describe("logs view", () => {
     // The way to any other screen without going back up first.
     expect(await dialog.findByRole("option", { name: "Teams" })).toBeInTheDocument();
     expect(dialog.getByRole("option", { name: "Logs" })).toBeInTheDocument();
+  });
+});
+
+/**
+ * A project's Settings swaps the project's list for its own, as the root
+ * Settings swaps the account's (D29, D37): its pages, General and Admins,
+ * under a heading that leads back to the project. The root Settings are the
+ * platform project's and list other pages; both open the same way.
+ */
+describe("project settings view", () => {
+  beforeEach(() => {
+    server.use(
+      http.get(`${PROJECT_1}/admins`, () => HttpResponse.json({ admins: [] })),
+      http.post("*/api/v1/grants/query", () => HttpResponse.json({ grants: [] })),
+      http.get("*/api/v1/variables", () => HttpResponse.json({})),
+    );
+  });
+
+  it("opens the project's Settings list from its Settings row, on General", async () => {
+    const router = renderShell();
+    const primary = within(await screen.findByRole("navigation", { name: "Primary" }));
+
+    await userEvent.click(primary.getByRole("link", { name: "Settings" }));
+
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/project/general"));
+    const nav = within(await screen.findByRole("navigation", { name: "Project settings" }));
+    expect(nav.getAllByRole("link").map((link) => link.textContent?.trim())).toEqual(
+      PROJECT_SETTINGS_ORDER,
+    );
+    expect(nav.getByRole("link", { name: "General" })).toHaveAttribute("data-active", "true");
+    // A row of the list it is already in opens no other.
+    expect(nav.getByRole("link", { name: "Admins" }).querySelector("[data-opens-list]")).toBeNull();
+    // The project's list is gone rather than sitting underneath it.
+    expect(screen.queryByRole("navigation", { name: "Primary" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the project's header while moving between its pages", async () => {
+    const router = renderShell(scopedPath("/project/general", "proj_1"));
+    const nav = within(await screen.findByRole("navigation", { name: "Project settings" }));
+    expect(await screen.findByLabelText("Project name")).toBeInTheDocument();
+
+    await userEvent.click(nav.getByRole("link", { name: "Admins" }));
+
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/project/admins"));
+    expect(await screen.findByRole("region", { name: "Admins" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "console-dev" })).toBeInTheDocument();
+    expect(nav.getByRole("link", { name: "Admins" })).toHaveAttribute("data-active", "true");
+    expect(screen.queryByLabelText("Project name")).not.toBeInTheDocument();
+  });
+
+  it("goes back up to the project's list from the Settings heading", async () => {
+    const router = renderShell(scopedPath("/project/admins", "proj_1"));
+    const nav = within(await screen.findByRole("navigation", { name: "Project settings" }));
+    // Named for where it leads, as Logs' heading is: the project's landing.
+    const heading = nav.getByRole("link", { name: "Settings: back to the project" });
+    expect(heading).toHaveAttribute("href", scopedPath("/", "proj_1"));
+
+    await userEvent.click(heading);
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/"));
+    const primary = within(await screen.findByRole("navigation", { name: "Primary" }));
+    expect(
+      primary.getAllByRole("listitem").map((li) => within(li).getAllByRole("link")[0]?.textContent),
+    ).toEqual(NAV_ORDER);
+  });
+
+  it("keeps the pill on the project whose Settings these are", async () => {
+    renderShell(scopedPath("/project/general", "proj_1"));
+    await screen.findByRole("navigation", { name: "Project settings" });
+
+    const pill = screen.getByRole("button", { name: "Switch project" });
+    await waitFor(() => expect(pill).toHaveTextContent("console-dev"));
+    expect(pill).not.toHaveTextContent("All projects");
   });
 });
 
@@ -1259,12 +1333,18 @@ describe("search", () => {
     const byName = within(await dialog.findByRole("group", { name: "Account" }));
     expect(byName.getByRole("option", { name: /^Profile/ })).toHaveTextContent("Settings");
 
-    // The project's own page is called Settings too, under the project's
-    // pages; the group heading is what tells them apart.
+    // The project's Settings is a list too (D37): its pages stand in for it,
+    // under the project's pages. The group heading is what tells the two
+    // Settings apart.
     await userEvent.clear(field);
     await userEvent.type(field, "sett");
     const account = within(await dialog.findByRole("group", { name: "Account" }));
     expect(account.getAllByRole("option")).toHaveLength(1);
+    const project = within(dialog.getByRole("group", { name: "Pages in console-dev" }));
+    expect(project.getAllByRole("option").map((option) => option.textContent)).toEqual([
+      "GeneralSettings",
+      "AdminsSettings",
+    ]);
     await userEvent.click(account.getByRole("option", { name: /^Profile/ }));
 
     await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/settings/profile"));

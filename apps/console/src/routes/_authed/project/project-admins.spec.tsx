@@ -2,7 +2,7 @@ import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, onTestFinished, vi } from "vitest";
 import {
   NEUTRAL_MESSAGE,
   SELF_MESSAGE,
@@ -177,9 +177,10 @@ function admins() {
   return within(screen.getByRole("region", { name: "Admins" }));
 }
 
-/** Opens the Admins tab, where the list and the Add button live. */
+/** Opens the Admins page from the project's Settings list, where the list and the Add button live. */
 async function openAdmins() {
-  await userEvent.click(await screen.findByRole("tab", { name: "Admins" }));
+  const nav = within(await screen.findByRole("navigation", { name: "Project settings" }));
+  await userEvent.click(nav.getByRole("link", { name: "Admins" }));
   return within(await screen.findByRole("region", { name: "Admins" }));
 }
 
@@ -188,7 +189,7 @@ function row(name: string) {
   return within(admins().getByRole("row", { name: new RegExp(name) }));
 }
 
-/** From any tab: opens Admins, then the row's menu, then its confirmation. */
+/** From any page: opens Admins, then the row's menu, then its confirmation. */
 async function openRemove(name: string) {
   await openAdmins();
   await userEvent.click(screen.getByRole("button", { name: `Actions for ${name}` }));
@@ -554,16 +555,19 @@ describe("project admins", () => {
   it("surfaces the API's own message when the grant is refused", async () => {
     // ADR 030 makes the payload's `message` the human-facing string. Signed in
     // without an identifier, the console cannot run its own self check, so
-    // self-granting comes back as the API's `grant.invalid` instead. One
-    // resolved value is enough: the guard reads the session once per render,
-    // and this submit fails, so nothing invalidates the route and reads it again.
+    // self-granting comes back as the API's `grant.invalid` instead. The guard
+    // reads the session on every navigation, and opening Admins is one, so the
+    // session stays this one for the whole test.
     const { fetchSession } = await import("@/auth/session");
     // A schema that designates no identifier leaves the field off the session
     // user entirely, rather than carrying it as undefined.
     const { user, ...session } = makeTestSession();
-    vi.mocked(fetchSession).mockResolvedValueOnce({
+    vi.mocked(fetchSession).mockResolvedValue({
       ...session,
       user: user && { user_id: user.user_id, display: user.display },
+    });
+    onTestFinished(() => {
+      vi.mocked(fetchSession).mockImplementation(async () => makeTestSession());
     });
     stubProject();
     server.use(
@@ -642,15 +646,15 @@ describe("project admins", () => {
   });
 });
 
-describe("portal nav", () => {
-  it("has no Admins entry in the primary sidebar", async () => {
-    // Admins lives on the project page now, not as a list screen. The Settings
-    // half of this is asserted where Settings renders (`landing.spec.tsx`):
-    // on a project URL the Settings nav is never mounted.
+describe("project settings nav", () => {
+  it("lists Admins among the project's Settings, not its screens", async () => {
+    // Admins is a page of the project's Settings (D37), not a list screen
+    // beside Users: the project's list is not drawn while its Settings are.
     stubProject();
     await renderProject();
 
-    const primary = await screen.findByRole("navigation", { name: "Primary" });
-    expect(within(primary).queryByRole("link", { name: /Admins/ })).not.toBeInTheDocument();
+    const nav = await screen.findByRole("navigation", { name: "Project settings" });
+    expect(within(nav).getByRole("link", { name: "Admins" })).toBeInTheDocument();
+    expect(screen.queryByRole("navigation", { name: "Primary" })).not.toBeInTheDocument();
   });
 });

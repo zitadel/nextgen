@@ -36,7 +36,7 @@ import { AddUserSheet } from "@/features/users/components/add-user-sheet";
 import { cn } from "@/lib/utils";
 
 import type { NavIcon } from "@/nav";
-import { type NavItem, useNavItems } from "./use-nav-items";
+import { type NavItem, PROJECT_SETTINGS_PATH, useNavItems } from "./use-nav-items";
 import { SETTINGS_PATH } from "./user-menu";
 
 /**
@@ -153,6 +153,7 @@ export function SearchDialog({
   const pages = useNavItems();
   const account = useNavItems("account");
   const settings = useNavItems("settings");
+  const projectSettings = useNavItems("project-settings");
 
   // A fresh palette each time it opens.
   useEffect(() => {
@@ -276,7 +277,11 @@ export function SearchDialog({
       },
       {
         heading: projectName ? `Pages in ${projectName}` : "Pages",
-        results: navResults(pages),
+        // The project's Settings row is a list too (D37): its pages stand in.
+        results: [
+          ...navResults(pages.filter((item) => item.to !== PROJECT_SETTINGS_PATH)),
+          ...navResults(projectSettings, "Settings"),
+        ],
       },
       { heading: "Actions", results: actions },
       { heading: "Users", results: userResults },
@@ -304,6 +309,7 @@ export function SearchDialog({
     pages,
     account,
     settings,
+    projectSettings,
     users,
     others,
     projects,
