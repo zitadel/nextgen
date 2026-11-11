@@ -30,6 +30,9 @@ import (
 // asks the wrong relation or a gate that stops forwarding the resource's team
 // or the credential's project. It pins today's behavior; a row the catalog
 // contradicts says so in `open` and stays as it is until that is decided.
+// The operations that ask no gate are classed in
+// authz_ungated_contract_internal_test.go, and the checks a handler asks after
+// its gate in authz_later_checks_internal_test.go.
 
 const (
 	viewer = "viewer"
@@ -63,7 +66,10 @@ type gateRow struct {
 	// cookie pins whether the spec lets the Console session cookie call it.
 	cookie   bool
 	relation string
-	target   gateTarget
+	// why explains a relation that is not the one the operation implies
+	// (impliedRelation); it must be empty on a row that follows the rule.
+	why    string
+	target gateTarget
 	// idField is the params field that carries the path id (onResource, onTarget).
 	idField string
 	// kind is the resource_scope_index kind the route expects (onResource).
@@ -113,6 +119,18 @@ const (
 	openCredentialTier   = "credential-tier: the catalog keeps user.set_password to admin bundles (system-permission-catalog.md:175), but this asks editor; only the bearer-only plane keeps a platform-project editor off an operator's credential"
 )
 
+// Why a relation is not the one its operation implies.
+const (
+	whyQuery           = "a query sent as POST: it reads"
+	whyGrantEscalation = "a grant can carry any role up to admin, so an editor minting one could escalate itself (grant.go)"
+	whyInvitationGrant = "an invitation offers a project role, so it asks what creating a grant asks (ADR 086)"
+	whyInvitationRead  = "ADR 086 asks admin for every invitation operation, reads included"
+	whyEvaluate        = "evaluates a policy against the request's input and changes nothing"
+	whyPreviewRemoval  = "ends a preview early and keeps its deployments in the history; the spec scopes it to deployment.write"
+	whyReleaseRevoke   = "marks the release revoked and keeps it; the spec scopes it to release.write"
+	whyVariableDelete  = "a variable is configuration: whoever may overwrite one can already destroy it (variable.go)"
+)
+
 // gateRows is the contract table, one row per gated operation (two for an
 // operation that gates by branch), grouped by resource.
 var gateRows = []gateRow{
@@ -128,7 +146,7 @@ var gateRows = []gateRow{
 	{op: "RollbackDeployment", cookie: true, relation: editor, target: onProject, denied: deploymentCodes.denied, miss: deploymentCodes.writeMiss},
 	{op: "GetDeploymentVariables", relation: viewer, target: onProject, denied: deploymentCodes.denied, miss: deploymentCodes.readMiss},
 	{op: "ListPreviews", relation: viewer, target: onProject, denied: deploymentCodes.denied, miss: deploymentCodes.readMiss},
-	{op: "RemovePreview", relation: editor, target: onProject, denied: deploymentCodes.denied, miss: deploymentCodes.writeMiss, open: openWriteIsNotDelete},
+	{op: "RemovePreview", relation: editor, why: whyPreviewRemoval, target: onProject, denied: deploymentCodes.denied, miss: deploymentCodes.writeMiss, open: openWriteIsNotDelete},
 
 	// Events.
 	{op: "ListEvents", cookie: true, relation: viewer, target: onProject, denied: eventCodes.denied, miss: eventCodes.readMiss},
@@ -139,15 +157,15 @@ var gateRows = []gateRow{
 	{op: "CreateFlowDefinition", relation: editor, target: onProject, denied: flowDefCodes.denied, miss: flowDefCodes.writeMiss},
 	{op: "GetFlowDefinition", cookie: true, relation: viewer, target: onResource, idField: "ID", kind: domain.ResourceKindFlowDefinition, denied: flowDefCodes.denied, miss: flowDefCodes.readMiss},
 
-	// Grants. Creating one asks admin: a grant can carry any role up to admin.
-	{op: "CreateGrant", cookie: true, relation: admin, target: onProject, denied: grantCodes.denied, miss: grantCodes.readMiss},
-	{op: "QueryGrants", cookie: true, relation: viewer, target: onProject, denied: grantCodes.denied, miss: grantCodes.readMiss},
+	// Grants.
+	{op: "CreateGrant", cookie: true, relation: admin, why: whyGrantEscalation, target: onProject, denied: grantCodes.denied, miss: grantCodes.readMiss},
+	{op: "QueryGrants", cookie: true, relation: viewer, why: whyQuery, target: onProject, denied: grantCodes.denied, miss: grantCodes.readMiss},
 	{op: "GetGrant", cookie: true, relation: viewer, target: onProject, denied: grantCodes.denied, miss: grantCodes.readMiss},
 	{op: "DeleteGrant", cookie: true, relation: admin, target: onProject, denied: grantCodes.denied, miss: grantCodes.readMiss},
 
 	// Identity provider connections.
 	{op: "CreateIdp", relation: editor, target: onProject, denied: idpCodes.denied, miss: idpCodes.writeMiss},
-	{op: "QueryIdps", cookie: true, relation: viewer, target: onProject, list: true, miss: idpCodes.readMiss},
+	{op: "QueryIdps", cookie: true, relation: viewer, why: whyQuery, target: onProject, list: true, miss: idpCodes.readMiss},
 	{op: "GetIdpById", cookie: true, relation: viewer, target: onResource, idField: "ID", kind: domain.ResourceKindIDPConnection, denied: idpCodes.denied, miss: idpCodes.readMiss},
 	{op: "ListIdpRevisions", relation: viewer, target: onResource, idField: "ID", kind: domain.ResourceKindIDPConnection, denied: idpCodes.denied, miss: idpCodes.readMiss},
 	// The revision is read before the gate: a found revision is checked on
@@ -168,22 +186,22 @@ var gateRows = []gateRow{
 		},
 	},
 
-	// Invitations: every operation asks admin, like creating a grant.
-	{op: "CreateInvitation", cookie: true, relation: admin, target: onProject, denied: invitationCodes.denied, miss: invitationCodes.readMiss},
-	{op: "ListInvitations", cookie: true, relation: admin, target: onProject, denied: invitationCodes.denied, miss: invitationCodes.readMiss, open: openInvitationRead},
-	{op: "GetInvitation", cookie: true, relation: admin, target: onProject, denied: invitationCodes.denied, miss: invitationCodes.readMiss, open: openInvitationRead},
+	// Invitations.
+	{op: "CreateInvitation", cookie: true, relation: admin, why: whyInvitationGrant, target: onProject, denied: invitationCodes.denied, miss: invitationCodes.readMiss},
+	{op: "ListInvitations", cookie: true, relation: admin, why: whyInvitationRead, target: onProject, denied: invitationCodes.denied, miss: invitationCodes.readMiss, open: openInvitationRead},
+	{op: "GetInvitation", cookie: true, relation: admin, why: whyInvitationRead, target: onProject, denied: invitationCodes.denied, miss: invitationCodes.readMiss, open: openInvitationRead},
 	{op: "CancelInvitation", cookie: true, relation: admin, target: onProject, denied: invitationCodes.denied, miss: invitationCodes.readMiss},
 
 	// Operation policies.
 	{op: "ListPolicies", cookie: true, relation: viewer, target: onProject, list: true, miss: policyCodes.readMiss},
 	{op: "PublishPolicy", relation: editor, target: onProject, denied: policyCodes.denied, miss: policyCodes.writeMiss},
-	{op: "EvaluatePolicy", cookie: true, relation: viewer, target: onProject, denied: policyCodes.denied, miss: policyCodes.readMiss},
+	{op: "EvaluatePolicy", cookie: true, relation: viewer, why: whyEvaluate, target: onProject, denied: policyCodes.denied, miss: policyCodes.readMiss},
 	{op: "GetPolicyRevision", cookie: true, relation: viewer, target: onProject, denied: policyCodes.denied, miss: policyCodes.readMiss},
 	{op: "GetPolicy", cookie: true, relation: viewer, target: onResource, idField: "PolicyID", kind: domain.ResourceKindPolicy, denied: policyCodes.denied, miss: policyCodes.readMiss},
 	{op: "ListPolicyRevisions", cookie: true, relation: viewer, target: onResource, idField: "PolicyID", kind: domain.ResourceKindPolicy, denied: policyCodes.denied, miss: policyCodes.readMiss},
 
 	// Projects, their admins, claim and origins.
-	{op: "QueryProjects", relation: viewer, target: onOwnProject, denied: projectCodes.denied, miss: projectCodes.readMiss},
+	{op: "QueryProjects", relation: viewer, why: whyQuery, target: onOwnProject, denied: projectCodes.denied, miss: projectCodes.readMiss},
 	{op: "GetProject", cookie: true, relation: viewer, target: onProject, denied: projectCodes.denied, miss: projectCodes.readMiss},
 	{op: "PatchProject", cookie: true, relation: editor, target: onProject, denied: projectCodes.denied, miss: projectCodes.writeMiss},
 	{op: "ListProjectAdmins", cookie: true, relation: viewer, target: onProject, denied: projectCodes.denied, miss: projectCodes.readMiss},
@@ -197,7 +215,7 @@ var gateRows = []gateRow{
 	{op: "CreateRelease", relation: editor, target: onProject, denied: releaseCodes.denied, miss: releaseCodes.writeMiss},
 	{op: "BuildRelease", relation: editor, target: onProject, denied: releaseCodes.denied, miss: releaseCodes.writeMiss},
 	{op: "GetReleaseById", cookie: true, relation: viewer, target: onProject, denied: releaseCodes.denied, miss: releaseCodes.readMiss},
-	{op: "RevokeRelease", cookie: true, relation: editor, target: onProject, denied: releaseCodes.denied, miss: releaseCodes.writeMiss, open: openWriteIsNotDelete},
+	{op: "RevokeRelease", cookie: true, relation: editor, why: whyReleaseRevoke, target: onProject, denied: releaseCodes.denied, miss: releaseCodes.writeMiss, open: openWriteIsNotDelete},
 
 	// User schemas.
 	{op: "ListSchemas", cookie: true, relation: viewer, target: onProject, list: true, miss: schemaCodes.readMiss},
@@ -205,24 +223,24 @@ var gateRows = []gateRow{
 	{op: "GetSchemaById", cookie: true, relation: viewer, target: onResource, idField: "ID", kind: domain.ResourceKindSchema, denied: schemaCodes.denied, miss: schemaCodes.readMiss},
 
 	// Search answers for the project before it reads any type.
-	{op: "Search", cookie: true, relation: viewer, target: onProject, list: true, miss: projectCodes.readMiss},
+	{op: "Search", cookie: true, relation: viewer, why: whyQuery, target: onProject, list: true, miss: projectCodes.readMiss},
 
 	// Sessions, as an operator manages them.
-	{op: "QuerySessions", relation: viewer, target: onProject, denied: sessionCodes.denied, miss: sessionCodes.readMiss},
+	{op: "QuerySessions", relation: viewer, why: whyQuery, target: onProject, denied: sessionCodes.denied, miss: sessionCodes.readMiss},
 	{op: "GetSession", relation: viewer, target: onResource, idField: "SessionID", kind: domain.ResourceKindSession, denied: sessionCodes.denied, miss: sessionCodes.readMiss},
 	{op: "RevokeSession", relation: admin, target: onResource, idField: "SessionID", kind: domain.ResourceKindSession, denied: sessionCodes.denied, miss: sessionCodes.readMiss},
 
 	// Teams. A refused delete is team.permission_denied, whatever the Check
 	// answered (requireTeamDelete).
 	{op: "CreateTeam", cookie: true, relation: editor, target: onProject, denied: teamCodes.denied, miss: teamCodes.writeMiss},
-	{op: "QueryTeams", cookie: true, relation: viewer, target: onProject, list: true, miss: teamCodes.readMiss},
+	{op: "QueryTeams", cookie: true, relation: viewer, why: whyQuery, target: onProject, list: true, miss: teamCodes.readMiss},
 	{op: "GetTeam", cookie: true, relation: viewer, target: onResource, idField: "TeamID", kind: domain.ResourceKindTeam, denied: teamCodes.denied, miss: teamCodes.readMiss},
 	{op: "UpdateTeam", cookie: true, relation: editor, target: onResource, idField: "TeamID", kind: domain.ResourceKindTeam, denied: teamCodes.denied, miss: teamCodes.readMiss},
 	{op: "DeleteTeam", relation: admin, target: onResource, idField: "TeamID", kind: domain.ResourceKindTeam, denied: teamCodes.denied, miss: teamCodes.denied},
 
 	// Users.
 	{op: "CreateUser", cookie: true, relation: editor, target: onProject, denied: userCodes.denied, miss: userCodes.writeMiss},
-	{op: "QueryUsers", cookie: true, relation: viewer, target: onProject, list: true, miss: userCodes.readMiss},
+	{op: "QueryUsers", cookie: true, relation: viewer, why: whyQuery, target: onProject, list: true, miss: userCodes.readMiss},
 	{op: "GetUserByID", cookie: true, relation: viewer, target: onResource, idField: "UserID", kind: domain.ResourceKindUser, denied: userCodes.denied, miss: userCodes.readMiss},
 	{op: "PatchUserByID", cookie: true, relation: editor, target: onResource, idField: "UserID", kind: domain.ResourceKindUser, denied: userCodes.denied, miss: userCodes.readMiss},
 	{op: "DeleteUserByID", cookie: true, relation: admin, target: onResource, idField: "UserID", kind: domain.ResourceKindUser, denied: userCodes.denied, miss: userCodes.readMiss},
@@ -234,60 +252,19 @@ var gateRows = []gateRow{
 	{op: "BeginUserPasskeyRegistration", relation: editor, target: onResource, idField: "UserID", kind: domain.ResourceKindUser, denied: userCodes.denied, miss: userCodes.readMiss, open: openCredentialTier},
 	{op: "FinishUserPasskeyRegistration", relation: editor, target: onResource, idField: "UserID", kind: domain.ResourceKindUser, denied: userCodes.denied, miss: userCodes.readMiss, open: openCredentialTier},
 
-	// Variables and secrets. Deleting one asks editor on purpose
-	// (variable.go): whoever may overwrite a value can already destroy it.
+	// Variables and secrets.
 	{op: "GetVariables", cookie: true, relation: viewer, target: onProject, denied: variableCodes.denied, miss: variableCodes.readMiss},
 	{op: "GetVariable", cookie: true, relation: viewer, target: onProject, denied: variableCodes.denied, miss: variableCodes.readMiss},
 	{op: "UpdateVariables", relation: editor, target: onProject, denied: variableCodes.denied, miss: variableCodes.writeMiss},
-	{op: "DeleteVariable", relation: editor, target: onProject, denied: variableCodes.denied, miss: variableCodes.writeMiss, open: openWriteIsNotDelete},
-}
-
-// ungatedOperations are the operations that ask no project gate, each with why.
-var ungatedOperations = map[string]string{
-	"GetLive":        "health probe, public",
-	"GetReady":       "health probe, public",
-	"CreateFlow":     "public: the login flow engine a browser drives before anyone signs in",
-	"GetFlowStep":    "public: the login flow engine a browser drives before anyone signs in",
-	"SubmitFlowStep": "public: the login flow engine a browser drives before anyone signs in",
-	"CreateProject":  "anonymous bootstrap; the claim flow attaches an owner",
-	"GetClaimWindow": "public: tells a claim link's holder whether it expired",
-	"CompleteClaim":  "the claim challenge and the platform session are the credential (verifyClaimSession), not a grant",
-
-	"CreateApplication":  "not implemented: answers 501",
-	"GetApplicationById": "not implemented: answers 501",
-
-	"CreateAuthAttempt":    "runtime plane: a project secret acts on its own project's attempts, no grant",
-	"GetAuthAttempt":       "runtime plane: a project secret acts on its own project's attempts, no grant",
-	"IssueChallenge":       "runtime plane: a project secret acts on its own project's attempts, no grant",
-	"VerifyChallengeProof": "runtime plane: a project secret acts on its own project's attempts, no grant",
-	"CreateHandoff":        "runtime plane: a project secret acts on its own project's attempts, no grant",
-	"CreateSession":        "runtime plane: mints an anonymous session, no grant",
-	"ExchangeHandoff":      "runtime plane: a project secret exchanges its own project's handoffs, no grant",
-
-	"AcceptInvitation": "the invitation token is the credential",
-	"LookupInvitation": "the invitation token is the credential",
-	"RejectInvitation": "the invitation token is the credential",
-
-	"GetMySession":          "self-service: the session cookie acts on itself",
-	"GetMySessionCsrfToken": "self-service: the session cookie acts on itself",
-	"RevokeMySession":       "self-service: the session cookie acts on itself",
-	"GetMyUser":             "self-service: the session cookie acts on its own user",
-	"PatchMyUser":           "self-service: the session cookie acts on its own user",
-	"GetMyUserSchema":       "self-service: the session cookie acts on its own user",
-	"GetMyPasswordState":    "self-service: the session cookie acts on its own user",
-	"ListMyIdentityLinks":   "self-service: the session cookie acts on its own user",
-	"ListMyPasskeys":        "self-service: the session cookie acts on its own user",
-	"ListMyTeams":           "self-service: the session cookie acts on its own user",
-	// It asks the resolver, but only the platform operator question, and a
-	// "no" still lists the caller's own projects.
-	"ListMyProjects": "asks only the platform operator question, pinned with its exact params by TestListMyProjects_PlatformOperator",
+	{op: "DeleteVariable", relation: editor, why: whyVariableDelete, target: onProject, denied: variableCodes.denied, miss: variableCodes.writeMiss, open: openWriteIsNotDelete},
 }
 
 const (
-	contractHome   = "proj_home"
-	contractTarget = "proj_target"
-	contractTeam   = "team_of_resource"
-	contractPathID = "path_id"
+	contractHome      = "proj_home"
+	contractTarget    = "proj_target"
+	contractElsewhere = "proj_elsewhere"
+	contractTeam      = "team_of_resource"
+	contractPathID    = "path_id"
 )
 
 // gateCall is what one run of a row puts in the request.
@@ -303,28 +280,31 @@ type gatePrincipal struct {
 	scope  ScopeContext
 }
 
-// gatePrincipals: a Console session homed in one project, which can reach
+// The principals: a Console session homed in one project, which can reach
 // another, and a project secret, which is confined to its own project for
 // path ids but may name another one (credentialCeiling).
-var gatePrincipals = []gatePrincipal{
-	{name: "session", scheme: "sessionCookie", scope: ScopeContext{
+var (
+	sessionPrincipal = gatePrincipal{name: "session", scheme: "sessionCookie", scope: ScopeContext{
 		ProjectID:     contractHome,
 		PrincipalType: domain.AuthzPrincipalTypeUser,
 		PrincipalID:   "user_alice",
-	}},
-	{name: "project secret", scheme: "oauth2", scope: ScopeContext{
+	}}
+	secretPrincipal = gatePrincipal{name: "project secret", scheme: "oauth2", scope: ScopeContext{
 		ProjectID:     contractHome,
 		Scope:         []string{"project.write", "project.read"},
 		PrincipalType: domain.AuthzPrincipalTypeSKProj,
 		PrincipalID:   contractHome,
-	}},
-}
+	}}
+	gatePrincipals = []gatePrincipal{sessionPrincipal, secretPrincipal}
+)
 
-// recordingAuthzStmts answers the gate's statements, denying every Check, and
-// records what each was asked. Every other statement goes to a gomock with no
+// recordingAuthzStmts answers the gate's statements and records what each
+// was asked. The i-th Check allows when answers[i] does and denies otherwise,
+// with or without a foothold. Every other statement goes to a gomock with no
 // expectations, so a denied request that reaches storage fails the test.
 type recordingAuthzStmts struct {
 	*servicemocks.MockAllStatements
+	answers  []bool
 	foothold bool
 	rsi      map[string]domain.ResourceScope
 
@@ -340,8 +320,9 @@ func (s *recordingAuthzStmts) ActiveSystemCatalogID(context.Context) (string, er
 func (s *recordingAuthzStmts) CheckAuthz(_ context.Context, params domain.AuthzCheckParams) (bool, bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	allowed := len(s.checks) < len(s.answers) && s.answers[len(s.checks)]
 	s.checks = append(s.checks, params)
-	return false, s.foothold, nil
+	return allowed, s.foothold, nil
 }
 
 func (s *recordingAuthzStmts) CheckPlatformOperator(_ context.Context, params domain.AuthzPlatformCheckParams) (bool, error) {
@@ -381,54 +362,106 @@ func (s *recordingAuthzStmts) GetResourceScopeByIDInProject(ctx context.Context,
 	return row, nil
 }
 
-// gateFixture is a Handler over recordingAuthzStmts whose services are
-// gomocks with no expectations, or real services over the same statements.
-// The services with neither stay nil: reaching one panics.
-type gateFixture struct {
-	handler *Handler
-	stmts   *recordingAuthzStmts
-	idps    *servicemocks.MockIDPConnectionService
+// recordedChecks is a copy of the Checks asked so far.
+func (s *recordingAuthzStmts) recordedChecks() []domain.AuthzCheckParams {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return slices.Clone(s.checks)
 }
 
-func newGateFixture(t *testing.T, foothold bool) *gateFixture {
+// gateFixture is a Handler over recordingAuthzStmts whose services are
+// gomocks with no expectations, recording fakes, or real services over the
+// same statements. The services with none of these stay nil: reaching one
+// panics, which callOperation reports.
+type gateFixture struct {
+	handler  *Handler
+	stmts    *recordingAuthzStmts
+	idps     *servicemocks.MockIDPConnectionService
+	sessions *servicemocks.MockSessionService
+	users    *recordingUserService
+	attempts *recordingAuthAttempts
+}
+
+func newGateFixture(t *testing.T, foothold bool, answers ...bool) *gateFixture {
 	t.Helper()
 	ctrl := gomock.NewController(t)
 	stmts := &recordingAuthzStmts{
 		MockAllStatements: servicemocks.NewMockAllStatements(ctrl),
+		answers:           answers,
 		foothold:          foothold,
 		rsi:               map[string]domain.ResourceScope{},
 	}
 	pool := servicemocks.NewMockPool(ctrl)
 	pool.EXPECT().Statements().Return(stmts).AnyTimes()
 	db := service.NewPool(pool)
-	idps := servicemocks.NewMockIDPConnectionService(ctrl)
-	variables := servicemocks.NewMockVariableService(ctrl)
-	return &gateFixture{
-		stmts: stmts,
-		idps:  idps,
-		handler: &Handler{
-			pool:                 db,
-			projectService:       servicemocks.NewMockProjectService(ctrl),
-			sessionService:       servicemocks.NewMockSessionService(ctrl),
-			releaseService:       servicemocks.NewMockReleaseService(ctrl),
-			variableService:      variables,
-			idpConnectionService: idps,
-			claimService:         servicemocks.NewMockClaimService(ctrl),
-			tokenService:         servicemocks.NewMockTokenService(ctrl),
-			keyService:           servicemocks.NewMockKeyService(ctrl),
-			teamService:          service.NewTeamService(db),
-			brandingService:      service.NewBrandingService(db),
-			eventService:         service.NewEventService(db, ""),
-			grantService:         service.NewGrantService(db, nil, ""),
-			policyService:        service.NewPolicyService(db, nil),
-			deploymentService:    service.NewDeploymentService(db, variables),
-		},
+	f := &gateFixture{
+		stmts:    stmts,
+		idps:     servicemocks.NewMockIDPConnectionService(ctrl),
+		sessions: servicemocks.NewMockSessionService(ctrl),
+		users:    &recordingUserService{},
+		attempts: &recordingAuthAttempts{},
 	}
+	variables := servicemocks.NewMockVariableService(ctrl)
+	f.handler = &Handler{
+		pool:                 db,
+		projectService:       servicemocks.NewMockProjectService(ctrl),
+		sessionService:       f.sessions,
+		userService:          f.users,
+		authAttemptService:   f.attempts,
+		releaseService:       servicemocks.NewMockReleaseService(ctrl),
+		variableService:      variables,
+		idpConnectionService: f.idps,
+		claimService:         servicemocks.NewMockClaimService(ctrl),
+		tokenService:         servicemocks.NewMockTokenService(ctrl),
+		keyService:           servicemocks.NewMockKeyService(ctrl),
+		schemaService:        service.NewSchemaService(db, nil, nil, domain.BuiltinSchemaBases{}),
+		teamService:          service.NewTeamService(db),
+		brandingService:      service.NewBrandingService(db),
+		eventService:         service.NewEventService(db, ""),
+		grantService:         service.NewGrantService(db, nil, ""),
+		policyService:        service.NewPolicyService(db, nil),
+		deploymentService:    service.NewDeploymentService(db, variables),
+	}
+	return f
+}
+
+// assertNoFakeReached fails when a request reached a recording fake.
+func (f *gateFixture) assertNoFakeReached(t *testing.T) {
+	t.Helper()
+	assert.Empty(t, f.users.calls, "the request reached the user service")
+	assert.Empty(t, f.attempts.projects, "the request reached the auth attempt service")
+}
+
+// errReachedService stops a request at the fake service it reached.
+var errReachedService = domain.ErrInternal(nil).WithMessage("test: reached the service")
+
+// recordingUserService records the user service methods a request reaches
+// after its checks, and stops it there. Any other method panics.
+type recordingUserService struct {
+	service.UserService
+	calls []string
+}
+
+func (s *recordingUserService) ListUsers(context.Context, service.ListUsersInput) (*service.ListUsersOutput, error) {
+	s.calls = append(s.calls, "ListUsers")
+	return nil, errReachedService
+}
+
+func (s *recordingUserService) GetUserByID(context.Context, service.GetUserInput) (*domain.User, error) {
+	s.calls = append(s.calls, "GetUserByID")
+	return nil, errReachedService
+}
+
+func (s *recordingUserService) ListUserTeams(context.Context, service.ListUserTeamsInput) (*service.ListUserTeamsOutput, error) {
+	s.calls = append(s.calls, "ListUserTeams")
+	return nil, errReachedService
 }
 
 // TestGateContract runs every row's operation, for every principal its spec
 // lets in, against Checks that deny: once with a foothold (403) and once
 // without (404), and asserts the one Check the gate asked and the answer.
+// A by-id row whose request names a project runs once more for a session
+// with the index row in another project.
 func TestGateContract(t *testing.T) {
 	t.Parallel()
 	ops := bundledOperations(t)
@@ -448,20 +481,79 @@ func TestGateContract(t *testing.T) {
 					// the request goes on to the service with a filter.
 					continue
 				}
-				name := fmt.Sprintf("%s/%s/foothold=%t", rowName(row), p.name, foothold)
-				t.Run(name, func(t *testing.T) {
+				t.Run(fmt.Sprintf("%s/%s/foothold=%t", rowName(row), p.name, foothold), func(t *testing.T) {
 					t.Parallel()
 					runGateRow(t, row, p, foothold)
 				})
 			}
 		}
 		assert.True(t, ran, "%s: no principal of this test reaches it through the spec's security schemes", rowName(row))
+
+		if row.target != onResource || !namesProject(t, row) {
+			continue
+		}
+		for _, p := range gatePrincipals {
+			if !spec.schemes[p.scheme] {
+				continue
+			}
+			t.Run(rowName(row)+"/"+p.name+"/index row in another project", func(t *testing.T) {
+				t.Parallel()
+				runIndexRowElsewhere(t, row, p)
+			})
+		}
 	}
 }
 
 func runGateRow(t *testing.T, row gateRow, p gatePrincipal, foothold bool) {
 	f := newGateFixture(t, foothold)
+	call, want := prepareGateCall(t, f, row, p)
 
+	err := callOperation(t, f.handler, row.op, buildArgs(t, row, call), p.scope, nil)
+
+	checks := f.stmts.recordedChecks()
+	require.Len(t, checks, 1, "the gate asks one Check before it refuses")
+	assert.Equal(t, want, checks[0], "the Check the gate asked")
+	assert.Empty(t, f.stmts.operators, "a principal outside the platform project is never asked the operator question")
+	f.assertNoFakeReached(t)
+	wantCode := row.miss
+	if foothold {
+		wantCode = row.denied
+	}
+	assertDomainCode(t, err, wantCode)
+}
+
+// runIndexRowElsewhere names one project while the path id's index row lives
+// in another: for a session, a third project its lookup is bounded to miss;
+// for a project secret, its own, which it looks in whatever it names. Either
+// way the request is the miss before any Check is asked.
+func runIndexRowElsewhere(t *testing.T, row gateRow, p gatePrincipal) {
+	f := newGateFixture(t, true)
+	call := gateCall{project: contractTarget, id: contractPathID}
+	rsiProject := contractElsewhere
+	if p.scope.PrincipalType != domain.AuthzPrincipalTypeUser {
+		rsiProject = p.scope.ProjectID
+	}
+	rsiID := row.rsiID
+	if rsiID == "" {
+		rsiID = call.id
+	}
+	f.stmts.rsi[rsiID] = domain.ResourceScope{ResourceID: rsiID, ResourceKind: row.kind, ProjectID: rsiProject, TeamID: new(contractTeam)}
+	if row.setup != nil {
+		row.setup(t, f, call)
+	}
+
+	err := callOperation(t, f.handler, row.op, buildArgs(t, row, call), p.scope, nil)
+
+	assert.Empty(t, f.stmts.recordedChecks(), "a path id outside the named project asks no Check")
+	f.assertNoFakeReached(t)
+	assertDomainCode(t, err, row.miss)
+}
+
+// prepareGateCall decides what a run of row by p names, serves the path id's
+// index row where the Check should find it, wires the row's setup, and
+// returns the Check the gate should ask.
+func prepareGateCall(t *testing.T, f *gateFixture, row gateRow, p gatePrincipal) (gateCall, domain.AuthzCheckParams) {
+	t.Helper()
 	// A project secret looks a path id up in its own project only, so its
 	// by-id runs name that project; a session reaches the target one. Every
 	// other run names the target project, which only the Check may refuse.
@@ -500,57 +592,95 @@ func runGateRow(t *testing.T, row gateRow, p gatePrincipal, foothold bool) {
 	if row.setup != nil {
 		row.setup(t, f, call)
 	}
-
-	err := callOperation(t, f.handler, row, p.scope, call)
-
-	f.stmts.mu.Lock()
-	defer f.stmts.mu.Unlock()
-	require.Len(t, f.stmts.checks, 1, "the gate asks one Check before it refuses")
-	assert.Equal(t, want, f.stmts.checks[0], "the Check the gate asked")
-	assert.Empty(t, f.stmts.operators, "a principal outside the platform project is never asked the operator question")
-	wantCode := row.miss
-	if foothold {
-		wantCode = row.denied
-	}
-	assertDomainCode(t, err, wantCode)
+	return call, want
 }
 
-// callOperation calls the row's operation on h by name, with a zero request
-// body and params whose project_id and path id carry the call.
-func callOperation(t *testing.T, h *Handler, row gateRow, scope ScopeContext, call gateCall) error {
-	t.Helper()
-	ctx := WithScopeContext(t.Context(), scope)
-	method := reflect.ValueOf(h).MethodByName(row.op)
-	require.True(t, method.IsValid(), "Handler has no method %s", row.op)
-	mt := method.Type()
-	require.GreaterOrEqual(t, mt.NumIn(), 1)
-	require.Equal(t, reflect.TypeFor[context.Context](), mt.In(0), "%s takes a context first", row.op)
+// opArgs are an operation's arguments after the context: a zero request body
+// and params whose project_id and path id carry the call.
+type opArgs struct {
+	values []reflect.Value
+	// namedProject and namedID report whether a ProjectID field and the path
+	// id field were found to carry the call.
+	namedProject, namedID bool
+}
 
-	args := []reflect.Value{reflect.ValueOf(ctx)}
-	var setProject, setID bool
-	for i := 1; i < mt.NumIn(); i++ {
-		arg, struc := zeroArg(mt.In(i))
-		if struc.IsValid() {
-			setProject = setStringField(struc, "ProjectID", call.project) || setProject
-			if row.idField != "" {
-				setID = setStringField(struc, row.idField, call.id) || setID
-			}
-		}
-		args = append(args, arg)
-	}
+// buildArgs builds row's arguments for call, and fails when the call cannot
+// be carried: no field to name the project in, or none for the path id.
+func buildArgs(t *testing.T, row gateRow, call gateCall) opArgs {
+	t.Helper()
+	args := buildOpArgs(t, row.op, row.idField, call)
 	if row.target == onProject || row.target == onTarget {
-		require.True(t, setProject, "%s: no ProjectID field to name the project in", row.op)
+		require.True(t, args.namedProject, "%s: no ProjectID field to name the project in", row.op)
 	}
 	if row.idField != "" {
-		require.True(t, setID, "%s: no %s field to carry the path id", row.op, row.idField)
+		require.True(t, args.namedID, "%s: no %s field to carry the path id", row.op, row.idField)
 	}
+	return args
+}
+
+// namesProject reports whether row's request carries a project_id.
+func namesProject(t *testing.T, row gateRow) bool {
+	t.Helper()
+	return buildOpArgs(t, row.op, row.idField, gateCall{project: contractTarget, id: contractPathID}).namedProject
+}
+
+func buildOpArgs(t *testing.T, op, idField string, call gateCall) opArgs {
+	t.Helper()
+	method, ok := reflect.TypeFor[*Handler]().MethodByName(op)
+	require.True(t, ok, "Handler has no method %s", op)
+	mt := method.Type // the receiver is In(0)
+	require.GreaterOrEqual(t, mt.NumIn(), 2)
+	require.Equal(t, reflect.TypeFor[context.Context](), mt.In(1), "%s takes a context first", op)
+
+	var args opArgs
+	for i := 2; i < mt.NumIn(); i++ {
+		arg, struc := zeroArg(mt.In(i))
+		if struc.IsValid() {
+			args.namedProject = setStringField(struc, "ProjectID", call.project) || args.namedProject
+			if idField != "" {
+				args.namedID = setStringField(struc, idField, call.id) || args.namedID
+			}
+		}
+		args.values = append(args.values, arg)
+	}
+	return args
+}
+
+// argOf returns a pointer to the argument of type T, so a test can set what
+// the zero request leaves out.
+func argOf[T any](t *testing.T, args opArgs) *T {
+	t.Helper()
+	for _, arg := range args.values {
+		switch arg.Type() {
+		case reflect.TypeFor[*T]():
+			return arg.Interface().(*T)
+		case reflect.TypeFor[T]():
+			return arg.Addr().Interface().(*T)
+		}
+	}
+	t.Fatalf("no argument of type %v", reflect.TypeFor[T]())
+	return nil
+}
+
+// callOperation calls op on h by name with args, under scope and, for a
+// self-service operation, the session cookie and the token it carried, as
+// HandleSessionCookie stores them.
+func callOperation(t *testing.T, h *Handler, op string, args opArgs, scope ScopeContext, token *domain.Token) error {
+	t.Helper()
+	ctx := WithScopeContext(t.Context(), scope)
+	if token != nil {
+		ctx = context.WithValue(ctx, sessionTokenKey{}, token)
+		ctx = context.WithValue(ctx, sessionCookieKey{}, "raw-session-cookie")
+	}
+	method := reflect.ValueOf(h).MethodByName(op)
+	require.True(t, method.IsValid(), "Handler has no method %s", op)
 
 	defer func() {
 		if r := recover(); r != nil {
-			t.Fatalf("%s reached an unwired service after its gate refused: %v", row.op, r)
+			t.Fatalf("%s reached an unwired service: %v", op, r)
 		}
 	}()
-	out := method.Call(args)
+	out := method.Call(append([]reflect.Value{reflect.ValueOf(ctx)}, args.values...))
 	if last := out[len(out)-1]; !last.IsNil() {
 		return last.Interface().(error)
 	}
@@ -589,7 +719,7 @@ func setStringField(s reflect.Value, name, value string) bool {
 		v, set := field.FieldByName("Value"), field.FieldByName("Set")
 		if v.IsValid() && v.Kind() == reflect.String && set.IsValid() && set.Kind() == reflect.Bool {
 			v.SetString(value)
-			set.SetBool(true)
+			set.SetBool(value != "")
 			return true
 		}
 	}
@@ -604,23 +734,23 @@ func rowName(row gateRow) string {
 }
 
 // TestGateContractCoversEveryOperation fails when the spec gains an
-// operation with neither a gate row nor a reason it is ungated, or when a row
-// or a reason outlives its operation. It also pins the plane: whether each
-// gated operation accepts the Console session cookie.
+// operation that is neither a gate row nor in exactly one ungated class, or
+// when a row or an entry outlives its operation. It also pins the plane:
+// whether each gated operation accepts the Console session cookie.
 func TestGateContractCoversEveryOperation(t *testing.T) {
 	t.Parallel()
 	ops := bundledOperations(t)
 	handler := reflect.TypeFor[api.Handler]()
 
-	rows := map[string]bool{}
+	classes := map[string][]string{} // operation → the classes it is in
 	seen := map[string]bool{}
 	for _, row := range gateRows {
 		key := rowName(row)
 		assert.False(t, seen[key], "duplicate gate row %s", key)
 		seen[key] = true
-		rows[row.op] = true
-		_, ungated := ungatedOperations[row.op]
-		assert.False(t, ungated, "%s has a gate row and an ungated reason", row.op)
+		if !slices.Contains(classes[row.op], "gated") {
+			classes[row.op] = append(classes[row.op], "gated")
+		}
 		assert.NotEmpty(t, row.relation, "%s: no relation", key)
 		assert.NotEmpty(t, row.miss, "%s: no miss code", key)
 		if !row.list {
@@ -636,17 +766,59 @@ func TestGateContractCoversEveryOperation(t *testing.T) {
 		assert.Equal(t, spec.schemes["sessionCookie"], row.cookie,
 			"%s %s: the row and the spec disagree on whether the Console session cookie may call it; change the plane deliberately and the row with it", spec.method, spec.path)
 	}
-	for op, reason := range ungatedOperations {
-		assert.NotEmpty(t, reason, "%s: an ungated operation needs its reason", op)
+	for op, class := range ungatedClasses() {
+		classes[op] = append(classes[op], class...)
+	}
+	for op, in := range classes {
 		_, ok := ops[op]
-		assert.True(t, ok, "ungated reason for %s names no operation in the spec", op)
+		assert.True(t, ok, "%s is classed (%v) but names no operation in the spec", op, in)
+		assert.Len(t, in, 1, "%s must be in exactly one class, is in %v", op, in)
 	}
 	for op, spec := range ops {
-		_, ungated := ungatedOperations[op]
-		assert.True(t, rows[op] || ungated,
-			"%s %s (%s) has no gate row and no ungated reason: add it to gateRows, or to ungatedOperations with why it asks no gate", spec.method, spec.path, op)
+		assert.NotEmpty(t, classes[op],
+			"%s %s (%s) has no gate row and no ungated class: add it to gateRows, or to one class in authz_ungated_contract_internal_test.go", spec.method, spec.path, op)
 		_, ok := handler.MethodByName(op)
 		assert.True(t, ok, "%s is not a method of the generated Handler: the operation name rule changed", op)
+	}
+}
+
+// removalVerb matches an operation name that removes something, whatever its
+// method: a removal can travel as POST when what it names does not fit a path
+// (an origin, a preview's URL) or when it keeps a record (a revoked release).
+var removalVerb = regexp.MustCompile(`^(Delete|Remove|Revoke|Cancel)([A-Z]|$)`)
+
+// impliedRelation is the relation an operation implies by what it does: a
+// removal (DELETE, or a removal verb) asks admin, any other read (GET) viewer,
+// anything else editor.
+func impliedRelation(op string, spec specOperation) string {
+	switch {
+	case spec.method == "DELETE" || removalVerb.MatchString(op):
+		return admin
+	case spec.method == "GET":
+		return viewer
+	default:
+		return editor
+	}
+}
+
+// TestGateRelationsFollowTheOperation makes every relation that is not the one
+// its operation implies say why, and fails a why that no longer explains one.
+func TestGateRelationsFollowTheOperation(t *testing.T) {
+	t.Parallel()
+	ops := bundledOperations(t)
+
+	for _, row := range gateRows {
+		spec, ok := ops[row.op]
+		if !ok {
+			continue // TestGateContractCoversEveryOperation reports it
+		}
+		rule := impliedRelation(row.op, spec)
+		if row.relation == rule {
+			assert.Empty(t, row.why, "%s: %s %s asks %s, as it implies, so its why is stale", rowName(row), spec.method, spec.path, rule)
+			continue
+		}
+		assert.NotEmpty(t, row.why, "%s: %s %s asks %s, where it implies %s: say why in the row",
+			rowName(row), spec.method, spec.path, row.relation, rule)
 	}
 }
 
