@@ -696,7 +696,13 @@ no app: where it would scaffold one, it previews the project, and
 (`.zitadel/policies/auth.factor.password.set.json`), with a minimum length of
 15, NIST's minimum for password-only sign-in and the wizard's default. Pass
 `--password-min-length <n>` only when the user asks for another value (`0` sets
-none), and give test users passwords at least that long.
+none), and give test users passwords at least that long. It writes the
+sign-up policy (`.zitadel/policies/user.create.json`) too, which that deploy
+publishes: the default, the built-in proof of work every password sign-up
+solves with or without the file; passkey and sign-in provider sign-ups are not
+challenged. A server too old to take it gets a warning and no file; a file
+`--force` kept stays, and every `deploy` fails until the server is upgraded or
+the file moves out of `.zitadel/policies/`.
 When setup fails after scaffolding a new app, before its default schema and
 flow files are written, it removes the app again and puts back what the
 directory held, so rerunning the same `setup` starts over. Setup writes

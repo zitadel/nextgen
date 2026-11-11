@@ -280,31 +280,31 @@ func TestFlowService_metrics(t *testing.T) {
 	}{
 		{"start at a step", func(t *testing.T) error {
 			sm := &fakeStateMachine{startResult: domain.FlowStepResult{State: &domain.FlowState{ProjectID: def.ProjectID}, Step: &domain.FlowStep{Name: "start"}}}
-			_, err := service.NewFlowService(stubDB(t), sm, domain.BuiltinSchemaBases{}).Start(withPinnedSchema(t, t.Context(), "human-user", testUserSchema.URL), service.StartFlowRequest{Definition: def, Purpose: domain.FlowDefinitionPurposeLogin})
+			_, err := service.NewFlowService(stubDB(t), sm, domain.BuiltinSchemaBases{}, nil).Start(withPinnedSchema(t, t.Context(), "human-user", testUserSchema.URL), service.StartFlowRequest{Definition: def, Purpose: domain.FlowDefinitionPurposeLogin})
 			return err
 		}, metrics.FlowStart, metrics.FlowStep},
 		{"start completes", func(t *testing.T) error {
 			sm := &fakeStateMachine{startResult: domain.FlowStepResult{State: &domain.FlowState{ProjectID: def.ProjectID}, Step: completeStep}}
-			_, err := service.NewFlowService(stubDB(t), sm, domain.BuiltinSchemaBases{}).Start(withPinnedSchema(t, t.Context(), "human-user", testUserSchema.URL), service.StartFlowRequest{Definition: def, Purpose: domain.FlowDefinitionPurposeLogin})
+			_, err := service.NewFlowService(stubDB(t), sm, domain.BuiltinSchemaBases{}, nil).Start(withPinnedSchema(t, t.Context(), "human-user", testUserSchema.URL), service.StartFlowRequest{Definition: def, Purpose: domain.FlowDefinitionPurposeLogin})
 			return err
 		}, metrics.FlowStart, metrics.FlowComplete},
 		{"start fails", func(t *testing.T) error {
-			_, err := service.NewFlowService(stubDB(t), &fakeStateMachine{}, domain.BuiltinSchemaBases{}).Start(t.Context(), service.StartFlowRequest{})
+			_, err := service.NewFlowService(stubDB(t), &fakeStateMachine{}, domain.BuiltinSchemaBases{}, nil).Start(t.Context(), service.StartFlowRequest{})
 			return err
 		}, metrics.FlowStart, metrics.FlowFailed},
 		{"submit completes", func(t *testing.T) error {
 			sm := &fakeStateMachine{processResult: domain.FlowStepResult{State: state, Step: completeStep}}
-			_, err := service.NewFlowService(stubSubmitDB(t, def, &domain.AuthAttempt{ProjectID: def.ProjectID, ID: "att-1"}), sm, domain.BuiltinSchemaBases{}).Submit(t.Context(), service.SubmitFlowRequest{State: state})
+			_, err := service.NewFlowService(stubSubmitDB(t, def, &domain.AuthAttempt{ProjectID: def.ProjectID, ID: "att-1"}), sm, domain.BuiltinSchemaBases{}, nil).Submit(t.Context(), service.SubmitFlowRequest{State: state})
 			return err
 		}, metrics.FlowSubmit, metrics.FlowComplete},
 		{"submit fails", func(t *testing.T) error {
 			sm := &fakeStateMachine{processErr: domain.ErrFlowIntegrity()}
-			_, err := service.NewFlowService(stubSubmitDB(t, def, &domain.AuthAttempt{ProjectID: def.ProjectID, ID: "att-1"}), sm, domain.BuiltinSchemaBases{}).Submit(t.Context(), service.SubmitFlowRequest{State: state})
+			_, err := service.NewFlowService(stubSubmitDB(t, def, &domain.AuthAttempt{ProjectID: def.ProjectID, ID: "att-1"}), sm, domain.BuiltinSchemaBases{}, nil).Submit(t.Context(), service.SubmitFlowRequest{State: state})
 			return err
 		}, metrics.FlowSubmit, metrics.FlowFailed},
 		{"render a step", func(t *testing.T) error {
 			sm := &fakeStateMachine{renderResult: domain.FlowStepResult{State: state, Step: &domain.FlowStep{Name: "password"}}}
-			_, err := service.NewFlowService(stubGetFlowDefinition(t, def), sm, domain.BuiltinSchemaBases{}).GetStep(t.Context(), service.GetFlowStepRequest{State: state})
+			_, err := service.NewFlowService(stubGetFlowDefinition(t, def), sm, domain.BuiltinSchemaBases{}, nil).GetStep(t.Context(), service.GetFlowStepRequest{State: state})
 			return err
 		}, metrics.FlowRender, metrics.FlowStep},
 	} {
