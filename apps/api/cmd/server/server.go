@@ -314,7 +314,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	variableService := service.NewVariableService(serviceDBPool, keyService)
 	idpConnectionService := service.NewIDPConnectionService(serviceDBPool, schemaValidator)
 	deploymentService := service.NewDeploymentService(serviceDBPool, variableService)
-	eventService := service.NewEventService(serviceDBPool)
+	eventService := service.NewEventService(serviceDBPool, cfg.Platform.ResolvedProjectID())
 	// Operation policies (ADR 066). Every template is compiled and checked
 	// here, so a template the server cannot evaluate stops it before it
 	// serves traffic. A project's published instance is resolved per password
@@ -435,7 +435,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	ctx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	exportAdapter := service.EventExportAdapter{Pool: serviceDBPool}
+	exportAdapter := service.EventExportAdapter{Pool: serviceDBPool, PlatformProjectID: cfg.Platform.ResolvedProjectID()}
 	requestEventCfg := audit.DefaultRequestBufferConfig()
 	requestEventCfg.FlushWait = cfg.Events.Request.FlushWait
 	requestEventBuf := audit.NewRequestBuffer(exportAdapter, requestEventCfg)

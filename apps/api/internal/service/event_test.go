@@ -20,11 +20,18 @@ import (
 
 func newMockedEventService(t *testing.T) (*service.EventService, *servicemocks.MockAllStatements) {
 	t.Helper()
+	return newMockedEventServiceOnPlatform(t, "")
+}
+
+// newMockedEventServiceOnPlatform builds the service for a deployment whose
+// platform project is platformProjectID; empty, it has none.
+func newMockedEventServiceOnPlatform(t *testing.T, platformProjectID string) (*service.EventService, *servicemocks.MockAllStatements) {
+	t.Helper()
 	ctrl := gomock.NewController(t)
 	pool := servicemocks.NewMockPool(ctrl)
 	statements := servicemocks.NewMockAllStatements(ctrl)
 	pool.EXPECT().Statements().Return(statements).AnyTimes()
-	return service.NewEventService(service.NewPool(pool)), statements
+	return service.NewEventService(service.NewPool(pool), platformProjectID), statements
 }
 
 func TestEventService_List_preClaimEmpty(t *testing.T) {
@@ -48,6 +55,118 @@ func TestEventService_Get_preClaimNotFound(t *testing.T) {
 	_, err := svc.Get(context.Background(), "proj_1", "evt_1")
 	require.Error(t, err)
 	assert.Equal(t, domain.ErrEventNotFound().Code, err.(domain.Error).Code)
+}
+
+// The platform project is never claimed, but its admins read its events from
+// the start (ADR 049 §4): neither list nor get asks for a claim.
+func TestEventService_platformProjectVisibleUnclaimed(t *testing.T) {
+	svc, stmts := newMockedEventServiceOnPlatform(t, "proj_platform")
+
+	want := &domain.Event{ProjectID: "proj_platform", ID: "evt_1", EventType: domain.EventTypeUserCreated, Category: domain.EventCategoryEntity}
+	stmts.EXPECT().ListEvents(gomock.Any(), gomock.Any()).
+		Return(&database.ListResult[*domain.Event]{Items: []*domain.Event{want}}, nil)
+	stmts.EXPECT().GetEventByID(gomock.Any(), "proj_platform", "evt_1").Return(want, nil)
+
+	resp, err := svc.List(context.Background(), service.ListEventsRequest{ProjectID: "proj_platform"})
+	require.NoError(t, err)
+	require.Len(t, resp.Events, 1)
+	assert.Equal(t, "evt_1", resp.Events[0].ID)
+
+	got, err := svc.Get(context.Background(), "proj_platform", "evt_1")
+	require.NoError(t, err)
+	assert.Equal(t, want, got)
+}
+
+// Naming a platform project lets only that one through: an unclaimed customer
+// project stays hidden.
+func TestEventService_unclaimedCustomerProjectHiddenBesidePlatform(t *testing.T) {
+	svc, stmts := newMockedEventServiceOnPlatform(t, "proj_platform")
+
+	stmts.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(&domain.Project{ID: "proj_1"}, nil).Times(2)
+	stmts.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), "proj_1").Return(nil, database.NewNoRowFoundError(nil)).Times(2)
+
+	resp, err := svc.List(context.Background(), service.ListEventsRequest{ProjectID: "proj_1"})
+	require.NoError(t, err)
+	assert.Empty(t, resp.Events)
+	assert.Empty(t, resp.NextPageToken)
+
+	_, err = svc.Get(context.Background(), "proj_1", "evt_1")
+	require.ErrorIs(t, err, domain.ErrEventNotFound())
+}
+
+// A deployment without a platform project gates every project on its claim,
+// the built-in platform id included.
+func TestEventService_noPlatformProjectGatesEveryProject(t *testing.T) {
+	svc, stmts := newMockedEventServiceOnPlatform(t, "")
+
+	stmts.EXPECT().GetProjectByID(gomock.Any(), domain.PlatformProjectID).Return(&domain.Project{ID: domain.PlatformProjectID}, nil).Times(2)
+	stmts.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), domain.PlatformProjectID).Return(nil, database.NewNoRowFoundError(nil)).Times(2)
+
+	resp, err := svc.List(context.Background(), service.ListEventsRequest{ProjectID: domain.PlatformProjectID})
+	require.NoError(t, err)
+	assert.Empty(t, resp.Events)
+
+	_, err = svc.Get(context.Background(), domain.PlatformProjectID, "evt_1")
+	require.ErrorIs(t, err, domain.ErrEventNotFound())
+}
+
+// The shipper exports the projects GET /events reads: the claimed ones and
+// the platform project, once, and only while it exists.
+func TestEventExportAdapter_ListVisibleProjectIDs(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		platform string
+		claimed  []string
+		// platformRow answers the platform project's lookup; nil, none is expected.
+		platformRow func(*servicemocks.MockAllStatements)
+		want        []string
+	}{
+		{
+			name:    "no platform project ships the claimed ones",
+			claimed: []string{"proj_a"},
+			want:    []string{"proj_a"},
+		},
+		{
+			name:     "the platform project ships beside the claimed ones",
+			platform: "proj_platform",
+			claimed:  []string{"proj_a"},
+			platformRow: func(stmts *servicemocks.MockAllStatements) {
+				stmts.EXPECT().GetProjectByID(gomock.Any(), "proj_platform").Return(&domain.Project{ID: "proj_platform"}, nil)
+			},
+			want: []string{"proj_a", "proj_platform"},
+		},
+		{
+			name:     "a claimed platform project ships once",
+			platform: "proj_platform",
+			claimed:  []string{"proj_a", "proj_platform"},
+			want:     []string{"proj_a", "proj_platform"},
+		},
+		{
+			name:     "a platform project that is gone ships nothing",
+			platform: "proj_platform",
+			claimed:  []string{"proj_a"},
+			platformRow: func(stmts *servicemocks.MockAllStatements) {
+				stmts.EXPECT().GetProjectByID(gomock.Any(), "proj_platform").Return(nil, database.NewNoRowFoundError(nil))
+			},
+			want: []string{"proj_a"},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			pool := servicemocks.NewMockPool(ctrl)
+			stmts := servicemocks.NewMockAllStatements(ctrl)
+			pool.EXPECT().Statements().Return(stmts).AnyTimes()
+			stmts.EXPECT().ListClaimedProjectIDs(gomock.Any(), "", gomock.Any()).Return(tc.claimed, nil)
+			if tc.platformRow != nil {
+				tc.platformRow(stmts)
+			}
+
+			adapter := service.EventExportAdapter{Pool: service.NewPool(pool), PlatformProjectID: tc.platform}
+			got, err := adapter.ListVisibleProjectIDs(t.Context())
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, got)
+		})
+	}
 }
 
 func TestEventService_List_claimedAppliesFilters(t *testing.T) {

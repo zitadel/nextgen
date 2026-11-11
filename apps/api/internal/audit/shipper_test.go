@@ -39,7 +39,7 @@ func newFakeExportSource(projects []string, events map[string][]*domain.Event) *
 
 func cursorKey(sinkID, projectID string) string { return sinkID + "|" + projectID }
 
-func (f *fakeExportSource) ListClaimedProjectIDs(context.Context) ([]string, error) {
+func (f *fakeExportSource) ListVisibleProjectIDs(context.Context) ([]string, error) {
 	return append([]string(nil), f.projects...), nil
 }
 

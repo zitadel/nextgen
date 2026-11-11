@@ -47,9 +47,10 @@ func DefaultExportConfig() ExportConfig {
 	}
 }
 
-// EventExportSource backs the shipper with claimed projects and sink cursors.
+// EventExportSource backs the shipper with the projects whose events ship
+// (claimed ones and the platform project, ADR 049 §4) and sink cursors.
 type EventExportSource interface {
-	ListClaimedProjectIDs(ctx context.Context) ([]string, error)
+	ListVisibleProjectIDs(ctx context.Context) ([]string, error)
 	EnsureSink(ctx context.Context, sink *domain.EventSink) error
 	GetEventSinkCursor(ctx context.Context, sinkID, projectID string) (*domain.EventSinkCursor, error)
 	UpsertEventSinkCursor(ctx context.Context, cursor *domain.EventSinkCursor) error
@@ -142,7 +143,7 @@ func (s *Shipper) loop() {
 func (s *Shipper) shipOnce() {
 	projects, err := s.listProjects()
 	if err != nil {
-		slog.Error("event shipper: list claimed projects failed",
+		slog.Error("event shipper: list projects failed",
 			slog.String("error", err.Error()),
 		)
 		return
@@ -154,14 +155,14 @@ func (s *Shipper) shipOnce() {
 	}
 }
 
-// listProjects lists the claimed projects under a job span of its own, ended
-// before any project is shipped.
+// listProjects lists the projects whose events ship under a job span of its
+// own, ended before any project is shipped.
 func (s *Shipper) listProjects() ([]string, error) {
-	ctx, span := startJobSpan(context.Background(), "audit.ListClaimedProjects")
+	ctx, span := startJobSpan(context.Background(), "audit.ListVisibleProjects")
 	defer span.End()
 	ctx, cancel := context.WithTimeout(ctx, shipListTimeout)
 	defer cancel()
-	projects, err := s.src.ListClaimedProjectIDs(ctx)
+	projects, err := s.src.ListVisibleProjectIDs(ctx)
 	if err != nil {
 		failJobSpan(ctx, err)
 	}
