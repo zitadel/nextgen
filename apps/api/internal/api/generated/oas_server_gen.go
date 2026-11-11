@@ -1258,8 +1258,8 @@ type Handler interface {
 	PublishBranding(ctx context.Context, req *Branding, params PublishBrandingParams) (PublishBrandingRes, error)
 	// PublishFlowDefinition implements publishFlowDefinition operation.
 	//
-	// Creates a flow definition by publishing a new revision of it. It records a
-	// `flowdef.created` event.
+	// Publishes a new revision of a flow definition, creating the flow definition
+	// on its first publish. It records a `flowdef.created` event.
 	// A [flow definition](/docs/concepts/flows-and-schemas) is a template that
 	// defines the sequence of steps (capabilities) for one user journey, such as
 	// registration, login or password reset. The body follows the flow
@@ -1335,7 +1335,7 @@ type Handler interface {
 	PublishPolicy(ctx context.Context, req PublishPolicyRequest, params PublishPolicyParams) (PublishPolicyRes, error)
 	// PublishSchema implements publishSchema operation.
 	//
-	// Creates a user schema, the JSON Schema that says which attributes a user
+	// Publishes a user schema, the JSON Schema that says which attributes a user
 	// has and which attribute identifies the user.
 	// The request is either a user schema (`kind: user-schema`) or a schema URL
 	// (`kind: schema-url`) that the server resolves. The response's `id` is what

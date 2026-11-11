@@ -1,8 +1,8 @@
 post:
   operationId: publishSchema
-  summary: Create a schema
+  summary: Publish a schema
   description: |
-    Creates a user schema, the JSON Schema that says which attributes a user
+    Publishes a user schema, the JSON Schema that says which attributes a user
     has and which attribute identifies the user.
 
     The request is either a user schema (`kind: user-schema`) or a schema URL

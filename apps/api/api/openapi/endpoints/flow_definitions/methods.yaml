@@ -1,9 +1,9 @@
 post:
   operationId: publishFlowDefinition
-  summary: Create a flow definition
+  summary: Publish a flow definition
   description: |
-    Creates a flow definition by publishing a new revision of it. It records a
-    `flowdef.created` event.
+    Publishes a new revision of a flow definition, creating the flow definition
+    on its first publish. It records a `flowdef.created` event.
 
     A [flow definition](/docs/concepts/flows-and-schemas) is a template that
     defines the sequence of steps (capabilities) for one user journey, such as

@@ -4026,8 +4026,8 @@
     "/schemas": {
       "post": {
         "operationId": "publishSchema",
-        "summary": "Create a schema",
-        "description": "Creates a user schema, the JSON Schema that says which attributes a user\nhas and which attribute identifies the user.\n\nThe request is either a user schema (`kind: user-schema`) or a schema URL\n(`kind: schema-url`) that the server resolves. The response's `id` is what\n`createUser` (`POST /users`) takes as `schema`.\n\nThe optional `$id` is the JSON Schema document URI that identifies the\nschema in later requests. It is a stable identity for GitOps, not a\nfree-form resource key. When `$id` is omitted, the server generates a\n`sch_*` URL. When provided, `$id` must be unique within the project and\nshould ideally be a valid URI pointing at where the schema can be accessed.\nA `$id` that already exists in the project is refused; pick another or\nomit it.\n",
+        "summary": "Publish a schema",
+        "description": "Publishes a user schema, the JSON Schema that says which attributes a user\nhas and which attribute identifies the user.\n\nThe request is either a user schema (`kind: user-schema`) or a schema URL\n(`kind: schema-url`) that the server resolves. The response's `id` is what\n`createUser` (`POST /users`) takes as `schema`.\n\nThe optional `$id` is the JSON Schema document URI that identifies the\nschema in later requests. It is a stable identity for GitOps, not a\nfree-form resource key. When `$id` is omitted, the server generates a\n`sch_*` URL. When provided, `$id` must be unique within the project and\nshould ideally be a valid URI pointing at where the schema can be accessed.\nA `$id` that already exists in the project is refused; pick another or\nomit it.\n",
         "tags": [
           "Schemas"
         ],
@@ -4371,8 +4371,8 @@
     "/flow_definitions": {
       "post": {
         "operationId": "publishFlowDefinition",
-        "summary": "Create a flow definition",
-        "description": "Creates a flow definition by publishing a new revision of it. It records a\n`flowdef.created` event.\n\nA [flow definition](/docs/concepts/flows-and-schemas) is a template that\ndefines the sequence of steps (capabilities) for one user journey, such as\nregistration, login or password reset. The body follows the flow\ndefinition schema, which includes the flow's purpose, audience and steps.\n\nEvery call allocates a new opaque ID. That `id` is the `revision_id` a\nrelease pins for `kind: flow_definition`.\n\nRevisions of one flow share its `name`. Posting a definition under an\nexisting `name` publishes a new revision of that flow, which is not a\nconflict. List with `name` to see a flow's revisions, newest by creation\ntime first.\n",
+        "summary": "Publish a flow definition",
+        "description": "Publishes a new revision of a flow definition, creating the flow definition\non its first publish. It records a `flowdef.created` event.\n\nA [flow definition](/docs/concepts/flows-and-schemas) is a template that\ndefines the sequence of steps (capabilities) for one user journey, such as\nregistration, login or password reset. The body follows the flow\ndefinition schema, which includes the flow's purpose, audience and steps.\n\nEvery call allocates a new opaque ID. That `id` is the `revision_id` a\nrelease pins for `kind: flow_definition`.\n\nRevisions of one flow share its `name`. Posting a definition under an\nexisting `name` publishes a new revision of that flow, which is not a\nconflict. List with `name` to see a flow's revisions, newest by creation\ntime first.\n",
         "tags": [
           "Flow Definitions"
         ],

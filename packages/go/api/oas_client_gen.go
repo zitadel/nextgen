@@ -1278,8 +1278,8 @@ type Invoker interface {
 	PublishBranding(ctx context.Context, request *Branding, params PublishBrandingParams) (PublishBrandingRes, error)
 	// PublishFlowDefinition invokes publishFlowDefinition operation.
 	//
-	// Creates a flow definition by publishing a new revision of it. It records a
-	// `flowdef.created` event.
+	// Publishes a new revision of a flow definition, creating the flow definition
+	// on its first publish. It records a `flowdef.created` event.
 	// A [flow definition](https://preview.zitadel.com/docs/concepts/flows-and-schemas) is a template that
 	// defines the sequence of steps (capabilities) for one user journey, such as
 	// registration, login or password reset. The body follows the flow
@@ -1355,7 +1355,7 @@ type Invoker interface {
 	PublishPolicy(ctx context.Context, request PublishPolicyRequest, params PublishPolicyParams) (PublishPolicyRes, error)
 	// PublishSchema invokes publishSchema operation.
 	//
-	// Creates a user schema, the JSON Schema that says which attributes a user
+	// Publishes a user schema, the JSON Schema that says which attributes a user
 	// has and which attribute identifies the user.
 	// The request is either a user schema (`kind: user-schema`) or a schema URL
 	// (`kind: schema-url`) that the server resolves. The response's `id` is what
@@ -15250,8 +15250,8 @@ func (c *Client) sendPublishBranding(ctx context.Context, request *Branding, par
 
 // PublishFlowDefinition invokes publishFlowDefinition operation.
 //
-// Creates a flow definition by publishing a new revision of it. It records a
-// `flowdef.created` event.
+// Publishes a new revision of a flow definition, creating the flow definition
+// on its first publish. It records a `flowdef.created` event.
 // A [flow definition](https://preview.zitadel.com/docs/concepts/flows-and-schemas) is a template that
 // defines the sequence of steps (capabilities) for one user journey, such as
 // registration, login or password reset. The body follows the flow
@@ -15708,7 +15708,7 @@ func (c *Client) sendPublishPolicy(ctx context.Context, request PublishPolicyReq
 
 // PublishSchema invokes publishSchema operation.
 //
-// Creates a user schema, the JSON Schema that says which attributes a user
+// Publishes a user schema, the JSON Schema that says which attributes a user
 // has and which attribute identifies the user.
 // The request is either a user schema (`kind: user-schema`) or a schema URL
 // (`kind: schema-url`) that the server resolves. The response's `id` is what

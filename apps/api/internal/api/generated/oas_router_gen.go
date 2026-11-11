@@ -3836,7 +3836,7 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 							return r, true
 						case "POST":
 							r.name = PublishFlowDefinitionOperation
-							r.summary = "Create a flow definition"
+							r.summary = "Publish a flow definition"
 							r.operationID = "publishFlowDefinition"
 							r.operationGroup = ""
 							r.pathPattern = "/flow_definitions"
@@ -5067,7 +5067,7 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 							return r, true
 						case "POST":
 							r.name = PublishSchemaOperation
-							r.summary = "Create a schema"
+							r.summary = "Publish a schema"
 							r.operationID = "publishSchema"
 							r.operationGroup = ""
 							r.pathPattern = "/schemas"
