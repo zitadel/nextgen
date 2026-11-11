@@ -62,7 +62,7 @@ func (f *webhookDeliveryFixture) expectDecryption() {
 }
 
 // A delivery is signed with the webhook's secret, and also with the one a
-// rotation replaced until that one expires (ADR 088 §3).
+// rotation replaced until that one expires (ADR 089 §3).
 func TestWebhookDeliveryAdapter_WebhookSecrets(t *testing.T) {
 	at := time.Date(2026, 11, 11, 10, 0, 0, 0, time.UTC)
 	for _, tc := range []struct {
@@ -94,7 +94,7 @@ func TestWebhookDeliveryAdapter_WebhookSecrets(t *testing.T) {
 }
 
 // A secret that cannot be decrypted is an error, the previous one's too:
-// the caller fails the delivery rather than sign with less (ADR 088 §3).
+// the caller fails the delivery rather than sign with less (ADR 089 §3).
 func TestWebhookDeliveryAdapter_WebhookSecretsFailsOnAnUnreadableSecret(t *testing.T) {
 	at := time.Now()
 	for name, hook := range map[string]domain.Webhook{
@@ -163,7 +163,7 @@ func TestWebhookDeliveryAdapter_WebhookEventsVisible(t *testing.T) {
 }
 
 // Disabling a webhook and its webhook.disabled event are one transaction,
-// and the event says why, with the system as its actor (ADR 088 §4).
+// and the event says why, with the system as its actor (ADR 089 §4).
 func TestWebhookDeliveryAdapter_DisableWebhookWritesItsEvent(t *testing.T) {
 	at := time.Date(2026, 11, 11, 10, 0, 0, 0, time.UTC)
 	hook := &domain.Webhook{ProjectID: "proj_1", ID: "hook_1", Secret: "enc:whsec_new", URL: "https://api.acme.com/hooks?token=t0p"}

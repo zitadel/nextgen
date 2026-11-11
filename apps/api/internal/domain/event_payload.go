@@ -471,7 +471,7 @@ func IDPConnectionPayloadDelta(previous, next *IDPConnection) (IDPConnectionPayl
 // (delta: only the fields the update named, with their new values). The
 // signing secret is never part of it, plain or encrypted, and the url is
 // recorded without its query and fragment, which may carry a token
-// (ADR 088 §5).
+// (ADR 089 §5).
 //
 // Description and Enabled are pointers so the delta can tell "not named"
 // (absent) from the empty string and false.
@@ -513,7 +513,7 @@ func WebhookPayloadDelta(update WebhookUpdate, stored *Webhook) WebhookPayload {
 }
 
 // WebhookDisabledPayload is the payload of webhook.disabled: why the server
-// stopped delivering to the webhook (ADR 088 §4). A state flip with a reason
+// stopped delivering to the webhook (ADR 089 §4). A state flip with a reason
 // enum, so it holds nothing else: the failed delivery is on the webhook's
 // last_error_at and last_error_status.
 type WebhookDisabledPayload struct {

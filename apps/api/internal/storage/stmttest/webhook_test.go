@@ -271,7 +271,7 @@ func TestWebhookStatements_ProjectDeleteCascades(t *testing.T) {
 }
 
 // A new webhook gets no history, and an enabled one nothing of what happened
-// while it was disabled (ADR 088 §4): its cursor is past every event stored
+// while it was disabled (ADR 089 §4): its cursor is past every event stored
 // before, and before every event stored after.
 func TestWebhookStatements_CursorStartsAtNow(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
@@ -327,7 +327,7 @@ func leaseDue(t *testing.T, stmts service.AllStatements, projectID, holder strin
 	return ids
 }
 
-// One sender (ADR 088 §4): a leased webhook goes to nobody else until the
+// One sender (ADR 089 §4): a leased webhook goes to nobody else until the
 // lease runs out or its holder gives it back, and a holder that lost it
 // writes nothing.
 func TestWebhookStatements_Lease(t *testing.T) {
@@ -524,7 +524,7 @@ func TestWebhookStatements_DisableFailedSkipsADisabledWebhook(t *testing.T) {
 	})
 }
 
-// Enabling a disabled webhook starts it clean (ADR 088 §4): not failing, due
+// Enabling a disabled webhook starts it clean (ADR 089 §4): not failing, due
 // at once, and out of the hands of a delivery that began before.
 func TestWebhookStatements_EnableClearsDeliveryState(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
