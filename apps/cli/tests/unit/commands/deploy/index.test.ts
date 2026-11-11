@@ -32,7 +32,7 @@ describe("where a release went", () => {
   });
 
   it("lists three with commas and a final and", () => {
-    expect(liveOn(HASH, ["a", "b", "c"])).toContain("live on a, b and c.");
+    expect(liveOn(HASH, ["a", "b", "c"])).toContain("live on a, b, and c.");
   });
 
   it("spells out a hash the server filled with a terminal escape", () => {
