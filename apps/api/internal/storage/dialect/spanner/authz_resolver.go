@@ -80,6 +80,31 @@ func (s authzResolverStatements) CheckAuthz(ctx context.Context, params domain.A
 	return out.allowed, out.foothold, nil
 }
 
+// CheckAuthzProjects implements [service.AuthzResolverStatements].
+func (s authzResolverStatements) CheckAuthzProjects(ctx context.Context, params domain.AuthzCheckParams, projectIDs []string) ([]domain.AuthzCheckResult, error) {
+	results := make([]domain.AuthzCheckResult, len(projectIDs))
+	if len(projectIDs) == 0 {
+		return results, nil
+	}
+	var c statementCompiler
+	authz.WriteCheckAuthzProjects(&c, spannerAuthzEnv(), params, projectIDs)
+	err := s.db.Query(ctx, c.statement(), func(iter *spanner.RowIterator) error {
+		return iter.Do(func(row *spanner.Row) error {
+			var arm int64
+			var result domain.AuthzCheckResult
+			if err := row.Columns(&arm, &result.Allowed, &result.Foothold); err != nil {
+				return err
+			}
+			results[arm] = result
+			return nil
+		})
+	})
+	if err != nil {
+		return nil, err
+	}
+	return results, nil
+}
+
 // CheckPlatformOperator implements [service.AuthzResolverStatements].
 func (s authzResolverStatements) CheckPlatformOperator(ctx context.Context, params domain.AuthzPlatformCheckParams) (bool, error) {
 	var c statementCompiler
