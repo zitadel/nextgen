@@ -28,7 +28,10 @@ properties:
     type: object
     description: |
       Solutions for security gates. Keys match gate names from the step's `gates` dictionary.
-      The login component collects these from `<zl-captcha>` component events.
+      For sign-up, the login component solves the built-in challenge with Web
+      Crypto and submits its JSON proof under `signup_pow`: with the password
+      for a password sign-up, and with `challenge_response` for a passkey
+      registration that creates the user.
     additionalProperties:
       type: string
   challenge_response:

@@ -58,7 +58,7 @@ export function AppShell({
 
   return (
     <SidebarProvider defaultOpen={readSidebarOpen()}>
-      <SearchDialog open={searchOpen} onOpenChange={setSearchOpen} />
+      <SearchDialog open={searchOpen} onOpenChange={setSearchOpen} userId={user?.userId} />
       <AppSidebar
         view={view}
         user={user}

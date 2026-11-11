@@ -8,5 +8,11 @@
     "config_rules": {
       "min_length_not_above_max_length": "config.min_length <= config.max_length"
     }
+  },
+  "user.create": {
+    "settings": {
+      "challenge": { "type": "string", "enum": ["zitadel_pow"] }
+    },
+    "config_rules": {}
   }
 }

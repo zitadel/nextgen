@@ -1,0 +1,16 @@
+title: InvitationAcceptedProjectMemberPayload
+description: |
+  An `invitation.accepted` payload for a `project_member` invitation.
+allOf:
+  - $ref: invitation-accepted-common-payload.yaml
+  - type: object
+    required:
+      - type
+      - project_member
+    properties:
+      type:
+        type: string
+        enum:
+          - project_member
+      project_member:
+        $ref: ../../invitations/invitation-project-member-payload.yaml
