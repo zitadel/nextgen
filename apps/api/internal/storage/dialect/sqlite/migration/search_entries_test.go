@@ -12,7 +12,7 @@ import (
 )
 
 // The teams, flow definitions, user schemas and connections that exist when
-// 000031 runs get their search entries from the migration: each name and its
+// 000032 runs get their search entries from the migration: each name and its
 // later words, at the newest revision.
 func TestSearchEntriesBackfill(t *testing.T) {
 	ctx := context.Background()
@@ -28,7 +28,7 @@ func TestSearchEntriesBackfill(t *testing.T) {
 
 	p, err := newProvider(db)
 	require.NoError(t, err)
-	_, err = p.UpTo(ctx, 30)
+	_, err = p.UpTo(ctx, 31)
 	require.NoError(t, err)
 
 	exec := func(query string, args ...any) {
@@ -50,7 +50,7 @@ func TestSearchEntriesBackfill(t *testing.T) {
 		VALUES ('p', 'r1', 'c1', '{"display_name":"Old"}', 1),
 		       ('p', 'r2', 'c1', '{"display_name":"Partner Portal"}', 2)`)
 
-	_, err = p.UpTo(ctx, 31)
+	_, err = p.UpTo(ctx, 32)
 	require.NoError(t, err)
 
 	rows, err := db.QueryContext(ctx, `SELECT resource_kind || '|' || resource_id || '|' || search_text || '|' || name_start || '|' || title || '|' || subtitle
