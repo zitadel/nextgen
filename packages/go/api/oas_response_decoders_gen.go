@@ -5785,7 +5785,7 @@ func decodeFinishUserPasskeyRegistrationResponse(resp *http.Response) (res Finis
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response UserPasswordHashingBusy
+			var response TooManyRequests
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -5802,7 +5802,7 @@ func decodeFinishUserPasskeyRegistrationResponse(resp *http.Response) (res Finis
 				}
 				return res, err
 			}
-			var wrapper UserPasswordHashingBusyHeaders
+			var wrapper TooManyRequestsHeaders
 			wrapper.Response = response
 			h := uri.NewHeaderDecoder(resp.Header)
 			// Parse "Retry-After" header.
@@ -5814,41 +5814,53 @@ func decodeFinishUserPasskeyRegistrationResponse(resp *http.Response) (res Finis
 				if err := func() error {
 					if err := h.HasParam(cfg); err == nil {
 						if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
-							val, err := d.DecodeValue()
-							if err != nil {
+							var wrapperDotRetryAfterVal int
+							if err := func() error {
+								val, err := d.DecodeValue()
+								if err != nil {
+									return err
+								}
+
+								c, err := conv.ToInt(val)
+								if err != nil {
+									return err
+								}
+
+								wrapperDotRetryAfterVal = c
+								return nil
+							}(); err != nil {
 								return err
 							}
-
-							c, err := conv.ToInt(val)
-							if err != nil {
-								return err
-							}
-
-							wrapper.RetryAfter = c
+							wrapper.RetryAfter.SetTo(wrapperDotRetryAfterVal)
 							return nil
 						}); err != nil {
 							return err
 						}
 						if err := func() error {
-							if err := (validate.Int{
-								MinSet:        true,
-								Min:           1,
-								MaxSet:        false,
-								Max:           0,
-								MinExclusive:  false,
-								MaxExclusive:  false,
-								MultipleOfSet: false,
-								MultipleOf:    0,
-								Pattern:       nil,
-							}).Validate(int64(wrapper.RetryAfter)); err != nil {
-								return errors.Wrap(err, "int")
+							if value, ok := wrapper.RetryAfter.Get(); ok {
+								if err := func() error {
+									if err := (validate.Int{
+										MinSet:        true,
+										Min:           1,
+										MaxSet:        false,
+										Max:           0,
+										MinExclusive:  false,
+										MaxExclusive:  false,
+										MultipleOfSet: false,
+										MultipleOf:    0,
+										Pattern:       nil,
+									}).Validate(int64(value)); err != nil {
+										return errors.Wrap(err, "int")
+									}
+									return nil
+								}(); err != nil {
+									return err
+								}
 							}
 							return nil
 						}(); err != nil {
 							return err
 						}
-					} else {
-						return err
 					}
 					return nil
 				}(); err != nil {
@@ -7493,7 +7505,7 @@ func decodeGetFlowStepResponse(resp *http.Response) (res GetFlowStepRes, _ error
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response UserPasswordHashingBusy
+			var response TooManyRequests
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -7510,7 +7522,7 @@ func decodeGetFlowStepResponse(resp *http.Response) (res GetFlowStepRes, _ error
 				}
 				return res, err
 			}
-			var wrapper UserPasswordHashingBusyHeaders
+			var wrapper TooManyRequestsHeaders
 			wrapper.Response = response
 			h := uri.NewHeaderDecoder(resp.Header)
 			// Parse "Retry-After" header.
@@ -7522,41 +7534,53 @@ func decodeGetFlowStepResponse(resp *http.Response) (res GetFlowStepRes, _ error
 				if err := func() error {
 					if err := h.HasParam(cfg); err == nil {
 						if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
-							val, err := d.DecodeValue()
-							if err != nil {
+							var wrapperDotRetryAfterVal int
+							if err := func() error {
+								val, err := d.DecodeValue()
+								if err != nil {
+									return err
+								}
+
+								c, err := conv.ToInt(val)
+								if err != nil {
+									return err
+								}
+
+								wrapperDotRetryAfterVal = c
+								return nil
+							}(); err != nil {
 								return err
 							}
-
-							c, err := conv.ToInt(val)
-							if err != nil {
-								return err
-							}
-
-							wrapper.RetryAfter = c
+							wrapper.RetryAfter.SetTo(wrapperDotRetryAfterVal)
 							return nil
 						}); err != nil {
 							return err
 						}
 						if err := func() error {
-							if err := (validate.Int{
-								MinSet:        true,
-								Min:           1,
-								MaxSet:        false,
-								Max:           0,
-								MinExclusive:  false,
-								MaxExclusive:  false,
-								MultipleOfSet: false,
-								MultipleOf:    0,
-								Pattern:       nil,
-							}).Validate(int64(wrapper.RetryAfter)); err != nil {
-								return errors.Wrap(err, "int")
+							if value, ok := wrapper.RetryAfter.Get(); ok {
+								if err := func() error {
+									if err := (validate.Int{
+										MinSet:        true,
+										Min:           1,
+										MaxSet:        false,
+										Max:           0,
+										MinExclusive:  false,
+										MaxExclusive:  false,
+										MultipleOfSet: false,
+										MultipleOf:    0,
+										Pattern:       nil,
+									}).Validate(int64(value)); err != nil {
+										return errors.Wrap(err, "int")
+									}
+									return nil
+								}(); err != nil {
+									return err
+								}
 							}
 							return nil
 						}(); err != nil {
 							return err
 						}
-					} else {
-						return err
 					}
 					return nil
 				}(); err != nil {
@@ -18801,7 +18825,7 @@ func decodeSetUserPasswordResponse(resp *http.Response) (res SetUserPasswordRes,
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response UserPasswordHashingBusy
+			var response TooManyRequests
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -18818,7 +18842,7 @@ func decodeSetUserPasswordResponse(resp *http.Response) (res SetUserPasswordRes,
 				}
 				return res, err
 			}
-			var wrapper UserPasswordHashingBusyHeaders
+			var wrapper TooManyRequestsHeaders
 			wrapper.Response = response
 			h := uri.NewHeaderDecoder(resp.Header)
 			// Parse "Retry-After" header.
@@ -18830,41 +18854,53 @@ func decodeSetUserPasswordResponse(resp *http.Response) (res SetUserPasswordRes,
 				if err := func() error {
 					if err := h.HasParam(cfg); err == nil {
 						if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
-							val, err := d.DecodeValue()
-							if err != nil {
+							var wrapperDotRetryAfterVal int
+							if err := func() error {
+								val, err := d.DecodeValue()
+								if err != nil {
+									return err
+								}
+
+								c, err := conv.ToInt(val)
+								if err != nil {
+									return err
+								}
+
+								wrapperDotRetryAfterVal = c
+								return nil
+							}(); err != nil {
 								return err
 							}
-
-							c, err := conv.ToInt(val)
-							if err != nil {
-								return err
-							}
-
-							wrapper.RetryAfter = c
+							wrapper.RetryAfter.SetTo(wrapperDotRetryAfterVal)
 							return nil
 						}); err != nil {
 							return err
 						}
 						if err := func() error {
-							if err := (validate.Int{
-								MinSet:        true,
-								Min:           1,
-								MaxSet:        false,
-								Max:           0,
-								MinExclusive:  false,
-								MaxExclusive:  false,
-								MultipleOfSet: false,
-								MultipleOf:    0,
-								Pattern:       nil,
-							}).Validate(int64(wrapper.RetryAfter)); err != nil {
-								return errors.Wrap(err, "int")
+							if value, ok := wrapper.RetryAfter.Get(); ok {
+								if err := func() error {
+									if err := (validate.Int{
+										MinSet:        true,
+										Min:           1,
+										MaxSet:        false,
+										Max:           0,
+										MinExclusive:  false,
+										MaxExclusive:  false,
+										MultipleOfSet: false,
+										MultipleOf:    0,
+										Pattern:       nil,
+									}).Validate(int64(value)); err != nil {
+										return errors.Wrap(err, "int")
+									}
+									return nil
+								}(); err != nil {
+									return err
+								}
 							}
 							return nil
 						}(); err != nil {
 							return err
 						}
-					} else {
-						return err
 					}
 					return nil
 				}(); err != nil {
@@ -19253,7 +19289,7 @@ func decodeSubmitFlowStepResponse(resp *http.Response) (res SubmitFlowStepRes, _
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response UserPasswordHashingBusy
+			var response TooManyRequests
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -19270,7 +19306,7 @@ func decodeSubmitFlowStepResponse(resp *http.Response) (res SubmitFlowStepRes, _
 				}
 				return res, err
 			}
-			var wrapper UserPasswordHashingBusyHeaders
+			var wrapper TooManyRequestsHeaders
 			wrapper.Response = response
 			h := uri.NewHeaderDecoder(resp.Header)
 			// Parse "Retry-After" header.
@@ -19282,41 +19318,53 @@ func decodeSubmitFlowStepResponse(resp *http.Response) (res SubmitFlowStepRes, _
 				if err := func() error {
 					if err := h.HasParam(cfg); err == nil {
 						if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
-							val, err := d.DecodeValue()
-							if err != nil {
+							var wrapperDotRetryAfterVal int
+							if err := func() error {
+								val, err := d.DecodeValue()
+								if err != nil {
+									return err
+								}
+
+								c, err := conv.ToInt(val)
+								if err != nil {
+									return err
+								}
+
+								wrapperDotRetryAfterVal = c
+								return nil
+							}(); err != nil {
 								return err
 							}
-
-							c, err := conv.ToInt(val)
-							if err != nil {
-								return err
-							}
-
-							wrapper.RetryAfter = c
+							wrapper.RetryAfter.SetTo(wrapperDotRetryAfterVal)
 							return nil
 						}); err != nil {
 							return err
 						}
 						if err := func() error {
-							if err := (validate.Int{
-								MinSet:        true,
-								Min:           1,
-								MaxSet:        false,
-								Max:           0,
-								MinExclusive:  false,
-								MaxExclusive:  false,
-								MultipleOfSet: false,
-								MultipleOf:    0,
-								Pattern:       nil,
-							}).Validate(int64(wrapper.RetryAfter)); err != nil {
-								return errors.Wrap(err, "int")
+							if value, ok := wrapper.RetryAfter.Get(); ok {
+								if err := func() error {
+									if err := (validate.Int{
+										MinSet:        true,
+										Min:           1,
+										MaxSet:        false,
+										Max:           0,
+										MinExclusive:  false,
+										MaxExclusive:  false,
+										MultipleOfSet: false,
+										MultipleOf:    0,
+										Pattern:       nil,
+									}).Validate(int64(value)); err != nil {
+										return errors.Wrap(err, "int")
+									}
+									return nil
+								}(); err != nil {
+									return err
+								}
 							}
 							return nil
 						}(); err != nil {
 							return err
 						}
-					} else {
-						return err
 					}
 					return nil
 				}(); err != nil {
@@ -19827,7 +19875,7 @@ func decodeVerifyChallengeProofResponse(resp *http.Response) (res VerifyChalleng
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response UserPasswordHashingBusy
+			var response TooManyRequests
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -19844,7 +19892,7 @@ func decodeVerifyChallengeProofResponse(resp *http.Response) (res VerifyChalleng
 				}
 				return res, err
 			}
-			var wrapper UserPasswordHashingBusyHeaders
+			var wrapper TooManyRequestsHeaders
 			wrapper.Response = response
 			h := uri.NewHeaderDecoder(resp.Header)
 			// Parse "Retry-After" header.
@@ -19856,41 +19904,53 @@ func decodeVerifyChallengeProofResponse(resp *http.Response) (res VerifyChalleng
 				if err := func() error {
 					if err := h.HasParam(cfg); err == nil {
 						if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
-							val, err := d.DecodeValue()
-							if err != nil {
+							var wrapperDotRetryAfterVal int
+							if err := func() error {
+								val, err := d.DecodeValue()
+								if err != nil {
+									return err
+								}
+
+								c, err := conv.ToInt(val)
+								if err != nil {
+									return err
+								}
+
+								wrapperDotRetryAfterVal = c
+								return nil
+							}(); err != nil {
 								return err
 							}
-
-							c, err := conv.ToInt(val)
-							if err != nil {
-								return err
-							}
-
-							wrapper.RetryAfter = c
+							wrapper.RetryAfter.SetTo(wrapperDotRetryAfterVal)
 							return nil
 						}); err != nil {
 							return err
 						}
 						if err := func() error {
-							if err := (validate.Int{
-								MinSet:        true,
-								Min:           1,
-								MaxSet:        false,
-								Max:           0,
-								MinExclusive:  false,
-								MaxExclusive:  false,
-								MultipleOfSet: false,
-								MultipleOf:    0,
-								Pattern:       nil,
-							}).Validate(int64(wrapper.RetryAfter)); err != nil {
-								return errors.Wrap(err, "int")
+							if value, ok := wrapper.RetryAfter.Get(); ok {
+								if err := func() error {
+									if err := (validate.Int{
+										MinSet:        true,
+										Min:           1,
+										MaxSet:        false,
+										Max:           0,
+										MinExclusive:  false,
+										MaxExclusive:  false,
+										MultipleOfSet: false,
+										MultipleOf:    0,
+										Pattern:       nil,
+									}).Validate(int64(value)); err != nil {
+										return errors.Wrap(err, "int")
+									}
+									return nil
+								}(); err != nil {
+									return err
+								}
 							}
 							return nil
 						}(); err != nil {
 							return err
 						}
-					} else {
-						return err
 					}
 					return nil
 				}(); err != nil {

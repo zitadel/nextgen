@@ -2733,7 +2733,7 @@ func encodeFinishUserPasskeyRegistrationResponse(response FinishUserPasskeyRegis
 
 		return nil
 
-	case *UserPasswordHashingBusyHeaders:
+	case *TooManyRequestsHeaders:
 		if err := func() error {
 			if err := response.Validate(); err != nil {
 				return err
@@ -2754,7 +2754,10 @@ func encodeFinishUserPasskeyRegistrationResponse(response FinishUserPasskeyRegis
 					Explode: false,
 				}
 				if err := h.EncodeParam(cfg, func(e uri.Encoder) error {
-					return e.EncodeValue(conv.IntToString(response.RetryAfter))
+					if val, ok := response.RetryAfter.Get(); ok {
+						return e.EncodeValue(conv.IntToString(val))
+					}
+					return nil
 				}); err != nil {
 					return errors.Wrap(err, "encode Retry-After header")
 				}
@@ -3571,7 +3574,7 @@ func encodeGetFlowStepResponse(response GetFlowStepRes, w http.ResponseWriter, s
 
 		return nil
 
-	case *UserPasswordHashingBusyHeaders:
+	case *TooManyRequestsHeaders:
 		if err := func() error {
 			if err := response.Validate(); err != nil {
 				return err
@@ -3592,7 +3595,10 @@ func encodeGetFlowStepResponse(response GetFlowStepRes, w http.ResponseWriter, s
 					Explode: false,
 				}
 				if err := h.EncodeParam(cfg, func(e uri.Encoder) error {
-					return e.EncodeValue(conv.IntToString(response.RetryAfter))
+					if val, ok := response.RetryAfter.Get(); ok {
+						return e.EncodeValue(conv.IntToString(val))
+					}
+					return nil
 				}); err != nil {
 					return errors.Wrap(err, "encode Retry-After header")
 				}
@@ -9057,7 +9063,7 @@ func encodeSetUserPasswordResponse(response SetUserPasswordRes, w http.ResponseW
 
 		return nil
 
-	case *UserPasswordHashingBusyHeaders:
+	case *TooManyRequestsHeaders:
 		if err := func() error {
 			if err := response.Validate(); err != nil {
 				return err
@@ -9078,7 +9084,10 @@ func encodeSetUserPasswordResponse(response SetUserPasswordRes, w http.ResponseW
 					Explode: false,
 				}
 				if err := h.EncodeParam(cfg, func(e uri.Encoder) error {
-					return e.EncodeValue(conv.IntToString(response.RetryAfter))
+					if val, ok := response.RetryAfter.Get(); ok {
+						return e.EncodeValue(conv.IntToString(val))
+					}
+					return nil
 				}); err != nil {
 					return errors.Wrap(err, "encode Retry-After header")
 				}
@@ -9283,7 +9292,7 @@ func encodeSubmitFlowStepResponse(response SubmitFlowStepRes, w http.ResponseWri
 
 		return nil
 
-	case *UserPasswordHashingBusyHeaders:
+	case *TooManyRequestsHeaders:
 		if err := func() error {
 			if err := response.Validate(); err != nil {
 				return err
@@ -9304,7 +9313,10 @@ func encodeSubmitFlowStepResponse(response SubmitFlowStepRes, w http.ResponseWri
 					Explode: false,
 				}
 				if err := h.EncodeParam(cfg, func(e uri.Encoder) error {
-					return e.EncodeValue(conv.IntToString(response.RetryAfter))
+					if val, ok := response.RetryAfter.Get(); ok {
+						return e.EncodeValue(conv.IntToString(val))
+					}
+					return nil
 				}); err != nil {
 					return errors.Wrap(err, "encode Retry-After header")
 				}
@@ -9558,7 +9570,7 @@ func encodeVerifyChallengeProofResponse(response VerifyChallengeProofRes, w http
 
 		return nil
 
-	case *UserPasswordHashingBusyHeaders:
+	case *TooManyRequestsHeaders:
 		if err := func() error {
 			if err := response.Validate(); err != nil {
 				return err
@@ -9579,7 +9591,10 @@ func encodeVerifyChallengeProofResponse(response VerifyChallengeProofRes, w http
 					Explode: false,
 				}
 				if err := h.EncodeParam(cfg, func(e uri.Encoder) error {
-					return e.EncodeValue(conv.IntToString(response.RetryAfter))
+					if val, ok := response.RetryAfter.Get(); ok {
+						return e.EncodeValue(conv.IntToString(val))
+					}
+					return nil
 				}); err != nil {
 					return errors.Wrap(err, "encode Retry-After header")
 				}

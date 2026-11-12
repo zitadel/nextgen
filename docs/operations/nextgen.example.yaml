@@ -72,7 +72,7 @@ password_hasher:
   concurrency:
     max_operations: 0 # 0 = one per CPU the process may use, following runtime.GOMAXPROCS
     memory_budget: 0 # bytes; 0 = half the Go memory limit (set from the container's limit) when there is one, else 512 MiB
-    max_wait: 0 # 0 = 1s
+    max_wait: 0 # 0 = 1s; any other value needs a unit, such as 2s (a bare 2 is 2ns and refused)
   verifiers:
     - argon2
     - bcrypt

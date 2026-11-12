@@ -70,6 +70,6 @@ post:
       content:
         application/json:
           schema:
-            $ref: ../../../../../components/schemas/errors/user-password_hashing_busy.yaml
+            $ref: ../../../../../components/schemas/too-many-requests.yaml
     default:
       $ref: verifyChallengeProof-error-response.yaml

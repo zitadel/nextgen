@@ -13,6 +13,8 @@ func TestHashConcurrencyConfig_validate(t *testing.T) {
 	assert.Error(t, HashConcurrencyConfig{MaxOperations: -1}.validate())
 	assert.Error(t, HashConcurrencyConfig{MemoryBudget: -1}.validate())
 	assert.Error(t, HashConcurrencyConfig{MaxWait: -time.Second}.validate())
+	assert.Error(t, HashConcurrencyConfig{MaxWait: 2}.validate(), "max_wait: 2 in YAML is 2ns")
+	assert.NoError(t, HashConcurrencyConfig{MaxWait: time.Millisecond}.validate())
 	assert.NoError(t, HashConcurrencyConfig{}.validate())
 }
 

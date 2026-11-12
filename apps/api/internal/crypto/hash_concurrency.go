@@ -51,6 +51,9 @@ func (c HashConcurrencyConfig) validate() error {
 		return fmt.Errorf("concurrency memory_budget must not be negative, got %d", c.MemoryBudget)
 	case c.MaxWait < 0:
 		return fmt.Errorf("concurrency max_wait must not be negative, got %s", c.MaxWait)
+	case c.MaxWait > 0 && c.MaxWait < time.Millisecond:
+		// A bare YAML number decodes as nanoseconds, never through ParseDuration.
+		return fmt.Errorf("concurrency max_wait %s is below 1ms; give it a unit, such as 1s", c.MaxWait)
 	}
 	return nil
 }

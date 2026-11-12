@@ -96898,6 +96898,82 @@ func (s *TknInvalidTknidDetails) init() TknInvalidTknidDetails {
 	return m
 }
 
+// Why the server refused the request for now. Each member names its error
+// code; `req.rate_limited` joins them when the server's own rate limits land.
+// Retry after the number of seconds in the `Retry-After` header.
+// Ref: #
+// TooManyRequests represents sum type.
+type TooManyRequests struct {
+	Type                    TooManyRequestsType // switch on this field
+	UserPasswordHashingBusy UserPasswordHashingBusy
+}
+
+// TooManyRequestsType is oneOf type of TooManyRequests.
+type TooManyRequestsType string
+
+// Possible values for TooManyRequestsType.
+const (
+	UserPasswordHashingBusyTooManyRequests TooManyRequestsType = "user.password_hashing_busy"
+)
+
+// IsUserPasswordHashingBusy reports whether TooManyRequests is UserPasswordHashingBusy.
+func (s TooManyRequests) IsUserPasswordHashingBusy() bool {
+	return s.Type == UserPasswordHashingBusyTooManyRequests
+}
+
+// SetUserPasswordHashingBusy sets TooManyRequests to UserPasswordHashingBusy.
+func (s *TooManyRequests) SetUserPasswordHashingBusy(v UserPasswordHashingBusy) {
+	s.Type = UserPasswordHashingBusyTooManyRequests
+	s.UserPasswordHashingBusy = v
+}
+
+// GetUserPasswordHashingBusy returns UserPasswordHashingBusy and true boolean if TooManyRequests is UserPasswordHashingBusy.
+func (s TooManyRequests) GetUserPasswordHashingBusy() (v UserPasswordHashingBusy, ok bool) {
+	if !s.IsUserPasswordHashingBusy() {
+		return v, false
+	}
+	return s.UserPasswordHashingBusy, true
+}
+
+// NewUserPasswordHashingBusyTooManyRequests returns new TooManyRequests from UserPasswordHashingBusy.
+func NewUserPasswordHashingBusyTooManyRequests(v UserPasswordHashingBusy) TooManyRequests {
+	var s TooManyRequests
+	s.SetUserPasswordHashingBusy(v)
+	return s
+}
+
+// TooManyRequestsHeaders wraps TooManyRequests with response headers.
+type TooManyRequestsHeaders struct {
+	RetryAfter OptInt
+	Response   TooManyRequests
+}
+
+// GetRetryAfter returns the value of RetryAfter.
+func (s *TooManyRequestsHeaders) GetRetryAfter() OptInt {
+	return s.RetryAfter
+}
+
+// GetResponse returns the value of Response.
+func (s *TooManyRequestsHeaders) GetResponse() TooManyRequests {
+	return s.Response
+}
+
+// SetRetryAfter sets the value of RetryAfter.
+func (s *TooManyRequestsHeaders) SetRetryAfter(val OptInt) {
+	s.RetryAfter = val
+}
+
+// SetResponse sets the value of Response.
+func (s *TooManyRequestsHeaders) SetResponse(val TooManyRequests) {
+	s.Response = val
+}
+
+func (*TooManyRequestsHeaders) finishUserPasskeyRegistrationRes() {}
+func (*TooManyRequestsHeaders) getFlowStepRes()                   {}
+func (*TooManyRequestsHeaders) setUserPasswordRes()               {}
+func (*TooManyRequestsHeaders) submitFlowStepRes()                {}
+func (*TooManyRequestsHeaders) verifyChallengeProofRes()          {}
+
 // Merged schema.
 // Ref: #
 type Unavailable struct {
@@ -100199,38 +100275,6 @@ func (s *UserPasswordHashingBusyDetails) init() UserPasswordHashingBusyDetails {
 	}
 	return m
 }
-
-// UserPasswordHashingBusyHeaders wraps UserPasswordHashingBusy with response headers.
-type UserPasswordHashingBusyHeaders struct {
-	RetryAfter int
-	Response   UserPasswordHashingBusy
-}
-
-// GetRetryAfter returns the value of RetryAfter.
-func (s *UserPasswordHashingBusyHeaders) GetRetryAfter() int {
-	return s.RetryAfter
-}
-
-// GetResponse returns the value of Response.
-func (s *UserPasswordHashingBusyHeaders) GetResponse() UserPasswordHashingBusy {
-	return s.Response
-}
-
-// SetRetryAfter sets the value of RetryAfter.
-func (s *UserPasswordHashingBusyHeaders) SetRetryAfter(val int) {
-	s.RetryAfter = val
-}
-
-// SetResponse sets the value of Response.
-func (s *UserPasswordHashingBusyHeaders) SetResponse(val UserPasswordHashingBusy) {
-	s.Response = val
-}
-
-func (*UserPasswordHashingBusyHeaders) finishUserPasskeyRegistrationRes() {}
-func (*UserPasswordHashingBusyHeaders) getFlowStepRes()                   {}
-func (*UserPasswordHashingBusyHeaders) setUserPasswordRes()               {}
-func (*UserPasswordHashingBusyHeaders) submitFlowStepRes()                {}
-func (*UserPasswordHashingBusyHeaders) verifyChallengeProofRes()          {}
 
 // Merged schema.
 // Ref: #

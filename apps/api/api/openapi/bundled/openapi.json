@@ -1003,7 +1003,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/user-password_hashing_busy"
+                  "$ref": "#/components/schemas/too-many-requests"
                 }
               }
             }
@@ -1182,7 +1182,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/user-password_hashing_busy"
+                  "$ref": "#/components/schemas/too-many-requests"
                 }
               }
             }
@@ -2134,7 +2134,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/user-password_hashing_busy"
+                  "$ref": "#/components/schemas/too-many-requests"
                 }
               }
             }
@@ -2249,7 +2249,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/user-password_hashing_busy"
+                  "$ref": "#/components/schemas/too-many-requests"
                 }
               }
             }
@@ -2482,7 +2482,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/user-password_hashing_busy"
+                  "$ref": "#/components/schemas/too-many-requests"
                 }
               }
             }
@@ -13402,6 +13402,20 @@
             "type": "string",
             "format": "date-time",
             "description": "The timestamp when the passkey was created."
+          }
+        }
+      },
+      "too-many-requests": {
+        "description": "Why the server refused the request for now. Each member names its error\ncode; `req.rate_limited` joins them when the server's own rate limits land.\nRetry after the number of seconds in the `Retry-After` header.\n",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/user-password_hashing_busy"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "code",
+          "mapping": {
+            "user.password_hashing_busy": "#/components/schemas/user-password_hashing_busy"
           }
         }
       },
@@ -35743,8 +35757,8 @@
     },
     "headers": {
       "retry-after": {
-        "description": "Whole seconds to wait before retrying the request; at least 1.",
-        "required": true,
+        "description": "Whole seconds to wait before retrying the request; at least 1. The server\nsends it with every 429 it answers itself; a 429 from a proxy or edge in\nfront of it may come without one.\n",
+        "required": false,
         "schema": {
           "type": "integer",
           "minimum": 1
