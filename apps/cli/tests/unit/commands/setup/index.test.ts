@@ -66,7 +66,7 @@ import {
 import { aBinaryRecord, aDockerRecord } from "@tests/helpers/runtime-record";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
 import { aNextApp, suggestedCommands } from "@tests/helpers/setup";
-import { aSuggest } from "@tests/helpers/suggest";
+import { aSuggest } from "@tests/helpers/suggestions";
 import { asTerminal } from "@tests/helpers/terminal";
 import { rejectionOf, thrownBy } from "@tests/helpers/thrown-value";
 

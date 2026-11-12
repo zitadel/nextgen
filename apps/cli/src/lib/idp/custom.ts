@@ -1,6 +1,5 @@
 import {
   CUSTOM_PROVIDER,
-  type CustomOidcInput,
   IDP_PROVIDERS,
   isLoopbackIssuer,
   type Parsed,
@@ -15,6 +14,7 @@ import {
 } from "@zitadel/config/idp";
 
 import { ZitadelError } from "@/lib/errors";
+import type { SuggestFlags } from "@/lib/suggestion";
 
 /**
  * The settings that describe a custom connection, in the order a command line
@@ -369,75 +369,26 @@ export function selectionFromFlags(
 }
 
 /**
- * The flags that restate a custom connection, for a command offered as text.
- *
- * @remarks
- * Suggested commands are run verbatim, so a display name with a space or a
- * metacharacter in it must arrive as one argument. Nothing here is a
- * credential: the name, issuer and scopes are the developer's own settings.
- *
- * @param custom - The custom connection.
- * @param flag - How the command spells each flag.
- * @returns The flags, each value one shell word.
- */
-export function customFlagText(custom: CustomOidcInput, flag: CustomFlagNames): string {
-  const values: CustomFlagValues = {
-    slug: custom.slug,
-    displayName: custom.displayName,
-    issuer: custom.issuer,
-    scopes: custom.scopes.join(" "),
-  };
-  return flagText(values, flag);
-}
-
-/**
- * The `auth-method sso enable` arguments that add `selection` to a project:
- * the provider, and for a custom connection the settings that describe it.
- *
- * @remarks
- * A suggestion builder wraps them with the selector its command needs.
+ * The flags `auth-method sso enable` takes to add `selection` to a project: the
+ * provider, and for a custom connection the settings that describe it. None
+ * of them is a credential: the client id is asked for, as the secret is.
  *
  * @param selection - The provider.
- * @returns The arguments.
+ * @returns The flags, in the order the command line takes them.
  */
-export function ssoEnableArgs(selection: ProviderSelection): string {
-  const command = `auth-method sso enable --provider ${selectionName(selection)}`;
+export function ssoEnableFlags(
+  selection: ProviderSelection,
+): SuggestFlags<"auth-method:sso:enable"> {
   if (selection.kind !== "custom") {
-    return command;
+    return { provider: selectionName(selection) };
   }
+  const { slug, displayName, issuer, scopes } = selection.connection;
 
-  return `${command} ${customFlagText(selection.connection, ENABLE_FLAG_NAMES)}`;
-}
-
-/**
- * One value as a single shell word: as it is when it needs no quoting, and in
- * single quotes otherwise.
- *
- * @param value - The value.
- * @returns The word.
- */
-function shellWord(value: string): string {
-  if (/^[A-Za-z0-9_@%+=:,./-]+$/.test(value)) {
-    return value;
-  }
-
-  return `'${value.replaceAll("'", "'\\''")}'`;
-}
-
-/**
- * The flags for whichever settings were given, each value as one shell word.
- *
- * @param values - The settings.
- * @param flag - How the command spells each flag.
- * @returns The flags, in command-line order.
- */
-export function flagText(values: CustomFlagValues, flag: CustomFlagNames): string {
-  return CUSTOM_SETTINGS.flatMap((setting) => {
-    const value = values[setting];
-    if (value === undefined) {
-      return [];
-    }
-
-    return [`${flag[setting]} ${shellWord(value)}`];
-  }).join(" ");
+  return {
+    provider: selectionName(selection),
+    slug,
+    displayName,
+    issuer,
+    scopes: scopes.join(" "),
+  };
 }

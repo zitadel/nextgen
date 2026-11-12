@@ -8,7 +8,7 @@ import {
   claimWindowDeadline,
   isAttached,
 } from "@/lib/claim-state";
-import { aSuggest } from "@tests/helpers/suggest";
+import { aSuggest } from "@tests/helpers/suggestions";
 
 /** A run that named no environment, so its suggestions carry no selector. */
 const SUGGEST = aSuggest();

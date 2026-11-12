@@ -3,7 +3,7 @@ import { describe, expect } from "vitest";
 
 import { checkCliVersion } from "@/commands/doctor/checks/cli-version";
 import { it } from "@tests/helpers/fixtures";
-import { aSuggest } from "@tests/helpers/suggest";
+import { aSuggest } from "@tests/helpers/suggestions";
 
 /**
  * Where the CLI asks npm for its newest release.

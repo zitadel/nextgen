@@ -11,7 +11,7 @@ import {
   renderDoctorReport,
   withCategories,
 } from "@/commands/doctor/report";
-import { aSuggest } from "@tests/helpers/suggest";
+import { aSuggest } from "@tests/helpers/suggestions";
 
 /**
  * The cause several credential checks share when the secret is gone.

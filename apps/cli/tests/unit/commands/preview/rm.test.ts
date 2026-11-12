@@ -10,7 +10,7 @@ import {
   usePlatformServer,
 } from "@tests/helpers/platform-project";
 import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
-import { runCommand } from "@tests/helpers/run-command";
+import { runCommand } from "@tests/helpers/run-cli";
 
 const SERVER = PLATFORM_URL;
 const { server, dirs } = usePlatformServer();

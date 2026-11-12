@@ -73,6 +73,7 @@ import {
   type SecretPublisher,
   selectionFromFlags,
   storeClientSecret,
+  ssoEnableFlags,
 } from "@/lib/idp";
 import { brandingGuidanceAction, exploreAllCommands } from "@/lib/journey-guidance";
 import { findLocalAdminFor } from "@/lib/local-server/admin-credential";
@@ -169,7 +170,6 @@ import {
   SETUP_PROMPTS,
   type SetupAnswers,
   type SsoDraft,
-  ssoEnableFlags,
 } from "./prompts";
 import {
   detectProjectFacts,
@@ -224,7 +224,7 @@ export type SetupRetryOptions = {
 
 /**
  * The `--sso-*` flags that describe a custom connection, as `setup` takes them.
- * Only the ones that were given are there.
+ * A setting that was not given is `undefined`, which a suggestion leaves out.
  */
 type SsoSettingFlags = Readonly<{
   ssoSlug?: string;
@@ -244,10 +244,10 @@ type SsoFlags = SsoSettingFlags & Readonly<{ sso: string }>;
  */
 function ssoSettingFlags(values: CustomFlagValues): SsoSettingFlags {
   return {
-    ...(values.slug === undefined ? {} : { ssoSlug: values.slug }),
-    ...(values.displayName === undefined ? {} : { ssoDisplayName: values.displayName }),
-    ...(values.issuer === undefined ? {} : { ssoIssuer: values.issuer }),
-    ...(values.scopes === undefined ? {} : { ssoScopes: values.scopes }),
+    ssoSlug: values.slug,
+    ssoDisplayName: values.displayName,
+    ssoIssuer: values.issuer,
+    ssoScopes: values.scopes,
   };
 }
 
@@ -289,19 +289,18 @@ export function setupRetryFlags(opts: SetupRetryOptions): SuggestFlags<"setup"> 
             : {}),
         };
 
+  // A value left `undefined` is left out of the command.
   return {
-    ...(opts.framework ? { framework: opts.framework } : {}),
-    ...(opts.preset && opts.preset !== DEFAULT_SETUP_PRESET ? { preset: opts.preset } : {}),
-    ...(opts.useCase && opts.useCase !== DEFAULT_SETUP_USE_CASE ? { useCase: opts.useCase } : {}),
-    ...(opts.renderer && opts.renderer !== "react" ? { renderer: opts.renderer } : {}),
-    ...(opts.devPort === undefined ? {} : { devPort: opts.devPort }),
+    framework: opts.framework || undefined,
+    preset: opts.preset === DEFAULT_SETUP_PRESET ? undefined : opts.preset,
+    useCase: opts.useCase === DEFAULT_SETUP_USE_CASE ? undefined : opts.useCase,
+    renderer: opts.renderer === "react" ? undefined : opts.renderer,
+    devPort: opts.devPort,
     // Even the recommended one, unlike the defaults above: without the flag, a
     // policy file `--force` keeps keeps its own minimum.
-    ...(opts.passwordMinLength === undefined
-      ? {}
-      : { passwordMinLength: opts.passwordMinLength ?? 0 }),
+    passwordMinLength: opts.passwordMinLength === null ? 0 : opts.passwordMinLength,
     ...sso,
-    ...(opts.server === null ? {} : { server: opts.server ?? "local" }),
+    server: opts.server === null ? undefined : (opts.server ?? "local"),
   };
 }
 

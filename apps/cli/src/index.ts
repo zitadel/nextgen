@@ -118,11 +118,11 @@ declare module "@/lib/suggestion" {
    * command is suggestible the moment it is in the table and there is nothing
    * else to keep in step with it.
    */
-  interface NextTable extends Suggestible {}
+  interface NextTable extends CommandTable {}
 }
 
 /**
  * The hand-written commands, then the generated resource commands a
  * hand-written one does not stand in for (`release create`).
  */
-type Suggestible = typeof WORKFLOW_COMMANDS & Omit<ResourceTable, keyof typeof WORKFLOW_COMMANDS>;
+type CommandTable = typeof WORKFLOW_COMMANDS & Omit<ResourceTable, keyof typeof WORKFLOW_COMMANDS>;

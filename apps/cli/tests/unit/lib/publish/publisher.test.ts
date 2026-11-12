@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { aSuggest } from "@tests/helpers/suggest";
+import { aSuggest } from "@tests/helpers/suggestions";
 import { ConflictError, ForbiddenError } from "@/lib/backend/errors";
 import { ZitadelError } from "@/lib/errors";
 import { type PreparedRelease, type PrepareRequest, Publisher } from "@/lib/publish/publisher";

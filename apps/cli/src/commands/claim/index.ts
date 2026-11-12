@@ -11,6 +11,7 @@ import { ZitadelError } from "@/lib/errors";
 import { log } from "@/lib/log";
 import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { reads, type Refused, relatedFlags, whole } from "@/lib/oclif/flags";
+import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { hasZitadelSecret, readZitadelSecret, writeZitadelSecret } from "@/lib/project";
 import { normalizePublicCliCommand } from "@/lib/public-cli";
 import { isLoopbackUrl } from "@/lib/server";
@@ -95,6 +96,30 @@ const TIMEOUT: Refused<number> = {
  * makes, so it is refused on its way in rather than once something has been
  * asked or sent.
  */
+/** How a link that died before the browser step finished is refused. */
+const LINK_EXPIRED_REFUSAL: Refusal = {
+  message: "The link expired before the browser step finished",
+  hint: "Links are valid for 10 minutes. Start a new one.",
+  next: ["{claim}"],
+};
+
+/** How a run that stopped waiting for the browser step is refused. */
+const WAIT_STOPPED_REFUSAL: Refusal = {
+  message: "Stopped waiting for the browser step to finish",
+  hint: "Links are valid for 10 minutes. Start a new one.",
+  next: ["{claim}"],
+};
+
+/**
+ * How a project past its claim window is refused. Deliberately not the
+ * retryable "start a new link" shape: a new challenge cannot fix a closed
+ * window, so suggesting `claim` again would send the user in a circle.
+ */
+const WINDOW_CLOSED_REFUSAL: Refusal = {
+  message: `This project was not claimed within ${CLAIM_WINDOW_DAYS} days of creation, so it can no longer be claimed.`,
+  hint: "The project still works for now, but it stays temporary and its data may be lost. To get a claimable project, run `zitadel setup` in a fresh directory (here it would just skip as already initialized) and claim the new one within the window.",
+};
+
 const CHALLENGE_ID: Refused<string> = {
   schema: z.string().trim().regex(getClaimStatusQueryChallengeIdRegExp),
   refusal: {
@@ -267,7 +292,7 @@ export default class Claim extends EnvironmentCommand {
         }
         case "window-expired": {
           this.recordTelemetry({ claim_outcome: "window_expired" });
-          throw claimWindowExpiredError();
+          throw refusalError(WINDOW_CLOSED_REFUSAL, {});
         }
         case "started": {
           break;
@@ -417,16 +442,14 @@ export default class Claim extends EnvironmentCommand {
               claim_outcome: "window_expired",
               poll_count: attempt,
             });
-            throw new AbortError(claimWindowExpiredError());
+            throw new AbortError(refusalError(WINDOW_CLOSED_REFUSAL, {}));
           }
           case "expired": {
             this.recordTelemetry({
               claim_outcome: "expired",
               poll_count: attempt,
             });
-            throw new AbortError(
-              expiredError("The link expired before the browser step finished", startOver),
-            );
+            throw new AbortError(refusalError(LINK_EXPIRED_REFUSAL, {}, { claim: startOver }));
           }
           case "not-found": {
             this.recordTelemetry({
@@ -467,7 +490,7 @@ export default class Claim extends EnvironmentCommand {
         claim_outcome: "timeout",
         poll_count: error.attempt,
       });
-      throw expiredError("Stopped waiting for the browser step to finish", startOver);
+      throw refusalError(WAIT_STOPPED_REFUSAL, {}, { claim: startOver });
     });
   }
 
@@ -538,26 +561,4 @@ export default class Claim extends EnvironmentCommand {
       },
     });
   }
-}
-
-function expiredError(message: string, claimAgain: SuggestedCommand): ZitadelError {
-  return new ZitadelError("E_VALIDATION", message, {
-    hint: "Links are valid for 10 minutes. Start a new one.",
-    nextCommands: [claimAgain],
-  });
-}
-
-/**
- * Deliberately not the retryable "start a new link" shape: a new challenge
- * cannot fix a closed window, so suggesting `claim` again would send the
- * user in a circle.
- */
-function claimWindowExpiredError(): ZitadelError {
-  return new ZitadelError(
-    "E_VALIDATION",
-    `This project was not claimed within ${CLAIM_WINDOW_DAYS} days of creation, so it can no longer be claimed.`,
-    {
-      hint: `The project still works for now, but it stays temporary and its data may be lost. To get a claimable project, run \`zitadel setup\` in a fresh directory (here it would just skip as already initialized) and claim the new one within the window.`,
-    },
-  );
 }

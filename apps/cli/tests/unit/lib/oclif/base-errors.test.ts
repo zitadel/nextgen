@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ZitadelError } from "@/lib/errors";
 import { resourceSuggestion } from "@/lib/suggestion";
 
-import { aConfigAt } from "@tests/helpers/suggest";
+import { aConfigAt } from "@tests/helpers/suggestions";
 import { BaseCommand } from "@/lib/oclif/base";
 import { DrawnSpinner } from "@/lib/ui/spinner";
 import { printing, stripAnsi } from "@tests/helpers/run-cli";

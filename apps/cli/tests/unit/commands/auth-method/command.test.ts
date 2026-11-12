@@ -134,17 +134,7 @@ class ChangeWriter extends AuthMethodPasskeyDisable {
    * @returns The change with its consent, or `undefined` when the person said no.
    */
   confirming(target: SchemaTarget, make: () => Change): Promise<unknown> {
-    return this.confirmIfNoSignInLeft(
-      target,
-      {
-        real: this.follow({ id: "auth-method:passkey:disable", flags: { force: true } }),
-        dryRun: this.follow({
-          id: "auth-method:passkey:disable",
-          flags: { force: true, dryRun: true },
-        }),
-      },
-      make,
-    );
+    return this.confirmIfNoSignInLeft(target, make);
   }
 }
 

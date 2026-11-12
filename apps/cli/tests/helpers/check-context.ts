@@ -2,7 +2,7 @@ import type { CheckContext } from "@/commands/doctor/checks";
 import { Consent } from "@/lib/consent";
 import { createOrca } from "@/lib/orca";
 
-import { aSuggest } from "./suggest";
+import { aSuggest } from "./suggestions";
 
 /**
  * The CLI version a doctor check runs as unless a test says otherwise.

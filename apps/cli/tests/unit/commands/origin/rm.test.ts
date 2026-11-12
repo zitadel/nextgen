@@ -11,7 +11,7 @@ import { it } from "@tests/helpers/fixtures";
 import { asTerminal as asPerson } from "@tests/helpers/terminal";
 
 import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
-import { runCommand } from "@tests/helpers/run-command";
+import { runCommand } from "@tests/helpers/run-cli";
 
 const SERVER = "https://api.zitadel.example";
 

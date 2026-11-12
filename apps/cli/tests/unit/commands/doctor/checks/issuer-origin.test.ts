@@ -10,7 +10,7 @@ import { takeReportedWarnings } from "@/lib/warnings";
 import { aCheckContext, declined, forced } from "@tests/helpers/check-context";
 import { it } from "@tests/helpers/fixtures";
 import { write } from "@tests/helpers/git-repo";
-import { aSuggest } from "@tests/helpers/suggest";
+import { aSuggest } from "@tests/helpers/suggestions";
 import { usePlatformServer } from "@tests/helpers/platform-project";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 

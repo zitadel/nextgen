@@ -17,7 +17,7 @@ vi.mock("node:os", async (importOriginal) => {
 import { installLogSink } from "@/lib/log";
 import { recordLog } from "@tests/helpers/log";
 import { claimSkills, eligibleForSkills, showSkillsHint } from "@/lib/skills-hint";
-import { aSuggest } from "@tests/helpers/suggest";
+import { aSuggest } from "@tests/helpers/suggestions";
 
 const CLAUDE = { name: "claude", display: "Claude Code", detected: true, installPath: "/x" };
 /** The `skills add` the hint names, as a run renders it. */

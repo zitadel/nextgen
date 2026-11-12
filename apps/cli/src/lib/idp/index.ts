@@ -44,18 +44,16 @@ export {
   type CustomFlagValues,
   checkGivenCustomFlags,
   customExample,
-  customFlagText,
   customFlagValues,
   ENABLE_FLAG_KEYS,
   ENABLE_FLAG_NAMES,
-  flagText,
   givenCustomFlags,
   type LoopbackReach,
   loopbackIssuerWarning,
   SETUP_FLAG_KEYS,
   SETUP_FLAG_NAMES,
   selectionFromFlags,
-  ssoEnableArgs,
+  ssoEnableFlags,
 } from "./custom";
 export { CredentialDelivery, type DeliveryRun } from "./delivery";
 export { askConnectionEndpoints } from "./endpoints";

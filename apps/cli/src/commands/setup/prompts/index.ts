@@ -24,7 +24,7 @@ export { PasswordPolicyPrompt } from "./password-policy";
 export { PickFrameworkPrompt } from "./pick-framework";
 export { ServerPrompt } from "./server";
 export { SignInPresetPrompt } from "./sign-in-preset";
-export { askCustomSettings, SocialSignInPrompt, ssoEnableFlags } from "./social-sign-in";
+export { askCustomSettings, SocialSignInPrompt } from "./social-sign-in";
 export type { PromptContext, SetupAnswers, SetupPrompt, SsoAnswer, SsoDraft } from "./types";
 export { completeSso } from "./types";
 export { UseCasePrompt } from "./use-case";

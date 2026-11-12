@@ -9,7 +9,7 @@ import {
   usePlatformServer,
 } from "@tests/helpers/platform-project";
 import { asTerminal as asPerson } from "@tests/helpers/terminal";
-import { runCommand } from "@tests/helpers/run-command";
+import { runCommand } from "@tests/helpers/run-cli";
 
 const { dirs } = usePlatformServer();
 

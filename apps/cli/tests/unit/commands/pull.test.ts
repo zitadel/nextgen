@@ -16,7 +16,7 @@ import {
 } from "@tests/helpers/platform-project";
 import { runCliForTest } from "@tests/helpers/run-cli";
 import { rejectionOf } from "@tests/helpers/thrown-value";
-import { runCommand } from "@tests/helpers/run-command";
+import { runCommand } from "@tests/helpers/run-cli";
 
 describe("fileList", () => {
   it("says what the paths under it are", () => {

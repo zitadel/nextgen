@@ -11,7 +11,7 @@ import { confirm, isCancel } from "@clack/prompts";
 import { createZitadelClient } from "@/lib/backend";
 import { Consent, type Gate, isRefusal } from "@/lib/consent";
 import { ZitadelError } from "@/lib/errors";
-import { aSuggest } from "@tests/helpers/suggest";
+import { aSuggest } from "@tests/helpers/suggestions";
 
 /** Renders the commands these questions suggest, as a run does. */
 const suggest = aSuggest();

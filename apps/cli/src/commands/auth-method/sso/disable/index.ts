@@ -62,17 +62,9 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
     const config = target.config;
     const schema = target.schema;
     const provider = flags.provider ?? this.refuseUnnamedProvider(schema);
-    const forced = { provider, schema: target.schemaFlag, force: true } as const;
-    const confirmed = await this.confirmIfNoSignInLeft(
-      target,
-      {
-        real: this.follow({ id: "auth-method:sso:disable", flags: forced }),
-        dryRun: this.follow({ id: "auth-method:sso:disable", flags: { ...forced, dryRun: true } }),
-      },
-      (options) => {
-        return config.connections.disable(schema, provider, options);
-      },
-    );
+    const confirmed = await this.confirmIfNoSignInLeft(target, (options) => {
+      return config.connections.disable(schema, provider, options);
+    });
     if (confirmed === undefined) {
       return this.emit({
         status: "skipped",
@@ -114,14 +106,8 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
           ? `Would remove ${provider} from ${where} (dry run)`
           : `${schema.name} does not offer ${provider}, so nothing would change (dry run)`,
       );
-      const real = this.follow({
-        id: "auth-method:sso:disable",
-        flags: {
-          provider,
-          ...(target.schemaGiven === undefined ? {} : { schema: target.schemaGiven }),
-          ...(this.force ? { force: true } : {}),
-        },
-      });
+      // What the developer typed, so the real run is one command away.
+      const real = await this.realRun();
 
       return this.emit({
         status: "ok",
@@ -129,13 +115,13 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
           ...data,
           title: wouldTitle,
           dry_run: true,
-          next_args: [real.args],
+          next_args: [this.argsOf(real)],
         },
         summary: {
           title: wouldTitle,
           sections: [],
         },
-        next: { commands: [real.command] },
+        next: { commands: [real] },
       });
     }
     await this.write(target, change, confirmed.consent);

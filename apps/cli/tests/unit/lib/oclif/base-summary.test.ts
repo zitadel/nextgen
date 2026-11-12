@@ -1,5 +1,5 @@
 import { stripVTControlCharacters as stripAnsi } from "node:util";
-import { aConfigAt } from "@tests/helpers/suggest";
+import { aConfigAt } from "@tests/helpers/suggestions";
 import { mkdirSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";

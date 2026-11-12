@@ -8,7 +8,7 @@ import { nonBlankString } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import type { JsonEnvelope } from "@/lib/oclif/types";
 import { optionArgs } from "@/lib/public-cli";
-import { type Checked, type SuggestedCommand, WHAT_CHANGED } from "@/lib/suggestion";
+import { type SuggestedCommand, WHAT_CHANGED } from "@/lib/suggestion";
 import { publishedIds } from "@/lib/sync/state";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { reportWarning } from "@/lib/warnings";
@@ -278,22 +278,6 @@ function brokenCandidates(
 }
 
 /**
- * One follow-up, as the command to run and as the words after the CLI
- * (`next_args`), both made from the same typed input.
- */
-export type Follow = {
-  /**
-   * The command, rendered for the run.
-   */
-  readonly command: SuggestedCommand;
-
-  /**
-   * The same command as its words, unquoted.
-   */
-  readonly args: readonly string[];
-};
-
-/**
  * A result's follow-up commands, as strings and as argument lists.
  */
 export type FollowUps = {
@@ -374,19 +358,6 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
   }
 
   /**
-   * A follow-up as a command and as its words, both from the same typed input.
-   *
-   * @param next - The target and its arguments and flags, by the names code reads them.
-   * @returns The command and its words.
-   */
-  protected follow<const Id extends string>(next: Checked<Id>): Follow {
-    return {
-      command: this.suggest(next),
-      args: this.suggestArgs(next),
-    };
-  }
-
-  /**
    * Make a change that may leave the schema with no way to sign in (ADR 070
    * §3).
    *
@@ -403,8 +374,6 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
    * change that then fails; its re-run keeps `--dry-run`.
    *
    * @param target - What the run read.
-   * @param retry - The command again with `--force`, which a refusal suggests,
-   *   as a real run and as a dry run.
    * @param make - Makes the change, with or without `force`.
    * @returns The change with the consent that allows it, or `undefined` when
    *   the person said no.
@@ -413,7 +382,6 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
    */
   protected async confirmIfNoSignInLeft(
     target: SchemaTarget,
-    retry: Readonly<{ real: Follow; dryRun: Follow }>,
     make: (options: ForceOptions) => Change,
   ): Promise<ConfirmedChange | undefined> {
     try {
@@ -429,16 +397,36 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
         throw error;
       }
       const question = `Disable ${error.disabling} anyway? Nobody will be able to sign in to ${error.schema}.`;
+      // The run again with --force, on the schema it resolved (a dry run's stays
+      // a preview, since --force with --dry-run writes nothing), then enabling
+      // each method the schema could take instead.
+      const retry = await this.rerun({ with: { force: true, schema: target.schemaFlag } });
+      const suggested = [
+        retry,
+        ...error.alternatives.flatMap((method) => {
+          return method === "password" || method === "passkey"
+            ? [
+                this.suggest({
+                  id: `auth-method:${method}:enable`,
+                  flags: { schema: target.schemaFlag },
+                }),
+              ]
+            : [];
+        }),
+      ];
+      const refusal: NoSignInLeftRefusal = {
+        error,
+        question,
+        suggested: {
+          commands: suggested,
+          args: suggested.map((command) => {
+            return this.argsOf(command);
+          }),
+        },
+        json: this.isJson,
+      };
       if (this.dryRun && this.nonInteractive && !this.force) {
-        // The re-run stays a preview: --force with --dry-run writes nothing.
-        refuseNoSignInLeft({
-          target,
-          error,
-          question,
-          retry: retry.dryRun,
-          alternatives: this.alternativesOf(target, error),
-          json: this.isJson,
-        });
+        refuseNoSignInLeft(refusal);
       }
       if (this.dryRun) {
         return {
@@ -453,16 +441,9 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
         verb: "disable",
         name: `disable ${error.disabling}, the last way to sign in to ${error.schema}`,
         message: question,
-        retry: retry.real.command,
+        retry,
         refuse: () => {
-          return refuseNoSignInLeft({
-            target,
-            error,
-            question,
-            retry: retry.real,
-            alternatives: this.alternativesOf(target, error),
-            json: this.isJson,
-          });
+          return refuseNoSignInLeft(refusal);
         },
       });
       if (consent === undefined) {
@@ -476,28 +457,6 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
         consent: consent,
       };
     }
-  }
-
-  /**
-   * Enabling each method the schema could take instead, as follow-ups.
-   *
-   * @param target - What the run read.
-   * @param error - The refusal that lists them.
-   * @returns One follow-up per alternative.
-   */
-  private alternativesOf(target: SchemaTarget, error: NoSignInLeftError): readonly Follow[] {
-    return error.alternatives.flatMap((method) => {
-      if (method !== "password" && method !== "passkey") {
-        return [];
-      }
-
-      return [
-        this.follow({
-          id: `auth-method:${method}:enable`,
-          flags: target.schemaFlag === undefined ? {} : { schema: target.schemaFlag },
-        }),
-      ];
-    });
   }
 
   /**
@@ -576,23 +535,21 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
    *   that did not reach the project.
    * @returns The commands and their argument lists.
    */
-  protected followUps(changed: boolean, leading: readonly Follow[] = []): FollowUps {
+  protected followUps(changed: boolean, leading: readonly SuggestedCommand[] = []): FollowUps {
     // The message is a placeholder the caller fills in: quoted in the command
     // string and listed as written in `next_args`.
-    const follows = changed
+    const commands = changed
       ? [
           ...leading,
-          this.follow({ id: "deploy", flags: { dryRun: true } }),
-          this.follow({ id: "deploy", flags: { message: WHAT_CHANGED } }),
+          this.suggest({ id: "deploy", flags: { dryRun: true } }),
+          this.suggest({ id: "deploy", flags: { message: WHAT_CHANGED } }),
         ]
       : leading;
 
     return {
-      commands: follows.map((follow) => {
-        return follow.command;
-      }),
-      args: follows.map((follow) => {
-        return follow.args;
+      commands,
+      args: commands.map((command) => {
+        return this.argsOf(command);
       }),
     };
   }
@@ -622,23 +579,12 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
     const target = await this.loadSchemaTarget(flags);
     const config = target.config;
     const schema = target.schema;
-    const forced = { schema: target.schemaFlag, force: true } as const;
-    const confirmed = await this.confirmIfNoSignInLeft(
-      target,
-      {
-        real: this.follow({ id: `auth-method:${method}:disable`, flags: forced }),
-        dryRun: this.follow({
-          id: `auth-method:${method}:disable`,
-          flags: { ...forced, dryRun: true },
-        }),
-      },
-      (options) => {
-        if (enabled) {
-          return config.schemas.enable(schema, method);
-        }
-        return config.schemas.disable(schema, method, options);
-      },
-    );
+    const confirmed = await this.confirmIfNoSignInLeft(target, (options) => {
+      if (enabled) {
+        return config.schemas.enable(schema, method);
+      }
+      return config.schemas.disable(schema, method, options);
+    });
     if (confirmed === undefined) {
       return this.emit({
         status: "skipped",
@@ -681,13 +627,8 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
           ? `Would ${verb} ${method} for ${schema.name} (dry run)`
           : `${unchanged} (dry run)`,
       );
-      const schemaGiven = target.schemaGiven === undefined ? {} : { schema: target.schemaGiven };
-      const real = enabled
-        ? this.follow({ id: `auth-method:${method}:enable`, flags: schemaGiven })
-        : this.follow({
-            id: `auth-method:${method}:disable`,
-            flags: { ...schemaGiven, ...(this.force ? { force: true } : {}) },
-          });
+      // What the developer typed, so the real run is one command away.
+      const real = await this.realRun();
 
       return this.emit({
         status: "ok",
@@ -695,13 +636,13 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
           ...data,
           title: wouldTitle,
           dry_run: true,
-          next_args: [real.args],
+          next_args: [this.argsOf(real)],
         },
         summary: {
           title: wouldTitle,
           sections: [],
         },
-        next: { commands: [real.command] },
+        next: { commands: [real] },
       });
     }
     await this.write(target, change, confirmed.consent);
@@ -731,11 +672,10 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
  * What {@link refuseNoSignInLeft} words its refusal from.
  */
 type NoSignInLeftRefusal = {
-  readonly target: SchemaTarget;
   readonly error: NoSignInLeftError;
   readonly question: string;
-  readonly retry: Follow;
-  readonly alternatives: readonly Follow[];
+  /** The exact re-run first, then enabling each method the schema could take instead. */
+  readonly suggested: FollowUps;
   readonly json: boolean;
 };
 
@@ -753,12 +693,6 @@ type NoSignInLeftRefusal = {
  */
 function refuseNoSignInLeft(input: NoSignInLeftRefusal): never {
   const error = input.error;
-  // Every suggestion as an argument list, the re-run first. The commands quote
-  // what needs it and the lists carry the words as they are.
-  const follows = [input.retry, ...input.alternatives];
-  const suggestedArgs = follows.map((follow) => {
-    return follow.args;
-  });
   const where = input.json
     ? " (the first of details.suggested_args holds the exact arguments)."
     : ".";
@@ -769,11 +703,9 @@ function refuseNoSignInLeft(input: NoSignInLeftRefusal): never {
       question: input.question,
       file: error.path,
       usable: error.usable,
-      suggested_args: suggestedArgs,
+      suggested_args: input.suggested.args,
     },
-    nextCommands: follows.map((follow) => {
-      return follow.command;
-    }),
+    nextCommands: input.suggested.commands,
   });
 }
 

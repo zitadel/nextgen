@@ -421,8 +421,8 @@ export default class Doctor extends Destructive(BaseCommand) {
         image,
         port,
         this.suggest,
-        (id, ...rest) => {
-          return this.suggestArgs(id, ...rest);
+        (next) => {
+          return [...this.argsOf(this.suggest(next))];
         },
         parentRuntimeDir,
       );

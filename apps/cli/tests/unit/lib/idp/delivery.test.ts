@@ -11,7 +11,7 @@ import { Connection } from "@/lib/zitadel";
 import { aGoogleConnection } from "@tests/helpers/config";
 import { anAcmeSsoConnection } from "@tests/helpers/connections";
 import { clientId, clientSecret, idVariable, secretVariable } from "@tests/helpers/idp-values";
-import { aSuggest } from "@tests/helpers/suggest";
+import { aSuggest } from "@tests/helpers/suggestions";
 
 /**
  * Where the connections in these tests are written.

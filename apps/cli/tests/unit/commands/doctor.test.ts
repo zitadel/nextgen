@@ -13,7 +13,7 @@ import { publicCliCommand } from "@/lib/public-cli";
 import { MANAGED_MARKER } from "@/lib/paths";
 import { advisoryForWarnings } from "@/commands/doctor/index";
 import { nextPort } from "@tests/helpers/ports";
-import { aSuggest, aSuggestWords } from "@tests/helpers/suggest";
+import { aSuggest, aSuggestWords } from "@tests/helpers/suggestions";
 import {
   aMachineRunning,
   cliVersion,

@@ -7,7 +7,7 @@ import { installLogSink } from "@/lib/log";
 import type { runPackageCommand } from "@/lib/package-manager";
 import { it } from "@tests/helpers/fixtures";
 import { writeJson } from "@tests/helpers/local-project";
-import { aSuggest } from "@tests/helpers/suggest";
+import { aSuggest } from "@tests/helpers/suggestions";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
 /**

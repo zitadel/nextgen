@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { customizeAndPublishActions } from "@/lib/journey-guidance";
-import { aSuggest } from "@tests/helpers/suggest";
+import { aSuggest } from "@tests/helpers/suggestions";
 
 describe("customizeAndPublishActions", () => {
   it("quotes the publish commands with the run's environment", () => {

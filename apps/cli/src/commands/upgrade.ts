@@ -18,7 +18,7 @@ import { newestCliCommand } from "@/lib/public-cli";
 import { type BreakingChange, breakingChanges, RELEASE_NOTES_URL } from "@/lib/release-notes";
 import { SHARED_SKILLS_DIR } from "@/lib/skills/add";
 import { arrow, command, dim, mark, strong, url } from "@/lib/style";
-import { type Suggest, type SuggestedCommand, shellCommand } from "@/lib/suggestion";
+import { type SuggestedCommand, shellCommand } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { isNewerVersion, latestCliVersion } from "@/lib/update-check";
 import { exactZitadelPins, floatingZitadelSpecs } from "@/lib/zitadel-pins";
@@ -125,14 +125,15 @@ export default class Upgrade extends BaseCommand {
         : await refreshProject(target, this.cwd, this.env, flags.telemetry === false, this.signal);
     }
 
+    // A command to run at the new version, written for `target` rather than
+    // for the release that is running.
+    const atTarget = this.suggestWith(this.scope(), target);
     const commands: SuggestedCommand[] = [
       ...(this.dryRun && !upToDate ? [this.suggest({ id: "upgrade" })] : []),
-      ...(refresh === "failed"
-        ? [this.atTarget(target)({ id: "doctor", flags: { fix: true } })]
-        : []),
-      ...(refresh === "issues" ? [this.atTarget(target)({ id: "doctor" })] : []),
+      ...(refresh === "failed" ? [atTarget({ id: "doctor", flags: { fix: true } })] : []),
+      ...(refresh === "issues" ? [atTarget({ id: "doctor" })] : []),
       ...(install !== undefined && !this.dryRun && existsSync(join(this.cwd, SHARED_SKILLS_DIR))
-        ? [this.atTarget(target)({ id: "skills:add" })]
+        ? [atTarget({ id: "skills:add" })]
         : []),
     ];
     const actions = [
@@ -202,18 +203,6 @@ export default class Upgrade extends BaseCommand {
         ...(commands.length > 0 ? { commands } : {}),
       },
     });
-  }
-
-  /**
-   * A command to run at the new version, from the shell's directory like every
-   * suggestion: the CLI's own `--cwd` goes back on, and the command is written
-   * for `target` rather than for the release that is running.
-   *
-   * @param target - The release the command runs as.
-   * @returns The renderer.
-   */
-  private atTarget(target: string): Suggest {
-    return this.suggestWith(this.scope(), target);
   }
 
   private async install(install: PackageCommand, installCommand: SuggestedCommand): Promise<void> {

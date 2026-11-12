@@ -13,7 +13,7 @@ import { usePlatformServer } from "@tests/helpers/platform-project";
 import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
 import { asTerminal as asPerson } from "@tests/helpers/terminal";
 import { type Answer, answering } from "@tests/helpers/keyboard";
-import { runCommand } from "@tests/helpers/run-command";
+import { runCommand } from "@tests/helpers/run-cli";
 
 const { server } = usePlatformServer();
 

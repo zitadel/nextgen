@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { asker } from "@/lib/input";
 import type { Questions } from "@/lib/ui";
 import { CredentialPrompt, type PromptRun } from "@/lib/idp";
-import { aSuggest } from "@tests/helpers/suggest";
+import { aSuggest } from "@tests/helpers/suggestions";
 import { ZitadelError } from "@/lib/errors";
 import {
   acmeSelection,

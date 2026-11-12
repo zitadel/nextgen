@@ -33,7 +33,7 @@ import { asker } from "@/lib/input";
 import { LocalServer } from "@/lib/local-server/server";
 import { takeReportedWarnings } from "@/lib/warnings";
 import { acmeSelection, clientId, clientSecret, googleSelection } from "@tests/helpers/idp-values";
-import { aSuggest } from "@tests/helpers/suggest";
+import { aSuggest } from "@tests/helpers/suggestions";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
 /**

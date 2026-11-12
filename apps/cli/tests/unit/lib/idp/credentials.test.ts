@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { idVariable, secretVariable } from "@tests/helpers/idp-values";
 import { republishCommand, republishCommands, unpublished } from "@/lib/idp";
-import { aSuggest } from "@tests/helpers/suggest";
+import { aSuggest } from "@tests/helpers/suggestions";
 
 /** A run that named no environment. */
 const NO_SELECTOR = aSuggest({}, "1.0.0-alpha.23");

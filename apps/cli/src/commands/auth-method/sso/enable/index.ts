@@ -22,7 +22,7 @@ import {
 } from "@zitadel/config/idp";
 import { z } from "zod";
 
-import { AuthMethodCommand, type Follow, type SchemaTarget } from "@/commands/auth-method/command";
+import { AuthMethodCommand, type SchemaTarget } from "@/commands/auth-method/command";
 import {
   isCancelled,
   Origins,
@@ -55,6 +55,7 @@ import { environmentFlags } from "@/lib/oclif/environment-flags";
 import { filled, reads, type Refused } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 
+import type { SuggestedCommand } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { reportWarning } from "@/lib/warnings";
 import {
@@ -444,18 +445,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     this.introduce(summary, target.schema, provider);
     if (this.dryRun) {
       // What the developer typed, so the real run is one command away.
-      const real = this.follow({
-        id: "auth-method:sso:enable",
-        flags: {
-          provider: flags.provider,
-          ...(target.schemaGiven === undefined ? {} : { schema: target.schemaGiven }),
-          ...(flags.slug === undefined ? {} : { slug: flags.slug }),
-          ...(flags.displayName === undefined ? {} : { displayName: flags.displayName }),
-          ...(flags.issuer === undefined ? {} : { issuer: flags.issuer }),
-          ...(flags.scopes === undefined ? {} : { scopes: flags.scopes }),
-          ...(flags.clientId === undefined ? {} : { clientId: flags.clientId }),
-        },
-      });
+      const real = await this.realRun();
 
       return this.previewResult(summary, preview, delivery.names, flags.clientId, real);
     }
@@ -665,7 +655,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     change: DocumentChange<Connection>,
     names: CredentialNames,
     givenClientId: ClientId | undefined,
-    real: Follow,
+    real: SuggestedCommand,
   ): JsonEnvelope {
     this.report(change);
     if (!this.isJson) {
@@ -701,7 +691,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         title,
         would_store: toStore,
         dry_run: true,
-        next_args: [real.args],
+        next_args: [this.argsOf(real)],
       },
       summary: {
         title,
@@ -710,7 +700,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
           return escapeControlCharacters(line);
         }),
       },
-      next: { commands: [real.command] },
+      next: { commands: [real] },
     });
   }
 
@@ -833,10 +823,10 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     const summary = input.summary;
     const name = summary.displayName;
     const recovery = input.delivery.unpublishedOf(input.published).map((missing) => {
-      return this.follow({
+      return this.suggest({
         id: "variable:set",
         args: { name: missing.name },
-        flags: missing.secret ? { secret: true } : {},
+        flags: { secret: missing.secret },
       });
     });
     const unpublished = !summary.reused || input.written.length > 0;

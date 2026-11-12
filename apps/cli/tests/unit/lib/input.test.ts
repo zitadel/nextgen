@@ -25,7 +25,7 @@ import { sourceFiles } from "@tests/helpers/source-files";
 import { flatOutput } from "@/lib/flat-output";
 import { asker, type Session } from "@/lib/input";
 import { PromptCancelled } from "@/lib/errors";
-import { aSuggest } from "@tests/helpers/suggest";
+import { aSuggest } from "@tests/helpers/suggestions";
 
 /** Renders the commands these questions suggest, as a run does. */
 const suggest = aSuggest();
