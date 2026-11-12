@@ -9,7 +9,7 @@ import {
   selectionName,
 } from "@zitadel/config/idp";
 
-import { inShell, type Suggest, type SuggestedCommand } from "@/lib/suggestion";
+import { type FillIn, inShell, type Suggest, type SuggestedCommand } from "@/lib/suggestion";
 import type { Questions } from "@/lib/ui";
 
 import type { GivenCredentials } from "./credentials";
@@ -19,7 +19,7 @@ import { askConnectionEndpoints } from "./endpoints";
  * What a suggested retry names where the client id is still to be given: the
  * one value there that is not a client id, so it is the reader's to replace.
  */
-const CLIENT_ID_PLACEHOLDER = "<client-id>" as ClientId;
+const CLIENT_ID_PLACEHOLDER = "<client-id>";
 
 /**
  * What {@link CredentialPrompt} asks about, and how.
@@ -168,7 +168,7 @@ export class CredentialPrompt {
    * @param pipe - What feeds the secret on stdin, if anything.
    * @returns The command, or `undefined` for a custom provider.
    */
-  private retryFor(clientId: ClientId, pipe: string): SuggestedCommand | undefined {
+  private retryFor(clientId: ClientId | FillIn, pipe: string): SuggestedCommand | undefined {
     const selection = this.run.selection;
     if (selection.kind !== "catalog") {
       return undefined;

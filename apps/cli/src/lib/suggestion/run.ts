@@ -111,15 +111,34 @@ export class RunSuggestions {
    */
   aimedAt(scope: Scope, cliVersion: string = this.run.cliVersion()): Suggest {
     return (next: Suggested | LooseNext) => {
-      if (typeof next === "string") {
-        return next;
-      }
-
-      return this.remembered(
-        suggestionWords(next.id, next, this.declared(next.id), scope),
-        cliVersion,
-      );
+      return this.render(next, scope, cliVersion);
     };
+  }
+
+  /**
+   * One follow-up aimed at `scope`, as `cliVersion` runs it; one rendered
+   * already is returned as it is.
+   *
+   * @param next - The follow-up.
+   * @param scope - What it is aimed at.
+   * @param cliVersion - The release it runs as.
+   * @returns The command.
+   * @throws {Error} When it names no command this CLI loaded, or input its
+   *   command does not take.
+   */
+  render(
+    next: Suggested | LooseNext,
+    scope: Scope,
+    cliVersion: string = this.run.cliVersion(),
+  ): SuggestedCommand {
+    if (typeof next === "string") {
+      return next;
+    }
+
+    return this.remembered(
+      suggestionWords(next.id, next, this.declared(next.id), scope),
+      cliVersion,
+    );
   }
 
   /**

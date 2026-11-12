@@ -1797,7 +1797,7 @@ export default class Setup extends Destructive(BaseCommand) {
         : {
             actions: [],
             boxActions: [],
-            commands: [] as SuggestedCommand[],
+            commands: [],
           };
 
     const writtenRel = allFilesWritten.map((file) => {
@@ -1905,7 +1905,7 @@ export default class Setup extends Destructive(BaseCommand) {
       : {
           actions: [],
           boxActions: [],
-          commands: [] as SuggestedCommand[],
+          commands: [],
         };
     // Only when the project is the local admin's: the console lists nothing
     // else for them, so the command would open an empty console otherwise.
@@ -1928,7 +1928,7 @@ export default class Setup extends Destructive(BaseCommand) {
       : {
           actions: [],
           boxActions: [],
-          commands: [] as SuggestedCommand[],
+          commands: [],
         };
     // A run that skipped social sign-in says how to add it later, the way
     // `consoleStep` says how to open the console.
@@ -1951,7 +1951,7 @@ export default class Setup extends Destructive(BaseCommand) {
         : {
             actions: [],
             boxActions: [],
-            commands: [] as SuggestedCommand[],
+            commands: [],
           };
     // This run again without `--dry-run`, with every other flag as typed, which
     // is what a preview's one follow-up is.
@@ -2748,7 +2748,7 @@ const README = "README.md";
  * placeholder for a client id, so it stands as the type the flag parses to
  * though it is not one a provider issued.
  */
-const ID_TO_FILL_IN = "<id>" as ClientId;
+const ID_TO_FILL_IN = "<id>";
 
 /**
  * What setup's default configuration left behind.

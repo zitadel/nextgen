@@ -451,7 +451,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
    * @throws {Error} When the target is no command this CLI loaded.
    */
   protected readonly suggest: Suggest = (next: Suggested | LooseNext) => {
-    return this.suggestions.aimedAt(this.scope())(next as Suggested);
+    return this.suggestions.render(next, this.scope());
   };
 
   /**

@@ -160,6 +160,14 @@ describe("a suggestion", () => {
     expect(checked({ id: "doctor", flags: { fix: true, force: true } })).toBeDefined();
   });
 
+  it("takes a value left to fill in for any flag that takes one, but not for a switch", () => {
+    expect(checked({ id: "start", flags: { port: "<port>" } })).toBeDefined();
+    // @ts-expect-error a switch takes no value to fill in
+    checked({ id: "doctor", flags: { fix: "<fix>" } });
+    // @ts-expect-error a value to fill in is written in angle brackets
+    checked({ id: "start", flags: { port: "port" } });
+  });
+
   it("does not compile for a command that does not exist, or a command line as text", () => {
     // @ts-expect-error there is no `deplyo`
     checked({ id: "deplyo" });

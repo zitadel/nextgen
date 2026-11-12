@@ -68,7 +68,18 @@ type Renderable = string | number | boolean | readonly (string | number)[];
  * A flag that parses to something a command line cannot carry (a duration, a
  * URL) is given as the text it is typed as.
  */
-type Given<Value> = [NonNullable<Value>] extends [Renderable] ? NonNullable<Value> : string;
+type Given<Value> =
+  | ([NonNullable<Value>] extends [Renderable] ? NonNullable<Value> : string)
+  // A value left for the reader to fill in: any value a switch is not.
+  | ([NonNullable<Value>] extends [boolean] ? never : FillIn);
+
+/**
+ * A value a suggestion leaves for the reader to fill in, such as `<client-id>`
+ * or {@link WHAT_CHANGED}: written in angle brackets, which the renderer
+ * quotes so a shell does not read it as a redirection. It stands in for any
+ * value but a switch's, which takes none.
+ */
+export type FillIn = `<${string}>`;
 
 /** Flags that say how a run answers, never what a suggestion should do. */
 type Answering = "color" | "debug" | "non-interactive" | "telemetry" | "verbose";
