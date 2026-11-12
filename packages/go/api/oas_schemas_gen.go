@@ -952,6 +952,324 @@ func (s *AlreadyClaimedResponseDetailsAdditional) init() AlreadyClaimedResponseD
 	return m
 }
 
+// Merged schema.
+// Ref: #
+type AppClientIDTaken struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptAppClientIDTakenDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *AppClientIDTaken) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *AppClientIDTaken) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *AppClientIDTaken) GetDetails() OptAppClientIDTakenDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *AppClientIDTaken) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *AppClientIDTaken) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *AppClientIDTaken) SetDetails(val OptAppClientIDTakenDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type AppClientIDTakenDetails map[string]jx.Raw
+
+func (s *AppClientIDTakenDetails) init() AppClientIDTakenDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type AppFieldImmutable struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptAppFieldImmutableDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *AppFieldImmutable) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *AppFieldImmutable) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *AppFieldImmutable) GetDetails() OptAppFieldImmutableDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *AppFieldImmutable) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *AppFieldImmutable) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *AppFieldImmutable) SetDetails(val OptAppFieldImmutableDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type AppFieldImmutableDetails map[string]jx.Raw
+
+func (s *AppFieldImmutableDetails) init() AppFieldImmutableDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type AppInvalid struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptAppInvalidDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *AppInvalid) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *AppInvalid) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *AppInvalid) GetDetails() OptAppInvalidDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *AppInvalid) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *AppInvalid) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *AppInvalid) SetDetails(val OptAppInvalidDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type AppInvalidDetails map[string]jx.Raw
+
+func (s *AppInvalidDetails) init() AppInvalidDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type AppNotFound struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptAppNotFoundDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *AppNotFound) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *AppNotFound) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *AppNotFound) GetDetails() OptAppNotFoundDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *AppNotFound) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *AppNotFound) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *AppNotFound) SetDetails(val OptAppNotFoundDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type AppNotFoundDetails map[string]jx.Raw
+
+func (s *AppNotFoundDetails) init() AppNotFoundDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type AppPermissionDenied struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptAppPermissionDeniedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *AppPermissionDenied) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *AppPermissionDenied) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *AppPermissionDenied) GetDetails() OptAppPermissionDeniedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *AppPermissionDenied) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *AppPermissionDenied) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *AppPermissionDenied) SetDetails(val OptAppPermissionDeniedDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type AppPermissionDeniedDetails map[string]jx.Raw
+
+func (s *AppPermissionDeniedDetails) init() AppPermissionDeniedDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type AppRevisionConflict struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptAppRevisionConflictDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *AppRevisionConflict) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *AppRevisionConflict) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *AppRevisionConflict) GetDetails() OptAppRevisionConflictDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *AppRevisionConflict) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *AppRevisionConflict) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *AppRevisionConflict) SetDetails(val OptAppRevisionConflictDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type AppRevisionConflictDetails map[string]jx.Raw
+
+func (s *AppRevisionConflictDetails) init() AppRevisionConflictDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
 // An application that authenticates its users via Zitadel, with its OAuth
 // clients. The document is the `application` field of the `createApplication`
 // (`POST /applications`) body.
@@ -1168,59 +1486,6 @@ func (s *ApplicationClientGrantTypesItem) UnmarshalText(data []byte) error {
 	}
 }
 
-// Merged schema.
-// Ref: #
-type ApplicationClientIDTaken struct {
-	// Merged property.
-	Code string `json:"code"`
-	// Human-readable explanation of the error.
-	Message string `json:"message"`
-	// Additional error-specific context.
-	Details OptApplicationClientIDTakenDetails `json:"details"`
-}
-
-// GetCode returns the value of Code.
-func (s *ApplicationClientIDTaken) GetCode() string {
-	return s.Code
-}
-
-// GetMessage returns the value of Message.
-func (s *ApplicationClientIDTaken) GetMessage() string {
-	return s.Message
-}
-
-// GetDetails returns the value of Details.
-func (s *ApplicationClientIDTaken) GetDetails() OptApplicationClientIDTakenDetails {
-	return s.Details
-}
-
-// SetCode sets the value of Code.
-func (s *ApplicationClientIDTaken) SetCode(val string) {
-	s.Code = val
-}
-
-// SetMessage sets the value of Message.
-func (s *ApplicationClientIDTaken) SetMessage(val string) {
-	s.Message = val
-}
-
-// SetDetails sets the value of Details.
-func (s *ApplicationClientIDTaken) SetDetails(val OptApplicationClientIDTakenDetails) {
-	s.Details = val
-}
-
-// Additional error-specific context.
-type ApplicationClientIDTakenDetails map[string]jx.Raw
-
-func (s *ApplicationClientIDTakenDetails) init() ApplicationClientIDTakenDetails {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
-}
-
 // A client secret the server generated, returned once.
 // Ref: #
 type ApplicationClientSecret struct {
@@ -1301,214 +1566,505 @@ func (s *ApplicationClientType) UnmarshalText(data []byte) error {
 
 // Merged schema.
 // Ref: #
-type ApplicationFieldImmutable struct {
+type ApplicationCreatedEvent struct {
+	// The event ID, in the form `evt_<opaque>`.
+	ID        string    `json:"id"`
+	ProjectID ProjectID `json:"project_id"`
+	// The team the actor operated under when the event was emitted, if any.
+	TeamID OptNilString `json:"team_id"`
 	// Merged property.
-	Code string `json:"code"`
-	// Human-readable explanation of the error.
-	Message string `json:"message"`
-	// Additional error-specific context.
-	Details OptApplicationFieldImmutableDetails `json:"details"`
+	EventType string `json:"event_type"`
+	// The category of the event.
+	Category ApplicationCreatedEventCategory `json:"category"`
+	// When the action happened, on the server's clock.
+	OccurredAt time.Time `json:"occurred_at"`
+	// When the event was stored, on the server's clock.
+	CreatedAt time.Time `json:"created_at"`
+	// The ID of the actor that triggered the event.
+	ActorID OptNilString `json:"actor_id"`
+	// The kind of actor that triggered the event.
+	ActorType OptNilApplicationCreatedEventActorType `json:"actor_type"`
+	// The type of resource the event affected.
+	EntityType OptNilString `json:"entity_type"`
+	// The ID of the resource the event affected.
+	EntityID OptNilString `json:"entity_id"`
+	// The application or agent that produced the event.
+	ClientID string `json:"client_id"`
+	// The ID of the token in use when the event was emitted, when there was one.
+	TokenID OptString `json:"token_id"`
+	// The kind of delegation. Absent when unset.
+	DelegationType OptApplicationCreatedEventDelegationType `json:"delegation_type"`
+	DelegationID   OptString                                `json:"delegation_id"`
+	Grantor        OptString                                `json:"grantor"`
+	// A device fingerprint ID that correlates events from the same device.
+	Fingerprint OptString `json:"fingerprint"`
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
+	RequestID OptNilString `json:"request_id"`
+	// The ID of the session the event belongs to.
+	SessionID OptNilString `json:"session_id"`
+	// An ID that correlates the events of one login flow.
+	FlowID   OptNilString       `json:"flow_id"`
+	Metadata OptEventMetadata   `json:"metadata"`
+	Payload  ApplicationPayload `json:"payload"`
 }
 
-// GetCode returns the value of Code.
-func (s *ApplicationFieldImmutable) GetCode() string {
-	return s.Code
+// GetID returns the value of ID.
+func (s *ApplicationCreatedEvent) GetID() string {
+	return s.ID
 }
 
-// GetMessage returns the value of Message.
-func (s *ApplicationFieldImmutable) GetMessage() string {
-	return s.Message
+// GetProjectID returns the value of ProjectID.
+func (s *ApplicationCreatedEvent) GetProjectID() ProjectID {
+	return s.ProjectID
 }
 
-// GetDetails returns the value of Details.
-func (s *ApplicationFieldImmutable) GetDetails() OptApplicationFieldImmutableDetails {
-	return s.Details
+// GetTeamID returns the value of TeamID.
+func (s *ApplicationCreatedEvent) GetTeamID() OptNilString {
+	return s.TeamID
 }
 
-// SetCode sets the value of Code.
-func (s *ApplicationFieldImmutable) SetCode(val string) {
-	s.Code = val
+// GetEventType returns the value of EventType.
+func (s *ApplicationCreatedEvent) GetEventType() string {
+	return s.EventType
 }
 
-// SetMessage sets the value of Message.
-func (s *ApplicationFieldImmutable) SetMessage(val string) {
-	s.Message = val
+// GetCategory returns the value of Category.
+func (s *ApplicationCreatedEvent) GetCategory() ApplicationCreatedEventCategory {
+	return s.Category
 }
 
-// SetDetails sets the value of Details.
-func (s *ApplicationFieldImmutable) SetDetails(val OptApplicationFieldImmutableDetails) {
-	s.Details = val
+// GetOccurredAt returns the value of OccurredAt.
+func (s *ApplicationCreatedEvent) GetOccurredAt() time.Time {
+	return s.OccurredAt
 }
 
-// Additional error-specific context.
-type ApplicationFieldImmutableDetails map[string]jx.Raw
+// GetCreatedAt returns the value of CreatedAt.
+func (s *ApplicationCreatedEvent) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
 
-func (s *ApplicationFieldImmutableDetails) init() ApplicationFieldImmutableDetails {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
+// GetActorID returns the value of ActorID.
+func (s *ApplicationCreatedEvent) GetActorID() OptNilString {
+	return s.ActorID
+}
+
+// GetActorType returns the value of ActorType.
+func (s *ApplicationCreatedEvent) GetActorType() OptNilApplicationCreatedEventActorType {
+	return s.ActorType
+}
+
+// GetEntityType returns the value of EntityType.
+func (s *ApplicationCreatedEvent) GetEntityType() OptNilString {
+	return s.EntityType
+}
+
+// GetEntityID returns the value of EntityID.
+func (s *ApplicationCreatedEvent) GetEntityID() OptNilString {
+	return s.EntityID
+}
+
+// GetClientID returns the value of ClientID.
+func (s *ApplicationCreatedEvent) GetClientID() string {
+	return s.ClientID
+}
+
+// GetTokenID returns the value of TokenID.
+func (s *ApplicationCreatedEvent) GetTokenID() OptString {
+	return s.TokenID
+}
+
+// GetDelegationType returns the value of DelegationType.
+func (s *ApplicationCreatedEvent) GetDelegationType() OptApplicationCreatedEventDelegationType {
+	return s.DelegationType
+}
+
+// GetDelegationID returns the value of DelegationID.
+func (s *ApplicationCreatedEvent) GetDelegationID() OptString {
+	return s.DelegationID
+}
+
+// GetGrantor returns the value of Grantor.
+func (s *ApplicationCreatedEvent) GetGrantor() OptString {
+	return s.Grantor
+}
+
+// GetFingerprint returns the value of Fingerprint.
+func (s *ApplicationCreatedEvent) GetFingerprint() OptString {
+	return s.Fingerprint
+}
+
+// GetRequestID returns the value of RequestID.
+func (s *ApplicationCreatedEvent) GetRequestID() OptNilString {
+	return s.RequestID
+}
+
+// GetSessionID returns the value of SessionID.
+func (s *ApplicationCreatedEvent) GetSessionID() OptNilString {
+	return s.SessionID
+}
+
+// GetFlowID returns the value of FlowID.
+func (s *ApplicationCreatedEvent) GetFlowID() OptNilString {
+	return s.FlowID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *ApplicationCreatedEvent) GetMetadata() OptEventMetadata {
+	return s.Metadata
+}
+
+// GetPayload returns the value of Payload.
+func (s *ApplicationCreatedEvent) GetPayload() ApplicationPayload {
+	return s.Payload
+}
+
+// SetID sets the value of ID.
+func (s *ApplicationCreatedEvent) SetID(val string) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *ApplicationCreatedEvent) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *ApplicationCreatedEvent) SetTeamID(val OptNilString) {
+	s.TeamID = val
+}
+
+// SetEventType sets the value of EventType.
+func (s *ApplicationCreatedEvent) SetEventType(val string) {
+	s.EventType = val
+}
+
+// SetCategory sets the value of Category.
+func (s *ApplicationCreatedEvent) SetCategory(val ApplicationCreatedEventCategory) {
+	s.Category = val
+}
+
+// SetOccurredAt sets the value of OccurredAt.
+func (s *ApplicationCreatedEvent) SetOccurredAt(val time.Time) {
+	s.OccurredAt = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *ApplicationCreatedEvent) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetActorID sets the value of ActorID.
+func (s *ApplicationCreatedEvent) SetActorID(val OptNilString) {
+	s.ActorID = val
+}
+
+// SetActorType sets the value of ActorType.
+func (s *ApplicationCreatedEvent) SetActorType(val OptNilApplicationCreatedEventActorType) {
+	s.ActorType = val
+}
+
+// SetEntityType sets the value of EntityType.
+func (s *ApplicationCreatedEvent) SetEntityType(val OptNilString) {
+	s.EntityType = val
+}
+
+// SetEntityID sets the value of EntityID.
+func (s *ApplicationCreatedEvent) SetEntityID(val OptNilString) {
+	s.EntityID = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *ApplicationCreatedEvent) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetTokenID sets the value of TokenID.
+func (s *ApplicationCreatedEvent) SetTokenID(val OptString) {
+	s.TokenID = val
+}
+
+// SetDelegationType sets the value of DelegationType.
+func (s *ApplicationCreatedEvent) SetDelegationType(val OptApplicationCreatedEventDelegationType) {
+	s.DelegationType = val
+}
+
+// SetDelegationID sets the value of DelegationID.
+func (s *ApplicationCreatedEvent) SetDelegationID(val OptString) {
+	s.DelegationID = val
+}
+
+// SetGrantor sets the value of Grantor.
+func (s *ApplicationCreatedEvent) SetGrantor(val OptString) {
+	s.Grantor = val
+}
+
+// SetFingerprint sets the value of Fingerprint.
+func (s *ApplicationCreatedEvent) SetFingerprint(val OptString) {
+	s.Fingerprint = val
+}
+
+// SetRequestID sets the value of RequestID.
+func (s *ApplicationCreatedEvent) SetRequestID(val OptNilString) {
+	s.RequestID = val
+}
+
+// SetSessionID sets the value of SessionID.
+func (s *ApplicationCreatedEvent) SetSessionID(val OptNilString) {
+	s.SessionID = val
+}
+
+// SetFlowID sets the value of FlowID.
+func (s *ApplicationCreatedEvent) SetFlowID(val OptNilString) {
+	s.FlowID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *ApplicationCreatedEvent) SetMetadata(val OptEventMetadata) {
+	s.Metadata = val
+}
+
+// SetPayload sets the value of Payload.
+func (s *ApplicationCreatedEvent) SetPayload(val ApplicationPayload) {
+	s.Payload = val
+}
+
+type ApplicationCreatedEventActorType string
+
+const (
+	ApplicationCreatedEventActorTypeHuman   ApplicationCreatedEventActorType = "human"
+	ApplicationCreatedEventActorTypeService ApplicationCreatedEventActorType = "service"
+	ApplicationCreatedEventActorTypeSystem  ApplicationCreatedEventActorType = "system"
+	ApplicationCreatedEventActorTypeAgent   ApplicationCreatedEventActorType = "agent"
+)
+
+// AllValues returns all ApplicationCreatedEventActorType values.
+func (ApplicationCreatedEventActorType) AllValues() []ApplicationCreatedEventActorType {
+	return []ApplicationCreatedEventActorType{
+		ApplicationCreatedEventActorTypeHuman,
+		ApplicationCreatedEventActorTypeService,
+		ApplicationCreatedEventActorTypeSystem,
+		ApplicationCreatedEventActorTypeAgent,
 	}
-	return m
 }
 
-// Merged schema.
+// MarshalText implements encoding.TextMarshaler.
+func (s ApplicationCreatedEventActorType) MarshalText() ([]byte, error) {
+	switch s {
+	case ApplicationCreatedEventActorTypeHuman:
+		return []byte(s), nil
+	case ApplicationCreatedEventActorTypeService:
+		return []byte(s), nil
+	case ApplicationCreatedEventActorTypeSystem:
+		return []byte(s), nil
+	case ApplicationCreatedEventActorTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ApplicationCreatedEventActorType) UnmarshalText(data []byte) error {
+	switch ApplicationCreatedEventActorType(data) {
+	case ApplicationCreatedEventActorTypeHuman:
+		*s = ApplicationCreatedEventActorTypeHuman
+		return nil
+	case ApplicationCreatedEventActorTypeService:
+		*s = ApplicationCreatedEventActorTypeService
+		return nil
+	case ApplicationCreatedEventActorTypeSystem:
+		*s = ApplicationCreatedEventActorTypeSystem
+		return nil
+	case ApplicationCreatedEventActorTypeAgent:
+		*s = ApplicationCreatedEventActorTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The category of the event.
+type ApplicationCreatedEventCategory string
+
+const (
+	ApplicationCreatedEventCategoryRequest ApplicationCreatedEventCategory = "request"
+	ApplicationCreatedEventCategoryAuth    ApplicationCreatedEventCategory = "auth"
+	ApplicationCreatedEventCategorySession ApplicationCreatedEventCategory = "session"
+	ApplicationCreatedEventCategoryAdmin   ApplicationCreatedEventCategory = "admin"
+	ApplicationCreatedEventCategoryEntity  ApplicationCreatedEventCategory = "entity"
+	ApplicationCreatedEventCategorySignal  ApplicationCreatedEventCategory = "signal"
+)
+
+// AllValues returns all ApplicationCreatedEventCategory values.
+func (ApplicationCreatedEventCategory) AllValues() []ApplicationCreatedEventCategory {
+	return []ApplicationCreatedEventCategory{
+		ApplicationCreatedEventCategoryRequest,
+		ApplicationCreatedEventCategoryAuth,
+		ApplicationCreatedEventCategorySession,
+		ApplicationCreatedEventCategoryAdmin,
+		ApplicationCreatedEventCategoryEntity,
+		ApplicationCreatedEventCategorySignal,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ApplicationCreatedEventCategory) MarshalText() ([]byte, error) {
+	switch s {
+	case ApplicationCreatedEventCategoryRequest:
+		return []byte(s), nil
+	case ApplicationCreatedEventCategoryAuth:
+		return []byte(s), nil
+	case ApplicationCreatedEventCategorySession:
+		return []byte(s), nil
+	case ApplicationCreatedEventCategoryAdmin:
+		return []byte(s), nil
+	case ApplicationCreatedEventCategoryEntity:
+		return []byte(s), nil
+	case ApplicationCreatedEventCategorySignal:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ApplicationCreatedEventCategory) UnmarshalText(data []byte) error {
+	switch ApplicationCreatedEventCategory(data) {
+	case ApplicationCreatedEventCategoryRequest:
+		*s = ApplicationCreatedEventCategoryRequest
+		return nil
+	case ApplicationCreatedEventCategoryAuth:
+		*s = ApplicationCreatedEventCategoryAuth
+		return nil
+	case ApplicationCreatedEventCategorySession:
+		*s = ApplicationCreatedEventCategorySession
+		return nil
+	case ApplicationCreatedEventCategoryAdmin:
+		*s = ApplicationCreatedEventCategoryAdmin
+		return nil
+	case ApplicationCreatedEventCategoryEntity:
+		*s = ApplicationCreatedEventCategoryEntity
+		return nil
+	case ApplicationCreatedEventCategorySignal:
+		*s = ApplicationCreatedEventCategorySignal
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The kind of delegation. Absent when unset.
+type ApplicationCreatedEventDelegationType string
+
+const (
+	ApplicationCreatedEventDelegationTypeDirect    ApplicationCreatedEventDelegationType = "direct"
+	ApplicationCreatedEventDelegationTypeDelegated ApplicationCreatedEventDelegationType = "delegated"
+	ApplicationCreatedEventDelegationTypePatShared ApplicationCreatedEventDelegationType = "pat_shared"
+	ApplicationCreatedEventDelegationTypeExchanged ApplicationCreatedEventDelegationType = "exchanged"
+)
+
+// AllValues returns all ApplicationCreatedEventDelegationType values.
+func (ApplicationCreatedEventDelegationType) AllValues() []ApplicationCreatedEventDelegationType {
+	return []ApplicationCreatedEventDelegationType{
+		ApplicationCreatedEventDelegationTypeDirect,
+		ApplicationCreatedEventDelegationTypeDelegated,
+		ApplicationCreatedEventDelegationTypePatShared,
+		ApplicationCreatedEventDelegationTypeExchanged,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ApplicationCreatedEventDelegationType) MarshalText() ([]byte, error) {
+	switch s {
+	case ApplicationCreatedEventDelegationTypeDirect:
+		return []byte(s), nil
+	case ApplicationCreatedEventDelegationTypeDelegated:
+		return []byte(s), nil
+	case ApplicationCreatedEventDelegationTypePatShared:
+		return []byte(s), nil
+	case ApplicationCreatedEventDelegationTypeExchanged:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ApplicationCreatedEventDelegationType) UnmarshalText(data []byte) error {
+	switch ApplicationCreatedEventDelegationType(data) {
+	case ApplicationCreatedEventDelegationTypeDirect:
+		*s = ApplicationCreatedEventDelegationTypeDirect
+		return nil
+	case ApplicationCreatedEventDelegationTypeDelegated:
+		*s = ApplicationCreatedEventDelegationTypeDelegated
+		return nil
+	case ApplicationCreatedEventDelegationTypePatShared:
+		*s = ApplicationCreatedEventDelegationTypePatShared
+		return nil
+	case ApplicationCreatedEventDelegationTypeExchanged:
+		*s = ApplicationCreatedEventDelegationTypeExchanged
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Payload for `application.created`, which holds every field, and
+// `application.updated`, which holds the new `revision_id`, `name` when it
+// changed, and `client_ids` when the revision added a client. The application
+// ID is the event's `entity_id`. The application document and the client
+// secrets are never included.
 // Ref: #
-type ApplicationInvalid struct {
-	// Merged property.
-	Code string `json:"code"`
-	// Human-readable explanation of the error.
-	Message string `json:"message"`
-	// Additional error-specific context.
-	Details OptApplicationInvalidDetails `json:"details"`
+type ApplicationPayload struct {
+	Slug OptString `json:"slug"`
+	Name OptString `json:"name"`
+	// The `client_id` of each client the write created. Each of them got a new
+	// secret.
+	ClientIds []string `json:"client_ids"`
+	// The revision the write appended.
+	RevisionID string `json:"revision_id"`
 }
 
-// GetCode returns the value of Code.
-func (s *ApplicationInvalid) GetCode() string {
-	return s.Code
+// GetSlug returns the value of Slug.
+func (s *ApplicationPayload) GetSlug() OptString {
+	return s.Slug
 }
 
-// GetMessage returns the value of Message.
-func (s *ApplicationInvalid) GetMessage() string {
-	return s.Message
+// GetName returns the value of Name.
+func (s *ApplicationPayload) GetName() OptString {
+	return s.Name
 }
 
-// GetDetails returns the value of Details.
-func (s *ApplicationInvalid) GetDetails() OptApplicationInvalidDetails {
-	return s.Details
+// GetClientIds returns the value of ClientIds.
+func (s *ApplicationPayload) GetClientIds() []string {
+	return s.ClientIds
 }
 
-// SetCode sets the value of Code.
-func (s *ApplicationInvalid) SetCode(val string) {
-	s.Code = val
+// GetRevisionID returns the value of RevisionID.
+func (s *ApplicationPayload) GetRevisionID() string {
+	return s.RevisionID
 }
 
-// SetMessage sets the value of Message.
-func (s *ApplicationInvalid) SetMessage(val string) {
-	s.Message = val
+// SetSlug sets the value of Slug.
+func (s *ApplicationPayload) SetSlug(val OptString) {
+	s.Slug = val
 }
 
-// SetDetails sets the value of Details.
-func (s *ApplicationInvalid) SetDetails(val OptApplicationInvalidDetails) {
-	s.Details = val
+// SetName sets the value of Name.
+func (s *ApplicationPayload) SetName(val OptString) {
+	s.Name = val
 }
 
-// Additional error-specific context.
-type ApplicationInvalidDetails map[string]jx.Raw
-
-func (s *ApplicationInvalidDetails) init() ApplicationInvalidDetails {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
+// SetClientIds sets the value of ClientIds.
+func (s *ApplicationPayload) SetClientIds(val []string) {
+	s.ClientIds = val
 }
 
-// Merged schema.
-// Ref: #
-type ApplicationNotFound struct {
-	// Merged property.
-	Code string `json:"code"`
-	// Human-readable explanation of the error.
-	Message string `json:"message"`
-	// Additional error-specific context.
-	Details OptApplicationNotFoundDetails `json:"details"`
-}
-
-// GetCode returns the value of Code.
-func (s *ApplicationNotFound) GetCode() string {
-	return s.Code
-}
-
-// GetMessage returns the value of Message.
-func (s *ApplicationNotFound) GetMessage() string {
-	return s.Message
-}
-
-// GetDetails returns the value of Details.
-func (s *ApplicationNotFound) GetDetails() OptApplicationNotFoundDetails {
-	return s.Details
-}
-
-// SetCode sets the value of Code.
-func (s *ApplicationNotFound) SetCode(val string) {
-	s.Code = val
-}
-
-// SetMessage sets the value of Message.
-func (s *ApplicationNotFound) SetMessage(val string) {
-	s.Message = val
-}
-
-// SetDetails sets the value of Details.
-func (s *ApplicationNotFound) SetDetails(val OptApplicationNotFoundDetails) {
-	s.Details = val
-}
-
-// Additional error-specific context.
-type ApplicationNotFoundDetails map[string]jx.Raw
-
-func (s *ApplicationNotFoundDetails) init() ApplicationNotFoundDetails {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
-}
-
-// Merged schema.
-// Ref: #
-type ApplicationPermissionDenied struct {
-	// Merged property.
-	Code string `json:"code"`
-	// Human-readable explanation of the error.
-	Message string `json:"message"`
-	// Additional error-specific context.
-	Details OptApplicationPermissionDeniedDetails `json:"details"`
-}
-
-// GetCode returns the value of Code.
-func (s *ApplicationPermissionDenied) GetCode() string {
-	return s.Code
-}
-
-// GetMessage returns the value of Message.
-func (s *ApplicationPermissionDenied) GetMessage() string {
-	return s.Message
-}
-
-// GetDetails returns the value of Details.
-func (s *ApplicationPermissionDenied) GetDetails() OptApplicationPermissionDeniedDetails {
-	return s.Details
-}
-
-// SetCode sets the value of Code.
-func (s *ApplicationPermissionDenied) SetCode(val string) {
-	s.Code = val
-}
-
-// SetMessage sets the value of Message.
-func (s *ApplicationPermissionDenied) SetMessage(val string) {
-	s.Message = val
-}
-
-// SetDetails sets the value of Details.
-func (s *ApplicationPermissionDenied) SetDetails(val OptApplicationPermissionDeniedDetails) {
-	s.Details = val
-}
-
-// Additional error-specific context.
-type ApplicationPermissionDeniedDetails map[string]jx.Raw
-
-func (s *ApplicationPermissionDeniedDetails) init() ApplicationPermissionDeniedDetails {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
+// SetRevisionID sets the value of RevisionID.
+func (s *ApplicationPayload) SetRevisionID(val string) {
+	s.RevisionID = val
 }
 
 // An application at its newest revision, with its document as `definition`.
@@ -1597,55 +2153,449 @@ func (*ApplicationResponse) getApplicationByIdRes() {}
 
 // Merged schema.
 // Ref: #
-type ApplicationRevisionConflict struct {
+type ApplicationUpdatedEvent struct {
+	// The event ID, in the form `evt_<opaque>`.
+	ID        string    `json:"id"`
+	ProjectID ProjectID `json:"project_id"`
+	// The team the actor operated under when the event was emitted, if any.
+	TeamID OptNilString `json:"team_id"`
 	// Merged property.
-	Code string `json:"code"`
-	// Human-readable explanation of the error.
-	Message string `json:"message"`
-	// Additional error-specific context.
-	Details OptApplicationRevisionConflictDetails `json:"details"`
+	EventType string `json:"event_type"`
+	// The category of the event.
+	Category ApplicationUpdatedEventCategory `json:"category"`
+	// When the action happened, on the server's clock.
+	OccurredAt time.Time `json:"occurred_at"`
+	// When the event was stored, on the server's clock.
+	CreatedAt time.Time `json:"created_at"`
+	// The ID of the actor that triggered the event.
+	ActorID OptNilString `json:"actor_id"`
+	// The kind of actor that triggered the event.
+	ActorType OptNilApplicationUpdatedEventActorType `json:"actor_type"`
+	// The type of resource the event affected.
+	EntityType OptNilString `json:"entity_type"`
+	// The ID of the resource the event affected.
+	EntityID OptNilString `json:"entity_id"`
+	// The application or agent that produced the event.
+	ClientID string `json:"client_id"`
+	// The ID of the token in use when the event was emitted, when there was one.
+	TokenID OptString `json:"token_id"`
+	// The kind of delegation. Absent when unset.
+	DelegationType OptApplicationUpdatedEventDelegationType `json:"delegation_type"`
+	DelegationID   OptString                                `json:"delegation_id"`
+	Grantor        OptString                                `json:"grantor"`
+	// A device fingerprint ID that correlates events from the same device.
+	Fingerprint OptString `json:"fingerprint"`
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
+	RequestID OptNilString `json:"request_id"`
+	// The ID of the session the event belongs to.
+	SessionID OptNilString `json:"session_id"`
+	// An ID that correlates the events of one login flow.
+	FlowID   OptNilString       `json:"flow_id"`
+	Metadata OptEventMetadata   `json:"metadata"`
+	Payload  ApplicationPayload `json:"payload"`
 }
 
-// GetCode returns the value of Code.
-func (s *ApplicationRevisionConflict) GetCode() string {
-	return s.Code
+// GetID returns the value of ID.
+func (s *ApplicationUpdatedEvent) GetID() string {
+	return s.ID
 }
 
-// GetMessage returns the value of Message.
-func (s *ApplicationRevisionConflict) GetMessage() string {
-	return s.Message
+// GetProjectID returns the value of ProjectID.
+func (s *ApplicationUpdatedEvent) GetProjectID() ProjectID {
+	return s.ProjectID
 }
 
-// GetDetails returns the value of Details.
-func (s *ApplicationRevisionConflict) GetDetails() OptApplicationRevisionConflictDetails {
-	return s.Details
+// GetTeamID returns the value of TeamID.
+func (s *ApplicationUpdatedEvent) GetTeamID() OptNilString {
+	return s.TeamID
 }
 
-// SetCode sets the value of Code.
-func (s *ApplicationRevisionConflict) SetCode(val string) {
-	s.Code = val
+// GetEventType returns the value of EventType.
+func (s *ApplicationUpdatedEvent) GetEventType() string {
+	return s.EventType
 }
 
-// SetMessage sets the value of Message.
-func (s *ApplicationRevisionConflict) SetMessage(val string) {
-	s.Message = val
+// GetCategory returns the value of Category.
+func (s *ApplicationUpdatedEvent) GetCategory() ApplicationUpdatedEventCategory {
+	return s.Category
 }
 
-// SetDetails sets the value of Details.
-func (s *ApplicationRevisionConflict) SetDetails(val OptApplicationRevisionConflictDetails) {
-	s.Details = val
+// GetOccurredAt returns the value of OccurredAt.
+func (s *ApplicationUpdatedEvent) GetOccurredAt() time.Time {
+	return s.OccurredAt
 }
 
-// Additional error-specific context.
-type ApplicationRevisionConflictDetails map[string]jx.Raw
+// GetCreatedAt returns the value of CreatedAt.
+func (s *ApplicationUpdatedEvent) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
 
-func (s *ApplicationRevisionConflictDetails) init() ApplicationRevisionConflictDetails {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
+// GetActorID returns the value of ActorID.
+func (s *ApplicationUpdatedEvent) GetActorID() OptNilString {
+	return s.ActorID
+}
+
+// GetActorType returns the value of ActorType.
+func (s *ApplicationUpdatedEvent) GetActorType() OptNilApplicationUpdatedEventActorType {
+	return s.ActorType
+}
+
+// GetEntityType returns the value of EntityType.
+func (s *ApplicationUpdatedEvent) GetEntityType() OptNilString {
+	return s.EntityType
+}
+
+// GetEntityID returns the value of EntityID.
+func (s *ApplicationUpdatedEvent) GetEntityID() OptNilString {
+	return s.EntityID
+}
+
+// GetClientID returns the value of ClientID.
+func (s *ApplicationUpdatedEvent) GetClientID() string {
+	return s.ClientID
+}
+
+// GetTokenID returns the value of TokenID.
+func (s *ApplicationUpdatedEvent) GetTokenID() OptString {
+	return s.TokenID
+}
+
+// GetDelegationType returns the value of DelegationType.
+func (s *ApplicationUpdatedEvent) GetDelegationType() OptApplicationUpdatedEventDelegationType {
+	return s.DelegationType
+}
+
+// GetDelegationID returns the value of DelegationID.
+func (s *ApplicationUpdatedEvent) GetDelegationID() OptString {
+	return s.DelegationID
+}
+
+// GetGrantor returns the value of Grantor.
+func (s *ApplicationUpdatedEvent) GetGrantor() OptString {
+	return s.Grantor
+}
+
+// GetFingerprint returns the value of Fingerprint.
+func (s *ApplicationUpdatedEvent) GetFingerprint() OptString {
+	return s.Fingerprint
+}
+
+// GetRequestID returns the value of RequestID.
+func (s *ApplicationUpdatedEvent) GetRequestID() OptNilString {
+	return s.RequestID
+}
+
+// GetSessionID returns the value of SessionID.
+func (s *ApplicationUpdatedEvent) GetSessionID() OptNilString {
+	return s.SessionID
+}
+
+// GetFlowID returns the value of FlowID.
+func (s *ApplicationUpdatedEvent) GetFlowID() OptNilString {
+	return s.FlowID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *ApplicationUpdatedEvent) GetMetadata() OptEventMetadata {
+	return s.Metadata
+}
+
+// GetPayload returns the value of Payload.
+func (s *ApplicationUpdatedEvent) GetPayload() ApplicationPayload {
+	return s.Payload
+}
+
+// SetID sets the value of ID.
+func (s *ApplicationUpdatedEvent) SetID(val string) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *ApplicationUpdatedEvent) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *ApplicationUpdatedEvent) SetTeamID(val OptNilString) {
+	s.TeamID = val
+}
+
+// SetEventType sets the value of EventType.
+func (s *ApplicationUpdatedEvent) SetEventType(val string) {
+	s.EventType = val
+}
+
+// SetCategory sets the value of Category.
+func (s *ApplicationUpdatedEvent) SetCategory(val ApplicationUpdatedEventCategory) {
+	s.Category = val
+}
+
+// SetOccurredAt sets the value of OccurredAt.
+func (s *ApplicationUpdatedEvent) SetOccurredAt(val time.Time) {
+	s.OccurredAt = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *ApplicationUpdatedEvent) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetActorID sets the value of ActorID.
+func (s *ApplicationUpdatedEvent) SetActorID(val OptNilString) {
+	s.ActorID = val
+}
+
+// SetActorType sets the value of ActorType.
+func (s *ApplicationUpdatedEvent) SetActorType(val OptNilApplicationUpdatedEventActorType) {
+	s.ActorType = val
+}
+
+// SetEntityType sets the value of EntityType.
+func (s *ApplicationUpdatedEvent) SetEntityType(val OptNilString) {
+	s.EntityType = val
+}
+
+// SetEntityID sets the value of EntityID.
+func (s *ApplicationUpdatedEvent) SetEntityID(val OptNilString) {
+	s.EntityID = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *ApplicationUpdatedEvent) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetTokenID sets the value of TokenID.
+func (s *ApplicationUpdatedEvent) SetTokenID(val OptString) {
+	s.TokenID = val
+}
+
+// SetDelegationType sets the value of DelegationType.
+func (s *ApplicationUpdatedEvent) SetDelegationType(val OptApplicationUpdatedEventDelegationType) {
+	s.DelegationType = val
+}
+
+// SetDelegationID sets the value of DelegationID.
+func (s *ApplicationUpdatedEvent) SetDelegationID(val OptString) {
+	s.DelegationID = val
+}
+
+// SetGrantor sets the value of Grantor.
+func (s *ApplicationUpdatedEvent) SetGrantor(val OptString) {
+	s.Grantor = val
+}
+
+// SetFingerprint sets the value of Fingerprint.
+func (s *ApplicationUpdatedEvent) SetFingerprint(val OptString) {
+	s.Fingerprint = val
+}
+
+// SetRequestID sets the value of RequestID.
+func (s *ApplicationUpdatedEvent) SetRequestID(val OptNilString) {
+	s.RequestID = val
+}
+
+// SetSessionID sets the value of SessionID.
+func (s *ApplicationUpdatedEvent) SetSessionID(val OptNilString) {
+	s.SessionID = val
+}
+
+// SetFlowID sets the value of FlowID.
+func (s *ApplicationUpdatedEvent) SetFlowID(val OptNilString) {
+	s.FlowID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *ApplicationUpdatedEvent) SetMetadata(val OptEventMetadata) {
+	s.Metadata = val
+}
+
+// SetPayload sets the value of Payload.
+func (s *ApplicationUpdatedEvent) SetPayload(val ApplicationPayload) {
+	s.Payload = val
+}
+
+type ApplicationUpdatedEventActorType string
+
+const (
+	ApplicationUpdatedEventActorTypeHuman   ApplicationUpdatedEventActorType = "human"
+	ApplicationUpdatedEventActorTypeService ApplicationUpdatedEventActorType = "service"
+	ApplicationUpdatedEventActorTypeSystem  ApplicationUpdatedEventActorType = "system"
+	ApplicationUpdatedEventActorTypeAgent   ApplicationUpdatedEventActorType = "agent"
+)
+
+// AllValues returns all ApplicationUpdatedEventActorType values.
+func (ApplicationUpdatedEventActorType) AllValues() []ApplicationUpdatedEventActorType {
+	return []ApplicationUpdatedEventActorType{
+		ApplicationUpdatedEventActorTypeHuman,
+		ApplicationUpdatedEventActorTypeService,
+		ApplicationUpdatedEventActorTypeSystem,
+		ApplicationUpdatedEventActorTypeAgent,
 	}
-	return m
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ApplicationUpdatedEventActorType) MarshalText() ([]byte, error) {
+	switch s {
+	case ApplicationUpdatedEventActorTypeHuman:
+		return []byte(s), nil
+	case ApplicationUpdatedEventActorTypeService:
+		return []byte(s), nil
+	case ApplicationUpdatedEventActorTypeSystem:
+		return []byte(s), nil
+	case ApplicationUpdatedEventActorTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ApplicationUpdatedEventActorType) UnmarshalText(data []byte) error {
+	switch ApplicationUpdatedEventActorType(data) {
+	case ApplicationUpdatedEventActorTypeHuman:
+		*s = ApplicationUpdatedEventActorTypeHuman
+		return nil
+	case ApplicationUpdatedEventActorTypeService:
+		*s = ApplicationUpdatedEventActorTypeService
+		return nil
+	case ApplicationUpdatedEventActorTypeSystem:
+		*s = ApplicationUpdatedEventActorTypeSystem
+		return nil
+	case ApplicationUpdatedEventActorTypeAgent:
+		*s = ApplicationUpdatedEventActorTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The category of the event.
+type ApplicationUpdatedEventCategory string
+
+const (
+	ApplicationUpdatedEventCategoryRequest ApplicationUpdatedEventCategory = "request"
+	ApplicationUpdatedEventCategoryAuth    ApplicationUpdatedEventCategory = "auth"
+	ApplicationUpdatedEventCategorySession ApplicationUpdatedEventCategory = "session"
+	ApplicationUpdatedEventCategoryAdmin   ApplicationUpdatedEventCategory = "admin"
+	ApplicationUpdatedEventCategoryEntity  ApplicationUpdatedEventCategory = "entity"
+	ApplicationUpdatedEventCategorySignal  ApplicationUpdatedEventCategory = "signal"
+)
+
+// AllValues returns all ApplicationUpdatedEventCategory values.
+func (ApplicationUpdatedEventCategory) AllValues() []ApplicationUpdatedEventCategory {
+	return []ApplicationUpdatedEventCategory{
+		ApplicationUpdatedEventCategoryRequest,
+		ApplicationUpdatedEventCategoryAuth,
+		ApplicationUpdatedEventCategorySession,
+		ApplicationUpdatedEventCategoryAdmin,
+		ApplicationUpdatedEventCategoryEntity,
+		ApplicationUpdatedEventCategorySignal,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ApplicationUpdatedEventCategory) MarshalText() ([]byte, error) {
+	switch s {
+	case ApplicationUpdatedEventCategoryRequest:
+		return []byte(s), nil
+	case ApplicationUpdatedEventCategoryAuth:
+		return []byte(s), nil
+	case ApplicationUpdatedEventCategorySession:
+		return []byte(s), nil
+	case ApplicationUpdatedEventCategoryAdmin:
+		return []byte(s), nil
+	case ApplicationUpdatedEventCategoryEntity:
+		return []byte(s), nil
+	case ApplicationUpdatedEventCategorySignal:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ApplicationUpdatedEventCategory) UnmarshalText(data []byte) error {
+	switch ApplicationUpdatedEventCategory(data) {
+	case ApplicationUpdatedEventCategoryRequest:
+		*s = ApplicationUpdatedEventCategoryRequest
+		return nil
+	case ApplicationUpdatedEventCategoryAuth:
+		*s = ApplicationUpdatedEventCategoryAuth
+		return nil
+	case ApplicationUpdatedEventCategorySession:
+		*s = ApplicationUpdatedEventCategorySession
+		return nil
+	case ApplicationUpdatedEventCategoryAdmin:
+		*s = ApplicationUpdatedEventCategoryAdmin
+		return nil
+	case ApplicationUpdatedEventCategoryEntity:
+		*s = ApplicationUpdatedEventCategoryEntity
+		return nil
+	case ApplicationUpdatedEventCategorySignal:
+		*s = ApplicationUpdatedEventCategorySignal
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The kind of delegation. Absent when unset.
+type ApplicationUpdatedEventDelegationType string
+
+const (
+	ApplicationUpdatedEventDelegationTypeDirect    ApplicationUpdatedEventDelegationType = "direct"
+	ApplicationUpdatedEventDelegationTypeDelegated ApplicationUpdatedEventDelegationType = "delegated"
+	ApplicationUpdatedEventDelegationTypePatShared ApplicationUpdatedEventDelegationType = "pat_shared"
+	ApplicationUpdatedEventDelegationTypeExchanged ApplicationUpdatedEventDelegationType = "exchanged"
+)
+
+// AllValues returns all ApplicationUpdatedEventDelegationType values.
+func (ApplicationUpdatedEventDelegationType) AllValues() []ApplicationUpdatedEventDelegationType {
+	return []ApplicationUpdatedEventDelegationType{
+		ApplicationUpdatedEventDelegationTypeDirect,
+		ApplicationUpdatedEventDelegationTypeDelegated,
+		ApplicationUpdatedEventDelegationTypePatShared,
+		ApplicationUpdatedEventDelegationTypeExchanged,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ApplicationUpdatedEventDelegationType) MarshalText() ([]byte, error) {
+	switch s {
+	case ApplicationUpdatedEventDelegationTypeDirect:
+		return []byte(s), nil
+	case ApplicationUpdatedEventDelegationTypeDelegated:
+		return []byte(s), nil
+	case ApplicationUpdatedEventDelegationTypePatShared:
+		return []byte(s), nil
+	case ApplicationUpdatedEventDelegationTypeExchanged:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ApplicationUpdatedEventDelegationType) UnmarshalText(data []byte) error {
+	switch ApplicationUpdatedEventDelegationType(data) {
+	case ApplicationUpdatedEventDelegationTypeDirect:
+		*s = ApplicationUpdatedEventDelegationTypeDirect
+		return nil
+	case ApplicationUpdatedEventDelegationTypeDelegated:
+		*s = ApplicationUpdatedEventDelegationTypeDelegated
+		return nil
+	case ApplicationUpdatedEventDelegationTypePatShared:
+		*s = ApplicationUpdatedEventDelegationTypePatShared
+		return nil
+	case ApplicationUpdatedEventDelegationTypeExchanged:
+		*s = ApplicationUpdatedEventDelegationTypeExchanged
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
 }
 
 // Merged schema.
@@ -13509,19 +14459,19 @@ func (*CreateApplicationCreated) createApplicationRes() {}
 
 // CreateApplicationErrorResponse represents sum type.
 type CreateApplicationErrorResponse struct {
-	Type                        CreateApplicationErrorResponseType // switch on this field
-	ApplicationClientIDTaken    ApplicationClientIDTaken
-	ApplicationFieldImmutable   ApplicationFieldImmutable
-	ApplicationInvalid          ApplicationInvalid
-	ApplicationNotFound         ApplicationNotFound
-	ApplicationPermissionDenied ApplicationPermissionDenied
-	ApplicationRevisionConflict ApplicationRevisionConflict
-	AuthUnauthorized            AuthUnauthorized
-	EvtInvalid                  EvtInvalid
-	Internal                    Internal
-	NotImplemented              NotImplemented
-	ReqInvalid                  ReqInvalid
-	Unavailable                 Unavailable
+	Type                CreateApplicationErrorResponseType // switch on this field
+	AppClientIDTaken    AppClientIDTaken
+	AppFieldImmutable   AppFieldImmutable
+	AppInvalid          AppInvalid
+	AppNotFound         AppNotFound
+	AppPermissionDenied AppPermissionDenied
+	AppRevisionConflict AppRevisionConflict
+	AuthUnauthorized    AuthUnauthorized
+	EvtInvalid          EvtInvalid
+	Internal            Internal
+	NotImplemented      NotImplemented
+	ReqInvalid          ReqInvalid
+	Unavailable         Unavailable
 }
 
 // CreateApplicationErrorResponseType is oneOf type of CreateApplicationErrorResponse.
@@ -13529,48 +14479,48 @@ type CreateApplicationErrorResponseType string
 
 // Possible values for CreateApplicationErrorResponseType.
 const (
-	ApplicationClientIDTakenCreateApplicationErrorResponse    CreateApplicationErrorResponseType = "application.client_id_taken"
-	ApplicationFieldImmutableCreateApplicationErrorResponse   CreateApplicationErrorResponseType = "application.field_immutable"
-	ApplicationInvalidCreateApplicationErrorResponse          CreateApplicationErrorResponseType = "application.invalid"
-	ApplicationNotFoundCreateApplicationErrorResponse         CreateApplicationErrorResponseType = "application.not_found"
-	ApplicationPermissionDeniedCreateApplicationErrorResponse CreateApplicationErrorResponseType = "application.permission_denied"
-	ApplicationRevisionConflictCreateApplicationErrorResponse CreateApplicationErrorResponseType = "application.revision_conflict"
-	AuthUnauthorizedCreateApplicationErrorResponse            CreateApplicationErrorResponseType = "auth.unauthorized"
-	EvtInvalidCreateApplicationErrorResponse                  CreateApplicationErrorResponseType = "evt.invalid"
-	InternalCreateApplicationErrorResponse                    CreateApplicationErrorResponseType = "internal"
-	NotImplementedCreateApplicationErrorResponse              CreateApplicationErrorResponseType = "not_implemented"
-	ReqInvalidCreateApplicationErrorResponse                  CreateApplicationErrorResponseType = "req.invalid"
-	UnavailableCreateApplicationErrorResponse                 CreateApplicationErrorResponseType = "unavailable"
+	AppClientIDTakenCreateApplicationErrorResponse    CreateApplicationErrorResponseType = "app.client_id_taken"
+	AppFieldImmutableCreateApplicationErrorResponse   CreateApplicationErrorResponseType = "app.field_immutable"
+	AppInvalidCreateApplicationErrorResponse          CreateApplicationErrorResponseType = "app.invalid"
+	AppNotFoundCreateApplicationErrorResponse         CreateApplicationErrorResponseType = "app.not_found"
+	AppPermissionDeniedCreateApplicationErrorResponse CreateApplicationErrorResponseType = "app.permission_denied"
+	AppRevisionConflictCreateApplicationErrorResponse CreateApplicationErrorResponseType = "app.revision_conflict"
+	AuthUnauthorizedCreateApplicationErrorResponse    CreateApplicationErrorResponseType = "auth.unauthorized"
+	EvtInvalidCreateApplicationErrorResponse          CreateApplicationErrorResponseType = "evt.invalid"
+	InternalCreateApplicationErrorResponse            CreateApplicationErrorResponseType = "internal"
+	NotImplementedCreateApplicationErrorResponse      CreateApplicationErrorResponseType = "not_implemented"
+	ReqInvalidCreateApplicationErrorResponse          CreateApplicationErrorResponseType = "req.invalid"
+	UnavailableCreateApplicationErrorResponse         CreateApplicationErrorResponseType = "unavailable"
 )
 
-// IsApplicationClientIDTaken reports whether CreateApplicationErrorResponse is ApplicationClientIDTaken.
-func (s CreateApplicationErrorResponse) IsApplicationClientIDTaken() bool {
-	return s.Type == ApplicationClientIDTakenCreateApplicationErrorResponse
+// IsAppClientIDTaken reports whether CreateApplicationErrorResponse is AppClientIDTaken.
+func (s CreateApplicationErrorResponse) IsAppClientIDTaken() bool {
+	return s.Type == AppClientIDTakenCreateApplicationErrorResponse
 }
 
-// IsApplicationFieldImmutable reports whether CreateApplicationErrorResponse is ApplicationFieldImmutable.
-func (s CreateApplicationErrorResponse) IsApplicationFieldImmutable() bool {
-	return s.Type == ApplicationFieldImmutableCreateApplicationErrorResponse
+// IsAppFieldImmutable reports whether CreateApplicationErrorResponse is AppFieldImmutable.
+func (s CreateApplicationErrorResponse) IsAppFieldImmutable() bool {
+	return s.Type == AppFieldImmutableCreateApplicationErrorResponse
 }
 
-// IsApplicationInvalid reports whether CreateApplicationErrorResponse is ApplicationInvalid.
-func (s CreateApplicationErrorResponse) IsApplicationInvalid() bool {
-	return s.Type == ApplicationInvalidCreateApplicationErrorResponse
+// IsAppInvalid reports whether CreateApplicationErrorResponse is AppInvalid.
+func (s CreateApplicationErrorResponse) IsAppInvalid() bool {
+	return s.Type == AppInvalidCreateApplicationErrorResponse
 }
 
-// IsApplicationNotFound reports whether CreateApplicationErrorResponse is ApplicationNotFound.
-func (s CreateApplicationErrorResponse) IsApplicationNotFound() bool {
-	return s.Type == ApplicationNotFoundCreateApplicationErrorResponse
+// IsAppNotFound reports whether CreateApplicationErrorResponse is AppNotFound.
+func (s CreateApplicationErrorResponse) IsAppNotFound() bool {
+	return s.Type == AppNotFoundCreateApplicationErrorResponse
 }
 
-// IsApplicationPermissionDenied reports whether CreateApplicationErrorResponse is ApplicationPermissionDenied.
-func (s CreateApplicationErrorResponse) IsApplicationPermissionDenied() bool {
-	return s.Type == ApplicationPermissionDeniedCreateApplicationErrorResponse
+// IsAppPermissionDenied reports whether CreateApplicationErrorResponse is AppPermissionDenied.
+func (s CreateApplicationErrorResponse) IsAppPermissionDenied() bool {
+	return s.Type == AppPermissionDeniedCreateApplicationErrorResponse
 }
 
-// IsApplicationRevisionConflict reports whether CreateApplicationErrorResponse is ApplicationRevisionConflict.
-func (s CreateApplicationErrorResponse) IsApplicationRevisionConflict() bool {
-	return s.Type == ApplicationRevisionConflictCreateApplicationErrorResponse
+// IsAppRevisionConflict reports whether CreateApplicationErrorResponse is AppRevisionConflict.
+func (s CreateApplicationErrorResponse) IsAppRevisionConflict() bool {
+	return s.Type == AppRevisionConflictCreateApplicationErrorResponse
 }
 
 // IsAuthUnauthorized reports whether CreateApplicationErrorResponse is AuthUnauthorized.
@@ -13603,129 +14553,129 @@ func (s CreateApplicationErrorResponse) IsUnavailable() bool {
 	return s.Type == UnavailableCreateApplicationErrorResponse
 }
 
-// SetApplicationClientIDTaken sets CreateApplicationErrorResponse to ApplicationClientIDTaken.
-func (s *CreateApplicationErrorResponse) SetApplicationClientIDTaken(v ApplicationClientIDTaken) {
-	s.Type = ApplicationClientIDTakenCreateApplicationErrorResponse
-	s.ApplicationClientIDTaken = v
+// SetAppClientIDTaken sets CreateApplicationErrorResponse to AppClientIDTaken.
+func (s *CreateApplicationErrorResponse) SetAppClientIDTaken(v AppClientIDTaken) {
+	s.Type = AppClientIDTakenCreateApplicationErrorResponse
+	s.AppClientIDTaken = v
 }
 
-// GetApplicationClientIDTaken returns ApplicationClientIDTaken and true boolean if CreateApplicationErrorResponse is ApplicationClientIDTaken.
-func (s CreateApplicationErrorResponse) GetApplicationClientIDTaken() (v ApplicationClientIDTaken, ok bool) {
-	if !s.IsApplicationClientIDTaken() {
+// GetAppClientIDTaken returns AppClientIDTaken and true boolean if CreateApplicationErrorResponse is AppClientIDTaken.
+func (s CreateApplicationErrorResponse) GetAppClientIDTaken() (v AppClientIDTaken, ok bool) {
+	if !s.IsAppClientIDTaken() {
 		return v, false
 	}
-	return s.ApplicationClientIDTaken, true
+	return s.AppClientIDTaken, true
 }
 
-// NewApplicationClientIDTakenCreateApplicationErrorResponse returns new CreateApplicationErrorResponse from ApplicationClientIDTaken.
-func NewApplicationClientIDTakenCreateApplicationErrorResponse(v ApplicationClientIDTaken) CreateApplicationErrorResponse {
+// NewAppClientIDTakenCreateApplicationErrorResponse returns new CreateApplicationErrorResponse from AppClientIDTaken.
+func NewAppClientIDTakenCreateApplicationErrorResponse(v AppClientIDTaken) CreateApplicationErrorResponse {
 	var s CreateApplicationErrorResponse
-	s.SetApplicationClientIDTaken(v)
+	s.SetAppClientIDTaken(v)
 	return s
 }
 
-// SetApplicationFieldImmutable sets CreateApplicationErrorResponse to ApplicationFieldImmutable.
-func (s *CreateApplicationErrorResponse) SetApplicationFieldImmutable(v ApplicationFieldImmutable) {
-	s.Type = ApplicationFieldImmutableCreateApplicationErrorResponse
-	s.ApplicationFieldImmutable = v
+// SetAppFieldImmutable sets CreateApplicationErrorResponse to AppFieldImmutable.
+func (s *CreateApplicationErrorResponse) SetAppFieldImmutable(v AppFieldImmutable) {
+	s.Type = AppFieldImmutableCreateApplicationErrorResponse
+	s.AppFieldImmutable = v
 }
 
-// GetApplicationFieldImmutable returns ApplicationFieldImmutable and true boolean if CreateApplicationErrorResponse is ApplicationFieldImmutable.
-func (s CreateApplicationErrorResponse) GetApplicationFieldImmutable() (v ApplicationFieldImmutable, ok bool) {
-	if !s.IsApplicationFieldImmutable() {
+// GetAppFieldImmutable returns AppFieldImmutable and true boolean if CreateApplicationErrorResponse is AppFieldImmutable.
+func (s CreateApplicationErrorResponse) GetAppFieldImmutable() (v AppFieldImmutable, ok bool) {
+	if !s.IsAppFieldImmutable() {
 		return v, false
 	}
-	return s.ApplicationFieldImmutable, true
+	return s.AppFieldImmutable, true
 }
 
-// NewApplicationFieldImmutableCreateApplicationErrorResponse returns new CreateApplicationErrorResponse from ApplicationFieldImmutable.
-func NewApplicationFieldImmutableCreateApplicationErrorResponse(v ApplicationFieldImmutable) CreateApplicationErrorResponse {
+// NewAppFieldImmutableCreateApplicationErrorResponse returns new CreateApplicationErrorResponse from AppFieldImmutable.
+func NewAppFieldImmutableCreateApplicationErrorResponse(v AppFieldImmutable) CreateApplicationErrorResponse {
 	var s CreateApplicationErrorResponse
-	s.SetApplicationFieldImmutable(v)
+	s.SetAppFieldImmutable(v)
 	return s
 }
 
-// SetApplicationInvalid sets CreateApplicationErrorResponse to ApplicationInvalid.
-func (s *CreateApplicationErrorResponse) SetApplicationInvalid(v ApplicationInvalid) {
-	s.Type = ApplicationInvalidCreateApplicationErrorResponse
-	s.ApplicationInvalid = v
+// SetAppInvalid sets CreateApplicationErrorResponse to AppInvalid.
+func (s *CreateApplicationErrorResponse) SetAppInvalid(v AppInvalid) {
+	s.Type = AppInvalidCreateApplicationErrorResponse
+	s.AppInvalid = v
 }
 
-// GetApplicationInvalid returns ApplicationInvalid and true boolean if CreateApplicationErrorResponse is ApplicationInvalid.
-func (s CreateApplicationErrorResponse) GetApplicationInvalid() (v ApplicationInvalid, ok bool) {
-	if !s.IsApplicationInvalid() {
+// GetAppInvalid returns AppInvalid and true boolean if CreateApplicationErrorResponse is AppInvalid.
+func (s CreateApplicationErrorResponse) GetAppInvalid() (v AppInvalid, ok bool) {
+	if !s.IsAppInvalid() {
 		return v, false
 	}
-	return s.ApplicationInvalid, true
+	return s.AppInvalid, true
 }
 
-// NewApplicationInvalidCreateApplicationErrorResponse returns new CreateApplicationErrorResponse from ApplicationInvalid.
-func NewApplicationInvalidCreateApplicationErrorResponse(v ApplicationInvalid) CreateApplicationErrorResponse {
+// NewAppInvalidCreateApplicationErrorResponse returns new CreateApplicationErrorResponse from AppInvalid.
+func NewAppInvalidCreateApplicationErrorResponse(v AppInvalid) CreateApplicationErrorResponse {
 	var s CreateApplicationErrorResponse
-	s.SetApplicationInvalid(v)
+	s.SetAppInvalid(v)
 	return s
 }
 
-// SetApplicationNotFound sets CreateApplicationErrorResponse to ApplicationNotFound.
-func (s *CreateApplicationErrorResponse) SetApplicationNotFound(v ApplicationNotFound) {
-	s.Type = ApplicationNotFoundCreateApplicationErrorResponse
-	s.ApplicationNotFound = v
+// SetAppNotFound sets CreateApplicationErrorResponse to AppNotFound.
+func (s *CreateApplicationErrorResponse) SetAppNotFound(v AppNotFound) {
+	s.Type = AppNotFoundCreateApplicationErrorResponse
+	s.AppNotFound = v
 }
 
-// GetApplicationNotFound returns ApplicationNotFound and true boolean if CreateApplicationErrorResponse is ApplicationNotFound.
-func (s CreateApplicationErrorResponse) GetApplicationNotFound() (v ApplicationNotFound, ok bool) {
-	if !s.IsApplicationNotFound() {
+// GetAppNotFound returns AppNotFound and true boolean if CreateApplicationErrorResponse is AppNotFound.
+func (s CreateApplicationErrorResponse) GetAppNotFound() (v AppNotFound, ok bool) {
+	if !s.IsAppNotFound() {
 		return v, false
 	}
-	return s.ApplicationNotFound, true
+	return s.AppNotFound, true
 }
 
-// NewApplicationNotFoundCreateApplicationErrorResponse returns new CreateApplicationErrorResponse from ApplicationNotFound.
-func NewApplicationNotFoundCreateApplicationErrorResponse(v ApplicationNotFound) CreateApplicationErrorResponse {
+// NewAppNotFoundCreateApplicationErrorResponse returns new CreateApplicationErrorResponse from AppNotFound.
+func NewAppNotFoundCreateApplicationErrorResponse(v AppNotFound) CreateApplicationErrorResponse {
 	var s CreateApplicationErrorResponse
-	s.SetApplicationNotFound(v)
+	s.SetAppNotFound(v)
 	return s
 }
 
-// SetApplicationPermissionDenied sets CreateApplicationErrorResponse to ApplicationPermissionDenied.
-func (s *CreateApplicationErrorResponse) SetApplicationPermissionDenied(v ApplicationPermissionDenied) {
-	s.Type = ApplicationPermissionDeniedCreateApplicationErrorResponse
-	s.ApplicationPermissionDenied = v
+// SetAppPermissionDenied sets CreateApplicationErrorResponse to AppPermissionDenied.
+func (s *CreateApplicationErrorResponse) SetAppPermissionDenied(v AppPermissionDenied) {
+	s.Type = AppPermissionDeniedCreateApplicationErrorResponse
+	s.AppPermissionDenied = v
 }
 
-// GetApplicationPermissionDenied returns ApplicationPermissionDenied and true boolean if CreateApplicationErrorResponse is ApplicationPermissionDenied.
-func (s CreateApplicationErrorResponse) GetApplicationPermissionDenied() (v ApplicationPermissionDenied, ok bool) {
-	if !s.IsApplicationPermissionDenied() {
+// GetAppPermissionDenied returns AppPermissionDenied and true boolean if CreateApplicationErrorResponse is AppPermissionDenied.
+func (s CreateApplicationErrorResponse) GetAppPermissionDenied() (v AppPermissionDenied, ok bool) {
+	if !s.IsAppPermissionDenied() {
 		return v, false
 	}
-	return s.ApplicationPermissionDenied, true
+	return s.AppPermissionDenied, true
 }
 
-// NewApplicationPermissionDeniedCreateApplicationErrorResponse returns new CreateApplicationErrorResponse from ApplicationPermissionDenied.
-func NewApplicationPermissionDeniedCreateApplicationErrorResponse(v ApplicationPermissionDenied) CreateApplicationErrorResponse {
+// NewAppPermissionDeniedCreateApplicationErrorResponse returns new CreateApplicationErrorResponse from AppPermissionDenied.
+func NewAppPermissionDeniedCreateApplicationErrorResponse(v AppPermissionDenied) CreateApplicationErrorResponse {
 	var s CreateApplicationErrorResponse
-	s.SetApplicationPermissionDenied(v)
+	s.SetAppPermissionDenied(v)
 	return s
 }
 
-// SetApplicationRevisionConflict sets CreateApplicationErrorResponse to ApplicationRevisionConflict.
-func (s *CreateApplicationErrorResponse) SetApplicationRevisionConflict(v ApplicationRevisionConflict) {
-	s.Type = ApplicationRevisionConflictCreateApplicationErrorResponse
-	s.ApplicationRevisionConflict = v
+// SetAppRevisionConflict sets CreateApplicationErrorResponse to AppRevisionConflict.
+func (s *CreateApplicationErrorResponse) SetAppRevisionConflict(v AppRevisionConflict) {
+	s.Type = AppRevisionConflictCreateApplicationErrorResponse
+	s.AppRevisionConflict = v
 }
 
-// GetApplicationRevisionConflict returns ApplicationRevisionConflict and true boolean if CreateApplicationErrorResponse is ApplicationRevisionConflict.
-func (s CreateApplicationErrorResponse) GetApplicationRevisionConflict() (v ApplicationRevisionConflict, ok bool) {
-	if !s.IsApplicationRevisionConflict() {
+// GetAppRevisionConflict returns AppRevisionConflict and true boolean if CreateApplicationErrorResponse is AppRevisionConflict.
+func (s CreateApplicationErrorResponse) GetAppRevisionConflict() (v AppRevisionConflict, ok bool) {
+	if !s.IsAppRevisionConflict() {
 		return v, false
 	}
-	return s.ApplicationRevisionConflict, true
+	return s.AppRevisionConflict, true
 }
 
-// NewApplicationRevisionConflictCreateApplicationErrorResponse returns new CreateApplicationErrorResponse from ApplicationRevisionConflict.
-func NewApplicationRevisionConflictCreateApplicationErrorResponse(v ApplicationRevisionConflict) CreateApplicationErrorResponse {
+// NewAppRevisionConflictCreateApplicationErrorResponse returns new CreateApplicationErrorResponse from AppRevisionConflict.
+func NewAppRevisionConflictCreateApplicationErrorResponse(v AppRevisionConflict) CreateApplicationErrorResponse {
 	var s CreateApplicationErrorResponse
-	s.SetApplicationRevisionConflict(v)
+	s.SetAppRevisionConflict(v)
 	return s
 }
 
@@ -26239,6 +27189,8 @@ func (s *EvaluatePolicyResponseViolations) init() EvaluatePolicyResponseViolatio
 // Event represents sum type.
 type Event struct {
 	Type                             EventType // switch on this field
+	ApplicationCreatedEvent          ApplicationCreatedEvent
+	ApplicationUpdatedEvent          ApplicationUpdatedEvent
 	AuthAttemptCreatedEvent          AuthAttemptCreatedEvent
 	AuthAttemptHandedOffEvent        AuthAttemptHandedOffEvent
 	AuthCheckFailedEvent             AuthCheckFailedEvent
@@ -26296,6 +27248,8 @@ type EventType string
 
 // Possible values for EventType.
 const (
+	ApplicationCreatedEventEvent          EventType = "application.created"
+	ApplicationUpdatedEventEvent          EventType = "application.updated"
 	AuthAttemptCreatedEventEvent          EventType = "auth.attempt.created"
 	AuthAttemptHandedOffEventEvent        EventType = "auth.attempt.handed_off"
 	AuthCheckFailedEventEvent             EventType = "auth.check.failed"
@@ -26347,6 +27301,12 @@ const (
 	VariableRemovedEventEvent             EventType = "variable.removed"
 	VariableSetEventEvent                 EventType = "variable.set"
 )
+
+// IsApplicationCreatedEvent reports whether Event is ApplicationCreatedEvent.
+func (s Event) IsApplicationCreatedEvent() bool { return s.Type == ApplicationCreatedEventEvent }
+
+// IsApplicationUpdatedEvent reports whether Event is ApplicationUpdatedEvent.
+func (s Event) IsApplicationUpdatedEvent() bool { return s.Type == ApplicationUpdatedEventEvent }
 
 // IsAuthAttemptCreatedEvent reports whether Event is AuthAttemptCreatedEvent.
 func (s Event) IsAuthAttemptCreatedEvent() bool { return s.Type == AuthAttemptCreatedEventEvent }
@@ -26509,6 +27469,48 @@ func (s Event) IsVariableRemovedEvent() bool { return s.Type == VariableRemovedE
 
 // IsVariableSetEvent reports whether Event is VariableSetEvent.
 func (s Event) IsVariableSetEvent() bool { return s.Type == VariableSetEventEvent }
+
+// SetApplicationCreatedEvent sets Event to ApplicationCreatedEvent.
+func (s *Event) SetApplicationCreatedEvent(v ApplicationCreatedEvent) {
+	s.Type = ApplicationCreatedEventEvent
+	s.ApplicationCreatedEvent = v
+}
+
+// GetApplicationCreatedEvent returns ApplicationCreatedEvent and true boolean if Event is ApplicationCreatedEvent.
+func (s Event) GetApplicationCreatedEvent() (v ApplicationCreatedEvent, ok bool) {
+	if !s.IsApplicationCreatedEvent() {
+		return v, false
+	}
+	return s.ApplicationCreatedEvent, true
+}
+
+// NewApplicationCreatedEventEvent returns new Event from ApplicationCreatedEvent.
+func NewApplicationCreatedEventEvent(v ApplicationCreatedEvent) Event {
+	var s Event
+	s.SetApplicationCreatedEvent(v)
+	return s
+}
+
+// SetApplicationUpdatedEvent sets Event to ApplicationUpdatedEvent.
+func (s *Event) SetApplicationUpdatedEvent(v ApplicationUpdatedEvent) {
+	s.Type = ApplicationUpdatedEventEvent
+	s.ApplicationUpdatedEvent = v
+}
+
+// GetApplicationUpdatedEvent returns ApplicationUpdatedEvent and true boolean if Event is ApplicationUpdatedEvent.
+func (s Event) GetApplicationUpdatedEvent() (v ApplicationUpdatedEvent, ok bool) {
+	if !s.IsApplicationUpdatedEvent() {
+		return v, false
+	}
+	return s.ApplicationUpdatedEvent, true
+}
+
+// NewApplicationUpdatedEventEvent returns new Event from ApplicationUpdatedEvent.
+func NewApplicationUpdatedEventEvent(v ApplicationUpdatedEvent) Event {
+	var s Event
+	s.SetApplicationUpdatedEvent(v)
+	return s
+}
 
 // SetAuthAttemptCreatedEvent sets Event to AuthAttemptCreatedEvent.
 func (s *Event) SetAuthAttemptCreatedEvent(v AuthAttemptCreatedEvent) {
@@ -35278,14 +36280,14 @@ func (s *GateKind) UnmarshalText(data []byte) error {
 
 // GetApplicationByIdErrorResponse represents sum type.
 type GetApplicationByIdErrorResponse struct {
-	Type                        GetApplicationByIdErrorResponseType // switch on this field
-	ApplicationNotFound         ApplicationNotFound
-	ApplicationPermissionDenied ApplicationPermissionDenied
-	AuthUnauthorized            AuthUnauthorized
-	Internal                    Internal
-	NotImplemented              NotImplemented
-	ReqInvalid                  ReqInvalid
-	Unavailable                 Unavailable
+	Type                GetApplicationByIdErrorResponseType // switch on this field
+	AppNotFound         AppNotFound
+	AppPermissionDenied AppPermissionDenied
+	AuthUnauthorized    AuthUnauthorized
+	Internal            Internal
+	NotImplemented      NotImplemented
+	ReqInvalid          ReqInvalid
+	Unavailable         Unavailable
 }
 
 // GetApplicationByIdErrorResponseType is oneOf type of GetApplicationByIdErrorResponse.
@@ -35293,23 +36295,23 @@ type GetApplicationByIdErrorResponseType string
 
 // Possible values for GetApplicationByIdErrorResponseType.
 const (
-	ApplicationNotFoundGetApplicationByIdErrorResponse         GetApplicationByIdErrorResponseType = "application.not_found"
-	ApplicationPermissionDeniedGetApplicationByIdErrorResponse GetApplicationByIdErrorResponseType = "application.permission_denied"
-	AuthUnauthorizedGetApplicationByIdErrorResponse            GetApplicationByIdErrorResponseType = "auth.unauthorized"
-	InternalGetApplicationByIdErrorResponse                    GetApplicationByIdErrorResponseType = "internal"
-	NotImplementedGetApplicationByIdErrorResponse              GetApplicationByIdErrorResponseType = "not_implemented"
-	ReqInvalidGetApplicationByIdErrorResponse                  GetApplicationByIdErrorResponseType = "req.invalid"
-	UnavailableGetApplicationByIdErrorResponse                 GetApplicationByIdErrorResponseType = "unavailable"
+	AppNotFoundGetApplicationByIdErrorResponse         GetApplicationByIdErrorResponseType = "app.not_found"
+	AppPermissionDeniedGetApplicationByIdErrorResponse GetApplicationByIdErrorResponseType = "app.permission_denied"
+	AuthUnauthorizedGetApplicationByIdErrorResponse    GetApplicationByIdErrorResponseType = "auth.unauthorized"
+	InternalGetApplicationByIdErrorResponse            GetApplicationByIdErrorResponseType = "internal"
+	NotImplementedGetApplicationByIdErrorResponse      GetApplicationByIdErrorResponseType = "not_implemented"
+	ReqInvalidGetApplicationByIdErrorResponse          GetApplicationByIdErrorResponseType = "req.invalid"
+	UnavailableGetApplicationByIdErrorResponse         GetApplicationByIdErrorResponseType = "unavailable"
 )
 
-// IsApplicationNotFound reports whether GetApplicationByIdErrorResponse is ApplicationNotFound.
-func (s GetApplicationByIdErrorResponse) IsApplicationNotFound() bool {
-	return s.Type == ApplicationNotFoundGetApplicationByIdErrorResponse
+// IsAppNotFound reports whether GetApplicationByIdErrorResponse is AppNotFound.
+func (s GetApplicationByIdErrorResponse) IsAppNotFound() bool {
+	return s.Type == AppNotFoundGetApplicationByIdErrorResponse
 }
 
-// IsApplicationPermissionDenied reports whether GetApplicationByIdErrorResponse is ApplicationPermissionDenied.
-func (s GetApplicationByIdErrorResponse) IsApplicationPermissionDenied() bool {
-	return s.Type == ApplicationPermissionDeniedGetApplicationByIdErrorResponse
+// IsAppPermissionDenied reports whether GetApplicationByIdErrorResponse is AppPermissionDenied.
+func (s GetApplicationByIdErrorResponse) IsAppPermissionDenied() bool {
+	return s.Type == AppPermissionDeniedGetApplicationByIdErrorResponse
 }
 
 // IsAuthUnauthorized reports whether GetApplicationByIdErrorResponse is AuthUnauthorized.
@@ -35337,45 +36339,45 @@ func (s GetApplicationByIdErrorResponse) IsUnavailable() bool {
 	return s.Type == UnavailableGetApplicationByIdErrorResponse
 }
 
-// SetApplicationNotFound sets GetApplicationByIdErrorResponse to ApplicationNotFound.
-func (s *GetApplicationByIdErrorResponse) SetApplicationNotFound(v ApplicationNotFound) {
-	s.Type = ApplicationNotFoundGetApplicationByIdErrorResponse
-	s.ApplicationNotFound = v
+// SetAppNotFound sets GetApplicationByIdErrorResponse to AppNotFound.
+func (s *GetApplicationByIdErrorResponse) SetAppNotFound(v AppNotFound) {
+	s.Type = AppNotFoundGetApplicationByIdErrorResponse
+	s.AppNotFound = v
 }
 
-// GetApplicationNotFound returns ApplicationNotFound and true boolean if GetApplicationByIdErrorResponse is ApplicationNotFound.
-func (s GetApplicationByIdErrorResponse) GetApplicationNotFound() (v ApplicationNotFound, ok bool) {
-	if !s.IsApplicationNotFound() {
+// GetAppNotFound returns AppNotFound and true boolean if GetApplicationByIdErrorResponse is AppNotFound.
+func (s GetApplicationByIdErrorResponse) GetAppNotFound() (v AppNotFound, ok bool) {
+	if !s.IsAppNotFound() {
 		return v, false
 	}
-	return s.ApplicationNotFound, true
+	return s.AppNotFound, true
 }
 
-// NewApplicationNotFoundGetApplicationByIdErrorResponse returns new GetApplicationByIdErrorResponse from ApplicationNotFound.
-func NewApplicationNotFoundGetApplicationByIdErrorResponse(v ApplicationNotFound) GetApplicationByIdErrorResponse {
+// NewAppNotFoundGetApplicationByIdErrorResponse returns new GetApplicationByIdErrorResponse from AppNotFound.
+func NewAppNotFoundGetApplicationByIdErrorResponse(v AppNotFound) GetApplicationByIdErrorResponse {
 	var s GetApplicationByIdErrorResponse
-	s.SetApplicationNotFound(v)
+	s.SetAppNotFound(v)
 	return s
 }
 
-// SetApplicationPermissionDenied sets GetApplicationByIdErrorResponse to ApplicationPermissionDenied.
-func (s *GetApplicationByIdErrorResponse) SetApplicationPermissionDenied(v ApplicationPermissionDenied) {
-	s.Type = ApplicationPermissionDeniedGetApplicationByIdErrorResponse
-	s.ApplicationPermissionDenied = v
+// SetAppPermissionDenied sets GetApplicationByIdErrorResponse to AppPermissionDenied.
+func (s *GetApplicationByIdErrorResponse) SetAppPermissionDenied(v AppPermissionDenied) {
+	s.Type = AppPermissionDeniedGetApplicationByIdErrorResponse
+	s.AppPermissionDenied = v
 }
 
-// GetApplicationPermissionDenied returns ApplicationPermissionDenied and true boolean if GetApplicationByIdErrorResponse is ApplicationPermissionDenied.
-func (s GetApplicationByIdErrorResponse) GetApplicationPermissionDenied() (v ApplicationPermissionDenied, ok bool) {
-	if !s.IsApplicationPermissionDenied() {
+// GetAppPermissionDenied returns AppPermissionDenied and true boolean if GetApplicationByIdErrorResponse is AppPermissionDenied.
+func (s GetApplicationByIdErrorResponse) GetAppPermissionDenied() (v AppPermissionDenied, ok bool) {
+	if !s.IsAppPermissionDenied() {
 		return v, false
 	}
-	return s.ApplicationPermissionDenied, true
+	return s.AppPermissionDenied, true
 }
 
-// NewApplicationPermissionDeniedGetApplicationByIdErrorResponse returns new GetApplicationByIdErrorResponse from ApplicationPermissionDenied.
-func NewApplicationPermissionDeniedGetApplicationByIdErrorResponse(v ApplicationPermissionDenied) GetApplicationByIdErrorResponse {
+// NewAppPermissionDeniedGetApplicationByIdErrorResponse returns new GetApplicationByIdErrorResponse from AppPermissionDenied.
+func NewAppPermissionDeniedGetApplicationByIdErrorResponse(v AppPermissionDenied) GetApplicationByIdErrorResponse {
 	var s GetApplicationByIdErrorResponse
-	s.SetApplicationPermissionDenied(v)
+	s.SetAppPermissionDenied(v)
 	return s
 }
 
@@ -58630,38 +59632,38 @@ func (s *OAuth2) SetScopes(val []string) {
 	s.Scopes = val
 }
 
-// NewOptApplicationClientIDTakenDetails returns new OptApplicationClientIDTakenDetails with value set to v.
-func NewOptApplicationClientIDTakenDetails(v ApplicationClientIDTakenDetails) OptApplicationClientIDTakenDetails {
-	return OptApplicationClientIDTakenDetails{
+// NewOptAppClientIDTakenDetails returns new OptAppClientIDTakenDetails with value set to v.
+func NewOptAppClientIDTakenDetails(v AppClientIDTakenDetails) OptAppClientIDTakenDetails {
+	return OptAppClientIDTakenDetails{
 		Value: v,
 		Set:   true,
 	}
 }
 
-// OptApplicationClientIDTakenDetails is optional ApplicationClientIDTakenDetails.
-type OptApplicationClientIDTakenDetails struct {
-	Value ApplicationClientIDTakenDetails
+// OptAppClientIDTakenDetails is optional AppClientIDTakenDetails.
+type OptAppClientIDTakenDetails struct {
+	Value AppClientIDTakenDetails
 	Set   bool
 }
 
-// IsSet returns true if OptApplicationClientIDTakenDetails was set.
-func (o OptApplicationClientIDTakenDetails) IsSet() bool { return o.Set }
+// IsSet returns true if OptAppClientIDTakenDetails was set.
+func (o OptAppClientIDTakenDetails) IsSet() bool { return o.Set }
 
 // Reset unsets value.
-func (o *OptApplicationClientIDTakenDetails) Reset() {
-	var v ApplicationClientIDTakenDetails
+func (o *OptAppClientIDTakenDetails) Reset() {
+	var v AppClientIDTakenDetails
 	o.Value = v
 	o.Set = false
 }
 
 // SetTo sets value to v.
-func (o *OptApplicationClientIDTakenDetails) SetTo(v ApplicationClientIDTakenDetails) {
+func (o *OptAppClientIDTakenDetails) SetTo(v AppClientIDTakenDetails) {
 	o.Set = true
 	o.Value = v
 }
 
 // Get returns value and boolean that denotes whether value was set.
-func (o OptApplicationClientIDTakenDetails) Get() (v ApplicationClientIDTakenDetails, ok bool) {
+func (o OptAppClientIDTakenDetails) Get() (v AppClientIDTakenDetails, ok bool) {
 	if !o.Set {
 		return v, false
 	}
@@ -58669,45 +59671,45 @@ func (o OptApplicationClientIDTakenDetails) Get() (v ApplicationClientIDTakenDet
 }
 
 // Or returns value if set, or given parameter if does not.
-func (o OptApplicationClientIDTakenDetails) Or(d ApplicationClientIDTakenDetails) ApplicationClientIDTakenDetails {
+func (o OptAppClientIDTakenDetails) Or(d AppClientIDTakenDetails) AppClientIDTakenDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
 	return d
 }
 
-// NewOptApplicationFieldImmutableDetails returns new OptApplicationFieldImmutableDetails with value set to v.
-func NewOptApplicationFieldImmutableDetails(v ApplicationFieldImmutableDetails) OptApplicationFieldImmutableDetails {
-	return OptApplicationFieldImmutableDetails{
+// NewOptAppFieldImmutableDetails returns new OptAppFieldImmutableDetails with value set to v.
+func NewOptAppFieldImmutableDetails(v AppFieldImmutableDetails) OptAppFieldImmutableDetails {
+	return OptAppFieldImmutableDetails{
 		Value: v,
 		Set:   true,
 	}
 }
 
-// OptApplicationFieldImmutableDetails is optional ApplicationFieldImmutableDetails.
-type OptApplicationFieldImmutableDetails struct {
-	Value ApplicationFieldImmutableDetails
+// OptAppFieldImmutableDetails is optional AppFieldImmutableDetails.
+type OptAppFieldImmutableDetails struct {
+	Value AppFieldImmutableDetails
 	Set   bool
 }
 
-// IsSet returns true if OptApplicationFieldImmutableDetails was set.
-func (o OptApplicationFieldImmutableDetails) IsSet() bool { return o.Set }
+// IsSet returns true if OptAppFieldImmutableDetails was set.
+func (o OptAppFieldImmutableDetails) IsSet() bool { return o.Set }
 
 // Reset unsets value.
-func (o *OptApplicationFieldImmutableDetails) Reset() {
-	var v ApplicationFieldImmutableDetails
+func (o *OptAppFieldImmutableDetails) Reset() {
+	var v AppFieldImmutableDetails
 	o.Value = v
 	o.Set = false
 }
 
 // SetTo sets value to v.
-func (o *OptApplicationFieldImmutableDetails) SetTo(v ApplicationFieldImmutableDetails) {
+func (o *OptAppFieldImmutableDetails) SetTo(v AppFieldImmutableDetails) {
 	o.Set = true
 	o.Value = v
 }
 
 // Get returns value and boolean that denotes whether value was set.
-func (o OptApplicationFieldImmutableDetails) Get() (v ApplicationFieldImmutableDetails, ok bool) {
+func (o OptAppFieldImmutableDetails) Get() (v AppFieldImmutableDetails, ok bool) {
 	if !o.Set {
 		return v, false
 	}
@@ -58715,45 +59717,45 @@ func (o OptApplicationFieldImmutableDetails) Get() (v ApplicationFieldImmutableD
 }
 
 // Or returns value if set, or given parameter if does not.
-func (o OptApplicationFieldImmutableDetails) Or(d ApplicationFieldImmutableDetails) ApplicationFieldImmutableDetails {
+func (o OptAppFieldImmutableDetails) Or(d AppFieldImmutableDetails) AppFieldImmutableDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
 	return d
 }
 
-// NewOptApplicationInvalidDetails returns new OptApplicationInvalidDetails with value set to v.
-func NewOptApplicationInvalidDetails(v ApplicationInvalidDetails) OptApplicationInvalidDetails {
-	return OptApplicationInvalidDetails{
+// NewOptAppInvalidDetails returns new OptAppInvalidDetails with value set to v.
+func NewOptAppInvalidDetails(v AppInvalidDetails) OptAppInvalidDetails {
+	return OptAppInvalidDetails{
 		Value: v,
 		Set:   true,
 	}
 }
 
-// OptApplicationInvalidDetails is optional ApplicationInvalidDetails.
-type OptApplicationInvalidDetails struct {
-	Value ApplicationInvalidDetails
+// OptAppInvalidDetails is optional AppInvalidDetails.
+type OptAppInvalidDetails struct {
+	Value AppInvalidDetails
 	Set   bool
 }
 
-// IsSet returns true if OptApplicationInvalidDetails was set.
-func (o OptApplicationInvalidDetails) IsSet() bool { return o.Set }
+// IsSet returns true if OptAppInvalidDetails was set.
+func (o OptAppInvalidDetails) IsSet() bool { return o.Set }
 
 // Reset unsets value.
-func (o *OptApplicationInvalidDetails) Reset() {
-	var v ApplicationInvalidDetails
+func (o *OptAppInvalidDetails) Reset() {
+	var v AppInvalidDetails
 	o.Value = v
 	o.Set = false
 }
 
 // SetTo sets value to v.
-func (o *OptApplicationInvalidDetails) SetTo(v ApplicationInvalidDetails) {
+func (o *OptAppInvalidDetails) SetTo(v AppInvalidDetails) {
 	o.Set = true
 	o.Value = v
 }
 
 // Get returns value and boolean that denotes whether value was set.
-func (o OptApplicationInvalidDetails) Get() (v ApplicationInvalidDetails, ok bool) {
+func (o OptAppInvalidDetails) Get() (v AppInvalidDetails, ok bool) {
 	if !o.Set {
 		return v, false
 	}
@@ -58761,45 +59763,45 @@ func (o OptApplicationInvalidDetails) Get() (v ApplicationInvalidDetails, ok boo
 }
 
 // Or returns value if set, or given parameter if does not.
-func (o OptApplicationInvalidDetails) Or(d ApplicationInvalidDetails) ApplicationInvalidDetails {
+func (o OptAppInvalidDetails) Or(d AppInvalidDetails) AppInvalidDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
 	return d
 }
 
-// NewOptApplicationNotFoundDetails returns new OptApplicationNotFoundDetails with value set to v.
-func NewOptApplicationNotFoundDetails(v ApplicationNotFoundDetails) OptApplicationNotFoundDetails {
-	return OptApplicationNotFoundDetails{
+// NewOptAppNotFoundDetails returns new OptAppNotFoundDetails with value set to v.
+func NewOptAppNotFoundDetails(v AppNotFoundDetails) OptAppNotFoundDetails {
+	return OptAppNotFoundDetails{
 		Value: v,
 		Set:   true,
 	}
 }
 
-// OptApplicationNotFoundDetails is optional ApplicationNotFoundDetails.
-type OptApplicationNotFoundDetails struct {
-	Value ApplicationNotFoundDetails
+// OptAppNotFoundDetails is optional AppNotFoundDetails.
+type OptAppNotFoundDetails struct {
+	Value AppNotFoundDetails
 	Set   bool
 }
 
-// IsSet returns true if OptApplicationNotFoundDetails was set.
-func (o OptApplicationNotFoundDetails) IsSet() bool { return o.Set }
+// IsSet returns true if OptAppNotFoundDetails was set.
+func (o OptAppNotFoundDetails) IsSet() bool { return o.Set }
 
 // Reset unsets value.
-func (o *OptApplicationNotFoundDetails) Reset() {
-	var v ApplicationNotFoundDetails
+func (o *OptAppNotFoundDetails) Reset() {
+	var v AppNotFoundDetails
 	o.Value = v
 	o.Set = false
 }
 
 // SetTo sets value to v.
-func (o *OptApplicationNotFoundDetails) SetTo(v ApplicationNotFoundDetails) {
+func (o *OptAppNotFoundDetails) SetTo(v AppNotFoundDetails) {
 	o.Set = true
 	o.Value = v
 }
 
 // Get returns value and boolean that denotes whether value was set.
-func (o OptApplicationNotFoundDetails) Get() (v ApplicationNotFoundDetails, ok bool) {
+func (o OptAppNotFoundDetails) Get() (v AppNotFoundDetails, ok bool) {
 	if !o.Set {
 		return v, false
 	}
@@ -58807,45 +59809,45 @@ func (o OptApplicationNotFoundDetails) Get() (v ApplicationNotFoundDetails, ok b
 }
 
 // Or returns value if set, or given parameter if does not.
-func (o OptApplicationNotFoundDetails) Or(d ApplicationNotFoundDetails) ApplicationNotFoundDetails {
+func (o OptAppNotFoundDetails) Or(d AppNotFoundDetails) AppNotFoundDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
 	return d
 }
 
-// NewOptApplicationPermissionDeniedDetails returns new OptApplicationPermissionDeniedDetails with value set to v.
-func NewOptApplicationPermissionDeniedDetails(v ApplicationPermissionDeniedDetails) OptApplicationPermissionDeniedDetails {
-	return OptApplicationPermissionDeniedDetails{
+// NewOptAppPermissionDeniedDetails returns new OptAppPermissionDeniedDetails with value set to v.
+func NewOptAppPermissionDeniedDetails(v AppPermissionDeniedDetails) OptAppPermissionDeniedDetails {
+	return OptAppPermissionDeniedDetails{
 		Value: v,
 		Set:   true,
 	}
 }
 
-// OptApplicationPermissionDeniedDetails is optional ApplicationPermissionDeniedDetails.
-type OptApplicationPermissionDeniedDetails struct {
-	Value ApplicationPermissionDeniedDetails
+// OptAppPermissionDeniedDetails is optional AppPermissionDeniedDetails.
+type OptAppPermissionDeniedDetails struct {
+	Value AppPermissionDeniedDetails
 	Set   bool
 }
 
-// IsSet returns true if OptApplicationPermissionDeniedDetails was set.
-func (o OptApplicationPermissionDeniedDetails) IsSet() bool { return o.Set }
+// IsSet returns true if OptAppPermissionDeniedDetails was set.
+func (o OptAppPermissionDeniedDetails) IsSet() bool { return o.Set }
 
 // Reset unsets value.
-func (o *OptApplicationPermissionDeniedDetails) Reset() {
-	var v ApplicationPermissionDeniedDetails
+func (o *OptAppPermissionDeniedDetails) Reset() {
+	var v AppPermissionDeniedDetails
 	o.Value = v
 	o.Set = false
 }
 
 // SetTo sets value to v.
-func (o *OptApplicationPermissionDeniedDetails) SetTo(v ApplicationPermissionDeniedDetails) {
+func (o *OptAppPermissionDeniedDetails) SetTo(v AppPermissionDeniedDetails) {
 	o.Set = true
 	o.Value = v
 }
 
 // Get returns value and boolean that denotes whether value was set.
-func (o OptApplicationPermissionDeniedDetails) Get() (v ApplicationPermissionDeniedDetails, ok bool) {
+func (o OptAppPermissionDeniedDetails) Get() (v AppPermissionDeniedDetails, ok bool) {
 	if !o.Set {
 		return v, false
 	}
@@ -58853,45 +59855,45 @@ func (o OptApplicationPermissionDeniedDetails) Get() (v ApplicationPermissionDen
 }
 
 // Or returns value if set, or given parameter if does not.
-func (o OptApplicationPermissionDeniedDetails) Or(d ApplicationPermissionDeniedDetails) ApplicationPermissionDeniedDetails {
+func (o OptAppPermissionDeniedDetails) Or(d AppPermissionDeniedDetails) AppPermissionDeniedDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
 	return d
 }
 
-// NewOptApplicationRevisionConflictDetails returns new OptApplicationRevisionConflictDetails with value set to v.
-func NewOptApplicationRevisionConflictDetails(v ApplicationRevisionConflictDetails) OptApplicationRevisionConflictDetails {
-	return OptApplicationRevisionConflictDetails{
+// NewOptAppRevisionConflictDetails returns new OptAppRevisionConflictDetails with value set to v.
+func NewOptAppRevisionConflictDetails(v AppRevisionConflictDetails) OptAppRevisionConflictDetails {
+	return OptAppRevisionConflictDetails{
 		Value: v,
 		Set:   true,
 	}
 }
 
-// OptApplicationRevisionConflictDetails is optional ApplicationRevisionConflictDetails.
-type OptApplicationRevisionConflictDetails struct {
-	Value ApplicationRevisionConflictDetails
+// OptAppRevisionConflictDetails is optional AppRevisionConflictDetails.
+type OptAppRevisionConflictDetails struct {
+	Value AppRevisionConflictDetails
 	Set   bool
 }
 
-// IsSet returns true if OptApplicationRevisionConflictDetails was set.
-func (o OptApplicationRevisionConflictDetails) IsSet() bool { return o.Set }
+// IsSet returns true if OptAppRevisionConflictDetails was set.
+func (o OptAppRevisionConflictDetails) IsSet() bool { return o.Set }
 
 // Reset unsets value.
-func (o *OptApplicationRevisionConflictDetails) Reset() {
-	var v ApplicationRevisionConflictDetails
+func (o *OptAppRevisionConflictDetails) Reset() {
+	var v AppRevisionConflictDetails
 	o.Value = v
 	o.Set = false
 }
 
 // SetTo sets value to v.
-func (o *OptApplicationRevisionConflictDetails) SetTo(v ApplicationRevisionConflictDetails) {
+func (o *OptAppRevisionConflictDetails) SetTo(v AppRevisionConflictDetails) {
 	o.Set = true
 	o.Value = v
 }
 
 // Get returns value and boolean that denotes whether value was set.
-func (o OptApplicationRevisionConflictDetails) Get() (v ApplicationRevisionConflictDetails, ok bool) {
+func (o OptAppRevisionConflictDetails) Get() (v AppRevisionConflictDetails, ok bool) {
 	if !o.Set {
 		return v, false
 	}
@@ -58899,7 +59901,99 @@ func (o OptApplicationRevisionConflictDetails) Get() (v ApplicationRevisionConfl
 }
 
 // Or returns value if set, or given parameter if does not.
-func (o OptApplicationRevisionConflictDetails) Or(d ApplicationRevisionConflictDetails) ApplicationRevisionConflictDetails {
+func (o OptAppRevisionConflictDetails) Or(d AppRevisionConflictDetails) AppRevisionConflictDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptApplicationCreatedEventDelegationType returns new OptApplicationCreatedEventDelegationType with value set to v.
+func NewOptApplicationCreatedEventDelegationType(v ApplicationCreatedEventDelegationType) OptApplicationCreatedEventDelegationType {
+	return OptApplicationCreatedEventDelegationType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptApplicationCreatedEventDelegationType is optional ApplicationCreatedEventDelegationType.
+type OptApplicationCreatedEventDelegationType struct {
+	Value ApplicationCreatedEventDelegationType
+	Set   bool
+}
+
+// IsSet returns true if OptApplicationCreatedEventDelegationType was set.
+func (o OptApplicationCreatedEventDelegationType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptApplicationCreatedEventDelegationType) Reset() {
+	var v ApplicationCreatedEventDelegationType
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptApplicationCreatedEventDelegationType) SetTo(v ApplicationCreatedEventDelegationType) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptApplicationCreatedEventDelegationType) Get() (v ApplicationCreatedEventDelegationType, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptApplicationCreatedEventDelegationType) Or(d ApplicationCreatedEventDelegationType) ApplicationCreatedEventDelegationType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptApplicationUpdatedEventDelegationType returns new OptApplicationUpdatedEventDelegationType with value set to v.
+func NewOptApplicationUpdatedEventDelegationType(v ApplicationUpdatedEventDelegationType) OptApplicationUpdatedEventDelegationType {
+	return OptApplicationUpdatedEventDelegationType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptApplicationUpdatedEventDelegationType is optional ApplicationUpdatedEventDelegationType.
+type OptApplicationUpdatedEventDelegationType struct {
+	Value ApplicationUpdatedEventDelegationType
+	Set   bool
+}
+
+// IsSet returns true if OptApplicationUpdatedEventDelegationType was set.
+func (o OptApplicationUpdatedEventDelegationType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptApplicationUpdatedEventDelegationType) Reset() {
+	var v ApplicationUpdatedEventDelegationType
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptApplicationUpdatedEventDelegationType) SetTo(v ApplicationUpdatedEventDelegationType) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptApplicationUpdatedEventDelegationType) Get() (v ApplicationUpdatedEventDelegationType, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptApplicationUpdatedEventDelegationType) Or(d ApplicationUpdatedEventDelegationType) ApplicationUpdatedEventDelegationType {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -66858,6 +67952,132 @@ func (o OptListSchemasRevisions) Get() (v ListSchemasRevisions, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptListSchemasRevisions) Or(d ListSchemasRevisions) ListSchemasRevisions {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilApplicationCreatedEventActorType returns new OptNilApplicationCreatedEventActorType with value set to v.
+func NewOptNilApplicationCreatedEventActorType(v ApplicationCreatedEventActorType) OptNilApplicationCreatedEventActorType {
+	return OptNilApplicationCreatedEventActorType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilApplicationCreatedEventActorType is optional nullable ApplicationCreatedEventActorType.
+type OptNilApplicationCreatedEventActorType struct {
+	Value ApplicationCreatedEventActorType
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilApplicationCreatedEventActorType was set.
+func (o OptNilApplicationCreatedEventActorType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilApplicationCreatedEventActorType) Reset() {
+	var v ApplicationCreatedEventActorType
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilApplicationCreatedEventActorType) SetTo(v ApplicationCreatedEventActorType) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilApplicationCreatedEventActorType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilApplicationCreatedEventActorType) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v ApplicationCreatedEventActorType
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilApplicationCreatedEventActorType) Get() (v ApplicationCreatedEventActorType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilApplicationCreatedEventActorType) Or(d ApplicationCreatedEventActorType) ApplicationCreatedEventActorType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilApplicationUpdatedEventActorType returns new OptNilApplicationUpdatedEventActorType with value set to v.
+func NewOptNilApplicationUpdatedEventActorType(v ApplicationUpdatedEventActorType) OptNilApplicationUpdatedEventActorType {
+	return OptNilApplicationUpdatedEventActorType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilApplicationUpdatedEventActorType is optional nullable ApplicationUpdatedEventActorType.
+type OptNilApplicationUpdatedEventActorType struct {
+	Value ApplicationUpdatedEventActorType
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilApplicationUpdatedEventActorType was set.
+func (o OptNilApplicationUpdatedEventActorType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilApplicationUpdatedEventActorType) Reset() {
+	var v ApplicationUpdatedEventActorType
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilApplicationUpdatedEventActorType) SetTo(v ApplicationUpdatedEventActorType) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilApplicationUpdatedEventActorType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilApplicationUpdatedEventActorType) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v ApplicationUpdatedEventActorType
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilApplicationUpdatedEventActorType) Get() (v ApplicationUpdatedEventActorType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilApplicationUpdatedEventActorType) Or(d ApplicationUpdatedEventActorType) ApplicationUpdatedEventActorType {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -110311,6 +111531,8 @@ func (s *WebhookDelivered) SetStatusCode(val int) {
 	s.StatusCode = val
 }
 
+func (*WebhookDelivered) applicationCreatedRes()          {}
+func (*WebhookDelivered) applicationUpdatedRes()          {}
 func (*WebhookDelivered) authAttemptCreatedRes()          {}
 func (*WebhookDelivered) authAttemptHandedOffRes()        {}
 func (*WebhookDelivered) authCheckFailedRes()             {}
@@ -110377,6 +111599,8 @@ func (s *WebhookNotDelivered) SetStatusCode(val int) {
 	s.StatusCode = val
 }
 
+func (*WebhookNotDelivered) applicationCreatedRes()          {}
+func (*WebhookNotDelivered) applicationUpdatedRes()          {}
 func (*WebhookNotDelivered) authAttemptCreatedRes()          {}
 func (*WebhookNotDelivered) authAttemptHandedOffRes()        {}
 func (*WebhookNotDelivered) authCheckFailedRes()             {}

@@ -10938,6 +10938,64 @@
         }
       }
     },
+    "application.created": {
+      "post": {
+        "operationId": "applicationCreated",
+        "summary": "application.created",
+        "description": "A registered application was created.\n\nThe body is the event as `GET /events` returns it.\n",
+        "tags": [
+          "Event Webhooks"
+        ],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/application-created-event"
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "$ref": "#/components/responses/webhook-delivered"
+          },
+          "default": {
+            "$ref": "#/components/responses/webhook-not-delivered"
+          }
+        }
+      }
+    },
+    "application.updated": {
+      "post": {
+        "operationId": "applicationUpdated",
+        "summary": "application.updated",
+        "description": "A registered application was revised. The payload holds the new\nrevision, the name when it changed, and the clients the revision added.\n\nThe body is the event as `GET /events` returns it.\n",
+        "tags": [
+          "Event Webhooks"
+        ],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/application-updated-event"
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "$ref": "#/components/responses/webhook-delivered"
+          },
+          "default": {
+            "$ref": "#/components/responses/webhook-not-delivered"
+          }
+        }
+      }
+    },
     "auth.attempt.created": {
       "post": {
         "operationId": "authAttemptCreated",
@@ -22795,6 +22853,83 @@
           }
         }
       },
+      "application-payload": {
+        "title": "ApplicationPayload",
+        "type": "object",
+        "description": "Payload for `application.created`, which holds every field, and\n`application.updated`, which holds the new `revision_id`, `name` when it\nchanged, and `client_ids` when the revision added a client. The application\nID is the event's `entity_id`. The application document and the client\nsecrets are never included.\n",
+        "required": [
+          "revision_id"
+        ],
+        "properties": {
+          "slug": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "client_ids": {
+            "type": "array",
+            "description": "The `client_id` of each client the write created. Each of them got a new\nsecret.\n",
+            "items": {
+              "type": "string"
+            }
+          },
+          "revision_id": {
+            "type": "string",
+            "description": "The revision the write appended."
+          }
+        }
+      },
+      "application-created-event": {
+        "title": "ApplicationCreatedEvent",
+        "description": "An event of type application.created, with the shared event fields and its own payload.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/event-base"
+          },
+          {
+            "type": "object",
+            "required": [
+              "event_type",
+              "payload"
+            ],
+            "properties": {
+              "event_type": {
+                "type": "string",
+                "const": "application.created"
+              },
+              "payload": {
+                "$ref": "#/components/schemas/application-payload"
+              }
+            }
+          }
+        ]
+      },
+      "application-updated-event": {
+        "title": "ApplicationUpdatedEvent",
+        "description": "An event of type application.updated, with the shared event fields and its own payload.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/event-base"
+          },
+          {
+            "type": "object",
+            "required": [
+              "event_type",
+              "payload"
+            ],
+            "properties": {
+              "event_type": {
+                "type": "string",
+                "const": "application.updated"
+              },
+              "payload": {
+                "$ref": "#/components/schemas/application-payload"
+              }
+            }
+          }
+        ]
+      },
       "empty-event-payload": {
         "title": "EmptyEventPayload",
         "type": "object",
@@ -24802,6 +24937,12 @@
         "description": "An event of any type. Read event_type to tell which type it is; each type\ncarries its own typed payload.\n",
         "oneOf": [
           {
+            "$ref": "#/components/schemas/application-created-event"
+          },
+          {
+            "$ref": "#/components/schemas/application-updated-event"
+          },
+          {
             "$ref": "#/components/schemas/auth-attempt-created-event"
           },
           {
@@ -24955,6 +25096,8 @@
         "discriminator": {
           "propertyName": "event_type",
           "mapping": {
+            "application.created": "#/components/schemas/application-created-event",
+            "application.updated": "#/components/schemas/application-updated-event",
             "auth.attempt.created": "#/components/schemas/auth-attempt-created-event",
             "auth.attempt.handed_off": "#/components/schemas/auth-attempt-handed_off-event",
             "auth.check.failed": "#/components/schemas/auth-check-failed-event",

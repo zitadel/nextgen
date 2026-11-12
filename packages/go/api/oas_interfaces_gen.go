@@ -9,6 +9,14 @@ type AddOriginRes interface {
 	addOriginRes()
 }
 
+type ApplicationCreatedRes interface {
+	applicationCreatedRes()
+}
+
+type ApplicationUpdatedRes interface {
+	applicationUpdatedRes()
+}
+
 type AuthAttemptCreatedRes interface {
 	authAttemptCreatedRes()
 }
