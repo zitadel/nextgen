@@ -1,5 +1,6 @@
 import { ZitadelError } from "@/lib/errors";
 import { isObject } from "@/lib/json";
+
 import type { Json } from "./types";
 import { isInteger, unwrap, type ZodLike } from "./zod";
 
@@ -11,12 +12,11 @@ import { isInteger, unwrap, type ZodLike } from "./zod";
  */
 
 /** The value at a path, or `undefined` when a segment on the way is missing. */
-export const valueAt = (document: unknown, path: readonly string[]): unknown =>
-  path.reduce<unknown>(
-    (current, segment) =>
-      isObject(current) && Object.hasOwn(current, segment) ? current[segment] : undefined,
-    document,
-  );
+export const valueAt = (document: unknown, path: readonly string[]): unknown => {
+  return path.reduce<unknown>((current, segment) => {
+    return isObject(current) && Object.hasOwn(current, segment) ? current[segment] : undefined;
+  }, document);
+};
 
 /**
  * A copy of `document` holding `value` at `path`. Objects missing on the way
@@ -48,14 +48,16 @@ export const mergeDocuments = (base: unknown, overlay: unknown): unknown => {
   }
   const keys = [...new Set([...Object.keys(base), ...Object.keys(overlay)])];
   return Object.fromEntries(
-    keys.map((key) => [
-      key,
-      !Object.hasOwn(overlay, key)
-        ? base[key]
-        : Object.hasOwn(base, key)
-          ? mergeDocuments(base[key], overlay[key])
-          : overlay[key],
-    ]),
+    keys.map((key) => {
+      return [
+        key,
+        !Object.hasOwn(overlay, key)
+          ? base[key]
+          : Object.hasOwn(base, key)
+            ? mergeDocuments(base[key], overlay[key])
+            : overlay[key],
+      ];
+    }),
   );
 };
 
@@ -90,18 +92,20 @@ export const decimalValue = (text: string, integer: boolean): number | undefined
 };
 
 /** Whether a schema accepts the text itself, so no reading of it is needed. */
-const takesText = (schema: ZodLike | undefined): boolean =>
-  ["string", "enum", "any", "unknown", undefined].includes(unwrap(schema)?.def?.type);
+const takesText = (schema: ZodLike | undefined): boolean => {
+  return ["string", "enum", "any", "unknown", undefined].includes(unwrap(schema)?.def?.type);
+};
 
 /**
  * A refusal for text that does not fit the schema. `label` is how the caller
  * spelled the value's place (`--set oidc.pkce_enabled`, `--attributes age`),
  * so the error can offer the JSON form of the same entry.
  */
-const misfit = (label: string, text: string, expected: string): ZitadelError =>
-  new ZitadelError("E_VALIDATION", `${label} expects ${expected}, got "${text}"`, {
+const misfit = (label: string, text: string, expected: string): ZitadelError => {
+  return new ZitadelError("E_VALIDATION", `${label} expects ${expected}, got "${text}"`, {
     hint: `Give ${expected}, or a JSON value with ${label}:=<json>.`,
   });
+};
 
 /** The scalar `text` stands for under one schema, or the error saying why it does not fit. */
 const scalarFrom = (schema: ZodLike | undefined, text: string, label: string): unknown => {
@@ -126,8 +130,14 @@ const scalarFrom = (schema: ZodLike | undefined, text: string, label: string): u
       if (members.some(takesText)) {
         return text;
       }
-      const readings = members.map((member) => scalarFrom(member, text, label));
-      return readings.find((reading) => !(reading instanceof ZitadelError)) ?? readings[0];
+      const readings = members.map((member) => {
+        return scalarFrom(member, text, label);
+      });
+      return (
+        readings.find((reading) => {
+          return !(reading instanceof ZitadelError);
+        }) ?? readings[0]
+      );
     }
     default:
       return text;

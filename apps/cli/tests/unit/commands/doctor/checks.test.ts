@@ -2405,17 +2405,18 @@ describe("ClaimCheck", () => {
   });
 
   describe("once the claim window has closed", () => {
-    it.for(["claim window has closed", "zitadel claim", "no longer be claimed"])(
-      "warns, saying %s",
-      async (said, { dir }) => {
-        await aNextProject(dir);
-        await writeSecret(dir, { ...SECRET, created_at: "2026-01-01T00:00:00.000Z" });
+    it.for([
+      "claim window has closed",
+      "npx @zitadel/cli@0.1.0-alpha.0 claim",
+      "no longer be claimed",
+    ])("warns, saying %s", async (said, { dir }) => {
+      await aNextProject(dir);
+      await writeSecret(dir, { ...SECRET, created_at: "2026-01-01T00:00:00.000Z" });
 
-        const outcome = await new ClaimCheck().run(aCheckContext(dir));
+      const outcome = await new ClaimCheck().run(aCheckContext(dir));
 
-        expect(outcome).toMatchObject({ status: "warn", message: expect.stringContaining(said) });
-      },
-    );
+      expect(outcome).toMatchObject({ status: "warn", message: expect.stringContaining(said) });
+    });
 
     it("reports the project as no longer claimable", async ({ dir }) => {
       await aNextProject(dir);
@@ -2567,7 +2568,7 @@ describe("DependencyVersionCheck", () => {
 
     expect(outcome).toMatchObject({
       status: "pass",
-      message: expect.stringContaining("no exactly-pinned"),
+      message: expect.stringContaining("No exactly-pinned"),
     });
   });
 

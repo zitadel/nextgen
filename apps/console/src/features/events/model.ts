@@ -167,6 +167,8 @@ export function around(event: Pick<ProjectEvent, "created_at">): EventsSearch {
  * spec adds and this list lacks fails `console:typecheck`.
  */
 export const EVENT_TYPES = [
+  "application.created",
+  "application.updated",
   "auth.attempt.created",
   "auth.attempt.handed_off",
   "auth.check.failed",

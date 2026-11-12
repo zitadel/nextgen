@@ -27,7 +27,7 @@ func (d *fakeDatabase) Ping(ctx context.Context) error {
 
 func newHealthTestServer(t *testing.T, database Pinger) *api.Server {
 	t.Helper()
-	srv, err := api.NewServer((&Handler{}).WithReadinessCheck(database), NewSecurityHandler(nil), api.WithErrorHandler(OgenErrorHandler))
+	srv, err := api.NewServer((&Handler{}).WithReadinessCheck(database), NewSecurityHandler(nil), api.WithErrorHandler(OgenErrorHandler(0)))
 	require.NoError(t, err)
 	return srv
 }

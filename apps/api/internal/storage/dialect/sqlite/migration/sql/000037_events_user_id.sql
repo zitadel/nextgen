@@ -1,5 +1,5 @@
 -- +goose Up
--- See the postgres peer (000049_events_user_id.sql) for the column, which
+-- See the postgres peer (000050_events_user_id.sql) for the column, which
 -- stays empty on the events already stored, and the index.
 -- +goose StatementBegin
 ALTER TABLE events ADD COLUMN user_id TEXT;

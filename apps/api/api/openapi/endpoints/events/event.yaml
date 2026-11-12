@@ -4,6 +4,8 @@ description: |
   An event of any type. Read event_type to tell which type it is; each type
   carries its own typed payload.
 oneOf:
+  - $ref: types/application-created-event.yaml
+  - $ref: types/application-updated-event.yaml
   - $ref: types/auth-attempt-created-event.yaml
   - $ref: types/auth-attempt-handed_off-event.yaml
   - $ref: types/auth-check-failed-event.yaml
@@ -57,6 +59,8 @@ oneOf:
 discriminator:
   propertyName: event_type
   mapping:
+    application.created: types/application-created-event.yaml
+    application.updated: types/application-updated-event.yaml
     auth.attempt.created: types/auth-attempt-created-event.yaml
     auth.attempt.handed_off: types/auth-attempt-handed_off-event.yaml
     auth.check.failed: types/auth-check-failed-event.yaml

@@ -1,6 +1,6 @@
 -- +goose NO TRANSACTION
 -- +goose Up
--- See the postgres peer (000049_events_user_id.sql) for the column, which
+-- See the postgres peer (000050_events_user_id.sql) for the column, which
 -- stays empty on the events already stored, and the index. As in 000044, the
 -- index covers every row and keeps created_at and id descending.
 -- +goose StatementBegin

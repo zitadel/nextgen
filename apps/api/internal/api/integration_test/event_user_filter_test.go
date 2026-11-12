@@ -38,7 +38,7 @@ func TestListEventsByUser(t *testing.T) {
 		password = "correct-horse-battery-staple"
 	)
 	users := harness.EnsureUserFixture(t)
-	encodedHash, err := harness.EnsureHasher(t).Hash(password)
+	encodedHash, err := harness.EnsureHasher(t).Hash(t.Context(), password)
 	require.NoError(t, err)
 	for userID, email := range map[string]string{ada: adaEmail, bob: bobEmail} {
 		emailAttr, err := domain.NewCreateAttribute("email", email, domain.AttributeUniquenessProject)

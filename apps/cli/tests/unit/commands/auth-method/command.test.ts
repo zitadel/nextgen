@@ -1,22 +1,20 @@
 import { mkdir } from "node:fs/promises";
+import { runCommand } from "@tests/helpers/run-cli";
 import { join } from "node:path";
 
 import { beforeEach, describe, expect, vi } from "vitest";
 
-vi.mock("@clack/prompts", async () => {
-  return (await import("@tests/helpers/clack")).clackDouble();
-});
-
-import { cancel, confirm, isCancel } from "@clack/prompts";
 import { Config, Errors } from "@oclif/core";
-import { consola } from "consola";
 
 import { readSchemaTarget, type SchemaTarget } from "@/commands/auth-method/command";
 import AuthMethodPasskeyDisable from "@/commands/auth-method/passkey/disable";
 import AuthMethodSsoDisable from "@/commands/auth-method/sso/disable";
 import { Consent } from "@/lib/consent";
 import { ZitadelError } from "@/lib/errors";
+
 import { BrokenFilesError, type Change, DiskStore, Schemas, UserSchema } from "@/lib/zitadel";
+import { answering, type Person } from "@tests/helpers/keyboard";
+import { recordLog } from "@tests/helpers/log";
 import { aSchema, SCHEMA_FILE } from "@tests/helpers/auth-method";
 import { aLoginFlow, anOidcConnection, aUserSchema } from "@tests/helpers/config";
 import { it } from "@tests/helpers/fixtures";
@@ -28,7 +26,7 @@ import {
   writeJson,
 } from "@tests/helpers/local-project";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
-import { useTerminal } from "@tests/helpers/terminal";
+import { asOneLine, asTerminal, useTerminal } from "@tests/helpers/terminal";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
 /**
@@ -117,6 +115,9 @@ function googleDisable(cwd: string): string[] {
  * The passkey command with its write reachable, to drive it without a run.
  */
 class ChangeWriter extends AuthMethodPasskeyDisable {
+  /** The command it stands in for, which its suggestions rebuild. */
+  public static override id = "auth-method:passkey:disable";
+
   /**
    * Writes `change` to the Project `target` was read from.
    *
@@ -137,7 +138,7 @@ class ChangeWriter extends AuthMethodPasskeyDisable {
    * @returns The change with its consent, or `undefined` when the person said no.
    */
   confirming(target: SchemaTarget, make: () => Change): Promise<unknown> {
-    return this.confirmIfNoSignInLeft(target, [], make);
+    return this.confirmIfNoSignInLeft(target, make);
   }
 }
 
@@ -157,14 +158,32 @@ function aNewSchema(read: SchemaTarget): Change {
  * Reads the schema target of the Project in `cwd`, as a run with these flags would.
  *
  * @param cwd - The Project.
- * @param flags - The `--schema` the run named, and whether it was given `--cwd`.
+ * @param flags - The `--schema` the run named.
  * @returns The target.
  */
-function target(
-  cwd: string,
-  flags: { schema?: string; cwdGiven?: boolean } = {},
-): Promise<SchemaTarget> {
-  return readSchemaTarget({ cwd, schema: flags.schema, cwdGiven: flags.cwdGiven ?? false });
+function target(cwd: string, flags: { schema?: string } = {}): Promise<SchemaTarget> {
+  return readSchemaTarget({
+    cwd,
+    schema: flags.schema,
+  });
+}
+
+/**
+ * Everything the command wrote to the terminal and the console so far.
+ *
+ * @param talk - The person at the keyboard, who saw what was drawn on the terminal.
+ * @returns What was drawn, then what went to stderr and the console.
+ */
+function printed(talk: Person): string {
+  return [
+    talk.shown(),
+    talk.errors(),
+    ...[...vi.mocked(console.log).mock.calls, ...vi.mocked(console.error).mock.calls].map(
+      (call) => {
+        return String(call[0]);
+      },
+    ),
+  ].join("\n");
 }
 
 useTerminal();
@@ -182,53 +201,71 @@ beforeEach(() => {
   vi.spyOn(console, "error").mockImplementation(() => {
     return undefined;
   });
-  vi.mocked(confirm).mockReset();
-  vi.mocked(cancel).mockReset();
-  vi.mocked(isCancel).mockReset().mockReturnValue(false);
 });
 
 describe("AuthMethodCommand", () => {
   describe("when disabling passkey would leave no way to sign in", () => {
-    it("asks once before going on", async ({ dir }) => {
+    it("asks before going on", async ({ dir }) => {
       const cwd = await aPasskeyOnlyProject(dir);
-      vi.mocked(confirm).mockResolvedValue(false);
 
-      await AuthMethodPasskeyDisable.run(passkeyDisable(cwd), CONFIG);
+      const talk = answering(false);
+      await asTerminal(() => {
+        return AuthMethodPasskeyDisable.run(passkeyDisable(cwd), CONFIG);
+      });
 
-      expect(confirm).toHaveBeenCalledOnce();
+      expect(talk.asked()).toEqual([
+        "Disable passkey anyway? Nobody will be able to sign in to default-human-user.",
+      ]);
     });
   });
 
   describe("when disabling Google would leave no way to sign in", () => {
     it("asks, naming the provider and the schema", async ({ dir }) => {
       const cwd = await aGoogleOnlyProject(dir);
-      vi.mocked(confirm).mockResolvedValue(false);
 
-      await AuthMethodSsoDisable.run(googleDisable(cwd), CONFIG);
+      const talk = answering(false);
+      await asTerminal(() => {
+        return AuthMethodSsoDisable.run(googleDisable(cwd), CONFIG);
+      });
 
-      expect(confirm).toHaveBeenCalledWith(
-        expect.objectContaining({
-          message: "Disable google anyway? Nobody will be able to sign in to default-human-user.",
-        }),
-      );
+      expect(talk.asked()).toEqual([
+        "Disable google anyway? Nobody will be able to sign in to default-human-user.",
+      ]);
     });
   });
 
   describe("when the person declines to disable passkey", () => {
     it("ends as skipped", async ({ dir }) => {
       const cwd = await aPasskeyOnlyProject(dir);
-      vi.mocked(confirm).mockResolvedValue(false);
 
-      const envelope = await AuthMethodPasskeyDisable.run(passkeyDisable(cwd), CONFIG);
+      answering(false);
+      const result = await asTerminal(() => {
+        return AuthMethodPasskeyDisable.run(passkeyDisable(cwd), CONFIG);
+      });
 
-      expect(envelope).toMatchObject({ status: "skipped", reason: "disable-cancelled" });
+      expect(result).toMatchObject({ status: "skipped", reason: "disable-cancelled" });
+    });
+
+    it("says the schema is unchanged", async ({ dir }) => {
+      const cwd = await aPasskeyOnlyProject(dir);
+
+      const talk = answering(false);
+      await asTerminal(() => {
+        return AuthMethodPasskeyDisable.run(passkeyDisable(cwd), CONFIG);
+      });
+
+      expect(asOneLine(printed(talk))).toContain(
+        ".zitadel/schemas/default-human-user.json is unchanged, so passkey is still enabled for default-human-user.",
+      );
     });
 
     it("leaves passkey enabled", async ({ dir }) => {
       const cwd = await aPasskeyOnlyProject(dir);
-      vi.mocked(confirm).mockResolvedValue(false);
 
-      await AuthMethodPasskeyDisable.run(passkeyDisable(cwd), CONFIG);
+      answering(false);
+      await asTerminal(() => {
+        return AuthMethodPasskeyDisable.run(passkeyDisable(cwd), CONFIG);
+      });
 
       expect(await readJson(cwd, SCHEMA_FILE)).toHaveProperty(["x-auth-methods", "passkey"], {
         enabled: true,
@@ -239,18 +276,22 @@ describe("AuthMethodCommand", () => {
   describe("when the person confirms disabling passkey", () => {
     it("ends ok, warning that nobody can sign in", async ({ dir }) => {
       const cwd = await aPasskeyOnlyProject(dir);
-      vi.mocked(confirm).mockResolvedValue(true);
 
-      const envelope = await AuthMethodPasskeyDisable.run(passkeyDisable(cwd), CONFIG);
+      answering(true);
+      const result = await asTerminal(() => {
+        return AuthMethodPasskeyDisable.run(passkeyDisable(cwd), CONFIG);
+      });
 
-      expect(envelope).toMatchObject({ status: "ok", warnings: [NO_WAY_TO_SIGN_IN] });
+      expect(result).toMatchObject({ status: "ok", warnings: [NO_WAY_TO_SIGN_IN] });
     });
 
     it("disables passkey", async ({ dir }) => {
       const cwd = await aPasskeyOnlyProject(dir);
-      vi.mocked(confirm).mockResolvedValue(true);
 
-      await AuthMethodPasskeyDisable.run(passkeyDisable(cwd), CONFIG);
+      answering(true);
+      await asTerminal(() => {
+        return AuthMethodPasskeyDisable.run(passkeyDisable(cwd), CONFIG);
+      });
 
       expect(await readJson(cwd, SCHEMA_FILE)).toHaveProperty(["x-auth-methods", "passkey"], {
         enabled: false,
@@ -261,18 +302,35 @@ describe("AuthMethodCommand", () => {
   describe("when the person declines to disable Google", () => {
     it("ends as skipped", async ({ dir }) => {
       const cwd = await aGoogleOnlyProject(dir);
-      vi.mocked(confirm).mockResolvedValue(false);
 
-      const envelope = await AuthMethodSsoDisable.run(googleDisable(cwd), CONFIG);
+      answering(false);
+      const result = await asTerminal(() => {
+        return AuthMethodSsoDisable.run(googleDisable(cwd), CONFIG);
+      });
 
-      expect(envelope).toMatchObject({ status: "skipped", reason: "disable-cancelled" });
+      expect(result).toMatchObject({ status: "skipped", reason: "disable-cancelled" });
+    });
+
+    it("says the schema is unchanged", async ({ dir }) => {
+      const cwd = await aGoogleOnlyProject(dir);
+
+      const talk = answering(false);
+      await asTerminal(() => {
+        return AuthMethodSsoDisable.run(googleDisable(cwd), CONFIG);
+      });
+
+      expect(asOneLine(printed(talk))).toContain(
+        ".zitadel/schemas/default-human-user.json is unchanged, so google is still offered to default-human-user.",
+      );
     });
 
     it("leaves Google enabled", async ({ dir }) => {
       const cwd = await aGoogleOnlyProject(dir);
-      vi.mocked(confirm).mockResolvedValue(false);
 
-      await AuthMethodSsoDisable.run(googleDisable(cwd), CONFIG);
+      answering(false);
+      await asTerminal(() => {
+        return AuthMethodSsoDisable.run(googleDisable(cwd), CONFIG);
+      });
 
       expect(await readJson(cwd, SCHEMA_FILE)).toHaveProperty(["x-auth-methods", "sso"], {
         enabled: true,
@@ -284,18 +342,22 @@ describe("AuthMethodCommand", () => {
   describe("when the person confirms disabling Google", () => {
     it("ends ok, warning that nobody can sign in", async ({ dir }) => {
       const cwd = await aGoogleOnlyProject(dir);
-      vi.mocked(confirm).mockResolvedValue(true);
 
-      const envelope = await AuthMethodSsoDisable.run(googleDisable(cwd), CONFIG);
+      answering(true);
+      const result = await asTerminal(() => {
+        return AuthMethodSsoDisable.run(googleDisable(cwd), CONFIG);
+      });
 
-      expect(envelope).toMatchObject({ status: "ok", warnings: [NO_WAY_TO_SIGN_IN] });
+      expect(result).toMatchObject({ status: "ok", warnings: [NO_WAY_TO_SIGN_IN] });
     });
 
     it("removes the provider", async ({ dir }) => {
       const cwd = await aGoogleOnlyProject(dir);
-      vi.mocked(confirm).mockResolvedValue(true);
 
-      await AuthMethodSsoDisable.run(googleDisable(cwd), CONFIG);
+      answering(true);
+      await asTerminal(() => {
+        return AuthMethodSsoDisable.run(googleDisable(cwd), CONFIG);
+      });
 
       expect(await readJson(cwd, SCHEMA_FILE)).toHaveProperty(["x-auth-methods", "sso"], {
         enabled: false,
@@ -303,39 +365,29 @@ describe("AuthMethodCommand", () => {
     });
   });
 
-  describe("when the person cancels the question with Ctrl-C", () => {
+  describe("when the question is left unanswered", () => {
     it("fails with the exit code of every cancelled prompt", async ({ dir }) => {
       const cwd = await aPasskeyOnlyProject(dir);
-      vi.mocked(confirm).mockResolvedValue(Symbol("cancel"));
-      vi.mocked(isCancel).mockReturnValueOnce(true);
 
       const error = await rejectionOf(() => {
-        return AuthMethodPasskeyDisable.run(passkeyDisable(cwd), CONFIG);
+        answering();
+        return asTerminal(() => {
+          return AuthMethodPasskeyDisable.run(passkeyDisable(cwd), CONFIG);
+        });
       });
 
       expect(error).toBeInstanceOf(Errors.ExitError);
       expect(error).toMatchObject({ oclif: { exit: CANCELLED } });
     });
 
-    it("says it was cancelled", async ({ dir }) => {
-      const cwd = await aPasskeyOnlyProject(dir);
-      vi.mocked(confirm).mockResolvedValue(Symbol("cancel"));
-      vi.mocked(isCancel).mockReturnValueOnce(true);
-
-      await rejectionOf(() => {
-        return AuthMethodPasskeyDisable.run(passkeyDisable(cwd), CONFIG);
-      });
-
-      expect(cancel).toHaveBeenCalledWith("Cancelled.");
-    });
-
     it("leaves passkey enabled", async ({ dir }) => {
       const cwd = await aPasskeyOnlyProject(dir);
-      vi.mocked(confirm).mockResolvedValue(Symbol("cancel"));
-      vi.mocked(isCancel).mockReturnValueOnce(true);
 
       await rejectionOf(() => {
-        return AuthMethodPasskeyDisable.run(passkeyDisable(cwd), CONFIG);
+        answering();
+        return asTerminal(() => {
+          return AuthMethodPasskeyDisable.run(passkeyDisable(cwd), CONFIG);
+        });
       });
 
       expect(await readJson(cwd, SCHEMA_FILE)).toHaveProperty(["x-auth-methods", "passkey"], {
@@ -348,19 +400,25 @@ describe("AuthMethodCommand", () => {
     it("does not ask", async ({ dir }) => {
       const cwd = await aPasskeyOnlyProject(dir);
 
-      await AuthMethodPasskeyDisable.run(passkeyDisable(cwd, "--dry-run"), CONFIG);
+      const talk = answering();
+      await asTerminal(() => {
+        return AuthMethodPasskeyDisable.run(passkeyDisable(cwd, "--dry-run"), CONFIG);
+      });
 
-      expect(confirm).not.toHaveBeenCalled();
+      expect(talk.asked()).toEqual([]);
     });
 
     it("previews the change and warns, rather than refusing", async ({ dir }) => {
       const cwd = await aPasskeyOnlyProject(dir);
 
-      const envelope = await AuthMethodPasskeyDisable.run(passkeyDisable(cwd, "--dry-run"), CONFIG);
+      answering();
+      const result = await asTerminal(() => {
+        return AuthMethodPasskeyDisable.run(passkeyDisable(cwd, "--dry-run"), CONFIG);
+      });
 
-      expect(envelope).toMatchObject({
-        status: "skipped",
-        reason: "dry-run",
+      expect(result).toMatchObject({
+        status: "ok",
+        data: { dry_run: true },
         warnings: [WOULD_HAVE_NO_WAY_TO_SIGN_IN],
       });
     });
@@ -368,7 +426,10 @@ describe("AuthMethodCommand", () => {
     it("leaves passkey enabled", async ({ dir }) => {
       const cwd = await aPasskeyOnlyProject(dir);
 
-      await AuthMethodPasskeyDisable.run(passkeyDisable(cwd, "--dry-run"), CONFIG);
+      answering();
+      await asTerminal(() => {
+        return AuthMethodPasskeyDisable.run(passkeyDisable(cwd, "--dry-run"), CONFIG);
+      });
 
       expect(await readJson(cwd, SCHEMA_FILE)).toHaveProperty(["x-auth-methods", "passkey"], {
         enabled: true,
@@ -380,17 +441,23 @@ describe("AuthMethodCommand", () => {
     it("does not ask", async ({ dir }) => {
       const cwd = await aPasskeyOnlyProject(dir);
 
-      await AuthMethodPasskeyDisable.run(passkeyDisable(cwd, "--force"), CONFIG);
+      const talk = answering();
+      await asTerminal(() => {
+        return AuthMethodPasskeyDisable.run(passkeyDisable(cwd, "--force"), CONFIG);
+      });
 
-      expect(confirm).not.toHaveBeenCalled();
+      expect(talk.asked()).toEqual([]);
     });
 
     it("ends ok", async ({ dir }) => {
       const cwd = await aPasskeyOnlyProject(dir);
 
-      const envelope = await AuthMethodPasskeyDisable.run(passkeyDisable(cwd, "--force"), CONFIG);
+      answering();
+      const result = await asTerminal(() => {
+        return AuthMethodPasskeyDisable.run(passkeyDisable(cwd, "--force"), CONFIG);
+      });
 
-      expect(envelope).toMatchObject({ status: "ok" });
+      expect(result).toMatchObject({ status: "ok" });
     });
   });
 
@@ -405,9 +472,10 @@ describe("AuthMethodCommand", () => {
      */
     async function scripted(cwd: string, ...flags: string[]): Promise<unknown> {
       await rejectionOf(() => {
-        return AuthMethodPasskeyDisable.run(
+        return runCommand(
+          AuthMethodPasskeyDisable,
+          "auth-method:passkey:disable",
           passkeyDisable(cwd, "--non-interactive", "--json", ...flags),
-          CONFIG,
         );
       });
       const printed = vi.mocked(console.log).mock.calls.flat().join("\n");
@@ -430,10 +498,10 @@ describe("AuthMethodCommand", () => {
               "disable",
               "--schema",
               "default-human-user",
-              "--cwd",
-              cwd,
               "--force",
               "--dry-run",
+              "--cwd",
+              cwd,
             ],
             expect.anything(),
           ],
@@ -446,7 +514,7 @@ describe("AuthMethodCommand", () => {
 
       const printed = await scripted(cwd, "--dry-run", "--force");
 
-      expect(printed).toMatchObject({ status: "skipped", reason: "dry-run" });
+      expect(printed).toMatchObject({ status: "ok", data: { dry_run: true } });
     });
   });
 
@@ -455,9 +523,10 @@ describe("AuthMethodCommand", () => {
       const cwd = await aPasskeyOnlyProject(dir);
 
       await rejectionOf(() => {
-        return AuthMethodPasskeyDisable.run(
+        return runCommand(
+          AuthMethodPasskeyDisable,
+          "auth-method:passkey:disable",
           passkeyDisable(cwd, "--non-interactive", "--json"),
-          CONFIG,
         );
       });
 
@@ -471,9 +540,9 @@ describe("AuthMethodCommand", () => {
               "disable",
               "--schema",
               "default-human-user",
+              "--force",
               "--cwd",
               cwd,
-              "--force",
             ],
             expect.anything(),
           ],
@@ -486,6 +555,7 @@ describe("AuthMethodCommand", () => {
     it("raises that failure as it is, without asking", async ({ dir }) => {
       const cwd = await aPasskeyOnlyProject(dir);
       const read = await target(cwd);
+      const talk = answering();
       const unrelated = new Error("the flows are broken");
 
       const error = await rejectionOf(() => {
@@ -495,7 +565,7 @@ describe("AuthMethodCommand", () => {
       });
 
       expect(error).toBe(unrelated);
-      expect(confirm).not.toHaveBeenCalled();
+      expect(talk.asked()).toEqual([]);
     });
   });
 
@@ -518,7 +588,7 @@ describe("AuthMethodCommand", () => {
         data: {
           next_args: [
             ["deploy", "--dry-run"],
-            ["deploy", "-m", "<what changed>"],
+            ["deploy", "--message", "<what changed>"],
           ],
         },
       });
@@ -531,39 +601,36 @@ describe("AuthMethodCommand.write", () => {
     const cwd = await aPasskeyOnlyProject(dir);
     const read = await target(cwd);
     const writer = new ChangeWriter([], CONFIG);
-    const success = vi.spyOn(consola, "success").mockImplementation(() => {
-      return undefined;
-    });
+    const recorded = recordLog();
 
     await writer.writeChange(read, aNewSchema(read));
 
-    expect(success).toHaveBeenCalledWith(`Wrote ${NEW_SCHEMA_FILE}`);
+    recorded.stop();
+    expect(recorded.said).toEqual([{ level: "done", text: `Wrote ${NEW_SCHEMA_FILE}` }]);
   });
 
   it("says it updated a file the change edits", async ({ dir }) => {
     const cwd = await aPasskeyOnlyProject(dir);
     const read = await target(cwd);
     const writer = new ChangeWriter([], CONFIG);
-    const success = vi.spyOn(consola, "success").mockImplementation(() => {
-      return undefined;
-    });
+    const recorded = recordLog();
 
     await writer.writeChange(read, read.config.schemas.enable(read.schema, "password"));
 
-    expect(success).toHaveBeenCalledWith(`Updated ${SCHEMA_FILE}`);
+    recorded.stop();
+    expect(recorded.said).toEqual([{ level: "done", text: `Updated ${SCHEMA_FILE}` }]);
   });
 
   it("says it removed a file the change deletes", async ({ dir }) => {
     const cwd = await aPasskeyOnlyProject(dir);
     const read = await target(cwd);
     const writer = new ChangeWriter([], CONFIG);
-    const success = vi.spyOn(consola, "success").mockImplementation(() => {
-      return undefined;
-    });
+    const recorded = recordLog();
 
     await writer.writeChange(read, read.config.schemas.remove(SCHEMA_FILE));
 
-    expect(success).toHaveBeenCalledWith(`Removed ${SCHEMA_FILE}`);
+    recorded.stop();
+    expect(recorded.said).toEqual([{ level: "done", text: `Removed ${SCHEMA_FILE}` }]);
   });
 
   it("writes the change to the Project", async ({ dir }) => {
@@ -643,32 +710,34 @@ describe("AuthMethodCommand.write", () => {
     const cwd = await aPasskeyOnlyProject(dir);
     const read = await target(cwd);
     const writer = new ChangeWriter([], CONFIG);
-    const success = vi.spyOn(consola, "success").mockImplementation(() => {
-      return undefined;
-    });
+    const recorded = recordLog();
 
     await writer.writeChange(read, read.config.schemas.enable(read.schema, "passkey"));
 
-    expect(success).not.toHaveBeenCalled();
+    recorded.stop();
+    expect(recorded.said).toEqual([]);
   });
 });
 
 describe("readSchemaTarget", () => {
   describe("with one schema", () => {
-    it("finds it, with no --cwd for the follow-ups", async ({ dir }) => {
+    it("finds it, pinning no --schema for the follow-ups", async ({ dir }) => {
       const cwd = await setUpProject(dir);
 
       const read = await target(cwd);
 
-      expect(read).toMatchObject({ schema: { name: "default-human-user" }, cwdArgs: [] });
+      expect(read).toMatchObject({
+        schema: { name: "default-human-user" },
+        schemaGiven: undefined,
+      });
     });
 
-    it("carries --cwd into the follow-ups when the run had one", async ({ dir }) => {
+    it("carries --schema into the follow-ups when the run had one", async ({ dir }) => {
       const cwd = await setUpProject(dir);
 
-      const read = await target(cwd, { cwdGiven: true });
+      const read = await target(cwd, { schema: "default-human-user" });
 
-      expect(read).toMatchObject({ cwdArgs: ["--cwd", cwd] });
+      expect(read).toMatchObject({ schemaGiven: "default-human-user" });
     });
   });
 
@@ -704,7 +773,7 @@ describe("readSchemaTarget", () => {
       expect(error).toBeInstanceOf(ZitadelError);
       expect(error).toMatchObject({
         code: "E_VALIDATION",
-        message: "This Project has more than one user schema",
+        message: "This project has more than one user schema",
       });
     });
   });
@@ -772,7 +841,7 @@ describe("readSchemaTarget", () => {
       expect(error).toBeInstanceOf(ZitadelError);
       expect(error).toMatchObject({
         code: "E_VALIDATION",
-        message: "This Project has more than one user schema",
+        message: "This project has more than one user schema",
         hint: "Name the one to change with --schema. Known schemas: customers (customer), employees",
       });
     });
@@ -787,7 +856,7 @@ describe("readSchemaTarget", () => {
       expect(error).toBeInstanceOf(ZitadelError);
       expect(error).toMatchObject({
         code: "E_NOT_FOUND",
-        message: "This Project has no user schema named staff",
+        message: "This project has no user schema named staff",
         hint: "Known schemas: customers (customer), employees",
         details: {
           known: ["customers", "employees"],
@@ -811,6 +880,16 @@ describe("readSchemaTarget", () => {
 
       expect(error).toBeInstanceOf(ZitadelError);
       expect(error).toMatchObject({ code: "E_NOT_FOUND" });
+    });
+
+    it("suggests setting the Project up", async ({ dir }) => {
+      const cwd = await makeProject(dir);
+
+      const error = await rejectionOf(() => {
+        return target(cwd);
+      });
+
+      expect(error).toMatchObject({ nextCommands: [{ id: "setup" }] });
     });
   });
 
@@ -887,7 +966,7 @@ describe("readSchemaTarget", () => {
 
       expect(error).not.toBeInstanceOf(BrokenFilesError);
       expect(error).toMatchObject({
-        message: "This Project has more than one user schema",
+        message: "This project has more than one user schema",
       });
     });
 
@@ -917,7 +996,7 @@ describe("readSchemaTarget", () => {
       });
 
       expect(error).toMatchObject({
-        message: "This Project has no user schema named partners",
+        message: "This project has no user schema named partners",
       });
     });
   });

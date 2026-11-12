@@ -32,6 +32,7 @@ var emitterDirs = []string{
 var variableTypeEmitters = map[string][]string{
 	"SetSSOCallbackResult":   {"auth.sso.authorization.failed", "auth.sso.exchange.failed", "auth.sso.exchange.succeeded"},
 	"emitAuthCheck":          {"auth.check.failed", "auth.check.succeeded"},
+	"emitApplicationEvent":   {"application.created", "application.updated"},
 	"emitOperatorEvent":      {"authz.granted", "authz.revoked"},
 	"emitIDPConnectionEvent": {"idp.created", "idp.updated"},
 	"emitPolicyEvent":        {"policy.created", "policy.updated"},

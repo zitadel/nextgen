@@ -154,7 +154,9 @@ personal data.
 - **`payload.user_id` stays** on the events that have it. Retiring it changes
   their contract and gives a reader nothing yet.
 - Stored events are not backfilled.
-- Invitations and team memberships set it once they have an emitter.
+- An accepted or a declined invitation and a team membership set it once
+  they have an emitter. A created or a cancelled invitation names no user:
+  its link is for whoever redeems it.
 
 ### 4. The actor is the authenticated caller
 

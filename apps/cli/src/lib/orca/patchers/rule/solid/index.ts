@@ -38,8 +38,7 @@ const ROOT: RootMount = {
  * Unlike Next.js — whose middleware runs the proxy and token exchange
  * server-side — a SPA has no server, so the dev proxy provides the same-origin
  * `/__nextgen` path locally. In production that path comes from a platform
- * rewrite or minimal worker (ADR 036); CLI scaffolding for it is tracked in
- * issue #560.
+ * rewrite or minimal worker (ADR 036).
  */
 export class SolidPatcher extends AbstractRulePatcher implements ViteSupport {
   canPatch(framework: string): boolean {

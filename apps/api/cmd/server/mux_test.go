@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -17,6 +18,7 @@ import (
 	oasapi "github.com/zitadel/nextgen/internal/api/generated"
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
+	"github.com/zitadel/nextgen/internal/oauth"
 	"github.com/zitadel/nextgen/internal/securityheaders"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/staticui/console"
@@ -86,7 +88,7 @@ func newTestMux(t *testing.T, cfg ServerConfig) http.Handler {
 	t.Helper()
 	mux, err := buildHTTPMux(cfg, idgen.NewULID(), doubleServers(t, echo), idpCallbackEcho(),
 		staticResolver(consoleRuntime{Mode: ConsoleModeStandalone, ConsoleProjectID: "proj_first"}, nil),
-		nil, nil)
+		nil, nil, nil)
 	require.NoError(t, err)
 	return mux
 }
@@ -160,12 +162,52 @@ func TestBuildHTTPMuxRoutesThePrefixTheProbesAndTheRootAlias(t *testing.T) {
 		{method: http.MethodGet, path: "/livez/", mount: "root"},
 		{method: http.MethodGet, path: "/api/flow", mount: "root"},
 		{method: http.MethodGet, path: "/api/v2/users/me", mount: "root"},
+		// With oauth.enabled off, the OAuth server's paths are nobody's.
+		{method: http.MethodGet, path: "/.well-known/oauth-authorization-server/oauth/proj_123", mount: "root"},
+		{method: http.MethodGet, path: "/oauth/proj_123/.well-known/openid-configuration", mount: "root"},
+		{method: http.MethodPost, path: "/oauth/proj_123/token", mount: "root"},
 	} {
 		name := tt.method + " " + tt.path
 		rec := serve(t, mux, tt.method, tt.path)
 		assert.Equal(t, tt.mount, rec.Header().Get("X-Test-Handler"), name)
 		assert.Equal(t, tt.path, rec.Header().Get("X-Test-Path"), "%s must reach its mount unrewritten", name)
 		assert.Equal(t, tt.deprecated, rec.Header().Get("Deprecation") != "", "%s: Deprecation", name)
+	}
+}
+
+// With oauth.enabled, the OAuth server takes the well-known metadata paths
+// and the endpoints under its prefix ahead of the API's root alias, through
+// the request ID and logging chain only: a client's request carries no CSRF
+// token or session. Every other path stays with the mounts above.
+func TestBuildHTTPMuxMountsTheOAuthServer(t *testing.T) {
+	publicBase, err := url.Parse("https://api.example.com")
+	require.NoError(t, err)
+	handlers := oauth.New(oauth.Config{PublicBase: publicBase, Admission: oauth.DenyAll{}, Settings: oauth.NotEnabled{}})
+	mux, err := buildHTTPMux(uiConfig(false), idgen.NewULID(), doubleServers(t, echo), idpCallbackEcho(),
+		staticResolver(consoleRuntime{Mode: ConsoleModeStandalone, ConsoleProjectID: "proj_first"}, nil),
+		nil, nil, handlers)
+	require.NoError(t, err)
+
+	for _, tt := range []struct {
+		method, path string
+		status       int
+	}{
+		{method: http.MethodGet, path: "/.well-known/oauth-authorization-server/oauth/proj_123", status: http.StatusNotFound},
+		{method: http.MethodGet, path: "/.well-known/openid-configuration/oauth/proj_123", status: http.StatusNotFound},
+		{method: http.MethodGet, path: "/oauth/proj_123/.well-known/openid-configuration", status: http.StatusNotFound},
+		{method: http.MethodGet, path: "/oauth/.well-known/openid-configuration", status: http.StatusNotFound},
+		{method: http.MethodPost, path: "/oauth/proj_123/token", status: http.StatusBadRequest},
+		{method: http.MethodGet, path: "/oauth/proj_123/jwks", status: http.StatusNotFound},
+	} {
+		name := tt.method + " " + tt.path
+		rec := serve(t, mux, tt.method, tt.path)
+		assert.Equal(t, tt.status, rec.Code, name)
+		assert.Empty(t, rec.Header().Get("X-Test-Handler"), "%s must not reach the API", name)
+		assert.Contains(t, rec.Body.String(), `"error":`, "%s: the OAuth server's error body", name)
+		assert.NotEmpty(t, rec.Header().Get("X-Request-Id"), "%s: the request ID chain", name)
+	}
+	for _, path := range []string{"/oauth-not", "/users/me", "/nope"} {
+		assert.Equal(t, "root", get(t, mux, path).Header().Get("X-Test-Handler"), path)
 	}
 }
 
@@ -214,7 +256,7 @@ func TestBuildHTTPMuxHandsTheCallbackItsConnectionSlug(t *testing.T) {
 		recorder := &slugRecorder{}
 		mux, err := buildHTTPMux(uiConfig(false), idgen.NewULID(), doubleServers(t, echo), api.NewIDPCallbackHandler(recorder),
 			staticResolver(consoleRuntime{Mode: ConsoleModeStandalone, ConsoleProjectID: "proj_first"}, nil),
-			nil, nil)
+			nil, nil, nil)
 		require.NoError(t, err)
 
 		rec := get(t, mux, path+"?state=s&code=c")
@@ -250,7 +292,7 @@ func TestBuildHTTPMuxMountsTheRetentionTriggerOnlyWhenGiven(t *testing.T) {
 	})
 	mux, err := buildHTTPMux(cfg, idgen.NewULID(), doubleServers(t, echo), idpCallbackEcho(),
 		staticResolver(consoleRuntime{Mode: ConsoleModeStandalone}, nil),
-		nil, trigger)
+		nil, trigger, nil)
 	require.NoError(t, err)
 
 	r := httptest.NewRequest(http.MethodGet, audit.RetentionTriggerPath, nil)
@@ -282,7 +324,7 @@ func TestBuildHTTPMuxRecordsCSRFRequestState(t *testing.T) {
 		}),
 		idpCallbackEcho(),
 		staticResolver(consoleRuntime{Mode: ConsoleModeStandalone, ConsoleProjectID: "proj_first"}, nil),
-		nil, nil)
+		nil, nil, nil)
 	require.NoError(t, err)
 
 	for _, path := range []string{"/api/v1/teams", "/teams", "/livez"} {
@@ -313,7 +355,7 @@ func TestBuildHTTPMuxHandsTheAPITheLoopbackSessionCookie(t *testing.T) {
 		}),
 		idpCallbackEcho(),
 		staticResolver(consoleRuntime{Mode: ConsoleModeStandalone, ConsoleProjectID: "proj_first"}, nil),
-		nil, nil)
+		nil, nil, nil)
 	require.NoError(t, err)
 
 	// Under the prefix and at the root alias (ADR 077).

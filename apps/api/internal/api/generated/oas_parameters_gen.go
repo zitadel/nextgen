@@ -4766,6 +4766,74 @@ func decodeGetMyUserSchemaParams(args [0]string, argsEscaped bool, r *http.Reque
 	return params, nil
 }
 
+// GetOAuthSettingsByIdParams is parameters of getOAuthSettingsById operation.
+type GetOAuthSettingsByIdParams struct {
+	// The OAuth settings revision ID: the `revision_id` of the `kind: oauth`
+	// pointer on the release that `buildRelease` (`POST /releases/build`) or
+	// `getReleaseById` (`GET /releases/{release_id}`) returns.
+	OAuthSettingsID string
+}
+
+func unpackGetOAuthSettingsByIdParams(packed middleware.Parameters) (params GetOAuthSettingsByIdParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "oauth_settings_id",
+			In:   "path",
+		}
+		params.OAuthSettingsID = packed[key].(string)
+	}
+	return params
+}
+
+func decodeGetOAuthSettingsByIdParams(args [1]string, argsEscaped bool, r *http.Request) (params GetOAuthSettingsByIdParams, _ error) {
+	// Decode path: oauth_settings_id.
+	if err := func() error {
+		param := args[0]
+		if argsEscaped {
+			unescaped, err := url.PathUnescape(args[0])
+			if err != nil {
+				return errors.Wrap(err, "unescape path")
+			}
+			param = unescaped
+		}
+		if len(param) > 0 {
+			d := uri.NewPathDecoder(uri.PathDecoderConfig{
+				Param:   "oauth_settings_id",
+				Value:   param,
+				Style:   uri.PathStyleSimple,
+				Explode: false,
+			})
+
+			if err := func() error {
+				val, err := d.DecodeValue()
+				if err != nil {
+					return err
+				}
+
+				c, err := conv.ToString(val)
+				if err != nil {
+					return err
+				}
+
+				params.OAuthSettingsID = c
+				return nil
+			}(); err != nil {
+				return err
+			}
+		} else {
+			return validate.ErrFieldRequired
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "oauth_settings_id",
+			In:   "path",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
 // GetPolicyParams is parameters of getPolicy operation.
 type GetPolicyParams struct {
 	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints

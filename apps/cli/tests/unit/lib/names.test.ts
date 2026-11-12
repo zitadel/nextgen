@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { byName, named } from "@/lib/oclif/names";
+import { byName, named } from "@/lib/names";
 
 describe("named", () => {
   it.each([

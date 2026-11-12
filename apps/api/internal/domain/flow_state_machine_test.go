@@ -102,8 +102,8 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 
 	hasher := cryptomock.NewMockHasher(mock)
 	hasher.EXPECT().
-		Hash(gomock.Any()).
-		DoAndReturn(func(s string) (string, error) { return "hashed:" + s, nil }).
+		Hash(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, s string) (string, error) { return "hashed:" + s, nil }).
 		AnyTimes()
 
 	schemaResolver := domainmock.NewMockSchemaResolver(mock)
