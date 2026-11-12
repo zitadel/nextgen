@@ -247,11 +247,14 @@ export function setupMockHandlers(
     before: FlowStepName | "idle",
     action: string,
     email: string | undefined,
+    attested: boolean,
   ): "user_not_found" | "user_already_exists" | undefined {
-    if (!routesByAccount || action !== "submit" || !email) return undefined;
+    if (!routesByAccount || !email) return undefined;
     const known = authn.hasAccount(email);
-    if (before === "identifier" && !known) return "user_not_found";
-    if (before === "register" && known) return "user_already_exists";
+    if (action === "submit" && before === "identifier" && !known) return "user_not_found";
+    // Asking for a passkey registration looks the email up too.
+    const signsUp = action === "submit" || (action === "passkey_register" && !attested);
+    if (signsUp && before === "register" && known) return "user_already_exists";
     return undefined;
   }
 
@@ -531,7 +534,7 @@ export function setupMockHandlers(
           { status: 403 },
         );
       }
-      const outcome = accountOutcome(before, body.action, email);
+      const outcome = accountOutcome(before, body.action, email, Boolean(body.challenge_response));
 
       // With account routing the collision is the switch to sign-in, as the
       // default flow wires `user_already_exists`, not this error.

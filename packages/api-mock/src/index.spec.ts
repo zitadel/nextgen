@@ -196,6 +196,7 @@ describe("setupMockHandlers", () => {
   test.each([
     {
       purpose: "login",
+      action: "submit",
       email: "new@example.com",
       name: "register",
       nextPurpose: "register",
@@ -203,24 +204,34 @@ describe("setupMockHandlers", () => {
     },
     {
       purpose: "register",
+      action: "submit",
+      email: "known@example.com",
+      name: "password",
+      nextPurpose: "login",
+      notice: "notice.user_already_exists",
+    },
+    {
+      purpose: "register",
+      action: "passkey_register",
       email: "known@example.com",
       name: "password",
       nextPurpose: "login",
       notice: "notice.user_already_exists",
     },
   ] as const)(
-    "routes $purpose for $email and explains the automatic switch once",
-    async ({ purpose, email, name, nextPurpose, notice }) => {
+    "routes $purpose $action for $email and explains the automatic switch once",
+    async ({ purpose, action, email, name, nextPurpose, notice }) => {
       mock = setupMockHandlers({ accounts: ["known@example.com"] });
       server.resetHandlers(...mock.handlers);
       const start = await createFlow({ purpose, project_id: PROJECT_ID });
       const switched = await submitFlowStep(start.id, {
         session_token: start.session_token,
-        action: "submit",
+        action,
         fields: { email },
       });
 
       expect(switched.step).toMatchObject({ name, purpose: nextPurpose, notice });
+      expect(switched.step.challenge).toBeUndefined();
       expect(switched.session_token).not.toBe(start.session_token);
       expect(switched.step.error).toBeUndefined();
       const resumed = await getFlowStep(start.id);
