@@ -93,6 +93,9 @@ dialects the build tags bring up (`postgres_integration`,
 `spanner_integration`, `sqlite_integration`; several at once for local
 parity).
 
+- The suites run in parallel in one database: a test touches only rows of its
+  own project. One that cannot (a statement with no project in its key) calls
+  `forEachDialectAlone`.
 - A domain-visible change under `dialect/{postgres,spanner,sqlite}/` (a new
   statement method, corrected error semantics such as `NoRowFoundError`, a
   filter, cascade or uniqueness contract) adds or extends a portable
