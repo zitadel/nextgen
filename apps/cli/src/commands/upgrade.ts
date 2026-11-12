@@ -10,7 +10,7 @@ import { painted } from "@/lib/oclif/rendering";
 import { Suggestible } from "@/lib/oclif/suggestible";
 import { hasZitadelConfig } from "@/lib/project";
 import { newestCliCommand } from "@/lib/public-cli";
-import { breakingChanges, RELEASE_NOTES_URL } from "@/lib/release-notes";
+import { type BreakingChange, breakingChanges, RELEASE_NOTES_URL } from "@/lib/release-notes";
 import { SHARED_SKILLS_DIR } from "@/lib/skills/add";
 import { arrow, command, dim, mark, strong, url } from "@/lib/style";
 import { type SuggestedCommand, shellCommand, unscopedCommand } from "@/lib/suggestion";
@@ -29,9 +29,14 @@ import {
   zitadelChannel,
 } from "@/lib/zitadel-packages";
 
+/**
+ * How long the new release's `doctor --fix` may run before it counts as failed.
+ */
 const DOCTOR_TIMEOUT_MS = 5 * 60 * 1000;
 
-/** How rerunning `doctor --fix` at the new version ended, when it ran at all. */
+/**
+ * How rerunning `doctor --fix` at the new version ended, when it ran at all.
+ */
 type Refresh = "done" | "issues" | "failed" | "planned" | "skipped";
 
 /**
@@ -55,11 +60,35 @@ export default class Upgrade extends Suggestible(BaseCommand) {
     "<%= config.bin %> <%= command.id %> --dry-run",
   ];
 
-  // Everything here is about npm and the project: nothing to ask a server.
+  /**
+   * Everything this command does is about npm and the project, so there is no
+   * server to ask.
+   */
   static override meta = {
     resolveServer: false,
   };
 
+  /**
+   * Upgrades the project in four steps, in an order that lets a person stop:
+   *
+   * 1. Plan, which only looks. A lookup that fails refuses here, before anything
+   *    is touched.
+   * 2. Print the breaking changes the upgrade crosses, before anything changes,
+   *    so the person reads them while they can still stop.
+   * 3. Install the new packages. A package manager that fails refuses here, and
+   *    nothing else has changed.
+   * 4. Regenerate the project's files with the new release's `doctor --fix`.
+   *
+   * What the person reads is built last, from what happened. A package's name and
+   * versions are what the registry answered, so each is spelled out where it is
+   * drawn, and every suggested command is built for the new release and run from
+   * the directory the person typed.
+   *
+   * @param input.flags - The parsed flags.
+   * @returns The result, which is also the `--json` envelope.
+   * @throws A `ZitadelError` `E_NETWORK` when the latest release cannot be looked
+   * up, and `E_VALIDATION` when the install fails.
+   */
   protected async execute({ flags }: Admitted<typeof Upgrade>): Promise<JsonEnvelope> {
     const upgrader = new Upgrader({
       cliVersion: this.cliVersion,
@@ -73,6 +102,7 @@ export default class Upgrade extends Suggestible(BaseCommand) {
         redirectStdoutToStderr: this.isJson,
       }),
     });
+
     const plan = await upgrader.plan().catch((error: unknown) => {
       if (!(error instanceof ReleaseLookupError)) {
         throw error;
@@ -82,16 +112,22 @@ export default class Upgrade extends Suggestible(BaseCommand) {
         nextCommands: [this.suggest("upgrade")],
       });
     });
-    const breaking = plan.upToDate ? [] : await breakingChanges(plan.oldest, plan.target);
 
-    // Before anything changes, so the person reads it while they can still stop.
+    let breaking: readonly BreakingChange[] = [];
     if (!plan.upToDate) {
-      const notes = breaking.map(({ version, note }) => {
-        return `  ${mark.warn} ${strong(escapeControlCharacters(version))}  ${escapeControlCharacters(note)}`;
-      });
-      const heading = notes.length > 0 ? [strong("Breaking changes on the way:"), ...notes] : [];
-      this.log([...heading, `Release notes: ${url(RELEASE_NOTES_URL)}`, ""].join("\n"));
+      breaking = await breakingChanges(plan.oldest, plan.target);
+      const banner: string[] = [];
+      if (breaking.length > 0) {
+        banner.push(strong("Breaking changes on the way:"));
+      }
+      for (const { version, note } of breaking) {
+        const said = `${strong(escapeControlCharacters(version))}  ${escapeControlCharacters(note)}`;
+        banner.push(`  ${mark.warn} ${said}`);
+      }
+      banner.push(`Release notes: ${url(RELEASE_NOTES_URL)}`, "");
+      this.log(banner.join("\n"));
     }
+
     const result = await upgrader.apply(plan).catch((error: unknown) => {
       if (!(error instanceof InstallError)) {
         throw error;
@@ -101,89 +137,131 @@ export default class Upgrade extends Suggestible(BaseCommand) {
         nextCommands: [shellCommand(error.command), this.suggest("upgrade")],
       });
     });
+
     const refresh = await this.refresh(plan.target, result, flags.telemetry === false);
 
-    const done = this.dryRun ? arrow : mark.pass;
-    const refreshLines: Partial<Record<Refresh, string>> = {
-      done: `  ${done} Refreshed generated files with doctor --fix`,
-      issues: `  ${mark.warn} Refreshed generated files; doctor still reports issues`,
-      failed: `  ${mark.warn} Could not refresh generated files`,
-    };
-    const refreshLine = refreshLines[refresh];
-    const rows = [
-      // A package's name and versions are what the registry answered, so they are
-      // spelled out here rather than by whatever prints the report.
-      ...plan.packages.map((pkg) => {
-        return `  ${done} ${escapeControlCharacters(`${pkg.name} ${pkg.from} → ${pkg.to}`)}`;
-      }),
-      ...(this.dryRun && result.installCommand !== undefined
-        ? [`  Would run ${command(result.installCommand)}`]
-        : []),
-      ...(refreshLine === undefined ? [] : [refreshLine]),
-      ...plan.leftAlone.map(({ name, specifier }) => {
-        const said = `- ${name} left at "${specifier}", not an exact version`;
-        return `  ${dim(escapeControlCharacters(said))}`;
-      }),
-    ];
-    const moves = this.dryRun ? "can be upgraded to" : "upgraded to";
-    const verb = plan.upToDate ? "is up to date at" : moves;
-    const title = `Zitadel ${verb} ${plan.target}${this.dryRun ? " (dry run)" : ""}`;
+    let done = mark.pass;
+    if (this.dryRun) {
+      done = arrow;
+    }
+    const rows: string[] = [];
+    for (const pkg of plan.packages) {
+      const said = escapeControlCharacters(`${pkg.name} ${pkg.from} → ${pkg.to}`);
+      rows.push(`  ${done} ${said}`);
+    }
+    if (this.dryRun && result.installCommand !== undefined) {
+      rows.push(`  Would run ${command(result.installCommand)}`);
+    }
+    if (refresh === "done") {
+      rows.push(`  ${done} Refreshed generated files with doctor --fix`);
+    } else if (refresh === "issues") {
+      rows.push(`  ${mark.warn} Refreshed generated files; doctor still reports issues`);
+    } else if (refresh === "failed") {
+      rows.push(`  ${mark.warn} Could not refresh generated files`);
+    }
+    for (const { name, specifier } of plan.leftAlone) {
+      const said = `- ${name} left at "${specifier}", not an exact version`;
+      rows.push(`  ${dim(escapeControlCharacters(said))}`);
+    }
 
-    // At the new version, and from the shell's directory like every suggestion.
-    const atTarget = (args: string): SuggestedCommand => {
-      return unscopedCommand(
-        flags.cwd === undefined ? args : `${args} ${Cmd.option("--cwd", flags.cwd)}`,
-        plan.target,
+    let title = `Zitadel upgraded to ${plan.target}`;
+    if (plan.upToDate) {
+      title = `Zitadel is up to date at ${plan.target}`;
+    } else if (this.dryRun) {
+      title = `Zitadel can be upgraded to ${plan.target}`;
+    }
+    if (this.dryRun) {
+      title = `${title} (dry run)`;
+    }
+
+    let cwdOption = "";
+    if (flags.cwd !== undefined) {
+      cwdOption = ` ${Cmd.option("--cwd", flags.cwd)}`;
+    }
+    const commands: SuggestedCommand[] = [];
+    if (this.dryRun && !plan.upToDate) {
+      commands.push(this.suggest("upgrade"));
+    }
+    if (refresh === "failed") {
+      commands.push(unscopedCommand(`doctor --fix${cwdOption}`, plan.target));
+    }
+    if (refresh === "issues") {
+      commands.push(unscopedCommand(`doctor${cwdOption}`, plan.target));
+    }
+    if (result.installed && existsSync(join(this.cwd, SHARED_SKILLS_DIR))) {
+      commands.push(unscopedCommand(`skills add${cwdOption}`, plan.target));
+    }
+
+    const actions: string[] = [];
+    if (plan.cliBehind) {
+      const newest = newestCliCommand("<command>", this.cliVersion);
+      const global = `npm install --global ${ZITADEL_CLI}@${plan.target}`;
+      actions.push(
+        `This CLI is still ${this.cliVersion}. Run the newest with ${newest}, or if you installed it globally, update it with ${global}.`,
       );
+    }
+
+    const data: Record<string, unknown> = {
+      title,
+      current_version: plan.cliVersion,
+      latest_version: plan.target,
+      up_to_date: plan.upToDate,
+      packages: plan.packages,
+      left_alone: plan.leftAlone.map(({ name, specifier }) => {
+        return {
+          name,
+          specifier,
+        };
+      }),
+      breaking_changes: breaking,
+      release_notes_url: RELEASE_NOTES_URL,
+      refresh,
     };
-    const commands: SuggestedCommand[] = [
-      ...(this.dryRun && !plan.upToDate ? [this.suggest("upgrade")] : []),
-      ...(refresh === "failed" ? [atTarget("doctor --fix")] : []),
-      ...(refresh === "issues" ? [atTarget("doctor")] : []),
-      ...(result.installed && existsSync(join(this.cwd, SHARED_SKILLS_DIR))
-        ? [atTarget("skills add")]
-        : []),
-    ];
-    const actions = plan.cliBehind
-      ? [
-          `This CLI is still ${this.cliVersion}. Run the newest with ${newestCliCommand("<command>", this.cliVersion)}, or if you installed it globally, update it with npm install --global ${ZITADEL_CLI}@${plan.target}.`,
-        ]
-      : [];
+    if (this.dryRun) {
+      data.dry_run = true;
+    }
+    if (result.installCommand !== undefined) {
+      data.install_command = result.installCommand;
+    }
+
+    const next: { actions?: string[]; commands?: SuggestedCommand[] } = {};
+    if (actions.length > 0) {
+      next.actions = actions;
+    }
+    if (commands.length > 0) {
+      next.commands = commands;
+    }
 
     return this.emit({
       status: "ok",
-      data: {
-        title,
-        ...(this.dryRun ? { dry_run: true } : {}),
-        current_version: plan.cliVersion,
-        latest_version: plan.target,
-        up_to_date: plan.upToDate,
-        packages: plan.packages,
-        left_alone: plan.leftAlone.map(({ name, specifier }) => {
-          return { name, specifier };
-        }),
-        breaking_changes: breaking,
-        release_notes_url: RELEASE_NOTES_URL,
-        refresh,
-        ...(result.installCommand === undefined ? {} : { install_command: result.installCommand }),
-      },
+      data,
       pretty: painted([strong(title), ...rows].join("\n")),
-      summary: { title, sections: [], lines: rows },
-      next: {
-        ...(actions.length > 0 ? { actions } : {}),
-        ...(commands.length > 0 ? { commands } : {}),
+      summary: {
+        title,
+        sections: [],
+        lines: rows,
       },
+      next,
     });
   }
 
   /**
-   * Has the new release regenerate the project's files: its `doctor --fix`,
-   * because only that release knows what it generates. As a child, its one
-   * envelope captured: it must not print into this command's output. A run that
-   * reports issues still repaired what it could.
+   * Has the new release regenerate the project's files with its own
+   * `doctor --fix`, because only that release knows what it generates.
    *
+   * It runs as a child whose one envelope is captured, because it must not print
+   * into this command's output, and with an environment that keeps it off the
+   * registry. A run that reports issues still repaired what it could, so the
+   * outcome says so rather than failing; the new packages stay either way.
+   * `--no-telemetry` reaches this run only, so it is passed on to the child.
+   * An interruption ends the child and the upgrade with it, instead of counting
+   * as a refresh that merely failed.
+   *
+   * @param version - The release whose `doctor --fix` is run.
+   * @param result - What the install did.
+   * @param noTelemetry - Whether `--no-telemetry` was given.
    * @returns `skipped` when nothing moved or the project has no Zitadel config,
-   * `planned` on a dry run, else how the run ended.
+   * `planned` on a dry run, and otherwise how the run ended.
    * @throws The signal's reason when the run was interrupted.
    */
   private async refresh(
@@ -197,6 +275,7 @@ export default class Upgrade extends Suggestible(BaseCommand) {
     if (this.dryRun) {
       return "planned";
     }
+
     const args = [
       "--yes",
       `${ZITADEL_CLI}@${version}`,
@@ -205,10 +284,16 @@ export default class Upgrade extends Suggestible(BaseCommand) {
       "--non-interactive",
       "--json",
     ];
+    if (noTelemetry) {
+      args.push("--no-telemetry");
+    }
     try {
-      const child = await execa("npx", noTelemetry ? [...args, "--no-telemetry"] : args, {
+      const child = await execa("npx", args, {
         cwd: this.cwd,
-        env: { ...this.env, [UPDATE_CHECK_VARIABLE]: "0" },
+        env: {
+          ...this.env,
+          [UPDATE_CHECK_VARIABLE]: "0",
+        },
         extendEnv: false,
         reject: false,
         stdin: "ignore",
@@ -217,7 +302,10 @@ export default class Upgrade extends Suggestible(BaseCommand) {
       });
       this.signal.throwIfAborted();
       const envelope = JSON.parse(child.stdout) as { status?: unknown };
-      return envelope.status === "ok" ? "done" : "issues";
+      if (envelope.status === "ok") {
+        return "done";
+      }
+      return "issues";
     } catch {
       this.signal.throwIfAborted();
       return "failed";

@@ -9,21 +9,50 @@ import {
 import { InstallError } from "./errors";
 import type { UpgradePlan } from "./plan";
 
-/** The install a plan needs, and how it reads in the person's shell. */
-export type PlannedInstall = Readonly<{ run: PackageCommand; display: string }>;
+/**
+ * The install a plan needs, and how it reads in the person's shell.
+ */
+export type PlannedInstall = Readonly<{
+  /**
+   * The command to run.
+   */
+  run: PackageCommand;
 
-/** What a {@link PackageInstaller} is given. */
+  /**
+   * The command as the person's shell reads it, from the directory they typed.
+   */
+  display: string;
+}>;
+
+/**
+ * What a {@link PackageInstaller} is given.
+ */
 export type InstallerOptions = Readonly<{
+  /**
+   * The project directory.
+   */
   cwd: string;
-  /** `--cwd` as typed, so the displayed command runs from the shell's directory. */
+
+  /**
+   * `--cwd` as typed, so the displayed command runs from the shell's directory.
+   */
   typedCwd: string | undefined;
-  /** Whether a package manager's progress must stay off stdout. */
+
+  /**
+   * Whether a package manager's progress must stay off stdout, which a command
+   * that prints one machine-readable result needs.
+   */
   redirectStdoutToStderr: boolean;
 }>;
 
-/** Installs a plan's packages with the project's own package manager. */
+/**
+ * Installs a plan's packages with the project's own package manager, so a pnpm
+ * or yarn project is not switched to npm by an upgrade.
+ */
 export class PackageInstaller {
-  /** What the installer was given. */
+  /**
+   * What the installer was given.
+   */
   private readonly options: InstallerOptions;
 
   /**
@@ -36,8 +65,10 @@ export class PackageInstaller {
   }
 
   /**
-   * The install the plan needs, with an exact-save flag so a pin stays a pin.
+   * Works out the install a plan needs. It saves exact versions, because a bare
+   * install would write a range, which is exactly the float an exact pin avoids.
    *
+   * @param plan - What is to be installed.
    * @returns The install, or `undefined` when no package moves.
    */
   async plan(plan: UpgradePlan): Promise<PlannedInstall | undefined> {
@@ -45,8 +76,12 @@ export class PackageInstaller {
       return undefined;
     }
     const { cwd, typedCwd } = this.options;
-    const run = addExactCommandFor(await detectPackageManager(cwd), [...plan.specs]);
-    return { run, display: inDirectory(run, typedCwd, cwd).display };
+    const manager = await detectPackageManager(cwd);
+    const run = addExactCommandFor(manager, [...plan.specs]);
+    return {
+      run,
+      display: inDirectory(run, typedCwd, cwd).display,
+    };
   }
 
   /**

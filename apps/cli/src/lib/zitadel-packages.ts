@@ -1,45 +1,73 @@
 import { join } from "node:path";
 
-import { Cache } from "./upgrade/cache";
-import { ReleaseChannel } from "./upgrade/channel";
 import { npmDistTagForCliVersion } from "./public-cli";
 import { isCI } from "./skills-hint";
 import { telemetryConfigDir } from "./telemetry/identity";
+import { Cache } from "./upgrade/cache";
+import { ReleaseChannel } from "./upgrade/channel";
 
-/** The prefix of the Zitadel packages that move together. */
+/**
+ * The prefix of the Zitadel packages that move together as one release.
+ */
 export const ZITADEL_SCOPE = "@zitadel/";
 
-/** The package whose dist-tag names the newest release. */
+/**
+ * The package whose dist-tag names the newest Zitadel release.
+ */
 export const ZITADEL_CLI = "@zitadel/cli";
 
-/** The environment variable that, set to `0`, keeps a run off the npm registry. */
+/**
+ * The environment variable that, set to `0`, keeps a run off the npm registry.
+ */
 export const UPDATE_CHECK_VARIABLE = "ZITADEL_UPDATE_CHECK";
 
+/**
+ * The registry asked when npm was not pointed at another.
+ */
 const DEFAULT_REGISTRY = "https://registry.npmjs.org";
 
 /**
- * Whether a run stays off the registry: asked to, or on CI, where no person
- * reads a notice.
+ * Whether a run stays off the registry: asked to with the environment variable,
+ * or running on CI, where no person reads a notice about a newer release.
  *
  * @param env - The run's environment.
+ * @returns `true` when the registry must not be asked.
  */
 export function updateCheckDisabled(env: NodeJS.ProcessEnv): boolean {
-  return env[UPDATE_CHECK_VARIABLE] === "0" || isCI(env);
+  if (env[UPDATE_CHECK_VARIABLE] === "0") {
+    return true;
+  }
+  return isCI(env);
 }
 
 /**
- * Where the newest Zitadel release is looked up. `npm_config_registry` is where
- * npm and npx themselves were pointed, so a mirror keeps working.
+ * Builds the channel that looks the newest Zitadel release up. It asks the
+ * registry that npm and npx themselves were pointed at, through
+ * `npm_config_registry`, so a mirror keeps working and a private registry sees
+ * the request npx made. Its answer is kept in the CLI's config directory, next to
+ * the telemetry identity.
  *
  * @param cliVersion - The running CLI's version, which decides the dist-tag.
  * @param env - The run's environment.
+ * @returns The channel.
  */
 export function zitadelChannel(cliVersion: string, env: NodeJS.ProcessEnv): ReleaseChannel {
-  const dir = telemetryConfigDir(env);
+  let registry = DEFAULT_REGISTRY;
+  const configured = env.npm_config_registry?.trim();
+  if (configured !== undefined && configured !== "") {
+    registry = configured.replace(/\/+$/, "");
+  }
+
+  let file: string | undefined;
+  const directory = telemetryConfigDir(env);
+  if (directory !== undefined) {
+    file = join(directory, "update-check.json");
+  }
+
   return new ReleaseChannel({
     packageName: ZITADEL_CLI,
     distTag: npmDistTagForCliVersion(cliVersion),
-    registry: (env.npm_config_registry?.trim() || DEFAULT_REGISTRY).replace(/\/+$/, ""),
-    cache: new Cache(dir === undefined ? undefined : join(dir, "update-check.json")),
+    registry,
+    cache: new Cache(file),
   });
 }

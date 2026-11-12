@@ -1,15 +1,23 @@
-/** The newest release could not be looked up. */
+/**
+ * The newest release could not be looked up. Its message is generic on purpose:
+ * a caller words the failure for its own person, with its own suggestions.
+ */
 export class ReleaseLookupError extends Error {
-  /** The message is generic: a caller words the failure for its own person. */
   constructor() {
     super("Could not look up the latest release");
     this.name = "ReleaseLookupError";
   }
 }
 
-/** The package manager failed to install the new packages. */
+/**
+ * The package manager failed to install the new packages. It carries the install
+ * and the failure, and nothing about how either is worded, so a caller words the
+ * failure for its own person.
+ */
 export class InstallError extends Error {
-  /** The install, as the person's shell reads it, so it can be rerun. */
+  /**
+   * The install, as the person's shell reads it, so it can be offered again.
+   */
   readonly command: string;
 
   /**

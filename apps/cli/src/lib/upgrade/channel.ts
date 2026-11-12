@@ -1,24 +1,52 @@
-import type { Cache } from "./cache";
+import type { Cache, CacheEntry } from "./cache";
 import { Release } from "./release";
 
-const LOOKUP_TIMEOUT_MS = 1500;
+/**
+ * How long the registry is left alone after it has answered, so a command that
+ * only wants to mention a newer release never costs a network round trip on
+ * every run.
+ */
 const CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
-/** What a {@link ReleaseChannel} is given. */
+/**
+ * How long a lookup may take. It is advice, so it must never hold up the command
+ * that asked.
+ */
+const LOOKUP_TIMEOUT_MS = 1500;
+
+/**
+ * What a {@link ReleaseChannel} is given.
+ */
 export type ChannelOptions = Readonly<{
-  /** The package whose dist-tag names the newest release, such as `@acme/cli`. */
+  /**
+   * The package whose dist-tag names the newest release, such as `@acme/cli`.
+   */
   packageName: string;
-  /** The dist-tag the releases are published on. */
+
+  /**
+   * The dist-tag the releases are published on.
+   */
   distTag: string;
-  /** The registry to ask, without a trailing slash. */
+
+  /**
+   * The registry to ask, without a trailing slash.
+   */
   registry: string;
-  /** Where the last answer is kept. */
+
+  /**
+   * Where the last answer is kept.
+   */
   cache: Cache;
 }>;
 
-/** The newest published release on one dist-tag, asked of the registry at most once a day. */
+/**
+ * The newest published release on one dist-tag, asked of the registry at most
+ * once a day.
+ */
 export class ReleaseChannel {
-  /** What the channel was given. */
+  /**
+   * What the channel was given.
+   */
   private readonly options: ChannelOptions;
 
   /**
@@ -32,34 +60,48 @@ export class ReleaseChannel {
   }
 
   /**
-   * The newest release, from the cache when it is under a day old. Never throws:
-   * a lookup is advice, so an offline machine costs the answer, not the caller.
+   * Looks the newest release up, from the cache when its answer is under a day
+   * old, and from the registry otherwise.
    *
-   * A failed lookup is remembered as well, keeping the version known before it, so
-   * an offline machine does not wait out the timeout on every run.
+   * It never throws: a lookup is advice, so an offline machine, a registry that
+   * does not answer or an unwritable cache costs the answer and never the
+   * caller. A failed lookup is remembered as well, keeping the version known
+   * before it, so an offline machine does not wait out the timeout on every run.
+   *
+   * A cached timestamp ahead of now (the clock moved back, or the file was
+   * edited) would otherwise keep its answer fresh for however long it says, so
+   * it counts as stale. A version the cache held is held to the same standard as
+   * one the registry sent, because a file is as much an answer from outside, so
+   * junk in it is neither returned nor written back.
+   *
+   * The registry is asked for the package's dist-tags alone, which is far less
+   * than its full document.
    *
    * @param options.fresh - Skip the cache and return only what the registry answered now.
    * @returns The release, or `undefined` when nobody can say.
    */
   async latest(options: { fresh?: boolean } = {}): Promise<Release | undefined> {
+    const { fresh = false } = options;
     const { packageName, distTag, registry, cache } = this.options;
     const key = `${registry}/${packageName}#${distTag}`;
     const cached = await cache.get(key);
-    // A timestamp ahead of now (the clock moved back, or the file was edited) is
-    // no answer to trust for however long it says, so it is asked again.
-    const age = Date.now() - (cached?.checked_at ?? 0);
-    if (!options.fresh && cached !== undefined && age >= 0 && age < CACHE_MAX_AGE_MS) {
-      return Release.from(cached.version);
+
+    if (!fresh && cached !== undefined) {
+      const age = Date.now() - cached.checked_at;
+      if (age >= 0 && age < CACHE_MAX_AGE_MS) {
+        return Release.from(cached.version);
+      }
     }
-    // The dist-tags alone, far less than the package's full document.
-    const answered = await fetch(
-      `${registry}/-/package/${packageName.replace("/", "%2f")}/dist-tags`,
-      {
-        signal: AbortSignal.timeout(LOOKUP_TIMEOUT_MS),
-      },
-    )
+
+    const path = `/-/package/${packageName.replace("/", "%2f")}/dist-tags`;
+    const answered = await fetch(`${registry}${path}`, {
+      signal: AbortSignal.timeout(LOOKUP_TIMEOUT_MS),
+    })
       .then(async (response) => {
-        return response.ok ? ((await response.json()) as Record<string, unknown>) : {};
+        if (!response.ok) {
+          return {};
+        }
+        return (await response.json()) as Record<string, unknown>;
       })
       .then((tags) => {
         return Release.from(tags[distTag]);
@@ -67,12 +109,17 @@ export class ReleaseChannel {
       .catch(() => {
         return undefined;
       });
-    // What the cache held is an answer from outside too, so junk in it is not kept.
-    const known = answered?.version ?? Release.from(cached?.version)?.version;
-    await cache.set(key, {
+
+    const known = answered ?? Release.from(cached?.version);
+    const entry: CacheEntry = {
       checked_at: Date.now(),
-      ...(known === undefined ? {} : { version: known }),
-    });
-    return options.fresh ? answered : Release.from(known);
+      version: known?.version,
+    };
+    await cache.set(key, entry);
+
+    if (fresh) {
+      return answered;
+    }
+    return known;
   }
 }
