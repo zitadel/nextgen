@@ -83,7 +83,11 @@ async function freePort() {
 // The OTLP/HTTP paths the server exports to, and what takes each export.
 const collectors = {
   "/v1/traces": (body) => router.ingest(decodeTraceRequest(body)),
-  "/v1/metrics": (body) => metrics.ingest(decodeMetricsRequest(body)),
+  "/v1/metrics": (body) => {
+    metrics.ingest(decodeMetricsRequest(body));
+    // TEMPORARY PROBE: does Vercel record a data point sent outside a request?
+    globalThis[runtimeIpc]?.sendMetric?.("zitadel.wrapper.probe", 1, { context: "collector" });
+  },
 };
 
 function collectorHandler(req, res) {
@@ -264,7 +268,9 @@ function sendMetrics() {
   if (typeof sendMetric !== "function") {
     return;
   }
-  for (const point of metrics.take(metricsPerRequest)) {
+  // TEMPORARY PROBE: the same data point, sent inside a request.
+  sendMetric.call(globalThis[runtimeIpc], "zitadel.wrapper.probe", 1, { context: "request" });
+  for (const point of metrics.take(metricsPerRequest - 1)) {
     sendMetric.call(globalThis[runtimeIpc], point.name, point.value, point.attributes);
   }
 }
