@@ -3,20 +3,12 @@ import { type Environment, requireValueInteractive, resolveEnvironment } from "@
 import { resolveCwd } from "@/lib/paths";
 import { BaseCommand, type MetaOptions } from "./base";
 import { CREDENTIALS, type CredentialKind } from "./credentials";
-import {
-  ENVIRONMENT_SELECTOR_OPTIONS,
-  environmentFlags,
-  environmentSelectorSuffix,
-} from "./environment-flags";
-import { byName } from "./names";
-import { Suggestible } from "./suggestible";
+import { environmentFlags } from "./environment-flags";
+import { byName } from "@/lib/names";
 import type { Connection, ConnectOptions, GlobalOptions } from "./types";
 
 export type { Connection } from "./types";
 
-import { Cmd } from "@/lib/cmd";
-import { optionArgs } from "@/lib/public-cli";
-import type { EnvironmentSelector, SuggestedCommand } from "@/lib/suggestion";
 import { userAgent } from "@/lib/user-agent";
 
 /**
@@ -29,7 +21,7 @@ import { userAgent } from "@/lib/user-agent";
  * Which credential it authenticates with is `static credential`; the project
  * secret unless a subclass says otherwise.
  */
-export abstract class EnvironmentCommand extends Suggestible(BaseCommand) {
+export abstract class EnvironmentCommand extends BaseCommand {
   static override baseFlags = { ...BaseCommand.baseFlags, ...environmentFlags };
 
   static credential: CredentialKind = "project";
@@ -38,9 +30,6 @@ export abstract class EnvironmentCommand extends Suggestible(BaseCommand) {
 
   /** What the invocation resolved to; set by {@link toMeta}. */
   protected environment!: Environment;
-
-  /** `--cwd` as typed, reproduced by {@link selector}. */
-  private cwdFlag: string | undefined;
 
   /**
    * Resolve the environment, then build the invocation context from its server.
@@ -59,7 +48,6 @@ export abstract class EnvironmentCommand extends Suggestible(BaseCommand) {
     const text = (value: unknown): string | undefined => {
       return typeof value === "string" ? value : undefined;
     };
-    this.cwdFlag = text(flags.cwd);
     // A command that only edits files in the project directory resolves none:
     // a stray ZITADEL_ENV must not stop it, and it names no server or project.
     if (options.environment === false) {
@@ -77,83 +65,6 @@ export abstract class EnvironmentCommand extends Suggestible(BaseCommand) {
       resolveServer: false,
       source: this.environment.values.ZITADEL_URL?.value ?? "",
     });
-  }
-
-  /**
-   * The flags that reproduce this invocation's environment selection, as a
-   * suffix to append to a `zitadel` command this run suggests (e.g.
-   * ` --env production`). A retry the CLI prints must resolve the same server,
-   * project and credential this run did; without the selector it would fall
-   * back to the default environment and quietly target the wrong project.
-   *
-   * Only flags actually passed are reproduced: a name that came from
-   * `ZITADEL_ENV` or a platform signal needs none, because the next run in the
-   * same environment inherits it. `--env` and `--env-file` are mutually
-   * exclusive; `--server` (the URL only) can accompany either. Empty when the
-   * invocation used no selector.
-   */
-  protected environmentSelector(): EnvironmentSelector {
-    // A command that resolved no environment has only its directory to put back.
-    if ((this.environment as Environment | undefined) === undefined) {
-      return this.cwdSelector();
-    }
-    const { environment } = this;
-
-    return environmentSelectorSuffix({
-      cwd: this.cwdFlag,
-      envFile: environment.envFile,
-      envName: environment.name.source === "--env" ? environment.name.value : undefined,
-      server:
-        environment.values.ZITADEL_URL?.source === "--server"
-          ? environment.values.ZITADEL_URL.value
-          : undefined,
-    });
-  }
-
-  protected override selector(): EnvironmentSelector {
-    return this.environmentSelector();
-  }
-
-  /**
-   * {@link environmentSelector} as arguments, for a result that reports its
-   * follow-ups as argument lists too (`next_args`).
-   */
-  protected environmentSelectorArgs(): string[] {
-    if ((this.environment as Environment | undefined) === undefined) {
-      return this.cwdFlag === undefined ? [] : optionArgs("--cwd", this.cwdFlag);
-    }
-    const { environment } = this;
-
-    return [
-      ...(environment.envFile !== undefined
-        ? optionArgs("--env-file", environment.envFile)
-        : environment.name.source === "--env"
-          ? optionArgs("--env", environment.name.value)
-          : []),
-      ...(environment.values.ZITADEL_URL?.source === "--server"
-        ? optionArgs("--server", environment.values.ZITADEL_URL.value)
-        : []),
-      ...(this.cwdFlag === undefined ? [] : optionArgs("--cwd", this.cwdFlag)),
-    ];
-  }
-
-  /** A follow-up the framework suggests, such as a list's next page, aimed at this project. */
-  protected override suggestFollowUp(args: string): SuggestedCommand {
-    return this.suggest(args);
-  }
-
-  /**
-   * The run again through {@link suggest}, which puts its selector back on.
-   * A run that resolved no environment (an `auth-method` edit) has none to
-   * put back, so it keeps the words as typed.
-   */
-  protected override retryCommand(words: readonly string[]): SuggestedCommand {
-    if ((this.environment as Environment | undefined) === undefined) {
-      return super.retryCommand(words);
-    }
-    const line = Cmd.of(words).without(ENVIRONMENT_SELECTOR_OPTIONS);
-
-    return this.suggest(line.toString());
   }
 
   /**

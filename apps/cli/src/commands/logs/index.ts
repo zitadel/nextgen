@@ -9,7 +9,6 @@ import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "@/
 import { reads, type Refused, whole } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { painted, prose } from "@/lib/oclif/rendering";
-import { Suggestible } from "@/lib/oclif/suggestible";
 
 /** How many lines `--tail` shows when it is not given. */
 const DEFAULT_TAIL = 200;
@@ -42,7 +41,7 @@ const FOLLOW_IS_NOT_JSON_REFUSAL: Refusal = {
 const NOT_STARTED_REFUSAL: Refusal = {
   message: "Local Zitadel runtime has not been started",
   hint: "Start the local server first.",
-  next: ["start"],
+  next: [{ id: "start" }],
 };
 
 /**
@@ -52,7 +51,7 @@ const NOT_STARTED_REFUSAL: Refusal = {
  * the start command ran in, or one inside it: the server is found from the
  * nearest .zitadel/local/ on the way up.
  */
-export default class Logs extends Suggestible(BaseCommand) {
+export default class Logs extends BaseCommand {
   static override description =
     "Show local Zitadel server logs.\n\nOn a terminal, warnings are yellow and errors red. Run it in the directory the start command ran in, or one inside it: the server is found from the nearest .zitadel/local/ on the way up.";
   static override group = CommandGroups.localDevelopment;
@@ -96,13 +95,10 @@ export default class Logs extends Suggestible(BaseCommand) {
     // in the nearest parent, as `doctor` and `console` find it.
     const started = await this.started.of(this.cwd);
     if (started === undefined) {
-      throw refusalError(NOT_STARTED_REFUSAL, {}, (next) => {
-        return this.suggest(next);
-      });
+      throw refusalError(NOT_STARTED_REFUSAL, {});
     }
     const server = LocalServer.at(started.dir, {
       cliVersion: this.cliVersion,
-      selector: this.cwdSelector(),
     });
     if (flags.follow) {
       await server.followLogs({

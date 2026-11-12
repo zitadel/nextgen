@@ -2,7 +2,6 @@ import { Flags } from "@oclif/core";
 import { z } from "zod";
 
 import { DeploymentService } from "@/lib/backend";
-import { Cmd } from "@/lib/cmd";
 import {
   type Admitted,
   CommandGroups,
@@ -11,6 +10,7 @@ import {
   nonBlankString,
 } from "@/lib/oclif";
 import { reads, type Refused, whole } from "@/lib/oclif/flags";
+import { relatedFlags } from "@/lib/suggestion/relations";
 import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
 
 /** The page sizes the server accepts, quoted by the refusal and the reference. */
@@ -51,26 +51,28 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
     "<%= config.bin %> deployment list --live",
     "<%= config.bin %> deployment list --origin https://app.acme.com",
   ];
-  static override flags = {
-    origin: nonBlankString({ description: "Only deployments that targeted this origin." }),
-    live: Flags.boolean({ description: "What each target serves now, not the full history." }),
-    limit: Flags.custom<number>({
-      parse: reads(LIMIT),
-    })({
-      min: LIMIT_MIN,
-      max: LIMIT_MAX,
-      description: "Page size (server default 20, max 100).",
-    }),
-    "page-token": nonBlankString({
-      description: "Continue from a previous page's next_page_token.",
-    }),
-    all: Flags.boolean({
-      char: "a",
-      description: "Fetch every page instead of one.",
-      exclusive: ["page-token"],
-    }),
-    plain: plainFlag,
-  };
+  static override flags = relatedFlags(
+    {
+      origin: nonBlankString({ description: "Only deployments that targeted this origin." }),
+      live: Flags.boolean({ description: "What each target serves now, not the full history." }),
+      limit: Flags.custom<number>({
+        parse: reads(LIMIT),
+      })({
+        min: LIMIT_MIN,
+        max: LIMIT_MAX,
+        description: "Page size (server default 20, max 100).",
+      }),
+      "page-token": nonBlankString({
+        description: "Continue from a previous page's next_page_token.",
+      }),
+      all: Flags.boolean({
+        char: "a",
+        description: "Fetch every page instead of one.",
+      }),
+      plain: plainFlag,
+    },
+    { all: { exclusive: ["page-token"] } },
+  );
 
   protected async execute({ flags }: Admitted<typeof DeploymentList>): Promise<JsonEnvelope> {
     const { client, projectId } = await this.connect();
@@ -102,12 +104,6 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
     const footer: string[] = [];
     const page = {
       token: listed.next,
-      command: "deployment list",
-      flags: [
-        ...(flags.origin === undefined ? [] : [Cmd.option("--origin", flags.origin)]),
-        ...(flags.live ? ["--live"] : []),
-        ...(flags.limit === undefined ? [] : [`--limit ${flags.limit}`]),
-      ],
     };
     const extra = {};
 

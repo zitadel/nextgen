@@ -3,17 +3,15 @@ import { join } from "node:path";
 
 import { execa } from "execa";
 
-import { Cmd } from "@/lib/cmd";
 import { errorMessage, ZitadelError } from "@/lib/errors";
 import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
 import { painted } from "@/lib/oclif/rendering";
-import { Suggestible } from "@/lib/oclif/suggestible";
 import { hasZitadelConfig } from "@/lib/project";
 import { newestCliCommand } from "@/lib/public-cli";
 import { type BreakingChange, breakingChanges, RELEASE_NOTES_URL } from "@/lib/release-notes";
 import { SHARED_SKILLS_DIR } from "@/lib/skills/add";
 import { arrow, command, dim, mark, strong, url } from "@/lib/style";
-import { type SuggestedCommand, shellCommand, unscopedCommand } from "@/lib/suggestion";
+import { type SuggestedCommand, shellCommand } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import {
   InstallError,
@@ -49,7 +47,7 @@ type Refresh = "done" | "issues" | "failed" | "planned" | "skipped";
  * choice the user made, as `doctor`'s `dependency-version` check also holds, so
  * it is reported and left alone.
  */
-export default class Upgrade extends Suggestible(BaseCommand) {
+export default class Upgrade extends BaseCommand {
   static override description =
     "Upgrade this project to the latest Zitadel release.\n\nRe-pins the project's exactly-pinned @zitadel/* packages with its own package manager, then runs the new release's doctor --fix to refresh generated files. Run it as npx @zitadel/cli@latest upgrade so the newest release does the upgrading.";
   static override group = CommandGroups.diagnostics;
@@ -103,13 +101,13 @@ export default class Upgrade extends Suggestible(BaseCommand) {
       }),
     });
 
-    const plan = await upgrader.plan().catch((error: unknown) => {
+    const plan = await upgrader.plan().catch(async (error: unknown) => {
       if (!(error instanceof ReleaseLookupError)) {
         throw error;
       }
       throw new ZitadelError("E_NETWORK", "Could not look up the latest Zitadel release", {
         hint: "Check the connection to the npm registry, then rerun.",
-        nextCommands: [this.suggest("upgrade")],
+        nextCommands: [await this.again("upgrade", {})],
       });
     });
 
@@ -128,13 +126,13 @@ export default class Upgrade extends Suggestible(BaseCommand) {
       this.log(banner.join("\n"));
     }
 
-    const result = await upgrader.apply(plan).catch((error: unknown) => {
+    const result = await upgrader.apply(plan).catch(async (error: unknown) => {
       if (!(error instanceof InstallError)) {
         throw error;
       }
       throw new ZitadelError("E_VALIDATION", "Could not install the new packages", {
         hint: `${errorMessage(error.cause)}. Nothing else changed; fix that and rerun.`,
-        nextCommands: [shellCommand(error.command), this.suggest("upgrade")],
+        nextCommands: [shellCommand(error.command), await this.again("upgrade", {})],
       });
     });
 
@@ -174,22 +172,19 @@ export default class Upgrade extends Suggestible(BaseCommand) {
       title = `${title} (dry run)`;
     }
 
-    let cwdOption = "";
-    if (flags.cwd !== undefined) {
-      cwdOption = ` ${Cmd.option("--cwd", flags.cwd)}`;
-    }
+    const atTarget = this.suggestWith(this.scope(), plan.target);
     const commands: SuggestedCommand[] = [];
     if (this.dryRun && !plan.upToDate) {
-      commands.push(this.suggest("upgrade"));
+      commands.push(await this.realRun());
     }
     if (refresh === "failed") {
-      commands.push(unscopedCommand(`doctor --fix${cwdOption}`, plan.target));
+      commands.push(atTarget({ id: "doctor", flags: { fix: true } }));
     }
     if (refresh === "issues") {
-      commands.push(unscopedCommand(`doctor${cwdOption}`, plan.target));
+      commands.push(atTarget({ id: "doctor" }));
     }
     if (result.installed && existsSync(join(this.cwd, SHARED_SKILLS_DIR))) {
-      commands.push(unscopedCommand(`skills add${cwdOption}`, plan.target));
+      commands.push(atTarget({ id: "skills:add" }));
     }
 
     const actions: string[] = [];

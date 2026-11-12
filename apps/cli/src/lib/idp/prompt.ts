@@ -9,16 +9,17 @@ import {
   selectionName,
 } from "@zitadel/config/idp";
 
-import {
-  type EnvironmentSelector,
-  inShell,
-  projectCommand,
-  type SuggestedCommand,
-} from "@/lib/suggestion";
+import { inShell, type Suggest, type SuggestedCommand } from "@/lib/suggestion";
 import type { Questions } from "@/lib/ui";
 
 import type { GivenCredentials } from "./credentials";
 import { askConnectionEndpoints } from "./endpoints";
+
+/**
+ * What a suggested retry names where the client id is still to be given: the
+ * one value there that is not a client id, so it is the reader's to replace.
+ */
+const CLIENT_ID_PLACEHOLDER = "<client-id>" as ClientId;
 
 /**
  * What {@link CredentialPrompt} asks about, and how.
@@ -51,15 +52,10 @@ export type PromptRun = {
   readonly developmentBuild: boolean;
 
   /**
-   * The run's `--env`/`--env-file`/`--server`, so a suggested retry targets
-   * the same project.
+   * Renders a suggested retry for the run, scope included, so it targets the
+   * same project.
    */
-  readonly selector: EnvironmentSelector;
-
-  /**
-   * The running CLI's version, for the public spelling of a suggested retry.
-   */
-  readonly cliVersion: string;
+  readonly suggest: Suggest;
 };
 
 /**
@@ -128,7 +124,7 @@ export class CredentialPrompt {
       flag: "--client-id",
       parse: parseClientId,
       given: givenClientId,
-      retry: this.retryFor("<client-id>", ""),
+      retry: this.retryFor(CLIENT_ID_PLACEHOLDER, ""),
     });
     const secretVariable = this.run.secretVariable;
     const secret = await this.run.ask.secret({
@@ -172,16 +168,18 @@ export class CredentialPrompt {
    * @param pipe - What feeds the secret on stdin, if anything.
    * @returns The command, or `undefined` for a custom provider.
    */
-  private retryFor(clientId: string, pipe: string): SuggestedCommand | undefined {
+  private retryFor(clientId: ClientId, pipe: string): SuggestedCommand | undefined {
     const selection = this.run.selection;
     if (selection.kind !== "catalog") {
       return undefined;
     }
-    const command = projectCommand(
-      `auth-method sso enable --provider ${selectionName(selection)} --client-id ${clientId}`,
-      this.run.selector,
-      this.run.cliVersion,
-    );
+    const command = this.run.suggest({
+      id: "auth-method:sso:enable",
+      flags: {
+        provider: selectionName(selection),
+        clientId,
+      },
+    });
 
     return inShell(command, { before: pipe });
   }

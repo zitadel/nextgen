@@ -2,7 +2,7 @@ import { Dependencies } from "@/lib/upgrade/dependencies";
 
 import { wrapForBox } from "./box";
 import { command, notice } from "./style";
-import { upgradeCommand } from "./suggestion";
+import type { SuggestedCommand } from "./suggestion";
 import { escapeControlCharacters } from "./terminal-text";
 import { drawBox } from "./ui/layout";
 import { updateCheckDisabled, ZITADEL_SCOPE, zitadelChannel } from "./zitadel-packages";
@@ -20,6 +20,7 @@ import { updateCheckDisabled, ZITADEL_SCOPE, zitadelChannel } from "./zitadel-pa
  * spelled out here.
  *
  * @param input.cliVersion - The running CLI's version.
+ * @param input.upgrade - The `upgrade` command the box quotes, rendered by the caller.
  * @param input.cwd - The project directory.
  * @param input.env - The run's environment.
  * @param input.columns - The terminal's width.
@@ -28,6 +29,7 @@ import { updateCheckDisabled, ZITADEL_SCOPE, zitadelChannel } from "./zitadel-pa
  */
 export async function updateNotice(input: {
   cliVersion: string;
+  upgrade: SuggestedCommand;
   cwd: string;
   env: NodeJS.ProcessEnv;
   columns?: number;
@@ -58,6 +60,6 @@ export async function updateNotice(input: {
     return undefined;
   }
 
-  const lines = [...behind, "", command(upgradeCommand(cliVersion))];
+  const lines = [...behind, "", command(input.upgrade)];
   return drawBox(wrapForBox(lines.join("\n"), columns), "Update available", notice);
 }

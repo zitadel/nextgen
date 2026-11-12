@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import Eject from "@/commands/eject";
+import { cliPackageRoot } from "@tests/helpers/oclif-build";
 import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
 import { type Answer, answering } from "@tests/helpers/keyboard";
 import { asTerminal } from "@tests/helpers/terminal";
@@ -350,7 +351,7 @@ describe("eject asked on a terminal", () => {
   /** Runs eject in `cwd` with a person at the terminal giving `answers`. */
   const ejecting = async (cwd: string, ...answers: Answer[]) => {
     const talk = answering(...answers);
-    const result = await asTerminal(() => Eject.run(["--cwd", cwd]));
+    const result = await asTerminal(() => Eject.run(["--cwd", cwd], cliPackageRoot));
     return { result, shown: talk.shown(), talk };
   };
 
@@ -453,7 +454,7 @@ describe("eject asked on a terminal", () => {
 
     const talk = answering();
 
-    await asTerminal(() => Eject.run(["--cwd", cwd, "--dry-run"]));
+    await asTerminal(() => Eject.run(["--cwd", cwd, "--dry-run"], cliPackageRoot));
 
     expect(talk.asked()).toEqual([]);
   });

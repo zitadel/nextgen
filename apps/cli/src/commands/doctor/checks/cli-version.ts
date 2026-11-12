@@ -1,4 +1,4 @@
-import { upgradeCommand } from "@/lib/suggestion";
+import type { Suggest } from "@/lib/suggestion";
 import { updateCheckDisabled, zitadelChannel } from "@/lib/zitadel-packages";
 
 import type { CheckOutcome } from "./types";
@@ -12,10 +12,10 @@ import type { CheckOutcome } from "./types";
 export async function checkCliVersion(input: {
   cliVersion: string;
   env: NodeJS.ProcessEnv;
-  /** `--cwd` as typed, which the suggested command carries. */
-  typedCwd?: string;
+  /** Renders the suggested command with the run's own scope. */
+  suggest: Suggest;
 }): Promise<CheckOutcome> {
-  const { cliVersion, env, typedCwd } = input;
+  const { cliVersion, env, suggest } = input;
   const base = { name: "cli-version" };
   if (updateCheckDisabled(env)) {
     return {
@@ -46,7 +46,7 @@ export async function checkCliVersion(input: {
     details: {
       current: cliVersion,
       latest: latest.version,
-      remedy_command: upgradeCommand(cliVersion, typedCwd),
+      remedy_command: suggest({ id: "upgrade" }),
     },
   };
 }

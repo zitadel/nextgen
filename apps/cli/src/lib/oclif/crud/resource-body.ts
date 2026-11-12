@@ -1,5 +1,6 @@
 import { isObject } from "@/lib/json";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { helpOf } from "@/lib/suggestion";
 
 import { type Assignment, fragmentOf } from "./assign";
 import { readRawBody } from "./body";
@@ -108,7 +109,8 @@ export type ResourceBodySource = Readonly<{
  */
 const MISSING_FIELDS_REFUSAL: Refusal = {
   message: "{command} is missing required {noun}: {spellings}",
-  hint: "Pass {alternatives}, or include {pronoun} in --data / --file. See `{command} --help`.",
+  hint: "Pass {alternatives}, or include {pronoun} in --data / --file. The help below lists every field.",
+  next: ["{help}"],
   details: {
     missing: "{names}",
   },
@@ -133,16 +135,20 @@ export const resourceBody = async (source: ResourceBodySource, flags: Json): Pro
   if (missing.length > 0) {
     const plural = new Intl.PluralRules("en").select(missing.length) === "one";
     const flagNames = missing.map(spelling);
-    throw refusalError(MISSING_FIELDS_REFUSAL, {
-      command: `${source.topic} ${source.verb}`,
-      noun: plural ? "field" : "fields",
-      pronoun: plural ? "it" : "them",
-      spellings: flagNames.join(", "),
-      alternatives: new Intl.ListFormat("en", { type: "conjunction" }).format(flagNames),
-      names: missing.map((field) => {
-        return field.name;
-      }),
-    });
+    throw refusalError(
+      MISSING_FIELDS_REFUSAL,
+      {
+        command: `${source.topic} ${source.verb}`,
+        noun: plural ? "field" : "fields",
+        pronoun: plural ? "it" : "them",
+        spellings: flagNames.join(", "),
+        alternatives: new Intl.ListFormat("en", { type: "conjunction" }).format(flagNames),
+        names: missing.map((field) => {
+          return field.name;
+        }),
+      },
+      { help: helpOf(`${source.topic}:${source.verb}`) },
+    );
   }
   const wrapped = source.root === undefined ? merged : { [source.root]: merged };
   return parseOrThrow(source.schema, wrapped, "Body does not match the API schema") as Json;

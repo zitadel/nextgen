@@ -12,7 +12,6 @@ import {
   toZitadelError,
 } from "@/lib/errors";
 import { ConfigError, ConflictError, NotFoundError } from "@/lib/zitadel";
-import { unscopedCommand } from "@/lib/suggestion";
 
 describe("EXIT_CODES", () => {
   it("maps every error code to its documented exit number", () => {
@@ -39,7 +38,7 @@ describe("ZitadelError", () => {
   it("carries the code, message, and optional extras", () => {
     const err = new ZitadelError("E_CONFLICT", "boom", {
       hint: "try again",
-      nextCommands: [unscopedCommand("doctor"), unscopedCommand("init")],
+      nextCommands: [{ id: "doctor" }, { id: "setup" }],
       details: { field: "x" },
     });
     expect(err).toBeInstanceOf(Error);
@@ -47,7 +46,7 @@ describe("ZitadelError", () => {
     expect(err.message).toBe("boom");
     expect(err.code).toBe("E_CONFLICT");
     expect(err.hint).toBe("try again");
-    expect(err.nextCommands).toEqual(["zitadel doctor", "zitadel init"]);
+    expect(err.nextCommands).toEqual([{ id: "doctor" }, { id: "setup" }]);
     expect(err.details).toEqual({ field: "x" });
   });
 

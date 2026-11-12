@@ -546,7 +546,9 @@ describe("resources", () => {
           code: "E_VALIDATION",
           message,
           hint: "List them to find one.",
-          next_commands: [expectedPublicCliCommand(`${list} --cwd ${app.path}`)],
+          next_commands: [
+            expectedPublicCliCommand(`${list} --server ${MOCK_SERVER_URL} --cwd ${app.path}`),
+          ],
           details: { argument: "id" },
         });
       });

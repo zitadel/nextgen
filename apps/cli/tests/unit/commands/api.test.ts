@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, vi } from "vitest";
 import { Config } from "@oclif/core";
 
 import Api, { readOperation } from "@/commands/api/index";
-import { unscopedCommand } from "@/lib/suggestion";
+
 import { ZitadelError } from "@/lib/errors";
 import { it } from "@tests/helpers/fixtures";
 import { makeProject } from "@tests/helpers/local-project";
@@ -173,9 +173,7 @@ describe("zitadel api for an operation the CLI cannot call", () => {
   it("suggests listing what it can call", () => {
     const error = ((): unknown => {
       try {
-        readOperation("getMyUser", undefined, (next) => {
-          return unscopedCommand(next);
-        });
+        readOperation("getMyUser", undefined);
       } catch (thrown) {
         return thrown;
       }
@@ -183,7 +181,7 @@ describe("zitadel api for an operation the CLI cannot call", () => {
     })();
 
     expect(error).toBeInstanceOf(ZitadelError);
-    expect((error as ZitadelError).nextCommands).toEqual([unscopedCommand("api ls")]);
+    expect((error as ZitadelError).nextCommands).toEqual([{ id: "api:ls" }]);
   });
 });
 

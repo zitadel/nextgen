@@ -87,7 +87,7 @@ class PreviewCommandProbe extends PreviewCommand {
   }
 }
 
-/** Exposes the selector suffix the base class derives from the resolution. */
+/** Exposes the scope the base class derives from the resolution. */
 class SelectorProbe extends EnvironmentCommand {
   protected async execute(): Promise<never> {
     throw new Error("unused");
@@ -96,7 +96,7 @@ class SelectorProbe extends EnvironmentCommand {
   async probe() {
     const { flags } = await this.parse(SelectorProbe);
     await this.toMeta(flags);
-    return { selector: this.environmentSelector() };
+    return { scope: this.scope() };
   }
 }
 
@@ -109,7 +109,7 @@ class FilesOnlyProbe extends EnvironmentCommand {
   async probe() {
     const { flags } = await this.parse(FilesOnlyProbe);
     await this.toMeta(flags, { environment: false });
-    return { selector: this.environmentSelector(), args: this.environmentSelectorArgs() };
+    return { scope: this.scope() };
   }
 }
 
@@ -277,60 +277,46 @@ describe("EnvironmentCommand.connect", () => {
   });
 });
 
-describe("EnvironmentCommand.environmentSelector", () => {
+describe("EnvironmentCommand.scope", () => {
   it("is empty when no selector flag was passed", async () => {
-    const { selector } = await new SelectorProbe([], config).probe();
+    const { scope } = await new SelectorProbe([], config).probe();
 
-    expect(selector).toBe("");
+    expect(scope).toEqual({});
   });
 
   it("reflects --cwd, which the other flags resolve against", async ({ dir }) => {
-    const { selector } = await new SelectorProbe(["--cwd", dir], config).probe();
+    const { scope } = await new SelectorProbe(["--cwd", dir], config).probe();
 
-    expect(selector).toBe(` --cwd ${dir}`);
+    expect(scope).toEqual({ cwd: dir });
   });
 
   it("reflects a non-default --env", async ({ dir }) => {
-    const { selector } = await new SelectorProbe(
-      ["--cwd", dir, "--env", "staging"],
-      config,
-    ).probe();
+    const { scope } = await new SelectorProbe(["--cwd", dir, "--env", "staging"], config).probe();
 
-    expect(selector).toBe(` --env staging --cwd ${dir}`);
+    expect(scope).toEqual({ cwd: dir, env: "staging" });
   });
 
-  it("reflects --env-file", async ({ dir }) => {
+  it("reflects --env-file in place of the environment's name", async ({ dir }) => {
     const file = await envFile(dir, URL_AND_PROJECT);
 
-    const { selector } = await new SelectorProbe(
-      ["--cwd", dir, "--env-file", file],
-      config,
-    ).probe();
+    const { scope } = await new SelectorProbe(["--cwd", dir, "--env-file", file], config).probe();
 
-    expect(selector).toBe(` --env-file ${file} --cwd ${dir}`);
+    expect(scope).toEqual({ cwd: dir, envFile: file });
   });
 
   it("keeps only --cwd in a command that resolved no environment", async ({ dir }) => {
-    const { selector } = await new FilesOnlyProbe(["--cwd", dir], config).probe();
+    const { scope } = await new FilesOnlyProbe(["--cwd", dir], config).probe();
 
-    expect(selector).toBe(` --cwd ${dir}`);
-  });
-
-  it("keeps only --cwd in the arguments of a command that resolved no environment", async ({
-    dir,
-  }) => {
-    const { args } = await new FilesOnlyProbe(["--cwd", dir], config).probe();
-
-    expect(args).toEqual(["--cwd", dir]);
+    expect(scope).toEqual({ cwd: dir });
   });
 
   it("reflects --server as the resolved origin", async ({ dir }) => {
-    const { selector } = await new SelectorProbe(
+    const { scope } = await new SelectorProbe(
       ["--cwd", dir, "--server", "https://staging.example"],
       config,
     ).probe();
 
-    expect(selector).toBe(` --server https://staging.example --cwd ${dir}`);
+    expect(scope).toEqual({ cwd: dir, server: "https://staging.example" });
   });
 });
 

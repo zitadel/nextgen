@@ -112,7 +112,7 @@ function refuseErrors(ctx: StepContext, findings: readonly (Issue | ServerFindin
     return UserSchema.refusesKey(finding);
   });
   const fix = literalSecret
-    ? `Publish a secret with \`${ctx.suggest("variable set NAME --secret")}\` and reference it as "\${{ NAME }}".`
+    ? `Publish a secret with ${ctx.suggest({ id: "variable:set", args: { name: "NAME" }, flags: { secret: true } })} and reference it as "\${{ NAME }}".`
     : "Fix the files named above and rerun; no changes were made.";
   const hint = refusedKey
     ? `${fix} A key a newer Zitadel server added needs a CLI as new as the server.`

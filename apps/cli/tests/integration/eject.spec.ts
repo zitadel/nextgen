@@ -313,7 +313,7 @@ describe("eject", () => {
               ".env.development.local -> .env.development.local.ejected-<timestamp>",
             ],
             manual_steps: MANUAL_STEPS,
-            next_commands: [expectedPublicCliCommand(`eject --force --cwd ${app.path}`)],
+            next_commands: [expectedPublicCliCommand(app.againAsRun("eject --force"))],
           },
           warnings: [],
         });
@@ -441,7 +441,7 @@ describe("eject", () => {
 
         const result = await app.run(["eject", "--force", "--dry-run"]);
 
-        expect(result).toSay(expectedPublicCliCommand(`eject --force --cwd ${app.path}`));
+        expect(result).toSay(expectedPublicCliCommand(app.againAsRun("eject --force")));
       });
 
       it("heads a skip with the headline the envelope carries", async () => {

@@ -421,7 +421,7 @@ describe("preview", () => {
             next_commands: [
               expectedPublicCliCommand(
                 app.againAsRun(
-                  `preview --origin ${PREVIEW_URL} --origin ${OTHER_URL} --ttl 1d -m 'add company' --strict`,
+                  `preview --origin ${PREVIEW_URL} --origin ${OTHER_URL} --ttl 1d --message 'add company' --strict`,
                 ),
               ),
             ],

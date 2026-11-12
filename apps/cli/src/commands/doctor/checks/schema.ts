@@ -2,7 +2,6 @@ import { createZitadelClient, IdpService } from "@/lib/backend";
 import { isCancellation } from "@/lib/errors";
 import { readProjectServer, readZitadelConfig, readZitadelSecret } from "@/lib/project";
 import { DEPLOYED_DEPENDENT_RULE } from "@/lib/publish/steps/validate";
-import { unscopedCommand } from "@/lib/suggestion";
 import { userAgent } from "@/lib/user-agent";
 import { CONFIG_DIRECTORIES, DiskStore, type Issue, ZitadelConfig } from "@/lib/zitadel";
 
@@ -73,7 +72,7 @@ export class SchemaCheck extends AbstractSanityCheck {
           message:
             `No schema files found in ${CONFIG_DIRECTORIES.schemas} — this project predates editable ` +
             "schema configuration or setup was interrupted. New projects scaffold editable " +
-            `defaults via ${unscopedCommand("setup", ctx.cliVersion)}.`,
+            `defaults via ${ctx.suggest({ id: "setup" })}.`,
           path: this.path,
         };
       }

@@ -1,11 +1,17 @@
-import { unscopedCommand } from "@/lib/suggestion";
-import type { Config } from "@oclif/core";
+import { type Config, Flags } from "@oclif/core";
 
 import { BaseCommand } from "@/lib/oclif/base";
 import { type Tabulate, Tabulatable } from "@/lib/oclif/tabulatable";
 
-class Unscoped extends Tabulatable(BaseCommand) {
-  public static override readonly id: string = "test:tabulate";
+class Listing extends Tabulatable(BaseCommand) {
+  public static override readonly id: string = "thing:list";
+
+  /** What a paged list takes, so its next page can be suggested as this run again. */
+  static override flags = {
+    limit: Flags.integer({ description: "Page size." }),
+    "page-token": Flags.string({ description: "Continue from a previous page." }),
+    all: Flags.boolean({ description: "Fetch every page." }),
+  };
 
   constructor(argv: string[] = []) {
     super(argv, {
@@ -18,16 +24,12 @@ class Unscoped extends Tabulatable(BaseCommand) {
     return this.emit({ summary: { title: "Done", sections: [] }, status: "ok", data: {} });
   }
 
-  drawList(...args: Parameters<Unscoped["listResult"]>) {
+  drawList(...args: Parameters<Listing["listResult"]>) {
     return this.listResult(...args);
   }
 }
 
-class Drawing extends Unscoped {
-  protected override suggestFollowUp(args: string) {
-    return unscopedCommand(args, "0.0.0-test");
-  }
-
+class Drawing extends Listing {
   draw: Tabulate = (columns, items) => this.tabulate(columns, items);
 
   drawDetail(...args: Parameters<Drawing["tabulateDetail"]>) {
@@ -60,9 +62,6 @@ class Running extends Drawing {
 
 /** A command that prints tables, for a test that needs one drawn the way a command draws it. */
 export const aTabulatingCommand = (argv: string[] = []): Drawing => new Drawing(argv);
-
-/** A list command that never says how to suggest a follow-up, as a plain `BaseCommand` one does not. */
-export const anUnscopedTabulatingCommand = (argv: string[] = []): Unscoped => new Unscoped(argv);
 
 /** Draws one table through a whole run, for a test about what the run decided. */
 export const aTableDrawnByARun = async (argv: string[] = []): Promise<string> => {

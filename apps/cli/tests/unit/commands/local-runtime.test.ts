@@ -23,6 +23,7 @@ import {
   parseJson,
   runCliForTest,
 } from "@tests/helpers/run-cli";
+import { cliPackageRoot } from "@tests/helpers/oclif-build";
 import { it } from "@tests/helpers/fixtures";
 import { type Answer, answering } from "@tests/helpers/keyboard";
 import { asOneLine, asTerminal } from "@tests/helpers/terminal";
@@ -161,7 +162,9 @@ describe("local runtime commands", () => {
     expect(envelope.data.next_actions.join("\n")).toContain("managed local runtime");
     expect(envelope.data.next_actions.join("\n")).toContain("--server <url>");
     expect(envelope.data.next_commands).toContain("docker version");
-    expect(envelope.data.next_commands).toContain(expectedPublicCliCommand(`doctor --cwd ${cwd}`));
+    expect(envelope.data.next_commands).toContain(
+      expectedPublicCliCommand(`doctor --runtime docker --port ${port} --cwd ${cwd}`),
+    );
     expect(envelope.data.checks.find((check) => check.name === "docker-cli")).toMatchObject({
       status: "warn",
     });
@@ -312,7 +315,9 @@ describe("local runtime commands", () => {
       warnings: string[];
     };
     expect(envelope.warnings.join("\n")).toContain("managed-runtime-processes");
-    expect(envelope.data.next_commands).toContain(expectedPublicCliCommand("stop --all"));
+    expect(envelope.data.next_commands).toContain(
+      expectedPublicCliCommand(`stop --all --cwd ${cwd}`),
+    );
     expect(
       envelope.data.checks.find((check) => check.name === "managed-runtime-processes"),
     ).toMatchObject({
@@ -347,7 +352,9 @@ describe("local runtime commands", () => {
     expect(envelope.hint).toContain("managed local runtime");
     expect(envelope.hint).toContain("--server <url>");
     expect(envelope.next_commands).toContain("docker version");
-    expect(envelope.next_commands).toContain(expectedPublicCliCommand(`start --cwd ${cwd}`));
+    expect(envelope.next_commands).toContain(
+      expectedPublicCliCommand(`start --runtime docker --port ${port} --cwd ${cwd}`),
+    );
     expect(envelope.details.message).toContain("remote or cloud setup can continue");
 
     const dockerCalls = await readDockerCalls(fake.logPath);
@@ -530,9 +537,7 @@ describe("local runtime commands", () => {
     expect(envelope.data.next_commands).toEqual([
       expectedPublicCliCommand(`setup --server local --cwd ${cwd}`),
     ]);
-    expect(envelope.data.next_actions).toContainEqual(
-      expect.stringContaining(expectedPublicCliCommand("logs --follow")),
-    );
+    expect(envelope.data.next_actions).toContainEqual(expect.stringContaining(" logs --follow"));
 
     const runtime = await readRuntimeMetadata(cwd);
     expect(runtime).toMatchObject({
@@ -989,7 +994,7 @@ describe("local runtime commands", () => {
       await writeRuntimeMetadata(cwd, runtimeFor(cwd, "http://localhost:8080"));
       const talk = answering(...answers);
       const outcome = await asTerminal(() =>
-        Reset.run(["--cwd", cwd]).then(
+        Reset.run(["--cwd", cwd], cliPackageRoot).then(
           (envelope) => ({ envelope: JSON.parse(JSON.stringify(envelope)) as unknown }),
           (error: unknown) => ({ error }),
         ),

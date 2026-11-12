@@ -1183,7 +1183,7 @@ describe("next page suggestion", () => {
     expect(res.exitCode).toBe(0);
     const json = parseJson(res.stdout) as { data: { next_commands: string[] } };
     expect(json.data.next_commands[0]).toContain(
-      "events list --limit 1 --filter category=entity --filter category=auth --page-token p2 --json",
+      "events list --filter category=entity --filter category=auth --limit 1 --page-token p2 --json",
     );
   });
 
@@ -1368,14 +1368,27 @@ describe("body field flags", () => {
     expect(json.hint).toContain("include it in --data");
   });
 
+  it("points a write missing a field at its help", async () => {
+    const cwd = await makeProject();
+    const res = await run(cwd, ["users", "create", "--attributes", "email=a@b.c"]);
+    const json = parseJson(res.stdout) as { next_commands: string[] };
+    expect(json.next_commands).toEqual([expectedPublicCliCommand("users create --help")]);
+  });
+
   it("points at both input modes when no body is given at all", async () => {
     const cwd = await makeProject();
     const res = await run(cwd, ["teams", "create"]);
     expect(res.exitCode).toBe(3);
     const json = parseJson(res.stdout) as { message: string; hint: string };
     expect(json.message).toBe("teams create needs a body");
-    expect(json.hint).toContain("--help");
     expect(json.hint).toContain("--data");
+  });
+
+  it("points a write without a body at its help", async () => {
+    const cwd = await makeProject();
+    const res = await run(cwd, ["teams", "create"]);
+    const json = parseJson(res.stdout) as { next_commands: string[] };
+    expect(json.next_commands).toEqual([expectedPublicCliCommand("teams create --help")]);
   });
 
   it("updates through field flags too", async ({ server }) => {
