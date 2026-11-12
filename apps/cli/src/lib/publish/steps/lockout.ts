@@ -1,4 +1,5 @@
 import type { Credential, QueriedUser, UserQuery } from "@/lib/backend";
+import { Cmd } from "@/lib/cmd";
 import { isCancellation } from "@/lib/errors";
 import { isObject } from "@/lib/json";
 import { mapBounded } from "@/lib/map-bounded";
@@ -490,7 +491,7 @@ async function lookupWarnings(
       const userCount = count(read.users.length, read.truncated);
       const users = plural(read.users.length, "user");
       const fix = ctx.suggest(
-        `users update <user_id> --schema <revision_id> --set attributes.${identifier}=<value>`,
+        `users update '<user_id>' --schema '<revision_id>' --set ${Cmd.quote(`attributes.${identifier}=<value>`)}`,
       );
       return {
         warnings: [

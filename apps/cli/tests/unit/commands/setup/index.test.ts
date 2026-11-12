@@ -3770,6 +3770,11 @@ describe("localServerHostsPlatform", () => {
 describe("setupRetryFlags", () => {
   it.each([
     {
+      situation: "a framework with a space or a command substitution, quoted for a shell",
+      flags: { framework: "my app $(id)" },
+      carried: "--framework 'my app $(id)'",
+    },
+    {
       situation: "the custom settings typed, though they do not make a connection yet",
       flags: { sso: "custom", ssoSlug: "acme-sso" },
       carried: "--sso custom --sso-slug acme-sso",

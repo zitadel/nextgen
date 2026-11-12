@@ -1,3 +1,4 @@
+import { Cmd } from "@/lib/cmd";
 import { readFile } from "node:fs/promises";
 import { text } from "node:stream/consumers";
 
@@ -189,7 +190,9 @@ export const buildRequest = ({ target, fields, input, projectId }: RequestInput)
           ? `${head} is a path parameter of ${operation.id}; give it as an argument`
           : `${head} is a ${parameter.in} parameter, which the CLI does not send`,
         parameter.in === "path"
-          ? { hint: `For example: zitadel api ${operation.id} <${head}>` }
+          ? {
+              hint: `For example: zitadel api ${Cmd.quote(operation.id)} ${Cmd.quote(`<${head}>`)}`,
+            }
           : {},
       );
     }

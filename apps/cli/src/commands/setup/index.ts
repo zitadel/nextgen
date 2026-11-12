@@ -252,16 +252,16 @@ export type SetupRetryOptions = {
 export function setupRetryFlags(opts: SetupRetryOptions): string {
   const parts: string[] = [];
   if (opts.framework) {
-    parts.push(`--framework ${opts.framework}`);
+    parts.push(Cmd.option("--framework", opts.framework));
   }
   if (opts.preset && opts.preset !== DEFAULT_SETUP_PRESET) {
-    parts.push(`--preset ${opts.preset}`);
+    parts.push(Cmd.option("--preset", opts.preset));
   }
   if (opts.useCase && opts.useCase !== DEFAULT_SETUP_USE_CASE) {
-    parts.push(`--use-case ${opts.useCase}`);
+    parts.push(Cmd.option("--use-case", opts.useCase));
   }
   if (opts.renderer && opts.renderer !== "react") {
-    parts.push(`--renderer ${opts.renderer}`);
+    parts.push(Cmd.option("--renderer", opts.renderer));
   }
   if (opts.devPort !== undefined) {
     parts.push(`--dev-port ${opts.devPort}`);
@@ -285,7 +285,7 @@ export function setupRetryFlags(opts: SetupRetryOptions): string {
     // Provider only. `--sso-client-id` would interpolate a value the wizard
     // accepted on emptiness alone into a command run verbatim, and nothing
     // here escapes it for a shell. The rerun asks for the id.
-    parts.push(`--sso ${selectionName(firstSso)}`);
+    parts.push(Cmd.option("--sso", selectionName(firstSso)));
     // A custom connection is nothing without its description, and none of it is
     // a credential, so unlike the client id it travels in the command.
     if (firstSso.kind === "custom") {
@@ -355,7 +355,7 @@ export function retryOptionsFromFlags(flags: {
   // selection yet, so a retry reproduces it.
   const typed =
     selection === undefined && flags.sso !== undefined && isKnownSsoName(flags.sso)
-      ? [`--sso ${flags.sso}`, flagText(customSettingsOf(flags), SETUP_FLAG_NAMES)]
+      ? [Cmd.option("--sso", flags.sso), flagText(customSettingsOf(flags), SETUP_FLAG_NAMES)]
           .filter((part) => {
             return part !== "";
           })
@@ -3099,7 +3099,10 @@ export async function ssoFromFlags(
     // A concrete rerun for an agent, never carrying the value: the secret is
     // piped from the caller's own environment.
     retry: inShell(
-      unscopedCommand(`setup --sso ${flags.sso} --sso-client-id <id> ...`, cliVersion),
+      unscopedCommand(
+        `setup ${Cmd.option("--sso", flags.sso)} --sso-client-id '<id>' ...`,
+        cliVersion,
+      ),
       { before: `printf '%s' "$CLIENT_SECRET" | ` },
     ),
   });

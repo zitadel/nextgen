@@ -172,6 +172,14 @@ describe("buildRequest", () => {
     ).toThrow("user_id is a path parameter of GetUserByID; give it as an argument");
   });
 
+  it("quotes the placeholder in the example it offers for a path parameter", () => {
+    expect(() =>
+      requestFor("GetUserByID", ["user_id=user_1"], { positionals: ["user_1"] }),
+    ).toThrow(
+      expect.objectContaining({ hint: "For example: zitadel api GetUserByID '<user_id>'" }),
+    );
+  });
+
   it("fills a required project_id the caller left out", () => {
     expect(requestFor("createTeam", ["name=Support"], { projectId: "proj_1" }).query).toEqual([
       ["project_id", "proj_1"],

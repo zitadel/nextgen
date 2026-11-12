@@ -571,14 +571,14 @@ export default class Api extends Destructive(EnvironmentCommand) {
     const filled: Record<string, string> = { ...values };
     const spelled = missing
       .map((each) => {
-        return `<${each}>`;
+        return Cmd.quote(`<${each}>`);
       })
       .join(" ");
     for (const name of missing) {
       filled[name] = await this.ask.text({
         name,
         message: `What is the value of ${name}?`,
-        retry: this.suggest(`api ${target.operation.id} ${spelled}`),
+        retry: this.suggest(`api ${Cmd.quote(target.operation.id)} ${spelled}`),
         parse: (value: string) => {
           const typed = value.trim();
           if (typed === "") {

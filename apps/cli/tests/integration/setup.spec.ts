@@ -2061,9 +2061,9 @@ describe("setup", () => {
             source: MOCK_SERVER_URL,
             code: "E_VALIDATION",
             message: "No client secret supplied",
-            hint: `Pipe it in on stdin. It is never a flag: that would put it in shell history, a process listing and CI logs. For example: printf '%s' "$CLIENT_SECRET" | ${expectedPublicCliCommand("setup --sso custom --sso-client-id <id> ...")}`,
+            hint: `Pipe it in on stdin. It is never a flag: that would put it in shell history, a process listing and CI logs. For example: printf '%s' "$CLIENT_SECRET" | ${expectedPublicCliCommand("setup --sso custom --sso-client-id '<id>' ...")}`,
             next_commands: [
-              `printf '%s' "$CLIENT_SECRET" | ${expectedPublicCliCommand("setup --sso custom --sso-client-id <id> ...")}`,
+              `printf '%s' "$CLIENT_SECRET" | ${expectedPublicCliCommand("setup --sso custom --sso-client-id '<id>' ...")}`,
             ],
           });
         });
