@@ -2,6 +2,7 @@ import { Flags, type Interfaces } from "@oclif/core";
 
 import { ZitadelError } from "@/lib/errors";
 import { named } from "@/lib/oclif/names";
+
 import { decimalValue, jsonValue, refuseProtoKey, setAt, typedValue } from "./document";
 import type { Json, Schema } from "./types";
 import {
@@ -103,7 +104,9 @@ const RESERVED = new Set([
  */
 const MAX_DEPTH = 6;
 
-const kebab = (name: string): string => name.replaceAll("_", "-");
+const kebab = (name: string): string => {
+  return name.replaceAll("_", "-");
+};
 
 /**
  * One-line flag help from a schema description: newlines collapsed, the first
@@ -151,8 +154,12 @@ const classify = (type: ZodLike | undefined): Classified => {
     case "union": {
       // A string that may be `null` (a clearable field) reads as a plain string
       // flag; clearing it is `--set <path>:=null`.
-      const members = (type.def.options ?? []).map((member) => unwrap(member));
-      const values = members.filter((member) => member?.def?.type !== "null");
+      const members = (type.def.options ?? []).map((member) => {
+        return unwrap(member);
+      });
+      const values = members.filter((member) => {
+        return member?.def?.type !== "null";
+      });
       return values.length === 1 && values[0]?.def?.type === "string"
         ? { kind: "string" }
         : { kind: "json" };
@@ -177,8 +184,8 @@ const leavesOf = (
   prefix: readonly string[],
   chainRequired: boolean,
   optionalAncestor: readonly string[] | undefined,
-): Leaf[] =>
-  Object.entries(object.shape ?? {}).flatMap(([key, field]): Leaf[] => {
+): Leaf[] => {
+  return Object.entries(object.shape ?? {}).flatMap(([key, field]): Leaf[] => {
     const path = [...prefix, key];
     const requiredHere = !isOptionalField(field);
     const required = chainRequired && requiredHere;
@@ -203,14 +210,17 @@ const leavesOf = (
       },
     ];
   });
+};
 
 /** The flag a leaf would get, before collisions are settled. */
-const candidateFlag = (leaf: Leaf): string | undefined =>
-  leaf.kind === "json" ? undefined : leaf.path.map(kebab).join("-");
+const candidateFlag = (leaf: Leaf): string | undefined => {
+  return leaf.kind === "json" ? undefined : leaf.path.map(kebab).join("-");
+};
 
 /** The flag names a leaf occupies: its own, and `--no-<flag>` for a boolean. */
-const occupied = (leaf: Leaf, flag: string): string[] =>
-  leaf.kind === "boolean" ? [flag, `no-${flag}`] : [flag];
+const occupied = (leaf: Leaf, flag: string): string[] => {
+  return leaf.kind === "boolean" ? [flag, `no-${flag}`] : [flag];
+};
 
 /**
  * Give each leaf its flag. Two leaves that would share a name, or a name the
@@ -229,9 +239,9 @@ const settleFlags = (leaves: readonly Leaf[], reserved: ReadonlySet<string>): Bo
     const flag = candidateFlag(leaf);
     const free =
       flag !== undefined &&
-      occupied(leaf, flag).every(
-        (name) => uses.get(name) === 1 && !RESERVED.has(name) && !reserved.has(name),
-      );
+      occupied(leaf, flag).every((name) => {
+        return uses.get(name) === 1 && !RESERVED.has(name) && !reserved.has(name);
+      });
     return free ? { ...leaf, flag } : leaf;
   });
 };
@@ -249,8 +259,9 @@ export type DescribeOptions = Readonly<{
 }>;
 
 /** The schema of the document a write sends: the body, or the part of it under `root`. */
-export const documentSchemaOf = (schema: Schema, root?: string): ZodLike | undefined =>
-  root === undefined ? (schema as ZodLike) : fieldOf(schema as ZodLike, root);
+export const documentSchemaOf = (schema: Schema, root?: string): ZodLike | undefined => {
+  return root === undefined ? (schema as ZodLike) : fieldOf(schema as ZodLike, root);
+};
 
 /**
  * Read the fields of a generated request schema, nested ones included.
@@ -348,10 +359,13 @@ const flagFor = (field: BodyField): Interfaces.FlagInput[string] => {
 };
 
 /** oclif flags for the given fields; a field without a flag is left to `--set`. */
-export const bodyFieldFlags = (fields: readonly BodyField[]): Interfaces.FlagInput =>
-  Object.fromEntries(
-    fields.flatMap((field) => (field.flag === undefined ? [] : [[field.flag, flagFor(field)]])),
+export const bodyFieldFlags = (fields: readonly BodyField[]): Interfaces.FlagInput => {
+  return Object.fromEntries(
+    fields.flatMap((field) => {
+      return field.flag === undefined ? [] : [[field.flag, flagFor(field)]];
+    }),
   );
+};
 
 /**
  * Build the document fragment the field flags describe, nesting each value at
@@ -412,20 +426,30 @@ const parsePair = (
  * given that way at all. Such a command offers no generated flags-only
  * example; its registry entry may declare one that is complete.
  */
-export const flagsAloneMayBeIncomplete = (fields: readonly BodyField[]): boolean =>
-  fields.some((field) => field.path.length > 1 || field.flag === undefined);
+export const flagsAloneMayBeIncomplete = (fields: readonly BodyField[]): boolean => {
+  return fields.some((field) => {
+    return field.path.length > 1 || field.flag === undefined;
+  });
+};
 
 /** One example invocation using the required fields, for a command's `examples`. */
 export const fieldExample = (fields: readonly BodyField[]): string | undefined => {
-  const required = fields.filter((field) => field.required);
-  if (required.length === 0 || required.some((field) => field.flag === undefined)) {
+  const required = fields.filter((field) => {
+    return field.required;
+  });
+  if (
+    required.length === 0 ||
+    required.some((field) => {
+      return field.flag === undefined;
+    })
+  ) {
     return undefined;
   }
   return required
-    .map((field) =>
-      field.kind === "record"
+    .map((field) => {
+      return field.kind === "record"
         ? `--${field.flag} <key>=<value>`
-        : `--${field.flag} ${field.options ? field.options[0] : `<${field.name}>`}`,
-    )
+        : `--${field.flag} ${field.options ? field.options[0] : `<${field.name}>`}`;
+    })
     .join(" ");
 };

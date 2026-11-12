@@ -13,6 +13,8 @@ import {
   type RuntimeMetadata,
 } from "@/lib/local-server/runtime";
 import { expectedPublicCliCommand, parseJson, runCliForTest } from "@tests/helpers/run-cli";
+import { asOneLine, asTerminal } from "@tests/helpers/terminal";
+import { stripAnsi } from "@tests/helpers/run-cli";
 
 // The platform is unreachable unless a test says otherwise — a network error,
 // not an HTTP status — so the user-presence probe reads as "unknown" and
@@ -95,7 +97,7 @@ describe("status command", () => {
     );
   });
 
-  it("ends with where to find every command, in the text only", async () => {
+  it("keeps the command overview out of what a script reads, in the text and the envelope alike", async () => {
     const cwd = await configuredProject();
 
     const text = await runCliForTest([
@@ -107,10 +109,7 @@ describe("status command", () => {
     ]);
     const json = await status(cwd);
 
-    expect(text.stdout.trimEnd().split("\n").slice(-2)).toEqual([
-      "Explore all commands:",
-      `  ${expectedPublicCliCommand("")}`,
-    ]);
+    expect(asOneLine(text.stdout)).not.toContain("Explore all commands");
     expect(json.stdout).not.toContain("Explore all commands");
   });
 
@@ -439,6 +438,76 @@ describe("status command", () => {
         `deploy -m '<what changed>' --server https://api.zitadel.cloud --cwd ${cwd}`,
       ),
     );
+  });
+
+  it("says in text that no local server was started in the directory", async () => {
+    const cwd = await configuredProject();
+
+    const res = await asTerminal(() =>
+      runCliForTest(["status", "--cwd", cwd, "--server", "https://api.zitadel.cloud"]),
+    );
+
+    expect(stripAnsi(res.stdout)).toContain("No local server was started in this directory.");
+  });
+
+  it("says the same in text read by a pipe", async () => {
+    const cwd = await configuredProject();
+
+    const res = await runCliForTest([
+      "status",
+      "--cwd",
+      cwd,
+      "--server",
+      "https://api.zitadel.cloud",
+    ]);
+
+    expect(stripAnsi(res.stdout)).toContain("No local server was started in this directory.");
+  });
+
+  it("says in text where a stopped local server last ran", async () => {
+    const cwd = await configuredProject();
+    await writeRuntimeMetadata(cwd, runtimeFor(cwd, "http://localhost:9"));
+    const binDir = await mkdtemp(join(tmpdir(), "zitadel-status-fake-docker-"));
+    tempDirs.push(binDir);
+    await writeFile(join(binDir, "docker"), "#!/usr/bin/env node\nprocess.exit(1);\n");
+    await chmod(join(binDir, "docker"), 0o755);
+
+    const res = await runCliForTest(
+      ["status", "--cwd", cwd, "--server", "https://api.zitadel.cloud"],
+      { PATH: `${binDir}:${process.env.PATH ?? ""}` },
+    );
+
+    expect(stripAnsi(res.stdout)).toContain(
+      "The local server is stopped, and last ran at http://localhost:9 (docker).",
+    );
+  });
+
+  it("says in text when Docker could not be asked about the local server", async () => {
+    const cwd = await configuredProject();
+    await writeRuntimeMetadata(cwd, runtimeFor(cwd, "http://localhost:9"));
+    const noDocker = await mkdtemp(join(tmpdir(), "zitadel-status-no-docker-"));
+    tempDirs.push(noDocker);
+
+    const res = await runCliForTest(
+      ["status", "--cwd", cwd, "--server", "https://api.zitadel.cloud"],
+      { PATH: noDocker },
+    );
+
+    expect(stripAnsi(res.stdout)).toContain("and Docker could not be asked about it");
+  });
+
+  // It resolves the project without opening a connection — the user-presence
+  // probe connects quietly and swallows every failure — so nothing else can
+  // record where it ran.
+  it("names the project it reported on, not only the server", async () => {
+    const cwd = await configuredProject();
+
+    const res = await asTerminal(() =>
+      runCliForTest(["status", "--cwd", cwd, "--server", "https://api.zitadel.cloud"]),
+    );
+
+    expect(stripAnsi(res.stdout)).toContain("project proj-001 on api.zitadel.cloud");
+    expect(stripAnsi(res.stdout)).not.toContain("Using project proj-001");
   });
 });
 

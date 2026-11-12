@@ -2,6 +2,7 @@ import { type Command, Help, type Interfaces, toConfiguredId, ux } from "@oclif/
 
 import { exploreAllCommands } from "@/lib/journey-guidance";
 import { showSkillsHint } from "@/lib/skills-hint";
+
 import { COMMAND_GROUPS, type CommandGroup, CommandGroups, compareInGroup } from "./groups";
 
 /** A loaded command plus the root-help statics `BaseCommand` (`./base`) declares. */
@@ -30,18 +31,34 @@ export default class ZitadelHelp extends Help {
   protected override async showRootHelp(): Promise<void> {
     const { bin } = this.config;
     const commands = this.rootCommands();
-    const groups = COMMAND_GROUPS.map(
-      (group) => [group, this.rowsOf(this.commandsOf(commands, group))] as const,
-    ).filter(([, rows]) => rows.length > 0);
-    const width = Math.max(0, ...groups.flatMap(([, rows]) => rows.map((row) => row.name.length)));
-    const list = (rows: readonly Row[]): string =>
-      rows.map((row) => `${row.name.padEnd(width)}  ${row.summary}`).join("\n");
+    const groups = COMMAND_GROUPS.map((group) => {
+      return [group, this.rowsOf(this.commandsOf(commands, group))] as const;
+    }).filter(([, rows]) => {
+      return rows.length > 0;
+    });
+    const width = Math.max(
+      0,
+      ...groups.flatMap(([, rows]) => {
+        return rows.map((row) => {
+          return row.name.length;
+        });
+      }),
+    );
+    const list = (rows: readonly Row[]): string => {
+      return rows
+        .map((row) => {
+          return `${row.name.padEnd(width)}  ${row.summary}`;
+        })
+        .join("\n");
+    };
 
     const sections = [
       this.render(this.config.pjson.oclif.description ?? this.config.pjson.description ?? ""),
       this.section("Usage", `${bin} <command> [flags]`),
       `Run a command below. Use \`${bin} <command> --help\` to see its options.`,
-      ...groups.map(([group, rows]) => this.section(group, list(rows))),
+      ...groups.map(([group, rows]) => {
+        return this.section(group, list(rows));
+      }),
       this.section(
         "Flags",
         ["-h, --help  Show help for command", `--version   Show ${bin} version`].join("\n"),
@@ -77,9 +94,9 @@ export default class ZitadelHelp extends Help {
    * not, whatever its depth. Alias entries and `help` itself are left out.
    */
   private rootCommands(): GroupedCommand[] {
-    return (this.sortedCommands as GroupedCommand[]).filter(
-      (command) => command.id !== "help" && !command.aliases?.includes(command.id),
-    );
+    return (this.sortedCommands as GroupedCommand[]).filter((command) => {
+      return command.id !== "help" && !command.aliases?.includes(command.id);
+    });
   }
 
   /**
@@ -87,11 +104,12 @@ export default class ZitadelHelp extends Help {
    * listed with the last one.
    */
   private commandsOf(commands: readonly GroupedCommand[], group: CommandGroup): GroupedCommand[] {
-    return commands.filter(
-      (command) =>
+    return commands.filter((command) => {
+      return (
         command.group === group ||
-        (command.group === undefined && group === CommandGroups.diagnostics),
-    );
+        (command.group === undefined && group === CommandGroups.diagnostics)
+      );
+    });
   }
 
   /**
@@ -109,9 +127,13 @@ export default class ZitadelHelp extends Help {
     }
     const rows = [...families].map(([family, members]): Row => {
       const order = Math.min(
-        ...members.map((member) => member.groupOrder ?? Number.MAX_SAFE_INTEGER),
+        ...members.map((member) => {
+          return member.groupOrder ?? Number.MAX_SAFE_INTEGER;
+        }),
       );
-      const isFamily = members.some((member) => member.id.includes(":"));
+      const isFamily = members.some((member) => {
+        return member.id.includes(":");
+      });
       if (!isFamily) {
         const [only] = members;
         return {
@@ -120,17 +142,25 @@ export default class ZitadelHelp extends Help {
           order,
         };
       }
-      const topic = this.config.topics.find((candidate) => candidate.name === family);
-      const root = members.find((member) => member.id === family) ?? members[0];
+      const topic = this.config.topics.find((candidate) => {
+        return candidate.name === family;
+      });
+      const root =
+        members.find((member) => {
+          return member.id === family;
+        }) ?? members[0];
       return {
         name: toConfiguredId(family, this.config),
         summary: this.oneLineSummary(topic?.description ?? root?.summary ?? root?.description),
         order,
       };
     });
-    return rows.sort((a, b) =>
-      compareInGroup({ id: a.name, groupOrder: a.order }, { id: b.name, groupOrder: b.order }),
-    );
+    return rows.sort((a, b) => {
+      return compareInGroup(
+        { id: a.name, groupOrder: a.order },
+        { id: b.name, groupOrder: b.order },
+      );
+    });
   }
 
   /**

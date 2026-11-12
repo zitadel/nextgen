@@ -12,7 +12,6 @@ function outcomeFor(input: Partial<Parameters<typeof missingPrimaryOrigin>[0]>) 
     origins: Origins.wrap([]),
     issuer: ISSUER,
     setupProject: true,
-    suggest: (command) => `zitadel ${command}` as never,
     ...input,
   });
 }
@@ -22,7 +21,7 @@ describe("missingPrimaryOrigin", () => {
     const outcome = outcomeFor({ origins: PREVIEW_ISSUER });
 
     expect(outcome.next).toEqual(["doctor --fix"]);
-    expect(outcome.hint).toContain("`zitadel doctor --fix`");
+    expect(outcome.hint).not.toContain("doctor --fix");
   });
 
   it("says why adding the preview issuer as primary does not work", () => {
@@ -38,7 +37,7 @@ describe("missingPrimaryOrigin", () => {
       `origin rm ${ISSUER} --force`,
       `origin add ${ISSUER} --kind primary`,
     ]);
-    expect(outcome.hint).toContain(`zitadel origin add ${ISSUER} --kind primary`);
+    expect(outcome.hint).not.toContain("origin add");
   });
 
   it("suggests adding the issuer as primary when the project does not hold it", () => {
@@ -55,8 +54,8 @@ describe("missingPrimaryOrigin", () => {
     ]);
   });
 
-  it("names origin add with a URL to fill in when no issuer resolves", () => {
-    expect(outcomeFor({ issuer: undefined }).hint).toContain("origin add <url> --kind primary");
+  it("asks for the URL the app serves from when no issuer resolves", () => {
+    expect(outcomeFor({ issuer: undefined }).hint).toContain("the URL the app serves from");
   });
 
   it("suggests origin list when no issuer resolves", () => {

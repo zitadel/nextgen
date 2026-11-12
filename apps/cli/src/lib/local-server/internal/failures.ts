@@ -1,5 +1,5 @@
 import { ZitadelError, toZitadelError } from "@/lib/errors";
-import { unscopedCommand } from "@/lib/suggestion";
+import { type EnvironmentSelector, projectCommand } from "@/lib/suggestion";
 import { listenersForPort, type TcpListener } from "@/lib/prober/ports";
 import {
   dockerRuntimeGuidance,
@@ -30,6 +30,7 @@ function startupCleanupFailedError(
   error: unknown,
   stopResult: StopOutcome,
   cliVersion: string,
+  selector: EnvironmentSelector,
 ): ZitadelError {
   const startupError = toZitadelError(error);
   return new ZitadelError(
@@ -40,9 +41,9 @@ function startupCleanupFailedError(
       nextCommands: [
         ...new Set([
           ...(startupError.nextCommands ?? []),
-          unscopedCommand("stop --all", cliVersion),
-          unscopedCommand("logs", cliVersion),
-          unscopedCommand("reset --force", cliVersion),
+          projectCommand("stop --all", selector, cliVersion),
+          projectCommand("logs", selector, cliVersion),
+          projectCommand("reset --force", selector, cliVersion),
         ]),
       ],
       details: {
@@ -61,18 +62,25 @@ function startupCleanupFailedError(
  * Fails early, with the guidance for starting Docker, when the daemon does not
  * answer: better than a start that fails halfway with a raw `docker` error.
  */
-export async function assertDockerAvailable(cliVersion: string): Promise<void> {
+export async function assertDockerAvailable(
+  cliVersion: string,
+  selector: EnvironmentSelector,
+): Promise<void> {
   const result = await DockerLauncher.available().catch((error: unknown) => {
-    throw dockerUnavailableError(error, cliVersion);
+    throw dockerUnavailableError(error, cliVersion, selector);
   });
   if (result.status !== 0) {
-    throw dockerUnavailableError(result.stderr || "docker version failed", cliVersion);
+    throw dockerUnavailableError(result.stderr || "docker version failed", cliVersion, selector);
   }
 }
 
 /** The error for a Docker daemon that is missing or not running. */
-function dockerUnavailableError(error: unknown, cliVersion: string): ZitadelError {
-  const advice = dockerRuntimeGuidance("start", cliVersion);
+function dockerUnavailableError(
+  error: unknown,
+  cliVersion: string,
+  selector: EnvironmentSelector,
+): ZitadelError {
+  const advice = dockerRuntimeGuidance("start", cliVersion, selector);
   return new ZitadelError("E_VALIDATION", "Docker is not reachable", {
     hint: advice.hint,
     nextCommands: advice.nextCommands,
@@ -86,17 +94,21 @@ function dockerUnavailableError(error: unknown, cliVersion: string): ZitadelErro
  * failed to become ready also carries what cleaning it up did, so a server that
  * could not be stopped is reported as such and not as a plain start failure.
  */
-export async function startFailure(error: unknown, cliVersion: string): Promise<unknown> {
+export async function startFailure(
+  error: unknown,
+  cliVersion: string,
+  selector: EnvironmentSelector,
+): Promise<unknown> {
   if (error instanceof ServerStartError) {
     const { record, details } = error;
     const reported =
       error.reason === "exited"
-        ? serverExitedError(record.server_url, cliVersion, details, error.logTail)
+        ? serverExitedError(record.server_url, cliVersion, selector, details, error.logTail)
         : new ZitadelError("E_NETWORK", "Local Zitadel server did not become healthy", {
             hint: "Inspect the local runtime logs, then reset the local runtime if needed.",
             nextCommands: [
-              unscopedCommand("logs", cliVersion),
-              unscopedCommand("reset --force", cliVersion),
+              projectCommand("logs", selector, cliVersion),
+              projectCommand("reset --force", selector, cliVersion),
             ],
             details: {
               ...details,
@@ -105,7 +117,7 @@ export async function startFailure(error: unknown, cliVersion: string): Promise<
             },
           });
     return error.cleanup.status === "failed"
-      ? startupCleanupFailedError(reported, error.cleanup, cliVersion)
+      ? startupCleanupFailedError(reported, error.cleanup, cliVersion, selector)
       : reported;
   }
   if (error instanceof ServerStopError) {
@@ -118,12 +130,12 @@ export async function startFailure(error: unknown, cliVersion: string): Promise<
     const url = localServerUrl(error.port);
     // Who holds the port is only for the message, so it can afford to wait for `lsof`.
     const listeners = await listenersForPort(error.port, { timeoutMs: 5000 });
-    return portInUseError(error.port, url, listeners, cliVersion);
+    return portInUseError(error.port, url, listeners, cliVersion, selector);
   }
   if (error instanceof NoFreePortError) {
     return new ZitadelError("E_PORT_IN_USE", error.message, {
       hint: "Free a port, or choose one with --port.",
-      nextCommands: [unscopedCommand("start --port 9080", cliVersion)],
+      nextCommands: [projectCommand("start --port 9080", selector, cliVersion)],
       details: { first_port: error.firstPort },
     });
   }
@@ -141,13 +153,14 @@ function portInUseError(
   serverUrl: string,
   listeners: ReadonlyArray<TcpListener>,
   cliVersion: string,
+  selector: EnvironmentSelector,
 ): ZitadelError {
   const fallbackPort = port === DEFAULT_LOCAL_SERVER_PORT ? port + 1 : DEFAULT_LOCAL_SERVER_PORT;
   return new ZitadelError("E_PORT_IN_USE", `Port ${String(port)} is already in use`, {
     hint: `Stop the process using ${serverUrl}, run \`zitadel stop --all\` for managed local runtimes, or choose another port.`,
     nextCommands: [
-      unscopedCommand("stop --all", cliVersion),
-      unscopedCommand(`start --port ${String(fallbackPort)}`, cliVersion),
+      projectCommand("stop --all", selector, cliVersion),
+      projectCommand(`start --port ${String(fallbackPort)}`, selector, cliVersion),
     ],
     details: { port, server_url: serverUrl, listeners },
   });
@@ -161,6 +174,7 @@ function portInUseError(
 function serverExitedError(
   serverUrl: string,
   cliVersion: string,
+  selector: EnvironmentSelector,
   details: Record<string, unknown>,
   logTail: string | undefined,
 ): ZitadelError {
@@ -170,8 +184,8 @@ function serverExitedError(
     {
       hint: "Inspect the local runtime logs, then retry after fixing the startup error.",
       nextCommands: [
-        unscopedCommand("logs", cliVersion),
-        unscopedCommand("reset --force", cliVersion),
+        projectCommand("logs", selector, cliVersion),
+        projectCommand("reset --force", selector, cliVersion),
       ],
       details: { ...details, server_url: serverUrl, ...(logTail ? { log_tail: logTail } : {}) },
     },

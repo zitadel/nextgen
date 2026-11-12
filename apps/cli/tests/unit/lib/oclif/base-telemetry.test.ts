@@ -55,7 +55,7 @@ class TestCommand extends BaseCommand {
     await this.toMeta({}, { resolveServer: false, source: "mock" });
   }
   public complete(): void {
-    this.emit({ status: "ok", data: {} });
+    this.emit({ summary: { title: "Done", sections: [] }, status: "ok", data: {} });
   }
   public async failWith(error: unknown): Promise<void> {
     try {

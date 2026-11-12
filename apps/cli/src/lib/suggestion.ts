@@ -1,5 +1,5 @@
 import { Cmd } from "./cmd";
-import { isPortableShellWord, newestCliCommand, publicCliCommand } from "./public-cli";
+import { newestCliCommand, publicCliCommand } from "./public-cli";
 
 declare const suggestedCommand: unique symbol;
 
@@ -11,7 +11,7 @@ declare const suggestedCommand: unique symbol;
  *
  * That decision is the point. A suggestion for a command that talks to a
  * project must carry the run's `--env` / `--env-file` / `--server`, or
- * following it quietly targets the default project instead (#1689). A raw
+ * following it quietly targets the default project instead. A raw
  * string does not typecheck where a suggestion is expected, so forgetting the
  * selector means choosing {@link unscopedCommand} by name, not by accident.
  */
@@ -66,27 +66,26 @@ export function unscopedCommand(args: string, cliVersion?: string): SuggestedCom
 
 /**
  * Commands built from argument lists, for a caller that also reports the lists
- * (`next_args`). Every argument must be a portable shell word, or none is
- * returned and the lists stand alone, which no shell interprets. The lists
- * carry whatever selector the command needs: they are the arguments as run.
+ * (`next_args`). Each argument is quoted as a shell word where it needs it
+ * (`Cmd.quote`), so a URL with a port stays as it is and a value with shell
+ * metacharacters or a placeholder to fill in (`<what changed>`) is wrapped.
+ * The lists carry whatever selector the command needs: they are the arguments
+ * as run.
  */
 export function portableSuggestions(
   argLists: readonly (readonly string[])[],
   cliVersion: string,
-  /** Arguments the caller fills in (`<what changed>`): quoted in the command, not portable words. */
-  placeholders: readonly string[] = [],
 ): SuggestedCommand[] {
-  const allowed = (word: string) => placeholders.includes(word) || isPortableShellWord(word);
-  if (!argLists.every((args) => args.every(allowed))) {
-    return [];
-  }
-  return argLists.map(
-    (args) =>
-      publicCliCommand(
-        args.map((word) => (placeholders.includes(word) ? `'${word}'` : word)).join(" "),
-        cliVersion,
-      ) as SuggestedCommand,
-  );
+  return argLists.map((args) => {
+    return publicCliCommand(
+      args
+        .map((word) => {
+          return Cmd.quote(word);
+        })
+        .join(" "),
+      cliVersion,
+    ) as SuggestedCommand;
+  });
 }
 
 /** A command that is not the CLI (`npm install …`, `rm …`), suggested as written. */

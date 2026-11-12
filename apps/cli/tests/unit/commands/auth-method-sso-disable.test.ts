@@ -18,7 +18,12 @@ import {
 import { authMethods, type ConfigDocuments } from "@tests/helpers/config";
 import { it } from "@tests/helpers/fixtures";
 import { readJson } from "@tests/helpers/local-project";
-import { expectedPublicCliCommand, parseJson, runCliForTest } from "@tests/helpers/run-cli";
+import {
+  expectedPublicCliCommand,
+  parseJson,
+  runCliForTest,
+  stripAnsi,
+} from "@tests/helpers/run-cli";
 
 /**
  * A schema that signs in with a password or with Google.
@@ -238,6 +243,18 @@ describe("auth-method sso disable", () => {
       expect(await readJson(dir, LOGIN_FLOW_FILE)).not.toHaveProperty(ENTRY_PROVIDERS);
     });
 
+    it("carries the headline it draws as data.title", async ({ dir }) => {
+      await writeProject(dir, GOOGLE_OFFERED);
+
+      const result = await runCliForTest(
+        authMethodJson(dir, "sso", "disable", "--provider", "google"),
+      );
+
+      expect(parseJson(result.stdout)).toMatchObject({
+        data: { title: expect.stringMatching(/^Removed google from /) },
+      });
+    });
+
     it("reports the files it changed and what is left", async ({ dir }) => {
       await writeProject(dir, GOOGLE_OFFERED);
 
@@ -317,14 +334,42 @@ describe("auth-method sso disable", () => {
   });
 
   describe("with --dry-run", () => {
-    it("reports a skipped preview", async ({ dir }) => {
+    it("reports the preview as a dry run", async ({ dir }) => {
       await writeProject(dir, GOOGLE_OFFERED);
 
       const result = await runCliForTest(
         authMethodJson(dir, "sso", "disable", "--provider", "google", "--dry-run"),
       );
 
-      expect(parseJson(result.stdout)).toMatchObject({ status: "skipped", reason: "dry-run" });
+      expect(parseJson(result.stdout)).toMatchObject({ status: "ok", data: { dry_run: true } });
+    });
+
+    it("carries the headline it draws as data.title", async ({ dir }) => {
+      await writeProject(dir, GOOGLE_OFFERED);
+
+      const result = await runCliForTest(
+        authMethodJson(dir, "sso", "disable", "--provider", "google", "--dry-run"),
+      );
+
+      expect(parseJson(result.stdout)).toMatchObject({
+        data: { title: expect.stringMatching(/^Would remove google from .* \(dry run\)$/) },
+      });
+    });
+
+    it("suggests the real command", async ({ dir }) => {
+      await writeProject(dir, GOOGLE_OFFERED);
+
+      const result = await runCliForTest(
+        authMethodJson(dir, "sso", "disable", "--provider", "google", "--dry-run"),
+      );
+
+      expect(parseJson(result.stdout)).toMatchObject({
+        data: {
+          next_commands: [
+            expectedPublicCliCommand(`auth-method sso disable --provider google --cwd ${dir}`),
+          ],
+        },
+      });
     });
 
     it.for(GOOGLE_OFFERED_IN)(
@@ -459,6 +504,18 @@ describe("auth-method sso disable", () => {
         ),
       ).toHaveLength(2);
     });
+
+    it("closes a dry run on a headline that says it is one", async ({ dir }) => {
+      await writeProject(dir, GITHUB_NOT_OFFERED);
+
+      const result = await runCliForTest(
+        authMethodText(dir, "sso", "disable", "--provider", "github", "--dry-run"),
+      );
+
+      expect(stripAnsi(result.stdout)).toContain(
+        "default-human-user does not offer github, so nothing would change (dry run)",
+      );
+    });
   });
 
   describe("when sso enable left a connection and steps behind", () => {
@@ -499,8 +556,8 @@ describe("auth-method sso disable", () => {
           next_actions: [
             "To stop publishing the connection, delete .zitadel/idps/google.json before the deploy below.",
             "Once that deploy is live, remove its credentials: " +
-              `\`${expectedPublicCliCommand(`variable rm GOOGLE_CLIENT_ID --cwd ${dir}`)}\` and ` +
-              `\`${expectedPublicCliCommand(`variable rm GOOGLE_CLIENT_SECRET --cwd ${dir}`)}\``,
+              `${expectedPublicCliCommand(`variable rm GOOGLE_CLIENT_ID --cwd ${dir}`)} and ` +
+              expectedPublicCliCommand(`variable rm GOOGLE_CLIENT_SECRET --cwd ${dir}`),
           ],
         },
       });
@@ -516,8 +573,10 @@ describe("auth-method sso disable", () => {
       expect(parseJson(result.stdout)).toHaveProperty(
         ["data", "next_actions", 1],
         "Once that deploy is live, remove its credentials: " +
-          `\`${expectedPublicCliCommand(`variable rm GOOGLE_CLIENT_ID --env production --cwd ${dir}`)}\` and ` +
-          `\`${expectedPublicCliCommand(`variable rm GOOGLE_CLIENT_SECRET --env production --cwd ${dir}`)}\``,
+          `${expectedPublicCliCommand(`variable rm GOOGLE_CLIENT_ID --env production --cwd ${dir}`)} and ` +
+          expectedPublicCliCommand(
+            `variable rm GOOGLE_CLIENT_SECRET --env production --cwd ${dir}`,
+          ),
       );
     });
 
@@ -616,8 +675,9 @@ describe("auth-method sso disable", () => {
       );
 
       expect(parseJson(result.stdout)).toMatchObject({
-        status: "skipped",
+        status: "ok",
         data: {
+          dry_run: true,
           notices: expect.arrayContaining([expect.objectContaining({ message: CONNECTION_KEPT })]),
         },
       });
@@ -967,8 +1027,8 @@ describe("auth-method sso disable", () => {
         );
 
         expect(parseJson(result.stdout)).toMatchObject({
-          status: "skipped",
-          reason: "dry-run",
+          status: "ok",
+          data: { dry_run: true },
           warnings: [WOULD_BE_LEFT_WITHOUT_SIGN_IN],
         });
       });

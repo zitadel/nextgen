@@ -1,6 +1,9 @@
 import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
 
+import DeploymentRollback from "@/commands/deployment/rollback/index";
+import { answering } from "@tests/helpers/keyboard";
+import { asTerminal as asPerson } from "@tests/helpers/terminal";
 import {
   aProjectWithTwoDeploys,
   liveAcrossTwoPages,
@@ -244,5 +247,34 @@ describe("deployment rollback", () => {
     expect(envelope.data).not.toHaveProperty("dropped_origins");
     expect(envelope.data).not.toHaveProperty("unserved_origins");
     expect(envelope.warnings).toEqual([expect.stringContaining("Could not check which origins")]);
+  });
+});
+
+describe("deployment rollback asked on a terminal", () => {
+  const rollingBackOn = async (serverUrl: string) => {
+    const { cwd } = await twoDeploys();
+    const talk = answering(false);
+    await asPerson(() => DeploymentRollback.run(["--cwd", cwd, "--server", serverUrl]));
+    return talk;
+  };
+
+  it("asks whether to roll back, naming the project and a remote server", async () => {
+    const talk = await rollingBackOn(SERVER);
+
+    expect(talk.asked()).toEqual([
+      expect.stringMatching(
+        /^Roll back to dep_\S+ in project proj-\S+ on preview\.zitadel\.com so its release goes live again\?$/,
+      ),
+    ]);
+  });
+
+  it("names a local server by its host and port", async () => {
+    const talk = await rollingBackOn("http://localhost:8112");
+
+    expect(talk.asked()).toEqual([
+      expect.stringMatching(
+        /^Roll back to dep_\S+ in project proj-\S+ on localhost:8112 so its release goes live again\?$/,
+      ),
+    ]);
   });
 });

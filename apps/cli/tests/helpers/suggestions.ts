@@ -27,6 +27,9 @@ const REFERENCE = JSON.parse(
 /** The CLI as a suggestion runs it: `npx @zitadel/cli@<version>` or `zitadel`. */
 const RUNNER = /^(?:@zitadel\/cli(?:@\S+)?|zitadel)$/;
 
+/** The words that ask for help rather than run a command. */
+const HELP: ReadonlySet<string> = new Set(["--help", "-h"]);
+
 /** One shell word: unquoted characters, escapes and quoted runs, up to the next blank. */
 const SHELL_WORD = /(?:[^\s'"\\]|\\[\s\S]|'[^']*'|"(?:\\[\s\S]|[^"\\])*")+/g;
 /** A quoted run or an escape inside a word, which the shell replaces with its text. */
@@ -126,6 +129,16 @@ function problemWith(command: string): string | undefined {
     (word, at) => at > runner && ["|", "&&", "||", ";", "<", ">", "2>&1"].includes(word),
   );
   const rest = words.slice(runner + 1, end === -1 ? undefined : end);
+  // Help is oclif's own flag, on the CLI and on every command, so no command lists it.
+  if (rest.length > 0 && HELP.has(rest.at(-1) as string)) {
+    const named = rest.slice(0, -1);
+    return named.length === 0 ||
+      REFERENCE.commands.some(({ id }) => {
+        return id === named.join(" ");
+      })
+      ? undefined
+      : `names no command: ${named.slice(0, 2).join(" ")}`;
+  }
   const reference = REFERENCE.commands
     .filter(({ id }) => id.split(" ").every((part, at) => rest[at] === part))
     .sort((a, b) => b.id.split(" ").length - a.id.split(" ").length)[0];

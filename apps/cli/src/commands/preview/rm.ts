@@ -1,12 +1,12 @@
-import { PreviewService } from "@/lib/backend";
 import { Args, Flags } from "@oclif/core";
 
+import { PreviewService } from "@/lib/backend";
 import { type Admitted, CommandGroups, type JsonEnvelope, PreviewCommand } from "@/lib/oclif";
 import { dryRunResult } from "@/lib/oclif/crud/shared";
-import { deletedData } from "@/lib/oclif/envelope";
 import { Destructive, Settled } from "@/lib/oclif/destructive";
+import { deletedData } from "@/lib/oclif/envelope";
 import { filled, type Refused, taken } from "@/lib/oclif/flags";
-import { prose } from "@/lib/oclif/rendering";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 
 /**
  * The preview URL to remove. It refuses a blank value, and drops a trailing
@@ -32,6 +32,7 @@ const URL: Refused<string> = {
 export default class PreviewRm extends Destructive(PreviewCommand) {
   static override description = "Remove a live preview from the project.";
   static override group = CommandGroups.configuration;
+
   static override examples = [
     "<%= config.bin %> preview rm https://acme-git-sso-acmeinc.vercel.app",
     "<%= config.bin %> preview rm https://acme-git-sso-acmeinc.vercel.app --force",
@@ -57,19 +58,23 @@ export default class PreviewRm extends Destructive(PreviewCommand) {
     return this.emit(
       await this.confirmed({
         verb: "remove",
-        name: `remove ${args.url} from the project`,
-        message: `Remove ${args.url} from the project?`,
-        preview: () => {
+        name: `stop serving ${args.url}`,
+        message: async () => {
+          const { projectId, server } = await this.connect();
+          return `Stop serving ${args.url} for project ${projectId} on ${server.replace(/^https?:\/\//, "")}?`;
+        },
+        preview: async () => {
           return dryRunResult({
-            verb: "remove",
+            verb: "stop",
             topic: "preview",
+            noun: "serving",
             id: args.url,
-            clause: "from the project",
+            next: await this.realRun(),
           });
         },
         prepare: async () => {
-          const connection = await this.connect();
-          const previewService = new PreviewService(connection.client, connection.projectId);
+          const { client, projectId } = await this.connect();
+          const previewService = new PreviewService(client, projectId);
           const previews = await previewService.list();
           // The server answers 204 whether or not the URL was live, so a typo
           // would otherwise read as a removal. Checked before asking, so
@@ -82,21 +87,32 @@ export default class PreviewRm extends Destructive(PreviewCommand) {
             return new Settled({
               status: "skipped",
               reason: "not-live",
-              pretty: prose(
-                `${args.url} is not a live preview of the project; nothing was removed`,
-              ),
+              summary: {
+                title: "Nothing was removed",
+                sections: [],
+                lines: [
+                  `${escapeControlCharacters(args.url)} is not a live preview of the project`,
+                ],
+              },
               next: { commands: [this.suggest("preview list")] },
             });
           }
-          return connection;
+          return {
+            client,
+            projectId,
+          };
         },
         apply: async (consent, { client, projectId }) => {
           const previewService = new PreviewService(consent.unlock(client), projectId);
           await previewService.remove(args.url);
+          const title = `Stopped serving ${escapeControlCharacters(args.url)}`;
           return {
             status: "ok",
-            data: deletedData({ url: args.url }),
-            pretty: prose(`Stopped serving ${args.url}`),
+            data: deletedData({ title, url: args.url }),
+            summary: {
+              title,
+              sections: [],
+            },
           };
         },
       }),

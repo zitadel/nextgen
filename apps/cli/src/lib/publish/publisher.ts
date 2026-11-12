@@ -1,12 +1,10 @@
-import { BuildReleaseBody as BuildReleaseBodySchema } from "@/lib/backend/schemas";
-
 import {
   type Deployment,
   DeploymentService,
   type DeployToPrimaryResult,
   IdpService,
-  type Origins,
   OriginService,
+  type Origins,
   type Release,
   type ReleaseInput,
   ReleaseService,
@@ -15,10 +13,12 @@ import {
   VariableService,
   type ZitadelClient,
 } from "@/lib/backend";
+import { BuildReleaseBody as BuildReleaseBodySchema } from "@/lib/backend/schemas";
 import { isCancellation, ZitadelError } from "@/lib/errors";
 import type { SuggestedCommand } from "@/lib/suggestion";
 import { type ConfigurationBundle, DiskStore, ZitadelConfig } from "@/lib/zitadel";
 import { SSO_RULES } from "@/lib/zitadel/rules/sso";
+
 import { headSha, worktreeIsDirty } from "./git";
 import {
   type PipelineMode,
@@ -228,13 +228,23 @@ export class Publisher {
       return issue.rule === DEPLOYED_DEPENDENT_RULE;
     });
     if (!needsDeployed) {
-      return { config: unknown, deployedUnknown: false };
+      return {
+        config: unknown,
+        deployedUnknown: false,
+      };
     }
     const deployed = await this.listDeployed();
     if (deployed === undefined) {
-      return { config: unknown, deployedUnknown: true };
+      return {
+        config: unknown,
+        deployedUnknown: true,
+      };
     }
-    return { config: unknown.withOptions({ deployed }), deployedUnknown: false };
+
+    return {
+      config: unknown.withOptions({ deployed }),
+      deployedUnknown: false,
+    };
   }
 
   /**
@@ -252,6 +262,7 @@ export class Publisher {
       if (isCancellation(error)) {
         throw error;
       }
+
       return undefined;
     }
   }
@@ -310,6 +321,7 @@ export class Publisher {
     // Together: neither answer depends on the other and each spawns git, so
     // asking in turn would cost a whole process for nothing.
     const [sha, dirty] = await Promise.all([headSha(request.cwd), worktreeIsDirty(request.cwd)]);
+
     return {
       bundle: Publisher.narrow(built.bundle),
       resourceCount: built.resourceCount,
@@ -351,6 +363,7 @@ export class Publisher {
       releaseId: release.id,
       message: request.message,
     });
+
     return {
       release,
       publication,
@@ -374,6 +387,7 @@ export class Publisher {
       message: request.message,
       ttl: request.ttl,
     });
+
     return {
       release,
       deployment,
@@ -395,6 +409,7 @@ export class Publisher {
       targets: "primary",
       message: request.message,
     });
+
     return {
       release,
       deployment,
@@ -426,15 +441,15 @@ export class Publisher {
     if (Publisher.isReleaseBundle(bundle)) {
       return bundle;
     }
+
     const issues = BuildReleaseBodySchema.shape.bundle.safeParse(bundle).error?.issues ?? [];
-    const noun = issues.length === 1 ? "issue" : "issues";
     const lines = issues.map((issue) => {
       const field = issue.path.join(".") || "(root)";
       return `  - bundle.${field} ${issue.message}`;
     });
     throw new ZitadelError(
       "E_VALIDATION",
-      `The release body does not match what the API takes, so nothing was sent (${issues.length} ${noun}):\n${lines.join("\n")}`,
+      `The release body does not match what the API takes, so nothing was sent:\n${lines.join("\n")}`,
       {
         details: {
           issues,

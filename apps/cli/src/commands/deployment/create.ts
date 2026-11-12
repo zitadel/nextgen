@@ -1,13 +1,13 @@
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
-import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { DeploymentService } from "@/lib/backend";
 import { GetReleaseByIdParams } from "@/lib/backend/schemas";
-
+import { Cmd } from "@/lib/cmd";
+import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { reads, type Refused } from "@/lib/oclif/flags";
 import { MESSAGE_MAX_LENGTH, messageTooLong } from "@/lib/publish";
-import { prose } from "@/lib/oclif/rendering";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 
 /**
  * The release `--release` deploys. The schema is the API spec's own, so a
@@ -18,7 +18,7 @@ const RELEASE: Refused<string> = {
   schema: z.string().trim().pipe(GetReleaseByIdParams.shape.release_id),
   refusal: {
     message: "Invalid {input}: {problem}",
-    hint: "Find one with `zitadel release list`.",
+    hint: "List the releases to find one.",
     next: ["release list"],
     details: {
       argument: "{input}",
@@ -49,16 +49,24 @@ const MESSAGE: Refused<string> = {
   },
 };
 
+/**
+ * `zitadel deployment create` — deploy an existing release to the project's
+ * origins.
+ */
 export default class DeploymentCreate extends EnvironmentCommand {
   static override description = "Deploy an existing release to the project's origins.";
   static override group = CommandGroups.configuration;
+
   static override examples = [
     "<%= config.bin %> deployment create --release rel_01KX3RG8A7F0N9WD3P2E4YM5C1",
   ];
   static override flags = {
     release: Flags.custom<string>({
       parse: reads(RELEASE),
-    })({ description: "The release id to deploy.", required: true }),
+    })({
+      description: "The release id to deploy.",
+      required: true,
+    }),
     message: Flags.custom<string>({
       parse: reads(MESSAGE),
     })({
@@ -73,15 +81,35 @@ export default class DeploymentCreate extends EnvironmentCommand {
     // literal: deploying an existing release writes a deployment record, and a
     // dry run must write none.
     if (this.dryRun) {
+      const title = `Would deploy ${escapeControlCharacters(flags.release)} to primary (dry run)`;
+
       return this.emit({
         status: "ok",
-        data: { dry_run: true, release_id: flags.release, targets: "primary" },
-        pretty: prose(`Would deploy ${flags.release} to primary. Nothing was deployed (dry run).`),
+        data: {
+          dry_run: true,
+          title,
+          release_id: flags.release,
+          targets: "primary",
+        },
+        summary: {
+          title,
+          sections: [],
+        },
+        next: {
+          commands: [
+            this.suggest(
+              [
+                "deployment create",
+                Cmd.option("--release", flags.release),
+                ...(flags.message === undefined ? [] : [Cmd.option("--message", flags.message)]),
+              ].join(" "),
+            ),
+          ],
+        },
       });
     }
 
     const { client, projectId } = await this.connect();
-
     const deploymentService = new DeploymentService(client, projectId);
     const deployment = await deploymentService.create({
       release_id: flags.release,
@@ -89,22 +117,31 @@ export default class DeploymentCreate extends EnvironmentCommand {
       message: flags.message,
     });
 
+    const title = `Deployed ${escapeControlCharacters(deployment.release_id)}`;
+
     return this.emit({
       status: "ok",
       data: {
+        title,
         deployment_id: deployment.id,
         release_id: deployment.release_id,
         origins: deployment.origins,
       },
+      summary: {
+        title,
+        sections: [],
+        lines:
+          deployment.origins.length === 0
+            ? []
+            : [
+                `Live on ${new Intl.ListFormat("en", { type: "conjunction" }).format(
+                  deployment.origins.map((origin) => {
+                    return escapeControlCharacters(origin);
+                  }),
+                )}.`,
+              ],
+      },
       next: { commands: [this.suggest("deployment list")] },
-      pretty: prose(
-        [
-          `Deployed ${deployment.release_id} to ${deployment.origins.length} origin${deployment.origins.length === 1 ? "" : "s"}`,
-          ...deployment.origins.map((origin) => {
-            return `  - ${origin}`;
-          }),
-        ].join("\n"),
-      ),
     });
   }
 }

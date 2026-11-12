@@ -2,6 +2,7 @@ import { ZitadelError } from "@/lib/errors";
 import { mapBounded } from "@/lib/map-bounded";
 import type { Step, StepContext, StepResult } from "@/lib/publish/pipeline";
 import { CONFIG_DIRECTORIES, type Issue, type RuleId, UserSchema } from "@/lib/zitadel";
+
 import { brandingAssetWarnings } from "./asset-probe";
 import { validateConnections } from "./idp-checks";
 
@@ -99,7 +100,6 @@ function refuseErrors(ctx: StepContext, findings: readonly (Issue | ServerFindin
   if (errors.length === 0) {
     return;
   }
-  const noun = errors.length === 1 ? "issue" : "issues";
   const literalSecret = errors.some((finding) => {
     return finding.rule === "connection/literal-secret";
   });
@@ -113,13 +113,13 @@ function refuseErrors(ctx: StepContext, findings: readonly (Issue | ServerFindin
   });
   const fix = literalSecret
     ? `Publish a secret with \`${ctx.suggest("variable set NAME --secret")}\` and reference it as "\${{ NAME }}".`
-    : "Fix the files named above and re-run; no changes were made.";
+    : "Fix the files named above and rerun; no changes were made.";
   const hint = refusedKey
     ? `${fix} A key a newer Zitadel server added needs a CLI as new as the server.`
     : fix;
   throw new ZitadelError(
     "E_VALIDATION",
-    `Configuration validation failed (${errors.length} ${noun}):\n${lines.join("\n")}`,
+    `Configuration validation failed (${errors.length} ${new Intl.PluralRules("en").select(errors.length) === "one" ? "issue" : "issues"}):\n${lines.join("\n")}`,
     {
       hint,
       details: {

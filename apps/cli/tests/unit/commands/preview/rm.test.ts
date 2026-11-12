@@ -1,6 +1,9 @@
 import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
 
+import PreviewRm from "@/commands/preview/rm";
+import { answering } from "@tests/helpers/keyboard";
+import { asTerminal as asPerson } from "@tests/helpers/terminal";
 import {
   aProjectDirectory,
   PLATFORM_URL,
@@ -20,7 +23,7 @@ async function aProjectWithPreviewsOnTwoPages(): Promise<{ cwd: string; removed:
     created_at: "2026-01-01T00:00:00.000Z",
   });
   server.use(
-    http.get(`${SERVER}/api/v1/projects/:project_id/previews`, ({ request }) =>
+    http.get("*/api/v1/projects/:project_id/previews", ({ request }) =>
       HttpResponse.json(
         new URL(request.url).searchParams.get("page_token") === "p2"
           ? { previews: [preview("https://pr-2.app.acme.com")], next_page_token: null }
@@ -28,7 +31,7 @@ async function aProjectWithPreviewsOnTwoPages(): Promise<{ cwd: string; removed:
       ),
     ),
     http.post<{ project_id: string }, { origin: string }>(
-      `${SERVER}/api/v1/projects/:project_id/previews/remove`,
+      "*/api/v1/projects/:project_id/previews/remove",
       async ({ request }) => {
         const body = await request.json();
         removed.push(body.origin);
@@ -60,6 +63,102 @@ describe("preview rm", () => {
     expect([parseJson(res.stdout), removed]).toEqual([
       expect.objectContaining({ status: "ok" }),
       ["https://pr-2.app.acme.com"],
+    ]);
+  });
+});
+
+describe("preview rm asked about a URL with a control character", () => {
+  it("keeps the character as it was typed, in the question it carries as data", async () => {
+    const { cwd } = await aProjectWithPreviewsOnTwoPages();
+    server.use(
+      http.get("*/api/v1/projects/:project_id/previews", () => {
+        return HttpResponse.json({
+          previews: [
+            {
+              origin: "https://pr-1\u001b[31m.app.acme.com",
+              expires_at: "2026-02-01T00:00:00.000Z",
+              created_at: "2026-01-01T00:00:00.000Z",
+            },
+          ],
+          next_page_token: null,
+        });
+      }),
+    );
+
+    const result = await runCliForTest([
+      "preview",
+      "rm",
+      "https://pr-1\u001b[31m.app.acme.com",
+      "--cwd",
+      cwd,
+      "--server",
+      SERVER,
+      "--non-interactive",
+      "--json",
+    ]);
+
+    const envelope = parseJson(result.stdout) as { code: string; hint: string };
+    expect(envelope.code).toBe("E_CONFIRMATION_REQUIRED");
+    expect(envelope.hint).toContain("\u001b[31m");
+  });
+});
+
+describe("preview rm asked on a terminal", () => {
+  const removingOn = async (serverUrl: string) => {
+    const { cwd } = await aProjectWithPreviewsOnTwoPages();
+    const talk = answering(false);
+    await asPerson(() =>
+      PreviewRm.run(["https://pr-1.app.acme.com", "--cwd", cwd, "--server", serverUrl]),
+    );
+    return talk;
+  };
+
+  it("asks whether to stop serving the preview, naming the project and a remote server", async () => {
+    const talk = await removingOn(SERVER);
+
+    expect(talk.asked()).toEqual([
+      "Stop serving https://pr-1.app.acme.com for project proj_test on preview.zitadel.com?",
+    ]);
+  });
+
+  it("spells out a control character in the URL in the question it draws", async () => {
+    const { cwd } = await aProjectWithPreviewsOnTwoPages();
+    server.use(
+      http.get("*/api/v1/projects/:project_id/previews", () => {
+        return HttpResponse.json({
+          previews: [
+            {
+              origin: "https://pr-1\u001b[31m.app.acme.com",
+              expires_at: "2026-02-01T00:00:00.000Z",
+              created_at: "2026-01-01T00:00:00.000Z",
+            },
+          ],
+          next_page_token: null,
+        });
+      }),
+    );
+    const talk = answering(false);
+
+    await asPerson(() => {
+      return PreviewRm.run([
+        "https://pr-1\u001b[31m.app.acme.com",
+        "--cwd",
+        cwd,
+        "--server",
+        SERVER,
+      ]);
+    });
+
+    expect(talk.asked()).toEqual([
+      "Stop serving https://pr-1\\x1b[31m.app.acme.com for project proj_test on preview.zitadel.com?",
+    ]);
+  });
+
+  it("names a local server by its host and port", async () => {
+    const talk = await removingOn("http://localhost:8112");
+
+    expect(talk.asked()).toEqual([
+      "Stop serving https://pr-1.app.acme.com for project proj_test on localhost:8112?",
     ]);
   });
 });

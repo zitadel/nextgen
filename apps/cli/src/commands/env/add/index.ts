@@ -1,17 +1,16 @@
 import { stat } from "node:fs/promises";
-import { z } from "zod";
 import { basename, join } from "node:path";
-
 import { Args, Flags } from "@oclif/core";
 import type { Parsed } from "@zitadel/config/idp";
-import { consola } from "consola";
+import { z } from "zod";
 
 import { createZitadelClient, ProjectService } from "@/lib/backend";
+import { Cmd } from "@/lib/cmd";
 import { deployInitialRelease, type InitialDeployment, isEnvironmentName } from "@/lib/environment";
 import { toZitadelError } from "@/lib/errors";
 import { writeManagedEnvFile } from "@/lib/fs-safe";
 import { isObject } from "@/lib/json";
-import { reportWarning } from "@/lib/warnings";
+import { log } from "@/lib/log";
 import {
   type Admitted,
   BaseCommand,
@@ -19,18 +18,18 @@ import {
   type JsonEnvelope,
   nonBlankString,
 } from "@/lib/oclif";
+import { environmentSelectorSuffix, projectEnvFile } from "@/lib/oclif/environment-flags";
+import { type Refused, reads, taken } from "@/lib/oclif/flags";
+import { Promptable } from "@/lib/oclif/promptable";
+import { interpolate, type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { Suggestible } from "@/lib/oclif/suggestible";
 import { PUBLIC_PROJECT_ID_VARIABLE } from "@/lib/orca/patchers/rule/public-project-id";
 import { readZitadelConfig } from "@/lib/project";
 import { DEFAULT_SERVER, parseServer, resolveServer } from "@/lib/server";
-import { Cmd } from "@/lib/cmd";
-import { environmentSelectorSuffix, projectEnvFile } from "@/lib/oclif/environment-flags";
 import { DEPLOY_ARGS, type EnvironmentSelector, projectCommand } from "@/lib/suggestion";
-import { Promptable } from "@/lib/oclif/promptable";
-import { reads, type Refused, taken } from "@/lib/oclif/flags";
-import { interpolate, type Refusal, refusalError } from "@/lib/oclif/refusal";
-import { userAgent } from "@/lib/user-agent";
 import { escapeControlCharacters } from "@/lib/terminal-text";
-import { prose } from "@/lib/oclif/rendering";
+import { userAgent } from "@/lib/user-agent";
+import { reportWarning } from "@/lib/warnings";
 
 /** What a `.env.<name>.local` that already exists is refused for. */
 const FILE_EXISTS_REFUSAL: Refusal = {
@@ -76,7 +75,7 @@ type PlatformVariable = { name: string; value?: string; secret?: boolean };
 const SERVER_RENDERED = ["next", "nuxt"];
 
 /** The message the release this command publishes carries. */
-const INITIAL_DEPLOY_MESSAGE = "Initial deployment from zitadel env add";
+const INITIAL_DEPLOY_MESSAGE = "Initial deployment from env add";
 
 /** What an app URL is refused for: it must be an http(s) URL. */
 const APP_URL_REFUSAL: Refusal = {
@@ -136,9 +135,10 @@ export function readAppUrl(answer: string): Parsed<string | undefined> {
  * platform builds from git), so the command ends by printing exactly which
  * values the platform and the pipeline need.
  */
-export default class EnvAdd extends Promptable(BaseCommand) {
+export default class EnvAdd extends Suggestible(Promptable(BaseCommand)) {
   static override description = "Bind an environment to a project, creating the project if needed.";
   static override group = CommandGroups.configuration;
+
   static override examples = [
     "<%= config.bin %> env add production --server https://api.zitadel.cloud --app-url https://app.acme.com",
     "<%= config.bin %> env add staging --server https://api.zitadel.cloud --project proj_01K9AA9M3K7E2QX8VB4T",
@@ -175,7 +175,12 @@ export default class EnvAdd extends Promptable(BaseCommand) {
     // `--server` resolves to an origin as it does everywhere; one that was not
     // given is left to the prompt below.
     const givenServer = this.meta.serverFlag
-      ? (await resolveServer({ cwd, serverFlag: this.meta.serverFlag })).value
+      ? (
+          await resolveServer({
+            cwd,
+            serverFlag: this.meta.serverFlag,
+          })
+        ).value
       : undefined;
 
     const config = await readZitadelConfig(cwd);
@@ -187,8 +192,7 @@ export default class EnvAdd extends Promptable(BaseCommand) {
 
     const server =
       givenServer ??
-      (await this.input({
-        kind: "text",
+      (await this.ask.text({
         name: "server",
         message: "What is the URL of your Zitadel server?",
         flag: "--server",
@@ -196,7 +200,7 @@ export default class EnvAdd extends Promptable(BaseCommand) {
         parse: parseServer,
         // The rerun keeps every choice this run made, so binding a project
         // (`--project`) stays a bind rather than creating a new project.
-        retry: this.suggestUnscoped(
+        retry: this.suggest(
           [
             `env add ${Cmd.quote(args.name)}`,
             "--server https://api.zitadel.cloud",
@@ -211,8 +215,7 @@ export default class EnvAdd extends Promptable(BaseCommand) {
       flags.appUrl ??
       (nonInteractive
         ? undefined
-        : await this.input({
-            kind: "text",
+        : await this.ask.text({
             name: "app URL",
             message: "What URL is your app served from? You can leave this empty to skip it.",
             flag: "--app-url",
@@ -222,15 +225,45 @@ export default class EnvAdd extends Promptable(BaseCommand) {
     const issuer = appUrl === undefined ? undefined : new URL(appUrl).origin;
 
     if (dryRun) {
+      const title = escapeControlCharacters(
+        `Would add the ${args.name} environment, bound to ${flags.project ?? "a new project"} (dry run)`,
+      );
+
       return this.emit({
-        status: "skipped",
-        reason: "dry-run",
+        status: "ok",
         data: {
+          title,
+          dry_run: true,
           environment: args.name,
           file: environment.file,
           server,
           project_id: flags.project,
           issuer,
+        },
+        summary: {
+          title,
+          sections: [],
+          lines: [
+            escapeControlCharacters(
+              flags.project === undefined
+                ? `Would create a project on ${server}`
+                : `Would bind the existing project ${flags.project}`,
+            ),
+            escapeControlCharacters(`Would write ${environment.file}`),
+          ],
+        },
+        next: {
+          commands: [
+            this.suggest(
+              [
+                `env add ${Cmd.quote(args.name)}`,
+                `--server ${Cmd.quote(server)}`,
+                ...(flags.project === undefined ? [] : [Cmd.option("--project", flags.project)]),
+                ...(flags.appUrl === undefined ? [] : [Cmd.option("--app-url", flags.appUrl)]),
+                ...(flags.force ? ["--force"] : []),
+              ].join(" "),
+            ),
+          ],
         },
       });
     }
@@ -238,12 +271,23 @@ export default class EnvAdd extends Promptable(BaseCommand) {
     const project =
       flags.project === undefined
         ? await new ProjectService(
-            createZitadelClient({ userAgent: userAgent(), baseUrl: server, signal: this.signal }),
+            createZitadelClient({
+              userAgent: userAgent(),
+              baseUrl: server,
+              signal: this.signal,
+            }),
           ).create({
             name: `${basename(cwd)}-${args.name}`,
             ...(issuer === undefined
               ? {}
-              : { origins: [{ pattern: issuer, kind: "primary" as const }] }),
+              : {
+                  origins: [
+                    {
+                      pattern: issuer,
+                      kind: "primary" as const,
+                    },
+                  ],
+                }),
             seed_defaults: false,
           })
         : {
@@ -252,9 +296,10 @@ export default class EnvAdd extends Promptable(BaseCommand) {
             preview_secret: env.ZITADEL_PREVIEW_TOKEN,
           };
     if (flags.project === undefined) {
-      consola.success(`Created project ${escapeControlCharacters(project.id)}`);
+      log.done(`Created project ${escapeControlCharacters(project.id)}`);
     }
     const { id: projectId, project_secret: projectSecret, preview_secret: previewToken } = project;
+    this.ui.ranAgainst(projectId, server);
 
     const values: Record<string, string> = {
       ZITADEL_URL: server,
@@ -267,22 +312,48 @@ export default class EnvAdd extends Promptable(BaseCommand) {
       ...(publicVariable === undefined ? {} : { [publicVariable]: projectId }),
     };
     await writeManagedEnvFile(environment.path, values);
-    consola.success(`Wrote ${environment.file}`);
+    log.done(`Wrote ${escapeControlCharacters(environment.file)}`);
 
     const appVariables: PlatformVariable[] = [
-      { name: "ZITADEL_URL", value: server },
-      { name: "ZITADEL_PROJECT_ID", value: projectId },
-      ...(publicVariable === undefined ? [] : [{ name: publicVariable, value: projectId }]),
+      {
+        name: "ZITADEL_URL",
+        value: server,
+      },
+      {
+        name: "ZITADEL_PROJECT_ID",
+        value: projectId,
+      },
+      ...(publicVariable === undefined
+        ? []
+        : [
+            {
+              name: publicVariable,
+              value: projectId,
+            },
+          ]),
     ];
     const serverRendered = typeof frameworkId === "string" && SERVER_RENDERED.includes(frameworkId);
     const platform = {
       production: [
         ...appVariables,
-        ...(serverRendered ? [{ name: "ZITADEL_PROJECT_SECRET", secret: true }] : []),
-        { name: "ZITADEL_ENV", value: "production" },
         ...(serverRendered
           ? [
-              { name: "ZITADEL_ENVIRONMENT", value: "production" },
+              {
+                name: "ZITADEL_PROJECT_SECRET",
+                secret: true,
+              },
+            ]
+          : []),
+        {
+          name: "ZITADEL_ENV",
+          value: "production",
+        },
+        ...(serverRendered
+          ? [
+              {
+                name: "ZITADEL_ENVIRONMENT",
+                value: "production",
+              },
               {
                 name: "ZITADEL_ISSUER",
                 value: issuer ?? "<the URL your production app is served from>",
@@ -292,14 +363,36 @@ export default class EnvAdd extends Promptable(BaseCommand) {
       ],
       preview: [
         ...appVariables,
-        { name: "ZITADEL_ENV", value: "preview" },
-        ...(serverRendered ? [{ name: "ZITADEL_ENVIRONMENT", value: "preview" }] : []),
-        { name: "ZITADEL_PREVIEW_TOKEN", secret: true },
+        {
+          name: "ZITADEL_ENV",
+          value: "preview",
+        },
+        ...(serverRendered
+          ? [
+              {
+                name: "ZITADEL_ENVIRONMENT",
+                value: "preview",
+              },
+            ]
+          : []),
+        {
+          name: "ZITADEL_PREVIEW_TOKEN",
+          secret: true,
+        },
       ],
       pipeline: [
-        { name: "ZITADEL_URL", value: server },
-        { name: "ZITADEL_PROJECT_ID", value: projectId },
-        { name: "ZITADEL_PROJECT_SECRET", secret: true },
+        {
+          name: "ZITADEL_URL",
+          value: server,
+        },
+        {
+          name: "ZITADEL_PROJECT_ID",
+          value: projectId,
+        },
+        {
+          name: "ZITADEL_PROJECT_SECRET",
+          secret: true,
+        },
       ],
     };
     // Only a secret actually written to the file can be copied from it. When
@@ -327,11 +420,10 @@ export default class EnvAdd extends Promptable(BaseCommand) {
     // offering it would ask for something that cannot work, and naming it
     // would send the reader to a command that fails the same way.
     const hasSomewhereToLand = createdProject && issuer !== undefined;
-    const { cliVersion } = this.meta;
     // A project this run created has never had a release, so the environment
-    // serves the server's own defaults until something is deployed to it
-    // (#1651). Offer that deploy here, the one moment the project, its secret
-    // and its origin are all at hand. A bound project (`--project`) is
+    // serves the server's own defaults until something is deployed to it.
+    // Offer that deploy here, the one moment the project, its secret and its
+    // origin are all at hand. A bound project (`--project`) is
     // someone else's and may already serve a release of its own, so it is
     // never offered one, and a run with nobody to ask gets the suggestion in
     // the envelope instead — there is no flag to deploy without being asked,
@@ -339,14 +431,13 @@ export default class EnvAdd extends Promptable(BaseCommand) {
     // permits overwriting the env file, never answers a `yes-no`.
     const offerDeployment = hasSomewhereToLand && !nonInteractive && projectSecret !== undefined;
     if (offerDeployment) {
-      consola.info(
+      log.info(
         "Nothing is deployed to this environment yet, so sign-in is refused until your .zitadel/ files are deployed.",
       );
     }
     const deployment: InitialDeployment | undefined =
       offerDeployment &&
-      (await this.input({
-        kind: "yes-no",
+      (await this.ask.yesNo({
         name: "deploy .zitadel/ to the new environment",
         message: "Would you like to deploy .zitadel/ to it now?",
         initialValue: true,
@@ -369,10 +460,48 @@ export default class EnvAdd extends Promptable(BaseCommand) {
       });
     };
 
+    // The runnable `origin add` is in the next steps; the line here is
+    // for the one they cannot hold: a placeholder origin, or a file
+    // without the project secret it would authenticate with.
+    let originGuidance: string[] = [];
+    if (needsOrigin) {
+      if (writtenKeys.has("ZITADEL_PROJECT_SECRET")) {
+        if (issuer === undefined) {
+          originGuidance = [
+            `Allow this project's origin: ${projectCommand("origin add '<your-app-url>' --kind primary", newEnvironment, this.cliVersion)}`,
+          ];
+        }
+      } else {
+        originGuidance = [
+          `Allow this project's origin once ZITADEL_PROJECT_SECRET is in ${environment.file}: ${projectCommand(`origin add ${issuer === undefined ? "'<your-app-url>'" : Cmd.quote(issuer)} --kind primary`, newEnvironment, this.cliVersion)}`,
+        ];
+      }
+    }
+    // Said even when nobody could be asked, because it is the one thing
+    // standing between this environment and a working app: until a
+    // release is deployed the project refuses sign-in, and the `.zitadel/`
+    // files in this directory are not served.
+    let deployGuidance: string[] = [];
+    if (createdProject && deployment === undefined) {
+      deployGuidance = [
+        `Nothing is deployed to ${args.name} yet, so sign-in is refused until .zitadel/ is deployed.`,
+      ];
+      // With an origin, the deploy is in the next steps.
+      if (!hasSomewhereToLand) {
+        deployGuidance = [
+          ...deployGuidance,
+          `Give it an origin first: ${projectCommand("origin add '<your-app-url>' --kind primary", newEnvironment, this.cliVersion)}`,
+          `Then deploy to it: ${projectCommand(DEPLOY_ARGS, newEnvironment, this.cliVersion)}`,
+        ];
+      }
+    }
+
+    const title = `Added the ${args.name} environment, bound to ${projectId}`;
+
     return this.emit({
       status: "ok",
       data: {
-        title: `Bound ${args.name} to ${projectId}.`,
+        title,
         environment: args.name,
         file: environment.file,
         server,
@@ -394,6 +523,27 @@ export default class EnvAdd extends Promptable(BaseCommand) {
                 origins: [...deployment.origins],
               },
       },
+      summary: {
+        title: escapeControlCharacters(title),
+        sections: [],
+        lines: [
+          `${environment.file} holds ${Object.keys(values).join(", ")}.`,
+          ...guidanceBlock([...originGuidance, ...deployGuidance]),
+          "",
+          "The deployed app never reads that file. Set these where it is built and run.",
+          "",
+          "Hosting platform, production scope:",
+          ...render(platform.production),
+          "",
+          "Hosting platform, preview scope:",
+          ...render(platform.preview),
+          "",
+          "Pipeline secret store, for the job that runs zitadel:",
+          ...render(platform.pipeline),
+        ].map((line) => {
+          return escapeControlCharacters(line);
+        }),
+      },
       // A bound project admits no origin except a loopback origin until the
       // first pattern is added, so the first step is `origin add` before
       // anything ships. `next_commands` is machine-readable, so the entry is
@@ -411,7 +561,7 @@ export default class EnvAdd extends Promptable(BaseCommand) {
                 projectCommand(
                   `origin add ${Cmd.quote(issuer)} --kind primary`,
                   newEnvironment,
-                  cliVersion,
+                  this.cliVersion,
                 ),
               ]
             : []),
@@ -421,59 +571,11 @@ export default class EnvAdd extends Promptable(BaseCommand) {
           // project someone else owns and may already serve a release of
           // their own, so this run does not propose replacing it.
           ...(hasSomewhereToLand && deployment === undefined
-            ? [projectCommand(DEPLOY_ARGS, newEnvironment, cliVersion)]
+            ? [projectCommand(DEPLOY_ARGS, newEnvironment, this.cliVersion)]
             : []),
-          projectCommand("env", newEnvironment, cliVersion),
+          projectCommand("env", newEnvironment, this.cliVersion),
         ],
       },
-      pretty: prose(
-        [
-          `Wrote ${environment.file} with ${Object.keys(values).join(", ")}`,
-          ...guidanceBlock([
-            // The runnable `origin add` is in the next steps; the line here is
-            // for the one they cannot hold: a placeholder origin, or a file
-            // without the project secret it would authenticate with.
-            ...(needsOrigin
-              ? writtenKeys.has("ZITADEL_PROJECT_SECRET")
-                ? issuer === undefined
-                  ? [
-                      `Allow this project's origin: zitadel origin add '<your-app-url>' --kind primary${newEnvironment}`,
-                    ]
-                  : []
-                : [
-                    `Allow this project's origin once ZITADEL_PROJECT_SECRET is in ${environment.file}: zitadel origin add ${issuer === undefined ? "'<your-app-url>'" : Cmd.quote(issuer)} --kind primary${newEnvironment}`,
-                  ]
-              : []),
-            // Said even when nobody could be asked, because it is the one thing
-            // standing between this environment and a working app: until a
-            // release is deployed the project refuses sign-in, and the `.zitadel/`
-            // files in this directory are not served.
-            ...(createdProject && deployment === undefined
-              ? [
-                  `Nothing is deployed to ${args.name} yet, so sign-in is refused until .zitadel/ is deployed.`,
-                  // With an origin, the deploy is in the next steps.
-                  ...(hasSomewhereToLand
-                    ? []
-                    : [
-                        `Give it an origin first: zitadel origin add '<your-app-url>' --kind primary${newEnvironment}`,
-                        `Then deploy to it: zitadel ${DEPLOY_ARGS}${newEnvironment}`,
-                      ]),
-                ]
-              : []),
-          ]),
-          "",
-          "The deployed app never reads that file. Set these where it is built and run.",
-          "",
-          "Hosting platform, production scope:",
-          ...render(platform.production),
-          "",
-          "Hosting platform, preview scope:",
-          ...render(platform.preview),
-          "",
-          "Pipeline secret store, for the job that runs zitadel:",
-          ...render(platform.pipeline),
-        ].join("\n"),
-      ),
     });
   }
 
@@ -493,7 +595,7 @@ export default class EnvAdd extends Promptable(BaseCommand) {
     projectSecret: string;
     selector: EnvironmentSelector;
   }): Promise<InitialDeployment | undefined> {
-    consola.start("Deploying .zitadel/ to the new environment");
+    log.start("Deploying .zitadel/ to the new environment");
     try {
       const deployment = await deployInitialRelease({
         client: createZitadelClient({
@@ -508,17 +610,20 @@ export default class EnvAdd extends Promptable(BaseCommand) {
         json: this.isJson,
         color: this.isColored,
         message: INITIAL_DEPLOY_MESSAGE,
+        narrate: (notices) => {
+          this.narrate(notices);
+        },
         suggest: (args) => {
           return projectCommand(args, opts.selector, this.cliVersion);
         },
       });
-      consola.success(
-        `Deployed ${deployment.contentHash} to ${deployment.origins.length} origin${deployment.origins.length === 1 ? "" : "s"}`,
+      log.done(
+        `Deployed ${escapeControlCharacters(deployment.contentHash)} to ${deployment.origins.length} ${new Intl.PluralRules("en").select(deployment.origins.length) === "one" ? "origin" : "origins"}`,
       );
       return deployment;
     } catch (error) {
       reportWarning(
-        `The environment was bound but the first deploy failed: ${toZitadelError(error).message}. Run \`zitadel ${DEPLOY_ARGS}${opts.selector}\` to publish it.`,
+        `The environment was bound but the first deploy failed: ${toZitadelError(error).message}. Run ${projectCommand(DEPLOY_ARGS, opts.selector, this.cliVersion)} to publish it.`,
       );
       return undefined;
     }

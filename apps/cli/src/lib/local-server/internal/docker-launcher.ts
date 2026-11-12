@@ -84,7 +84,9 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
       env.values,
     ).catch(async (error: unknown) => {
       // A run that failed after the container was created leaves it behind.
-      await DockerLauncher.remove(spec.containerName).catch(() => false);
+      await DockerLauncher.remove(spec.containerName).catch(() => {
+        return false;
+      });
       throw error;
     });
     return launched(
@@ -151,7 +153,9 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
       `${spec.dataDir}:${CONTAINER_DATA_DIR}`,
       // Project variables first: Docker takes the last value for a repeated
       // name, so the CLI's own settings below always win.
-      ...envNames.flatMap((name) => ["--env", name]),
+      ...envNames.flatMap((name) => {
+        return ["--env", name];
+      }),
       "--env",
       `NEXTGEN_SERVER_ADDRESS=:${CONTAINER_HTTP_PORT}`,
       "--env",
@@ -312,11 +316,18 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
    * --follow` then replays the log before it streams, so the replay is skipped,
    * stream by stream, by the lines read the first time; only whole lines are
    * handed over then, so a line still being written is not handed over twice.
+   *
+   * @param containerName - The container whose log is followed.
+   * @param tail - How many of the last lines Docker picks, or `"all"`.
+   * @param sink - Where the log is handed.
+   * @param interrupted - The run's Ctrl-C; following stops once it aborts, even
+   *   if it aborted before following began.
    */
   static async followLogs(
     containerName: string,
     tail: number | "all",
     sink: LogSink,
+    interrupted: AbortSignal,
   ): Promise<void> {
     const replayed = { stdout: 0, stderr: 0 };
     if (tail === "all") {
@@ -327,7 +338,7 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
       replayed.stdout = stdout.split("\n").length - 1;
       replayed.stderr = stderr.split("\n").length - 1;
     }
-    const stop = stopSignal();
+    const stop = stopSignal(interrupted);
     try {
       await streamDocker(
         ["logs", "--tail", String(tail), "--follow", containerName],

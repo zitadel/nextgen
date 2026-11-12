@@ -1,19 +1,21 @@
 import { Args, Flags } from "@oclif/core";
-import { errorMessage, ZitadelError } from "@/lib/errors";
 
+import { previewVerdict } from "@/commands/preview";
+import { type Variable, VariableService, VariableWrite } from "@/lib/backend";
+import { Cmd } from "@/lib/cmd";
+import { errorMessage, ZitadelError } from "@/lib/errors";
 import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { dryRunResult } from "@/lib/oclif/crud/shared";
-import { type Variable, VariableService, VariableWrite } from "@/lib/backend";
-import { variableNameArg } from "./name";
-import { heldCell, parseVariableValue, VARIABLE_TYPES, type VariableType } from "@/lib/variables";
-import { type Refusal, refusalError } from "@/lib/oclif/refusal";
-import { reportWarning } from "@/lib/warnings";
-import { previewVerdict } from "@/commands/preview";
-import { runsInCi } from "@/lib/telemetry/dimensions/ci-provider";
-import { DEPLOY_ARGS, inShell } from "@/lib/suggestion";
 import { Promptable } from "@/lib/oclif/promptable";
+import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { Tabulatable } from "@/lib/oclif/tabulatable";
-import { painted } from "@/lib/oclif/rendering";
+import { DEPLOY_ARGS, inShell, type SuggestedCommand } from "@/lib/suggestion";
+import { runsInCi } from "@/lib/telemetry/dimensions/ci-provider";
+import { escapeControlCharacters } from "@/lib/terminal-text";
+import { heldCell, parseVariableValue, VARIABLE_TYPES, type VariableType } from "@/lib/variables";
+import { reportWarning } from "@/lib/warnings";
+
+import { variableNameArg } from "./name";
 
 /** How a secret asked to be stored as another type is refused. */
 const SECRET_AS_STRING_REFUSAL: Refusal = {
@@ -30,7 +32,7 @@ const SECRET_VALUE_REFUSAL: Refusal = {
 /** How a value that does not parse as the type `--as` names is refused. */
 const VALUE_TYPE_REFUSAL: Refusal = {
   message: '"{value}" is not a valid {as} value.',
-  hint: "A boolean variable is exactly `true` or `false`, and a number is a JSON number such as 5, -1.5 or 1e3. Pass --as string to keep it as text.",
+  hint: "A boolean variable is exactly true or false, and a number is a JSON number such as 5, -1.5 or 1e3. Pass --as string to keep it as text.",
 };
 
 /**
@@ -51,6 +53,7 @@ const VALUE_TYPE_REFUSAL: Refusal = {
 export default class VariableSet extends Tabulatable(Promptable(EnvironmentCommand)) {
   static override description = "Set one variable on the project.";
   static override group = CommandGroups.configuration;
+
   static override examples = [
     "<%= config.bin %> variable set GOOGLE_CLIENT_ID 1234.apps.googleusercontent.com",
     "<%= config.bin %> variable set GOOGLE_CLIENT_SECRET --secret < secret.txt",
@@ -115,6 +118,9 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
       //
       // The resource commands' dry-run contract, plus what this write would
       // store. Never the value: it may be a credential.
+      // The real write, with what this run was given: a value typed here is
+      // kept, and one that was to be piped is piped again.
+      const real = pipeArgs(args.name, write, flags.as, args.value);
       const preview = dryRunResult({
         verb: "set",
         topic: "variable",
@@ -125,6 +131,12 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
           ...(flags.as === "string" ? [] : [`as ${flags.as}`]),
           ...(write.preview ? ["(preview)"] : []),
         ].join(" "),
+        next:
+          args.value === undefined
+            ? inShell(this.suggest(real), {
+                after: " < value.txt",
+              })
+            : this.suggest(real),
       });
 
       return this.emit({
@@ -147,15 +159,9 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
     // when the value is to be stored as a secret, so it does not stay on screen
     // or in a scrollback buffer. An empty string is a value the scalar schema
     // accepts; only an absent input is an error.
-    const value = await this.input({
-      kind: write.secret ? "secret" : "text",
+    const question = {
       name: `value for ${args.name}`,
       message: `What should the value of ${args.name} be?`,
-      ...(write.secret || args.value === undefined
-        ? {}
-        : {
-            given: args.value,
-          }),
       stdin: true,
       // The selector this.suggest appends must precede the stdin redirection.
       retry: inShell(this.suggest(pipeArgs(args.name, write, flags.as)), {
@@ -164,7 +170,16 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
       parse: (raw: string) => {
         return parseVariableValue(raw, flags.as);
       },
-    });
+    };
+    let value: string | number | boolean;
+    if (write.secret) {
+      value = await this.ask.secret(question);
+    } else {
+      value = await this.ask.text({
+        ...question,
+        ...(args.value === undefined ? {} : { given: args.value }),
+      });
+    }
 
     const written = await variableService.set(args.name, value, write);
     this.recordTelemetry({
@@ -211,7 +226,32 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
           credentialSet: true,
           strict: false,
         });
-        const previewable = verdict === "preview";
+        let next: { actions: string[]; commands: SuggestedCommand[] } = {
+          actions: [
+            "The new value applies after the next deploy: sign-ins keep using the variables the last deploy froze.",
+          ],
+          commands: [this.suggest(DEPLOY_ARGS)],
+        };
+        if (write.preview) {
+          next = {
+            actions: [
+              "The new preview value applies to the next preview: a preview build keeps using the variables its last deploy froze.",
+            ],
+            commands: [],
+          };
+          if (verdict === "preview") {
+            next.commands = [this.suggest("preview --origin '<preview-url>' -m '<what changed>'")];
+          } else if (verdict === "unnamed-ci-build") {
+            next.actions.push(
+              "Name the environment with --env preview: a CI build that names none is not known to be a preview, and preview skips it.",
+            );
+          } else {
+            next.actions.push(
+              "Run it in the preview or development environment: preview skips any other.",
+            );
+          }
+        }
+
         return this.emit({
           status: "ok",
           data: {
@@ -221,34 +261,15 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
             primary,
             preview,
           },
-          pretty: painted(
-            this.tabulateDetail(`Set ${args.name} on the project`, ["primary", "preview"], {
+          summary: {
+            title: `Set ${escapeControlCharacters(args.name)} on the project`,
+            sections: [],
+            lines: this.tabulateDetail(undefined, ["primary", "preview"], {
               primary: stateCell(primary),
               preview: stateCell(preview),
-            }),
-          ),
-          next: write.preview
-            ? {
-                actions: [
-                  "The new preview value applies to the next `preview`: a preview build keeps using the variables its last deploy froze.",
-                  ...(previewable
-                    ? []
-                    : [
-                        verdict === "unnamed-ci-build"
-                          ? "Name the environment with `--env preview`: a CI build that names none is not known to be a preview, and `preview` skips it."
-                          : "Run it in the preview or development environment: `preview` skips any other.",
-                      ]),
-                ],
-                commands: previewable
-                  ? [this.suggest("preview --origin '<preview-url>' -m '<what changed>'")]
-                  : [],
-              }
-            : {
-                actions: [
-                  "The new value applies after the next `deploy`: sign-ins keep using the variables the last deploy froze.",
-                ],
-                commands: [this.suggest(DEPLOY_ARGS)],
-              },
+            }).split("\n"),
+          },
+          next,
         });
       }
     }
@@ -326,17 +347,19 @@ function stateCell(state: KindState): string {
 }
 
 /**
- * The scripted form to suggest when a run supplied no value.
+ * The scripted form to suggest when a run supplied no value, or the write a
+ * dry run stood in for, with the value it was given.
  *
  * It carries the write the run actually made and the type it stored. Dropping
  * any of them would hand back a command that writes a credential as a readable
  * value, stores a number as a string, or writes the wrong kind.
  */
-function pipeArgs(name: string, write: VariableWrite, type: VariableType): string {
+function pipeArgs(name: string, write: VariableWrite, type: VariableType, value?: string): string {
   return [
     "variable",
     "set",
     name,
+    ...(value === undefined ? [] : [Cmd.quote(value)]),
     ...(write.secret ? ["--secret"] : []),
     ...(type === "string" ? [] : ["--as", type]),
     ...(write.preview ? ["--preview"] : []),

@@ -56,6 +56,7 @@ export async function deployMessage(
     return undefined;
   }
   const subject = await headSubject(cwd);
+
   return cut(subject ?? undefined);
 }
 
@@ -78,6 +79,7 @@ async function pullRequestTitle(path: string | undefined): Promise<string | unde
     if (typeof title !== "string") {
       return undefined;
     }
+
     return title;
   } catch {
     return undefined;
@@ -95,5 +97,6 @@ function cut(value: string | undefined): string | undefined {
   if (!trimmed) {
     return undefined;
   }
+
   return Array.from(trimmed).slice(0, MESSAGE_MAX_LENGTH).join("");
 }

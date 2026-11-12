@@ -2,6 +2,7 @@ import { Change } from "@/lib/git/change";
 import type { Git } from "@/lib/git/git";
 import type { Check, Operation } from "@/lib/git/operation";
 import type { DiffedFile, DiffOptions } from "@/lib/git/types";
+
 import { DiffSince } from "./diff-since";
 
 /**
@@ -67,8 +68,8 @@ export class DiffFilesSince implements Operation<DiffedFile[] | null> {
         patches.push(section);
       }
     }
-    return Change.listedIn(output.slice(0, end).split("\0")).map((change, index) =>
-      change.diffedWith(patches[index] ?? ""),
-    );
+    return Change.listedIn(output.slice(0, end).split("\0")).map((change, index) => {
+      return change.diffedWith(patches[index] ?? "");
+    });
   }
 }

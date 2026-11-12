@@ -48,7 +48,7 @@ class RepeatedProbe extends EnvironmentCommand {
     throw new Error("unused");
   }
 
-  async probe(...asked: ReadonlyArray<{ quiet?: boolean; prompt?: boolean }>) {
+  async probe(...asked: ReadonlyArray<{ timeoutMs?: number; prompt?: boolean }>) {
     const { flags } = await this.parse(RepeatedProbe);
     await this.toMeta(flags);
     const opened = [];
@@ -100,6 +100,19 @@ class SelectorProbe extends EnvironmentCommand {
   }
 }
 
+/** A command that edits files only, so it resolves no environment. */
+class FilesOnlyProbe extends EnvironmentCommand {
+  protected async execute(): Promise<never> {
+    throw new Error("unused");
+  }
+
+  async probe() {
+    const { flags } = await this.parse(FilesOnlyProbe);
+    await this.toMeta(flags, { environment: false });
+    return { selector: this.environmentSelector(), args: this.environmentSelectorArgs() };
+  }
+}
+
 const config = await Config.load(cliPackageRoot);
 
 async function envFile(dir: string, contents: string): Promise<string> {
@@ -138,8 +151,8 @@ describe("EnvironmentCommand.connect", () => {
     const file = await envFile(dir, `${URL_AND_PROJECT}ZITADEL_PROJECT_SECRET=sk_staging\n`);
 
     const opened = await new RepeatedProbe(["--cwd", dir, "--env-file", file], config).probe(
-      { quiet: true, prompt: false },
-      { prompt: false, quiet: true },
+      { timeoutMs: 1000, prompt: false },
+      { prompt: false, timeoutMs: 1000 },
     );
 
     expect(opened[0]).toBe(opened[1]);
@@ -151,7 +164,6 @@ describe("EnvironmentCommand.connect", () => {
     const file = await envFile(dir, `${URL_AND_PROJECT}ZITADEL_PROJECT_SECRET=sk_staging\n`);
 
     const connection = await new OptionedProbe(["--cwd", dir, "--env-file", file], config).probe({
-      quiet: true,
       prompt: false,
       timeoutMs: 1500,
     });
@@ -162,9 +174,9 @@ describe("EnvironmentCommand.connect", () => {
   it("leaves a connection nobody hurried on the default deadline", async ({ dir }) => {
     const file = await envFile(dir, `${URL_AND_PROJECT}ZITADEL_PROJECT_SECRET=sk_staging\n`);
 
-    const connection = await new OptionedProbe(["--cwd", dir, "--env-file", file], config).probe({
-      quiet: true,
-    });
+    const connection = await new OptionedProbe(["--cwd", dir, "--env-file", file], config).probe(
+      {},
+    );
 
     expect(connectionOf(connection.client).timeoutMs).toBe(REQUEST_TIMEOUT_MS);
   });
@@ -296,6 +308,20 @@ describe("EnvironmentCommand.environmentSelector", () => {
     ).probe();
 
     expect(selector).toBe(` --env-file ${file} --cwd ${dir}`);
+  });
+
+  it("keeps only --cwd in a command that resolved no environment", async ({ dir }) => {
+    const { selector } = await new FilesOnlyProbe(["--cwd", dir], config).probe();
+
+    expect(selector).toBe(` --cwd ${dir}`);
+  });
+
+  it("keeps only --cwd in the arguments of a command that resolved no environment", async ({
+    dir,
+  }) => {
+    const { args } = await new FilesOnlyProbe(["--cwd", dir], config).probe();
+
+    expect(args).toEqual(["--cwd", dir]);
   });
 
   it("reflects --server as the resolved origin", async ({ dir }) => {

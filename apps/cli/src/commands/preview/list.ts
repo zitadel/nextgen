@@ -1,7 +1,7 @@
-import { PreviewService } from "@/lib/backend";
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
+import { PreviewService } from "@/lib/backend";
 import {
   type Admitted,
   CommandGroups,
@@ -44,6 +44,7 @@ const LIMIT: Refused<number> = {
 export default class PreviewList extends Tabulatable(PreviewCommand) {
   static override description = "List the project's live previews, newest first.";
   static override group = CommandGroups.configuration;
+
   static override examples = [
     "<%= config.bin %> preview list",
     "<%= config.bin %> preview list --all",
@@ -70,7 +71,6 @@ export default class PreviewList extends Tabulatable(PreviewCommand) {
 
   protected async execute({ flags }: Admitted<typeof PreviewList>): Promise<JsonEnvelope> {
     const { client, projectId } = await this.connect();
-
     const previewService = new PreviewService(client, projectId);
     const listed = await previewService.page(
       {
@@ -90,9 +90,8 @@ export default class PreviewList extends Tabulatable(PreviewCommand) {
         created: preview.created_at,
       };
     });
-
     const columns = COLUMNS;
-    const empty = "No live previews.";
+    const empty = "No previews found";
     const footer: string[] = [];
     const page = {
       token: listed.next,

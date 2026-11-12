@@ -5,7 +5,10 @@ import { join } from "node:path";
 import { HttpResponse, http } from "msw";
 import { afterEach, describe, expect } from "vitest";
 
+import OriginRm from "@/commands/origin/rm";
+import { answering } from "@tests/helpers/keyboard";
 import { it } from "@tests/helpers/fixtures";
+import { asTerminal as asPerson } from "@tests/helpers/terminal";
 
 import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
 
@@ -148,8 +151,28 @@ describe("origin rm", () => {
     const result = await remove(cwd, ["--env", "production", "--force"]);
 
     expect((parseJson(result.stdout) as { warnings?: string[] }).warnings).toEqual([
-      expect.stringContaining("origin add <url> --kind primary --env production"),
+      expect.stringContaining("origin add '<your-app-url>' --kind primary --env production"),
     ]);
+  });
+
+  it("keeps a control character in the pattern as it was typed, in the question it carries as data", async () => {
+    const cwd = await anAppDir();
+
+    const result = await runCliForTest([
+      "origin",
+      "rm",
+      "https://app\u001b[31m.acme.com",
+      "--cwd",
+      cwd,
+      "--server",
+      SERVER,
+      "--non-interactive",
+      "--json",
+    ]);
+
+    const envelope = parseJson(result.stdout) as { code: string; hint: string };
+    expect(envelope.code).toBe("E_CONFIRMATION_REQUIRED");
+    expect(envelope.hint).toContain("\u001b[31m");
   });
 
   it("quotes a wildcard pattern in the suggested retry, so the shell cannot expand it", async () => {
@@ -169,5 +192,45 @@ describe("origin rm", () => {
 
     const envelope = parseJson(result.stdout) as { next_commands?: string[] };
     expect(envelope.next_commands?.[0]).toContain("origin rm 'https://*-acme.vercel.app' --force");
+  });
+});
+
+describe("origin rm asked on a terminal", () => {
+  const removingOn = async (serverUrl: string) => {
+    const cwd = await anAppDir();
+    const talk = answering(false);
+    await asPerson(() =>
+      OriginRm.run(["https://app.acme.com", "--cwd", cwd, "--server", serverUrl]),
+    );
+    return talk;
+  };
+
+  it("asks whether to remove the pattern, naming the project and a remote server", async () => {
+    const talk = await removingOn(SERVER);
+
+    expect(talk.asked()).toEqual([
+      "Remove https://app.acme.com from project proj_unit on api.zitadel.example?",
+    ]);
+  });
+
+  it("spells out a control character in the pattern in the question it draws", async () => {
+    const cwd = await anAppDir();
+    const talk = answering(false);
+
+    await asPerson(() => {
+      return OriginRm.run(["https://app\u001b[31m.acme.com", "--cwd", cwd, "--server", SERVER]);
+    });
+
+    expect(talk.asked()).toEqual([
+      "Remove https://app\\x1b[31m.acme.com from project proj_unit on api.zitadel.example?",
+    ]);
+  });
+
+  it("names a local server by its host and port", async () => {
+    const talk = await removingOn("http://localhost:8112");
+
+    expect(talk.asked()).toEqual([
+      "Remove https://app.acme.com from project proj_unit on localhost:8112?",
+    ]);
   });
 });

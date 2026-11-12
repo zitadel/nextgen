@@ -1,5 +1,10 @@
 import { publicCliCommand } from "@/lib/public-cli";
-import { shellCommand, type SuggestedCommand, unscopedCommand } from "@/lib/suggestion";
+import {
+  type EnvironmentSelector,
+  projectCommand,
+  type SuggestedCommand,
+  shellCommand,
+} from "@/lib/suggestion";
 import { errorMessage } from "@/lib/errors";
 
 export type DockerRuntimeGuidance = {
@@ -17,14 +22,18 @@ export function dockerUnavailableMessage(error: unknown): string {
 export function dockerRuntimeGuidance(
   retryCommand: "doctor" | "start",
   cliVersion: string,
+  selector: EnvironmentSelector,
 ): DockerRuntimeGuidance {
   return {
     hint: "Docker is required only for the managed local runtime (`zitadel start` and `--server local`). Start Docker, then retry; or target a remote server with `--server <url>`.",
     nextActions: [
       "Start Docker Desktop, Docker Engine, or a Docker-compatible runtime such as Colima.",
-      `Run \`docker version\`, then rerun \`${publicCliCommand(retryCommand, cliVersion)}\`.`,
+      `Run \`docker version\`, then rerun \`${publicCliCommand(`${retryCommand}${selector}`, cliVersion)}\`.`,
       "If you are not using the managed local runtime, run setup with `--server <url>` instead.",
     ],
-    nextCommands: [shellCommand("docker version"), unscopedCommand(retryCommand, cliVersion)],
+    nextCommands: [
+      shellCommand("docker version"),
+      projectCommand(retryCommand, selector, cliVersion),
+    ],
   };
 }

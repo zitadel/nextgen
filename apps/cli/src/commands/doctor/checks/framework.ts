@@ -1,5 +1,6 @@
 import { isObject } from "@/lib/json";
 import { readZitadelConfig } from "@/lib/project";
+
 import { AbstractSanityCheck, type CheckContext } from "./types";
 
 /** Verifies the framework detected on disk matches the one recorded in config. */

@@ -1,5 +1,6 @@
-import { LocalServer } from "@/lib/local-server/server";
 import { readPort } from "@/commands/setup/index";
+import { LocalServer } from "@/lib/local-server/server";
+
 import type { PromptContext, SetupAnswers, SetupPrompt } from "./types";
 
 /**
@@ -27,14 +28,16 @@ export class DevPortPrompt implements SetupPrompt {
     }
     // With the next ones all taken too, the detected port is still the best guess.
     const suggested = String((await LocalServer.nextFreePort(answers.devPort)) ?? answers.devPort);
-    const devPort = await ctx.input({
-      kind: "text",
+    const devPort = await ctx.ask.text({
       name: "dev server port",
       message: `Port ${answers.devPort} is in use. Which port should your app run on?`,
       placeholder: suggested,
       initialValue: suggested,
       parse: readPort,
     });
-    return { ...answers, devPort };
+    return {
+      ...answers,
+      devPort,
+    };
   }
 }
