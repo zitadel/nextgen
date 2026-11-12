@@ -4,7 +4,7 @@ import { distance } from "fastest-levenshtein";
 import { ZitadelError } from "@/lib/errors";
 import { type Admitted, BaseCommand } from "@/lib/oclif/base";
 import type { JsonEnvelope } from "@/lib/oclif/types";
-import { type SuggestedCommand, unscopedCommand } from "@/lib/suggestion";
+import { commandOf, type SuggestedCommand } from "@/lib/suggestion";
 import type { Telemetry, TelemetryDeps } from "@/lib/telemetry";
 
 /** The exit code a shell reports for a command it cannot find, which scripts already branch on. */
@@ -48,6 +48,10 @@ export class NotFound extends BaseCommand {
         .flatMap((command) => [command.id, ...command.aliases])
         .map((name) => name.split(":"));
     };
+    // The help of the command `words` name, which reads no scope.
+    const help = (words: readonly string[]): SuggestedCommand => {
+      return commandOf([...words, "--help"], this.cliVersion);
+    };
     const visible = named(false);
     const known = [...visible, ...named(true)];
     // The next word of every visible command under `parent`.
@@ -70,7 +74,7 @@ export class NotFound extends BaseCommand {
     if (words[0] === undefined) {
       this.id = "(default)";
       throw new ZitadelError("E_VALIDATION", "That is not a zitadel command.", {
-        nextCommands: [unscopedCommand("--help")],
+        nextCommands: [help([])],
       });
     }
 
@@ -85,7 +89,7 @@ export class NotFound extends BaseCommand {
         throw new ZitadelError(
           "E_VALIDATION",
           `${prefix.join(" ")} does not take the argument typed after it.`,
-          { nextCommands: [unscopedCommand(`${prefix.join(" ")} --help`)] },
+          { nextCommands: [help(prefix)] },
         );
       }
     }
@@ -101,12 +105,12 @@ export class NotFound extends BaseCommand {
     const meant = near(typed[depth] as string, under(parent));
     const next: SuggestedCommand[] = [];
     if (meant !== undefined) {
-      next.push(unscopedCommand(`${[...parent, meant].join(" ")} --help`));
+      next.push(help([...parent, meant]));
     }
     if (parent.length > 0) {
-      next.push(unscopedCommand(`${parent.join(" ")} --help`));
+      next.push(help(parent));
     } else if (next.length === 0) {
-      next.push(unscopedCommand("--help"));
+      next.push(help([]));
     }
     this.id = typed.join(":");
     throw new ZitadelError("E_VALIDATION", `${typed.join(" ")} is not a zitadel command.`, {
