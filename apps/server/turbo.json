@@ -113,7 +113,9 @@
       ]
     },
     // The proof-of-work package needs no generated API, database or embedded
-    // UI, so a focused race and fuzz run keeps its feedback loop short.
+    // UI, so a focused race and fuzz run keeps its feedback loop short. The
+    // root `ci` script names it, so CI runs it when these inputs change. A
+    // race run is a probe, so it is never replayed.
     "test:pow": {
       "cache": false,
       "dependsOn": ["check-pow-vectors"],

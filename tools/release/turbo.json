@@ -51,16 +51,23 @@
     // publishing cannot create one (scripts/release-npm-preflight.mjs). It
     // asks the registry, so it is never cached; its inputs are the manifests
     // a release publishes, so `--affected` selects it when one changes, the
-    // version PR's version bumps among them. `test` stands for it, so
-    // `turbo run test` runs it.
+    // version PR's version bumps among them, and every script release.mjs
+    // loads. `test` stands for it, so `turbo run test` runs it.
     "check-npm": {
       "cache": false,
       "inputs": [
         "$TURBO_ROOT$/apps/*/package.json",
         "$TURBO_ROOT$/packages/*/package.json",
         "$TURBO_ROOT$/scripts/release.mjs",
+        "$TURBO_ROOT$/scripts/release-artifacts.mjs",
+        "$TURBO_ROOT$/scripts/release-automation.mjs",
+        "$TURBO_ROOT$/scripts/release-github.mjs",
         "$TURBO_ROOT$/scripts/release-manifest.mjs",
-        "$TURBO_ROOT$/scripts/release-npm-preflight.mjs"
+        "$TURBO_ROOT$/scripts/release-npm-preflight.mjs",
+        "$TURBO_ROOT$/scripts/check-changesets-status.mjs",
+        "$TURBO_ROOT$/scripts/server-build.mjs",
+        "$TURBO_ROOT$/scripts/map-all.mjs",
+        "$TURBO_ROOT$/scripts/dev-process.mjs"
       ],
       "passThroughEnv": ["NPM_*"]
     },
@@ -91,8 +98,8 @@
       "command": ["git", "clean", "-fdX", "--", "../../dist/release"]
     },
     // Packs every public package and checks the set (verify-tarballs.mjs).
-    // CI runs it when a public package or these scripts change; the journeys
-    // pack only what each installs.
+    // CI runs it when a public package or a script release.mjs loads
+    // changes; the journeys pack only what each installs.
     "pack": {
       "cache": false,
       "dependsOn": ["build-public-packages"],
@@ -100,7 +107,14 @@
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/scripts/release.mjs",
         "$TURBO_ROOT$/scripts/release-artifacts.mjs",
+        "$TURBO_ROOT$/scripts/release-automation.mjs",
+        "$TURBO_ROOT$/scripts/release-github.mjs",
         "$TURBO_ROOT$/scripts/release-manifest.mjs",
+        "$TURBO_ROOT$/scripts/release-npm-preflight.mjs",
+        "$TURBO_ROOT$/scripts/check-changesets-status.mjs",
+        "$TURBO_ROOT$/scripts/server-build.mjs",
+        "$TURBO_ROOT$/scripts/map-all.mjs",
+        "$TURBO_ROOT$/scripts/dev-process.mjs",
         "$TURBO_ROOT$/e2e/journey/scripts/verify-tarballs.mjs",
         "$TURBO_ROOT$/e2e/journey/scripts/lib.mjs"
       ],

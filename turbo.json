@@ -330,6 +330,8 @@
         ".github/workflows/deployment-suite.yml",
         "scripts/go-generate.mjs",
         "scripts/go-generate.test.mjs",
+        "scripts/generated-outputs.mjs",
+        "scripts/map-all.mjs",
         "scripts/task-graph.test.mjs",
         "scripts/cloud-build.test.mjs",
         "vercel.json",

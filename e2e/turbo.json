@@ -71,12 +71,25 @@
       "inputs": ["package.json"],
       "dependsOn": ["@zitadel/testing#build", "@zitadel/cli#build", "@zitadel/server#build"]
     },
+    // A lane's folder through an explicit glob, which also matches ignored
+    // files: the excludes name what a run writes there (reports, traces, the
+    // kit's handshake), so a lane's key never holds its own output.
     "console-base": {
-      "inputs": ["console/**", "package.json", "playwright.shared.ts", "!**/README.md", "!**/AGENTS.md"],
+      "inputs": [
+        "console/**",
+        "package.json",
+        "playwright.shared.ts",
+        "!**/test-results/**",
+        "!**/playwright-report/**",
+        "!**/test-output/**",
+        "!**/.zitadel-testing/**",
+        "!**/README.md",
+        "!**/AGENTS.md"
+      ],
       "dependsOn": ["install-browsers"]
     },
-    // The demo app's folder through an explicit glob, which also matches
-    // ignored files: the excludes name what the demo's own tooling writes.
+    // The demo app's folder through an explicit glob too: the excludes also
+    // name what the demo's own tooling writes.
     "demo-next-base": {
       "inputs": [
         "demo-next/**",
@@ -84,6 +97,10 @@
         "playwright.shared.ts",
         "$TURBO_ROOT$/apps/demo-next/**",
         "$TURBO_ROOT$/scripts/task-guard.mjs",
+        "!**/test-results/**",
+        "!**/playwright-report/**",
+        "!**/test-output/**",
+        "!**/.zitadel-testing/**",
         "!**/README.md",
         "!**/AGENTS.md",
         "!$TURBO_ROOT$/apps/demo-next/node_modules/**",
@@ -221,6 +238,10 @@
         "package.json",
         "playwright.shared.ts",
         "$TURBO_ROOT$/apps/demo-nuxt/**",
+        "!**/test-results/**",
+        "!**/playwright-report/**",
+        "!**/test-output/**",
+        "!**/.zitadel-testing/**",
         "!**/README.md",
         "!**/AGENTS.md",
         "!$TURBO_ROOT$/apps/demo-nuxt/node_modules/**",

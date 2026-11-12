@@ -263,8 +263,9 @@ dependencies and runs the root `ci` script (`pnpm run ci`, in
     changesets checks.
   - the e2e lanes, the kit's real-instance suite
     (`@zitadel/testing#test:integration`), the 13 CI journeys
-    (`@zitadel/e2e#journey:<id>`) and the Postgres lane
-    (`@zitadel/server#test:postgres`). Each journey packs the npm tarballs
+    (`@zitadel/e2e#journey:<id>`), the Postgres lane
+    (`@zitadel/server#test:postgres`) and the proof-of-work race run
+    (`@zitadel/server#test:pow`). Each journey packs the npm tarballs
     it installs from the builds it depends on, so an SDK change runs only
     the journeys that install that SDK; `@zitadel/release#pack` packs and
     checks the full release set. The console and demo lanes and the kit's
