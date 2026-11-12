@@ -31,6 +31,7 @@ oneOf:
   - $ref: types/invitation-cancelled-event.yaml
   - $ref: types/invitation-created-event.yaml
   - $ref: types/invitation-rejected-event.yaml
+  - $ref: types/oauth_settings-created-event.yaml
   - $ref: types/origin-added-event.yaml
   - $ref: types/origin-removed-event.yaml
   - $ref: types/policy-created-event.yaml
@@ -84,6 +85,7 @@ discriminator:
     invitation.cancelled: types/invitation-cancelled-event.yaml
     invitation.created: types/invitation-created-event.yaml
     invitation.rejected: types/invitation-rejected-event.yaml
+    oauth_settings.created: types/oauth_settings-created-event.yaml
     origin.added: types/origin-added-event.yaml
     origin.removed: types/origin-removed-event.yaml
     policy.created: types/policy-created-event.yaml

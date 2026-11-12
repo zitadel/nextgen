@@ -25771,6 +25771,7 @@ type Event struct {
 	InvitationCancelledEvent         InvitationCancelledEvent
 	InvitationCreatedEvent           InvitationCreatedEvent
 	InvitationRejectedEvent          InvitationRejectedEvent
+	OAuthSettingsCreatedEvent        OAuthSettingsCreatedEvent
 	OriginAddedEvent                 OriginAddedEvent
 	OriginRemovedEvent               OriginRemovedEvent
 	PolicyCreatedEvent               PolicyCreatedEvent
@@ -25828,6 +25829,7 @@ const (
 	InvitationCancelledEventEvent         EventType = "invitation.cancelled"
 	InvitationCreatedEventEvent           EventType = "invitation.created"
 	InvitationRejectedEventEvent          EventType = "invitation.rejected"
+	OAuthSettingsCreatedEventEvent        EventType = "oauth_settings.created"
 	OriginAddedEventEvent                 EventType = "origin.added"
 	OriginRemovedEventEvent               EventType = "origin.removed"
 	PolicyCreatedEventEvent               EventType = "policy.created"
@@ -25945,6 +25947,9 @@ func (s Event) IsInvitationCreatedEvent() bool { return s.Type == InvitationCrea
 
 // IsInvitationRejectedEvent reports whether Event is InvitationRejectedEvent.
 func (s Event) IsInvitationRejectedEvent() bool { return s.Type == InvitationRejectedEventEvent }
+
+// IsOAuthSettingsCreatedEvent reports whether Event is OAuthSettingsCreatedEvent.
+func (s Event) IsOAuthSettingsCreatedEvent() bool { return s.Type == OAuthSettingsCreatedEventEvent }
 
 // IsOriginAddedEvent reports whether Event is OriginAddedEvent.
 func (s Event) IsOriginAddedEvent() bool { return s.Type == OriginAddedEventEvent }
@@ -26579,6 +26584,27 @@ func (s Event) GetInvitationRejectedEvent() (v InvitationRejectedEvent, ok bool)
 func NewInvitationRejectedEventEvent(v InvitationRejectedEvent) Event {
 	var s Event
 	s.SetInvitationRejectedEvent(v)
+	return s
+}
+
+// SetOAuthSettingsCreatedEvent sets Event to OAuthSettingsCreatedEvent.
+func (s *Event) SetOAuthSettingsCreatedEvent(v OAuthSettingsCreatedEvent) {
+	s.Type = OAuthSettingsCreatedEventEvent
+	s.OAuthSettingsCreatedEvent = v
+}
+
+// GetOAuthSettingsCreatedEvent returns OAuthSettingsCreatedEvent and true boolean if Event is OAuthSettingsCreatedEvent.
+func (s Event) GetOAuthSettingsCreatedEvent() (v OAuthSettingsCreatedEvent, ok bool) {
+	if !s.IsOAuthSettingsCreatedEvent() {
+		return v, false
+	}
+	return s.OAuthSettingsCreatedEvent, true
+}
+
+// NewOAuthSettingsCreatedEventEvent returns new Event from OAuthSettingsCreatedEvent.
+func NewOAuthSettingsCreatedEventEvent(v OAuthSettingsCreatedEvent) Event {
+	var s Event
+	s.SetOAuthSettingsCreatedEvent(v)
 	return s
 }
 
@@ -40571,12 +40597,14 @@ func (*GetMyUserSchemaErrorResponseStatusCode) getMyUserSchemaRes() {}
 
 // GetOAuthSettingsByIdErrorResponse represents sum type.
 type GetOAuthSettingsByIdErrorResponse struct {
-	Type             GetOAuthSettingsByIdErrorResponseType // switch on this field
-	AuthUnauthorized AuthUnauthorized
-	Internal         Internal
-	NotImplemented   NotImplemented
-	ReqInvalid       ReqInvalid
-	Unavailable      Unavailable
+	Type                     GetOAuthSettingsByIdErrorResponseType // switch on this field
+	AuthUnauthorized         AuthUnauthorized
+	Internal                 Internal
+	NotImplemented           NotImplemented
+	OauthsetNotFound         OauthsetNotFound
+	OauthsetPermissionDenied OauthsetPermissionDenied
+	ReqInvalid               ReqInvalid
+	Unavailable              Unavailable
 }
 
 // GetOAuthSettingsByIdErrorResponseType is oneOf type of GetOAuthSettingsByIdErrorResponse.
@@ -40584,11 +40612,13 @@ type GetOAuthSettingsByIdErrorResponseType string
 
 // Possible values for GetOAuthSettingsByIdErrorResponseType.
 const (
-	AuthUnauthorizedGetOAuthSettingsByIdErrorResponse GetOAuthSettingsByIdErrorResponseType = "auth.unauthorized"
-	InternalGetOAuthSettingsByIdErrorResponse         GetOAuthSettingsByIdErrorResponseType = "internal"
-	NotImplementedGetOAuthSettingsByIdErrorResponse   GetOAuthSettingsByIdErrorResponseType = "not_implemented"
-	ReqInvalidGetOAuthSettingsByIdErrorResponse       GetOAuthSettingsByIdErrorResponseType = "req.invalid"
-	UnavailableGetOAuthSettingsByIdErrorResponse      GetOAuthSettingsByIdErrorResponseType = "unavailable"
+	AuthUnauthorizedGetOAuthSettingsByIdErrorResponse         GetOAuthSettingsByIdErrorResponseType = "auth.unauthorized"
+	InternalGetOAuthSettingsByIdErrorResponse                 GetOAuthSettingsByIdErrorResponseType = "internal"
+	NotImplementedGetOAuthSettingsByIdErrorResponse           GetOAuthSettingsByIdErrorResponseType = "not_implemented"
+	OauthsetNotFoundGetOAuthSettingsByIdErrorResponse         GetOAuthSettingsByIdErrorResponseType = "oauthset.not_found"
+	OauthsetPermissionDeniedGetOAuthSettingsByIdErrorResponse GetOAuthSettingsByIdErrorResponseType = "oauthset.permission_denied"
+	ReqInvalidGetOAuthSettingsByIdErrorResponse               GetOAuthSettingsByIdErrorResponseType = "req.invalid"
+	UnavailableGetOAuthSettingsByIdErrorResponse              GetOAuthSettingsByIdErrorResponseType = "unavailable"
 )
 
 // IsAuthUnauthorized reports whether GetOAuthSettingsByIdErrorResponse is AuthUnauthorized.
@@ -40604,6 +40634,16 @@ func (s GetOAuthSettingsByIdErrorResponse) IsInternal() bool {
 // IsNotImplemented reports whether GetOAuthSettingsByIdErrorResponse is NotImplemented.
 func (s GetOAuthSettingsByIdErrorResponse) IsNotImplemented() bool {
 	return s.Type == NotImplementedGetOAuthSettingsByIdErrorResponse
+}
+
+// IsOauthsetNotFound reports whether GetOAuthSettingsByIdErrorResponse is OauthsetNotFound.
+func (s GetOAuthSettingsByIdErrorResponse) IsOauthsetNotFound() bool {
+	return s.Type == OauthsetNotFoundGetOAuthSettingsByIdErrorResponse
+}
+
+// IsOauthsetPermissionDenied reports whether GetOAuthSettingsByIdErrorResponse is OauthsetPermissionDenied.
+func (s GetOAuthSettingsByIdErrorResponse) IsOauthsetPermissionDenied() bool {
+	return s.Type == OauthsetPermissionDeniedGetOAuthSettingsByIdErrorResponse
 }
 
 // IsReqInvalid reports whether GetOAuthSettingsByIdErrorResponse is ReqInvalid.
@@ -40676,6 +40716,48 @@ func (s GetOAuthSettingsByIdErrorResponse) GetNotImplemented() (v NotImplemented
 func NewNotImplementedGetOAuthSettingsByIdErrorResponse(v NotImplemented) GetOAuthSettingsByIdErrorResponse {
 	var s GetOAuthSettingsByIdErrorResponse
 	s.SetNotImplemented(v)
+	return s
+}
+
+// SetOauthsetNotFound sets GetOAuthSettingsByIdErrorResponse to OauthsetNotFound.
+func (s *GetOAuthSettingsByIdErrorResponse) SetOauthsetNotFound(v OauthsetNotFound) {
+	s.Type = OauthsetNotFoundGetOAuthSettingsByIdErrorResponse
+	s.OauthsetNotFound = v
+}
+
+// GetOauthsetNotFound returns OauthsetNotFound and true boolean if GetOAuthSettingsByIdErrorResponse is OauthsetNotFound.
+func (s GetOAuthSettingsByIdErrorResponse) GetOauthsetNotFound() (v OauthsetNotFound, ok bool) {
+	if !s.IsOauthsetNotFound() {
+		return v, false
+	}
+	return s.OauthsetNotFound, true
+}
+
+// NewOauthsetNotFoundGetOAuthSettingsByIdErrorResponse returns new GetOAuthSettingsByIdErrorResponse from OauthsetNotFound.
+func NewOauthsetNotFoundGetOAuthSettingsByIdErrorResponse(v OauthsetNotFound) GetOAuthSettingsByIdErrorResponse {
+	var s GetOAuthSettingsByIdErrorResponse
+	s.SetOauthsetNotFound(v)
+	return s
+}
+
+// SetOauthsetPermissionDenied sets GetOAuthSettingsByIdErrorResponse to OauthsetPermissionDenied.
+func (s *GetOAuthSettingsByIdErrorResponse) SetOauthsetPermissionDenied(v OauthsetPermissionDenied) {
+	s.Type = OauthsetPermissionDeniedGetOAuthSettingsByIdErrorResponse
+	s.OauthsetPermissionDenied = v
+}
+
+// GetOauthsetPermissionDenied returns OauthsetPermissionDenied and true boolean if GetOAuthSettingsByIdErrorResponse is OauthsetPermissionDenied.
+func (s GetOAuthSettingsByIdErrorResponse) GetOauthsetPermissionDenied() (v OauthsetPermissionDenied, ok bool) {
+	if !s.IsOauthsetPermissionDenied() {
+		return v, false
+	}
+	return s.OauthsetPermissionDenied, true
+}
+
+// NewOauthsetPermissionDeniedGetOAuthSettingsByIdErrorResponse returns new GetOAuthSettingsByIdErrorResponse from OauthsetPermissionDenied.
+func NewOauthsetPermissionDeniedGetOAuthSettingsByIdErrorResponse(v OauthsetPermissionDenied) GetOAuthSettingsByIdErrorResponse {
+	var s GetOAuthSettingsByIdErrorResponse
+	s.SetOauthsetPermissionDenied(v)
 	return s
 }
 
@@ -58302,6 +58384,471 @@ func (s *OAuthSettings) SetEnabled(val bool) {
 	s.Enabled = val
 }
 
+// Merged schema.
+// Ref: #
+type OAuthSettingsCreatedEvent struct {
+	// The event ID, in the form `evt_<opaque>`.
+	ID        string    `json:"id"`
+	ProjectID ProjectID `json:"project_id"`
+	// The team the actor operated under when the event was emitted, if any.
+	TeamID OptNilString `json:"team_id"`
+	// Merged property.
+	EventType string `json:"event_type"`
+	// The category of the event.
+	Category OAuthSettingsCreatedEventCategory `json:"category"`
+	// When the action happened, on the server's clock.
+	OccurredAt time.Time `json:"occurred_at"`
+	// When the event was stored, on the server's clock.
+	CreatedAt time.Time `json:"created_at"`
+	// The ID of the actor that triggered the event.
+	ActorID OptNilString `json:"actor_id"`
+	// The kind of actor that triggered the event.
+	ActorType OptNilOAuthSettingsCreatedEventActorType `json:"actor_type"`
+	// The type of resource the event affected.
+	EntityType OptNilString `json:"entity_type"`
+	// The ID of the resource the event affected.
+	EntityID OptNilString `json:"entity_id"`
+	// The application or agent that produced the event.
+	ClientID string `json:"client_id"`
+	// The ID of the token in use when the event was emitted, when there was one.
+	TokenID OptString `json:"token_id"`
+	// The kind of delegation. Absent when unset.
+	DelegationType OptOAuthSettingsCreatedEventDelegationType `json:"delegation_type"`
+	DelegationID   OptString                                  `json:"delegation_id"`
+	Grantor        OptString                                  `json:"grantor"`
+	// A device fingerprint ID that correlates events from the same device.
+	Fingerprint OptString `json:"fingerprint"`
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
+	RequestID OptNilString `json:"request_id"`
+	// The ID of the session the event belongs to.
+	SessionID OptNilString `json:"session_id"`
+	// An ID that correlates the events of one login flow.
+	FlowID   OptNilString                `json:"flow_id"`
+	Metadata OptEventMetadata            `json:"metadata"`
+	Payload  OAuthSettingsCreatedPayload `json:"payload"`
+}
+
+// GetID returns the value of ID.
+func (s *OAuthSettingsCreatedEvent) GetID() string {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *OAuthSettingsCreatedEvent) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *OAuthSettingsCreatedEvent) GetTeamID() OptNilString {
+	return s.TeamID
+}
+
+// GetEventType returns the value of EventType.
+func (s *OAuthSettingsCreatedEvent) GetEventType() string {
+	return s.EventType
+}
+
+// GetCategory returns the value of Category.
+func (s *OAuthSettingsCreatedEvent) GetCategory() OAuthSettingsCreatedEventCategory {
+	return s.Category
+}
+
+// GetOccurredAt returns the value of OccurredAt.
+func (s *OAuthSettingsCreatedEvent) GetOccurredAt() time.Time {
+	return s.OccurredAt
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *OAuthSettingsCreatedEvent) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetActorID returns the value of ActorID.
+func (s *OAuthSettingsCreatedEvent) GetActorID() OptNilString {
+	return s.ActorID
+}
+
+// GetActorType returns the value of ActorType.
+func (s *OAuthSettingsCreatedEvent) GetActorType() OptNilOAuthSettingsCreatedEventActorType {
+	return s.ActorType
+}
+
+// GetEntityType returns the value of EntityType.
+func (s *OAuthSettingsCreatedEvent) GetEntityType() OptNilString {
+	return s.EntityType
+}
+
+// GetEntityID returns the value of EntityID.
+func (s *OAuthSettingsCreatedEvent) GetEntityID() OptNilString {
+	return s.EntityID
+}
+
+// GetClientID returns the value of ClientID.
+func (s *OAuthSettingsCreatedEvent) GetClientID() string {
+	return s.ClientID
+}
+
+// GetTokenID returns the value of TokenID.
+func (s *OAuthSettingsCreatedEvent) GetTokenID() OptString {
+	return s.TokenID
+}
+
+// GetDelegationType returns the value of DelegationType.
+func (s *OAuthSettingsCreatedEvent) GetDelegationType() OptOAuthSettingsCreatedEventDelegationType {
+	return s.DelegationType
+}
+
+// GetDelegationID returns the value of DelegationID.
+func (s *OAuthSettingsCreatedEvent) GetDelegationID() OptString {
+	return s.DelegationID
+}
+
+// GetGrantor returns the value of Grantor.
+func (s *OAuthSettingsCreatedEvent) GetGrantor() OptString {
+	return s.Grantor
+}
+
+// GetFingerprint returns the value of Fingerprint.
+func (s *OAuthSettingsCreatedEvent) GetFingerprint() OptString {
+	return s.Fingerprint
+}
+
+// GetRequestID returns the value of RequestID.
+func (s *OAuthSettingsCreatedEvent) GetRequestID() OptNilString {
+	return s.RequestID
+}
+
+// GetSessionID returns the value of SessionID.
+func (s *OAuthSettingsCreatedEvent) GetSessionID() OptNilString {
+	return s.SessionID
+}
+
+// GetFlowID returns the value of FlowID.
+func (s *OAuthSettingsCreatedEvent) GetFlowID() OptNilString {
+	return s.FlowID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *OAuthSettingsCreatedEvent) GetMetadata() OptEventMetadata {
+	return s.Metadata
+}
+
+// GetPayload returns the value of Payload.
+func (s *OAuthSettingsCreatedEvent) GetPayload() OAuthSettingsCreatedPayload {
+	return s.Payload
+}
+
+// SetID sets the value of ID.
+func (s *OAuthSettingsCreatedEvent) SetID(val string) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *OAuthSettingsCreatedEvent) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *OAuthSettingsCreatedEvent) SetTeamID(val OptNilString) {
+	s.TeamID = val
+}
+
+// SetEventType sets the value of EventType.
+func (s *OAuthSettingsCreatedEvent) SetEventType(val string) {
+	s.EventType = val
+}
+
+// SetCategory sets the value of Category.
+func (s *OAuthSettingsCreatedEvent) SetCategory(val OAuthSettingsCreatedEventCategory) {
+	s.Category = val
+}
+
+// SetOccurredAt sets the value of OccurredAt.
+func (s *OAuthSettingsCreatedEvent) SetOccurredAt(val time.Time) {
+	s.OccurredAt = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *OAuthSettingsCreatedEvent) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetActorID sets the value of ActorID.
+func (s *OAuthSettingsCreatedEvent) SetActorID(val OptNilString) {
+	s.ActorID = val
+}
+
+// SetActorType sets the value of ActorType.
+func (s *OAuthSettingsCreatedEvent) SetActorType(val OptNilOAuthSettingsCreatedEventActorType) {
+	s.ActorType = val
+}
+
+// SetEntityType sets the value of EntityType.
+func (s *OAuthSettingsCreatedEvent) SetEntityType(val OptNilString) {
+	s.EntityType = val
+}
+
+// SetEntityID sets the value of EntityID.
+func (s *OAuthSettingsCreatedEvent) SetEntityID(val OptNilString) {
+	s.EntityID = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *OAuthSettingsCreatedEvent) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetTokenID sets the value of TokenID.
+func (s *OAuthSettingsCreatedEvent) SetTokenID(val OptString) {
+	s.TokenID = val
+}
+
+// SetDelegationType sets the value of DelegationType.
+func (s *OAuthSettingsCreatedEvent) SetDelegationType(val OptOAuthSettingsCreatedEventDelegationType) {
+	s.DelegationType = val
+}
+
+// SetDelegationID sets the value of DelegationID.
+func (s *OAuthSettingsCreatedEvent) SetDelegationID(val OptString) {
+	s.DelegationID = val
+}
+
+// SetGrantor sets the value of Grantor.
+func (s *OAuthSettingsCreatedEvent) SetGrantor(val OptString) {
+	s.Grantor = val
+}
+
+// SetFingerprint sets the value of Fingerprint.
+func (s *OAuthSettingsCreatedEvent) SetFingerprint(val OptString) {
+	s.Fingerprint = val
+}
+
+// SetRequestID sets the value of RequestID.
+func (s *OAuthSettingsCreatedEvent) SetRequestID(val OptNilString) {
+	s.RequestID = val
+}
+
+// SetSessionID sets the value of SessionID.
+func (s *OAuthSettingsCreatedEvent) SetSessionID(val OptNilString) {
+	s.SessionID = val
+}
+
+// SetFlowID sets the value of FlowID.
+func (s *OAuthSettingsCreatedEvent) SetFlowID(val OptNilString) {
+	s.FlowID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *OAuthSettingsCreatedEvent) SetMetadata(val OptEventMetadata) {
+	s.Metadata = val
+}
+
+// SetPayload sets the value of Payload.
+func (s *OAuthSettingsCreatedEvent) SetPayload(val OAuthSettingsCreatedPayload) {
+	s.Payload = val
+}
+
+type OAuthSettingsCreatedEventActorType string
+
+const (
+	OAuthSettingsCreatedEventActorTypeHuman   OAuthSettingsCreatedEventActorType = "human"
+	OAuthSettingsCreatedEventActorTypeService OAuthSettingsCreatedEventActorType = "service"
+	OAuthSettingsCreatedEventActorTypeSystem  OAuthSettingsCreatedEventActorType = "system"
+	OAuthSettingsCreatedEventActorTypeAgent   OAuthSettingsCreatedEventActorType = "agent"
+)
+
+// AllValues returns all OAuthSettingsCreatedEventActorType values.
+func (OAuthSettingsCreatedEventActorType) AllValues() []OAuthSettingsCreatedEventActorType {
+	return []OAuthSettingsCreatedEventActorType{
+		OAuthSettingsCreatedEventActorTypeHuman,
+		OAuthSettingsCreatedEventActorTypeService,
+		OAuthSettingsCreatedEventActorTypeSystem,
+		OAuthSettingsCreatedEventActorTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s OAuthSettingsCreatedEventActorType) MarshalText() ([]byte, error) {
+	switch s {
+	case OAuthSettingsCreatedEventActorTypeHuman:
+		return []byte(s), nil
+	case OAuthSettingsCreatedEventActorTypeService:
+		return []byte(s), nil
+	case OAuthSettingsCreatedEventActorTypeSystem:
+		return []byte(s), nil
+	case OAuthSettingsCreatedEventActorTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *OAuthSettingsCreatedEventActorType) UnmarshalText(data []byte) error {
+	switch OAuthSettingsCreatedEventActorType(data) {
+	case OAuthSettingsCreatedEventActorTypeHuman:
+		*s = OAuthSettingsCreatedEventActorTypeHuman
+		return nil
+	case OAuthSettingsCreatedEventActorTypeService:
+		*s = OAuthSettingsCreatedEventActorTypeService
+		return nil
+	case OAuthSettingsCreatedEventActorTypeSystem:
+		*s = OAuthSettingsCreatedEventActorTypeSystem
+		return nil
+	case OAuthSettingsCreatedEventActorTypeAgent:
+		*s = OAuthSettingsCreatedEventActorTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The category of the event.
+type OAuthSettingsCreatedEventCategory string
+
+const (
+	OAuthSettingsCreatedEventCategoryRequest OAuthSettingsCreatedEventCategory = "request"
+	OAuthSettingsCreatedEventCategoryAuth    OAuthSettingsCreatedEventCategory = "auth"
+	OAuthSettingsCreatedEventCategorySession OAuthSettingsCreatedEventCategory = "session"
+	OAuthSettingsCreatedEventCategoryAdmin   OAuthSettingsCreatedEventCategory = "admin"
+	OAuthSettingsCreatedEventCategoryEntity  OAuthSettingsCreatedEventCategory = "entity"
+	OAuthSettingsCreatedEventCategorySignal  OAuthSettingsCreatedEventCategory = "signal"
+)
+
+// AllValues returns all OAuthSettingsCreatedEventCategory values.
+func (OAuthSettingsCreatedEventCategory) AllValues() []OAuthSettingsCreatedEventCategory {
+	return []OAuthSettingsCreatedEventCategory{
+		OAuthSettingsCreatedEventCategoryRequest,
+		OAuthSettingsCreatedEventCategoryAuth,
+		OAuthSettingsCreatedEventCategorySession,
+		OAuthSettingsCreatedEventCategoryAdmin,
+		OAuthSettingsCreatedEventCategoryEntity,
+		OAuthSettingsCreatedEventCategorySignal,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s OAuthSettingsCreatedEventCategory) MarshalText() ([]byte, error) {
+	switch s {
+	case OAuthSettingsCreatedEventCategoryRequest:
+		return []byte(s), nil
+	case OAuthSettingsCreatedEventCategoryAuth:
+		return []byte(s), nil
+	case OAuthSettingsCreatedEventCategorySession:
+		return []byte(s), nil
+	case OAuthSettingsCreatedEventCategoryAdmin:
+		return []byte(s), nil
+	case OAuthSettingsCreatedEventCategoryEntity:
+		return []byte(s), nil
+	case OAuthSettingsCreatedEventCategorySignal:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *OAuthSettingsCreatedEventCategory) UnmarshalText(data []byte) error {
+	switch OAuthSettingsCreatedEventCategory(data) {
+	case OAuthSettingsCreatedEventCategoryRequest:
+		*s = OAuthSettingsCreatedEventCategoryRequest
+		return nil
+	case OAuthSettingsCreatedEventCategoryAuth:
+		*s = OAuthSettingsCreatedEventCategoryAuth
+		return nil
+	case OAuthSettingsCreatedEventCategorySession:
+		*s = OAuthSettingsCreatedEventCategorySession
+		return nil
+	case OAuthSettingsCreatedEventCategoryAdmin:
+		*s = OAuthSettingsCreatedEventCategoryAdmin
+		return nil
+	case OAuthSettingsCreatedEventCategoryEntity:
+		*s = OAuthSettingsCreatedEventCategoryEntity
+		return nil
+	case OAuthSettingsCreatedEventCategorySignal:
+		*s = OAuthSettingsCreatedEventCategorySignal
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The kind of delegation. Absent when unset.
+type OAuthSettingsCreatedEventDelegationType string
+
+const (
+	OAuthSettingsCreatedEventDelegationTypeDirect    OAuthSettingsCreatedEventDelegationType = "direct"
+	OAuthSettingsCreatedEventDelegationTypeDelegated OAuthSettingsCreatedEventDelegationType = "delegated"
+	OAuthSettingsCreatedEventDelegationTypePatShared OAuthSettingsCreatedEventDelegationType = "pat_shared"
+	OAuthSettingsCreatedEventDelegationTypeExchanged OAuthSettingsCreatedEventDelegationType = "exchanged"
+)
+
+// AllValues returns all OAuthSettingsCreatedEventDelegationType values.
+func (OAuthSettingsCreatedEventDelegationType) AllValues() []OAuthSettingsCreatedEventDelegationType {
+	return []OAuthSettingsCreatedEventDelegationType{
+		OAuthSettingsCreatedEventDelegationTypeDirect,
+		OAuthSettingsCreatedEventDelegationTypeDelegated,
+		OAuthSettingsCreatedEventDelegationTypePatShared,
+		OAuthSettingsCreatedEventDelegationTypeExchanged,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s OAuthSettingsCreatedEventDelegationType) MarshalText() ([]byte, error) {
+	switch s {
+	case OAuthSettingsCreatedEventDelegationTypeDirect:
+		return []byte(s), nil
+	case OAuthSettingsCreatedEventDelegationTypeDelegated:
+		return []byte(s), nil
+	case OAuthSettingsCreatedEventDelegationTypePatShared:
+		return []byte(s), nil
+	case OAuthSettingsCreatedEventDelegationTypeExchanged:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *OAuthSettingsCreatedEventDelegationType) UnmarshalText(data []byte) error {
+	switch OAuthSettingsCreatedEventDelegationType(data) {
+	case OAuthSettingsCreatedEventDelegationTypeDirect:
+		*s = OAuthSettingsCreatedEventDelegationTypeDirect
+		return nil
+	case OAuthSettingsCreatedEventDelegationTypeDelegated:
+		*s = OAuthSettingsCreatedEventDelegationTypeDelegated
+		return nil
+	case OAuthSettingsCreatedEventDelegationTypePatShared:
+		*s = OAuthSettingsCreatedEventDelegationTypePatShared
+		return nil
+	case OAuthSettingsCreatedEventDelegationTypeExchanged:
+		*s = OAuthSettingsCreatedEventDelegationTypeExchanged
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Payload for `oauth_settings.created`: the settings the new revision holds.
+// The revision id is the event's `entity_id`.
+// Ref: #
+type OAuthSettingsCreatedPayload struct {
+	// Whether the project's OAuth authorization server answers.
+	Enabled bool `json:"enabled"`
+}
+
+// GetEnabled returns the value of Enabled.
+func (s *OAuthSettingsCreatedPayload) GetEnabled() bool {
+	return s.Enabled
+}
+
+// SetEnabled sets the value of Enabled.
+func (s *OAuthSettingsCreatedPayload) SetEnabled(val bool) {
+	s.Enabled = val
+}
+
 // A stored OAuth settings revision. `oauth` echoes the canonical stored
 // settings, so a client such as the CLI can reconcile local files with the
 // server's stored state.
@@ -58345,6 +58892,112 @@ func (s *OAuthSettingsRevisionResponse) SetOAuth(val OAuthSettings) {
 }
 
 func (*OAuthSettingsRevisionResponse) getOAuthSettingsByIdRes() {}
+
+// Merged schema.
+// Ref: #
+type OauthsetNotFound struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptOauthsetNotFoundDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *OauthsetNotFound) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *OauthsetNotFound) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *OauthsetNotFound) GetDetails() OptOauthsetNotFoundDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *OauthsetNotFound) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *OauthsetNotFound) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *OauthsetNotFound) SetDetails(val OptOauthsetNotFoundDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type OauthsetNotFoundDetails map[string]jx.Raw
+
+func (s *OauthsetNotFoundDetails) init() OauthsetNotFoundDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type OauthsetPermissionDenied struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptOauthsetPermissionDeniedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *OauthsetPermissionDenied) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *OauthsetPermissionDenied) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *OauthsetPermissionDenied) GetDetails() OptOauthsetPermissionDeniedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *OauthsetPermissionDenied) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *OauthsetPermissionDenied) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *OauthsetPermissionDenied) SetDetails(val OptOauthsetPermissionDeniedDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type OauthsetPermissionDeniedDetails map[string]jx.Raw
+
+func (s *OauthsetPermissionDeniedDetails) init() OauthsetPermissionDeniedDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
 
 // NewOptAttAlreadyHandedOffDetails returns new OptAttAlreadyHandedOffDetails with value set to v.
 func NewOptAttAlreadyHandedOffDetails(v AttAlreadyHandedOffDetails) OptAttAlreadyHandedOffDetails {
@@ -68761,6 +69414,69 @@ func (o OptNilInvitationTeamMemberCreatedByType) Or(d InvitationTeamMemberCreate
 	return d
 }
 
+// NewOptNilOAuthSettingsCreatedEventActorType returns new OptNilOAuthSettingsCreatedEventActorType with value set to v.
+func NewOptNilOAuthSettingsCreatedEventActorType(v OAuthSettingsCreatedEventActorType) OptNilOAuthSettingsCreatedEventActorType {
+	return OptNilOAuthSettingsCreatedEventActorType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilOAuthSettingsCreatedEventActorType is optional nullable OAuthSettingsCreatedEventActorType.
+type OptNilOAuthSettingsCreatedEventActorType struct {
+	Value OAuthSettingsCreatedEventActorType
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilOAuthSettingsCreatedEventActorType was set.
+func (o OptNilOAuthSettingsCreatedEventActorType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilOAuthSettingsCreatedEventActorType) Reset() {
+	var v OAuthSettingsCreatedEventActorType
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilOAuthSettingsCreatedEventActorType) SetTo(v OAuthSettingsCreatedEventActorType) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilOAuthSettingsCreatedEventActorType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilOAuthSettingsCreatedEventActorType) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v OAuthSettingsCreatedEventActorType
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilOAuthSettingsCreatedEventActorType) Get() (v OAuthSettingsCreatedEventActorType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilOAuthSettingsCreatedEventActorType) Or(d OAuthSettingsCreatedEventActorType) OAuthSettingsCreatedEventActorType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptNilOriginAddedEventActorType returns new OptNilOriginAddedEventActorType with value set to v.
 func NewOptNilOriginAddedEventActorType(v OriginAddedEventActorType) OptNilOriginAddedEventActorType {
 	return OptNilOriginAddedEventActorType{
@@ -70989,6 +71705,144 @@ func (o OptOAuthSettings) Get() (v OAuthSettings, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptOAuthSettings) Or(d OAuthSettings) OAuthSettings {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptOAuthSettingsCreatedEventDelegationType returns new OptOAuthSettingsCreatedEventDelegationType with value set to v.
+func NewOptOAuthSettingsCreatedEventDelegationType(v OAuthSettingsCreatedEventDelegationType) OptOAuthSettingsCreatedEventDelegationType {
+	return OptOAuthSettingsCreatedEventDelegationType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptOAuthSettingsCreatedEventDelegationType is optional OAuthSettingsCreatedEventDelegationType.
+type OptOAuthSettingsCreatedEventDelegationType struct {
+	Value OAuthSettingsCreatedEventDelegationType
+	Set   bool
+}
+
+// IsSet returns true if OptOAuthSettingsCreatedEventDelegationType was set.
+func (o OptOAuthSettingsCreatedEventDelegationType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptOAuthSettingsCreatedEventDelegationType) Reset() {
+	var v OAuthSettingsCreatedEventDelegationType
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptOAuthSettingsCreatedEventDelegationType) SetTo(v OAuthSettingsCreatedEventDelegationType) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptOAuthSettingsCreatedEventDelegationType) Get() (v OAuthSettingsCreatedEventDelegationType, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptOAuthSettingsCreatedEventDelegationType) Or(d OAuthSettingsCreatedEventDelegationType) OAuthSettingsCreatedEventDelegationType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptOauthsetNotFoundDetails returns new OptOauthsetNotFoundDetails with value set to v.
+func NewOptOauthsetNotFoundDetails(v OauthsetNotFoundDetails) OptOauthsetNotFoundDetails {
+	return OptOauthsetNotFoundDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptOauthsetNotFoundDetails is optional OauthsetNotFoundDetails.
+type OptOauthsetNotFoundDetails struct {
+	Value OauthsetNotFoundDetails
+	Set   bool
+}
+
+// IsSet returns true if OptOauthsetNotFoundDetails was set.
+func (o OptOauthsetNotFoundDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptOauthsetNotFoundDetails) Reset() {
+	var v OauthsetNotFoundDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptOauthsetNotFoundDetails) SetTo(v OauthsetNotFoundDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptOauthsetNotFoundDetails) Get() (v OauthsetNotFoundDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptOauthsetNotFoundDetails) Or(d OauthsetNotFoundDetails) OauthsetNotFoundDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptOauthsetPermissionDeniedDetails returns new OptOauthsetPermissionDeniedDetails with value set to v.
+func NewOptOauthsetPermissionDeniedDetails(v OauthsetPermissionDeniedDetails) OptOauthsetPermissionDeniedDetails {
+	return OptOauthsetPermissionDeniedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptOauthsetPermissionDeniedDetails is optional OauthsetPermissionDeniedDetails.
+type OptOauthsetPermissionDeniedDetails struct {
+	Value OauthsetPermissionDeniedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptOauthsetPermissionDeniedDetails was set.
+func (o OptOauthsetPermissionDeniedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptOauthsetPermissionDeniedDetails) Reset() {
+	var v OauthsetPermissionDeniedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptOauthsetPermissionDeniedDetails) SetTo(v OauthsetPermissionDeniedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptOauthsetPermissionDeniedDetails) Get() (v OauthsetPermissionDeniedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptOauthsetPermissionDeniedDetails) Or(d OauthsetPermissionDeniedDetails) OauthsetPermissionDeniedDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -109833,6 +110687,7 @@ func (*WebhookDelivered) invitationAcceptedRes()          {}
 func (*WebhookDelivered) invitationCancelledRes()         {}
 func (*WebhookDelivered) invitationCreatedRes()           {}
 func (*WebhookDelivered) invitationRejectedRes()          {}
+func (*WebhookDelivered) oauthSettingsCreatedRes()        {}
 func (*WebhookDelivered) originAddedRes()                 {}
 func (*WebhookDelivered) originRemovedRes()               {}
 func (*WebhookDelivered) policyCreatedRes()               {}
@@ -109899,6 +110754,7 @@ func (*WebhookNotDelivered) invitationAcceptedRes()          {}
 func (*WebhookNotDelivered) invitationCancelledRes()         {}
 func (*WebhookNotDelivered) invitationCreatedRes()           {}
 func (*WebhookNotDelivered) invitationRejectedRes()          {}
+func (*WebhookNotDelivered) oauthSettingsCreatedRes()        {}
 func (*WebhookNotDelivered) originAddedRes()                 {}
 func (*WebhookNotDelivered) originRemovedRes()               {}
 func (*WebhookNotDelivered) policyCreatedRes()               {}

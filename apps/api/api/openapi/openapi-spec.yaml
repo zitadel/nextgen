@@ -400,6 +400,8 @@ webhooks:
     $ref: endpoints/events/webhooks/invitation-created.yaml
   invitation.rejected:
     $ref: endpoints/events/webhooks/invitation-rejected.yaml
+  oauth_settings.created:
+    $ref: endpoints/events/webhooks/oauth_settings-created.yaml
   origin.added:
     $ref: endpoints/events/webhooks/origin-added.yaml
   origin.removed:

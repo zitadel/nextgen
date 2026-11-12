@@ -219,6 +219,13 @@ type BrandingPayload struct {
 // BrandingCreatedPayload is an alias for branding.created.
 type BrandingCreatedPayload = BrandingPayload
 
+// OAuthSettingsPayload records a published OAuth settings revision for
+// oauth_settings.created. The revision id is the event's entity_id; Enabled
+// is the whole of the settings, a configuration value and never user data.
+type OAuthSettingsPayload struct {
+	Enabled bool `json:"enabled"`
+}
+
 // PolicyPayload records a published policy revision for policy.created (the
 // first publish of an operation) and policy.updated (every later one). The
 // policy id is the event's entity_id. Config holds the instance's settings,

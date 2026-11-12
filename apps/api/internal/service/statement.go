@@ -50,6 +50,7 @@ type AllStatements interface {
 	UserPasskeyStatements
 	UserRecoveryCodesStatements
 	BrandingStatements
+	OAuthSettingsStatements
 	VariableStatements
 	VariableSetStatements
 	ClaimStatements
@@ -693,6 +694,15 @@ type BrandingStatements interface {
 	CreateBranding(ctx context.Context, entity *domain.Branding) error
 	GetBrandingByID(ctx context.Context, projectID, id string) (*domain.Branding, error)
 	ListBrandings(ctx context.Context, filter *database.ListOptions[domain.BrandingField]) (*database.ListResult[*domain.Branding], error)
+}
+
+// OAuthSettingsStatements persist the immutable OAuth settings revisions a
+// release pins. Revisions are create-only, like branding.
+type OAuthSettingsStatements interface {
+	Statements
+	CreateOAuthSettings(ctx context.Context, entity *domain.OAuthSettings) error
+	GetOAuthSettingsByID(ctx context.Context, projectID, id string) (*domain.OAuthSettings, error)
+	ListOAuthSettings(ctx context.Context, filter *database.ListOptions[domain.OAuthSettingsField]) (*database.ListResult[*domain.OAuthSettings], error)
 }
 
 // TODO(IAM-marco): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods

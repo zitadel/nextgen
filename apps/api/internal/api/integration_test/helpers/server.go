@@ -62,6 +62,11 @@ func (h *Harness) EnsureTestServer(t testing.TB) *httptest.Server {
 		api.MountAPI(mux, func(next http.Handler) http.Handler {
 			return h.withServerLog(api.WithSessionStateNoStore(api.WithCSRFRequest(next)))
 		}, h.withServerLog, h.EnsureAPIServers(t))
+		// The OAuth authorization server as oauth.enabled mounts it, with
+		// ConsoleOrigin as the server's public base: a forwarded request to
+		// that host is the server's own origin, which no customer project
+		// may claim as an issuer and the platform project's issuer sits on.
+		h.EnsureOAuthHandlers(t).Mount(mux, h.withServerLog)
 		h.testServer.value = httptest.NewServer(mux)
 	}
 	return h.testServer.value
@@ -146,7 +151,7 @@ func (h *Harness) EnsureHandler(t testing.TB) *api.Handler {
 			service.NewVariableService(db, h.EnsureKeyService(t)),
 			db,
 			platform.ID,
-		).WithBuiltinSchemaBases(BuiltinSchemaBases()).WithRuntimeResolver(service.NewRuntimeResolver(db, releaseService, ConsoleOrigin)).WithPolicyService(h.EnsurePolicyService(t)).
+		).WithBuiltinSchemaBases(BuiltinSchemaBases()).WithRuntimeResolver(h.EnsureRuntimeResolver(t)).WithPolicyService(h.EnsurePolicyService(t)).WithOAuthSettingsService(h.EnsureOAuthSettingsService(t)).
 			WithInvitationService(service.NewInvitationService(db, h.EnsureKeyService(t), ConsoleOrigin+"/ui/console", platform.ID))
 	}
 	return h.handler.value

@@ -21,6 +21,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/idpconnection"
 	"github.com/zitadel/nextgen/internal/storage/invitation"
+	"github.com/zitadel/nextgen/internal/storage/oauthsettings"
 	"github.com/zitadel/nextgen/internal/storage/policystore"
 	"github.com/zitadel/nextgen/internal/storage/release"
 )
@@ -81,6 +82,7 @@ func TestCursorBattle_DrainAllListIncarnations(t *testing.T) {
 		t.Run("tokens", func(t *testing.T) { battleTokens(t, d) })
 		t.Run("sessions", func(t *testing.T) { battleSessions(t, d) })
 		t.Run("brandings", func(t *testing.T) { battleBrandings(t, d) })
+		t.Run("oauth_settings", func(t *testing.T) { battleOAuthSettings(t, d) })
 		t.Run("releases", func(t *testing.T) { battleReleases(t, d) })
 		t.Run("invitations", func(t *testing.T) { battleInvitations(t, d) })
 		t.Run("deployments", func(t *testing.T) { battleDeployments(t, d) })
@@ -580,6 +582,35 @@ func battleBrandings(t *testing.T, d dialect) {
 			opts.Pagination.Cursor = cursor
 			return d.stmts.ListBrandings(unfilteredListCtx(t), opts)
 		}, func(b *domain.Branding) string { return b.ID })
+		assertDrainMatch(t, want, got)
+	})
+}
+
+func battleOAuthSettings(t *testing.T, d dialect) {
+	t.Helper()
+	projectID, _ := uniqueOAuthSettingsIDs(t)
+	ensureOAuthSettingsProject(t, d.stmts, projectID)
+	want := make([]string, 0, 5)
+	for range 5 {
+		entity := sampleOAuthSettings(projectID, "")
+		require.NoError(t, d.stmts.CreateOAuthSettings(t.Context(), entity))
+		want = append(want, entity.ID)
+	}
+	filter := database.Equal(database.Col(domain.OAuthSettingsFieldProjectID), projectID)
+	orderAsc := oauthsettings.NewestFirst()
+	orderAsc.Direction = database.OrderAsc
+	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.OAuthSettingsField]) (*database.ListResult[*domain.OAuthSettings], error) {
+		return d.stmts.ListOAuthSettings(unfilteredListCtx(t), &database.ListOptions[domain.OAuthSettingsField]{
+			Filter: filter, Pagination: page,
+		})
+	}, func(s *domain.OAuthSettings) string { return s.ID }, 2)
+
+	t.Run("newest_first_helper", func(t *testing.T) {
+		got := pageAll(t, len(want), nil, func(cursor []byte) (*database.ListResult[*domain.OAuthSettings], error) {
+			opts := oauthsettings.ListOptions(projectID, 2)
+			opts.Pagination.Cursor = cursor
+			return d.stmts.ListOAuthSettings(unfilteredListCtx(t), opts)
+		}, func(s *domain.OAuthSettings) string { return s.ID })
 		assertDrainMatch(t, want, got)
 	})
 }

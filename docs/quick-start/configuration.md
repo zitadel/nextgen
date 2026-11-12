@@ -43,7 +43,7 @@ itself and creates a local admin you reach with `zitadel console`.
 
 | YAML key        | Environment             | Default | Description |
 | --------------- | ----------------------- | ------- | ----------- |
-| `oauth.enabled` | `NEXTGEN_OAUTH_ENABLED` | `false` | Serves the OAuth 2.0 authorization server: a project's [RFC 8414](https://www.rfc-editor.org/rfc/rfc8414) metadata at `/.well-known/oauth-authorization-server/oauth/<project_id>` and its endpoints under `/oauth/<project_id>`. A project's issuer answers only once the project has OAuth enabled; with the switch off, those paths answer like any other path nothing serves. |
+| `oauth.enabled` | `NEXTGEN_OAUTH_ENABLED` | `false` | Serves the OAuth 2.0 authorization server: a project's [RFC 8414](https://www.rfc-editor.org/rfc/rfc8414) metadata at `/.well-known/oauth-authorization-server/oauth/<project_id>` and its endpoints under `/oauth/<project_id>`. A project's issuer answers only once the release deployed to that origin carries `oauth: { "enabled": true }`; with the switch off, those paths answer like any other path nothing serves. |
 
 ## Database
 

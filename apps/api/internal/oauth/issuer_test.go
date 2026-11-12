@@ -166,12 +166,3 @@ func TestDeriveIssuer(t *testing.T) {
 		})
 	}
 }
-
-// The default admission of a server with OAuth off refuses with an answer
-// that means "no", never with a server fault: the metadata then stays a 404.
-func TestDenyAllIsNoServerFault(t *testing.T) {
-	t.Parallel()
-	err := DenyAll{}.Admit(t.Context(), "proj_123", "https://app.example.com")
-	require.Error(t, err)
-	assert.False(t, domain.IsServerFault(err))
-}
