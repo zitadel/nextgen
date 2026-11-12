@@ -198,10 +198,12 @@ function BrandingScreen() {
           </div>
 
           <div className="ml-auto flex items-center gap-2">
+            {/* One name in both states: `aria-pressed` says which is on. */}
             <Button
               variant="outline"
               size="icon"
-              aria-label={narrow ? "Show at desktop width" : "Show at phone width"}
+              aria-label="Phone width"
+              title="Phone width"
               aria-pressed={narrow}
               onClick={() => setNarrow((value) => !value)}
             >
@@ -260,7 +262,17 @@ function BrandingScreen() {
             // Centred by auto margins, not the stage's alignment: a step
             // taller than the stage (an error banner) then starts at its top
             // and scrolls, instead of spilling above where it cannot.
-            <div className={narrow ? "m-auto w-96" : "m-auto w-full max-w-lg"}>
+            // Phone width is the card on a 375px screen, less the login page's
+            // padding either side (`--zl-spacing-6` below 48rem). The card
+            // stops at its own 384px maximum, so a phone frame must be
+            // narrower than that to show any change.
+            <div
+              className={
+                narrow
+                  ? "m-auto w-[calc(375px-2*var(--zl-spacing-6))] max-w-full"
+                  : "m-auto w-full max-w-lg"
+              }
+            >
               <LoginPreview
                 journey={activeJourney}
                 flowName={activeFlowName}
