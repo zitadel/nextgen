@@ -183,6 +183,8 @@ tracked below.
 | Startup reconcile of the platform operators configuration (`CreateAuthzAssignment` / `RevokeAuthzAssignment` on the platform operator relation, [ADR 075](../../adrs/075-platform-operators.md)); actor type `system` | `authz.granted`, `authz.revoked` | `admin` | `authz_assignment` | `principal_type`, `principal_id`, `relation` |
 | InvitationService create, and the new row of a replace | `invitation.created` | `admin` | `invitation` | `type` and its object (`project_member` with `relation`), `journey_id`, `replaces_invitation_id`, `expires_at`; never the metadata or the token |
 | InvitationService cancel of a pending invitation, and the original a replace deletes | `invitation.cancelled` | `admin` | `invitation` | `journey_id`, `reason` (`cancelled` or `replaced`), `replaced_by_invitation_id` |
+| InvitationService accept, sharing its `request_id` with the grant service's `authz.granted` and `authz.revoked` when it writes any (none when the user already holds an identical active grant) | `invitation.accepted` | `admin` | `invitation` | `type` and its object, `journey_id`, `user_id` (secondary) |
+| InvitationService decline | `invitation.rejected` | `admin` | `invitation` | `journey_id`, `user_id` (secondary) |
 | Set password (`entity_id` / `factor_id` = password row id) | `auth.factor.password.set` | `auth` | `user_password` | `user_id`, `factor_id` |
 | Create passkey (`entity_id` / `factor_id` = credential id) | `auth.factor.passkey.enrolled` | `auth` | `user_passkey` | `user_id`, `factor_id` |
 
@@ -213,16 +215,7 @@ a `domain.EventType` constant and an events API schema, so clients can be
 built against it, but nothing emits it yet. A type moves to Path B with its
 producer.
 
-Invitation events ([ADR 086 §5](../../adrs/086-invitations.md#5-events)) are
-`admin` category with `entity_type` `invitation`. `type` names the
-invitation's kind, and the object of the same name (`project_member` with
-`relation`, or `team_member` with `team_id` and `role`) says what it grants. No payload
-carries the invitation's metadata or its token.
-
-| `event_type` | Payload | Producer |
-|--------------|---------|----------|
-| `invitation.accepted` | `type` and its object, `journey_id`, `user_id` (secondary) | InvitationService accept, sharing its `request_id` with the grant service's authz events when it writes any (none when the user already holds an identical active grant) ([#2853](https://github.com/zitadel/nextgen/issues/2853)) |
-| `invitation.rejected` | `journey_id`, `user_id` (secondary) | InvitationService decline ([#2853](https://github.com/zitadel/nextgen/issues/2853)) |
+None today.
 
 ## Deferred
 

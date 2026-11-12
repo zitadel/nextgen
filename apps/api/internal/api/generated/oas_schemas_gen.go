@@ -25,7 +25,9 @@ type AcceptInvitationErrorResponse struct {
 	Type                AcceptInvitationErrorResponseType // switch on this field
 	AuthCsrfInvalid     AuthCsrfInvalid
 	AuthUnauthorized    AuthUnauthorized
+	EvtInvalid          EvtInvalid
 	Internal            Internal
+	InvInviterNotAdmin  InvInviterNotAdmin
 	InvNotFound         InvNotFound
 	InvPlatformRequired InvPlatformRequired
 	InvProjectUnclaimed InvProjectUnclaimed
@@ -42,7 +44,9 @@ type AcceptInvitationErrorResponseType string
 const (
 	AuthCsrfInvalidAcceptInvitationErrorResponse     AcceptInvitationErrorResponseType = "auth.csrf_invalid"
 	AuthUnauthorizedAcceptInvitationErrorResponse    AcceptInvitationErrorResponseType = "auth.unauthorized"
+	EvtInvalidAcceptInvitationErrorResponse          AcceptInvitationErrorResponseType = "evt.invalid"
 	InternalAcceptInvitationErrorResponse            AcceptInvitationErrorResponseType = "internal"
+	InvInviterNotAdminAcceptInvitationErrorResponse  AcceptInvitationErrorResponseType = "inv.inviter_not_admin"
 	InvNotFoundAcceptInvitationErrorResponse         AcceptInvitationErrorResponseType = "inv.not_found"
 	InvPlatformRequiredAcceptInvitationErrorResponse AcceptInvitationErrorResponseType = "inv.platform_required"
 	InvProjectUnclaimedAcceptInvitationErrorResponse AcceptInvitationErrorResponseType = "inv.project_unclaimed"
@@ -62,9 +66,19 @@ func (s AcceptInvitationErrorResponse) IsAuthUnauthorized() bool {
 	return s.Type == AuthUnauthorizedAcceptInvitationErrorResponse
 }
 
+// IsEvtInvalid reports whether AcceptInvitationErrorResponse is EvtInvalid.
+func (s AcceptInvitationErrorResponse) IsEvtInvalid() bool {
+	return s.Type == EvtInvalidAcceptInvitationErrorResponse
+}
+
 // IsInternal reports whether AcceptInvitationErrorResponse is Internal.
 func (s AcceptInvitationErrorResponse) IsInternal() bool {
 	return s.Type == InternalAcceptInvitationErrorResponse
+}
+
+// IsInvInviterNotAdmin reports whether AcceptInvitationErrorResponse is InvInviterNotAdmin.
+func (s AcceptInvitationErrorResponse) IsInvInviterNotAdmin() bool {
+	return s.Type == InvInviterNotAdminAcceptInvitationErrorResponse
 }
 
 // IsInvNotFound reports whether AcceptInvitationErrorResponse is InvNotFound.
@@ -144,6 +158,27 @@ func NewAuthUnauthorizedAcceptInvitationErrorResponse(v AuthUnauthorized) Accept
 	return s
 }
 
+// SetEvtInvalid sets AcceptInvitationErrorResponse to EvtInvalid.
+func (s *AcceptInvitationErrorResponse) SetEvtInvalid(v EvtInvalid) {
+	s.Type = EvtInvalidAcceptInvitationErrorResponse
+	s.EvtInvalid = v
+}
+
+// GetEvtInvalid returns EvtInvalid and true boolean if AcceptInvitationErrorResponse is EvtInvalid.
+func (s AcceptInvitationErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
+	if !s.IsEvtInvalid() {
+		return v, false
+	}
+	return s.EvtInvalid, true
+}
+
+// NewEvtInvalidAcceptInvitationErrorResponse returns new AcceptInvitationErrorResponse from EvtInvalid.
+func NewEvtInvalidAcceptInvitationErrorResponse(v EvtInvalid) AcceptInvitationErrorResponse {
+	var s AcceptInvitationErrorResponse
+	s.SetEvtInvalid(v)
+	return s
+}
+
 // SetInternal sets AcceptInvitationErrorResponse to Internal.
 func (s *AcceptInvitationErrorResponse) SetInternal(v Internal) {
 	s.Type = InternalAcceptInvitationErrorResponse
@@ -162,6 +197,27 @@ func (s AcceptInvitationErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalAcceptInvitationErrorResponse(v Internal) AcceptInvitationErrorResponse {
 	var s AcceptInvitationErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetInvInviterNotAdmin sets AcceptInvitationErrorResponse to InvInviterNotAdmin.
+func (s *AcceptInvitationErrorResponse) SetInvInviterNotAdmin(v InvInviterNotAdmin) {
+	s.Type = InvInviterNotAdminAcceptInvitationErrorResponse
+	s.InvInviterNotAdmin = v
+}
+
+// GetInvInviterNotAdmin returns InvInviterNotAdmin and true boolean if AcceptInvitationErrorResponse is InvInviterNotAdmin.
+func (s AcceptInvitationErrorResponse) GetInvInviterNotAdmin() (v InvInviterNotAdmin, ok bool) {
+	if !s.IsInvInviterNotAdmin() {
+		return v, false
+	}
+	return s.InvInviterNotAdmin, true
+}
+
+// NewInvInviterNotAdminAcceptInvitationErrorResponse returns new AcceptInvitationErrorResponse from InvInviterNotAdmin.
+func NewInvInviterNotAdminAcceptInvitationErrorResponse(v InvInviterNotAdmin) AcceptInvitationErrorResponse {
+	var s AcceptInvitationErrorResponse
+	s.SetInvInviterNotAdmin(v)
 	return s
 }
 
@@ -47321,6 +47377,59 @@ func (s *InvInvalidDetails) init() InvInvalidDetails {
 
 // Merged schema.
 // Ref: #
+type InvInviterNotAdmin struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptInvInviterNotAdminDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *InvInviterNotAdmin) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *InvInviterNotAdmin) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *InvInviterNotAdmin) GetDetails() OptInvInviterNotAdminDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *InvInviterNotAdmin) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *InvInviterNotAdmin) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *InvInviterNotAdmin) SetDetails(val OptInvInviterNotAdminDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type InvInviterNotAdminDetails map[string]jx.Raw
+
+func (s *InvInviterNotAdminDetails) init() InvInviterNotAdminDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
 type InvNotFound struct {
 	// Merged property.
 	Code string `json:"code"`
@@ -65000,6 +65109,52 @@ func (o OptInvInvalidDetails) Get() (v InvInvalidDetails, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptInvInvalidDetails) Or(d InvInvalidDetails) InvInvalidDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptInvInviterNotAdminDetails returns new OptInvInviterNotAdminDetails with value set to v.
+func NewOptInvInviterNotAdminDetails(v InvInviterNotAdminDetails) OptInvInviterNotAdminDetails {
+	return OptInvInviterNotAdminDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptInvInviterNotAdminDetails is optional InvInviterNotAdminDetails.
+type OptInvInviterNotAdminDetails struct {
+	Value InvInviterNotAdminDetails
+	Set   bool
+}
+
+// IsSet returns true if OptInvInviterNotAdminDetails was set.
+func (o OptInvInviterNotAdminDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptInvInviterNotAdminDetails) Reset() {
+	var v InvInviterNotAdminDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptInvInviterNotAdminDetails) SetTo(v InvInviterNotAdminDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptInvInviterNotAdminDetails) Get() (v InvInviterNotAdminDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptInvInviterNotAdminDetails) Or(d InvInviterNotAdminDetails) InvInviterNotAdminDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -88506,6 +88661,7 @@ type RejectInvitationErrorResponse struct {
 	Type             RejectInvitationErrorResponseType // switch on this field
 	AuthCsrfInvalid  AuthCsrfInvalid
 	AuthUnauthorized AuthUnauthorized
+	EvtInvalid       EvtInvalid
 	Internal         Internal
 	InvNotFound      InvNotFound
 	NotImplemented   NotImplemented
@@ -88520,6 +88676,7 @@ type RejectInvitationErrorResponseType string
 const (
 	AuthCsrfInvalidRejectInvitationErrorResponse  RejectInvitationErrorResponseType = "auth.csrf_invalid"
 	AuthUnauthorizedRejectInvitationErrorResponse RejectInvitationErrorResponseType = "auth.unauthorized"
+	EvtInvalidRejectInvitationErrorResponse       RejectInvitationErrorResponseType = "evt.invalid"
 	InternalRejectInvitationErrorResponse         RejectInvitationErrorResponseType = "internal"
 	InvNotFoundRejectInvitationErrorResponse      RejectInvitationErrorResponseType = "inv.not_found"
 	NotImplementedRejectInvitationErrorResponse   RejectInvitationErrorResponseType = "not_implemented"
@@ -88535,6 +88692,11 @@ func (s RejectInvitationErrorResponse) IsAuthCsrfInvalid() bool {
 // IsAuthUnauthorized reports whether RejectInvitationErrorResponse is AuthUnauthorized.
 func (s RejectInvitationErrorResponse) IsAuthUnauthorized() bool {
 	return s.Type == AuthUnauthorizedRejectInvitationErrorResponse
+}
+
+// IsEvtInvalid reports whether RejectInvitationErrorResponse is EvtInvalid.
+func (s RejectInvitationErrorResponse) IsEvtInvalid() bool {
+	return s.Type == EvtInvalidRejectInvitationErrorResponse
 }
 
 // IsInternal reports whether RejectInvitationErrorResponse is Internal.
@@ -88601,6 +88763,27 @@ func (s RejectInvitationErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized
 func NewAuthUnauthorizedRejectInvitationErrorResponse(v AuthUnauthorized) RejectInvitationErrorResponse {
 	var s RejectInvitationErrorResponse
 	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetEvtInvalid sets RejectInvitationErrorResponse to EvtInvalid.
+func (s *RejectInvitationErrorResponse) SetEvtInvalid(v EvtInvalid) {
+	s.Type = EvtInvalidRejectInvitationErrorResponse
+	s.EvtInvalid = v
+}
+
+// GetEvtInvalid returns EvtInvalid and true boolean if RejectInvitationErrorResponse is EvtInvalid.
+func (s RejectInvitationErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
+	if !s.IsEvtInvalid() {
+		return v, false
+	}
+	return s.EvtInvalid, true
+}
+
+// NewEvtInvalidRejectInvitationErrorResponse returns new RejectInvitationErrorResponse from EvtInvalid.
+func NewEvtInvalidRejectInvitationErrorResponse(v EvtInvalid) RejectInvitationErrorResponse {
+	var s RejectInvitationErrorResponse
+	s.SetEvtInvalid(v)
 	return s
 }
 

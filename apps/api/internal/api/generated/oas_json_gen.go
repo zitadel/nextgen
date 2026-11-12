@@ -132,11 +132,43 @@ func (s AcceptInvitationErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case EvtInvalidAcceptInvitationErrorResponse:
+		e.FieldStart("code")
+		e.Str("evt.invalid")
+		{
+			s := s.EvtInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case InternalAcceptInvitationErrorResponse:
 		e.FieldStart("code")
 		e.Str("internal")
 		{
 			s := s.Internal
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case InvInviterNotAdminAcceptInvitationErrorResponse:
+		e.FieldStart("code")
+		e.Str("inv.inviter_not_admin")
+		{
+			s := s.InvInviterNotAdmin
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -292,8 +324,14 @@ func (s *AcceptInvitationErrorResponse) Decode(d *jx.Decoder) error {
 				case "auth.unauthorized":
 					s.Type = AuthUnauthorizedAcceptInvitationErrorResponse
 					found = true
+				case "evt.invalid":
+					s.Type = EvtInvalidAcceptInvitationErrorResponse
+					found = true
 				case "internal":
 					s.Type = InternalAcceptInvitationErrorResponse
+					found = true
+				case "inv.inviter_not_admin":
+					s.Type = InvInviterNotAdminAcceptInvitationErrorResponse
 					found = true
 				case "inv.not_found":
 					s.Type = InvNotFoundAcceptInvitationErrorResponse
@@ -338,8 +376,16 @@ func (s *AcceptInvitationErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
 			return err
 		}
+	case EvtInvalidAcceptInvitationErrorResponse:
+		if err := s.EvtInvalid.Decode(d); err != nil {
+			return err
+		}
 	case InternalAcceptInvitationErrorResponse:
 		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case InvInviterNotAdminAcceptInvitationErrorResponse:
+		if err := s.InvInviterNotAdmin.Decode(d); err != nil {
 			return err
 		}
 	case InvNotFoundAcceptInvitationErrorResponse:
@@ -77181,6 +77227,194 @@ func (s *InvInvalidDetails) UnmarshalJSON(data []byte) error {
 }
 
 // Encode implements json.Marshaler.
+func (s *InvInviterNotAdmin) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *InvInviterNotAdmin) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("code")
+		e.Str("inv.inviter_not_admin")
+	}
+	{
+		e.FieldStart("message")
+		e.Str(s.Message)
+	}
+	{
+		if s.Details.Set {
+			e.FieldStart("details")
+			s.Details.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfInvInviterNotAdmin = [3]string{
+	0: "code",
+	1: "message",
+	2: "details",
+}
+
+// Decode decodes InvInviterNotAdmin from json.
+func (s *InvInviterNotAdmin) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode InvInviterNotAdmin to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "code":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.Code = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"code\"")
+			}
+		case "message":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := d.Str()
+				s.Message = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"message\"")
+			}
+		case "details":
+			if err := func() error {
+				s.Details.Reset()
+				if err := s.Details.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"details\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode InvInviterNotAdmin")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfInvInviterNotAdmin) {
+					name = jsonFieldsNameOfInvInviterNotAdmin[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *InvInviterNotAdmin) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *InvInviterNotAdmin) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s InvInviterNotAdminDetails) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields implements json.Marshaler.
+func (s InvInviterNotAdminDetails) encodeFields(e *jx.Encoder) {
+	for k, elem := range s {
+		e.FieldStart(k)
+
+		if len(elem) != 0 {
+			e.Raw(elem)
+		}
+	}
+}
+
+// Decode decodes InvInviterNotAdminDetails from json.
+func (s *InvInviterNotAdminDetails) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode InvInviterNotAdminDetails to nil")
+	}
+	m := s.init()
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		var elem jx.Raw
+		if err := func() error {
+			v, err := d.RawAppend(nil)
+			elem = jx.Raw(v)
+			if err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrapf(err, "decode field %q", k)
+		}
+		m[string(k)] = elem
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode InvInviterNotAdminDetails")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s InvInviterNotAdminDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *InvInviterNotAdminDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
 func (s *InvNotFound) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
@@ -98449,6 +98683,40 @@ func (s OptInvInvalidDetails) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *OptInvInvalidDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes InvInviterNotAdminDetails as json.
+func (o OptInvInviterNotAdminDetails) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes InvInviterNotAdminDetails from json.
+func (o *OptInvInviterNotAdminDetails) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptInvInviterNotAdminDetails to nil")
+	}
+	o.Set = true
+	o.Value = make(InvInviterNotAdminDetails)
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptInvInviterNotAdminDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptInvInviterNotAdminDetails) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -128386,6 +128654,22 @@ func (s RejectInvitationErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case EvtInvalidRejectInvitationErrorResponse:
+		e.FieldStart("code")
+		e.Str("evt.invalid")
+		{
+			s := s.EvtInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case InternalRejectInvitationErrorResponse:
 		e.FieldStart("code")
 		e.Str("internal")
@@ -128498,6 +128782,9 @@ func (s *RejectInvitationErrorResponse) Decode(d *jx.Decoder) error {
 				case "auth.unauthorized":
 					s.Type = AuthUnauthorizedRejectInvitationErrorResponse
 					found = true
+				case "evt.invalid":
+					s.Type = EvtInvalidRejectInvitationErrorResponse
+					found = true
 				case "internal":
 					s.Type = InternalRejectInvitationErrorResponse
 					found = true
@@ -128533,6 +128820,10 @@ func (s *RejectInvitationErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case AuthUnauthorizedRejectInvitationErrorResponse:
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
+			return err
+		}
+	case EvtInvalidRejectInvitationErrorResponse:
+		if err := s.EvtInvalid.Decode(d); err != nil {
 			return err
 		}
 	case InternalRejectInvitationErrorResponse:
