@@ -1,3 +1,4 @@
+import { Flags } from "@oclif/core";
 import { describe, expect, expectTypeOf, it } from "vitest";
 
 import { aSuggest } from "@tests/helpers/suggestions";
@@ -7,6 +8,7 @@ import {
   type Declared,
   declaredOf,
   distinct,
+  type FlagsOf,
   type HelpNext,
   helpOf,
   inShell,
@@ -21,6 +23,7 @@ import {
   suggestionWords,
   WHAT_CHANGED,
 } from "@/lib/suggestion";
+import { relatedFlags } from "@/lib/suggestion/relations";
 
 const VERSION = "1.0.0-alpha.25";
 
@@ -34,6 +37,22 @@ const VERSION = "1.0.0-alpha.25";
 function checked(next: Next): Next {
   return next;
 }
+
+/** A command whose one switch is required, as no command in the table has yet. */
+const RequiredSwitch = {
+  flags: relatedFlags(
+    { confirm: Flags.boolean({ description: "Confirm it." }) },
+    { confirm: { required: true } },
+  ),
+};
+
+describe("FlagsOf", () => {
+  it("takes a required switch only given on", () => {
+    expectTypeOf<{ confirm: true }>().toExtend<FlagsOf<typeof RequiredSwitch>>();
+    expectTypeOf<{ confirm: false }>().not.toExtend<FlagsOf<typeof RequiredSwitch>>();
+    expectTypeOf<Record<never, never>>().not.toExtend<FlagsOf<typeof RequiredSwitch>>();
+  });
+});
 
 describe("NextTable", () => {
   it("names a generated resource command under each verb its descriptor has", () => {

@@ -147,8 +147,11 @@ type FlagValues<Class> = {
     Values<Class>[Key & keyof Values<Class>]
   >;
 } & {
-  readonly [Key in RequiredKey<Class> as Named<Key>]: Given<
-    Values<Class>[Key & keyof Values<Class>]
+  // A required flag is given on: `false` for a required switch is the same as
+  // leaving it out, which the target refuses.
+  readonly [Key in RequiredKey<Class> as Named<Key>]: Exclude<
+    Given<Values<Class>[Key & keyof Values<Class>]>,
+    false
   >;
 } & {
   /**
@@ -158,10 +161,16 @@ type FlagValues<Class> = {
   readonly json?: boolean;
 };
 
+/**
+ * The flags a suggestion of the command class `Class` may carry, by the names
+ * code reads them: every flag it declares typed as it parses, its required
+ * flags given, its `exclusive` flags never both given, and its `dependsOn`
+ * flags given with what they depend on.
+ */
+export type FlagsOf<Class> = FlagValues<Class> & Exclusions<Class> & Dependencies<Class>;
+
 /** The flags a suggestion of `Id` may carry, by the names code reads them. */
-export type SuggestFlags<Id> = FlagValues<Target<Id>> &
-  Exclusions<Target<Id>> &
-  Dependencies<Target<Id>>;
+export type SuggestFlags<Id> = FlagsOf<Target<Id>>;
 
 type ArgValues<Class> = Class extends { args: infer Args }
   ? Args extends Interfaces.ArgInput
