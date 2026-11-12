@@ -1,11 +1,17 @@
 import { Link } from "@tanstack/react-router";
 
 import { CliCommand, CLI_DEPLOY } from "@/components/cli-hint";
-import { CARD_ACTION_BUTTON, DetailRow, DetailSection } from "@/components/detail-page";
+import {
+  CARD_ACTION_BUTTON,
+  DETAIL_VALUE,
+  DETAIL_VALUE_EMPTY,
+  DetailRow,
+  DetailRows,
+  DetailSection,
+} from "@/components/detail-page";
 import { IdText } from "@/components/id-text";
 import { OriginLink } from "@/components/origin-link";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import { DeploymentStatusBadge } from "@/features/deployments/components/deployment-status-badge";
 import type { Deployment } from "@/features/deployments/deployment";
 import { formatRecent } from "@/lib/date";
@@ -32,11 +38,11 @@ export function ProductionCard({ live }: { live: CardRead<Deployment | undefined
       }
     >
       {live.error !== undefined ? (
-        <p className="text-sm leading-5 text-muted-foreground">{live.error}</p>
+        <p className={DETAIL_VALUE_EMPTY}>{live.error}</p>
       ) : live.value ? (
         <LiveDeployment deployment={live.value} />
       ) : (
-        <p className="text-sm leading-5 text-muted-foreground">
+        <p className={DETAIL_VALUE_EMPTY}>
           Nothing is live on this project&rsquo;s primary origins yet. Deploy a release from
           Deployments, or run <CliCommand>{CLI_DEPLOY}</CliCommand> in your app.
         </p>
@@ -48,9 +54,8 @@ export function ProductionCard({ live }: { live: CardRead<Deployment | undefined
 function LiveDeployment({ deployment }: { deployment: Deployment }) {
   const { message } = deployment.metadata;
   const origins = deployment.targets.map((target) => target.origin);
-  // Rows 12px apart with a rule between them.
   return (
-    <div className="flex flex-col gap-3">
+    <DetailRows>
       <DetailRow align="center" label="Release">
         <span className="flex min-w-0 items-center gap-3">
           <Link
@@ -63,21 +68,16 @@ function LiveDeployment({ deployment }: { deployment: Deployment }) {
           <DeploymentStatusBadge status={deployment.status} />
         </span>
       </DetailRow>
-      <Separator />
       <DetailRow align="center" label="Deployed">
         <time dateTime={deployment.deployed_at} className="text-sm text-foreground">
           {formatRecent(deployment.deployed_at)}
         </time>
       </DetailRow>
       {message && (
-        <>
-          <Separator />
-          <DetailRow label="Message">
-            <p className="min-w-0 text-sm leading-5 text-foreground wrap-anywhere">{message}</p>
-          </DetailRow>
-        </>
+        <DetailRow label="Message">
+          <p className={DETAIL_VALUE}>{message}</p>
+        </DetailRow>
       )}
-      <Separator />
       <DetailRow label={origins.length === 1 ? "Origin" : "Origins"}>
         <ul className="flex min-w-0 flex-col gap-1">
           {origins.map((origin) => (
@@ -91,6 +91,6 @@ function LiveDeployment({ deployment }: { deployment: Deployment }) {
           ))}
         </ul>
       </DetailRow>
-    </div>
+    </DetailRows>
   );
 }

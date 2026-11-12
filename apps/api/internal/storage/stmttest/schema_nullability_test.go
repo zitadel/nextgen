@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/zitadel/nextgen/internal/storage/application"
 	"github.com/zitadel/nextgen/internal/storage/branding"
 	"github.com/zitadel/nextgen/internal/storage/deployment"
 	"github.com/zitadel/nextgen/internal/storage/dialect/authz"
@@ -71,6 +72,9 @@ func sharedSchemaColumns(t *testing.T) []schematest.ColumnNullability {
 	require.NoError(t, err)
 	cols = append(cols, joined...)
 	joined, err = schematest.JoinColumns(map[string]string{"p": "policies", "r": "policy_revisions"}, policystore.Schema)
+	require.NoError(t, err)
+	cols = append(cols, joined...)
+	joined, err = schematest.JoinColumns(map[string]string{"a": "applications", "r": "application_revisions"}, application.Schema)
 	require.NoError(t, err)
 	return append(cols, joined...)
 }

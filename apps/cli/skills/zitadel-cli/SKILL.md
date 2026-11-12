@@ -546,13 +546,22 @@ claim window that has closed, which retrying never recovers. Ctrl-C exits
 130: a command waiting on the server, or on an answer at a prompt, stops at
 once with `E_CANCELLED`, and any other command exits within a second, possibly
 without an envelope. In human mode a cancel prints no error block. A name the
-CLI cannot resolve to a command is handled by its help layer, not the envelope:
-an unknown command, an unknown subcommand, and a stray extra word (read as a
-subcommand) each write nothing to stdout, explain themselves on stderr, and
-exit 127. Treat an empty stdout as that case rather than as a parse failure.
-Everything the CLI does resolve answers with an envelope, errors included — an
-unknown flag, a missing argument and a resource that is not found are all
-`status: "error"` objects on stdout.
+CLI cannot resolve to a command, an unknown command or an unknown subcommand,
+is an `E_VALIDATION` envelope like any other, but it exits 127, as a shell
+does for a command it cannot find. Its `next_commands` are the `--help` of the
+command it was one edit from and of the topic. It is never run as a different
+command. Its message names the first word that is no command where it was
+typed, as typed, and never a word after that one. A stray extra word after a
+real command is that command refusing an argument it does not take: an
+`E_VALIDATION` envelope that exits 3, like any other refusal. Asking for help
+on such a name is the one exception: the help layer answers, with nothing on stdout. With `--help`
+among the arguments, even with `--json`, and as `zitadel help <name>`, it is a
+plain `Command … not found` on stderr and exit 2. `zitadel help <name> --json`
+is the help layer refusing `--json`, which it does not take: `Nonexistent
+flag: --json` and a stack trace on stderr, and exit 1. Treat an empty stdout as
+either case, never as an envelope. Everything else answers with an envelope
+too, errors included — an unknown flag, a missing argument and a resource that
+is not found are all `status: "error"` objects on stdout.
 
 ## Clarify before you configure
 

@@ -153,6 +153,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	GetInvitationOperation: []string{
 		"project.write",
 	},
+	GetOAuthSettingsByIdOperation: []string{
+		"oauth_settings.read",
+	},
 	GetPolicyOperation: []string{
 		"policy.read",
 	},
@@ -360,6 +363,7 @@ var operationRolesSessionCookie = map[string][]string{
 	GetMySessionCsrfTokenOperation: []string{},
 	GetMyUserOperation:             []string{},
 	GetMyUserSchemaOperation:       []string{},
+	GetOAuthSettingsByIdOperation:  []string{},
 	GetPolicyOperation:             []string{},
 	GetPolicyRevisionOperation:     []string{},
 	GetProjectOperation:            []string{},
