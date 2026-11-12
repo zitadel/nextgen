@@ -378,7 +378,12 @@ func (s *InvitationService) grantInvited(ctx context.Context, stmts AllStatement
 		if entity.ProjectMember == nil {
 			return domain.ErrInternal(fmt.Errorf("invitation %q has no project_member object", entity.ID))
 		}
-		return s.grants.EnsureUserGrant(ctx, stmts, entity.ProjectID, userID, entity.ProjectMember.Relation, now)
+		err := s.grants.EnsureUserGrant(ctx, stmts, entity.ProjectID, userID, entity.ProjectMember.Relation, now)
+		// Create validated the relation, so a refusal here is a stored fault.
+		if errors.Is(err, domain.ErrGrantInvalid()) {
+			return domain.ErrInternal(err).WithMessage("invitation holds an invalid relation")
+		}
+		return err
 	default:
 		return domain.ErrNotImplemented()
 	}

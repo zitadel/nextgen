@@ -188,6 +188,9 @@ func (s *GrantService) EnsureUserGrant(ctx context.Context, stmts AllStatements,
 	ctx, end := startSpan(ctx, "GrantService.EnsureUserGrant")
 	defer end(&err)
 
+	if _, ok := allowedGrantRelations[relation]; !ok {
+		return domain.ErrGrantInvalid().WithDetails("relation must be viewer, editor, or admin")
+	}
 	held, err := stmts.ListAuthzAssignments(ctx, projectID, domain.AuthzPrincipalTypeUser, userID, false)
 	if err != nil {
 		return err

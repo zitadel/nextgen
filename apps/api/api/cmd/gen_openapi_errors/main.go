@@ -1013,6 +1013,9 @@ var operationExcludedErrors = map[string][]string{
 	// unchanged.
 	"getGrant":    {"domain.ErrUserNotFound"},
 	"queryGrants": {"domain.ErrUserNotFound"},
+	// The invitation's adapter turns EnsureUserGrant's relation guard into
+	// domain.ErrInternal: create already validated the stored relation.
+	"acceptInvitation": {"domain.ErrGrantInvalid"},
 	// The flow engine catches a stale parked SSO row with errors.Is and renders
 	// the step; the analysis cannot see that check prune the error. The SSO
 	// resolver turns a user schema the project does not hold into
