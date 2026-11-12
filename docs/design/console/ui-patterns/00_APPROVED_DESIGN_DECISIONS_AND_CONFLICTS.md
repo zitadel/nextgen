@@ -69,7 +69,7 @@ These decisions do not belong in the seven reusable component guides. The curren
 | Current `RowMenu` default horizontal `Ellipsis` | Vertical ellipsis | Shared control icon update; preserve DropdownMenu/accessibility |
 | `styling.md` one resource detail shell (D41) plus the Profile settings composition | Shared title/optional Meta/content hierarchy | Largely aligned; verify remaining screens. Preserve existing shell, widths, tabs, content, permissions and API actions |
 | D24 originally described Projects without the sidebar | D27 supersedes D24; shared shell/sidebar is current | Follow Console ADR 0001, not a deferred UI-01–07 pattern |
-| `styling.md` describes `SUBSECTION_HEADING`; `typography.ts` does not export it | No new design style approved | **Technical documentation/code reconciliation** required; do not invent symbol |
+| `styling.md` and `typography.ts` both define `SUBSECTION_HEADING` at 14/20 | No new design style required | Reuse the existing shared subsection-heading role; no missing export |
 | Forms have varying current optional/validation/helper conventions | Approved field marker, blur/submit timing and helper placement | Shared convention rollout with actual field/API/accessible validation |
 
 All other valid technical contracts remain unchanged: shadcn/new-york/Radix component track; semantic tokens; `rounded-md` 8px; table/panel variants and existing sizes; `Page` shell; form/error semantics; native links, Copy, keyboard/touch, responsive pinned-column behavior and truthful backend state.
@@ -87,7 +87,7 @@ All other valid technical contracts remain unchanged: shadcn/new-york/Radix comp
 
 ## 5. Remaining reviews — NOT pending global design decisions
 
-- **Engineering verification:** actual routes, API state→Badge mappings, configurable-column schema data/permissions, ID elision, `SUBSECTION_HEADING` mismatch, form exception/validation rollouts, accessible interactions and regression QA.
+- **Engineering verification:** actual routes, API state→Badge mappings, configurable-column schema data/permissions, ID typography (12px monospace while preserving existing middle elision), subsection-heading usage, form exception/validation rollouts, accessible interactions and regression QA.
 - **Screen review / individual tickets:** concrete table column sets, route/toolbar labels, copy variants, visual before/after and particular screen layouts, including the previously approved applications in §2.
 - **Figma/documentation:** internal Design System/component and product-screen references may support private prelaunch review. Before public documentation, omit or replace private UI Working File links. A curated public file is optional; no new interaction decision is created by its absence.
 - **Documentation QA:** Check that linked design references are accessible to intended reviewers and verify responsive and focus states during implementation review.
