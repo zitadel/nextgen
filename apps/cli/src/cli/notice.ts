@@ -5,7 +5,8 @@ import { command, notice } from "@/lib/style";
 import type { SuggestedCommand } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { drawBox } from "@/lib/ui/layout";
-import { updateCheckDisabled, ZITADEL_SCOPE, zitadelChannel } from "./release";
+import { ZITADEL_SCOPE } from "./constants";
+import { updateCheckDisabled, zitadelChannel } from "./release";
 
 /**
  * The box `zitadel --version` ends with when something is behind the latest

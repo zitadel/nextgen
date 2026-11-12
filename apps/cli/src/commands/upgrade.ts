@@ -20,7 +20,8 @@ import {
   type UpgradeResult,
   Upgrader,
 } from "@/lib/upgrade";
-import { UPDATE_CHECK_VARIABLE, ZITADEL_CLI, ZITADEL_SCOPE, zitadelChannel } from "@/cli/release";
+import { UPDATE_CHECK_VARIABLE, ZITADEL_CLI, ZITADEL_SCOPE } from "@/cli/constants";
+import { zitadelChannel } from "@/cli/release";
 
 /**
  * How long the new release's `doctor --fix` may run before it counts as failed.
@@ -191,8 +192,11 @@ export default class Upgrade extends BaseCommand {
       );
     }
 
-    const data: Record<string, unknown> = {
-      title,
+    const data: Record<string, unknown> = { title };
+    if (this.dryRun) {
+      data.dry_run = true;
+    }
+    Object.assign(data, {
       current_version: plan.cliVersion,
       latest_version: plan.target,
       up_to_date: plan.upToDate,
@@ -206,10 +210,7 @@ export default class Upgrade extends BaseCommand {
       breaking_changes: breaking,
       release_notes_url: RELEASE_NOTES_URL,
       refresh,
-    };
-    if (this.dryRun) {
-      data.dry_run = true;
-    }
+    });
     if (result.installCommand !== undefined) {
       data.install_command = result.installCommand;
     }

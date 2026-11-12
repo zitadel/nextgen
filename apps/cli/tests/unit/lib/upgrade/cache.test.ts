@@ -1,10 +1,10 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { Cache } from "@/lib/upgrade";
+import { Cache } from "@/lib/upgrade/cache";
 
 let home: string;
 
@@ -77,5 +77,37 @@ describe("Cache", () => {
     await new Cache(file).set("a", { checked_at: 1 });
 
     expect(JSON.parse(await readFile(file, "utf8"))).toEqual({ a: { checked_at: 1 } });
+  });
+
+  it.each(["null", "5", '"text"', "[]"])("ignores a key holding %s", async (value) => {
+    const file = join(home, "cache.json");
+    await writeFile(file, `{"a": ${value}}`);
+
+    await expect(new Cache(file).get("a")).resolves.toBeUndefined();
+  });
+
+  it("drops the keys of the older flat format the first time it keeps something", async () => {
+    const file = join(home, "cache.json");
+    await writeFile(
+      file,
+      JSON.stringify({
+        checked_at: 1,
+        dist_tag: "latest",
+        registry: "https://r",
+        version: "1.0.0",
+      }),
+    );
+
+    await new Cache(file).set("a", { checked_at: 2 });
+
+    expect(JSON.parse(await readFile(file, "utf8"))).toEqual({ a: { checked_at: 2 } });
+  });
+
+  it("leaves no temporary file behind", async () => {
+    const file = join(home, "cache.json");
+
+    await new Cache(file).set("a", { checked_at: 1 });
+
+    expect(await readdir(home)).toEqual(["cache.json"]);
   });
 });

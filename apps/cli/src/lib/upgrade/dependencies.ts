@@ -84,7 +84,8 @@ export class Dependencies {
   }
 
   /**
-   * Reads the project's `package.json`.
+   * Reads the project's `package.json`. A dependency whose value is not a string
+   * is not a specifier at all, so it is ignored rather than crashing the read.
    *
    * @param cwd - The project directory.
    * @param scope - The package name prefix to keep, such as `@acme/`.
@@ -100,12 +101,12 @@ export class Dependencies {
       ...pkg.dependencies,
       ...pkg.devDependencies,
     });
-    const inScope = entries.filter(([name]) => {
-      return name.startsWith(scope);
+    const inScope = entries.filter(([name, specifier]) => {
+      return name.startsWith(scope) && typeof specifier === "string";
     });
     return new Dependencies(
       inScope.map(([name, specifier]) => {
-        return new Dependency(name, (specifier ?? "").trim());
+        return new Dependency(name, String(specifier).trim());
       }),
     );
   }

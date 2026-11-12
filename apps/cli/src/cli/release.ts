@@ -6,20 +6,7 @@ import { telemetryConfigDir } from "@/lib/telemetry/identity";
 import { Cache } from "@/lib/upgrade/cache";
 import { ReleaseChannel } from "@/lib/upgrade/channel";
 
-/**
- * The prefix of the Zitadel packages that move together as one release.
- */
-export const ZITADEL_SCOPE = "@zitadel/";
-
-/**
- * The package whose dist-tag names the newest Zitadel release.
- */
-export const ZITADEL_CLI = "@zitadel/cli";
-
-/**
- * The environment variable that, set to `0`, keeps a run off the npm registry.
- */
-export const UPDATE_CHECK_VARIABLE = "ZITADEL_UPDATE_CHECK";
+import { UPDATE_CHECK_VARIABLE, ZITADEL_CLI } from "./constants";
 
 /**
  * The registry asked when npm was not pointed at another.

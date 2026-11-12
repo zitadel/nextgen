@@ -29,8 +29,10 @@ describe("zitadelChannel", () => {
       http.get(REGISTRY, () => HttpResponse.json({ latest: "2.0.0", alpha: "3.0.0-alpha.1" })),
     );
 
-    const stable = await zitadelChannel("1.0.0", {}).latest({ fresh: true });
-    const alpha = await zitadelChannel("3.0.0-alpha.0", {}).latest({ fresh: true });
+    const stable = await zitadelChannel("1.0.0", { XDG_CONFIG_HOME: home }).latest({ fresh: true });
+    const alpha = await zitadelChannel("3.0.0-alpha.0", { XDG_CONFIG_HOME: home }).latest({
+      fresh: true,
+    });
 
     expect([stable?.version, alpha?.version]).toEqual(["2.0.0", "3.0.0-alpha.1"]);
   });

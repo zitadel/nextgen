@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { Release } from "@/lib/upgrade";
+import { Release } from "@/lib/upgrade/release";
 
 describe("Release.isNewerThan", () => {
   it.each([

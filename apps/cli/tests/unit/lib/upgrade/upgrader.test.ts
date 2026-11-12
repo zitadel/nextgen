@@ -6,14 +6,11 @@ import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import {
-  Cache,
-  InstallError,
-  PackageInstaller,
-  ReleaseChannel,
-  ReleaseLookupError,
-  Upgrader,
-} from "@/lib/upgrade";
+import { Cache } from "@/lib/upgrade/cache";
+import { ReleaseChannel } from "@/lib/upgrade/channel";
+import { InstallError, ReleaseLookupError } from "@/lib/upgrade/errors";
+import { PackageInstaller } from "@/lib/upgrade/installer";
+import { Upgrader } from "@/lib/upgrade/upgrader";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
 const REGISTRY = "https://registry.npmjs.org/-/package/@zitadel%2fcli/dist-tags";

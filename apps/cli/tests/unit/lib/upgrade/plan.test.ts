@@ -4,7 +4,9 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { Dependencies, Release, UpgradePlan } from "@/lib/upgrade";
+import { Dependencies } from "@/lib/upgrade/dependencies";
+import { UpgradePlan } from "@/lib/upgrade/plan";
+import { Release } from "@/lib/upgrade/release";
 
 const created: string[] = [];
 
@@ -41,6 +43,12 @@ describe("UpgradePlan.create", () => {
     const result = await plan("3.0.0-alpha.1", "2.0.0", {});
 
     expect(result.target).toBe("3.0.0-alpha.1");
+  });
+
+  it("is up to date, and moves nothing, for a development build whose version is not semver", async () => {
+    const result = await plan("dev", "2.0.0", { "@zitadel/api": "1.0.0" });
+
+    expect([result.upToDate, result.packages, result.target]).toEqual([true, [], "dev"]);
   });
 
   it("leaves a range alone and names it", async () => {

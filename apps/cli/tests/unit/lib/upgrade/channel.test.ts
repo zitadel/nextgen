@@ -6,7 +6,8 @@ import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { Cache, ReleaseChannel } from "@/lib/upgrade";
+import { Cache } from "@/lib/upgrade/cache";
+import { ReleaseChannel } from "@/lib/upgrade/channel";
 
 const REGISTRY = "https://registry.npmjs.org";
 const MIRROR = "https://mirror.example/npm";

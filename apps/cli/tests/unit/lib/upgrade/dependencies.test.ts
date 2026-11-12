@@ -1,6 +1,6 @@
-import { describe, expect } from "vitest";
+import { describe, expect, it as plain } from "vitest";
 
-import { Dependencies } from "@/lib/upgrade";
+import { Dependencies, Dependency } from "@/lib/upgrade/dependencies";
 import { it } from "@tests/helpers/fixtures";
 import { write } from "@tests/helpers/git-repo";
 import { rejectionOf } from "@tests/helpers/thrown-value";
@@ -34,6 +34,18 @@ describe("Dependencies.read", () => {
     expect(error).toBeInstanceOf(SyntaxError);
   });
 
+  it("ignores a dependency whose value is not a string", async ({ dir }) => {
+    await write(dir, {
+      "package.json": JSON.stringify({
+        dependencies: { "@zitadel/sdk": 1, "@zitadel/api": "1.0.0" },
+      }),
+    });
+
+    const dependencies = await Dependencies.read(dir, "@zitadel/");
+
+    expect(summary(dependencies, "exact")).toEqual([["@zitadel/api", "1.0.0"]]);
+  });
+
   it("keeps only the packages in the scope it is given", async ({ dir }) => {
     await write(dir, { "package.json": MIXED });
 
@@ -63,5 +75,28 @@ describe("Dependencies.floating", () => {
     const dependencies = await Dependencies.read(dir, "@zitadel/");
 
     expect(summary(dependencies, "floating")).toEqual([["@zitadel/api", "^1.2.3"]]);
+  });
+});
+
+describe("Dependency", () => {
+  plain.each([
+    ["1.2.3", true],
+    ["^1.2.3", false],
+    ["latest", false],
+    ["workspace:*", false],
+  ])("%s is exact: %s", (specifier, exact) => {
+    expect(new Dependency("@zitadel/api", specifier).isExact).toBe(exact);
+  });
+
+  plain.each([
+    ["1.0.0", "2.0.0", true, false],
+    ["2.0.0", "2.0.0", false, false],
+    ["3.0.0", "2.0.0", false, true],
+    ["^1.0.0", "2.0.0", false, false],
+    ["1.0.0", "dev", false, false],
+  ])("%s against %s: behind %s, ahead %s", (specifier, version, behind, ahead) => {
+    const dependency = new Dependency("@zitadel/api", specifier);
+
+    expect([dependency.isBehind(version), dependency.isAhead(version)]).toEqual([behind, ahead]);
   });
 });

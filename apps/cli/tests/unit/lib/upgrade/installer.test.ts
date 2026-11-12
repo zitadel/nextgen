@@ -4,7 +4,11 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { InstallError, PackageInstaller, Release, Dependencies, UpgradePlan } from "@/lib/upgrade";
+import { Dependencies } from "@/lib/upgrade/dependencies";
+import { InstallError } from "@/lib/upgrade/errors";
+import { PackageInstaller, type PlannedInstall } from "@/lib/upgrade/installer";
+import { UpgradePlan } from "@/lib/upgrade/plan";
+import { Release } from "@/lib/upgrade/release";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
 const created: string[] = [];
@@ -67,5 +71,24 @@ describe("PackageInstaller.install", () => {
     expect(error).toBeInstanceOf(InstallError);
     expect((error as InstallError).command).toBe(install.display);
     expect((error as InstallError).cause).toBeDefined();
+  });
+
+  it("wraps a package manager that runs and exits non-zero, with the exit as the cause", async () => {
+    const dir = await project({ "@zitadel/api": "1.0.0" });
+    const install: PlannedInstall = {
+      run: {
+        command: process.execPath as PlannedInstall["run"]["command"],
+        args: ["-e", "process.exit(3)"],
+        display: "node -e process.exit(3)",
+      },
+      display: "node -e process.exit(3)",
+    };
+
+    const error = await rejectionOf(() => {
+      return installerIn(dir).install(install);
+    });
+
+    expect(error).toBeInstanceOf(InstallError);
+    expect(((error as InstallError).cause as { code?: number }).code).toBe(3);
   });
 });
