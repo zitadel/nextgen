@@ -42,6 +42,7 @@ export async function checkCliVersion(input: {
       message: `CLI ${cliVersion} is the latest version`,
     };
   }
+  const upgrade = suggest({ id: "upgrade" });
   return {
     ...base,
     status: "warn",
@@ -49,7 +50,8 @@ export async function checkCliVersion(input: {
     details: {
       current: cliVersion,
       latest,
-      remedy_command: suggest({ id: "upgrade" }),
+      remedy_command: upgrade,
     },
+    remedy: upgrade,
   };
 }

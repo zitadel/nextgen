@@ -238,6 +238,43 @@ describe("shellCommand", () => {
   it("is suggested exactly as written", () => {
     expect(shellCommand("npm install @zitadel/cli@alpha")).toBe("npm install @zitadel/cli@alpha");
   });
+
+  it("does not compile for a literal that runs the CLI", () => {
+    expect(() => {
+      // @ts-expect-error the CLI is suggested as an object the renderer checks
+      shellCommand("zitadel deploy --dry-run");
+    }).toThrow();
+    expect(() => {
+      // @ts-expect-error the CLI is suggested as an object the renderer checks
+      shellCommand("npx @zitadel/cli@1.0.0 deploy");
+    }).toThrow();
+  });
+
+  it.each([
+    ["the CLI's name", "zitadel deploy"],
+    ["npx", "npx @zitadel/cli@latest deploy"],
+    ["npx -y", "npx -y @zitadel/cli deploy"],
+    ["pnpm dlx", "pnpm dlx @zitadel/cli deploy"],
+    ["bunx", "bunx @zitadel/cli deploy"],
+    ["a step after cd", "cd app && zitadel deploy"],
+    ["a step after a pipe", "cat secret | npx @zitadel/cli variable set KEY"],
+  ])("refuses a command built at run time that runs the CLI through %s", (_how, built) => {
+    const command: string = built;
+
+    expect(() => {
+      return shellCommand(command);
+    }).toThrow("runs the CLI");
+  });
+
+  it.each([
+    ["installs the CLI", "npm install -g @zitadel/cli@latest"],
+    ["pins an SDK", "pnpm add --save-exact @zitadel/sdk-next@1.0.0"],
+    ["names zitadel in an argument", "rm .zitadel/local-admin.json"],
+  ])("takes a command that only %s", (_what, built) => {
+    const command: string = built;
+
+    expect(shellCommand(command)).toBe(built);
+  });
 });
 
 describe("inShell", () => {

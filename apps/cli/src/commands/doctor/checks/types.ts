@@ -1,7 +1,7 @@
 import type { Consent, Gate } from "@/lib/consent";
 import { errorMessage, ZitadelError, type ZitadelErrorCode } from "@/lib/errors";
 import type { Orca } from "@/lib/orca";
-import type { Suggest } from "@/lib/suggestion";
+import type { Suggest, SuggestedCommand } from "@/lib/suggestion";
 
 /** Pass/fail/advisory outcome of a single {@link SanityCheck}. */
 export type CheckOutcome = {
@@ -18,6 +18,12 @@ export type CheckOutcome = {
    */
   code?: ZitadelErrorCode;
   hint?: string;
+  /**
+   * The command that repairs a warning, as the check rendered it: kept typed
+   * here so nothing reads it back out of `details` as a bare string. The
+   * envelope carries its text as `details.remedy_command`, never this field.
+   */
+  remedy?: SuggestedCommand;
 };
 
 /** Everything a check needs to inspect or repair a project. */

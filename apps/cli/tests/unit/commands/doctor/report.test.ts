@@ -11,6 +11,7 @@ import {
   renderDoctorReport,
   withCategories,
 } from "@/commands/doctor/report";
+import { shellCommand } from "@/lib/suggestion";
 import { aSuggest } from "@tests/helpers/suggestions";
 
 /**
@@ -31,6 +32,7 @@ const BEHIND: CheckOutcome = {
   status: "warn",
   message: "behind",
   details: { latest: "2.0.0", remedy_command: UPGRADE },
+  remedy: aSuggest()({ id: "upgrade" }),
 };
 
 /**
@@ -282,6 +284,7 @@ describe("renderDoctorReport", () => {
           status: "warn",
           message: "pins differ",
           details: { remedy_command: "npm install --save-exact @zitadel/sdk-next@1.0.0" },
+          remedy: shellCommand("npm install --save-exact @zitadel/sdk-next@1.0.0"),
         },
       ]);
 

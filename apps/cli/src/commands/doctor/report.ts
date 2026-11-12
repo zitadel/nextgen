@@ -82,8 +82,10 @@ export function categoryOf(checkName: string): CheckCategory {
 /** The checks as the envelope carries them. */
 export function withCategories(
   checks: readonly CheckOutcome[],
-): Array<CheckOutcome & { category: CheckCategory }> {
-  return checks.map((check) => {
+): Array<Omit<CheckOutcome, "remedy"> & { category: CheckCategory }> {
+  return checks.map(({ remedy: _typed, ...check }) => {
+    // The remedy's text is in `details.remedy_command`; the typed copy is the
+    // CLI's own and stays out of the envelope.
     return {
       ...check,
       category: categoryOf(check.name),
@@ -356,11 +358,8 @@ function remediesOf(category: CheckCategory, checks: readonly CheckOutcome[]): s
     .filter((check) => {
       return check.status !== "pass";
     })
-    .map((check) => {
-      return detailsOf(check)?.remedy_command;
-    })
-    .filter((remedy): remedy is string => {
-      return typeof remedy === "string";
+    .flatMap((check) => {
+      return check.remedy === undefined ? [] : [check.remedy];
     });
   return category === "versions" ? remedies.slice(0, 1) : [...new Set(remedies)];
 }

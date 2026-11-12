@@ -1144,21 +1144,18 @@ function formatListeners(listeners: Awaited<ReturnType<typeof listenersForPort>>
 }
 
 /**
- * A warning may carry its own repair as `details.remedy_command` (today: the
- * dependency-version check's package-manager-aware exact-pin install).
- * Surfacing that string keeps the structured advisory identical to the
- * command quoted in the warning's prose.
+ * The repair a warning carries, as its check rendered it (today: the CLI
+ * version's `upgrade` and the dependency pins' package-manager-aware install),
+ * so the structured advisory is the very command its prose quotes.
+ *
+ * @param check - The check, when it ran.
+ * @returns Its repair, or nothing when it passed or carries none.
  */
 function remedyCommandOf(check: CheckOutcome | undefined): SuggestedCommand | undefined {
   if (check?.status !== "warn") {
     return undefined;
   }
-  const details = check.details;
-  if (typeof details !== "object" || details === null) {
-    return undefined;
-  }
-  const remedy = (details as { remedy_command?: unknown }).remedy_command;
-  return typeof remedy === "string" && remedy.length > 0 ? shellCommand(remedy) : undefined;
+  return check.remedy;
 }
 
 /**

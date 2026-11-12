@@ -424,9 +424,43 @@ function canonical(value: unknown): string {
   });
 }
 
-/** A command that is not the CLI (`npm install …`, `rm …`), suggested as written. */
-export function shellCommand(command: string): SuggestedCommand {
-  return command as SuggestedCommand;
+/** The ways a command line can run this CLI, which a suggestion of it never spells by hand. */
+type CliInvocation = `${"zitadel" | "npx @zitadel/cli" | "@zitadel/cli"}${" " | "@"}${string}`;
+
+/**
+ * `Command`, unless it runs this CLI: then a message in its place, so writing
+ * one by hand does not compile.
+ */
+type NotTheCli<Command extends string> = Command extends CliInvocation | "zitadel"
+  ? "run the CLI through a suggestion object, not shellCommand"
+  : Command;
+
+/**
+ * Each step of a shell command line that runs this CLI: a word or package
+ * runner that starts it, at the start of the line or after `&&`, `||`, `;` or
+ * a pipe.
+ */
+const RUNS_THE_CLI =
+  /(?:^|&&|\|\||;|\|)\s*(?:zitadel|(?:npx|bunx|pnpm\s+dlx|yarn\s+dlx)(?:\s+-y)?\s+@zitadel\/cli(?:@\S*)?|@zitadel\/cli(?:@\S*)?)(?=\s|$)/;
+
+/**
+ * A command that is not the CLI (`npm install …`, `rm …`), suggested as written.
+ * One that runs the CLI is refused: as a literal by the compiler, and as a
+ * string built at run time when it is made, since only the renderer checks a
+ * CLI command against what it names.
+ *
+ * @param command - The command line, as a shell runs it.
+ * @returns The command.
+ * @throws {Error} When the command runs this CLI.
+ */
+export function shellCommand<const Command extends string>(
+  command: Command & NotTheCli<Command>,
+): SuggestedCommand {
+  if (RUNS_THE_CLI.test(command)) {
+    throw new Error(`${command} runs the CLI: suggest it as { id, args, flags } instead`);
+  }
+
+  return command as string as SuggestedCommand;
 }
 
 /**
