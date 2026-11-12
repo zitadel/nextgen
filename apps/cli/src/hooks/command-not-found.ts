@@ -156,19 +156,47 @@ const hook: Hook<"command_not_found"> = async ({ id, argv, config }) => {
   const spelled = own.some((_, index) => own.slice(0, index + 1).join(":") === id);
   const typed = spelled ? own : [...id.split(":"), ...(argv ?? [])];
   const end = typed.indexOf("--") === -1 ? typed.length : typed.indexOf("--");
-  const json = typed.slice(0, end).includes("--json");
-  const valued = new Set(
-    Object.entries(BaseCommand.baseFlags)
-      .filter(([, flag]) => flag.type === "option")
-      .flatMap(([name, flag]) => [`--${name}`, ...(flag.char ? [`-${flag.char}`] : [])]),
-  );
+  // The flags every command takes, split by whether they take a value. A flag
+  // that is none of them may take one, so the word after it is never read as a
+  // command name: it may be a value, a secret even, and is never repeated.
+  const flags = Object.entries(BaseCommand.baseFlags);
+  const valued = new Set(flags.filter(([, f]) => f.type === "option").map(([name]) => name));
+  const switches = new Set([
+    "json",
+    ...flags.filter(([, f]) => f.type === "boolean").map(([n]) => n),
+  ]);
+  const named = (letter: string): string | undefined => {
+    return flags.find(([, f]) => f.char === letter)?.[0];
+  };
   const words: string[] = [];
+  let json = false;
   for (let index = 0; index < end; index += 1) {
     const word = typed[index] as string;
-    if (valued.has(word)) {
-      index += 1;
-    } else if (!word.startsWith("-")) {
+    if (!word.startsWith("-")) {
       words.push(word);
+      continue;
+    }
+    if (word === "--json") {
+      json = true;
+      continue;
+    }
+    if (word.startsWith("--")) {
+      const name = word.slice(2).replace(/^no-/, "");
+      if (!word.includes("=") && !switches.has(name)) {
+        index += 1;
+      }
+      continue;
+    }
+    // A cluster of short flags (`-nc`): the first letter that takes a value
+    // takes the rest of the cluster, or the next word when it is the last one.
+    for (const [position, letter] of [...word.slice(1)].entries()) {
+      const name = named(letter);
+      if (name === undefined || valued.has(name)) {
+        if (position === word.length - 2) {
+          index += 1;
+        }
+        break;
+      }
     }
   }
   await NotFound.run([...words, ...(json ? ["--json"] : [])], config);

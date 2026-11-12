@@ -558,6 +558,27 @@ describe("the cli", () => {
             "That is not a zitadel command.",
             ["--help"],
           ],
+          [
+            "the value of a flag no command declares",
+            ["--token", "SECRET", "--json"],
+            "(default)",
+            "That is not a zitadel command.",
+            ["--help"],
+          ],
+          [
+            "the value of a short flag no command declares",
+            ["-x", "SECRET", "--json"],
+            "(default)",
+            "That is not a zitadel command.",
+            ["--help"],
+          ],
+          [
+            "a short flag cluster that takes the value after it",
+            ["-nc", "/tmp", "statu", "--json"],
+            "statu",
+            "statu is not a zitadel command.",
+            ["status --help"],
+          ],
         ])("answers %s by what was typed", async (_, argv, command, message, next) => {
           const result = await runCliForTest(argv);
 
@@ -569,6 +590,15 @@ describe("the cli", () => {
             code: "E_VALIDATION",
             message,
             next_commands: next.map((step) => expectedPublicCliCommand(step)),
+          });
+        });
+
+        it("prints no envelope for a --json typed as another flag's value", async () => {
+          const result = await runCliForTest(["--cwd", "--json", "statu"]);
+
+          expect({ exitCode: result.exitCode, stdout: result.stdout }).toEqual({
+            exitCode: 127,
+            stdout: "",
           });
         });
 
