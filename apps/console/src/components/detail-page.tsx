@@ -26,7 +26,8 @@ import { SECTION_HEADING, PAGE_TITLE } from "./typography";
  * which a change to a value here updates too.
  *
  * Every one is headed by {@link DetailHeader}: the title, then one line of
- * identity values.
+ * identity values. Only resources (projects, teams, users, releases) lead
+ * the title with an icon tile; configuration has none.
  */
 
 /** The 36px gap between the header's identity line and the first body element. */
@@ -278,6 +279,11 @@ export interface DetailMetaItem {
   /** Left out of the line when there is none, as a user's unread created date. */
   value?: string;
   /**
+   * The value stands alone, in the foreground, its label read only by screen
+   * readers: a user's email, which names itself.
+   */
+  labelHidden?: boolean;
+  /**
    * Shown in the foreground with a copy button, and cut in the middle rather
    * than widening the page: an id, or anything else a person copies.
    */
@@ -285,25 +291,33 @@ export interface DetailMetaItem {
 }
 
 /**
- * A detail screen's header: the title row (the icon tile, the title,
- * a status beside it, an action at the row's end), then one 12/16 identity
- * line, each value after its muted label and ruled off from the next. The
- * line stacks under `sm`, where the rules go.
+ * A detail screen's header: an optional link up to the screen's list, the
+ * title row (a resource's icon tile, the title, a status beside it, an action
+ * at the row's end), then one 12/16 identity line, each value after its muted
+ * label and ruled off from the next. The line stacks under `sm`, where the
+ * rules go.
  */
 export function DetailHeader({
   icon: Icon,
+  parent,
   title,
   status,
   subtitle,
   meta,
   action,
 }: {
-  /** The glyph of the screen's sidebar entry. */
-  icon: LucideIcon;
+  /** A resource's tile: the glyph of its sidebar entry. Configuration has none. */
+  icon?: LucideIcon;
+  /**
+   * 8px over the title, 14/20 muted: a link to the list this screen opens
+   * from, where that list is not a sidebar entry (identity providers, a tab
+   * of Authentication).
+   */
+  parent?: ReactNode;
   title: string;
   /** Beside the title, e.g. a `StatusBadge`. */
   status?: ReactNode;
-  /** A second identity line under the title, e.g. a user's identifier. */
+  /** A second line under the title, e.g. the site a project signs people into. */
   subtitle?: string;
   meta: DetailMetaItem[];
   /** At the title row's end, e.g. the resource's actions menu. */
@@ -315,21 +329,26 @@ export function DetailHeader({
   return (
     <header className="flex items-start justify-between gap-4 px-2">
       <div className="flex min-w-0 flex-col gap-4">
-        <div className="flex min-w-0 items-start gap-2">
-          <span className={ICON_PLATE}>
-            <Icon className="size-4" strokeWidth={1.5} aria-hidden />
-          </span>
-          {/* The subtitle shares the title's left edge, not the tile's. */}
-          <div className="flex min-w-0 flex-col gap-1">
-            <div className="flex min-w-0 flex-wrap items-center gap-2">
-              {/* `wrap-anywhere`, not `break-words`: only `anywhere` lowers the
+        <div className="flex min-w-0 flex-col gap-2">
+          {parent && <div className="text-muted-foreground text-sm leading-5">{parent}</div>}
+          <div className="flex min-w-0 items-start gap-2">
+            {Icon && (
+              <span className={ICON_PLATE}>
+                <Icon className="size-4" strokeWidth={1.5} aria-hidden />
+              </span>
+            )}
+            {/* The subtitle shares the title's left edge, not the tile's. */}
+            <div className="flex min-w-0 flex-col gap-1">
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                {/* `wrap-anywhere`, not `break-words`: only `anywhere` lowers the
                   flex item's minimum width, so a title with no break point (a
                   user's email address) wraps on a phone instead of widening
                   the page past the viewport. */}
-              <h1 className={cn(DETAIL_TITLE, "wrap-anywhere")}>{title}</h1>
-              {status}
+                <h1 className={cn(DETAIL_TITLE, "wrap-anywhere")}>{title}</h1>
+                {status}
+              </div>
+              {subtitle && <p className="text-muted-foreground text-sm">{subtitle}</p>}
             </div>
-            {subtitle && <p className="text-muted-foreground text-sm">{subtitle}</p>}
           </div>
         </div>
         {items.length > 0 && (
@@ -342,14 +361,21 @@ export function DetailHeader({
                 key={item.label}
                 className={cn(
                   "flex items-center",
-                  item.copyable ? "min-w-0" : "shrink-0",
+                  item.copyable || item.labelHidden ? "min-w-0" : "shrink-0",
                   index > 0 && META_RULE,
                 )}
               >
-                <dt className="shrink-0 whitespace-nowrap">{item.label}</dt>
+                <dt className={item.labelHidden ? "sr-only" : "shrink-0 whitespace-nowrap"}>
+                  {item.label}
+                </dt>
                 {/* `gap-0.5`: the copy glyph sits 2px inside its 16px button, so
                   it lands 4px after the id. */}
-                <dd className="ml-1 flex min-w-0 items-center gap-0.5">
+                <dd
+                  className={cn(
+                    "flex min-w-0 items-center gap-0.5",
+                    item.labelHidden ? "text-foreground" : "ml-1",
+                  )}
+                >
                   {item.copyable ? (
                     <>
                       {/* One line, cut in the middle: a URI id must not widen the page. */}
@@ -357,7 +383,16 @@ export function DetailHeader({
                       <CopyButton value={item.value} label={`Copy ${item.label}`} size="inline" />
                     </>
                   ) : (
-                    <span className="whitespace-nowrap">{item.value}</span>
+                    // A long email wraps on a phone, where the line stacks, and
+                    // is cut at its end from `sm`, as the id beside it is cut.
+                    <span
+                      className={
+                        item.labelHidden ? "wrap-anywhere sm:truncate" : "whitespace-nowrap"
+                      }
+                      title={item.labelHidden ? item.value : undefined}
+                    >
+                      {item.value}
+                    </span>
                   )}
                 </dd>
               </div>

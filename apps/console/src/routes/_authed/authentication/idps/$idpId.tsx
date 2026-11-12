@@ -1,5 +1,4 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Shield } from "lucide-react";
 import { Fragment } from "react";
 
 import { api } from "@/api/zitadel";
@@ -62,9 +61,17 @@ function IdpDetail() {
 
   return (
     <Page>
-      {/* `Shield`, the sidebar's glyph for Authentication, where connections live. */}
       <DetailHeader
-        icon={Shield}
+        // Authentication's tab, which the sidebar does not list on its own.
+        parent={
+          <Link
+            to="/authentication"
+            search={{ tab: "identity-providers" }}
+            className="hover:text-foreground transition-colors"
+          >
+            Identity providers
+          </Link>
+        }
         title={idp.definition.display_name}
         meta={[
           { label: "Connection ID", value: idp.id, copyable: true },

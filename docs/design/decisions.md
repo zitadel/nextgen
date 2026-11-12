@@ -17,7 +17,7 @@
 ## Decisions
 
 ### D41 · Configuration and resources share one detail layout — 2026-11-11 · [standing]
-Supersedes the look half of D0a. Login flows, identity providers and releases draw the same detail screen as users, teams and project settings: a header, then body cards of labelled rows on one 218px label rail, 16px either side of the rule between rows and no rule after the last, labels in medium weight, inputs and a section's aside starting on the rail. Configuration still differs in what it allows (D0b), not in how it looks.
+Supersedes the look half of D0a. Login flows, identity providers and releases draw the same detail screen as users, teams and project settings: a header, then body cards of labelled rows on one 218px label rail, 16px either side of the rule between rows and no rule after the last, labels in medium weight, inputs and a section's aside starting on the rail. Configuration still differs in what it allows (D0b), not in how it looks. The header is the title over one line of identity values, 16px apart, and the body starts 36px under it. Only resources (projects, teams, users, releases) lead the title with an icon tile. A user's email is the line's first value, unlabelled. A value with nothing behind it yet (a project's issuer, a team's primary domain, a user's last sign-in) is left out; the designs keep it for later. An identity provider keeps a link to its list above the title (amends D13): that list is a tab of Authentication, so the sidebar alone does not lead back to it.
 → Designs follow the shared layout.
 
 ### D40 · A project's Settings opens its own list, as the root Settings do — 2026-11-11 · [standing]
@@ -119,7 +119,7 @@ Adding a resource (e.g. a user) opens a drawer from the right — the shadcn/ui 
 ### D14 · Schema attributes shown as a simple list — 2026-07-31
 On the schema detail, list the pre-populated attributes as a flat, scannable list — not an accordion or a left-nav list (schema setup will get complex, so keep the detail page roomy rather than nesting). If a schema's attribute list gets long, reuse the user-list pattern: search bar + horizontal scroll + "Load more." Rows open the detail on click (shadcn/ui list-item standard).
 
-### D13 · No back buttons or breadcrumbs (console-wide) — 2026-07-31 · [standing]
+### D13 · No back buttons or breadcrumbs (console-wide) — 2026-07-31 · [standing, amended by D41]
 Vercel-style navigation: no back button and no breadcrumbs anywhere in the console — you move back up via the left-side nav. (Login-flow equivalent is D9.)
 
 ### D12 · Brand colors applied — 2026-07-31 · [standing]

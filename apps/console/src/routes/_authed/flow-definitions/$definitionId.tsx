@@ -1,5 +1,4 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Workflow } from "lucide-react";
 
 import { api } from "@/api/zitadel";
 import { DETAIL_BODY, DetailHeader, DetailSection } from "@/components/detail-page";
@@ -73,7 +72,6 @@ function FlowDefinitionDetail() {
   return (
     <Page>
       <DetailHeader
-        icon={Workflow}
         title={name}
         // The design draws a third value, `Expires at`; nothing backs it.
         meta={[

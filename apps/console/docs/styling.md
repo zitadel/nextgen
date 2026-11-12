@@ -284,27 +284,34 @@ heading with no header gutter, then `SettingsCard`
 block, 16px between rows. No icon tile and no identity line: a settings screen
 is not a resource with an id.
 
-`DetailHeader` is the title row (the icon tile, carrying the glyph of the
-screen's sidebar entry, the title, a status beside it) over one identity line: the `meta`
+`DetailHeader` is the title row (a resource's icon tile, carrying the glyph of
+its sidebar entry, the title, a status beside it) over one identity line: the `meta`
 items, each value after its muted label, the id `copyable` and cut in the
-middle, a rule between items. The line stacks under `sm`. An `action` (a
+middle, a rule between items. A `labelHidden` item (a user's email) stands
+alone in the foreground. A screen whose list is not a sidebar entry (an
+identity provider, listed in a tab of Authentication) takes a `parent` link to
+that list, 8px over the title. The line stacks under `sm`. An `action` (a
 release's menu) sits at the right, beside the title and the line together.
 
 | Region        | Value                                                 |
 | ------------- | ----------------------------------------------------- |
 | Page          | `Page` — 16px gutter, 20px top at `lg`, as every screen |
 | Header gutter | 24px — the page gutter plus 8px                        |
-| Title row     | 24px icon tile (`ICON_PLATE`), 8px to a 24/24 display-face title, status 8px after |
+| Parent link   | 14/20 muted, 8px over the title row; only where the list is not in the sidebar |
+| Title row     | 24px icon tile (`ICON_PLATE`) on a resource, 8px to a 24/24 display-face title, status 8px after |
 | Identity line | 16px under the title row; 12/16, value 4px after its label, a 1px by 16px rule with 8px either side |
 | Body          | 36px under the identity line; 16px between its parts   |
 | Body card     | 24px inset, 20px block, 16px from title to rule to content; the 1px stroke is drawn inside the edge (`Card`'s inset outline), as the design draws it |
 | Labelled row  | 218px label rail from `sm`, stacked below; 20px line, 4px block; 16px either side of a zero-height rule between rows |
 
-The title's icon is the glyph the resource's sidebar entry carries, at stroke
-1.5. Tabs are the body's first element when a resource has more than one
-section (Users: Overview / Authentication); a single-section resource renders
-its cards directly. A new resource's detail screen composes this shell rather
-than measuring its own frame.
+Only resources (projects, teams, users, releases) carry the icon tile, the
+glyph their sidebar entry carries at stroke 1.5; configuration (user schemas,
+login flows, identity providers) has none. A value with no data behind it is
+left out of the identity line rather than shown empty. Tabs are the body's
+first element when a resource has more than one section (Users: Overview /
+Authentication); a single-section resource renders its cards directly. A new
+resource's detail screen composes this shell rather than measuring its own
+frame.
 
 ## Traps that have already cost time
 

@@ -1,5 +1,4 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Braces } from "lucide-react";
 
 import { api } from "@/api/zitadel";
 import {
@@ -93,7 +92,6 @@ function SchemaDetail() {
       {/* The design draws `Expires at` beside the id; nothing on the schema
           resource backs it, so the created date stands in. */}
       <DetailHeader
-        icon={Braces}
         title={name}
         meta={[
           { label: "Schema ID", value: schemaId, copyable: true },

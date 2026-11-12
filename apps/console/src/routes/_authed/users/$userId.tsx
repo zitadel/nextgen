@@ -35,7 +35,7 @@ import { UserProfileCard } from "@/features/users/components/user-profile-card";
  * markup. Rather than render labels with nothing behind them, each is left out
  * and recorded here:
  *
- *   - **Last login** on the identity line: no such field anywhere on the user
+ *   - **Last sign-in** on the identity line: no such field anywhere on the user
  *   - **unlinking** a provider account: links are written only by a sign-in
  *
  * The design's "Project permissions" block is not pending — it has been removed
@@ -72,14 +72,15 @@ function UserDetail() {
 
   return (
     <Page>
-      {/* `User`, the sidebar's glyph for Users, as each detail title carries its
-          section's. */}
+      {/* `User`, the sidebar's glyph for Users, as a resource's title tile. */}
       <DetailHeader
         icon={User}
         title={name}
         status={metadata.status && <StatusBadge status={metadata.status} />}
-        subtitle={secondary}
         meta={[
+          // The identifier under a display name, as the design's email; a user
+          // titled by the identifier has nothing to repeat here.
+          { label: "Identifier", value: secondary, labelHidden: true },
           { label: "User ID", value: userId, copyable: true },
           {
             label: "Created",

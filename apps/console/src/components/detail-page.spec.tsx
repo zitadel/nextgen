@@ -53,6 +53,30 @@ describe("detail header", () => {
     expect(container.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
   });
 
+  it("draws no icon tile for configuration", () => {
+    const { container } = render(<DetailHeader title="Default login" meta={[]} />);
+    expect(container.querySelector("svg")).toBeNull();
+  });
+
+  it("puts the link to the screen's list above the title", () => {
+    renderHeader({ parent: <a href="/authentication">Identity providers</a> });
+    const link = screen.getByRole("link", { name: "Identity providers" });
+    const title = screen.getByRole("heading", { level: 1 });
+    expect(link.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("names an unlabelled value for screen readers only", () => {
+    renderHeader({
+      meta: [
+        { label: "Identifier", value: "maya@acme.com", labelHidden: true },
+        { label: "User ID", value: "user_01", copyable: true },
+      ],
+    });
+    // The value keeps its name for a screen reader, paired as a term.
+    expect(screen.getAllByRole("term")[0]).toHaveTextContent("Identifier");
+    expect(screen.getAllByRole("definition")[0]).toHaveTextContent("maya@acme.com");
+  });
+
   it("leaves out an item without a value", () => {
     renderHeader({
       meta: [
