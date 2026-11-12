@@ -36,7 +36,7 @@ require (
 	github.com/veqryn/slog-context v0.9.0
 	github.com/veqryn/slog-context/otel v0.9.0
 	github.com/zitadel/oidc/v3 v3.47.5
-	github.com/zitadel/passwap v0.12.2-0.20261021213051-c600161c0e57
+	github.com/zitadel/passwap v0.13.0
 	github.com/zitadel/sloggcp v0.6.0
 	go.opentelemetry.io/contrib/bridges/otelslog v0.20.0
 	go.opentelemetry.io/contrib/exporters/autoexport v0.70.0
