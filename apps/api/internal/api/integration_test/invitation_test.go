@@ -377,6 +377,52 @@ func TestInvitationRedeem(t *testing.T) {
 		require.NoError(t, err)
 		return resp
 	}
+	reject := func(t *testing.T, client *helpers.ApiClient, token string) api.RejectInvitationRes {
+		t.Helper()
+		resp, err := client.RejectInvitation(t.Context(), &api.InvitationTokenRequest{Token: token})
+		require.NoError(t, err)
+		return resp
+	}
+
+	// Grants are seeded and read below the API: an expired one can't be created
+	// over it, and the colleague can't list the project's grants.
+	stmts := harness.EnsureServiceDB(t).Statements()
+	seedGrant := func(t *testing.T, userID, relation string, expiresAt *time.Time) string {
+		t.Helper()
+		asgn := &domain.AuthzAssignment{
+			ProjectID:     project.ID,
+			CatalogID:     domain.SystemCatalogID,
+			PrincipalType: domain.AuthzPrincipalTypeUser,
+			PrincipalID:   userID,
+			ObjectType:    "project",
+			Relation:      relation,
+			ExpiresAt:     expiresAt,
+		}
+		asgn.ApplyScope(domain.NewProjectAssignmentScope())
+		require.NoError(t, stmts.CreateAuthzAssignment(t.Context(), asgn))
+		return asgn.ID
+	}
+	// grants returns the user's unrevoked direct grants on the project by relation.
+	grants := func(t *testing.T, userID string) map[string][]*domain.AuthzAssignment {
+		t.Helper()
+		held, err := stmts.ListAuthzAssignments(t.Context(), project.ID, domain.AuthzPrincipalTypeUser, userID, false)
+		require.NoError(t, err)
+		byRelation := map[string][]*domain.AuthzAssignment{}
+		for _, asgn := range held {
+			if asgn.CatalogID == domain.SystemCatalogID && asgn.ObjectType == "project" && asgn.DelegationID == nil {
+				byRelation[asgn.Relation] = append(byRelation[asgn.Relation], asgn)
+			}
+		}
+		return byRelation
+	}
+	accepted := func(t *testing.T, resp api.AcceptInvitationRes) {
+		t.Helper()
+		got, ok := resp.(*api.Invitation)
+		require.True(t, ok, helpers.MustMarshal(t, resp))
+		member, ok := got.GetInvitationProjectMember()
+		require.True(t, ok)
+		assert.Equal(t, api.InvitationStatusAccepted, member.Status)
+	}
 
 	t.Run("look up and accept", func(t *testing.T) {
 		t.Parallel()
@@ -507,6 +553,128 @@ func TestInvitationRedeem(t *testing.T) {
 		refused, ok := accept(t, colleague, token).(*api.AcceptInvitationForbidden)
 		require.True(t, ok)
 		assert.Equal(t, "inv.inviter_not_admin", string(refused.Code))
+	})
+
+	t.Run("accept renews an expired grant", func(t *testing.T) {
+		t.Parallel()
+		colleagueID, colleague := newColleague(t)
+		expired := seedGrant(t, colleagueID, "admin", new(time.Now().Add(-time.Hour)))
+		_, token := invite(t, owner, api.InvitationProjectMemberPayloadRelationAdmin)
+
+		accepted(t, accept(t, colleague, token))
+
+		admin := grants(t, colleagueID)["admin"]
+		require.Len(t, admin, 1, "the expired grant is revoked")
+		assert.NotEqual(t, expired, admin[0].ID)
+		assert.Nil(t, admin[0].ExpiresAt)
+		after, err := colleague.GetProject(t.Context(), api.GetProjectParams{ProjectID: projectID})
+		require.NoError(t, err)
+		require.IsType(t, &api.ProjectDetailResponse{}, after, helpers.MustMarshal(t, after))
+	})
+
+	t.Run("accept keeps an identical active grant", func(t *testing.T) {
+		t.Parallel()
+		colleagueID, colleague := newColleague(t)
+		held := seedGrant(t, colleagueID, "editor", nil)
+		_, token := invite(t, owner, api.InvitationProjectMemberPayloadRelationEditor)
+
+		accepted(t, accept(t, colleague, token))
+
+		editor := grants(t, colleagueID)["editor"]
+		require.Len(t, editor, 1)
+		assert.Equal(t, held, editor[0].ID)
+	})
+
+	t.Run("accept adds a relation beside another", func(t *testing.T) {
+		t.Parallel()
+		colleagueID, colleague := newColleague(t)
+		viewer := seedGrant(t, colleagueID, "viewer", nil)
+		_, token := invite(t, owner, api.InvitationProjectMemberPayloadRelationAdmin)
+
+		accepted(t, accept(t, colleague, token))
+
+		held := grants(t, colleagueID)
+		require.Len(t, held["viewer"], 1)
+		assert.Equal(t, viewer, held["viewer"][0].ID)
+		require.Len(t, held["admin"], 1)
+	})
+
+	t.Run("of two concurrent accepts one wins", func(t *testing.T) {
+		t.Parallel()
+		_, token := invite(t, owner, api.InvitationProjectMemberPayloadRelationViewer)
+		firstID, first := newColleague(t)
+		secondID, second := newColleague(t)
+
+		results := make([]api.AcceptInvitationRes, 2)
+		var wg sync.WaitGroup
+		for i, client := range []*helpers.ApiClient{first, second} {
+			wg.Go(func() {
+				resp, err := client.AcceptInvitation(t.Context(), &api.InvitationTokenRequest{Token: token})
+				assert.NoError(t, err)
+				results[i] = resp
+			})
+		}
+		wg.Wait()
+
+		var won, lost int
+		for _, resp := range results {
+			switch resp.(type) {
+			case *api.Invitation:
+				won++
+			case *api.AcceptInvitationNotFound:
+				lost++
+			default:
+				t.Errorf("unexpected answer: %s", helpers.MustMarshal(t, resp))
+			}
+		}
+		assert.Equal(t, 1, won)
+		assert.Equal(t, 1, lost)
+		// Only the winner holds the relation.
+		assert.Equal(t, 1, len(grants(t, firstID)["viewer"])+len(grants(t, secondID)["viewer"]))
+	})
+
+	t.Run("an expired invitation answers as unknown", func(t *testing.T) {
+		t.Parallel()
+		token, tokenHash, err := domain.NewInvitationToken()
+		require.NoError(t, err)
+		journeyID, err := domain.NewInvitationJourneyID()
+		require.NoError(t, err)
+		// Seeded below the API, which only creates invitations that expire later.
+		require.NoError(t, stmts.CreateInvitation(t.Context(), &domain.Invitation{
+			ProjectID:     project.ID,
+			Type:          domain.InvitationTypeProjectMember,
+			ProjectMember: &domain.InvitationProjectMember{Relation: "viewer"},
+			CreatedBy:     &ownerID,
+			ExpiresAt:     time.Now().Add(-time.Minute),
+			JourneyID:     journeyID,
+			TokenHash:     tokenHash,
+		}))
+		colleagueID, colleague := newColleague(t)
+
+		require.IsType(t, &api.LookupInvitationNotFound{}, lookup(t, colleague, token))
+		require.IsType(t, &api.AcceptInvitationNotFound{}, accept(t, colleague, token))
+		require.IsType(t, &api.RejectInvitationNotFound{}, reject(t, colleague, token))
+		assert.Empty(t, grants(t, colleagueID))
+	})
+
+	t.Run("a project secret's invitation", func(t *testing.T) {
+		t.Parallel()
+		secret, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+		require.NoError(t, err)
+		harness.SetProjectSecretOnApiClient(t, secret, project)
+		_, token := invite(t, secret, api.InvitationProjectMemberPayloadRelationViewer)
+		colleagueID, colleague := newColleague(t)
+
+		found, ok := lookup(t, colleague, token).(*api.InvitationLookupResponse)
+		require.True(t, ok)
+		view, ok := found.GetInvitationLookupProjectMemberResponse()
+		require.True(t, ok)
+		assert.True(t, view.CreatedBy.IsNull())
+		assert.True(t, view.Inviter.IsNull())
+
+		// No inviter to check, so only the project's claim applies.
+		accepted(t, accept(t, colleague, token))
+		require.Len(t, grants(t, colleagueID)["viewer"], 1)
 	})
 }
 
