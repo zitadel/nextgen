@@ -243,8 +243,11 @@ export type Checked<Id extends string> = Id extends SuggestionId
  */
 export type Next = { [Id in SuggestionId]: NextOf<Id> }[SuggestionId];
 
+/** The flags of the command class `Class` by the names code reads them. */
+export type FlagNameOf<Class> = Named<FlagKey<Class>>;
+
 /** The flags of `Id` by the names code reads them, for a rerun's `without`. */
-export type SuggestFlagName<Id> = Named<FlagKey<Target<Id>>>;
+export type SuggestFlagName<Id> = FlagNameOf<Target<Id>>;
 
 /** A suggestion's input once its id is no longer known to the compiler. */
 export type LooseInput = Readonly<{

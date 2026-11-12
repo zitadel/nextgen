@@ -49,7 +49,7 @@ import {
 import type { CommandGroup } from "./groups";
 import { escapeControlCharacters, escapeJsonControlCharacters } from "@/lib/terminal-text";
 import type { RELATIONS } from "@/lib/suggestion/relations";
-import { type Rerun, RunSuggestions, typedScopeOf } from "@/lib/suggestion/run";
+import { type Rerun, type RerunOf, RunSuggestions, typedScopeOf } from "@/lib/suggestion/run";
 import { type NextSteps, nextStepsData, renderNextSteps, stepsOf } from "./next-steps";
 import { painted } from "./rendering";
 import type {
@@ -494,19 +494,36 @@ export abstract class BaseCommand extends Interruptible(Command) {
       throw new Error(`${this.id} cannot suggest itself as ${id}`);
     }
 
-    return this.rerun({ without: change.without, with: change.with }, id);
+    return this.rebuilt({ without: change.without, with: change.with }, id);
   };
 
   /**
    * {@link again} for code that does not know which command it runs in, such
-   * as a mixin: the changes are checked when the command is rendered, not when
-   * it is compiled ({@link RunSuggestions.rerun}).
+   * as a mixin. It names the flags it relies on as `Defs`, which is never
+   * inferred, so the change is checked against them when it is compiled; the
+   * run then refuses one the command does not declare
+   * ({@link RunSuggestions.rerun}).
    *
    * @param change - What the rerun changes, by the names code reads them.
-   * @param id - The running command, where the class has no id of its own.
+   * @returns The command.
+   * @example
+   * await this.rerun<{ force: Interfaces.BooleanFlag<boolean> }>({ with: { force: true } });
+   */
+  protected async rerun<Defs extends object = Record<never, never>>(
+    change: RerunOf<NoInfer<Defs>> = {},
+  ): Promise<SuggestedCommand> {
+    return this.rebuilt(change as Rerun, this.id ?? "");
+  }
+
+  /**
+   * This run again with `change`, its flags only names by now: the one
+   * implementation {@link again}, {@link rerun} and {@link realRun} share.
+   *
+   * @param change - What the rerun changes.
+   * @param id - The running command.
    * @returns The command.
    */
-  protected async rerun(change: Rerun = {}, id: string = this.id ?? ""): Promise<SuggestedCommand> {
+  private async rebuilt(change: Rerun, id: string): Promise<SuggestedCommand> {
     const { raw } = await this.parseOnce();
     // Read off the running class itself rather than looked up by id: this run
     // is the command, whatever table it was loaded from.
@@ -529,7 +546,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
    * @returns The command.
    */
   protected async realRun(): Promise<SuggestedCommand> {
-    return this.rerun({ without: ["dryRun"] });
+    return this.rebuilt({ without: ["dryRun"] }, this.id ?? "");
   }
 
   /**

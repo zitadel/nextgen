@@ -1,9 +1,14 @@
+import type { Interfaces } from "@oclif/core";
+
 import { Consent, type Gate } from "@/lib/consent";
 import { CANCELLED } from "@/lib/errors";
 
 import type { BaseCommand } from "./base";
 import { Promptable } from "./promptable";
 import type { CommandResult } from "./types";
+
+/** The flag a destructive command declares, which its `--force` retry sets. */
+type ConsentFlags = Readonly<{ force: Interfaces.BooleanFlag<boolean> }>;
 
 /** A class that can be extended, abstract or not, whatever arguments it takes. */
 // biome-ignore lint/suspicious/noExplicitAny: the constructor of any command, which a mixin cannot name
@@ -114,7 +119,7 @@ export function Destructive<TBase extends CommandClass<BaseCommand>>(Base: TBase
           ? gate
           : {
               ...gate,
-              retry: await this.rerun({
+              retry: await this.rerun<ConsentFlags>({
                 with: { force: true },
                 arguments: gate.arguments,
               }),

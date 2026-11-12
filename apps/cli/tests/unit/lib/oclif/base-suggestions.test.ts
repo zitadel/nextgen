@@ -1,4 +1,4 @@
-import { Config, Flags } from "@oclif/core";
+import { Config, Flags, type Interfaces } from "@oclif/core";
 import { describe, expect } from "vitest";
 
 import { it } from "@tests/helpers/fixtures";
@@ -120,6 +120,28 @@ class ConsentProbe extends EnvironmentCommand {
   async probe() {
     const { flags } = await this.parse(ConsentProbe);
     await this.toMeta(flags, { resolveServer: false, environment: false });
+    return this.rerun<typeof ConsentProbe.flags>({ with: { force: true } });
+  }
+
+  /**
+   * This run again, without a flag its class does not declare.
+   *
+   * @returns The command, which the run refuses to build.
+   */
+  async leavingOutAFlagItLacks() {
+    const { flags } = await this.parse(ConsentProbe);
+    await this.toMeta(flags, { resolveServer: false, environment: false });
+    return this.rerun<{ ghost: Interfaces.BooleanFlag<boolean> }>({ without: ["ghost"] });
+  }
+
+  /**
+   * A rerun that sets a flag without naming the flags it relies on, which
+   * does not compile.
+   *
+   * @returns The command.
+   */
+  async withoutNamingItsFlags() {
+    // @ts-expect-error a rerun names the flags it relies on, so `force` is unknown here
     return this.rerun({ with: { force: true } });
   }
 }
@@ -203,6 +225,12 @@ describe("BaseCommand.suggest with a server named with its credentials", () => {
 });
 
 describe("BaseCommand.rerun", () => {
+  it("refuses to leave out a flag the command does not declare", async ({ dir }) => {
+    await expect(new ConsentProbe(["--cwd", dir], config).leavingOutAFlagItLacks()).rejects.toThrow(
+      "variable:rm declares no --ghost to leave out",
+    );
+  });
+
   it("puts an environment-scoped run's server back without its credentials", async ({ dir }) => {
     const retry = await new ConsentProbe(
       ["--cwd", dir, "--server", "https://user:p@ss@a.example"],

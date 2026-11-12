@@ -1,3 +1,5 @@
+import type { Interfaces } from "@oclif/core";
+
 import { Consent } from "@/lib/consent";
 import { CANCELLED, ZitadelError } from "@/lib/errors";
 import { log } from "@/lib/log";
@@ -28,6 +30,17 @@ import {
   type UserSchema,
   ZitadelConfig,
 } from "@/lib/zitadel";
+
+/**
+ * The flags the re-run of a refused change sets: the schema every `auth-method`
+ * command takes, `--force`, and the `--provider` an SSO command names its
+ * change by. A command without one of them refuses the re-run that names it.
+ */
+type RetryFlags = Readonly<{
+  schema: Interfaces.OptionFlag<string | undefined>;
+  force: Interfaces.BooleanFlag<boolean>;
+  provider: Interfaces.OptionFlag<string | undefined>;
+}>;
 
 /**
  * What every `auth-method` command reads before changing anything.
@@ -385,7 +398,7 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
   protected async confirmIfNoSignInLeft(
     target: SchemaTarget,
     make: (options: ForceOptions) => Change,
-    naming: Readonly<Record<string, unknown>> = {},
+    naming: Readonly<{ provider?: string }> = {},
   ): Promise<ConfirmedChange | undefined> {
     try {
       return {
@@ -403,7 +416,7 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
       // The run again with --force, on the schema it resolved (a dry run's stays
       // a preview, since --force with --dry-run writes nothing), then enabling
       // each method the schema could take instead.
-      const retry = await this.rerun({
+      const retry = await this.rerun<RetryFlags>({
         with: { ...naming, schema: target.schemaFlag, force: true },
       });
       const suggested = [

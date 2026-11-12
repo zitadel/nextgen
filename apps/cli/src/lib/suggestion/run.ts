@@ -7,12 +7,15 @@ import {
   type Declared,
   type Declaring,
   declaredOf,
+  type FlagNameOf,
+  type FlagsOf,
   isSuggestion,
   type LooseNext,
   type Scope,
   type Suggest,
   type Suggested,
   type SuggestedCommand,
+  spelled,
   suggestionWords,
   withoutCredentials,
 } from ".";
@@ -50,7 +53,24 @@ export type ParsedToken = Readonly<
   { type: "arg"; input: string } | { type: "flag"; flag: string; input: string }
 >;
 
-/** How a rerun changes the command line it rebuilds, by the names code reads them. */
+/**
+ * How a rerun changes the command line it rebuilds, checked against `Defs`:
+ * the flags the code asking for it relies on the command declaring, typed as
+ * they parse. A rerun from code that does not know which command it runs in
+ * (a mixin) names them, and the run refuses one its command does not declare.
+ */
+export type RerunOf<Defs> = Readonly<{
+  /** Flags to leave out. */
+  without?: readonly FlagNameOf<{ flags: Defs }>[];
+  /** Flags to set ahead of the typed ones, as a `--force` retry reads. */
+  with?: Partial<FlagsOf<{ flags: Defs }>>;
+  /** Flags to set after the typed ones, such as a next page's token. */
+  after?: Partial<FlagsOf<{ flags: Defs }>>;
+  /** The arguments to name, where they are not the ones typed. */
+  arguments?: readonly string[];
+}>;
+
+/** How a rerun changes the command line it rebuilds, once its flags are only names. */
 export type Rerun = Readonly<{
   /** Flags to leave out. */
   without?: readonly string[];
@@ -137,6 +157,12 @@ export class RunSuggestions {
     raw: readonly ParsedToken[],
     change: Rerun = {},
   ): SuggestedCommand {
+    const undeclared = (change.without ?? []).filter((name) => {
+      return !target.flags.has(spelled(name)) && !ANSWERING.includes(name);
+    });
+    if (undeclared.length > 0) {
+      throw new Error(`${id} declares no --${undeclared.map(spelled).join(", --")} to leave out`);
+    }
     const redact = withoutCredentials;
     const positional = (
       change.arguments ??
