@@ -55,7 +55,7 @@ export default class Upgrade extends Suggestible(BaseCommand) {
     if (!plan.upToDate) {
       this.log(new BreakingChangesBanner(plan.breaking).render());
     }
-    const { refresh, installed, report } = await upgrader.apply(plan);
+    const { installed, report } = await upgrader.apply(plan);
 
     // At the new version, and from the shell's directory like every suggestion.
     const atTarget = (args: string): SuggestedCommand => {
@@ -66,8 +66,8 @@ export default class Upgrade extends Suggestible(BaseCommand) {
     };
     const commands: SuggestedCommand[] = [
       ...(this.dryRun && !plan.upToDate ? [this.suggest("upgrade")] : []),
-      ...(refresh === "failed" ? [atTarget("doctor --fix")] : []),
-      ...(refresh === "issues" ? [atTarget("doctor")] : []),
+      ...(report.refresh === "failed" ? [atTarget("doctor --fix")] : []),
+      ...(report.refresh === "issues" ? [atTarget("doctor")] : []),
       ...(installed && existsSync(join(this.cwd, SHARED_SKILLS_DIR))
         ? [atTarget("skills add")]
         : []),

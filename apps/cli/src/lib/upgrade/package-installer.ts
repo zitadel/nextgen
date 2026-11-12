@@ -12,27 +12,24 @@ import type { UpgradePlan } from "./upgrade-plan";
 /** The install a plan needs, and how it reads in the person's shell. */
 export type PlannedInstall = Readonly<{ run: PackageCommand; display: string }>;
 
+/** What a {@link PackageInstaller} is given. */
+export type PackageInstallerOptions = Readonly<{
+  cwd: string;
+  typedCwd: string | undefined;
+  redirectStdoutToStderr: boolean;
+}>;
+
 /** Installs a plan's packages with the project's own package manager. */
 export class PackageInstaller {
   /** What the run was given. */
-  private readonly options: Readonly<{
-    cwd: string;
-    typedCwd: string | undefined;
-    redirectStdoutToStderr: boolean;
-  }>;
+  private readonly options: PackageInstallerOptions;
 
   /**
    * @param options.cwd - The project directory.
    * @param options.typedCwd - `--cwd` as typed, so the displayed command runs from the shell's directory.
    * @param options.redirectStdoutToStderr - Whether a package manager's progress must stay off stdout.
    */
-  constructor(
-    options: Readonly<{
-      cwd: string;
-      typedCwd: string | undefined;
-      redirectStdoutToStderr: boolean;
-    }>,
-  ) {
+  constructor(options: PackageInstallerOptions) {
     this.options = options;
   }
 
@@ -66,11 +63,7 @@ export class PackageInstaller {
         redirectStdoutToStderr: this.options.redirectStdoutToStderr,
       });
     } catch (error) {
-      throw new InstallError(
-        error instanceof Error ? error.message : String(error),
-        install.display,
-        error,
-      );
+      throw new InstallError(install.display, error);
     }
   }
 }

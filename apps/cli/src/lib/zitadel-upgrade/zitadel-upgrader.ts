@@ -1,10 +1,9 @@
-import { ZitadelError } from "@/lib/errors";
+import { errorMessage, ZitadelError } from "@/lib/errors";
 import { breakingChanges } from "@/lib/release-notes";
 import { shellCommand, type SuggestedCommand } from "@/lib/suggestion";
 import {
   InstallError,
   PackageInstaller,
-  type Refresh,
   ReleaseLookupError,
   type UpgradePlan,
   Upgrader,
@@ -15,10 +14,21 @@ import { ZITADEL } from "./zitadel";
 import { ZitadelRefresher } from "./zitadel-refresher";
 import { ZitadelReleaseChannel } from "./zitadel-release-channel";
 
+/** What a {@link ZitadelUpgrader} is given. */
+export type ZitadelUpgraderOptions = Readonly<{
+  cliVersion: string;
+  cwd: string;
+  typedCwd: string | undefined;
+  env: NodeJS.ProcessEnv;
+  json: boolean;
+  noTelemetry: boolean;
+  dryRun: boolean;
+  signal: AbortSignal;
+  retry: SuggestedCommand;
+}>;
+
 /** What {@link ZitadelUpgrader.apply} did. */
 export type ZitadelUpgradeResult = Readonly<{
-  /** How the refresh ended. */
-  refresh: Refresh;
   /** Whether the new packages were installed; a dry run installs nothing. */
   installed: boolean;
   /** The lines a person reads and the data a script parses. */
@@ -31,7 +41,7 @@ export class ZitadelUpgrader {
   private readonly upgrader: Upgrader;
 
   /** What the run was given. */
-  private readonly options: Readonly<{ dryRun: boolean; retry: SuggestedCommand }>;
+  private readonly options: ZitadelUpgraderOptions;
 
   /**
    * @param options.cliVersion - The running CLI's version.
@@ -44,19 +54,7 @@ export class ZitadelUpgrader {
    * @param options.signal - Ctrl-C, which ends the upgrade rather than failing a step.
    * @param options.retry - The command that reruns this upgrade, suggested when a step fails.
    */
-  constructor(
-    options: Readonly<{
-      cliVersion: string;
-      cwd: string;
-      typedCwd: string | undefined;
-      env: NodeJS.ProcessEnv;
-      json: boolean;
-      noTelemetry: boolean;
-      dryRun: boolean;
-      signal: AbortSignal;
-      retry: SuggestedCommand;
-    }>,
-  ) {
+  constructor(options: ZitadelUpgraderOptions) {
     this.options = options;
     this.upgrader = new Upgrader(ZITADEL, {
       cliVersion: options.cliVersion,
@@ -102,7 +100,6 @@ export class ZitadelUpgrader {
     try {
       const { refresh, installed, installCommand } = await this.upgrader.apply(plan);
       return {
-        refresh,
         installed,
         report: new UpgradeReport(plan, {
           refresh,
@@ -115,7 +112,7 @@ export class ZitadelUpgrader {
         throw error;
       }
       throw new ZitadelError("E_VALIDATION", "Could not install the new packages", {
-        hint: `${error.message}. Nothing else changed; fix that and rerun.`,
+        hint: `${errorMessage(error.cause)}. Nothing else changed; fix that and rerun.`,
         nextCommands: [shellCommand(error.command), this.options.retry],
       });
     }

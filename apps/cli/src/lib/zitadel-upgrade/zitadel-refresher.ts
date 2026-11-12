@@ -7,15 +7,18 @@ import { UPDATE_CHECK_VARIABLE, ZITADEL } from "./zitadel";
 
 const REFRESH_TIMEOUT_MS = 5 * 60 * 1000;
 
+/** What a {@link ZitadelRefresher} is given. */
+export type ZitadelRefresherOptions = Readonly<{
+  cwd: string;
+  env: NodeJS.ProcessEnv;
+  noTelemetry: boolean;
+  signal: AbortSignal;
+}>;
+
 /** Has the new Zitadel CLI regenerate a project's files with its `doctor --fix`. */
 export class ZitadelRefresher implements Refresher {
   /** What the run was given. */
-  private readonly options: Readonly<{
-    cwd: string;
-    env: NodeJS.ProcessEnv;
-    noTelemetry: boolean;
-    signal: AbortSignal;
-  }>;
+  private readonly options: ZitadelRefresherOptions;
 
   /**
    * @param options.cwd - The project directory.
@@ -23,14 +26,7 @@ export class ZitadelRefresher implements Refresher {
    * @param options.noTelemetry - `--no-telemetry` was given: it reaches this run only, not the child, without being passed on.
    * @param options.signal - Ctrl-C: it ends the child and the upgrade with it, rather than a refresh that merely failed.
    */
-  constructor(
-    options: Readonly<{
-      cwd: string;
-      env: NodeJS.ProcessEnv;
-      noTelemetry: boolean;
-      signal: AbortSignal;
-    }>,
-  ) {
+  constructor(options: ZitadelRefresherOptions) {
     this.options = options;
   }
 

@@ -2,18 +2,36 @@ import { arrow, command, dim, mark } from "@/lib/style";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { RELEASE_NOTES_URL } from "@/lib/release-notes";
 
-import type { Refresh, UpgradePlan } from "@/lib/upgrade";
+import type { BreakingChange, PackageUpgrade, Refresh, UpgradePlan } from "@/lib/upgrade";
+
+/** How an upgrade run ended. */
+export type UpgradeOutcome = Readonly<{
+  refresh: Refresh;
+  dryRun: boolean;
+  installCommand: string | undefined;
+}>;
+
+/** The envelope data of `upgrade`, the contract `SKILL.md` documents. */
+export type UpgradeData = Readonly<{
+  title: string;
+  dry_run?: true;
+  current_version: string;
+  latest_version: string;
+  up_to_date: boolean;
+  packages: readonly PackageUpgrade[];
+  left_alone: readonly Readonly<{ name: string; specifier: string }>[];
+  breaking_changes: readonly BreakingChange[];
+  release_notes_url: string;
+  refresh: Refresh;
+  install_command?: string;
+}>;
 
 /** What an upgrade run did, as the lines a person reads and the data a script parses. */
 export class UpgradeReport {
   /** What was decided. */
   private readonly plan: UpgradePlan;
   /** How the run ended. */
-  private readonly outcome: Readonly<{
-    refresh: Refresh;
-    dryRun: boolean;
-    installCommand: string | undefined;
-  }>;
+  private readonly outcome: UpgradeOutcome;
 
   /**
    * @param plan - What was decided.
@@ -21,16 +39,14 @@ export class UpgradeReport {
    * @param outcome.dryRun - Whether nothing was changed.
    * @param outcome.installCommand - The install as the shell reads it, when one was needed.
    */
-  constructor(
-    plan: UpgradePlan,
-    outcome: Readonly<{
-      refresh: Refresh;
-      dryRun: boolean;
-      installCommand: string | undefined;
-    }>,
-  ) {
+  constructor(plan: UpgradePlan, outcome: UpgradeOutcome) {
     this.plan = plan;
     this.outcome = outcome;
+  }
+
+  /** How the refresh ended. */
+  get refresh(): Refresh {
+    return this.outcome.refresh;
   }
 
   /** The headline, the one sentence both renderings draw. */
@@ -62,7 +78,7 @@ export class UpgradeReport {
   }
 
   /** The envelope's `data`. */
-  data(): Readonly<Record<string, unknown>> {
+  data(): UpgradeData {
     const { plan, outcome } = this;
     return {
       title: this.title,

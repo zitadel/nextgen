@@ -124,7 +124,11 @@
 - Keep `src/lib/oclif` generic: no product concept and no domain-lib import. A
   unit test fails on a leak (`tests/unit/lib/oclif/layering.test.ts`).
 - A domain lib under `src/lib` stays plain functions and parsers, and never
-  imports `lib/oclif`.
+  imports `lib/oclif`. The exception is `src/lib/upgrade` (classes): it imports
+  only itself, node, `semver`, `lib/npm` and `lib/package-manager`, and
+  everything of Zitadel or the CLI comes in through its interfaces from
+  `src/lib/zitadel-upgrade`. `tests/unit/lib/upgrade/layering.test.ts` fails on
+  any other import there, dynamic ones included.
 - Say what a command is doing with `log` (`src/lib/log.ts`) from a command or a
   library alike, never a logger or stream of your own: the running command's
   sink decides the look, and `--json` installs one that draws nothing; with no

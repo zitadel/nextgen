@@ -1,3 +1,7 @@
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
@@ -25,6 +29,21 @@ describe("ZitadelReleaseChannel.latestFresh", () => {
   });
 });
 
+describe("ZitadelReleaseChannel cache", () => {
+  it("keeps the answer in the CLI's config directory, where the next run reads it", async () => {
+    const home = await mkdtemp(join(tmpdir(), "zitadel-release-channel-"));
+    server.use(http.get(REGISTRY, () => HttpResponse.json({ latest: "2.0.0" })));
+
+    await new ZitadelReleaseChannel("1.0.0", { XDG_CONFIG_HOME: home }).latestFresh();
+
+    const cached = JSON.parse(
+      await readFile(join(home, "zitadel", "cli", "update-check.json"), "utf8"),
+    ) as Record<string, unknown>;
+    await rm(home, { recursive: true, force: true });
+    expect(cached).toMatchObject({ dist_tag: "latest", version: "2.0.0" });
+  });
+});
+
 describe("ZitadelReleaseChannel.isDisabled", () => {
   it.each([
     [{ ZITADEL_UPDATE_CHECK: "0" }, true],
@@ -32,6 +51,6 @@ describe("ZitadelReleaseChannel.isDisabled", () => {
     [{ CI: "false" }, false],
     [{}, false],
   ])("for %o is %s", (environment, disabled) => {
-    expect(new ZitadelReleaseChannel("1.0.0", environment).isDisabled()).toBe(disabled);
+    expect(ZitadelReleaseChannel.isDisabled(environment)).toBe(disabled);
   });
 });

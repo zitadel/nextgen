@@ -8,6 +8,14 @@ import { ScopedDependencies } from "@/lib/upgrade";
 import { ZITADEL } from "./zitadel";
 import { ZitadelReleaseChannel } from "./zitadel-release-channel";
 
+/** What an {@link UpdateNotice} is given. */
+export type UpdateNoticeOptions = Readonly<{
+  cliVersion: string;
+  cwd: string;
+  env: NodeJS.ProcessEnv;
+  columns?: number;
+}>;
+
 /**
  * The box `--version` ends with when something is behind the latest release. It
  * compares the project's pins as well as the CLI: under `npx <cli>@latest` the
@@ -15,12 +23,7 @@ import { ZitadelReleaseChannel } from "./zitadel-release-channel";
  */
 export class UpdateNotice {
   /** What the run was given. */
-  private readonly options: Readonly<{
-    cliVersion: string;
-    cwd: string;
-    env: NodeJS.ProcessEnv;
-    columns?: number;
-  }>;
+  private readonly options: UpdateNoticeOptions;
 
   /**
    * @param options.cliVersion - The running CLI's version.
@@ -28,25 +31,17 @@ export class UpdateNotice {
    * @param options.env - The run's environment.
    * @param options.columns - The terminal's width.
    */
-  constructor(
-    options: Readonly<{
-      cliVersion: string;
-      cwd: string;
-      env: NodeJS.ProcessEnv;
-      columns?: number;
-    }>,
-  ) {
+  constructor(options: UpdateNoticeOptions) {
     this.options = options;
   }
 
   /** The box, or `undefined` when nothing is behind, the check is off or the lookup found nothing. */
   async render(): Promise<string | undefined> {
     const { cliVersion, cwd, env, columns } = this.options;
-    const channel = new ZitadelReleaseChannel(cliVersion, env);
-    if (channel.isDisabled()) {
+    if (ZitadelReleaseChannel.isDisabled(env)) {
       return undefined;
     }
-    const release = await channel.latest();
+    const release = await new ZitadelReleaseChannel(cliVersion, env).latest();
     if (release === undefined) {
       return undefined;
     }

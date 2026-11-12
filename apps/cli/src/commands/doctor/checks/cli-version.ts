@@ -17,15 +17,14 @@ export async function checkCliVersion(input: {
 }): Promise<CheckOutcome> {
   const { cliVersion, env, typedCwd } = input;
   const base = { name: "cli-version" };
-  const channel = new ZitadelReleaseChannel(cliVersion, env);
-  if (channel.isDisabled()) {
+  if (ZitadelReleaseChannel.isDisabled(env)) {
     return {
       ...base,
       status: "pass",
       message: `CLI ${cliVersion}; update check is off`,
     };
   }
-  const latest = await channel.latest();
+  const latest = await new ZitadelReleaseChannel(cliVersion, env).latest();
   if (latest === undefined) {
     return {
       ...base,

@@ -12,12 +12,11 @@ export class InstallError extends Error {
   readonly command: string;
 
   /**
-   * @param message - What the package manager said.
    * @param command - The install, as the person's shell reads it.
-   * @param cause - The failure itself.
+   * @param cause - What the package manager failed with.
    */
-  constructor(message: string, command: string, cause: unknown) {
-    super(message, { cause });
+  constructor(command: string, cause: unknown) {
+    super("Could not install the new packages", { cause });
     this.name = "InstallError";
     this.command = command;
   }

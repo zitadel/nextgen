@@ -94,6 +94,10 @@ describe("ZitadelUpgrader.apply", () => {
 
     const result = await upgrade.apply(plan);
 
-    expect([plan.upToDate, result.installed, result.refresh]).toEqual([false, false, "skipped"]);
+    expect([plan.upToDate, result.installed, result.report.refresh]).toEqual([
+      false,
+      false,
+      "skipped",
+    ]);
   });
 });

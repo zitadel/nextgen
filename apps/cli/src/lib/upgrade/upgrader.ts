@@ -7,6 +7,17 @@ import { ScopedDependencies } from "./scoped-dependencies";
 import { UpgradePlan } from "./upgrade-plan";
 import type { UpgradeTarget } from "./upgrade-target";
 
+/** What an {@link Upgrader} is given. */
+export type UpgraderOptions = Readonly<{
+  cliVersion: string;
+  cwd: string;
+  dryRun: boolean;
+  channel: ReleaseChannel;
+  changes: ChangeSource;
+  installer: PackageInstaller;
+  refresher: Refresher;
+}>;
+
 /** What {@link Upgrader.apply} did. */
 export type UpgradeResult = Readonly<{
   /** What was decided. */
@@ -25,15 +36,7 @@ export class Upgrader {
   private readonly target: UpgradeTarget;
 
   /** What the run was given. */
-  private readonly options: Readonly<{
-    cliVersion: string;
-    cwd: string;
-    dryRun: boolean;
-    channel: ReleaseChannel;
-    changes: ChangeSource;
-    installer: PackageInstaller;
-    refresher: Refresher;
-  }>;
+  private readonly options: UpgraderOptions;
 
   /**
    * @param target - What is being upgraded.
@@ -45,18 +48,7 @@ export class Upgrader {
    * @param options.installer - What installs the new packages.
    * @param options.refresher - What regenerates the project's files.
    */
-  constructor(
-    target: UpgradeTarget,
-    options: Readonly<{
-      cliVersion: string;
-      cwd: string;
-      dryRun: boolean;
-      channel: ReleaseChannel;
-      changes: ChangeSource;
-      installer: PackageInstaller;
-      refresher: Refresher;
-    }>,
-  ) {
+  constructor(target: UpgradeTarget, options: UpgraderOptions) {
     this.target = target;
     this.options = options;
   }
