@@ -12,7 +12,7 @@ Canonical owner of shared **text roles, resource identifier presentation, dates/
 
 **EXISTING:** Reuse `PAGE_TITLE` display-serif 24/24, `PAGE_TITLE_ROW` 36px, `SECTION_HEADING` serif 16/20, `OVERLINE` uppercase 12/16 with 0.72px tracking, `EYEBROW` (overline + muted), `PANEL_HEAD_CELL` muted uppercase 12px and `FIELD_LABEL_TYPOGRAPHY` sans regular 14/20. These are shared roles, not an invitation to create screen-specific duplicates.
 
-**Technical documentation discrepancy:** `styling.md` describes `SUBSECTION_HEADING` 14/20, while the current `typography.ts` does not export that symbol. **Engineering/documentation reconciliation required** before changing the code; preserve the legitimate subsection-heading hierarchy, do not silently invent an API.
+**EXISTING:** `SUBSECTION_HEADING` is exported from `typography.ts` as the shared 14/20 serif subsection role and is documented in `styling.md`. Reuse this role for headings within card bodies beneath a `SECTION_HEADING`; do not create screen-specific duplicates.
 
 ## 3. Visual Rules
 
@@ -30,7 +30,7 @@ Full values remain available through UI-02 Copy as needed; timestamps and labels
 
 ## 5. Variants & Exceptions
 
-**Current code vs approved target:** `ResourceIdCell` uses `text-sm` and end truncation; it needs alignment to the approved **12px monospace / middle-truncation** rule. Resource IDs, timestamps, short labels, headings, descriptive copy and table head labels have distinct roles. Use field semantics for date-only vs date-time presentation; **any bespoke screen exception is decided and documented in that screen's polishing ticket**, not in the generic pattern.
+**Current code vs approved target:** `ResourceIdCell` already renders `IdText`, which middle-truncates constrained identifiers and retains the full value for Copy and tooltip. The remaining approved typography change is **12px monospace** instead of the current `text-sm`; preserve the existing layout-aware middle elision. Resource IDs, timestamps, short labels, headings, descriptive copy and table head labels have distinct roles. Use field semantics for date-only vs date-time presentation; **any bespoke screen exception is decided and documented in that screen's polishing ticket**, not in the generic pattern.
 
 ## 6. States & Responsive Behavior
 
@@ -44,7 +44,7 @@ Test long translated strings, constrained identifiers, safe Copy access, date fo
 
 - [ ] IDs render at 12px monospace, middle-truncate only when constrained, and expose the untouched source for Copy.
 - [ ] Existing type role hierarchy, responsive scale, shared style tokens and distinct panel headers remain intact.
-- [ ] `SUBSECTION_HEADING` documentation/code mismatch resolved by engineering without invented design changes.
+- [ ] Reuse the existing `SUBSECTION_HEADING` 14/20 role wherever a card-body subsection heading is needed, without duplicating the style.
 - [ ] `formatRecent()` unchanged: relative within 24h, localized date + time thereafter; date-only fields stay date-only where appropriate.
 - [ ] Remove only proven redundant supporting copy and preserve meaningful instructions/accessibility text; exact screens handled in tickets.
 - [ ] Check long copy/identifiers and date formatting on desktop, mobile, keyboard, and both themes.
