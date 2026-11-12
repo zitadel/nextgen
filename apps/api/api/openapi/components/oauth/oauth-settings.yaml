@@ -1,0 +1,32 @@
+x-meta-schema: true
+type: object
+description: |
+  The OAuth settings of a project: whether the project's OAuth authorization
+  server answers. It has one shape in two places: the `oauth` resource of the
+  bundle `buildRelease` (`POST /releases/build`) takes, which publishes it as
+  a new immutable revision, and the read-only revision
+  `getOAuthSettingsById` (`GET /oauth_settings/{oauth_settings_id}`)
+  returns. Locally it is the descriptor in `.zitadel/` that `zitadel deploy`
+  publishes with the rest of the bundle.
+
+  A release is the only writer: there is no operation that publishes OAuth
+  settings on their own. A release without `oauth` leaves the authorization
+  server off.
+additionalProperties: false
+required:
+  - enabled
+properties:
+  "$schema":
+    type: string
+    description: |
+      Editor affordance: path or URL of this file's JSON meta-schema, so an
+      editor validates and autocompletes it. The CLI strips it before upload;
+      the platform ignores it.
+  enabled:
+    type: boolean
+    description: |
+      Whether the project's OAuth authorization server answers. While it is
+      `false`, or the deployed release pins no OAuth settings, the server
+      publishes no authorization server metadata for the project and refuses
+      every OAuth request to it.
+    example: true
