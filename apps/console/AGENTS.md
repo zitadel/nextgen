@@ -68,10 +68,10 @@ between files are the sign the component is missing.
 - A project's sidebar lists its screens; opened without a selection, a screen
   asks for a project first (Projects with `?next=`, D31).
 - The root's sidebar lists Projects, the platform project's screens and
-  Settings (`useAccountListItems`, D41). `/settings` lists the platform
+  Settings (`useAccountListItems`, D42). `/settings` lists the platform
   project's Settings pages and the add-on's (`useSettingsListItems`, D29); the
   person's profile is `/account`, opened from the account menu.
-- The reserved platform project is the root, never a project to choose (D41):
+- The reserved platform project is the root, never a project to choose (D42):
   read its id only from `getPlatformProjectId()`, and send `exclude_platform`
   with every `listMyProjects`.
 - Its screens are the project screens with it selected: never add a route or

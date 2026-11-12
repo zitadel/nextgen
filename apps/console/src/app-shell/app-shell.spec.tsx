@@ -25,7 +25,7 @@ vi.mock("@/auth/session", async (importOriginal) => {
 });
 
 // An add-on with one Settings page, as the hosted cloud's has Billing, Support
-// and Email: the console's own build has none, and then no Settings row (D41).
+// and Email: the console's own build has none, and then no Settings row (D42).
 vi.mock("@/addon", () => ({
   addon: {
     screens: [
@@ -61,7 +61,7 @@ const NAV_ORDER = [
   "Events",
   "Settings",
 ];
-// The root's list (D41) for someone who holds nothing on the platform project:
+// The root's list (D42) for someone who holds nothing on the platform project:
 // Projects, the spine, then Settings. No project's screens: those are reached
 // by choosing the project.
 const ACCOUNT_ORDER = ["Projects", "Settings"];
@@ -84,7 +84,7 @@ const PLATFORM_ROOT_ORDER = [
 // profile is the account menu's, so it is not here.
 const SETTINGS_ORDER = ["Settings", "Invoices"];
 // For someone who may act on the platform project, its own Settings pages
-// come first: that project is the root (D41).
+// come first: that project is the root (D42).
 const PLATFORM_SETTINGS_ORDER = ["Settings", "General", "Admins", "Invoices"];
 // The project's Settings list (D40): the heading that leads back, then its pages.
 const PROJECT_SETTINGS_ORDER = ["Settings", "General", "Admins"];
@@ -104,7 +104,7 @@ const USERS_QUERY = "*/api/v1/users/query";
 const TEAMS_QUERY = "*/api/v1/teams/query";
 // `/settings` lands on the profile, which reads the signed-in person's own record.
 const MY_USER = "*/api/v1/users/me";
-// The reserved platform project (D41): the console signs in to it. Whether its
+// The reserved platform project (D42): the console signs in to it. Whether its
 // read answers says whether the person may act on it.
 const PLATFORM = "*/api/v1/projects/proj_platform";
 
@@ -359,7 +359,7 @@ describe("app shell navigation", () => {
     // (`?status=active`).
     await waitFor(() => expect(router.state.resolvedLocation?.search.next).toMatch(/^\/teams\b/));
     expect(await screen.findByRole("heading", { name: "Continue to Teams" })).toBeInTheDocument();
-    // The root's list holds no row for a project's screen (D41), so Projects,
+    // The root's list holds no row for a project's screen (D42), so Projects,
     // the page that asks, is the marked one.
     expect(
       within(screen.getByRole("navigation", { name: "Account" })).getByRole("link", {
@@ -375,7 +375,7 @@ describe("app shell navigation", () => {
   });
 
   // The reserved platform project is the root's, for someone who may act on
-  // it (D41). Anyone else is never in it: a URL that names it goes on without.
+  // it (D42). Anyone else is never in it: a URL that names it goes on without.
   it("drops a selection of the platform project for someone who may not act on it", async () => {
     const router = renderShell("/users?project=proj_platform");
 
@@ -419,7 +419,7 @@ describe("app shell navigation", () => {
  * ways in; the list's heading leads back up, and the project pill back into a
  * project (D29).
  */
-// The reserved platform project is the root (D41): for someone who may act on
+// The reserved platform project is the root (D42): for someone who may act on
 // it, its screens are the root's, drawn like any project's with that project
 // selected, and never offered as a project to choose.
 describe("platform root", () => {
@@ -650,7 +650,7 @@ describe("settings view", () => {
     await userEvent.click(screen.getByRole("button", { name: /^Account:/ }));
     expect(await screen.findByRole("menuitem", { name: "Log out" })).toBeInTheDocument();
     // The person heads the menu and opens their profile, apart from the root
-    // Settings (D41). The selection rides along, so the pill's list still
+    // Settings (D42). The selection rides along, so the pill's list still
     // marks the project.
     expect(screen.getByRole("menuitem", { name: /^Test User/ })).toHaveAttribute(
       "href",
@@ -1594,7 +1594,7 @@ describe("search", () => {
       ]),
     );
 
-    // Profile is the account's, apart from Settings (D41).
+    // Profile is the account's, apart from Settings (D42).
     await userEvent.clear(field);
     await userEvent.type(field, "prof");
     const profile = await dialog.findByRole("option", { name: /^Profile/ });

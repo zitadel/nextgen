@@ -234,7 +234,7 @@ func TestPlatformOperatorReadsUnclaimedEvents(t *testing.T) {
 }
 
 // TestPlatformProjectReadGatesTheRoot pins the read the console lists its root
-// pages on (D41, Console ADR 0004 §5): GET /projects/{platform project}
+// pages on (D42, Console ADR 0004 §5): GET /projects/{platform project}
 // answers for someone who can act on that project and for nobody else. A
 // person homed in it, and one who owns a team in it as every hosted customer
 // does, are refused: being signed in to the platform project grants nothing

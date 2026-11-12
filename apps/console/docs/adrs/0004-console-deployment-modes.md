@@ -48,7 +48,7 @@
 > self-host) hold only for the surfaces both builds share. Those still render
 > from effective permissions.
 >
-> **Amendment (2026-11-11) — [D41](../../../../docs/design/decisions.md):**
+> **Amendment (2026-11-11) — [D42](../../../../docs/design/decisions.md):**
 > the reserved platform project is the Console's root level, not a project to
 > select. The runtime document names it (§3), and its surfaces render at the
 > root from effective permissions on it (§5). It holds who may use the
@@ -110,7 +110,7 @@ The reserved project is a **control project**, not a super-project:
   054; and
 - it is never the project a customer's application signs its users into.
 
-> **Amendment (2026-11-11, D41):** the last point is for the people who own
+> **Amendment (2026-11-11, D42):** the last point is for the people who own
 > the platform to keep, and the server holds them to it. The reserved project
 > manages who may use the platform. It is a project like any other in what
 > it has (users, teams, grants, and the configuration that signs them in),
@@ -304,7 +304,7 @@ it does not choose a different Console login project and does not grant access.
 > preferred a default selection among the operator's projects; the default is
 > now their only project, or none.
 
-> **Amendment (2026-11-11, D41):** the document carries one more
+> **Amendment (2026-11-11, D42):** the document carries one more
 > sign-in fact, whether the sign-in target is the reserved platform project:
 >
 > ```json
@@ -381,7 +381,7 @@ export const Route = createFileRoute("/_authed/billing/")({
 The sidebar and a route guard hide unavailable routes, but UI gating is never
 authorization. Each API operation performs its own target-scoped check.
 
-> **Amendment (2026-11-11, D41):** the reserved platform project's screens
+> **Amendment (2026-11-11, D42):** the reserved platform project's screens
 > are root surfaces: a project's own screens, rows of the root's sidebar
 > beside Projects, and the same rule governs them, with the reserved project
 > as the target. They are listed, and the project may be the Console's

@@ -192,7 +192,7 @@ func TestListMyProjects(t *testing.T) {
 		assert.False(t, page2.NextPageToken.Set, helpers.MustMarshal(t, page2))
 	})
 
-	// The storage half of `exclude_platform` (D41): the excluded project is left
+	// The storage half of `exclude_platform` (D42): the excluded project is left
 	// out with the grants and the name search, so a page is never short a row.
 	t.Run("an excluded project is left out of the page", func(t *testing.T) {
 		t.Parallel()

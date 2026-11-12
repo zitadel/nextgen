@@ -71,7 +71,7 @@ test("a platform operator reaches every management screen without an error", asy
   await expect(page.locator("zitadel-login").getByRole("textbox", { name: "Email" })).toBeVisible();
 
   // The platform project the console signs in to is the root, not a project
-  // to choose (D41): the server marks it, Projects never lists it, and this
+  // to choose (D42): the server marks it, Projects never lists it, and this
   // operator, who holds no grant on it, finds none of its screens in the
   // root's sidebar.
   const runtime = (await (await page.request.get("/console/runtime.json")).json()) as {

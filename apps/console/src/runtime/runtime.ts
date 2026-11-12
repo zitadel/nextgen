@@ -50,7 +50,7 @@ export interface ConsoleRuntime {
    */
   publishable_key?: string;
   /**
-   * The reserved platform project (ADR 0004 §3 amendment, D41): present, and
+   * The reserved platform project (ADR 0004 §3 amendment, D42): present, and
    * equal to `console_project_id`, only when the console signs in to the
    * project bootstrap provisioned. The console draws that project at its root
    * (its screens are the root sidebar's rows, for someone who may act on it)
@@ -141,7 +141,7 @@ export function getConsoleProjectId(): string {
 }
 
 /**
- * The reserved platform project's id (D41), or `undefined` when the console
+ * The reserved platform project's id (D42), or `undefined` when the console
  * signs in to an ordinary project or none. The only way the console knows that
  * project: never a written id, and never `console_project_id` on its own.
  * Whether the person may act on it is another question

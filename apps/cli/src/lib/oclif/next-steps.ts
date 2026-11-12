@@ -1,5 +1,7 @@
+import type { BoxAction } from "@/lib/box";
 import { command, dim, strong } from "@/lib/style";
 import { escapeControlCharacters } from "@/lib/terminal-text";
+import { NEXT_LABEL } from "@/lib/ui/summary";
 
 /**
  * What a command suggests doing next, and the one place it is shown.
@@ -20,6 +22,33 @@ export type NextSteps<C extends string = string> = {
   readonly actions?: readonly string[];
   readonly commands?: readonly C[];
 };
+
+/** A step as the ending draws it: a sentence and, when it asks for one, the command. */
+export type EndingStep = BoxAction;
+
+/**
+ * The next steps as the steps an ending is made of, so a command states them
+ * once, as the result's `next`, and the envelope and the ending cannot say
+ * different things. Prose is a step of its own; the commands follow under the
+ * heading every command uses.
+ */
+export function stepsOf(next: NextSteps | undefined): EndingStep[] {
+  const commands = next?.commands ?? [];
+
+  return [
+    ...(next?.actions ?? []).map((text) => {
+      return { text };
+    }),
+    ...(commands.length === 0
+      ? []
+      : [
+          {
+            text: NEXT_LABEL,
+            command: commands.join("\n"),
+          },
+        ]),
+  ];
+}
 
 declare const stepsShown: unique symbol;
 
@@ -59,13 +88,14 @@ export function renderNextSteps(next: NextSteps): string {
   if (actions.length === 0 && commands.length === 0) {
     return "";
   }
+
   // The block is coloured, so it is printed as it came and cannot be spelled
   // out as a whole. A suggested command goes through the palette, which spells
   // out what it is given; an action is prose nothing colours, and it names
   // what the server answered — a cursor to page with, an id to act on — so it
   // is spelled out here.
   return [
-    strong("Next:"),
+    strong(NEXT_LABEL),
     ...actions.map((action) => {
       return `  ${escapeControlCharacters(action)}`;
     }),

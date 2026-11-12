@@ -204,7 +204,7 @@ describe("getConsoleProjectId", () => {
   });
 });
 
-// The server marks the reserved platform project (D41): the console reads it
+// The server marks the reserved platform project (D42): the console reads it
 // from the document only, and only as the project it signs in to.
 describe("getPlatformProjectId", () => {
   it("names the reserved platform project the document marks", async () => {

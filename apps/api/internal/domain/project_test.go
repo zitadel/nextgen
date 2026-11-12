@@ -16,7 +16,7 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
-// Only the built-in row is reserved (D41): a pin naming an ordinary project,
+// Only the built-in row is reserved (D42): a pin naming an ordinary project,
 // and no platform project at all, mark nothing.
 func TestReservedPlatformProjectID(t *testing.T) {
 	t.Parallel()

@@ -21,7 +21,7 @@ const (
 var PlatformProjectID = PrefixProject.IDPrefix("platform") // "proj_platform"
 
 // ReservedPlatformProjectID is the deployment's reserved platform project
-// (Console ADR 0004 §2, D41), given the project the deployment treats as its
+// (Console ADR 0004 §2, D42), given the project the deployment treats as its
 // platform project: that project when it is the built-in row, else "". Only
 // the bootstrap provisioner writes that row (POST /projects never mints its
 // id), so its id is the persisted marker. A platform.project_id pin naming an

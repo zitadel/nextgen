@@ -611,11 +611,11 @@ describe("projects screen", () => {
       reads.map(() => "proj_platform"),
     );
     // And every read leaves the reserved platform project out: the root draws
-    // it, and it is never a project to choose (D41).
+    // it, and it is never a project to choose (D42).
     expect(reads.map((params) => params.get("exclude_platform"))).toEqual(reads.map(() => "true"));
   });
 
-  it("never selects the platform project a URL names (D41)", async () => {
+  it("never selects the platform project a URL names (D42)", async () => {
     _setRuntimeForTesting({
       mode: "standalone",
       console_project_id: "proj_platform",

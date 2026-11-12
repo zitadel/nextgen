@@ -93,7 +93,7 @@ export function AppShell({
 /** The console's home: Projects, the list of every project. */
 const HOME_ROUTE = "/_authed/projects/";
 
-/** The person's profile, which the account menu opens (D41). */
+/** The person's profile, which the account menu opens (D42). */
 const ACCOUNT_ROUTE = "/_authed/account/";
 
 /** Events, whose list replaces the project's on the screen and under an event's drawer. */
@@ -102,7 +102,7 @@ const EVENTS_PATH = "/events";
 /**
  * Which of the sidebar's lists is showing, and the **URL** decides: the route,
  * and whether the project it is drawn for is the reserved platform project,
- * whose screens are the root's (D41).
+ * whose screens are the root's (D42).
  *
  * Projects is above every project, so it lists the root's screens, and so do
  * the person's profile (`/account`) and any screen of the platform project;
@@ -118,7 +118,7 @@ const EVENTS_PATH = "/events";
 function useShellView(): NavView {
   const matchRoute = useMatchRoute();
   const atHome = !!useMatch({ from: HOME_ROUTE, shouldThrow: false });
-  // The person's profile is above every project too (D41), with no row of its own.
+  // The person's profile is above every project too (D42), with no row of its own.
   const atAccount = !!useMatch({ from: ACCOUNT_ROUTE, shouldThrow: false });
   // So is every screen drawn for the platform project: it is the root's.
   const atPlatform = usePlatformSelected();
@@ -228,7 +228,7 @@ const NAV_LABEL: Record<NavView, string> = {
  * Console ADR 0001). Portal is the project's screens. Account is the root's
  * list, what sits above every project: Projects, the home, then the reserved
  * platform project's screens for someone who may act on it, then Settings
- * (D41, `useAccountListItems`). Those screens are a project's own, drawn for
+ * (D42, `useAccountListItems`). Those screens are a project's own, drawn for
  * the platform project, which their rows select; a customer's project is
  * reached by choosing it.
  * Settings is that row's own list, under a heading that leads back: the
@@ -239,7 +239,7 @@ const NAV_LABEL: Record<NavView, string> = {
  * the project: its General and Admins pages (D40).
  *
  * Events is one screen's own list, under a heading that leads back to the
- * project's, or to the root's for the platform project's Events (D41): a
+ * project's, or to the root's for the platform project's Events (D42): a
  * picker of the list's views, not routes, and its filters in a group of
  * their own (D30). The events feature draws both.
  *
@@ -254,7 +254,7 @@ function NavList({ view }: { view: NavView }) {
   const items = view === "account" ? account : view === "settings" ? settings : own;
   const matchRoute = useMatchRoute();
   const entrance = useListEntrance(view);
-  // Whether the screen is drawn for the platform project (D41): its rows are
+  // Whether the screen is drawn for the platform project (D42): its rows are
   // the marked ones then, and Events' list leads back to the root's.
   const atPlatform = usePlatformSelected();
 
@@ -284,7 +284,7 @@ function NavList({ view }: { view: NavView }) {
                 tooltip={name}
               >
                 {/* A row of the root's that is the platform project's screen
-                    selects that project (D41); every other row keeps the
+                    selects that project (D42); every other row keeps the
                     selection, which `_authed` retains. */}
                 <Link to={to} search={project ? { project } : undefined} title={name}>
                   <Icon aria-hidden />
@@ -410,7 +410,7 @@ function ListHeading({
  * so the bar carries none of them.
  */
 function ContextBar({ view, userId }: { view: NavView; userId?: string }) {
-  // A screen drawn for the platform project is the root's (D41): the pill
+  // A screen drawn for the platform project is the root's (D42): the pill
   // says the root there, never a project named Platform.
   const root = usePlatformSelected();
   return (

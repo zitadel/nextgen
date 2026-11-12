@@ -102,7 +102,7 @@ export function ContextSwitcher({
   allProjects?: boolean;
   /**
    * The screen is the root's own: it is drawn for the reserved platform
-   * project, which is the selection then (D41). The pill says the root, never
+   * project, which is the selection then (D42). The pill says the root, never
    * a project named for the platform, and its list marks and remembers none.
    */
   root?: boolean;
@@ -199,7 +199,7 @@ function ProjectSwitcher({
 
   const label = current && (current.name ?? current.id);
   // A selection outlives the way up to Projects and Settings (D36). While it
-  // is the platform project the pill names the root (D41).
+  // is the platform project the pill names the root (D42).
   const shown = root ? undefined : selected;
   const unselected = root || (allProjects && !selected);
 

@@ -111,7 +111,7 @@ interface NavLink {
  */
 function useGone(error: unknown): { resource: string; list: NavLink } | undefined {
   const match = useMatch({ strict: false, shouldThrow: false });
-  // A root page's resource leads back to its row of the root's list (D41).
+  // A root page's resource leads back to its row of the root's list (D42).
   const items = [...useNavItems(), ...useNavItems("account")];
   const resource = match?.staticData.resource;
   if (!match || !resource || !(error instanceof ApiError) || error.status !== 404) {

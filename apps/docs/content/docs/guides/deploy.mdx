@@ -24,7 +24,7 @@ Preview first. `--dry-run` validates the configuration, prints the git diff agai
 npx @zitadel/cli@latest deploy --dry-run
 ```
 
-It ends with `Validated <n> resources. Nothing was deployed (dry run).`
+It ends with `Validated <n> resources and deployed nothing (dry run)`
 
 Then deploy:
 
@@ -34,13 +34,14 @@ npx @zitadel/cli@latest deploy -m "<why this release changes>"
 
 `-m` records why on the release and the deployment ([Messages](#messages)). A non-interactive run, such as CI, fails without it unless a pull request title or a clean git commit supplies one. A release carries a content digest, so re-running `deploy` on unchanged configuration returns the same release.
 
-On success it prints the digest, how many resources the release pins (includes) and each origin it went live on:
+On success it prints how many resources the release pins (includes), then the start of its digest and each origin it went live on:
 
 ```text
-Deployed sha256:<digest>
-  <n> resources to <m> origins
-  - <origin>
+Deployed <n> resources
+Release sha256:<first 12 digits> is now live on <origin>.
 ```
+
+The full digest is `content_hash` in the `--json` envelope.
 
 Under `--json` the result is one envelope on stdout. `data` carries `release_id`, `content_hash`, `deployment_id`, `resources`, `origins` and `diff`, and `data.next_commands` suggests `deployment list`. `diff.files` lists each changed file with its `status` and its `patch`, the file's part of the diff. It is `null` when there is nothing to diff against yet, such as before the first deploy, and `diff.note` says why.
 
@@ -82,9 +83,9 @@ Undo the last deploy by deploying the release before it:
 npx @zitadel/cli@latest deployment rollback
 ```
 
-It asks first. Add `--force` when non-interactive and `-m "<why>"` to record the reason. `--dry-run` prints "Would re-apply `<deployment id>`" and changes nothing. To restore a specific deployment, pass its ID from `deployment list`.
+It asks first. Add `--force` when non-interactive and `-m "<why>"` to record the reason. `--dry-run` prints "Would roll back to `<deployment id>` (dry run)" and changes nothing. To restore a specific deployment, pass its ID from `deployment list`.
 
-It prints `Rolled back to <release id> on <origins>`, then a table of the revisions that release pins (`kind`, `handle`, `revision_id`). A revision is one immutable version of a schema, flow or branding resource. The `schema` row is the revision new registrations use. With `--json`, `data` carries `deployment_id`, `release_id`, `rolled_back_to`, `origins` and `pointers`.
+It prints `Rolled back to <release id>` and the origins it is live on, then a table of the revisions that release pins (`kind`, `handle`, `revision_id`). A revision is one immutable version of a schema, flow or branding resource. The `schema` row is the revision new registrations use. With `--json`, `data` carries `deployment_id`, `release_id`, `rolled_back_to`, `origins` and `pointers`.
 
 A rollback restores every origin that deployment froze, including listed ones the live deployment left out, which serve its release again. A primary origin it leaves out refuses sign-in until the next `deploy`. Both `deployment rollback` and the console name these origins first.
 

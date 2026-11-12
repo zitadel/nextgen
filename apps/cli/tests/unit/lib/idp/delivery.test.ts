@@ -6,12 +6,12 @@ import {
   type PublishedCredentials,
   type SecretPublisher,
 } from "@/lib/idp";
-import { environmentSelectorSuffix } from "@/lib/oclif/environment-flags";
 import { takeReportedWarnings } from "@/lib/warnings";
 import { Connection } from "@/lib/zitadel";
 import { aGoogleConnection } from "@tests/helpers/config";
 import { anAcmeSsoConnection } from "@tests/helpers/connections";
 import { clientId, clientSecret, idVariable, secretVariable } from "@tests/helpers/idp-values";
+import { aSuggest } from "@tests/helpers/suggestions";
 
 /**
  * Where the connections in these tests are written.
@@ -55,8 +55,7 @@ function deliveryFor(connection: Connection, reused = false): CredentialDelivery
   const run: DeliveryRun = {
     connection,
     reused,
-    selector: environmentSelectorSuffix({}),
-    cliVersion: "1.0.0",
+    suggest: aSuggest(),
   };
   return new CredentialDelivery(run);
 }
@@ -194,32 +193,32 @@ describe("CredentialDelivery.areStored", () => {
   });
 });
 
-describe("CredentialDelivery.recoveryArgs", () => {
+describe("CredentialDelivery.unpublishedOf", () => {
   it("lists nothing when the project holds everything", () => {
     const published: PublishedCredentials = {
       clientId: "stored",
       secret: { name: secretVariable("acme-sso"), published: "stored" },
     };
 
-    expect(deliveryFor(ACME).recoveryArgs(published, [])).toEqual([]);
+    expect(deliveryFor(ACME).unpublishedOf(published)).toEqual([]);
   });
 
-  it("lists each credential that did not arrive, with the extra arguments", () => {
+  it("lists each credential that did not arrive", () => {
     const published: PublishedCredentials = {
       clientId: "failed",
       secret: { name: secretVariable("acme-sso"), published: "deferred" },
     };
 
-    expect(deliveryFor(ACME).recoveryArgs(published, ["--cwd", "/p"])).toEqual([
-      ["variable", "set", idVariable("acme-sso"), "--cwd", "/p"],
-      ["variable", "set", secretVariable("acme-sso"), "--secret", "--cwd", "/p"],
+    expect(deliveryFor(ACME).unpublishedOf(published)).toEqual([
+      { name: idVariable("acme-sso"), secret: false },
+      { name: secretVariable("acme-sso"), secret: true },
     ]);
   });
 
   it("leaves out a credential nothing was sent for", () => {
     const published: PublishedCredentials = { clientId: undefined, secret: undefined };
 
-    expect(deliveryFor(ACME).recoveryArgs(published, [])).toEqual([]);
+    expect(deliveryFor(ACME).unpublishedOf(published)).toEqual([]);
   });
 
   it("leaves out a client id the connection holds as a value", () => {
@@ -228,8 +227,8 @@ describe("CredentialDelivery.recoveryArgs", () => {
       secret: { name: secretVariable("google"), published: "failed" },
     };
 
-    expect(deliveryFor(GOOGLE).recoveryArgs(published, [])).toEqual([
-      ["variable", "set", secretVariable("google"), "--secret"],
+    expect(deliveryFor(GOOGLE).unpublishedOf(published)).toEqual([
+      { name: secretVariable("google"), secret: true },
     ]);
   });
 });

@@ -279,7 +279,7 @@ func TestStandaloneRuntimeResolverMintsWhenPreviewTokenIsGone(t *testing.T) {
 }
 
 // The bootstrapped platform project is marked as reserved, so the console
-// draws it at its root (D41). An ordinary project, pinned or first-created, is
+// draws it at its root (D42). An ordinary project, pinned or first-created, is
 // never marked: TestStandaloneRuntimeResolverReusesPreviewToken's document
 // carries no platform_project_id.
 func TestStandaloneRuntimeResolverMarksReservedPlatformProject(t *testing.T) {

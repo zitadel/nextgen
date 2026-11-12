@@ -9,7 +9,7 @@ import { type ProjectRef, toProjectRef } from "./model";
 
 /**
  * Every list of the person's projects leaves out the reserved platform project
- * (D41): the console draws it at the root and never offers it as a project.
+ * (D42): the console draws it at the root and never offers it as a project.
  * The server excludes it only where the deployment has one, so a pinned
  * ordinary project stays listed.
  */

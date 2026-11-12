@@ -850,7 +850,7 @@ func TestAuthAttemptService_VerifyProof_Password(t *testing.T) {
 			}
 			stmts.EXPECT().GetUserPassword(gomock.Any(), gomock.Any()).Return(password, nil)
 			hashers.EXPECT().HasherForProject(gomock.Any(), "proj").Return(projectHasher, nil)
-			projectHasher.EXPECT().VerifyAndRehash("encoded", "secret").Return(tt.updated, tt.verifyErr)
+			projectHasher.EXPECT().VerifyAndRehash(gomock.Any(), "encoded", "secret").Return(tt.updated, tt.verifyErr)
 			if tt.wantStore {
 				stmts.EXPECT().UpdateUserPasswordHash(gomock.Any(), password, tt.updated).Return(tt.storeErr)
 			}
@@ -887,7 +887,7 @@ func TestAuthAttemptService_VerifyProof_Password(t *testing.T) {
 		})
 		stmts.EXPECT().GetUserPassword(gomock.Any(), gomock.Any()).Return(&domain.UserPassword{EncodedHash: "encoded"}, nil)
 		hashers.EXPECT().HasherForProject(gomock.Any(), "proj").Return(nil, errors.New("policy unavailable"))
-		defaultVerifier.EXPECT().VerifyHash("encoded", "secret").Return(nil)
+		defaultVerifier.EXPECT().VerifyHash(gomock.Any(), "encoded", "secret").Return(nil)
 		stmts.EXPECT().AuthAttemptChallengeSucceeded(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, _, _ string, factor domain.AuthFactor, _ string) error {
 			succeededFactor = factor
 			return nil

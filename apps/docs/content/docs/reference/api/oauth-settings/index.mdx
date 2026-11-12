@@ -1,0 +1,12 @@
+---
+title: OAuth settings
+description: Read the OAuth settings revisions a release publishes, which say whether a project's OAuth authorization server answers.
+---
+
+OAuth settings say whether a project's OAuth authorization server answers. A
+[release](/docs/reference/api/releases) publishes them as an immutable
+revision from the `oauth` resource of its bundle, and this operation reads one
+back. There is no operation that publishes them on their own. Under a release
+that pins no OAuth settings, the authorization server is off.
+
+<Operations />

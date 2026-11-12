@@ -27,6 +27,7 @@ import {
 } from "@tests/helpers/local-project";
 import { usePlatformServer } from "@tests/helpers/platform-project";
 import { expectedPublicCliCommand, parseJson, runCliForTest } from "@tests/helpers/run-cli";
+import { asOneLine } from "@tests/helpers/terminal";
 
 /**
  * The subcommand and provider every Google run names.
@@ -351,7 +352,7 @@ describe("auth-method sso enable", () => {
         data: {
           next_args: [
             ["deploy", "--dry-run", "--cwd", cwd],
-            ["deploy", "-m", "<what changed>", "--cwd", cwd],
+            ["deploy", "--message", "<what changed>", "--cwd", cwd],
           ],
         },
       });
@@ -374,9 +375,10 @@ describe("auth-method sso enable", () => {
     );
 
     it.for([
-      "Google sign-in is configured locally. Provider credentials are stored on your Project.",
-      "Deploy the configuration to make Google sign-in available in your app, then reload your app and test Google sign-in.",
-      `  $ ${expectedPublicCliCommand("deploy --dry-run")}`,
+      "Google sign-in is configured locally",
+      "Its credentials are stored in your project.",
+      "Deploy it to make Google sign-in available in your app, then reload the app and test it",
+      expectedPublicCliCommand("deploy --dry-run"),
     ])("says %s", async (line, { dir }) => {
       const cwd = await aProject(dir);
 
@@ -384,7 +386,22 @@ describe("auth-method sso enable", () => {
         return runCliForTest(authMethodText(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
       });
 
-      expect(result.stdout).toContain(line);
+      expect(asOneLine(result.stdout)).toContain(line);
+    });
+
+    it.for([
+      { output: "piped text", command: "deploy --dry-run", run: authMethodText },
+      { output: "piped text", command: "deploy --message", run: authMethodText },
+      { output: "--json", command: "deploy --dry-run", run: authMethodJson },
+      { output: "--json", command: "deploy --message", run: authMethodJson },
+    ])("names $command once in $output", async ({ command, run }, { dir }) => {
+      const cwd = await aProject(dir);
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(run(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(asOneLine(result.stdout).split(expectedPublicCliCommand(command))).toHaveLength(2);
     });
   });
 
@@ -397,7 +414,7 @@ describe("auth-method sso enable", () => {
         return runCliForTest(authMethodText(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
       });
 
-      expect(result.stdout).toContain("Google sign-in is configured locally.");
+      expect(result.stdout).toContain("Google sign-in is configured locally");
     });
 
     it("does not say the credentials are stored", async ({ dir }) => {
@@ -408,7 +425,7 @@ describe("auth-method sso enable", () => {
         return runCliForTest(authMethodText(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
       });
 
-      expect(result.stdout).not.toContain("stored on your Project");
+      expect(result.stdout).not.toContain("credentials are stored");
     });
 
     it("reports the secret the project never received", async ({ dir }) => {
@@ -480,7 +497,7 @@ describe("auth-method sso enable", () => {
           return runCliForTest(authMethodText(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
         });
 
-        expect(result.stderr).toContain(line);
+        expect(asOneLine(result.stdout + result.stderr)).toContain(line);
       },
     );
 
@@ -571,18 +588,18 @@ describe("auth-method sso enable", () => {
   });
 
   describe("with a custom provider", () => {
-    it.for([
-      "Acme SSO sign-in is configured locally.",
-      "then reload your app and test Acme SSO sign-in.",
-    ])("says %s", async (line, { dir }) => {
-      const cwd = await aProject(dir);
+    it.for(["Acme SSO sign-in is configured locally", "then reload the app and test it"])(
+      "says %s",
+      async (line, { dir }) => {
+        const cwd = await aProject(dir);
 
-      const result = await withStdin(SECRET, () => {
-        return runCliForTest(authMethodText(cwd, ...ACME, "--client-id", ACME_CLIENT_ID));
-      });
+        const result = await withStdin(SECRET, () => {
+          return runCliForTest(authMethodText(cwd, ...ACME, "--client-id", ACME_CLIENT_ID));
+        });
 
-      expect(result.stdout).toContain(line);
-    });
+        expect(result.stdout).toContain(line);
+      },
+    );
   });
 
   describe("when the schema defines nothing the provider maps", () => {
@@ -667,7 +684,7 @@ describe("auth-method sso enable", () => {
         return runCliForTest(authMethodText(cwd, ...GOOGLE));
       });
 
-      expect(result.stdout).toContain("Google sign-in is already configured locally.");
+      expect(result.stdout).toContain("Google sign-in is already configured locally");
     });
 
     it("does not offer a deploy, since nothing changed", async ({ dir }) => {
@@ -677,7 +694,31 @@ describe("auth-method sso enable", () => {
         return runCliForTest(authMethodText(cwd, ...GOOGLE));
       });
 
-      expect(result.stdout).not.toContain("Deploy the configuration");
+      expect(result.stdout).not.toContain("Deploy it to make");
+    });
+
+    // The chain's summary says where the command ran, so the label pair it
+    // used to print before the first question has no place any more.
+    it("never labels the project it ran against before its first question", async ({ dir }) => {
+      const cwd = await aProject(dir);
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodText(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(result.stdout + result.stderr).not.toContain("Project   ");
+    });
+
+    it("still says which schema it is editing", async ({ dir }) => {
+      const cwd = await aProject(dir);
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodText(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(result.stdout + result.stderr).toContain(
+        "Editing .zitadel/schemas/default-human-user.json",
+      );
     });
 
     it("prints the callback URI to register, without --json", async ({ dir }) => {
@@ -950,14 +991,44 @@ describe("auth-method sso enable", () => {
   });
 
   describe("with --dry-run", () => {
-    it("reports the run as skipped", async ({ dir }) => {
+    it("reports the preview as a dry run", async ({ dir }) => {
       const cwd = await aProject(dir);
 
       const result = await withStdin(SECRET, () => {
         return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID, "--dry-run"));
       });
 
-      expect(parseJson(result.stdout)).toMatchObject({ status: "skipped" });
+      expect(parseJson(result.stdout)).toMatchObject({ status: "ok", data: { dry_run: true } });
+    });
+
+    it("carries the headline it draws as data.title", async ({ dir }) => {
+      const cwd = await aProject(dir);
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID, "--dry-run"));
+      });
+
+      expect(parseJson(result.stdout)).toMatchObject({
+        data: { title: `Would write ${SCHEMA_FILE} (dry run)` },
+      });
+    });
+
+    it("suggests the real command", async ({ dir }) => {
+      const cwd = await aProject(dir);
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID, "--dry-run"));
+      });
+
+      expect(parseJson(result.stdout)).toMatchObject({
+        data: {
+          next_commands: [
+            expect.stringContaining(
+              `auth-method sso enable --provider google --client-id ${CLIENT_ID}`,
+            ),
+          ],
+        },
+      });
     });
 
     it("writes no connection", async ({ dir }) => {
@@ -1135,7 +1206,7 @@ describe("auth-method sso enable", () => {
       expect(parseJson(result.stdout)).toMatchObject({
         next_commands: [
           expect.stringContaining(
-            "auth-method sso enable --provider google --client-id <client-id> --server https://api.zitadel.cloud",
+            "auth-method sso enable --provider google --client-id '<client-id>' --server https://api.zitadel.cloud",
           ),
         ],
       });
@@ -1530,14 +1601,21 @@ describe("auth-method sso enable", () => {
   });
 
   describe("when the Project's path needs quoting", () => {
-    it("leaves the follow-ups out of next_commands", async ({ dir }) => {
+    it("quotes the path in the next_commands", async ({ dir }) => {
       const cwd = await aProject(join(dir, "my project"));
 
       const result = await withStdin(SECRET, () => {
         return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
       });
 
-      expect(parseJson(result.stdout)).toMatchObject({ data: { next_commands: [] } });
+      expect(parseJson(result.stdout)).toMatchObject({
+        data: {
+          next_commands: [
+            expect.stringMatching(/ deploy --dry-run --cwd '[^']+my project'$/),
+            expect.stringMatching(/ deploy --message '<what changed>' --cwd '[^']+my project'$/),
+          ],
+        },
+      });
     });
 
     it("still lists them as next_args", async ({ dir }) => {

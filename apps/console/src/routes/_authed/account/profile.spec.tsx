@@ -103,7 +103,7 @@ describe("profile", () => {
     expect(email).toHaveAttribute("placeholder", "No email address");
   });
 
-  it("is the account's, apart from the root Settings (D41)", async () => {
+  it("is the account's, apart from the root Settings (D42)", async () => {
     server.use(http.get(ME_URL, () => HttpResponse.json(me())));
     await renderAt("/account");
     await screen.findByRole("heading", { name: "Profile" });

@@ -17,7 +17,7 @@ export interface NavItem {
   /**
    * The project the row's screen is drawn for, where that is not the
    * selection: the reserved platform project, on a row of the root's lists
-   * (D41). The row selects it.
+   * (D42). The row selects it.
    */
   project?: string;
 }
@@ -56,7 +56,7 @@ export function useNavItems(view: NavView = "portal"): NavItem[] {
 }
 
 /**
- * The root's list as the sidebar draws it (D41): Projects, the spine, then
+ * The root's list as the sidebar draws it (D42): Projects, the spine, then
  * the reserved platform project's screens for someone who may act on it, then
  * Settings.
  *
@@ -90,7 +90,7 @@ export function useAccountListItems(): NavItem[] {
 }
 
 /**
- * The root's Settings list (D29, D41): the platform project's own Settings
+ * The root's Settings list (D29, D42): the platform project's own Settings
  * pages (General, Admins) for someone who may act on it, each drawn for that
  * project, then what an add-on adds (the hosted cloud's Billing, Support and
  * Email).

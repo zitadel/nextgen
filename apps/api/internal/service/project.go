@@ -592,7 +592,7 @@ type ListAuthorizedProjectsRequest struct {
 	Limit     int
 	PageToken string
 	// ExcludeProjectID leaves one project out of the listing: the reserved
-	// platform project when the caller asked for `exclude_platform` (D41).
+	// platform project when the caller asked for `exclude_platform` (D42).
 	// Applied with the authorization and the name search, so paging stays
 	// whole. Empty excludes nothing.
 	ExcludeProjectID string

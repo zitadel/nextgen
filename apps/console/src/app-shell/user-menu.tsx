@@ -174,7 +174,7 @@ export function UserMenuItem({ user, onSignOut }: { user?: ShellUser; onSignOut?
  * above the row instead, which sits at the bottom of the sheet.
  *
  * It follows Vercel's: the person heads it and opens their profile
- * (`/account`, apart from the root's Settings, D41); then Theme, Documentation
+ * (`/account`, apart from the root's Settings, D42); then Theme, Documentation
  * and Log out. Nothing else repeats a Settings page. `Feedback` is parked: it has no
  * destination yet, and a row that does nothing reads as broken.
  */

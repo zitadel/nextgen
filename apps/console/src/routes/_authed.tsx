@@ -49,7 +49,7 @@ export const Route = createFileRoute("/_authed")({
       throw redirect({ to: "/login", search: { next: routerRelativeHref(location.href) } });
     }
     const leaf = matches[matches.length - 1];
-    // The reserved platform project is the root (D41): its screens are the
+    // The reserved platform project is the root (D42): its screens are the
     // root's, for someone who may act on it. For anyone else a URL naming it
     // goes on without it, and gets the default like any project they cannot
     // choose. `undefined` removes the retained key, which leaving it out

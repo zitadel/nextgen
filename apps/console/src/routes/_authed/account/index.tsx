@@ -48,7 +48,7 @@ import {
  */
 export const Route = createFileRoute("/_authed/account/")({
   // No sidebar row: the account menu's first row opens it, as Vercel's account
-  // settings open from the avatar, apart from the team's Settings (D41).
+  // settings open from the avatar, apart from the team's Settings (D42).
   loader: async () => {
     // A failed schema read leaves the identifier alone (below), and a failed
     // sign-in method read costs its list, never the screen.

@@ -4,7 +4,7 @@ import { expectNoErrorBoundary } from "../support/screens";
 import { signIn } from "../support/sign-in";
 
 /**
- * Profile (`/account`, D41), against a real instance.
+ * Profile (`/account`, D42), against a real instance.
  *
  * The unit spec stubs `GET /users/me`. This proves the signed-in person's own
  * record reaches the screen through the session cookie alone: the email shown

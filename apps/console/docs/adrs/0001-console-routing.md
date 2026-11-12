@@ -237,7 +237,7 @@ the sidebar.
 > the selected project, and the pill names it. With none selected the pill
 > says `All projects` and a project's row asks for one (D22, D31).
 
-> **Amendment (2026-11-11, design decision D41):** the account list is the
+> **Amendment (2026-11-11, design decision D42):** the account list is the
 > root's: Projects, then the reserved platform project's screens for someone
 > who may act on it, then Settings. Those screens are the portal's own
 > routes: a row of the root's selects the platform project (`?project=`), and

@@ -1,6 +1,5 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-
 import semver from "semver";
 
 import { npmDistTagForCliVersion } from "./public-cli";

@@ -14,7 +14,7 @@ const lastAnswer = sessionKept((): { value: string | null | undefined } => ({ va
 
 /**
  * Whether the signed-in person may act on the reserved platform project, the
- * console's root (D41, Console ADR 0004 §5 amendment).
+ * console's root (D42, Console ADR 0004 §5 amendment).
  *
  * Its screens are a project's screens, and rows of the root sidebar only for
  * someone who can, which a platform operator always can (root ADR 075) and a

@@ -364,7 +364,7 @@
     {
       "id": "console",
       "group": "Local development",
-      "description": "Open the local console, signed in as the local admin.\n\nThe local admin is the one `zitadel start` created. Run this in the directory `zitadel start` ran in, or one inside it: the local admin is read from the nearest `.zitadel/local/` on the way up.",
+      "description": "Open the local console, signed in as the local admin.\n\nThe local admin is the one the start command created. Run this in the directory it ran in, or one inside it: the local admin is read from the nearest .zitadel/local/ on the way up.",
       "args": [],
       "flags": [
         {
@@ -385,7 +385,7 @@
     {
       "id": "logs",
       "group": "Local development",
-      "description": "Show local Zitadel server logs.\n\nOn a terminal, warnings are yellow and errors red. Run it in the directory `zitadel start` ran in, or one inside it: the server is found from the nearest `.zitadel/local/` on the way up.",
+      "description": "Show local Zitadel server logs.\n\nOn a terminal, warnings are yellow and errors red. Run it in the directory the start command ran in, or one inside it: the server is found from the nearest .zitadel/local/ on the way up.",
       "args": [],
       "flags": [
         {
@@ -1279,7 +1279,7 @@
         },
         {
           "name": "schema",
-          "description": "User schema to change, by file name or objectType. Required when the Project has more than one.",
+          "description": "User schema to change, by file name or objectType. Required when the project has more than one.",
           "type": "option"
         }
       ],
@@ -1300,7 +1300,7 @@
       "flags": [
         {
           "name": "schema",
-          "description": "User schema to change, by file name or objectType. Required when the Project has more than one.",
+          "description": "User schema to change, by file name or objectType. Required when the project has more than one.",
           "type": "option"
         }
       ],
@@ -1327,7 +1327,7 @@
         },
         {
           "name": "schema",
-          "description": "User schema to change, by file name or objectType. Required when the Project has more than one.",
+          "description": "User schema to change, by file name or objectType. Required when the project has more than one.",
           "type": "option"
         }
       ],
@@ -1348,7 +1348,7 @@
       "flags": [
         {
           "name": "schema",
-          "description": "User schema to change, by file name or objectType. Required when the Project has more than one.",
+          "description": "User schema to change, by file name or objectType. Required when the project has more than one.",
           "type": "option"
         }
       ],
@@ -1380,7 +1380,7 @@
         },
         {
           "name": "schema",
-          "description": "User schema to change, by file name or objectType. Required when the Project has more than one.",
+          "description": "User schema to change, by file name or objectType. Required when the project has more than one.",
           "type": "option"
         }
       ],
@@ -1446,7 +1446,7 @@
         },
         {
           "name": "schema",
-          "description": "User schema to change, by file name or objectType. Required when the Project has more than one.",
+          "description": "User schema to change, by file name or objectType. Required when the project has more than one.",
           "type": "option"
         }
       ],
@@ -2282,14 +2282,14 @@
       "args": [
         {
           "name": "deployment_id",
-          "description": "The deployment to re-apply. Omit to undo the last deploy."
+          "description": "The deployment to roll back to. Omit to undo the last deploy."
         }
       ],
       "flags": [
         {
           "name": "force",
           "char": "f",
-          "description": "Re-apply the deployment without the confirmation prompt. Required when non-interactive.",
+          "description": "Roll back to the deployment without the confirmation prompt. Required when non-interactive.",
           "type": "boolean"
         },
         {
@@ -3769,7 +3769,7 @@
     {
       "id": "api ls",
       "group": "Diagnostics and utilities",
-      "description": "List the operations of the Zitadel API that `zitadel api` calls.",
+      "description": "List the operations of the Zitadel API that the api command calls.",
       "args": [
         {
           "name": "filter",

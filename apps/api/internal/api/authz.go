@@ -179,6 +179,15 @@ var idpAccess = resourceAccess{
 	configuration: true,
 }
 
+// applicationAccess guards the project's registered applications. Create is
+// project-scoped; the get resolves the path id through RSI in the project.
+var applicationAccess = resourceAccess{
+	kind:      domain.ResourceKindApplication,
+	readMiss:  domain.ErrApplicationNotFound,
+	writeMiss: domain.ErrApplicationNotFound,
+	denied:    domain.ErrApplicationPermissionDenied,
+}
+
 // deploymentAccess gates the record of what runs where (ADR 035, #532).
 // Same shape as releaseAccess: create and get are project-scoped — both carry
 // a project_id and the get filters its lookup by it — so no route resolves a

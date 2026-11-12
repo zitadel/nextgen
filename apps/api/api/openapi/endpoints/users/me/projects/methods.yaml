@@ -63,7 +63,7 @@ get:
       schema:
         $ref: ../../../../components/schemas/sort-direction.yaml
       example: desc
-    # Console ADR 0004 §3 (D41): the console lists customer projects only and
+    # Console ADR 0004 §3 (D42): the console lists customer projects only and
     # draws the platform project's surfaces at its root.
     - name: exclude_platform
       in: query

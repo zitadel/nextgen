@@ -312,13 +312,13 @@ function SearchPalette({
   const recentProjects = useMemo(() => readRecentProjects(userId), [userId]);
   const pages = useNavItems();
   // The root's lists, the platform project's screens among them for someone
-  // who may act on it (D41).
+  // who may act on it (D42).
   const account = useAccountListItems();
   const settings = useSettingsListItems();
   const projectSettings = useNavItems("project-settings");
 
   const selected = useSelectedProject();
-  // The reserved platform project is the root (D41): selected, its screens
+  // The reserved platform project is the root (D42): selected, its screens
   // are the root's, and neither they nor its hits read as a project's.
   const platformProjectId = getPlatformProjectId();
   const atPlatform = projectId !== undefined && projectId === platformProjectId;
@@ -424,7 +424,7 @@ function SearchPalette({
       pages.find((item) => item.to === LIST_PATH[type])?.nav.icon ?? Search;
     // A hit opens in its own project, which opening it selects (`?project=`,
     // D39). One in the reserved platform project opens the root's screen the
-    // same way (D41).
+    // same way (D42).
     const openHit = (hit: SearchHit) => {
       const search = (prev: Record<string, unknown>) => ({ ...prev, project: hit.projectId });
       switch (hit.type) {
@@ -462,7 +462,7 @@ function SearchPalette({
     const hitResult = (hit: SearchHit, group: string): RankedResult => {
       const Icon = iconOf(hit.type);
       const root = hit.projectId === platformProjectId;
-      // A root hit reads as the root's screen that lists it (D41), never as a
+      // A root hit reads as the root's screen that lists it (D42), never as a
       // project named for the platform.
       const placed = root ? ROOT_PAGE[hit.type] : placeOf(hit.projectId);
       return {
@@ -498,7 +498,7 @@ function SearchPalette({
     });
 
     // The Settings row is a list, not a page: its pages stand in for it.
-    // Profile is the account menu's, apart from Settings (D41).
+    // Profile is the account menu's, apart from Settings (D42).
     const profile: RankedResult[] = matches(PROFILE)
       ? [
           {
@@ -719,12 +719,12 @@ const CHOOSE_A_PROJECT = "Choose a project";
 /** What is above every project: the menu's heading, and beneath its rows once typed. */
 const ACCOUNT = "Account";
 
-/** The person's own page, which the account menu opens (`/account`, D41). */
+/** The person's own page, which the account menu opens (`/account`, D42). */
 const PROFILE = "Profile";
 
 /**
  * The root's screen that lists a hit in the reserved platform project, by
- * kind (D41), a row of the root sidebar: what the hit reads beneath its name,
+ * kind (D42), a row of the root sidebar: what the hit reads beneath its name,
  * where a project's hit reads its project.
  */
 const ROOT_PAGE: Record<SearchResultType, string> = {

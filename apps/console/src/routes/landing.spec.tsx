@@ -223,7 +223,7 @@ describe("landing routes", () => {
   });
 
   it("forwards Settings to its list's first page, and says so when it holds none", async () => {
-    // No add-on here, so the root's Settings hold nothing (D41); the person's
+    // No add-on here, so the root's Settings hold nothing (D42); the person's
     // profile is the account menu's, at /account.
     const router = await renderAt("/settings");
 

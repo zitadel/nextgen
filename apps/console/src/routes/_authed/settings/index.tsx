@@ -10,7 +10,7 @@ import { PageHeader } from "@/components/resource-page";
  * every project. Everything beneath it is listed in the sidebar's Settings
  * list instead of the account's (D29): the platform project's own Settings
  * pages (General, Admins) for someone who may act on it, since that project
- * is the root (D41), then what the hosted cloud adds (Billing, Support,
+ * is the root (D42), then what the hosted cloud adds (Billing, Support,
  * Email). The person's profile is the account menu's, at `/account`.
  *
  * It has no page of its own: it forwards to the list's first page. With

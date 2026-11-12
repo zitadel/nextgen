@@ -16,7 +16,7 @@
 
 ## Decisions
 
-### D41 · The platform project is the root: a project's screens, for the people who own the platform — 2026-11-11 · [standing]
+### D42 · The platform project is the root: a project's screens, for the people who own the platform — 2026-11-11 · [standing]
 Amends D27, D29, D37, D39 and D40, and supersedes D34. An operator administers every project (root [ADR 075](../adrs/075-platform-operators.md)), so the reserved platform project the console signs into showed in Projects, the switcher and search as a project named Platform, chosen like a customer's. It is not one of the projects: it is the root, and the projects are the spine beneath it. It is still a project, with a project's resources and a project's configuration, so its screens are a project's own, under the same names. What differs is where they are and who sees them: they are the root's, it is never a project to choose, and they are only for someone who may act on it. It manages who may use the platform (the console, the CLI, later MCP clients) and never an application's end users. It stays a control project, not a super-project ([ADR 053](../adrs/053-cross-project-principals.md) §9): an operator always may act on it and a cloud customer, who holds no grant there, never can. Signing in to it or being homed in it shows nothing.
 The root's sidebar is the root's: Projects, then the platform project's screens (Teams, Users, User schemas, Login flows, Branding, Deployments, Authentication, Events), then Settings. Each is the project's screen drawn for the platform project, which its row selects (`?project=` names it), so no screen is copied and one a project gains, such as Apps, is the root's too. Overview is left out, since the root's home is Projects. The platform project's own Settings pages, General and Admins, head the root's Settings list (D29), before what the hosted cloud adds (Billing, Support, Email). Its teams are the accounts that own projects, and its Admins are who administers the platform; operators are not listed there, since they hold it through the server's configuration (ADR 075 §4). This replaces D34, whose root listed a project's screens and asked for a project. Someone who cannot act on the platform project sees Projects and Settings, and a URL that selects it goes on in their own project, as for any project they cannot choose.
 While one of its screens is open the pill says the root, All projects, never a project named Platform, and the switcher's list and its recent projects never hold it. Events' list and the Settings list lead back to Projects from there. The way from a root screen into a project is the pill's list or Projects: the platform project is the selection while its screen is open, so D36's kept selection covers Projects and Settings only.
@@ -35,6 +35,10 @@ Search lists the root's screens with what is above every project, reading Accoun
 → Operators: a read-only list waits for an operator read under ADR 054 §10.
 → The schema has no root: the platform project is the `projects` row with the built-in id, and configuration names it to the server. A marker column written by bootstrap belongs with Console ADR 0004 §2's cutover.
 → Design review of the root's sidebar, which is long for someone who administers the platform, and of Profile at `/account`.
+
+### D41 · Configuration and resources share one detail layout — 2026-11-11 · [standing]
+Supersedes the look half of D0a. Login flows, identity providers and releases draw the same detail screen as users, teams and project settings: a header, then body cards of labelled rows on one 218px label rail, 16px either side of the rule between rows and no rule after the last, labels in medium weight, inputs and a section's aside starting on the rail. Configuration still differs in what it allows (D0b), not in how it looks.
+→ Designs follow the shared layout.
 
 ### D40 · A project's Settings opens its own list, as the root Settings do — 2026-11-11 · [standing]
 Amends D35, whose project Settings was one page with General and Admins tabs. On Projects, Settings carried an arrow and swapped the sidebar for its own list (D29); in a project, a row of the same name and glyph opened a page beside the project's screens. As Vercel's team and project Settings both do, a project's Settings now opens a list too: General (the project's name, origins, variables and policies), then Admins, under a heading that leads back to the project. Both pages keep the project's header (its name, ID and created date). The root Settings are the platform project's (Profile, and on the hosted cloud Billing, Support and Email), so the two lists hold different pages; only the way they open is shared. Search lists a project's Settings pages among its pages, marked Settings and the project.
@@ -181,8 +185,8 @@ Minimal (email) · Consumer (email, given name, family name) · Business (+ comp
 ### D0b · Schemas are read-only in the portal — 2026-07-23 · [standing]
 No editing; changes go through the CLI only. Version switching is view-only (skip between versions, no restore/apply).
 
-### D0a · Resources vs. schemas are different page patterns — 2026-07-23 · [standing]
-Users/teams/projects are resources; schemas are configuration, not resources — they should look different. MVP permissions: account creator = owner; invited users get admin; evolve later.
+### D0a · Resources vs. schemas are different page patterns — 2026-07-23 · [superseded in part by D41]
+Users/teams/projects are resources; schemas are configuration, not resources — they should look different (superseded by D41: the detail screens share one layout). MVP permissions: account creator = owner; invited users get admin; evolve later.
 
 ---
 

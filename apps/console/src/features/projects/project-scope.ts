@@ -94,7 +94,7 @@ export function validateProjectScopeSearch(search: Record<string, unknown>): Pro
 
 /**
  * Whether `?project=` names the reserved platform project, the console's root
- * (D41). It is never offered as a project to choose; its screens are the
+ * (D42). It is never offered as a project to choose; its screens are the
  * root's, which the root's sidebar opens by selecting it. The `_authed` guard
  * lets that selection stand only for someone who may act on the project
  * (`readPlatformAccess`), and drops it for anyone else.
@@ -162,7 +162,7 @@ export function useProjectScope(): string | undefined {
 
 /**
  * Whether the selected project is the reserved platform project: the screen
- * is one of the root's (D41), drawn for that project like any project's, and
+ * is one of the root's (D42), drawn for that project like any project's, and
  * the chrome around it is the root's (its sidebar, its pill).
  */
 export function usePlatformSelected(): boolean {

@@ -62,7 +62,7 @@ describe("an add-on's screens", () => {
     const nav = await screen.findByRole("navigation", { name: "Settings" });
     const links = within(nav).getAllByRole("link");
     // Under the list's heading. No platform project here, so the add-on's page
-    // is the list's only one (D41): the profile is the account menu's.
+    // is the list's only one (D42): the profile is the account menu's.
     expect(links.map((link) => link.textContent)).toEqual(["Settings", "Invoices"]);
   });
 });

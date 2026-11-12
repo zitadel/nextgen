@@ -44,7 +44,7 @@ type consoleRuntime struct {
 	// it (`internal/api/authz.go`).
 	PublishableKey string `json:"publishable_key,omitempty"`
 	// PlatformProjectID marks the sign-in project as the deployment's
-	// reserved platform project (Console ADR 0004 §3, D41): present, and equal
+	// reserved platform project (Console ADR 0004 §3, D42): present, and equal
 	// to ConsoleProjectID, only when that is the built-in row bootstrap
 	// provisioned. The console draws that project's surfaces at its root and
 	// never offers it as a project. A pin to an ordinary project and the

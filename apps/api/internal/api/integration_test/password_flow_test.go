@@ -56,7 +56,7 @@ func TestPasswordLoginFlow(t *testing.T) {
 	}))
 
 	hasher := harness.EnsureHasher(t)
-	encodedHash, err := hasher.Hash(userPass)
+	encodedHash, err := hasher.Hash(t.Context(), userPass)
 	require.NoError(t, err)
 
 	require.NoError(t, harness.EnsureUserFixture(t).SetPassword(t.Context(), &domain.SetUserPassword{
@@ -268,7 +268,7 @@ func TestPasswordRegisterFlow(t *testing.T) {
 	pw, err := harness.EnsureUserFixture(t).GetPasswordByUserID(t.Context(), project.ID, user.ID)
 	require.NoError(t, err)
 	require.NotEmpty(t, pw.EncodedHash)
-	_, err = pw.Verify(newPass, harness.EnsureHasherFactory(t).Default())
+	_, err = pw.Verify(t.Context(), newPass, harness.EnsureHasherFactory(t).Default())
 	require.NoError(t, err)
 }
 
