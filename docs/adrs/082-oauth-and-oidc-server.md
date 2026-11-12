@@ -22,6 +22,13 @@
 > [ADR 068](068-project-is-the-data-boundary.md),
 > [ADR 070](070-cli-auth-method-toggles.md),
 > [ADR 078](078-abuse-prevention-in-layers.md)
+>
+> **Amendment (2026-11-11) — [D41](../design/decisions.md),
+> [Console ADR 0004 §1](../../apps/console/docs/adrs/0004-console-deployment-modes.md#1-every-bootstrapped-deployment-has-one-reserved-platform-project):**
+> the reserved platform project never holds a customer's app. Its apps are
+> Zitadel's own (the Console, the CLI, MCP clients acting on Zitadel), which
+> the server declares. When applications are built, declaring or registering
+> one on it through the API is refused as its other configuration is.
 
 ## TL;DR
 

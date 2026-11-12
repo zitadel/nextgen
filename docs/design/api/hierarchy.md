@@ -23,6 +23,8 @@ This means:
 
 Same resources, different project context. The SDK talks to `/users`, `/teams`, `/team_memberships` at both scales — the scope comes from the `project_id` resolved by the resource-scope index (see [`url-architecture.md`](url-architecture.md)).
 
+The platform project has these resources and no configuration of its own. What signs its users in is what the server ships and deploys at every start, and the API refuses to write it ([Console ADR 0004 §1](../../../apps/console/docs/adrs/0004-console-deployment-modes.md#1-every-bootstrapped-deployment-has-one-reserved-platform-project)).
+
 ## Self-hosted exposes the same API shape as cloud
 
 **LOCKED.** A bootstrapped self-hosted deployment returns a singleton platform project and a singleton default team with the identical JSON schema the cloud version returns. The SDK does not branch on deployment mode — it blindly works against both. Before bootstrap completes there is no platform project to return; that is a deployment-lifecycle state, not a second API shape ([Console ADR 0004 §2](../../../apps/console/docs/adrs/0004-console-deployment-modes.md#2-bootstrap-is-explicit-desired-state)).

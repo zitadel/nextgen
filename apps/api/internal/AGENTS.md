@@ -51,6 +51,15 @@ through any wrapping.
   `internal/errorpage`, never HTML of its own; an API path answers the
   envelope even to a browser ([ADR 076](../docs/adrs/076-error-pages-and-unmatched-routes.md)).
 
+## The platform project's configuration
+
+- A resource a project deploys (what a release ships, a deployment serves or
+  an origin admits) sets `configuration` on its `resourceAccess`: the reserved
+  platform project refuses its writes
+  ([Console ADR 0004 §1](../../console/docs/adrs/0004-console-deployment-modes.md#1-every-bootstrapped-deployment-has-one-reserved-platform-project)).
+- `TestEveryGatedResourceIsClassedForThePlatformProject` fails until a new
+  resource is classed as configuration or as the platform project's own.
+
 ## Format before push
 
 Run `moon run server:format` before pushing Go changes. It only checks

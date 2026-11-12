@@ -5,9 +5,11 @@ package integration_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -270,4 +272,32 @@ func TestPlatformProjectReadGatesTheRoot(t *testing.T) {
 			assert.Equal(t, tc.status, status, body)
 		})
 	}
+}
+
+// TestPinnedPlatformProjectKeepsItsConfiguration pins the other side of
+// Console ADR 0004 §1: the server refuses configuration writes on the
+// reserved platform project only, the row bootstrap provisions. The harness's
+// platform project is an ordinary project the deployment pins, as a
+// self-hoster's only project is, so its administrator still adds and removes
+// an origin from the Console.
+func TestPinnedPlatformProjectKeepsItsConfiguration(t *testing.T) {
+	t.Parallel()
+
+	platform := harness.EnsurePlatformProject(t)
+	require.NotEqual(t, domain.PlatformProjectID, platform.ID, "the harness pins an ordinary project")
+	path := "/projects/" + platform.ID + "/origins"
+
+	adminID := platformUser(t)
+	admin := harness.SeedProjectAdmin(t, platform.ID, adminID)
+	t.Cleanup(func() {
+		_ = harness.EnsureServiceDB(t).Statements().RevokeAuthzAssignment(context.Background(), platform.ID, admin.ID)
+	})
+	cookie := platformSessionCookie(t, adminID)
+	pattern := fmt.Sprintf("https://pinned-%d.example.com", time.Now().UnixNano())
+
+	status, body := consoleCall(t, cookie, http.MethodPost, path, fmt.Sprintf(`{"pattern":%q,"kind":"preview"}`, pattern))
+	require.Less(t, status, http.StatusBadRequest, body)
+
+	status, body = consoleCall(t, cookie, http.MethodPost, path+"/remove", fmt.Sprintf(`{"pattern":%q}`, pattern))
+	assert.Less(t, status, http.StatusBadRequest, body)
 }

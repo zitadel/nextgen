@@ -18,6 +18,15 @@
 > [ADR 075](075-platform-operators.md),
 > [ADR 078](078-abuse-prevention-in-layers.md) (§5 amended here),
 > [ADR 079](079-release-confidence.md)
+>
+> **Amendment (2026-11-11) — [D41](../design/decisions.md),
+> [Console ADR 0004 §1](../../apps/console/docs/adrs/0004-console-deployment-modes.md#1-every-bootstrapped-deployment-has-one-reserved-platform-project):**
+> the platform project takes no configuration through the API, so §3's
+> `.zitadel/` folder applied to it and §8.1's project secret and
+> `zitadel apply` are withdrawn. What sign-up asks for on the hosted cloud
+> (§3's terms checkbox) ships with the server or becomes a setting of the
+> `user.create` policy; which is open. §8.1's other half stands: the platform
+> project's events are read like any project's.
 
 ## Context
 

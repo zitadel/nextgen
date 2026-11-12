@@ -461,6 +461,13 @@ platform-homed automation key granted broad roles — the operator credential is
 explicit precisely so issuance governance, customer visibility, and audit
 posture can attach to it.
 
+> **Amendment (2026-11-11) —
+> [Console ADR 0004 §1](../../apps/console/docs/adrs/0004-console-deployment-modes.md#1-every-bootstrapped-deployment-has-one-reserved-platform-project):**
+> the identity home is closed to end users by the server. No role on the
+> reserved platform project, an operator's included, writes its
+> configuration through the API: an admitted origin would make an
+> application's end users principals of this ADR.
+
 ## Testing obligations
 
 The implementation is not complete until the shared resolver suites prove,
