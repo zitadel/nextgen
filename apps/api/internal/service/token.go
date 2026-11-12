@@ -123,7 +123,6 @@ func (s *tokenService) RevokeToken(ctx context.Context, projectID, tokenID strin
 			ProjectID:  projectID,
 			EntityType: "token",
 			EntityID:   tokenID,
-			TokenID:    tokenID,
 			Payload:    domain.AuthTokenRevokedPayload{},
 		})
 	})
