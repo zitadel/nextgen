@@ -162,7 +162,9 @@ describe("local runtime commands", () => {
     expect(envelope.data.next_actions.join("\n")).toContain("managed local runtime");
     expect(envelope.data.next_actions.join("\n")).toContain("--server <url>");
     expect(envelope.data.next_commands).toContain("docker version");
-    expect(envelope.data.next_commands).toContain(expectedPublicCliCommand(`doctor --cwd ${cwd}`));
+    expect(envelope.data.next_commands).toContain(
+      expectedPublicCliCommand(`doctor --runtime docker --port ${port} --cwd ${cwd}`),
+    );
     expect(envelope.data.checks.find((check) => check.name === "docker-cli")).toMatchObject({
       status: "warn",
     });
