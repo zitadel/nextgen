@@ -106,6 +106,29 @@ test("a histogram is one data point per recorded value", () => {
   assert.ok(Math.abs(spread[3] - 0.3) < 1e-12);
 });
 
+test("what Vercel already has another way is not sent", () => {
+  const queue = new MetricQueue();
+  queue.ingest(
+    exportOf(
+      histogram("db.client.operation.duration", {
+        count: 1,
+        sum: 0.01,
+        bucketCounts: [1],
+        explicitBounds: [],
+      }),
+      counter("ogen.server.request_count", 4),
+      counter("ogen.server.errors_count", 1),
+      level("db.client.connection.count", 2),
+      counter("zitadel.audit.events.written", 1),
+    ),
+  );
+  assert.deepEqual(
+    queue.take(100).map((point) => point.name),
+    ["db.client.connection.count", "zitadel.audit.events.written"],
+  );
+  assert.equal(queue.unsupported, 0);
+});
+
 test("what has no replay is counted, not sent", () => {
   const queue = new MetricQueue();
   queue.ingest(

@@ -23,6 +23,23 @@
 // Data points wait in a queue until a request takes them (take): Vercel
 // accepts 100 per invocation, and each is billed as one Observability event.
 // The queue is bounded; past maxQueued the oldest are dropped and counted.
+//
+// Vercel has no sampling for custom metrics, so what it already has another
+// way is not sent (notReported).
+
+// Instruments Vercel is not sent, by name or by prefix (a trailing dot):
+//
+// - db.client.operation.duration: one value per statement, half of all data
+//   points. The statement spans in Vercel Tracing carry the same durations.
+// - ogen.server.: request count, errors and duration, which Vercel's own
+//   request and function metrics report by route.
+const notReported = ["db.client.operation.duration", "ogen.server."];
+
+function reported(name) {
+  return !notReported.some((entry) =>
+    entry.endsWith(".") ? name.startsWith(entry) : name === entry,
+  );
+}
 
 const DELTA = 1;
 const CUMULATIVE = 2;
@@ -111,10 +128,17 @@ export class MetricQueue {
   #maxQueued;
   #levelRepeatMs;
   #now;
+  #reported;
   dropped = 0;
   unsupported = 0;
 
-  constructor({ maxQueued = 2000, levelRepeatMs = 60_000, now = Date.now } = {}) {
+  constructor({
+    maxQueued = 2000,
+    levelRepeatMs = 60_000,
+    now = Date.now,
+    isReported = reported,
+  } = {}) {
+    this.#reported = isReported;
     this.#maxQueued = maxQueued;
     this.#levelRepeatMs = levelRepeatMs;
     this.#now = now;
@@ -170,7 +194,7 @@ export class MetricQueue {
       for (const sm of rm.scopeMetrics ?? []) {
         for (const metric of sm.metrics ?? []) {
           const name = clip(metric.name);
-          if (name === "") {
+          if (name === "" || !this.#reported(metric.name)) {
             continue;
           }
           if (metric.gauge) {

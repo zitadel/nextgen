@@ -755,9 +755,12 @@ const otlpCollectorEnv = "CLOUD_OTLP_COLLECTOR"
 //   - A fraction of 0 leaves sampling to Vercel: a request is traced when
 //     Vercel's sampling rules trace it and the wrapper sends a sampled
 //     traceparent, and a root the server starts itself is dropped.
-//   - Metrics go to the same collector every 100ms, as deltas: Vercel takes
+//   - Metrics go to the same collector every 10s, as deltas: Vercel takes
 //     single data points and aggregates them itself, so the wrapper needs
-//     what happened since the last export, not a running total.
+//     what happened since the last export, not a running total. Each data
+//     point is billed, and a counter is one per export however many requests
+//     raised it, so the interval is what a busy instance's metrics cost. An
+//     instance that stops loses what it recorded since its last export.
 func exportToWrapper(port string) error {
 	collector := os.Getenv(otlpCollectorEnv)
 	if collector == "" {
@@ -778,7 +781,7 @@ func exportToWrapper(port string) error {
 		"NEXTGEN_INSTRUMENTATION_METRIC_EXPORTER_TYPE":           "http",
 		"NEXTGEN_INSTRUMENTATION_METRIC_EXPORTER_ENDPOINT":       collector,
 		"NEXTGEN_INSTRUMENTATION_METRIC_EXPORTER_INSECURE":       "true",
-		"NEXTGEN_INSTRUMENTATION_METRIC_EXPORTER_BATCH_DURATION": "100ms",
+		"NEXTGEN_INSTRUMENTATION_METRIC_EXPORTER_BATCH_DURATION": "10s",
 		"OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE":      "delta",
 	} {
 		if err := os.Setenv(key, value); err != nil {
