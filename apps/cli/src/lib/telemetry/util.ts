@@ -6,8 +6,8 @@ import type { Properties } from "mixpanel";
  */
 export function compact(properties: Properties): Properties {
   return Object.fromEntries(
-    Object.entries(properties).filter(
-      ([, value]) => value !== undefined && value !== null && value !== "",
-    ),
+    Object.entries(properties).filter(([, value]) => {
+      return value !== undefined && value !== null && value !== "";
+    }),
   );
 }

@@ -3,7 +3,7 @@ import { mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { http, HttpResponse } from "msw";
-import { describe, expect, vi } from "vitest";
+import { beforeEach, describe, expect, vi } from "vitest";
 
 import type { JsonObject } from "@/lib/zitadel";
 import {
@@ -27,6 +27,7 @@ import {
 } from "@tests/helpers/local-project";
 import { usePlatformServer } from "@tests/helpers/platform-project";
 import { expectedPublicCliCommand, parseJson, runCliForTest } from "@tests/helpers/run-cli";
+import { asOneLine } from "@tests/helpers/terminal";
 
 /**
  * The subcommand and provider every Google run names.
@@ -79,6 +80,26 @@ const CONNECTION_FILE = ".zitadel/idps/google.json";
  * The URI the developer registers with Google for the connection.
  */
 const CALLBACK_URI = "http://localhost:3000/__nextgen/idp/google/callback";
+
+/**
+ * The primary origin a deploy lands the app on.
+ */
+const DEPLOYED_ORIGIN = "https://app.acme.com";
+
+/**
+ * The URI the developer registers for the primary origin.
+ */
+const DEPLOYED_CALLBACK_URI = `${DEPLOYED_ORIGIN}/__nextgen/idp/google/callback`;
+
+/**
+ * The preview pattern a pull-request build of the app is served from.
+ */
+const PREVIEW_PATTERN = "https://app-*.vercel.app";
+
+/**
+ * The URI the developer registers for the preview pattern.
+ */
+const PREVIEW_CALLBACK_URI = `${PREVIEW_PATTERN}/__nextgen/idp/google/callback`;
 
 /**
  * The project the linked Project publishes to.
@@ -354,9 +375,10 @@ describe("auth-method sso enable", () => {
     );
 
     it.for([
-      "Google sign-in is configured locally. Provider credentials are stored on your Project.",
-      "Deploy the configuration to make Google sign-in available in your app, then reload your app and test Google sign-in.",
-      `  $ ${expectedPublicCliCommand("deploy --dry-run")}`,
+      "Google sign-in is configured locally",
+      "Its credentials are stored in your project.",
+      "Deploy it to make Google sign-in available in your app, then reload the app and test it",
+      expectedPublicCliCommand("deploy --dry-run"),
     ])("says %s", async (line, { dir }) => {
       const cwd = await aProject(dir);
 
@@ -364,7 +386,22 @@ describe("auth-method sso enable", () => {
         return runCliForTest(authMethodText(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
       });
 
-      expect(result.stdout).toContain(line);
+      expect(asOneLine(result.stdout)).toContain(line);
+    });
+
+    it.for([
+      { output: "piped text", command: "deploy --dry-run", run: authMethodText },
+      { output: "piped text", command: "deploy -m", run: authMethodText },
+      { output: "--json", command: "deploy --dry-run", run: authMethodJson },
+      { output: "--json", command: "deploy -m", run: authMethodJson },
+    ])("names $command once in $output", async ({ command, run }, { dir }) => {
+      const cwd = await aProject(dir);
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(run(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(asOneLine(result.stdout).split(expectedPublicCliCommand(command))).toHaveLength(2);
     });
   });
 
@@ -377,7 +414,7 @@ describe("auth-method sso enable", () => {
         return runCliForTest(authMethodText(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
       });
 
-      expect(result.stdout).toContain("Google sign-in is configured locally.");
+      expect(result.stdout).toContain("Google sign-in is configured locally");
     });
 
     it("does not say the credentials are stored", async ({ dir }) => {
@@ -388,7 +425,7 @@ describe("auth-method sso enable", () => {
         return runCliForTest(authMethodText(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
       });
 
-      expect(result.stdout).not.toContain("stored on your Project");
+      expect(result.stdout).not.toContain("credentials are stored");
     });
 
     it("reports the secret the project never received", async ({ dir }) => {
@@ -460,7 +497,7 @@ describe("auth-method sso enable", () => {
           return runCliForTest(authMethodText(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
         });
 
-        expect(result.stderr).toContain(line);
+        expect(asOneLine(result.stdout + result.stderr)).toContain(line);
       },
     );
 
@@ -551,18 +588,18 @@ describe("auth-method sso enable", () => {
   });
 
   describe("with a custom provider", () => {
-    it.for([
-      "Acme SSO sign-in is configured locally.",
-      "then reload your app and test Acme SSO sign-in.",
-    ])("says %s", async (line, { dir }) => {
-      const cwd = await aProject(dir);
+    it.for(["Acme SSO sign-in is configured locally", "then reload the app and test it"])(
+      "says %s",
+      async (line, { dir }) => {
+        const cwd = await aProject(dir);
 
-      const result = await withStdin(SECRET, () => {
-        return runCliForTest(authMethodText(cwd, ...ACME, "--client-id", ACME_CLIENT_ID));
-      });
+        const result = await withStdin(SECRET, () => {
+          return runCliForTest(authMethodText(cwd, ...ACME, "--client-id", ACME_CLIENT_ID));
+        });
 
-      expect(result.stdout).toContain(line);
-    });
+        expect(result.stdout).toContain(line);
+      },
+    );
   });
 
   describe("when the schema defines nothing the provider maps", () => {
@@ -647,7 +684,7 @@ describe("auth-method sso enable", () => {
         return runCliForTest(authMethodText(cwd, ...GOOGLE));
       });
 
-      expect(result.stdout).toContain("Google sign-in is already configured locally.");
+      expect(result.stdout).toContain("Google sign-in is already configured locally");
     });
 
     it("does not offer a deploy, since nothing changed", async ({ dir }) => {
@@ -657,7 +694,31 @@ describe("auth-method sso enable", () => {
         return runCliForTest(authMethodText(cwd, ...GOOGLE));
       });
 
-      expect(result.stdout).not.toContain("Deploy the configuration");
+      expect(result.stdout).not.toContain("Deploy it to make");
+    });
+
+    // The chain's summary says where the command ran, so the label pair it
+    // used to print before the first question has no place any more.
+    it("never labels the project it ran against before its first question", async ({ dir }) => {
+      const cwd = await aProject(dir);
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodText(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(result.stdout + result.stderr).not.toContain("Project   ");
+    });
+
+    it("still says which schema it is editing", async ({ dir }) => {
+      const cwd = await aProject(dir);
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodText(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(result.stdout + result.stderr).toContain(
+        "Editing .zitadel/schemas/default-human-user.json",
+      );
     });
 
     it("prints the callback URI to register, without --json", async ({ dir }) => {
@@ -745,15 +806,229 @@ describe("auth-method sso enable", () => {
     );
   });
 
+  describe("when the Project serves a primary origin and a preview pattern", () => {
+    beforeEach(() => {
+      platform.use(
+        http.get("*/projects/:id", ({ params }) => {
+          return HttpResponse.json({
+            id: String(params.id),
+            name: "app",
+            lifecycle: "active",
+            origins: [
+              { pattern: DEPLOYED_ORIGIN, kind: "primary" },
+              { pattern: PREVIEW_PATTERN, kind: "preview" },
+            ],
+          });
+        }),
+      );
+    });
+
+    it("prints the callback URI on the primary origin", async ({ dir }) => {
+      const cwd = await aProject(dir);
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodText(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(result.stdout).toContain(DEPLOYED_CALLBACK_URI);
+    });
+
+    it("says each preview URL needs its own callback URI", async ({ dir }) => {
+      const cwd = await aProject(dir);
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodText(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(result.stdout).toContain("Each preview URL needs its own callback URI");
+    });
+
+    it("lists the preview callback URI pattern", async ({ dir }) => {
+      const cwd = await aProject(dir);
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodText(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(result.stdout).toContain(PREVIEW_CALLBACK_URI);
+    });
+  });
+
+  describe("when the Project holds the development issuer as a preview origin", () => {
+    beforeEach(() => {
+      platform.use(
+        http.get("*/projects/:id", ({ params }) => {
+          return HttpResponse.json({
+            id: String(params.id),
+            name: "app",
+            lifecycle: "active",
+            origins: [{ pattern: "http://localhost:3000", kind: "preview" }],
+          });
+        }),
+      );
+    });
+
+    it("prints the development callback URI once", async ({ dir }) => {
+      const cwd = await aProject(dir);
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodText(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(result.stdout.split(CALLBACK_URI)).toHaveLength(2);
+    });
+  });
+
+  describe("when the Project holds the development issuer as a primary origin", () => {
+    beforeEach(() => {
+      platform.use(
+        http.get("*/projects/:id", ({ params }) => {
+          return HttpResponse.json({
+            id: String(params.id),
+            name: "app",
+            lifecycle: "active",
+            origins: [{ pattern: "http://localhost:3000", kind: "primary" }],
+          });
+        }),
+      );
+    });
+
+    it("prints the development callback URI once", async ({ dir }) => {
+      const cwd = await aProject(dir);
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodText(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(result.stdout.split(CALLBACK_URI)).toHaveLength(2);
+    });
+  });
+
+  describe("when the Project holds no preview origin", () => {
+    it("prints no preview block", async ({ dir }) => {
+      const cwd = await aProject(dir);
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodText(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(result.stdout).not.toContain("Each preview URL needs its own callback URI");
+    });
+  });
+
+  describe("when the Project holds one primary origin under two spellings", () => {
+    beforeEach(() => {
+      platform.use(
+        http.get("*/projects/:id", ({ params }) => {
+          return HttpResponse.json({
+            id: String(params.id),
+            name: "app",
+            lifecycle: "active",
+            origins: [
+              { pattern: DEPLOYED_ORIGIN, kind: "primary" },
+              { pattern: `${DEPLOYED_ORIGIN}/`, kind: "primary" },
+            ],
+          });
+        }),
+      );
+    });
+
+    it("prints the deployed callback URI once", async ({ dir }) => {
+      const cwd = await aProject(dir);
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodText(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(result.stdout.split(DEPLOYED_CALLBACK_URI)).toHaveLength(2);
+    });
+  });
+
+  describe("when Ctrl-C is pressed during the origin read", () => {
+    beforeEach(() => {
+      platform.use(
+        http.get("*/projects/:id", () => {
+          process.emit("SIGINT", "SIGINT");
+          return HttpResponse.json({ id: PROJECT_ID, name: "app", lifecycle: "active" });
+        }),
+      );
+    });
+
+    it("writes no connection file", async ({ dir }) => {
+      const cwd = await aProject(dir);
+
+      await withStdin(SECRET, () => {
+        return runCliForTest(authMethodText(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(existsSync(join(cwd, CONNECTION_FILE))).toBe(false);
+    });
+  });
+
+  describe("when a primary origin holds an escape sequence", () => {
+    beforeEach(() => {
+      platform.use(
+        http.get("*/projects/:id", ({ params }) => {
+          return HttpResponse.json({
+            id: String(params.id),
+            name: "app",
+            lifecycle: "active",
+            origins: [{ pattern: "https://app.acme.com\u001b[2J", kind: "primary" }],
+          });
+        }),
+      );
+    });
+
+    it("prints the escape sequence as text, not as a control character", async ({ dir }) => {
+      const cwd = await aProject(dir);
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodText(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
+      });
+
+      expect(result.stdout).toContain("https://app.acme.com\\x1b[2J/__nextgen/idp/google/callback");
+    });
+  });
+
   describe("with --dry-run", () => {
-    it("reports the run as skipped", async ({ dir }) => {
+    it("reports the preview as a dry run", async ({ dir }) => {
       const cwd = await aProject(dir);
 
       const result = await withStdin(SECRET, () => {
         return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID, "--dry-run"));
       });
 
-      expect(parseJson(result.stdout)).toMatchObject({ status: "skipped" });
+      expect(parseJson(result.stdout)).toMatchObject({ status: "ok", data: { dry_run: true } });
+    });
+
+    it("carries the headline it draws as data.title", async ({ dir }) => {
+      const cwd = await aProject(dir);
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID, "--dry-run"));
+      });
+
+      expect(parseJson(result.stdout)).toMatchObject({
+        data: { title: `Would write ${SCHEMA_FILE} (dry run)` },
+      });
+    });
+
+    it("suggests the real command", async ({ dir }) => {
+      const cwd = await aProject(dir);
+
+      const result = await withStdin(SECRET, () => {
+        return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID, "--dry-run"));
+      });
+
+      expect(parseJson(result.stdout)).toMatchObject({
+        data: {
+          next_commands: [
+            expect.stringContaining(
+              `auth-method sso enable --provider google --client-id ${CLIENT_ID}`,
+            ),
+          ],
+        },
+      });
     });
 
     it("writes no connection", async ({ dir }) => {
@@ -1326,14 +1601,21 @@ describe("auth-method sso enable", () => {
   });
 
   describe("when the Project's path needs quoting", () => {
-    it("leaves the follow-ups out of next_commands", async ({ dir }) => {
+    it("quotes the path in the next_commands", async ({ dir }) => {
       const cwd = await aProject(join(dir, "my project"));
 
       const result = await withStdin(SECRET, () => {
         return runCliForTest(authMethodJson(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
       });
 
-      expect(parseJson(result.stdout)).toMatchObject({ data: { next_commands: [] } });
+      expect(parseJson(result.stdout)).toMatchObject({
+        data: {
+          next_commands: [
+            expect.stringMatching(/ deploy --dry-run --cwd '[^']+my project'$/),
+            expect.stringMatching(/ deploy -m '<what changed>' --cwd '[^']+my project'$/),
+          ],
+        },
+      });
     });
 
     it("still lists them as next_args", async ({ dir }) => {

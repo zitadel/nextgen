@@ -18,6 +18,7 @@ import (
 	"github.com/zitadel/passwap/bcrypt"
 
 	"github.com/zitadel/nextgen/internal/audit"
+	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/instrumentation"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
@@ -190,6 +191,32 @@ func TestLoadConfigEventRetention(t *testing.T) {
 	assert.ErrorContains(t, err, "events.retention.trigger_secret must be at least 16 printable ASCII characters")
 }
 
+// The two settings the cloud's launcher makes for a server that runs only
+// while it serves a request, read as it writes them into the environment.
+func TestLoadConfigForAServerThatRunsOnlyWhileItServes(t *testing.T) {
+	t.Setenv("NEXTGEN_SERVER_DATA_DIR", t.TempDir())
+	t.Setenv("NEXTGEN_SERVER_IDLE_TIMEOUT", "")
+	t.Setenv("NEXTGEN_EVENTS_REQUEST_FLUSH_WAIT", "")
+	configPath := filepath.Join(t.TempDir(), "nextgen.yaml")
+	require.NoError(t, os.WriteFile(configPath, nil, 0o600))
+
+	cfg, err := loadConfig(configPath)
+	require.NoError(t, err)
+	assert.Equal(t, time.Minute, cfg.Server.IdleTimeout)
+	assert.Equal(t, time.Minute, idleTimeout(cfg.Server.IdleTimeout))
+	assert.Zero(t, cfg.Events.Request.FlushWait, "a request does not wait for its event")
+
+	t.Setenv("NEXTGEN_SERVER_IDLE_TIMEOUT", "0")
+	t.Setenv("NEXTGEN_EVENTS_REQUEST_FLUSH_WAIT", "2s")
+	cfg, err = loadConfig(configPath)
+	require.NoError(t, err)
+	assert.Zero(t, cfg.Server.IdleTimeout)
+	// net/http reads zero as "as long as ReadTimeout"; only a negative
+	// timeout never closes an idle connection.
+	assert.Negative(t, idleTimeout(cfg.Server.IdleTimeout))
+	assert.Equal(t, 2*time.Second, cfg.Events.Request.FlushWait)
+}
+
 // TestLoadConfigErrorDefaults pins the error capture defaults of ADR 030
 // Decision 5: the report location is on and the stack trace is off.
 func TestLoadConfigErrorDefaults(t *testing.T) {
@@ -219,14 +246,14 @@ func TestLoadConfigDefaultsToArgon2id(t *testing.T) {
 	require.NoError(t, err)
 
 	const password = "Passw0rd!"
-	encoded, err := hasher.Hash(password)
+	encoded, err := hasher.Hash(t.Context(), password)
 	require.NoError(t, err)
 	assert.True(t, strings.HasPrefix(encoded, argon2.Prefix), "default hasher should produce argon2id, got %q", encoded)
 
 	// Pre-existing bcrypt hash still verifies and is rehashed to argon2id.
 	legacy, err := bcrypt.New(10, nil).Hash(password)
 	require.NoError(t, err)
-	rehashed, err := hasher.VerifyAndRehash(legacy, password)
+	rehashed, err := hasher.VerifyAndRehash(t.Context(), legacy, password)
 	require.NoError(t, err)
 	assert.True(t, strings.HasPrefix(rehashed, argon2.Prefix), "bcrypt hash should rehash to argon2id, got %q", rehashed)
 }
@@ -358,4 +385,32 @@ func TestRunLogsTheErrorItReturns(t *testing.T) {
 	require.NotNil(t, runError, "no \"run error\" record in:\n%s", records.String())
 	assert.Equal(t, "ERROR", runError["level"])
 	assert.Equal(t, err.Error(), runError["err"])
+}
+
+// The hashing bound is on by default and every field is left at zero, which
+// the limiter resolves itself: one hash per CPU, a budget from the process's
+// memory limit, a second's wait before a refusal.
+func TestLoadConfigDefaultsHashConcurrency(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "nextgen.yaml")
+	require.NoError(t, os.WriteFile(configPath, nil, 0o600))
+
+	cfg, err := loadConfig(configPath)
+	require.NoError(t, err)
+
+	assert.Equal(t, crypto.HashConcurrencyConfig{}, cfg.PasswordHasher.Concurrency)
+}
+
+// The keys are multi-word and reach the struct through their mapstructure
+// tags, from a file and from the environment alike.
+func TestLoadConfigHashConcurrencyOverrides(t *testing.T) {
+	t.Setenv("NEXTGEN_PASSWORD_HASHER_CONCURRENCY_MAX_WAIT", "250ms")
+	configPath := filepath.Join(t.TempDir(), "nextgen.yaml")
+	require.NoError(t, os.WriteFile(configPath, []byte("password_hasher:\n  concurrency:\n    max_operations: 3\n    memory_budget: 1048576\n"), 0o600))
+
+	cfg, err := loadConfig(configPath)
+	require.NoError(t, err)
+
+	assert.Equal(t, 3, cfg.PasswordHasher.Concurrency.MaxOperations)
+	assert.Equal(t, int64(1<<20), cfg.PasswordHasher.Concurrency.MemoryBudget)
+	assert.Equal(t, 250*time.Millisecond, cfg.PasswordHasher.Concurrency.MaxWait)
 }

@@ -52,6 +52,17 @@ describe("pathValuesOf", () => {
     );
   });
 
+  it.each([
+    ["getSession", ["a", "b"], "getSession takes 1 path parameter (session_id), but got 2"],
+    [
+      "finishUserPasskeyRegistration",
+      ["a", "b", "c"],
+      "finishUserPasskeyRegistration takes 2 path parameters (user_id, registration_id), but got 3",
+    ],
+  ])("counts the path parameters of %s in the singular or plural", (operation, given, message) => {
+    expect(() => pathValuesOf(resolveTarget(operation), given, undefined)).toThrow(message);
+  });
+
   it("refuses a positional when the path already names its parameters", () => {
     expect(() => pathValuesOf(resolveTarget("/sessions/s_1"), ["s_2"], undefined)).toThrow(
       /already names session_id/,
@@ -159,6 +170,14 @@ describe("buildRequest", () => {
     expect(() =>
       requestFor("GetUserByID", ["user_id=user_1"], { positionals: ["user_1"] }),
     ).toThrow("user_id is a path parameter of GetUserByID; give it as an argument");
+  });
+
+  it("quotes the placeholder in the example it offers for a path parameter", () => {
+    expect(() =>
+      requestFor("GetUserByID", ["user_id=user_1"], { positionals: ["user_1"] }),
+    ).toThrow(
+      expect.objectContaining({ hint: "For example: zitadel api GetUserByID '<user_id>'" }),
+    );
   });
 
   it("fills a required project_id the caller left out", () => {

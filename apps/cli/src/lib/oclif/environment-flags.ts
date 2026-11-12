@@ -1,12 +1,12 @@
 import { posix } from "node:path";
-
 import { Flags } from "@oclif/core";
 
 import { Cmd } from "@/lib/cmd";
 import { isEnvironmentName } from "@/lib/environment";
+import { asEnvironmentSelector, type EnvironmentSelector } from "@/lib/suggestion";
+
 import { nonBlankString } from "./flags";
 import { refusalError } from "./refusal";
-import { asEnvironmentSelector, type EnvironmentSelector } from "@/lib/suggestion";
 
 /**
  * The flags that choose the environment a command runs against, spread into

@@ -1,5 +1,7 @@
 import { Flags } from "@oclif/core";
 
+import { OriginService } from "@/lib/backend";
+import { errorMessage } from "@/lib/errors";
 import {
   type Admitted,
   CommandGroups,
@@ -7,13 +9,11 @@ import {
   type JsonEnvelope,
   nonBlankArg,
 } from "@/lib/oclif";
-import { OriginService } from "@/lib/backend";
 import { dryRunResult } from "@/lib/oclif/crud/shared";
-import { deletedData } from "@/lib/oclif/envelope";
-import { reportWarning } from "@/lib/warnings";
 import { Destructive } from "@/lib/oclif/destructive";
-import { errorMessage } from "@/lib/errors";
-import { prose } from "@/lib/oclif/rendering";
+import { deletedData } from "@/lib/oclif/envelope";
+import { escapeControlCharacters } from "@/lib/terminal-text";
+import { reportWarning } from "@/lib/warnings";
 
 /**
  * `zitadel origin rm <pattern>` — remove one origin pattern from the project.
@@ -24,6 +24,7 @@ import { prose } from "@/lib/oclif/rendering";
 export default class OriginRm extends Destructive(EnvironmentCommand) {
   static override description = "Remove an origin pattern from the project.";
   static override group = CommandGroups.configuration;
+
   static override examples = [
     "<%= config.bin %> origin rm https://app.acme.com",
     "<%= config.bin %> origin rm https://app.acme.com --force",
@@ -48,13 +49,17 @@ export default class OriginRm extends Destructive(EnvironmentCommand) {
       await this.confirmed({
         verb: "remove",
         name: `remove ${args.pattern} from the project`,
-        message: `Remove ${args.pattern} from the project?`,
-        preview: () => {
+        message: async () => {
+          const { projectId, server } = await this.connect();
+          return `Remove ${args.pattern} from project ${projectId} on ${server.replace(/^https?:\/\//, "")}?`;
+        },
+        preview: async () => {
           return dryRunResult({
             verb: "remove",
             topic: "origin",
             id: args.pattern,
             clause: "from the project",
+            next: await this.realRun(),
           });
         },
         prepare: () => {
@@ -63,29 +68,35 @@ export default class OriginRm extends Destructive(EnvironmentCommand) {
         apply: async (consent, { client, projectId }) => {
           const originService = new OriginService(consent.unlock(client), projectId);
           const removal = await originService.remove(args.pattern);
-          const data = deletedData({
-            pattern: args.pattern,
-          });
+          const removed = `Removed ${escapeControlCharacters(removal.pattern)} from the project's origins`;
+          const emptied = `Removed ${escapeControlCharacters(removal.pattern)}`;
           switch (removal.outcome) {
             case "removed": {
               return {
                 status: "ok",
-                data,
-                pretty: prose(`Removed ${removal.pattern} from the project's origins`),
+                data: deletedData({ title: removed, pattern: args.pattern }),
+                summary: {
+                  title: removed,
+                  sections: [],
+                },
               };
             }
             case "emptied": {
               // Named in the text, not as a next command: the URL is the developer's
-              // to fill in, and a `<url>` placeholder is a shell redirection.
+              // to fill in, and an unquoted `<url>` placeholder is a shell redirection, so the placeholder is quoted.
               reportWarning(
-                `${removal.pattern} was the project's last origin, so the project now admits no origin except a loopback origin. Add the ones it should admit with \`zitadel origin add <url> --kind primary${this.environmentSelector()}\`.`,
+                `${removal.pattern} was the project's last origin, so the project now admits no origin except a loopback origin. Add the ones it should admit with ${this.suggest("origin add '<your-app-url>' --kind primary")}.`,
               );
               return {
                 status: "ok",
-                data,
-                pretty: prose(
-                  `Removed ${removal.pattern}; the project has no origins left and admits no origin except a loopback origin`,
-                ),
+                data: deletedData({ title: emptied, pattern: args.pattern }),
+                summary: {
+                  title: emptied,
+                  sections: [],
+                  lines: [
+                    "The project has no origins left and admits no origin except a loopback origin",
+                  ],
+                },
               };
             }
             case "unverified": {
@@ -94,8 +105,11 @@ export default class OriginRm extends Destructive(EnvironmentCommand) {
               );
               return {
                 status: "ok",
-                data,
-                pretty: prose(`Removed ${removal.pattern} from the project's origins`),
+                data: deletedData({ title: removed, pattern: args.pattern }),
+                summary: {
+                  title: removed,
+                  sections: [],
+                },
               };
             }
           }

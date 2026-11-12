@@ -14,13 +14,14 @@ const PREVIEW_COLUMNS = ["name", "value"] as const;
  *
  * The project's own set. A secret is reported as held without its value, because
  * the platform never discloses one. Without `--preview` it lists every name with
- * its primary value and whether a preview value exists beside it (#1617); with
+ * its primary value and whether a preview value exists beside it; with
  * `--preview` it lists the preview values alone, which are never merged with the
  * primary ones — only the names that hold one.
  */
 export default class VariableList extends Tabulatable(EnvironmentCommand) {
   static override description = "List the variables entered on the project.";
   static override group = CommandGroups.configuration;
+
   static override examples = [
     "<%= config.bin %> variable list",
     "<%= config.bin %> variable list --preview",
@@ -47,7 +48,7 @@ export default class VariableList extends Tabulatable(EnvironmentCommand) {
         return variableCell(item);
       });
       const columns = PREVIEW_COLUMNS;
-      const empty = "No preview values on the project.";
+      const empty = "No preview variables found";
       const footer: string[] = [];
       const page = null;
       const extra = {};
@@ -72,7 +73,7 @@ export default class VariableList extends Tabulatable(EnvironmentCommand) {
       return inventoryCell(item);
     });
     const columns = COLUMNS;
-    const empty = "No variables on the project.";
+    const empty = "No variables found";
     const footer: string[] = [];
     const page = null;
     const extra = {};

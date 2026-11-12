@@ -90,3 +90,18 @@ func InsertUserPasswordAt(ctx context.Context, pool database.Pool, projectID, id
 	)
 	return wrapError(err)
 }
+
+// ReactivateUser sets a deactivated user back to active so stmttest can assert
+// that authorization reads the user's status at check time (ADR 053 §4). There
+// is no product statement that reactivates a user.
+func ReactivateUser(ctx context.Context, pool database.Pool, projectID, userID string) error {
+	p, ok := pool.(*Pool)
+	if !ok {
+		return fmt.Errorf("postgres.ReactivateUser: expected *Pool, got %T", pool)
+	}
+	_, err := p.pool.Exec(ctx,
+		`UPDATE zitadel_nextgen.users SET status = $1, updated_at = now() WHERE project_id = $2 AND id = $3`,
+		domain.UserStatusActive.String(), projectID, userID,
+	)
+	return err
+}

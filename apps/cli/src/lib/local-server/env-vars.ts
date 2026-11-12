@@ -1,5 +1,5 @@
 /**
- * Dev-runtime secret join (issue #1049).
+ * Dev-runtime secret join.
  *
  * The developer's env files configure the local server. When `zitadel start`
  * spawns it, the CLI reads `.env.local`, then `.env`, and hands every
@@ -59,13 +59,20 @@ export const EMPTY_SUMMARY: EnvSummary = { injected: [] };
 export const EMPTY_ENV: ResolvedEnv = { ...EMPTY_SUMMARY, values: {} };
 
 /** True for an `env` block read back from `runtime.json`; names only. */
-export const isEnvSummary = (value: unknown): value is EnvSummary =>
-  isObject(value) &&
-  Array.isArray(value.injected) &&
-  value.injected.every((item) => typeof item === "string");
+export const isEnvSummary = (value: unknown): value is EnvSummary => {
+  return (
+    isObject(value) &&
+    Array.isArray(value.injected) &&
+    value.injected.every((item) => {
+      return typeof item === "string";
+    })
+  );
+};
 
 /** The serialisable half of a resolution: what the metadata file stores. */
-export const envSummary = ({ injected }: EnvSummary): EnvSummary => ({ injected });
+export const envSummary = ({ injected }: EnvSummary): EnvSummary => {
+  return { injected };
+};
 
 /**
  * Reads the project's env files into one map. Earlier files win, so a key in
@@ -75,11 +82,14 @@ export const loadEnvFiles = async (
   cwd: string,
   files: readonly string[] = ENV_FILES,
 ): Promise<Readonly<Record<string, string>>> => {
-  const parsed = await Promise.all(files.map((file) => readEnvFile(join(cwd, file))));
-  return parsed.reduceRight<Record<string, string>>(
-    (merged, source) => Object.assign(merged, source),
-    {},
+  const parsed = await Promise.all(
+    files.map((file) => {
+      return readEnvFile(join(cwd, file));
+    }),
   );
+  return parsed.reduceRight<Record<string, string>>((merged, source) => {
+    return Object.assign(merged, source);
+  }, {});
 };
 
 const readEnvFile = async (path: string): Promise<Readonly<Record<string, string>>> => {
@@ -98,7 +108,9 @@ const readEnvFile = async (path: string): Promise<Readonly<Record<string, string
   // parseEnv types values as possibly-undefined (it never emits them); drop them for the string map.
   return Object.fromEntries(
     Object.entries(parseEnv(contents.replace(/^\uFEFF/, ""))).filter(
-      (entry): entry is [string, string] => entry[1] !== undefined,
+      (entry): entry is [string, string] => {
+        return entry[1] !== undefined;
+      },
     ),
   );
 };
@@ -113,13 +125,22 @@ export const loadProjectEnv = async (
   cwd: string,
   shell: Readonly<Record<string, string | undefined>> = process.env,
 ): Promise<ResolvedEnv> => {
-  const declared = Object.entries(await loadEnvFiles(cwd)).filter(
-    ([name]) => name.startsWith(ENV_PREFIX) && !CLI_OWNED.has(name),
-  );
-  const defaults = Object.entries(LOCAL_DEFAULTS).filter(
-    ([name]) =>
-      shell[name] === undefined && !declared.some(([declaredName]) => declaredName === name),
-  );
-  const values = Object.fromEntries([...defaults, ...declared.filter(([, value]) => value !== "")]);
+  const declared = Object.entries(await loadEnvFiles(cwd)).filter(([name]) => {
+    return name.startsWith(ENV_PREFIX) && !CLI_OWNED.has(name);
+  });
+  const defaults = Object.entries(LOCAL_DEFAULTS).filter(([name]) => {
+    return (
+      shell[name] === undefined &&
+      !declared.some(([declaredName]) => {
+        return declaredName === name;
+      })
+    );
+  });
+  const values = Object.fromEntries([
+    ...defaults,
+    ...declared.filter(([, value]) => {
+      return value !== "";
+    }),
+  ]);
   return { values, injected: Object.keys(values).sort() };
 };

@@ -6,7 +6,8 @@ import { GetInvitationParams } from "@/lib/backend/schemas";
 import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { type Refused, taken } from "@/lib/oclif/flags";
 import { Tabulatable } from "@/lib/oclif/tabulatable";
-import { painted } from "@/lib/oclif/rendering";
+import { json } from "@/lib/oclif/rendering";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 
 /**
  * The invitation `invitation get` reads. The schema is the API spec's own, so
@@ -47,14 +48,39 @@ export default class InvitationGet extends Tabulatable(EnvironmentCommand) {
     const invitationService = new InvitationService(client, projectId);
     const invitation = await invitationService.get(args.invitationId);
 
+    const title = `Read ${escapeControlCharacters(invitation.id)}`;
+    if (this.isJson || !this.isOnScreen) {
+      return this.emit({
+        status: "ok",
+        data: invitation,
+        pretty: json(invitation),
+        summary: {
+          title,
+          sections: [],
+        },
+      });
+    }
+
     return this.emit({
       status: "ok",
       data: invitation,
-      pretty: painted(
-        this.tabulateDetail(
-          invitation.id,
-          ["name", "role", "status", "created_at", "expires_at", "accepted_by", "accepted_at"],
+      summary: {
+        title,
+        sections: [],
+        lines: this.tabulateDetail(
+          undefined,
+          [
+            "id",
+            "name",
+            "role",
+            "status",
+            "created_at",
+            "expires_at",
+            "accepted_by",
+            "accepted_at",
+          ],
           {
+            id: invitation.id,
             name: invitation.metadata?.name ?? "",
             role: invitationRole(invitation),
             status: invitation.status,
@@ -63,8 +89,8 @@ export default class InvitationGet extends Tabulatable(EnvironmentCommand) {
             accepted_by: invitation.accepted_by ?? "",
             accepted_at: invitation.accepted_at ?? "",
           },
-        ),
-      ),
+        ).split("\n"),
+      },
     });
   }
 }

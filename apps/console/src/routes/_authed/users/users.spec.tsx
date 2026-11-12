@@ -1,8 +1,8 @@
 import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { http, HttpResponse } from "msw";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { delay, http, HttpResponse } from "msw";
+import { afterEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import { scopedPath } from "@/test/project-scope.fixture";
 import { server } from "@/test/msw";
 import { createAppRouter } from "../../../router";
@@ -28,7 +28,7 @@ async function renderUsers(path = scopedPath("/users")) {
 }
 
 /** Records every `POST /users/query` body, so the expansion sent can be asserted. */
-function recordQueries(response: (body: Record<string, unknown>) => Response) {
+function recordQueries(response: (body: Record<string, unknown>) => Response | Promise<Response>) {
   const bodies: Record<string, unknown>[] = [];
   server.use(
     http.post(USERS_QUERY_URL, async ({ request }) => {
@@ -648,7 +648,7 @@ describe("users screen", () => {
     await longPress(await screen.findByRole("link", { name: "maya@acme.com" }));
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
 
-    await longPress(screen.getByText("active"));
+    await longPress(screen.getByText("Active"));
     expect(await screen.findByRole("menu")).toBeInTheDocument();
   });
 
@@ -1031,9 +1031,9 @@ describe("users screen", () => {
     await renderUsers();
     const table = within(await screen.findByRole("table"));
 
-    expect(table.getByText("active")).toBeInTheDocument();
+    expect(table.getByText("Active")).toBeInTheDocument();
     // Underscores read as words; the value is not otherwise reinterpreted.
-    expect(table.getByText("pending purge")).toBeInTheDocument();
+    expect(table.getByText("Pending Purge")).toBeInTheDocument();
     expect(table.getAllByText("—").length).toBeGreaterThan(0);
   });
 
@@ -1301,6 +1301,9 @@ describe("users screen", () => {
           schemas: params.get("object_type") === "business" ? [newer, older] : [],
         });
       }),
+      // A search a later term replaced keeps reading, and on a busy runner can land
+      // in the next test. Its answer is discarded either way.
+      http.get(`${SCHEMAS_URL}/sch_business`, () => HttpResponse.json(BUSINESS_SCHEMA)),
     );
   }
 
@@ -1335,17 +1338,20 @@ describe("users screen", () => {
 
   it("narrows the list to a schema, then to one of its revisions, on the server", async () => {
     // Every revision of a schema shares its object type, so the schema filter
-    // sends that; a revision adds `schema equals` its id. The revision filter
-    // stays in view, disabled until a schema is chosen, and changing the
-    // schema drops it.
+    // sends that; a revision adds `schema equals` its id. The revision is
+    // listed but cannot be chosen until a schema is, and clearing the schema
+    // drops it.
     serveLineage();
     const bodies = recordQueries(() => HttpResponse.json({ users: [] }));
     const router = await renderUsers();
     await screen.findByRole("table");
     expect(bodies.at(-1)).not.toHaveProperty("filter");
-    expect(screen.getByRole("combobox", { name: "Filter by revision" })).toBeDisabled();
-
-    await userEvent.click(screen.getByRole("combobox", { name: "Filter by schema" }));
+    await userEvent.click(screen.getByRole("button", { name: "Add filter" }));
+    expect(await screen.findByRole("option", { name: /^Revision/ })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    await userEvent.click(screen.getByRole("option", { name: "User schema" }));
     await userEvent.click(await screen.findByRole("option", { name: "Business" }));
     await waitFor(() =>
       expect(router.state.resolvedLocation?.search).toMatchObject({ schema: "business" }),
@@ -1357,11 +1363,10 @@ describe("users screen", () => {
     );
     expect(await screen.findByText("No users match this filter.")).toBeInTheDocument();
 
-    const revision = screen.getByRole("combobox", { name: "Filter by revision" });
-    await waitFor(() => expect(revision).toBeEnabled());
-    await userEvent.click(revision);
+    await userEvent.click(screen.getByRole("button", { name: "Add filter" }));
+    await userEvent.click(await screen.findByRole("option", { name: "Revision" }));
     // The chosen schema's history, newest first; what each option shows is
-    // `RevisionItems`' to prove.
+    // `RevisionOption`'s to prove.
     const options = within(await screen.findByRole("listbox")).getAllByRole("option");
     expect(options.map((option) => option.getAttribute("title") ?? option.textContent)).toEqual([
       "Older revisions",
@@ -1377,11 +1382,12 @@ describe("users screen", () => {
         ],
       }),
     );
-    expect(screen.getByRole("combobox", { name: "Filter by revision" })).toHaveTextContent(
+    expect(screen.getByRole("button", { name: /^Revision/ })).toHaveTextContent(
       "Revisionsch_business",
     );
 
-    // Clearing the revision keeps the schema, and hands focus to its trigger.
+    // Clearing the revision keeps the schema, and hands focus to the button
+    // that stays.
     await userEvent.click(screen.getByRole("button", { name: "Clear the revision filter" }));
     await waitFor(() =>
       expect(bodies.at(-1)).toEqual(
@@ -1394,11 +1400,11 @@ describe("users screen", () => {
       project: "proj_test",
       schema: "business",
     });
-    expect(screen.getByRole("combobox", { name: "Filter by revision" })).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Add filter" })).toHaveFocus();
 
     await userEvent.click(screen.getByRole("button", { name: "Clear the schema filter" }));
     await waitFor(() => expect(bodies.at(-1)).not.toHaveProperty("filter"));
-    expect(screen.getByRole("combobox", { name: "Filter by revision" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: /^User schema/ })).toBeNull();
     expect(router.state.resolvedLocation?.search).toEqual({ project: "proj_test" });
   });
 
@@ -1424,7 +1430,8 @@ describe("users screen", () => {
     const router = await renderUsers(`${scopedPath("/users")}&schema=business`);
     await screen.findByRole("table");
 
-    await userEvent.click(screen.getByRole("combobox", { name: "Filter by revision" }));
+    await userEvent.click(screen.getByRole("button", { name: "Add filter" }));
+    await userEvent.click(await screen.findByRole("option", { name: "Revision" }));
     await userEvent.click(await screen.findByRole("option", { name: "Older revisions" }));
     await waitFor(() =>
       expect(bodies.at(-1)).toEqual(
@@ -1440,7 +1447,7 @@ describe("users screen", () => {
       schema: "business",
       revision: "older",
     });
-    expect(screen.getByRole("combobox", { name: "Filter by revision" })).toHaveTextContent(
+    expect(screen.getByRole("button", { name: /^Revision/ })).toHaveTextContent(
       "RevisionOlder revisions",
     );
   });
@@ -1515,14 +1522,16 @@ describe("users screen", () => {
     await renderUsers(`${scopedPath("/users")}&schema=business`);
     await screen.findByRole("table");
 
-    await userEvent.click(screen.getByRole("combobox", { name: "Filter by revision" }));
-    const listbox = within(await screen.findByRole("listbox"));
-    expect(listbox.getAllByRole("option")).toHaveLength(1);
+    await userEvent.click(screen.getByRole("button", { name: "Add filter" }));
+    await userEvent.click(await screen.findByRole("option", { name: "Revision" }));
+    const listbox = within(screen.getByRole("listbox"));
+    await waitFor(() => expect(listbox.getAllByRole("option")).toHaveLength(1));
+    expect(listbox.getByRole("option")).toHaveAttribute("title", "sch_business");
     expect(listbox.queryByRole("option", { name: "Older revisions" })).toBeNull();
   });
 
   it("disables a filter with nothing to offer", async () => {
-    // The schemas cannot be read, so neither filter has options to open.
+    // The schemas cannot be read, so neither filter has values to choose.
     recordQueries(() => HttpResponse.json({ users: [] }));
     server.use(
       http.get(SCHEMAS_URL, () =>
@@ -1532,19 +1541,380 @@ describe("users screen", () => {
     await renderUsers();
 
     await screen.findByRole("table");
-    expect(screen.getByRole("combobox", { name: "Filter by schema" })).toBeDisabled();
-    expect(screen.getByRole("combobox", { name: "Filter by revision" })).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: "Add filter" }));
+    for (const property of [/^User schema/, /^Revision/]) {
+      expect(await screen.findByRole("option", { name: property })).toHaveAttribute(
+        "aria-disabled",
+        "true",
+      );
+    }
+    // What needs no schema can still be chosen.
+    expect(screen.getByRole("option", { name: "Status" })).not.toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+  });
+
+  it("searches by identifier on the server, keeps the term in the URL, and pages with it", async () => {
+    serveLineage();
+    server.use(http.get(`${SCHEMAS_URL}/sch_business`, () => HttpResponse.json(BUSINESS_SCHEMA)));
+    const user = (id: string) => ({
+      id,
+      schema: "sch_business",
+      attributes: { email: `${id}@acme.com` },
+    });
+    const bodies = recordQueries((body) =>
+      HttpResponse.json(
+        body.filter && !body.page_token
+          ? { users: [user("user_match")], next_page_token: "next" }
+          : { users: [user(body.page_token ? "user_more" : "user_all")] },
+      ),
+    );
+    const router = await renderUsers(scopedPath("/users"));
+
+    await userEvent.type(
+      await screen.findByRole("searchbox", { name: "Search by identifier" }),
+      " alex ",
+    );
+    await waitFor(() => expect(router.state.resolvedLocation?.search).toMatchObject({ q: "alex" }));
+    await waitFor(() =>
+      expect(bodies.at(-1)).toMatchObject({
+        filter: [{ field: "identifier", operation: "starts_with", value: "alex" }],
+      }),
+    );
+
+    await userEvent.click(await screen.findByRole("button", { name: /load more/i }));
+    await waitFor(() =>
+      expect(bodies.at(-1)).toMatchObject({
+        page_token: "next",
+        filter: [{ field: "identifier", operation: "starts_with", value: "alex" }],
+      }),
+    );
+  });
+
+  it("keeps the search field mounted and focused through a slow search", async () => {
+    serveLineage();
+    server.use(http.get(`${SCHEMAS_URL}/sch_business`, () => HttpResponse.json(BUSINESS_SCHEMA)));
+    const user = (id: string) => ({
+      id,
+      schema: "sch_business",
+      identifier: `${id}@acme.com`,
+      attributes: { email: `${id}@acme.com` },
+    });
+    // Past the router's pending delay, which a fast response never reaches.
+    const bodies = recordQueries(async (body) => {
+      if (body.filter) await delay(1600);
+      return HttpResponse.json({ users: [user(body.filter ? "user_match" : "user_all")] });
+    });
+    await renderUsers(scopedPath("/users"));
+    const field = await screen.findByRole("searchbox", { name: "Search by identifier" });
+    await screen.findByText("user_all@acme.com");
+
+    await userEvent.type(field, "alex");
+    await waitFor(() => expect(bodies.at(-1)).toHaveProperty("filter"));
+    await act(() => new Promise((resolve) => setTimeout(resolve, 1200)));
+
+    // The same element, still focused, and what follows the pause is kept.
+    expect(screen.getByRole("searchbox", { name: "Search by identifier" })).toBe(field);
+    expect(field).toHaveFocus();
+    await userEvent.keyboard("x");
+    expect(field).toHaveValue("alexx");
+
+    await screen.findByText("user_match@acme.com");
+    expect(screen.getByRole("searchbox", { name: "Search by identifier" })).toBe(field);
+    expect(field).toHaveFocus();
+    // The search for what followed the pause, answered and drawn, so nothing it
+    // reads is still in flight when the next test starts.
+    await waitFor(() =>
+      expect(bodies.at(-1)).toMatchObject({
+        filter: [{ field: "identifier", operation: "starts_with", value: "alexx" }],
+      }),
+    );
+    await waitFor(
+      () => expect(screen.getByRole("table")).not.toHaveAttribute("aria-busy", "true"),
+      {
+        timeout: 4000,
+      },
+    );
+  }, 15000);
+
+  it("reads a new term once, and again after the list is invalidated", async () => {
+    serveLineage();
+    const bodies = recordQueries(() => HttpResponse.json({ users: [] }));
+    const router = await renderUsers(`${scopedPath("/users")}&q=first`);
+    await screen.findByText("No users match this search.");
+    const field = screen.getByRole("searchbox", { name: "Search by identifier" });
+
+    await userEvent.clear(field);
+    await userEvent.type(field, "second");
+    await waitFor(() =>
+      expect(router.state.resolvedLocation?.search).toMatchObject({ q: "second" }),
+    );
+    await waitFor(() =>
+      expect(bodies.at(-1)).toMatchObject({
+        filter: [{ field: "identifier", operation: "starts_with", value: "second" }],
+      }),
+    );
+    await waitFor(() => expect(screen.getByRole("table")).not.toHaveAttribute("aria-busy", "true"));
+    const reads = (value: string) =>
+      bodies.filter(
+        (body) => (body.filter as { value: string }[] | undefined)?.[0]?.value === value,
+      ).length;
+    await act(() => new Promise((resolve) => setTimeout(resolve, 100)));
+    expect(reads("second")).toBe(1);
+
+    await act(() => router.invalidate());
+    await waitFor(() => expect(reads("second")).toBe(2));
+    await act(() => new Promise((resolve) => setTimeout(resolve, 100)));
+    expect(reads("second")).toBe(2);
+  });
+
+  it("reads only the rows for a new term, keeping the older revisions filter", async () => {
+    serveLineage();
+    const bodies = recordQueries(() => HttpResponse.json({ users: [] }));
+    const schemaReads: string[] = [];
+    const countSchemaReads = ({ request }: { request: Request }) => {
+      const url = new URL(request.url);
+      if (url.pathname.startsWith("/api/v1/schemas")) schemaReads.push(url.pathname + url.search);
+    };
+    await renderUsers(`${scopedPath("/users")}&schema=business&revision=older`);
+    await screen.findByText("No users match this filter.");
+    server.events.on("request:start", countSchemaReads);
+    onTestFinished(() => server.events.removeListener("request:start", countSchemaReads));
+
+    await userEvent.type(screen.getByRole("searchbox", { name: "Search by identifier" }), "ada");
+
+    await waitFor(() =>
+      expect(bodies.at(-1)).toEqual(
+        expect.objectContaining({
+          filter: [
+            { field: "identifier", operation: "starts_with", value: "ada" },
+            { field: "schema_object_type", operation: "equals", value: "business" },
+            { field: "schema", operation: "not_equals", value: "sch_business_2" },
+          ],
+        }),
+      ),
+    );
+    await waitFor(() => expect(screen.getByRole("table")).not.toHaveAttribute("aria-busy", "true"));
+    expect(schemaReads).toEqual([]);
+  });
+
+  it.each([
+    ["not text", "q=true"],
+    ["only spaces", "q=%20%20"],
+  ])("sends no identifier filter for a term that is %s", async (_name, query) => {
+    serveLineage();
+    const bodies = recordQueries(() => HttpResponse.json({ users: [] }));
+    await renderUsers(`${scopedPath("/users")}&${query}`);
+
+    await waitFor(() => expect(bodies.length).toBeGreaterThan(0));
+    expect(bodies[0]).not.toHaveProperty("filter.0.field", "identifier");
+  });
+
+  it("trims a padded term from the URL before it searches", async () => {
+    serveLineage();
+    const bodies = recordQueries(() => HttpResponse.json({ users: [] }));
+    await renderUsers(`${scopedPath("/users")}&q=%20alex%20`);
+
+    await waitFor(() =>
+      expect(bodies[0]).toMatchObject({
+        filter: [{ field: "identifier", operation: "starts_with", value: "alex" }],
+      }),
+    );
+  });
+
+  it("searches for a number someone typed into the URL", async () => {
+    serveLineage();
+    const bodies = recordQueries(() => HttpResponse.json({ users: [] }));
+    await renderUsers(`${scopedPath("/users")}&q=12345`);
+
+    await waitFor(() =>
+      expect(bodies[0]).toMatchObject({
+        filter: [{ field: "identifier", operation: "starts_with", value: "12345" }],
+      }),
+    );
+  });
+
+  it("keeps the list and the field when a search fails, and says so", async () => {
+    serveLineage();
+    server.use(http.get(`${SCHEMAS_URL}/sch_business`, () => HttpResponse.json(BUSINESS_SCHEMA)));
+    recordQueries((body) =>
+      body.filter
+        ? HttpResponse.json({ message: "The search is unavailable." }, { status: 503 })
+        : HttpResponse.json({
+            users: [
+              {
+                id: "user_all",
+                schema: "sch_business",
+                identifier: "user_all@acme.com",
+                attributes: { email: "user_all@acme.com" },
+              },
+            ],
+          }),
+    );
+    await renderUsers(scopedPath("/users"));
+    const field = await screen.findByRole("searchbox", { name: "Search by identifier" });
+    await screen.findByText("user_all@acme.com");
+
+    await userEvent.type(field, "alex");
+
+    expect(await screen.findByText("The search is unavailable.")).toBeInTheDocument();
+    expect(screen.getByRole("searchbox", { name: "Search by identifier" })).toHaveValue("alex");
+    expect(screen.getByText("user_all@acme.com")).toBeInTheDocument();
+  });
+
+  it("still shows the pending state on a slow first load", async () => {
+    serveLineage();
+    recordQueries(async () => {
+      await delay(1600);
+      return HttpResponse.json({ users: [] });
+    });
+    await renderUsers(scopedPath("/users"));
+
+    expect(await screen.findByText("Loading…", undefined, { timeout: 1500 })).toBeInTheDocument();
+    expect(
+      await screen.findByText("No users yet.", undefined, { timeout: 3000 }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows the answer to the latest term when an earlier search answers last", async () => {
+    serveLineage();
+    server.use(http.get(`${SCHEMAS_URL}/sch_business`, () => HttpResponse.json(BUSINESS_SCHEMA)));
+    const user = (id: string) => ({
+      id,
+      schema: "sch_business",
+      identifier: `${id}@acme.com`,
+      attributes: { email: `${id}@acme.com` },
+    });
+    recordQueries(async (body) => {
+      const value = (body.filter as { value: string }[] | undefined)?.[0]?.value;
+      if (value === "first") await delay(1200);
+      return HttpResponse.json({ users: [user(value ? `user_${value}` : "user_all")] });
+    });
+    await renderUsers(scopedPath("/users"));
+    const field = await screen.findByRole("searchbox", { name: "Search by identifier" });
+    await screen.findByText("user_all@acme.com");
+
+    await userEvent.type(field, "first");
+    await act(() => new Promise((resolve) => setTimeout(resolve, 500)));
+    await userEvent.clear(field);
+    await userEvent.type(field, "second");
+
+    expect(
+      await screen.findByText("user_second@acme.com", undefined, { timeout: 4000 }),
+    ).toBeInTheDocument();
+    // Past the moment the earlier search answers.
+    await act(() => new Promise((resolve) => setTimeout(resolve, 1200)));
+    expect(screen.getByText("user_second@acme.com")).toBeInTheDocument();
+    expect(screen.queryByText("user_first@acme.com")).not.toBeInTheDocument();
+  }, 15000);
+
+  it("offers no search on a project with no users, and keeps it once a search empties the list", async () => {
+    serveLineage();
+    recordQueries(() => HttpResponse.json({ users: [] }));
+    await renderUsers(scopedPath("/users"));
+
+    expect(await screen.findByText("No users yet.")).toBeInTheDocument();
+    expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
+  });
+
+  it("sends the search together with the schema filter", async () => {
+    serveLineage();
+    const bodies = recordQueries(() => HttpResponse.json({ users: [] }));
+    await renderUsers(`${scopedPath("/users")}&q=alex&schema=business`);
+
+    await screen.findByRole("table");
+    expect(screen.getByRole("searchbox", { name: "Search by identifier" })).toHaveValue("alex");
+    expect(bodies.at(-1)).toMatchObject({
+      filter: [
+        { field: "identifier", operation: "starts_with", value: "alex" },
+        { field: "schema_object_type", operation: "equals", value: "business" },
+      ],
+    });
+  });
+
+  it("clears a search with no matches from inside the table, apart from an empty project", async () => {
+    serveLineage();
+    const bodies = recordQueries(() => HttpResponse.json({ users: [] }));
+    const router = await renderUsers(`${scopedPath("/users")}&q=nobody`);
+
+    expect(await screen.findByText("No users match this search.")).toBeInTheDocument();
+    expect(screen.queryByText("No users yet.")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+    const field = screen.getByRole("searchbox", { name: "Search by identifier" });
+    expect(field).toHaveFocus();
+    await waitFor(() => expect(router.state.resolvedLocation?.search).not.toHaveProperty("q"));
+    await waitFor(() => expect(bodies.at(-1)).not.toHaveProperty("filter"));
+    expect(await screen.findByText("No users yet.")).toBeInTheDocument();
+    // The term the row was for is gone, and the field stays where focus went.
+    expect(screen.getByRole("searchbox", { name: "Search by identifier" })).toBe(field);
+    expect(field).toHaveValue("");
+    expect(field).toHaveFocus();
+    expect(screen.queryByRole("button", { name: "Clear filters" })).not.toBeInTheDocument();
+  });
+
+  it("narrows by status and by when the user was created, each chosen as its type is", async () => {
+    serveLineage();
+    const bodies = recordQueries(() => HttpResponse.json({ users: [] }));
+    const router = await renderUsers();
+    await screen.findByRole("table");
+
+    // A status is one of a set.
+    await userEvent.click(screen.getByRole("button", { name: "Add filter" }));
+    await userEvent.click(await screen.findByRole("option", { name: "Status" }));
+    await userEvent.click(await screen.findByRole("option", { name: "Suspended" }));
+    await waitFor(() =>
+      expect(bodies.at(-1)).toMatchObject({
+        filter: [{ field: "status", operation: "equals", value: "suspended" }],
+      }),
+    );
+    expect(screen.getByRole("button", { name: /^Status/ })).toHaveTextContent("StatusSuspended");
+
+    // A date is a range that ends now.
+    const before = Date.now();
+    await userEvent.click(screen.getByRole("button", { name: "Add filter" }));
+    await userEvent.click(await screen.findByRole("option", { name: "Created" }));
+    await userEvent.click(await screen.findByRole("option", { name: "Last 7 days" }));
+    await waitFor(() =>
+      expect(router.state.resolvedLocation?.search).toEqual({
+        project: "proj_test",
+        status: "suspended",
+        created: "7d",
+      }),
+    );
+    const criteria = (bodies.at(-1) ?? {}).filter as { field: string; value: string }[];
+    const created = criteria[1];
+    expect(created).toMatchObject({ field: "created_at", operation: "greater_than_or_equal" });
+    const week = 7 * 24 * 60 * 60 * 1000;
+    expect(Date.parse(created!.value)).toBeGreaterThanOrEqual(before - week);
+    expect(Date.parse(created!.value)).toBeLessThanOrEqual(Date.now() - week);
+
+    // The empty list's button clears them all.
+    await userEvent.click(await screen.findByRole("button", { name: "Clear filters" }));
+    await waitFor(() => expect(bodies.at(-1)).not.toHaveProperty("filter"));
+    expect(router.state.resolvedLocation?.search).toEqual({ project: "proj_test" });
+  });
+
+  it("drops a status or a date the filter could not have sent", async () => {
+    serveLineage();
+    const bodies = recordQueries(() => HttpResponse.json({ users: [] }));
+    const router = await renderUsers(`${scopedPath("/users")}&status=gone&created=yesterday`);
+
+    await screen.findByRole("table");
+    expect(bodies.at(-1)).not.toHaveProperty("filter");
+    expect(router.state.resolvedLocation?.search).toEqual({ project: "proj_test" });
   });
 
   it("names an object type the URL carries that no schema has", async () => {
     // A link kept after its schema was deleted still narrows the list; the
-    // trigger says so rather than going blank for want of a matching option.
+    // chip says so rather than going blank for want of a matching option.
     serveLineage();
     recordQueries(() => HttpResponse.json({ users: [] }));
     await renderUsers(`${scopedPath("/users")}&schema=ghost`);
 
     await screen.findByRole("table");
-    expect(screen.getByRole("combobox", { name: "Filter by schema" })).toHaveTextContent("ghost");
+    expect(screen.getByRole("button", { name: /^User schema/ })).toHaveTextContent("ghost");
     expect(screen.getByText("No users match this filter.")).toBeInTheDocument();
   });
 
@@ -1567,11 +1937,7 @@ describe("users screen", () => {
         { field: "schema", operation: "equals", value: "sch_business" },
       ],
     });
-    expect(screen.getByRole("combobox", { name: "Filter by schema" })).toHaveTextContent(
-      "business",
-    );
-    expect(screen.getByRole("combobox", { name: "Filter by revision" })).toHaveTextContent(
-      "sch_business",
-    );
+    expect(screen.getByRole("button", { name: /^User schema/ })).toHaveTextContent("business");
+    expect(screen.getByRole("button", { name: /^Revision/ })).toHaveTextContent("sch_business");
   });
 });

@@ -1,14 +1,15 @@
 import pTimeout from "p-timeout";
-import { UserService } from "@/lib/backend";
-import { isCancellation } from "@/lib/errors";
 
+import { UserService } from "@/lib/backend";
 import {
+  type ClaimState,
   claimAction,
   claimCommand,
   claimState,
   claimWindowClosedAction,
-  type ClaimState,
 } from "@/lib/claim-state";
+import { Cmd } from "@/lib/cmd";
+import { isCancellation } from "@/lib/errors";
 import {
   customizeAndPublishActions,
   exploreAllCommands,
@@ -22,15 +23,14 @@ import {
 import { LocalServer } from "@/lib/local-server/server";
 import {
   type Admitted,
-  type Connection,
   CommandGroups,
+  type Connection,
   EnvironmentCommand,
   type JsonEnvelope,
   type MetaOptions,
 } from "@/lib/oclif";
 import type { GlobalOptions } from "@/lib/oclif/types";
 import { resolveCwd } from "@/lib/paths";
-import { Cmd } from "@/lib/cmd";
 import {
   hasZitadelConfig,
   hasZitadelSecret,
@@ -39,12 +39,13 @@ import {
   readZitadelSecret,
 } from "@/lib/project";
 import {
+  DEPLOY_ARGS,
   type EnvironmentSelector,
   projectCommand,
   type SuggestedCommand,
   unscopedCommand,
 } from "@/lib/suggestion";
-import { DEPLOY_ARGS } from "@/lib/suggestion";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 
 /**
  * `zitadel status` — summarize the local server and project state.
@@ -77,6 +78,7 @@ export default class Status extends EnvironmentCommand {
   protected async execute({ flags }: Admitted<typeof Status>): Promise<JsonEnvelope> {
     const server = await LocalServer.at(this.cwd, {
       cliVersion: this.cliVersion,
+      selector: this.cwdSelector(),
     }).status();
     const serverLifecycle = server.lifecycle;
 
@@ -85,35 +87,43 @@ export default class Status extends EnvironmentCommand {
       this.environment.values.ZITADEL_ISSUER?.value,
       this.environment.values.ZITADEL_PROJECT_ID?.value,
       this.environment.envFile !== undefined || this.environment.name.value !== "development"
-        ? { name: this.environment.name.value, envFile: this.environment.envFile }
+        ? {
+            name: this.environment.name.value,
+            envFile: this.environment.envFile,
+          }
         : undefined,
+    );
+    this.ui.ranAgainst(
+      project.lifecycle === "configured" ? project.project_id : undefined,
+      this.environment.values.ZITADEL_URL?.value ?? this.meta.source,
     );
     const users =
       project.lifecycle === "configured"
         ? await detectUserPresence(() => {
             return this.connect({
-              quiet: true,
               prompt: false,
               timeoutMs: PRESENCE_PROBE_TIMEOUT_MS,
             });
           })
         : "unknown";
-    const nextCommands = nextCommandsFor(
-      serverLifecycle,
-      project,
-      users,
-      this.cliVersion,
-      this.environmentSelector(),
-      // `--cwd` as typed, for the follow-ups the selector does not carry: the
-      // runtime and the project files they act on live in that directory.
-      typeof flags.cwd === "string" ? ` ${Cmd.option("--cwd", flags.cwd)}` : "",
-    );
-    const nextActions = nextActionsFor(project, users, this.cliVersion, this.environmentSelector());
+    const serverUrl =
+      server.runtime === undefined ? undefined : escapeControlCharacters(server.runtime.server_url);
+    const backend = server.runtime?.backend;
+    const how =
+      server.runtime?.backend === "binary" && server.process !== undefined
+        ? `${backend}, pid ${server.process.pid}`
+        : backend;
+    let dockerSaid = "";
+    if (backend === "docker" && !server.docker.available) {
+      dockerSaid = `, and Docker could not be asked about it${server.docker.error === undefined ? "" : `: ${escapeControlCharacters(server.docker.error)}`}`;
+    }
+
+    const title = "Checked the status of the project";
 
     return this.emit({
       status: "ok",
       data: {
-        title: "Zitadel status.",
+        title,
         server: {
           lifecycle: serverLifecycle,
           runtime: runtimeSummary(server.runtime),
@@ -126,8 +136,45 @@ export default class Status extends EnvironmentCommand {
         },
         project,
       },
-      next: { actions: nextActions, commands: nextCommands },
-      footer: exploreAllCommands(this.cliVersion),
+      summary: {
+        title,
+        sections: [],
+        lines: [
+          `${
+            {
+              missing: "No local server was started in this directory",
+              stopped: `The local server is stopped, and last ran at ${serverUrl} (${how})`,
+              unhealthy: `The local server is running at ${serverUrl} (${how}) but does not answer`,
+              running: `The local server is running and healthy at ${serverUrl} (${how})`,
+            }[server.lifecycle]
+          }${dockerSaid}.`,
+          escapeControlCharacters(
+            `${[
+              ...("project_id" in project && project.project_id !== undefined
+                ? [`Project ${project.project_id}`]
+                : []),
+              `lifecycle ${project.lifecycle}`,
+              ...("issuer" in project && project.issuer !== undefined
+                ? [`issuer ${project.issuer}`]
+                : []),
+            ].join(", ")}.`,
+          ),
+        ],
+        overview: exploreAllCommands(this.cliVersion),
+      },
+      next: {
+        actions: nextActionsFor(project, users, this.cliVersion, this.environmentSelector()),
+        commands: nextCommandsFor(
+          serverLifecycle,
+          project,
+          users,
+          this.cliVersion,
+          this.environmentSelector(),
+          // `--cwd` as typed, for the follow-ups the selector does not carry: the
+          // runtime and the project files they act on live in that directory.
+          typeof flags.cwd === "string" ? ` ${Cmd.option("--cwd", flags.cwd)}` : "",
+        ),
+      },
     });
   }
 }
@@ -224,7 +271,10 @@ async function projectStatus(
   // not move the project, so the source would answer the wrong question.
   const claim =
     secret !== undefined && projectId === secret.project_id
-      ? claimState({ secret, server: readProjectServer(config) })
+      ? claimState({
+          secret,
+          server: readProjectServer(config),
+        })
       : ({ kind: "not-applicable" } as const);
   return {
     lifecycle: "configured",

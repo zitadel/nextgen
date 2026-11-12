@@ -4,6 +4,9 @@ import { useMatch, useRouter, useSearch } from "@tanstack/react-router";
 import { withoutTrailingSlash } from "@/lib/base-path";
 import type { NavMeta, NavView } from "@/nav";
 
+/** Route prefix of the selected project's Settings, whose pages have a list of their own (D40). */
+export const PROJECT_SETTINGS_PATH = "/project";
+
 export interface NavItem {
   /** Route path. */
   to: string;
@@ -14,7 +17,7 @@ export interface NavItem {
  * Builds one sidebar's list from `staticData.nav` on the route tree (Console
  * ADR 0001).
  *
- * `view` selects which list. The shell renders three from one route tree, so
+ * `view` selects which list. The shell renders several from one route tree, so
  * an entry belongs to exactly one of them. The list is one level, sorted by
  * `nav.order` so the sidebar matches the design regardless of route
  * registration order.
@@ -38,6 +41,26 @@ export function useNavItems(view: NavView = "portal"): NavItem[] {
     })
     .filter((item): item is NavItem => item !== undefined)
     .sort((a, b) => a.nav.order - b.nav.order);
+}
+
+/**
+ * The account list as the sidebar draws it (D34): its first row, Projects,
+ * then the project's screens, then the account's other rows (Settings). Above
+ * every project the account's rows alone left the sidebar nearly empty; with
+ * the project's screens it shows what the console holds. Choosing one opens it
+ * in the selected project (D36), and asks for a project first when none is
+ * (D31).
+ *
+ * Two of the project's rows are left out, as in Vercel. Its landing, `/`
+ * (Overview, D35), is the row Projects stands in for up here. A screen named
+ * like an account row (the project's own Settings) would name two places
+ * alike: up here Settings is the account's.
+ */
+export function accountListItems(account: NavItem[], project: NavItem[]): NavItem[] {
+  const [home, ...rest] = account;
+  const taken = new Set(account.map((item) => item.nav.label));
+  const screens = project.filter((item) => item.to !== "/" && !taken.has(item.nav.label));
+  return home ? [home, ...screens, ...rest] : screens;
 }
 
 /**

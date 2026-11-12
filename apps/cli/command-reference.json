@@ -365,7 +365,7 @@
     {
       "id": "console",
       "group": "Local development",
-      "description": "Open the local console, signed in as the local admin.\n\nThe local admin is the one `zitadel start` created. Run this in the directory `zitadel start` ran in, or one inside it: the local admin is read from the nearest `.zitadel/local/` on the way up.",
+      "description": "Open the local console, signed in as the local admin.\n\nThe local admin is the one the start command created. Run this in the directory it ran in, or one inside it: the local admin is read from the nearest .zitadel/local/ on the way up.",
       "args": [],
       "flags": [
         {
@@ -386,7 +386,7 @@
     {
       "id": "logs",
       "group": "Local development",
-      "description": "Show local Zitadel server logs.\n\nOn a terminal, warnings are yellow and errors red. Run it in the directory `zitadel start` ran in, or one inside it: the server is found from the nearest `.zitadel/local/` on the way up.",
+      "description": "Show local Zitadel server logs.\n\nOn a terminal, warnings are yellow and errors red. Run it in the directory the start command ran in, or one inside it: the server is found from the nearest .zitadel/local/ on the way up.",
       "args": [],
       "flags": [
         {
@@ -644,7 +644,7 @@
         },
         {
           "name": "filter",
-          "description": "Filter as field=operation:value (operation defaults to equals). Fields: created_at (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), id (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), schema (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), schema_object_type (equals|not_equals|contains), status (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), team_id (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), lifecycle_owner_team_id (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal).",
+          "description": "Filter as field=operation:value (operation defaults to equals). Fields: created_at (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), id (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), identifier (starts_with), schema (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), schema_object_type (equals|not_equals|contains), status (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), team_id (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), lifecycle_owner_team_id (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal).",
           "type": "option",
           "multiple": true
         },
@@ -1280,7 +1280,7 @@
         },
         {
           "name": "schema",
-          "description": "User schema to change, by file name or objectType. Required when the Project has more than one.",
+          "description": "User schema to change, by file name or objectType. Required when the project has more than one.",
           "type": "option"
         }
       ],
@@ -1301,7 +1301,7 @@
       "flags": [
         {
           "name": "schema",
-          "description": "User schema to change, by file name or objectType. Required when the Project has more than one.",
+          "description": "User schema to change, by file name or objectType. Required when the project has more than one.",
           "type": "option"
         }
       ],
@@ -1328,7 +1328,7 @@
         },
         {
           "name": "schema",
-          "description": "User schema to change, by file name or objectType. Required when the Project has more than one.",
+          "description": "User schema to change, by file name or objectType. Required when the project has more than one.",
           "type": "option"
         }
       ],
@@ -1349,7 +1349,7 @@
       "flags": [
         {
           "name": "schema",
-          "description": "User schema to change, by file name or objectType. Required when the Project has more than one.",
+          "description": "User schema to change, by file name or objectType. Required when the project has more than one.",
           "type": "option"
         }
       ],
@@ -1381,7 +1381,7 @@
         },
         {
           "name": "schema",
-          "description": "User schema to change, by file name or objectType. Required when the Project has more than one.",
+          "description": "User schema to change, by file name or objectType. Required when the project has more than one.",
           "type": "option"
         }
       ],
@@ -1447,7 +1447,7 @@
         },
         {
           "name": "schema",
-          "description": "User schema to change, by file name or objectType. Required when the Project has more than one.",
+          "description": "User schema to change, by file name or objectType. Required when the project has more than one.",
           "type": "option"
         }
       ],
@@ -2283,14 +2283,14 @@
       "args": [
         {
           "name": "deployment_id",
-          "description": "The deployment to re-apply. Omit to undo the last deploy."
+          "description": "The deployment to roll back to. Omit to undo the last deploy."
         }
       ],
       "flags": [
         {
           "name": "force",
           "char": "f",
-          "description": "Re-apply the deployment without the confirmation prompt. Required when non-interactive.",
+          "description": "Roll back to the deployment without the confirmation prompt. Required when non-interactive.",
           "type": "boolean"
         },
         {
@@ -3472,8 +3472,13 @@
     {
       "id": "variable resolve",
       "group": "Configuration and releases",
-      "description": "Show the variables the live deployment froze for a target.",
-      "args": [],
+      "description": "Show the variables a deployment froze, the live one by default.",
+      "args": [
+        {
+          "name": "deployment_id",
+          "description": "The deployment to read; the live one when omitted."
+        }
+      ],
       "flags": [
         {
           "name": "origin",
@@ -3503,6 +3508,9 @@
         },
         {
           "command": "variable resolve --origin https://app.acme.com"
+        },
+        {
+          "command": "variable resolve dep_01KX5N7C9D2E7F0N9WD3P2E4YM6"
         },
         {
           "command": "variable resolve --json"
@@ -3922,6 +3930,17 @@
           "char": "f",
           "description": "Call an operation that deletes, revokes or rolls back without the confirmation prompt. Required when non-interactive.",
           "type": "boolean"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
+          "type": "option"
         }
       ],
       "examples": [
@@ -3948,7 +3967,7 @@
     {
       "id": "api ls",
       "group": "Diagnostics and utilities",
-      "description": "List the operations of the Zitadel API that `zitadel api` calls.",
+      "description": "List the operations of the Zitadel API that the api command calls.",
       "args": [
         {
           "name": "filter",
@@ -4054,7 +4073,7 @@
         },
         {
           "name": "filter",
-          "description": "Filter as field=operation:value (operation defaults to equals). Fields: category (equals; values request|auth|session|admin|entity|signal; repeats widen), event_type (equals; repeats widen), actor_id (equals), session_id (equals), flow_id (equals), request_id (equals), entity_type (equals), entity_id (equals), team_id (equals), created_at (greater_than_or_equal|less_than).",
+          "description": "Filter as field=operation:value (operation defaults to equals). Fields: category (equals; values request|auth|session|admin|entity|signal; repeats widen), event_type (equals; repeats widen), actor_id (equals), session_id (equals), flow_id (equals), request_id (equals), entity_type (equals), entity_id (equals), team_id (equals), operation_id (equals; repeats widen), status_class (equals; values 1xx|2xx|3xx|4xx|5xx; repeats widen), created_at (greater_than_or_equal|less_than).",
           "type": "option",
           "multiple": true
         },

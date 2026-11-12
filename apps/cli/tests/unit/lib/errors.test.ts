@@ -6,6 +6,7 @@ import {
   EXIT_CODES,
   ZitadelError,
   errorMessage,
+  failureText,
   isCancellation,
   isErrno,
   toZitadelError,
@@ -510,6 +511,51 @@ describe("resources the platform rejected", () => {
     );
   });
 
+  it("appends the fields a connection may not change", () => {
+    const error = rejected({
+      code: "rel.invalid",
+      message: "release: invalid",
+      details: {
+        resources: [
+          {
+            code: "idp.field_immutable",
+            kind: "idp",
+            handle: "zitadel-cloud",
+            message:
+              "identity provider connection: the field is fixed for the life of the connection",
+            details: { details: { fields: ["oidc.issuer"] } },
+          },
+        ],
+      },
+    });
+
+    expect(error.hint).toBe(
+      "idp zitadel-cloud: identity provider connection: the field is fixed for the life of the connection: oidc.issuer.",
+    );
+  });
+
+  it("appends the endpoints a connection left out", () => {
+    const error = rejected({
+      code: "rel.invalid",
+      message: "release: invalid",
+      details: {
+        resources: [
+          {
+            code: "idp.endpoints_partial",
+            kind: "idp",
+            handle: "acme-sso",
+            message: "identity provider connection: the endpoints are partially set",
+            details: { details: { missing: ["jwks_uri", "token_endpoint"] } },
+          },
+        ],
+      },
+    });
+
+    expect(error.hint).toBe(
+      "idp acme-sso: identity provider connection: the endpoints are partially set: jwks_uri, token_endpoint.",
+    );
+  });
+
   it("adds no hint when a resource has no message", () => {
     expect(rejected({ details: { resources: [{ kind: "schema", handle: "a" }] } }).hint).toBe(
       undefined,
@@ -548,5 +594,63 @@ describe("isCancellation", () => {
     expect(isCancellation(new ZitadelError("E_NETWORK", "Unreachable."))).toBe(false);
     expect(isCancellation(new Error("Cancelled."))).toBe(false);
     expect(isCancellation(undefined)).toBe(false);
+  });
+});
+
+// Every failure the CLI reports is one grammar: `Error: <sentence> (E_CODE)`,
+// said once, with the sentence the envelope's `message` carries.
+describe("a failure as a person is shown it", () => {
+  describe("an ordinary message", () => {
+    it.each([
+      ["variable not found"],
+      ["release: still served by an origin"],
+      ["npm install failed"],
+      ["http://localhost:9/users/query got no response"],
+      ["usr_1 was not found on the project"],
+      [".zitadel/state.json could not be read"],
+      ["--client-id was given an empty value"],
+      ["POST http://localhost:9/users/query got no response"],
+    ])("leaves %j exactly as it was thrown", (message) => {
+      expect(failureText(message).sentence).toBe(message);
+    });
+  });
+
+  describe("oclif's own rendering of a refused command line", () => {
+    const refused =
+      "The following error occurred:\n  Missing required flag kind\nSee more help with --help";
+
+    it("states the reason as the one sentence, without oclif's heading", () => {
+      expect(failureText(refused).sentence).toBe("Missing required flag kind");
+    });
+
+    it("says the command line was refused, so --help can be offered under Next:", () => {
+      expect(failureText(refused).misuse).toBe(true);
+    });
+
+    it("drops oclif's own help footer, which nothing else writes", () => {
+      expect(failureText(refused).sentence).not.toContain("--help");
+    });
+
+    it("joins the reasons when the command line was wrong in more than one way", () => {
+      const both =
+        "The following errors occurred:\n  Missing required flag kind\n  Missing required flag pattern\nSee more help with --help";
+
+      expect(failureText(both).sentence).toBe(
+        "Missing required flag kind; Missing required flag pattern",
+      );
+    });
+
+    it("names what a heading introduces on the heading's own line", () => {
+      const missing = "Missing 1 required arg:\nurl  the origin to add\nSee more help with --help";
+
+      expect(failureText(missing).sentence).toBe("Missing 1 required arg: url");
+    });
+
+    it("leaves an ordinary failure's own lines alone", () => {
+      expect(failureText("Bad port\nUse 1 to 65535.")).toEqual({
+        sentence: "Bad port\nUse 1 to 65535.",
+        misuse: false,
+      });
+    });
   });
 });

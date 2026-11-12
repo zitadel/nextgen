@@ -9,7 +9,7 @@ import { Destructive } from "@/lib/oclif/destructive";
 import { deletedData } from "@/lib/oclif/envelope";
 import { type Refused, taken } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
-import { prose } from "@/lib/oclif/rendering";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 
 /** The invitation `invitation cancel` cancels, as the API spells an invitation id. */
 const INVITATION_ID: Refused<string> = {
@@ -80,14 +80,15 @@ export default class InvitationCancel extends Destructive(EnvironmentCommand) {
       await this.confirmed({
         verb: "cancel",
         name: `cancel ${invitation.id}`,
-        message: `Cancel ${describe(invitation)}? Its link stops working.`,
+        message: `Cancel ${describe(invitation)} so its link stops working?`,
         // A bare cancel picked its invitation, which a retry must name.
         arguments: [invitation.id],
-        preview: () => {
+        preview: async () => {
           return dryRunResult({
             verb: "cancel",
             topic: "invitation",
             id: invitation.id,
+            next: await this.realRun(),
           });
         },
         apply: async (consent) => {
@@ -97,12 +98,14 @@ export default class InvitationCancel extends Destructive(EnvironmentCommand) {
             role: invitationGrant(invitation),
             invitation_journey_id: invitation.journey_id,
           });
+          const title = `Cancelled ${escapeControlCharacters(invitation.id)}; its link no longer works`;
           return {
             status: "ok",
-            data: deletedData({
-              id: invitation.id,
-            }),
-            pretty: prose(`Cancelled ${invitation.id}; its link no longer works`),
+            data: deletedData({ title, id: invitation.id }),
+            summary: {
+              title,
+              sections: [],
+            },
           };
         },
       }),
@@ -120,8 +123,7 @@ export default class InvitationCancel extends Destructive(EnvironmentCommand) {
         return this.suggest(command);
       });
     }
-    return this.input({
-      kind: "select",
+    return this.ask.select({
       name: "invitation id",
       message: "Which invitation would you like to cancel?",
       retry: this.suggest("invitation list --status pending"),

@@ -25,14 +25,13 @@
 - A command the CLI suggests running next (`next.commands` on a result,
   `nextCommands` on an error, an input question's `retry`) is a
   `SuggestedCommand` from `src/lib/suggestion.ts`, and only its builders make
-  one: `this.suggest(args)` on an `EnvironmentCommand` appends the run's
-  `--env`/`--env-file`/`--server`; `this.suggestUnscoped(args)` /
-  `unscopedCommand` is the deliberate opt-out for a command that targets no
-  project (`setup`, `start`, `doctor`); `projectCommand` takes an
-  `EnvironmentSelector`, which only `environmentSelectorSuffix` makes;
-  `shellCommand` is for anything that is not the CLI, and `inShell` adds a pipe
-  or redirection around a suggestion. A raw string does not typecheck there, so
-  a retry cannot silently fall back to the default project (#1689).
+  one; a raw string does not typecheck there (#1689).
+- Build every suggested command with `this.suggest(args)` from the `Suggestible`
+  mixin (`src/lib/oclif/suggestible.ts`); the target's own flags decide whether
+  the environment selector goes on (`env-file` present) or only `--cwd`.
+- `unscopedCommand` is for an error raised outside a command (`project.ts`),
+  `shellCommand` for anything that is not the CLI, and `inShell` adds a pipe or
+  redirection around a suggestion.
 - Pass a result's next steps as `next` (`src/lib/oclif/next-steps.ts`), never
   in its data: `emit` writes them to the envelope and prints every one.
 - A GritQL rule (`biome-plugins/no-raw-next-commands.grit`) rejects a
@@ -50,6 +49,23 @@
 
 ## Command code
 
+- Name the CLI one way in anything a person reads — a hint, a warning, a box
+  line, a description: the public `npx @zitadel/cli@<version> …` form, from a
+  `src/lib/suggestion.ts` builder, never bare `zitadel …` and never in
+  backticks. `tests/unit/lib/public-cli.test.ts` scans `src/commands` for both,
+  and exempts only a `hint:` line (see the rule on quoting a command below).
+  - Say it once: when the run's own step already prints the command, the
+    prose says what to do and leaves the spelling to the step.
+- `Next:` is the only label that introduces a command. Anything else that
+  introduces one is a sentence saying what the command cannot say for itself —
+  why it is there, or when to run it — ending in a colon, one fact per
+  sentence. `Explore all commands:` is the exception: it closes every box by
+  pointing at the command index, not at this run's next step.
+- One text per message: the envelope's `message` and `data.title` are the very
+  strings the terminal draws. Never capitalise, trim or add a full stop for one
+  rendering; write the sentence once, without a trailing full stop.
+- A dry run answers `ok` with `data.dry_run: true` and a headline ending in
+  `(dry run)`; it is never `skipped`, which means a person said no.
 - Read [`docs/styling.md`](docs/styling.md) before changing human output. Style
   it with `src/lib/style.ts`, not `picocolors`; a unit test fails on another import.
 - Read a command top-down: its description, group and flags, then what it
@@ -89,7 +105,9 @@
   `this.suggest(...)` in where one names a follow-up: a refusal raised without
   a suggester goes without its follow-ups.
   - A refusal raised while a flag parses names its follow-ups too, unscoped —
-    the environment comes from the flags, so there is none to repeat yet. A
+    the environment comes from the flags, so there is none to repeat yet, but
+    the failure handler puts the `--cwd` read from the command line on any bare
+    `zitadel …` follow-up, as it does for one raised below a command. A
     flag whose own `parse` refuses in more than one way passes
     `suggesterOf(command)` (`src/lib/oclif/flags.ts`), as `--design` does.
   - A `next` entry that is only a placeholder takes its value as it is, so a
@@ -107,19 +125,51 @@
   unit test fails on a leak (`tests/unit/lib/oclif/layering.test.ts`).
 - A domain lib under `src/lib` stays plain functions and parsers, and never
   imports `lib/oclif`.
+- Say what a command is doing with `log` (`src/lib/log.ts`) from a command or a
+  library alike, never a logger or stream of your own: the running command's
+  sink decides the look, and `--json` installs one that draws nothing; with no
+  sink installed, a line is written plainly. A unit test fails on a
+  `consola` import.
 - Report a warning through `reportWarning` (`src/lib/warnings.ts`) or a
-  result's `warnings`, never `consola.warn`: `--json` silences consola. A unit
-  test fails on any other `consola.warn`.
-- Ask for input through `this.input(...)` (`src/lib/input.ts`), never clack's
-  prompts and never a hand-written flag-or-stdin-or-prompt rule. A unit test
-  fails on a clack import elsewhere.
+  result's `warnings`, never `log.warn`: `--json` silences `log`. A unit test
+  fails on any other `log.warn`.
+- Quote a command in a `hint:` as `` `zitadel …` ``; the base command spells it
+  out as the `npx @zitadel/cli@<version> …` form and takes the other backticks
+  off (`spellOutCommands`). Only a `hint:` line may do this: a message, a
+  warning or a box line names its command with `suggest`, because the scan
+  above rejects backticks and a bare `zitadel …` anywhere else in
+  `src/commands`.
+- Ask for input through `this.ask` — `this.ask.text/secret/select/multiselect/yesNo`
+  (`src/lib/ui/questions.ts`, engine in `src/lib/input.ts`) — never clack's
+  prompts and never a hand-written flag-or-stdin-or-prompt rule. One method per
+  kind of question and no `kind` string: a unit test fails on a clack import
+  elsewhere and on a `kind:` question outside the engine.
+- A command draws one of two shapes, and the shape is the command's, never
+  inferred from how a run went (`src/lib/ui/presentation.ts`). A wizard sets
+  `static override wizard = true` and gets the chain, the guide beside its
+  prompts and the summary box; every other command draws neither chain nor
+  box, asks the same clack prompts with no guide, no mark and no indent
+  (`src/lib/flat-output.ts`), a yes or no as a No/Yes list, and ends on its
+  answer and one dim footer. Nothing else reads a line from the
+  terminal: a unit test fails on a `readline` import. Adding a question, a
+  warning or a `--force` to a command must not change its shape.
+  - The shape holds off a terminal: a run nothing can be drawn into has its
+    ending written out in the same words (`Ui.written`), so only the gutter
+    and the frame are missing. There is no third rendering.
+  - The exception is a machine's: `--json`, and the form a normal command
+    already chooses off a terminal (`--plain` is implied, so a list is
+    tab-separated rows and a record is the record). The ending never
+    decorates one, or `cut`, `awk` and `wc -l` stop working.
+- Draw through `this.ui` (`src/lib/ui/`) alone: never `@clack/prompts`
+  or a write to `process.stdout`/`process.stderr` in a new file.
+  `tests/unit/lib/ui/index.test.ts` lists every file that still does; add none.
 - Fail early: run every check that does not depend on an answer before the
   first question, and each one that does as soon as its answer is given.
 - Pass `this.signal` (the run's Ctrl-C, `src/lib/oclif/interruptible.ts`) to every
   client and wait a command starts; `createZitadelClient` requires it.
 - A command that asks anything extends `Promptable(...)`
   (`src/lib/oclif/promptable.ts`), as in `Promptable(BaseCommand)` or
-  `Promptable(EnvironmentCommand)`. Only such a command has `this.input`, so
+  `Promptable(EnvironmentCommand)`. Only such a command has `this.ask`, so
   what can prompt is visible from its class, and the compiler rejects a
   command that asks without it.
 - Word every prompt as a polite question to a person, never a field label or a
@@ -131,11 +181,16 @@
   - Add where the answer comes from or where it goes, in the same message: "It
     will be stored on the project as GOOGLE_CLIENT_SECRET."
   - A confirmation that acts on something may be a short direct question, as
-    long as it names the thing and, when it is not obvious, what happens:
-    "Delete user usr_1?" or "Revoke rel_1? Its content can never be served again."
+    long as it names the thing and, when it is not obvious, what happens. It
+    stays one question: fold the consequence into it rather than adding a
+    second sentence, and use the verb the command's own result uses.
+    "Delete user usr_1?" or "Revoke rel_1 so its content can never be served
+    again?"; "Roll back to dep_1 …?", never "Re-apply dep_1 …?".
   - Leave names and ids in a prompt unquoted ("What is the value of user_id?",
     "Remove FOO from the project?"); a terminal does not render backticks.
   - Ask the same thing the same way in every command that asks it.
+- Write "project" in lowercase in every message ("stored in your project"), as the prompts
+  do; only product names are capitalised.
 - A command that prints a table, a list or a record extends `Tabulatable(...)`
   (`src/lib/oclif/tabulatable.ts`). A record or a table inside another output
   uses `this.tabulate` or `this.tabulateDetail`; a table draws nothing under
@@ -155,8 +210,9 @@
   client withholds the spec's destructive operations until `consent.unlock`.
 - Updates are not guarded, though a merge-patch `null` removes what it names;
   guarding them needs a follow-up of its own, not a `Consent`.
-- A plain yes or no is `kind: "yes-no"`, which `--force` never answers; only
-  `Consent` asks a `confirm`.
+- A plain yes or no is `this.ask.yesNo(...)`, which `--force` never answers; only
+  `Consent` asks a `confirm`, so a command whose `--force` means something else
+  (`setup` overwriting files) needs no asker of its own.
 - `biome-plugins/no-consent-bypass.grit` rejects every way around `Consent`:
   casts, raw HTTP, `Consent.request` outside the mixin.
 - The flag surface follows the [WebCLI spec](https://webcli.com/). Record a new

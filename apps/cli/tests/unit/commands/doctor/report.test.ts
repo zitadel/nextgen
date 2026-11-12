@@ -145,8 +145,12 @@ describe("renderDoctorReport", () => {
   describe("when a category's checks all passed", () => {
     const text = report([pass("config"), pass("schema")]);
 
-    it.each(["[✓] Project", "2 checks passed", "✓ Zitadel doctor passed."])("says %s", (said) => {
+    it.each(["[✓] Project", "2 checks passed"])("says %s", (said) => {
       expect(text).toContain(said);
+    });
+
+    it("leaves the verdict to the title above it", () => {
+      expect(text).not.toContain("Zitadel doctor passed");
     });
 
     it("collapses the category", () => {
@@ -164,12 +168,12 @@ describe("renderDoctorReport", () => {
       { name: "schema", status: "warn", message: "No schema files" },
     ]);
 
-    it.each([
-      "[!] Project",
-      "    ! No schema files",
-      "! Zitadel doctor passed with warnings in 1 category.",
-    ])("says %s", (said) => {
+    it.each(["[!] Project", "    ! No schema files"])("says %s", (said) => {
       expect(text).toContain(said);
+    });
+
+    it("leaves the verdict to the title above it", () => {
+      expect(text).not.toContain("Zitadel doctor passed");
     });
 
     it("leaves out the checks that passed", () => {

@@ -1,22 +1,27 @@
 package service
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"slices"
 	"time"
+	"unicode/utf8"
 
 	"github.com/muhlemmer/gu"
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	v2user "github.com/zitadel/nextgen/internal/storage/user"
 )
 
 const (
 	userFieldCreatedAt            = "created_at"
 	userFieldID                   = "id"
+	userFieldIdentifier           = "identifier"
 	userFieldSchema               = "schema"
 	userFieldSchemaObjectType     = "schema_object_type"
 	userFieldStatus               = "status"
@@ -133,6 +138,33 @@ type ListUsersOutput struct {
 	NextPageToken string
 }
 
+// SearchUsersInput asks for the users of a project a text finds.
+type SearchUsersInput struct {
+	ProjectID string
+	// Query is matched, ignoring case, against the start of each user's
+	// identifier and of each part of their display name.
+	Query string
+	// Limit is the most users returned.
+	Limit int
+}
+
+// SearchUsersOutput holds the users found, the best match first: a user whose
+// value is the whole query comes before the users it only starts.
+// SearchUsersInProjectsInput asks for the users of several projects whose
+// identifier or a part of whose display name a text starts (ADR 087 §6).
+type SearchUsersInProjectsInput struct {
+	ProjectIDs []string
+	Query      string
+	// Limit is the most users returned, from all the projects together.
+	Limit int
+}
+
+type SearchUsersOutput struct {
+	Items []*domain.User
+	// More reports that further users match.
+	More bool
+}
+
 type ListUserTeamsOutput struct {
 	Items         []*domain.UserTeam
 	NextPageToken string
@@ -145,6 +177,16 @@ type UserService interface {
 	CreateUser(ctx context.Context, input CreateUserInput) (*domain.User, error)
 	DeleteUser(ctx context.Context, input DeleteUserInput) error
 	ListUsers(ctx context.Context, input ListUsersInput) (*ListUsersOutput, error)
+	// SearchUsers finds users by the start of their identifier or of a part of
+	// their display name, from the search index (ADR 058). Like ListUsers it
+	// is a management list: the caller's list filter narrows it.
+	SearchUsers(ctx context.Context, input SearchUsersInput) (*SearchUsersOutput, error)
+	// SearchUsersInProjects is SearchUsers across projects whose list gate
+	// allows the caller every user, decided before the call (ctx carries the
+	// one-shot skip). Its reads do not grow with the projects: one of their
+	// user schemas, one of the search index across all of them, and one list of
+	// the users it answers with. Each user carries their best MatchedText.
+	SearchUsersInProjects(ctx context.Context, input SearchUsersInProjectsInput) (*SearchUsersOutput, error)
 	ListPasskeys(ctx context.Context, input ListPasskeysInput) (passkeys []*domain.UserPasskey, nextPage string, err error)
 	ListIdentityLinks(ctx context.Context, input ListIdentityLinksInput) (links []*domain.IDPIdentityLink, nextPage string, err error)
 	ListUserTeams(ctx context.Context, input ListUserTeamsInput) (*ListUserTeamsOutput, error)
@@ -247,7 +289,7 @@ func (s *userService) CreateUser(ctx context.Context, input CreateUserInput) (_ 
 		user := action.CreateUser
 		emitUserCreateFailedBestEffort(ctx, s.v2Pool.Statements(), user.ProjectID, unique)
 		conflictingKeys, lookupErr := listConflictingUniqueAttributes(ctx, s.v2Pool.Statements(),
-			user.ProjectID, user.ID, user.Attributes, user.Attributes.RegistryTeamScopes(nil, user.AttributeTeamScope()))
+			user.ProjectID, user.ID, user.Attributes, user.Attributes.UniqueTeamScopes(nil, user.AttributeTeamScope()))
 		if lookupErr != nil || len(conflictingKeys) == 0 {
 			return nil, err
 		}
@@ -315,6 +357,19 @@ func (s *userService) ListUsers(ctx context.Context, input ListUsersInput) (_ *L
 	filters := make([]database.Filter[domain.UserField], 0, len(columnFilters)+1)
 	filters = append(filters, database.Equal(database.Col(domain.UserFieldProjectID), input.ProjectID))
 	for _, f := range columnFilters {
+		if f.Field == userFieldIdentifier {
+			// The storage option holds one search and ADR 031 ANDs filters,
+			// so a second term would silently win over the first.
+			if queryOpts.Search != nil {
+				return nil, domain.ErrRequestInvalid().
+					WithDetails(fmt.Sprintf("%s may only be given once", userFieldIdentifier))
+			}
+			queryOpts.Search, err = userIdentifierSearch(ctx, s.v2Pool.Statements(), input.ProjectID, f)
+			if err != nil {
+				return nil, err
+			}
+			continue
+		}
 		filter, err := userFilter(f, s.builtinBases)
 		if err != nil {
 			return nil, err
@@ -327,6 +382,16 @@ func (s *userService) ListUsers(ctx context.Context, input ListUsersInput) (_ *L
 	orderBy, err := listOrderBy(input.Sorting, domain.UserFieldCreatedAt, database.OrderDesc, userField, domain.UserFieldID)
 	if err != nil {
 		return nil, err
+	}
+	if queryOpts.Search != nil {
+		// A search comes back in the order of the search index. Any other
+		// order would have the database collect every match before it could
+		// return the first page.
+		if input.Sorting != nil {
+			return nil, domain.ErrRequestInvalid().
+				WithDetails(fmt.Sprintf("sorting cannot be combined with an %s filter, which orders the users by identifier", userFieldIdentifier))
+		}
+		orderBy = v2user.SearchOrder()
 	}
 
 	result, err := s.v2Pool.Statements().ListUsers(ctx, &database.ListOptions[domain.UserField]{
@@ -348,6 +413,270 @@ func (s *userService) ListUsers(ctx context.Context, input ListUsersInput) (_ *L
 		Items:         result.Items,
 		NextPageToken: string(result.NextCursor),
 	}, nil
+}
+
+func (s *userService) SearchUsers(ctx context.Context, input SearchUsersInput) (_ *SearchUsersOutput, err error) {
+	ctx, end := startSpan(ctx, "UserService.SearchUsers")
+	defer end(&err)
+
+	term, ok := domain.SearchText(input.Query)
+	if !ok {
+		return &SearchUsersOutput{}, nil
+	}
+	limit := normalizeLimit(input.Limit)
+	keys, perUser, err := designatedSearchKeys(ctx, s.v2Pool.Statements(), input.ProjectID)
+	if err != nil {
+		return nil, mapListError(err, "failed to list schemas from database")
+	}
+	search := &UserSearch{ProjectID: input.ProjectID, Prefix: term, Arms: make([]UserSearchArm, 0, len(keys))}
+	for _, key := range keys {
+		// No schema narrows an arm: an attribute carries search text only
+		// when the user's own schema designates it.
+		search.Arms = append(search.Arms, UserSearchArm{Key: key})
+	}
+
+	// A user is returned once per property they match on, at most perUser
+	// times, so this many rows hold limit+1 different users whenever that
+	// many match: enough to fill the answer and to know whether more follow.
+	rows := (limit + 1) * max(perUser, 1)
+	result, err := s.v2Pool.Statements().ListUsers(ctx, &database.ListOptions[domain.UserField]{
+		Filter:     database.Equal(database.Col(domain.UserFieldProjectID), input.ProjectID),
+		Pagination: database.Page[domain.UserField]{Limit: uint32(rows), OrderBy: v2user.SearchOrder()},
+	}, UserQueryOptions{Search: search})
+	if err != nil {
+		return nil, mapListError(err, "failed to search users in database")
+	}
+
+	// The rows come best match first, so the first row of a user is their
+	// best match.
+	found := make([]*domain.User, 0, limit+1)
+	seen := make(map[string]struct{}, limit+1)
+	for _, user := range result.Items {
+		if _, dup := seen[user.ID]; dup {
+			continue
+		}
+		seen[user.ID] = struct{}{}
+		found = append(found, user)
+		if len(found) > limit {
+			break
+		}
+	}
+	out := &SearchUsersOutput{Items: found}
+	if len(found) > limit {
+		out.Items, out.More = found[:limit], true
+	}
+	if err := s.attachUserRefs(ctx, input.ProjectID, out.Items...); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (s *userService) SearchUsersInProjects(ctx context.Context, input SearchUsersInProjectsInput) (_ *SearchUsersOutput, err error) {
+	ctx, end := startSpan(ctx, "UserService.SearchUsersInProjects")
+	defer end(&err)
+
+	term, ok := domain.SearchText(input.Query)
+	if !ok || len(input.ProjectIDs) == 0 {
+		return &SearchUsersOutput{}, nil
+	}
+	limit := normalizeLimit(input.Limit)
+	stmts := s.v2Pool.Statements()
+	designations, attributeKeys, err := searchDesignations(WithAuthzListUnrestricted(ctx), stmts, input.ProjectIDs)
+	if err != nil {
+		return nil, mapListError(err, "failed to list schemas from database")
+	}
+	var ranges []domain.UserSearchRange
+	perUser := 1
+	for _, projectID := range input.ProjectIDs {
+		d := designations[projectID]
+		if d == nil {
+			continue
+		}
+		perUser = max(perUser, d.perUser)
+		for _, key := range d.searchKeys {
+			ranges = append(ranges, domain.UserSearchRange{ProjectID: projectID, Key: key})
+		}
+	}
+	// As in SearchUsers: a user is a row per property they match on, so this
+	// many rows a range hold limit+1 different users whenever that many match.
+	read, err := stmts.SearchUserIndex(ctx, ranges, term, (limit+1)*perUser)
+	if err != nil {
+		return nil, mapListError(err, "failed to search users in database")
+	}
+
+	type candidate struct{ projectID, userID, text string }
+	better := func(a, b string) bool {
+		if (a == term) != (b == term) {
+			return a == term
+		}
+		return a < b
+	}
+	byUser := make(map[[2]string]*candidate)
+	more := false
+	for _, r := range read {
+		more = more || r.Full
+		for _, hit := range r.Hits {
+			key := [2]string{r.ProjectID, hit.UserID}
+			if c, ok := byUser[key]; !ok || better(hit.MatchedText, c.text) {
+				byUser[key] = &candidate{projectID: r.ProjectID, userID: hit.UserID, text: hit.MatchedText}
+			}
+		}
+	}
+	candidates := make([]*candidate, 0, len(byUser))
+	for _, c := range byUser {
+		candidates = append(candidates, c)
+	}
+	slices.SortFunc(candidates, func(a, b *candidate) int {
+		switch {
+		case better(a.text, b.text):
+			return -1
+		case better(b.text, a.text):
+			return 1
+		}
+		return cmp.Or(cmp.Compare(a.projectID, b.projectID), cmp.Compare(a.userID, b.userID))
+	})
+	if len(candidates) > limit {
+		candidates, more = candidates[:limit], true
+	}
+	if len(candidates) == 0 {
+		return &SearchUsersOutput{More: more}, nil
+	}
+
+	// The users answered with, from every project in one list, with the
+	// attributes their names are made of. These are rows the read above
+	// already chose, not a list of the project, so no gate applies.
+	idsByProject := make(map[string][]database.Filter[domain.UserField])
+	var projects []string
+	for _, c := range candidates {
+		if _, ok := idsByProject[c.projectID]; !ok {
+			projects = append(projects, c.projectID)
+		}
+		idsByProject[c.projectID] = append(idsByProject[c.projectID], database.Equal(database.Col(domain.UserFieldID), c.userID))
+	}
+	perProject := make([]database.Filter[domain.UserField], 0, len(projects))
+	for _, projectID := range projects {
+		perProject = append(perProject, database.And(
+			database.Equal(database.Col(domain.UserFieldProjectID), projectID),
+			database.Or(idsByProject[projectID]...),
+		))
+	}
+	listed, err := stmts.ListUsers(WithAuthzListUnrestricted(ctx), &database.ListOptions[domain.UserField]{
+		Filter: database.Or(perProject...),
+		Pagination: database.Page[domain.UserField]{
+			Limit: uint32(len(candidates)),
+			OrderBy: database.OrderBy[domain.UserField]{
+				Columns:   []database.Column[domain.UserField]{database.Col(domain.UserFieldID)},
+				Direction: database.OrderAsc,
+			},
+		},
+	}, UserQueryOptions{AttributeKeys: attributeKeys})
+	if err != nil {
+		return nil, mapListError(err, "failed to read users from database")
+	}
+	users := make(map[[2]string]*domain.User, len(listed.Items))
+	for _, user := range listed.Items {
+		users[[2]string{user.ProjectID, user.ID}] = user
+	}
+	out := &SearchUsersOutput{More: more, Items: make([]*domain.User, 0, len(candidates))}
+	for _, c := range candidates {
+		user, ok := users[[2]string{c.projectID, c.userID}]
+		if !ok {
+			// Gone between the two reads.
+			continue
+		}
+		user.MatchedText = c.text
+		ref := domain.ResolveUserRef(user, designations[c.projectID].documents[user.SchemaURL])
+		user.Ref = &ref
+		out.Items = append(out.Items, user)
+	}
+	return out, nil
+}
+
+// projectDesignations is what one project's user schemas designate, for a
+// search across projects.
+type projectDesignations struct {
+	// documents are the project's user schema revisions by URL.
+	documents map[string][]byte
+	// searchKeys are the properties any revision designates as identifier or
+	// display part; perUser the most of them one revision designates.
+	searchKeys []domain.AttributeKey
+	perUser    int
+}
+
+// searchDesignations reads the user schemas of projectIDs in one paged list
+// and returns each project's designations, and the attribute keys a user's
+// name is made of in any of them.
+func searchDesignations(ctx context.Context, stmts AllStatements, projectIDs []string) (map[string]*projectDesignations, []string, error) {
+	projectFilters := make([]database.Filter[domain.JSONSchemaField], 0, len(projectIDs))
+	for _, projectID := range projectIDs {
+		projectFilters = append(projectFilters, database.Equal(database.Col(domain.JSONSchemaFieldProjectID), projectID))
+	}
+	list := func(cursor []byte) (*database.ListResult[*domain.JSONSchema], error) {
+		return stmts.ListJSONSchemas(ctx, &database.ListOptions[domain.JSONSchemaField]{
+			Filter: database.And(
+				database.Or(projectFilters...),
+				database.Equal(database.Col(domain.JSONSchemaFieldKind), domain.JSONSchemaKindUserSchema.String()),
+			),
+			Pagination: database.Page[domain.JSONSchemaField]{
+				Limit:  refSchemaPageSize,
+				Cursor: cursor,
+				OrderBy: database.OrderBy[domain.JSONSchemaField]{
+					Columns: []database.Column[domain.JSONSchemaField]{
+						database.Col(domain.JSONSchemaFieldProjectID),
+						database.Col(domain.JSONSchemaFieldURL),
+					},
+					Direction: database.OrderAsc,
+				},
+			},
+		}, JSONSchemaQueryOptions{})
+	}
+	first, err := list(nil)
+	if err != nil {
+		return nil, nil, err
+	}
+	byProject := make(map[string]*projectDesignations, len(projectIDs))
+	var attributeKeys []string
+	for schema, err := range first.Iterate(list) {
+		if err != nil {
+			return nil, nil, err
+		}
+		d := byProject[schema.ProjectID]
+		if d == nil {
+			d = &projectDesignations{documents: map[string][]byte{}}
+			byProject[schema.ProjectID] = d
+		}
+		d.documents[schema.URL] = schema.Schema
+		var designated []domain.AttributeKey
+		if identifier := domain.DesignatedIdentifier(schema.Schema); identifier != "" {
+			designated = append(designated, domain.AttributeKey(identifier))
+		}
+		for _, part := range domain.DesignatedDisplay(schema.Schema) {
+			if part != "" {
+				designated = append(designated, domain.AttributeKey(part))
+			}
+		}
+		slices.Sort(designated)
+		designated = slices.Compact(designated)
+		d.perUser = max(d.perUser, len(designated))
+		for _, key := range designated {
+			if !slices.Contains(d.searchKeys, key) {
+				d.searchKeys = append(d.searchKeys, key)
+			}
+		}
+		for _, key := range domain.DesignatedAttributeKeys(schema.Schema) {
+			if !slices.Contains(attributeKeys, key) {
+				attributeKeys = append(attributeKeys, key)
+			}
+		}
+	}
+	for _, d := range byProject {
+		slices.Sort(d.searchKeys)
+	}
+	if len(attributeKeys) == 0 {
+		// As in designatingSchemas: empty AttributeKeys hydrates everything.
+		attributeKeys = []string{""}
+	}
+	return byProject, attributeKeys, nil
 }
 
 // splitUserFilters separates the predicates that compile to a filter on the
@@ -451,6 +780,57 @@ func userFilter(f Filter, builtinBases domain.BuiltinSchemaBases) (database.Filt
 	}
 }
 
+// identifierSearchTerm reads the term of an identifier filter as the search
+// index holds text (see [domain.SearchText]), refusing an operation it has no
+// comparison for before any schema is read. An empty term is refused too: as a
+// prefix it would select every user with an identifier.
+func identifierSearchTerm(f Filter) (string, error) {
+	if f.Operation != filterOpStartsWith {
+		return "", domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("operation %q is not valid for %s", f.Operation, userFieldIdentifier))
+	}
+	value, err := stringFilterValue(f)
+	if err != nil {
+		return "", err
+	}
+	if utf8.RuneCountInString(value) > domain.SearchTextMaxRunes {
+		return "", domain.ErrRequestInvalid().
+			WithDetails(fmt.Sprintf("%s filter value may be at most %d characters", userFieldIdentifier, domain.SearchTextMaxRunes))
+	}
+	term, ok := domain.SearchText(value)
+	if !ok {
+		return "", domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("%s filter value must not be empty", userFieldIdentifier))
+	}
+	return term, nil
+}
+
+// userIdentifierSearch finds users by the start of the identifier their own
+// schema designates, from the search index. Each designated property is one
+// arm, counted only for the users on a schema that designates it, as an
+// identifier lookup is (ADR 058 §5): the same property may carry search text
+// under another schema as a display part, and that is not the user's
+// identifier. A user is on one schema, so the arms never share a user. With no
+// designation there is no arm and the search finds nobody; the read still
+// runs, so the page token and the authz list filter are checked as on any
+// other list.
+func userIdentifierSearch(ctx context.Context, stmts AllStatements, projectID string, f Filter) (*UserSearch, error) {
+	term, err := identifierSearchTerm(f)
+	if err != nil {
+		return nil, err
+	}
+	designated, err := designatedIdentifierKeys(ctx, stmts, projectID)
+	if err != nil {
+		return nil, mapListError(err, "failed to list schemas from database")
+	}
+	search := &UserSearch{ProjectID: projectID, Prefix: term, Arms: make([]UserSearchArm, 0, len(designated))}
+	for _, key := range slices.Sorted(maps.Keys(designated)) {
+		search.Arms = append(search.Arms, UserSearchArm{
+			Key:   domain.AttributeKey(key),
+			Users: database.Or(equalIDFilters(domain.UserFieldSchemaURL, designated[key])...),
+		})
+	}
+	return search, nil
+}
+
 // userStatusFilter filters on the user's lifecycle status.
 func userStatusFilter(op, status string) (database.Filter[domain.UserField], error) {
 	switch op {
@@ -485,7 +865,7 @@ func userField(field string) (domain.UserField, error) {
 		return domain.UserFieldStatus, nil
 	case userFieldLifecycleOwnerTeamID:
 		return domain.UserFieldLifecycleOwnerTeamID, nil
-	case userFieldTeamID, userFieldSchemaObjectType:
+	case userFieldTeamID, userFieldSchemaObjectType, userFieldIdentifier:
 		// Not a column on the user: the keyset cursor is built from the last
 		// row's sort values, and there is no such value on that row.
 		return domain.UserFieldUnspecified, domain.ErrRequestInvalid().
@@ -680,7 +1060,7 @@ func (s *userService) PatchUser(ctx context.Context, input PatchUserInput) (_ *d
 		}
 		patch := action.patch
 		conflictingKeys, lookupErr := listConflictingUniqueAttributes(ctx, s.v2Pool.Statements(),
-			patch.ProjectID, patch.UserID, patch.Attributes, patch.RegistryTeamScopes)
+			patch.ProjectID, patch.UserID, patch.Attributes, patch.UniqueTeamScopes)
 		if lookupErr != nil || len(conflictingKeys) == 0 {
 			return nil, err
 		}
@@ -703,7 +1083,7 @@ func (s *userService) dryRunPatchUser(ctx context.Context, input PatchUserInput)
 	}
 	patch := action.patch
 	taken, err := listConflictingUniqueAttributes(ctx, s.v2Pool.Statements(),
-		patch.ProjectID, patch.UserID, patch.Attributes, patch.RegistryTeamScopes)
+		patch.ProjectID, patch.UserID, patch.Attributes, patch.UniqueTeamScopes)
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to look up unique attributes in the database")
 	}
@@ -967,7 +1347,7 @@ func (o *PatchUserAction) Prepare(ctx context.Context) error {
 		return domain.ErrInternal(err).WithMessage("failed to get user from database")
 	}
 
-	// Read outside the transaction like the user itself: registry mutations
+	// Read outside the transaction like the user itself: unique claim changes
 	// always move the user's updated_at, so the patch statement's guard
 	// catches interleaved changes and the retry re-reads both.
 	storedScopes, err := o.pool.Statements().GetUserUniqueAttributeScopes(ctx, o.ProjectID, o.UserID)
@@ -1005,11 +1385,11 @@ func (o *PatchUserAction) Prepare(ctx context.Context) error {
 	o.schemaJSON = targetSchema.Schema
 	o.current = user
 	o.patch, err = domain.NewPatchUser(domain.PatchUserParams{
-		Current:              user,
-		SchemaURL:            targetSchema.URL,
-		Schema:               targetSchema.Schema,
-		AttributesPatch:      o.Attributes,
-		StoredRegistryScopes: storedScopes,
+		Current:                user,
+		SchemaURL:              targetSchema.URL,
+		Schema:                 targetSchema.Schema,
+		AttributesPatch:        o.Attributes,
+		StoredUniqueTeamScopes: storedScopes,
 	})
 	return err
 }
@@ -1083,8 +1463,8 @@ func (o *SetPasswordUserAction) Prepare(ctx context.Context) (err error) {
 	if err != nil {
 		return err
 	}
-	_, end := startSpan(ctx, "password.Hash")
-	o.hash, err = domain.HashPassword(o.Password, hasher)
+	hashCtx, end := startSpan(ctx, "password.Hash")
+	o.hash, err = domain.HashPassword(hashCtx, o.Password, hasher)
 	end(&err)
 	return err
 }

@@ -58,35 +58,90 @@ export const RESOURCE_TABLE_FIXED = "min-w-[36rem] table-fixed text-xs";
 /** A screen's title: the 24/24 display face, shared with the detail shell. */
 export const RESOURCE_TITLE = PAGE_TITLE;
 
+/** Controls on a row of the title's own: 8px apart, wrapping among themselves. */
+const TITLE_ROW_CONTROLS = "flex min-w-0 basis-full flex-wrap items-center gap-2";
+
+/**
+ * A row under the title at every width (`filterBelow`, `below`): out of the
+ * header's 8px inset, flush with the table under it.
+ */
+const TITLE_ROW_BELOW = `${TITLE_ROW_CONTROLS} lg:-mx-2 lg:basis-[calc(100%+1rem)]`;
+
 /**
  * The title row of a list screen: the heading with, where the screen has one,
  * its primary action beside it at every width (D19), and any filter beside
- * that. 36px tall (`PAGE_TITLE_ROW`), except on a phone with a filter, where
- * the filter takes a second row under the title.
+ * that. 36px tall (`PAGE_TITLE_ROW`), except where the row is too narrow for a
+ * filter, which then takes a row of its own under the title, and where the
+ * screen gives it a row `below`.
  */
 export function ResourceTitle({
   children,
   action,
   filter,
+  filterBelow = false,
+  below,
 }: {
   children: ReactNode;
   action?: ReactNode;
   /**
-   * Controls that narrow the list, beside the action and 8px from it. On a
-   * phone they drop to their own row under the title while the action keeps
-   * the title row (D19).
+   * Controls that narrow the list, beside the action and 8px from it. By the
+   * width of the row, not the viewport, since the sidebar takes part of it: too
+   * narrow, they drop to their own row under the title while the action keeps
+   * the title row (D19). Wide enough, a basis of 0 keeps them on the title row
+   * whatever they hold, and they wrap among themselves rather than push the
+   * action off it.
    */
   filter?: ReactNode;
+  /**
+   * Keeps the filter on its own row under the title at every width, for one
+   * that wants the row's whole width (Events' search, which fills with chips).
+   */
+  filterBelow?: boolean;
+  /**
+   * A row of its own under the title row at every width, flush with the table
+   * and filling from the left: a list's `ResourceFilter`, whose chips need the
+   * width the title row cannot promise.
+   */
+  below?: ReactNode;
 }) {
+  const belowRow = below && <div className={cn(TITLE_ROW_BELOW, "order-4")}>{below}</div>;
+  if (!filter) {
+    return (
+      <div className={cn(RESOURCE_HEADER, PAGE_TITLE_ROW, "flex-wrap gap-x-2 gap-y-4")}>
+        <h1 className={RESOURCE_TITLE}>{children}</h1>
+        <div className="order-2 ml-auto sm:order-3 sm:ml-0">{action}</div>
+        {belowRow}
+      </div>
+    );
+  }
   return (
-    <div className={cn(RESOURCE_HEADER, PAGE_TITLE_ROW, "flex-wrap gap-x-2 gap-y-4")}>
-      <h1 className={RESOURCE_TITLE}>{children}</h1>
-      {filter && (
-        <div className="order-3 flex min-w-0 basis-full flex-wrap items-center gap-2 sm:order-2 sm:ml-auto sm:basis-auto">
-          {filter}
-        </div>
+    <div
+      className={cn(
+        RESOURCE_HEADER,
+        PAGE_TITLE_ROW,
+        "@container/title-row flex-wrap gap-x-2 gap-y-4",
       )}
-      <div className="order-2 ml-auto sm:order-3 sm:ml-0">{action}</div>
+    >
+      <h1 className={RESOURCE_TITLE}>{children}</h1>
+      <div
+        className={cn(
+          "order-3",
+          filterBelow
+            ? TITLE_ROW_BELOW
+            : `${TITLE_ROW_CONTROLS} @3xl/title-row:order-2 @3xl/title-row:grow @3xl/title-row:basis-0 @3xl/title-row:justify-end`,
+        )}
+      >
+        {filter}
+      </div>
+      <div
+        className={cn(
+          "order-2 ml-auto",
+          !filterBelow && "@3xl/title-row:order-3 @3xl/title-row:ml-0",
+        )}
+      >
+        {action}
+      </div>
+      {belowRow}
     </div>
   );
 }
@@ -104,14 +159,16 @@ export const RESOURCE_TABLE_SCROLL = "group/scroll";
 
 /**
  * The leading column, pinned to the card's left edge from 640px. Its 1px
- * divider shows only while a column is scrolled under it.
+ * divider shows only while a column is scrolled under it. Raised one step, no
+ * more: over the cells scrolling under it, and under the shell's top bar
+ * (`z-10`), which the page scrolls it beneath.
  *
  * Below 640px it scrolls with the rest: a phone's card is about 300px wide,
  * and a pinned identity column (up to 280px) beside the pinned menu would
  * leave no room for any column between them.
  */
 export const RESOURCE_STICKY_START =
-  "sm:sticky sm:left-0 sm:z-10 bg-card sm:group-data-[scroll-start]/scroll:shadow-[inset_-1px_0_0_var(--color-border)]";
+  "sm:sticky sm:left-0 sm:z-1 bg-card sm:group-data-[scroll-start]/scroll:shadow-[inset_-1px_0_0_var(--color-border)]";
 
 /**
  * The trailing column (the row menu), pinned to the card's right edge so the
@@ -119,7 +176,7 @@ export const RESOURCE_STICKY_START =
  * under it.
  */
 export const RESOURCE_STICKY_END =
-  "sticky right-0 z-10 bg-card group-data-[scroll-end]/scroll:shadow-[inset_1px_0_0_var(--color-border)]";
+  "sticky right-0 z-1 bg-card group-data-[scroll-end]/scroll:shadow-[inset_1px_0_0_var(--color-border)]";
 
 /**
  * A body cell of a sticky column. It must be opaque, or the scrolled cells
@@ -131,11 +188,38 @@ export const RESOURCE_STICKY_END =
 export const RESOURCE_STICKY_BODY =
   "transition-colors bg-card group-hover:bg-[color-mix(in_oklab,var(--color-muted)_40%,var(--color-card))] group-has-aria-expanded:bg-[color-mix(in_oklab,var(--color-muted)_50%,var(--color-card))]";
 
-/** One body cell: 56px tall, inset 24px. */
-export const RESOURCE_CELL = "h-14 px-6 py-2";
+/**
+ * How tall a table's rows are, set once on its card (`RESOURCE_TABLE_WRAP`)
+ * and read by every head and body cell beneath it, so a screen chooses what
+ * fits its rows and never restates a height per cell.
+ *
+ * `comfortable`, the default, is the design's 56px with 8px block padding: a
+ * row with a second line under its name, or a mark beside it. `compact` is
+ * 40px with 4px: one line a row, where the list is read by the screenful
+ * (Events). A compact row's menu takes `RowMenu`'s `icon-xs`, the 24px button
+ * a narrow menu column sizes itself for.
+ */
+export const RESOURCE_DENSITY = {
+  comfortable: "",
+  compact: "[--resource-row:2.5rem] [--resource-row-pad:0.25rem] [--resource-menu:1.5rem]",
+} as const;
+
+export type ResourceDensity = keyof typeof RESOURCE_DENSITY;
+
+/** One body cell: as tall as the table's density (56px by default), inset 24px. */
+export const RESOURCE_CELL =
+  "h-[var(--resource-row,3.5rem)] px-6 py-[var(--resource-row-pad,0.5rem)]";
+
+/**
+ * The row menu's body cell in a narrow menu column: inset 8px, not the cells'
+ * 24px, which would make the column 84px wide for one 36px button.
+ */
+export const RESOURCE_MENU_CELL_NARROW =
+  "h-[var(--resource-row,3.5rem)] px-2 py-[var(--resource-row-pad,0.5rem)]";
 
 /** A body cell holding secondary text. */
-export const RESOURCE_CELL_MUTED = "text-muted-foreground h-14 truncate px-6 py-2 text-sm";
+export const RESOURCE_CELL_MUTED =
+  "text-muted-foreground h-[var(--resource-row,3.5rem)] truncate px-6 py-[var(--resource-row-pad,0.5rem)] text-sm";
 
 // The row's copy button rests hidden and shows on the row's hover or its own
 // focus, so a keyboard reaches it; where there is no hover it always shows.
@@ -205,7 +289,7 @@ export function ResourceHeadCell({
   return (
     <TableHead
       className={cn(
-        "text-foreground h-14 py-0 pr-4 pl-6 align-middle font-serif text-xs leading-4 tracking-[0.72px] uppercase",
+        "text-foreground h-[var(--resource-row,3.5rem)] py-0 pr-4 pl-6 align-middle font-serif text-xs leading-4 tracking-[0.72px] uppercase",
         className,
       )}
     >
@@ -214,9 +298,27 @@ export function ResourceHeadCell({
   );
 }
 
-/** The empty header cell over the row menus. */
-export function ResourceMenuHead({ className }: { className?: string }) {
-  return <TableHead className={cn("h-14 px-6", className)} />;
+/**
+ * The empty header cell over the row menus. `narrow` for a column that is the
+ * menu's button and no wider, with {@link RESOURCE_MENU_CELL_NARROW} beneath.
+ */
+export function ResourceMenuHead({
+  className,
+  narrow = false,
+}: {
+  className?: string;
+  narrow?: boolean;
+}) {
+  return (
+    <TableHead
+      className={cn(
+        "h-[var(--resource-row,3.5rem)]",
+        // Narrow: the menu's button (36px, or the density's) and 8px either side.
+        narrow ? "w-[calc(var(--resource-menu,2.25rem)+1rem)] px-2" : "px-6",
+        className,
+      )}
+    />
+  );
 }
 
 /**
@@ -294,20 +396,34 @@ export function RowMenu({
  * `Load more` under a cursor-paginated list (decisions log D5: a button, not
  * pagination controls). Its presence means there is more; its absence means the
  * list is complete.
+ *
+ * A list whose server may stop reading before a page is full names the button
+ * for that (`label`) and says so in a line above it (`note`).
  */
-export function LoadMore({ paging }: { paging: LoadMoreState }) {
+export function LoadMore({
+  paging,
+  label = "Load more",
+  note,
+}: {
+  paging: LoadMoreState;
+  label?: string;
+  note?: ReactNode;
+}) {
   return (
     <>
       <FormError message={paging.error} className="mt-3" />
       {paging.hasMore && (
-        <Button
-          variant="secondary"
-          className="mt-6 h-9 w-full gap-1.5 px-2.5"
-          onClick={() => void paging.loadMore()}
-          loading={paging.loading}
-        >
-          Load more
-        </Button>
+        <>
+          {note && <p className="text-muted-foreground mt-6 text-center text-sm">{note}</p>}
+          <Button
+            variant="secondary"
+            className={cn("h-9 w-full gap-1.5 px-2.5", note ? "mt-3" : "mt-6")}
+            onClick={() => void paging.loadMore()}
+            loading={paging.loading}
+          >
+            {label}
+          </Button>
+        </>
       )}
     </>
   );

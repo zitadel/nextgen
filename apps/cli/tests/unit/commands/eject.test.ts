@@ -2,16 +2,14 @@ import { access, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:f
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it, vi } from "vitest";
-
-vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
-
-import { cancel, confirm, isCancel } from "@clack/prompts";
+import { afterEach, describe, expect, it } from "vitest";
 
 import Eject from "@/commands/eject";
 import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
+import { type Answer, answering } from "@tests/helpers/keyboard";
 import { asTerminal } from "@tests/helpers/terminal";
 import { MANAGED_MARKER } from "@/lib/paths";
+import { stripAnsi } from "@tests/helpers/run-cli";
 
 function eject(cwd: string, extra: string[] = []) {
   return runCliForTest([
@@ -188,6 +186,33 @@ describe("eject command", () => {
     expect(entries.some((name) => name.startsWith(".env.local.ejected-"))).toBe(true);
   });
 
+  // One sentence, in the past tense, with no full stop: the chain closes on
+  // it, and "Zitadel ejected, and the remote project is untouched." was two.
+  it("closes on one sentence saying what it did", async () => {
+    const cwd = await makeManagedProject();
+
+    const res = await eject(cwd, ["--force"]);
+
+    expect((parseJson(res.stdout) as { data: { title: string } }).data.title).toBe(
+      "Removed Zitadel from this app, leaving the remote project untouched",
+    );
+  });
+
+  it("answers a dry run as one, saying what it would do", async () => {
+    const cwd = await makeManagedProject();
+
+    const res = await eject(cwd, ["--dry-run"]);
+
+    expect(parseJson(res.stdout)).toMatchObject({
+      status: "ok",
+      data: {
+        dry_run: true,
+        title: "Would remove Zitadel from this app, leaving the remote project untouched (dry run)",
+        next_commands: [expect.stringContaining("eject --force")],
+      },
+    });
+  });
+
   it("reports what would be removed in dry-run without touching the filesystem", async () => {
     const cwd = await makeManagedProject();
 
@@ -285,48 +310,159 @@ describe("eject command", () => {
     expect(json.status).toBe("skipped");
     expect(json.reason).toBe("nothing-to-eject");
   });
+
+  it("suggests setup in the envelope when there is nothing to eject", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "zitadel-eject-empty-"));
+    tempDirs.push(cwd);
+
+    const res = await eject(cwd, ["--force"]);
+
+    expect(parseJson(res.stdout)).toMatchObject({
+      next_commands: [expect.stringContaining("setup")],
+    });
+  });
+
+  it("suggests setup in the envelope on a dry run with nothing to eject", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "zitadel-eject-empty-"));
+    tempDirs.push(cwd);
+
+    const res = await eject(cwd, ["--dry-run"]);
+
+    expect(parseJson(res.stdout)).toMatchObject({
+      data: { next_commands: [expect.stringContaining("setup")] },
+    });
+  });
+
+  it.for(["zitadel.json", ".env.local", "Remove the Zitadel configuration block from vite.config"])(
+    "tells a person on the terminal about %s",
+    async (line) => {
+      const cwd = await makeManagedViteProject();
+      await writeFile(join(cwd, ".env.local"), "ZITADEL_PROJECT_ID=proj-001\n");
+
+      const res = await runCliForTest(["eject", "--cwd", cwd, "--force"]);
+
+      expect(stripAnsi(res.stdout)).toContain(line);
+    },
+  );
 });
 
 describe("eject asked on a terminal", () => {
-  // The built CLI bundles its own prompts, so a prompt can only be answered
-  // by running the command from source, where `input` is the one module asked.
-  const ejecting = (cwd: string) => asTerminal(() => Eject.run(["--cwd", cwd]));
+  /** Runs eject in `cwd` with a person at the terminal giving `answers`. */
+  const ejecting = async (cwd: string, ...answers: Answer[]) => {
+    const talk = answering(...answers);
+    const result = await asTerminal(() => Eject.run(["--cwd", cwd]));
+    return { result, shown: talk.shown(), talk };
+  };
 
-  afterEach(() => {
-    vi.mocked(confirm).mockReset();
-    vi.mocked(isCancel).mockReset();
-    vi.mocked(isCancel).mockReturnValue(false);
+  it("asks whether to remove the managed files and local state", async () => {
+    const cwd = await makeManagedProject();
+
+    const { talk } = await ejecting(cwd, false);
+
+    expect(talk.asked()).toEqual(["Remove the managed files and local Zitadel state?"]);
   });
 
   it("is skipped, removing nothing, when the answer is no", async () => {
     const cwd = await makeManagedProject();
-    vi.mocked(confirm).mockResolvedValueOnce(false as never);
 
-    const envelope = await ejecting(cwd);
+    const { result } = await ejecting(cwd, false);
 
-    expect(JSON.parse(JSON.stringify(envelope))).toMatchObject({
+    expect(JSON.parse(JSON.stringify(result))).toMatchObject({
       status: "skipped",
       reason: "eject-cancelled",
     });
     expect(await exists(join(cwd, "app/login/page.tsx"))).toBe(true);
   });
 
+  it("removes the managed files when the answer is yes", async () => {
+    const cwd = await makeManagedProject();
+
+    const { result } = await ejecting(cwd, true);
+
+    expect(JSON.parse(JSON.stringify(result))).toMatchObject({ status: "ok" });
+    expect(await exists(join(cwd, "app/login/page.tsx"))).toBe(false);
+  });
+
+  // A declined run changed nothing, so its summary says what is still there
+  // rather than repeating the refusal the closing line already made.
+  it("says what a declined run left in place", async () => {
+    const cwd = await makeManagedProject();
+
+    const { shown } = await ejecting(cwd, false);
+
+    expect(stripAnsi(shown)).toContain("Nothing was removed. Zitadel is still set up in this app.");
+  });
+
+  it("offers the eject command again when the answer is no", async () => {
+    const cwd = await makeManagedProject();
+
+    const { shown } = await ejecting(cwd, false);
+
+    expect(stripAnsi(shown)).toContain("Remove it whenever you like:");
+    expect(stripAnsi(shown)).toMatch(/\$ .* eject --cwd /);
+  });
+
+  it("offers the eject command again in the envelope when the answer is no", async () => {
+    const cwd = await makeManagedProject();
+
+    const { result } = await ejecting(cwd, false);
+
+    expect(JSON.parse(JSON.stringify(result))).toMatchObject({
+      next_commands: [expect.stringContaining("eject")],
+    });
+  });
+
+  it("ends a declined run on the one dim footer", async () => {
+    const cwd = await makeManagedProject();
+
+    const { shown } = await ejecting(cwd, false);
+
+    expect(stripAnsi(shown).trimEnd().split("\n").at(-1)).toBe("Cancelled");
+  });
+
+  it("never shows a person the reason the envelope carries", async () => {
+    const cwd = await makeManagedProject();
+
+    const { shown } = await ejecting(cwd, false);
+
+    expect(stripAnsi(shown)).not.toContain("eject-cancelled");
+  });
+
+  it("points an app that was never set up at setup, not at the reason token", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "zitadel-eject-untouched-"));
+    tempDirs.push(cwd);
+
+    const { shown } = await ejecting(cwd, true);
+
+    expect(stripAnsi(shown)).toContain(
+      "Zitadel is not set up in this app, so nothing was removed.",
+    );
+  });
+
+  it("offers setup to an app that had nothing to remove", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "zitadel-eject-untouched-"));
+    tempDirs.push(cwd);
+
+    const { shown } = await ejecting(cwd, true);
+
+    expect(stripAnsi(shown)).toContain("Set it up whenever you like:");
+  });
+
   it("does not ask on a dry run, which removes nothing", async () => {
     const cwd = await makeManagedProject();
 
+    const talk = answering();
+
     await asTerminal(() => Eject.run(["--cwd", cwd, "--dry-run"]));
 
-    expect(confirm).not.toHaveBeenCalled();
+    expect(talk.asked()).toEqual([]);
   });
 
-  it("fails, removing nothing, on Ctrl-C", async () => {
+  it("fails, removing nothing, when the person walks away", async () => {
     const cwd = await makeManagedProject();
-    vi.mocked(isCancel).mockReturnValue(true);
-    vi.mocked(confirm).mockResolvedValueOnce(Symbol("cancel") as never);
 
     await expect(ejecting(cwd)).rejects.toThrow();
 
-    expect(cancel).toHaveBeenCalledWith("Cancelled.");
     expect(await exists(join(cwd, "app/login/page.tsx"))).toBe(true);
   });
 });

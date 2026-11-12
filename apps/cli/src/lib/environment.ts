@@ -7,7 +7,7 @@ import type { ZitadelClient } from "./backend";
 import { Publisher } from "./publish";
 import { ZitadelError } from "./errors";
 import { readIfExists } from "./fs";
-import { input } from "./input";
+import type { Questions } from "./ui";
 import { hasZitadelSecret, readZitadelSecret } from "./project";
 import { appendManagedEnvValue } from "./fs-safe";
 import { parseServer, resolveServer, serverOrigin } from "./server";
@@ -72,7 +72,12 @@ const PLATFORM_SIGNALS: ReadonlyArray<{
   platform?: string;
   name: (value: string) => string;
 }> = [
-  { variable: "VERCEL_ENV", name: (value) => value },
+  {
+    variable: "VERCEL_ENV",
+    name: (value) => {
+      return value;
+    },
+  },
   {
     variable: "CONTEXT",
     platform: "NETLIFY",
@@ -295,7 +300,11 @@ export function requireValue(environment: Environment, key: EnvironmentKey): str
     return resolved.value;
   }
   const name = environment.name.value;
-  const consulted = `Consulted, in order: ${environment.consulted.map((entry) => entry.source).join(", ")}.`;
+  const consulted = `Consulted, in order: ${environment.consulted
+    .map((entry) => {
+      return entry.source;
+    })
+    .join(", ")}.`;
   // The file to set the value in. An --env-file run reads that file; an
   // environment already bound by `env add` has its `.env.<name>.local`. Only an
   // environment with no project at all is pointed at `env add` (or `setup` for
@@ -304,7 +313,9 @@ export function requireValue(environment: Environment, key: EnvironmentKey): str
   // process environment already names a project would pair that project with
   // another's credential.
   const boundFile = `.env.${name}.local`;
-  const bound = environment.consulted.some((entry) => entry.source === boundFile && entry.present);
+  const bound = environment.consulted.some((entry) => {
+    return entry.source === boundFile && entry.present;
+  });
   const file = environment.envFile ?? (bound ? boundFile : undefined);
   const unbound = file === undefined && environment.values.ZITADEL_PROJECT_ID === undefined;
   throw new ZitadelError("E_VALIDATION", `${key} is not set for the ${name} environment`, {
@@ -327,7 +338,9 @@ export function requireValue(environment: Environment, key: EnvironmentKey): str
     details: {
       environment: name,
       variable: key,
-      consulted: environment.consulted.map((entry) => entry.source),
+      consulted: environment.consulted.map((entry) => {
+        return entry.source;
+      }),
     },
   });
 }
@@ -341,7 +354,7 @@ const SECRET_KEYS: ReadonlySet<EnvironmentKey> = new Set([
 /**
  * Like {@link requireValue}, but on an interactive terminal a missing value is
  * asked for and persisted to `.env.<name>.local` before it is returned, so the
- * next run resolves it from the file rather than asking again (#1313). A secret
+ * next run resolves it from the file rather than asking again. A secret
  * is asked for without echo and the file is written `0600`. A run that named
  * its own file with `--env-file` keeps the value for this run only: writing it
  * to `.env.<name>.local` would hand it to every later run of that environment.
@@ -354,7 +367,7 @@ const SECRET_KEYS: ReadonlySet<EnvironmentKey> = new Set([
 export async function requireValueInteractive(
   environment: Environment,
   key: EnvironmentKey,
-  options: { cwd: string; interactive: boolean },
+  options: { cwd: string; interactive: boolean; ask: Questions },
 ): Promise<string> {
   const resolved = environment.values[key];
   if (resolved) {
@@ -365,23 +378,28 @@ export async function requireValueInteractive(
     return requireValue(environment, key);
   }
   const name = environment.name.value;
-  const value = await input(
-    {
-      kind: SECRET_KEYS.has(key) ? "secret" : "text",
-      name: key,
-      message: `${key} for the ${name} environment`,
-      // Persist (and return) the normalized form, matching how the resolver
-      // stores a server value, so the file and this run agree with every later run.
-      parse: (answer: string) => {
-        const typed = answer.trim();
-        if (typed === "") {
-          return { ok: false, problem: `Enter ${key}.` } as const;
-        }
-        return key === "ZITADEL_URL" ? parseServer(typed) : ({ ok: true, value: typed } as const);
-      },
+  const question = {
+    name: key,
+    message: `What is the value of ${key} for the ${name} environment?`,
+    parse: (answer: string) => {
+      const typed = answer.trim();
+      if (typed === "") {
+        return {
+          ok: false,
+          problem: `${key} cannot be empty`,
+        } as const;
+      }
+      return key === "ZITADEL_URL"
+        ? parseServer(typed)
+        : ({
+            ok: true,
+            value: typed,
+          } as const);
     },
-    { interactive: true, force: false },
-  );
+  };
+  const value = SECRET_KEYS.has(key)
+    ? await options.ask.secret(question)
+    : await options.ask.text(question);
   if (environment.envFile === undefined) {
     await persistEnvValue(join(options.cwd, `.env.${name}.local`), key, value);
   }
@@ -443,6 +461,7 @@ export async function deployInitialRelease(input: {
   color: boolean;
   message: string;
   suggest: (args: string) => SuggestedCommand;
+  narrate: (notices: readonly string[]) => void;
 }): Promise<InitialDeployment> {
   const publisher = new Publisher(input.client, input.projectId);
   const prepared = await publisher.prepare({
@@ -458,9 +477,7 @@ export async function deployInitialRelease(input: {
   for (const warning of prepared.warnings) {
     reportWarning(warning);
   }
-  for (const notice of prepared.notices) {
-    process.stdout.write(notice);
-  }
+  input.narrate(prepared.notices);
   const { release, deployment } = await publisher.deployInitial({
     prepared,
     message: input.message,
@@ -469,6 +486,8 @@ export async function deployInitialRelease(input: {
     releaseId: release.id,
     contentHash: release.content_hash,
     deploymentId: deployment.id,
-    origins: deployment.targets.map((target) => target.origin),
+    origins: deployment.targets.map((target) => {
+      return target.origin;
+    }),
   };
 }

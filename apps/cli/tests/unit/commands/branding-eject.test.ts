@@ -4,16 +4,14 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
-
-import { cancel, isCancel, select } from "@clack/prompts";
-
 import { getDefaultBrandingConfig } from "@zitadel/config/defaults";
 
 import BrandingEject from "@/commands/branding/eject";
 import { projectMetaSchemas } from "@/lib/meta-schemas";
+import { BRANDING_DESIGN_INFO } from "@/lib/zitadel";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
 import { cliVersion, parseJson, runCliForTest } from "@tests/helpers/run-cli";
+import { type Answer, answering } from "@tests/helpers/keyboard";
 import { asTerminal } from "@tests/helpers/terminal";
 
 const tempDirs: string[] = [];
@@ -167,13 +165,13 @@ describe("branding eject", () => {
     }
   });
 
-  it("quotes an unknown design as JSON, so an escape sequence in it cannot drive the terminal", async () => {
+  it("carries an unknown design as typed, leaving the terminal to spell out an escape sequence in it", async () => {
     const cwd = await makeProject();
 
     const res = await eject(cwd, "--design", "x\u001b[31m");
 
     const json = parseJson(res.stdout) as { message: string };
-    expect(json.message).toBe('Unknown design "x\\u001b[31m"');
+    expect(json.message).toBe('Unknown design "x\u001b[31m"');
   });
 
   it("rejects an unknown design and lists the catalog", async () => {
@@ -184,6 +182,63 @@ describe("branding eject", () => {
     expect(json.code).toBe("E_VALIDATION");
     expect(json.message).toContain('"nope"');
     expect(json.hint).toBe("Pick one of: centered, minimal.");
+  });
+
+  it("--dry-run names the files it would write on the terminal", async () => {
+    const cwd = await makeProject();
+
+    const res = await runCliForTest(["branding", "eject", "--cwd", cwd, "--dry-run"]);
+
+    expect(res.stdout).toContain(".zitadel/branding/login.liquid");
+  });
+
+  it("--dry-run suggests the real command, with the design it was given", async () => {
+    const cwd = await makeProject();
+
+    const res = await eject(cwd, "--dry-run", "--design", "minimal");
+
+    expect(parseJson(res.stdout)).toMatchObject({
+      data: {
+        next_commands: [expect.stringContaining("branding eject --design minimal")],
+      },
+    });
+  });
+
+  it("--dry-run writes no file and says what it would eject", async () => {
+    const cwd = await makeProject();
+
+    const res = await eject(cwd, "--dry-run");
+
+    expect(res.exitCode, res.stderr).toBe(0);
+    const envelope = parseJson(res.stdout) as {
+      status: string;
+      data: { dry_run: boolean; title: string; files_would_write: string[] };
+    };
+    expect(envelope.status).toBe("ok");
+    expect(envelope.data.dry_run).toBe(true);
+    expect(envelope.data.title).toBe(
+      "Would eject the centered design into .zitadel/branding/ (dry run)",
+    );
+    expect(envelope.data.files_would_write).toContain(".zitadel/branding/login.liquid");
+    await expect(readFile(join(cwd, ".zitadel/branding/login.liquid"), "utf8")).rejects.toThrow();
+    await expect(readFile(join(cwd, ".zitadel/meta/branding.json"), "utf8")).rejects.toThrow();
+  });
+
+  it("counts the files a re-run with --force left unchanged", async () => {
+    const cwd = await makeProject();
+    await eject(cwd);
+
+    const res = await runCliForTest([
+      "branding",
+      "eject",
+      "--cwd",
+      cwd,
+      "--force",
+      "--non-interactive",
+    ]);
+
+    expect(res.exitCode, res.stderr).toBe(0);
+    expect(res.stdout).toContain("Files: 2 written, 2 unchanged");
   });
 
   it("refuses to overwrite existing files without --force", async () => {
@@ -229,22 +284,46 @@ describe("branding eject", () => {
 describe("branding eject asked on a terminal", () => {
   // The built CLI bundles its own prompts, so a prompt can only be answered
   // by running the command from source, where `input` is the one module asked.
-  const ejecting = (cwd: string) => asTerminal(() => BrandingEject.run(["--cwd", cwd]));
+  const ejecting = (cwd: string, ...answers: Answer[]) => {
+    const talk = answering(...answers);
+    return {
+      talk,
+      done: asTerminal(() => BrandingEject.run(["--cwd", cwd])),
+    };
+  };
 
-  afterEach(() => {
-    vi.mocked(select).mockReset();
-    vi.mocked(isCancel).mockReset();
-    vi.mocked(isCancel).mockReturnValue(false);
+  it("asks which design to start from, offering each design", async () => {
+    const cwd = await makeProject();
+
+    const { talk, done } = ejecting(cwd, BRANDING_DESIGN_INFO.minimal.label);
+    await done;
+
+    expect(talk.asked()).toEqual(["Which design would you like to start from?"]);
+    expect(talk.options()[0]).toEqual(
+      expect.arrayContaining([
+        BRANDING_DESIGN_INFO.centered.label,
+        BRANDING_DESIGN_INFO.minimal.label,
+      ]),
+    );
   });
 
   it("scaffolds the design that was chosen", async () => {
     const cwd = await makeProject();
-    vi.mocked(select).mockResolvedValueOnce("minimal" as never);
 
-    await ejecting(cwd);
+    await ejecting(cwd, BRANDING_DESIGN_INFO.minimal.label).done;
 
     expect(await readFile(join(cwd, ".zitadel/branding/login.liquid"), "utf8")).toBe(
       getDefaultBrandingConfig("minimal").template,
+    );
+  });
+
+  it("scaffolds the default design when it is the one chosen", async () => {
+    const cwd = await makeProject();
+
+    await ejecting(cwd, BRANDING_DESIGN_INFO.centered.label).done;
+
+    expect(await readFile(join(cwd, ".zitadel/branding/login.liquid"), "utf8")).toBe(
+      getDefaultBrandingConfig("centered").template,
     );
   });
 
@@ -265,14 +344,11 @@ describe("branding eject asked on a terminal", () => {
     });
   });
 
-  it("fails, scaffolding nothing, on Ctrl-C", async () => {
+  it("fails, scaffolding nothing, when the person walks away", async () => {
     const cwd = await makeProject();
-    vi.mocked(isCancel).mockReturnValue(true);
-    vi.mocked(select).mockResolvedValueOnce(Symbol("cancel") as never);
 
-    await expect(ejecting(cwd)).rejects.toThrow();
+    await expect(ejecting(cwd).done).rejects.toThrow();
 
-    expect(cancel).toHaveBeenCalledWith("Cancelled.");
     await expect(readFile(join(cwd, ".zitadel/branding/branding.json"), "utf8")).rejects.toThrow();
   });
 });

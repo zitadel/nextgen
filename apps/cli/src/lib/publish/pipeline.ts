@@ -1,6 +1,6 @@
 import type { DeploymentService, SchemaService, UserService, VariableService } from "@/lib/backend";
-import type { ConfigStore, ConfigurationBundle, ZitadelConfig } from "@/lib/zitadel";
 import type { SuggestedCommand } from "@/lib/suggestion";
+import type { ConfigStore, ConfigurationBundle, ZitadelConfig } from "@/lib/zitadel";
 
 /**
  * The publishes a step can run for. `preview` lands with the preview command.
@@ -190,8 +190,15 @@ export async function runSteps(steps: readonly Step[], ctx: StepContext): Promis
       notices: [...progress.outcome.notices, ...(result.notices ?? [])],
       lockouts: [...progress.outcome.lockouts, ...(result.lockouts ?? [])],
     };
-    const learned: Learned = { ...progress.ctx.learned, ...result.learned };
-    return { outcome, ctx: { ...progress.ctx, learned } };
+
+    return {
+      outcome,
+      ctx: {
+        ...progress.ctx,
+        learned: { ...progress.ctx.learned, ...result.learned },
+      },
+    };
   }, Promise.resolve(start));
+
   return done.outcome;
 }
