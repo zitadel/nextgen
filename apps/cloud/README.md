@@ -64,7 +64,7 @@ This folder is the package `@zitadel/cloud`, whose tasks
 The `server` service is a Node.js function: Vercel adds spans to a request's
 trace only from a Node.js function, so [`server/index.mjs`](server/index.mjs)
 starts the launcher on loopback, forwards every request to it with Vercel's
-own `traceparent`, and hands the server's spans to Vercel. Its build command
+own `traceparent`, and hands the server's spans and metrics to Vercel. Its build command
 puts Go on PATH ([`install-go.sh`](install-go.sh)), which Vercel's Node.js
 build image lacks, and runs `deploy`, which turbo orders after `build` (the
 launcher) and `migrate`; the function ships the launcher through its
@@ -74,8 +74,7 @@ the deployment's secrets, and any branch's build can write the team's cache.
 runs `schemas` and is rooted here, where `package.json` has no
 framework dependencies, so Vercel detects no framework (a service takes no
 `framework: null`); a framework dependency in it would change how that
-service builds. Moon has no project for the package: the launcher's Go
-tests run in the server's `test`.
+service builds. The launcher's Go tests run in the server's `test`.
 
 | File | Role |
 |---|---|

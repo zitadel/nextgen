@@ -131,18 +131,13 @@ jobs:
       - name: Install dependencies
         # Filter to design-tokens (+ deps). --loglevel error hides monorepo
         # "Unsupported platform" / optional-bin WARNs from unrelated packages.
-        # Filtered installs still include the workspace root's devDependencies,
-        # so node_modules/.bin/moon is present for the moon steps below.
         run: >-
           corepack pnpm install --frozen-lockfile
           --filter @zitadel/design-tokens...
           --loglevel error
 
-      # Bare `moon` below is the workspace's own pinned @moonrepo/cli, so CI
-      # runs the exact version the lockfile resolves — same as local dev.
-      - name: Put workspace binaries on PATH
-        run: echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
-
+      # The steps below run the package's own scripts in the order they need
+      # (generate before the snapshot test); none needs a task runner's graph.
       - name: Pin requested Figma library version
         if: >-
           github.event_name == 'workflow_dispatch'
@@ -160,7 +155,7 @@ jobs:
         if: >-
           github.event_name == 'push'
           || (github.event_name == 'workflow_dispatch' && inputs.source == 'export')
-        run: moon run design-tokens:sync-export
+        run: corepack pnpm --filter @zitadel/design-tokens run sync:export
 
       - name: Pull tokens from Figma REST (Enterprise path)
         if: >-
@@ -168,10 +163,10 @@ jobs:
           && inputs.source == 'figma-rest'
         env:
           FIGMA_TOKEN: ${{ secrets.FIGMA_TOKEN }}
-        run: moon run design-tokens:sync
+        run: corepack pnpm --filter @zitadel/design-tokens run sync
 
       - name: Regenerate token artifacts
-        run: moon run design-tokens:generate
+        run: corepack pnpm --filter @zitadel/design-tokens run generate
 
       # Commit/push before the snapshot gate so a legitimate rename still lands
       # a reviewable PR. The snapshot step then fails the workflow check when
@@ -193,4 +188,4 @@ jobs:
         run: bash .github/scripts/design-tokens-open-sync-pr.sh
 
       - name: Run snapshot test (hard gate)
-        run: moon run design-tokens:test
+        run: corepack pnpm --filter @zitadel/design-tokens run test

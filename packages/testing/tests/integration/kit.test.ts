@@ -5,8 +5,8 @@ import { startLocalZitadel } from "../../src/index";
 
 const serverBinary = process.env.ZITADEL_SERVER_BINARY;
 
-// Run via `moon run testing:test-integration`: the task builds the server
-// binary and the CLI, and injects ZITADEL_SERVER_BINARY.
+// Run via `turbo run test:integration --filter=@zitadel/testing`: the task
+// builds the server binary and the CLI, and injects ZITADEL_SERVER_BINARY.
 describe.skipIf(!serverBinary)("startLocalZitadel (real instance)", () => {
   it("boots, seeds loginable users, and tears down cleanly", async () => {
     const bootStarted = performance.now();

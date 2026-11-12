@@ -37,7 +37,7 @@ Skip a changeset **only** when the change is *exclusively*:
   (`packages/config/defaults/README-*.md`) definitely does. The guards
   (`scripts/check-pr-title.mjs`, `scripts/check-changesets-status.mjs`)
   encode this split.
-- CI / build wiring (`.github/`, `moon.yml`, `.changeset/`)
+- CI / build wiring (`.github/`, `turbo.json`, `.changeset/`)
 - a refactor with no behavior change
 
 ## Decision table
@@ -130,7 +130,8 @@ The public packages publish to npm's `latest` tag as `0.x`
   that starts with `**Breaking:**` says what breaks and what to do; the website
   changelog lists such a change under Breaking. A `major` would release every
   public package as 1.0.0, so `node scripts/check-changesets-status.mjs --pending`
-  refuses it; CI runs it on every PR.
+  refuses it; CI runs it (`@zitadel/release#check-changesets`) whenever a
+  changeset or a package manifest changes.
 - 1.0.0 is cut by a PR that deletes that check and adds a `major` changeset.
   Release candidates, if any, run in prerelease mode on a release branch.
 
