@@ -6,7 +6,7 @@ import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { ZitadelReleaseChannel } from "@/lib/zitadel-upgrade";
+import { updateCheckDisabled, zitadelChannel } from "@/lib/zitadel-packages";
 
 const REGISTRY = "https://registry.npmjs.org/-/package/@zitadel%2fcli/dist-tags";
 
@@ -23,24 +23,24 @@ afterEach(async () => {
   await rm(home, { recursive: true, force: true });
 });
 
-describe("ZitadelReleaseChannel.latestFresh", () => {
+describe("zitadelChannel", () => {
   it("reads the version on the dist-tag of the CLI's own channel", async () => {
     server.use(
       http.get(REGISTRY, () => HttpResponse.json({ latest: "2.0.0", alpha: "3.0.0-alpha.1" })),
     );
 
-    const stable = await new ZitadelReleaseChannel("1.0.0", {}).latestFresh();
-    const alpha = await new ZitadelReleaseChannel("3.0.0-alpha.0", {}).latestFresh();
+    const stable = await zitadelChannel("1.0.0", {}).latestFresh();
+    const alpha = await zitadelChannel("3.0.0-alpha.0", {}).latestFresh();
 
     expect([stable?.version, alpha?.version]).toEqual(["2.0.0", "3.0.0-alpha.1"]);
   });
 });
 
-describe("ZitadelReleaseChannel cache", () => {
+describe("zitadelChannel cache", () => {
   it("keeps the answer in the CLI's config directory, where the next run reads it", async () => {
     server.use(http.get(REGISTRY, () => HttpResponse.json({ latest: "2.0.0" })));
 
-    await new ZitadelReleaseChannel("1.0.0", { XDG_CONFIG_HOME: home }).latestFresh();
+    await zitadelChannel("1.0.0", { XDG_CONFIG_HOME: home }).latestFresh();
 
     const cached = JSON.parse(
       await readFile(join(home, "zitadel", "cli", "update-check.json"), "utf8"),
@@ -49,13 +49,13 @@ describe("ZitadelReleaseChannel cache", () => {
   });
 });
 
-describe("ZitadelReleaseChannel.isDisabled", () => {
+describe("updateCheckDisabled", () => {
   it.each([
     [{ ZITADEL_UPDATE_CHECK: "0" }, true],
     [{ CI: "true" }, true],
     [{ CI: "false" }, false],
     [{}, false],
   ])("for %o is %s", (environment, disabled) => {
-    expect(ZitadelReleaseChannel.isDisabled(environment)).toBe(disabled);
+    expect(updateCheckDisabled(environment)).toBe(disabled);
   });
 });

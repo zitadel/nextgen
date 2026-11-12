@@ -1,9 +1,7 @@
 import semver from "semver";
 
-import type { BreakingChange, ChangeSource } from "./change-source";
-import type { Dependency } from "./dependency";
+import type { Dependencies, Dependency } from "./dependencies";
 import type { Release } from "./release";
-import type { ScopedDependencies } from "./scoped-dependencies";
 
 /** One package a plan moves. */
 export type PackageUpgrade = Readonly<{ name: string; from: string; to: string }>;
@@ -18,21 +16,17 @@ export class UpgradePlan {
   readonly packages: readonly PackageUpgrade[];
   /** The dependencies the plan leaves as they are. */
   readonly leftAlone: readonly Dependency[];
-  /** The breaking changes between the oldest version involved and the target. */
-  readonly breaking: readonly BreakingChange[];
 
   private constructor(
     cliVersion: string,
     target: string,
     packages: readonly PackageUpgrade[],
     leftAlone: readonly Dependency[],
-    breaking: readonly BreakingChange[],
   ) {
     this.cliVersion = cliVersion;
     this.target = target;
     this.packages = packages;
     this.leftAlone = leftAlone;
-    this.breaking = breaking;
   }
 
   /**
@@ -40,15 +34,13 @@ export class UpgradePlan {
    * @param input.latest - What the registry answered. A CLI ahead of it (a
    * prerelease) is what its own files target, so it is never moved back.
    * @param input.dependencies - The project's dependencies.
-   * @param input.changes - Where the breaking changes are read from.
    */
-  static async create(input: {
+  static create(input: {
     cliVersion: string;
     latest: Release;
-    dependencies: ScopedDependencies | undefined;
-    changes: ChangeSource;
-  }): Promise<UpgradePlan> {
-    const { cliVersion, latest, dependencies, changes } = input;
+    dependencies: Dependencies | undefined;
+  }): UpgradePlan {
+    const { cliVersion, latest, dependencies } = input;
     const target = latest.isNewerThan(cliVersion) ? latest.version : cliVersion;
     const packages = (dependencies?.exact() ?? [])
       .filter((dependency) => {
@@ -61,20 +53,13 @@ export class UpgradePlan {
           to: target,
         };
       });
-    const upToDate = target === cliVersion && packages.length === 0;
-    const oldest = [
-      cliVersion,
-      ...packages.map((pkg) => {
-        return pkg.from;
-      }),
-    ].sort(semver.compare)[0];
-    return new UpgradePlan(
-      cliVersion,
-      target,
-      packages,
-      dependencies?.floating() ?? [],
-      upToDate ? [] : await changes.breakingChanges(oldest ?? "0.0.0", target),
-    );
+    return new UpgradePlan(cliVersion, target, packages, dependencies?.floating() ?? []);
+  }
+
+  /** The oldest version the upgrade starts from: the CLI's, or the oldest pin. */
+  get oldest(): string {
+    const versions = [this.cliVersion, ...this.packages.map((pkg) => pkg.from)];
+    return [...versions].sort(semver.compare)[0] ?? "0.0.0";
   }
 
   /** Whether this CLI is itself older than the target. */

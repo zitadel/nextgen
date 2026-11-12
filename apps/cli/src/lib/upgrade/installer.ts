@@ -7,35 +7,36 @@ import {
 } from "@/lib/package-manager";
 
 import { InstallError } from "./errors";
-import type { UpgradePlan } from "./upgrade-plan";
+import type { UpgradePlan } from "./plan";
 
 /** The install a plan needs, and how it reads in the person's shell. */
 export type PlannedInstall = Readonly<{ run: PackageCommand; display: string }>;
 
 /** What a {@link PackageInstaller} is given. */
-export type PackageInstallerOptions = Readonly<{
+export type InstallerOptions = Readonly<{
   cwd: string;
+  /** `--cwd` as typed, so the displayed command runs from the shell's directory. */
   typedCwd: string | undefined;
+  /** Whether a package manager's progress must stay off stdout. */
   redirectStdoutToStderr: boolean;
 }>;
 
 /** Installs a plan's packages with the project's own package manager. */
 export class PackageInstaller {
-  /** What the run was given. */
-  private readonly options: PackageInstallerOptions;
+  /** What the installer was given. */
+  private readonly options: InstallerOptions;
 
   /**
    * @param options.cwd - The project directory.
-   * @param options.typedCwd - `--cwd` as typed, so the displayed command runs from the shell's directory.
-   * @param options.redirectStdoutToStderr - Whether a package manager's progress must stay off stdout.
+   * @param options.typedCwd - `--cwd` as typed.
+   * @param options.redirectStdoutToStderr - Whether progress must stay off stdout.
    */
-  constructor(options: PackageInstallerOptions) {
+  constructor(options: InstallerOptions) {
     this.options = options;
   }
 
   /**
-   * The install the plan needs, in the project's own package manager and with an
-   * exact-save flag, so a pin stays a pin.
+   * The install the plan needs, with an exact-save flag so a pin stays a pin.
    *
    * @returns The install, or `undefined` when no package moves.
    */
@@ -43,11 +44,9 @@ export class PackageInstaller {
     if (plan.packages.length === 0) {
       return undefined;
     }
-    const run = addExactCommandFor(await detectPackageManager(this.options.cwd), [...plan.specs]);
-    return {
-      run,
-      display: inDirectory(run, this.options.typedCwd, this.options.cwd).display,
-    };
+    const { cwd, typedCwd } = this.options;
+    const run = addExactCommandFor(await detectPackageManager(cwd), [...plan.specs]);
+    return { run, display: inDirectory(run, typedCwd, cwd).display };
   }
 
   /**

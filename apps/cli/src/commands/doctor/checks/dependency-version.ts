@@ -1,8 +1,8 @@
 import semver from "semver";
 
 import { addExactCommandFor, detectPackageManager } from "@/lib/package-manager";
-import { ScopedDependencies } from "@/lib/upgrade/scoped-dependencies";
-import { ZITADEL } from "@/lib/zitadel-upgrade/zitadel";
+import { Dependencies } from "@/lib/upgrade/dependencies";
+import { ZITADEL_SCOPE } from "@/lib/zitadel-packages";
 
 import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
 
@@ -41,7 +41,7 @@ export class DependencyVersionCheck implements SanityCheck {
         message: `CLI version ${ctx.cliVersion} is not an exact release; skipping the pin comparison`,
       };
     }
-    const dependencies = await ScopedDependencies.read(ctx.cwd, ZITADEL.scope).catch(() => {
+    const dependencies = await Dependencies.read(ctx.cwd, ZITADEL_SCOPE).catch(() => {
       return undefined;
     });
     if (dependencies === undefined) {

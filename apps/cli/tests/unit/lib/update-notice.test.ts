@@ -6,7 +6,7 @@ import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { UpdateNotice } from "@/lib/zitadel-upgrade";
+import { updateNotice } from "@/lib/update-notice";
 
 const REGISTRY = "https://registry.npmjs.org/-/package/@zitadel%2fcli/dist-tags";
 
@@ -14,12 +14,12 @@ const server = setupServer();
 let dir: string;
 
 function notice(cliVersion: string, env: NodeJS.ProcessEnv = {}) {
-  return new UpdateNotice({
+  return updateNotice({
     cliVersion,
     cwd: dir,
     env: { XDG_CONFIG_HOME: dir, ...env },
     columns: 80,
-  }).render();
+  });
 }
 
 function pins(dependencies: Record<string, string>): Promise<void> {
@@ -37,7 +37,7 @@ afterEach(async () => {
   await rm(dir, { recursive: true, force: true });
 });
 
-describe("UpdateNotice", () => {
+describe("updateNotice", () => {
   it("boxes the new version and the command, on the dist-tag", async () => {
     const box = await notice("1.0.0");
 

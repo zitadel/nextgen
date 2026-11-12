@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { Dependency } from "@/lib/upgrade/dependency";
+import { Dependency } from "@/lib/upgrade/dependencies";
 
 describe("Dependency", () => {
   it.each([

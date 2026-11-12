@@ -6,7 +6,7 @@ import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { DistTagRegistry, LookupCache, ReleaseChannel, UpgradeTarget } from "@/lib/upgrade";
+import { ReleaseChannel } from "@/lib/upgrade";
 
 const REGISTRY = "https://registry.npmjs.org/-/package/@acme%2fcli/dist-tags";
 
@@ -33,18 +33,17 @@ async function cacheHolds(lookup: Record<string, unknown>): Promise<void> {
   await writeFile(file, JSON.stringify(lookup));
 }
 
-const ACME = new UpgradeTarget("@acme/", "@acme/cli");
-
 function channel(
   cliVersion: string,
   environment: NodeJS.ProcessEnv,
   cacheFile: string = join(configHome, "acme", "update-check.json"),
 ): ReleaseChannel {
-  return new ReleaseChannel(
-    cliVersion === "3.0.0-alpha.0" ? "alpha" : "latest",
-    DistTagRegistry.of(environment, ACME),
-    LookupCache.at(cacheFile),
-  );
+  return new ReleaseChannel({
+    packageName: "@acme/cli",
+    distTag: cliVersion === "3.0.0-alpha.0" ? "alpha" : "latest",
+    registry: (environment.npm_config_registry ?? "https://registry.npmjs.org").replace(/\/+$/, ""),
+    cacheFile,
+  });
 }
 
 async function latestVersion(

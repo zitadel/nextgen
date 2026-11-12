@@ -1,12 +1,7 @@
-export type { BreakingChange, ChangeSource } from "./change-source";
-export { DistTagRegistry } from "./dist-tag-registry";
+export { ReleaseChannel } from "./channel";
+export { Dependencies, Dependency } from "./dependencies";
 export { InstallError, ReleaseLookupError } from "./errors";
-export { LookupCache } from "./lookup-cache";
-export { PackageInstaller } from "./package-installer";
+export { PackageInstaller } from "./installer";
+export { type PackageUpgrade, UpgradePlan } from "./plan";
 export { Release } from "./release";
-export { ReleaseChannel } from "./release-channel";
-export type { Refresh, RefreshOutcome, Refresher } from "./refresher";
-export { ScopedDependencies } from "./scoped-dependencies";
-export { type PackageUpgrade, UpgradePlan } from "./upgrade-plan";
-export { UpgradeTarget } from "./upgrade-target";
 export { Upgrader, type UpgradeResult } from "./upgrader";

@@ -2,25 +2,11 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { http, HttpResponse } from "msw";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
-import { breakingChanges } from "@/lib/release-notes";
-import {
-  InstallError,
-  PackageInstaller,
-  Release,
-  ScopedDependencies,
-  UpgradePlan,
-} from "@/lib/upgrade";
+import { InstallError, PackageInstaller, Release, Dependencies, UpgradePlan } from "@/lib/upgrade";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
-const server = setupServer(
-  http.get("https://api.github.com/repos/zitadel/nextgen/releases", () => {
-    return HttpResponse.json([]);
-  }),
-);
 const created: string[] = [];
 
 async function project(dependencies: Record<string, string>): Promise<string> {
@@ -34,8 +20,7 @@ async function aPlan(dir: string): Promise<UpgradePlan> {
   return UpgradePlan.create({
     cliVersion: "2.0.0",
     latest: new Release("2.0.0"),
-    dependencies: await ScopedDependencies.read(dir, "@zitadel/"),
-    changes: { breakingChanges },
+    dependencies: await Dependencies.read(dir, "@zitadel/"),
   });
 }
 
@@ -43,8 +28,6 @@ function installerIn(cwd: string): PackageInstaller {
   return new PackageInstaller({ cwd, typedCwd: undefined, redirectStdoutToStderr: true });
 }
 
-beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
-afterAll(() => server.close());
 afterEach(async () => {
   await Promise.all(
     created.splice(0).map((dir) => {

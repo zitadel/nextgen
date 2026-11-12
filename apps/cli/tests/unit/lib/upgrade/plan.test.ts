@@ -1,20 +1,11 @@
-import { http, HttpResponse } from "msw";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-
-import { breakingChanges } from "@/lib/release-notes";
-import { Release, ScopedDependencies, UpgradePlan } from "@/lib/upgrade";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const RELEASES = "https://api.github.com/repos/zitadel/nextgen/releases";
+import { afterEach, describe, expect, it } from "vitest";
 
-const server = setupServer(
-  http.get(RELEASES, () => {
-    return HttpResponse.json([{ tag_name: "v2.0.0", body: "**Breaking:** it broke" }]);
-  }),
-);
+import { Dependencies, Release, UpgradePlan } from "@/lib/upgrade";
+
 const created: string[] = [];
 
 async function plan(cliVersion: string, latest: string, dependencies: Record<string, string>) {
@@ -24,13 +15,10 @@ async function plan(cliVersion: string, latest: string, dependencies: Record<str
   return UpgradePlan.create({
     cliVersion,
     latest: new Release(latest),
-    dependencies: await ScopedDependencies.read(dir, "@zitadel/"),
-    changes: { breakingChanges },
+    dependencies: await Dependencies.read(dir, "@zitadel/"),
   });
 }
 
-beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
-afterAll(() => server.close());
 afterEach(async () => {
   await Promise.all(
     created.splice(0).map((dir) => {
@@ -67,11 +55,10 @@ describe("UpgradePlan.create", () => {
     expect(result.upToDate).toBe(true);
   });
 
-  it("reads the breaking changes only when something moves", async () => {
-    const behind = await plan("1.0.0", "2.0.0", {});
-    const current = await plan("2.0.0", "2.0.0", {});
+  it("starts from the oldest of the CLI and the pins that move", async () => {
+    const result = await plan("2.0.0", "2.0.0", { "@zitadel/api": "1.0.0" });
 
-    expect([behind.breaking.length, current.breaking.length]).toEqual([1, 0]);
+    expect(result.oldest).toBe("1.0.0");
   });
 
   it("hands the package manager name@version specs", async () => {

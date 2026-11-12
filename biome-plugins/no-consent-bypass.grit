@@ -63,7 +63,7 @@ or {
     $filename <: not r".*/apps/cli/src/lib/publish/steps/asset-probe\.ts$",
     $filename <: not r".*/apps/cli/src/lib/local-server/runtime\.ts$",
     $filename <: not r".*/apps/cli/src/lib/telemetry/index\.ts$",
-    $filename <: not r".*/apps/cli/src/lib/upgrade/dist-tag-registry\.ts$",
+    $filename <: not r".*/apps/cli/src/lib/upgrade/channel\.ts$",
     $filename <: not r".*/apps/cli/src/lib/release-notes\.ts$",
     register_diagnostic(span=$bypass, message="Reach the platform through the client from lib/backend/client or OperationService in lib/backend, which gate destructive operations.", severity="error")
   },

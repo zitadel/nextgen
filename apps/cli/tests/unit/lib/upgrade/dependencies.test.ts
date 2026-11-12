@@ -1,6 +1,6 @@
 import { describe, expect } from "vitest";
 
-import { ScopedDependencies } from "@/lib/upgrade";
+import { Dependencies } from "@/lib/upgrade";
 import { it } from "@tests/helpers/fixtures";
 import { write } from "@tests/helpers/git-repo";
 import { rejectionOf } from "@tests/helpers/thrown-value";
@@ -13,22 +13,22 @@ const MIXED = JSON.stringify({
   devDependencies: { "@zitadel/testing": " 2.0.0 " },
 });
 
-function summary(dependencies: ScopedDependencies | undefined, kind: "exact" | "floating") {
+function summary(dependencies: Dependencies | undefined, kind: "exact" | "floating") {
   return dependencies?.[kind]().map((dependency) => {
     return [dependency.name, dependency.specifier];
   });
 }
 
-describe("ScopedDependencies.read", () => {
+describe("Dependencies.read", () => {
   it("is undefined without a package.json", async ({ dir }) => {
-    await expect(ScopedDependencies.read(dir, "@zitadel/")).resolves.toBeUndefined();
+    await expect(Dependencies.read(dir, "@zitadel/")).resolves.toBeUndefined();
   });
 
   it("refuses a package.json that is not valid JSON", async ({ dir }) => {
     await write(dir, { "package.json": "{ not json" });
 
     const error = await rejectionOf(() => {
-      return ScopedDependencies.read(dir, "@zitadel/");
+      return Dependencies.read(dir, "@zitadel/");
     });
 
     expect(error).toBeInstanceOf(SyntaxError);
@@ -37,17 +37,17 @@ describe("ScopedDependencies.read", () => {
   it("keeps only the packages in the scope it is given", async ({ dir }) => {
     await write(dir, { "package.json": MIXED });
 
-    const dependencies = await ScopedDependencies.read(dir, "@other/");
+    const dependencies = await Dependencies.read(dir, "@other/");
 
     expect(summary(dependencies, "exact")).toEqual([]);
   });
 });
 
-describe("ScopedDependencies.exact", () => {
+describe("Dependencies.exact", () => {
   it("lists only the exact pins of the scope", async ({ dir }) => {
     await write(dir, { "package.json": MIXED });
 
-    const dependencies = await ScopedDependencies.read(dir, "@zitadel/");
+    const dependencies = await Dependencies.read(dir, "@zitadel/");
 
     expect(summary(dependencies, "exact")).toEqual([
       ["@zitadel/sdk-next", "1.2.3"],
@@ -56,11 +56,11 @@ describe("ScopedDependencies.exact", () => {
   });
 });
 
-describe("ScopedDependencies.floating", () => {
+describe("Dependencies.floating", () => {
   it("lists the dependencies of the scope that are not exact pins", async ({ dir }) => {
     await write(dir, { "package.json": MIXED });
 
-    const dependencies = await ScopedDependencies.read(dir, "@zitadel/");
+    const dependencies = await Dependencies.read(dir, "@zitadel/");
 
     expect(summary(dependencies, "floating")).toEqual([["@zitadel/api", "^1.2.3"]]);
   });
