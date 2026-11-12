@@ -296,7 +296,7 @@ describe("auth-method passkey disable", () => {
             source: "",
             code: "E_CONFIRMATION_REQUIRED",
             message: `${SCHEMA_FILE} would have no way to sign in left`,
-            hint: `Enable another method first, such as ${expectedPublicCliCommand("auth-method sso enable --provider <name>")}. If the schema's users are only managed through the API, ask a person first: ${QUESTION} Re-run with --force only once they agree (the first of details.suggested_args holds the exact arguments).`,
+            hint: `Enable another method first, such as ${expectedPublicCliCommand("auth-method sso enable --provider '<name>'")}. If the schema's users are only managed through the API, ask a person first: ${QUESTION} Re-run with --force only once they agree (the first of details.suggested_args holds the exact arguments).`,
             next_commands: [
               expectedPublicCliCommand(
                 `auth-method passkey disable --schema ${SCHEMA} --cwd ${app.path} --force`,
