@@ -993,6 +993,21 @@
               }
             }
           },
+          "429": {
+            "description": "The server is hashing or checking as many passwords as it allows right\nnow and could not take on another within its wait. Nothing was changed;\nretry after the number of seconds in the `Retry-After` header.\n",
+            "headers": {
+              "Retry-After": {
+                "$ref": "#/components/headers/retry-after"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/too-many-requests"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Something went wrong on the server. This was not your fault.",
             "content": {
@@ -1153,6 +1168,21 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "The server is hashing or checking as many passwords as it allows right\nnow and could not take on another within its wait. Nothing was changed;\nretry after the number of seconds in the `Retry-After` header.\n",
+            "headers": {
+              "Retry-After": {
+                "$ref": "#/components/headers/retry-after"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/too-many-requests"
                 }
               }
             }
@@ -2094,6 +2124,21 @@
               }
             }
           },
+          "429": {
+            "description": "The server is hashing or checking as many passwords as it allows right\nnow and could not take on another within its wait. Nothing was changed;\nretry after the number of seconds in the `Retry-After` header.\n",
+            "headers": {
+              "Retry-After": {
+                "$ref": "#/components/headers/retry-after"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/too-many-requests"
+                }
+              }
+            }
+          },
           "default": {
             "$ref": "#/components/responses/getFlowStep-error-response"
           }
@@ -2190,6 +2235,21 @@
                       "message": "the release this attempt runs on was revoked"
                     }
                   }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "The server is hashing or checking as many passwords as it allows right\nnow and could not take on another within its wait. Nothing was changed;\nretry after the number of seconds in the `Retry-After` header.\n",
+            "headers": {
+              "Retry-After": {
+                "$ref": "#/components/headers/retry-after"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/too-many-requests"
                 }
               }
             }
@@ -2408,6 +2468,21 @@
                       "message": "the submitted proof was rejected"
                     }
                   }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "The server is hashing or checking as many passwords as it allows right\nnow and could not take on another within its wait. Nothing was changed;\nretry after the number of seconds in the `Retry-After` header.\n",
+            "headers": {
+              "Retry-After": {
+                "$ref": "#/components/headers/retry-after"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/too-many-requests"
                 }
               }
             }
@@ -8755,7 +8830,7 @@
       "post": {
         "operationId": "createInvitation",
         "summary": "Create an invitation",
-        "description": "Creates an invitation for a project, or replaces an existing one, and\nreturns the invitation and its one-shot link.\n\nSend `type` and the object named after it. `project_member` takes\n`relation` (`viewer`, `editor` or `admin`). `team_member` takes `team_id`\nand `role`, and answers `501` `not_implemented` until team invitations\nship. Optional `metadata.name` labels who the link is for. Optional\n`replaces_invitation_id` replaces that invitation: the new row keeps the\noriginal's `journey_id`, and a pending original is deleted in the same\ntransaction.\n\nThe `link` appears only in this response. Share it out of band; whoever\nopens it and is signed in can redeem the role. It expires in 72 hours.\nRefused for an unclaimed project, on a server without a platform project,\nand when the project's pending-invitation cap is reached.\n\nAuthenticate with a project secret (`oauth2`) or a console session cookie\n(`sessionCookie`). Creation needs the same project `admin` check as\n`createGrant` (`POST /grants`). Cookie requests follow that scheme's CSRF\nrules.\n",
+        "description": "Creates an invitation for a project, or replaces an existing one, and\nreturns the invitation and its one-shot link.\n\nSend `type` and the object named after it. `project_member` takes\n`relation` (`viewer`, `editor` or `admin`). `team_member` takes `team_id`\nand `role`, and answers `501` `not_implemented` until team invitations\nship. Optional `metadata.name` labels who the link is for. Optional\n`replaces_invitation_id` replaces that invitation: the new row keeps the\noriginal's `journey_id`, and the original is deleted in the same\ntransaction unless it was accepted.\n\nThe `link` appears only in this response. Share it out of band; whoever\nopens it and is signed in can redeem the role. It expires in 72 hours.\nRefused for an unclaimed project, on a server without a platform project,\nand when the project's pending-invitation cap is reached.\n\nAuthenticate with a project secret (`oauth2`) or a console session cookie\n(`sessionCookie`). Creation needs the same project `admin` check as\n`createGrant` (`POST /grants`). Cookie requests follow that scheme's CSRF\nrules.\n",
         "tags": [
           "Invitations"
         ],
@@ -8863,7 +8938,7 @@
             }
           },
           "404": {
-            "description": "Project not found, or the invitation to replace was not found.",
+            "description": "Project not found, or the invitation to replace was not found or was\nalready accepted.\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -11507,7 +11582,7 @@
       "post": {
         "operationId": "invitationCancelled",
         "summary": "invitation.cancelled",
-        "description": "A pending invitation was cancelled by an administrator, or by a\nreplacement.\n\nNot sent yet: the contract is published ahead of the code that sends it.\n\nThe body is the event as `GET /events` returns it.\n",
+        "description": "A pending invitation was cancelled by an administrator, or an unaccepted\none was deleted by its replacement.\n\nThe body is the event as `GET /events` returns it.\n",
         "tags": [
           "Event Webhooks"
         ],
@@ -11536,7 +11611,7 @@
       "post": {
         "operationId": "invitationCreated",
         "summary": "invitation.created",
-        "description": "An invitation was created, new or as the replacement of another.\n\nNot sent yet: the contract is published ahead of the code that sends it.\n\nThe body is the event as `GET /events` returns it.\n",
+        "description": "An invitation was created, new or as the replacement of another.\n\nThe body is the event as `GET /events` returns it.\n",
         "tags": [
           "Event Webhooks"
         ],
@@ -13450,6 +13525,26 @@
           }
         ]
       },
+      "user-password_hashing_busy": {
+        "description": "The server is hashing too many passwords right now. Try again in a moment.\n\nError code: user.password_hashing_busy\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "user.password_hashing_busy"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
       "user-password_policy_violation": {
         "description": "The password does not meet the password policy.\n\nError code: user.password_policy_violation\n",
         "allOf": [
@@ -13511,6 +13606,20 @@
             "type": "string",
             "format": "date-time",
             "description": "The timestamp when the passkey was created."
+          }
+        }
+      },
+      "too-many-requests": {
+        "description": "Why the server refused the request for now. Each member names its error\ncode; `req.rate_limited` joins them when the server's own rate limits land.\nRetry after the number of seconds in the `Retry-After` header.\n",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/user-password_hashing_busy"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "code",
+          "mapping": {
+            "user.password_hashing_busy": "#/components/schemas/user-password_hashing_busy"
           }
         }
       },
@@ -21606,7 +21715,7 @@
           "rejected",
           "expired"
         ],
-        "description": "Lifecycle status of the invitation. `expired` is derived on read from\n`expires_at`; `accepted` and `rejected` are final. Cancel and replace of a\npending invitation delete the row rather than leaving a cancelled status.\n"
+        "description": "Lifecycle status of the invitation. `expired` is derived on read from\n`expires_at`; `accepted` and `rejected` are final. Cancel and replace delete\nthe row rather than leaving a cancelled status.\n"
       },
       "inv-not_found": {
         "description": "Invitation not found\n\nError code: inv.not_found\n",
@@ -21657,7 +21766,7 @@
       },
       "invitation-metadata": {
         "title": "InvitationMetadata",
-        "description": "What the administrator entered at creation, so other administrators know who\nthe link is for. It is only displayed, never matched. Null once the\ninvitation is accepted or declined. Cancel and replace of a pending\ninvitation delete the row, so the metadata goes with it.\n",
+        "description": "What the administrator entered at creation, so other administrators know who\nthe link is for. It is only displayed, never matched. Null once the\ninvitation is accepted or declined. Cancel deletes the row with it; replace\nmoves it to the new invitation unless that sends its own.\n",
         "type": "object",
         "required": [
           "name"
@@ -21711,7 +21820,7 @@
             "$ref": "#/components/schemas/project-id"
           },
           "metadata": {
-            "description": "Who the administrator said the link is for. Null after accept or decline.\nCancel and replace of a pending invitation delete the row.\n",
+            "description": "Who the administrator said the link is for. Null after accept or decline.\nCancel and replace delete the row.\n",
             "oneOf": [
               {
                 "$ref": "#/components/schemas/invitation-metadata"
@@ -21933,7 +22042,7 @@
             "$ref": "#/components/schemas/invitation-metadata"
           },
           "replaces_invitation_id": {
-            "description": "When set, this create replaces that invitation: the new invitation keeps\nthe original's `journey_id`, and a pending original is deleted in the\nsame transaction. Use the `id` that `createInvitation`\n(`POST /invitations`) or `listInvitations` (`GET /invitations`) returns.\n",
+            "description": "When set, this create replaces that invitation: the new invitation keeps\nthe original's `journey_id` and, without `metadata` of its own, the\noriginal's metadata. The original is deleted in the same transaction. An\naccepted invitation cannot be replaced. Use the `id` that\n`createInvitation` (`POST /invitations`) or `listInvitations`\n(`GET /invitations`) returns.\n",
             "$ref": "#/components/schemas/invitation-id"
           }
         }
@@ -22106,7 +22215,6 @@
             "properties": {
               "link": {
                 "type": "string",
-                "format": "uri",
                 "description": "The browser URL to share. It carries the redeem token in the fragment.\nOnly this create or replace response returns it.\n",
                 "example": "https://console.example.com/invitations/accept#token=dGhpc2lzYXRva2Vu"
               }
@@ -22129,7 +22237,6 @@
             "properties": {
               "link": {
                 "type": "string",
-                "format": "uri",
                 "description": "The browser URL to share. It carries the redeem token in the fragment.\nOnly this create or replace response returns it.\n"
               }
             }
@@ -25781,6 +25888,13 @@
           "message": "The password must not be empty."
         }
       },
+      "user-password_hashing_busy": {
+        "summary": "user.password_hashing_busy",
+        "value": {
+          "code": "user.password_hashing_busy",
+          "message": "The server is hashing too many passwords right now. Try again in a moment."
+        }
+      },
       "user-password_policy_violation": {
         "summary": "user.password_policy_violation",
         "value": {
@@ -27467,6 +27581,9 @@
                   "$ref": "#/components/schemas/user-password_empty"
                 },
                 {
+                  "$ref": "#/components/schemas/user-password_hashing_busy"
+                },
+                {
                   "$ref": "#/components/schemas/user-password_policy_violation"
                 },
                 {
@@ -27495,6 +27612,7 @@
                   "user.invalid": "#/components/schemas/user-invalid",
                   "user.not_found": "#/components/schemas/user-not_found",
                   "user.password_empty": "#/components/schemas/user-password_empty",
+                  "user.password_hashing_busy": "#/components/schemas/user-password_hashing_busy",
                   "user.password_policy_violation": "#/components/schemas/user-password_policy_violation",
                   "user.password_too_long": "#/components/schemas/user-password_too_long",
                   "user.permission_denied": "#/components/schemas/user-permission_denied"
@@ -27549,6 +27667,9 @@
               },
               "user.password_empty": {
                 "$ref": "#/components/examples/user-password_empty"
+              },
+              "user.password_hashing_busy": {
+                "$ref": "#/components/examples/user-password_hashing_busy"
               },
               "user.password_policy_violation": {
                 "$ref": "#/components/examples/user-password_policy_violation"
@@ -27688,6 +27809,9 @@
                   "$ref": "#/components/schemas/user-password_empty"
                 },
                 {
+                  "$ref": "#/components/schemas/user-password_hashing_busy"
+                },
+                {
                   "$ref": "#/components/schemas/user-password_policy_violation"
                 },
                 {
@@ -27717,6 +27841,7 @@
                   "user.invalid": "#/components/schemas/user-invalid",
                   "user.not_found": "#/components/schemas/user-not_found",
                   "user.password_empty": "#/components/schemas/user-password_empty",
+                  "user.password_hashing_busy": "#/components/schemas/user-password_hashing_busy",
                   "user.password_policy_violation": "#/components/schemas/user-password_policy_violation",
                   "user.password_too_long": "#/components/schemas/user-password_too_long",
                   "user.permission_denied": "#/components/schemas/user-permission_denied"
@@ -27774,6 +27899,9 @@
               },
               "user.password_empty": {
                 "$ref": "#/components/examples/user-password_empty"
+              },
+              "user.password_hashing_busy": {
+                "$ref": "#/components/examples/user-password_hashing_busy"
               },
               "user.password_policy_violation": {
                 "$ref": "#/components/examples/user-password_policy_violation"
@@ -28722,6 +28850,9 @@
                   "$ref": "#/components/schemas/user-password_empty"
                 },
                 {
+                  "$ref": "#/components/schemas/user-password_hashing_busy"
+                },
+                {
                   "$ref": "#/components/schemas/user-password_policy_violation"
                 },
                 {
@@ -28770,6 +28901,7 @@
                   "user.invalid": "#/components/schemas/user-invalid",
                   "user.not_found": "#/components/schemas/user-not_found",
                   "user.password_empty": "#/components/schemas/user-password_empty",
+                  "user.password_hashing_busy": "#/components/schemas/user-password_hashing_busy",
                   "user.password_policy_violation": "#/components/schemas/user-password_policy_violation",
                   "user.password_too_long": "#/components/schemas/user-password_too_long"
                 }
@@ -28892,6 +29024,9 @@
               },
               "user.password_empty": {
                 "$ref": "#/components/examples/user-password_empty"
+              },
+              "user.password_hashing_busy": {
+                "$ref": "#/components/examples/user-password_hashing_busy"
               },
               "user.password_policy_violation": {
                 "$ref": "#/components/examples/user-password_policy_violation"
@@ -29036,6 +29171,9 @@
                   "$ref": "#/components/schemas/user-password_empty"
                 },
                 {
+                  "$ref": "#/components/schemas/user-password_hashing_busy"
+                },
+                {
                   "$ref": "#/components/schemas/user-password_policy_violation"
                 },
                 {
@@ -29087,6 +29225,7 @@
                   "user.invalid": "#/components/schemas/user-invalid",
                   "user.not_found": "#/components/schemas/user-not_found",
                   "user.password_empty": "#/components/schemas/user-password_empty",
+                  "user.password_hashing_busy": "#/components/schemas/user-password_hashing_busy",
                   "user.password_policy_violation": "#/components/schemas/user-password_policy_violation",
                   "user.password_too_long": "#/components/schemas/user-password_too_long"
                 }
@@ -29218,6 +29357,9 @@
               },
               "user.password_empty": {
                 "$ref": "#/components/examples/user-password_empty"
+              },
+              "user.password_hashing_busy": {
+                "$ref": "#/components/examples/user-password_hashing_busy"
               },
               "user.password_policy_violation": {
                 "$ref": "#/components/examples/user-password_policy_violation"
@@ -29565,6 +29707,9 @@
                   "$ref": "#/components/schemas/user-password_empty"
                 },
                 {
+                  "$ref": "#/components/schemas/user-password_hashing_busy"
+                },
+                {
                   "$ref": "#/components/schemas/user-password_policy_violation"
                 },
                 {
@@ -29591,6 +29736,7 @@
                   "user.invalid": "#/components/schemas/user-invalid",
                   "user.not_found": "#/components/schemas/user-not_found",
                   "user.password_empty": "#/components/schemas/user-password_empty",
+                  "user.password_hashing_busy": "#/components/schemas/user-password_hashing_busy",
                   "user.password_policy_violation": "#/components/schemas/user-password_policy_violation",
                   "user.password_too_long": "#/components/schemas/user-password_too_long"
                 }
@@ -29647,6 +29793,9 @@
               },
               "user.password_empty": {
                 "$ref": "#/components/examples/user-password_empty"
+              },
+              "user.password_hashing_busy": {
+                "$ref": "#/components/examples/user-password_hashing_busy"
               },
               "user.password_policy_violation": {
                 "$ref": "#/components/examples/user-password_policy_violation"
@@ -34748,7 +34897,22 @@
                   "$ref": "#/components/schemas/auth-unauthorized"
                 },
                 {
+                  "$ref": "#/components/schemas/enc_key-decrypt_failed"
+                },
+                {
+                  "$ref": "#/components/schemas/enc_key-encrypt_failed"
+                },
+                {
+                  "$ref": "#/components/schemas/enc_key-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/evt-invalid"
+                },
+                {
                   "$ref": "#/components/schemas/internal"
+                },
+                {
+                  "$ref": "#/components/schemas/tkn-invalid"
                 },
                 {
                   "$ref": "#/components/schemas/inv-invalid"
@@ -34775,6 +34939,9 @@
                   "$ref": "#/components/schemas/req-invalid"
                 },
                 {
+                  "$ref": "#/components/schemas/enc_key-unknown_alg"
+                },
+                {
                   "$ref": "#/components/schemas/unavailable"
                 }
               ],
@@ -34783,7 +34950,12 @@
                 "mapping": {
                   "auth.csrf_invalid": "#/components/schemas/auth-csrf_invalid",
                   "auth.unauthorized": "#/components/schemas/auth-unauthorized",
+                  "enc_key.decrypt_failed": "#/components/schemas/enc_key-decrypt_failed",
+                  "enc_key.encrypt_failed": "#/components/schemas/enc_key-encrypt_failed",
+                  "enc_key.not_found": "#/components/schemas/enc_key-not_found",
+                  "evt.invalid": "#/components/schemas/evt-invalid",
                   "internal": "#/components/schemas/internal",
+                  "tkn.invalid": "#/components/schemas/tkn-invalid",
                   "inv.invalid": "#/components/schemas/inv-invalid",
                   "inv.not_found": "#/components/schemas/inv-not_found",
                   "inv.pending_limit": "#/components/schemas/inv-pending_limit",
@@ -34792,6 +34964,7 @@
                   "inv.project_unclaimed": "#/components/schemas/inv-project_unclaimed",
                   "not_implemented": "#/components/schemas/not_implemented",
                   "req.invalid": "#/components/schemas/req-invalid",
+                  "enc_key.unknown_alg": "#/components/schemas/enc_key-unknown_alg",
                   "unavailable": "#/components/schemas/unavailable"
                 }
               }
@@ -34803,8 +34976,23 @@
               "auth.unauthorized": {
                 "$ref": "#/components/examples/auth-unauthorized"
               },
+              "enc_key.decrypt_failed": {
+                "$ref": "#/components/examples/enc_key-decrypt_failed"
+              },
+              "enc_key.encrypt_failed": {
+                "$ref": "#/components/examples/enc_key-encrypt_failed"
+              },
+              "enc_key.not_found": {
+                "$ref": "#/components/examples/enc_key-not_found"
+              },
+              "evt.invalid": {
+                "$ref": "#/components/examples/evt-invalid"
+              },
               "internal": {
                 "$ref": "#/components/examples/internal"
+              },
+              "tkn.invalid": {
+                "$ref": "#/components/examples/tkn-invalid"
               },
               "inv.invalid": {
                 "$ref": "#/components/examples/inv-invalid"
@@ -34829,6 +35017,9 @@
               },
               "req.invalid": {
                 "$ref": "#/components/examples/req-invalid"
+              },
+              "enc_key.unknown_alg": {
+                "$ref": "#/components/examples/enc_key-unknown_alg"
               },
               "unavailable": {
                 "$ref": "#/components/examples/unavailable"
@@ -35139,6 +35330,9 @@
                   "$ref": "#/components/schemas/auth-unauthorized"
                 },
                 {
+                  "$ref": "#/components/schemas/evt-invalid"
+                },
+                {
                   "$ref": "#/components/schemas/internal"
                 },
                 {
@@ -35162,6 +35356,7 @@
                 "mapping": {
                   "auth.csrf_invalid": "#/components/schemas/auth-csrf_invalid",
                   "auth.unauthorized": "#/components/schemas/auth-unauthorized",
+                  "evt.invalid": "#/components/schemas/evt-invalid",
                   "internal": "#/components/schemas/internal",
                   "inv.not_found": "#/components/schemas/inv-not_found",
                   "inv.permission_denied": "#/components/schemas/inv-permission_denied",
@@ -35177,6 +35372,9 @@
               },
               "auth.unauthorized": {
                 "$ref": "#/components/examples/auth-unauthorized"
+              },
+              "evt.invalid": {
+                "$ref": "#/components/examples/evt-invalid"
               },
               "internal": {
                 "$ref": "#/components/examples/internal"
@@ -36530,6 +36728,15 @@
       }
     },
     "headers": {
+      "retry-after": {
+        "description": "Whole seconds to wait before retrying the request; at least 1. The server\nsends it with every 429 it answers itself; a 429 from a proxy or edge in\nfront of it may come without one.\n",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "example": 1
+      },
       "cache-control-private-no-store": {
         "description": "Prevents browsers and shared caches from storing session-specific responses.",
         "schema": {

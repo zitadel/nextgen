@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { Origins } from "@/lib/backend";
+
 import Deploy, { missingPrimaryOrigin } from "@/commands/deploy/index";
 import { parseFlag } from "@tests/helpers/inputs";
 
@@ -12,7 +13,6 @@ function outcomeFor(input: Partial<Parameters<typeof missingPrimaryOrigin>[0]>) 
     origins: Origins.wrap([]),
     issuer: ISSUER,
     setupProject: true,
-    suggest: (command) => `zitadel ${command}` as never,
     ...input,
   });
 }
@@ -21,8 +21,8 @@ describe("missingPrimaryOrigin", () => {
   it("suggests doctor --fix for setup's project holding its issuer as a preview origin", () => {
     const outcome = outcomeFor({ origins: PREVIEW_ISSUER });
 
-    expect(outcome.next).toEqual(["doctor --fix"]);
-    expect(outcome.hint).toContain("`zitadel doctor --fix`");
+    expect(outcome.next).toEqual([{ id: "doctor", flags: { fix: true } }]);
+    expect(outcome.hint).not.toContain("doctor --fix");
   });
 
   it("says why adding the preview issuer as primary does not work", () => {
@@ -35,10 +35,10 @@ describe("missingPrimaryOrigin", () => {
     const outcome = outcomeFor({ origins: PREVIEW_ISSUER, setupProject: false });
 
     expect(outcome.next).toEqual([
-      `origin rm ${ISSUER} --force`,
-      `origin add ${ISSUER} --kind primary`,
+      { id: "origin:rm", args: { pattern: ISSUER }, flags: { force: true } },
+      { id: "origin:add", args: { pattern: ISSUER }, flags: { kind: "primary" } },
     ]);
-    expect(outcome.hint).toContain(`zitadel origin add ${ISSUER} --kind primary`);
+    expect(outcome.hint).not.toContain("origin add");
   });
 
   it("suggests adding the issuer as primary when the project does not hold it", () => {
@@ -46,21 +46,23 @@ describe("missingPrimaryOrigin", () => {
       origins: Origins.wrap([{ pattern: "https://*-acme.vercel.app", kind: "preview" }]),
     });
 
-    expect(outcome.next).toEqual([`origin add ${ISSUER} --kind primary`]);
+    expect(outcome.next).toEqual([
+      { id: "origin:add", args: { pattern: ISSUER }, flags: { kind: "primary" } },
+    ]);
   });
 
   it("adds the issuer as its origin, without a trailing slash", () => {
     expect(outcomeFor({ issuer: `${ISSUER}/` }).next).toEqual([
-      `origin add ${ISSUER} --kind primary`,
+      { id: "origin:add", args: { pattern: ISSUER }, flags: { kind: "primary" } },
     ]);
   });
 
-  it("names origin add with a URL to fill in when no issuer resolves", () => {
-    expect(outcomeFor({ issuer: undefined }).hint).toContain("origin add <url> --kind primary");
+  it("asks for the URL the app serves from when no issuer resolves", () => {
+    expect(outcomeFor({ issuer: undefined }).hint).toContain("the URL the app serves from");
   });
 
   it("suggests origin list when no issuer resolves", () => {
-    expect(outcomeFor({ issuer: undefined }).next).toEqual(["origin list"]);
+    expect(outcomeFor({ issuer: undefined }).next).toEqual([{ id: "origin:list" }]);
   });
 });
 

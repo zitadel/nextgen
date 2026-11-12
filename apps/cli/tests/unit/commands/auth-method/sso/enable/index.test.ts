@@ -1,18 +1,13 @@
 import { chmod, mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { beforeEach, describe, expect, vi } from "vitest";
-
-vi.mock("@clack/prompts", async () => {
-  return (await import("@tests/helpers/clack")).clackDouble();
-});
-
-import { password, text } from "@clack/prompts";
-import { Errors } from "@oclif/core";
+import { Config, Errors } from "@oclif/core";
+import { describe, expect } from "vitest";
 
 import AuthMethodSsoEnable from "@/commands/auth-method/sso/enable";
 import { ZitadelError } from "@/lib/errors";
 import type { JsonObject } from "@/lib/zitadel";
+import { answering } from "@tests/helpers/keyboard";
 import { authMethodJson, authMethodText } from "@tests/helpers/auth-method";
 import {
   anOidcConnection,
@@ -34,8 +29,14 @@ import {
 } from "@tests/helpers/local-project";
 import { usePlatformServer } from "@tests/helpers/platform-project";
 import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
-import { useTerminal } from "@tests/helpers/terminal";
+import { cliPackageRoot } from "@tests/helpers/oclif-build";
+import { asOneLine, asTerminal } from "@tests/helpers/terminal";
 import { rejectionOf } from "@tests/helpers/thrown-value";
+
+/**
+ * The CLI's configuration, which a run reads the commands it suggests from.
+ */
+const CONFIG = await Config.load(cliPackageRoot);
 
 /**
  * The custom connection the tests describe.
@@ -86,7 +87,8 @@ function aSchemaWith(properties: JsonObject, required: string[] = []): JsonObjec
 const ANOTHER_CONNECTION = anOidcConnection({ slug: "something-else" });
 
 /**
- * The questions the command asks a person for a custom connection.
+ * The questions the command asks a person for a custom connection, as a person
+ * reads them.
  */
 const QUESTION = {
   slug: "What would you like to call this connection? It is used in your configuration, for example acme-sso.",
@@ -101,7 +103,7 @@ const QUESTION = {
 /**
  * The exit codes the CLI ends a refused run with.
  */
-const EXIT = { validation: 3, notFound: 4, conflict: 5 } as const;
+const EXIT = { validation: 3, notFound: 4, conflict: 5, interrupted: 130 } as const;
 
 /**
  * What a script names of a custom connection when it leaves out the rest.
@@ -119,6 +121,12 @@ const CUSTOM = ["sso", "enable", "--provider", "custom"] as const;
 const MISSING = "A custom connection needs --display-name, --issuer";
 
 /**
+ * What the person types for a connection that is already on disk: its slug,
+ * then the client id and the client secret.
+ */
+const SLUG_AND_CREDENTIALS = [ACME.slug, ACME.clientId, ACME.secret] as const;
+
+/**
  * The arguments of `auth-method sso enable --provider custom` run from source
  * against the Project in `cwd`.
  *
@@ -131,37 +139,30 @@ function customArgs(cwd: string, ...flags: string[]): string[] {
 }
 
 /**
- * Queues what the person types, in the order the questions come, and the
- * client secret they type last.
+ * `auth-method sso enable --provider custom` run by a person at a terminal who
+ * answers the questions in the order they come. A run that is refused does not
+ * throw out of here: its failure is handed back beside the questions the person
+ * was asked and everything else the run wrote, so a test can say what had been
+ * asked before the refusal.
  *
- * @param answers - The answers to the text questions.
+ * @param cwd - The Project.
+ * @param answers - What the person answers, one answer to each question.
+ * @param flags - The flags the person typed.
+ * @returns The failure, when the run was refused, the questions asked and what else was shown.
  */
-function typing(...answers: string[]): void {
-  for (const answer of answers) {
-    vi.mocked(text).mockResolvedValueOnce(answer);
-  }
-  vi.mocked(password).mockResolvedValueOnce(ACME.secret);
-}
-
-/**
- * Makes the person type the slug, then the client id to every later
- * question, and the client secret whenever it is asked for.
- */
-function typingTheSlugThenTheClientId(): void {
-  vi.mocked(text).mockResolvedValueOnce(ACME.slug);
-  vi.mocked(text).mockResolvedValue(ACME.clientId);
-  vi.mocked(password).mockResolvedValue(ACME.secret);
-}
-
-/**
- * Every question asked so far.
- *
- * @returns The questions, in the order they were asked.
- */
-function asked(): string[] {
-  return vi.mocked(text).mock.calls.map(([question]) => {
-    return question.message;
+async function enterCustom(
+  cwd: string,
+  answers: readonly string[],
+  ...flags: string[]
+): Promise<{ failure: unknown; shown: string; asked: string[] }> {
+  const talk = answering(...answers);
+  let failure: unknown;
+  await asTerminal(async () => {
+    failure = await rejectionOf(() => {
+      return AuthMethodSsoEnable.run(customArgs(cwd, ...flags), CONFIG);
+    });
   });
+  return { failure, shown: talk.plain(), asked: talk.asked() };
 }
 
 /**
@@ -220,44 +221,42 @@ async function aProjectWithAcme(
 }
 
 const { server } = usePlatformServer();
-useTerminal();
-
-beforeEach(() => {
-  vi.mocked(text).mockReset();
-  vi.mocked(password).mockReset();
-});
 
 describe("auth-method sso enable", () => {
   describe("with --provider custom at a terminal", () => {
-    it("asks for the connection's settings, then for its client id", async ({ dir }) => {
+    it("asks for the connection's settings, then for its credentials", async ({ dir }) => {
       const cwd = await setUpProject(dir);
-      typing(ACME.slug, ACME.displayName, ACME.issuer, "openid email", ACME.clientId);
 
-      await AuthMethodSsoEnable.run(customArgs(cwd));
+      const { asked } = await enterCustom(cwd, [
+        ACME.slug,
+        ACME.displayName,
+        ACME.issuer,
+        "openid email",
+        ACME.clientId,
+        ACME.secret,
+      ]);
 
-      expect(asked()).toEqual([
+      expect(asked).toEqual([
         QUESTION.slug,
         QUESTION.displayName,
         QUESTION.issuer,
         QUESTION.scopes,
         QUESTION.clientId,
+        QUESTION.secret,
       ]);
-    });
-
-    it("asks for the client secret, naming the variable it is stored as", async ({ dir }) => {
-      const cwd = await setUpProject(dir);
-      typing(ACME.slug, ACME.displayName, ACME.issuer, "openid email", ACME.clientId);
-
-      await AuthMethodSsoEnable.run(customArgs(cwd));
-
-      expect(password).toHaveBeenCalledWith(expect.objectContaining({ message: QUESTION.secret }));
     });
 
     it("writes the settings the person typed", async ({ dir }) => {
       const cwd = await setUpProject(dir);
-      typing(ACME.slug, ACME.displayName, ACME.issuer, "openid email", ACME.clientId);
 
-      await AuthMethodSsoEnable.run(customArgs(cwd));
+      await enterCustom(cwd, [
+        ACME.slug,
+        ACME.displayName,
+        ACME.issuer,
+        "openid email",
+        ACME.clientId,
+        ACME.secret,
+      ]);
 
       expect(await readJson(cwd, ACME.file)).toMatchObject({
         display_name: ACME.displayName,
@@ -267,41 +266,56 @@ describe("auth-method sso enable", () => {
 
     it("asks only for what the flags left out", async ({ dir }) => {
       const cwd = await setUpProject(dir);
-      typing(ACME.displayName, ACME.scopes, ACME.clientId);
 
-      await AuthMethodSsoEnable.run(customArgs(cwd, "--slug", ACME.slug, "--issuer", ACME.issuer));
+      const { asked } = await enterCustom(
+        cwd,
+        [ACME.displayName, ACME.scopes, ACME.clientId, ACME.secret],
+        "--slug",
+        ACME.slug,
+        "--issuer",
+        ACME.issuer,
+      );
 
-      expect(asked()).toEqual([QUESTION.displayName, QUESTION.scopes, QUESTION.clientId]);
+      expect(asked).toEqual([
+        QUESTION.displayName,
+        QUESTION.scopes,
+        QUESTION.clientId,
+        QUESTION.secret,
+      ]);
     });
 
     it("writes the issuer a flag gave", async ({ dir }) => {
       const cwd = await setUpProject(dir);
-      typing(ACME.displayName, ACME.scopes, ACME.clientId);
 
-      await AuthMethodSsoEnable.run(customArgs(cwd, "--slug", ACME.slug, "--issuer", ACME.issuer));
+      await enterCustom(
+        cwd,
+        [ACME.displayName, ACME.scopes, ACME.clientId, ACME.secret],
+        "--slug",
+        ACME.slug,
+        "--issuer",
+        ACME.issuer,
+      );
 
       expect(await readJson(cwd, ACME.file)).toMatchObject({ oidc: { issuer: ACME.issuer } });
     });
 
-    it("asks only for the client id when the flags gave every setting", async ({ dir }) => {
+    it("asks only for the credentials when the flags gave every setting", async ({ dir }) => {
       const cwd = await setUpProject(dir);
-      typing(ACME.clientId);
 
-      await AuthMethodSsoEnable.run(
-        customArgs(
-          cwd,
-          "--slug",
-          ACME.slug,
-          "--display-name",
-          ACME.displayName,
-          "--issuer",
-          ACME.issuer,
-          "--scopes",
-          ACME.scopes,
-        ),
+      const { asked } = await enterCustom(
+        cwd,
+        [ACME.clientId, ACME.secret],
+        "--slug",
+        ACME.slug,
+        "--display-name",
+        ACME.displayName,
+        "--issuer",
+        ACME.issuer,
+        "--scopes",
+        ACME.scopes,
       );
 
-      expect(asked()).toEqual([QUESTION.clientId]);
+      expect(asked).toEqual([QUESTION.clientId, QUESTION.secret]);
     });
   });
 
@@ -309,47 +323,53 @@ describe("auth-method sso enable", () => {
     it("refuses the flag as a validation failure", async ({ dir }) => {
       const cwd = await setUpProject(dir);
 
-      const error = await rejectionOf(() => {
-        return AuthMethodSsoEnable.run(customArgs(cwd, "--issuer", "not a url"));
-      });
+      const { failure } = await enterCustom(cwd, [], "--issuer", "not a url");
 
-      expect(error).toBeInstanceOf(Errors.ExitError);
-      expect(error).toMatchObject({ oclif: { exit: EXIT.validation } });
+      expect(failure).toBeInstanceOf(Errors.ExitError);
+      expect(failure).toMatchObject({ oclif: { exit: EXIT.validation } });
     });
 
     it("asks nothing first", async ({ dir }) => {
       const cwd = await setUpProject(dir);
 
-      await rejectionOf(() => {
-        return AuthMethodSsoEnable.run(customArgs(cwd, "--issuer", "not a url"));
-      });
+      const { asked } = await enterCustom(cwd, [], "--issuer", "not a url");
 
-      expect(text).not.toHaveBeenCalled();
+      expect(asked).toEqual([]);
     });
   });
 
   describe("when the typed slug names a provider", () => {
-    it("refuses it as a validation failure", async ({ dir }) => {
+    it("refuses the name where it is typed", async ({ dir }) => {
       const cwd = await setUpProject(dir);
-      typing("google");
 
-      const error = await rejectionOf(() => {
-        return AuthMethodSsoEnable.run(customArgs(cwd));
-      });
+      const { shown } = await enterCustom(cwd, ["google"]);
 
-      expect(error).toBeInstanceOf(Errors.ExitError);
-      expect(error).toMatchObject({ oclif: { exit: EXIT.validation } });
+      expect(shown).toContain('"google" is a built-in provider. Choose another name');
+    });
+
+    it("asks for the slug again", async ({ dir }) => {
+      const cwd = await setUpProject(dir);
+
+      const { shown } = await enterCustom(cwd, ["google", "google"]);
+
+      expect(shown.split('"google" is a built-in provider').length - 1).toBe(2);
+    });
+
+    it("ends the run when nobody answers again", async ({ dir }) => {
+      const cwd = await setUpProject(dir);
+
+      const { failure } = await enterCustom(cwd, ["google"]);
+
+      expect(failure).toBeInstanceOf(Errors.ExitError);
+      expect(failure).toMatchObject({ oclif: { exit: EXIT.interrupted } });
     });
 
     it("asks nothing after the slug", async ({ dir }) => {
       const cwd = await setUpProject(dir);
-      typing("google");
 
-      await rejectionOf(() => {
-        return AuthMethodSsoEnable.run(customArgs(cwd));
-      });
+      const { asked } = await enterCustom(cwd, ["google"]);
 
-      expect(asked()).toEqual([QUESTION.slug]);
+      expect([...new Set(asked)]).toEqual([QUESTION.slug]);
     });
   });
 
@@ -357,58 +377,38 @@ describe("auth-method sso enable", () => {
     it("refuses it as not found", async ({ dir }) => {
       const cwd = await setUpProject(dir);
 
-      const error = await rejectionOf(() => {
-        return AuthMethodSsoEnable.run(customArgs(cwd, "--schema", "nope"));
-      });
+      const { failure } = await enterCustom(cwd, [], "--schema", "nope");
 
-      expect(error).toBeInstanceOf(Errors.ExitError);
-      expect(error).toMatchObject({ oclif: { exit: EXIT.notFound } });
+      expect(failure).toBeInstanceOf(Errors.ExitError);
+      expect(failure).toMatchObject({ oclif: { exit: EXIT.notFound } });
     });
 
-    it.for([
-      ["text", text],
-      ["password", password],
-    ] as const)(
-      "asks no %s question, so nobody answers for nothing",
-      async ([_, prompt], { dir }) => {
-        const cwd = await setUpProject(dir);
+    it("asks no question, so nobody answers for nothing", async ({ dir }) => {
+      const cwd = await setUpProject(dir);
 
-        await rejectionOf(() => {
-          return AuthMethodSsoEnable.run(customArgs(cwd, "--schema", "nope"));
-        });
+      const { asked } = await enterCustom(cwd, [], "--schema", "nope");
 
-        expect(prompt).not.toHaveBeenCalled();
-      },
-    );
+      expect(asked).toEqual([]);
+    });
   });
 
   describe("when no login flow runs against the schema of an unlinked Project", () => {
     it("refuses it as not found", async ({ dir }) => {
       const cwd = await anUnlinkedProject(dir, { elsewhere: loginFlow("another-schema") });
 
-      const error = await rejectionOf(() => {
-        return AuthMethodSsoEnable.run(customArgs(cwd));
-      });
+      const { failure } = await enterCustom(cwd, []);
 
-      expect(error).toBeInstanceOf(Errors.ExitError);
-      expect(error).toMatchObject({ oclif: { exit: EXIT.notFound } });
+      expect(failure).toBeInstanceOf(Errors.ExitError);
+      expect(failure).toMatchObject({ oclif: { exit: EXIT.notFound } });
     });
 
-    it.for([
-      ["text", text],
-      ["password", password],
-    ] as const)(
-      "asks no %s question, not even to link the Project",
-      async ([_, prompt], { dir }) => {
-        const cwd = await anUnlinkedProject(dir, { elsewhere: loginFlow("another-schema") });
+    it("asks nothing, not even to link the Project", async ({ dir }) => {
+      const cwd = await anUnlinkedProject(dir, { elsewhere: loginFlow("another-schema") });
 
-        await rejectionOf(() => {
-          return AuthMethodSsoEnable.run(customArgs(cwd));
-        });
+      const { shown } = await enterCustom(cwd, []);
 
-        expect(prompt).not.toHaveBeenCalled();
-      },
-    );
+      expect(shown).toBe("");
+    });
   });
 
   describe("when the Project is not linked", () => {
@@ -417,12 +417,10 @@ describe("auth-method sso enable", () => {
         "default-human-user-login": loginFlow("default-human-user"),
       });
 
-      const error = await rejectionOf(() => {
-        return AuthMethodSsoEnable.run(customArgs(cwd));
-      });
+      const { failure } = await enterCustom(cwd, []);
 
-      expect(error).toBeInstanceOf(Errors.ExitError);
-      expect(error).toMatchObject({ code: "EEXIT" });
+      expect(failure).toBeInstanceOf(Errors.ExitError);
+      expect(failure).toMatchObject({ code: "EEXIT" });
     });
 
     it("asks for what the Project is missing", async ({ dir }) => {
@@ -430,11 +428,9 @@ describe("auth-method sso enable", () => {
         "default-human-user-login": loginFlow("default-human-user"),
       });
 
-      await rejectionOf(() => {
-        return AuthMethodSsoEnable.run(customArgs(cwd));
-      });
+      const { shown } = await enterCustom(cwd, []);
 
-      expect(asked()).not.toEqual([]);
+      expect(shown).not.toBe("");
     });
 
     it("asks for that before the connection's own settings", async ({ dir }) => {
@@ -442,11 +438,9 @@ describe("auth-method sso enable", () => {
         "default-human-user-login": loginFlow("default-human-user"),
       });
 
-      await rejectionOf(() => {
-        return AuthMethodSsoEnable.run(customArgs(cwd));
-      });
+      const { asked } = await enterCustom(cwd, []);
 
-      expect(asked()).not.toContain(QUESTION.slug);
+      expect(asked).not.toContain(QUESTION.slug);
     });
   });
 
@@ -458,12 +452,10 @@ describe("auth-method sso enable", () => {
       await mkdir(join(cwd, ".zitadel/idps"), { recursive: true });
       await writeFile(join(cwd, ".zitadel/idps/broken.json"), "{ not json");
 
-      const error = await rejectionOf(() => {
-        return AuthMethodSsoEnable.run(customArgs(cwd));
-      });
+      const { failure } = await enterCustom(cwd, []);
 
-      expect(error).toBeInstanceOf(Errors.ExitError);
-      expect(error).toMatchObject({ oclif: { exit: EXIT.validation } });
+      expect(failure).toBeInstanceOf(Errors.ExitError);
+      expect(failure).toMatchObject({ oclif: { exit: EXIT.validation } });
     });
 
     it("asks nothing, not even to link the Project", async ({ dir }) => {
@@ -473,11 +465,9 @@ describe("auth-method sso enable", () => {
       await mkdir(join(cwd, ".zitadel/idps"), { recursive: true });
       await writeFile(join(cwd, ".zitadel/idps/broken.json"), "{ not json");
 
-      await rejectionOf(() => {
-        return AuthMethodSsoEnable.run(customArgs(cwd));
-      });
+      const { shown } = await enterCustom(cwd, []);
 
-      expect(text).not.toHaveBeenCalled();
+      expect(shown).toBe("");
     });
   });
 
@@ -495,14 +485,11 @@ describe("auth-method sso enable", () => {
         flows: { "default-human-user-login": BROKEN_FLOW },
         linked: true,
       });
-      typing(ACME.slug);
 
-      const error = await rejectionOf(() => {
-        return AuthMethodSsoEnable.run(customArgs(cwd));
-      });
+      const { failure } = await enterCustom(cwd, [ACME.slug]);
 
-      expect(error).toBeInstanceOf(Errors.ExitError);
-      expect(error).toMatchObject({ oclif: { exit: EXIT.validation } });
+      expect(failure).toBeInstanceOf(Errors.ExitError);
+      expect(failure).toMatchObject({ oclif: { exit: EXIT.validation } });
     });
 
     it("asks nothing after the slug", async ({ dir }) => {
@@ -511,13 +498,10 @@ describe("auth-method sso enable", () => {
         flows: { "default-human-user-login": BROKEN_FLOW },
         linked: true,
       });
-      typing(ACME.slug);
 
-      await rejectionOf(() => {
-        return AuthMethodSsoEnable.run(customArgs(cwd));
-      });
+      const { asked } = await enterCustom(cwd, [ACME.slug]);
 
-      expect(asked()).toEqual([QUESTION.slug]);
+      expect(asked).toEqual([QUESTION.slug]);
     });
   });
 
@@ -526,27 +510,21 @@ describe("auth-method sso enable", () => {
       const cwd = await setUpProject(dir);
       await mkdir(join(cwd, ".zitadel/idps"), { recursive: true });
       await writeJson(cwd, ACME.file, ANOTHER_CONNECTION);
-      typing(ACME.slug);
 
-      const error = await rejectionOf(() => {
-        return AuthMethodSsoEnable.run(customArgs(cwd));
-      });
+      const { failure } = await enterCustom(cwd, [ACME.slug]);
 
-      expect(error).toBeInstanceOf(Errors.ExitError);
-      expect(error).toMatchObject({ oclif: { exit: EXIT.conflict } });
+      expect(failure).toBeInstanceOf(Errors.ExitError);
+      expect(failure).toMatchObject({ oclif: { exit: EXIT.conflict } });
     });
 
     it("asks nothing after the slug", async ({ dir }) => {
       const cwd = await setUpProject(dir);
       await mkdir(join(cwd, ".zitadel/idps"), { recursive: true });
       await writeJson(cwd, ACME.file, ANOTHER_CONNECTION);
-      typing(ACME.slug);
 
-      await rejectionOf(() => {
-        return AuthMethodSsoEnable.run(customArgs(cwd));
-      });
+      const { asked } = await enterCustom(cwd, [ACME.slug]);
 
-      expect(asked()).toEqual([QUESTION.slug]);
+      expect(asked).toEqual([QUESTION.slug]);
     });
   });
 
@@ -554,33 +532,28 @@ describe("auth-method sso enable", () => {
     it("refuses settings the flags left out, since a dry run never asks", async ({ dir }) => {
       const cwd = await setUpProject(dir);
 
-      const error = await rejectionOf(() => {
-        return AuthMethodSsoEnable.run(customArgs(cwd, "--dry-run"));
-      });
+      const { failure } = await enterCustom(cwd, [], "--dry-run");
 
-      expect(error).toBeInstanceOf(Errors.ExitError);
-      expect(error).toMatchObject({ oclif: { exit: EXIT.validation } });
+      expect(failure).toBeInstanceOf(Errors.ExitError);
+      expect(failure).toMatchObject({ oclif: { exit: EXIT.validation } });
     });
 
     it("asks nothing", async ({ dir }) => {
       const cwd = await setUpProject(dir);
 
-      await rejectionOf(() => {
-        return AuthMethodSsoEnable.run(customArgs(cwd, "--dry-run"));
-      });
+      const { asked } = await enterCustom(cwd, [], "--dry-run");
 
-      expect(text).not.toHaveBeenCalled();
+      expect(asked).toEqual([]);
     });
   });
 
   describe("with the connection on disk", () => {
     it("asks for the slug first", async ({ dir }) => {
       const cwd = await aProjectWithAcme(dir);
-      typingTheSlugThenTheClientId();
 
-      await AuthMethodSsoEnable.run(customArgs(cwd));
+      const { asked } = await enterCustom(cwd, SLUG_AND_CREDENTIALS);
 
-      expect(asked()[0]).toBe(QUESTION.slug);
+      expect(asked[0]).toBe(QUESTION.slug);
     });
 
     it.for([
@@ -589,18 +562,16 @@ describe("auth-method sso enable", () => {
       ["scopes", QUESTION.scopes],
     ] as const)("does not ask for the %s the file holds", async ([_, question], { dir }) => {
       const cwd = await aProjectWithAcme(dir);
-      typingTheSlugThenTheClientId();
 
-      await AuthMethodSsoEnable.run(customArgs(cwd));
+      const { asked } = await enterCustom(cwd, SLUG_AND_CREDENTIALS);
 
-      expect(asked()).not.toContain(question);
+      expect(asked).not.toContain(question);
     });
 
     it("writes no other connection file", async ({ dir }) => {
       const cwd = await aProjectWithAcme(dir);
-      typingTheSlugThenTheClientId();
 
-      await AuthMethodSsoEnable.run(customArgs(cwd));
+      await enterCustom(cwd, SLUG_AND_CREDENTIALS);
 
       expect(await readdir(join(cwd, ".zitadel/idps"))).toEqual(["acme-sso.json"]);
     });
@@ -608,9 +579,8 @@ describe("auth-method sso enable", () => {
     it("leaves the connection as it was", async ({ dir }) => {
       const cwd = await aProjectWithAcme(dir);
       const before = await readJson(cwd, ACME.file);
-      typingTheSlugThenTheClientId();
 
-      await AuthMethodSsoEnable.run(customArgs(cwd));
+      await enterCustom(cwd, SLUG_AND_CREDENTIALS);
 
       expect(await readJson(cwd, ACME.file)).toEqual(before);
     });
@@ -619,9 +589,8 @@ describe("auth-method sso enable", () => {
       const cwd = await aProjectWithAcme(dir);
       await writeJson(cwd, ".zitadel/idps/renamed.json", await readJson(cwd, ACME.file));
       await rm(join(cwd, ACME.file));
-      typingTheSlugThenTheClientId();
 
-      await AuthMethodSsoEnable.run(customArgs(cwd));
+      await enterCustom(cwd, SLUG_AND_CREDENTIALS);
 
       expect(await readdir(join(cwd, ".zitadel/idps"))).toEqual(["renamed.json"]);
     });
@@ -630,22 +599,25 @@ describe("auth-method sso enable", () => {
       dir,
     }) => {
       const cwd = await aProjectWithAcme(dir, { display_name: "   " });
-      typing(ACME.slug, ACME.clientId);
 
-      await AuthMethodSsoEnable.run(customArgs(cwd, "--display-name", ACME.displayName));
+      const { asked } = await enterCustom(
+        cwd,
+        SLUG_AND_CREDENTIALS,
+        "--display-name",
+        ACME.displayName,
+      );
 
-      expect(asked()).not.toContain(QUESTION.displayName);
+      expect(asked).not.toContain(QUESTION.displayName);
     });
 
     it("does not ask for stored scopes the rules refuse, since reuse never applies them", async ({
       dir,
     }) => {
       const cwd = await aProjectWithAcme(dir, { oidc: { scopes: ["profile"] } });
-      typingTheSlugThenTheClientId();
 
-      await AuthMethodSsoEnable.run(customArgs(cwd));
+      const { asked } = await enterCustom(cwd, SLUG_AND_CREDENTIALS);
 
-      expect(asked()).not.toContain(QUESTION.scopes);
+      expect(asked).not.toContain(QUESTION.scopes);
     });
   });
 
@@ -655,75 +627,67 @@ describe("auth-method sso enable", () => {
   ])("with a connection on disk holding %s", (_, overrides, exit) => {
     it("refuses it", async ({ dir }) => {
       const cwd = await aProjectWithAcme(dir, overrides);
-      typing(ACME.slug);
 
-      const error = await rejectionOf(() => {
-        return AuthMethodSsoEnable.run(customArgs(cwd));
-      });
+      const { failure } = await enterCustom(cwd, [ACME.slug]);
 
-      expect(error).toBeInstanceOf(Errors.ExitError);
-      expect(error).toMatchObject({ oclif: { exit } });
+      expect(failure).toBeInstanceOf(Errors.ExitError);
+      expect(failure).toMatchObject({ oclif: { exit } });
     });
 
     it("asks nothing after the slug", async ({ dir }) => {
       const cwd = await aProjectWithAcme(dir, overrides);
-      typing(ACME.slug);
 
-      await rejectionOf(() => {
-        return AuthMethodSsoEnable.run(customArgs(cwd));
-      });
+      const { asked } = await enterCustom(cwd, [ACME.slug]);
 
-      expect(asked()).toEqual([QUESTION.slug]);
+      expect(asked).toEqual([QUESTION.slug]);
     });
   });
 
   describe("with a connection on disk whose issuer the connection contract refuses", () => {
     it("refuses the project as not valid", async ({ dir }) => {
       const cwd = await aProjectWithAcme(dir, { oidc: { issuer: "not a url" } });
-      typing(ACME.slug);
 
-      const error = await rejectionOf(() => {
-        return AuthMethodSsoEnable.run(customArgs(cwd));
-      });
+      const { failure } = await enterCustom(cwd, [ACME.slug]);
 
-      expect(error).toBeInstanceOf(Errors.ExitError);
-      expect(error).toMatchObject({ oclif: { exit: EXIT.validation } });
+      expect(failure).toBeInstanceOf(Errors.ExitError);
+      expect(failure).toMatchObject({ oclif: { exit: EXIT.validation } });
     });
 
     it("asks nothing", async ({ dir }) => {
       const cwd = await aProjectWithAcme(dir, { oidc: { issuer: "not a url" } });
-      typing(ACME.slug);
 
-      await rejectionOf(() => {
-        return AuthMethodSsoEnable.run(customArgs(cwd));
-      });
+      const { asked } = await enterCustom(cwd, [ACME.slug]);
 
-      expect(text).not.toHaveBeenCalled();
+      expect(asked).toEqual([]);
     });
   });
 
   describe("with an --issuer other than the one the connection on disk holds", () => {
     it("refuses it as a conflict", async ({ dir }) => {
       const cwd = await aProjectWithAcme(dir);
-      typing(ACME.slug);
 
-      const error = await rejectionOf(() => {
-        return AuthMethodSsoEnable.run(customArgs(cwd, "--issuer", "https://elsewhere.example"));
-      });
+      const { failure } = await enterCustom(
+        cwd,
+        [ACME.slug],
+        "--issuer",
+        "https://elsewhere.example",
+      );
 
-      expect(error).toBeInstanceOf(Errors.ExitError);
-      expect(error).toMatchObject({ oclif: { exit: EXIT.conflict } });
+      expect(failure).toBeInstanceOf(Errors.ExitError);
+      expect(failure).toMatchObject({ oclif: { exit: EXIT.conflict } });
     });
 
     it("refuses it before asking anything after the slug", async ({ dir }) => {
       const cwd = await aProjectWithAcme(dir);
-      typing(ACME.slug);
 
-      await rejectionOf(() => {
-        return AuthMethodSsoEnable.run(customArgs(cwd, "--issuer", "https://elsewhere.example"));
-      });
+      const { asked } = await enterCustom(
+        cwd,
+        [ACME.slug],
+        "--issuer",
+        "https://elsewhere.example",
+      );
 
-      expect(asked()).toEqual([QUESTION.slug]);
+      expect(asked).toEqual([QUESTION.slug]);
     });
   });
 
@@ -962,7 +926,7 @@ describe("auth-method sso enable", () => {
         );
       });
 
-      expect(result.stdout).toContain(line);
+      expect(asOneLine(result.stdout)).toContain(line);
     });
 
     it("prints its notice after writing the file it describes", async ({ dir }) => {
@@ -985,8 +949,9 @@ describe("auth-method sso enable", () => {
         );
       });
 
-      expect(result.stdout.indexOf("When someone signs in with Acme SSO")).toBeGreaterThan(
-        result.stdout.indexOf(`Wrote ${ACME.file}`),
+      const output = asOneLine(result.stdout);
+      expect(output.indexOf("When someone signs in with Acme SSO")).toBeGreaterThan(
+        output.indexOf(`Wrote ${ACME.file}`),
       );
     });
 
@@ -1057,17 +1022,20 @@ describe("auth-method sso enable when the schema cannot be written", () => {
     try {
       failure = await withStdin(ACME.secret, () => {
         return rejectionOf(() => {
-          return AuthMethodSsoEnable.run([
-            ...customArgs(cwd),
-            "--slug",
-            ACME.slug,
-            "--display-name",
-            ACME.displayName,
-            "--issuer",
-            ACME.issuer,
-            "--client-id",
-            ACME.clientId,
-          ]);
+          return AuthMethodSsoEnable.run(
+            [
+              ...customArgs(cwd),
+              "--slug",
+              ACME.slug,
+              "--display-name",
+              ACME.displayName,
+              "--issuer",
+              ACME.issuer,
+              "--client-id",
+              ACME.clientId,
+            ],
+            CONFIG,
+          );
         });
       });
     } finally {

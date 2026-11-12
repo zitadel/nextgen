@@ -73,5 +73,17 @@ get:
         application/json:
           schema:
             $ref: ../../../components/error-details.yaml
+    '429':
+      description: |
+        The server is hashing or checking as many passwords as it allows right
+        now and could not take on another within its wait. Nothing was changed;
+        retry after the number of seconds in the `Retry-After` header.
+      headers:
+        Retry-After:
+          $ref: ../../../components/headers/retry-after.yaml
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/schemas/too-many-requests.yaml
     default:
       $ref: getFlowStep-error-response.yaml

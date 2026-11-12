@@ -15,7 +15,9 @@ export class VueDetector implements Detector {
   readonly versionFloor = "3.2";
 
   async detect(cwd: string): Promise<FrameworkFacts | null> {
-    const pkg = await readPackageJson(cwd).catch(() => undefined);
+    const pkg = await readPackageJson(cwd).catch(() => {
+      return undefined;
+    });
     if (
       !pkg ||
       hasDependency(pkg, "nuxt") ||

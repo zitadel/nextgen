@@ -17584,6 +17584,22 @@ func (s CancelInvitationErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case EvtInvalidCancelInvitationErrorResponse:
+		e.FieldStart("code")
+		e.Str("evt.invalid")
+		{
+			s := s.EvtInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case InternalCancelInvitationErrorResponse:
 		e.FieldStart("code")
 		e.Str("internal")
@@ -17712,6 +17728,9 @@ func (s *CancelInvitationErrorResponse) Decode(d *jx.Decoder) error {
 				case "auth.unauthorized":
 					s.Type = AuthUnauthorizedCancelInvitationErrorResponse
 					found = true
+				case "evt.invalid":
+					s.Type = EvtInvalidCancelInvitationErrorResponse
+					found = true
 				case "internal":
 					s.Type = InternalCancelInvitationErrorResponse
 					found = true
@@ -17750,6 +17769,10 @@ func (s *CancelInvitationErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case AuthUnauthorizedCancelInvitationErrorResponse:
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
+			return err
+		}
+	case EvtInvalidCancelInvitationErrorResponse:
+		if err := s.EvtInvalid.Decode(d); err != nil {
 			return err
 		}
 	case InternalCancelInvitationErrorResponse:
@@ -27162,11 +27185,91 @@ func (s CreateInvitationErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case EncKeyDecryptFailedCreateInvitationErrorResponse:
+		e.FieldStart("code")
+		e.Str("enc_key.decrypt_failed")
+		{
+			s := s.EncKeyDecryptFailed
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case EncKeyEncryptFailedCreateInvitationErrorResponse:
+		e.FieldStart("code")
+		e.Str("enc_key.encrypt_failed")
+		{
+			s := s.EncKeyEncryptFailed
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case EncKeyNotFoundCreateInvitationErrorResponse:
+		e.FieldStart("code")
+		e.Str("enc_key.not_found")
+		{
+			s := s.EncKeyNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case EvtInvalidCreateInvitationErrorResponse:
+		e.FieldStart("code")
+		e.Str("evt.invalid")
+		{
+			s := s.EvtInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case InternalCreateInvitationErrorResponse:
 		e.FieldStart("code")
 		e.Str("internal")
 		{
 			s := s.Internal
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case TknInvalidCreateInvitationErrorResponse:
+		e.FieldStart("code")
+		e.Str("tkn.invalid")
+		{
+			s := s.TknInvalid
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -27306,6 +27409,22 @@ func (s CreateInvitationErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case EncKeyUnknownAlgCreateInvitationErrorResponse:
+		e.FieldStart("code")
+		e.Str("enc_key.unknown_alg")
+		{
+			s := s.EncKeyUnknownAlg
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case UnavailableCreateInvitationErrorResponse:
 		e.FieldStart("code")
 		e.Str("unavailable")
@@ -27354,8 +27473,23 @@ func (s *CreateInvitationErrorResponse) Decode(d *jx.Decoder) error {
 				case "auth.unauthorized":
 					s.Type = AuthUnauthorizedCreateInvitationErrorResponse
 					found = true
+				case "enc_key.decrypt_failed":
+					s.Type = EncKeyDecryptFailedCreateInvitationErrorResponse
+					found = true
+				case "enc_key.encrypt_failed":
+					s.Type = EncKeyEncryptFailedCreateInvitationErrorResponse
+					found = true
+				case "enc_key.not_found":
+					s.Type = EncKeyNotFoundCreateInvitationErrorResponse
+					found = true
+				case "evt.invalid":
+					s.Type = EvtInvalidCreateInvitationErrorResponse
+					found = true
 				case "internal":
 					s.Type = InternalCreateInvitationErrorResponse
+					found = true
+				case "tkn.invalid":
+					s.Type = TknInvalidCreateInvitationErrorResponse
 					found = true
 				case "inv.invalid":
 					s.Type = InvInvalidCreateInvitationErrorResponse
@@ -27380,6 +27514,9 @@ func (s *CreateInvitationErrorResponse) Decode(d *jx.Decoder) error {
 					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidCreateInvitationErrorResponse
+					found = true
+				case "enc_key.unknown_alg":
+					s.Type = EncKeyUnknownAlgCreateInvitationErrorResponse
 					found = true
 				case "unavailable":
 					s.Type = UnavailableCreateInvitationErrorResponse
@@ -27406,8 +27543,28 @@ func (s *CreateInvitationErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
 			return err
 		}
+	case EncKeyDecryptFailedCreateInvitationErrorResponse:
+		if err := s.EncKeyDecryptFailed.Decode(d); err != nil {
+			return err
+		}
+	case EncKeyEncryptFailedCreateInvitationErrorResponse:
+		if err := s.EncKeyEncryptFailed.Decode(d); err != nil {
+			return err
+		}
+	case EncKeyNotFoundCreateInvitationErrorResponse:
+		if err := s.EncKeyNotFound.Decode(d); err != nil {
+			return err
+		}
+	case EvtInvalidCreateInvitationErrorResponse:
+		if err := s.EvtInvalid.Decode(d); err != nil {
+			return err
+		}
 	case InternalCreateInvitationErrorResponse:
 		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case TknInvalidCreateInvitationErrorResponse:
+		if err := s.TknInvalid.Decode(d); err != nil {
 			return err
 		}
 	case InvInvalidCreateInvitationErrorResponse:
@@ -27440,6 +27597,10 @@ func (s *CreateInvitationErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case ReqInvalidCreateInvitationErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case EncKeyUnknownAlgCreateInvitationErrorResponse:
+		if err := s.EncKeyUnknownAlg.Decode(d); err != nil {
 			return err
 		}
 	case UnavailableCreateInvitationErrorResponse:
@@ -27795,7 +27956,7 @@ func (s *CreateInvitationProjectMemberResponse) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("link")
-		json.EncodeURI(e, s.Link)
+		e.Str(s.Link)
 	}
 }
 
@@ -27964,8 +28125,8 @@ func (s *CreateInvitationProjectMemberResponse) Decode(d *jx.Decoder) error {
 		case "link":
 			requiredBitSet[1] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeURI(d)
-				s.Link = v
+				v, err := d.Str()
+				s.Link = string(v)
 				if err != nil {
 					return err
 				}
@@ -28312,7 +28473,7 @@ func (s CreateInvitationResponse) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("link")
-				json.EncodeURI(e, s.Link)
+				e.Str(s.Link)
 			}
 		}
 	case CreateInvitationTeamMemberResponseCreateInvitationResponse:
@@ -28380,7 +28541,7 @@ func (s CreateInvitationResponse) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("link")
-				json.EncodeURI(e, s.Link)
+				e.Str(s.Link)
 			}
 		}
 	}
@@ -28710,7 +28871,7 @@ func (s *CreateInvitationTeamMemberResponse) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("link")
-		json.EncodeURI(e, s.Link)
+		e.Str(s.Link)
 	}
 }
 
@@ -28879,8 +29040,8 @@ func (s *CreateInvitationTeamMemberResponse) Decode(d *jx.Decoder) error {
 		case "link":
 			requiredBitSet[1] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeURI(d)
-				s.Link = v
+				v, err := d.Str()
+				s.Link = string(v)
 				if err != nil {
 					return err
 				}
@@ -48643,6 +48804,22 @@ func (s FinishUserPasskeyRegistrationErrorResponse) encodeFields(e *jx.Encoder) 
 				}
 			}
 		}
+	case UserPasswordHashingBusyFinishUserPasskeyRegistrationErrorResponse:
+		e.FieldStart("code")
+		e.Str("user.password_hashing_busy")
+		{
+			s := s.UserPasswordHashingBusy
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case UserPasswordPolicyViolationFinishUserPasskeyRegistrationErrorResponse:
 		e.FieldStart("code")
 		e.Str("user.password_policy_violation")
@@ -48765,6 +48942,9 @@ func (s *FinishUserPasskeyRegistrationErrorResponse) Decode(d *jx.Decoder) error
 				case "user.password_empty":
 					s.Type = UserPasswordEmptyFinishUserPasskeyRegistrationErrorResponse
 					found = true
+				case "user.password_hashing_busy":
+					s.Type = UserPasswordHashingBusyFinishUserPasskeyRegistrationErrorResponse
+					found = true
 				case "user.password_policy_violation":
 					s.Type = UserPasswordPolicyViolationFinishUserPasskeyRegistrationErrorResponse
 					found = true
@@ -48850,6 +49030,10 @@ func (s *FinishUserPasskeyRegistrationErrorResponse) Decode(d *jx.Decoder) error
 		}
 	case UserPasswordEmptyFinishUserPasskeyRegistrationErrorResponse:
 		if err := s.UserPasswordEmpty.Decode(d); err != nil {
+			return err
+		}
+	case UserPasswordHashingBusyFinishUserPasskeyRegistrationErrorResponse:
+		if err := s.UserPasswordHashingBusy.Decode(d); err != nil {
 			return err
 		}
 	case UserPasswordPolicyViolationFinishUserPasskeyRegistrationErrorResponse:
@@ -62933,6 +63117,22 @@ func (s GetFlowStepErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case UserPasswordHashingBusyGetFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("user.password_hashing_busy")
+		{
+			s := s.UserPasswordHashingBusy
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case UserPasswordPolicyViolationGetFlowStepErrorResponse:
 		e.FieldStart("code")
 		e.Str("user.password_policy_violation")
@@ -63108,6 +63308,9 @@ func (s *GetFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 				case "user.password_empty":
 					s.Type = UserPasswordEmptyGetFlowStepErrorResponse
 					found = true
+				case "user.password_hashing_busy":
+					s.Type = UserPasswordHashingBusyGetFlowStepErrorResponse
+					found = true
 				case "user.password_policy_violation":
 					s.Type = UserPasswordPolicyViolationGetFlowStepErrorResponse
 					found = true
@@ -63282,6 +63485,10 @@ func (s *GetFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case UserPasswordEmptyGetFlowStepErrorResponse:
 		if err := s.UserPasswordEmpty.Decode(d); err != nil {
+			return err
+		}
+	case UserPasswordHashingBusyGetFlowStepErrorResponse:
+		if err := s.UserPasswordHashingBusy.Decode(d); err != nil {
 			return err
 		}
 	case UserPasswordPolicyViolationGetFlowStepErrorResponse:
@@ -106429,6 +106636,40 @@ func (s *OptUserPasswordEmptyDetails) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes UserPasswordHashingBusyDetails as json.
+func (o OptUserPasswordHashingBusyDetails) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes UserPasswordHashingBusyDetails from json.
+func (o *OptUserPasswordHashingBusyDetails) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptUserPasswordHashingBusyDetails to nil")
+	}
+	o.Set = true
+	o.Value = make(UserPasswordHashingBusyDetails)
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptUserPasswordHashingBusyDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptUserPasswordHashingBusyDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes UserPasswordPolicyViolationDetails as json.
 func (o OptUserPasswordPolicyViolationDetails) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -145368,6 +145609,22 @@ func (s SetUserPasswordErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case UserPasswordHashingBusySetUserPasswordErrorResponse:
+		e.FieldStart("code")
+		e.Str("user.password_hashing_busy")
+		{
+			s := s.UserPasswordHashingBusy
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case UserPasswordPolicyViolationSetUserPasswordErrorResponse:
 		e.FieldStart("code")
 		e.Str("user.password_policy_violation")
@@ -145493,6 +145750,9 @@ func (s *SetUserPasswordErrorResponse) Decode(d *jx.Decoder) error {
 				case "user.password_empty":
 					s.Type = UserPasswordEmptySetUserPasswordErrorResponse
 					found = true
+				case "user.password_hashing_busy":
+					s.Type = UserPasswordHashingBusySetUserPasswordErrorResponse
+					found = true
 				case "user.password_policy_violation":
 					s.Type = UserPasswordPolicyViolationSetUserPasswordErrorResponse
 					found = true
@@ -145582,6 +145842,10 @@ func (s *SetUserPasswordErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case UserPasswordEmptySetUserPasswordErrorResponse:
 		if err := s.UserPasswordEmpty.Decode(d); err != nil {
+			return err
+		}
+	case UserPasswordHashingBusySetUserPasswordErrorResponse:
+		if err := s.UserPasswordHashingBusy.Decode(d); err != nil {
 			return err
 		}
 	case UserPasswordPolicyViolationSetUserPasswordErrorResponse:
@@ -146778,6 +147042,22 @@ func (s SubmitFlowStepErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case UserPasswordHashingBusySubmitFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("user.password_hashing_busy")
+		{
+			s := s.UserPasswordHashingBusy
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case UserPasswordPolicyViolationSubmitFlowStepErrorResponse:
 		e.FieldStart("code")
 		e.Str("user.password_policy_violation")
@@ -146961,6 +147241,9 @@ func (s *SubmitFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 					found = true
 				case "user.password_empty":
 					s.Type = UserPasswordEmptySubmitFlowStepErrorResponse
+					found = true
+				case "user.password_hashing_busy":
+					s.Type = UserPasswordHashingBusySubmitFlowStepErrorResponse
 					found = true
 				case "user.password_policy_violation":
 					s.Type = UserPasswordPolicyViolationSubmitFlowStepErrorResponse
@@ -147148,6 +147431,10 @@ func (s *SubmitFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case UserPasswordEmptySubmitFlowStepErrorResponse:
 		if err := s.UserPasswordEmpty.Decode(d); err != nil {
+			return err
+		}
+	case UserPasswordHashingBusySubmitFlowStepErrorResponse:
+		if err := s.UserPasswordHashingBusy.Decode(d); err != nil {
 			return err
 		}
 	case UserPasswordPolicyViolationSubmitFlowStepErrorResponse:
@@ -150972,6 +151259,97 @@ func (s TknInvalidTknidDetails) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *TknInvalidTknidDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes TooManyRequests as json.
+func (s TooManyRequests) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+func (s TooManyRequests) encodeFields(e *jx.Encoder) {
+	switch s.Type {
+	case UserPasswordHashingBusyTooManyRequests:
+		e.FieldStart("code")
+		e.Str("user.password_hashing_busy")
+		{
+			s := s.UserPasswordHashingBusy
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	}
+}
+
+// Decode decodes TooManyRequests from json.
+func (s *TooManyRequests) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode TooManyRequests to nil")
+	}
+	// Sum type discriminator.
+	if typ := d.Next(); typ != jx.Object {
+		return errors.Errorf("unexpected json type %q", typ)
+	}
+
+	var found bool
+	if err := d.Capture(func(d *jx.Decoder) error {
+		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
+			if found {
+				return d.Skip()
+			}
+			switch string(key) {
+			case "code":
+				typ, err := d.Str()
+				if err != nil {
+					return err
+				}
+				switch typ {
+				case "user.password_hashing_busy":
+					s.Type = UserPasswordHashingBusyTooManyRequests
+					found = true
+				default:
+					return errors.Errorf("unknown type %s", typ)
+				}
+				return nil
+			}
+			return d.Skip()
+		})
+	}); err != nil {
+		return errors.Wrap(err, "capture")
+	}
+	if !found {
+		return errors.New("unable to detect sum type variant")
+	}
+	switch s.Type {
+	case UserPasswordHashingBusyTooManyRequests:
+		if err := s.UserPasswordHashingBusy.Decode(d); err != nil {
+			return err
+		}
+	default:
+		return errors.Errorf("inferred invalid type: %s", s.Type)
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s TooManyRequests) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *TooManyRequests) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -156824,6 +157202,194 @@ func (s *UserPasswordEmptyDetails) UnmarshalJSON(data []byte) error {
 }
 
 // Encode implements json.Marshaler.
+func (s *UserPasswordHashingBusy) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *UserPasswordHashingBusy) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("code")
+		e.Str("user.password_hashing_busy")
+	}
+	{
+		e.FieldStart("message")
+		e.Str(s.Message)
+	}
+	{
+		if s.Details.Set {
+			e.FieldStart("details")
+			s.Details.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfUserPasswordHashingBusy = [3]string{
+	0: "code",
+	1: "message",
+	2: "details",
+}
+
+// Decode decodes UserPasswordHashingBusy from json.
+func (s *UserPasswordHashingBusy) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode UserPasswordHashingBusy to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "code":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.Code = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"code\"")
+			}
+		case "message":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := d.Str()
+				s.Message = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"message\"")
+			}
+		case "details":
+			if err := func() error {
+				s.Details.Reset()
+				if err := s.Details.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"details\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode UserPasswordHashingBusy")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfUserPasswordHashingBusy) {
+					name = jsonFieldsNameOfUserPasswordHashingBusy[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *UserPasswordHashingBusy) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *UserPasswordHashingBusy) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s UserPasswordHashingBusyDetails) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields implements json.Marshaler.
+func (s UserPasswordHashingBusyDetails) encodeFields(e *jx.Encoder) {
+	for k, elem := range s {
+		e.FieldStart(k)
+
+		if len(elem) != 0 {
+			e.Raw(elem)
+		}
+	}
+}
+
+// Decode decodes UserPasswordHashingBusyDetails from json.
+func (s *UserPasswordHashingBusyDetails) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode UserPasswordHashingBusyDetails to nil")
+	}
+	m := s.init()
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		var elem jx.Raw
+		if err := func() error {
+			v, err := d.RawAppend(nil)
+			elem = jx.Raw(v)
+			if err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrapf(err, "decode field %q", k)
+		}
+		m[string(k)] = elem
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode UserPasswordHashingBusyDetails")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s UserPasswordHashingBusyDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *UserPasswordHashingBusyDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
 func (s *UserPasswordPolicyViolation) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
@@ -162572,6 +163138,22 @@ func (s VerifyChallengeProofErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case UserPasswordHashingBusyVerifyChallengeProofErrorResponse:
+		e.FieldStart("code")
+		e.Str("user.password_hashing_busy")
+		{
+			s := s.UserPasswordHashingBusy
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case UserPasswordPolicyViolationVerifyChallengeProofErrorResponse:
 		e.FieldStart("code")
 		e.Str("user.password_policy_violation")
@@ -162681,6 +163263,9 @@ func (s *VerifyChallengeProofErrorResponse) Decode(d *jx.Decoder) error {
 				case "user.password_empty":
 					s.Type = UserPasswordEmptyVerifyChallengeProofErrorResponse
 					found = true
+				case "user.password_hashing_busy":
+					s.Type = UserPasswordHashingBusyVerifyChallengeProofErrorResponse
+					found = true
 				case "user.password_policy_violation":
 					s.Type = UserPasswordPolicyViolationVerifyChallengeProofErrorResponse
 					found = true
@@ -162767,6 +163352,10 @@ func (s *VerifyChallengeProofErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case UserPasswordEmptyVerifyChallengeProofErrorResponse:
 		if err := s.UserPasswordEmpty.Decode(d); err != nil {
+			return err
+		}
+	case UserPasswordHashingBusyVerifyChallengeProofErrorResponse:
+		if err := s.UserPasswordHashingBusy.Decode(d); err != nil {
 			return err
 		}
 	case UserPasswordPolicyViolationVerifyChallengeProofErrorResponse:

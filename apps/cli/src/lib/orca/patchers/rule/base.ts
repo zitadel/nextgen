@@ -142,7 +142,9 @@ export abstract class AbstractRulePatcher implements Patcher {
             }
             if (op.kind === "edit" && op.overwrites) {
               const candidates = typeof op.path === "string" ? [op.path] : op.path;
-              return !candidates.some((candidate) => excluded.has(candidate));
+              return !candidates.some((candidate) => {
+                return excluded.has(candidate);
+              });
             }
             return true;
           });
@@ -240,10 +242,9 @@ export abstract class AbstractRulePatcher implements Patcher {
       configEdits: this.routeConfigEdits(view),
       guidanceFiles: ["AGENTS.md", "README.md"],
       fileClasses: Object.fromEntries(
-        markedFiles.map((path) => [
-          path,
-          infrastructure.has(path) ? "infrastructure" : "presentation",
-        ]),
+        markedFiles.map((path) => {
+          return [path, infrastructure.has(path) ? "infrastructure" : "presentation"];
+        }),
       ),
       conditionalFiles: this.conditionallyScaffoldedFiles(view),
       retiredAlternates: this.retiredAlternateFiles(view),
@@ -425,12 +426,16 @@ function guidanceOps(ctx: PatchContext): FileOp[] {
     {
       kind: "edit",
       path: "AGENTS.md",
-      edit: (source) => upsertGuidanceSection(source, agentsGuidanceSection(ctx), AGENTS_HEADER),
+      edit: (source) => {
+        return upsertGuidanceSection(source, agentsGuidanceSection(ctx), AGENTS_HEADER);
+      },
     },
     {
       kind: "edit",
       path: "README.md",
-      edit: (source) => upsertGuidanceSection(source, readmeGuidanceSection(ctx), README_HEADER),
+      edit: (source) => {
+        return upsertGuidanceSection(source, readmeGuidanceSection(ctx), README_HEADER);
+      },
     },
   ];
 }

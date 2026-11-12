@@ -1,7 +1,7 @@
-import { DeploymentService } from "@/lib/backend";
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
+import { DeploymentService } from "@/lib/backend";
 import {
   type Admitted,
   CommandGroups,
@@ -10,11 +10,8 @@ import {
   nonBlankString,
 } from "@/lib/oclif";
 import { reads, type Refused, whole } from "@/lib/oclif/flags";
+import { relatedFlags } from "@/lib/suggestion/relations";
 import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
-import { Cmd } from "@/lib/cmd";
-
-/** The columns `list` renders, in order. */
-const COLUMNS = ["id", "release_id", "reason", "origins", "deployed_at"] as const;
 
 /** The page sizes the server accepts, quoted by the refusal and the reference. */
 const LIMIT_MIN = 1;
@@ -33,6 +30,8 @@ const LIMIT: Refused<number> = {
   },
 };
 
+const COLUMNS = ["id", "release_id", "reason", "origins", "deployed_at"] as const;
+
 /**
  * `zitadel deployment list` — show the project's deployment history.
  *
@@ -45,36 +44,38 @@ const LIMIT: Refused<number> = {
 export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
   static override description = "List the project's deployments, newest first.";
   static override group = CommandGroups.configuration;
+
   static override examples = [
     "<%= config.bin %> deployment list",
     "<%= config.bin %> deployment list --all",
     "<%= config.bin %> deployment list --live",
     "<%= config.bin %> deployment list --origin https://app.acme.com",
   ];
-  static override flags = {
-    origin: nonBlankString({ description: "Only deployments that targeted this origin." }),
-    live: Flags.boolean({ description: "What each target serves now, not the full history." }),
-    limit: Flags.custom<number>({
-      parse: reads(LIMIT),
-    })({
-      min: LIMIT_MIN,
-      max: LIMIT_MAX,
-      description: "Page size (server default 20, max 100).",
-    }),
-    "page-token": nonBlankString({
-      description: "Continue from a previous page's next_page_token.",
-    }),
-    all: Flags.boolean({
-      char: "a",
-      description: "Fetch every page instead of one.",
-      exclusive: ["page-token"],
-    }),
-    plain: plainFlag,
-  };
+  static override flags = relatedFlags(
+    {
+      origin: nonBlankString({ description: "Only deployments that targeted this origin." }),
+      live: Flags.boolean({ description: "What each target serves now, not the full history." }),
+      limit: Flags.custom<number>({
+        parse: reads(LIMIT),
+      })({
+        min: LIMIT_MIN,
+        max: LIMIT_MAX,
+        description: "Page size (server default 20, max 100).",
+      }),
+      "page-token": nonBlankString({
+        description: "Continue from a previous page's next_page_token.",
+      }),
+      all: Flags.boolean({
+        char: "a",
+        description: "Fetch every page instead of one.",
+      }),
+      plain: plainFlag,
+    },
+    { all: { exclusive: ["page-token"] } },
+  );
 
   protected async execute({ flags }: Admitted<typeof DeploymentList>): Promise<JsonEnvelope> {
     const { client, projectId } = await this.connect();
-
     const deploymentService = new DeploymentService(client, projectId);
     const listed = await deploymentService.page(
       {
@@ -89,28 +90,20 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
     );
 
     const items = listed.items;
-    // Flatten each deployment's targets to one `origins` cell for the table.
     const rows = items.map((deployment) => {
       return {
         id: deployment.id,
         release_id: deployment.release_id,
-        reason: deployment.metadata.reason,
+        reason: deployment.reason ?? "deploy",
         origins: deployment.origins.join(", "),
         deployed_at: deployment.deployed_at,
       };
     });
-
     const columns = COLUMNS;
-    const empty = "No deployments yet.";
+    const empty = "No deployments found";
     const footer: string[] = [];
     const page = {
       token: listed.next,
-      command: "deployment list",
-      flags: [
-        ...(flags.origin === undefined ? [] : [Cmd.option("--origin", flags.origin)]),
-        ...(flags.live ? ["--live"] : []),
-        ...(flags.limit === undefined ? [] : [`--limit ${flags.limit}`]),
-      ],
     };
     const extra = {};
 

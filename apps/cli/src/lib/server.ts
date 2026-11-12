@@ -12,6 +12,23 @@ import { DEFAULT_SERVER } from "@zitadel/config/server";
  */
 export { DEFAULT_SERVER } from "@zitadel/config/server";
 
+/**
+ * The host of a server, for an ending that says where a run happened, or
+ * `undefined` for the default server, which a reader does not need told, and
+ * for an address that is not a URL.
+ *
+ * @param server - The server's address.
+ * @returns The host, or `undefined` when there is nothing to say.
+ */
+export function hostUnlessDefault(server: string): string | undefined {
+  try {
+    const { host } = new URL(server);
+    return host === new URL(DEFAULT_SERVER).host ? undefined : host;
+  } catch {
+    return undefined;
+  }
+}
+
 /** The variable {@link resolveServer} reads when `--server` is not given. */
 export const SERVER_VARIABLE: FlagVariable = {
   name: "ZITADEL_API_BASE",
@@ -65,12 +82,21 @@ export async function resolveServer(input: ResolveServerInput): Promise<Resolved
 export function parseServer(value: string): Parsed<string> {
   const typed = value.trim();
   if (typed === "") {
-    return { ok: false, problem: "Enter the server URL." };
+    return {
+      ok: false,
+      problem: "The server URL cannot be empty",
+    };
   }
   try {
-    return { ok: true, value: serverOrigin(typed) };
+    return {
+      ok: true,
+      value: serverOrigin(typed),
+    };
   } catch (error) {
-    return { ok: false, problem: errorMessage(error) };
+    return {
+      ok: false,
+      problem: errorMessage(error),
+    };
   }
 }
 
