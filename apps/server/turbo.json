@@ -149,6 +149,10 @@
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "passThroughEnv": ["ZITADEL_TEST_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
+    // Its packages get 45 minutes each (the script's -timeout; spanner.yml's
+    // job allows 60): the migration round trip applies every migration's Up
+    // once per walk, about 20 minutes for 53 migrations on Omni, and grows
+    // with each one.
     "test:spanner": {
       "cache": false,
       "dependsOn": ["go-sources", "go-tests", "@zitadel/console#build"],
