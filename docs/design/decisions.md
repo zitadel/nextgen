@@ -1,7 +1,7 @@
 # Design Decisions
 
 > [!NOTE]
-> The [Console UI pattern guides](console/ui-patterns/README.md) are the approved design reference for reusable UI/UX patterns. Feature-specific and historical product decisions remain in this log while their current rules are mapped into the relevant specifications or ADRs. **This document remains active; it is not archived by this PR.**
+> The [Console UI pattern guides](console/ui-patterns/README.md) are the approved design reference for reusable UI/UX patterns. Feature-specific and historical product decisions remain in this log while their current rules are mapped into the relevant specifications or ADRs. **This log remains active; it is not archived.**
 
 ---
 
