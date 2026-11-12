@@ -191,13 +191,22 @@ func (s *GrantService) EnsureUserGrant(ctx context.Context, stmts AllStatements,
 	if _, ok := allowedGrantRelations[relation]; !ok {
 		return domain.ErrGrantInvalid().WithDetails("relation must be viewer, editor, or admin")
 	}
+	// The same active, platform-homed principal check as Create.
+	home, err := s.resolvePrincipalHome(ctx, stmts, domain.AuthzPrincipalTypeUser, userID)
+	if err != nil {
+		return err
+	}
+	if err := s.loadPrincipal(ctx, stmts, home, domain.AuthzPrincipalTypeUser, userID); err != nil {
+		return err
+	}
 	held, err := stmts.ListAuthzAssignments(ctx, projectID, domain.AuthzPrincipalTypeUser, userID, false)
 	if err != nil {
 		return err
 	}
 	var expired []*domain.AuthzAssignment
 	for _, asgn := range held {
-		if !isManagedGrant(asgn) || asgn.Relation != relation {
+		// Delegated rows sit outside the unique binding the write targets.
+		if !isManagedGrant(asgn) || asgn.DelegationID != nil || asgn.Relation != relation {
 			continue
 		}
 		if asgn.ExpiresAt == nil || now.Before(*asgn.ExpiresAt) {

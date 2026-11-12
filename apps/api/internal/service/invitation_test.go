@@ -651,6 +651,16 @@ func TestInvitationService_Accept(t *testing.T) {
 			wantCreate: true,
 			wantEvents: []domain.EventType{domain.EventTypeAuthzRevoked, domain.EventTypeAuthzGranted, domain.EventTypeInvitationAccepted},
 		},
+		{
+			name: "a delegated grant of the same relation: creates the direct one",
+			held: []*domain.AuthzAssignment{func() *domain.AuthzAssignment {
+				asgn := managed("asgn_delegated", "admin", nil)
+				asgn.DelegationID = new("dlg_1")
+				return asgn
+			}()},
+			wantCreate: true,
+			wantEvents: []domain.EventType{domain.EventTypeAuthzGranted, domain.EventTypeInvitationAccepted},
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -659,6 +669,7 @@ func TestInvitationService_Accept(t *testing.T) {
 			entity := pendingInvitation(new("user_admin"))
 			expectInvitationByToken(s, entity)
 			expectClaimedProject(s, invitationProjectID)
+			expectActiveUserPrincipal(s, accepter)
 			s.EXPECT().ListAuthzAssignments(gomock.Any(), invitationProjectID, domain.AuthzPrincipalTypeUser, accepter, false).Return(tc.held, nil)
 			if tc.revokes != "" {
 				s.EXPECT().RevokeAuthzAssignment(gomock.Any(), invitationProjectID, tc.revokes).Return(nil)
@@ -726,6 +737,20 @@ func TestInvitationService_Accept(t *testing.T) {
 			wantErr: domain.ErrInvitationInviterNotAdmin(),
 		},
 		{
+			name: "an accepting user no longer active",
+			setup: func(s *servicemocks.MockAllStatements, entity *domain.Invitation) {
+				expectClaimedProject(s, invitationProjectID)
+				expectStatusChange(s, entity, domain.InvitationStatusAccepted, new(accepter))
+				s.EXPECT().GetResourceScope(gomock.Any(), accepter).Return(&domain.ResourceScope{
+					ResourceID:   accepter,
+					ResourceKind: domain.ResourceKindUser,
+					ProjectID:    grantPlatformProjID,
+				}, nil)
+				s.EXPECT().GetUser(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, database.NewNoRowFoundError(nil))
+			},
+			wantErr: domain.ErrAuthUnauthorized(nil),
+		},
+		{
 			name: "a decline or accept that won the race",
 			setup: func(s *servicemocks.MockAllStatements, entity *domain.Invitation) {
 				// The loser misses on the status change and writes no grant.
@@ -763,6 +788,7 @@ func TestInvitationService_Accept(t *testing.T) {
 		entity := pendingInvitation(nil)
 		expectInvitationByToken(s, entity)
 		expectClaimedProject(s, invitationProjectID)
+		expectActiveUserPrincipal(s, accepter)
 		s.EXPECT().ListAuthzAssignments(gomock.Any(), invitationProjectID, domain.AuthzPrincipalTypeUser, accepter, false).Return(nil, nil)
 		s.EXPECT().CreateAuthzAssignment(gomock.Any(), gomock.Any()).Return(nil)
 		expectStatusChange(s, entity, domain.InvitationStatusAccepted, new(accepter))

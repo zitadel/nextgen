@@ -383,6 +383,10 @@ func (s *InvitationService) grantInvited(ctx context.Context, stmts AllStatement
 		if errors.Is(err, domain.ErrGrantInvalid()) {
 			return domain.ErrInternal(err).WithMessage("invitation holds an invalid relation")
 		}
+		// The session's user is gone or no longer active.
+		if errors.Is(err, domain.ErrGrantPrincipalNotFound()) {
+			return domain.ErrAuthUnauthorized(err)
+		}
 		return err
 	default:
 		return domain.ErrNotImplemented()
