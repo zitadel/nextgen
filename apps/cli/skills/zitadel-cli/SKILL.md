@@ -326,7 +326,9 @@ Each invocation prints one JSON object:
   `-m`) and repeats the `--cwd`, `--env`, `--env-file` and `--server` the run was
   given (the environment ones only for a command that takes them), so following
   it acts on the same project. A retry or a dry run's real command keeps every
-  flag the run was given.
+  flag the run was given except those that only say how it answers
+  (`--json`, `--non-interactive`, `--no-color`, `--verbose`, `--debug`,
+  `--no-telemetry`); add `--non-interactive --json` when you run one.
 - A command named in a `hint`, a `warning` or a `next_actions` line is written
   the same way `next_commands` writes it — `npx @zitadel/cli@<version> …`,
   unquoted — so prose and follow-up never name the same command two ways.
