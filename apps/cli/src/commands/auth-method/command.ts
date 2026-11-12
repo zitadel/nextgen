@@ -375,6 +375,8 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
    *
    * @param target - What the run read.
    * @param make - Makes the change, with or without `force`.
+   * @param naming - The flags that name what the change is to, ahead of the
+   *   schema in the re-run it suggests (`--provider`).
    * @returns The change with the consent that allows it, or `undefined` when
    *   the person said no.
    * @throws {@link ZitadelError} With `E_CONFIRMATION_REQUIRED` when nobody can
@@ -383,6 +385,7 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
   protected async confirmIfNoSignInLeft(
     target: SchemaTarget,
     make: (options: ForceOptions) => Change,
+    naming: Readonly<Record<string, unknown>> = {},
   ): Promise<ConfirmedChange | undefined> {
     try {
       return {
@@ -400,7 +403,9 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
       // The run again with --force, on the schema it resolved (a dry run's stays
       // a preview, since --force with --dry-run writes nothing), then enabling
       // each method the schema could take instead.
-      const retry = await this.rerun({ with: { force: true, schema: target.schemaFlag } });
+      const retry = await this.rerun({
+        with: { ...naming, schema: target.schemaFlag, force: true },
+      });
       const suggested = [
         retry,
         ...error.alternatives.flatMap((method) => {

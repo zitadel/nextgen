@@ -62,9 +62,13 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
     const config = target.config;
     const schema = target.schema;
     const provider = flags.provider ?? this.refuseUnnamedProvider(schema);
-    const confirmed = await this.confirmIfNoSignInLeft(target, (options) => {
-      return config.connections.disable(schema, provider, options);
-    });
+    const confirmed = await this.confirmIfNoSignInLeft(
+      target,
+      (options) => {
+        return config.connections.disable(schema, provider, options);
+      },
+      { provider },
+    );
     if (confirmed === undefined) {
       return this.emit({
         status: "skipped",

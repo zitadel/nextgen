@@ -127,6 +127,19 @@ export function renderNextSteps(next: NextSteps): string {
  */
 const CREDENTIALS = /(\w+:\/\/)[^/?#\s]*@/g;
 
+/**
+ * Flags that say how a run answers, never what it does, so a rebuilt command
+ * leaves them out: the person or agent following it answers its own way.
+ */
+const ANSWERING: readonly string[] = [
+  "json",
+  "nonInteractive",
+  "color",
+  "debug",
+  "verbose",
+  "telemetry",
+];
+
 /** What a {@link RunSuggestions} reads off the run it renders for. */
 export type SuggestingRun = Readonly<{
   /** Finds what a command declares, by id: oclif's config. */
@@ -213,7 +226,7 @@ export class RunSuggestions {
   /**
    * The running command again, rebuilt from its command line as oclif parsed
    * it rather than as typed. A flag that only says how the run answered
-   * (`--json`, `--non-interactive`) and the scope the renderer puts back on are
+   * (`--json`, `--non-interactive`, `--no-color`, …) and the scope the renderer puts back on are
    * left out, and a URL's credentials never reach the command. Arguments that
    * read as flags go last, after a `--`.
    *
@@ -242,7 +255,7 @@ export class RunSuggestions {
     // put back stays as typed: a command that chooses no environment keeps its
     // own `--server`.
     const rescoped = target.flags.has("env-file") ? ["cwd", "server", "env", "envFile"] : ["cwd"];
-    const dropped = new Set([...rescoped, "json", "nonInteractive", ...(change.without ?? [])]);
+    const dropped = new Set([...rescoped, ...ANSWERING, ...(change.without ?? [])]);
     const typed: Record<string, unknown> = {};
     for (const token of raw) {
       if (token.type !== "flag" || dropped.has(named(token.flag))) {

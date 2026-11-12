@@ -98,6 +98,8 @@ describe("a suggestion", () => {
   it("does not compile with a flag whose dependsOn is left out", () => {
     // @ts-expect-error --force depends on --fix
     checked({ id: "doctor", flags: { force: true } });
+    // @ts-expect-error --fix given off does not satisfy it
+    checked({ id: "doctor", flags: { force: true, fix: false } });
 
     expect(checked({ id: "doctor", flags: { fix: true, force: true } })).toBeDefined();
   });
@@ -137,6 +139,15 @@ describe("distinct", () => {
       logs,
       { id: "stop", flags: { all: true } },
     ]);
+  });
+
+  it("reads two suggestions written in a different order as the same", () => {
+    expect(
+      distinct([
+        { id: "variable:get", args: { name: "A" } },
+        { args: { name: "A" }, id: "variable:get" },
+      ]),
+    ).toHaveLength(1);
   });
 
   it("keeps two suggestions of one command with different input", () => {
@@ -303,6 +314,14 @@ describe("suggestionWords", () => {
     expect(() => {
       return suggestionWords("setup", { flags: { message: "m" } }, LOCAL, {});
     }).toThrow("setup declares no --message");
+  });
+
+  it("refuses an argument given after one it leaves out, which would be read in its place", () => {
+    const pair: Declared = { flags: new Map(), args: ["source", "target"] };
+
+    expect(() => {
+      return suggestionWords("copy", { args: { target: "b" } }, pair, {});
+    }).toThrow("copy takes its target only after its source");
   });
 
   it("refuses an argument the target does not declare", () => {

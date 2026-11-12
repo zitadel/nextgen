@@ -3835,7 +3835,11 @@ describe("setupRetryFlags", () => {
   it("keeps the flags in command-line order, ending with the server", () => {
     const retry = setupRetryFlags({ framework: "next", devPort: 3001, passwordMinLength: 12 });
 
-    expect(Object.keys(retry)).toEqual(["framework", "devPort", "passwordMinLength", "server"]);
+    const given = Object.entries(retry).flatMap(([name, value]) => {
+      return value === undefined ? [] : [name];
+    });
+
+    expect(given).toEqual(["framework", "devPort", "passwordMinLength", "server"]);
   });
 
   it.each([

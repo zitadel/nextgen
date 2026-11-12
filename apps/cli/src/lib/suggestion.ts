@@ -155,7 +155,11 @@ type Dependencies<Class> = AllOf<
     [Key in keyof Relations<Class>]: Relations<Class>[Key] extends {
       readonly dependsOn: readonly (infer Needed extends string)[];
     }
-      ? [Absent<Key & string> | { readonly [Name in Needed as Named<Name>]: unknown }]
+      ? [
+          | Absent<Key & string>
+          // Given, and given on: a switch that is off does not satisfy it.
+          | { readonly [Name in Needed as Named<Name>]: Exclude<Renderable, false> },
+        ]
       : never;
   }[keyof Relations<Class>]
 >;
@@ -348,7 +352,7 @@ export function distinct(suggested: readonly Suggested[]): Suggested[] {
   const seen = new Set<string>();
 
   return suggested.filter((next) => {
-    const key = isSuggestion(next) ? JSON.stringify(next) : next;
+    const key = isSuggestion(next) ? canonical(next) : next;
     if (seen.has(key)) {
       return false;
     }
@@ -385,6 +389,27 @@ export function suggesterFor(
       cliVersion,
     );
   };
+}
+
+/**
+ * A value as JSON with every object's keys sorted, so two suggestions written
+ * with their properties in a different order read as the same.
+ *
+ * @param value - The value.
+ * @returns Its canonical JSON.
+ */
+function canonical(value: unknown): string {
+  return JSON.stringify(value, (_key, inner: unknown) => {
+    if (typeof inner !== "object" || inner === null || Array.isArray(inner)) {
+      return inner;
+    }
+
+    return Object.fromEntries(
+      Object.entries(inner).sort(([one], [other]) => {
+        return one.localeCompare(other);
+      }),
+    );
+  });
 }
 
 /** A command that is not the CLI (`npm install …`, `rm …`), suggested as written. */
@@ -620,6 +645,16 @@ export function suggestionWords(
     if (value !== undefined && target.flags.has(spelled(name))) {
       options.push(...optionArgs(`--${spelled(name)}`, value));
     }
+  }
+  // A positional argument is read by where it stands, so one given after one
+  // left out would be read as the one left out.
+  const present = target.args.map((arg) => {
+    return input.args?.[named(arg)] !== undefined;
+  });
+  const gap = present.indexOf(false);
+  const after = gap === -1 ? -1 : present.indexOf(true, gap);
+  if (after !== -1) {
+    throw new Error(`${id} takes its ${target.args[after]} only after its ${target.args[gap]}`);
   }
   const positional = [
     ...target.args.flatMap((arg) => {

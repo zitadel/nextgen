@@ -1,4 +1,5 @@
 import { mkdir } from "node:fs/promises";
+import { runCommand } from "@tests/helpers/run-cli";
 import { join } from "node:path";
 
 import { beforeEach, describe, expect, vi } from "vitest";
@@ -114,6 +115,9 @@ function googleDisable(cwd: string): string[] {
  * The passkey command with its write reachable, to drive it without a run.
  */
 class ChangeWriter extends AuthMethodPasskeyDisable {
+  /** The command it stands in for, which its suggestions rebuild. */
+  public static override id = "auth-method:passkey:disable";
+
   /**
    * Writes `change` to the Project `target` was read from.
    *
@@ -468,9 +472,10 @@ describe("AuthMethodCommand", () => {
      */
     async function scripted(cwd: string, ...flags: string[]): Promise<unknown> {
       await rejectionOf(() => {
-        return AuthMethodPasskeyDisable.run(
+        return runCommand(
+          AuthMethodPasskeyDisable,
+          "auth-method:passkey:disable",
           passkeyDisable(cwd, "--non-interactive", "--json", ...flags),
-          CONFIG,
         );
       });
       const printed = vi.mocked(console.log).mock.calls.flat().join("\n");
@@ -518,9 +523,10 @@ describe("AuthMethodCommand", () => {
       const cwd = await aPasskeyOnlyProject(dir);
 
       await rejectionOf(() => {
-        return AuthMethodPasskeyDisable.run(
+        return runCommand(
+          AuthMethodPasskeyDisable,
+          "auth-method:passkey:disable",
           passkeyDisable(cwd, "--non-interactive", "--json"),
-          CONFIG,
         );
       });
 
