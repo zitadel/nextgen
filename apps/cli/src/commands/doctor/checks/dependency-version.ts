@@ -1,7 +1,7 @@
 import semver from "semver";
 
 import { addExactCommandFor, detectPackageManager } from "@/lib/package-manager";
-import { exactZitadelPins } from "@/lib/zitadel-pins";
+import { ScopedDependencies, ZITADEL } from "@/lib/upgrade";
 
 import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
 
@@ -40,10 +40,10 @@ export class DependencyVersionCheck implements SanityCheck {
         message: `CLI version ${ctx.cliVersion} is not an exact release; skipping the pin comparison`,
       };
     }
-    const exact = await exactZitadelPins(ctx.cwd).catch(() => {
+    const dependencies = await ScopedDependencies.read(ctx.cwd, ZITADEL.scope).catch(() => {
       return undefined;
     });
-    if (exact === undefined) {
+    if (dependencies === undefined) {
       // A missing or unparsable package.json is the dependency check's
       // failure to report; double-flagging the same root cause helps nobody.
       return {
@@ -52,8 +52,9 @@ export class DependencyVersionCheck implements SanityCheck {
         message: "No package.json to compare pins against",
       };
     }
-    const mismatched = exact.filter(([, version]) => {
-      return !semver.eq(version, ctx.cliVersion);
+    const exact = dependencies.exact();
+    const mismatched = exact.filter((dependency) => {
+      return !semver.eq(dependency.specifier, ctx.cliVersion);
     });
     if (mismatched.length > 0) {
       // Repair with the project's own package manager and an exact-save flag:
@@ -61,8 +62,8 @@ export class DependencyVersionCheck implements SanityCheck {
       // and write a caret range — exactly the float this check ignores.
       const remedy = addExactCommandFor(
         await detectPackageManager(ctx.cwd),
-        mismatched.map(([name]) => {
-          return `${name}@${ctx.cliVersion}`;
+        mismatched.map((dependency) => {
+          return `${dependency.name}@${ctx.cliVersion}`;
         }),
       ).display;
       return {
@@ -70,17 +71,17 @@ export class DependencyVersionCheck implements SanityCheck {
         status: "warn",
         message:
           `${mismatched
-            .map(([name, version]) => {
-              return `${name}@${version}`;
+            .map((dependency) => {
+              return `${dependency.name}@${dependency.specifier}`;
             })
             .join(", ")} ` +
           `does not match this CLI's version (${ctx.cliVersion}); scaffolded files and ` +
           `guidance target the CLI's train`,
         details: {
-          mismatched: mismatched.map(([name, version]) => {
+          mismatched: mismatched.map((dependency) => {
             return {
-              name,
-              declared: version,
+              name: dependency.name,
+              declared: dependency.specifier,
               expected: ctx.cliVersion,
             };
           }),

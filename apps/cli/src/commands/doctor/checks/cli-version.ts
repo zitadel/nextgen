@@ -1,5 +1,5 @@
 import { upgradeCommand } from "@/lib/suggestion";
-import { isNewerVersion, latestCliVersion, updateCheckDisabled } from "@/lib/update-check";
+import { ReleaseChannel, ZITADEL } from "@/lib/upgrade";
 
 import type { CheckOutcome } from "./types";
 
@@ -17,17 +17,15 @@ export async function checkCliVersion(input: {
 }): Promise<CheckOutcome> {
   const { cliVersion, env, typedCwd } = input;
   const base = { name: "cli-version" };
-  if (updateCheckDisabled(env)) {
+  const channel = new ReleaseChannel(ZITADEL, cliVersion, env);
+  if (channel.isDisabled()) {
     return {
       ...base,
       status: "pass",
       message: `CLI ${cliVersion}; update check is off`,
     };
   }
-  const latest = await latestCliVersion({
-    cliVersion,
-    env,
-  });
+  const latest = await channel.latest();
   if (latest === undefined) {
     return {
       ...base,
@@ -35,7 +33,7 @@ export async function checkCliVersion(input: {
       message: `CLI ${cliVersion}; could not look up the latest version`,
     };
   }
-  if (!isNewerVersion(latest, cliVersion)) {
+  if (!latest.isNewerThan(cliVersion)) {
     return {
       ...base,
       status: "pass",
@@ -45,10 +43,10 @@ export async function checkCliVersion(input: {
   return {
     ...base,
     status: "warn",
-    message: `CLI ${cliVersion} is behind the latest version, ${latest}`,
+    message: `CLI ${cliVersion} is behind the latest version, ${latest.version}`,
     details: {
       current: cliVersion,
-      latest,
+      latest: latest.version,
       remedy_command: upgradeCommand(cliVersion, typedCwd),
     },
   };

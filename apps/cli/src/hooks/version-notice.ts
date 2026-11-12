@@ -19,13 +19,13 @@ const hook: Hook<"finally"> = async ({ config }) => {
     return;
   }
   try {
-    const { updateNotice } = await import("@/lib/update-notice");
-    const notice = await updateNotice({
+    const { UpdateNotice, ZITADEL } = await import("@/lib/upgrade");
+    const notice = await new UpdateNotice(ZITADEL, {
       cliVersion: config.version,
       cwd: process.cwd(),
       env: process.env,
       columns: process.stdout.columns,
-    });
+    }).render();
     if (notice !== undefined) {
       process.stderr.write(`${notice}\n`);
     }
