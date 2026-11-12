@@ -643,6 +643,20 @@ describe("the cli", () => {
             ["--help"],
           ],
           [
+            "a word after a word of only spaces",
+            [" ", "SECRET", "--json"],
+            "(default)",
+            "That is not a zitadel command",
+            ["--help"],
+          ],
+          [
+            "the values of a flag that takes every word after it",
+            ["--origin", "a", "SECRET", "statu", "--json"],
+            "(default)",
+            "That is not a zitadel command",
+            ["--help"],
+          ],
+          [
             "a word after a pass-through nothing came before",
             ["--json", "--", "frobnicate"],
             "frobnicate",

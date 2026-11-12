@@ -61,13 +61,15 @@ export class NotFound extends BaseCommand {
         return c[0];
       }),
     );
-    const words = input.argv
-      .flatMap((word) => {
-        return leading.has(word.split(":")[0] as string) ? word.split(":") : [word];
-      })
-      .filter((word) => {
-        return word.trim() !== "";
-      });
+    const split = input.argv.flatMap((word) => {
+      return leading.has(word.split(":")[0] as string) ? word.split(":") : [word];
+    });
+    // A blank word names nothing, and nothing after it is named either: the
+    // next word may be an argument, a secret even.
+    const blank = split.findIndex((word) => {
+      return word.trim() === "";
+    });
+    const words = blank === -1 ? split : split.slice(0, blank);
     // The next word of every visible command under `parent`.
     const under = (parent: readonly string[]): string[] => {
       return visible
@@ -203,6 +205,17 @@ const hook: Hook<"command_not_found"> = async ({ id, argv, config }) => {
   ]) {
     switches.set(name, (switches.get(name) ?? true) && flag.type === "boolean");
   }
+  // A flag that takes every word after it as a value, as `--origin` does in
+  // the command that declares it: nothing after it can be named.
+  const greedy = new Set(
+    config.commands.flatMap((command) => {
+      return Object.entries(command.flags).flatMap(([name, flag]) => {
+        return flag.type === "option" && flag.multiple === true && flag.multipleNonGreedy !== true
+          ? [name]
+          : [];
+      });
+    }),
+  );
   const valued = new Set(
     base.flatMap(([name, flag]) => {
       return flag.type === "option" ? [name] : [];
@@ -216,6 +229,7 @@ const hook: Hook<"command_not_found"> = async ({ id, argv, config }) => {
   const words: string[] = [];
   let json = false;
   let passed = false;
+  let closed = false;
   for (let index = 0; index < typed.length; index += 1) {
     const word = typed[index] as string;
     const next = typed[index + 1];
@@ -232,7 +246,9 @@ const hook: Hook<"command_not_found"> = async ({ id, argv, config }) => {
       continue;
     }
     if (!word.startsWith("-")) {
-      words.push(word);
+      if (!closed) {
+        words.push(word);
+      }
       continue;
     }
     // After `--` a word that reads as a flag is an argument, so it ends the
@@ -249,6 +265,10 @@ const hook: Hook<"command_not_found"> = async ({ id, argv, config }) => {
       const typedName = word.slice(2);
       const name =
         switches.has(typedName) || !typedName.startsWith("no-") ? typedName : typedName.slice(3);
+      if (greedy.has(name)) {
+        closed = true;
+        continue;
+      }
       if (!word.includes("=") && switches.get(name) !== true) {
         takesNext(valued.has(name));
       }
