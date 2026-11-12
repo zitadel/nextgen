@@ -24,9 +24,12 @@ const INVITATION_ID: Refused<string> = {
   },
 };
 
-/** How a bare dry run is refused: picking an invitation would read the server. */
-const DRY_RUN_WITHOUT_ID_REFUSAL: Refusal = {
-  message: "A dry run needs the invitation to cancel",
+/**
+ * How a bare cancel is refused when it cannot pick: a dry run must not read the
+ * server, and a run with nobody to ask would read it only to refuse.
+ */
+const NO_ID_REFUSAL: Refusal = {
+  message: "Name the invitation to cancel",
   hint: "Pass its id; find one with `zitadel invitation list --status pending`.",
   next: ["invitation list --status pending"],
 };
@@ -66,8 +69,8 @@ export default class InvitationCancel extends Destructive(EnvironmentCommand) {
   };
 
   protected async execute({ args }: Admitted<typeof InvitationCancel>): Promise<JsonEnvelope> {
-    if (args.invitationId === undefined && this.dryRun) {
-      throw refusalError(DRY_RUN_WITHOUT_ID_REFUSAL, {}, (command) => {
+    if (args.invitationId === undefined && (this.dryRun || this.nonInteractive)) {
+      throw refusalError(NO_ID_REFUSAL, {}, (command) => {
         return this.suggest(command);
       });
     }
