@@ -84,7 +84,6 @@ post:
                         type: string
                 flow_definitions:
                   - name: default-login
-                    status: active
                     user_schema: human-user
                     purposes:
                       login: identify

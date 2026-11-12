@@ -289,7 +289,7 @@ describe("auth-method sso disable", () => {
       });
     });
 
-    it("warns when the schema is left with methods no active flow offers", async ({ dir }) => {
+    it("warns when the schema is left with methods no flow offers", async ({ dir }) => {
       const googleAlone = {
         ...aFlowOffering(["google"]),
         steps: [
@@ -309,7 +309,7 @@ describe("auth-method sso disable", () => {
 
       expect(parseJson(result.stdout)).toMatchObject({
         warnings: [
-          "No active login flow for default-human-user offers a method it enables, so nobody can sign in until one does.",
+          "No login flow for default-human-user offers a method it enables, so nobody can sign in until one does.",
         ],
       });
     });

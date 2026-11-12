@@ -18,13 +18,12 @@ Validation runs in two layers:
 |---|:-:|---|
 | `name` | ✓ | The handle that groups revisions; not unique. Every `POST` publishes a new revision under the name. A release pins one revision of a name, and resolution by name returns it. |
 | `schema_version` | ✓ | Monotonic per `(project_id, name)`. The server hard-codes it today. |
-| `status` | ✓ | `draft`, `active`, `deprecated`, `archived`. Only `active` is resolvable. |
 | `user_schema` | ✓ | `objectType` of the user schema this flow's `fields` resolve against; a schema id is accepted on write and stored as its `objectType`. The revision of it the release pins is captured into `FlowState.UserSchemaURL` at `Start` so mid-flow schema changes don't reshape in-flight data. |
 | `purposes` | ✓ | Map from purpose (`login`, `register`, `recovery`, `profiling`, `reauth`, `link_account`) to the name of that purpose's entry-point step. |
 | `audience` | optional | `app_ids[]`, `team_ids[]`. Empty = project default. Specificity for resolution is app > team > default. |
 | `steps` | ✓ | Ordered list of `FlowDefinitionStep`. Order doesn't drive runtime; transitions do. |
 
-`name`, `schema_version`, `status`, and `purposes` are top-level columns on `flow_definitions`; everything else is JSONB. Promote audience columns when in-memory filtering stops being good enough.
+`name`, `schema_version`, and `purposes` are top-level columns on `flow_definitions`; everything else is JSONB. Promote audience columns when in-memory filtering stops being good enough.
 
 ## Step shape
 

@@ -94,13 +94,13 @@ func TestNullableValue(t *testing.T) {
 
 func TestCoerceNumberValue(t *testing.T) {
 	t.Parallel()
-	got, err := database.CoerceNumberValue[domain.FlowDefinitionStatus](float64(domain.FlowDefinitionStatusActive))
+	got, err := database.CoerceNumberValue[domain.FlowDefinitionPurpose](float64(domain.FlowDefinitionPurposeRegister))
 	require.NoError(t, err)
-	assert.Equal(t, domain.FlowDefinitionStatusActive, got)
+	assert.Equal(t, domain.FlowDefinitionPurposeRegister, got)
 
-	got, err = database.CoerceNumberValue[domain.FlowDefinitionStatus](domain.FlowDefinitionStatusDraft)
+	got, err = database.CoerceNumberValue[domain.FlowDefinitionPurpose](domain.FlowDefinitionPurposeLogin)
 	require.NoError(t, err)
-	assert.Equal(t, domain.FlowDefinitionStatusDraft, got)
+	assert.Equal(t, domain.FlowDefinitionPurposeLogin, got)
 }
 
 func TestCoerceSliceString(t *testing.T) {
