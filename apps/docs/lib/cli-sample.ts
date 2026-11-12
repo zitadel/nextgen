@@ -66,6 +66,13 @@ export function cliSample(
       : apiSample(operation, path, request);
   }
 
+  if (topic === "invitation" && (verb === "create" || verb === "list")) {
+    const flags = invitationFlags(verb, request);
+    return flags === undefined
+      ? apiSample(operation, path, request)
+      : `${context}\n${line([`${cli} ${command}`], flags)}`;
+  }
+
   const flags: string[] = [];
   if (verb === "list") {
     flags.push(...listFlags(request));
@@ -176,6 +183,33 @@ function variables(
     ...(prompts ? ["# Each set prompts for the value, or reads it from stdin."] : []),
     ...commands,
   ].join("\n");
+}
+
+// The invitation commands take flags, not `--data`: `create` says a project
+// invitation with `--relation`, `--name` and `--replaces`, and `list` filters
+// with `--status` and `--type`. A team invitation has no flag yet, so it is
+// `undefined` and the sample is the api call.
+function invitationFlags(verb: string, request: RequestData): string[] | undefined {
+  if (verb === "list") {
+    const status = request.query.status?.values[0];
+    const type = request.query.type?.values[0];
+    return [
+      ...(typeof status === "string" ? [`--status ${word(status)}`] : []),
+      ...(typeof type === "string" ? [`--type ${word(type)}`] : []),
+      ...listFlags(request),
+    ];
+  }
+  const body = record(request.body);
+  if (body.type !== "project_member") return undefined;
+  const { relation } = record(body.project_member);
+  const { name } = record(body.metadata);
+  return [
+    ...(typeof relation === "string" ? [`--relation ${word(relation)}`] : []),
+    ...(typeof name === "string" ? [`--name ${word(name)}`] : []),
+    ...(typeof body.replaces_invitation_id === "string"
+      ? [`--replaces ${word(body.replaces_invitation_id)}`]
+      : []),
+  ];
 }
 
 /** One command: on a line while it fits the repo's 100 columns, else a flag a line, as cURL is. */

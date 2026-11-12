@@ -24,6 +24,13 @@ const INVITATION_ID: Refused<string> = {
   },
 };
 
+/** How a bare dry run is refused: picking an invitation would read the server. */
+const DRY_RUN_WITHOUT_ID_REFUSAL: Refusal = {
+  message: "A dry run needs the invitation to cancel",
+  hint: "Pass its id; find one with `zitadel invitation list --status pending`.",
+  next: ["invitation list --status pending"],
+};
+
 /** How a bare cancel is refused when the project has no invitation left to cancel. */
 const NOTHING_PENDING_REFUSAL: Refusal = {
   message: "The project has no pending invitations",
@@ -59,6 +66,11 @@ export default class InvitationCancel extends Destructive(EnvironmentCommand) {
   };
 
   protected async execute({ args }: Admitted<typeof InvitationCancel>): Promise<JsonEnvelope> {
+    if (args.invitationId === undefined && this.dryRun) {
+      throw refusalError(DRY_RUN_WITHOUT_ID_REFUSAL, {}, (command) => {
+        return this.suggest(command);
+      });
+    }
     const invitationId = args.invitationId ?? (await this.pickPending());
 
     return this.emit(
@@ -125,5 +137,8 @@ export default class InvitationCancel extends Destructive(EnvironmentCommand) {
 /** Who a pending invitation is for and when it expires, beside its id in the picker. */
 function pendingHint(invitation: Invitation): string {
   const whom = invitation.metadata?.name;
-  return `${whom === undefined ? "" : `${whom}, `}expires ${invitation.expires_at}`;
+  // The name is whatever an administrator typed; the picker draws hints as given.
+  return escapeControlCharacters(
+    `${whom === undefined ? "" : `${whom}, `}expires ${invitation.expires_at}`,
+  );
 }
