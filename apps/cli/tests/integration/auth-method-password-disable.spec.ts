@@ -48,7 +48,7 @@ const WOULD_LEAVE_NONE_WARNING =
  * What the command warns when no login flow offers a method the schema enables.
  */
 const NO_ACTIVE_FLOW_WARNING =
-  "No active login flow for default-human-user offers a method it enables, so nobody can sign in until one does.";
+  "No login flow for default-human-user offers a method it enables, so nobody can sign in until one does.";
 
 describe("auth-method password disable", () => {
   describe("against an invalid server", () => {
