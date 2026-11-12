@@ -17,10 +17,13 @@ type FlowAuthAttemptAdapter struct {
 	// schemaStore backs the create-user action a provisional passkey
 	// registration applies inside its verify transaction.
 	schemaStore domain.JSONSchemaStore
+	// protection spends the sign-up proof a provisional passkey registration
+	// needs before it creates its user, as a password sign-up does.
+	protection SignupProtection
 }
 
-func NewFlowAuthAttemptAdapter(attempts AuthAttemptService, schemaStore domain.JSONSchemaStore) *FlowAuthAttemptAdapter {
-	return &FlowAuthAttemptAdapter{attempts: attempts, schemaStore: schemaStore}
+func NewFlowAuthAttemptAdapter(attempts AuthAttemptService, schemaStore domain.JSONSchemaStore, protection SignupProtection) *FlowAuthAttemptAdapter {
+	return &FlowAuthAttemptAdapter{attempts: attempts, schemaStore: schemaStore, protection: protection}
 }
 
 var _ domain.FlowAuthAttemptService = (*FlowAuthAttemptAdapter)(nil)
@@ -30,6 +33,7 @@ func (a *FlowAuthAttemptAdapter) Start(ctx context.Context, in domain.FlowCreate
 		ProjectID:      in.ProjectID,
 		SessionID:      in.SessionID,
 		RequiredChecks: in.RequiredChecks,
+		FlowID:         in.FlowID,
 	})
 	if err != nil {
 		return "", err
@@ -218,7 +222,8 @@ func (a *FlowAuthAttemptAdapter) IssuePasskeyRegistrationChallenge(ctx context.C
 // SubmitPasskeyRegistration verifies the attestation against the challenge
 // identified by ChallengeID. The create-user factory rides along; the attempt
 // service invokes it with the persisted challenge's authoritative user handle,
-// and only when that challenge is provisional.
+// and only when that challenge is provisional. That makes it a sign-up, so the
+// factory spends the flow's sign-up proof before it builds the user.
 func (a *FlowAuthAttemptAdapter) SubmitPasskeyRegistration(ctx context.Context, in domain.FlowSubmitPasskeyRegistrationInput) error {
 	_, err := a.attempts.VerifyProof(ctx, VerifyProofInput{
 		ProjectID:   in.ProjectID,
@@ -226,7 +231,16 @@ func (a *FlowAuthAttemptAdapter) SubmitPasskeyRegistration(ctx context.Context, 
 		ChallengeID: in.ChallengeID,
 		Proof: PasskeyRegistrationProof{
 			AttestationResponse: in.Attestation,
-			CreateUser: func(userID string) []UserAction {
+			CreateUser: func(ctx context.Context, userID string) ([]UserAction, error) {
+				// Spent once, before the user exists: a registration that
+				// fails after this still costs the proof, as a password
+				// sign-up's does.
+				if a.protection == nil || in.State == nil || in.State.ProjectID != in.ProjectID {
+					return nil, domain.ErrFlowIntegrity()
+				}
+				if err := a.protection.Consume(ctx, in.State, in.GateProofs[domain.SignupGate]); err != nil {
+					return nil, err
+				}
 				return []UserAction{NewCreateUserAction(
 					CreateUserInput{
 						ProjectID:  in.ProjectID,
@@ -235,7 +249,7 @@ func (a *FlowAuthAttemptAdapter) SubmitPasskeyRegistration(ctx context.Context, 
 						ID:         userID,
 					},
 					a.schemaStore,
-				)}
+				)}, nil
 			},
 		},
 	})

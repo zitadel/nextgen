@@ -34,8 +34,12 @@ export const ZITADEL_TELEMETRY: FlagVariable = {
   name: "ZITADEL_TELEMETRY",
   flag: "telemetry",
   description: `An empty value or one of ${[...DISABLED_VALUES]
-    .filter((value) => value !== "")
-    .map((value) => `\`${value}\``)
+    .filter((value) => {
+      return value !== "";
+    })
+    .map((value) => {
+      return `\`${value}\``;
+    })
     .join(", ")} turns telemetry off.`,
   precedence: "Turns telemetry off even with `--telemetry`.",
 };

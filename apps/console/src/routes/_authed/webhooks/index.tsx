@@ -38,7 +38,7 @@ import {
 import { formatRecent } from "@/lib/date";
 
 /**
- * Webhooks: the endpoints the project's events are sent to (D37, root ADR
+ * Webhooks: the endpoints the project's events are sent to (D41, root ADR
  * 088), on the shared resource table. The server POSTs each event a webhook
  * names to its URL, signed with the webhook's secret.
  *
@@ -62,7 +62,7 @@ import { formatRecent } from "@/lib/date";
  * in its own words, in the drawer or the dialog the action opened.
  */
 export const Route = createFileRoute("/_authed/webhooks/")({
-  // After Logs, which shows the events these send; before Settings, the last.
+  // After Events, which shows the events these send; before Settings, the last.
   staticData: { scope: "project", nav: { label: "Webhooks", order: 10, icon: WebhookIcon } },
   loaderDeps: projectScopeDeps,
   loader: async ({ deps }) => ({

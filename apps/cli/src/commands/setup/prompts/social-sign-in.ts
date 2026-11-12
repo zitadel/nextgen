@@ -1,26 +1,24 @@
-import { log, note } from "@clack/prompts";
-
 import {
-  credentialVariables,
-  CUSTOM_PROVIDER,
   type ClientId,
+  CUSTOM_PROVIDER,
   type CustomOidcInput,
+  credentialVariables,
   DEFAULT_SCOPES,
-  idpProvider,
   IDP_PROVIDERS,
-  RESERVED_SLUGS,
   type IdpProvider,
   type Issuer,
+  idpProvider,
+  type Parsed,
+  type ProviderName,
+  type ProviderSelection,
   parseClientId,
   parseClientSecret,
   parseConnectionSlug,
   parseDisplayName,
   parseIssuer,
   parseScopes,
-  type Parsed,
-  type ProviderName,
-  type ProviderSelection,
   providerOf,
+  RESERVED_SLUGS,
   selectionName,
   slugFromDisplayName,
   validated,
@@ -28,14 +26,14 @@ import {
 
 import {
   askConnectionEndpoints,
-  callbackUriFor,
   type CustomFlagValues,
+  callbackUriFor,
   loopbackIssuerWarning,
-  ssoEnableArgs,
+  ssoEnableFlags,
 } from "@/lib/idp";
-import { reportWarning } from "@/lib/warnings";
-import type { Asker } from "@/lib/input";
 import { issuerFromPort } from "@/lib/orca";
+import type { Questions } from "@/lib/ui";
+import { reportWarning } from "@/lib/warnings";
 
 import type { PromptContext, SetupAnswers, SetupPrompt, SsoDraft } from "./types";
 
@@ -50,35 +48,33 @@ import type { PromptContext, SetupAnswers, SetupPrompt, SsoDraft } from "./types
  */
 export async function askCustomSettings(
   given: CustomFlagValues,
-  ask: Asker,
+  ask: Questions,
 ): Promise<Required<CustomFlagValues>> {
   // The display name comes first so the slug can be suggested from it: "Acme
   // SSO" offers "acme-sso", which the developer accepts or edits.
-  const displayName = await ask({
-    kind: "text",
+  const displayName = await ask.text({
     name: "display name",
     message: "What name should the sign-in button show? For example Acme SSO.",
     parse: parseDisplayName,
     given: given.displayName,
   });
-  const slug = await ask({
-    kind: "text",
+  const slug = await ask.text({
     name: "connection name",
     message:
       "What would you like to call this connection? It is used in your configuration, for example acme-sso.",
-    parse: (value) => parseConnectionSlug(value, RESERVED_SLUGS),
+    parse: (value) => {
+      return parseConnectionSlug(value, RESERVED_SLUGS);
+    },
     given: given.slug,
     initialValue: slugFromDisplayName(displayName, RESERVED_SLUGS),
   });
-  const issuer = await ask({
-    kind: "text",
+  const issuer = await ask.text({
     name: "issuer",
     message: "What is the issuer URL of the provider?",
     parse: parseIssuer,
     given: given.issuer,
   });
-  const scopes = await ask({
-    kind: "text",
+  const scopes = await ask.text({
     name: "scopes",
     message: "Which scopes should we request? Separate them with spaces.",
     parse: parseScopes,
@@ -86,14 +82,19 @@ export async function askCustomSettings(
     initialValue: DEFAULT_SCOPES.join(" "),
   });
   // The settings carry the scopes as the one string a flag does.
-  return { slug, displayName, issuer, scopes: scopes.join(" ") };
+  return {
+    slug,
+    displayName,
+    issuer,
+    scopes: scopes.join(" "),
+  };
 }
 
 /**
  * "Which external sign-in providers would you like to add?" — the one
  * onboarding question that needs something from outside the terminal, so it
  * asks last of the configuration questions and takes "not now" as a
- * first-class answer (#1081).
+ * first-class answer.
  *
  * Registering the OAuth application is the developer's to do and cannot be
  * automated, so the question announces what to register and where before
@@ -115,10 +116,15 @@ export class SocialSignInPrompt implements SetupPrompt {
   async ask(answers: SetupAnswers, ctx: PromptContext): Promise<SetupAnswers> {
     // `--sso` names the set; the wizard asks for it only when no flag did.
     const chosen = ctx.ssoFromFlag
-      ? answers.sso.map((draft) => selectionName(draft.selection))
-      : await this.chooseProviders(ctx.input);
+      ? answers.sso.map((draft) => {
+          return selectionName(draft.selection);
+        })
+      : await this.chooseProviders(ctx.ask);
     if (chosen.length === 0) {
-      return { ...answers, sso: [] };
+      return {
+        ...answers,
+        sso: [],
+      };
     }
 
     // Asked per provider rather than once: each registers its own OAuth
@@ -126,14 +132,22 @@ export class SocialSignInPrompt implements SetupPrompt {
     // secret. A flagged run still gets asked for whatever the flags left out.
     const collected: SsoDraft[] = [];
     for (const name of chosen) {
-      const flagged = answers.sso.find((draft) => selectionName(draft.selection) === name);
+      const flagged = answers.sso.find((draft) => {
+        return selectionName(draft.selection) === name;
+      });
       // A custom connection is described before anything else about it can be
       // said: the announcement names its issuer, and its slug names the secret.
       const selection: ProviderSelection =
         flagged?.selection ??
         (name === CUSTOM_PROVIDER
-          ? { kind: "custom", connection: await this.askCustom(ctx.input) }
-          : { kind: "catalog", id: name });
+          ? {
+              kind: "custom",
+              connection: await this.askCustom(ctx.ask),
+            }
+          : {
+              kind: "catalog",
+              id: name,
+            });
       // A custom connection typed in here has not been through the flag checks.
       const loopback = flagged === undefined ? loopbackIssuerWarning(selection) : undefined;
       if (loopback !== undefined) {
@@ -150,12 +164,11 @@ export class SocialSignInPrompt implements SetupPrompt {
             (await askConnectionEndpoints({
               provider: selection.id,
               developmentBuild: ctx.developmentBuild === true,
-              ask: ctx.input,
+              ask: ctx.ask,
             })));
-      this.announce(entry, answers.devPort, endpoints?.issuer);
+      this.announce(ctx, entry, answers.devPort, endpoints?.issuer);
 
-      const clientId = await ctx.input({
-        kind: "text",
+      const clientId = await ctx.ask.text({
         name: "client id",
         // "To skip", not "to add it later": the line after it names the command
         // that adds it, and the shorter question fits an 80-column terminal.
@@ -167,24 +180,34 @@ export class SocialSignInPrompt implements SetupPrompt {
         given: flagged?.credentials.clientId,
       });
       if (clientId === undefined) {
-        log.info(
+        ctx.say(
           [
             `Skipped ${entry.displayName}. Once its OAuth application exists, add it with:`,
-            ctx.suggest(ssoEnableArgs(selection)),
+            ctx.suggest({ id: "auth-method:sso:enable", flags: ssoEnableFlags(selection) }),
           ].join("\n"),
         );
         continue;
       }
-      const secret = await ctx.input({
-        kind: "secret",
-        name: "client secret",
-        message: `What is the client secret of your ${entry.displayName} OAuth app? It will be stored on the project as ${credentialVariables(providerOf(selection).slug).clientSecret}.`,
-        parse: parseClientSecret,
-        given: flagged?.credentials.secret,
+      const secret =
+        flagged?.credentials.secret ??
+        (await ctx.ask.secret({
+          name: "client secret",
+          message: `What is the client secret of your ${entry.displayName} OAuth app? It will be stored on the project as ${credentialVariables(providerOf(selection).slug).clientSecret}.`,
+          parse: parseClientSecret,
+        }));
+      collected.push({
+        selection,
+        credentials: {
+          clientId,
+          secret,
+        },
+        endpoints,
       });
-      collected.push({ selection, credentials: { clientId, secret }, endpoints });
     }
-    return { ...answers, sso: collected };
+    return {
+      ...answers,
+      sso: collected,
+    };
   }
 
   /**
@@ -196,22 +219,23 @@ export class SocialSignInPrompt implements SetupPrompt {
    * not a silent skip: it asks whether to go on without SSO, where No goes back
    * to the list, and only a Yes returns none.
    */
-  private async chooseProviders(ask: Asker): Promise<readonly ProviderName[]> {
+  private async chooseProviders(ask: Questions): Promise<readonly ProviderName[]> {
     for (;;) {
       // Nothing preselected, and declining costs nothing:
       // `auth-method sso enable` performs this journey on an existing Project
       // later.
-      const chosen: readonly ProviderName[] = await ask({
-        kind: "multiselect",
+      const chosen: readonly ProviderName[] = await ask.multiselect({
         name: "external sign-in providers",
         message:
           "Which external sign-in providers would you like to add? Use Space to select and Enter to continue.",
         required: false,
         options: [
-          ...IDP_PROVIDERS.map((provider) => ({
-            value: provider as ProviderName,
-            label: `${idpProvider(provider).displayName} — requires a ${idpProvider(provider).displayName} OAuth app`,
-          })),
+          ...IDP_PROVIDERS.map((provider) => {
+            return {
+              value: provider as ProviderName,
+              label: `${idpProvider(provider).displayName} — requires a ${idpProvider(provider).displayName} OAuth app`,
+            };
+          }),
           {
             value: CUSTOM_PROVIDER as ProviderName,
             label: "Another OpenID Connect (OIDC) provider — requires provider configuration",
@@ -221,8 +245,7 @@ export class SocialSignInPrompt implements SetupPrompt {
       if (chosen.length > 0) {
         return chosen;
       }
-      const continueWithout = await ask({
-        kind: "yes-no",
+      const continueWithout = await ask.yesNo({
         name: "continue without SSO",
         message: "Would you like to continue without setting up SSO?",
         initialValue: false,
@@ -239,30 +262,28 @@ export class SocialSignInPrompt implements SetupPrompt {
    * can be shown rather than left for the developer to work out, which
    * matters because the vendor matches it literally.
    */
-  private announce(entry: IdpProvider, devPort: number, issuer?: Issuer): void {
-    note(
-      [
-        // Where to register depends on who is actually answering: pointing a
-        // developer at the vendor's console when the connection runs against
-        // their own stand-in would be worse than saying nothing.
-        ...(issuer === undefined
-          ? [
-              entry.consoleUrl === undefined
-                ? `Register a client at ${entry.issuer}, as an OAuth application:`
-                : "Register an OAuth application at:",
-              ...(entry.consoleUrl === undefined ? [] : [entry.consoleUrl]),
-            ]
-          : ["Register a client with the provider at:", issuer]),
-        "",
-        "Redirect URI:",
-        callbackUriFor(issuerFromPort(devPort), entry.slug),
-      ].join("\n"),
-      `${entry.displayName} sign-in`,
-    );
+  private announce(ctx: PromptContext, entry: IdpProvider, devPort: number, issuer?: Issuer): void {
+    let registration: string[];
+    if (issuer === undefined) {
+      registration = [
+        entry.consoleUrl === undefined
+          ? `Register a client at ${entry.issuer}, as an OAuth application:`
+          : "Register an OAuth application at:",
+        ...(entry.consoleUrl === undefined ? [] : [entry.consoleUrl]),
+      ];
+    } else {
+      registration = ["Register a client with the provider at:", issuer];
+    }
+    ctx.note(`${entry.displayName} sign-in`, [
+      ...registration,
+      "",
+      "Redirect URI:",
+      callbackUriFor(issuerFromPort(devPort), entry.slug),
+    ]);
   }
 
   /** Describe a custom connection from scratch: nothing was given on the command line. */
-  private async askCustom(ask: Asker): Promise<CustomOidcInput> {
+  private async askCustom(ask: Questions): Promise<CustomOidcInput> {
     const values = await askCustomSettings({}, ask);
     return {
       slug: validated(parseConnectionSlug(values.slug, RESERVED_SLUGS)),
@@ -279,5 +300,10 @@ export class SocialSignInPrompt implements SetupPrompt {
  * either configured with both values or not at all.
  */
 function clientIdOrSkip(value: string): Parsed<ClientId | undefined> {
-  return value.trim() === "" ? { ok: true, value: undefined } : parseClientId(value);
+  return value.trim() === ""
+    ? {
+        ok: true,
+        value: undefined,
+      }
+    : parseClientId(value);
 }

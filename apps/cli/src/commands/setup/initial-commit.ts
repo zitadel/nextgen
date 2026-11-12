@@ -7,7 +7,7 @@ import { isLocalRuntimePath, isSecretPath } from "@/lib/secret-paths";
  * other commit this repository's tooling writes, and with no trailer of any
  * kind: the commit belongs to the developer, not to the tool that made it.
  */
-export const INITIAL_COMMIT_SUBJECT = "chore: scaffold the project with zitadel setup";
+export const INITIAL_COMMIT_SUBJECT = "chore: scaffold the project with Zitadel setup";
 
 /** What {@link ensureInitialCommit} did, for setup to report. */
 export type InitialCommitOutcome =
@@ -60,7 +60,10 @@ function isCliOwned(path: string): boolean {
  * hostname to guess from, and there git refuses to commit. No commit means no
  * `git_sha`, and the next deploy has nothing to diff against.
  */
-const FALLBACK_AUTHOR: Author = { name: "Zitadel Setup", email: "setup@zitadel.local" };
+const FALLBACK_AUTHOR: Author = {
+  name: "Zitadel Setup",
+  email: "setup@zitadel.local",
+};
 
 /** What the git working tree of a project holds, as setup needs to know before it writes. */
 export type WorktreeState =
@@ -103,20 +106,40 @@ export async function inspectWorktree(cwd: string): Promise<WorktreeState> {
   try {
     const blocked = await repository.readyToCommit();
     if (blocked !== null) {
-      return { kind: "blocked", blocked };
+      return {
+        kind: "blocked",
+        blocked,
+      };
     }
     const files = await repository.uncommittedFiles();
-    const dirty = files.filter((file) => !isCliOwned(file.path));
+    const dirty = files.filter((file) => {
+      return !isCliOwned(file.path);
+    });
     if (dirty.length === 0) {
       return { kind: "clean" };
     }
     return {
       kind: "dirty",
-      modified: dirty.filter((change) => !change.untracked).map((change) => change.path),
-      untracked: dirty.filter((change) => change.untracked).map((change) => change.path),
+      modified: dirty
+        .filter((change) => {
+          return !change.untracked;
+        })
+        .map((change) => {
+          return change.path;
+        }),
+      untracked: dirty
+        .filter((change) => {
+          return change.untracked;
+        })
+        .map((change) => {
+          return change.path;
+        }),
     };
   } catch (error) {
-    return { kind: "unknown", reason: messageOf(error) };
+    return {
+      kind: "unknown",
+      reason: messageOf(error),
+    };
   }
 }
 
@@ -133,7 +156,7 @@ export async function inspectWorktree(cwd: string): Promise<WorktreeState> {
  *
  * Nothing here prompts, so it behaves the same interactively and in CI, and no
  * failure is fatal: the worst case is the first release carrying no commit,
- * which is what happened before this existed. When the commit fails after
+ * which a later deploy reports as having no baseline. When the commit fails after
  * setup ran `git init`, the outcome says so, since the repository now exists.
  */
 export async function ensureInitialCommit(cwd: string): Promise<InitialCommitOutcome> {
@@ -145,9 +168,18 @@ export async function ensureInitialCommit(cwd: string): Promise<InitialCommitOut
         except: isSecretPath,
         authorIfGitHasNone: FALLBACK_AUTHOR,
       })
-      .catch((error: unknown) => ({ committed: false as const, reason: firstLineOf(error) }));
+      .catch((error: unknown) => {
+        return {
+          committed: false as const,
+          reason: firstLineOf(error),
+        };
+      });
     if (!outcome.committed) {
-      return { kind: "unavailable", reason: outcome.reason, createdRepository: existing === null };
+      return {
+        kind: "unavailable",
+        reason: outcome.reason,
+        createdRepository: existing === null,
+      };
     }
     const commit = {
       sha: outcome.sha,
@@ -155,11 +187,21 @@ export async function ensureInitialCommit(cwd: string): Promise<InitialCommitOut
       invented: outcome.author === "fallback",
     };
     if (existing === null) {
-      return { kind: "created", ...commit };
+      return {
+        kind: "created",
+        ...commit,
+      };
     }
-    return { kind: "committed", ...commit };
+    return {
+      kind: "committed",
+      ...commit,
+    };
   } catch (error) {
-    return { kind: "unavailable", reason: firstLineOf(error), createdRepository: false };
+    return {
+      kind: "unavailable",
+      reason: firstLineOf(error),
+      createdRepository: false,
+    };
   }
 }
 
@@ -182,15 +224,27 @@ export function gitReport(outcome: InitialCommitOutcome): {
   readonly commit: string | null;
 } {
   if (outcome.kind === "created") {
-    return { initialized: true, commit: outcome.sha };
+    return {
+      initialized: true,
+      commit: outcome.sha,
+    };
   }
   if (outcome.kind === "committed") {
-    return { initialized: false, commit: outcome.sha };
+    return {
+      initialized: false,
+      commit: outcome.sha,
+    };
   }
   if (outcome.kind === "unavailable") {
-    return { initialized: outcome.createdRepository, commit: null };
+    return {
+      initialized: outcome.createdRepository,
+      commit: null,
+    };
   }
-  return { initialized: false, commit: null };
+  return {
+    initialized: false,
+    commit: null,
+  };
 }
 
 /** The warning for a commit that could not be made, saying so when setup left a new, empty repository behind. */

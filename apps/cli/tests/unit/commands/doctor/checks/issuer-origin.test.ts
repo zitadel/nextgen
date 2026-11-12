@@ -10,6 +10,7 @@ import { takeReportedWarnings } from "@/lib/warnings";
 import { aCheckContext, declined, forced } from "@tests/helpers/check-context";
 import { it } from "@tests/helpers/fixtures";
 import { write } from "@tests/helpers/git-repo";
+import { aSuggest } from "@tests/helpers/suggestions";
 import { usePlatformServer } from "@tests/helpers/platform-project";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
@@ -177,12 +178,25 @@ describe("IssuerOriginCheck.run", () => {
       });
     });
 
-    it("names doctor --fix", async ({ dir }) => {
+    it("names the doctor --fix a reader can run", async ({ dir }) => {
       await aProject(dir, AS_PREVIEW);
 
       const outcome = await check.run(aCheckContext(dir));
 
-      expect(outcome.message).toContain("zitadel doctor --fix");
+      expect(outcome.message).toContain("npx @zitadel/cli@0.1.0-alpha.0 doctor --fix");
+    });
+
+    it("carries the run's environment selection into the doctor --fix it names", async ({
+      dir,
+    }) => {
+      await aProject(dir, AS_PREVIEW);
+      const suggest = aSuggest({ env: "staging" }, "0.1.0-alpha.0");
+
+      const outcome = await check.run(aCheckContext(dir, { suggest }));
+
+      expect(outcome.message).toContain(
+        "npx @zitadel/cli@0.1.0-alpha.0 doctor --fix --env staging",
+      );
     });
 
     it("matches an issuer written with a trailing slash", async ({ dir }) => {
@@ -308,21 +322,21 @@ describe("IssuerOriginCheck.fix", () => {
       await check.fix(aCheckContext(dir, { consent: forced() }));
 
       expect(takeReportedWarnings()).toEqual([
-        `${ISSUER} is a primary origin now, but it serves nothing until a deployment names it: run \`zitadel deploy\` in the app.`,
+        `${ISSUER} is a primary origin now, but it serves nothing until a deployment names it: deploy in the app.`,
       ]);
     });
   });
 
   describe("when the replacement is declined", () => {
-    it("asks to replace the preview origin", async ({ dir }) => {
-      await aProject(dir, AS_PREVIEW);
+    it("asks to replace the preview origin, naming the project and the server", async ({ dir }) => {
+      const project = await aProject(dir, AS_PREVIEW);
       const consent = vi.fn(declined);
 
       await check.fix(aCheckContext(dir, { consent }));
 
       expect(consent).toHaveBeenCalledWith(
         expect.objectContaining({
-          message: `Make ${ISSUER} a primary origin? It is removed and added back as primary.`,
+          message: `Replace the preview origin ${ISSUER} with a primary one in project ${project.id} on api.zitadel.example?`,
         }),
       );
     });

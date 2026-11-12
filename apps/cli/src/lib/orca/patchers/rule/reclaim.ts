@@ -22,18 +22,21 @@ import type { FileOp, ScaffoldPlan } from "./file-writer/types";
 export function reclaimableOps(plan: ScaffoldPlan): FileOp[] {
   return (
     plan.ops
-      .filter(
-        (op) =>
+      .filter((op) => {
+        return (
           op.kind === "merge-env" ||
           op.kind === "append-gitignore" ||
           op.kind === "add-dep" ||
           op.kind === "edit" ||
-          (op.kind === "write" && op.contents.includes(MANAGED_MARKER)),
-      )
+          (op.kind === "write" && op.contents.includes(MANAGED_MARKER))
+        );
+      })
       // A repair only adds what is missing: setup may replace its own stale
       // values, but a value the developer changed since (`env add --force`, a
       // prompt's answer) is theirs, so a replayed merge never overwrites.
-      .map((op) => (op.kind === "merge-env" && op.overwrite ? { ...op, overwrite: false } : op))
+      .map((op) => {
+        return op.kind === "merge-env" && op.overwrite ? { ...op, overwrite: false } : op;
+      })
   );
 }
 
@@ -66,7 +69,9 @@ export async function withoutExistingTargets(
     if (op.kind === "edit" && op.overwrites) {
       const candidates = typeof op.path === "string" ? [op.path] : op.path;
       const present = await Promise.all(
-        candidates.map((candidate) => pathExists(join(cwd, candidate))),
+        candidates.map((candidate) => {
+          return pathExists(join(cwd, candidate));
+        }),
       );
       if (!present.includes(true)) {
         kept.push(op);
@@ -91,6 +96,8 @@ export async function withoutExistingTargets(
  * error handling reports the real problem.
  */
 async function dependencyDeclared(cwd: string, name: string): Promise<boolean> {
-  const pkg = await readPackageJson(cwd).catch(() => undefined);
+  const pkg = await readPackageJson(cwd).catch(() => {
+    return undefined;
+  });
   return pkg?.dependencies?.[name] !== undefined || pkg?.devDependencies?.[name] !== undefined;
 }

@@ -6,6 +6,7 @@ import {
   PLATFORM_URL,
   usePlatformServer,
 } from "@tests/helpers/platform-project";
+import { asTerminal } from "@tests/helpers/project";
 import { runCliForTest } from "@tests/helpers/run-cli";
 
 const SERVER = PLATFORM_URL;
@@ -61,7 +62,7 @@ describe("preview list", () => {
 
     const { stderr } = await firstPagePiped(cwd);
 
-    expect(stderr).toContain("preview list --limit 1 --page-token p2");
+    expect(stderr).toContain("preview list --limit 1 --plain --page-token p2");
   });
 
   it("lists every page's previews with --all", async () => {
@@ -122,5 +123,21 @@ describe("preview list", () => {
     await runCliForTest(["preview", "list", "--all", "--json", "--cwd", cwd, "--server", SERVER]);
 
     expect(tokens).toEqual([null, "p\u001b2"]);
+  });
+
+  it("says so when the project has no previews", async () => {
+    server.use(
+      http.get(`${SERVER}/api/v1/projects/:project_id/previews`, () =>
+        HttpResponse.json({ previews: [], next_page_token: null }),
+      ),
+    );
+    const cwd = await aProjectDirectory("zitadel-preview-list-", { id: "proj_test", secret: "ps" });
+    dirs.push(cwd);
+
+    const result = await asTerminal(() =>
+      runCliForTest(["preview", "list", "--cwd", cwd, "--server", SERVER]),
+    );
+
+    expect(`${result.stdout}${result.stderr}`).toContain("No previews found");
   });
 });

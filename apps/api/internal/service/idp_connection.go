@@ -22,6 +22,8 @@ type CreateIDPConnectionOutput struct {
 
 type ListIDPConnectionsInput struct {
 	ProjectID string
+	// ID narrows the list to the connection with this id.
+	ID        string
 	Sorting   *Sorting // optional; defaults to created_at asc
 	Filters   []Filter
 	Limit     int
@@ -390,6 +392,9 @@ func (s *idpConnectionService) List(ctx context.Context, input ListIDPConnection
 
 	filters := make([]database.Filter[domain.IDPConnectionField], 0, len(input.Filters)+1)
 	filters = append(filters, database.Equal(database.Col(domain.IDPConnectionFieldProjectID), input.ProjectID))
+	if input.ID != "" {
+		filters = append(filters, database.Equal(database.Col(domain.IDPConnectionFieldID), input.ID))
+	}
 	for _, f := range input.Filters {
 		filter, err := idpConnectionFilter(f)
 		if err != nil {

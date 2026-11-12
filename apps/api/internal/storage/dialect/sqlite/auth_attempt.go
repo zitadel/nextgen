@@ -17,13 +17,13 @@ import (
 
 const (
 	authAttemptGetSelect = `SELECT aa.project_id, aa.id, aa.handoff_token, aa.handed_off_at, aa.session_id,` +
-		` aa.required_checks, aa.created_at, c.type, aa.time_to_live, aa.internal, aa.deployment_id, aa.release_id,` +
+		` aa.required_checks, aa.created_at, c.type, aa.time_to_live, aa.internal, aa.deployment_id, aa.release_id, aa.flow_id,` +
 		` c.id, c.last_challenged_at, c.last_verified_at, c.last_failed_at, c.failure_count, c.challenge_payload, c.factor_payload` +
 		` FROM auth_attempts aa` +
 		` LEFT JOIN checks c ON aa.project_id = c.project_id AND aa.id = c.auth_attempt_id`
 
-	createAuthAttemptStmt = `INSERT INTO auth_attempts (project_id, id, required_checks, time_to_live, session_id, created_at, internal, deployment_id, release_id)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	createAuthAttemptStmt = `INSERT INTO auth_attempts (project_id, id, required_checks, time_to_live, session_id, created_at, internal, deployment_id, release_id, flow_id)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
 	createAuthCheckStmt = `INSERT INTO checks (project_id, auth_attempt_id, id, type, last_challenged_at, last_verified_at, challenge_payload, factor_payload, failure_count)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`
@@ -130,6 +130,7 @@ func (as authAttemptStatements) CreateAuthAttempt(ctx context.Context, attempt *
 		if _, err := tx.Exec(ctx, createAuthAttemptStmt,
 			attempt.ProjectID, attempt.ID, string(req), ttlNanos, sessionID, now.UnixNano(), attempt.Internal,
 			authattempt.EmptyStringArg(attempt.DeploymentID), authattempt.EmptyStringArg(attempt.ReleaseID),
+			authattempt.EmptyStringArg(attempt.FlowID),
 		); err != nil {
 			return fmt.Errorf("failed to create auth attempt: %w", wrapError(err))
 		}
@@ -228,6 +229,7 @@ func scanAuthAttemptRows(rows *sql.Rows, attempt *domain.AuthAttempt) error {
 			timeToLiveNano     sql.NullInt64
 			deploymentIDVal    sql.NullString
 			releaseIDVal       sql.NullString
+			flowIDVal          sql.NullString
 			checkID            sql.NullString
 			lastChallengedNano sql.NullInt64
 			verifiedAtNano     sql.NullInt64
@@ -241,7 +243,7 @@ func scanAuthAttemptRows(rows *sql.Rows, attempt *domain.AuthAttempt) error {
 		if err := rows.Scan(
 			&attempt.ProjectID, &attemptID, &handoffToken, &handedOffAtNano, &sessionIDVal,
 			&requiredChecksJSON, &createdNano, &checkType, &timeToLiveNano, &internalInt,
-			&deploymentIDVal, &releaseIDVal,
+			&deploymentIDVal, &releaseIDVal, &flowIDVal,
 			&checkID, &lastChallengedNano, &verifiedAtNano, &lastFailedAtNano, &failureCount,
 			&challengePayload, &factorPayload,
 		); err != nil {
@@ -255,6 +257,9 @@ func scanAuthAttemptRows(rows *sql.Rows, attempt *domain.AuthAttempt) error {
 		}
 		if releaseIDVal.Valid {
 			attempt.ReleaseID = releaseIDVal.String
+		}
+		if flowIDVal.Valid {
+			attempt.FlowID = flowIDVal.String
 		}
 
 		if attempt.RequiredChecks == nil && requiredChecksJSON.Valid {

@@ -190,7 +190,7 @@ composes `Page`, `ResourceTitle` (with the Add button as its `action`,
 beside the title at every width, D19, labelled with what it adds as the sheet
 it opens is titled: `Add user`, `New project`, never a bare `Add`, the list's search as its `filter`,
 beside the action on one 36px row and on its own row under the title on a
-phone, where `filterBelow` keeps it at every width, as Logs' search is, and
+phone, where `filterBelow` keeps it at every width, as Events' search is, and
 the list's `ResourceFilter` as its `below` row, by "List filters" below),
 then `ResourceHeaderRow` +
 `ResourceHeadCell`, `ResourceRow`, `ResourceEmptyRow` and `LoadMore`. A
@@ -205,7 +205,7 @@ its card below 576px rather than squeezing the cells.
 | Table top | 20px under the title row at `lg`, 16px below |
 | Table head | 56px tall, 24px leading / 16px trailing inset |
 | Table cell | 56px tall, 24px inset, 8px block padding |
-| Row density | `RESOURCE_DENSITY` on the table's card sets the height for every head and body cell: `comfortable` (56px, the default) or `compact` (40px, 4px block padding, `RowMenu size="icon-xs"`; Logs). Never restate a height per cell |
+| Row density | `RESOURCE_DENSITY` on the table's card sets the height for every head and body cell: `comfortable` (56px, the default) or `compact` (40px, 4px block padding, `RowMenu size="icon-xs"`; Events). Never restate a height per cell |
 | Head label | display face, 12/16, 0.72px tracking, `foreground` |
 | Row icon | 16px, stroke 1.5, `muted-foreground`, 10px to its label |
 

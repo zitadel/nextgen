@@ -484,6 +484,12 @@ func markPlatformOperator(ctx context.Context, scope ScopeContext) {
 // can read every project (ADR 075 §3): the question listMyProjects asks without
 // a target project.
 func (h *Handler) platformOperator(ctx context.Context, scope ScopeContext) (bool, error) {
+	return h.platformOperatorWith(ctx, resolver.New(), scope)
+}
+
+// platformOperatorWith is platformOperator asking through r, so a caller that
+// checks projects next reads the active catalog once.
+func (h *Handler) platformOperatorWith(ctx context.Context, r *resolver.Resolver, scope ScopeContext) (bool, error) {
 	req := resolver.Request{
 		PrincipalType:     scope.PrincipalType,
 		PrincipalID:       scope.PrincipalID,
@@ -499,7 +505,7 @@ func (h *Handler) platformOperator(ctx context.Context, scope ScopeContext) (boo
 	if h == nil || h.pool == nil {
 		return false, domain.ErrInternal(errors.New("authz statements not configured"))
 	}
-	ok, err := resolver.New().PlatformOperator(ctx, h.pool.Statements(), req)
+	ok, err := r.PlatformOperator(ctx, h.pool.Statements(), req)
 	if err != nil {
 		return false, domain.ErrInternal(err).WithMessage("authz permission check failed")
 	}
@@ -636,22 +642,53 @@ func (h *Handler) requireProjectListAccess(ctx context.Context, projectID string
 }
 
 func requireProjectListAccess(ctx context.Context, stmts service.AuthzResolverStatements, projectID string, res resourceAccess, kind domain.ResourceKind) (context.Context, bool, error) {
+	gate, err := decideProjectListGate(ctx, stmts, projectID, res)
+	if err != nil {
+		return ctx, false, err
+	}
+	return gate.listContext(ctx, kind), gate.allow, nil
+}
+
+// projectListGate is what the caller may read of one project's lists, decided
+// once: every list, or the rows the caller's narrower grants reach. A search
+// across several types reads each type's list behind the one decision.
+type projectListGate struct {
+	projectID string
+	allow     bool
+	// params narrow each list to the caller's grants when allow is false.
+	params domain.AuthzCheckParams
+}
+
+// decideProjectListGate asks whether the caller may read projectID's lists,
+// answering a project they cannot reach with res's miss.
+func decideProjectListGate(ctx context.Context, stmts service.AuthzResolverStatements, projectID string, res resourceAccess) (projectListGate, error) {
+	gate := projectListGate{projectID: projectID}
 	r := resolver.New()
 	dec, err := checkProjectAccess(ctx, r, stmts, projectID, opRead, nil)
 	if err != nil {
-		return ctx, false, mapCeilingError(err, res, opRead, nil)
+		return gate, mapCeilingError(err, res, opRead, nil)
 	}
 	switch dec {
 	case resolver.DecisionAllow:
-		return service.WithAuthzListSkipOnce(ctx), true, nil
+		gate.allow = true
+		return gate, nil
 	case resolver.DecisionForbidden:
-		ctx, err := withAuthzListFilter(ctx, r, stmts, projectID, kind, opRead)
-		return ctx, false, err
-	case resolver.DecisionNotFound, resolver.DecisionUnspecified:
-		return ctx, false, res.miss(opRead)
+		gate.params, err = authzListFilterParams(ctx, r, stmts, projectID, opRead)
+		return gate, err
 	default:
-		return ctx, false, res.miss(opRead)
+		return gate, res.miss(opRead)
 	}
+}
+
+// listContext marks ctx for one list read of kind behind the gate.
+func (g projectListGate) listContext(ctx context.Context, kind domain.ResourceKind) context.Context {
+	if g.allow {
+		return service.WithAuthzListSkipOnce(ctx)
+	}
+	return service.WithAuthzListFilter(ctx, service.AuthzListFilter{
+		AuthzCheckParams: g.params,
+		ResourceKind:     kind,
+	})
 }
 
 // mapAuthzDecisionAfterRSI maps Check results after RSI already located the
@@ -673,18 +710,28 @@ func mapAuthzDecisionAfterRSI(dec resolver.Decision, res resourceAccess) error {
 // withAuthzListFilter attaches the EXISTS list predicate using the same
 // CheckParams builder as resolver.Check (including ConstraintTeamID).
 func withAuthzListFilter(ctx context.Context, r *resolver.Resolver, stmts service.AuthzResolverStatements, projectID string, kind domain.ResourceKind, op accessOp) (context.Context, error) {
-	scope, ok := GetScopeContext(ctx)
-	if !ok || scope.PrincipalType == "" || scope.PrincipalID == "" {
-		return ctx, domain.ErrInternal(nil).WithMessage("authz list filter requires credential scope")
-	}
-	params, err := r.CheckParams(ctx, stmts, projectCheckRequest(scope, projectID, op, nil))
+	params, err := authzListFilterParams(ctx, r, stmts, projectID, op)
 	if err != nil {
-		return ctx, domain.ErrInternal(err).WithMessage("authz catalog lookup failed")
+		return ctx, err
 	}
 	return service.WithAuthzListFilter(ctx, service.AuthzListFilter{
 		AuthzCheckParams: params,
 		ResourceKind:     kind,
 	}), nil
+}
+
+// authzListFilterParams are the check parameters a list filter narrows a
+// project's rows to the caller's grants with.
+func authzListFilterParams(ctx context.Context, r *resolver.Resolver, stmts service.AuthzResolverStatements, projectID string, op accessOp) (domain.AuthzCheckParams, error) {
+	scope, ok := GetScopeContext(ctx)
+	if !ok || scope.PrincipalType == "" || scope.PrincipalID == "" {
+		return domain.AuthzCheckParams{}, domain.ErrInternal(nil).WithMessage("authz list filter requires credential scope")
+	}
+	params, err := r.CheckParams(ctx, stmts, projectCheckRequest(scope, projectID, op, nil))
+	if err != nil {
+		return domain.AuthzCheckParams{}, domain.ErrInternal(err).WithMessage("authz catalog lookup failed")
+	}
+	return params, nil
 }
 
 // requireTeamDelete gates deleteTeam via the team's RSI. Unknown teams are

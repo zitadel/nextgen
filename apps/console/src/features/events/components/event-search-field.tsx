@@ -7,7 +7,7 @@ import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover"
 
 import {
   chipFilters,
-  type LogsSearch,
+  type EventsSearch,
   narrowedBy,
   type SearchMeaning,
   searchMeanings,
@@ -24,7 +24,7 @@ const READING: Partial<Record<string, string>> = {
 type Option = { kind: "meaning"; meaning: SearchMeaning } | { kind: "mine" };
 
 /**
- * The search above the Logs table, as Vercel's Logs has one: where every value
+ * The search above the Events table, as Vercel's Logs has one: where every value
  * that is pasted rather than chosen narrows the list. The filters it set sit
  * in the field as chips, each with its name, its value and a button that
  * removes it; Backspace in the empty field removes the last.
@@ -41,7 +41,7 @@ type Option = { kind: "meaning"; meaning: SearchMeaning } | { kind: "mine" };
  * field offers **My activity**, the list narrowed to what the signed-in
  * person did, whose chip reads `actor: me`.
  */
-export function LogSearchField({ current, me }: { current: LogsSearch; me?: string }) {
+export function EventSearchField({ current, me }: { current: EventsSearch; me?: string }) {
   const navigate = useNavigate();
   const [term, setTerm] = useState("");
   const [open, setOpen] = useState(false);
@@ -56,7 +56,7 @@ export function LogSearchField({ current, me }: { current: LogsSearch; me?: stri
         : []
       : searchMeanings(term).map((meaning) => ({ kind: "meaning", meaning }));
 
-  function go(search: LogsSearch) {
+  function go(search: EventsSearch) {
     void navigate({ to: "/events", search });
   }
 
@@ -140,7 +140,7 @@ export function LogSearchField({ current, me }: { current: LogsSearch; me?: stri
               placeholder={
                 chips.length > 0 ? "Add a filter" : "Search by ID, event type or operation"
               }
-              aria-label="Search logs by ID, event type or operation"
+              aria-label="Search events by ID, event type or operation"
               autoComplete="off"
               autoCapitalize="off"
               spellCheck={false}
