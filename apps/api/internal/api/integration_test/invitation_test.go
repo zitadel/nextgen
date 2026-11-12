@@ -396,6 +396,11 @@ func TestInvitationRedeem(t *testing.T) {
 		assert.Equal(t, project.Name, view.ProjectName)
 		assert.Equal(t, api.InvitationProjectMemberPayloadRelationAdmin, view.ProjectMember.Relation)
 		assert.Equal(t, ownerID, view.CreatedBy.Value)
+		// The colleague cannot read platform users, so lookup names the inviter.
+		inviter, ok := view.Inviter.Get()
+		require.True(t, ok)
+		assert.Equal(t, api.UserID(ownerID), inviter.UserID)
+		assert.NotEmpty(t, inviter.Identifier.Value)
 		assert.Equal(t, api.InvitationStatusPending, view.Status)
 		assert.Equal(t, created.ExpiresAt.Unix(), view.ExpiresAt.Unix())
 
@@ -456,6 +461,11 @@ func TestInvitationRedeem(t *testing.T) {
 		self, ok := accept(t, owner, token).(*api.AcceptInvitationForbidden)
 		require.True(t, ok)
 		assert.Equal(t, "inv.self_accept", string(self.Code))
+		declined, err := owner.RejectInvitation(t.Context(), &api.InvitationTokenRequest{Token: token})
+		require.NoError(t, err)
+		selfReject, ok := declined.(*api.RejectInvitationForbidden)
+		require.True(t, ok, helpers.MustMarshal(t, declined))
+		assert.Equal(t, "inv.self_reject", string(selfReject.Code))
 
 		_, colleague := newColleague(t)
 		colleague.SetOmitCSRF(true)

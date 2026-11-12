@@ -48,7 +48,10 @@ func newMockedInvitationService(t *testing.T, platformProjectID string) (*servic
 	keys := servicemocks.NewMockKeyService(ctrl)
 	db := service.NewPool(pool)
 	grants := service.NewGrantService(db, nil, platformProjectID)
-	return service.NewInvitationService(db, keys, grants, invitationConsole, platformProjectID), statements, keys, events
+	refs := &grantRefStub{byID: map[string]domain.UserRef{
+		"user_admin": {UserID: "user_admin", Identifier: "ada@example.com", IdentifierProperty: "email", Display: "Ada Lovelace"},
+	}}
+	return service.NewInvitationService(db, keys, grants, refs, invitationConsole, platformProjectID), statements, keys, events
 }
 
 // invitationEvent decodes one recorded event's payload into T.
@@ -552,6 +555,30 @@ func TestInvitationService_Lookup(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "Acme", got.ProjectName)
 		assert.Equal(t, "inv_1", got.ID)
+		require.NotNil(t, got.Inviter)
+		assert.Equal(t, "Ada Lovelace", got.Inviter.Display)
+	})
+
+	t.Run("an inviter that no longer resolves degrades to its id", func(t *testing.T) {
+		t.Parallel()
+		svc, s, _, _ := newMockedInvitationService(t, grantPlatformProjID)
+		expectInvitationByToken(s, pendingInvitation(new("user_gone")))
+		s.EXPECT().GetProjectByID(gomock.Any(), invitationProjectID).Return(&domain.Project{ID: invitationProjectID, Name: "Acme"}, nil)
+
+		got, err := svc.Lookup(t.Context(), invitationToken)
+		require.NoError(t, err)
+		assert.Equal(t, &domain.UserRef{UserID: "user_gone"}, got.Inviter)
+	})
+
+	t.Run("a project secret's invitation names no inviter", func(t *testing.T) {
+		t.Parallel()
+		svc, s, _, _ := newMockedInvitationService(t, grantPlatformProjID)
+		expectInvitationByToken(s, pendingInvitation(nil))
+		s.EXPECT().GetProjectByID(gomock.Any(), invitationProjectID).Return(&domain.Project{ID: invitationProjectID, Name: "Acme"}, nil)
+
+		got, err := svc.Lookup(t.Context(), invitationToken)
+		require.NoError(t, err)
+		assert.Nil(t, got.Inviter)
 	})
 
 	t.Run("an unknown token", func(t *testing.T) {
@@ -767,6 +794,16 @@ func TestInvitationService_Reject(t *testing.T) {
 		require.Len(t, *events, 1)
 		rejected := invitationEvent[domain.InvitationRejectedPayload](t, (*events)[0], domain.EventTypeInvitationRejected, "inv_1")
 		assert.Equal(t, domain.InvitationRejectedPayload{JourneyID: "journey_1", UserID: "user_colleague"}, rejected)
+	})
+
+	t.Run("the inviter declining their own invitation", func(t *testing.T) {
+		t.Parallel()
+		svc, s, _, events := newMockedInvitationService(t, grantPlatformProjID)
+		expectInvitationByToken(s, pendingInvitation(new("user_admin")))
+
+		_, err := svc.Reject(t.Context(), invitationToken, "user_admin")
+		require.ErrorIs(t, err, domain.ErrInvitationSelfReject())
+		assert.Empty(t, *events)
 	})
 
 	t.Run("a finished invitation", func(t *testing.T) {

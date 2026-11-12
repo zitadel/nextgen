@@ -25,16 +25,18 @@ type InvitationService struct {
 	db     *DB
 	keys   KeyService
 	grants *GrantService
+	refs   UserRefResolver
 	// consoleBaseURL never ends in a slash.
 	consoleBaseURL    string
 	platformProjectID string
 }
 
-func NewInvitationService(db *DB, keys KeyService, grants *GrantService, consoleBaseURL, platformProjectID string) *InvitationService {
+func NewInvitationService(db *DB, keys KeyService, grants *GrantService, refs UserRefResolver, consoleBaseURL, platformProjectID string) *InvitationService {
 	return &InvitationService{
 		db:                db,
 		keys:              keys,
 		grants:            grants,
+		refs:              refs,
 		consoleBaseURL:    consoleBaseURL,
 		platformProjectID: platformProjectID,
 	}
@@ -272,6 +274,9 @@ func (s *InvitationService) Cancel(ctx context.Context, projectID, id string) (e
 type InvitationLookup struct {
 	*domain.Invitation
 	ProjectName string
+	// Inviter names CreatedBy for a redeemer who cannot read platform users.
+	// Nil when a project secret created the invitation.
+	Inviter *domain.UserRef
 }
 
 // InviterCheck reports whether userID still administers projectID, reading
@@ -292,7 +297,19 @@ func (s *InvitationService) Lookup(ctx context.Context, token string) (_ *Invita
 	if err != nil {
 		return nil, mapInvitationError(err, "failed to look up invitation")
 	}
-	return &InvitationLookup{Invitation: entity, ProjectName: project.Name}, nil
+	found := &InvitationLookup{Invitation: entity, ProjectName: project.Name}
+	if entity.CreatedBy != nil {
+		// Creators are platform users; a missing one degrades to its id.
+		found.Inviter = &domain.UserRef{UserID: *entity.CreatedBy}
+		refs, err := s.refs.ResolveUserRefs(ctx, s.platformProjectID, []string{*entity.CreatedBy})
+		if err != nil {
+			return nil, domain.ErrInternal(err).WithMessage("failed to resolve the inviter")
+		}
+		if ref, ok := refs[*entity.CreatedBy]; ok {
+			found.Inviter = &ref
+		}
+	}
+	return found, nil
 }
 
 // Accept redeems a pending invitation for userID: the type's adapter writes
@@ -379,6 +396,10 @@ func (s *InvitationService) Reject(ctx context.Context, token, userID string) (_
 		entity, err := pendingInvitationByToken(ctx, stmts, token, now)
 		if err != nil {
 			return err
+		}
+		// An administrator cancels their own invitation instead.
+		if entity.CreatedBy != nil && *entity.CreatedBy == userID {
+			return domain.ErrInvitationSelfReject()
 		}
 		rejected, err = stmts.ChangeInvitationStatus(ctx, entity.ProjectID, entity.ID, domain.InvitationStatusRejected, nil, now)
 		if err != nil {

@@ -47746,6 +47746,59 @@ func (s *InvSelfAcceptDetails) init() InvSelfAcceptDetails {
 	return m
 }
 
+// Merged schema.
+// Ref: #
+type InvSelfReject struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptInvSelfRejectDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *InvSelfReject) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *InvSelfReject) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *InvSelfReject) GetDetails() OptInvSelfRejectDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *InvSelfReject) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *InvSelfReject) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *InvSelfReject) SetDetails(val OptInvSelfRejectDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type InvSelfRejectDetails map[string]jx.Raw
+
+func (s *InvSelfRejectDetails) init() InvSelfRejectDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
 // An invitation is a link, valid for 72 hours, that grants a role to whoever
 // redeems it. Discriminate on `type`; the object named after the type holds
 // everything specific to that type.
@@ -49891,6 +49944,10 @@ type InvitationLookupProjectMemberResponse struct {
 	// The user who created the invitation. Null when a project secret created it.
 	CreatedBy     OptNilString                                             `json:"created_by"`
 	CreatedByType OptNilInvitationLookupProjectMemberResponseCreatedByType `json:"created_by_type"`
+	// The user who created the invitation, resolved so the accept page can
+	// name them: render `display`, falling back to `identifier`, then
+	// `user_id`. Null when a project secret created it.
+	Inviter OptNilUserRef `json:"inviter"`
 	// When the invitation expires.
 	ExpiresAt     time.Time                                 `json:"expires_at"`
 	Status        InvitationStatus                          `json:"status"`
@@ -49916,6 +49973,11 @@ func (s *InvitationLookupProjectMemberResponse) GetCreatedBy() OptNilString {
 // GetCreatedByType returns the value of CreatedByType.
 func (s *InvitationLookupProjectMemberResponse) GetCreatedByType() OptNilInvitationLookupProjectMemberResponseCreatedByType {
 	return s.CreatedByType
+}
+
+// GetInviter returns the value of Inviter.
+func (s *InvitationLookupProjectMemberResponse) GetInviter() OptNilUserRef {
+	return s.Inviter
 }
 
 // GetExpiresAt returns the value of ExpiresAt.
@@ -49956,6 +50018,11 @@ func (s *InvitationLookupProjectMemberResponse) SetCreatedBy(val OptNilString) {
 // SetCreatedByType sets the value of CreatedByType.
 func (s *InvitationLookupProjectMemberResponse) SetCreatedByType(val OptNilInvitationLookupProjectMemberResponseCreatedByType) {
 	s.CreatedByType = val
+}
+
+// SetInviter sets the value of Inviter.
+func (s *InvitationLookupProjectMemberResponse) SetInviter(val OptNilUserRef) {
+	s.Inviter = val
 }
 
 // SetExpiresAt sets the value of ExpiresAt.
@@ -50149,6 +50216,10 @@ type InvitationLookupTeamMemberResponse struct {
 	// The user who created the invitation. Null when a project secret created it.
 	CreatedBy     OptNilString                                          `json:"created_by"`
 	CreatedByType OptNilInvitationLookupTeamMemberResponseCreatedByType `json:"created_by_type"`
+	// The user who created the invitation, resolved so the accept page can
+	// name them: render `display`, falling back to `identifier`, then
+	// `user_id`. Null when a project secret created it.
+	Inviter OptNilUserRef `json:"inviter"`
 	// When the invitation expires.
 	ExpiresAt  time.Time                              `json:"expires_at"`
 	Status     InvitationStatus                       `json:"status"`
@@ -50174,6 +50245,11 @@ func (s *InvitationLookupTeamMemberResponse) GetCreatedBy() OptNilString {
 // GetCreatedByType returns the value of CreatedByType.
 func (s *InvitationLookupTeamMemberResponse) GetCreatedByType() OptNilInvitationLookupTeamMemberResponseCreatedByType {
 	return s.CreatedByType
+}
+
+// GetInviter returns the value of Inviter.
+func (s *InvitationLookupTeamMemberResponse) GetInviter() OptNilUserRef {
+	return s.Inviter
 }
 
 // GetExpiresAt returns the value of ExpiresAt.
@@ -50214,6 +50290,11 @@ func (s *InvitationLookupTeamMemberResponse) SetCreatedBy(val OptNilString) {
 // SetCreatedByType sets the value of CreatedByType.
 func (s *InvitationLookupTeamMemberResponse) SetCreatedByType(val OptNilInvitationLookupTeamMemberResponseCreatedByType) {
 	s.CreatedByType = val
+}
+
+// SetInviter sets the value of Inviter.
+func (s *InvitationLookupTeamMemberResponse) SetInviter(val OptNilUserRef) {
+	s.Inviter = val
 }
 
 // SetExpiresAt sets the value of ExpiresAt.
@@ -65437,6 +65518,52 @@ func (o OptInvSelfAcceptDetails) Or(d InvSelfAcceptDetails) InvSelfAcceptDetails
 	return d
 }
 
+// NewOptInvSelfRejectDetails returns new OptInvSelfRejectDetails with value set to v.
+func NewOptInvSelfRejectDetails(v InvSelfRejectDetails) OptInvSelfRejectDetails {
+	return OptInvSelfRejectDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptInvSelfRejectDetails is optional InvSelfRejectDetails.
+type OptInvSelfRejectDetails struct {
+	Value InvSelfRejectDetails
+	Set   bool
+}
+
+// IsSet returns true if OptInvSelfRejectDetails was set.
+func (o OptInvSelfRejectDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptInvSelfRejectDetails) Reset() {
+	var v InvSelfRejectDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptInvSelfRejectDetails) SetTo(v InvSelfRejectDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptInvSelfRejectDetails) Get() (v InvSelfRejectDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptInvSelfRejectDetails) Or(d InvSelfRejectDetails) InvSelfRejectDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptInvitationAcceptedEventDelegationType returns new OptInvitationAcceptedEventDelegationType with value set to v.
 func NewOptInvitationAcceptedEventDelegationType(v InvitationAcceptedEventDelegationType) OptInvitationAcceptedEventDelegationType {
 	return OptInvitationAcceptedEventDelegationType{
@@ -70577,6 +70704,69 @@ func (o OptNilUserPropertyXMinusUnique) Get() (v UserPropertyXMinusUnique, ok bo
 
 // Or returns value if set, or given parameter if does not.
 func (o OptNilUserPropertyXMinusUnique) Or(d UserPropertyXMinusUnique) UserPropertyXMinusUnique {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilUserRef returns new OptNilUserRef with value set to v.
+func NewOptNilUserRef(v UserRef) OptNilUserRef {
+	return OptNilUserRef{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilUserRef is optional nullable UserRef.
+type OptNilUserRef struct {
+	Value UserRef
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilUserRef was set.
+func (o OptNilUserRef) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilUserRef) Reset() {
+	var v UserRef
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilUserRef) SetTo(v UserRef) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilUserRef) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilUserRef) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v UserRef
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilUserRef) Get() (v UserRef, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilUserRef) Or(d UserRef) UserRef {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -88664,6 +88854,7 @@ type RejectInvitationErrorResponse struct {
 	EvtInvalid       EvtInvalid
 	Internal         Internal
 	InvNotFound      InvNotFound
+	InvSelfReject    InvSelfReject
 	NotImplemented   NotImplemented
 	ReqInvalid       ReqInvalid
 	Unavailable      Unavailable
@@ -88679,6 +88870,7 @@ const (
 	EvtInvalidRejectInvitationErrorResponse       RejectInvitationErrorResponseType = "evt.invalid"
 	InternalRejectInvitationErrorResponse         RejectInvitationErrorResponseType = "internal"
 	InvNotFoundRejectInvitationErrorResponse      RejectInvitationErrorResponseType = "inv.not_found"
+	InvSelfRejectRejectInvitationErrorResponse    RejectInvitationErrorResponseType = "inv.self_reject"
 	NotImplementedRejectInvitationErrorResponse   RejectInvitationErrorResponseType = "not_implemented"
 	ReqInvalidRejectInvitationErrorResponse       RejectInvitationErrorResponseType = "req.invalid"
 	UnavailableRejectInvitationErrorResponse      RejectInvitationErrorResponseType = "unavailable"
@@ -88707,6 +88899,11 @@ func (s RejectInvitationErrorResponse) IsInternal() bool {
 // IsInvNotFound reports whether RejectInvitationErrorResponse is InvNotFound.
 func (s RejectInvitationErrorResponse) IsInvNotFound() bool {
 	return s.Type == InvNotFoundRejectInvitationErrorResponse
+}
+
+// IsInvSelfReject reports whether RejectInvitationErrorResponse is InvSelfReject.
+func (s RejectInvitationErrorResponse) IsInvSelfReject() bool {
+	return s.Type == InvSelfRejectRejectInvitationErrorResponse
 }
 
 // IsNotImplemented reports whether RejectInvitationErrorResponse is NotImplemented.
@@ -88826,6 +89023,27 @@ func (s RejectInvitationErrorResponse) GetInvNotFound() (v InvNotFound, ok bool)
 func NewInvNotFoundRejectInvitationErrorResponse(v InvNotFound) RejectInvitationErrorResponse {
 	var s RejectInvitationErrorResponse
 	s.SetInvNotFound(v)
+	return s
+}
+
+// SetInvSelfReject sets RejectInvitationErrorResponse to InvSelfReject.
+func (s *RejectInvitationErrorResponse) SetInvSelfReject(v InvSelfReject) {
+	s.Type = InvSelfRejectRejectInvitationErrorResponse
+	s.InvSelfReject = v
+}
+
+// GetInvSelfReject returns InvSelfReject and true boolean if RejectInvitationErrorResponse is InvSelfReject.
+func (s RejectInvitationErrorResponse) GetInvSelfReject() (v InvSelfReject, ok bool) {
+	if !s.IsInvSelfReject() {
+		return v, false
+	}
+	return s.InvSelfReject, true
+}
+
+// NewInvSelfRejectRejectInvitationErrorResponse returns new RejectInvitationErrorResponse from InvSelfReject.
+func NewInvSelfRejectRejectInvitationErrorResponse(v InvSelfReject) RejectInvitationErrorResponse {
+	var s RejectInvitationErrorResponse
+	s.SetInvSelfReject(v)
 	return s
 }
 

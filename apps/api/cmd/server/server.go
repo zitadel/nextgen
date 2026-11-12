@@ -314,7 +314,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	}
 	claimService := service.NewClaimService(serviceDBPool, consoleBase, cfg.Platform.ResolvedProjectID())
 	grantService := service.NewGrantService(serviceDBPool, userRefs, cfg.Platform.ResolvedProjectID())
-	invitationService := service.NewInvitationService(serviceDBPool, keyService, grantService, consoleBase, cfg.Platform.ResolvedProjectID())
+	invitationService := service.NewInvitationService(serviceDBPool, keyService, grantService, userRefs, consoleBase, cfg.Platform.ResolvedProjectID())
 	brandingService := service.NewBrandingService(serviceDBPool)
 	variableService := service.NewVariableService(serviceDBPool, keyService)
 	idpConnectionService := service.NewIDPConnectionService(serviceDBPool, schemaValidator)

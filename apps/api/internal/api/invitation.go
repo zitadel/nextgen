@@ -202,6 +202,11 @@ func (h *Handler) LookupInvitation(ctx context.Context, req *api.InvitationToken
 	} else {
 		view.CreatedByType.SetToNull()
 	}
+	if found.Inviter != nil {
+		view.Inviter.SetTo(userRefToAPI(*found.Inviter))
+	} else {
+		view.Inviter.SetToNull()
+	}
 	resp := api.NewInvitationLookupProjectMemberResponseInvitationLookupResponse(view)
 	return &resp, nil
 }
@@ -291,6 +296,7 @@ func invitationErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		return errorResponseWithStatusCode(http.StatusNotFound, err)
 	case domain.ErrInvitationPermissionDenied().Code,
 		domain.ErrInvitationSelfAccept().Code,
+		domain.ErrInvitationSelfReject().Code,
 		domain.ErrInvitationInviterNotAdmin().Code:
 		return errorResponseWithStatusCode(http.StatusForbidden, err)
 	case domain.ErrInvitationProjectUnclaimed().Code,

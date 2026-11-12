@@ -184,7 +184,10 @@ func (s *GrantService) writeGrant(ctx context.Context, stmts AllStatements, inpu
 // transaction, for invitation acceptance (ADR 086 §4). An identical active
 // grant is already done; an identical expired one is revoked and written anew.
 // It reads first because a unique violation would abort a Postgres transaction.
-func (s *GrantService) EnsureUserGrant(ctx context.Context, stmts AllStatements, projectID, userID, relation string, now time.Time) error {
+func (s *GrantService) EnsureUserGrant(ctx context.Context, stmts AllStatements, projectID, userID, relation string, now time.Time) (err error) {
+	ctx, end := startSpan(ctx, "GrantService.EnsureUserGrant")
+	defer end(&err)
+
 	held, err := stmts.ListAuthzAssignments(ctx, projectID, domain.AuthzPrincipalTypeUser, userID, false)
 	if err != nil {
 		return err

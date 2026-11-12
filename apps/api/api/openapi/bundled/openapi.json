@@ -9263,7 +9263,7 @@
       "post": {
         "operationId": "rejectInvitation",
         "summary": "Decline an invitation",
-        "description": "Declines a pending invitation for the signed-in user and returns the\nupdated invitation with status `rejected`.\n\nSend the plaintext token from the invitation link fragment. Metadata is\ncleared. Every unknown or finished token answers the same opaque `404`.\nAuthenticate with a platform-project user session cookie (`sessionCookie`).\nCookie requests follow that scheme's CSRF rules. The call is rate-limited.\n",
+        "description": "Declines a pending invitation for the signed-in user and returns the\nupdated invitation with status `rejected`.\n\nSend the plaintext token from the invitation link fragment. Metadata is\ncleared. The inviter cannot decline their own invitation; an administrator\ncancels it instead. Every unknown or finished token answers the same\nopaque `404`.\nAuthenticate with a platform-project user session cookie (`sessionCookie`).\nCookie requests follow that scheme's CSRF rules. The call is rate-limited.\n",
         "tags": [
           "Invitations"
         ],
@@ -9314,7 +9314,7 @@
             }
           },
           "403": {
-            "description": "CSRF failed (`auth.csrf_invalid`).",
+            "description": "The inviter cannot decline their own invitation, or CSRF failed\n(`auth.csrf_invalid`).\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -22310,6 +22310,17 @@
           "created_by_type": {
             "$ref": "#/components/schemas/invitation-created-by-type"
           },
+          "inviter": {
+            "description": "The user who created the invitation, resolved so the accept page can\nname them: render `display`, falling back to `identifier`, then\n`user_id`. Null when a project secret created it.\n",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/user-ref"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "expires_at": {
             "type": "string",
             "format": "date-time",
@@ -22425,6 +22436,26 @@
               "code": {
                 "type": "string",
                 "const": "inv.self_accept"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "inv-self_reject": {
+        "description": "The inviter cannot decline their own invitation\n\nError code: inv.self_reject\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "inv.self_reject"
               }
             },
             "required": [
@@ -26732,6 +26763,13 @@
         "value": {
           "code": "inv.self_accept",
           "message": "the inviter cannot accept their own invitation"
+        }
+      },
+      "inv-self_reject": {
+        "summary": "inv.self_reject",
+        "value": {
+          "code": "inv.self_reject",
+          "message": "the inviter cannot decline their own invitation"
         }
       },
       "evt-not_found": {
@@ -35246,6 +35284,9 @@
                   "$ref": "#/components/schemas/inv-not_found"
                 },
                 {
+                  "$ref": "#/components/schemas/inv-self_reject"
+                },
+                {
                   "$ref": "#/components/schemas/not_implemented"
                 },
                 {
@@ -35263,6 +35304,7 @@
                   "evt.invalid": "#/components/schemas/evt-invalid",
                   "internal": "#/components/schemas/internal",
                   "inv.not_found": "#/components/schemas/inv-not_found",
+                  "inv.self_reject": "#/components/schemas/inv-self_reject",
                   "not_implemented": "#/components/schemas/not_implemented",
                   "req.invalid": "#/components/schemas/req-invalid",
                   "unavailable": "#/components/schemas/unavailable"
@@ -35284,6 +35326,9 @@
               },
               "inv.not_found": {
                 "$ref": "#/components/examples/inv-not_found"
+              },
+              "inv.self_reject": {
+                "$ref": "#/components/examples/inv-self_reject"
               },
               "not_implemented": {
                 "$ref": "#/components/examples/not_implemented"

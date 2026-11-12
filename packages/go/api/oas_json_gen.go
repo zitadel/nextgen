@@ -78542,6 +78542,194 @@ func (s *InvSelfAcceptDetails) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode implements json.Marshaler.
+func (s *InvSelfReject) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *InvSelfReject) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("code")
+		e.Str("inv.self_reject")
+	}
+	{
+		e.FieldStart("message")
+		e.Str(s.Message)
+	}
+	{
+		if s.Details.Set {
+			e.FieldStart("details")
+			s.Details.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfInvSelfReject = [3]string{
+	0: "code",
+	1: "message",
+	2: "details",
+}
+
+// Decode decodes InvSelfReject from json.
+func (s *InvSelfReject) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode InvSelfReject to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "code":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.Code = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"code\"")
+			}
+		case "message":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := d.Str()
+				s.Message = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"message\"")
+			}
+		case "details":
+			if err := func() error {
+				s.Details.Reset()
+				if err := s.Details.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"details\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode InvSelfReject")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfInvSelfReject) {
+					name = jsonFieldsNameOfInvSelfReject[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *InvSelfReject) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *InvSelfReject) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s InvSelfRejectDetails) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields implements json.Marshaler.
+func (s InvSelfRejectDetails) encodeFields(e *jx.Encoder) {
+	for k, elem := range s {
+		e.FieldStart(k)
+
+		if len(elem) != 0 {
+			e.Raw(elem)
+		}
+	}
+}
+
+// Decode decodes InvSelfRejectDetails from json.
+func (s *InvSelfRejectDetails) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode InvSelfRejectDetails to nil")
+	}
+	m := s.init()
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		var elem jx.Raw
+		if err := func() error {
+			v, err := d.RawAppend(nil)
+			elem = jx.Raw(v)
+			if err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrapf(err, "decode field %q", k)
+		}
+		m[string(k)] = elem
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode InvSelfRejectDetails")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s InvSelfRejectDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *InvSelfRejectDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes Invitation as json.
 func (s Invitation) Encode(e *jx.Encoder) {
 	e.ObjStart()
@@ -82004,6 +82192,12 @@ func (s *InvitationLookupProjectMemberResponse) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.Inviter.Set {
+			e.FieldStart("inviter")
+			s.Inviter.Encode(e)
+		}
+	}
+	{
 		e.FieldStart("expires_at")
 		json.EncodeDateTime(e, s.ExpiresAt)
 	}
@@ -82021,15 +82215,16 @@ func (s *InvitationLookupProjectMemberResponse) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfInvitationLookupProjectMemberResponse = [8]string{
+var jsonFieldsNameOfInvitationLookupProjectMemberResponse = [9]string{
 	0: "project_id",
 	1: "project_name",
 	2: "created_by",
 	3: "created_by_type",
-	4: "expires_at",
-	5: "status",
-	6: "type",
-	7: "project_member",
+	4: "inviter",
+	5: "expires_at",
+	6: "status",
+	7: "type",
+	8: "project_member",
 }
 
 // Decode decodes InvitationLookupProjectMemberResponse from json.
@@ -82037,7 +82232,7 @@ func (s *InvitationLookupProjectMemberResponse) Decode(d *jx.Decoder) error {
 	if s == nil {
 		return errors.New("invalid: unable to decode InvitationLookupProjectMemberResponse to nil")
 	}
-	var requiredBitSet [1]uint8
+	var requiredBitSet [2]uint8
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
@@ -82083,8 +82278,18 @@ func (s *InvitationLookupProjectMemberResponse) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"created_by_type\"")
 			}
+		case "inviter":
+			if err := func() error {
+				s.Inviter.Reset()
+				if err := s.Inviter.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"inviter\"")
+			}
 		case "expires_at":
-			requiredBitSet[0] |= 1 << 4
+			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
 				v, err := json.DecodeDateTime(d)
 				s.ExpiresAt = v
@@ -82096,7 +82301,7 @@ func (s *InvitationLookupProjectMemberResponse) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"expires_at\"")
 			}
 		case "status":
-			requiredBitSet[0] |= 1 << 5
+			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
 				if err := s.Status.Decode(d); err != nil {
 					return err
@@ -82106,7 +82311,7 @@ func (s *InvitationLookupProjectMemberResponse) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"status\"")
 			}
 		case "type":
-			requiredBitSet[0] |= 1 << 6
+			requiredBitSet[0] |= 1 << 7
 			if err := func() error {
 				if err := s.Type.Decode(d); err != nil {
 					return err
@@ -82116,7 +82321,7 @@ func (s *InvitationLookupProjectMemberResponse) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"type\"")
 			}
 		case "project_member":
-			requiredBitSet[0] |= 1 << 7
+			requiredBitSet[1] |= 1 << 0
 			if err := func() error {
 				if err := s.ProjectMember.Decode(d); err != nil {
 					return err
@@ -82134,8 +82339,9 @@ func (s *InvitationLookupProjectMemberResponse) Decode(d *jx.Decoder) error {
 	}
 	// Validate required fields.
 	var failures []validate.FieldError
-	for i, mask := range [1]uint8{
-		0b11110011,
+	for i, mask := range [2]uint8{
+		0b11100011,
+		0b00000001,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -82298,6 +82504,12 @@ func (s InvitationLookupResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 			{
+				if s.Inviter.Set {
+					e.FieldStart("inviter")
+					s.Inviter.Encode(e)
+				}
+			}
+			{
 				e.FieldStart("expires_at")
 				json.EncodeDateTime(e, s.ExpiresAt)
 			}
@@ -82333,6 +82545,12 @@ func (s InvitationLookupResponse) encodeFields(e *jx.Encoder) {
 				if s.CreatedByType.Set {
 					e.FieldStart("created_by_type")
 					s.CreatedByType.Encode(e)
+				}
+			}
+			{
+				if s.Inviter.Set {
+					e.FieldStart("inviter")
+					s.Inviter.Encode(e)
 				}
 			}
 			{
@@ -82451,6 +82669,12 @@ func (s *InvitationLookupTeamMemberResponse) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.Inviter.Set {
+			e.FieldStart("inviter")
+			s.Inviter.Encode(e)
+		}
+	}
+	{
 		e.FieldStart("expires_at")
 		json.EncodeDateTime(e, s.ExpiresAt)
 	}
@@ -82468,15 +82692,16 @@ func (s *InvitationLookupTeamMemberResponse) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfInvitationLookupTeamMemberResponse = [8]string{
+var jsonFieldsNameOfInvitationLookupTeamMemberResponse = [9]string{
 	0: "project_id",
 	1: "project_name",
 	2: "created_by",
 	3: "created_by_type",
-	4: "expires_at",
-	5: "status",
-	6: "type",
-	7: "team_member",
+	4: "inviter",
+	5: "expires_at",
+	6: "status",
+	7: "type",
+	8: "team_member",
 }
 
 // Decode decodes InvitationLookupTeamMemberResponse from json.
@@ -82484,7 +82709,7 @@ func (s *InvitationLookupTeamMemberResponse) Decode(d *jx.Decoder) error {
 	if s == nil {
 		return errors.New("invalid: unable to decode InvitationLookupTeamMemberResponse to nil")
 	}
-	var requiredBitSet [1]uint8
+	var requiredBitSet [2]uint8
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
@@ -82530,8 +82755,18 @@ func (s *InvitationLookupTeamMemberResponse) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"created_by_type\"")
 			}
+		case "inviter":
+			if err := func() error {
+				s.Inviter.Reset()
+				if err := s.Inviter.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"inviter\"")
+			}
 		case "expires_at":
-			requiredBitSet[0] |= 1 << 4
+			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
 				v, err := json.DecodeDateTime(d)
 				s.ExpiresAt = v
@@ -82543,7 +82778,7 @@ func (s *InvitationLookupTeamMemberResponse) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"expires_at\"")
 			}
 		case "status":
-			requiredBitSet[0] |= 1 << 5
+			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
 				if err := s.Status.Decode(d); err != nil {
 					return err
@@ -82553,7 +82788,7 @@ func (s *InvitationLookupTeamMemberResponse) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"status\"")
 			}
 		case "type":
-			requiredBitSet[0] |= 1 << 6
+			requiredBitSet[0] |= 1 << 7
 			if err := func() error {
 				if err := s.Type.Decode(d); err != nil {
 					return err
@@ -82563,7 +82798,7 @@ func (s *InvitationLookupTeamMemberResponse) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"type\"")
 			}
 		case "team_member":
-			requiredBitSet[0] |= 1 << 7
+			requiredBitSet[1] |= 1 << 0
 			if err := func() error {
 				if err := s.TeamMember.Decode(d); err != nil {
 					return err
@@ -82581,8 +82816,9 @@ func (s *InvitationLookupTeamMemberResponse) Decode(d *jx.Decoder) error {
 	}
 	// Validate required fields.
 	var failures []validate.FieldError
-	for i, mask := range [1]uint8{
-		0b11110011,
+	for i, mask := range [2]uint8{
+		0b11100011,
+		0b00000001,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -98925,6 +99161,40 @@ func (s *OptInvSelfAcceptDetails) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes InvSelfRejectDetails as json.
+func (o OptInvSelfRejectDetails) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes InvSelfRejectDetails from json.
+func (o *OptInvSelfRejectDetails) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptInvSelfRejectDetails to nil")
+	}
+	o.Set = true
+	o.Value = make(InvSelfRejectDetails)
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptInvSelfRejectDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptInvSelfRejectDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes InvitationAcceptedEventDelegationType as json.
 func (o OptInvitationAcceptedEventDelegationType) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -102653,6 +102923,55 @@ func (s OptNilUserPropertyXMinusUnique) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *OptNilUserPropertyXMinusUnique) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes UserRef as json.
+func (o OptNilUserRef) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	if o.Null {
+		e.Null()
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes UserRef from json.
+func (o *OptNilUserRef) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptNilUserRef to nil")
+	}
+	if d.Next() == jx.Null {
+		if err := d.Null(); err != nil {
+			return err
+		}
+
+		var v UserRef
+		o.Value = v
+		o.Set = true
+		o.Null = true
+		return nil
+	}
+	o.Set = true
+	o.Null = false
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptNilUserRef) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptNilUserRef) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -128702,6 +129021,22 @@ func (s RejectInvitationErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case InvSelfRejectRejectInvitationErrorResponse:
+		e.FieldStart("code")
+		e.Str("inv.self_reject")
+		{
+			s := s.InvSelfReject
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case NotImplementedRejectInvitationErrorResponse:
 		e.FieldStart("code")
 		e.Str("not_implemented")
@@ -128791,6 +129126,9 @@ func (s *RejectInvitationErrorResponse) Decode(d *jx.Decoder) error {
 				case "inv.not_found":
 					s.Type = InvNotFoundRejectInvitationErrorResponse
 					found = true
+				case "inv.self_reject":
+					s.Type = InvSelfRejectRejectInvitationErrorResponse
+					found = true
 				case "not_implemented":
 					s.Type = NotImplementedRejectInvitationErrorResponse
 					found = true
@@ -128832,6 +129170,10 @@ func (s *RejectInvitationErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case InvNotFoundRejectInvitationErrorResponse:
 		if err := s.InvNotFound.Decode(d); err != nil {
+			return err
+		}
+	case InvSelfRejectRejectInvitationErrorResponse:
+		if err := s.InvSelfReject.Decode(d); err != nil {
 			return err
 		}
 	case NotImplementedRejectInvitationErrorResponse:
