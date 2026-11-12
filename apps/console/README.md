@@ -47,10 +47,11 @@ each route's `staticData.nav` ([`src/nav.ts`](src/nav.ts)).
 - **Events** (`/events`, `/events/$eventId`): the project's events.
 - **Project settings** (`/project`).
 - **Projects** (`/projects`), the root's home, and beside it the platform
-  project's pages for someone who can act on it (D41): Users and Events,
-  under `/platform`.
-- **Settings** (`/settings`): what the hosted cloud adds (Billing, Support,
-  Email).
+  project's screens for someone who can act on it (D41): the project screens
+  above, with that project selected.
+- **Settings** (`/settings`): the platform project's General and Admins for
+  someone who can act on it, then what the hosted cloud adds (Billing,
+  Support, Email).
 
 The sidebar is one level, in the order and with the icons of the design's
 "01 / Nav Level 1".

@@ -7,8 +7,7 @@ import {
   schemaFlatFields,
 } from "@/features/schemas/model";
 import { displayValue, field } from "@/lib/record";
-import { dateFilterStart, parseDateFilter } from "@/lib/resource-filter";
-import { searchTerm } from "@/lib/search-params";
+import { dateFilterStart } from "@/lib/resource-filter";
 import {
   type UserTeam,
   userAttributes,
@@ -39,37 +38,6 @@ export type UsersSearch = {
 
 /** The revision filter's value for every revision of the schema but the newest. */
 export const OLDER_REVISIONS = "older";
-
-/** The filter's earlier `Latest only` choice; the newest revision is picked by its id now. */
-const LEGACY_LATEST = "latest";
-
-/**
- * `validateSearch` of a Users list (the project's, and the root's):
- * the filter lives in the URL, as the Teams tabs do. It is a server-side
- * filter, so it belongs to the request the loader makes, is linkable and
- * survives a reload. Only what the filter can send is kept: a revision
- * belongs to a schema, so it goes without one, and `latest`, which earlier
- * links carry, names no revision.
- */
-export function validateUsersSearch(search: Record<string, unknown>): UsersSearch {
-  const schema = typeof search.schema === "string" && search.schema ? search.schema : undefined;
-  const revision =
-    schema &&
-    typeof search.revision === "string" &&
-    search.revision &&
-    search.revision !== LEGACY_LATEST
-      ? search.revision
-      : undefined;
-  // Every key, even unset: the router lays this over the raw search, so a
-  // key left out would keep the URL's value.
-  return {
-    q: searchTerm(search.q),
-    schema,
-    revision,
-    status: parseUserStatus(search.status),
-    created: parseDateFilter(search.created),
-  };
-}
 
 /** A user's lifecycle statuses, as the API names them. */
 export const USER_STATUSES = ["active", "suspended", "deactivated", "pending_purge"] as const;

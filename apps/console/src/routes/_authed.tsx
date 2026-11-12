@@ -9,6 +9,7 @@ import {
 import { fetchSession, signOut } from "@/auth/session";
 import { AppShell } from "@/app-shell/app-shell";
 import { routerRelativeHref, withoutTrailingSlash } from "@/lib/base-path";
+import { readPlatformAccess } from "@/features/platform/access";
 import {
   PROJECT_SCOPE_PARAM,
   resolveDefaultProjectScope,
@@ -48,10 +49,16 @@ export const Route = createFileRoute("/_authed")({
       throw redirect({ to: "/login", search: { next: routerRelativeHref(location.href) } });
     }
     const leaf = matches[matches.length - 1];
-    // The reserved platform project is the root, never a selection (D41): a
-    // URL naming it goes on without it, and gets the default like any other.
-    // `undefined` removes the retained key, which leaving it out would keep.
-    if (leaf && selectsPlatformProject(location.search)) {
+    // The reserved platform project is the root (D41): its screens are the
+    // root's, for someone who may act on it. For anyone else a URL naming it
+    // goes on without it, and gets the default like any project they cannot
+    // choose. `undefined` removes the retained key, which leaving it out
+    // would keep.
+    if (
+      leaf &&
+      selectsPlatformProject(location.search) &&
+      !(await readPlatformAccess().catch(() => undefined))
+    ) {
       throw redirect({
         to: withoutTrailingSlash(leaf.fullPath),
         params: leaf.params,

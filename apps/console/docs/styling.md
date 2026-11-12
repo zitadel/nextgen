@@ -236,7 +236,7 @@ the design even though its box measures correctly.
 A list is narrowed through `ResourceFilter` (`src/components/resource-filter.tsx`):
 **Add filter** lists the resource's properties, then the chosen property's
 values by its type, and each set filter is a chip. The Users list
-(`src/features/users/components/users-screen.tsx`) is the shipped example. To add it to a
+(`src/routes/_authed/users/index.tsx`) is the shipped example. To add it to a
 list:
 
 1. Describe the properties as `FilterDefinition`s (`src/lib/resource-filter.ts`)

@@ -1,6 +1,5 @@
 import { useRouter, useSearch } from "@tanstack/react-router";
 import { ApiError } from "@zitadel/api/runtime/fetch";
-import { type ReactNode, createContext, createElement, useContext } from "react";
 
 import { api } from "@/api/zitadel";
 import { useAsync } from "@/hooks/use-async";
@@ -94,10 +93,11 @@ export function validateProjectScopeSearch(search: Record<string, unknown>): Pro
 }
 
 /**
- * Whether `?project=` names the reserved platform project, which is never
- * selected (D41): the root draws it. The `_authed` guard drops such a
- * selection from the URL, as the router keeps a raw search key in every
- * match whatever `validateSearch` answers.
+ * Whether `?project=` names the reserved platform project, the console's root
+ * (D41). It is never offered as a project to choose; its screens are the
+ * root's, which the root's sidebar opens by selecting it. The `_authed` guard
+ * lets that selection stand only for someone who may act on the project
+ * (`readPlatformAccess`), and drops it for anyone else.
  */
 export function selectsPlatformProject(search: Record<string, unknown>): boolean {
   const platform = getPlatformProjectId();
@@ -161,32 +161,22 @@ export function useProjectScope(): string | undefined {
 }
 
 /**
- * The project a root page manages in place of the selection (D41): the
- * root's Users and Events draw the project screens' components for the
- * reserved platform project, which is never selected. Set by
- * {@link ManagedProject} around such a page.
+ * Whether the selected project is the reserved platform project: the screen
+ * is one of the root's (D41), drawn for that project like any project's, and
+ * the chrome around it is the root's (its sidebar, its pill).
  */
-const ManagedProjectContext = createContext<string | undefined>(undefined);
-
-/**
- * Renders `children` as managing project `id` rather than the selection, so a
- * project screen's components (an Add user sheet, a branding preview) act on
- * it. The selection, and the chrome that names it, stay as they are (D36).
- */
-export function ManagedProject({ id, children }: { id: string; children: ReactNode }) {
-  return createElement(ManagedProjectContext.Provider, { value: id }, children);
+export function usePlatformSelected(): boolean {
+  const platform = getPlatformProjectId();
+  return useProjectScope() === platform && platform !== undefined;
 }
 
 /**
- * The project a screen's components act on: the one {@link ManagedProject}
- * names on a root page, else the selected project. `scope: "project"` screens
- * are never rendered without one, so an empty value here is a routing mistake
- * and fails loudly rather than querying `""`.
+ * The selected project id on a screen that declared `scope: "project"`. The
+ * `_authed` guard never renders such a screen without one, so an empty value
+ * here is a routing mistake and fails loudly rather than querying `""`.
  */
 export function useRequiredProjectScope(): string {
-  const managed = useContext(ManagedProjectContext);
-  const selected = useProjectScope();
-  return requireProjectScope(managed ?? selected);
+  return requireProjectScope(useProjectScope());
 }
 
 /** Loader-side counterpart of {@link useRequiredProjectScope}. */

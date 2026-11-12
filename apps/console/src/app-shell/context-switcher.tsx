@@ -101,8 +101,9 @@ export function ContextSwitcher({
   /** The screen is above every project: with none selected, the pill says so. */
   allProjects?: boolean;
   /**
-   * The screen manages the root itself, a page of the platform project (D41):
-   * the pill says so whichever project is selected, and marks none.
+   * The screen is the root's own: it is drawn for the reserved platform
+   * project, which is the selection then (D41). The pill says the root, never
+   * a project named for the platform, and its list marks and remembers none.
    */
   root?: boolean;
 }) {
@@ -115,7 +116,8 @@ export function ContextSwitcher({
   // project selected anywhere — the switcher, Projects, search, a link — is the
   // one they opened last.
   const current = useSelectedProject();
-  useRememberRecentProject(userId, current);
+  // The platform project is the root, never one of the person's projects.
+  useRememberRecentProject(userId, root ? undefined : current);
   const selected = useProjectScope();
   const teamId = useParams({ strict: false, select: (params) => params.teamId });
 
@@ -185,7 +187,8 @@ function ProjectSwitcher({
     groups = [{ options: byName(matches).map(toOption) }];
     emptyLabel = found?.term.toLowerCase() === term ? NO_MATCHES : SEARCHING;
   } else if (mine) {
-    const named = current?.name === undefined ? undefined : { ...current, name: current.name };
+    const named =
+      root || current?.name === undefined ? undefined : { ...current, name: current.name };
     const { recent, rest } = openingList(mine, named, recents);
     groups = [
       { heading: "Recent", options: recent.map(toOption) },
@@ -195,9 +198,8 @@ function ProjectSwitcher({
   }
 
   const label = current && (current.name ?? current.id);
-  // A selection outlives the way up to Projects and Settings (D36). On a page
-  // of the platform project it stays in the URL for the way back, but the
-  // pill names the root: that page is not the selected project's (D41).
+  // A selection outlives the way up to Projects and Settings (D36). While it
+  // is the platform project the pill names the root (D41).
   const shown = root ? undefined : selected;
   const unselected = root || (allProjects && !selected);
 

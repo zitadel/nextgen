@@ -238,15 +238,16 @@ the sidebar.
 > says `All projects` and a project's row asks for one (D22, D31).
 
 > **Amendment (2026-11-11, design decision D41):** the account list is the
-> root's: Projects, then the reserved platform project's pages for someone
-> who may act on it, then Settings. It draws no portal entry, which replaces
-> D34's amendment above. The platform's pages are routes under `/platform`
-> with `staticData.platformRoot` and `view: "account"`; the shell shows the
-> account list on them and on `/account`, and their pill says `All projects`
-> whichever project the URL keeps selected. The root's Events
-> (`/platform/events`) swaps in the Events list as `/events` does, under a
-> heading that leads back to Projects. `/settings` lists what an add-on
-> adds, and its row is left out while that is nothing.
+> root's: Projects, then the reserved platform project's screens for someone
+> who may act on it, then Settings. Those screens are the portal's own
+> routes: a row of the root's selects the platform project (`?project=`), and
+> while it is the selection the shell shows the account list on them, as on
+> `/account`, and the pill says `All projects`. This replaces D34's amendment
+> above, whose rows asked for a project. The list leaves out Overview, and the
+> project's Settings row, whose pages head the root's Settings list before
+> what an add-on adds; `/project` shows that list while the platform project
+> is selected. `/events` leads back to Projects then. The `_authed` guard
+> drops the selection for someone who may not act on that project.
 
 > **Amendment (2026-11-10, design decision D35):** `/` is a screen again, the
 > project's Overview, declaring `scope: "project"` and the portal list's first

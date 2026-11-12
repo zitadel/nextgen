@@ -23,7 +23,6 @@ import {
 } from "@/components/ui/popover";
 import { formatDate } from "@/lib/date";
 import type { UserSchema } from "@/features/schemas/model";
-import { PROJECT_USER_LINKS, type UserLinks } from "@/features/users/links";
 import type { AttributeSummary, UserRow } from "@/features/users/list";
 import { cn } from "@/lib/utils";
 
@@ -57,24 +56,20 @@ function IdentifierChip({ property }: { property?: string }) {
  *
  * `sticky` pins it to the card's left edge while the other columns scroll
  * under it (the Users list); the header cell over it takes
- * `RESOURCE_STICKY_START` too. `card` adds the identity hover card. `links`
- * names the detail it opens and the schema the card does: the project's,
- * unless the root's Users draws it (D41).
+ * `RESOURCE_STICKY_START` too. `card` adds the identity hover card.
  */
 export function UserIdentityCell({
   user,
   sticky = false,
   card,
-  links = PROJECT_USER_LINKS,
 }: {
   user: UserRow;
   sticky?: boolean;
   card?: IdentityCardContext;
-  links?: UserLinks;
 }) {
   const link = (
     <Link
-      to={links.detail}
+      to="/users/$userId"
       params={{ userId: user.id }}
       className="text-foreground block min-w-0 truncate font-medium underline-offset-2 hover:underline"
     >
@@ -95,7 +90,7 @@ export function UserIdentityCell({
           <HoverCard openDelay={400} closeDelay={100}>
             <HoverCardTrigger asChild>{link}</HoverCardTrigger>
             <HoverCardContent align="start" className="w-80 overflow-hidden p-3">
-              <UserIdentityCard user={user} context={card} schemaLink={links.schema} />
+              <UserIdentityCard user={user} context={card} />
             </HoverCardContent>
           </HoverCard>
         ) : (
@@ -131,16 +126,7 @@ interface IdentityCardContext {
  * but its content is not reachable by keyboard, and everything in it is on the
  * detail screen too.
  */
-function UserIdentityCard({
-  user,
-  context,
-  schemaLink,
-}: {
-  user: UserRow;
-  context: IdentityCardContext;
-  /** Absent at the root, where the schema has no page and its name reads as text (D41). */
-  schemaLink: UserLinks["schema"];
-}) {
+function UserIdentityCard({ user, context }: { user: UserRow; context: IdentityCardContext }) {
   const display = user.secondary ? user.name : undefined;
   const owner = user.lifecycleOwnerTeamId;
   const ownerName = owner && user.teams.find((team) => team.id === owner)?.name;
@@ -152,16 +138,14 @@ function UserIdentityCard({
             opening it: the schema is what decides everything below. */}
         <p className="text-muted-foreground mt-0.5 flex min-w-0 items-center gap-1.5">
           <Braces aria-hidden strokeWidth={1.5} className="size-3.5 shrink-0" />
-          {user.schemaId && schemaLink ? (
+          {user.schemaId ? (
             <Link
-              to={schemaLink}
+              to="/schemas/$schemaId"
               params={{ schemaId: user.schemaId }}
               className="hover:text-foreground truncate underline-offset-2 hover:underline"
             >
               {context.schemaTitle}
             </Link>
-          ) : user.schemaId ? (
-            <span className="truncate">{context.schemaTitle}</span>
           ) : (
             <span className="truncate">No schema</span>
           )}
@@ -253,14 +237,11 @@ export function UserAttributesCell({
   user,
   summary,
   schema,
-  detail,
 }: {
   user: UserRow;
   summary: AttributeSummary;
   /** The user's schema document, for the Fields tab's labels and formats. */
   schema?: UserSchema;
-  /** The user's detail, which View details opens. */
-  detail: UserLinks["detail"];
 }) {
   const empty = summary.entries.length === 0 && summary.more === 0;
   return (
@@ -312,7 +293,7 @@ export function UserAttributesCell({
                 <PopoverDescription className="truncate text-xs">{user.name}</PopoverDescription>
               </PopoverHeader>
               <Link
-                to={detail}
+                to="/users/$userId"
                 params={{ userId: user.id }}
                 className="shrink-0 text-sm underline-offset-2 hover:underline"
               >
@@ -324,12 +305,7 @@ export function UserAttributesCell({
               noun="attributes"
               compact
               fields={
-                <AttributeFields
-                  attributes={user.attributes}
-                  schema={schema}
-                  userId={user.id}
-                  detail={detail}
-                />
+                <AttributeFields attributes={user.attributes} schema={schema} userId={user.id} />
               }
             />
           </PopoverContent>

@@ -22,7 +22,6 @@ import {
   schemaFields,
 } from "@/features/schemas/model";
 import { UserRevisionSheet } from "@/features/users/components/user-revision-sheet";
-import type { UserLinks } from "@/features/users/links";
 import {
   attributesPatch,
   draftFromAttributes,
@@ -71,7 +70,6 @@ export function UserProfileCard({
   latestSchemaId,
   revisions,
   attributes,
-  links,
   onSaved,
 }: {
   userId: string;
@@ -84,11 +82,6 @@ export function UserProfileCard({
   /** The schema's history, which a move picks from. */
   revisions: SchemaRevision[];
   attributes: Record<string, unknown>;
-  /**
-   * Where the card's links lead: the schema, absent at the root, which shows
-   * no schemas, so it reads as text there (D41); the user's own page.
-   */
-  links: UserLinks;
   onSaved: () => Promise<void>;
 }) {
   const root = useMemo(() => formRoot(schema ? schemaFields(schema) : []), [schema]);
@@ -114,7 +107,6 @@ export function UserProfileCard({
     [root, form.draft],
   );
   const name = schema && schemaId ? schemaDisplayName(schema, schemaId) : undefined;
-  const schemaLink = links.schema;
   // Being on an older revision is normal during a rollout, not an error, so this
   // says what is available rather than ranking the user's revision. The newest may
   // not be the one a release serves, which is why it never reads "outdated".
@@ -131,54 +123,38 @@ export function UserProfileCard({
         <h2 className={`${SECTION_HEADING} ${LABEL_COLUMN}`}>User schema</h2>
         {schema && schemaId && (
           <div className="flex max-w-full min-w-0 flex-wrap items-center gap-x-3">
-            {name !== schemaId &&
-              (schemaLink ? (
-                // The name is the schema, so it opens the newest revision; the
-                // box beside it is the revision this user is on. `min-h-6` is
-                // the 24px touch target, the box's own height.
-                <Link
-                  to={schemaLink}
-                  params={{ schemaId: latestSchemaId ?? schemaId }}
-                  className={`text-foreground inline-flex min-h-6 min-w-0 items-center break-words underline-offset-2 hover:underline ${FIELD_LABEL_TYPOGRAPHY}`}
-                >
-                  {name}
-                </Link>
-              ) : (
-                <span
-                  className={`text-foreground inline-flex min-h-6 min-w-0 items-center break-words ${FIELD_LABEL_TYPOGRAPHY}`}
-                >
-                  {name}
-                </span>
-              ))}
-            {schemaLink ? (
-              <Button
-                asChild
-                variant="secondary"
-                size="xs"
-                className="h-auto min-h-6 max-w-full justify-start py-0.5 has-[>svg]:px-2"
+            {name !== schemaId && (
+              // The name is the schema, so it opens the newest revision; the
+              // box beside it is the revision this user is on. `min-h-6` is
+              // the 24px touch target, the box's own height.
+              <Link
+                to="/schemas/$schemaId"
+                params={{ schemaId: latestSchemaId ?? schemaId }}
+                className={`text-foreground inline-flex min-h-6 min-w-0 items-center break-words underline-offset-2 hover:underline ${FIELD_LABEL_TYPOGRAPHY}`}
               >
-                <Link
-                  to={schemaLink}
-                  params={{ schemaId }}
-                  aria-label={name !== schemaId ? `${name} ${schemaId}` : undefined}
-                >
-                  <GitCommitHorizontal className="size-4" strokeWidth={1.5} aria-hidden />
-                  <Badge
-                    variant="ghost"
-                    className="h-auto min-h-5 min-w-0 shrink px-0 py-0 font-mono font-normal"
-                  >
-                    <IdText id={schemaId} title={schemaId} />
-                  </Badge>
-                </Link>
-              </Button>
-            ) : (
-              // The revision as text, with the box's glyph and no fill: a
-              // filled box would read as a button that opens it.
-              <span className="text-muted-foreground inline-flex min-h-6 max-w-full min-w-0 items-center gap-1 font-mono text-xs">
-                <GitCommitHorizontal className="size-4 shrink-0" strokeWidth={1.5} aria-hidden />
-                <IdText id={schemaId} title={schemaId} />
-              </span>
+                {name}
+              </Link>
             )}
+            <Button
+              asChild
+              variant="secondary"
+              size="xs"
+              className="h-auto min-h-6 max-w-full justify-start py-0.5 has-[>svg]:px-2"
+            >
+              <Link
+                to="/schemas/$schemaId"
+                params={{ schemaId }}
+                aria-label={name !== schemaId ? `${name} ${schemaId}` : undefined}
+              >
+                <GitCommitHorizontal className="size-4" strokeWidth={1.5} aria-hidden />
+                <Badge
+                  variant="ghost"
+                  className="h-auto min-h-5 min-w-0 shrink px-0 py-0 font-mono font-normal"
+                >
+                  <IdText id={schemaId} title={schemaId} />
+                </Badge>
+              </Link>
+            </Button>
             {newerRevision && <Badge variant="warning">New revision available</Badge>}
             {ownRevisionId && (
               <RevisionBadges revisions={revisions} latestId={latestSchemaId} id={ownRevisionId} />
@@ -188,7 +164,6 @@ export function UserProfileCard({
         {schema && ownRevisionId && revisions.length > 1 && (
           <UserRevisionSheet
             userId={userId}
-            detail={links.detail}
             attributes={attributes}
             currentId={ownRevisionId}
             currentSchema={schema}

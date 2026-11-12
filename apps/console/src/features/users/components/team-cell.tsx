@@ -1,7 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { Box } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import type { UserLinks } from "@/features/users/links";
 import type { UserTeam } from "@/features/users/model";
 
 /**
@@ -11,8 +10,7 @@ import type { UserTeam } from "@/features/users/model";
  * the active ones, and an unmarked name would read as a full member.
  *
  * Each name opens its team, as the Teams directory's own rows do — the embedded
- * entry carries the id, so the link costs no extra read. Without `link` (the
- * root's Users, whose teams have no page, D41) the names read as text.
+ * entry carries the id, so the link costs no extra read.
  *
  * `+more` is deliberately not a link. The response carries the capped list and a
  * boolean, not the names past the cap, so there is nothing to expand inline
@@ -21,15 +19,7 @@ import type { UserTeam } from "@/features/users/model";
  * screen to send the operator to. It becomes a link to that screen when the
  * screen lists them.
  */
-export function TeamCell({
-  teams,
-  truncated,
-  link,
-}: {
-  teams: UserTeam[];
-  truncated: boolean;
-  link: UserLinks["team"];
-}) {
+export function TeamCell({ teams, truncated }: { teams: UserTeam[]; truncated: boolean }) {
   if (teams.length === 0) return <>—</>;
   return (
     <span className="flex items-center gap-1.5">
@@ -43,17 +33,13 @@ export function TeamCell({
             {/* The separator sits outside the anchor: it belongs to the list,
                 not to either team it divides. */}
             {index > 0 && ", "}
-            {link ? (
-              <Link
-                to={link}
-                params={{ teamId: team.id }}
-                className="hover:text-foreground underline-offset-2 hover:underline"
-              >
-                {team.name}
-              </Link>
-            ) : (
-              team.name
-            )}
+            <Link
+              to="/teams/$teamId"
+              params={{ teamId: team.id }}
+              className="hover:text-foreground underline-offset-2 hover:underline"
+            >
+              {team.name}
+            </Link>
             {team.status && team.status !== "active" && (
               <Badge
                 variant="outline"

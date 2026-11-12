@@ -5,7 +5,6 @@ import { type ReactNode, useRef, useState } from "react";
 import { IdText } from "@/components/id-text";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 
-import { type EventsHome, eventLinks } from "../home";
 import {
   chipFilters,
   type EventsSearch,
@@ -42,16 +41,7 @@ type Option = { kind: "meaning"; meaning: SearchMeaning } | { kind: "mine" };
  * field offers **My activity**, the list narrowed to what the signed-in
  * person did, whose chip reads `actor: me`.
  */
-export function EventSearchField({
-  home,
-  current,
-  me,
-}: {
-  /** The list it narrows: a project's Events, or the root's (D41). */
-  home: EventsHome;
-  current: EventsSearch;
-  me?: string;
-}) {
+export function EventSearchField({ current, me }: { current: EventsSearch; me?: string }) {
   const navigate = useNavigate();
   const [term, setTerm] = useState("");
   const [open, setOpen] = useState(false);
@@ -67,7 +57,7 @@ export function EventSearchField({
       : searchMeanings(term).map((meaning) => ({ kind: "meaning", meaning }));
 
   function go(search: EventsSearch) {
-    void navigate({ to: home, search });
+    void navigate({ to: "/events", search });
   }
 
   function choose(option: Option) {
@@ -79,7 +69,7 @@ export function EventSearchField({
     }
     const { meaning } = option;
     if (meaning.kind === "event") {
-      void navigate(eventLinks(home, current).event(meaning.id));
+      void navigate({ to: "/events/$eventId", params: { eventId: meaning.id }, search: current });
     } else {
       go(narrowedBy(current, meaning.filter.key, meaning.value));
     }

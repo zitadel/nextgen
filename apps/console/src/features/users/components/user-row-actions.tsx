@@ -3,7 +3,6 @@ import { useState } from "react";
 import { DeleteUserDialog } from "@/features/users/components/delete-user-dialog";
 import { RowMenu } from "@/components/resource-list";
 import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import type { UserLinks } from "@/features/users/links";
 
 /**
  * The row menu carries only actions that reach the API.
@@ -21,13 +20,10 @@ import type { UserLinks } from "@/features/users/links";
 export function UserRowActions({
   userId,
   name,
-  detail,
   onDeleted,
 }: {
   userId: string;
   name: string;
-  /** The user's detail, which View details opens. */
-  detail: UserLinks["detail"];
   onDeleted: () => void | Promise<void>;
 }) {
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -36,7 +32,7 @@ export function UserRowActions({
     <>
       <RowMenu name={name}>
         <DropdownMenuItem asChild>
-          <Link to={detail} params={{ userId }}>
+          <Link to="/users/$userId" params={{ userId }}>
             View details
           </Link>
         </DropdownMenuItem>

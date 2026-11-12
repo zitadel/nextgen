@@ -1,10 +1,10 @@
 import { redirect } from "@tanstack/react-router";
+import { requireProjectScope } from "@/features/projects/project-scope";
 import { fetchAllSchemas, fetchLatestSchemaId, fetchSchemaRevisions } from "@/features/schemas/api";
 import type { UserSchema } from "@/features/schemas/model";
 import { useSearchedLoad } from "@/hooks/use-searched-load";
 
-import { columnsForUsers, type fetchUserDetail, fetchUsers } from "./api";
-import type { UserLinks } from "./links";
+import { columnsForUsers, fetchUsers } from "./api";
 import {
   OLDER_REVISIONS,
   type SchemaOption,
@@ -14,17 +14,13 @@ import {
 } from "./list";
 
 /**
- * What the Users screens read: the list's load, the search that follows it
- * without a new load (`useUserSearch`), and a user's detail. Each takes the
- * project it reads, so the selected project's Users and the root's Users,
- * the reserved platform project's (D41), share them.
+ * What the Users list reads: the route's load, and the search that follows it
+ * without a new load (`useUserSearch`).
  */
 
-/**
- * The first page of a search, and what the screen draws around it. `list` is
- * the screen's own path, where an `older` filter it cannot apply drops back.
- */
-export async function loadUsers(projectId: string, search: UsersSearch, list: UserLinks["list"]) {
+/** The first page of a search, and what the screen draws around it. */
+export async function loadUsers(search: UsersSearch & { project?: string }) {
+  const projectId = requireProjectScope(search.project);
   // The filter's options are the project's schemas at their latest revision;
   // the chosen schema's revisions, with whether each is in use, are read for
   // it alone. Both are chrome: unreadable, the list still renders, narrowed
@@ -43,8 +39,9 @@ export async function loadUsers(projectId: string, search: UsersSearch, list: Us
     : undefined;
   if (older && !latestId) {
     throw redirect({
-      to: list,
-      search: (prev: Record<string, unknown>) => ({ ...prev, revision: undefined }),
+      from: "/users/",
+      to: "/users",
+      search: (prev) => ({ ...prev, revision: undefined }),
     });
   }
   const filter = userFilter(search, latestId);
@@ -70,7 +67,8 @@ export async function loadUsers(projectId: string, search: UsersSearch, list: Us
  * A later term's first page. Only the rows depend on the term: the filter's
  * options, the revisions and the newest revision stay as the load read them.
  */
-async function searchUsers(projectId: string, search: UsersSearch, base: LoadedUsers) {
+async function searchUsers(search: UsersSearch & { project?: string }, base: LoadedUsers) {
+  const projectId = requireProjectScope(search.project);
   const filter = userFilter(search, base.latestId);
   const page = await fetchUsers(projectId, undefined, true, filter);
   return {
@@ -93,17 +91,13 @@ export function latestDocuments(options: SchemaOption[]): Map<string, UserSchema
 
 /** The Users list as the latest search term has it (`useSearchedLoad`). */
 export function useUserSearch(
-  projectId: string,
-  search: UsersSearch,
+  search: UsersSearch & { project?: string },
   fromRoute: LoadedUsers,
 ): { loaded: LoadedUsers; searching: boolean; searchError: string | undefined } {
   return useSearchedLoad(
     search.q,
     fromRoute,
-    (base) => searchUsers(projectId, search, base),
+    (base) => searchUsers(search, base),
     "Could not search the users.",
   );
 }
-
-/** Everything a user's detail shows (`fetchUserDetail`). */
-export type LoadedUser = Awaited<ReturnType<typeof fetchUserDetail>>;

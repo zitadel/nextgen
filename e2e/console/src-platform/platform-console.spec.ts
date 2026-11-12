@@ -71,8 +71,9 @@ test("a platform operator reaches every management screen without an error", asy
   await expect(page.locator("zitadel-login").getByRole("textbox", { name: "Email" })).toBeVisible();
 
   // The platform project the console signs in to is the root, not a project
-  // (D41): the server marks it, Projects never lists it, and this operator,
-  // who holds no grant on it, finds none of its pages in the root's sidebar.
+  // to choose (D41): the server marks it, Projects never lists it, and this
+  // operator, who holds no grant on it, finds none of its screens in the
+  // root's sidebar.
   const runtime = (await (await page.request.get("/console/runtime.json")).json()) as {
     console_project_id?: string;
     platform_project_id?: string;
@@ -88,12 +89,14 @@ test("a platform operator reaches every management screen without an error", asy
   await expect(projectLink).toBeVisible();
   // Bootstrap names the platform project "Platform" (internal/bootstrap/platform).
   await expect(page.getByRole("table").getByRole("link", { name: "Platform" })).toHaveCount(0);
-  // Its pages refuse this operator outright: the server answers the platform
-  // project's read with a refusal, so a link to one lands on Projects, whose
-  // sidebar lists none of them. The embedded console has no add-on either, so
-  // Projects is the root's only row.
-  await page.goto("/ui/console/platform/users");
-  await expect(page).toHaveURL(/\/projects(\?|$)/);
+  // Its screens are not this operator's: the server answers the platform
+  // project's read with a refusal, so a URL that selects it goes on in their
+  // own project instead, and the root's sidebar lists none of its screens.
+  // The embedded console has no add-on either, so Projects is the root's
+  // only row.
+  await page.goto(`/ui/console/users?project=${runtime.platform_project_id}`);
+  await expect(page).toHaveURL(new RegExp(`/users\\?project=${zitadel.handle.projectId}$`));
+  await page.goto("/ui/console/projects");
   await expect(projectLink).toBeVisible();
   const root = page.getByRole("navigation", { name: "Account" });
   await expect(root.getByRole("link")).toHaveText(["Projects"]);

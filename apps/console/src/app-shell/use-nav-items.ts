@@ -14,7 +14,16 @@ export interface NavItem {
   /** Route path. */
   to: string;
   nav: NavMeta;
+  /**
+   * The project the row's screen is drawn for, where that is not the
+   * selection: the reserved platform project, on a row of the root's lists
+   * (D41). The row selects it.
+   */
+  project?: string;
 }
+
+/** A project's home, Overview. The root's home is Projects, so its list leaves this out. */
+const OVERVIEW_PATH = "/";
 
 /**
  * Builds one sidebar's list from `staticData.nav` on the route tree (Console
@@ -29,22 +38,16 @@ export interface NavItem {
  * project is selected (D22): without one, the `_authed` guard sends such a
  * screen to Projects to choose one first (`?next=`), and choosing one goes on
  * to it. Links need not carry the selection — the `_authed` layout retains it.
- *
- * The root pages of the reserved platform project (`staticData.platformRoot`,
- * D41) are listed only for someone who may act on that project.
  */
 export function useNavItems(view: NavView = "portal"): NavItem[] {
   const router = useRouter();
-  const platform = usePlatformAccess();
 
   return (Object.values(router.routesById) as AnyRoute[])
     .map((route): NavItem | undefined => {
-      const staticData = route.options.staticData;
-      const nav = staticData?.nav;
+      const nav = route.options.staticData?.nav;
       // `view` defaults to the portal list so the existing screens, none of
       // which declare one, keep their place.
       if (!nav || (nav.view ?? "portal") !== view) return undefined;
-      if (staticData.platformRoot && !platform) return undefined;
       const to = withoutTrailingSlash(route.fullPath);
       return { to, nav };
     })
@@ -54,17 +57,49 @@ export function useNavItems(view: NavView = "portal"): NavItem[] {
 
 /**
  * The root's list as the sidebar draws it (D41): Projects, the spine, then
- * the reserved platform project's own pages for someone who may act on it
- * (Users and Events, which `useNavItems` already leaves out for anyone
- * else), then Settings. The root is the platform, so its sidebar holds the
- * root's screens and no project's: a project's are reached by choosing the
- * project.
+ * the reserved platform project's screens for someone who may act on it, then
+ * Settings.
  *
- * Settings opens a list (D29): with nothing in it (no add-on) the row would
- * open nothing, so it is left out.
+ * The platform project is the root, so its screens are a project's own, under
+ * a project's names (Teams, Users, Deployments and the rest), each drawn for
+ * the platform project: the row selects it (`project`). Overview is left out,
+ * since the root's home is Projects, and so is the project's Settings row,
+ * whose pages join the root's Settings list (`useSettingsListItems`). Anyone
+ * else sees Projects and Settings: a customer's project is reached by
+ * choosing it.
+ *
+ * Settings opens a list (D29): with nothing in it the row would open nothing,
+ * so it is left out.
  */
-export function accountListItems(account: NavItem[], settings: NavItem[]): NavItem[] {
-  return settings.length > 0 ? account : account.filter((item) => item.to !== SETTINGS_PATH);
+export function useAccountListItems(): NavItem[] {
+  const account = useNavItems("account");
+  const portal = useNavItems("portal");
+  const settings = useSettingsListItems();
+  const platform = usePlatformAccess();
+
+  const own = platform
+    ? portal
+        .filter(({ to }) => to !== OVERVIEW_PATH && to !== PROJECT_SETTINGS_PATH)
+        .map((item) => ({ ...item, project: platform }))
+    : [];
+  return [
+    ...account.filter((item) => item.to !== SETTINGS_PATH),
+    ...own,
+    ...(settings.length > 0 ? account.filter((item) => item.to === SETTINGS_PATH) : []),
+  ];
+}
+
+/**
+ * The root's Settings list (D29, D41): the platform project's own Settings
+ * pages (General, Admins) for someone who may act on it, each drawn for that
+ * project, then what an add-on adds (the hosted cloud's Billing, Support and
+ * Email).
+ */
+export function useSettingsListItems(): NavItem[] {
+  const addon = useNavItems("settings");
+  const project = useNavItems("project-settings");
+  const platform = usePlatformAccess();
+  return platform ? [...project.map((item) => ({ ...item, project: platform })), ...addon] : addon;
 }
 
 /**

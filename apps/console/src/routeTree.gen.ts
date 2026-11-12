@@ -23,7 +23,6 @@ import { Route as AuthedEventsIndexRouteImport } from './routes/_authed/events/i
 import { Route as AuthedEventsEventIdRouteImport } from './routes/_authed/events/$eventId'
 import { Route as AuthedFlowDefinitionsIndexRouteImport } from './routes/_authed/flow-definitions/index'
 import { Route as AuthedFlowDefinitionsDefinitionIdRouteImport } from './routes/_authed/flow-definitions/$definitionId'
-import { Route as AuthedPlatformEventsRouteRouteImport } from './routes/_authed/platform/events/route'
 import { Route as AuthedProjectIndexRouteImport } from './routes/_authed/project/index'
 import { Route as AuthedProjectAdminsRouteImport } from './routes/_authed/project/admins'
 import { Route as AuthedProjectGeneralRouteImport } from './routes/_authed/project/general'
@@ -39,10 +38,6 @@ import { Route as AuthedTeamsTeamIdRouteImport } from './routes/_authed/teams/$t
 import { Route as AuthedUsersIndexRouteImport } from './routes/_authed/users/index'
 import { Route as AuthedUsersUserIdRouteImport } from './routes/_authed/users/$userId'
 import { Route as AuthedAuthenticationIdpsIdpIdRouteImport } from './routes/_authed/authentication/idps/$idpId'
-import { Route as AuthedPlatformEventsIndexRouteImport } from './routes/_authed/platform/events/index'
-import { Route as AuthedPlatformEventsEventIdRouteImport } from './routes/_authed/platform/events/$eventId'
-import { Route as AuthedPlatformUsersIndexRouteImport } from './routes/_authed/platform/users/index'
-import { Route as AuthedPlatformUsersUserIdRouteImport } from './routes/_authed/platform/users/$userId'
 
 const AuthedRoute = AuthedRouteImport.update({
   id: '/_authed',
@@ -114,12 +109,6 @@ const AuthedFlowDefinitionsDefinitionIdRoute =
   AuthedFlowDefinitionsDefinitionIdRouteImport.update({
     id: '/flow-definitions/$definitionId',
     path: '/flow-definitions/$definitionId',
-    getParentRoute: () => AuthedRoute,
-  } as any)
-const AuthedPlatformEventsRouteRoute =
-  AuthedPlatformEventsRouteRouteImport.update({
-    id: '/platform/events',
-    path: '/platform/events',
     getParentRoute: () => AuthedRoute,
   } as any)
 const AuthedProjectIndexRoute = AuthedProjectIndexRouteImport.update({
@@ -198,30 +187,6 @@ const AuthedAuthenticationIdpsIdpIdRoute =
     path: '/authentication/idps/$idpId',
     getParentRoute: () => AuthedRoute,
   } as any)
-const AuthedPlatformEventsIndexRoute =
-  AuthedPlatformEventsIndexRouteImport.update({
-    id: '/',
-    path: '/',
-    getParentRoute: () => AuthedPlatformEventsRouteRoute,
-  } as any)
-const AuthedPlatformEventsEventIdRoute =
-  AuthedPlatformEventsEventIdRouteImport.update({
-    id: '/$eventId',
-    path: '/$eventId',
-    getParentRoute: () => AuthedPlatformEventsRouteRoute,
-  } as any)
-const AuthedPlatformUsersIndexRoute =
-  AuthedPlatformUsersIndexRouteImport.update({
-    id: '/platform/users/',
-    path: '/platform/users/',
-    getParentRoute: () => AuthedRoute,
-  } as any)
-const AuthedPlatformUsersUserIdRoute =
-  AuthedPlatformUsersUserIdRouteImport.update({
-    id: '/platform/users/$userId',
-    path: '/platform/users/$userId',
-    getParentRoute: () => AuthedRoute,
-  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthedIndexRoute
@@ -229,7 +194,6 @@ export interface FileRoutesByFullPath {
   '/events': typeof AuthedEventsRouteRouteWithChildren
   '/project': typeof AuthedProjectRouteRouteWithChildren
   '/claim/': typeof ClaimIndexRoute
-  '/platform/events': typeof AuthedPlatformEventsRouteRouteWithChildren
   '/events/$eventId': typeof AuthedEventsEventIdRoute
   '/flow-definitions/$definitionId': typeof AuthedFlowDefinitionsDefinitionIdRoute
   '/project/admins': typeof AuthedProjectAdminsRoute
@@ -253,10 +217,6 @@ export interface FileRoutesByFullPath {
   '/teams/': typeof AuthedTeamsIndexRoute
   '/users/': typeof AuthedUsersIndexRoute
   '/authentication/idps/$idpId': typeof AuthedAuthenticationIdpsIdpIdRoute
-  '/platform/events/$eventId': typeof AuthedPlatformEventsEventIdRoute
-  '/platform/users/$userId': typeof AuthedPlatformUsersUserIdRoute
-  '/platform/events/': typeof AuthedPlatformEventsIndexRoute
-  '/platform/users/': typeof AuthedPlatformUsersIndexRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
@@ -285,10 +245,6 @@ export interface FileRoutesByTo {
   '/teams': typeof AuthedTeamsIndexRoute
   '/users': typeof AuthedUsersIndexRoute
   '/authentication/idps/$idpId': typeof AuthedAuthenticationIdpsIdpIdRoute
-  '/platform/events/$eventId': typeof AuthedPlatformEventsEventIdRoute
-  '/platform/users/$userId': typeof AuthedPlatformUsersUserIdRoute
-  '/platform/events': typeof AuthedPlatformEventsIndexRoute
-  '/platform/users': typeof AuthedPlatformUsersIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -298,7 +254,6 @@ export interface FileRoutesById {
   '/_authed/project': typeof AuthedProjectRouteRouteWithChildren
   '/_authed/': typeof AuthedIndexRoute
   '/claim/': typeof ClaimIndexRoute
-  '/_authed/platform/events': typeof AuthedPlatformEventsRouteRouteWithChildren
   '/_authed/events/$eventId': typeof AuthedEventsEventIdRoute
   '/_authed/flow-definitions/$definitionId': typeof AuthedFlowDefinitionsDefinitionIdRoute
   '/_authed/project/admins': typeof AuthedProjectAdminsRoute
@@ -322,10 +277,6 @@ export interface FileRoutesById {
   '/_authed/teams/': typeof AuthedTeamsIndexRoute
   '/_authed/users/': typeof AuthedUsersIndexRoute
   '/_authed/authentication/idps/$idpId': typeof AuthedAuthenticationIdpsIdpIdRoute
-  '/_authed/platform/events/$eventId': typeof AuthedPlatformEventsEventIdRoute
-  '/_authed/platform/users/$userId': typeof AuthedPlatformUsersUserIdRoute
-  '/_authed/platform/events/': typeof AuthedPlatformEventsIndexRoute
-  '/_authed/platform/users/': typeof AuthedPlatformUsersIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -335,7 +286,6 @@ export interface FileRouteTypes {
     | '/events'
     | '/project'
     | '/claim/'
-    | '/platform/events'
     | '/events/$eventId'
     | '/flow-definitions/$definitionId'
     | '/project/admins'
@@ -359,10 +309,6 @@ export interface FileRouteTypes {
     | '/teams/'
     | '/users/'
     | '/authentication/idps/$idpId'
-    | '/platform/events/$eventId'
-    | '/platform/users/$userId'
-    | '/platform/events/'
-    | '/platform/users/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
@@ -391,10 +337,6 @@ export interface FileRouteTypes {
     | '/teams'
     | '/users'
     | '/authentication/idps/$idpId'
-    | '/platform/events/$eventId'
-    | '/platform/users/$userId'
-    | '/platform/events'
-    | '/platform/users'
   id:
     | '__root__'
     | '/_authed'
@@ -403,7 +345,6 @@ export interface FileRouteTypes {
     | '/_authed/project'
     | '/_authed/'
     | '/claim/'
-    | '/_authed/platform/events'
     | '/_authed/events/$eventId'
     | '/_authed/flow-definitions/$definitionId'
     | '/_authed/project/admins'
@@ -427,10 +368,6 @@ export interface FileRouteTypes {
     | '/_authed/teams/'
     | '/_authed/users/'
     | '/_authed/authentication/idps/$idpId'
-    | '/_authed/platform/events/$eventId'
-    | '/_authed/platform/users/$userId'
-    | '/_authed/platform/events/'
-    | '/_authed/platform/users/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -539,13 +476,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedFlowDefinitionsDefinitionIdRouteImport
       parentRoute: typeof AuthedRoute
     }
-    '/_authed/platform/events': {
-      id: '/_authed/platform/events'
-      path: '/platform/events'
-      fullPath: '/platform/events'
-      preLoaderRoute: typeof AuthedPlatformEventsRouteRouteImport
-      parentRoute: typeof AuthedRoute
-    }
     '/_authed/project/': {
       id: '/_authed/project/'
       path: '/'
@@ -651,34 +581,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedAuthenticationIdpsIdpIdRouteImport
       parentRoute: typeof AuthedRoute
     }
-    '/_authed/platform/events/': {
-      id: '/_authed/platform/events/'
-      path: '/'
-      fullPath: '/platform/events/'
-      preLoaderRoute: typeof AuthedPlatformEventsIndexRouteImport
-      parentRoute: typeof AuthedPlatformEventsRouteRoute
-    }
-    '/_authed/platform/events/$eventId': {
-      id: '/_authed/platform/events/$eventId'
-      path: '/$eventId'
-      fullPath: '/platform/events/$eventId'
-      preLoaderRoute: typeof AuthedPlatformEventsEventIdRouteImport
-      parentRoute: typeof AuthedPlatformEventsRouteRoute
-    }
-    '/_authed/platform/users/': {
-      id: '/_authed/platform/users/'
-      path: '/platform/users'
-      fullPath: '/platform/users/'
-      preLoaderRoute: typeof AuthedPlatformUsersIndexRouteImport
-      parentRoute: typeof AuthedRoute
-    }
-    '/_authed/platform/users/$userId': {
-      id: '/_authed/platform/users/$userId'
-      path: '/platform/users/$userId'
-      fullPath: '/platform/users/$userId'
-      preLoaderRoute: typeof AuthedPlatformUsersUserIdRouteImport
-      parentRoute: typeof AuthedRoute
-    }
   }
 }
 
@@ -710,27 +612,10 @@ const AuthedProjectRouteRouteChildren: AuthedProjectRouteRouteChildren = {
 const AuthedProjectRouteRouteWithChildren =
   AuthedProjectRouteRoute._addFileChildren(AuthedProjectRouteRouteChildren)
 
-interface AuthedPlatformEventsRouteRouteChildren {
-  AuthedPlatformEventsEventIdRoute: typeof AuthedPlatformEventsEventIdRoute
-  AuthedPlatformEventsIndexRoute: typeof AuthedPlatformEventsIndexRoute
-}
-
-const AuthedPlatformEventsRouteRouteChildren: AuthedPlatformEventsRouteRouteChildren =
-  {
-    AuthedPlatformEventsEventIdRoute: AuthedPlatformEventsEventIdRoute,
-    AuthedPlatformEventsIndexRoute: AuthedPlatformEventsIndexRoute,
-  }
-
-const AuthedPlatformEventsRouteRouteWithChildren =
-  AuthedPlatformEventsRouteRoute._addFileChildren(
-    AuthedPlatformEventsRouteRouteChildren,
-  )
-
 interface AuthedRouteChildren {
   AuthedEventsRouteRoute: typeof AuthedEventsRouteRouteWithChildren
   AuthedProjectRouteRoute: typeof AuthedProjectRouteRouteWithChildren
   AuthedIndexRoute: typeof AuthedIndexRoute
-  AuthedPlatformEventsRouteRoute: typeof AuthedPlatformEventsRouteRouteWithChildren
   AuthedFlowDefinitionsDefinitionIdRoute: typeof AuthedFlowDefinitionsDefinitionIdRoute
   AuthedProjectsProjectIdRoute: typeof AuthedProjectsProjectIdRoute
   AuthedReleasesReleaseIdRoute: typeof AuthedReleasesReleaseIdRoute
@@ -749,15 +634,12 @@ interface AuthedRouteChildren {
   AuthedTeamsIndexRoute: typeof AuthedTeamsIndexRoute
   AuthedUsersIndexRoute: typeof AuthedUsersIndexRoute
   AuthedAuthenticationIdpsIdpIdRoute: typeof AuthedAuthenticationIdpsIdpIdRoute
-  AuthedPlatformUsersUserIdRoute: typeof AuthedPlatformUsersUserIdRoute
-  AuthedPlatformUsersIndexRoute: typeof AuthedPlatformUsersIndexRoute
 }
 
 const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedEventsRouteRoute: AuthedEventsRouteRouteWithChildren,
   AuthedProjectRouteRoute: AuthedProjectRouteRouteWithChildren,
   AuthedIndexRoute: AuthedIndexRoute,
-  AuthedPlatformEventsRouteRoute: AuthedPlatformEventsRouteRouteWithChildren,
   AuthedFlowDefinitionsDefinitionIdRoute:
     AuthedFlowDefinitionsDefinitionIdRoute,
   AuthedProjectsProjectIdRoute: AuthedProjectsProjectIdRoute,
@@ -777,8 +659,6 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedTeamsIndexRoute: AuthedTeamsIndexRoute,
   AuthedUsersIndexRoute: AuthedUsersIndexRoute,
   AuthedAuthenticationIdpsIdpIdRoute: AuthedAuthenticationIdpsIdpIdRoute,
-  AuthedPlatformUsersUserIdRoute: AuthedPlatformUsersUserIdRoute,
-  AuthedPlatformUsersIndexRoute: AuthedPlatformUsersIndexRoute,
 }
 
 const AuthedRouteWithChildren =

@@ -43,7 +43,13 @@ import { cn } from "@/lib/utils";
 import { getPlatformProjectId } from "@/runtime/runtime";
 
 import type { NavIcon } from "@/nav";
-import { type NavItem, PROJECT_SETTINGS_PATH, useNavItems } from "./use-nav-items";
+import {
+  type NavItem,
+  PROJECT_SETTINGS_PATH,
+  useAccountListItems,
+  useNavItems,
+  useSettingsListItems,
+} from "./use-nav-items";
 import { SETTINGS_PATH } from "./user-menu";
 
 /**
@@ -305,16 +311,21 @@ function SearchPalette({
   // Read as the palette opens, so it holds what was opened since it last did.
   const recentProjects = useMemo(() => readRecentProjects(userId), [userId]);
   const pages = useNavItems();
-  const account = useNavItems("account");
-  const settings = useNavItems("settings");
+  // The root's lists, the platform project's screens among them for someone
+  // who may act on it (D41).
+  const account = useAccountListItems();
+  const settings = useSettingsListItems();
   const projectSettings = useNavItems("project-settings");
 
   const selected = useSelectedProject();
-  const projectName = selected?.name;
-  // The reserved platform project, whose hits read as the root (D41).
+  // The reserved platform project is the root (D41): selected, its screens
+  // are the root's, and neither they nor its hits read as a project's.
   const platformProjectId = getPlatformProjectId();
-  // Where the selected project's rows are: its name, or its id until that is read.
-  const place = projectId ? (projectName ?? projectId) : undefined;
+  const atPlatform = projectId !== undefined && projectId === platformProjectId;
+  const projectName = atPlatform ? undefined : selected?.name;
+  // Where the selected project's rows are: its name, or its id until that is
+  // read. The root's are above every project.
+  const place = atPlatform ? ACCOUNT : projectId ? (projectName ?? projectId) : undefined;
   const q = query.trim().toLowerCase();
 
   const groups = useMemo((): ResultGroup[] => {
@@ -335,13 +346,22 @@ function SearchPalette({
       items
         .filter((item) => matches(item.nav.label) || (!!list && matches(list)))
         .map((item) => ({
-          id: `page:${item.to}`,
+          // The root lists the platform project's screens beside the selected
+          // project's, on the same routes: the project tells the two apart.
+          id: item.project ? `page:${item.project}:${item.to}` : `page:${item.to}`,
           icon: <item.nav.icon aria-hidden />,
           label: item.nav.label,
           description: [list, description].filter(Boolean).join(" · ") || undefined,
           inProject,
           kind,
-          go: close(() => void navigate({ to: item.to })),
+          // A row of the root's that is the platform project's screen selects it.
+          go: close(
+            () =>
+              void navigate({
+                to: item.to,
+                search: item.project ? { project: item.project } : undefined,
+              }),
+          ),
         }));
 
     // The project's pages. With none selected, opening one asks for one (D22).
@@ -352,13 +372,16 @@ function SearchPalette({
       inProject: projectId !== undefined,
       kind: projectId ? KIND.page : KIND.pageOfNoProject,
     };
-    const pageResults = [
-      ...navResults(
-        pages.filter((item) => item.to !== PROJECT_SETTINGS_PATH),
-        inProject,
-      ),
-      ...navResults(projectSettings, { ...inProject, list: "Settings" }),
-    ];
+    // The platform project's screens are the root's rows below, not these.
+    const pageResults = atPlatform
+      ? []
+      : [
+          ...navResults(
+            pages.filter((item) => item.to !== PROJECT_SETTINGS_PATH),
+            inProject,
+          ),
+          ...navResults(projectSettings, { ...inProject, list: "Settings" }),
+        ];
 
     // What the palette does in the selected project: what its list screens'
     // own buttons do. The server refuses what the person may not do, as it
@@ -400,10 +423,9 @@ function SearchPalette({
     const iconOf = (type: SearchResultType): LucideIcon | NavIcon =>
       pages.find((item) => item.to === LIST_PATH[type])?.nav.icon ?? Search;
     // A hit opens in its own project, which opening it selects (`?project=`,
-    // D39). One in the reserved platform project opens its root page instead
-    // and keeps the selection (D41, D36).
+    // D39). One in the reserved platform project opens the root's screen the
+    // same way (D41).
     const openHit = (hit: SearchHit) => {
-      if (hit.projectId === platformProjectId) return openRootHit(hit);
       const search = (prev: Record<string, unknown>) => ({ ...prev, project: hit.projectId });
       switch (hit.type) {
         case "user":
@@ -426,14 +448,7 @@ function SearchPalette({
           });
       }
     };
-    const openRootHit = (hit: SearchHit) => {
-      switch (hit.type) {
-        case "user":
-          return navigate({ to: "/platform/users/$userId", params: { userId: hit.id } });
-        default:
-          return undefined;
-      }
-    };
+
     // The project a hit is in, by name: the selected one's, else the person's
     // projects the palette holds, else its id, which the server answers with.
     const projectNames = new Map<string, string>();
@@ -447,8 +462,8 @@ function SearchPalette({
     const hitResult = (hit: SearchHit, group: string): RankedResult => {
       const Icon = iconOf(hit.type);
       const root = hit.projectId === platformProjectId;
-      // A root hit reads as the root page it opens (D41), never as a project
-      // named for the platform.
+      // A root hit reads as the root's screen that lists it (D41), never as a
+      // project named for the platform.
       const placed = root ? ROOT_PAGE[hit.type] : placeOf(hit.projectId);
       return {
         id: `${group}:${hit.type}:${hit.projectId}:${hit.id}`,
@@ -460,19 +475,14 @@ function SearchPalette({
         inProject: hit.projectId === projectId,
         kind: HIT_KIND[hit.type],
         go: close(() => {
-          // Recents are a project's (D33), and the root is none.
-          if (!root) rememberHit(hit.projectId, hit);
+          rememberHit(hit.projectId, hit);
           void openHit(hit);
         }),
       };
     };
-    // What the server found of one type, for the text in the field now
-    // (`hitsFor`). The platform project's kinds that no root page shows
-    // (its teams, its schemas) are left out (D41).
+    // What the server found of one type, for the text in the field now (`hitsFor`).
     const hitResults = (answer: typeof users, type: SearchResultType): RankedResult[] =>
-      hitsFor(answer ?? NO_ANSWER, query, type)
-        .filter((hit) => hit.projectId !== platformProjectId || ROOT_PAGE[hit.type] !== undefined)
-        .map((hit) => hitResult(hit, "hit"));
+      hitsFor(answer ?? NO_ANSWER, query, type).map((hit) => hitResult(hit, "hit"));
 
     // Beneath a project, as the switcher draws it (D21): its site's host, or
     // else its id, which tells two of one name apart.
@@ -512,8 +522,11 @@ function SearchPalette({
     ];
 
     if (!q) {
+      // The platform project is never one of the projects to open.
       const current =
-        selected?.name === undefined ? undefined : { ...selected, name: selected.name };
+        atPlatform || selected?.name === undefined
+          ? undefined
+          : { ...selected, name: selected.name };
       const opening = mine ? openingList(mine, current, recentProjects) : { recent: [], rest: [] };
       // Past one page the list opens on the recent ones alone, since that
       // page is only the first of them. The palette still fills its group
@@ -593,6 +606,7 @@ function SearchPalette({
     projectName,
     place,
     platformProjectId,
+    atPlatform,
     q,
     query,
     navigate,
@@ -709,13 +723,16 @@ const ACCOUNT = "Account";
 const PROFILE = "Profile";
 
 /**
- * The root page a hit in the reserved platform project opens, by kind (D41),
- * a row of the root sidebar: its users are the root's Users. Kinds the root
- * has no page for (its teams, and its configuration, which is the server's)
- * are absent, and such hits are left out.
+ * The root's screen that lists a hit in the reserved platform project, by
+ * kind (D41), a row of the root sidebar: what the hit reads beneath its name,
+ * where a project's hit reads its project.
  */
-const ROOT_PAGE: Partial<Record<SearchResultType, string>> = {
+const ROOT_PAGE: Record<SearchResultType, string> = {
   user: "Users",
+  team: "Teams",
+  schema: "User schemas",
+  flow_definition: "Login flows",
+  idp: "Authentication",
 };
 
 /** The list screen of each kind of hit: where its glyph comes from. */

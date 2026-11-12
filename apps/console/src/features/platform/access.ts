@@ -1,4 +1,3 @@
-import { redirect } from "@tanstack/react-router";
 import { ApiError } from "@zitadel/api/runtime/fetch";
 import { useEffect, useState } from "react";
 
@@ -17,12 +16,12 @@ const lastAnswer = sessionKept((): { value: string | null | undefined } => ({ va
  * Whether the signed-in person may act on the reserved platform project, the
  * console's root (D41, Console ADR 0004 §5 amendment).
  *
- * Its pages (Users and Events) are
- * rows of the root sidebar only for someone who can, which a platform
- * operator always can (root ADR 075) and a cloud customer, holding no grant
- * there, never can. Signing in to the project, or being homed in it, is not
- * that: the server answers it, from the person's grants, by reading the
- * project. Each page's own reads then decide what it shows.
+ * Its screens are a project's screens, and rows of the root sidebar only for
+ * someone who can, which a platform operator always can (root ADR 075) and a
+ * cloud customer, holding no grant there, never can. Only they may have it
+ * selected (`routes/_authed.tsx`). Signing in to the project, or being homed
+ * in it, is not that: the server answers it, from the person's grants, by
+ * reading the project. Each screen's own reads then decide what it shows.
  *
  * Until effective permissions are exposed (ADR 0004 §5), the read is the
  * project itself, `GET /projects/{id}`: refused (403, 404) for anyone who
@@ -48,7 +47,7 @@ export const readPlatformAccess = sessionCached(async (): Promise<string | undef
  * The reserved platform project's id when the person may act on it, for the
  * chrome (the root sidebar, search): `undefined` while the first read is in
  * flight, where the deployment has none, and when it is refused or fails, so
- * the root pages are simply not listed.
+ * its screens are simply not listed.
  */
 export function usePlatformAccess(): string | undefined {
   const platform = getPlatformProjectId();
@@ -71,26 +70,4 @@ export function usePlatformAccess(): string | undefined {
     };
   }, [platform]);
   return read ?? undefined;
-}
-
-/**
- * `beforeLoad` of a root page of the platform project (D41): the project's id
- * in the route's context, for its loader and its `ManagedProject`. Someone
- * who may not act on it (or a deployment without one, or a failed read) goes
- * to Projects instead, the root's home, as the page is not in their list.
- */
-export async function requirePlatformRoot(): Promise<{ platformProjectId: string }> {
-  const id = await readPlatformAccess().catch(() => undefined);
-  if (!id) throw redirect({ to: "/projects", replace: true });
-  return { platformProjectId: id };
-}
-
-declare module "@tanstack/react-router" {
-  interface StaticDataRouteOption {
-    /**
-     * Set on a root page of the reserved platform project (D41): the sidebar
-     * and search list it only while {@link usePlatformAccess} answers.
-     */
-    platformRoot?: true;
-  }
 }

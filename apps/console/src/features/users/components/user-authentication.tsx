@@ -4,7 +4,6 @@ import { Fragment, type ReactNode } from "react";
 import { Separator } from "@/components/ui/separator";
 import { formatDate, formatDateTime } from "@/lib/date";
 import type { IdpConnection, UserIdentityLink } from "@/features/authentication/model";
-import type { UserLinks } from "@/features/users/links";
 
 // An authentication row: a muted label, its value on the right. 4px block
 // padding, and 18px to the rule between rows (the list's `gap-4.5`).
@@ -18,22 +17,19 @@ export function UserAuthentication({
   passkeys,
   identityLinks,
   idps,
-  idpDetail,
 }: {
   /** `null`: the user has no password; `undefined`: it could not be read. */
   passwordSetAt: string | null | undefined;
   passkeys: { created_at: string }[] | undefined;
   identityLinks: UserIdentityLink[] | undefined;
   idps: IdpConnection[] | null;
-  /** A provider's page; absent (the root's Users, D41), its name reads as text. */
-  idpDetail: UserLinks["idp"];
 }) {
   return (
     <AuthenticationRows
       rows={[
         { key: "password", label: "Password", value: passwordState(passwordSetAt) },
         { key: "passkey", label: "Passkey", value: passkeyState(passkeys) },
-        ...identityLinkRows(identityLinks, idps, idpDetail),
+        ...identityLinkRows(identityLinks, idps),
       ]}
     />
   );
@@ -91,7 +87,6 @@ function passkeyState(passkeys: { created_at: string }[] | undefined): string {
 function identityLinkRows(
   links: UserIdentityLink[] | undefined,
   idps: IdpConnection[] | null,
-  idpDetail: UserLinks["idp"],
 ): AuthenticationRow[] {
   if (!links?.length) {
     return [
@@ -108,17 +103,13 @@ function identityLinkRows(
     return {
       key: link.id,
       label: idp ? (
-        idpDetail ? (
-          <Link
-            to={idpDetail}
-            params={{ idpId: idp.id }}
-            className="hover:text-foreground hover:underline"
-          >
-            {idp.definition.display_name}
-          </Link>
-        ) : (
-          idp.definition.display_name
-        )
+        <Link
+          to="/authentication/idps/$idpId"
+          params={{ idpId: idp.id }}
+          className="hover:text-foreground hover:underline"
+        >
+          {idp.definition.display_name}
+        </Link>
       ) : (
         // The connection list may be refused (`idp.read`); the id is still
         // the honest name for it.
