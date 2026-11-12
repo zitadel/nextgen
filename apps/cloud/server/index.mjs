@@ -35,8 +35,8 @@ import { spawn } from "node:child_process";
 import http from "node:http";
 import net from "node:net";
 import { fileURLToPath } from "node:url";
-import { gunzipSync } from "node:zlib";
 
+import { collectorHandler } from "./collector.mjs";
 import { MetricQueue } from "./metrics.mjs";
 import { decodeMetricsRequest, decodeTraceRequest } from "./otlp.mjs";
 import { SpanRouter } from "./spans.mjs";
@@ -56,6 +56,7 @@ const metricWaitMs = 300;
 // How long a finished response waits for its server span. The launcher sets
 // the server's batch timeout to 100ms.
 const spanWaitMs = 1000;
+// The largest export the collector takes (collector.mjs).
 const maxExportBytes = 16 << 20;
 // Hop-by-hop headers are the connection's, not the message's (RFC 9110 7.6.1).
 const hopByHop = new Set([
@@ -117,39 +118,6 @@ function nextMetricExport() {
   });
 }
 
-function collectorHandler(req, res) {
-  const collect = req.method === "POST" ? collectors.get(req.url) : undefined;
-  if (!collect) {
-    res.writeHead(404).end();
-    return;
-  }
-  const chunks = [];
-  let size = 0;
-  req.on("data", (chunk) => {
-    size += chunk.length;
-    if (size > maxExportBytes) {
-      req.destroy();
-      return;
-    }
-    chunks.push(chunk);
-  });
-  req.on("end", () => {
-    try {
-      let body = Buffer.concat(chunks);
-      if (req.headers["content-encoding"] === "gzip") {
-        body = gunzipSync(body);
-      }
-      collect(body);
-      // An empty Export*ServiceResponse: everything was accepted.
-      res.writeHead(200, { "content-type": "application/x-protobuf" }).end();
-    } catch (error) {
-      // The path is an argument, not part of the format string.
-      console.error("server wrapper: dropping an export to %s:", req.url, error);
-      res.writeHead(400).end();
-    }
-  });
-}
-
 async function waitForServer(port, exited) {
   const deadline = Date.now() + 30_000;
   while (Date.now() < deadline) {
@@ -174,7 +142,9 @@ async function waitForServer(port, exited) {
 
 function start() {
   started ??= (async () => {
-    const collectorPort = await listen(http.createServer(collectorHandler));
+    const collectorPort = await listen(
+      http.createServer(collectorHandler(collectors, { maxBytes: maxExportBytes })),
+    );
     const port = await freePort();
     const child = spawn(launcherPath, [], {
       env: {
