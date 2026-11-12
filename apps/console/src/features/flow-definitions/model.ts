@@ -7,7 +7,7 @@ import type {
 
 /**
  * Display strings for the login-flow screens. Read-only: flow definitions are
- * configuration applied through the CLI (decisions log D0a).
+ * configuration applied through the CLI (decisions log D0b).
  *
  * Orval names the same object once per operation, so these alias the list's
  * names and let structural typing carry the detail's.

@@ -290,6 +290,8 @@ type ListFlowDefinitionsRequest struct {
 	ProjectID string
 	Purpose   string
 	Name      string
+	// ID narrows the list to the revision with this id.
+	ID string
 	// LatestRevisionPerName keeps only the newest revision of each flow name.
 	LatestRevisionPerName bool
 	Limit                 int
@@ -321,6 +323,9 @@ func (fd *flowDefinitionService) List(ctx context.Context, req ListFlowDefinitio
 	}
 	if req.Name != "" {
 		filters = append(filters, database.Equal(database.Col(domain.FlowDefinitionFieldName), req.Name))
+	}
+	if req.ID != "" {
+		filters = append(filters, database.Equal(database.Col(domain.FlowDefinitionFieldID), req.ID))
 	}
 	cursor, err := revisionsCursor(req.PageToken, req.LatestRevisionPerName)
 	if err != nil {

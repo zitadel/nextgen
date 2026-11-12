@@ -952,6 +952,324 @@ func (s *AlreadyClaimedResponseDetailsAdditional) init() AlreadyClaimedResponseD
 	return m
 }
 
+// Merged schema.
+// Ref: #
+type AppClientIDTaken struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptAppClientIDTakenDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *AppClientIDTaken) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *AppClientIDTaken) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *AppClientIDTaken) GetDetails() OptAppClientIDTakenDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *AppClientIDTaken) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *AppClientIDTaken) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *AppClientIDTaken) SetDetails(val OptAppClientIDTakenDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type AppClientIDTakenDetails map[string]jx.Raw
+
+func (s *AppClientIDTakenDetails) init() AppClientIDTakenDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type AppFieldImmutable struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptAppFieldImmutableDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *AppFieldImmutable) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *AppFieldImmutable) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *AppFieldImmutable) GetDetails() OptAppFieldImmutableDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *AppFieldImmutable) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *AppFieldImmutable) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *AppFieldImmutable) SetDetails(val OptAppFieldImmutableDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type AppFieldImmutableDetails map[string]jx.Raw
+
+func (s *AppFieldImmutableDetails) init() AppFieldImmutableDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type AppInvalid struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptAppInvalidDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *AppInvalid) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *AppInvalid) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *AppInvalid) GetDetails() OptAppInvalidDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *AppInvalid) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *AppInvalid) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *AppInvalid) SetDetails(val OptAppInvalidDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type AppInvalidDetails map[string]jx.Raw
+
+func (s *AppInvalidDetails) init() AppInvalidDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type AppNotFound struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptAppNotFoundDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *AppNotFound) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *AppNotFound) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *AppNotFound) GetDetails() OptAppNotFoundDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *AppNotFound) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *AppNotFound) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *AppNotFound) SetDetails(val OptAppNotFoundDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type AppNotFoundDetails map[string]jx.Raw
+
+func (s *AppNotFoundDetails) init() AppNotFoundDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type AppPermissionDenied struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptAppPermissionDeniedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *AppPermissionDenied) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *AppPermissionDenied) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *AppPermissionDenied) GetDetails() OptAppPermissionDeniedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *AppPermissionDenied) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *AppPermissionDenied) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *AppPermissionDenied) SetDetails(val OptAppPermissionDeniedDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type AppPermissionDeniedDetails map[string]jx.Raw
+
+func (s *AppPermissionDeniedDetails) init() AppPermissionDeniedDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type AppRevisionConflict struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptAppRevisionConflictDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *AppRevisionConflict) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *AppRevisionConflict) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *AppRevisionConflict) GetDetails() OptAppRevisionConflictDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *AppRevisionConflict) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *AppRevisionConflict) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *AppRevisionConflict) SetDetails(val OptAppRevisionConflictDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type AppRevisionConflictDetails map[string]jx.Raw
+
+func (s *AppRevisionConflictDetails) init() AppRevisionConflictDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
 // An application that authenticates its users via Zitadel, with its OAuth
 // clients. The document is the `application` field of the `createApplication`
 // (`POST /applications`) body.
@@ -1246,6 +1564,509 @@ func (s *ApplicationClientType) UnmarshalText(data []byte) error {
 	}
 }
 
+// Merged schema.
+// Ref: #
+type ApplicationCreatedEvent struct {
+	// The event ID, in the form `evt_<opaque>`.
+	ID        string    `json:"id"`
+	ProjectID ProjectID `json:"project_id"`
+	// The team the actor operated under when the event was emitted, if any.
+	TeamID OptNilString `json:"team_id"`
+	// Merged property.
+	EventType string `json:"event_type"`
+	// The category of the event.
+	Category ApplicationCreatedEventCategory `json:"category"`
+	// When the action happened, on the server's clock.
+	OccurredAt time.Time `json:"occurred_at"`
+	// When the event was stored, on the server's clock.
+	CreatedAt time.Time `json:"created_at"`
+	// The ID of the actor that triggered the event.
+	ActorID OptNilString `json:"actor_id"`
+	// The kind of actor that triggered the event.
+	ActorType OptNilApplicationCreatedEventActorType `json:"actor_type"`
+	// The type of resource the event affected.
+	EntityType OptNilString `json:"entity_type"`
+	// The ID of the resource the event affected.
+	EntityID OptNilString `json:"entity_id"`
+	// The application or agent that produced the event.
+	ClientID string `json:"client_id"`
+	// The ID of the token in use when the event was emitted, when there was one.
+	TokenID OptString `json:"token_id"`
+	// The kind of delegation. Absent when unset.
+	DelegationType OptApplicationCreatedEventDelegationType `json:"delegation_type"`
+	DelegationID   OptString                                `json:"delegation_id"`
+	Grantor        OptString                                `json:"grantor"`
+	// A device fingerprint ID that correlates events from the same device.
+	Fingerprint OptString `json:"fingerprint"`
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
+	RequestID OptNilString `json:"request_id"`
+	// The ID of the session the event belongs to.
+	SessionID OptNilString `json:"session_id"`
+	// An ID that correlates the events of one login flow.
+	FlowID   OptNilString       `json:"flow_id"`
+	Metadata OptEventMetadata   `json:"metadata"`
+	Payload  ApplicationPayload `json:"payload"`
+}
+
+// GetID returns the value of ID.
+func (s *ApplicationCreatedEvent) GetID() string {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *ApplicationCreatedEvent) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *ApplicationCreatedEvent) GetTeamID() OptNilString {
+	return s.TeamID
+}
+
+// GetEventType returns the value of EventType.
+func (s *ApplicationCreatedEvent) GetEventType() string {
+	return s.EventType
+}
+
+// GetCategory returns the value of Category.
+func (s *ApplicationCreatedEvent) GetCategory() ApplicationCreatedEventCategory {
+	return s.Category
+}
+
+// GetOccurredAt returns the value of OccurredAt.
+func (s *ApplicationCreatedEvent) GetOccurredAt() time.Time {
+	return s.OccurredAt
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *ApplicationCreatedEvent) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetActorID returns the value of ActorID.
+func (s *ApplicationCreatedEvent) GetActorID() OptNilString {
+	return s.ActorID
+}
+
+// GetActorType returns the value of ActorType.
+func (s *ApplicationCreatedEvent) GetActorType() OptNilApplicationCreatedEventActorType {
+	return s.ActorType
+}
+
+// GetEntityType returns the value of EntityType.
+func (s *ApplicationCreatedEvent) GetEntityType() OptNilString {
+	return s.EntityType
+}
+
+// GetEntityID returns the value of EntityID.
+func (s *ApplicationCreatedEvent) GetEntityID() OptNilString {
+	return s.EntityID
+}
+
+// GetClientID returns the value of ClientID.
+func (s *ApplicationCreatedEvent) GetClientID() string {
+	return s.ClientID
+}
+
+// GetTokenID returns the value of TokenID.
+func (s *ApplicationCreatedEvent) GetTokenID() OptString {
+	return s.TokenID
+}
+
+// GetDelegationType returns the value of DelegationType.
+func (s *ApplicationCreatedEvent) GetDelegationType() OptApplicationCreatedEventDelegationType {
+	return s.DelegationType
+}
+
+// GetDelegationID returns the value of DelegationID.
+func (s *ApplicationCreatedEvent) GetDelegationID() OptString {
+	return s.DelegationID
+}
+
+// GetGrantor returns the value of Grantor.
+func (s *ApplicationCreatedEvent) GetGrantor() OptString {
+	return s.Grantor
+}
+
+// GetFingerprint returns the value of Fingerprint.
+func (s *ApplicationCreatedEvent) GetFingerprint() OptString {
+	return s.Fingerprint
+}
+
+// GetRequestID returns the value of RequestID.
+func (s *ApplicationCreatedEvent) GetRequestID() OptNilString {
+	return s.RequestID
+}
+
+// GetSessionID returns the value of SessionID.
+func (s *ApplicationCreatedEvent) GetSessionID() OptNilString {
+	return s.SessionID
+}
+
+// GetFlowID returns the value of FlowID.
+func (s *ApplicationCreatedEvent) GetFlowID() OptNilString {
+	return s.FlowID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *ApplicationCreatedEvent) GetMetadata() OptEventMetadata {
+	return s.Metadata
+}
+
+// GetPayload returns the value of Payload.
+func (s *ApplicationCreatedEvent) GetPayload() ApplicationPayload {
+	return s.Payload
+}
+
+// SetID sets the value of ID.
+func (s *ApplicationCreatedEvent) SetID(val string) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *ApplicationCreatedEvent) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *ApplicationCreatedEvent) SetTeamID(val OptNilString) {
+	s.TeamID = val
+}
+
+// SetEventType sets the value of EventType.
+func (s *ApplicationCreatedEvent) SetEventType(val string) {
+	s.EventType = val
+}
+
+// SetCategory sets the value of Category.
+func (s *ApplicationCreatedEvent) SetCategory(val ApplicationCreatedEventCategory) {
+	s.Category = val
+}
+
+// SetOccurredAt sets the value of OccurredAt.
+func (s *ApplicationCreatedEvent) SetOccurredAt(val time.Time) {
+	s.OccurredAt = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *ApplicationCreatedEvent) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetActorID sets the value of ActorID.
+func (s *ApplicationCreatedEvent) SetActorID(val OptNilString) {
+	s.ActorID = val
+}
+
+// SetActorType sets the value of ActorType.
+func (s *ApplicationCreatedEvent) SetActorType(val OptNilApplicationCreatedEventActorType) {
+	s.ActorType = val
+}
+
+// SetEntityType sets the value of EntityType.
+func (s *ApplicationCreatedEvent) SetEntityType(val OptNilString) {
+	s.EntityType = val
+}
+
+// SetEntityID sets the value of EntityID.
+func (s *ApplicationCreatedEvent) SetEntityID(val OptNilString) {
+	s.EntityID = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *ApplicationCreatedEvent) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetTokenID sets the value of TokenID.
+func (s *ApplicationCreatedEvent) SetTokenID(val OptString) {
+	s.TokenID = val
+}
+
+// SetDelegationType sets the value of DelegationType.
+func (s *ApplicationCreatedEvent) SetDelegationType(val OptApplicationCreatedEventDelegationType) {
+	s.DelegationType = val
+}
+
+// SetDelegationID sets the value of DelegationID.
+func (s *ApplicationCreatedEvent) SetDelegationID(val OptString) {
+	s.DelegationID = val
+}
+
+// SetGrantor sets the value of Grantor.
+func (s *ApplicationCreatedEvent) SetGrantor(val OptString) {
+	s.Grantor = val
+}
+
+// SetFingerprint sets the value of Fingerprint.
+func (s *ApplicationCreatedEvent) SetFingerprint(val OptString) {
+	s.Fingerprint = val
+}
+
+// SetRequestID sets the value of RequestID.
+func (s *ApplicationCreatedEvent) SetRequestID(val OptNilString) {
+	s.RequestID = val
+}
+
+// SetSessionID sets the value of SessionID.
+func (s *ApplicationCreatedEvent) SetSessionID(val OptNilString) {
+	s.SessionID = val
+}
+
+// SetFlowID sets the value of FlowID.
+func (s *ApplicationCreatedEvent) SetFlowID(val OptNilString) {
+	s.FlowID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *ApplicationCreatedEvent) SetMetadata(val OptEventMetadata) {
+	s.Metadata = val
+}
+
+// SetPayload sets the value of Payload.
+func (s *ApplicationCreatedEvent) SetPayload(val ApplicationPayload) {
+	s.Payload = val
+}
+
+type ApplicationCreatedEventActorType string
+
+const (
+	ApplicationCreatedEventActorTypeHuman   ApplicationCreatedEventActorType = "human"
+	ApplicationCreatedEventActorTypeService ApplicationCreatedEventActorType = "service"
+	ApplicationCreatedEventActorTypeSystem  ApplicationCreatedEventActorType = "system"
+	ApplicationCreatedEventActorTypeAgent   ApplicationCreatedEventActorType = "agent"
+)
+
+// AllValues returns all ApplicationCreatedEventActorType values.
+func (ApplicationCreatedEventActorType) AllValues() []ApplicationCreatedEventActorType {
+	return []ApplicationCreatedEventActorType{
+		ApplicationCreatedEventActorTypeHuman,
+		ApplicationCreatedEventActorTypeService,
+		ApplicationCreatedEventActorTypeSystem,
+		ApplicationCreatedEventActorTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ApplicationCreatedEventActorType) MarshalText() ([]byte, error) {
+	switch s {
+	case ApplicationCreatedEventActorTypeHuman:
+		return []byte(s), nil
+	case ApplicationCreatedEventActorTypeService:
+		return []byte(s), nil
+	case ApplicationCreatedEventActorTypeSystem:
+		return []byte(s), nil
+	case ApplicationCreatedEventActorTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ApplicationCreatedEventActorType) UnmarshalText(data []byte) error {
+	switch ApplicationCreatedEventActorType(data) {
+	case ApplicationCreatedEventActorTypeHuman:
+		*s = ApplicationCreatedEventActorTypeHuman
+		return nil
+	case ApplicationCreatedEventActorTypeService:
+		*s = ApplicationCreatedEventActorTypeService
+		return nil
+	case ApplicationCreatedEventActorTypeSystem:
+		*s = ApplicationCreatedEventActorTypeSystem
+		return nil
+	case ApplicationCreatedEventActorTypeAgent:
+		*s = ApplicationCreatedEventActorTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The category of the event.
+type ApplicationCreatedEventCategory string
+
+const (
+	ApplicationCreatedEventCategoryRequest ApplicationCreatedEventCategory = "request"
+	ApplicationCreatedEventCategoryAuth    ApplicationCreatedEventCategory = "auth"
+	ApplicationCreatedEventCategorySession ApplicationCreatedEventCategory = "session"
+	ApplicationCreatedEventCategoryAdmin   ApplicationCreatedEventCategory = "admin"
+	ApplicationCreatedEventCategoryEntity  ApplicationCreatedEventCategory = "entity"
+	ApplicationCreatedEventCategorySignal  ApplicationCreatedEventCategory = "signal"
+)
+
+// AllValues returns all ApplicationCreatedEventCategory values.
+func (ApplicationCreatedEventCategory) AllValues() []ApplicationCreatedEventCategory {
+	return []ApplicationCreatedEventCategory{
+		ApplicationCreatedEventCategoryRequest,
+		ApplicationCreatedEventCategoryAuth,
+		ApplicationCreatedEventCategorySession,
+		ApplicationCreatedEventCategoryAdmin,
+		ApplicationCreatedEventCategoryEntity,
+		ApplicationCreatedEventCategorySignal,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ApplicationCreatedEventCategory) MarshalText() ([]byte, error) {
+	switch s {
+	case ApplicationCreatedEventCategoryRequest:
+		return []byte(s), nil
+	case ApplicationCreatedEventCategoryAuth:
+		return []byte(s), nil
+	case ApplicationCreatedEventCategorySession:
+		return []byte(s), nil
+	case ApplicationCreatedEventCategoryAdmin:
+		return []byte(s), nil
+	case ApplicationCreatedEventCategoryEntity:
+		return []byte(s), nil
+	case ApplicationCreatedEventCategorySignal:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ApplicationCreatedEventCategory) UnmarshalText(data []byte) error {
+	switch ApplicationCreatedEventCategory(data) {
+	case ApplicationCreatedEventCategoryRequest:
+		*s = ApplicationCreatedEventCategoryRequest
+		return nil
+	case ApplicationCreatedEventCategoryAuth:
+		*s = ApplicationCreatedEventCategoryAuth
+		return nil
+	case ApplicationCreatedEventCategorySession:
+		*s = ApplicationCreatedEventCategorySession
+		return nil
+	case ApplicationCreatedEventCategoryAdmin:
+		*s = ApplicationCreatedEventCategoryAdmin
+		return nil
+	case ApplicationCreatedEventCategoryEntity:
+		*s = ApplicationCreatedEventCategoryEntity
+		return nil
+	case ApplicationCreatedEventCategorySignal:
+		*s = ApplicationCreatedEventCategorySignal
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The kind of delegation. Absent when unset.
+type ApplicationCreatedEventDelegationType string
+
+const (
+	ApplicationCreatedEventDelegationTypeDirect    ApplicationCreatedEventDelegationType = "direct"
+	ApplicationCreatedEventDelegationTypeDelegated ApplicationCreatedEventDelegationType = "delegated"
+	ApplicationCreatedEventDelegationTypePatShared ApplicationCreatedEventDelegationType = "pat_shared"
+	ApplicationCreatedEventDelegationTypeExchanged ApplicationCreatedEventDelegationType = "exchanged"
+)
+
+// AllValues returns all ApplicationCreatedEventDelegationType values.
+func (ApplicationCreatedEventDelegationType) AllValues() []ApplicationCreatedEventDelegationType {
+	return []ApplicationCreatedEventDelegationType{
+		ApplicationCreatedEventDelegationTypeDirect,
+		ApplicationCreatedEventDelegationTypeDelegated,
+		ApplicationCreatedEventDelegationTypePatShared,
+		ApplicationCreatedEventDelegationTypeExchanged,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ApplicationCreatedEventDelegationType) MarshalText() ([]byte, error) {
+	switch s {
+	case ApplicationCreatedEventDelegationTypeDirect:
+		return []byte(s), nil
+	case ApplicationCreatedEventDelegationTypeDelegated:
+		return []byte(s), nil
+	case ApplicationCreatedEventDelegationTypePatShared:
+		return []byte(s), nil
+	case ApplicationCreatedEventDelegationTypeExchanged:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ApplicationCreatedEventDelegationType) UnmarshalText(data []byte) error {
+	switch ApplicationCreatedEventDelegationType(data) {
+	case ApplicationCreatedEventDelegationTypeDirect:
+		*s = ApplicationCreatedEventDelegationTypeDirect
+		return nil
+	case ApplicationCreatedEventDelegationTypeDelegated:
+		*s = ApplicationCreatedEventDelegationTypeDelegated
+		return nil
+	case ApplicationCreatedEventDelegationTypePatShared:
+		*s = ApplicationCreatedEventDelegationTypePatShared
+		return nil
+	case ApplicationCreatedEventDelegationTypeExchanged:
+		*s = ApplicationCreatedEventDelegationTypeExchanged
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Payload for `application.created`, which holds every field, and
+// `application.updated`, which holds the new `revision_id`, `name` when it
+// changed, and `client_ids` when the revision added a client. The application
+// ID is the event's `entity_id`. The application document and the client
+// secrets are never included.
+// Ref: #
+type ApplicationPayload struct {
+	Slug OptString `json:"slug"`
+	Name OptString `json:"name"`
+	// The `client_id` of each client the write created. Each of them got a new
+	// secret.
+	ClientIds []string `json:"client_ids"`
+	// The revision the write appended.
+	RevisionID string `json:"revision_id"`
+}
+
+// GetSlug returns the value of Slug.
+func (s *ApplicationPayload) GetSlug() OptString {
+	return s.Slug
+}
+
+// GetName returns the value of Name.
+func (s *ApplicationPayload) GetName() OptString {
+	return s.Name
+}
+
+// GetClientIds returns the value of ClientIds.
+func (s *ApplicationPayload) GetClientIds() []string {
+	return s.ClientIds
+}
+
+// GetRevisionID returns the value of RevisionID.
+func (s *ApplicationPayload) GetRevisionID() string {
+	return s.RevisionID
+}
+
+// SetSlug sets the value of Slug.
+func (s *ApplicationPayload) SetSlug(val OptString) {
+	s.Slug = val
+}
+
+// SetName sets the value of Name.
+func (s *ApplicationPayload) SetName(val OptString) {
+	s.Name = val
+}
+
+// SetClientIds sets the value of ClientIds.
+func (s *ApplicationPayload) SetClientIds(val []string) {
+	s.ClientIds = val
+}
+
+// SetRevisionID sets the value of RevisionID.
+func (s *ApplicationPayload) SetRevisionID(val string) {
+	s.RevisionID = val
+}
+
 // An application at its newest revision, with its document as `definition`.
 // It never carries a client secret.
 // Ref: #
@@ -1329,6 +2150,453 @@ func (s *ApplicationResponse) SetDefinition(val Application) {
 }
 
 func (*ApplicationResponse) getApplicationByIdRes() {}
+
+// Merged schema.
+// Ref: #
+type ApplicationUpdatedEvent struct {
+	// The event ID, in the form `evt_<opaque>`.
+	ID        string    `json:"id"`
+	ProjectID ProjectID `json:"project_id"`
+	// The team the actor operated under when the event was emitted, if any.
+	TeamID OptNilString `json:"team_id"`
+	// Merged property.
+	EventType string `json:"event_type"`
+	// The category of the event.
+	Category ApplicationUpdatedEventCategory `json:"category"`
+	// When the action happened, on the server's clock.
+	OccurredAt time.Time `json:"occurred_at"`
+	// When the event was stored, on the server's clock.
+	CreatedAt time.Time `json:"created_at"`
+	// The ID of the actor that triggered the event.
+	ActorID OptNilString `json:"actor_id"`
+	// The kind of actor that triggered the event.
+	ActorType OptNilApplicationUpdatedEventActorType `json:"actor_type"`
+	// The type of resource the event affected.
+	EntityType OptNilString `json:"entity_type"`
+	// The ID of the resource the event affected.
+	EntityID OptNilString `json:"entity_id"`
+	// The application or agent that produced the event.
+	ClientID string `json:"client_id"`
+	// The ID of the token in use when the event was emitted, when there was one.
+	TokenID OptString `json:"token_id"`
+	// The kind of delegation. Absent when unset.
+	DelegationType OptApplicationUpdatedEventDelegationType `json:"delegation_type"`
+	DelegationID   OptString                                `json:"delegation_id"`
+	Grantor        OptString                                `json:"grantor"`
+	// A device fingerprint ID that correlates events from the same device.
+	Fingerprint OptString `json:"fingerprint"`
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
+	RequestID OptNilString `json:"request_id"`
+	// The ID of the session the event belongs to.
+	SessionID OptNilString `json:"session_id"`
+	// An ID that correlates the events of one login flow.
+	FlowID   OptNilString       `json:"flow_id"`
+	Metadata OptEventMetadata   `json:"metadata"`
+	Payload  ApplicationPayload `json:"payload"`
+}
+
+// GetID returns the value of ID.
+func (s *ApplicationUpdatedEvent) GetID() string {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *ApplicationUpdatedEvent) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *ApplicationUpdatedEvent) GetTeamID() OptNilString {
+	return s.TeamID
+}
+
+// GetEventType returns the value of EventType.
+func (s *ApplicationUpdatedEvent) GetEventType() string {
+	return s.EventType
+}
+
+// GetCategory returns the value of Category.
+func (s *ApplicationUpdatedEvent) GetCategory() ApplicationUpdatedEventCategory {
+	return s.Category
+}
+
+// GetOccurredAt returns the value of OccurredAt.
+func (s *ApplicationUpdatedEvent) GetOccurredAt() time.Time {
+	return s.OccurredAt
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *ApplicationUpdatedEvent) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetActorID returns the value of ActorID.
+func (s *ApplicationUpdatedEvent) GetActorID() OptNilString {
+	return s.ActorID
+}
+
+// GetActorType returns the value of ActorType.
+func (s *ApplicationUpdatedEvent) GetActorType() OptNilApplicationUpdatedEventActorType {
+	return s.ActorType
+}
+
+// GetEntityType returns the value of EntityType.
+func (s *ApplicationUpdatedEvent) GetEntityType() OptNilString {
+	return s.EntityType
+}
+
+// GetEntityID returns the value of EntityID.
+func (s *ApplicationUpdatedEvent) GetEntityID() OptNilString {
+	return s.EntityID
+}
+
+// GetClientID returns the value of ClientID.
+func (s *ApplicationUpdatedEvent) GetClientID() string {
+	return s.ClientID
+}
+
+// GetTokenID returns the value of TokenID.
+func (s *ApplicationUpdatedEvent) GetTokenID() OptString {
+	return s.TokenID
+}
+
+// GetDelegationType returns the value of DelegationType.
+func (s *ApplicationUpdatedEvent) GetDelegationType() OptApplicationUpdatedEventDelegationType {
+	return s.DelegationType
+}
+
+// GetDelegationID returns the value of DelegationID.
+func (s *ApplicationUpdatedEvent) GetDelegationID() OptString {
+	return s.DelegationID
+}
+
+// GetGrantor returns the value of Grantor.
+func (s *ApplicationUpdatedEvent) GetGrantor() OptString {
+	return s.Grantor
+}
+
+// GetFingerprint returns the value of Fingerprint.
+func (s *ApplicationUpdatedEvent) GetFingerprint() OptString {
+	return s.Fingerprint
+}
+
+// GetRequestID returns the value of RequestID.
+func (s *ApplicationUpdatedEvent) GetRequestID() OptNilString {
+	return s.RequestID
+}
+
+// GetSessionID returns the value of SessionID.
+func (s *ApplicationUpdatedEvent) GetSessionID() OptNilString {
+	return s.SessionID
+}
+
+// GetFlowID returns the value of FlowID.
+func (s *ApplicationUpdatedEvent) GetFlowID() OptNilString {
+	return s.FlowID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *ApplicationUpdatedEvent) GetMetadata() OptEventMetadata {
+	return s.Metadata
+}
+
+// GetPayload returns the value of Payload.
+func (s *ApplicationUpdatedEvent) GetPayload() ApplicationPayload {
+	return s.Payload
+}
+
+// SetID sets the value of ID.
+func (s *ApplicationUpdatedEvent) SetID(val string) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *ApplicationUpdatedEvent) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *ApplicationUpdatedEvent) SetTeamID(val OptNilString) {
+	s.TeamID = val
+}
+
+// SetEventType sets the value of EventType.
+func (s *ApplicationUpdatedEvent) SetEventType(val string) {
+	s.EventType = val
+}
+
+// SetCategory sets the value of Category.
+func (s *ApplicationUpdatedEvent) SetCategory(val ApplicationUpdatedEventCategory) {
+	s.Category = val
+}
+
+// SetOccurredAt sets the value of OccurredAt.
+func (s *ApplicationUpdatedEvent) SetOccurredAt(val time.Time) {
+	s.OccurredAt = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *ApplicationUpdatedEvent) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetActorID sets the value of ActorID.
+func (s *ApplicationUpdatedEvent) SetActorID(val OptNilString) {
+	s.ActorID = val
+}
+
+// SetActorType sets the value of ActorType.
+func (s *ApplicationUpdatedEvent) SetActorType(val OptNilApplicationUpdatedEventActorType) {
+	s.ActorType = val
+}
+
+// SetEntityType sets the value of EntityType.
+func (s *ApplicationUpdatedEvent) SetEntityType(val OptNilString) {
+	s.EntityType = val
+}
+
+// SetEntityID sets the value of EntityID.
+func (s *ApplicationUpdatedEvent) SetEntityID(val OptNilString) {
+	s.EntityID = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *ApplicationUpdatedEvent) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetTokenID sets the value of TokenID.
+func (s *ApplicationUpdatedEvent) SetTokenID(val OptString) {
+	s.TokenID = val
+}
+
+// SetDelegationType sets the value of DelegationType.
+func (s *ApplicationUpdatedEvent) SetDelegationType(val OptApplicationUpdatedEventDelegationType) {
+	s.DelegationType = val
+}
+
+// SetDelegationID sets the value of DelegationID.
+func (s *ApplicationUpdatedEvent) SetDelegationID(val OptString) {
+	s.DelegationID = val
+}
+
+// SetGrantor sets the value of Grantor.
+func (s *ApplicationUpdatedEvent) SetGrantor(val OptString) {
+	s.Grantor = val
+}
+
+// SetFingerprint sets the value of Fingerprint.
+func (s *ApplicationUpdatedEvent) SetFingerprint(val OptString) {
+	s.Fingerprint = val
+}
+
+// SetRequestID sets the value of RequestID.
+func (s *ApplicationUpdatedEvent) SetRequestID(val OptNilString) {
+	s.RequestID = val
+}
+
+// SetSessionID sets the value of SessionID.
+func (s *ApplicationUpdatedEvent) SetSessionID(val OptNilString) {
+	s.SessionID = val
+}
+
+// SetFlowID sets the value of FlowID.
+func (s *ApplicationUpdatedEvent) SetFlowID(val OptNilString) {
+	s.FlowID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *ApplicationUpdatedEvent) SetMetadata(val OptEventMetadata) {
+	s.Metadata = val
+}
+
+// SetPayload sets the value of Payload.
+func (s *ApplicationUpdatedEvent) SetPayload(val ApplicationPayload) {
+	s.Payload = val
+}
+
+type ApplicationUpdatedEventActorType string
+
+const (
+	ApplicationUpdatedEventActorTypeHuman   ApplicationUpdatedEventActorType = "human"
+	ApplicationUpdatedEventActorTypeService ApplicationUpdatedEventActorType = "service"
+	ApplicationUpdatedEventActorTypeSystem  ApplicationUpdatedEventActorType = "system"
+	ApplicationUpdatedEventActorTypeAgent   ApplicationUpdatedEventActorType = "agent"
+)
+
+// AllValues returns all ApplicationUpdatedEventActorType values.
+func (ApplicationUpdatedEventActorType) AllValues() []ApplicationUpdatedEventActorType {
+	return []ApplicationUpdatedEventActorType{
+		ApplicationUpdatedEventActorTypeHuman,
+		ApplicationUpdatedEventActorTypeService,
+		ApplicationUpdatedEventActorTypeSystem,
+		ApplicationUpdatedEventActorTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ApplicationUpdatedEventActorType) MarshalText() ([]byte, error) {
+	switch s {
+	case ApplicationUpdatedEventActorTypeHuman:
+		return []byte(s), nil
+	case ApplicationUpdatedEventActorTypeService:
+		return []byte(s), nil
+	case ApplicationUpdatedEventActorTypeSystem:
+		return []byte(s), nil
+	case ApplicationUpdatedEventActorTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ApplicationUpdatedEventActorType) UnmarshalText(data []byte) error {
+	switch ApplicationUpdatedEventActorType(data) {
+	case ApplicationUpdatedEventActorTypeHuman:
+		*s = ApplicationUpdatedEventActorTypeHuman
+		return nil
+	case ApplicationUpdatedEventActorTypeService:
+		*s = ApplicationUpdatedEventActorTypeService
+		return nil
+	case ApplicationUpdatedEventActorTypeSystem:
+		*s = ApplicationUpdatedEventActorTypeSystem
+		return nil
+	case ApplicationUpdatedEventActorTypeAgent:
+		*s = ApplicationUpdatedEventActorTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The category of the event.
+type ApplicationUpdatedEventCategory string
+
+const (
+	ApplicationUpdatedEventCategoryRequest ApplicationUpdatedEventCategory = "request"
+	ApplicationUpdatedEventCategoryAuth    ApplicationUpdatedEventCategory = "auth"
+	ApplicationUpdatedEventCategorySession ApplicationUpdatedEventCategory = "session"
+	ApplicationUpdatedEventCategoryAdmin   ApplicationUpdatedEventCategory = "admin"
+	ApplicationUpdatedEventCategoryEntity  ApplicationUpdatedEventCategory = "entity"
+	ApplicationUpdatedEventCategorySignal  ApplicationUpdatedEventCategory = "signal"
+)
+
+// AllValues returns all ApplicationUpdatedEventCategory values.
+func (ApplicationUpdatedEventCategory) AllValues() []ApplicationUpdatedEventCategory {
+	return []ApplicationUpdatedEventCategory{
+		ApplicationUpdatedEventCategoryRequest,
+		ApplicationUpdatedEventCategoryAuth,
+		ApplicationUpdatedEventCategorySession,
+		ApplicationUpdatedEventCategoryAdmin,
+		ApplicationUpdatedEventCategoryEntity,
+		ApplicationUpdatedEventCategorySignal,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ApplicationUpdatedEventCategory) MarshalText() ([]byte, error) {
+	switch s {
+	case ApplicationUpdatedEventCategoryRequest:
+		return []byte(s), nil
+	case ApplicationUpdatedEventCategoryAuth:
+		return []byte(s), nil
+	case ApplicationUpdatedEventCategorySession:
+		return []byte(s), nil
+	case ApplicationUpdatedEventCategoryAdmin:
+		return []byte(s), nil
+	case ApplicationUpdatedEventCategoryEntity:
+		return []byte(s), nil
+	case ApplicationUpdatedEventCategorySignal:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ApplicationUpdatedEventCategory) UnmarshalText(data []byte) error {
+	switch ApplicationUpdatedEventCategory(data) {
+	case ApplicationUpdatedEventCategoryRequest:
+		*s = ApplicationUpdatedEventCategoryRequest
+		return nil
+	case ApplicationUpdatedEventCategoryAuth:
+		*s = ApplicationUpdatedEventCategoryAuth
+		return nil
+	case ApplicationUpdatedEventCategorySession:
+		*s = ApplicationUpdatedEventCategorySession
+		return nil
+	case ApplicationUpdatedEventCategoryAdmin:
+		*s = ApplicationUpdatedEventCategoryAdmin
+		return nil
+	case ApplicationUpdatedEventCategoryEntity:
+		*s = ApplicationUpdatedEventCategoryEntity
+		return nil
+	case ApplicationUpdatedEventCategorySignal:
+		*s = ApplicationUpdatedEventCategorySignal
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The kind of delegation. Absent when unset.
+type ApplicationUpdatedEventDelegationType string
+
+const (
+	ApplicationUpdatedEventDelegationTypeDirect    ApplicationUpdatedEventDelegationType = "direct"
+	ApplicationUpdatedEventDelegationTypeDelegated ApplicationUpdatedEventDelegationType = "delegated"
+	ApplicationUpdatedEventDelegationTypePatShared ApplicationUpdatedEventDelegationType = "pat_shared"
+	ApplicationUpdatedEventDelegationTypeExchanged ApplicationUpdatedEventDelegationType = "exchanged"
+)
+
+// AllValues returns all ApplicationUpdatedEventDelegationType values.
+func (ApplicationUpdatedEventDelegationType) AllValues() []ApplicationUpdatedEventDelegationType {
+	return []ApplicationUpdatedEventDelegationType{
+		ApplicationUpdatedEventDelegationTypeDirect,
+		ApplicationUpdatedEventDelegationTypeDelegated,
+		ApplicationUpdatedEventDelegationTypePatShared,
+		ApplicationUpdatedEventDelegationTypeExchanged,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ApplicationUpdatedEventDelegationType) MarshalText() ([]byte, error) {
+	switch s {
+	case ApplicationUpdatedEventDelegationTypeDirect:
+		return []byte(s), nil
+	case ApplicationUpdatedEventDelegationTypeDelegated:
+		return []byte(s), nil
+	case ApplicationUpdatedEventDelegationTypePatShared:
+		return []byte(s), nil
+	case ApplicationUpdatedEventDelegationTypeExchanged:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ApplicationUpdatedEventDelegationType) UnmarshalText(data []byte) error {
+	switch ApplicationUpdatedEventDelegationType(data) {
+	case ApplicationUpdatedEventDelegationTypeDirect:
+		*s = ApplicationUpdatedEventDelegationTypeDirect
+		return nil
+	case ApplicationUpdatedEventDelegationTypeDelegated:
+		*s = ApplicationUpdatedEventDelegationTypeDelegated
+		return nil
+	case ApplicationUpdatedEventDelegationTypePatShared:
+		*s = ApplicationUpdatedEventDelegationTypePatShared
+		return nil
+	case ApplicationUpdatedEventDelegationTypeExchanged:
+		*s = ApplicationUpdatedEventDelegationTypeExchanged
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
 
 // Merged schema.
 // Ref: #
@@ -11005,7 +12273,8 @@ type BundleResourceError struct {
 	// Additional error-specific context.
 	Details OptBundleResourceErrorDetails `json:"details"`
 	Kind    ReleasePointerKind            `json:"kind"`
-	// The resource's position in its kind's array in the bundle; `0` for the branding.
+	// The resource's position in its kind's array in the bundle; `0` for the branding and for the OAuth
+	// settings, which are single objects.
 	Index int `json:"index"`
 	// The resource's handle, when it declares one.
 	Handle OptString `json:"handle"`
@@ -11088,6 +12357,7 @@ type CancelInvitationErrorResponse struct {
 	Type                CancelInvitationErrorResponseType // switch on this field
 	AuthCsrfInvalid     AuthCsrfInvalid
 	AuthUnauthorized    AuthUnauthorized
+	EvtInvalid          EvtInvalid
 	Internal            Internal
 	InvNotFound         InvNotFound
 	InvPermissionDenied InvPermissionDenied
@@ -11103,6 +12373,7 @@ type CancelInvitationErrorResponseType string
 const (
 	AuthCsrfInvalidCancelInvitationErrorResponse     CancelInvitationErrorResponseType = "auth.csrf_invalid"
 	AuthUnauthorizedCancelInvitationErrorResponse    CancelInvitationErrorResponseType = "auth.unauthorized"
+	EvtInvalidCancelInvitationErrorResponse          CancelInvitationErrorResponseType = "evt.invalid"
 	InternalCancelInvitationErrorResponse            CancelInvitationErrorResponseType = "internal"
 	InvNotFoundCancelInvitationErrorResponse         CancelInvitationErrorResponseType = "inv.not_found"
 	InvPermissionDeniedCancelInvitationErrorResponse CancelInvitationErrorResponseType = "inv.permission_denied"
@@ -11119,6 +12390,11 @@ func (s CancelInvitationErrorResponse) IsAuthCsrfInvalid() bool {
 // IsAuthUnauthorized reports whether CancelInvitationErrorResponse is AuthUnauthorized.
 func (s CancelInvitationErrorResponse) IsAuthUnauthorized() bool {
 	return s.Type == AuthUnauthorizedCancelInvitationErrorResponse
+}
+
+// IsEvtInvalid reports whether CancelInvitationErrorResponse is EvtInvalid.
+func (s CancelInvitationErrorResponse) IsEvtInvalid() bool {
+	return s.Type == EvtInvalidCancelInvitationErrorResponse
 }
 
 // IsInternal reports whether CancelInvitationErrorResponse is Internal.
@@ -11190,6 +12466,27 @@ func (s CancelInvitationErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized
 func NewAuthUnauthorizedCancelInvitationErrorResponse(v AuthUnauthorized) CancelInvitationErrorResponse {
 	var s CancelInvitationErrorResponse
 	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetEvtInvalid sets CancelInvitationErrorResponse to EvtInvalid.
+func (s *CancelInvitationErrorResponse) SetEvtInvalid(v EvtInvalid) {
+	s.Type = EvtInvalidCancelInvitationErrorResponse
+	s.EvtInvalid = v
+}
+
+// GetEvtInvalid returns EvtInvalid and true boolean if CancelInvitationErrorResponse is EvtInvalid.
+func (s CancelInvitationErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
+	if !s.IsEvtInvalid() {
+		return v, false
+	}
+	return s.EvtInvalid, true
+}
+
+// NewEvtInvalidCancelInvitationErrorResponse returns new CancelInvitationErrorResponse from EvtInvalid.
+func NewEvtInvalidCancelInvitationErrorResponse(v EvtInvalid) CancelInvitationErrorResponse {
+	var s CancelInvitationErrorResponse
+	s.SetEvtInvalid(v)
 	return s
 }
 
@@ -12988,11 +14285,13 @@ func NewPasskeyFactorPayloadCompletedFactorPayload(v PasskeyFactorPayload) Compl
 // - two policies for the same `operation`;
 // - a schema without an `objectType`.
 // Each kind is optional, and the arrays may be empty: a project that never
-// ejected its branding omits `branding`. The bundle carries at least one
-// resource. The release it builds pins at most 50 resources, which counts the
-// resources the bundle carries plus those resolved from the project. The
-// server refuses anything outside that with `rel.invalid`. Unknown keys are
-// refused.
+// ejected its branding omits `branding`, and one that never turned on its
+// OAuth authorization server omits `oauth`. `branding` and `oauth` are
+// single objects, because a project has one of each. The bundle carries at
+// least one resource. The release it builds pins at most 50 resources, which
+// counts the resources the bundle carries plus those resolved from the
+// project. The server refuses anything outside that with `rel.invalid`.
+// Unknown keys are refused.
 // Ref: #
 type ConfigurationBundle struct {
 	// User schemas, one per `.zitadel/schemas/*.json`, in either form
@@ -13029,6 +14328,11 @@ type ConfigurationBundle struct {
 	// inlined, exactly as `POST /branding` takes it. A project has one
 	// branding, so this is a single object.
 	Branding OptBranding `json:"branding"`
+	// The project's OAuth settings. A project has one set of them, so this is
+	// a single object, and the release is its only writer: there is no
+	// per-kind create endpoint. Omit it to leave the project's OAuth
+	// authorization server off.
+	OAuth OptOAuthSettings `json:"oauth"`
 }
 
 // GetSchemas returns the value of Schemas.
@@ -13056,6 +14360,11 @@ func (s *ConfigurationBundle) GetBranding() OptBranding {
 	return s.Branding
 }
 
+// GetOAuth returns the value of OAuth.
+func (s *ConfigurationBundle) GetOAuth() OptOAuthSettings {
+	return s.OAuth
+}
+
 // SetSchemas sets the value of Schemas.
 func (s *ConfigurationBundle) SetSchemas(val []ConfigurationBundleSchemasItem) {
 	s.Schemas = val
@@ -13079,6 +14388,11 @@ func (s *ConfigurationBundle) SetPolicies(val []PublishPolicyRequest) {
 // SetBranding sets the value of Branding.
 func (s *ConfigurationBundle) SetBranding(val OptBranding) {
 	s.Branding = val
+}
+
+// SetOAuth sets the value of OAuth.
+func (s *ConfigurationBundle) SetOAuth(val OptOAuthSettings) {
+	s.OAuth = val
 }
 
 // ConfigurationBundleSchemasItem represents sum type.
@@ -13163,12 +14477,19 @@ func (*CreateApplicationCreated) createApplicationRes() {}
 
 // CreateApplicationErrorResponse represents sum type.
 type CreateApplicationErrorResponse struct {
-	Type             CreateApplicationErrorResponseType // switch on this field
-	AuthUnauthorized AuthUnauthorized
-	Internal         Internal
-	NotImplemented   NotImplemented
-	ReqInvalid       ReqInvalid
-	Unavailable      Unavailable
+	Type                CreateApplicationErrorResponseType // switch on this field
+	AppClientIDTaken    AppClientIDTaken
+	AppFieldImmutable   AppFieldImmutable
+	AppInvalid          AppInvalid
+	AppNotFound         AppNotFound
+	AppPermissionDenied AppPermissionDenied
+	AppRevisionConflict AppRevisionConflict
+	AuthUnauthorized    AuthUnauthorized
+	EvtInvalid          EvtInvalid
+	Internal            Internal
+	NotImplemented      NotImplemented
+	ReqInvalid          ReqInvalid
+	Unavailable         Unavailable
 }
 
 // CreateApplicationErrorResponseType is oneOf type of CreateApplicationErrorResponse.
@@ -13176,16 +14497,58 @@ type CreateApplicationErrorResponseType string
 
 // Possible values for CreateApplicationErrorResponseType.
 const (
-	AuthUnauthorizedCreateApplicationErrorResponse CreateApplicationErrorResponseType = "auth.unauthorized"
-	InternalCreateApplicationErrorResponse         CreateApplicationErrorResponseType = "internal"
-	NotImplementedCreateApplicationErrorResponse   CreateApplicationErrorResponseType = "not_implemented"
-	ReqInvalidCreateApplicationErrorResponse       CreateApplicationErrorResponseType = "req.invalid"
-	UnavailableCreateApplicationErrorResponse      CreateApplicationErrorResponseType = "unavailable"
+	AppClientIDTakenCreateApplicationErrorResponse    CreateApplicationErrorResponseType = "app.client_id_taken"
+	AppFieldImmutableCreateApplicationErrorResponse   CreateApplicationErrorResponseType = "app.field_immutable"
+	AppInvalidCreateApplicationErrorResponse          CreateApplicationErrorResponseType = "app.invalid"
+	AppNotFoundCreateApplicationErrorResponse         CreateApplicationErrorResponseType = "app.not_found"
+	AppPermissionDeniedCreateApplicationErrorResponse CreateApplicationErrorResponseType = "app.permission_denied"
+	AppRevisionConflictCreateApplicationErrorResponse CreateApplicationErrorResponseType = "app.revision_conflict"
+	AuthUnauthorizedCreateApplicationErrorResponse    CreateApplicationErrorResponseType = "auth.unauthorized"
+	EvtInvalidCreateApplicationErrorResponse          CreateApplicationErrorResponseType = "evt.invalid"
+	InternalCreateApplicationErrorResponse            CreateApplicationErrorResponseType = "internal"
+	NotImplementedCreateApplicationErrorResponse      CreateApplicationErrorResponseType = "not_implemented"
+	ReqInvalidCreateApplicationErrorResponse          CreateApplicationErrorResponseType = "req.invalid"
+	UnavailableCreateApplicationErrorResponse         CreateApplicationErrorResponseType = "unavailable"
 )
+
+// IsAppClientIDTaken reports whether CreateApplicationErrorResponse is AppClientIDTaken.
+func (s CreateApplicationErrorResponse) IsAppClientIDTaken() bool {
+	return s.Type == AppClientIDTakenCreateApplicationErrorResponse
+}
+
+// IsAppFieldImmutable reports whether CreateApplicationErrorResponse is AppFieldImmutable.
+func (s CreateApplicationErrorResponse) IsAppFieldImmutable() bool {
+	return s.Type == AppFieldImmutableCreateApplicationErrorResponse
+}
+
+// IsAppInvalid reports whether CreateApplicationErrorResponse is AppInvalid.
+func (s CreateApplicationErrorResponse) IsAppInvalid() bool {
+	return s.Type == AppInvalidCreateApplicationErrorResponse
+}
+
+// IsAppNotFound reports whether CreateApplicationErrorResponse is AppNotFound.
+func (s CreateApplicationErrorResponse) IsAppNotFound() bool {
+	return s.Type == AppNotFoundCreateApplicationErrorResponse
+}
+
+// IsAppPermissionDenied reports whether CreateApplicationErrorResponse is AppPermissionDenied.
+func (s CreateApplicationErrorResponse) IsAppPermissionDenied() bool {
+	return s.Type == AppPermissionDeniedCreateApplicationErrorResponse
+}
+
+// IsAppRevisionConflict reports whether CreateApplicationErrorResponse is AppRevisionConflict.
+func (s CreateApplicationErrorResponse) IsAppRevisionConflict() bool {
+	return s.Type == AppRevisionConflictCreateApplicationErrorResponse
+}
 
 // IsAuthUnauthorized reports whether CreateApplicationErrorResponse is AuthUnauthorized.
 func (s CreateApplicationErrorResponse) IsAuthUnauthorized() bool {
 	return s.Type == AuthUnauthorizedCreateApplicationErrorResponse
+}
+
+// IsEvtInvalid reports whether CreateApplicationErrorResponse is EvtInvalid.
+func (s CreateApplicationErrorResponse) IsEvtInvalid() bool {
+	return s.Type == EvtInvalidCreateApplicationErrorResponse
 }
 
 // IsInternal reports whether CreateApplicationErrorResponse is Internal.
@@ -13208,6 +14571,132 @@ func (s CreateApplicationErrorResponse) IsUnavailable() bool {
 	return s.Type == UnavailableCreateApplicationErrorResponse
 }
 
+// SetAppClientIDTaken sets CreateApplicationErrorResponse to AppClientIDTaken.
+func (s *CreateApplicationErrorResponse) SetAppClientIDTaken(v AppClientIDTaken) {
+	s.Type = AppClientIDTakenCreateApplicationErrorResponse
+	s.AppClientIDTaken = v
+}
+
+// GetAppClientIDTaken returns AppClientIDTaken and true boolean if CreateApplicationErrorResponse is AppClientIDTaken.
+func (s CreateApplicationErrorResponse) GetAppClientIDTaken() (v AppClientIDTaken, ok bool) {
+	if !s.IsAppClientIDTaken() {
+		return v, false
+	}
+	return s.AppClientIDTaken, true
+}
+
+// NewAppClientIDTakenCreateApplicationErrorResponse returns new CreateApplicationErrorResponse from AppClientIDTaken.
+func NewAppClientIDTakenCreateApplicationErrorResponse(v AppClientIDTaken) CreateApplicationErrorResponse {
+	var s CreateApplicationErrorResponse
+	s.SetAppClientIDTaken(v)
+	return s
+}
+
+// SetAppFieldImmutable sets CreateApplicationErrorResponse to AppFieldImmutable.
+func (s *CreateApplicationErrorResponse) SetAppFieldImmutable(v AppFieldImmutable) {
+	s.Type = AppFieldImmutableCreateApplicationErrorResponse
+	s.AppFieldImmutable = v
+}
+
+// GetAppFieldImmutable returns AppFieldImmutable and true boolean if CreateApplicationErrorResponse is AppFieldImmutable.
+func (s CreateApplicationErrorResponse) GetAppFieldImmutable() (v AppFieldImmutable, ok bool) {
+	if !s.IsAppFieldImmutable() {
+		return v, false
+	}
+	return s.AppFieldImmutable, true
+}
+
+// NewAppFieldImmutableCreateApplicationErrorResponse returns new CreateApplicationErrorResponse from AppFieldImmutable.
+func NewAppFieldImmutableCreateApplicationErrorResponse(v AppFieldImmutable) CreateApplicationErrorResponse {
+	var s CreateApplicationErrorResponse
+	s.SetAppFieldImmutable(v)
+	return s
+}
+
+// SetAppInvalid sets CreateApplicationErrorResponse to AppInvalid.
+func (s *CreateApplicationErrorResponse) SetAppInvalid(v AppInvalid) {
+	s.Type = AppInvalidCreateApplicationErrorResponse
+	s.AppInvalid = v
+}
+
+// GetAppInvalid returns AppInvalid and true boolean if CreateApplicationErrorResponse is AppInvalid.
+func (s CreateApplicationErrorResponse) GetAppInvalid() (v AppInvalid, ok bool) {
+	if !s.IsAppInvalid() {
+		return v, false
+	}
+	return s.AppInvalid, true
+}
+
+// NewAppInvalidCreateApplicationErrorResponse returns new CreateApplicationErrorResponse from AppInvalid.
+func NewAppInvalidCreateApplicationErrorResponse(v AppInvalid) CreateApplicationErrorResponse {
+	var s CreateApplicationErrorResponse
+	s.SetAppInvalid(v)
+	return s
+}
+
+// SetAppNotFound sets CreateApplicationErrorResponse to AppNotFound.
+func (s *CreateApplicationErrorResponse) SetAppNotFound(v AppNotFound) {
+	s.Type = AppNotFoundCreateApplicationErrorResponse
+	s.AppNotFound = v
+}
+
+// GetAppNotFound returns AppNotFound and true boolean if CreateApplicationErrorResponse is AppNotFound.
+func (s CreateApplicationErrorResponse) GetAppNotFound() (v AppNotFound, ok bool) {
+	if !s.IsAppNotFound() {
+		return v, false
+	}
+	return s.AppNotFound, true
+}
+
+// NewAppNotFoundCreateApplicationErrorResponse returns new CreateApplicationErrorResponse from AppNotFound.
+func NewAppNotFoundCreateApplicationErrorResponse(v AppNotFound) CreateApplicationErrorResponse {
+	var s CreateApplicationErrorResponse
+	s.SetAppNotFound(v)
+	return s
+}
+
+// SetAppPermissionDenied sets CreateApplicationErrorResponse to AppPermissionDenied.
+func (s *CreateApplicationErrorResponse) SetAppPermissionDenied(v AppPermissionDenied) {
+	s.Type = AppPermissionDeniedCreateApplicationErrorResponse
+	s.AppPermissionDenied = v
+}
+
+// GetAppPermissionDenied returns AppPermissionDenied and true boolean if CreateApplicationErrorResponse is AppPermissionDenied.
+func (s CreateApplicationErrorResponse) GetAppPermissionDenied() (v AppPermissionDenied, ok bool) {
+	if !s.IsAppPermissionDenied() {
+		return v, false
+	}
+	return s.AppPermissionDenied, true
+}
+
+// NewAppPermissionDeniedCreateApplicationErrorResponse returns new CreateApplicationErrorResponse from AppPermissionDenied.
+func NewAppPermissionDeniedCreateApplicationErrorResponse(v AppPermissionDenied) CreateApplicationErrorResponse {
+	var s CreateApplicationErrorResponse
+	s.SetAppPermissionDenied(v)
+	return s
+}
+
+// SetAppRevisionConflict sets CreateApplicationErrorResponse to AppRevisionConflict.
+func (s *CreateApplicationErrorResponse) SetAppRevisionConflict(v AppRevisionConflict) {
+	s.Type = AppRevisionConflictCreateApplicationErrorResponse
+	s.AppRevisionConflict = v
+}
+
+// GetAppRevisionConflict returns AppRevisionConflict and true boolean if CreateApplicationErrorResponse is AppRevisionConflict.
+func (s CreateApplicationErrorResponse) GetAppRevisionConflict() (v AppRevisionConflict, ok bool) {
+	if !s.IsAppRevisionConflict() {
+		return v, false
+	}
+	return s.AppRevisionConflict, true
+}
+
+// NewAppRevisionConflictCreateApplicationErrorResponse returns new CreateApplicationErrorResponse from AppRevisionConflict.
+func NewAppRevisionConflictCreateApplicationErrorResponse(v AppRevisionConflict) CreateApplicationErrorResponse {
+	var s CreateApplicationErrorResponse
+	s.SetAppRevisionConflict(v)
+	return s
+}
+
 // SetAuthUnauthorized sets CreateApplicationErrorResponse to AuthUnauthorized.
 func (s *CreateApplicationErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
 	s.Type = AuthUnauthorizedCreateApplicationErrorResponse
@@ -13226,6 +14715,27 @@ func (s CreateApplicationErrorResponse) GetAuthUnauthorized() (v AuthUnauthorize
 func NewAuthUnauthorizedCreateApplicationErrorResponse(v AuthUnauthorized) CreateApplicationErrorResponse {
 	var s CreateApplicationErrorResponse
 	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetEvtInvalid sets CreateApplicationErrorResponse to EvtInvalid.
+func (s *CreateApplicationErrorResponse) SetEvtInvalid(v EvtInvalid) {
+	s.Type = EvtInvalidCreateApplicationErrorResponse
+	s.EvtInvalid = v
+}
+
+// GetEvtInvalid returns EvtInvalid and true boolean if CreateApplicationErrorResponse is EvtInvalid.
+func (s CreateApplicationErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
+	if !s.IsEvtInvalid() {
+		return v, false
+	}
+	return s.EvtInvalid, true
+}
+
+// NewEvtInvalidCreateApplicationErrorResponse returns new CreateApplicationErrorResponse from EvtInvalid.
+func NewEvtInvalidCreateApplicationErrorResponse(v EvtInvalid) CreateApplicationErrorResponse {
+	var s CreateApplicationErrorResponse
+	s.SetEvtInvalid(v)
 	return s
 }
 
@@ -17702,7 +19212,12 @@ type CreateInvitationErrorResponse struct {
 	Type                CreateInvitationErrorResponseType // switch on this field
 	AuthCsrfInvalid     AuthCsrfInvalid
 	AuthUnauthorized    AuthUnauthorized
+	EncKeyDecryptFailed EncKeyDecryptFailed
+	EncKeyEncryptFailed EncKeyEncryptFailed
+	EncKeyNotFound      EncKeyNotFound
+	EvtInvalid          EvtInvalid
 	Internal            Internal
+	TknInvalid          TknInvalid
 	InvInvalid          InvInvalid
 	InvNotFound         InvNotFound
 	InvPendingLimit     InvPendingLimit
@@ -17711,6 +19226,7 @@ type CreateInvitationErrorResponse struct {
 	InvProjectUnclaimed InvProjectUnclaimed
 	NotImplemented      NotImplemented
 	ReqInvalid          ReqInvalid
+	EncKeyUnknownAlg    EncKeyUnknownAlg
 	Unavailable         Unavailable
 }
 
@@ -17721,7 +19237,12 @@ type CreateInvitationErrorResponseType string
 const (
 	AuthCsrfInvalidCreateInvitationErrorResponse     CreateInvitationErrorResponseType = "auth.csrf_invalid"
 	AuthUnauthorizedCreateInvitationErrorResponse    CreateInvitationErrorResponseType = "auth.unauthorized"
+	EncKeyDecryptFailedCreateInvitationErrorResponse CreateInvitationErrorResponseType = "enc_key.decrypt_failed"
+	EncKeyEncryptFailedCreateInvitationErrorResponse CreateInvitationErrorResponseType = "enc_key.encrypt_failed"
+	EncKeyNotFoundCreateInvitationErrorResponse      CreateInvitationErrorResponseType = "enc_key.not_found"
+	EvtInvalidCreateInvitationErrorResponse          CreateInvitationErrorResponseType = "evt.invalid"
 	InternalCreateInvitationErrorResponse            CreateInvitationErrorResponseType = "internal"
+	TknInvalidCreateInvitationErrorResponse          CreateInvitationErrorResponseType = "tkn.invalid"
 	InvInvalidCreateInvitationErrorResponse          CreateInvitationErrorResponseType = "inv.invalid"
 	InvNotFoundCreateInvitationErrorResponse         CreateInvitationErrorResponseType = "inv.not_found"
 	InvPendingLimitCreateInvitationErrorResponse     CreateInvitationErrorResponseType = "inv.pending_limit"
@@ -17730,6 +19251,7 @@ const (
 	InvProjectUnclaimedCreateInvitationErrorResponse CreateInvitationErrorResponseType = "inv.project_unclaimed"
 	NotImplementedCreateInvitationErrorResponse      CreateInvitationErrorResponseType = "not_implemented"
 	ReqInvalidCreateInvitationErrorResponse          CreateInvitationErrorResponseType = "req.invalid"
+	EncKeyUnknownAlgCreateInvitationErrorResponse    CreateInvitationErrorResponseType = "enc_key.unknown_alg"
 	UnavailableCreateInvitationErrorResponse         CreateInvitationErrorResponseType = "unavailable"
 )
 
@@ -17743,9 +19265,34 @@ func (s CreateInvitationErrorResponse) IsAuthUnauthorized() bool {
 	return s.Type == AuthUnauthorizedCreateInvitationErrorResponse
 }
 
+// IsEncKeyDecryptFailed reports whether CreateInvitationErrorResponse is EncKeyDecryptFailed.
+func (s CreateInvitationErrorResponse) IsEncKeyDecryptFailed() bool {
+	return s.Type == EncKeyDecryptFailedCreateInvitationErrorResponse
+}
+
+// IsEncKeyEncryptFailed reports whether CreateInvitationErrorResponse is EncKeyEncryptFailed.
+func (s CreateInvitationErrorResponse) IsEncKeyEncryptFailed() bool {
+	return s.Type == EncKeyEncryptFailedCreateInvitationErrorResponse
+}
+
+// IsEncKeyNotFound reports whether CreateInvitationErrorResponse is EncKeyNotFound.
+func (s CreateInvitationErrorResponse) IsEncKeyNotFound() bool {
+	return s.Type == EncKeyNotFoundCreateInvitationErrorResponse
+}
+
+// IsEvtInvalid reports whether CreateInvitationErrorResponse is EvtInvalid.
+func (s CreateInvitationErrorResponse) IsEvtInvalid() bool {
+	return s.Type == EvtInvalidCreateInvitationErrorResponse
+}
+
 // IsInternal reports whether CreateInvitationErrorResponse is Internal.
 func (s CreateInvitationErrorResponse) IsInternal() bool {
 	return s.Type == InternalCreateInvitationErrorResponse
+}
+
+// IsTknInvalid reports whether CreateInvitationErrorResponse is TknInvalid.
+func (s CreateInvitationErrorResponse) IsTknInvalid() bool {
+	return s.Type == TknInvalidCreateInvitationErrorResponse
 }
 
 // IsInvInvalid reports whether CreateInvitationErrorResponse is InvInvalid.
@@ -17786,6 +19333,11 @@ func (s CreateInvitationErrorResponse) IsNotImplemented() bool {
 // IsReqInvalid reports whether CreateInvitationErrorResponse is ReqInvalid.
 func (s CreateInvitationErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidCreateInvitationErrorResponse
+}
+
+// IsEncKeyUnknownAlg reports whether CreateInvitationErrorResponse is EncKeyUnknownAlg.
+func (s CreateInvitationErrorResponse) IsEncKeyUnknownAlg() bool {
+	return s.Type == EncKeyUnknownAlgCreateInvitationErrorResponse
 }
 
 // IsUnavailable reports whether CreateInvitationErrorResponse is Unavailable.
@@ -17835,6 +19387,90 @@ func NewAuthUnauthorizedCreateInvitationErrorResponse(v AuthUnauthorized) Create
 	return s
 }
 
+// SetEncKeyDecryptFailed sets CreateInvitationErrorResponse to EncKeyDecryptFailed.
+func (s *CreateInvitationErrorResponse) SetEncKeyDecryptFailed(v EncKeyDecryptFailed) {
+	s.Type = EncKeyDecryptFailedCreateInvitationErrorResponse
+	s.EncKeyDecryptFailed = v
+}
+
+// GetEncKeyDecryptFailed returns EncKeyDecryptFailed and true boolean if CreateInvitationErrorResponse is EncKeyDecryptFailed.
+func (s CreateInvitationErrorResponse) GetEncKeyDecryptFailed() (v EncKeyDecryptFailed, ok bool) {
+	if !s.IsEncKeyDecryptFailed() {
+		return v, false
+	}
+	return s.EncKeyDecryptFailed, true
+}
+
+// NewEncKeyDecryptFailedCreateInvitationErrorResponse returns new CreateInvitationErrorResponse from EncKeyDecryptFailed.
+func NewEncKeyDecryptFailedCreateInvitationErrorResponse(v EncKeyDecryptFailed) CreateInvitationErrorResponse {
+	var s CreateInvitationErrorResponse
+	s.SetEncKeyDecryptFailed(v)
+	return s
+}
+
+// SetEncKeyEncryptFailed sets CreateInvitationErrorResponse to EncKeyEncryptFailed.
+func (s *CreateInvitationErrorResponse) SetEncKeyEncryptFailed(v EncKeyEncryptFailed) {
+	s.Type = EncKeyEncryptFailedCreateInvitationErrorResponse
+	s.EncKeyEncryptFailed = v
+}
+
+// GetEncKeyEncryptFailed returns EncKeyEncryptFailed and true boolean if CreateInvitationErrorResponse is EncKeyEncryptFailed.
+func (s CreateInvitationErrorResponse) GetEncKeyEncryptFailed() (v EncKeyEncryptFailed, ok bool) {
+	if !s.IsEncKeyEncryptFailed() {
+		return v, false
+	}
+	return s.EncKeyEncryptFailed, true
+}
+
+// NewEncKeyEncryptFailedCreateInvitationErrorResponse returns new CreateInvitationErrorResponse from EncKeyEncryptFailed.
+func NewEncKeyEncryptFailedCreateInvitationErrorResponse(v EncKeyEncryptFailed) CreateInvitationErrorResponse {
+	var s CreateInvitationErrorResponse
+	s.SetEncKeyEncryptFailed(v)
+	return s
+}
+
+// SetEncKeyNotFound sets CreateInvitationErrorResponse to EncKeyNotFound.
+func (s *CreateInvitationErrorResponse) SetEncKeyNotFound(v EncKeyNotFound) {
+	s.Type = EncKeyNotFoundCreateInvitationErrorResponse
+	s.EncKeyNotFound = v
+}
+
+// GetEncKeyNotFound returns EncKeyNotFound and true boolean if CreateInvitationErrorResponse is EncKeyNotFound.
+func (s CreateInvitationErrorResponse) GetEncKeyNotFound() (v EncKeyNotFound, ok bool) {
+	if !s.IsEncKeyNotFound() {
+		return v, false
+	}
+	return s.EncKeyNotFound, true
+}
+
+// NewEncKeyNotFoundCreateInvitationErrorResponse returns new CreateInvitationErrorResponse from EncKeyNotFound.
+func NewEncKeyNotFoundCreateInvitationErrorResponse(v EncKeyNotFound) CreateInvitationErrorResponse {
+	var s CreateInvitationErrorResponse
+	s.SetEncKeyNotFound(v)
+	return s
+}
+
+// SetEvtInvalid sets CreateInvitationErrorResponse to EvtInvalid.
+func (s *CreateInvitationErrorResponse) SetEvtInvalid(v EvtInvalid) {
+	s.Type = EvtInvalidCreateInvitationErrorResponse
+	s.EvtInvalid = v
+}
+
+// GetEvtInvalid returns EvtInvalid and true boolean if CreateInvitationErrorResponse is EvtInvalid.
+func (s CreateInvitationErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
+	if !s.IsEvtInvalid() {
+		return v, false
+	}
+	return s.EvtInvalid, true
+}
+
+// NewEvtInvalidCreateInvitationErrorResponse returns new CreateInvitationErrorResponse from EvtInvalid.
+func NewEvtInvalidCreateInvitationErrorResponse(v EvtInvalid) CreateInvitationErrorResponse {
+	var s CreateInvitationErrorResponse
+	s.SetEvtInvalid(v)
+	return s
+}
+
 // SetInternal sets CreateInvitationErrorResponse to Internal.
 func (s *CreateInvitationErrorResponse) SetInternal(v Internal) {
 	s.Type = InternalCreateInvitationErrorResponse
@@ -17853,6 +19489,27 @@ func (s CreateInvitationErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalCreateInvitationErrorResponse(v Internal) CreateInvitationErrorResponse {
 	var s CreateInvitationErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetTknInvalid sets CreateInvitationErrorResponse to TknInvalid.
+func (s *CreateInvitationErrorResponse) SetTknInvalid(v TknInvalid) {
+	s.Type = TknInvalidCreateInvitationErrorResponse
+	s.TknInvalid = v
+}
+
+// GetTknInvalid returns TknInvalid and true boolean if CreateInvitationErrorResponse is TknInvalid.
+func (s CreateInvitationErrorResponse) GetTknInvalid() (v TknInvalid, ok bool) {
+	if !s.IsTknInvalid() {
+		return v, false
+	}
+	return s.TknInvalid, true
+}
+
+// NewTknInvalidCreateInvitationErrorResponse returns new CreateInvitationErrorResponse from TknInvalid.
+func NewTknInvalidCreateInvitationErrorResponse(v TknInvalid) CreateInvitationErrorResponse {
+	var s CreateInvitationErrorResponse
+	s.SetTknInvalid(v)
 	return s
 }
 
@@ -18024,6 +19681,27 @@ func NewReqInvalidCreateInvitationErrorResponse(v ReqInvalid) CreateInvitationEr
 	return s
 }
 
+// SetEncKeyUnknownAlg sets CreateInvitationErrorResponse to EncKeyUnknownAlg.
+func (s *CreateInvitationErrorResponse) SetEncKeyUnknownAlg(v EncKeyUnknownAlg) {
+	s.Type = EncKeyUnknownAlgCreateInvitationErrorResponse
+	s.EncKeyUnknownAlg = v
+}
+
+// GetEncKeyUnknownAlg returns EncKeyUnknownAlg and true boolean if CreateInvitationErrorResponse is EncKeyUnknownAlg.
+func (s CreateInvitationErrorResponse) GetEncKeyUnknownAlg() (v EncKeyUnknownAlg, ok bool) {
+	if !s.IsEncKeyUnknownAlg() {
+		return v, false
+	}
+	return s.EncKeyUnknownAlg, true
+}
+
+// NewEncKeyUnknownAlgCreateInvitationErrorResponse returns new CreateInvitationErrorResponse from EncKeyUnknownAlg.
+func NewEncKeyUnknownAlgCreateInvitationErrorResponse(v EncKeyUnknownAlg) CreateInvitationErrorResponse {
+	var s CreateInvitationErrorResponse
+	s.SetEncKeyUnknownAlg(v)
+	return s
+}
+
 // SetUnavailable sets CreateInvitationErrorResponse to Unavailable.
 func (s *CreateInvitationErrorResponse) SetUnavailable(v Unavailable) {
 	s.Type = UnavailableCreateInvitationErrorResponse
@@ -18087,9 +19765,11 @@ type CreateInvitationProjectMemberRequest struct {
 	// Optional label for who the link is for. Displayed only; never matched.
 	Metadata OptInvitationMetadata `json:"metadata"`
 	// When set, this create replaces that invitation: the new invitation keeps
-	// the original's `journey_id`, and a pending original is deleted in the
-	// same transaction. Use the `id` that `createInvitation`
-	// (`POST /invitations`) or `listInvitations` (`GET /invitations`) returns.
+	// the original's `journey_id` and, without `metadata` of its own, the
+	// original's metadata. The original is deleted in the same transaction. An
+	// accepted invitation cannot be replaced. Use the `id` that
+	// `createInvitation` (`POST /invitations`) or `listInvitations`
+	// (`GET /invitations`) returns.
 	ReplacesInvitationID OptInvitationID                          `json:"replaces_invitation_id"`
 	Type                 CreateInvitationProjectMemberRequestType `json:"type"`
 	ProjectMember        InvitationProjectMemberPayload           `json:"project_member"`
@@ -18175,7 +19855,7 @@ type CreateInvitationProjectMemberResponse struct {
 	ID        InvitationID `json:"id"`
 	ProjectID ProjectID    `json:"project_id"`
 	// Who the administrator said the link is for. Null after accept or decline.
-	// Cancel and replace of a pending invitation delete the row.
+	// Cancel and replace delete the row.
 	Metadata OptNilInvitationMetadata `json:"metadata"`
 	Status   InvitationStatus         `json:"status"`
 	// The user who created the invitation. Null when a project secret created
@@ -18197,7 +19877,7 @@ type CreateInvitationProjectMemberResponse struct {
 	ProjectMember InvitationProjectMemberPayload            `json:"project_member"`
 	// The browser URL to share. It carries the redeem token in the fragment.
 	// Only this create or replace response returns it.
-	Link url.URL `json:"link"`
+	Link string `json:"link"`
 }
 
 // GetID returns the value of ID.
@@ -18266,7 +19946,7 @@ func (s *CreateInvitationProjectMemberResponse) GetProjectMember() InvitationPro
 }
 
 // GetLink returns the value of Link.
-func (s *CreateInvitationProjectMemberResponse) GetLink() url.URL {
+func (s *CreateInvitationProjectMemberResponse) GetLink() string {
 	return s.Link
 }
 
@@ -18336,7 +20016,7 @@ func (s *CreateInvitationProjectMemberResponse) SetProjectMember(val InvitationP
 }
 
 // SetLink sets the value of Link.
-func (s *CreateInvitationProjectMemberResponse) SetLink(val url.URL) {
+func (s *CreateInvitationProjectMemberResponse) SetLink(val string) {
 	s.Link = val
 }
 
@@ -18579,9 +20259,11 @@ type CreateInvitationTeamMemberRequest struct {
 	// Optional label for who the link is for. Displayed only; never matched.
 	Metadata OptInvitationMetadata `json:"metadata"`
 	// When set, this create replaces that invitation: the new invitation keeps
-	// the original's `journey_id`, and a pending original is deleted in the
-	// same transaction. Use the `id` that `createInvitation`
-	// (`POST /invitations`) or `listInvitations` (`GET /invitations`) returns.
+	// the original's `journey_id` and, without `metadata` of its own, the
+	// original's metadata. The original is deleted in the same transaction. An
+	// accepted invitation cannot be replaced. Use the `id` that
+	// `createInvitation` (`POST /invitations`) or `listInvitations`
+	// (`GET /invitations`) returns.
 	ReplacesInvitationID OptInvitationID                       `json:"replaces_invitation_id"`
 	Type                 CreateInvitationTeamMemberRequestType `json:"type"`
 	TeamMember           InvitationTeamMemberPayload           `json:"team_member"`
@@ -18667,7 +20349,7 @@ type CreateInvitationTeamMemberResponse struct {
 	ID        InvitationID `json:"id"`
 	ProjectID ProjectID    `json:"project_id"`
 	// Who the administrator said the link is for. Null after accept or decline.
-	// Cancel and replace of a pending invitation delete the row.
+	// Cancel and replace delete the row.
 	Metadata OptNilInvitationMetadata `json:"metadata"`
 	Status   InvitationStatus         `json:"status"`
 	// The user who created the invitation. Null when a project secret created
@@ -18689,7 +20371,7 @@ type CreateInvitationTeamMemberResponse struct {
 	TeamMember InvitationTeamMemberPayload            `json:"team_member"`
 	// The browser URL to share. It carries the redeem token in the fragment.
 	// Only this create or replace response returns it.
-	Link url.URL `json:"link"`
+	Link string `json:"link"`
 }
 
 // GetID returns the value of ID.
@@ -18758,7 +20440,7 @@ func (s *CreateInvitationTeamMemberResponse) GetTeamMember() InvitationTeamMembe
 }
 
 // GetLink returns the value of Link.
-func (s *CreateInvitationTeamMemberResponse) GetLink() url.URL {
+func (s *CreateInvitationTeamMemberResponse) GetLink() string {
 	return s.Link
 }
 
@@ -18828,7 +20510,7 @@ func (s *CreateInvitationTeamMemberResponse) SetTeamMember(val InvitationTeamMem
 }
 
 // SetLink sets the value of Link.
-func (s *CreateInvitationTeamMemberResponse) SetLink(val url.URL) {
+func (s *CreateInvitationTeamMemberResponse) SetLink(val string) {
 	s.Link = val
 }
 
@@ -25035,6 +26717,7 @@ func (*ErrorDetails) createProjectRes()        {}
 func (*ErrorDetails) createSessionRes()        {}
 func (*ErrorDetails) getBrandingByIdRes()      {}
 func (*ErrorDetails) getMyUserRes()            {}
+func (*ErrorDetails) getOAuthSettingsByIdRes() {}
 func (*ErrorDetails) initClaimRes()            {}
 func (*ErrorDetails) listFlowDefinitionsRes()  {}
 func (*ErrorDetails) listMyIdentityLinksRes()  {}
@@ -25388,6 +27071,7 @@ func (*EvaluatePolicyErrorResponseStatusCode) evaluatePolicyRes() {}
 type EvaluatePolicyRequest struct {
 	Type                       EvaluatePolicyRequestType // switch on this field
 	PasswordSetEvaluateRequest PasswordSetEvaluateRequest
+	UserCreateEvaluateRequest  UserCreateEvaluateRequest
 }
 
 // EvaluatePolicyRequestType is oneOf type of EvaluatePolicyRequest.
@@ -25396,11 +27080,17 @@ type EvaluatePolicyRequestType string
 // Possible values for EvaluatePolicyRequestType.
 const (
 	PasswordSetEvaluateRequestEvaluatePolicyRequest EvaluatePolicyRequestType = "auth.factor.password.set"
+	UserCreateEvaluateRequestEvaluatePolicyRequest  EvaluatePolicyRequestType = "user.create"
 )
 
 // IsPasswordSetEvaluateRequest reports whether EvaluatePolicyRequest is PasswordSetEvaluateRequest.
 func (s EvaluatePolicyRequest) IsPasswordSetEvaluateRequest() bool {
 	return s.Type == PasswordSetEvaluateRequestEvaluatePolicyRequest
+}
+
+// IsUserCreateEvaluateRequest reports whether EvaluatePolicyRequest is UserCreateEvaluateRequest.
+func (s EvaluatePolicyRequest) IsUserCreateEvaluateRequest() bool {
+	return s.Type == UserCreateEvaluateRequestEvaluatePolicyRequest
 }
 
 // SetPasswordSetEvaluateRequest sets EvaluatePolicyRequest to PasswordSetEvaluateRequest.
@@ -25424,6 +27114,27 @@ func NewPasswordSetEvaluateRequestEvaluatePolicyRequest(v PasswordSetEvaluateReq
 	return s
 }
 
+// SetUserCreateEvaluateRequest sets EvaluatePolicyRequest to UserCreateEvaluateRequest.
+func (s *EvaluatePolicyRequest) SetUserCreateEvaluateRequest(v UserCreateEvaluateRequest) {
+	s.Type = UserCreateEvaluateRequestEvaluatePolicyRequest
+	s.UserCreateEvaluateRequest = v
+}
+
+// GetUserCreateEvaluateRequest returns UserCreateEvaluateRequest and true boolean if EvaluatePolicyRequest is UserCreateEvaluateRequest.
+func (s EvaluatePolicyRequest) GetUserCreateEvaluateRequest() (v UserCreateEvaluateRequest, ok bool) {
+	if !s.IsUserCreateEvaluateRequest() {
+		return v, false
+	}
+	return s.UserCreateEvaluateRequest, true
+}
+
+// NewUserCreateEvaluateRequestEvaluatePolicyRequest returns new EvaluatePolicyRequest from UserCreateEvaluateRequest.
+func NewUserCreateEvaluateRequestEvaluatePolicyRequest(v UserCreateEvaluateRequest) EvaluatePolicyRequest {
+	var s EvaluatePolicyRequest
+	s.SetUserCreateEvaluateRequest(v)
+	return s
+}
+
 // The decision the operation would reach for the request. A refusal carries
 // the error code and violations an API call of the operation would answer
 // with. A login flow shows the same rules as field errors instead.
@@ -25432,8 +27143,8 @@ type EvaluatePolicyResponse struct {
 	// Whether the operation would go ahead.
 	Allowed bool `json:"allowed"`
 	// The error code an API call of the operation would answer with, set
-	// only when it would refuse, for example `user.password_empty` or
-	// `user.password_policy_violation`.
+	// only when it would refuse, for example `user.password_empty`,
+	// `user.password_policy_violation` or, for a sign-up, `flow.proof_invalid`.
 	Code OptString `json:"code"`
 	// Every failed rule keyed by name, with the value of the setting it is
 	// named after, for example `{"min_length": 12}`. It matches the live
@@ -25494,51 +27205,59 @@ func (s *EvaluatePolicyResponseViolations) init() EvaluatePolicyResponseViolatio
 // Ref: #
 // Event represents sum type.
 type Event struct {
-	Type                            EventType // switch on this field
-	AuthAttemptCreatedEvent         AuthAttemptCreatedEvent
-	AuthAttemptHandedOffEvent       AuthAttemptHandedOffEvent
-	AuthCheckFailedEvent            AuthCheckFailedEvent
-	AuthCheckSucceededEvent         AuthCheckSucceededEvent
-	AuthFactorPasskeyEnrolledEvent  AuthFactorPasskeyEnrolledEvent
-	AuthFactorPasswordSetEvent      AuthFactorPasswordSetEvent
-	AuthSSOAuthorizationFailedEvent AuthSSOAuthorizationFailedEvent
-	AuthSSOExchangeFailedEvent      AuthSSOExchangeFailedEvent
-	AuthSSOExchangeSucceededEvent   AuthSSOExchangeSucceededEvent
-	AuthTokenIssuedEvent            AuthTokenIssuedEvent
-	AuthTokenRevokedEvent           AuthTokenRevokedEvent
-	AuthzGrantedEvent               AuthzGrantedEvent
-	AuthzRevokedEvent               AuthzRevokedEvent
-	BrandingCreatedEvent            BrandingCreatedEvent
-	DeploymentCreatedEvent          DeploymentCreatedEvent
-	FlowdefCreatedEvent             FlowdefCreatedEvent
-	FlowdefDeletedEvent             FlowdefDeletedEvent
-	FlowdefUpdatedEvent             FlowdefUpdatedEvent
-	IdpCreatedEvent                 IdpCreatedEvent
-	IdpIdentityLinkCreatedEvent     IdpIdentityLinkCreatedEvent
-	IdpUpdatedEvent                 IdpUpdatedEvent
-	OriginAddedEvent                OriginAddedEvent
-	OriginRemovedEvent              OriginRemovedEvent
-	PolicyCreatedEvent              PolicyCreatedEvent
-	PolicyUpdatedEvent              PolicyUpdatedEvent
-	PreviewRemovedEvent             PreviewRemovedEvent
-	ProjectCreatedEvent             ProjectCreatedEvent
-	ProjectDeletedEvent             ProjectDeletedEvent
-	ProjectUpdatedEvent             ProjectUpdatedEvent
-	ReleaseCreatedEvent             ReleaseCreatedEvent
-	ReleaseRevokedEvent             ReleaseRevokedEvent
-	RequestAPIEvent                 RequestAPIEvent
-	SchemaCreatedEvent              SchemaCreatedEvent
-	SessionDeletedEvent             SessionDeletedEvent
-	SessionEstablishedEvent         SessionEstablishedEvent
-	TeamCreatedEvent                TeamCreatedEvent
-	TeamDeactivatedEvent            TeamDeactivatedEvent
-	TeamUpdatedEvent                TeamUpdatedEvent
-	UserCreateFailedEvent           UserCreateFailedEvent
-	UserCreatedEvent                UserCreatedEvent
-	UserDeletedEvent                UserDeletedEvent
-	UserUpdatedEvent                UserUpdatedEvent
-	VariableRemovedEvent            VariableRemovedEvent
-	VariableSetEvent                VariableSetEvent
+	Type                             EventType // switch on this field
+	ApplicationCreatedEvent          ApplicationCreatedEvent
+	ApplicationUpdatedEvent          ApplicationUpdatedEvent
+	AuthAttemptCreatedEvent          AuthAttemptCreatedEvent
+	AuthAttemptHandedOffEvent        AuthAttemptHandedOffEvent
+	AuthCheckFailedEvent             AuthCheckFailedEvent
+	AuthCheckSucceededEvent          AuthCheckSucceededEvent
+	AuthFactorPasskeyEnrolledEvent   AuthFactorPasskeyEnrolledEvent
+	AuthFactorPasswordSetEvent       AuthFactorPasswordSetEvent
+	AuthSSOAuthorizationFailedEvent  AuthSSOAuthorizationFailedEvent
+	AuthSSOExchangeFailedEvent       AuthSSOExchangeFailedEvent
+	AuthSSOExchangeSucceededEvent    AuthSSOExchangeSucceededEvent
+	AuthTokenIssuedEvent             AuthTokenIssuedEvent
+	AuthTokenRevokedEvent            AuthTokenRevokedEvent
+	AuthzGrantedEvent                AuthzGrantedEvent
+	AuthzRevokedEvent                AuthzRevokedEvent
+	BrandingCreatedEvent             BrandingCreatedEvent
+	DeploymentCreatedEvent           DeploymentCreatedEvent
+	FlowSignupChallengeConsumedEvent FlowSignupChallengeConsumedEvent
+	FlowSignupChallengeIssuedEvent   FlowSignupChallengeIssuedEvent
+	FlowdefCreatedEvent              FlowdefCreatedEvent
+	FlowdefDeletedEvent              FlowdefDeletedEvent
+	FlowdefUpdatedEvent              FlowdefUpdatedEvent
+	IdpCreatedEvent                  IdpCreatedEvent
+	IdpIdentityLinkCreatedEvent      IdpIdentityLinkCreatedEvent
+	IdpUpdatedEvent                  IdpUpdatedEvent
+	InvitationAcceptedEvent          InvitationAcceptedEvent
+	InvitationCancelledEvent         InvitationCancelledEvent
+	InvitationCreatedEvent           InvitationCreatedEvent
+	InvitationRejectedEvent          InvitationRejectedEvent
+	OriginAddedEvent                 OriginAddedEvent
+	OriginRemovedEvent               OriginRemovedEvent
+	PolicyCreatedEvent               PolicyCreatedEvent
+	PolicyUpdatedEvent               PolicyUpdatedEvent
+	PreviewRemovedEvent              PreviewRemovedEvent
+	ProjectCreatedEvent              ProjectCreatedEvent
+	ProjectDeletedEvent              ProjectDeletedEvent
+	ProjectUpdatedEvent              ProjectUpdatedEvent
+	ReleaseCreatedEvent              ReleaseCreatedEvent
+	ReleaseRevokedEvent              ReleaseRevokedEvent
+	RequestAPIEvent                  RequestAPIEvent
+	SchemaCreatedEvent               SchemaCreatedEvent
+	SessionDeletedEvent              SessionDeletedEvent
+	SessionEstablishedEvent          SessionEstablishedEvent
+	TeamCreatedEvent                 TeamCreatedEvent
+	TeamDeactivatedEvent             TeamDeactivatedEvent
+	TeamUpdatedEvent                 TeamUpdatedEvent
+	UserCreateFailedEvent            UserCreateFailedEvent
+	UserCreatedEvent                 UserCreatedEvent
+	UserDeletedEvent                 UserDeletedEvent
+	UserUpdatedEvent                 UserUpdatedEvent
+	VariableRemovedEvent             VariableRemovedEvent
+	VariableSetEvent                 VariableSetEvent
 }
 
 // EventType is oneOf type of Event.
@@ -25546,51 +27265,65 @@ type EventType string
 
 // Possible values for EventType.
 const (
-	AuthAttemptCreatedEventEvent         EventType = "auth.attempt.created"
-	AuthAttemptHandedOffEventEvent       EventType = "auth.attempt.handed_off"
-	AuthCheckFailedEventEvent            EventType = "auth.check.failed"
-	AuthCheckSucceededEventEvent         EventType = "auth.check.succeeded"
-	AuthFactorPasskeyEnrolledEventEvent  EventType = "auth.factor.passkey.enrolled"
-	AuthFactorPasswordSetEventEvent      EventType = "auth.factor.password.set"
-	AuthSSOAuthorizationFailedEventEvent EventType = "auth.sso.authorization.failed"
-	AuthSSOExchangeFailedEventEvent      EventType = "auth.sso.exchange.failed"
-	AuthSSOExchangeSucceededEventEvent   EventType = "auth.sso.exchange.succeeded"
-	AuthTokenIssuedEventEvent            EventType = "auth.token.issued"
-	AuthTokenRevokedEventEvent           EventType = "auth.token.revoked"
-	AuthzGrantedEventEvent               EventType = "authz.granted"
-	AuthzRevokedEventEvent               EventType = "authz.revoked"
-	BrandingCreatedEventEvent            EventType = "branding.created"
-	DeploymentCreatedEventEvent          EventType = "deployment.created"
-	FlowdefCreatedEventEvent             EventType = "flowdef.created"
-	FlowdefDeletedEventEvent             EventType = "flowdef.deleted"
-	FlowdefUpdatedEventEvent             EventType = "flowdef.updated"
-	IdpCreatedEventEvent                 EventType = "idp.created"
-	IdpIdentityLinkCreatedEventEvent     EventType = "idp.identity_link.created"
-	IdpUpdatedEventEvent                 EventType = "idp.updated"
-	OriginAddedEventEvent                EventType = "origin.added"
-	OriginRemovedEventEvent              EventType = "origin.removed"
-	PolicyCreatedEventEvent              EventType = "policy.created"
-	PolicyUpdatedEventEvent              EventType = "policy.updated"
-	PreviewRemovedEventEvent             EventType = "preview.removed"
-	ProjectCreatedEventEvent             EventType = "project.created"
-	ProjectDeletedEventEvent             EventType = "project.deleted"
-	ProjectUpdatedEventEvent             EventType = "project.updated"
-	ReleaseCreatedEventEvent             EventType = "release.created"
-	ReleaseRevokedEventEvent             EventType = "release.revoked"
-	RequestAPIEventEvent                 EventType = "request.api"
-	SchemaCreatedEventEvent              EventType = "schema.created"
-	SessionDeletedEventEvent             EventType = "session.deleted"
-	SessionEstablishedEventEvent         EventType = "session.established"
-	TeamCreatedEventEvent                EventType = "team.created"
-	TeamDeactivatedEventEvent            EventType = "team.deactivated"
-	TeamUpdatedEventEvent                EventType = "team.updated"
-	UserCreateFailedEventEvent           EventType = "user.create.failed"
-	UserCreatedEventEvent                EventType = "user.created"
-	UserDeletedEventEvent                EventType = "user.deleted"
-	UserUpdatedEventEvent                EventType = "user.updated"
-	VariableRemovedEventEvent            EventType = "variable.removed"
-	VariableSetEventEvent                EventType = "variable.set"
+	ApplicationCreatedEventEvent          EventType = "application.created"
+	ApplicationUpdatedEventEvent          EventType = "application.updated"
+	AuthAttemptCreatedEventEvent          EventType = "auth.attempt.created"
+	AuthAttemptHandedOffEventEvent        EventType = "auth.attempt.handed_off"
+	AuthCheckFailedEventEvent             EventType = "auth.check.failed"
+	AuthCheckSucceededEventEvent          EventType = "auth.check.succeeded"
+	AuthFactorPasskeyEnrolledEventEvent   EventType = "auth.factor.passkey.enrolled"
+	AuthFactorPasswordSetEventEvent       EventType = "auth.factor.password.set"
+	AuthSSOAuthorizationFailedEventEvent  EventType = "auth.sso.authorization.failed"
+	AuthSSOExchangeFailedEventEvent       EventType = "auth.sso.exchange.failed"
+	AuthSSOExchangeSucceededEventEvent    EventType = "auth.sso.exchange.succeeded"
+	AuthTokenIssuedEventEvent             EventType = "auth.token.issued"
+	AuthTokenRevokedEventEvent            EventType = "auth.token.revoked"
+	AuthzGrantedEventEvent                EventType = "authz.granted"
+	AuthzRevokedEventEvent                EventType = "authz.revoked"
+	BrandingCreatedEventEvent             EventType = "branding.created"
+	DeploymentCreatedEventEvent           EventType = "deployment.created"
+	FlowSignupChallengeConsumedEventEvent EventType = "flow.signup_challenge.consumed"
+	FlowSignupChallengeIssuedEventEvent   EventType = "flow.signup_challenge.issued"
+	FlowdefCreatedEventEvent              EventType = "flowdef.created"
+	FlowdefDeletedEventEvent              EventType = "flowdef.deleted"
+	FlowdefUpdatedEventEvent              EventType = "flowdef.updated"
+	IdpCreatedEventEvent                  EventType = "idp.created"
+	IdpIdentityLinkCreatedEventEvent      EventType = "idp.identity_link.created"
+	IdpUpdatedEventEvent                  EventType = "idp.updated"
+	InvitationAcceptedEventEvent          EventType = "invitation.accepted"
+	InvitationCancelledEventEvent         EventType = "invitation.cancelled"
+	InvitationCreatedEventEvent           EventType = "invitation.created"
+	InvitationRejectedEventEvent          EventType = "invitation.rejected"
+	OriginAddedEventEvent                 EventType = "origin.added"
+	OriginRemovedEventEvent               EventType = "origin.removed"
+	PolicyCreatedEventEvent               EventType = "policy.created"
+	PolicyUpdatedEventEvent               EventType = "policy.updated"
+	PreviewRemovedEventEvent              EventType = "preview.removed"
+	ProjectCreatedEventEvent              EventType = "project.created"
+	ProjectDeletedEventEvent              EventType = "project.deleted"
+	ProjectUpdatedEventEvent              EventType = "project.updated"
+	ReleaseCreatedEventEvent              EventType = "release.created"
+	ReleaseRevokedEventEvent              EventType = "release.revoked"
+	RequestAPIEventEvent                  EventType = "request.api"
+	SchemaCreatedEventEvent               EventType = "schema.created"
+	SessionDeletedEventEvent              EventType = "session.deleted"
+	SessionEstablishedEventEvent          EventType = "session.established"
+	TeamCreatedEventEvent                 EventType = "team.created"
+	TeamDeactivatedEventEvent             EventType = "team.deactivated"
+	TeamUpdatedEventEvent                 EventType = "team.updated"
+	UserCreateFailedEventEvent            EventType = "user.create.failed"
+	UserCreatedEventEvent                 EventType = "user.created"
+	UserDeletedEventEvent                 EventType = "user.deleted"
+	UserUpdatedEventEvent                 EventType = "user.updated"
+	VariableRemovedEventEvent             EventType = "variable.removed"
+	VariableSetEventEvent                 EventType = "variable.set"
 )
+
+// IsApplicationCreatedEvent reports whether Event is ApplicationCreatedEvent.
+func (s Event) IsApplicationCreatedEvent() bool { return s.Type == ApplicationCreatedEventEvent }
+
+// IsApplicationUpdatedEvent reports whether Event is ApplicationUpdatedEvent.
+func (s Event) IsApplicationUpdatedEvent() bool { return s.Type == ApplicationUpdatedEventEvent }
 
 // IsAuthAttemptCreatedEvent reports whether Event is AuthAttemptCreatedEvent.
 func (s Event) IsAuthAttemptCreatedEvent() bool { return s.Type == AuthAttemptCreatedEventEvent }
@@ -25643,6 +27376,16 @@ func (s Event) IsBrandingCreatedEvent() bool { return s.Type == BrandingCreatedE
 // IsDeploymentCreatedEvent reports whether Event is DeploymentCreatedEvent.
 func (s Event) IsDeploymentCreatedEvent() bool { return s.Type == DeploymentCreatedEventEvent }
 
+// IsFlowSignupChallengeConsumedEvent reports whether Event is FlowSignupChallengeConsumedEvent.
+func (s Event) IsFlowSignupChallengeConsumedEvent() bool {
+	return s.Type == FlowSignupChallengeConsumedEventEvent
+}
+
+// IsFlowSignupChallengeIssuedEvent reports whether Event is FlowSignupChallengeIssuedEvent.
+func (s Event) IsFlowSignupChallengeIssuedEvent() bool {
+	return s.Type == FlowSignupChallengeIssuedEventEvent
+}
+
 // IsFlowdefCreatedEvent reports whether Event is FlowdefCreatedEvent.
 func (s Event) IsFlowdefCreatedEvent() bool { return s.Type == FlowdefCreatedEventEvent }
 
@@ -25662,6 +27405,18 @@ func (s Event) IsIdpIdentityLinkCreatedEvent() bool {
 
 // IsIdpUpdatedEvent reports whether Event is IdpUpdatedEvent.
 func (s Event) IsIdpUpdatedEvent() bool { return s.Type == IdpUpdatedEventEvent }
+
+// IsInvitationAcceptedEvent reports whether Event is InvitationAcceptedEvent.
+func (s Event) IsInvitationAcceptedEvent() bool { return s.Type == InvitationAcceptedEventEvent }
+
+// IsInvitationCancelledEvent reports whether Event is InvitationCancelledEvent.
+func (s Event) IsInvitationCancelledEvent() bool { return s.Type == InvitationCancelledEventEvent }
+
+// IsInvitationCreatedEvent reports whether Event is InvitationCreatedEvent.
+func (s Event) IsInvitationCreatedEvent() bool { return s.Type == InvitationCreatedEventEvent }
+
+// IsInvitationRejectedEvent reports whether Event is InvitationRejectedEvent.
+func (s Event) IsInvitationRejectedEvent() bool { return s.Type == InvitationRejectedEventEvent }
 
 // IsOriginAddedEvent reports whether Event is OriginAddedEvent.
 func (s Event) IsOriginAddedEvent() bool { return s.Type == OriginAddedEventEvent }
@@ -25731,6 +27486,48 @@ func (s Event) IsVariableRemovedEvent() bool { return s.Type == VariableRemovedE
 
 // IsVariableSetEvent reports whether Event is VariableSetEvent.
 func (s Event) IsVariableSetEvent() bool { return s.Type == VariableSetEventEvent }
+
+// SetApplicationCreatedEvent sets Event to ApplicationCreatedEvent.
+func (s *Event) SetApplicationCreatedEvent(v ApplicationCreatedEvent) {
+	s.Type = ApplicationCreatedEventEvent
+	s.ApplicationCreatedEvent = v
+}
+
+// GetApplicationCreatedEvent returns ApplicationCreatedEvent and true boolean if Event is ApplicationCreatedEvent.
+func (s Event) GetApplicationCreatedEvent() (v ApplicationCreatedEvent, ok bool) {
+	if !s.IsApplicationCreatedEvent() {
+		return v, false
+	}
+	return s.ApplicationCreatedEvent, true
+}
+
+// NewApplicationCreatedEventEvent returns new Event from ApplicationCreatedEvent.
+func NewApplicationCreatedEventEvent(v ApplicationCreatedEvent) Event {
+	var s Event
+	s.SetApplicationCreatedEvent(v)
+	return s
+}
+
+// SetApplicationUpdatedEvent sets Event to ApplicationUpdatedEvent.
+func (s *Event) SetApplicationUpdatedEvent(v ApplicationUpdatedEvent) {
+	s.Type = ApplicationUpdatedEventEvent
+	s.ApplicationUpdatedEvent = v
+}
+
+// GetApplicationUpdatedEvent returns ApplicationUpdatedEvent and true boolean if Event is ApplicationUpdatedEvent.
+func (s Event) GetApplicationUpdatedEvent() (v ApplicationUpdatedEvent, ok bool) {
+	if !s.IsApplicationUpdatedEvent() {
+		return v, false
+	}
+	return s.ApplicationUpdatedEvent, true
+}
+
+// NewApplicationUpdatedEventEvent returns new Event from ApplicationUpdatedEvent.
+func NewApplicationUpdatedEventEvent(v ApplicationUpdatedEvent) Event {
+	var s Event
+	s.SetApplicationUpdatedEvent(v)
+	return s
+}
 
 // SetAuthAttemptCreatedEvent sets Event to AuthAttemptCreatedEvent.
 func (s *Event) SetAuthAttemptCreatedEvent(v AuthAttemptCreatedEvent) {
@@ -26047,6 +27844,48 @@ func NewDeploymentCreatedEventEvent(v DeploymentCreatedEvent) Event {
 	return s
 }
 
+// SetFlowSignupChallengeConsumedEvent sets Event to FlowSignupChallengeConsumedEvent.
+func (s *Event) SetFlowSignupChallengeConsumedEvent(v FlowSignupChallengeConsumedEvent) {
+	s.Type = FlowSignupChallengeConsumedEventEvent
+	s.FlowSignupChallengeConsumedEvent = v
+}
+
+// GetFlowSignupChallengeConsumedEvent returns FlowSignupChallengeConsumedEvent and true boolean if Event is FlowSignupChallengeConsumedEvent.
+func (s Event) GetFlowSignupChallengeConsumedEvent() (v FlowSignupChallengeConsumedEvent, ok bool) {
+	if !s.IsFlowSignupChallengeConsumedEvent() {
+		return v, false
+	}
+	return s.FlowSignupChallengeConsumedEvent, true
+}
+
+// NewFlowSignupChallengeConsumedEventEvent returns new Event from FlowSignupChallengeConsumedEvent.
+func NewFlowSignupChallengeConsumedEventEvent(v FlowSignupChallengeConsumedEvent) Event {
+	var s Event
+	s.SetFlowSignupChallengeConsumedEvent(v)
+	return s
+}
+
+// SetFlowSignupChallengeIssuedEvent sets Event to FlowSignupChallengeIssuedEvent.
+func (s *Event) SetFlowSignupChallengeIssuedEvent(v FlowSignupChallengeIssuedEvent) {
+	s.Type = FlowSignupChallengeIssuedEventEvent
+	s.FlowSignupChallengeIssuedEvent = v
+}
+
+// GetFlowSignupChallengeIssuedEvent returns FlowSignupChallengeIssuedEvent and true boolean if Event is FlowSignupChallengeIssuedEvent.
+func (s Event) GetFlowSignupChallengeIssuedEvent() (v FlowSignupChallengeIssuedEvent, ok bool) {
+	if !s.IsFlowSignupChallengeIssuedEvent() {
+		return v, false
+	}
+	return s.FlowSignupChallengeIssuedEvent, true
+}
+
+// NewFlowSignupChallengeIssuedEventEvent returns new Event from FlowSignupChallengeIssuedEvent.
+func NewFlowSignupChallengeIssuedEventEvent(v FlowSignupChallengeIssuedEvent) Event {
+	var s Event
+	s.SetFlowSignupChallengeIssuedEvent(v)
+	return s
+}
+
 // SetFlowdefCreatedEvent sets Event to FlowdefCreatedEvent.
 func (s *Event) SetFlowdefCreatedEvent(v FlowdefCreatedEvent) {
 	s.Type = FlowdefCreatedEventEvent
@@ -26170,6 +28009,90 @@ func (s Event) GetIdpUpdatedEvent() (v IdpUpdatedEvent, ok bool) {
 func NewIdpUpdatedEventEvent(v IdpUpdatedEvent) Event {
 	var s Event
 	s.SetIdpUpdatedEvent(v)
+	return s
+}
+
+// SetInvitationAcceptedEvent sets Event to InvitationAcceptedEvent.
+func (s *Event) SetInvitationAcceptedEvent(v InvitationAcceptedEvent) {
+	s.Type = InvitationAcceptedEventEvent
+	s.InvitationAcceptedEvent = v
+}
+
+// GetInvitationAcceptedEvent returns InvitationAcceptedEvent and true boolean if Event is InvitationAcceptedEvent.
+func (s Event) GetInvitationAcceptedEvent() (v InvitationAcceptedEvent, ok bool) {
+	if !s.IsInvitationAcceptedEvent() {
+		return v, false
+	}
+	return s.InvitationAcceptedEvent, true
+}
+
+// NewInvitationAcceptedEventEvent returns new Event from InvitationAcceptedEvent.
+func NewInvitationAcceptedEventEvent(v InvitationAcceptedEvent) Event {
+	var s Event
+	s.SetInvitationAcceptedEvent(v)
+	return s
+}
+
+// SetInvitationCancelledEvent sets Event to InvitationCancelledEvent.
+func (s *Event) SetInvitationCancelledEvent(v InvitationCancelledEvent) {
+	s.Type = InvitationCancelledEventEvent
+	s.InvitationCancelledEvent = v
+}
+
+// GetInvitationCancelledEvent returns InvitationCancelledEvent and true boolean if Event is InvitationCancelledEvent.
+func (s Event) GetInvitationCancelledEvent() (v InvitationCancelledEvent, ok bool) {
+	if !s.IsInvitationCancelledEvent() {
+		return v, false
+	}
+	return s.InvitationCancelledEvent, true
+}
+
+// NewInvitationCancelledEventEvent returns new Event from InvitationCancelledEvent.
+func NewInvitationCancelledEventEvent(v InvitationCancelledEvent) Event {
+	var s Event
+	s.SetInvitationCancelledEvent(v)
+	return s
+}
+
+// SetInvitationCreatedEvent sets Event to InvitationCreatedEvent.
+func (s *Event) SetInvitationCreatedEvent(v InvitationCreatedEvent) {
+	s.Type = InvitationCreatedEventEvent
+	s.InvitationCreatedEvent = v
+}
+
+// GetInvitationCreatedEvent returns InvitationCreatedEvent and true boolean if Event is InvitationCreatedEvent.
+func (s Event) GetInvitationCreatedEvent() (v InvitationCreatedEvent, ok bool) {
+	if !s.IsInvitationCreatedEvent() {
+		return v, false
+	}
+	return s.InvitationCreatedEvent, true
+}
+
+// NewInvitationCreatedEventEvent returns new Event from InvitationCreatedEvent.
+func NewInvitationCreatedEventEvent(v InvitationCreatedEvent) Event {
+	var s Event
+	s.SetInvitationCreatedEvent(v)
+	return s
+}
+
+// SetInvitationRejectedEvent sets Event to InvitationRejectedEvent.
+func (s *Event) SetInvitationRejectedEvent(v InvitationRejectedEvent) {
+	s.Type = InvitationRejectedEventEvent
+	s.InvitationRejectedEvent = v
+}
+
+// GetInvitationRejectedEvent returns InvitationRejectedEvent and true boolean if Event is InvitationRejectedEvent.
+func (s Event) GetInvitationRejectedEvent() (v InvitationRejectedEvent, ok bool) {
+	if !s.IsInvitationRejectedEvent() {
+		return v, false
+	}
+	return s.InvitationRejectedEvent, true
+}
+
+// NewInvitationRejectedEventEvent returns new Event from InvitationRejectedEvent.
+func NewInvitationRejectedEventEvent(v InvitationRejectedEvent) Event {
+	var s Event
+	s.SetInvitationRejectedEvent(v)
 	return s
 }
 
@@ -28307,6 +30230,7 @@ type FinishUserPasskeyRegistrationErrorResponse struct {
 	UserInvalid                 UserInvalid
 	UserNotFound                UserNotFound
 	UserPasswordEmpty           UserPasswordEmpty
+	UserPasswordHashingBusy     UserPasswordHashingBusy
 	UserPasswordPolicyViolation UserPasswordPolicyViolation
 	UserPasswordTooLong         UserPasswordTooLong
 	UserPermissionDenied        UserPermissionDenied
@@ -28333,6 +30257,7 @@ const (
 	UserInvalidFinishUserPasskeyRegistrationErrorResponse                 FinishUserPasskeyRegistrationErrorResponseType = "user.invalid"
 	UserNotFoundFinishUserPasskeyRegistrationErrorResponse                FinishUserPasskeyRegistrationErrorResponseType = "user.not_found"
 	UserPasswordEmptyFinishUserPasskeyRegistrationErrorResponse           FinishUserPasskeyRegistrationErrorResponseType = "user.password_empty"
+	UserPasswordHashingBusyFinishUserPasskeyRegistrationErrorResponse     FinishUserPasskeyRegistrationErrorResponseType = "user.password_hashing_busy"
 	UserPasswordPolicyViolationFinishUserPasskeyRegistrationErrorResponse FinishUserPasskeyRegistrationErrorResponseType = "user.password_policy_violation"
 	UserPasswordTooLongFinishUserPasskeyRegistrationErrorResponse         FinishUserPasskeyRegistrationErrorResponseType = "user.password_too_long"
 	UserPermissionDeniedFinishUserPasskeyRegistrationErrorResponse        FinishUserPasskeyRegistrationErrorResponseType = "user.permission_denied"
@@ -28416,6 +30341,11 @@ func (s FinishUserPasskeyRegistrationErrorResponse) IsUserNotFound() bool {
 // IsUserPasswordEmpty reports whether FinishUserPasskeyRegistrationErrorResponse is UserPasswordEmpty.
 func (s FinishUserPasskeyRegistrationErrorResponse) IsUserPasswordEmpty() bool {
 	return s.Type == UserPasswordEmptyFinishUserPasskeyRegistrationErrorResponse
+}
+
+// IsUserPasswordHashingBusy reports whether FinishUserPasskeyRegistrationErrorResponse is UserPasswordHashingBusy.
+func (s FinishUserPasskeyRegistrationErrorResponse) IsUserPasswordHashingBusy() bool {
+	return s.Type == UserPasswordHashingBusyFinishUserPasskeyRegistrationErrorResponse
 }
 
 // IsUserPasswordPolicyViolation reports whether FinishUserPasskeyRegistrationErrorResponse is UserPasswordPolicyViolation.
@@ -28766,6 +30696,27 @@ func (s FinishUserPasskeyRegistrationErrorResponse) GetUserPasswordEmpty() (v Us
 func NewUserPasswordEmptyFinishUserPasskeyRegistrationErrorResponse(v UserPasswordEmpty) FinishUserPasskeyRegistrationErrorResponse {
 	var s FinishUserPasskeyRegistrationErrorResponse
 	s.SetUserPasswordEmpty(v)
+	return s
+}
+
+// SetUserPasswordHashingBusy sets FinishUserPasskeyRegistrationErrorResponse to UserPasswordHashingBusy.
+func (s *FinishUserPasskeyRegistrationErrorResponse) SetUserPasswordHashingBusy(v UserPasswordHashingBusy) {
+	s.Type = UserPasswordHashingBusyFinishUserPasskeyRegistrationErrorResponse
+	s.UserPasswordHashingBusy = v
+}
+
+// GetUserPasswordHashingBusy returns UserPasswordHashingBusy and true boolean if FinishUserPasskeyRegistrationErrorResponse is UserPasswordHashingBusy.
+func (s FinishUserPasskeyRegistrationErrorResponse) GetUserPasswordHashingBusy() (v UserPasswordHashingBusy, ok bool) {
+	if !s.IsUserPasswordHashingBusy() {
+		return v, false
+	}
+	return s.UserPasswordHashingBusy, true
+}
+
+// NewUserPasswordHashingBusyFinishUserPasskeyRegistrationErrorResponse returns new FinishUserPasskeyRegistrationErrorResponse from UserPasswordHashingBusy.
+func NewUserPasswordHashingBusyFinishUserPasskeyRegistrationErrorResponse(v UserPasswordHashingBusy) FinishUserPasskeyRegistrationErrorResponse {
+	var s FinishUserPasskeyRegistrationErrorResponse
+	s.SetUserPasswordHashingBusy(v)
 	return s
 }
 
@@ -30169,6 +32120,112 @@ func (s *FlowNotFoundDetails) init() FlowNotFoundDetails {
 	return m
 }
 
+// Merged schema.
+// Ref: #
+type FlowProofInvalid struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptFlowProofInvalidDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *FlowProofInvalid) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *FlowProofInvalid) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *FlowProofInvalid) GetDetails() OptFlowProofInvalidDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *FlowProofInvalid) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *FlowProofInvalid) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *FlowProofInvalid) SetDetails(val OptFlowProofInvalidDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type FlowProofInvalidDetails map[string]jx.Raw
+
+func (s *FlowProofInvalidDetails) init() FlowProofInvalidDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type FlowRateLimited struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptFlowRateLimitedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *FlowRateLimited) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *FlowRateLimited) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *FlowRateLimited) GetDetails() OptFlowRateLimitedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *FlowRateLimited) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *FlowRateLimited) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *FlowRateLimited) SetDetails(val OptFlowRateLimitedDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type FlowRateLimitedDetails map[string]jx.Raw
+
+func (s *FlowRateLimitedDetails) init() FlowRateLimitedDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
 // The state of a flow, with its handle, its session and the step to render.
 // Ref: #
 type FlowResponse struct {
@@ -30419,6 +32476,900 @@ func (s *FlowSSOUserSchemaMismatchDetails) init() FlowSSOUserSchemaMismatchDetai
 		*s = m
 	}
 	return m
+}
+
+// Merged schema.
+// Ref: #
+type FlowSignupChallengeConsumedEvent struct {
+	// The event ID, in the form `evt_<opaque>`.
+	ID        string    `json:"id"`
+	ProjectID ProjectID `json:"project_id"`
+	// The team the actor operated under when the event was emitted, if any.
+	TeamID OptNilString `json:"team_id"`
+	// Merged property.
+	EventType string `json:"event_type"`
+	// The category of the event.
+	Category FlowSignupChallengeConsumedEventCategory `json:"category"`
+	// When the action happened, on the server's clock.
+	OccurredAt time.Time `json:"occurred_at"`
+	// When the event was stored, on the server's clock.
+	CreatedAt time.Time `json:"created_at"`
+	// The ID of the actor that triggered the event.
+	ActorID OptNilString `json:"actor_id"`
+	// The kind of actor that triggered the event.
+	ActorType OptNilFlowSignupChallengeConsumedEventActorType `json:"actor_type"`
+	// The type of resource the event affected.
+	EntityType OptNilString `json:"entity_type"`
+	// The ID of the resource the event affected.
+	EntityID OptNilString `json:"entity_id"`
+	// The application or agent that produced the event.
+	ClientID string `json:"client_id"`
+	// The ID of the token in use when the event was emitted, when there was one.
+	TokenID OptString `json:"token_id"`
+	// The kind of delegation. Absent when unset.
+	DelegationType OptFlowSignupChallengeConsumedEventDelegationType `json:"delegation_type"`
+	DelegationID   OptString                                         `json:"delegation_id"`
+	Grantor        OptString                                         `json:"grantor"`
+	// A device fingerprint ID that correlates events from the same device.
+	Fingerprint OptString `json:"fingerprint"`
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
+	RequestID OptNilString `json:"request_id"`
+	// The ID of the session the event belongs to.
+	SessionID OptNilString `json:"session_id"`
+	// An ID that correlates the events of one login flow.
+	FlowID   OptNilString      `json:"flow_id"`
+	Metadata OptEventMetadata  `json:"metadata"`
+	Payload  EmptyEventPayload `json:"payload"`
+}
+
+// GetID returns the value of ID.
+func (s *FlowSignupChallengeConsumedEvent) GetID() string {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *FlowSignupChallengeConsumedEvent) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *FlowSignupChallengeConsumedEvent) GetTeamID() OptNilString {
+	return s.TeamID
+}
+
+// GetEventType returns the value of EventType.
+func (s *FlowSignupChallengeConsumedEvent) GetEventType() string {
+	return s.EventType
+}
+
+// GetCategory returns the value of Category.
+func (s *FlowSignupChallengeConsumedEvent) GetCategory() FlowSignupChallengeConsumedEventCategory {
+	return s.Category
+}
+
+// GetOccurredAt returns the value of OccurredAt.
+func (s *FlowSignupChallengeConsumedEvent) GetOccurredAt() time.Time {
+	return s.OccurredAt
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *FlowSignupChallengeConsumedEvent) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetActorID returns the value of ActorID.
+func (s *FlowSignupChallengeConsumedEvent) GetActorID() OptNilString {
+	return s.ActorID
+}
+
+// GetActorType returns the value of ActorType.
+func (s *FlowSignupChallengeConsumedEvent) GetActorType() OptNilFlowSignupChallengeConsumedEventActorType {
+	return s.ActorType
+}
+
+// GetEntityType returns the value of EntityType.
+func (s *FlowSignupChallengeConsumedEvent) GetEntityType() OptNilString {
+	return s.EntityType
+}
+
+// GetEntityID returns the value of EntityID.
+func (s *FlowSignupChallengeConsumedEvent) GetEntityID() OptNilString {
+	return s.EntityID
+}
+
+// GetClientID returns the value of ClientID.
+func (s *FlowSignupChallengeConsumedEvent) GetClientID() string {
+	return s.ClientID
+}
+
+// GetTokenID returns the value of TokenID.
+func (s *FlowSignupChallengeConsumedEvent) GetTokenID() OptString {
+	return s.TokenID
+}
+
+// GetDelegationType returns the value of DelegationType.
+func (s *FlowSignupChallengeConsumedEvent) GetDelegationType() OptFlowSignupChallengeConsumedEventDelegationType {
+	return s.DelegationType
+}
+
+// GetDelegationID returns the value of DelegationID.
+func (s *FlowSignupChallengeConsumedEvent) GetDelegationID() OptString {
+	return s.DelegationID
+}
+
+// GetGrantor returns the value of Grantor.
+func (s *FlowSignupChallengeConsumedEvent) GetGrantor() OptString {
+	return s.Grantor
+}
+
+// GetFingerprint returns the value of Fingerprint.
+func (s *FlowSignupChallengeConsumedEvent) GetFingerprint() OptString {
+	return s.Fingerprint
+}
+
+// GetRequestID returns the value of RequestID.
+func (s *FlowSignupChallengeConsumedEvent) GetRequestID() OptNilString {
+	return s.RequestID
+}
+
+// GetSessionID returns the value of SessionID.
+func (s *FlowSignupChallengeConsumedEvent) GetSessionID() OptNilString {
+	return s.SessionID
+}
+
+// GetFlowID returns the value of FlowID.
+func (s *FlowSignupChallengeConsumedEvent) GetFlowID() OptNilString {
+	return s.FlowID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *FlowSignupChallengeConsumedEvent) GetMetadata() OptEventMetadata {
+	return s.Metadata
+}
+
+// GetPayload returns the value of Payload.
+func (s *FlowSignupChallengeConsumedEvent) GetPayload() EmptyEventPayload {
+	return s.Payload
+}
+
+// SetID sets the value of ID.
+func (s *FlowSignupChallengeConsumedEvent) SetID(val string) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *FlowSignupChallengeConsumedEvent) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *FlowSignupChallengeConsumedEvent) SetTeamID(val OptNilString) {
+	s.TeamID = val
+}
+
+// SetEventType sets the value of EventType.
+func (s *FlowSignupChallengeConsumedEvent) SetEventType(val string) {
+	s.EventType = val
+}
+
+// SetCategory sets the value of Category.
+func (s *FlowSignupChallengeConsumedEvent) SetCategory(val FlowSignupChallengeConsumedEventCategory) {
+	s.Category = val
+}
+
+// SetOccurredAt sets the value of OccurredAt.
+func (s *FlowSignupChallengeConsumedEvent) SetOccurredAt(val time.Time) {
+	s.OccurredAt = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *FlowSignupChallengeConsumedEvent) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetActorID sets the value of ActorID.
+func (s *FlowSignupChallengeConsumedEvent) SetActorID(val OptNilString) {
+	s.ActorID = val
+}
+
+// SetActorType sets the value of ActorType.
+func (s *FlowSignupChallengeConsumedEvent) SetActorType(val OptNilFlowSignupChallengeConsumedEventActorType) {
+	s.ActorType = val
+}
+
+// SetEntityType sets the value of EntityType.
+func (s *FlowSignupChallengeConsumedEvent) SetEntityType(val OptNilString) {
+	s.EntityType = val
+}
+
+// SetEntityID sets the value of EntityID.
+func (s *FlowSignupChallengeConsumedEvent) SetEntityID(val OptNilString) {
+	s.EntityID = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *FlowSignupChallengeConsumedEvent) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetTokenID sets the value of TokenID.
+func (s *FlowSignupChallengeConsumedEvent) SetTokenID(val OptString) {
+	s.TokenID = val
+}
+
+// SetDelegationType sets the value of DelegationType.
+func (s *FlowSignupChallengeConsumedEvent) SetDelegationType(val OptFlowSignupChallengeConsumedEventDelegationType) {
+	s.DelegationType = val
+}
+
+// SetDelegationID sets the value of DelegationID.
+func (s *FlowSignupChallengeConsumedEvent) SetDelegationID(val OptString) {
+	s.DelegationID = val
+}
+
+// SetGrantor sets the value of Grantor.
+func (s *FlowSignupChallengeConsumedEvent) SetGrantor(val OptString) {
+	s.Grantor = val
+}
+
+// SetFingerprint sets the value of Fingerprint.
+func (s *FlowSignupChallengeConsumedEvent) SetFingerprint(val OptString) {
+	s.Fingerprint = val
+}
+
+// SetRequestID sets the value of RequestID.
+func (s *FlowSignupChallengeConsumedEvent) SetRequestID(val OptNilString) {
+	s.RequestID = val
+}
+
+// SetSessionID sets the value of SessionID.
+func (s *FlowSignupChallengeConsumedEvent) SetSessionID(val OptNilString) {
+	s.SessionID = val
+}
+
+// SetFlowID sets the value of FlowID.
+func (s *FlowSignupChallengeConsumedEvent) SetFlowID(val OptNilString) {
+	s.FlowID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *FlowSignupChallengeConsumedEvent) SetMetadata(val OptEventMetadata) {
+	s.Metadata = val
+}
+
+// SetPayload sets the value of Payload.
+func (s *FlowSignupChallengeConsumedEvent) SetPayload(val EmptyEventPayload) {
+	s.Payload = val
+}
+
+type FlowSignupChallengeConsumedEventActorType string
+
+const (
+	FlowSignupChallengeConsumedEventActorTypeHuman   FlowSignupChallengeConsumedEventActorType = "human"
+	FlowSignupChallengeConsumedEventActorTypeService FlowSignupChallengeConsumedEventActorType = "service"
+	FlowSignupChallengeConsumedEventActorTypeSystem  FlowSignupChallengeConsumedEventActorType = "system"
+	FlowSignupChallengeConsumedEventActorTypeAgent   FlowSignupChallengeConsumedEventActorType = "agent"
+)
+
+// AllValues returns all FlowSignupChallengeConsumedEventActorType values.
+func (FlowSignupChallengeConsumedEventActorType) AllValues() []FlowSignupChallengeConsumedEventActorType {
+	return []FlowSignupChallengeConsumedEventActorType{
+		FlowSignupChallengeConsumedEventActorTypeHuman,
+		FlowSignupChallengeConsumedEventActorTypeService,
+		FlowSignupChallengeConsumedEventActorTypeSystem,
+		FlowSignupChallengeConsumedEventActorTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s FlowSignupChallengeConsumedEventActorType) MarshalText() ([]byte, error) {
+	switch s {
+	case FlowSignupChallengeConsumedEventActorTypeHuman:
+		return []byte(s), nil
+	case FlowSignupChallengeConsumedEventActorTypeService:
+		return []byte(s), nil
+	case FlowSignupChallengeConsumedEventActorTypeSystem:
+		return []byte(s), nil
+	case FlowSignupChallengeConsumedEventActorTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *FlowSignupChallengeConsumedEventActorType) UnmarshalText(data []byte) error {
+	switch FlowSignupChallengeConsumedEventActorType(data) {
+	case FlowSignupChallengeConsumedEventActorTypeHuman:
+		*s = FlowSignupChallengeConsumedEventActorTypeHuman
+		return nil
+	case FlowSignupChallengeConsumedEventActorTypeService:
+		*s = FlowSignupChallengeConsumedEventActorTypeService
+		return nil
+	case FlowSignupChallengeConsumedEventActorTypeSystem:
+		*s = FlowSignupChallengeConsumedEventActorTypeSystem
+		return nil
+	case FlowSignupChallengeConsumedEventActorTypeAgent:
+		*s = FlowSignupChallengeConsumedEventActorTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The category of the event.
+type FlowSignupChallengeConsumedEventCategory string
+
+const (
+	FlowSignupChallengeConsumedEventCategoryRequest FlowSignupChallengeConsumedEventCategory = "request"
+	FlowSignupChallengeConsumedEventCategoryAuth    FlowSignupChallengeConsumedEventCategory = "auth"
+	FlowSignupChallengeConsumedEventCategorySession FlowSignupChallengeConsumedEventCategory = "session"
+	FlowSignupChallengeConsumedEventCategoryAdmin   FlowSignupChallengeConsumedEventCategory = "admin"
+	FlowSignupChallengeConsumedEventCategoryEntity  FlowSignupChallengeConsumedEventCategory = "entity"
+	FlowSignupChallengeConsumedEventCategorySignal  FlowSignupChallengeConsumedEventCategory = "signal"
+)
+
+// AllValues returns all FlowSignupChallengeConsumedEventCategory values.
+func (FlowSignupChallengeConsumedEventCategory) AllValues() []FlowSignupChallengeConsumedEventCategory {
+	return []FlowSignupChallengeConsumedEventCategory{
+		FlowSignupChallengeConsumedEventCategoryRequest,
+		FlowSignupChallengeConsumedEventCategoryAuth,
+		FlowSignupChallengeConsumedEventCategorySession,
+		FlowSignupChallengeConsumedEventCategoryAdmin,
+		FlowSignupChallengeConsumedEventCategoryEntity,
+		FlowSignupChallengeConsumedEventCategorySignal,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s FlowSignupChallengeConsumedEventCategory) MarshalText() ([]byte, error) {
+	switch s {
+	case FlowSignupChallengeConsumedEventCategoryRequest:
+		return []byte(s), nil
+	case FlowSignupChallengeConsumedEventCategoryAuth:
+		return []byte(s), nil
+	case FlowSignupChallengeConsumedEventCategorySession:
+		return []byte(s), nil
+	case FlowSignupChallengeConsumedEventCategoryAdmin:
+		return []byte(s), nil
+	case FlowSignupChallengeConsumedEventCategoryEntity:
+		return []byte(s), nil
+	case FlowSignupChallengeConsumedEventCategorySignal:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *FlowSignupChallengeConsumedEventCategory) UnmarshalText(data []byte) error {
+	switch FlowSignupChallengeConsumedEventCategory(data) {
+	case FlowSignupChallengeConsumedEventCategoryRequest:
+		*s = FlowSignupChallengeConsumedEventCategoryRequest
+		return nil
+	case FlowSignupChallengeConsumedEventCategoryAuth:
+		*s = FlowSignupChallengeConsumedEventCategoryAuth
+		return nil
+	case FlowSignupChallengeConsumedEventCategorySession:
+		*s = FlowSignupChallengeConsumedEventCategorySession
+		return nil
+	case FlowSignupChallengeConsumedEventCategoryAdmin:
+		*s = FlowSignupChallengeConsumedEventCategoryAdmin
+		return nil
+	case FlowSignupChallengeConsumedEventCategoryEntity:
+		*s = FlowSignupChallengeConsumedEventCategoryEntity
+		return nil
+	case FlowSignupChallengeConsumedEventCategorySignal:
+		*s = FlowSignupChallengeConsumedEventCategorySignal
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The kind of delegation. Absent when unset.
+type FlowSignupChallengeConsumedEventDelegationType string
+
+const (
+	FlowSignupChallengeConsumedEventDelegationTypeDirect    FlowSignupChallengeConsumedEventDelegationType = "direct"
+	FlowSignupChallengeConsumedEventDelegationTypeDelegated FlowSignupChallengeConsumedEventDelegationType = "delegated"
+	FlowSignupChallengeConsumedEventDelegationTypePatShared FlowSignupChallengeConsumedEventDelegationType = "pat_shared"
+	FlowSignupChallengeConsumedEventDelegationTypeExchanged FlowSignupChallengeConsumedEventDelegationType = "exchanged"
+)
+
+// AllValues returns all FlowSignupChallengeConsumedEventDelegationType values.
+func (FlowSignupChallengeConsumedEventDelegationType) AllValues() []FlowSignupChallengeConsumedEventDelegationType {
+	return []FlowSignupChallengeConsumedEventDelegationType{
+		FlowSignupChallengeConsumedEventDelegationTypeDirect,
+		FlowSignupChallengeConsumedEventDelegationTypeDelegated,
+		FlowSignupChallengeConsumedEventDelegationTypePatShared,
+		FlowSignupChallengeConsumedEventDelegationTypeExchanged,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s FlowSignupChallengeConsumedEventDelegationType) MarshalText() ([]byte, error) {
+	switch s {
+	case FlowSignupChallengeConsumedEventDelegationTypeDirect:
+		return []byte(s), nil
+	case FlowSignupChallengeConsumedEventDelegationTypeDelegated:
+		return []byte(s), nil
+	case FlowSignupChallengeConsumedEventDelegationTypePatShared:
+		return []byte(s), nil
+	case FlowSignupChallengeConsumedEventDelegationTypeExchanged:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *FlowSignupChallengeConsumedEventDelegationType) UnmarshalText(data []byte) error {
+	switch FlowSignupChallengeConsumedEventDelegationType(data) {
+	case FlowSignupChallengeConsumedEventDelegationTypeDirect:
+		*s = FlowSignupChallengeConsumedEventDelegationTypeDirect
+		return nil
+	case FlowSignupChallengeConsumedEventDelegationTypeDelegated:
+		*s = FlowSignupChallengeConsumedEventDelegationTypeDelegated
+		return nil
+	case FlowSignupChallengeConsumedEventDelegationTypePatShared:
+		*s = FlowSignupChallengeConsumedEventDelegationTypePatShared
+		return nil
+	case FlowSignupChallengeConsumedEventDelegationTypeExchanged:
+		*s = FlowSignupChallengeConsumedEventDelegationTypeExchanged
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Merged schema.
+// Ref: #
+type FlowSignupChallengeIssuedEvent struct {
+	// The event ID, in the form `evt_<opaque>`.
+	ID        string    `json:"id"`
+	ProjectID ProjectID `json:"project_id"`
+	// The team the actor operated under when the event was emitted, if any.
+	TeamID OptNilString `json:"team_id"`
+	// Merged property.
+	EventType string `json:"event_type"`
+	// The category of the event.
+	Category FlowSignupChallengeIssuedEventCategory `json:"category"`
+	// When the action happened, on the server's clock.
+	OccurredAt time.Time `json:"occurred_at"`
+	// When the event was stored, on the server's clock.
+	CreatedAt time.Time `json:"created_at"`
+	// The ID of the actor that triggered the event.
+	ActorID OptNilString `json:"actor_id"`
+	// The kind of actor that triggered the event.
+	ActorType OptNilFlowSignupChallengeIssuedEventActorType `json:"actor_type"`
+	// The type of resource the event affected.
+	EntityType OptNilString `json:"entity_type"`
+	// The ID of the resource the event affected.
+	EntityID OptNilString `json:"entity_id"`
+	// The application or agent that produced the event.
+	ClientID string `json:"client_id"`
+	// The ID of the token in use when the event was emitted, when there was one.
+	TokenID OptString `json:"token_id"`
+	// The kind of delegation. Absent when unset.
+	DelegationType OptFlowSignupChallengeIssuedEventDelegationType `json:"delegation_type"`
+	DelegationID   OptString                                       `json:"delegation_id"`
+	Grantor        OptString                                       `json:"grantor"`
+	// A device fingerprint ID that correlates events from the same device.
+	Fingerprint OptString `json:"fingerprint"`
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
+	RequestID OptNilString `json:"request_id"`
+	// The ID of the session the event belongs to.
+	SessionID OptNilString `json:"session_id"`
+	// An ID that correlates the events of one login flow.
+	FlowID   OptNilString      `json:"flow_id"`
+	Metadata OptEventMetadata  `json:"metadata"`
+	Payload  EmptyEventPayload `json:"payload"`
+}
+
+// GetID returns the value of ID.
+func (s *FlowSignupChallengeIssuedEvent) GetID() string {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *FlowSignupChallengeIssuedEvent) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *FlowSignupChallengeIssuedEvent) GetTeamID() OptNilString {
+	return s.TeamID
+}
+
+// GetEventType returns the value of EventType.
+func (s *FlowSignupChallengeIssuedEvent) GetEventType() string {
+	return s.EventType
+}
+
+// GetCategory returns the value of Category.
+func (s *FlowSignupChallengeIssuedEvent) GetCategory() FlowSignupChallengeIssuedEventCategory {
+	return s.Category
+}
+
+// GetOccurredAt returns the value of OccurredAt.
+func (s *FlowSignupChallengeIssuedEvent) GetOccurredAt() time.Time {
+	return s.OccurredAt
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *FlowSignupChallengeIssuedEvent) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetActorID returns the value of ActorID.
+func (s *FlowSignupChallengeIssuedEvent) GetActorID() OptNilString {
+	return s.ActorID
+}
+
+// GetActorType returns the value of ActorType.
+func (s *FlowSignupChallengeIssuedEvent) GetActorType() OptNilFlowSignupChallengeIssuedEventActorType {
+	return s.ActorType
+}
+
+// GetEntityType returns the value of EntityType.
+func (s *FlowSignupChallengeIssuedEvent) GetEntityType() OptNilString {
+	return s.EntityType
+}
+
+// GetEntityID returns the value of EntityID.
+func (s *FlowSignupChallengeIssuedEvent) GetEntityID() OptNilString {
+	return s.EntityID
+}
+
+// GetClientID returns the value of ClientID.
+func (s *FlowSignupChallengeIssuedEvent) GetClientID() string {
+	return s.ClientID
+}
+
+// GetTokenID returns the value of TokenID.
+func (s *FlowSignupChallengeIssuedEvent) GetTokenID() OptString {
+	return s.TokenID
+}
+
+// GetDelegationType returns the value of DelegationType.
+func (s *FlowSignupChallengeIssuedEvent) GetDelegationType() OptFlowSignupChallengeIssuedEventDelegationType {
+	return s.DelegationType
+}
+
+// GetDelegationID returns the value of DelegationID.
+func (s *FlowSignupChallengeIssuedEvent) GetDelegationID() OptString {
+	return s.DelegationID
+}
+
+// GetGrantor returns the value of Grantor.
+func (s *FlowSignupChallengeIssuedEvent) GetGrantor() OptString {
+	return s.Grantor
+}
+
+// GetFingerprint returns the value of Fingerprint.
+func (s *FlowSignupChallengeIssuedEvent) GetFingerprint() OptString {
+	return s.Fingerprint
+}
+
+// GetRequestID returns the value of RequestID.
+func (s *FlowSignupChallengeIssuedEvent) GetRequestID() OptNilString {
+	return s.RequestID
+}
+
+// GetSessionID returns the value of SessionID.
+func (s *FlowSignupChallengeIssuedEvent) GetSessionID() OptNilString {
+	return s.SessionID
+}
+
+// GetFlowID returns the value of FlowID.
+func (s *FlowSignupChallengeIssuedEvent) GetFlowID() OptNilString {
+	return s.FlowID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *FlowSignupChallengeIssuedEvent) GetMetadata() OptEventMetadata {
+	return s.Metadata
+}
+
+// GetPayload returns the value of Payload.
+func (s *FlowSignupChallengeIssuedEvent) GetPayload() EmptyEventPayload {
+	return s.Payload
+}
+
+// SetID sets the value of ID.
+func (s *FlowSignupChallengeIssuedEvent) SetID(val string) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *FlowSignupChallengeIssuedEvent) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *FlowSignupChallengeIssuedEvent) SetTeamID(val OptNilString) {
+	s.TeamID = val
+}
+
+// SetEventType sets the value of EventType.
+func (s *FlowSignupChallengeIssuedEvent) SetEventType(val string) {
+	s.EventType = val
+}
+
+// SetCategory sets the value of Category.
+func (s *FlowSignupChallengeIssuedEvent) SetCategory(val FlowSignupChallengeIssuedEventCategory) {
+	s.Category = val
+}
+
+// SetOccurredAt sets the value of OccurredAt.
+func (s *FlowSignupChallengeIssuedEvent) SetOccurredAt(val time.Time) {
+	s.OccurredAt = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *FlowSignupChallengeIssuedEvent) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetActorID sets the value of ActorID.
+func (s *FlowSignupChallengeIssuedEvent) SetActorID(val OptNilString) {
+	s.ActorID = val
+}
+
+// SetActorType sets the value of ActorType.
+func (s *FlowSignupChallengeIssuedEvent) SetActorType(val OptNilFlowSignupChallengeIssuedEventActorType) {
+	s.ActorType = val
+}
+
+// SetEntityType sets the value of EntityType.
+func (s *FlowSignupChallengeIssuedEvent) SetEntityType(val OptNilString) {
+	s.EntityType = val
+}
+
+// SetEntityID sets the value of EntityID.
+func (s *FlowSignupChallengeIssuedEvent) SetEntityID(val OptNilString) {
+	s.EntityID = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *FlowSignupChallengeIssuedEvent) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetTokenID sets the value of TokenID.
+func (s *FlowSignupChallengeIssuedEvent) SetTokenID(val OptString) {
+	s.TokenID = val
+}
+
+// SetDelegationType sets the value of DelegationType.
+func (s *FlowSignupChallengeIssuedEvent) SetDelegationType(val OptFlowSignupChallengeIssuedEventDelegationType) {
+	s.DelegationType = val
+}
+
+// SetDelegationID sets the value of DelegationID.
+func (s *FlowSignupChallengeIssuedEvent) SetDelegationID(val OptString) {
+	s.DelegationID = val
+}
+
+// SetGrantor sets the value of Grantor.
+func (s *FlowSignupChallengeIssuedEvent) SetGrantor(val OptString) {
+	s.Grantor = val
+}
+
+// SetFingerprint sets the value of Fingerprint.
+func (s *FlowSignupChallengeIssuedEvent) SetFingerprint(val OptString) {
+	s.Fingerprint = val
+}
+
+// SetRequestID sets the value of RequestID.
+func (s *FlowSignupChallengeIssuedEvent) SetRequestID(val OptNilString) {
+	s.RequestID = val
+}
+
+// SetSessionID sets the value of SessionID.
+func (s *FlowSignupChallengeIssuedEvent) SetSessionID(val OptNilString) {
+	s.SessionID = val
+}
+
+// SetFlowID sets the value of FlowID.
+func (s *FlowSignupChallengeIssuedEvent) SetFlowID(val OptNilString) {
+	s.FlowID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *FlowSignupChallengeIssuedEvent) SetMetadata(val OptEventMetadata) {
+	s.Metadata = val
+}
+
+// SetPayload sets the value of Payload.
+func (s *FlowSignupChallengeIssuedEvent) SetPayload(val EmptyEventPayload) {
+	s.Payload = val
+}
+
+type FlowSignupChallengeIssuedEventActorType string
+
+const (
+	FlowSignupChallengeIssuedEventActorTypeHuman   FlowSignupChallengeIssuedEventActorType = "human"
+	FlowSignupChallengeIssuedEventActorTypeService FlowSignupChallengeIssuedEventActorType = "service"
+	FlowSignupChallengeIssuedEventActorTypeSystem  FlowSignupChallengeIssuedEventActorType = "system"
+	FlowSignupChallengeIssuedEventActorTypeAgent   FlowSignupChallengeIssuedEventActorType = "agent"
+)
+
+// AllValues returns all FlowSignupChallengeIssuedEventActorType values.
+func (FlowSignupChallengeIssuedEventActorType) AllValues() []FlowSignupChallengeIssuedEventActorType {
+	return []FlowSignupChallengeIssuedEventActorType{
+		FlowSignupChallengeIssuedEventActorTypeHuman,
+		FlowSignupChallengeIssuedEventActorTypeService,
+		FlowSignupChallengeIssuedEventActorTypeSystem,
+		FlowSignupChallengeIssuedEventActorTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s FlowSignupChallengeIssuedEventActorType) MarshalText() ([]byte, error) {
+	switch s {
+	case FlowSignupChallengeIssuedEventActorTypeHuman:
+		return []byte(s), nil
+	case FlowSignupChallengeIssuedEventActorTypeService:
+		return []byte(s), nil
+	case FlowSignupChallengeIssuedEventActorTypeSystem:
+		return []byte(s), nil
+	case FlowSignupChallengeIssuedEventActorTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *FlowSignupChallengeIssuedEventActorType) UnmarshalText(data []byte) error {
+	switch FlowSignupChallengeIssuedEventActorType(data) {
+	case FlowSignupChallengeIssuedEventActorTypeHuman:
+		*s = FlowSignupChallengeIssuedEventActorTypeHuman
+		return nil
+	case FlowSignupChallengeIssuedEventActorTypeService:
+		*s = FlowSignupChallengeIssuedEventActorTypeService
+		return nil
+	case FlowSignupChallengeIssuedEventActorTypeSystem:
+		*s = FlowSignupChallengeIssuedEventActorTypeSystem
+		return nil
+	case FlowSignupChallengeIssuedEventActorTypeAgent:
+		*s = FlowSignupChallengeIssuedEventActorTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The category of the event.
+type FlowSignupChallengeIssuedEventCategory string
+
+const (
+	FlowSignupChallengeIssuedEventCategoryRequest FlowSignupChallengeIssuedEventCategory = "request"
+	FlowSignupChallengeIssuedEventCategoryAuth    FlowSignupChallengeIssuedEventCategory = "auth"
+	FlowSignupChallengeIssuedEventCategorySession FlowSignupChallengeIssuedEventCategory = "session"
+	FlowSignupChallengeIssuedEventCategoryAdmin   FlowSignupChallengeIssuedEventCategory = "admin"
+	FlowSignupChallengeIssuedEventCategoryEntity  FlowSignupChallengeIssuedEventCategory = "entity"
+	FlowSignupChallengeIssuedEventCategorySignal  FlowSignupChallengeIssuedEventCategory = "signal"
+)
+
+// AllValues returns all FlowSignupChallengeIssuedEventCategory values.
+func (FlowSignupChallengeIssuedEventCategory) AllValues() []FlowSignupChallengeIssuedEventCategory {
+	return []FlowSignupChallengeIssuedEventCategory{
+		FlowSignupChallengeIssuedEventCategoryRequest,
+		FlowSignupChallengeIssuedEventCategoryAuth,
+		FlowSignupChallengeIssuedEventCategorySession,
+		FlowSignupChallengeIssuedEventCategoryAdmin,
+		FlowSignupChallengeIssuedEventCategoryEntity,
+		FlowSignupChallengeIssuedEventCategorySignal,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s FlowSignupChallengeIssuedEventCategory) MarshalText() ([]byte, error) {
+	switch s {
+	case FlowSignupChallengeIssuedEventCategoryRequest:
+		return []byte(s), nil
+	case FlowSignupChallengeIssuedEventCategoryAuth:
+		return []byte(s), nil
+	case FlowSignupChallengeIssuedEventCategorySession:
+		return []byte(s), nil
+	case FlowSignupChallengeIssuedEventCategoryAdmin:
+		return []byte(s), nil
+	case FlowSignupChallengeIssuedEventCategoryEntity:
+		return []byte(s), nil
+	case FlowSignupChallengeIssuedEventCategorySignal:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *FlowSignupChallengeIssuedEventCategory) UnmarshalText(data []byte) error {
+	switch FlowSignupChallengeIssuedEventCategory(data) {
+	case FlowSignupChallengeIssuedEventCategoryRequest:
+		*s = FlowSignupChallengeIssuedEventCategoryRequest
+		return nil
+	case FlowSignupChallengeIssuedEventCategoryAuth:
+		*s = FlowSignupChallengeIssuedEventCategoryAuth
+		return nil
+	case FlowSignupChallengeIssuedEventCategorySession:
+		*s = FlowSignupChallengeIssuedEventCategorySession
+		return nil
+	case FlowSignupChallengeIssuedEventCategoryAdmin:
+		*s = FlowSignupChallengeIssuedEventCategoryAdmin
+		return nil
+	case FlowSignupChallengeIssuedEventCategoryEntity:
+		*s = FlowSignupChallengeIssuedEventCategoryEntity
+		return nil
+	case FlowSignupChallengeIssuedEventCategorySignal:
+		*s = FlowSignupChallengeIssuedEventCategorySignal
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The kind of delegation. Absent when unset.
+type FlowSignupChallengeIssuedEventDelegationType string
+
+const (
+	FlowSignupChallengeIssuedEventDelegationTypeDirect    FlowSignupChallengeIssuedEventDelegationType = "direct"
+	FlowSignupChallengeIssuedEventDelegationTypeDelegated FlowSignupChallengeIssuedEventDelegationType = "delegated"
+	FlowSignupChallengeIssuedEventDelegationTypePatShared FlowSignupChallengeIssuedEventDelegationType = "pat_shared"
+	FlowSignupChallengeIssuedEventDelegationTypeExchanged FlowSignupChallengeIssuedEventDelegationType = "exchanged"
+)
+
+// AllValues returns all FlowSignupChallengeIssuedEventDelegationType values.
+func (FlowSignupChallengeIssuedEventDelegationType) AllValues() []FlowSignupChallengeIssuedEventDelegationType {
+	return []FlowSignupChallengeIssuedEventDelegationType{
+		FlowSignupChallengeIssuedEventDelegationTypeDirect,
+		FlowSignupChallengeIssuedEventDelegationTypeDelegated,
+		FlowSignupChallengeIssuedEventDelegationTypePatShared,
+		FlowSignupChallengeIssuedEventDelegationTypeExchanged,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s FlowSignupChallengeIssuedEventDelegationType) MarshalText() ([]byte, error) {
+	switch s {
+	case FlowSignupChallengeIssuedEventDelegationTypeDirect:
+		return []byte(s), nil
+	case FlowSignupChallengeIssuedEventDelegationTypeDelegated:
+		return []byte(s), nil
+	case FlowSignupChallengeIssuedEventDelegationTypePatShared:
+		return []byte(s), nil
+	case FlowSignupChallengeIssuedEventDelegationTypeExchanged:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *FlowSignupChallengeIssuedEventDelegationType) UnmarshalText(data []byte) error {
+	switch FlowSignupChallengeIssuedEventDelegationType(data) {
+	case FlowSignupChallengeIssuedEventDelegationTypeDirect:
+		*s = FlowSignupChallengeIssuedEventDelegationTypeDirect
+		return nil
+	case FlowSignupChallengeIssuedEventDelegationTypeDelegated:
+		*s = FlowSignupChallengeIssuedEventDelegationTypeDelegated
+		return nil
+	case FlowSignupChallengeIssuedEventDelegationTypePatShared:
+		*s = FlowSignupChallengeIssuedEventDelegationTypePatShared
+		return nil
+	case FlowSignupChallengeIssuedEventDelegationTypeExchanged:
+		*s = FlowSignupChallengeIssuedEventDelegationTypeExchanged
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
 }
 
 // The step the login component renders now. A step is one screen of a flow.
@@ -30934,12 +33885,12 @@ func (s *FlowStepComplete) UnmarshalText(data []byte) error {
 // step can be submitted.
 // The server injects gates dynamically based on policy, even if they
 // are not declared in the flow definition.
-type FlowStepGates map[string]Gate
+type FlowStepGates map[string]RuntimeGate
 
 func (s *FlowStepGates) init() FlowStepGates {
 	m := *s
 	if m == nil {
-		m = map[string]Gate{}
+		m = map[string]RuntimeGate{}
 		*s = m
 	}
 	return m
@@ -31096,7 +34047,10 @@ type FlowSubmitRequest struct {
 	// User input values. Keys match field names from the step's `fields` dictionary.
 	Fields OptFlowSubmitRequestFields `json:"fields"`
 	// Solutions for security gates. Keys match gate names from the step's `gates` dictionary.
-	// The login component collects these from `<zl-captcha>` component events.
+	// For sign-up, the login component solves the built-in challenge with Web
+	// Crypto and submits its JSON proof under `signup_pow`: with the password
+	// for a password sign-up, and with `challenge_response` for a passkey
+	// registration that creates the user.
 	GateProofs OptFlowSubmitRequestGateProofs `json:"gate_proofs"`
 	// Response to a pending challenge on the step. Required when the step has a
 	// `challenge` property (for example, after submitting a passkey action).
@@ -31256,7 +34210,10 @@ func (s *FlowSubmitRequestFields) init() FlowSubmitRequestFields {
 }
 
 // Solutions for security gates. Keys match gate names from the step's `gates` dictionary.
-// The login component collects these from `<zl-captcha>` component events.
+// For sign-up, the login component solves the built-in challenge with Web
+// Crypto and submits its JSON proof under `signup_pow`: with the password
+// for a password sign-up, and with `challenge_response` for a passkey
+// registration that creates the user.
 type FlowSubmitRequestGateProofs map[string]string
 
 func (s *FlowSubmitRequestGateProofs) init() FlowSubmitRequestGateProofs {
@@ -33173,9 +36130,9 @@ func (s *FlowdefUpdatedEventDelegationType) UnmarshalText(data []byte) error {
 	}
 }
 
-// A gate is a security check, such as a captcha, that must be satisfied
-// before this step's submission is accepted. The server may also inject gates
-// at runtime based on policy or risk evaluation.
+// A reserved gate declaration. Gates declared in a flow definition are not
+// currently enforced. Required signup gates are attached by the server based
+// on `on_success: create_user`, independently of this declaration.
 // Ref: #
 type Gate struct {
 	// The gate category. Only `captcha` is defined today. Authenticator
@@ -33183,12 +36140,9 @@ type Gate struct {
 	// credential authentication attempts (`auth_attempts`) with `x-credential`
 	// on a field.
 	Kind GateKind `json:"kind"`
-	// The provider within the gate kind, for example `altcha`, `turnstile` or
-	// `hcaptcha`. The server looks up an implementation in its provider
-	// registry.
+	// Reserved implementation identifier. Declaring a provider does not enable it.
 	Provider string `json:"provider"`
-	// Provider-specific configuration consumed by the implementation when
-	// issuing the per-render challenge. Opaque to the server.
+	// Reserved provider-specific configuration. It has no runtime effect.
 	Config OptGateConfig `json:"config"`
 }
 
@@ -33222,8 +36176,7 @@ func (s *Gate) SetConfig(val OptGateConfig) {
 	s.Config = val
 }
 
-// Provider-specific configuration consumed by the implementation when
-// issuing the per-render challenge. Opaque to the server.
+// Reserved provider-specific configuration. It has no runtime effect.
 type GateConfig map[string]jx.Raw
 
 func (s *GateConfig) init() GateConfig {
@@ -33275,12 +36228,14 @@ func (s *GateKind) UnmarshalText(data []byte) error {
 
 // GetApplicationByIdErrorResponse represents sum type.
 type GetApplicationByIdErrorResponse struct {
-	Type             GetApplicationByIdErrorResponseType // switch on this field
-	AuthUnauthorized AuthUnauthorized
-	Internal         Internal
-	NotImplemented   NotImplemented
-	ReqInvalid       ReqInvalid
-	Unavailable      Unavailable
+	Type                GetApplicationByIdErrorResponseType // switch on this field
+	AppNotFound         AppNotFound
+	AppPermissionDenied AppPermissionDenied
+	AuthUnauthorized    AuthUnauthorized
+	Internal            Internal
+	NotImplemented      NotImplemented
+	ReqInvalid          ReqInvalid
+	Unavailable         Unavailable
 }
 
 // GetApplicationByIdErrorResponseType is oneOf type of GetApplicationByIdErrorResponse.
@@ -33288,12 +36243,24 @@ type GetApplicationByIdErrorResponseType string
 
 // Possible values for GetApplicationByIdErrorResponseType.
 const (
-	AuthUnauthorizedGetApplicationByIdErrorResponse GetApplicationByIdErrorResponseType = "auth.unauthorized"
-	InternalGetApplicationByIdErrorResponse         GetApplicationByIdErrorResponseType = "internal"
-	NotImplementedGetApplicationByIdErrorResponse   GetApplicationByIdErrorResponseType = "not_implemented"
-	ReqInvalidGetApplicationByIdErrorResponse       GetApplicationByIdErrorResponseType = "req.invalid"
-	UnavailableGetApplicationByIdErrorResponse      GetApplicationByIdErrorResponseType = "unavailable"
+	AppNotFoundGetApplicationByIdErrorResponse         GetApplicationByIdErrorResponseType = "app.not_found"
+	AppPermissionDeniedGetApplicationByIdErrorResponse GetApplicationByIdErrorResponseType = "app.permission_denied"
+	AuthUnauthorizedGetApplicationByIdErrorResponse    GetApplicationByIdErrorResponseType = "auth.unauthorized"
+	InternalGetApplicationByIdErrorResponse            GetApplicationByIdErrorResponseType = "internal"
+	NotImplementedGetApplicationByIdErrorResponse      GetApplicationByIdErrorResponseType = "not_implemented"
+	ReqInvalidGetApplicationByIdErrorResponse          GetApplicationByIdErrorResponseType = "req.invalid"
+	UnavailableGetApplicationByIdErrorResponse         GetApplicationByIdErrorResponseType = "unavailable"
 )
+
+// IsAppNotFound reports whether GetApplicationByIdErrorResponse is AppNotFound.
+func (s GetApplicationByIdErrorResponse) IsAppNotFound() bool {
+	return s.Type == AppNotFoundGetApplicationByIdErrorResponse
+}
+
+// IsAppPermissionDenied reports whether GetApplicationByIdErrorResponse is AppPermissionDenied.
+func (s GetApplicationByIdErrorResponse) IsAppPermissionDenied() bool {
+	return s.Type == AppPermissionDeniedGetApplicationByIdErrorResponse
+}
 
 // IsAuthUnauthorized reports whether GetApplicationByIdErrorResponse is AuthUnauthorized.
 func (s GetApplicationByIdErrorResponse) IsAuthUnauthorized() bool {
@@ -33318,6 +36285,48 @@ func (s GetApplicationByIdErrorResponse) IsReqInvalid() bool {
 // IsUnavailable reports whether GetApplicationByIdErrorResponse is Unavailable.
 func (s GetApplicationByIdErrorResponse) IsUnavailable() bool {
 	return s.Type == UnavailableGetApplicationByIdErrorResponse
+}
+
+// SetAppNotFound sets GetApplicationByIdErrorResponse to AppNotFound.
+func (s *GetApplicationByIdErrorResponse) SetAppNotFound(v AppNotFound) {
+	s.Type = AppNotFoundGetApplicationByIdErrorResponse
+	s.AppNotFound = v
+}
+
+// GetAppNotFound returns AppNotFound and true boolean if GetApplicationByIdErrorResponse is AppNotFound.
+func (s GetApplicationByIdErrorResponse) GetAppNotFound() (v AppNotFound, ok bool) {
+	if !s.IsAppNotFound() {
+		return v, false
+	}
+	return s.AppNotFound, true
+}
+
+// NewAppNotFoundGetApplicationByIdErrorResponse returns new GetApplicationByIdErrorResponse from AppNotFound.
+func NewAppNotFoundGetApplicationByIdErrorResponse(v AppNotFound) GetApplicationByIdErrorResponse {
+	var s GetApplicationByIdErrorResponse
+	s.SetAppNotFound(v)
+	return s
+}
+
+// SetAppPermissionDenied sets GetApplicationByIdErrorResponse to AppPermissionDenied.
+func (s *GetApplicationByIdErrorResponse) SetAppPermissionDenied(v AppPermissionDenied) {
+	s.Type = AppPermissionDeniedGetApplicationByIdErrorResponse
+	s.AppPermissionDenied = v
+}
+
+// GetAppPermissionDenied returns AppPermissionDenied and true boolean if GetApplicationByIdErrorResponse is AppPermissionDenied.
+func (s GetApplicationByIdErrorResponse) GetAppPermissionDenied() (v AppPermissionDenied, ok bool) {
+	if !s.IsAppPermissionDenied() {
+		return v, false
+	}
+	return s.AppPermissionDenied, true
+}
+
+// NewAppPermissionDeniedGetApplicationByIdErrorResponse returns new GetApplicationByIdErrorResponse from AppPermissionDenied.
+func NewAppPermissionDeniedGetApplicationByIdErrorResponse(v AppPermissionDenied) GetApplicationByIdErrorResponse {
+	var s GetApplicationByIdErrorResponse
+	s.SetAppPermissionDenied(v)
+	return s
 }
 
 // SetAuthUnauthorized sets GetApplicationByIdErrorResponse to AuthUnauthorized.
@@ -35555,6 +38564,7 @@ type GetFlowStepErrorResponse struct {
 	FlowIntegrity               FlowIntegrity
 	FlowInvalidAction           FlowInvalidAction
 	FlowNotFound                FlowNotFound
+	FlowRateLimited             FlowRateLimited
 	FlowRestartRequired         FlowRestartRequired
 	FlowSSOUserSchemaMismatch   FlowSSOUserSchemaMismatch
 	FlowUnsupported             FlowUnsupported
@@ -35578,6 +38588,7 @@ type GetFlowStepErrorResponse struct {
 	UserInvalid                 UserInvalid
 	UserNotFound                UserNotFound
 	UserPasswordEmpty           UserPasswordEmpty
+	UserPasswordHashingBusy     UserPasswordHashingBusy
 	UserPasswordPolicyViolation UserPasswordPolicyViolation
 	UserPasswordTooLong         UserPasswordTooLong
 }
@@ -35602,6 +38613,7 @@ const (
 	FlowIntegrityGetFlowStepErrorResponse               GetFlowStepErrorResponseType = "flow.integrity"
 	FlowInvalidActionGetFlowStepErrorResponse           GetFlowStepErrorResponseType = "flow.invalid_action"
 	FlowNotFoundGetFlowStepErrorResponse                GetFlowStepErrorResponseType = "flow.not_found"
+	FlowRateLimitedGetFlowStepErrorResponse             GetFlowStepErrorResponseType = "flow.rate_limited"
 	FlowRestartRequiredGetFlowStepErrorResponse         GetFlowStepErrorResponseType = "flow.restart_required"
 	FlowSSOUserSchemaMismatchGetFlowStepErrorResponse   GetFlowStepErrorResponseType = "flow.sso_user_schema_mismatch"
 	FlowUnsupportedGetFlowStepErrorResponse             GetFlowStepErrorResponseType = "flow.unsupported"
@@ -35625,6 +38637,7 @@ const (
 	UserInvalidGetFlowStepErrorResponse                 GetFlowStepErrorResponseType = "user.invalid"
 	UserNotFoundGetFlowStepErrorResponse                GetFlowStepErrorResponseType = "user.not_found"
 	UserPasswordEmptyGetFlowStepErrorResponse           GetFlowStepErrorResponseType = "user.password_empty"
+	UserPasswordHashingBusyGetFlowStepErrorResponse     GetFlowStepErrorResponseType = "user.password_hashing_busy"
 	UserPasswordPolicyViolationGetFlowStepErrorResponse GetFlowStepErrorResponseType = "user.password_policy_violation"
 	UserPasswordTooLongGetFlowStepErrorResponse         GetFlowStepErrorResponseType = "user.password_too_long"
 )
@@ -35702,6 +38715,11 @@ func (s GetFlowStepErrorResponse) IsFlowInvalidAction() bool {
 // IsFlowNotFound reports whether GetFlowStepErrorResponse is FlowNotFound.
 func (s GetFlowStepErrorResponse) IsFlowNotFound() bool {
 	return s.Type == FlowNotFoundGetFlowStepErrorResponse
+}
+
+// IsFlowRateLimited reports whether GetFlowStepErrorResponse is FlowRateLimited.
+func (s GetFlowStepErrorResponse) IsFlowRateLimited() bool {
+	return s.Type == FlowRateLimitedGetFlowStepErrorResponse
 }
 
 // IsFlowRestartRequired reports whether GetFlowStepErrorResponse is FlowRestartRequired.
@@ -35817,6 +38835,11 @@ func (s GetFlowStepErrorResponse) IsUserNotFound() bool {
 // IsUserPasswordEmpty reports whether GetFlowStepErrorResponse is UserPasswordEmpty.
 func (s GetFlowStepErrorResponse) IsUserPasswordEmpty() bool {
 	return s.Type == UserPasswordEmptyGetFlowStepErrorResponse
+}
+
+// IsUserPasswordHashingBusy reports whether GetFlowStepErrorResponse is UserPasswordHashingBusy.
+func (s GetFlowStepErrorResponse) IsUserPasswordHashingBusy() bool {
+	return s.Type == UserPasswordHashingBusyGetFlowStepErrorResponse
 }
 
 // IsUserPasswordPolicyViolation reports whether GetFlowStepErrorResponse is UserPasswordPolicyViolation.
@@ -36141,6 +39164,27 @@ func (s GetFlowStepErrorResponse) GetFlowNotFound() (v FlowNotFound, ok bool) {
 func NewFlowNotFoundGetFlowStepErrorResponse(v FlowNotFound) GetFlowStepErrorResponse {
 	var s GetFlowStepErrorResponse
 	s.SetFlowNotFound(v)
+	return s
+}
+
+// SetFlowRateLimited sets GetFlowStepErrorResponse to FlowRateLimited.
+func (s *GetFlowStepErrorResponse) SetFlowRateLimited(v FlowRateLimited) {
+	s.Type = FlowRateLimitedGetFlowStepErrorResponse
+	s.FlowRateLimited = v
+}
+
+// GetFlowRateLimited returns FlowRateLimited and true boolean if GetFlowStepErrorResponse is FlowRateLimited.
+func (s GetFlowStepErrorResponse) GetFlowRateLimited() (v FlowRateLimited, ok bool) {
+	if !s.IsFlowRateLimited() {
+		return v, false
+	}
+	return s.FlowRateLimited, true
+}
+
+// NewFlowRateLimitedGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from FlowRateLimited.
+func NewFlowRateLimitedGetFlowStepErrorResponse(v FlowRateLimited) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetFlowRateLimited(v)
 	return s
 }
 
@@ -36624,6 +39668,27 @@ func (s GetFlowStepErrorResponse) GetUserPasswordEmpty() (v UserPasswordEmpty, o
 func NewUserPasswordEmptyGetFlowStepErrorResponse(v UserPasswordEmpty) GetFlowStepErrorResponse {
 	var s GetFlowStepErrorResponse
 	s.SetUserPasswordEmpty(v)
+	return s
+}
+
+// SetUserPasswordHashingBusy sets GetFlowStepErrorResponse to UserPasswordHashingBusy.
+func (s *GetFlowStepErrorResponse) SetUserPasswordHashingBusy(v UserPasswordHashingBusy) {
+	s.Type = UserPasswordHashingBusyGetFlowStepErrorResponse
+	s.UserPasswordHashingBusy = v
+}
+
+// GetUserPasswordHashingBusy returns UserPasswordHashingBusy and true boolean if GetFlowStepErrorResponse is UserPasswordHashingBusy.
+func (s GetFlowStepErrorResponse) GetUserPasswordHashingBusy() (v UserPasswordHashingBusy, ok bool) {
+	if !s.IsUserPasswordHashingBusy() {
+		return v, false
+	}
+	return s.UserPasswordHashingBusy, true
+}
+
+// NewUserPasswordHashingBusyGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from UserPasswordHashingBusy.
+func NewUserPasswordHashingBusyGetFlowStepErrorResponse(v UserPasswordHashingBusy) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetUserPasswordHashingBusy(v)
 	return s
 }
 
@@ -39004,6 +42069,186 @@ func (s *GetMyUserSchemaErrorResponseStatusCode) SetResponse(val GetMyUserSchema
 }
 
 func (*GetMyUserSchemaErrorResponseStatusCode) getMyUserSchemaRes() {}
+
+// GetOAuthSettingsByIdErrorResponse represents sum type.
+type GetOAuthSettingsByIdErrorResponse struct {
+	Type             GetOAuthSettingsByIdErrorResponseType // switch on this field
+	AuthUnauthorized AuthUnauthorized
+	Internal         Internal
+	NotImplemented   NotImplemented
+	ReqInvalid       ReqInvalid
+	Unavailable      Unavailable
+}
+
+// GetOAuthSettingsByIdErrorResponseType is oneOf type of GetOAuthSettingsByIdErrorResponse.
+type GetOAuthSettingsByIdErrorResponseType string
+
+// Possible values for GetOAuthSettingsByIdErrorResponseType.
+const (
+	AuthUnauthorizedGetOAuthSettingsByIdErrorResponse GetOAuthSettingsByIdErrorResponseType = "auth.unauthorized"
+	InternalGetOAuthSettingsByIdErrorResponse         GetOAuthSettingsByIdErrorResponseType = "internal"
+	NotImplementedGetOAuthSettingsByIdErrorResponse   GetOAuthSettingsByIdErrorResponseType = "not_implemented"
+	ReqInvalidGetOAuthSettingsByIdErrorResponse       GetOAuthSettingsByIdErrorResponseType = "req.invalid"
+	UnavailableGetOAuthSettingsByIdErrorResponse      GetOAuthSettingsByIdErrorResponseType = "unavailable"
+)
+
+// IsAuthUnauthorized reports whether GetOAuthSettingsByIdErrorResponse is AuthUnauthorized.
+func (s GetOAuthSettingsByIdErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedGetOAuthSettingsByIdErrorResponse
+}
+
+// IsInternal reports whether GetOAuthSettingsByIdErrorResponse is Internal.
+func (s GetOAuthSettingsByIdErrorResponse) IsInternal() bool {
+	return s.Type == InternalGetOAuthSettingsByIdErrorResponse
+}
+
+// IsNotImplemented reports whether GetOAuthSettingsByIdErrorResponse is NotImplemented.
+func (s GetOAuthSettingsByIdErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedGetOAuthSettingsByIdErrorResponse
+}
+
+// IsReqInvalid reports whether GetOAuthSettingsByIdErrorResponse is ReqInvalid.
+func (s GetOAuthSettingsByIdErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidGetOAuthSettingsByIdErrorResponse
+}
+
+// IsUnavailable reports whether GetOAuthSettingsByIdErrorResponse is Unavailable.
+func (s GetOAuthSettingsByIdErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableGetOAuthSettingsByIdErrorResponse
+}
+
+// SetAuthUnauthorized sets GetOAuthSettingsByIdErrorResponse to AuthUnauthorized.
+func (s *GetOAuthSettingsByIdErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedGetOAuthSettingsByIdErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if GetOAuthSettingsByIdErrorResponse is AuthUnauthorized.
+func (s GetOAuthSettingsByIdErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedGetOAuthSettingsByIdErrorResponse returns new GetOAuthSettingsByIdErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedGetOAuthSettingsByIdErrorResponse(v AuthUnauthorized) GetOAuthSettingsByIdErrorResponse {
+	var s GetOAuthSettingsByIdErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets GetOAuthSettingsByIdErrorResponse to Internal.
+func (s *GetOAuthSettingsByIdErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalGetOAuthSettingsByIdErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if GetOAuthSettingsByIdErrorResponse is Internal.
+func (s GetOAuthSettingsByIdErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalGetOAuthSettingsByIdErrorResponse returns new GetOAuthSettingsByIdErrorResponse from Internal.
+func NewInternalGetOAuthSettingsByIdErrorResponse(v Internal) GetOAuthSettingsByIdErrorResponse {
+	var s GetOAuthSettingsByIdErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets GetOAuthSettingsByIdErrorResponse to NotImplemented.
+func (s *GetOAuthSettingsByIdErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedGetOAuthSettingsByIdErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if GetOAuthSettingsByIdErrorResponse is NotImplemented.
+func (s GetOAuthSettingsByIdErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedGetOAuthSettingsByIdErrorResponse returns new GetOAuthSettingsByIdErrorResponse from NotImplemented.
+func NewNotImplementedGetOAuthSettingsByIdErrorResponse(v NotImplemented) GetOAuthSettingsByIdErrorResponse {
+	var s GetOAuthSettingsByIdErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
+// SetReqInvalid sets GetOAuthSettingsByIdErrorResponse to ReqInvalid.
+func (s *GetOAuthSettingsByIdErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidGetOAuthSettingsByIdErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if GetOAuthSettingsByIdErrorResponse is ReqInvalid.
+func (s GetOAuthSettingsByIdErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidGetOAuthSettingsByIdErrorResponse returns new GetOAuthSettingsByIdErrorResponse from ReqInvalid.
+func NewReqInvalidGetOAuthSettingsByIdErrorResponse(v ReqInvalid) GetOAuthSettingsByIdErrorResponse {
+	var s GetOAuthSettingsByIdErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets GetOAuthSettingsByIdErrorResponse to Unavailable.
+func (s *GetOAuthSettingsByIdErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableGetOAuthSettingsByIdErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if GetOAuthSettingsByIdErrorResponse is Unavailable.
+func (s GetOAuthSettingsByIdErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableGetOAuthSettingsByIdErrorResponse returns new GetOAuthSettingsByIdErrorResponse from Unavailable.
+func NewUnavailableGetOAuthSettingsByIdErrorResponse(v Unavailable) GetOAuthSettingsByIdErrorResponse {
+	var s GetOAuthSettingsByIdErrorResponse
+	s.SetUnavailable(v)
+	return s
+}
+
+// GetOAuthSettingsByIdErrorResponseStatusCode wraps GetOAuthSettingsByIdErrorResponse with StatusCode.
+type GetOAuthSettingsByIdErrorResponseStatusCode struct {
+	StatusCode int
+	Response   GetOAuthSettingsByIdErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *GetOAuthSettingsByIdErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *GetOAuthSettingsByIdErrorResponseStatusCode) GetResponse() GetOAuthSettingsByIdErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *GetOAuthSettingsByIdErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *GetOAuthSettingsByIdErrorResponseStatusCode) SetResponse(val GetOAuthSettingsByIdErrorResponse) {
+	s.Response = val
+}
+
+func (*GetOAuthSettingsByIdErrorResponseStatusCode) getOAuthSettingsByIdRes() {}
 
 // GetPolicyErrorResponse represents sum type.
 type GetPolicyErrorResponse struct {
@@ -46166,6 +49411,2066 @@ func (*Invitation) acceptInvitationRes() {}
 func (*Invitation) getInvitationRes()    {}
 func (*Invitation) rejectInvitationRes() {}
 
+// Merged schema.
+// Ref: #
+type InvitationAcceptedEvent struct {
+	// The event ID, in the form `evt_<opaque>`.
+	ID        string    `json:"id"`
+	ProjectID ProjectID `json:"project_id"`
+	// The team the actor operated under when the event was emitted, if any.
+	TeamID OptNilString `json:"team_id"`
+	// Merged property.
+	EventType string `json:"event_type"`
+	// The category of the event.
+	Category InvitationAcceptedEventCategory `json:"category"`
+	// When the action happened, on the server's clock.
+	OccurredAt time.Time `json:"occurred_at"`
+	// When the event was stored, on the server's clock.
+	CreatedAt time.Time `json:"created_at"`
+	// The ID of the actor that triggered the event.
+	ActorID OptNilString `json:"actor_id"`
+	// The kind of actor that triggered the event.
+	ActorType OptNilInvitationAcceptedEventActorType `json:"actor_type"`
+	// The type of resource the event affected.
+	EntityType OptNilString `json:"entity_type"`
+	// The ID of the resource the event affected.
+	EntityID OptNilString `json:"entity_id"`
+	// The application or agent that produced the event.
+	ClientID string `json:"client_id"`
+	// The ID of the token in use when the event was emitted, when there was one.
+	TokenID OptString `json:"token_id"`
+	// The kind of delegation. Absent when unset.
+	DelegationType OptInvitationAcceptedEventDelegationType `json:"delegation_type"`
+	DelegationID   OptString                                `json:"delegation_id"`
+	Grantor        OptString                                `json:"grantor"`
+	// A device fingerprint ID that correlates events from the same device.
+	Fingerprint OptString `json:"fingerprint"`
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
+	RequestID OptNilString `json:"request_id"`
+	// The ID of the session the event belongs to.
+	SessionID OptNilString `json:"session_id"`
+	// An ID that correlates the events of one login flow.
+	FlowID   OptNilString              `json:"flow_id"`
+	Metadata OptEventMetadata          `json:"metadata"`
+	Payload  InvitationAcceptedPayload `json:"payload"`
+}
+
+// GetID returns the value of ID.
+func (s *InvitationAcceptedEvent) GetID() string {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *InvitationAcceptedEvent) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *InvitationAcceptedEvent) GetTeamID() OptNilString {
+	return s.TeamID
+}
+
+// GetEventType returns the value of EventType.
+func (s *InvitationAcceptedEvent) GetEventType() string {
+	return s.EventType
+}
+
+// GetCategory returns the value of Category.
+func (s *InvitationAcceptedEvent) GetCategory() InvitationAcceptedEventCategory {
+	return s.Category
+}
+
+// GetOccurredAt returns the value of OccurredAt.
+func (s *InvitationAcceptedEvent) GetOccurredAt() time.Time {
+	return s.OccurredAt
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *InvitationAcceptedEvent) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetActorID returns the value of ActorID.
+func (s *InvitationAcceptedEvent) GetActorID() OptNilString {
+	return s.ActorID
+}
+
+// GetActorType returns the value of ActorType.
+func (s *InvitationAcceptedEvent) GetActorType() OptNilInvitationAcceptedEventActorType {
+	return s.ActorType
+}
+
+// GetEntityType returns the value of EntityType.
+func (s *InvitationAcceptedEvent) GetEntityType() OptNilString {
+	return s.EntityType
+}
+
+// GetEntityID returns the value of EntityID.
+func (s *InvitationAcceptedEvent) GetEntityID() OptNilString {
+	return s.EntityID
+}
+
+// GetClientID returns the value of ClientID.
+func (s *InvitationAcceptedEvent) GetClientID() string {
+	return s.ClientID
+}
+
+// GetTokenID returns the value of TokenID.
+func (s *InvitationAcceptedEvent) GetTokenID() OptString {
+	return s.TokenID
+}
+
+// GetDelegationType returns the value of DelegationType.
+func (s *InvitationAcceptedEvent) GetDelegationType() OptInvitationAcceptedEventDelegationType {
+	return s.DelegationType
+}
+
+// GetDelegationID returns the value of DelegationID.
+func (s *InvitationAcceptedEvent) GetDelegationID() OptString {
+	return s.DelegationID
+}
+
+// GetGrantor returns the value of Grantor.
+func (s *InvitationAcceptedEvent) GetGrantor() OptString {
+	return s.Grantor
+}
+
+// GetFingerprint returns the value of Fingerprint.
+func (s *InvitationAcceptedEvent) GetFingerprint() OptString {
+	return s.Fingerprint
+}
+
+// GetRequestID returns the value of RequestID.
+func (s *InvitationAcceptedEvent) GetRequestID() OptNilString {
+	return s.RequestID
+}
+
+// GetSessionID returns the value of SessionID.
+func (s *InvitationAcceptedEvent) GetSessionID() OptNilString {
+	return s.SessionID
+}
+
+// GetFlowID returns the value of FlowID.
+func (s *InvitationAcceptedEvent) GetFlowID() OptNilString {
+	return s.FlowID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *InvitationAcceptedEvent) GetMetadata() OptEventMetadata {
+	return s.Metadata
+}
+
+// GetPayload returns the value of Payload.
+func (s *InvitationAcceptedEvent) GetPayload() InvitationAcceptedPayload {
+	return s.Payload
+}
+
+// SetID sets the value of ID.
+func (s *InvitationAcceptedEvent) SetID(val string) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *InvitationAcceptedEvent) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *InvitationAcceptedEvent) SetTeamID(val OptNilString) {
+	s.TeamID = val
+}
+
+// SetEventType sets the value of EventType.
+func (s *InvitationAcceptedEvent) SetEventType(val string) {
+	s.EventType = val
+}
+
+// SetCategory sets the value of Category.
+func (s *InvitationAcceptedEvent) SetCategory(val InvitationAcceptedEventCategory) {
+	s.Category = val
+}
+
+// SetOccurredAt sets the value of OccurredAt.
+func (s *InvitationAcceptedEvent) SetOccurredAt(val time.Time) {
+	s.OccurredAt = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *InvitationAcceptedEvent) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetActorID sets the value of ActorID.
+func (s *InvitationAcceptedEvent) SetActorID(val OptNilString) {
+	s.ActorID = val
+}
+
+// SetActorType sets the value of ActorType.
+func (s *InvitationAcceptedEvent) SetActorType(val OptNilInvitationAcceptedEventActorType) {
+	s.ActorType = val
+}
+
+// SetEntityType sets the value of EntityType.
+func (s *InvitationAcceptedEvent) SetEntityType(val OptNilString) {
+	s.EntityType = val
+}
+
+// SetEntityID sets the value of EntityID.
+func (s *InvitationAcceptedEvent) SetEntityID(val OptNilString) {
+	s.EntityID = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *InvitationAcceptedEvent) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetTokenID sets the value of TokenID.
+func (s *InvitationAcceptedEvent) SetTokenID(val OptString) {
+	s.TokenID = val
+}
+
+// SetDelegationType sets the value of DelegationType.
+func (s *InvitationAcceptedEvent) SetDelegationType(val OptInvitationAcceptedEventDelegationType) {
+	s.DelegationType = val
+}
+
+// SetDelegationID sets the value of DelegationID.
+func (s *InvitationAcceptedEvent) SetDelegationID(val OptString) {
+	s.DelegationID = val
+}
+
+// SetGrantor sets the value of Grantor.
+func (s *InvitationAcceptedEvent) SetGrantor(val OptString) {
+	s.Grantor = val
+}
+
+// SetFingerprint sets the value of Fingerprint.
+func (s *InvitationAcceptedEvent) SetFingerprint(val OptString) {
+	s.Fingerprint = val
+}
+
+// SetRequestID sets the value of RequestID.
+func (s *InvitationAcceptedEvent) SetRequestID(val OptNilString) {
+	s.RequestID = val
+}
+
+// SetSessionID sets the value of SessionID.
+func (s *InvitationAcceptedEvent) SetSessionID(val OptNilString) {
+	s.SessionID = val
+}
+
+// SetFlowID sets the value of FlowID.
+func (s *InvitationAcceptedEvent) SetFlowID(val OptNilString) {
+	s.FlowID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *InvitationAcceptedEvent) SetMetadata(val OptEventMetadata) {
+	s.Metadata = val
+}
+
+// SetPayload sets the value of Payload.
+func (s *InvitationAcceptedEvent) SetPayload(val InvitationAcceptedPayload) {
+	s.Payload = val
+}
+
+type InvitationAcceptedEventActorType string
+
+const (
+	InvitationAcceptedEventActorTypeHuman   InvitationAcceptedEventActorType = "human"
+	InvitationAcceptedEventActorTypeService InvitationAcceptedEventActorType = "service"
+	InvitationAcceptedEventActorTypeSystem  InvitationAcceptedEventActorType = "system"
+	InvitationAcceptedEventActorTypeAgent   InvitationAcceptedEventActorType = "agent"
+)
+
+// AllValues returns all InvitationAcceptedEventActorType values.
+func (InvitationAcceptedEventActorType) AllValues() []InvitationAcceptedEventActorType {
+	return []InvitationAcceptedEventActorType{
+		InvitationAcceptedEventActorTypeHuman,
+		InvitationAcceptedEventActorTypeService,
+		InvitationAcceptedEventActorTypeSystem,
+		InvitationAcceptedEventActorTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s InvitationAcceptedEventActorType) MarshalText() ([]byte, error) {
+	switch s {
+	case InvitationAcceptedEventActorTypeHuman:
+		return []byte(s), nil
+	case InvitationAcceptedEventActorTypeService:
+		return []byte(s), nil
+	case InvitationAcceptedEventActorTypeSystem:
+		return []byte(s), nil
+	case InvitationAcceptedEventActorTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *InvitationAcceptedEventActorType) UnmarshalText(data []byte) error {
+	switch InvitationAcceptedEventActorType(data) {
+	case InvitationAcceptedEventActorTypeHuman:
+		*s = InvitationAcceptedEventActorTypeHuman
+		return nil
+	case InvitationAcceptedEventActorTypeService:
+		*s = InvitationAcceptedEventActorTypeService
+		return nil
+	case InvitationAcceptedEventActorTypeSystem:
+		*s = InvitationAcceptedEventActorTypeSystem
+		return nil
+	case InvitationAcceptedEventActorTypeAgent:
+		*s = InvitationAcceptedEventActorTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The category of the event.
+type InvitationAcceptedEventCategory string
+
+const (
+	InvitationAcceptedEventCategoryRequest InvitationAcceptedEventCategory = "request"
+	InvitationAcceptedEventCategoryAuth    InvitationAcceptedEventCategory = "auth"
+	InvitationAcceptedEventCategorySession InvitationAcceptedEventCategory = "session"
+	InvitationAcceptedEventCategoryAdmin   InvitationAcceptedEventCategory = "admin"
+	InvitationAcceptedEventCategoryEntity  InvitationAcceptedEventCategory = "entity"
+	InvitationAcceptedEventCategorySignal  InvitationAcceptedEventCategory = "signal"
+)
+
+// AllValues returns all InvitationAcceptedEventCategory values.
+func (InvitationAcceptedEventCategory) AllValues() []InvitationAcceptedEventCategory {
+	return []InvitationAcceptedEventCategory{
+		InvitationAcceptedEventCategoryRequest,
+		InvitationAcceptedEventCategoryAuth,
+		InvitationAcceptedEventCategorySession,
+		InvitationAcceptedEventCategoryAdmin,
+		InvitationAcceptedEventCategoryEntity,
+		InvitationAcceptedEventCategorySignal,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s InvitationAcceptedEventCategory) MarshalText() ([]byte, error) {
+	switch s {
+	case InvitationAcceptedEventCategoryRequest:
+		return []byte(s), nil
+	case InvitationAcceptedEventCategoryAuth:
+		return []byte(s), nil
+	case InvitationAcceptedEventCategorySession:
+		return []byte(s), nil
+	case InvitationAcceptedEventCategoryAdmin:
+		return []byte(s), nil
+	case InvitationAcceptedEventCategoryEntity:
+		return []byte(s), nil
+	case InvitationAcceptedEventCategorySignal:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *InvitationAcceptedEventCategory) UnmarshalText(data []byte) error {
+	switch InvitationAcceptedEventCategory(data) {
+	case InvitationAcceptedEventCategoryRequest:
+		*s = InvitationAcceptedEventCategoryRequest
+		return nil
+	case InvitationAcceptedEventCategoryAuth:
+		*s = InvitationAcceptedEventCategoryAuth
+		return nil
+	case InvitationAcceptedEventCategorySession:
+		*s = InvitationAcceptedEventCategorySession
+		return nil
+	case InvitationAcceptedEventCategoryAdmin:
+		*s = InvitationAcceptedEventCategoryAdmin
+		return nil
+	case InvitationAcceptedEventCategoryEntity:
+		*s = InvitationAcceptedEventCategoryEntity
+		return nil
+	case InvitationAcceptedEventCategorySignal:
+		*s = InvitationAcceptedEventCategorySignal
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The kind of delegation. Absent when unset.
+type InvitationAcceptedEventDelegationType string
+
+const (
+	InvitationAcceptedEventDelegationTypeDirect    InvitationAcceptedEventDelegationType = "direct"
+	InvitationAcceptedEventDelegationTypeDelegated InvitationAcceptedEventDelegationType = "delegated"
+	InvitationAcceptedEventDelegationTypePatShared InvitationAcceptedEventDelegationType = "pat_shared"
+	InvitationAcceptedEventDelegationTypeExchanged InvitationAcceptedEventDelegationType = "exchanged"
+)
+
+// AllValues returns all InvitationAcceptedEventDelegationType values.
+func (InvitationAcceptedEventDelegationType) AllValues() []InvitationAcceptedEventDelegationType {
+	return []InvitationAcceptedEventDelegationType{
+		InvitationAcceptedEventDelegationTypeDirect,
+		InvitationAcceptedEventDelegationTypeDelegated,
+		InvitationAcceptedEventDelegationTypePatShared,
+		InvitationAcceptedEventDelegationTypeExchanged,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s InvitationAcceptedEventDelegationType) MarshalText() ([]byte, error) {
+	switch s {
+	case InvitationAcceptedEventDelegationTypeDirect:
+		return []byte(s), nil
+	case InvitationAcceptedEventDelegationTypeDelegated:
+		return []byte(s), nil
+	case InvitationAcceptedEventDelegationTypePatShared:
+		return []byte(s), nil
+	case InvitationAcceptedEventDelegationTypeExchanged:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *InvitationAcceptedEventDelegationType) UnmarshalText(data []byte) error {
+	switch InvitationAcceptedEventDelegationType(data) {
+	case InvitationAcceptedEventDelegationTypeDirect:
+		*s = InvitationAcceptedEventDelegationTypeDirect
+		return nil
+	case InvitationAcceptedEventDelegationTypeDelegated:
+		*s = InvitationAcceptedEventDelegationTypeDelegated
+		return nil
+	case InvitationAcceptedEventDelegationTypePatShared:
+		*s = InvitationAcceptedEventDelegationTypePatShared
+		return nil
+	case InvitationAcceptedEventDelegationTypeExchanged:
+		*s = InvitationAcceptedEventDelegationTypeExchanged
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Payload for `invitation.accepted`. The invitation ID is the event's
+// `entity_id`, and `user_id` is the user who redeemed the link. Discriminate
+// on `type`; the object named after it says what the invitation granted. Grant
+// events the acceptance writes, such as `authz.granted`, carry this event's
+// `request_id`. There are none when the user already holds an identical
+// active grant.
+// Ref: #
+// InvitationAcceptedPayload represents sum type.
+type InvitationAcceptedPayload struct {
+	Type                                   InvitationAcceptedPayloadType // switch on this field
+	InvitationAcceptedProjectMemberPayload InvitationAcceptedProjectMemberPayload
+	InvitationAcceptedTeamMemberPayload    InvitationAcceptedTeamMemberPayload
+}
+
+// InvitationAcceptedPayloadType is oneOf type of InvitationAcceptedPayload.
+type InvitationAcceptedPayloadType string
+
+// Possible values for InvitationAcceptedPayloadType.
+const (
+	InvitationAcceptedProjectMemberPayloadInvitationAcceptedPayload InvitationAcceptedPayloadType = "project_member"
+	InvitationAcceptedTeamMemberPayloadInvitationAcceptedPayload    InvitationAcceptedPayloadType = "team_member"
+)
+
+// IsInvitationAcceptedProjectMemberPayload reports whether InvitationAcceptedPayload is InvitationAcceptedProjectMemberPayload.
+func (s InvitationAcceptedPayload) IsInvitationAcceptedProjectMemberPayload() bool {
+	return s.Type == InvitationAcceptedProjectMemberPayloadInvitationAcceptedPayload
+}
+
+// IsInvitationAcceptedTeamMemberPayload reports whether InvitationAcceptedPayload is InvitationAcceptedTeamMemberPayload.
+func (s InvitationAcceptedPayload) IsInvitationAcceptedTeamMemberPayload() bool {
+	return s.Type == InvitationAcceptedTeamMemberPayloadInvitationAcceptedPayload
+}
+
+// SetInvitationAcceptedProjectMemberPayload sets InvitationAcceptedPayload to InvitationAcceptedProjectMemberPayload.
+func (s *InvitationAcceptedPayload) SetInvitationAcceptedProjectMemberPayload(v InvitationAcceptedProjectMemberPayload) {
+	s.Type = InvitationAcceptedProjectMemberPayloadInvitationAcceptedPayload
+	s.InvitationAcceptedProjectMemberPayload = v
+}
+
+// GetInvitationAcceptedProjectMemberPayload returns InvitationAcceptedProjectMemberPayload and true boolean if InvitationAcceptedPayload is InvitationAcceptedProjectMemberPayload.
+func (s InvitationAcceptedPayload) GetInvitationAcceptedProjectMemberPayload() (v InvitationAcceptedProjectMemberPayload, ok bool) {
+	if !s.IsInvitationAcceptedProjectMemberPayload() {
+		return v, false
+	}
+	return s.InvitationAcceptedProjectMemberPayload, true
+}
+
+// NewInvitationAcceptedProjectMemberPayloadInvitationAcceptedPayload returns new InvitationAcceptedPayload from InvitationAcceptedProjectMemberPayload.
+func NewInvitationAcceptedProjectMemberPayloadInvitationAcceptedPayload(v InvitationAcceptedProjectMemberPayload) InvitationAcceptedPayload {
+	var s InvitationAcceptedPayload
+	s.SetInvitationAcceptedProjectMemberPayload(v)
+	return s
+}
+
+// SetInvitationAcceptedTeamMemberPayload sets InvitationAcceptedPayload to InvitationAcceptedTeamMemberPayload.
+func (s *InvitationAcceptedPayload) SetInvitationAcceptedTeamMemberPayload(v InvitationAcceptedTeamMemberPayload) {
+	s.Type = InvitationAcceptedTeamMemberPayloadInvitationAcceptedPayload
+	s.InvitationAcceptedTeamMemberPayload = v
+}
+
+// GetInvitationAcceptedTeamMemberPayload returns InvitationAcceptedTeamMemberPayload and true boolean if InvitationAcceptedPayload is InvitationAcceptedTeamMemberPayload.
+func (s InvitationAcceptedPayload) GetInvitationAcceptedTeamMemberPayload() (v InvitationAcceptedTeamMemberPayload, ok bool) {
+	if !s.IsInvitationAcceptedTeamMemberPayload() {
+		return v, false
+	}
+	return s.InvitationAcceptedTeamMemberPayload, true
+}
+
+// NewInvitationAcceptedTeamMemberPayloadInvitationAcceptedPayload returns new InvitationAcceptedPayload from InvitationAcceptedTeamMemberPayload.
+func NewInvitationAcceptedTeamMemberPayloadInvitationAcceptedPayload(v InvitationAcceptedTeamMemberPayload) InvitationAcceptedPayload {
+	var s InvitationAcceptedPayload
+	s.SetInvitationAcceptedTeamMemberPayload(v)
+	return s
+}
+
+// Merged schema.
+// Ref: #
+type InvitationAcceptedProjectMemberPayload struct {
+	// Shared by an invitation and every invitation that replaces it.
+	JourneyID     string                                     `json:"journey_id"`
+	UserID        string                                     `json:"user_id"`
+	Type          InvitationAcceptedProjectMemberPayloadType `json:"type"`
+	ProjectMember InvitationProjectMemberPayload             `json:"project_member"`
+}
+
+// GetJourneyID returns the value of JourneyID.
+func (s *InvitationAcceptedProjectMemberPayload) GetJourneyID() string {
+	return s.JourneyID
+}
+
+// GetUserID returns the value of UserID.
+func (s *InvitationAcceptedProjectMemberPayload) GetUserID() string {
+	return s.UserID
+}
+
+// GetType returns the value of Type.
+func (s *InvitationAcceptedProjectMemberPayload) GetType() InvitationAcceptedProjectMemberPayloadType {
+	return s.Type
+}
+
+// GetProjectMember returns the value of ProjectMember.
+func (s *InvitationAcceptedProjectMemberPayload) GetProjectMember() InvitationProjectMemberPayload {
+	return s.ProjectMember
+}
+
+// SetJourneyID sets the value of JourneyID.
+func (s *InvitationAcceptedProjectMemberPayload) SetJourneyID(val string) {
+	s.JourneyID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *InvitationAcceptedProjectMemberPayload) SetUserID(val string) {
+	s.UserID = val
+}
+
+// SetType sets the value of Type.
+func (s *InvitationAcceptedProjectMemberPayload) SetType(val InvitationAcceptedProjectMemberPayloadType) {
+	s.Type = val
+}
+
+// SetProjectMember sets the value of ProjectMember.
+func (s *InvitationAcceptedProjectMemberPayload) SetProjectMember(val InvitationProjectMemberPayload) {
+	s.ProjectMember = val
+}
+
+type InvitationAcceptedProjectMemberPayloadType string
+
+const (
+	InvitationAcceptedProjectMemberPayloadTypeProjectMember InvitationAcceptedProjectMemberPayloadType = "project_member"
+)
+
+// AllValues returns all InvitationAcceptedProjectMemberPayloadType values.
+func (InvitationAcceptedProjectMemberPayloadType) AllValues() []InvitationAcceptedProjectMemberPayloadType {
+	return []InvitationAcceptedProjectMemberPayloadType{
+		InvitationAcceptedProjectMemberPayloadTypeProjectMember,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s InvitationAcceptedProjectMemberPayloadType) MarshalText() ([]byte, error) {
+	switch s {
+	case InvitationAcceptedProjectMemberPayloadTypeProjectMember:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *InvitationAcceptedProjectMemberPayloadType) UnmarshalText(data []byte) error {
+	switch InvitationAcceptedProjectMemberPayloadType(data) {
+	case InvitationAcceptedProjectMemberPayloadTypeProjectMember:
+		*s = InvitationAcceptedProjectMemberPayloadTypeProjectMember
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Merged schema.
+// Ref: #
+type InvitationAcceptedTeamMemberPayload struct {
+	// Shared by an invitation and every invitation that replaces it.
+	JourneyID  string                                  `json:"journey_id"`
+	UserID     string                                  `json:"user_id"`
+	Type       InvitationAcceptedTeamMemberPayloadType `json:"type"`
+	TeamMember InvitationTeamMemberPayload             `json:"team_member"`
+}
+
+// GetJourneyID returns the value of JourneyID.
+func (s *InvitationAcceptedTeamMemberPayload) GetJourneyID() string {
+	return s.JourneyID
+}
+
+// GetUserID returns the value of UserID.
+func (s *InvitationAcceptedTeamMemberPayload) GetUserID() string {
+	return s.UserID
+}
+
+// GetType returns the value of Type.
+func (s *InvitationAcceptedTeamMemberPayload) GetType() InvitationAcceptedTeamMemberPayloadType {
+	return s.Type
+}
+
+// GetTeamMember returns the value of TeamMember.
+func (s *InvitationAcceptedTeamMemberPayload) GetTeamMember() InvitationTeamMemberPayload {
+	return s.TeamMember
+}
+
+// SetJourneyID sets the value of JourneyID.
+func (s *InvitationAcceptedTeamMemberPayload) SetJourneyID(val string) {
+	s.JourneyID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *InvitationAcceptedTeamMemberPayload) SetUserID(val string) {
+	s.UserID = val
+}
+
+// SetType sets the value of Type.
+func (s *InvitationAcceptedTeamMemberPayload) SetType(val InvitationAcceptedTeamMemberPayloadType) {
+	s.Type = val
+}
+
+// SetTeamMember sets the value of TeamMember.
+func (s *InvitationAcceptedTeamMemberPayload) SetTeamMember(val InvitationTeamMemberPayload) {
+	s.TeamMember = val
+}
+
+type InvitationAcceptedTeamMemberPayloadType string
+
+const (
+	InvitationAcceptedTeamMemberPayloadTypeTeamMember InvitationAcceptedTeamMemberPayloadType = "team_member"
+)
+
+// AllValues returns all InvitationAcceptedTeamMemberPayloadType values.
+func (InvitationAcceptedTeamMemberPayloadType) AllValues() []InvitationAcceptedTeamMemberPayloadType {
+	return []InvitationAcceptedTeamMemberPayloadType{
+		InvitationAcceptedTeamMemberPayloadTypeTeamMember,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s InvitationAcceptedTeamMemberPayloadType) MarshalText() ([]byte, error) {
+	switch s {
+	case InvitationAcceptedTeamMemberPayloadTypeTeamMember:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *InvitationAcceptedTeamMemberPayloadType) UnmarshalText(data []byte) error {
+	switch InvitationAcceptedTeamMemberPayloadType(data) {
+	case InvitationAcceptedTeamMemberPayloadTypeTeamMember:
+		*s = InvitationAcceptedTeamMemberPayloadTypeTeamMember
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// An `invitation.cancelled` payload for an invitation an administrator
+// cancelled.
+// Ref: #
+type InvitationCancelledByAdministratorPayload struct {
+	// Shared by an invitation and every invitation that replaces it.
+	JourneyID string                                          `json:"journey_id"`
+	Reason    InvitationCancelledByAdministratorPayloadReason `json:"reason"`
+}
+
+// GetJourneyID returns the value of JourneyID.
+func (s *InvitationCancelledByAdministratorPayload) GetJourneyID() string {
+	return s.JourneyID
+}
+
+// GetReason returns the value of Reason.
+func (s *InvitationCancelledByAdministratorPayload) GetReason() InvitationCancelledByAdministratorPayloadReason {
+	return s.Reason
+}
+
+// SetJourneyID sets the value of JourneyID.
+func (s *InvitationCancelledByAdministratorPayload) SetJourneyID(val string) {
+	s.JourneyID = val
+}
+
+// SetReason sets the value of Reason.
+func (s *InvitationCancelledByAdministratorPayload) SetReason(val InvitationCancelledByAdministratorPayloadReason) {
+	s.Reason = val
+}
+
+type InvitationCancelledByAdministratorPayloadReason string
+
+const (
+	InvitationCancelledByAdministratorPayloadReasonCancelled InvitationCancelledByAdministratorPayloadReason = "cancelled"
+)
+
+// AllValues returns all InvitationCancelledByAdministratorPayloadReason values.
+func (InvitationCancelledByAdministratorPayloadReason) AllValues() []InvitationCancelledByAdministratorPayloadReason {
+	return []InvitationCancelledByAdministratorPayloadReason{
+		InvitationCancelledByAdministratorPayloadReasonCancelled,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s InvitationCancelledByAdministratorPayloadReason) MarshalText() ([]byte, error) {
+	switch s {
+	case InvitationCancelledByAdministratorPayloadReasonCancelled:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *InvitationCancelledByAdministratorPayloadReason) UnmarshalText(data []byte) error {
+	switch InvitationCancelledByAdministratorPayloadReason(data) {
+	case InvitationCancelledByAdministratorPayloadReasonCancelled:
+		*s = InvitationCancelledByAdministratorPayloadReasonCancelled
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// An `invitation.cancelled` payload for an invitation a replacement
+// cancelled.
+// Ref: #
+type InvitationCancelledByReplacementPayload struct {
+	// Shared by an invitation and every invitation that replaces it.
+	JourneyID string                                        `json:"journey_id"`
+	Reason    InvitationCancelledByReplacementPayloadReason `json:"reason"`
+	// The invitation that replaced this one.
+	ReplacedByInvitationID string `json:"replaced_by_invitation_id"`
+}
+
+// GetJourneyID returns the value of JourneyID.
+func (s *InvitationCancelledByReplacementPayload) GetJourneyID() string {
+	return s.JourneyID
+}
+
+// GetReason returns the value of Reason.
+func (s *InvitationCancelledByReplacementPayload) GetReason() InvitationCancelledByReplacementPayloadReason {
+	return s.Reason
+}
+
+// GetReplacedByInvitationID returns the value of ReplacedByInvitationID.
+func (s *InvitationCancelledByReplacementPayload) GetReplacedByInvitationID() string {
+	return s.ReplacedByInvitationID
+}
+
+// SetJourneyID sets the value of JourneyID.
+func (s *InvitationCancelledByReplacementPayload) SetJourneyID(val string) {
+	s.JourneyID = val
+}
+
+// SetReason sets the value of Reason.
+func (s *InvitationCancelledByReplacementPayload) SetReason(val InvitationCancelledByReplacementPayloadReason) {
+	s.Reason = val
+}
+
+// SetReplacedByInvitationID sets the value of ReplacedByInvitationID.
+func (s *InvitationCancelledByReplacementPayload) SetReplacedByInvitationID(val string) {
+	s.ReplacedByInvitationID = val
+}
+
+type InvitationCancelledByReplacementPayloadReason string
+
+const (
+	InvitationCancelledByReplacementPayloadReasonReplaced InvitationCancelledByReplacementPayloadReason = "replaced"
+)
+
+// AllValues returns all InvitationCancelledByReplacementPayloadReason values.
+func (InvitationCancelledByReplacementPayloadReason) AllValues() []InvitationCancelledByReplacementPayloadReason {
+	return []InvitationCancelledByReplacementPayloadReason{
+		InvitationCancelledByReplacementPayloadReasonReplaced,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s InvitationCancelledByReplacementPayloadReason) MarshalText() ([]byte, error) {
+	switch s {
+	case InvitationCancelledByReplacementPayloadReasonReplaced:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *InvitationCancelledByReplacementPayloadReason) UnmarshalText(data []byte) error {
+	switch InvitationCancelledByReplacementPayloadReason(data) {
+	case InvitationCancelledByReplacementPayloadReasonReplaced:
+		*s = InvitationCancelledByReplacementPayloadReasonReplaced
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Merged schema.
+// Ref: #
+type InvitationCancelledEvent struct {
+	// The event ID, in the form `evt_<opaque>`.
+	ID        string    `json:"id"`
+	ProjectID ProjectID `json:"project_id"`
+	// The team the actor operated under when the event was emitted, if any.
+	TeamID OptNilString `json:"team_id"`
+	// Merged property.
+	EventType string `json:"event_type"`
+	// The category of the event.
+	Category InvitationCancelledEventCategory `json:"category"`
+	// When the action happened, on the server's clock.
+	OccurredAt time.Time `json:"occurred_at"`
+	// When the event was stored, on the server's clock.
+	CreatedAt time.Time `json:"created_at"`
+	// The ID of the actor that triggered the event.
+	ActorID OptNilString `json:"actor_id"`
+	// The kind of actor that triggered the event.
+	ActorType OptNilInvitationCancelledEventActorType `json:"actor_type"`
+	// The type of resource the event affected.
+	EntityType OptNilString `json:"entity_type"`
+	// The ID of the resource the event affected.
+	EntityID OptNilString `json:"entity_id"`
+	// The application or agent that produced the event.
+	ClientID string `json:"client_id"`
+	// The ID of the token in use when the event was emitted, when there was one.
+	TokenID OptString `json:"token_id"`
+	// The kind of delegation. Absent when unset.
+	DelegationType OptInvitationCancelledEventDelegationType `json:"delegation_type"`
+	DelegationID   OptString                                 `json:"delegation_id"`
+	Grantor        OptString                                 `json:"grantor"`
+	// A device fingerprint ID that correlates events from the same device.
+	Fingerprint OptString `json:"fingerprint"`
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
+	RequestID OptNilString `json:"request_id"`
+	// The ID of the session the event belongs to.
+	SessionID OptNilString `json:"session_id"`
+	// An ID that correlates the events of one login flow.
+	FlowID   OptNilString               `json:"flow_id"`
+	Metadata OptEventMetadata           `json:"metadata"`
+	Payload  InvitationCancelledPayload `json:"payload"`
+}
+
+// GetID returns the value of ID.
+func (s *InvitationCancelledEvent) GetID() string {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *InvitationCancelledEvent) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *InvitationCancelledEvent) GetTeamID() OptNilString {
+	return s.TeamID
+}
+
+// GetEventType returns the value of EventType.
+func (s *InvitationCancelledEvent) GetEventType() string {
+	return s.EventType
+}
+
+// GetCategory returns the value of Category.
+func (s *InvitationCancelledEvent) GetCategory() InvitationCancelledEventCategory {
+	return s.Category
+}
+
+// GetOccurredAt returns the value of OccurredAt.
+func (s *InvitationCancelledEvent) GetOccurredAt() time.Time {
+	return s.OccurredAt
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *InvitationCancelledEvent) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetActorID returns the value of ActorID.
+func (s *InvitationCancelledEvent) GetActorID() OptNilString {
+	return s.ActorID
+}
+
+// GetActorType returns the value of ActorType.
+func (s *InvitationCancelledEvent) GetActorType() OptNilInvitationCancelledEventActorType {
+	return s.ActorType
+}
+
+// GetEntityType returns the value of EntityType.
+func (s *InvitationCancelledEvent) GetEntityType() OptNilString {
+	return s.EntityType
+}
+
+// GetEntityID returns the value of EntityID.
+func (s *InvitationCancelledEvent) GetEntityID() OptNilString {
+	return s.EntityID
+}
+
+// GetClientID returns the value of ClientID.
+func (s *InvitationCancelledEvent) GetClientID() string {
+	return s.ClientID
+}
+
+// GetTokenID returns the value of TokenID.
+func (s *InvitationCancelledEvent) GetTokenID() OptString {
+	return s.TokenID
+}
+
+// GetDelegationType returns the value of DelegationType.
+func (s *InvitationCancelledEvent) GetDelegationType() OptInvitationCancelledEventDelegationType {
+	return s.DelegationType
+}
+
+// GetDelegationID returns the value of DelegationID.
+func (s *InvitationCancelledEvent) GetDelegationID() OptString {
+	return s.DelegationID
+}
+
+// GetGrantor returns the value of Grantor.
+func (s *InvitationCancelledEvent) GetGrantor() OptString {
+	return s.Grantor
+}
+
+// GetFingerprint returns the value of Fingerprint.
+func (s *InvitationCancelledEvent) GetFingerprint() OptString {
+	return s.Fingerprint
+}
+
+// GetRequestID returns the value of RequestID.
+func (s *InvitationCancelledEvent) GetRequestID() OptNilString {
+	return s.RequestID
+}
+
+// GetSessionID returns the value of SessionID.
+func (s *InvitationCancelledEvent) GetSessionID() OptNilString {
+	return s.SessionID
+}
+
+// GetFlowID returns the value of FlowID.
+func (s *InvitationCancelledEvent) GetFlowID() OptNilString {
+	return s.FlowID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *InvitationCancelledEvent) GetMetadata() OptEventMetadata {
+	return s.Metadata
+}
+
+// GetPayload returns the value of Payload.
+func (s *InvitationCancelledEvent) GetPayload() InvitationCancelledPayload {
+	return s.Payload
+}
+
+// SetID sets the value of ID.
+func (s *InvitationCancelledEvent) SetID(val string) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *InvitationCancelledEvent) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *InvitationCancelledEvent) SetTeamID(val OptNilString) {
+	s.TeamID = val
+}
+
+// SetEventType sets the value of EventType.
+func (s *InvitationCancelledEvent) SetEventType(val string) {
+	s.EventType = val
+}
+
+// SetCategory sets the value of Category.
+func (s *InvitationCancelledEvent) SetCategory(val InvitationCancelledEventCategory) {
+	s.Category = val
+}
+
+// SetOccurredAt sets the value of OccurredAt.
+func (s *InvitationCancelledEvent) SetOccurredAt(val time.Time) {
+	s.OccurredAt = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *InvitationCancelledEvent) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetActorID sets the value of ActorID.
+func (s *InvitationCancelledEvent) SetActorID(val OptNilString) {
+	s.ActorID = val
+}
+
+// SetActorType sets the value of ActorType.
+func (s *InvitationCancelledEvent) SetActorType(val OptNilInvitationCancelledEventActorType) {
+	s.ActorType = val
+}
+
+// SetEntityType sets the value of EntityType.
+func (s *InvitationCancelledEvent) SetEntityType(val OptNilString) {
+	s.EntityType = val
+}
+
+// SetEntityID sets the value of EntityID.
+func (s *InvitationCancelledEvent) SetEntityID(val OptNilString) {
+	s.EntityID = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *InvitationCancelledEvent) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetTokenID sets the value of TokenID.
+func (s *InvitationCancelledEvent) SetTokenID(val OptString) {
+	s.TokenID = val
+}
+
+// SetDelegationType sets the value of DelegationType.
+func (s *InvitationCancelledEvent) SetDelegationType(val OptInvitationCancelledEventDelegationType) {
+	s.DelegationType = val
+}
+
+// SetDelegationID sets the value of DelegationID.
+func (s *InvitationCancelledEvent) SetDelegationID(val OptString) {
+	s.DelegationID = val
+}
+
+// SetGrantor sets the value of Grantor.
+func (s *InvitationCancelledEvent) SetGrantor(val OptString) {
+	s.Grantor = val
+}
+
+// SetFingerprint sets the value of Fingerprint.
+func (s *InvitationCancelledEvent) SetFingerprint(val OptString) {
+	s.Fingerprint = val
+}
+
+// SetRequestID sets the value of RequestID.
+func (s *InvitationCancelledEvent) SetRequestID(val OptNilString) {
+	s.RequestID = val
+}
+
+// SetSessionID sets the value of SessionID.
+func (s *InvitationCancelledEvent) SetSessionID(val OptNilString) {
+	s.SessionID = val
+}
+
+// SetFlowID sets the value of FlowID.
+func (s *InvitationCancelledEvent) SetFlowID(val OptNilString) {
+	s.FlowID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *InvitationCancelledEvent) SetMetadata(val OptEventMetadata) {
+	s.Metadata = val
+}
+
+// SetPayload sets the value of Payload.
+func (s *InvitationCancelledEvent) SetPayload(val InvitationCancelledPayload) {
+	s.Payload = val
+}
+
+type InvitationCancelledEventActorType string
+
+const (
+	InvitationCancelledEventActorTypeHuman   InvitationCancelledEventActorType = "human"
+	InvitationCancelledEventActorTypeService InvitationCancelledEventActorType = "service"
+	InvitationCancelledEventActorTypeSystem  InvitationCancelledEventActorType = "system"
+	InvitationCancelledEventActorTypeAgent   InvitationCancelledEventActorType = "agent"
+)
+
+// AllValues returns all InvitationCancelledEventActorType values.
+func (InvitationCancelledEventActorType) AllValues() []InvitationCancelledEventActorType {
+	return []InvitationCancelledEventActorType{
+		InvitationCancelledEventActorTypeHuman,
+		InvitationCancelledEventActorTypeService,
+		InvitationCancelledEventActorTypeSystem,
+		InvitationCancelledEventActorTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s InvitationCancelledEventActorType) MarshalText() ([]byte, error) {
+	switch s {
+	case InvitationCancelledEventActorTypeHuman:
+		return []byte(s), nil
+	case InvitationCancelledEventActorTypeService:
+		return []byte(s), nil
+	case InvitationCancelledEventActorTypeSystem:
+		return []byte(s), nil
+	case InvitationCancelledEventActorTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *InvitationCancelledEventActorType) UnmarshalText(data []byte) error {
+	switch InvitationCancelledEventActorType(data) {
+	case InvitationCancelledEventActorTypeHuman:
+		*s = InvitationCancelledEventActorTypeHuman
+		return nil
+	case InvitationCancelledEventActorTypeService:
+		*s = InvitationCancelledEventActorTypeService
+		return nil
+	case InvitationCancelledEventActorTypeSystem:
+		*s = InvitationCancelledEventActorTypeSystem
+		return nil
+	case InvitationCancelledEventActorTypeAgent:
+		*s = InvitationCancelledEventActorTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The category of the event.
+type InvitationCancelledEventCategory string
+
+const (
+	InvitationCancelledEventCategoryRequest InvitationCancelledEventCategory = "request"
+	InvitationCancelledEventCategoryAuth    InvitationCancelledEventCategory = "auth"
+	InvitationCancelledEventCategorySession InvitationCancelledEventCategory = "session"
+	InvitationCancelledEventCategoryAdmin   InvitationCancelledEventCategory = "admin"
+	InvitationCancelledEventCategoryEntity  InvitationCancelledEventCategory = "entity"
+	InvitationCancelledEventCategorySignal  InvitationCancelledEventCategory = "signal"
+)
+
+// AllValues returns all InvitationCancelledEventCategory values.
+func (InvitationCancelledEventCategory) AllValues() []InvitationCancelledEventCategory {
+	return []InvitationCancelledEventCategory{
+		InvitationCancelledEventCategoryRequest,
+		InvitationCancelledEventCategoryAuth,
+		InvitationCancelledEventCategorySession,
+		InvitationCancelledEventCategoryAdmin,
+		InvitationCancelledEventCategoryEntity,
+		InvitationCancelledEventCategorySignal,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s InvitationCancelledEventCategory) MarshalText() ([]byte, error) {
+	switch s {
+	case InvitationCancelledEventCategoryRequest:
+		return []byte(s), nil
+	case InvitationCancelledEventCategoryAuth:
+		return []byte(s), nil
+	case InvitationCancelledEventCategorySession:
+		return []byte(s), nil
+	case InvitationCancelledEventCategoryAdmin:
+		return []byte(s), nil
+	case InvitationCancelledEventCategoryEntity:
+		return []byte(s), nil
+	case InvitationCancelledEventCategorySignal:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *InvitationCancelledEventCategory) UnmarshalText(data []byte) error {
+	switch InvitationCancelledEventCategory(data) {
+	case InvitationCancelledEventCategoryRequest:
+		*s = InvitationCancelledEventCategoryRequest
+		return nil
+	case InvitationCancelledEventCategoryAuth:
+		*s = InvitationCancelledEventCategoryAuth
+		return nil
+	case InvitationCancelledEventCategorySession:
+		*s = InvitationCancelledEventCategorySession
+		return nil
+	case InvitationCancelledEventCategoryAdmin:
+		*s = InvitationCancelledEventCategoryAdmin
+		return nil
+	case InvitationCancelledEventCategoryEntity:
+		*s = InvitationCancelledEventCategoryEntity
+		return nil
+	case InvitationCancelledEventCategorySignal:
+		*s = InvitationCancelledEventCategorySignal
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The kind of delegation. Absent when unset.
+type InvitationCancelledEventDelegationType string
+
+const (
+	InvitationCancelledEventDelegationTypeDirect    InvitationCancelledEventDelegationType = "direct"
+	InvitationCancelledEventDelegationTypeDelegated InvitationCancelledEventDelegationType = "delegated"
+	InvitationCancelledEventDelegationTypePatShared InvitationCancelledEventDelegationType = "pat_shared"
+	InvitationCancelledEventDelegationTypeExchanged InvitationCancelledEventDelegationType = "exchanged"
+)
+
+// AllValues returns all InvitationCancelledEventDelegationType values.
+func (InvitationCancelledEventDelegationType) AllValues() []InvitationCancelledEventDelegationType {
+	return []InvitationCancelledEventDelegationType{
+		InvitationCancelledEventDelegationTypeDirect,
+		InvitationCancelledEventDelegationTypeDelegated,
+		InvitationCancelledEventDelegationTypePatShared,
+		InvitationCancelledEventDelegationTypeExchanged,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s InvitationCancelledEventDelegationType) MarshalText() ([]byte, error) {
+	switch s {
+	case InvitationCancelledEventDelegationTypeDirect:
+		return []byte(s), nil
+	case InvitationCancelledEventDelegationTypeDelegated:
+		return []byte(s), nil
+	case InvitationCancelledEventDelegationTypePatShared:
+		return []byte(s), nil
+	case InvitationCancelledEventDelegationTypeExchanged:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *InvitationCancelledEventDelegationType) UnmarshalText(data []byte) error {
+	switch InvitationCancelledEventDelegationType(data) {
+	case InvitationCancelledEventDelegationTypeDirect:
+		*s = InvitationCancelledEventDelegationTypeDirect
+		return nil
+	case InvitationCancelledEventDelegationTypeDelegated:
+		*s = InvitationCancelledEventDelegationTypeDelegated
+		return nil
+	case InvitationCancelledEventDelegationTypePatShared:
+		*s = InvitationCancelledEventDelegationTypePatShared
+		return nil
+	case InvitationCancelledEventDelegationTypeExchanged:
+		*s = InvitationCancelledEventDelegationTypeExchanged
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Payload for `invitation.cancelled`. The invitation ID is the event's
+// `entity_id`. Discriminate on `reason`: `cancelled` when an administrator
+// cancelled it, `replaced` when a replacement cancelled it, which then names
+// the replacement in `replaced_by_invitation_id`.
+// Ref: #
+// InvitationCancelledPayload represents sum type.
+type InvitationCancelledPayload struct {
+	Type                                      InvitationCancelledPayloadType // switch on this field
+	InvitationCancelledByAdministratorPayload InvitationCancelledByAdministratorPayload
+	InvitationCancelledByReplacementPayload   InvitationCancelledByReplacementPayload
+}
+
+// InvitationCancelledPayloadType is oneOf type of InvitationCancelledPayload.
+type InvitationCancelledPayloadType string
+
+// Possible values for InvitationCancelledPayloadType.
+const (
+	InvitationCancelledByAdministratorPayloadInvitationCancelledPayload InvitationCancelledPayloadType = "cancelled"
+	InvitationCancelledByReplacementPayloadInvitationCancelledPayload   InvitationCancelledPayloadType = "replaced"
+)
+
+// IsInvitationCancelledByAdministratorPayload reports whether InvitationCancelledPayload is InvitationCancelledByAdministratorPayload.
+func (s InvitationCancelledPayload) IsInvitationCancelledByAdministratorPayload() bool {
+	return s.Type == InvitationCancelledByAdministratorPayloadInvitationCancelledPayload
+}
+
+// IsInvitationCancelledByReplacementPayload reports whether InvitationCancelledPayload is InvitationCancelledByReplacementPayload.
+func (s InvitationCancelledPayload) IsInvitationCancelledByReplacementPayload() bool {
+	return s.Type == InvitationCancelledByReplacementPayloadInvitationCancelledPayload
+}
+
+// SetInvitationCancelledByAdministratorPayload sets InvitationCancelledPayload to InvitationCancelledByAdministratorPayload.
+func (s *InvitationCancelledPayload) SetInvitationCancelledByAdministratorPayload(v InvitationCancelledByAdministratorPayload) {
+	s.Type = InvitationCancelledByAdministratorPayloadInvitationCancelledPayload
+	s.InvitationCancelledByAdministratorPayload = v
+}
+
+// GetInvitationCancelledByAdministratorPayload returns InvitationCancelledByAdministratorPayload and true boolean if InvitationCancelledPayload is InvitationCancelledByAdministratorPayload.
+func (s InvitationCancelledPayload) GetInvitationCancelledByAdministratorPayload() (v InvitationCancelledByAdministratorPayload, ok bool) {
+	if !s.IsInvitationCancelledByAdministratorPayload() {
+		return v, false
+	}
+	return s.InvitationCancelledByAdministratorPayload, true
+}
+
+// NewInvitationCancelledByAdministratorPayloadInvitationCancelledPayload returns new InvitationCancelledPayload from InvitationCancelledByAdministratorPayload.
+func NewInvitationCancelledByAdministratorPayloadInvitationCancelledPayload(v InvitationCancelledByAdministratorPayload) InvitationCancelledPayload {
+	var s InvitationCancelledPayload
+	s.SetInvitationCancelledByAdministratorPayload(v)
+	return s
+}
+
+// SetInvitationCancelledByReplacementPayload sets InvitationCancelledPayload to InvitationCancelledByReplacementPayload.
+func (s *InvitationCancelledPayload) SetInvitationCancelledByReplacementPayload(v InvitationCancelledByReplacementPayload) {
+	s.Type = InvitationCancelledByReplacementPayloadInvitationCancelledPayload
+	s.InvitationCancelledByReplacementPayload = v
+}
+
+// GetInvitationCancelledByReplacementPayload returns InvitationCancelledByReplacementPayload and true boolean if InvitationCancelledPayload is InvitationCancelledByReplacementPayload.
+func (s InvitationCancelledPayload) GetInvitationCancelledByReplacementPayload() (v InvitationCancelledByReplacementPayload, ok bool) {
+	if !s.IsInvitationCancelledByReplacementPayload() {
+		return v, false
+	}
+	return s.InvitationCancelledByReplacementPayload, true
+}
+
+// NewInvitationCancelledByReplacementPayloadInvitationCancelledPayload returns new InvitationCancelledPayload from InvitationCancelledByReplacementPayload.
+func NewInvitationCancelledByReplacementPayloadInvitationCancelledPayload(v InvitationCancelledByReplacementPayload) InvitationCancelledPayload {
+	var s InvitationCancelledPayload
+	s.SetInvitationCancelledByReplacementPayload(v)
+	return s
+}
+
+// Merged schema.
+// Ref: #
+type InvitationCreatedEvent struct {
+	// The event ID, in the form `evt_<opaque>`.
+	ID        string    `json:"id"`
+	ProjectID ProjectID `json:"project_id"`
+	// The team the actor operated under when the event was emitted, if any.
+	TeamID OptNilString `json:"team_id"`
+	// Merged property.
+	EventType string `json:"event_type"`
+	// The category of the event.
+	Category InvitationCreatedEventCategory `json:"category"`
+	// When the action happened, on the server's clock.
+	OccurredAt time.Time `json:"occurred_at"`
+	// When the event was stored, on the server's clock.
+	CreatedAt time.Time `json:"created_at"`
+	// The ID of the actor that triggered the event.
+	ActorID OptNilString `json:"actor_id"`
+	// The kind of actor that triggered the event.
+	ActorType OptNilInvitationCreatedEventActorType `json:"actor_type"`
+	// The type of resource the event affected.
+	EntityType OptNilString `json:"entity_type"`
+	// The ID of the resource the event affected.
+	EntityID OptNilString `json:"entity_id"`
+	// The application or agent that produced the event.
+	ClientID string `json:"client_id"`
+	// The ID of the token in use when the event was emitted, when there was one.
+	TokenID OptString `json:"token_id"`
+	// The kind of delegation. Absent when unset.
+	DelegationType OptInvitationCreatedEventDelegationType `json:"delegation_type"`
+	DelegationID   OptString                               `json:"delegation_id"`
+	Grantor        OptString                               `json:"grantor"`
+	// A device fingerprint ID that correlates events from the same device.
+	Fingerprint OptString `json:"fingerprint"`
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
+	RequestID OptNilString `json:"request_id"`
+	// The ID of the session the event belongs to.
+	SessionID OptNilString `json:"session_id"`
+	// An ID that correlates the events of one login flow.
+	FlowID   OptNilString             `json:"flow_id"`
+	Metadata OptEventMetadata         `json:"metadata"`
+	Payload  InvitationCreatedPayload `json:"payload"`
+}
+
+// GetID returns the value of ID.
+func (s *InvitationCreatedEvent) GetID() string {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *InvitationCreatedEvent) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *InvitationCreatedEvent) GetTeamID() OptNilString {
+	return s.TeamID
+}
+
+// GetEventType returns the value of EventType.
+func (s *InvitationCreatedEvent) GetEventType() string {
+	return s.EventType
+}
+
+// GetCategory returns the value of Category.
+func (s *InvitationCreatedEvent) GetCategory() InvitationCreatedEventCategory {
+	return s.Category
+}
+
+// GetOccurredAt returns the value of OccurredAt.
+func (s *InvitationCreatedEvent) GetOccurredAt() time.Time {
+	return s.OccurredAt
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *InvitationCreatedEvent) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetActorID returns the value of ActorID.
+func (s *InvitationCreatedEvent) GetActorID() OptNilString {
+	return s.ActorID
+}
+
+// GetActorType returns the value of ActorType.
+func (s *InvitationCreatedEvent) GetActorType() OptNilInvitationCreatedEventActorType {
+	return s.ActorType
+}
+
+// GetEntityType returns the value of EntityType.
+func (s *InvitationCreatedEvent) GetEntityType() OptNilString {
+	return s.EntityType
+}
+
+// GetEntityID returns the value of EntityID.
+func (s *InvitationCreatedEvent) GetEntityID() OptNilString {
+	return s.EntityID
+}
+
+// GetClientID returns the value of ClientID.
+func (s *InvitationCreatedEvent) GetClientID() string {
+	return s.ClientID
+}
+
+// GetTokenID returns the value of TokenID.
+func (s *InvitationCreatedEvent) GetTokenID() OptString {
+	return s.TokenID
+}
+
+// GetDelegationType returns the value of DelegationType.
+func (s *InvitationCreatedEvent) GetDelegationType() OptInvitationCreatedEventDelegationType {
+	return s.DelegationType
+}
+
+// GetDelegationID returns the value of DelegationID.
+func (s *InvitationCreatedEvent) GetDelegationID() OptString {
+	return s.DelegationID
+}
+
+// GetGrantor returns the value of Grantor.
+func (s *InvitationCreatedEvent) GetGrantor() OptString {
+	return s.Grantor
+}
+
+// GetFingerprint returns the value of Fingerprint.
+func (s *InvitationCreatedEvent) GetFingerprint() OptString {
+	return s.Fingerprint
+}
+
+// GetRequestID returns the value of RequestID.
+func (s *InvitationCreatedEvent) GetRequestID() OptNilString {
+	return s.RequestID
+}
+
+// GetSessionID returns the value of SessionID.
+func (s *InvitationCreatedEvent) GetSessionID() OptNilString {
+	return s.SessionID
+}
+
+// GetFlowID returns the value of FlowID.
+func (s *InvitationCreatedEvent) GetFlowID() OptNilString {
+	return s.FlowID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *InvitationCreatedEvent) GetMetadata() OptEventMetadata {
+	return s.Metadata
+}
+
+// GetPayload returns the value of Payload.
+func (s *InvitationCreatedEvent) GetPayload() InvitationCreatedPayload {
+	return s.Payload
+}
+
+// SetID sets the value of ID.
+func (s *InvitationCreatedEvent) SetID(val string) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *InvitationCreatedEvent) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *InvitationCreatedEvent) SetTeamID(val OptNilString) {
+	s.TeamID = val
+}
+
+// SetEventType sets the value of EventType.
+func (s *InvitationCreatedEvent) SetEventType(val string) {
+	s.EventType = val
+}
+
+// SetCategory sets the value of Category.
+func (s *InvitationCreatedEvent) SetCategory(val InvitationCreatedEventCategory) {
+	s.Category = val
+}
+
+// SetOccurredAt sets the value of OccurredAt.
+func (s *InvitationCreatedEvent) SetOccurredAt(val time.Time) {
+	s.OccurredAt = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *InvitationCreatedEvent) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetActorID sets the value of ActorID.
+func (s *InvitationCreatedEvent) SetActorID(val OptNilString) {
+	s.ActorID = val
+}
+
+// SetActorType sets the value of ActorType.
+func (s *InvitationCreatedEvent) SetActorType(val OptNilInvitationCreatedEventActorType) {
+	s.ActorType = val
+}
+
+// SetEntityType sets the value of EntityType.
+func (s *InvitationCreatedEvent) SetEntityType(val OptNilString) {
+	s.EntityType = val
+}
+
+// SetEntityID sets the value of EntityID.
+func (s *InvitationCreatedEvent) SetEntityID(val OptNilString) {
+	s.EntityID = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *InvitationCreatedEvent) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetTokenID sets the value of TokenID.
+func (s *InvitationCreatedEvent) SetTokenID(val OptString) {
+	s.TokenID = val
+}
+
+// SetDelegationType sets the value of DelegationType.
+func (s *InvitationCreatedEvent) SetDelegationType(val OptInvitationCreatedEventDelegationType) {
+	s.DelegationType = val
+}
+
+// SetDelegationID sets the value of DelegationID.
+func (s *InvitationCreatedEvent) SetDelegationID(val OptString) {
+	s.DelegationID = val
+}
+
+// SetGrantor sets the value of Grantor.
+func (s *InvitationCreatedEvent) SetGrantor(val OptString) {
+	s.Grantor = val
+}
+
+// SetFingerprint sets the value of Fingerprint.
+func (s *InvitationCreatedEvent) SetFingerprint(val OptString) {
+	s.Fingerprint = val
+}
+
+// SetRequestID sets the value of RequestID.
+func (s *InvitationCreatedEvent) SetRequestID(val OptNilString) {
+	s.RequestID = val
+}
+
+// SetSessionID sets the value of SessionID.
+func (s *InvitationCreatedEvent) SetSessionID(val OptNilString) {
+	s.SessionID = val
+}
+
+// SetFlowID sets the value of FlowID.
+func (s *InvitationCreatedEvent) SetFlowID(val OptNilString) {
+	s.FlowID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *InvitationCreatedEvent) SetMetadata(val OptEventMetadata) {
+	s.Metadata = val
+}
+
+// SetPayload sets the value of Payload.
+func (s *InvitationCreatedEvent) SetPayload(val InvitationCreatedPayload) {
+	s.Payload = val
+}
+
+type InvitationCreatedEventActorType string
+
+const (
+	InvitationCreatedEventActorTypeHuman   InvitationCreatedEventActorType = "human"
+	InvitationCreatedEventActorTypeService InvitationCreatedEventActorType = "service"
+	InvitationCreatedEventActorTypeSystem  InvitationCreatedEventActorType = "system"
+	InvitationCreatedEventActorTypeAgent   InvitationCreatedEventActorType = "agent"
+)
+
+// AllValues returns all InvitationCreatedEventActorType values.
+func (InvitationCreatedEventActorType) AllValues() []InvitationCreatedEventActorType {
+	return []InvitationCreatedEventActorType{
+		InvitationCreatedEventActorTypeHuman,
+		InvitationCreatedEventActorTypeService,
+		InvitationCreatedEventActorTypeSystem,
+		InvitationCreatedEventActorTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s InvitationCreatedEventActorType) MarshalText() ([]byte, error) {
+	switch s {
+	case InvitationCreatedEventActorTypeHuman:
+		return []byte(s), nil
+	case InvitationCreatedEventActorTypeService:
+		return []byte(s), nil
+	case InvitationCreatedEventActorTypeSystem:
+		return []byte(s), nil
+	case InvitationCreatedEventActorTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *InvitationCreatedEventActorType) UnmarshalText(data []byte) error {
+	switch InvitationCreatedEventActorType(data) {
+	case InvitationCreatedEventActorTypeHuman:
+		*s = InvitationCreatedEventActorTypeHuman
+		return nil
+	case InvitationCreatedEventActorTypeService:
+		*s = InvitationCreatedEventActorTypeService
+		return nil
+	case InvitationCreatedEventActorTypeSystem:
+		*s = InvitationCreatedEventActorTypeSystem
+		return nil
+	case InvitationCreatedEventActorTypeAgent:
+		*s = InvitationCreatedEventActorTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The category of the event.
+type InvitationCreatedEventCategory string
+
+const (
+	InvitationCreatedEventCategoryRequest InvitationCreatedEventCategory = "request"
+	InvitationCreatedEventCategoryAuth    InvitationCreatedEventCategory = "auth"
+	InvitationCreatedEventCategorySession InvitationCreatedEventCategory = "session"
+	InvitationCreatedEventCategoryAdmin   InvitationCreatedEventCategory = "admin"
+	InvitationCreatedEventCategoryEntity  InvitationCreatedEventCategory = "entity"
+	InvitationCreatedEventCategorySignal  InvitationCreatedEventCategory = "signal"
+)
+
+// AllValues returns all InvitationCreatedEventCategory values.
+func (InvitationCreatedEventCategory) AllValues() []InvitationCreatedEventCategory {
+	return []InvitationCreatedEventCategory{
+		InvitationCreatedEventCategoryRequest,
+		InvitationCreatedEventCategoryAuth,
+		InvitationCreatedEventCategorySession,
+		InvitationCreatedEventCategoryAdmin,
+		InvitationCreatedEventCategoryEntity,
+		InvitationCreatedEventCategorySignal,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s InvitationCreatedEventCategory) MarshalText() ([]byte, error) {
+	switch s {
+	case InvitationCreatedEventCategoryRequest:
+		return []byte(s), nil
+	case InvitationCreatedEventCategoryAuth:
+		return []byte(s), nil
+	case InvitationCreatedEventCategorySession:
+		return []byte(s), nil
+	case InvitationCreatedEventCategoryAdmin:
+		return []byte(s), nil
+	case InvitationCreatedEventCategoryEntity:
+		return []byte(s), nil
+	case InvitationCreatedEventCategorySignal:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *InvitationCreatedEventCategory) UnmarshalText(data []byte) error {
+	switch InvitationCreatedEventCategory(data) {
+	case InvitationCreatedEventCategoryRequest:
+		*s = InvitationCreatedEventCategoryRequest
+		return nil
+	case InvitationCreatedEventCategoryAuth:
+		*s = InvitationCreatedEventCategoryAuth
+		return nil
+	case InvitationCreatedEventCategorySession:
+		*s = InvitationCreatedEventCategorySession
+		return nil
+	case InvitationCreatedEventCategoryAdmin:
+		*s = InvitationCreatedEventCategoryAdmin
+		return nil
+	case InvitationCreatedEventCategoryEntity:
+		*s = InvitationCreatedEventCategoryEntity
+		return nil
+	case InvitationCreatedEventCategorySignal:
+		*s = InvitationCreatedEventCategorySignal
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The kind of delegation. Absent when unset.
+type InvitationCreatedEventDelegationType string
+
+const (
+	InvitationCreatedEventDelegationTypeDirect    InvitationCreatedEventDelegationType = "direct"
+	InvitationCreatedEventDelegationTypeDelegated InvitationCreatedEventDelegationType = "delegated"
+	InvitationCreatedEventDelegationTypePatShared InvitationCreatedEventDelegationType = "pat_shared"
+	InvitationCreatedEventDelegationTypeExchanged InvitationCreatedEventDelegationType = "exchanged"
+)
+
+// AllValues returns all InvitationCreatedEventDelegationType values.
+func (InvitationCreatedEventDelegationType) AllValues() []InvitationCreatedEventDelegationType {
+	return []InvitationCreatedEventDelegationType{
+		InvitationCreatedEventDelegationTypeDirect,
+		InvitationCreatedEventDelegationTypeDelegated,
+		InvitationCreatedEventDelegationTypePatShared,
+		InvitationCreatedEventDelegationTypeExchanged,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s InvitationCreatedEventDelegationType) MarshalText() ([]byte, error) {
+	switch s {
+	case InvitationCreatedEventDelegationTypeDirect:
+		return []byte(s), nil
+	case InvitationCreatedEventDelegationTypeDelegated:
+		return []byte(s), nil
+	case InvitationCreatedEventDelegationTypePatShared:
+		return []byte(s), nil
+	case InvitationCreatedEventDelegationTypeExchanged:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *InvitationCreatedEventDelegationType) UnmarshalText(data []byte) error {
+	switch InvitationCreatedEventDelegationType(data) {
+	case InvitationCreatedEventDelegationTypeDirect:
+		*s = InvitationCreatedEventDelegationTypeDirect
+		return nil
+	case InvitationCreatedEventDelegationTypeDelegated:
+		*s = InvitationCreatedEventDelegationTypeDelegated
+		return nil
+	case InvitationCreatedEventDelegationTypePatShared:
+		*s = InvitationCreatedEventDelegationTypePatShared
+		return nil
+	case InvitationCreatedEventDelegationTypeExchanged:
+		*s = InvitationCreatedEventDelegationTypeExchanged
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Payload for `invitation.created`. The invitation ID is the event's
+// `entity_id`. Discriminate on `type`; the object named after it says what
+// the invitation's link grants. The metadata entered at creation and the
+// link's token never appear.
+// Ref: #
+// InvitationCreatedPayload represents sum type.
+type InvitationCreatedPayload struct {
+	Type                                  InvitationCreatedPayloadType // switch on this field
+	InvitationCreatedProjectMemberPayload InvitationCreatedProjectMemberPayload
+	InvitationCreatedTeamMemberPayload    InvitationCreatedTeamMemberPayload
+}
+
+// InvitationCreatedPayloadType is oneOf type of InvitationCreatedPayload.
+type InvitationCreatedPayloadType string
+
+// Possible values for InvitationCreatedPayloadType.
+const (
+	InvitationCreatedProjectMemberPayloadInvitationCreatedPayload InvitationCreatedPayloadType = "project_member"
+	InvitationCreatedTeamMemberPayloadInvitationCreatedPayload    InvitationCreatedPayloadType = "team_member"
+)
+
+// IsInvitationCreatedProjectMemberPayload reports whether InvitationCreatedPayload is InvitationCreatedProjectMemberPayload.
+func (s InvitationCreatedPayload) IsInvitationCreatedProjectMemberPayload() bool {
+	return s.Type == InvitationCreatedProjectMemberPayloadInvitationCreatedPayload
+}
+
+// IsInvitationCreatedTeamMemberPayload reports whether InvitationCreatedPayload is InvitationCreatedTeamMemberPayload.
+func (s InvitationCreatedPayload) IsInvitationCreatedTeamMemberPayload() bool {
+	return s.Type == InvitationCreatedTeamMemberPayloadInvitationCreatedPayload
+}
+
+// SetInvitationCreatedProjectMemberPayload sets InvitationCreatedPayload to InvitationCreatedProjectMemberPayload.
+func (s *InvitationCreatedPayload) SetInvitationCreatedProjectMemberPayload(v InvitationCreatedProjectMemberPayload) {
+	s.Type = InvitationCreatedProjectMemberPayloadInvitationCreatedPayload
+	s.InvitationCreatedProjectMemberPayload = v
+}
+
+// GetInvitationCreatedProjectMemberPayload returns InvitationCreatedProjectMemberPayload and true boolean if InvitationCreatedPayload is InvitationCreatedProjectMemberPayload.
+func (s InvitationCreatedPayload) GetInvitationCreatedProjectMemberPayload() (v InvitationCreatedProjectMemberPayload, ok bool) {
+	if !s.IsInvitationCreatedProjectMemberPayload() {
+		return v, false
+	}
+	return s.InvitationCreatedProjectMemberPayload, true
+}
+
+// NewInvitationCreatedProjectMemberPayloadInvitationCreatedPayload returns new InvitationCreatedPayload from InvitationCreatedProjectMemberPayload.
+func NewInvitationCreatedProjectMemberPayloadInvitationCreatedPayload(v InvitationCreatedProjectMemberPayload) InvitationCreatedPayload {
+	var s InvitationCreatedPayload
+	s.SetInvitationCreatedProjectMemberPayload(v)
+	return s
+}
+
+// SetInvitationCreatedTeamMemberPayload sets InvitationCreatedPayload to InvitationCreatedTeamMemberPayload.
+func (s *InvitationCreatedPayload) SetInvitationCreatedTeamMemberPayload(v InvitationCreatedTeamMemberPayload) {
+	s.Type = InvitationCreatedTeamMemberPayloadInvitationCreatedPayload
+	s.InvitationCreatedTeamMemberPayload = v
+}
+
+// GetInvitationCreatedTeamMemberPayload returns InvitationCreatedTeamMemberPayload and true boolean if InvitationCreatedPayload is InvitationCreatedTeamMemberPayload.
+func (s InvitationCreatedPayload) GetInvitationCreatedTeamMemberPayload() (v InvitationCreatedTeamMemberPayload, ok bool) {
+	if !s.IsInvitationCreatedTeamMemberPayload() {
+		return v, false
+	}
+	return s.InvitationCreatedTeamMemberPayload, true
+}
+
+// NewInvitationCreatedTeamMemberPayloadInvitationCreatedPayload returns new InvitationCreatedPayload from InvitationCreatedTeamMemberPayload.
+func NewInvitationCreatedTeamMemberPayloadInvitationCreatedPayload(v InvitationCreatedTeamMemberPayload) InvitationCreatedPayload {
+	var s InvitationCreatedPayload
+	s.SetInvitationCreatedTeamMemberPayload(v)
+	return s
+}
+
+// Merged schema.
+// Ref: #
+type InvitationCreatedProjectMemberPayload struct {
+	// Shared by an invitation and every invitation that replaces it.
+	JourneyID string `json:"journey_id"`
+	// The invitation this one replaces, when it was created as a replacement.
+	ReplacesInvitationID OptString                                 `json:"replaces_invitation_id"`
+	ExpiresAt            time.Time                                 `json:"expires_at"`
+	Type                 InvitationCreatedProjectMemberPayloadType `json:"type"`
+	ProjectMember        InvitationProjectMemberPayload            `json:"project_member"`
+}
+
+// GetJourneyID returns the value of JourneyID.
+func (s *InvitationCreatedProjectMemberPayload) GetJourneyID() string {
+	return s.JourneyID
+}
+
+// GetReplacesInvitationID returns the value of ReplacesInvitationID.
+func (s *InvitationCreatedProjectMemberPayload) GetReplacesInvitationID() OptString {
+	return s.ReplacesInvitationID
+}
+
+// GetExpiresAt returns the value of ExpiresAt.
+func (s *InvitationCreatedProjectMemberPayload) GetExpiresAt() time.Time {
+	return s.ExpiresAt
+}
+
+// GetType returns the value of Type.
+func (s *InvitationCreatedProjectMemberPayload) GetType() InvitationCreatedProjectMemberPayloadType {
+	return s.Type
+}
+
+// GetProjectMember returns the value of ProjectMember.
+func (s *InvitationCreatedProjectMemberPayload) GetProjectMember() InvitationProjectMemberPayload {
+	return s.ProjectMember
+}
+
+// SetJourneyID sets the value of JourneyID.
+func (s *InvitationCreatedProjectMemberPayload) SetJourneyID(val string) {
+	s.JourneyID = val
+}
+
+// SetReplacesInvitationID sets the value of ReplacesInvitationID.
+func (s *InvitationCreatedProjectMemberPayload) SetReplacesInvitationID(val OptString) {
+	s.ReplacesInvitationID = val
+}
+
+// SetExpiresAt sets the value of ExpiresAt.
+func (s *InvitationCreatedProjectMemberPayload) SetExpiresAt(val time.Time) {
+	s.ExpiresAt = val
+}
+
+// SetType sets the value of Type.
+func (s *InvitationCreatedProjectMemberPayload) SetType(val InvitationCreatedProjectMemberPayloadType) {
+	s.Type = val
+}
+
+// SetProjectMember sets the value of ProjectMember.
+func (s *InvitationCreatedProjectMemberPayload) SetProjectMember(val InvitationProjectMemberPayload) {
+	s.ProjectMember = val
+}
+
+type InvitationCreatedProjectMemberPayloadType string
+
+const (
+	InvitationCreatedProjectMemberPayloadTypeProjectMember InvitationCreatedProjectMemberPayloadType = "project_member"
+)
+
+// AllValues returns all InvitationCreatedProjectMemberPayloadType values.
+func (InvitationCreatedProjectMemberPayloadType) AllValues() []InvitationCreatedProjectMemberPayloadType {
+	return []InvitationCreatedProjectMemberPayloadType{
+		InvitationCreatedProjectMemberPayloadTypeProjectMember,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s InvitationCreatedProjectMemberPayloadType) MarshalText() ([]byte, error) {
+	switch s {
+	case InvitationCreatedProjectMemberPayloadTypeProjectMember:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *InvitationCreatedProjectMemberPayloadType) UnmarshalText(data []byte) error {
+	switch InvitationCreatedProjectMemberPayloadType(data) {
+	case InvitationCreatedProjectMemberPayloadTypeProjectMember:
+		*s = InvitationCreatedProjectMemberPayloadTypeProjectMember
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Merged schema.
+// Ref: #
+type InvitationCreatedTeamMemberPayload struct {
+	// Shared by an invitation and every invitation that replaces it.
+	JourneyID string `json:"journey_id"`
+	// The invitation this one replaces, when it was created as a replacement.
+	ReplacesInvitationID OptString                              `json:"replaces_invitation_id"`
+	ExpiresAt            time.Time                              `json:"expires_at"`
+	Type                 InvitationCreatedTeamMemberPayloadType `json:"type"`
+	TeamMember           InvitationTeamMemberPayload            `json:"team_member"`
+}
+
+// GetJourneyID returns the value of JourneyID.
+func (s *InvitationCreatedTeamMemberPayload) GetJourneyID() string {
+	return s.JourneyID
+}
+
+// GetReplacesInvitationID returns the value of ReplacesInvitationID.
+func (s *InvitationCreatedTeamMemberPayload) GetReplacesInvitationID() OptString {
+	return s.ReplacesInvitationID
+}
+
+// GetExpiresAt returns the value of ExpiresAt.
+func (s *InvitationCreatedTeamMemberPayload) GetExpiresAt() time.Time {
+	return s.ExpiresAt
+}
+
+// GetType returns the value of Type.
+func (s *InvitationCreatedTeamMemberPayload) GetType() InvitationCreatedTeamMemberPayloadType {
+	return s.Type
+}
+
+// GetTeamMember returns the value of TeamMember.
+func (s *InvitationCreatedTeamMemberPayload) GetTeamMember() InvitationTeamMemberPayload {
+	return s.TeamMember
+}
+
+// SetJourneyID sets the value of JourneyID.
+func (s *InvitationCreatedTeamMemberPayload) SetJourneyID(val string) {
+	s.JourneyID = val
+}
+
+// SetReplacesInvitationID sets the value of ReplacesInvitationID.
+func (s *InvitationCreatedTeamMemberPayload) SetReplacesInvitationID(val OptString) {
+	s.ReplacesInvitationID = val
+}
+
+// SetExpiresAt sets the value of ExpiresAt.
+func (s *InvitationCreatedTeamMemberPayload) SetExpiresAt(val time.Time) {
+	s.ExpiresAt = val
+}
+
+// SetType sets the value of Type.
+func (s *InvitationCreatedTeamMemberPayload) SetType(val InvitationCreatedTeamMemberPayloadType) {
+	s.Type = val
+}
+
+// SetTeamMember sets the value of TeamMember.
+func (s *InvitationCreatedTeamMemberPayload) SetTeamMember(val InvitationTeamMemberPayload) {
+	s.TeamMember = val
+}
+
+type InvitationCreatedTeamMemberPayloadType string
+
+const (
+	InvitationCreatedTeamMemberPayloadTypeTeamMember InvitationCreatedTeamMemberPayloadType = "team_member"
+)
+
+// AllValues returns all InvitationCreatedTeamMemberPayloadType values.
+func (InvitationCreatedTeamMemberPayloadType) AllValues() []InvitationCreatedTeamMemberPayloadType {
+	return []InvitationCreatedTeamMemberPayloadType{
+		InvitationCreatedTeamMemberPayloadTypeTeamMember,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s InvitationCreatedTeamMemberPayloadType) MarshalText() ([]byte, error) {
+	switch s {
+	case InvitationCreatedTeamMemberPayloadTypeTeamMember:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *InvitationCreatedTeamMemberPayloadType) UnmarshalText(data []byte) error {
+	switch InvitationCreatedTeamMemberPayloadType(data) {
+	case InvitationCreatedTeamMemberPayloadTypeTeamMember:
+		*s = InvitationCreatedTeamMemberPayloadTypeTeamMember
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
 type InvitationID string
 
 // Merged schema.
@@ -46613,8 +51918,8 @@ func (s *InvitationLookupTeamMemberResponseType) UnmarshalText(data []byte) erro
 
 // What the administrator entered at creation, so other administrators know who
 // the link is for. It is only displayed, never matched. Null once the
-// invitation is accepted or declined. Cancel and replace of a pending
-// invitation delete the row, so the metadata goes with it.
+// invitation is accepted or declined. Cancel deletes the row with it; replace
+// moves it to the new invitation unless that sends its own.
 // Ref: #
 type InvitationMetadata struct {
 	// A display name for who the invitation is intended for.
@@ -46637,7 +51942,7 @@ type InvitationProjectMember struct {
 	ID        InvitationID `json:"id"`
 	ProjectID ProjectID    `json:"project_id"`
 	// Who the administrator said the link is for. Null after accept or decline.
-	// Cancel and replace of a pending invitation delete the row.
+	// Cancel and replace delete the row.
 	Metadata OptNilInvitationMetadata `json:"metadata"`
 	Status   InvitationStatus         `json:"status"`
 	// The user who created the invitation. Null when a project secret created
@@ -46944,9 +52249,485 @@ func (s *InvitationProjectMemberType) UnmarshalText(data []byte) error {
 	}
 }
 
+// Merged schema.
+// Ref: #
+type InvitationRejectedEvent struct {
+	// The event ID, in the form `evt_<opaque>`.
+	ID        string    `json:"id"`
+	ProjectID ProjectID `json:"project_id"`
+	// The team the actor operated under when the event was emitted, if any.
+	TeamID OptNilString `json:"team_id"`
+	// Merged property.
+	EventType string `json:"event_type"`
+	// The category of the event.
+	Category InvitationRejectedEventCategory `json:"category"`
+	// When the action happened, on the server's clock.
+	OccurredAt time.Time `json:"occurred_at"`
+	// When the event was stored, on the server's clock.
+	CreatedAt time.Time `json:"created_at"`
+	// The ID of the actor that triggered the event.
+	ActorID OptNilString `json:"actor_id"`
+	// The kind of actor that triggered the event.
+	ActorType OptNilInvitationRejectedEventActorType `json:"actor_type"`
+	// The type of resource the event affected.
+	EntityType OptNilString `json:"entity_type"`
+	// The ID of the resource the event affected.
+	EntityID OptNilString `json:"entity_id"`
+	// The application or agent that produced the event.
+	ClientID string `json:"client_id"`
+	// The ID of the token in use when the event was emitted, when there was one.
+	TokenID OptString `json:"token_id"`
+	// The kind of delegation. Absent when unset.
+	DelegationType OptInvitationRejectedEventDelegationType `json:"delegation_type"`
+	DelegationID   OptString                                `json:"delegation_id"`
+	Grantor        OptString                                `json:"grantor"`
+	// A device fingerprint ID that correlates events from the same device.
+	Fingerprint OptString `json:"fingerprint"`
+	// The ID of the HTTP request that caused the event. Events of one request
+	// share it. Only the `request.api` event of a request carries
+	// `metadata.client`.
+	RequestID OptNilString `json:"request_id"`
+	// The ID of the session the event belongs to.
+	SessionID OptNilString `json:"session_id"`
+	// An ID that correlates the events of one login flow.
+	FlowID   OptNilString              `json:"flow_id"`
+	Metadata OptEventMetadata          `json:"metadata"`
+	Payload  InvitationRejectedPayload `json:"payload"`
+}
+
+// GetID returns the value of ID.
+func (s *InvitationRejectedEvent) GetID() string {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *InvitationRejectedEvent) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *InvitationRejectedEvent) GetTeamID() OptNilString {
+	return s.TeamID
+}
+
+// GetEventType returns the value of EventType.
+func (s *InvitationRejectedEvent) GetEventType() string {
+	return s.EventType
+}
+
+// GetCategory returns the value of Category.
+func (s *InvitationRejectedEvent) GetCategory() InvitationRejectedEventCategory {
+	return s.Category
+}
+
+// GetOccurredAt returns the value of OccurredAt.
+func (s *InvitationRejectedEvent) GetOccurredAt() time.Time {
+	return s.OccurredAt
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *InvitationRejectedEvent) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetActorID returns the value of ActorID.
+func (s *InvitationRejectedEvent) GetActorID() OptNilString {
+	return s.ActorID
+}
+
+// GetActorType returns the value of ActorType.
+func (s *InvitationRejectedEvent) GetActorType() OptNilInvitationRejectedEventActorType {
+	return s.ActorType
+}
+
+// GetEntityType returns the value of EntityType.
+func (s *InvitationRejectedEvent) GetEntityType() OptNilString {
+	return s.EntityType
+}
+
+// GetEntityID returns the value of EntityID.
+func (s *InvitationRejectedEvent) GetEntityID() OptNilString {
+	return s.EntityID
+}
+
+// GetClientID returns the value of ClientID.
+func (s *InvitationRejectedEvent) GetClientID() string {
+	return s.ClientID
+}
+
+// GetTokenID returns the value of TokenID.
+func (s *InvitationRejectedEvent) GetTokenID() OptString {
+	return s.TokenID
+}
+
+// GetDelegationType returns the value of DelegationType.
+func (s *InvitationRejectedEvent) GetDelegationType() OptInvitationRejectedEventDelegationType {
+	return s.DelegationType
+}
+
+// GetDelegationID returns the value of DelegationID.
+func (s *InvitationRejectedEvent) GetDelegationID() OptString {
+	return s.DelegationID
+}
+
+// GetGrantor returns the value of Grantor.
+func (s *InvitationRejectedEvent) GetGrantor() OptString {
+	return s.Grantor
+}
+
+// GetFingerprint returns the value of Fingerprint.
+func (s *InvitationRejectedEvent) GetFingerprint() OptString {
+	return s.Fingerprint
+}
+
+// GetRequestID returns the value of RequestID.
+func (s *InvitationRejectedEvent) GetRequestID() OptNilString {
+	return s.RequestID
+}
+
+// GetSessionID returns the value of SessionID.
+func (s *InvitationRejectedEvent) GetSessionID() OptNilString {
+	return s.SessionID
+}
+
+// GetFlowID returns the value of FlowID.
+func (s *InvitationRejectedEvent) GetFlowID() OptNilString {
+	return s.FlowID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *InvitationRejectedEvent) GetMetadata() OptEventMetadata {
+	return s.Metadata
+}
+
+// GetPayload returns the value of Payload.
+func (s *InvitationRejectedEvent) GetPayload() InvitationRejectedPayload {
+	return s.Payload
+}
+
+// SetID sets the value of ID.
+func (s *InvitationRejectedEvent) SetID(val string) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *InvitationRejectedEvent) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *InvitationRejectedEvent) SetTeamID(val OptNilString) {
+	s.TeamID = val
+}
+
+// SetEventType sets the value of EventType.
+func (s *InvitationRejectedEvent) SetEventType(val string) {
+	s.EventType = val
+}
+
+// SetCategory sets the value of Category.
+func (s *InvitationRejectedEvent) SetCategory(val InvitationRejectedEventCategory) {
+	s.Category = val
+}
+
+// SetOccurredAt sets the value of OccurredAt.
+func (s *InvitationRejectedEvent) SetOccurredAt(val time.Time) {
+	s.OccurredAt = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *InvitationRejectedEvent) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetActorID sets the value of ActorID.
+func (s *InvitationRejectedEvent) SetActorID(val OptNilString) {
+	s.ActorID = val
+}
+
+// SetActorType sets the value of ActorType.
+func (s *InvitationRejectedEvent) SetActorType(val OptNilInvitationRejectedEventActorType) {
+	s.ActorType = val
+}
+
+// SetEntityType sets the value of EntityType.
+func (s *InvitationRejectedEvent) SetEntityType(val OptNilString) {
+	s.EntityType = val
+}
+
+// SetEntityID sets the value of EntityID.
+func (s *InvitationRejectedEvent) SetEntityID(val OptNilString) {
+	s.EntityID = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *InvitationRejectedEvent) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetTokenID sets the value of TokenID.
+func (s *InvitationRejectedEvent) SetTokenID(val OptString) {
+	s.TokenID = val
+}
+
+// SetDelegationType sets the value of DelegationType.
+func (s *InvitationRejectedEvent) SetDelegationType(val OptInvitationRejectedEventDelegationType) {
+	s.DelegationType = val
+}
+
+// SetDelegationID sets the value of DelegationID.
+func (s *InvitationRejectedEvent) SetDelegationID(val OptString) {
+	s.DelegationID = val
+}
+
+// SetGrantor sets the value of Grantor.
+func (s *InvitationRejectedEvent) SetGrantor(val OptString) {
+	s.Grantor = val
+}
+
+// SetFingerprint sets the value of Fingerprint.
+func (s *InvitationRejectedEvent) SetFingerprint(val OptString) {
+	s.Fingerprint = val
+}
+
+// SetRequestID sets the value of RequestID.
+func (s *InvitationRejectedEvent) SetRequestID(val OptNilString) {
+	s.RequestID = val
+}
+
+// SetSessionID sets the value of SessionID.
+func (s *InvitationRejectedEvent) SetSessionID(val OptNilString) {
+	s.SessionID = val
+}
+
+// SetFlowID sets the value of FlowID.
+func (s *InvitationRejectedEvent) SetFlowID(val OptNilString) {
+	s.FlowID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *InvitationRejectedEvent) SetMetadata(val OptEventMetadata) {
+	s.Metadata = val
+}
+
+// SetPayload sets the value of Payload.
+func (s *InvitationRejectedEvent) SetPayload(val InvitationRejectedPayload) {
+	s.Payload = val
+}
+
+type InvitationRejectedEventActorType string
+
+const (
+	InvitationRejectedEventActorTypeHuman   InvitationRejectedEventActorType = "human"
+	InvitationRejectedEventActorTypeService InvitationRejectedEventActorType = "service"
+	InvitationRejectedEventActorTypeSystem  InvitationRejectedEventActorType = "system"
+	InvitationRejectedEventActorTypeAgent   InvitationRejectedEventActorType = "agent"
+)
+
+// AllValues returns all InvitationRejectedEventActorType values.
+func (InvitationRejectedEventActorType) AllValues() []InvitationRejectedEventActorType {
+	return []InvitationRejectedEventActorType{
+		InvitationRejectedEventActorTypeHuman,
+		InvitationRejectedEventActorTypeService,
+		InvitationRejectedEventActorTypeSystem,
+		InvitationRejectedEventActorTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s InvitationRejectedEventActorType) MarshalText() ([]byte, error) {
+	switch s {
+	case InvitationRejectedEventActorTypeHuman:
+		return []byte(s), nil
+	case InvitationRejectedEventActorTypeService:
+		return []byte(s), nil
+	case InvitationRejectedEventActorTypeSystem:
+		return []byte(s), nil
+	case InvitationRejectedEventActorTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *InvitationRejectedEventActorType) UnmarshalText(data []byte) error {
+	switch InvitationRejectedEventActorType(data) {
+	case InvitationRejectedEventActorTypeHuman:
+		*s = InvitationRejectedEventActorTypeHuman
+		return nil
+	case InvitationRejectedEventActorTypeService:
+		*s = InvitationRejectedEventActorTypeService
+		return nil
+	case InvitationRejectedEventActorTypeSystem:
+		*s = InvitationRejectedEventActorTypeSystem
+		return nil
+	case InvitationRejectedEventActorTypeAgent:
+		*s = InvitationRejectedEventActorTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The category of the event.
+type InvitationRejectedEventCategory string
+
+const (
+	InvitationRejectedEventCategoryRequest InvitationRejectedEventCategory = "request"
+	InvitationRejectedEventCategoryAuth    InvitationRejectedEventCategory = "auth"
+	InvitationRejectedEventCategorySession InvitationRejectedEventCategory = "session"
+	InvitationRejectedEventCategoryAdmin   InvitationRejectedEventCategory = "admin"
+	InvitationRejectedEventCategoryEntity  InvitationRejectedEventCategory = "entity"
+	InvitationRejectedEventCategorySignal  InvitationRejectedEventCategory = "signal"
+)
+
+// AllValues returns all InvitationRejectedEventCategory values.
+func (InvitationRejectedEventCategory) AllValues() []InvitationRejectedEventCategory {
+	return []InvitationRejectedEventCategory{
+		InvitationRejectedEventCategoryRequest,
+		InvitationRejectedEventCategoryAuth,
+		InvitationRejectedEventCategorySession,
+		InvitationRejectedEventCategoryAdmin,
+		InvitationRejectedEventCategoryEntity,
+		InvitationRejectedEventCategorySignal,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s InvitationRejectedEventCategory) MarshalText() ([]byte, error) {
+	switch s {
+	case InvitationRejectedEventCategoryRequest:
+		return []byte(s), nil
+	case InvitationRejectedEventCategoryAuth:
+		return []byte(s), nil
+	case InvitationRejectedEventCategorySession:
+		return []byte(s), nil
+	case InvitationRejectedEventCategoryAdmin:
+		return []byte(s), nil
+	case InvitationRejectedEventCategoryEntity:
+		return []byte(s), nil
+	case InvitationRejectedEventCategorySignal:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *InvitationRejectedEventCategory) UnmarshalText(data []byte) error {
+	switch InvitationRejectedEventCategory(data) {
+	case InvitationRejectedEventCategoryRequest:
+		*s = InvitationRejectedEventCategoryRequest
+		return nil
+	case InvitationRejectedEventCategoryAuth:
+		*s = InvitationRejectedEventCategoryAuth
+		return nil
+	case InvitationRejectedEventCategorySession:
+		*s = InvitationRejectedEventCategorySession
+		return nil
+	case InvitationRejectedEventCategoryAdmin:
+		*s = InvitationRejectedEventCategoryAdmin
+		return nil
+	case InvitationRejectedEventCategoryEntity:
+		*s = InvitationRejectedEventCategoryEntity
+		return nil
+	case InvitationRejectedEventCategorySignal:
+		*s = InvitationRejectedEventCategorySignal
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The kind of delegation. Absent when unset.
+type InvitationRejectedEventDelegationType string
+
+const (
+	InvitationRejectedEventDelegationTypeDirect    InvitationRejectedEventDelegationType = "direct"
+	InvitationRejectedEventDelegationTypeDelegated InvitationRejectedEventDelegationType = "delegated"
+	InvitationRejectedEventDelegationTypePatShared InvitationRejectedEventDelegationType = "pat_shared"
+	InvitationRejectedEventDelegationTypeExchanged InvitationRejectedEventDelegationType = "exchanged"
+)
+
+// AllValues returns all InvitationRejectedEventDelegationType values.
+func (InvitationRejectedEventDelegationType) AllValues() []InvitationRejectedEventDelegationType {
+	return []InvitationRejectedEventDelegationType{
+		InvitationRejectedEventDelegationTypeDirect,
+		InvitationRejectedEventDelegationTypeDelegated,
+		InvitationRejectedEventDelegationTypePatShared,
+		InvitationRejectedEventDelegationTypeExchanged,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s InvitationRejectedEventDelegationType) MarshalText() ([]byte, error) {
+	switch s {
+	case InvitationRejectedEventDelegationTypeDirect:
+		return []byte(s), nil
+	case InvitationRejectedEventDelegationTypeDelegated:
+		return []byte(s), nil
+	case InvitationRejectedEventDelegationTypePatShared:
+		return []byte(s), nil
+	case InvitationRejectedEventDelegationTypeExchanged:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *InvitationRejectedEventDelegationType) UnmarshalText(data []byte) error {
+	switch InvitationRejectedEventDelegationType(data) {
+	case InvitationRejectedEventDelegationTypeDirect:
+		*s = InvitationRejectedEventDelegationTypeDirect
+		return nil
+	case InvitationRejectedEventDelegationTypeDelegated:
+		*s = InvitationRejectedEventDelegationTypeDelegated
+		return nil
+	case InvitationRejectedEventDelegationTypePatShared:
+		*s = InvitationRejectedEventDelegationTypePatShared
+		return nil
+	case InvitationRejectedEventDelegationTypeExchanged:
+		*s = InvitationRejectedEventDelegationTypeExchanged
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Payload for `invitation.rejected`. The invitation ID is the event's
+// `entity_id`, and `user_id` is the user who declined it.
+// Ref: #
+type InvitationRejectedPayload struct {
+	// Shared by an invitation and every invitation that replaces it.
+	JourneyID string `json:"journey_id"`
+	UserID    string `json:"user_id"`
+}
+
+// GetJourneyID returns the value of JourneyID.
+func (s *InvitationRejectedPayload) GetJourneyID() string {
+	return s.JourneyID
+}
+
+// GetUserID returns the value of UserID.
+func (s *InvitationRejectedPayload) GetUserID() string {
+	return s.UserID
+}
+
+// SetJourneyID sets the value of JourneyID.
+func (s *InvitationRejectedPayload) SetJourneyID(val string) {
+	s.JourneyID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *InvitationRejectedPayload) SetUserID(val string) {
+	s.UserID = val
+}
+
 // Lifecycle status of the invitation. `expired` is derived on read from
-// `expires_at`; `accepted` and `rejected` are final. Cancel and replace of a
-// pending invitation delete the row rather than leaving a cancelled status.
+// `expires_at`; `accepted` and `rejected` are final. Cancel and replace delete
+// the row rather than leaving a cancelled status.
 // Ref: #
 type InvitationStatus string
 
@@ -47009,7 +52790,7 @@ type InvitationTeamMember struct {
 	ID        InvitationID `json:"id"`
 	ProjectID ProjectID    `json:"project_id"`
 	// Who the administrator said the link is for. Null after accept or decline.
-	// Cancel and replace of a pending invitation delete the row.
+	// Cancel and replace delete the row.
 	Metadata OptNilInvitationMetadata `json:"metadata"`
 	Status   InvitationStatus         `json:"status"`
 	// The user who created the invitation. Null when a project secret created
@@ -53979,6 +59760,461 @@ func (s *OAuth2) SetScopes(val []string) {
 	s.Scopes = val
 }
 
+// The OAuth settings of a project: whether the project's OAuth authorization
+// server answers. It has one shape in two places: the `oauth` resource of the
+// bundle `buildRelease` (`POST /releases/build`) takes, which publishes it as
+// a new immutable revision, and the read-only revision
+// `getOAuthSettingsById` (`GET /oauth_settings/{oauth_settings_id}`)
+// returns. Locally it is the descriptor in `.zitadel/` that `zitadel deploy`
+// publishes with the rest of the bundle.
+// A release is the only writer: there is no operation that publishes OAuth
+// settings on their own. A release without `oauth` leaves the authorization
+// server off.
+// Ref: #
+type OAuthSettings struct {
+	// Editor affordance: path or URL of this file's JSON meta-schema, so an
+	// editor validates and autocompletes it. The CLI strips it before upload;
+	// the platform ignores it.
+	Schema OptString `json:"$schema"`
+	// Whether the project's OAuth authorization server answers. While it is
+	// `false`, or the deployed release pins no OAuth settings, the server
+	// publishes no authorization server metadata for the project and refuses
+	// every OAuth request to it.
+	Enabled bool `json:"enabled"`
+}
+
+// GetSchema returns the value of Schema.
+func (s *OAuthSettings) GetSchema() OptString {
+	return s.Schema
+}
+
+// GetEnabled returns the value of Enabled.
+func (s *OAuthSettings) GetEnabled() bool {
+	return s.Enabled
+}
+
+// SetSchema sets the value of Schema.
+func (s *OAuthSettings) SetSchema(val OptString) {
+	s.Schema = val
+}
+
+// SetEnabled sets the value of Enabled.
+func (s *OAuthSettings) SetEnabled(val bool) {
+	s.Enabled = val
+}
+
+// A stored OAuth settings revision. `oauth` echoes the canonical stored
+// settings, so a client such as the CLI can reconcile local files with the
+// server's stored state.
+// Ref: #
+type OAuthSettingsRevisionResponse struct {
+	// The unique identifier of this OAuth settings revision.
+	ID string `json:"id"`
+	// When this revision was published.
+	CreatedAt time.Time     `json:"created_at"`
+	OAuth     OAuthSettings `json:"oauth"`
+}
+
+// GetID returns the value of ID.
+func (s *OAuthSettingsRevisionResponse) GetID() string {
+	return s.ID
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *OAuthSettingsRevisionResponse) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetOAuth returns the value of OAuth.
+func (s *OAuthSettingsRevisionResponse) GetOAuth() OAuthSettings {
+	return s.OAuth
+}
+
+// SetID sets the value of ID.
+func (s *OAuthSettingsRevisionResponse) SetID(val string) {
+	s.ID = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *OAuthSettingsRevisionResponse) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetOAuth sets the value of OAuth.
+func (s *OAuthSettingsRevisionResponse) SetOAuth(val OAuthSettings) {
+	s.OAuth = val
+}
+
+func (*OAuthSettingsRevisionResponse) getOAuthSettingsByIdRes() {}
+
+// NewOptAppClientIDTakenDetails returns new OptAppClientIDTakenDetails with value set to v.
+func NewOptAppClientIDTakenDetails(v AppClientIDTakenDetails) OptAppClientIDTakenDetails {
+	return OptAppClientIDTakenDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptAppClientIDTakenDetails is optional AppClientIDTakenDetails.
+type OptAppClientIDTakenDetails struct {
+	Value AppClientIDTakenDetails
+	Set   bool
+}
+
+// IsSet returns true if OptAppClientIDTakenDetails was set.
+func (o OptAppClientIDTakenDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptAppClientIDTakenDetails) Reset() {
+	var v AppClientIDTakenDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptAppClientIDTakenDetails) SetTo(v AppClientIDTakenDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptAppClientIDTakenDetails) Get() (v AppClientIDTakenDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptAppClientIDTakenDetails) Or(d AppClientIDTakenDetails) AppClientIDTakenDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptAppFieldImmutableDetails returns new OptAppFieldImmutableDetails with value set to v.
+func NewOptAppFieldImmutableDetails(v AppFieldImmutableDetails) OptAppFieldImmutableDetails {
+	return OptAppFieldImmutableDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptAppFieldImmutableDetails is optional AppFieldImmutableDetails.
+type OptAppFieldImmutableDetails struct {
+	Value AppFieldImmutableDetails
+	Set   bool
+}
+
+// IsSet returns true if OptAppFieldImmutableDetails was set.
+func (o OptAppFieldImmutableDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptAppFieldImmutableDetails) Reset() {
+	var v AppFieldImmutableDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptAppFieldImmutableDetails) SetTo(v AppFieldImmutableDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptAppFieldImmutableDetails) Get() (v AppFieldImmutableDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptAppFieldImmutableDetails) Or(d AppFieldImmutableDetails) AppFieldImmutableDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptAppInvalidDetails returns new OptAppInvalidDetails with value set to v.
+func NewOptAppInvalidDetails(v AppInvalidDetails) OptAppInvalidDetails {
+	return OptAppInvalidDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptAppInvalidDetails is optional AppInvalidDetails.
+type OptAppInvalidDetails struct {
+	Value AppInvalidDetails
+	Set   bool
+}
+
+// IsSet returns true if OptAppInvalidDetails was set.
+func (o OptAppInvalidDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptAppInvalidDetails) Reset() {
+	var v AppInvalidDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptAppInvalidDetails) SetTo(v AppInvalidDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptAppInvalidDetails) Get() (v AppInvalidDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptAppInvalidDetails) Or(d AppInvalidDetails) AppInvalidDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptAppNotFoundDetails returns new OptAppNotFoundDetails with value set to v.
+func NewOptAppNotFoundDetails(v AppNotFoundDetails) OptAppNotFoundDetails {
+	return OptAppNotFoundDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptAppNotFoundDetails is optional AppNotFoundDetails.
+type OptAppNotFoundDetails struct {
+	Value AppNotFoundDetails
+	Set   bool
+}
+
+// IsSet returns true if OptAppNotFoundDetails was set.
+func (o OptAppNotFoundDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptAppNotFoundDetails) Reset() {
+	var v AppNotFoundDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptAppNotFoundDetails) SetTo(v AppNotFoundDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptAppNotFoundDetails) Get() (v AppNotFoundDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptAppNotFoundDetails) Or(d AppNotFoundDetails) AppNotFoundDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptAppPermissionDeniedDetails returns new OptAppPermissionDeniedDetails with value set to v.
+func NewOptAppPermissionDeniedDetails(v AppPermissionDeniedDetails) OptAppPermissionDeniedDetails {
+	return OptAppPermissionDeniedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptAppPermissionDeniedDetails is optional AppPermissionDeniedDetails.
+type OptAppPermissionDeniedDetails struct {
+	Value AppPermissionDeniedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptAppPermissionDeniedDetails was set.
+func (o OptAppPermissionDeniedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptAppPermissionDeniedDetails) Reset() {
+	var v AppPermissionDeniedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptAppPermissionDeniedDetails) SetTo(v AppPermissionDeniedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptAppPermissionDeniedDetails) Get() (v AppPermissionDeniedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptAppPermissionDeniedDetails) Or(d AppPermissionDeniedDetails) AppPermissionDeniedDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptAppRevisionConflictDetails returns new OptAppRevisionConflictDetails with value set to v.
+func NewOptAppRevisionConflictDetails(v AppRevisionConflictDetails) OptAppRevisionConflictDetails {
+	return OptAppRevisionConflictDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptAppRevisionConflictDetails is optional AppRevisionConflictDetails.
+type OptAppRevisionConflictDetails struct {
+	Value AppRevisionConflictDetails
+	Set   bool
+}
+
+// IsSet returns true if OptAppRevisionConflictDetails was set.
+func (o OptAppRevisionConflictDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptAppRevisionConflictDetails) Reset() {
+	var v AppRevisionConflictDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptAppRevisionConflictDetails) SetTo(v AppRevisionConflictDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptAppRevisionConflictDetails) Get() (v AppRevisionConflictDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptAppRevisionConflictDetails) Or(d AppRevisionConflictDetails) AppRevisionConflictDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptApplicationCreatedEventDelegationType returns new OptApplicationCreatedEventDelegationType with value set to v.
+func NewOptApplicationCreatedEventDelegationType(v ApplicationCreatedEventDelegationType) OptApplicationCreatedEventDelegationType {
+	return OptApplicationCreatedEventDelegationType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptApplicationCreatedEventDelegationType is optional ApplicationCreatedEventDelegationType.
+type OptApplicationCreatedEventDelegationType struct {
+	Value ApplicationCreatedEventDelegationType
+	Set   bool
+}
+
+// IsSet returns true if OptApplicationCreatedEventDelegationType was set.
+func (o OptApplicationCreatedEventDelegationType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptApplicationCreatedEventDelegationType) Reset() {
+	var v ApplicationCreatedEventDelegationType
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptApplicationCreatedEventDelegationType) SetTo(v ApplicationCreatedEventDelegationType) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptApplicationCreatedEventDelegationType) Get() (v ApplicationCreatedEventDelegationType, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptApplicationCreatedEventDelegationType) Or(d ApplicationCreatedEventDelegationType) ApplicationCreatedEventDelegationType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptApplicationUpdatedEventDelegationType returns new OptApplicationUpdatedEventDelegationType with value set to v.
+func NewOptApplicationUpdatedEventDelegationType(v ApplicationUpdatedEventDelegationType) OptApplicationUpdatedEventDelegationType {
+	return OptApplicationUpdatedEventDelegationType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptApplicationUpdatedEventDelegationType is optional ApplicationUpdatedEventDelegationType.
+type OptApplicationUpdatedEventDelegationType struct {
+	Value ApplicationUpdatedEventDelegationType
+	Set   bool
+}
+
+// IsSet returns true if OptApplicationUpdatedEventDelegationType was set.
+func (o OptApplicationUpdatedEventDelegationType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptApplicationUpdatedEventDelegationType) Reset() {
+	var v ApplicationUpdatedEventDelegationType
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptApplicationUpdatedEventDelegationType) SetTo(v ApplicationUpdatedEventDelegationType) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptApplicationUpdatedEventDelegationType) Get() (v ApplicationUpdatedEventDelegationType, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptApplicationUpdatedEventDelegationType) Or(d ApplicationUpdatedEventDelegationType) ApplicationUpdatedEventDelegationType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptAttAlreadyHandedOffDetails returns new OptAttAlreadyHandedOffDetails with value set to v.
 func NewOptAttAlreadyHandedOffDetails(v AttAlreadyHandedOffDetails) OptAttAlreadyHandedOffDetails {
 	return OptAttAlreadyHandedOffDetails{
@@ -58165,6 +64401,98 @@ func (o OptFlowNotFoundDetails) Or(d FlowNotFoundDetails) FlowNotFoundDetails {
 	return d
 }
 
+// NewOptFlowProofInvalidDetails returns new OptFlowProofInvalidDetails with value set to v.
+func NewOptFlowProofInvalidDetails(v FlowProofInvalidDetails) OptFlowProofInvalidDetails {
+	return OptFlowProofInvalidDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFlowProofInvalidDetails is optional FlowProofInvalidDetails.
+type OptFlowProofInvalidDetails struct {
+	Value FlowProofInvalidDetails
+	Set   bool
+}
+
+// IsSet returns true if OptFlowProofInvalidDetails was set.
+func (o OptFlowProofInvalidDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFlowProofInvalidDetails) Reset() {
+	var v FlowProofInvalidDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFlowProofInvalidDetails) SetTo(v FlowProofInvalidDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFlowProofInvalidDetails) Get() (v FlowProofInvalidDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFlowProofInvalidDetails) Or(d FlowProofInvalidDetails) FlowProofInvalidDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptFlowRateLimitedDetails returns new OptFlowRateLimitedDetails with value set to v.
+func NewOptFlowRateLimitedDetails(v FlowRateLimitedDetails) OptFlowRateLimitedDetails {
+	return OptFlowRateLimitedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFlowRateLimitedDetails is optional FlowRateLimitedDetails.
+type OptFlowRateLimitedDetails struct {
+	Value FlowRateLimitedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptFlowRateLimitedDetails was set.
+func (o OptFlowRateLimitedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFlowRateLimitedDetails) Reset() {
+	var v FlowRateLimitedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFlowRateLimitedDetails) SetTo(v FlowRateLimitedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFlowRateLimitedDetails) Get() (v FlowRateLimitedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFlowRateLimitedDetails) Or(d FlowRateLimitedDetails) FlowRateLimitedDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptFlowRestartRequiredDetails returns new OptFlowRestartRequiredDetails with value set to v.
 func NewOptFlowRestartRequiredDetails(v FlowRestartRequiredDetails) OptFlowRestartRequiredDetails {
 	return OptFlowRestartRequiredDetails{
@@ -58251,6 +64579,98 @@ func (o OptFlowSSOUserSchemaMismatchDetails) Get() (v FlowSSOUserSchemaMismatchD
 
 // Or returns value if set, or given parameter if does not.
 func (o OptFlowSSOUserSchemaMismatchDetails) Or(d FlowSSOUserSchemaMismatchDetails) FlowSSOUserSchemaMismatchDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptFlowSignupChallengeConsumedEventDelegationType returns new OptFlowSignupChallengeConsumedEventDelegationType with value set to v.
+func NewOptFlowSignupChallengeConsumedEventDelegationType(v FlowSignupChallengeConsumedEventDelegationType) OptFlowSignupChallengeConsumedEventDelegationType {
+	return OptFlowSignupChallengeConsumedEventDelegationType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFlowSignupChallengeConsumedEventDelegationType is optional FlowSignupChallengeConsumedEventDelegationType.
+type OptFlowSignupChallengeConsumedEventDelegationType struct {
+	Value FlowSignupChallengeConsumedEventDelegationType
+	Set   bool
+}
+
+// IsSet returns true if OptFlowSignupChallengeConsumedEventDelegationType was set.
+func (o OptFlowSignupChallengeConsumedEventDelegationType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFlowSignupChallengeConsumedEventDelegationType) Reset() {
+	var v FlowSignupChallengeConsumedEventDelegationType
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFlowSignupChallengeConsumedEventDelegationType) SetTo(v FlowSignupChallengeConsumedEventDelegationType) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFlowSignupChallengeConsumedEventDelegationType) Get() (v FlowSignupChallengeConsumedEventDelegationType, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFlowSignupChallengeConsumedEventDelegationType) Or(d FlowSignupChallengeConsumedEventDelegationType) FlowSignupChallengeConsumedEventDelegationType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptFlowSignupChallengeIssuedEventDelegationType returns new OptFlowSignupChallengeIssuedEventDelegationType with value set to v.
+func NewOptFlowSignupChallengeIssuedEventDelegationType(v FlowSignupChallengeIssuedEventDelegationType) OptFlowSignupChallengeIssuedEventDelegationType {
+	return OptFlowSignupChallengeIssuedEventDelegationType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFlowSignupChallengeIssuedEventDelegationType is optional FlowSignupChallengeIssuedEventDelegationType.
+type OptFlowSignupChallengeIssuedEventDelegationType struct {
+	Value FlowSignupChallengeIssuedEventDelegationType
+	Set   bool
+}
+
+// IsSet returns true if OptFlowSignupChallengeIssuedEventDelegationType was set.
+func (o OptFlowSignupChallengeIssuedEventDelegationType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFlowSignupChallengeIssuedEventDelegationType) Reset() {
+	var v FlowSignupChallengeIssuedEventDelegationType
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFlowSignupChallengeIssuedEventDelegationType) SetTo(v FlowSignupChallengeIssuedEventDelegationType) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFlowSignupChallengeIssuedEventDelegationType) Get() (v FlowSignupChallengeIssuedEventDelegationType, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFlowSignupChallengeIssuedEventDelegationType) Or(d FlowSignupChallengeIssuedEventDelegationType) FlowSignupChallengeIssuedEventDelegationType {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -61017,6 +67437,144 @@ func (o OptInvSelfAcceptDetails) Or(d InvSelfAcceptDetails) InvSelfAcceptDetails
 	return d
 }
 
+// NewOptInvitationAcceptedEventDelegationType returns new OptInvitationAcceptedEventDelegationType with value set to v.
+func NewOptInvitationAcceptedEventDelegationType(v InvitationAcceptedEventDelegationType) OptInvitationAcceptedEventDelegationType {
+	return OptInvitationAcceptedEventDelegationType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptInvitationAcceptedEventDelegationType is optional InvitationAcceptedEventDelegationType.
+type OptInvitationAcceptedEventDelegationType struct {
+	Value InvitationAcceptedEventDelegationType
+	Set   bool
+}
+
+// IsSet returns true if OptInvitationAcceptedEventDelegationType was set.
+func (o OptInvitationAcceptedEventDelegationType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptInvitationAcceptedEventDelegationType) Reset() {
+	var v InvitationAcceptedEventDelegationType
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptInvitationAcceptedEventDelegationType) SetTo(v InvitationAcceptedEventDelegationType) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptInvitationAcceptedEventDelegationType) Get() (v InvitationAcceptedEventDelegationType, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptInvitationAcceptedEventDelegationType) Or(d InvitationAcceptedEventDelegationType) InvitationAcceptedEventDelegationType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptInvitationCancelledEventDelegationType returns new OptInvitationCancelledEventDelegationType with value set to v.
+func NewOptInvitationCancelledEventDelegationType(v InvitationCancelledEventDelegationType) OptInvitationCancelledEventDelegationType {
+	return OptInvitationCancelledEventDelegationType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptInvitationCancelledEventDelegationType is optional InvitationCancelledEventDelegationType.
+type OptInvitationCancelledEventDelegationType struct {
+	Value InvitationCancelledEventDelegationType
+	Set   bool
+}
+
+// IsSet returns true if OptInvitationCancelledEventDelegationType was set.
+func (o OptInvitationCancelledEventDelegationType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptInvitationCancelledEventDelegationType) Reset() {
+	var v InvitationCancelledEventDelegationType
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptInvitationCancelledEventDelegationType) SetTo(v InvitationCancelledEventDelegationType) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptInvitationCancelledEventDelegationType) Get() (v InvitationCancelledEventDelegationType, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptInvitationCancelledEventDelegationType) Or(d InvitationCancelledEventDelegationType) InvitationCancelledEventDelegationType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptInvitationCreatedEventDelegationType returns new OptInvitationCreatedEventDelegationType with value set to v.
+func NewOptInvitationCreatedEventDelegationType(v InvitationCreatedEventDelegationType) OptInvitationCreatedEventDelegationType {
+	return OptInvitationCreatedEventDelegationType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptInvitationCreatedEventDelegationType is optional InvitationCreatedEventDelegationType.
+type OptInvitationCreatedEventDelegationType struct {
+	Value InvitationCreatedEventDelegationType
+	Set   bool
+}
+
+// IsSet returns true if OptInvitationCreatedEventDelegationType was set.
+func (o OptInvitationCreatedEventDelegationType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptInvitationCreatedEventDelegationType) Reset() {
+	var v InvitationCreatedEventDelegationType
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptInvitationCreatedEventDelegationType) SetTo(v InvitationCreatedEventDelegationType) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptInvitationCreatedEventDelegationType) Get() (v InvitationCreatedEventDelegationType, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptInvitationCreatedEventDelegationType) Or(d InvitationCreatedEventDelegationType) InvitationCreatedEventDelegationType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptInvitationID returns new OptInvitationID with value set to v.
 func NewOptInvitationID(v InvitationID) OptInvitationID {
 	return OptInvitationID{
@@ -61103,6 +67661,52 @@ func (o OptInvitationMetadata) Get() (v InvitationMetadata, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptInvitationMetadata) Or(d InvitationMetadata) InvitationMetadata {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptInvitationRejectedEventDelegationType returns new OptInvitationRejectedEventDelegationType with value set to v.
+func NewOptInvitationRejectedEventDelegationType(v InvitationRejectedEventDelegationType) OptInvitationRejectedEventDelegationType {
+	return OptInvitationRejectedEventDelegationType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptInvitationRejectedEventDelegationType is optional InvitationRejectedEventDelegationType.
+type OptInvitationRejectedEventDelegationType struct {
+	Value InvitationRejectedEventDelegationType
+	Set   bool
+}
+
+// IsSet returns true if OptInvitationRejectedEventDelegationType was set.
+func (o OptInvitationRejectedEventDelegationType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptInvitationRejectedEventDelegationType) Reset() {
+	var v InvitationRejectedEventDelegationType
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptInvitationRejectedEventDelegationType) SetTo(v InvitationRejectedEventDelegationType) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptInvitationRejectedEventDelegationType) Get() (v InvitationRejectedEventDelegationType, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptInvitationRejectedEventDelegationType) Or(d InvitationRejectedEventDelegationType) InvitationRejectedEventDelegationType {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -61563,6 +68167,132 @@ func (o OptListSchemasRevisions) Get() (v ListSchemasRevisions, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptListSchemasRevisions) Or(d ListSchemasRevisions) ListSchemasRevisions {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilApplicationCreatedEventActorType returns new OptNilApplicationCreatedEventActorType with value set to v.
+func NewOptNilApplicationCreatedEventActorType(v ApplicationCreatedEventActorType) OptNilApplicationCreatedEventActorType {
+	return OptNilApplicationCreatedEventActorType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilApplicationCreatedEventActorType is optional nullable ApplicationCreatedEventActorType.
+type OptNilApplicationCreatedEventActorType struct {
+	Value ApplicationCreatedEventActorType
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilApplicationCreatedEventActorType was set.
+func (o OptNilApplicationCreatedEventActorType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilApplicationCreatedEventActorType) Reset() {
+	var v ApplicationCreatedEventActorType
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilApplicationCreatedEventActorType) SetTo(v ApplicationCreatedEventActorType) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilApplicationCreatedEventActorType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilApplicationCreatedEventActorType) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v ApplicationCreatedEventActorType
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilApplicationCreatedEventActorType) Get() (v ApplicationCreatedEventActorType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilApplicationCreatedEventActorType) Or(d ApplicationCreatedEventActorType) ApplicationCreatedEventActorType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilApplicationUpdatedEventActorType returns new OptNilApplicationUpdatedEventActorType with value set to v.
+func NewOptNilApplicationUpdatedEventActorType(v ApplicationUpdatedEventActorType) OptNilApplicationUpdatedEventActorType {
+	return OptNilApplicationUpdatedEventActorType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilApplicationUpdatedEventActorType is optional nullable ApplicationUpdatedEventActorType.
+type OptNilApplicationUpdatedEventActorType struct {
+	Value ApplicationUpdatedEventActorType
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilApplicationUpdatedEventActorType was set.
+func (o OptNilApplicationUpdatedEventActorType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilApplicationUpdatedEventActorType) Reset() {
+	var v ApplicationUpdatedEventActorType
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilApplicationUpdatedEventActorType) SetTo(v ApplicationUpdatedEventActorType) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilApplicationUpdatedEventActorType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilApplicationUpdatedEventActorType) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v ApplicationUpdatedEventActorType
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilApplicationUpdatedEventActorType) Get() (v ApplicationUpdatedEventActorType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilApplicationUpdatedEventActorType) Or(d ApplicationUpdatedEventActorType) ApplicationUpdatedEventActorType {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -62955,6 +69685,132 @@ func (o OptNilFlowDefinitionStepTransitionsItemPurpose) Or(d FlowDefinitionStepT
 	return d
 }
 
+// NewOptNilFlowSignupChallengeConsumedEventActorType returns new OptNilFlowSignupChallengeConsumedEventActorType with value set to v.
+func NewOptNilFlowSignupChallengeConsumedEventActorType(v FlowSignupChallengeConsumedEventActorType) OptNilFlowSignupChallengeConsumedEventActorType {
+	return OptNilFlowSignupChallengeConsumedEventActorType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilFlowSignupChallengeConsumedEventActorType is optional nullable FlowSignupChallengeConsumedEventActorType.
+type OptNilFlowSignupChallengeConsumedEventActorType struct {
+	Value FlowSignupChallengeConsumedEventActorType
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilFlowSignupChallengeConsumedEventActorType was set.
+func (o OptNilFlowSignupChallengeConsumedEventActorType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilFlowSignupChallengeConsumedEventActorType) Reset() {
+	var v FlowSignupChallengeConsumedEventActorType
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilFlowSignupChallengeConsumedEventActorType) SetTo(v FlowSignupChallengeConsumedEventActorType) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilFlowSignupChallengeConsumedEventActorType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilFlowSignupChallengeConsumedEventActorType) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v FlowSignupChallengeConsumedEventActorType
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilFlowSignupChallengeConsumedEventActorType) Get() (v FlowSignupChallengeConsumedEventActorType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilFlowSignupChallengeConsumedEventActorType) Or(d FlowSignupChallengeConsumedEventActorType) FlowSignupChallengeConsumedEventActorType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilFlowSignupChallengeIssuedEventActorType returns new OptNilFlowSignupChallengeIssuedEventActorType with value set to v.
+func NewOptNilFlowSignupChallengeIssuedEventActorType(v FlowSignupChallengeIssuedEventActorType) OptNilFlowSignupChallengeIssuedEventActorType {
+	return OptNilFlowSignupChallengeIssuedEventActorType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilFlowSignupChallengeIssuedEventActorType is optional nullable FlowSignupChallengeIssuedEventActorType.
+type OptNilFlowSignupChallengeIssuedEventActorType struct {
+	Value FlowSignupChallengeIssuedEventActorType
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilFlowSignupChallengeIssuedEventActorType was set.
+func (o OptNilFlowSignupChallengeIssuedEventActorType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilFlowSignupChallengeIssuedEventActorType) Reset() {
+	var v FlowSignupChallengeIssuedEventActorType
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilFlowSignupChallengeIssuedEventActorType) SetTo(v FlowSignupChallengeIssuedEventActorType) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilFlowSignupChallengeIssuedEventActorType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilFlowSignupChallengeIssuedEventActorType) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v FlowSignupChallengeIssuedEventActorType
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilFlowSignupChallengeIssuedEventActorType) Get() (v FlowSignupChallengeIssuedEventActorType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilFlowSignupChallengeIssuedEventActorType) Or(d FlowSignupChallengeIssuedEventActorType) FlowSignupChallengeIssuedEventActorType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptNilFlowdefCreatedEventActorType returns new OptNilFlowdefCreatedEventActorType with value set to v.
 func NewOptNilFlowdefCreatedEventActorType(v FlowdefCreatedEventActorType) OptNilFlowdefCreatedEventActorType {
 	return OptNilFlowdefCreatedEventActorType{
@@ -63333,6 +70189,195 @@ func (o OptNilIdpUpdatedEventActorType) Or(d IdpUpdatedEventActorType) IdpUpdate
 	return d
 }
 
+// NewOptNilInvitationAcceptedEventActorType returns new OptNilInvitationAcceptedEventActorType with value set to v.
+func NewOptNilInvitationAcceptedEventActorType(v InvitationAcceptedEventActorType) OptNilInvitationAcceptedEventActorType {
+	return OptNilInvitationAcceptedEventActorType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilInvitationAcceptedEventActorType is optional nullable InvitationAcceptedEventActorType.
+type OptNilInvitationAcceptedEventActorType struct {
+	Value InvitationAcceptedEventActorType
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilInvitationAcceptedEventActorType was set.
+func (o OptNilInvitationAcceptedEventActorType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilInvitationAcceptedEventActorType) Reset() {
+	var v InvitationAcceptedEventActorType
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilInvitationAcceptedEventActorType) SetTo(v InvitationAcceptedEventActorType) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilInvitationAcceptedEventActorType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilInvitationAcceptedEventActorType) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v InvitationAcceptedEventActorType
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilInvitationAcceptedEventActorType) Get() (v InvitationAcceptedEventActorType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilInvitationAcceptedEventActorType) Or(d InvitationAcceptedEventActorType) InvitationAcceptedEventActorType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilInvitationCancelledEventActorType returns new OptNilInvitationCancelledEventActorType with value set to v.
+func NewOptNilInvitationCancelledEventActorType(v InvitationCancelledEventActorType) OptNilInvitationCancelledEventActorType {
+	return OptNilInvitationCancelledEventActorType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilInvitationCancelledEventActorType is optional nullable InvitationCancelledEventActorType.
+type OptNilInvitationCancelledEventActorType struct {
+	Value InvitationCancelledEventActorType
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilInvitationCancelledEventActorType was set.
+func (o OptNilInvitationCancelledEventActorType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilInvitationCancelledEventActorType) Reset() {
+	var v InvitationCancelledEventActorType
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilInvitationCancelledEventActorType) SetTo(v InvitationCancelledEventActorType) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilInvitationCancelledEventActorType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilInvitationCancelledEventActorType) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v InvitationCancelledEventActorType
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilInvitationCancelledEventActorType) Get() (v InvitationCancelledEventActorType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilInvitationCancelledEventActorType) Or(d InvitationCancelledEventActorType) InvitationCancelledEventActorType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilInvitationCreatedEventActorType returns new OptNilInvitationCreatedEventActorType with value set to v.
+func NewOptNilInvitationCreatedEventActorType(v InvitationCreatedEventActorType) OptNilInvitationCreatedEventActorType {
+	return OptNilInvitationCreatedEventActorType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilInvitationCreatedEventActorType is optional nullable InvitationCreatedEventActorType.
+type OptNilInvitationCreatedEventActorType struct {
+	Value InvitationCreatedEventActorType
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilInvitationCreatedEventActorType was set.
+func (o OptNilInvitationCreatedEventActorType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilInvitationCreatedEventActorType) Reset() {
+	var v InvitationCreatedEventActorType
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilInvitationCreatedEventActorType) SetTo(v InvitationCreatedEventActorType) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilInvitationCreatedEventActorType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilInvitationCreatedEventActorType) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v InvitationCreatedEventActorType
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilInvitationCreatedEventActorType) Get() (v InvitationCreatedEventActorType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilInvitationCreatedEventActorType) Or(d InvitationCreatedEventActorType) InvitationCreatedEventActorType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptNilInvitationLookupProjectMemberResponseCreatedByType returns new OptNilInvitationLookupProjectMemberResponseCreatedByType with value set to v.
 func NewOptNilInvitationLookupProjectMemberResponseCreatedByType(v InvitationLookupProjectMemberResponseCreatedByType) OptNilInvitationLookupProjectMemberResponseCreatedByType {
 	return OptNilInvitationLookupProjectMemberResponseCreatedByType{
@@ -63579,6 +70624,69 @@ func (o OptNilInvitationProjectMemberCreatedByType) Get() (v InvitationProjectMe
 
 // Or returns value if set, or given parameter if does not.
 func (o OptNilInvitationProjectMemberCreatedByType) Or(d InvitationProjectMemberCreatedByType) InvitationProjectMemberCreatedByType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilInvitationRejectedEventActorType returns new OptNilInvitationRejectedEventActorType with value set to v.
+func NewOptNilInvitationRejectedEventActorType(v InvitationRejectedEventActorType) OptNilInvitationRejectedEventActorType {
+	return OptNilInvitationRejectedEventActorType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilInvitationRejectedEventActorType is optional nullable InvitationRejectedEventActorType.
+type OptNilInvitationRejectedEventActorType struct {
+	Value InvitationRejectedEventActorType
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilInvitationRejectedEventActorType was set.
+func (o OptNilInvitationRejectedEventActorType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilInvitationRejectedEventActorType) Reset() {
+	var v InvitationRejectedEventActorType
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilInvitationRejectedEventActorType) SetTo(v InvitationRejectedEventActorType) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilInvitationRejectedEventActorType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilInvitationRejectedEventActorType) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v InvitationRejectedEventActorType
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilInvitationRejectedEventActorType) Get() (v InvitationRejectedEventActorType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilInvitationRejectedEventActorType) Or(d InvitationRejectedEventActorType) InvitationRejectedEventActorType {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -65836,6 +72944,52 @@ func (o OptNotImplementedDetails) Or(d NotImplementedDetails) NotImplementedDeta
 	return d
 }
 
+// NewOptOAuthSettings returns new OptOAuthSettings with value set to v.
+func NewOptOAuthSettings(v OAuthSettings) OptOAuthSettings {
+	return OptOAuthSettings{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptOAuthSettings is optional OAuthSettings.
+type OptOAuthSettings struct {
+	Value OAuthSettings
+	Set   bool
+}
+
+// IsSet returns true if OptOAuthSettings was set.
+func (o OptOAuthSettings) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptOAuthSettings) Reset() {
+	var v OAuthSettings
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptOAuthSettings) SetTo(v OAuthSettings) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptOAuthSettings) Get() (v OAuthSettings, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptOAuthSettings) Or(d OAuthSettings) OAuthSettings {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptOrigin returns new OptOrigin with value set to v.
 func NewOptOrigin(v Origin) OptOrigin {
 	return OptOrigin{
@@ -66796,6 +73950,52 @@ func (o OptPolicyUpdatedEventDelegationType) Get() (v PolicyUpdatedEventDelegati
 
 // Or returns value if set, or given parameter if does not.
 func (o OptPolicyUpdatedEventDelegationType) Or(d PolicyUpdatedEventDelegationType) PolicyUpdatedEventDelegationType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptPowChallenge returns new OptPowChallenge with value set to v.
+func NewOptPowChallenge(v PowChallenge) OptPowChallenge {
+	return OptPowChallenge{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptPowChallenge is optional PowChallenge.
+type OptPowChallenge struct {
+	Value PowChallenge
+	Set   bool
+}
+
+// IsSet returns true if OptPowChallenge was set.
+func (o OptPowChallenge) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptPowChallenge) Reset() {
+	var v PowChallenge
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptPowChallenge) SetTo(v PowChallenge) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptPowChallenge) Get() (v PowChallenge, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptPowChallenge) Or(d PowChallenge) PowChallenge {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -68780,6 +75980,52 @@ func (o OptRollbackDeploymentRequest) Or(d RollbackDeploymentRequest) RollbackDe
 	return d
 }
 
+// NewOptRuntimeGateConfig returns new OptRuntimeGateConfig with value set to v.
+func NewOptRuntimeGateConfig(v RuntimeGateConfig) OptRuntimeGateConfig {
+	return OptRuntimeGateConfig{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptRuntimeGateConfig is optional RuntimeGateConfig.
+type OptRuntimeGateConfig struct {
+	Value RuntimeGateConfig
+	Set   bool
+}
+
+// IsSet returns true if OptRuntimeGateConfig was set.
+func (o OptRuntimeGateConfig) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptRuntimeGateConfig) Reset() {
+	var v RuntimeGateConfig
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptRuntimeGateConfig) SetTo(v RuntimeGateConfig) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptRuntimeGateConfig) Get() (v RuntimeGateConfig, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptRuntimeGateConfig) Or(d RuntimeGateConfig) RuntimeGateConfig {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptSSOAuthMethod returns new OptSSOAuthMethod with value set to v.
 func NewOptSSOAuthMethod(v SSOAuthMethod) OptSSOAuthMethod {
 	return OptSSOAuthMethod{
@@ -69694,6 +76940,52 @@ func (o OptSessTokenCreationFailedDetails) Get() (v SessTokenCreationFailedDetai
 
 // Or returns value if set, or given parameter if does not.
 func (o OptSessTokenCreationFailedDetails) Or(d SessTokenCreationFailedDetails) SessTokenCreationFailedDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptSessTokenInvalidDetails returns new OptSessTokenInvalidDetails with value set to v.
+func NewOptSessTokenInvalidDetails(v SessTokenInvalidDetails) OptSessTokenInvalidDetails {
+	return OptSessTokenInvalidDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptSessTokenInvalidDetails is optional SessTokenInvalidDetails.
+type OptSessTokenInvalidDetails struct {
+	Value SessTokenInvalidDetails
+	Set   bool
+}
+
+// IsSet returns true if OptSessTokenInvalidDetails was set.
+func (o OptSessTokenInvalidDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptSessTokenInvalidDetails) Reset() {
+	var v SessTokenInvalidDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptSessTokenInvalidDetails) SetTo(v SessTokenInvalidDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptSessTokenInvalidDetails) Get() (v SessTokenInvalidDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptSessTokenInvalidDetails) Or(d SessTokenInvalidDetails) SessTokenInvalidDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -70896,6 +78188,52 @@ func (o OptUserConflictDetails) Or(d UserConflictDetails) UserConflictDetails {
 	return d
 }
 
+// NewOptUserCreateConfigChallenge returns new OptUserCreateConfigChallenge with value set to v.
+func NewOptUserCreateConfigChallenge(v UserCreateConfigChallenge) OptUserCreateConfigChallenge {
+	return OptUserCreateConfigChallenge{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptUserCreateConfigChallenge is optional UserCreateConfigChallenge.
+type OptUserCreateConfigChallenge struct {
+	Value UserCreateConfigChallenge
+	Set   bool
+}
+
+// IsSet returns true if OptUserCreateConfigChallenge was set.
+func (o OptUserCreateConfigChallenge) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptUserCreateConfigChallenge) Reset() {
+	var v UserCreateConfigChallenge
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptUserCreateConfigChallenge) SetTo(v UserCreateConfigChallenge) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptUserCreateConfigChallenge) Get() (v UserCreateConfigChallenge, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptUserCreateConfigChallenge) Or(d UserCreateConfigChallenge) UserCreateConfigChallenge {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptUserCreateFailedEventDelegationType returns new OptUserCreateFailedEventDelegationType with value set to v.
 func NewOptUserCreateFailedEventDelegationType(v UserCreateFailedEventDelegationType) OptUserCreateFailedEventDelegationType {
 	return OptUserCreateFailedEventDelegationType{
@@ -71350,6 +78688,52 @@ func (o OptUserPasswordEmptyDetails) Get() (v UserPasswordEmptyDetails, ok bool)
 
 // Or returns value if set, or given parameter if does not.
 func (o OptUserPasswordEmptyDetails) Or(d UserPasswordEmptyDetails) UserPasswordEmptyDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptUserPasswordHashingBusyDetails returns new OptUserPasswordHashingBusyDetails with value set to v.
+func NewOptUserPasswordHashingBusyDetails(v UserPasswordHashingBusyDetails) OptUserPasswordHashingBusyDetails {
+	return OptUserPasswordHashingBusyDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptUserPasswordHashingBusyDetails is optional UserPasswordHashingBusyDetails.
+type OptUserPasswordHashingBusyDetails struct {
+	Value UserPasswordHashingBusyDetails
+	Set   bool
+}
+
+// IsSet returns true if OptUserPasswordHashingBusyDetails was set.
+func (o OptUserPasswordHashingBusyDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptUserPasswordHashingBusyDetails) Reset() {
+	var v UserPasswordHashingBusyDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptUserPasswordHashingBusyDetails) SetTo(v UserPasswordHashingBusyDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptUserPasswordHashingBusyDetails) Get() (v UserPasswordHashingBusyDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptUserPasswordHashingBusyDetails) Or(d UserPasswordHashingBusyDetails) UserPasswordHashingBusyDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -76196,6 +83580,7 @@ func (s *PolRevisionConflictDetails) init() PolRevisionConflictDetails {
 type Policy struct {
 	Type              PolicyType // switch on this field
 	PasswordSetPolicy PasswordSetPolicy
+	UserCreatePolicy  UserCreatePolicy
 }
 
 // PolicyType is oneOf type of Policy.
@@ -76204,10 +83589,14 @@ type PolicyType string
 // Possible values for PolicyType.
 const (
 	PasswordSetPolicyPolicy PolicyType = "auth.factor.password.set"
+	UserCreatePolicyPolicy  PolicyType = "user.create"
 )
 
 // IsPasswordSetPolicy reports whether Policy is PasswordSetPolicy.
 func (s Policy) IsPasswordSetPolicy() bool { return s.Type == PasswordSetPolicyPolicy }
+
+// IsUserCreatePolicy reports whether Policy is UserCreatePolicy.
+func (s Policy) IsUserCreatePolicy() bool { return s.Type == UserCreatePolicyPolicy }
 
 // SetPasswordSetPolicy sets Policy to PasswordSetPolicy.
 func (s *Policy) SetPasswordSetPolicy(v PasswordSetPolicy) {
@@ -76227,6 +83616,27 @@ func (s Policy) GetPasswordSetPolicy() (v PasswordSetPolicy, ok bool) {
 func NewPasswordSetPolicyPolicy(v PasswordSetPolicy) Policy {
 	var s Policy
 	s.SetPasswordSetPolicy(v)
+	return s
+}
+
+// SetUserCreatePolicy sets Policy to UserCreatePolicy.
+func (s *Policy) SetUserCreatePolicy(v UserCreatePolicy) {
+	s.Type = UserCreatePolicyPolicy
+	s.UserCreatePolicy = v
+}
+
+// GetUserCreatePolicy returns UserCreatePolicy and true boolean if Policy is UserCreatePolicy.
+func (s Policy) GetUserCreatePolicy() (v UserCreatePolicy, ok bool) {
+	if !s.IsUserCreatePolicy() {
+		return v, false
+	}
+	return s.UserCreatePolicy, true
+}
+
+// NewUserCreatePolicyPolicy returns new Policy from UserCreatePolicy.
+func NewUserCreatePolicyPolicy(v UserCreatePolicy) Policy {
+	var s Policy
+	s.SetUserCreatePolicy(v)
 	return s
 }
 
@@ -76689,12 +84099,14 @@ type PolicyOperation string
 
 const (
 	PolicyOperationAuthFactorPasswordSet PolicyOperation = "auth.factor.password.set"
+	PolicyOperationUserCreate            PolicyOperation = "user.create"
 )
 
 // AllValues returns all PolicyOperation values.
 func (PolicyOperation) AllValues() []PolicyOperation {
 	return []PolicyOperation{
 		PolicyOperationAuthFactorPasswordSet,
+		PolicyOperationUserCreate,
 	}
 }
 
@@ -76702,6 +84114,8 @@ func (PolicyOperation) AllValues() []PolicyOperation {
 func (s PolicyOperation) MarshalText() ([]byte, error) {
 	switch s {
 	case PolicyOperationAuthFactorPasswordSet:
+		return []byte(s), nil
+	case PolicyOperationUserCreate:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -76713,6 +84127,9 @@ func (s *PolicyOperation) UnmarshalText(data []byte) error {
 	switch PolicyOperation(data) {
 	case PolicyOperationAuthFactorPasswordSet:
 		*s = PolicyOperationAuthFactorPasswordSet
+		return nil
+	case PolicyOperationUserCreate:
+		*s = PolicyOperationUserCreate
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)
@@ -77222,6 +84639,95 @@ func (s *PolicyUpdatedEventDelegationType) UnmarshalText(data []byte) error {
 	default:
 		return errors.Errorf("invalid value: %q", data)
 	}
+}
+
+// A short-lived, single-use signup challenge scoped to this project and flow.
+// For pbkdf2_sha256_5000_l1, try counters 0 through 511, deriving 32 bytes with
+// PBKDF2-HMAC-SHA256 (5000 iterations), password nonce || uint32_be(counter),
+// and the supplied salt. Match the first 16 derived bytes to key_prefix.
+// Submit gate_proofs.signup_pow as a JSON string containing protocol,
+// challenge_id and derived_key (the full 32 bytes in lowercase hex).
+// The proof is spent before the user is created (for a password, before it
+// is hashed), even if user creation fails.
+// Ref: #
+type PowChallenge struct {
+	Protocol    string    `json:"protocol"`
+	ChallengeID string    `json:"challenge_id"`
+	ProfileID   string    `json:"profile_id"`
+	Salt        string    `json:"salt"`
+	Nonce       string    `json:"nonce"`
+	KeyPrefix   string    `json:"key_prefix"`
+	ExpiresAt   time.Time `json:"expires_at"`
+}
+
+// GetProtocol returns the value of Protocol.
+func (s *PowChallenge) GetProtocol() string {
+	return s.Protocol
+}
+
+// GetChallengeID returns the value of ChallengeID.
+func (s *PowChallenge) GetChallengeID() string {
+	return s.ChallengeID
+}
+
+// GetProfileID returns the value of ProfileID.
+func (s *PowChallenge) GetProfileID() string {
+	return s.ProfileID
+}
+
+// GetSalt returns the value of Salt.
+func (s *PowChallenge) GetSalt() string {
+	return s.Salt
+}
+
+// GetNonce returns the value of Nonce.
+func (s *PowChallenge) GetNonce() string {
+	return s.Nonce
+}
+
+// GetKeyPrefix returns the value of KeyPrefix.
+func (s *PowChallenge) GetKeyPrefix() string {
+	return s.KeyPrefix
+}
+
+// GetExpiresAt returns the value of ExpiresAt.
+func (s *PowChallenge) GetExpiresAt() time.Time {
+	return s.ExpiresAt
+}
+
+// SetProtocol sets the value of Protocol.
+func (s *PowChallenge) SetProtocol(val string) {
+	s.Protocol = val
+}
+
+// SetChallengeID sets the value of ChallengeID.
+func (s *PowChallenge) SetChallengeID(val string) {
+	s.ChallengeID = val
+}
+
+// SetProfileID sets the value of ProfileID.
+func (s *PowChallenge) SetProfileID(val string) {
+	s.ProfileID = val
+}
+
+// SetSalt sets the value of Salt.
+func (s *PowChallenge) SetSalt(val string) {
+	s.Salt = val
+}
+
+// SetNonce sets the value of Nonce.
+func (s *PowChallenge) SetNonce(val string) {
+	s.Nonce = val
+}
+
+// SetKeyPrefix sets the value of KeyPrefix.
+func (s *PowChallenge) SetKeyPrefix(val string) {
+	s.KeyPrefix = val
+}
+
+// SetExpiresAt sets the value of ExpiresAt.
+func (s *PowChallenge) SetExpiresAt(val time.Time) {
+	s.ExpiresAt = val
 }
 
 // A preview URL that is live: an origin matching one of the project's
@@ -80586,6 +88092,7 @@ func (*PublishPolicyErrorResponseStatusCode) publishPolicyRes() {}
 type PublishPolicyRequest struct {
 	Type                   PublishPolicyRequestType // switch on this field
 	PasswordSetPolicyInput PasswordSetPolicyInput
+	UserCreatePolicyInput  UserCreatePolicyInput
 }
 
 // PublishPolicyRequestType is oneOf type of PublishPolicyRequest.
@@ -80594,11 +88101,17 @@ type PublishPolicyRequestType string
 // Possible values for PublishPolicyRequestType.
 const (
 	PasswordSetPolicyInputPublishPolicyRequest PublishPolicyRequestType = "auth.factor.password.set"
+	UserCreatePolicyInputPublishPolicyRequest  PublishPolicyRequestType = "user.create"
 )
 
 // IsPasswordSetPolicyInput reports whether PublishPolicyRequest is PasswordSetPolicyInput.
 func (s PublishPolicyRequest) IsPasswordSetPolicyInput() bool {
 	return s.Type == PasswordSetPolicyInputPublishPolicyRequest
+}
+
+// IsUserCreatePolicyInput reports whether PublishPolicyRequest is UserCreatePolicyInput.
+func (s PublishPolicyRequest) IsUserCreatePolicyInput() bool {
+	return s.Type == UserCreatePolicyInputPublishPolicyRequest
 }
 
 // SetPasswordSetPolicyInput sets PublishPolicyRequest to PasswordSetPolicyInput.
@@ -80619,6 +88132,27 @@ func (s PublishPolicyRequest) GetPasswordSetPolicyInput() (v PasswordSetPolicyIn
 func NewPasswordSetPolicyInputPublishPolicyRequest(v PasswordSetPolicyInput) PublishPolicyRequest {
 	var s PublishPolicyRequest
 	s.SetPasswordSetPolicyInput(v)
+	return s
+}
+
+// SetUserCreatePolicyInput sets PublishPolicyRequest to UserCreatePolicyInput.
+func (s *PublishPolicyRequest) SetUserCreatePolicyInput(v UserCreatePolicyInput) {
+	s.Type = UserCreatePolicyInputPublishPolicyRequest
+	s.UserCreatePolicyInput = v
+}
+
+// GetUserCreatePolicyInput returns UserCreatePolicyInput and true boolean if PublishPolicyRequest is UserCreatePolicyInput.
+func (s PublishPolicyRequest) GetUserCreatePolicyInput() (v UserCreatePolicyInput, ok bool) {
+	if !s.IsUserCreatePolicyInput() {
+		return v, false
+	}
+	return s.UserCreatePolicyInput, true
+}
+
+// NewUserCreatePolicyInputPublishPolicyRequest returns new PublishPolicyRequest from UserCreatePolicyInput.
+func NewUserCreatePolicyInputPublishPolicyRequest(v UserCreatePolicyInput) PublishPolicyRequest {
+	var s PublishPolicyRequest
+	s.SetUserCreatePolicyInput(v)
 	return s
 }
 
@@ -84932,6 +92466,8 @@ type ReleasePointer struct {
 	// - `branding` — always `default`. A project has one branding, so there is
 	// nothing to distinguish. It is revisioned like everything else, and
 	// `revision_id` is what varies between releases.
+	// - `oauth` — always `default`, likewise: a project has one set of OAuth
+	// settings, and `revision_id` is what varies between releases.
 	// - `idp` — the connection's `slug`, so `google` and `github` are
 	// separate resources a release pins separately
 	// - `policy` — the policy's `operation`, so a project's password policy
@@ -84992,6 +92528,7 @@ const (
 	ReleasePointerKindBranding       ReleasePointerKind = "branding"
 	ReleasePointerKindIdp            ReleasePointerKind = "idp"
 	ReleasePointerKindPolicy         ReleasePointerKind = "policy"
+	ReleasePointerKindOAuth          ReleasePointerKind = "oauth"
 )
 
 // AllValues returns all ReleasePointerKind values.
@@ -85002,6 +92539,7 @@ func (ReleasePointerKind) AllValues() []ReleasePointerKind {
 		ReleasePointerKindBranding,
 		ReleasePointerKindIdp,
 		ReleasePointerKindPolicy,
+		ReleasePointerKindOAuth,
 	}
 }
 
@@ -85017,6 +92555,8 @@ func (s ReleasePointerKind) MarshalText() ([]byte, error) {
 	case ReleasePointerKindIdp:
 		return []byte(s), nil
 	case ReleasePointerKindPolicy:
+		return []byte(s), nil
+	case ReleasePointerKindOAuth:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -85040,6 +92580,9 @@ func (s *ReleasePointerKind) UnmarshalText(data []byte) error {
 		return nil
 	case ReleasePointerKindPolicy:
 		*s = ReleasePointerKindPolicy
+		return nil
+	case ReleasePointerKindOAuth:
+		*s = ReleasePointerKindOAuth
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)
@@ -87298,6 +94841,10 @@ type RevokeReleaseConflictDetailsOriginsItem struct {
 	Origin Origin `json:"origin"`
 	// The newest deployment to the origin, which pins the release.
 	DeploymentID DeploymentID `json:"deployment_id"`
+	// Whether the origin serves the release as a primary origin or as
+	// a preview. A deploy or a rollback frees a primary origin;
+	// removing the preview frees a preview.
+	Kind DeploymentKind `json:"kind"`
 }
 
 // GetOrigin returns the value of Origin.
@@ -87310,6 +94857,11 @@ func (s *RevokeReleaseConflictDetailsOriginsItem) GetDeploymentID() DeploymentID
 	return s.DeploymentID
 }
 
+// GetKind returns the value of Kind.
+func (s *RevokeReleaseConflictDetailsOriginsItem) GetKind() DeploymentKind {
+	return s.Kind
+}
+
 // SetOrigin sets the value of Origin.
 func (s *RevokeReleaseConflictDetailsOriginsItem) SetOrigin(val Origin) {
 	s.Origin = val
@@ -87318,6 +94870,11 @@ func (s *RevokeReleaseConflictDetailsOriginsItem) SetOrigin(val Origin) {
 // SetDeploymentID sets the value of DeploymentID.
 func (s *RevokeReleaseConflictDetailsOriginsItem) SetDeploymentID(val DeploymentID) {
 	s.DeploymentID = val
+}
+
+// SetKind sets the value of Kind.
+func (s *RevokeReleaseConflictDetailsOriginsItem) SetKind(val DeploymentKind) {
+	s.Kind = val
 }
 
 // RevokeReleaseErrorResponse represents sum type.
@@ -88500,6 +96057,117 @@ func (s *RollbackDeploymentRequest) SetMessage(val OptString) {
 // SetExpectedDeploymentID sets the value of ExpectedDeploymentID.
 func (s *RollbackDeploymentRequest) SetExpectedDeploymentID(val OptDeploymentID) {
 	s.ExpectedDeploymentID = val
+}
+
+// A runtime security challenge that must be satisfied before this step's submission
+// is accepted. The engine may also inject gates at runtime based on policy
+// or risk evaluation.
+// Ref: #
+type RuntimeGate struct {
+	// The gate category. Only `captcha` is currently defined. Authenticator
+	// ceremonies (e.g. passkey) are modelled as credential auth_attempts via
+	// `x-credential` on a field, not as gates.
+	Kind RuntimeGateKind `json:"kind"`
+	// Implementation identifier. `zitadel_pow` protects sign-up with the
+	// built-in proof-of-work solver: a step that creates its user on submit
+	// (`create_user`), and a step carrying a passkey registration that creates
+	// its user, whose attestation carries the proof. External providers are
+	// not supported.
+	Provider  string          `json:"provider"`
+	Challenge OptPowChallenge `json:"challenge"`
+	// Reserved provider-specific configuration. The built-in signup gate uses
+	// `challenge` and does not accept caller-selected cost parameters.
+	Config OptRuntimeGateConfig `json:"config"`
+}
+
+// GetKind returns the value of Kind.
+func (s *RuntimeGate) GetKind() RuntimeGateKind {
+	return s.Kind
+}
+
+// GetProvider returns the value of Provider.
+func (s *RuntimeGate) GetProvider() string {
+	return s.Provider
+}
+
+// GetChallenge returns the value of Challenge.
+func (s *RuntimeGate) GetChallenge() OptPowChallenge {
+	return s.Challenge
+}
+
+// GetConfig returns the value of Config.
+func (s *RuntimeGate) GetConfig() OptRuntimeGateConfig {
+	return s.Config
+}
+
+// SetKind sets the value of Kind.
+func (s *RuntimeGate) SetKind(val RuntimeGateKind) {
+	s.Kind = val
+}
+
+// SetProvider sets the value of Provider.
+func (s *RuntimeGate) SetProvider(val string) {
+	s.Provider = val
+}
+
+// SetChallenge sets the value of Challenge.
+func (s *RuntimeGate) SetChallenge(val OptPowChallenge) {
+	s.Challenge = val
+}
+
+// SetConfig sets the value of Config.
+func (s *RuntimeGate) SetConfig(val OptRuntimeGateConfig) {
+	s.Config = val
+}
+
+// Reserved provider-specific configuration. The built-in signup gate uses
+// `challenge` and does not accept caller-selected cost parameters.
+type RuntimeGateConfig map[string]jx.Raw
+
+func (s *RuntimeGateConfig) init() RuntimeGateConfig {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// The gate category. Only `captcha` is currently defined. Authenticator
+// ceremonies (e.g. passkey) are modelled as credential auth_attempts via
+// `x-credential` on a field, not as gates.
+type RuntimeGateKind string
+
+const (
+	RuntimeGateKindCaptcha RuntimeGateKind = "captcha"
+)
+
+// AllValues returns all RuntimeGateKind values.
+func (RuntimeGateKind) AllValues() []RuntimeGateKind {
+	return []RuntimeGateKind{
+		RuntimeGateKindCaptcha,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s RuntimeGateKind) MarshalText() ([]byte, error) {
+	switch s {
+	case RuntimeGateKindCaptcha:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *RuntimeGateKind) UnmarshalText(data []byte) error {
+	switch RuntimeGateKind(data) {
+	case RuntimeGateKindCaptcha:
+		*s = RuntimeGateKindCaptcha
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
 }
 
 // Ref: #
@@ -89818,24 +97486,16 @@ type SearchErrorResponse struct {
 	AuthCsrfInvalid         AuthCsrfInvalid
 	AuthUnauthorized        AuthUnauthorized
 	FlowdefInvalid          FlowdefInvalid
-	FlowdefNotFound         FlowdefNotFound
-	FlowdefPermissionDenied FlowdefPermissionDenied
-	IdpNotFound             IdpNotFound
-	IdpPermissionDenied     IdpPermissionDenied
 	Internal                Internal
-	SchNotFound             SchNotFound
-	SchPermissionDenied     SchPermissionDenied
 	FlowdefMissingProjectID FlowdefMissingProjectID
 	NotImplemented          NotImplemented
 	ProjNotFound            ProjNotFound
 	ProjPermissionDenied    ProjPermissionDenied
 	ReqInvalid              ReqInvalid
-	TeamTeamNotFound        TeamTeamNotFound
-	TeamPermissionDenied    TeamPermissionDenied
+	SessProjectMismatch     SessProjectMismatch
+	SessTokenInvalid        SessTokenInvalid
 	TeamProjectNotFound     TeamProjectNotFound
 	Unavailable             Unavailable
-	UserNotFound            UserNotFound
-	UserPermissionDenied    UserPermissionDenied
 }
 
 // SearchErrorResponseType is oneOf type of SearchErrorResponse.
@@ -89846,24 +97506,16 @@ const (
 	AuthCsrfInvalidSearchErrorResponse         SearchErrorResponseType = "auth.csrf_invalid"
 	AuthUnauthorizedSearchErrorResponse        SearchErrorResponseType = "auth.unauthorized"
 	FlowdefInvalidSearchErrorResponse          SearchErrorResponseType = "flowdef.invalid"
-	FlowdefNotFoundSearchErrorResponse         SearchErrorResponseType = "flowdef.not_found"
-	FlowdefPermissionDeniedSearchErrorResponse SearchErrorResponseType = "flowdef.permission_denied"
-	IdpNotFoundSearchErrorResponse             SearchErrorResponseType = "idp.not_found"
-	IdpPermissionDeniedSearchErrorResponse     SearchErrorResponseType = "idp.permission_denied"
 	InternalSearchErrorResponse                SearchErrorResponseType = "internal"
-	SchNotFoundSearchErrorResponse             SearchErrorResponseType = "sch.not_found"
-	SchPermissionDeniedSearchErrorResponse     SearchErrorResponseType = "sch.permission_denied"
 	FlowdefMissingProjectIDSearchErrorResponse SearchErrorResponseType = "flowdef.missing_project_id"
 	NotImplementedSearchErrorResponse          SearchErrorResponseType = "not_implemented"
 	ProjNotFoundSearchErrorResponse            SearchErrorResponseType = "proj.not_found"
 	ProjPermissionDeniedSearchErrorResponse    SearchErrorResponseType = "proj.permission_denied"
 	ReqInvalidSearchErrorResponse              SearchErrorResponseType = "req.invalid"
-	TeamTeamNotFoundSearchErrorResponse        SearchErrorResponseType = "team.team_not_found"
-	TeamPermissionDeniedSearchErrorResponse    SearchErrorResponseType = "team.permission_denied"
+	SessProjectMismatchSearchErrorResponse     SearchErrorResponseType = "sess.project_mismatch"
+	SessTokenInvalidSearchErrorResponse        SearchErrorResponseType = "sess.token_invalid"
 	TeamProjectNotFoundSearchErrorResponse     SearchErrorResponseType = "team.project_not_found"
 	UnavailableSearchErrorResponse             SearchErrorResponseType = "unavailable"
-	UserNotFoundSearchErrorResponse            SearchErrorResponseType = "user.not_found"
-	UserPermissionDeniedSearchErrorResponse    SearchErrorResponseType = "user.permission_denied"
 )
 
 // IsAuthCsrfInvalid reports whether SearchErrorResponse is AuthCsrfInvalid.
@@ -89881,34 +97533,8 @@ func (s SearchErrorResponse) IsFlowdefInvalid() bool {
 	return s.Type == FlowdefInvalidSearchErrorResponse
 }
 
-// IsFlowdefNotFound reports whether SearchErrorResponse is FlowdefNotFound.
-func (s SearchErrorResponse) IsFlowdefNotFound() bool {
-	return s.Type == FlowdefNotFoundSearchErrorResponse
-}
-
-// IsFlowdefPermissionDenied reports whether SearchErrorResponse is FlowdefPermissionDenied.
-func (s SearchErrorResponse) IsFlowdefPermissionDenied() bool {
-	return s.Type == FlowdefPermissionDeniedSearchErrorResponse
-}
-
-// IsIdpNotFound reports whether SearchErrorResponse is IdpNotFound.
-func (s SearchErrorResponse) IsIdpNotFound() bool { return s.Type == IdpNotFoundSearchErrorResponse }
-
-// IsIdpPermissionDenied reports whether SearchErrorResponse is IdpPermissionDenied.
-func (s SearchErrorResponse) IsIdpPermissionDenied() bool {
-	return s.Type == IdpPermissionDeniedSearchErrorResponse
-}
-
 // IsInternal reports whether SearchErrorResponse is Internal.
 func (s SearchErrorResponse) IsInternal() bool { return s.Type == InternalSearchErrorResponse }
-
-// IsSchNotFound reports whether SearchErrorResponse is SchNotFound.
-func (s SearchErrorResponse) IsSchNotFound() bool { return s.Type == SchNotFoundSearchErrorResponse }
-
-// IsSchPermissionDenied reports whether SearchErrorResponse is SchPermissionDenied.
-func (s SearchErrorResponse) IsSchPermissionDenied() bool {
-	return s.Type == SchPermissionDeniedSearchErrorResponse
-}
 
 // IsFlowdefMissingProjectID reports whether SearchErrorResponse is FlowdefMissingProjectID.
 func (s SearchErrorResponse) IsFlowdefMissingProjectID() bool {
@@ -89931,14 +97557,14 @@ func (s SearchErrorResponse) IsProjPermissionDenied() bool {
 // IsReqInvalid reports whether SearchErrorResponse is ReqInvalid.
 func (s SearchErrorResponse) IsReqInvalid() bool { return s.Type == ReqInvalidSearchErrorResponse }
 
-// IsTeamTeamNotFound reports whether SearchErrorResponse is TeamTeamNotFound.
-func (s SearchErrorResponse) IsTeamTeamNotFound() bool {
-	return s.Type == TeamTeamNotFoundSearchErrorResponse
+// IsSessProjectMismatch reports whether SearchErrorResponse is SessProjectMismatch.
+func (s SearchErrorResponse) IsSessProjectMismatch() bool {
+	return s.Type == SessProjectMismatchSearchErrorResponse
 }
 
-// IsTeamPermissionDenied reports whether SearchErrorResponse is TeamPermissionDenied.
-func (s SearchErrorResponse) IsTeamPermissionDenied() bool {
-	return s.Type == TeamPermissionDeniedSearchErrorResponse
+// IsSessTokenInvalid reports whether SearchErrorResponse is SessTokenInvalid.
+func (s SearchErrorResponse) IsSessTokenInvalid() bool {
+	return s.Type == SessTokenInvalidSearchErrorResponse
 }
 
 // IsTeamProjectNotFound reports whether SearchErrorResponse is TeamProjectNotFound.
@@ -89948,14 +97574,6 @@ func (s SearchErrorResponse) IsTeamProjectNotFound() bool {
 
 // IsUnavailable reports whether SearchErrorResponse is Unavailable.
 func (s SearchErrorResponse) IsUnavailable() bool { return s.Type == UnavailableSearchErrorResponse }
-
-// IsUserNotFound reports whether SearchErrorResponse is UserNotFound.
-func (s SearchErrorResponse) IsUserNotFound() bool { return s.Type == UserNotFoundSearchErrorResponse }
-
-// IsUserPermissionDenied reports whether SearchErrorResponse is UserPermissionDenied.
-func (s SearchErrorResponse) IsUserPermissionDenied() bool {
-	return s.Type == UserPermissionDeniedSearchErrorResponse
-}
 
 // SetAuthCsrfInvalid sets SearchErrorResponse to AuthCsrfInvalid.
 func (s *SearchErrorResponse) SetAuthCsrfInvalid(v AuthCsrfInvalid) {
@@ -90020,90 +97638,6 @@ func NewFlowdefInvalidSearchErrorResponse(v FlowdefInvalid) SearchErrorResponse 
 	return s
 }
 
-// SetFlowdefNotFound sets SearchErrorResponse to FlowdefNotFound.
-func (s *SearchErrorResponse) SetFlowdefNotFound(v FlowdefNotFound) {
-	s.Type = FlowdefNotFoundSearchErrorResponse
-	s.FlowdefNotFound = v
-}
-
-// GetFlowdefNotFound returns FlowdefNotFound and true boolean if SearchErrorResponse is FlowdefNotFound.
-func (s SearchErrorResponse) GetFlowdefNotFound() (v FlowdefNotFound, ok bool) {
-	if !s.IsFlowdefNotFound() {
-		return v, false
-	}
-	return s.FlowdefNotFound, true
-}
-
-// NewFlowdefNotFoundSearchErrorResponse returns new SearchErrorResponse from FlowdefNotFound.
-func NewFlowdefNotFoundSearchErrorResponse(v FlowdefNotFound) SearchErrorResponse {
-	var s SearchErrorResponse
-	s.SetFlowdefNotFound(v)
-	return s
-}
-
-// SetFlowdefPermissionDenied sets SearchErrorResponse to FlowdefPermissionDenied.
-func (s *SearchErrorResponse) SetFlowdefPermissionDenied(v FlowdefPermissionDenied) {
-	s.Type = FlowdefPermissionDeniedSearchErrorResponse
-	s.FlowdefPermissionDenied = v
-}
-
-// GetFlowdefPermissionDenied returns FlowdefPermissionDenied and true boolean if SearchErrorResponse is FlowdefPermissionDenied.
-func (s SearchErrorResponse) GetFlowdefPermissionDenied() (v FlowdefPermissionDenied, ok bool) {
-	if !s.IsFlowdefPermissionDenied() {
-		return v, false
-	}
-	return s.FlowdefPermissionDenied, true
-}
-
-// NewFlowdefPermissionDeniedSearchErrorResponse returns new SearchErrorResponse from FlowdefPermissionDenied.
-func NewFlowdefPermissionDeniedSearchErrorResponse(v FlowdefPermissionDenied) SearchErrorResponse {
-	var s SearchErrorResponse
-	s.SetFlowdefPermissionDenied(v)
-	return s
-}
-
-// SetIdpNotFound sets SearchErrorResponse to IdpNotFound.
-func (s *SearchErrorResponse) SetIdpNotFound(v IdpNotFound) {
-	s.Type = IdpNotFoundSearchErrorResponse
-	s.IdpNotFound = v
-}
-
-// GetIdpNotFound returns IdpNotFound and true boolean if SearchErrorResponse is IdpNotFound.
-func (s SearchErrorResponse) GetIdpNotFound() (v IdpNotFound, ok bool) {
-	if !s.IsIdpNotFound() {
-		return v, false
-	}
-	return s.IdpNotFound, true
-}
-
-// NewIdpNotFoundSearchErrorResponse returns new SearchErrorResponse from IdpNotFound.
-func NewIdpNotFoundSearchErrorResponse(v IdpNotFound) SearchErrorResponse {
-	var s SearchErrorResponse
-	s.SetIdpNotFound(v)
-	return s
-}
-
-// SetIdpPermissionDenied sets SearchErrorResponse to IdpPermissionDenied.
-func (s *SearchErrorResponse) SetIdpPermissionDenied(v IdpPermissionDenied) {
-	s.Type = IdpPermissionDeniedSearchErrorResponse
-	s.IdpPermissionDenied = v
-}
-
-// GetIdpPermissionDenied returns IdpPermissionDenied and true boolean if SearchErrorResponse is IdpPermissionDenied.
-func (s SearchErrorResponse) GetIdpPermissionDenied() (v IdpPermissionDenied, ok bool) {
-	if !s.IsIdpPermissionDenied() {
-		return v, false
-	}
-	return s.IdpPermissionDenied, true
-}
-
-// NewIdpPermissionDeniedSearchErrorResponse returns new SearchErrorResponse from IdpPermissionDenied.
-func NewIdpPermissionDeniedSearchErrorResponse(v IdpPermissionDenied) SearchErrorResponse {
-	var s SearchErrorResponse
-	s.SetIdpPermissionDenied(v)
-	return s
-}
-
 // SetInternal sets SearchErrorResponse to Internal.
 func (s *SearchErrorResponse) SetInternal(v Internal) {
 	s.Type = InternalSearchErrorResponse
@@ -90122,48 +97656,6 @@ func (s SearchErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalSearchErrorResponse(v Internal) SearchErrorResponse {
 	var s SearchErrorResponse
 	s.SetInternal(v)
-	return s
-}
-
-// SetSchNotFound sets SearchErrorResponse to SchNotFound.
-func (s *SearchErrorResponse) SetSchNotFound(v SchNotFound) {
-	s.Type = SchNotFoundSearchErrorResponse
-	s.SchNotFound = v
-}
-
-// GetSchNotFound returns SchNotFound and true boolean if SearchErrorResponse is SchNotFound.
-func (s SearchErrorResponse) GetSchNotFound() (v SchNotFound, ok bool) {
-	if !s.IsSchNotFound() {
-		return v, false
-	}
-	return s.SchNotFound, true
-}
-
-// NewSchNotFoundSearchErrorResponse returns new SearchErrorResponse from SchNotFound.
-func NewSchNotFoundSearchErrorResponse(v SchNotFound) SearchErrorResponse {
-	var s SearchErrorResponse
-	s.SetSchNotFound(v)
-	return s
-}
-
-// SetSchPermissionDenied sets SearchErrorResponse to SchPermissionDenied.
-func (s *SearchErrorResponse) SetSchPermissionDenied(v SchPermissionDenied) {
-	s.Type = SchPermissionDeniedSearchErrorResponse
-	s.SchPermissionDenied = v
-}
-
-// GetSchPermissionDenied returns SchPermissionDenied and true boolean if SearchErrorResponse is SchPermissionDenied.
-func (s SearchErrorResponse) GetSchPermissionDenied() (v SchPermissionDenied, ok bool) {
-	if !s.IsSchPermissionDenied() {
-		return v, false
-	}
-	return s.SchPermissionDenied, true
-}
-
-// NewSchPermissionDeniedSearchErrorResponse returns new SearchErrorResponse from SchPermissionDenied.
-func NewSchPermissionDeniedSearchErrorResponse(v SchPermissionDenied) SearchErrorResponse {
-	var s SearchErrorResponse
-	s.SetSchPermissionDenied(v)
 	return s
 }
 
@@ -90272,45 +97764,45 @@ func NewReqInvalidSearchErrorResponse(v ReqInvalid) SearchErrorResponse {
 	return s
 }
 
-// SetTeamTeamNotFound sets SearchErrorResponse to TeamTeamNotFound.
-func (s *SearchErrorResponse) SetTeamTeamNotFound(v TeamTeamNotFound) {
-	s.Type = TeamTeamNotFoundSearchErrorResponse
-	s.TeamTeamNotFound = v
+// SetSessProjectMismatch sets SearchErrorResponse to SessProjectMismatch.
+func (s *SearchErrorResponse) SetSessProjectMismatch(v SessProjectMismatch) {
+	s.Type = SessProjectMismatchSearchErrorResponse
+	s.SessProjectMismatch = v
 }
 
-// GetTeamTeamNotFound returns TeamTeamNotFound and true boolean if SearchErrorResponse is TeamTeamNotFound.
-func (s SearchErrorResponse) GetTeamTeamNotFound() (v TeamTeamNotFound, ok bool) {
-	if !s.IsTeamTeamNotFound() {
+// GetSessProjectMismatch returns SessProjectMismatch and true boolean if SearchErrorResponse is SessProjectMismatch.
+func (s SearchErrorResponse) GetSessProjectMismatch() (v SessProjectMismatch, ok bool) {
+	if !s.IsSessProjectMismatch() {
 		return v, false
 	}
-	return s.TeamTeamNotFound, true
+	return s.SessProjectMismatch, true
 }
 
-// NewTeamTeamNotFoundSearchErrorResponse returns new SearchErrorResponse from TeamTeamNotFound.
-func NewTeamTeamNotFoundSearchErrorResponse(v TeamTeamNotFound) SearchErrorResponse {
+// NewSessProjectMismatchSearchErrorResponse returns new SearchErrorResponse from SessProjectMismatch.
+func NewSessProjectMismatchSearchErrorResponse(v SessProjectMismatch) SearchErrorResponse {
 	var s SearchErrorResponse
-	s.SetTeamTeamNotFound(v)
+	s.SetSessProjectMismatch(v)
 	return s
 }
 
-// SetTeamPermissionDenied sets SearchErrorResponse to TeamPermissionDenied.
-func (s *SearchErrorResponse) SetTeamPermissionDenied(v TeamPermissionDenied) {
-	s.Type = TeamPermissionDeniedSearchErrorResponse
-	s.TeamPermissionDenied = v
+// SetSessTokenInvalid sets SearchErrorResponse to SessTokenInvalid.
+func (s *SearchErrorResponse) SetSessTokenInvalid(v SessTokenInvalid) {
+	s.Type = SessTokenInvalidSearchErrorResponse
+	s.SessTokenInvalid = v
 }
 
-// GetTeamPermissionDenied returns TeamPermissionDenied and true boolean if SearchErrorResponse is TeamPermissionDenied.
-func (s SearchErrorResponse) GetTeamPermissionDenied() (v TeamPermissionDenied, ok bool) {
-	if !s.IsTeamPermissionDenied() {
+// GetSessTokenInvalid returns SessTokenInvalid and true boolean if SearchErrorResponse is SessTokenInvalid.
+func (s SearchErrorResponse) GetSessTokenInvalid() (v SessTokenInvalid, ok bool) {
+	if !s.IsSessTokenInvalid() {
 		return v, false
 	}
-	return s.TeamPermissionDenied, true
+	return s.SessTokenInvalid, true
 }
 
-// NewTeamPermissionDeniedSearchErrorResponse returns new SearchErrorResponse from TeamPermissionDenied.
-func NewTeamPermissionDeniedSearchErrorResponse(v TeamPermissionDenied) SearchErrorResponse {
+// NewSessTokenInvalidSearchErrorResponse returns new SearchErrorResponse from SessTokenInvalid.
+func NewSessTokenInvalidSearchErrorResponse(v SessTokenInvalid) SearchErrorResponse {
 	var s SearchErrorResponse
-	s.SetTeamPermissionDenied(v)
+	s.SetSessTokenInvalid(v)
 	return s
 }
 
@@ -90353,48 +97845,6 @@ func (s SearchErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
 func NewUnavailableSearchErrorResponse(v Unavailable) SearchErrorResponse {
 	var s SearchErrorResponse
 	s.SetUnavailable(v)
-	return s
-}
-
-// SetUserNotFound sets SearchErrorResponse to UserNotFound.
-func (s *SearchErrorResponse) SetUserNotFound(v UserNotFound) {
-	s.Type = UserNotFoundSearchErrorResponse
-	s.UserNotFound = v
-}
-
-// GetUserNotFound returns UserNotFound and true boolean if SearchErrorResponse is UserNotFound.
-func (s SearchErrorResponse) GetUserNotFound() (v UserNotFound, ok bool) {
-	if !s.IsUserNotFound() {
-		return v, false
-	}
-	return s.UserNotFound, true
-}
-
-// NewUserNotFoundSearchErrorResponse returns new SearchErrorResponse from UserNotFound.
-func NewUserNotFoundSearchErrorResponse(v UserNotFound) SearchErrorResponse {
-	var s SearchErrorResponse
-	s.SetUserNotFound(v)
-	return s
-}
-
-// SetUserPermissionDenied sets SearchErrorResponse to UserPermissionDenied.
-func (s *SearchErrorResponse) SetUserPermissionDenied(v UserPermissionDenied) {
-	s.Type = UserPermissionDeniedSearchErrorResponse
-	s.UserPermissionDenied = v
-}
-
-// GetUserPermissionDenied returns UserPermissionDenied and true boolean if SearchErrorResponse is UserPermissionDenied.
-func (s SearchErrorResponse) GetUserPermissionDenied() (v UserPermissionDenied, ok bool) {
-	if !s.IsUserPermissionDenied() {
-		return v, false
-	}
-	return s.UserPermissionDenied, true
-}
-
-// NewUserPermissionDeniedSearchErrorResponse returns new SearchErrorResponse from UserPermissionDenied.
-func NewUserPermissionDeniedSearchErrorResponse(v UserPermissionDenied) SearchErrorResponse {
-	var s SearchErrorResponse
-	s.SetUserPermissionDenied(v)
 	return s
 }
 
@@ -90485,9 +97935,14 @@ type SearchResponse struct {
 	Results []SearchResult `json:"results"`
 	// The requested types whose matches are not all in `results`: there were
 	// more than `limit_per_type`, the text was too short to search that type,
-	// or the project holds more of that type than one search reads. Empty when
-	// every requested type is complete.
+	// a project holds more matches of that type than one search reads, or
+	// `more_projects` is true. Empty when every requested type is complete.
 	IncompleteTypes []SearchResultType `json:"incomplete_types"`
+	// True when a session searched without `project_id` and the person can act
+	// on more projects than one search reads: the results come from the
+	// newest 10 of them. Search another by naming it in `project_id`. Always
+	// false when the request names a project or uses a project secret.
+	MoreProjects bool `json:"more_projects"`
 }
 
 // GetResults returns the value of Results.
@@ -90500,6 +97955,11 @@ func (s *SearchResponse) GetIncompleteTypes() []SearchResultType {
 	return s.IncompleteTypes
 }
 
+// GetMoreProjects returns the value of MoreProjects.
+func (s *SearchResponse) GetMoreProjects() bool {
+	return s.MoreProjects
+}
+
 // SetResults sets the value of Results.
 func (s *SearchResponse) SetResults(val []SearchResult) {
 	s.Results = val
@@ -90508,6 +97968,11 @@ func (s *SearchResponse) SetResults(val []SearchResult) {
 // SetIncompleteTypes sets the value of IncompleteTypes.
 func (s *SearchResponse) SetIncompleteTypes(val []SearchResultType) {
 	s.IncompleteTypes = val
+}
+
+// SetMoreProjects sets the value of MoreProjects.
+func (s *SearchResponse) SetMoreProjects(val bool) {
+	s.MoreProjects = val
 }
 
 func (*SearchResponse) searchRes() {}
@@ -91151,6 +98616,59 @@ func (s *SessTokenCreationFailed) SetDetails(val OptSessTokenCreationFailedDetai
 type SessTokenCreationFailedDetails map[string]jx.Raw
 
 func (s *SessTokenCreationFailedDetails) init() SessTokenCreationFailedDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type SessTokenInvalid struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptSessTokenInvalidDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *SessTokenInvalid) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *SessTokenInvalid) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *SessTokenInvalid) GetDetails() OptSessTokenInvalidDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *SessTokenInvalid) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *SessTokenInvalid) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *SessTokenInvalid) SetDetails(val OptSessTokenInvalidDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type SessTokenInvalidDetails map[string]jx.Raw
+
+func (s *SessTokenInvalidDetails) init() SessTokenInvalidDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}
@@ -92610,6 +100128,7 @@ type SetUserPasswordErrorResponse struct {
 	UserInvalid                 UserInvalid
 	UserNotFound                UserNotFound
 	UserPasswordEmpty           UserPasswordEmpty
+	UserPasswordHashingBusy     UserPasswordHashingBusy
 	UserPasswordPolicyViolation UserPasswordPolicyViolation
 	UserPasswordTooLong         UserPasswordTooLong
 	UserPermissionDenied        UserPermissionDenied
@@ -92637,6 +100156,7 @@ const (
 	UserInvalidSetUserPasswordErrorResponse                 SetUserPasswordErrorResponseType = "user.invalid"
 	UserNotFoundSetUserPasswordErrorResponse                SetUserPasswordErrorResponseType = "user.not_found"
 	UserPasswordEmptySetUserPasswordErrorResponse           SetUserPasswordErrorResponseType = "user.password_empty"
+	UserPasswordHashingBusySetUserPasswordErrorResponse     SetUserPasswordErrorResponseType = "user.password_hashing_busy"
 	UserPasswordPolicyViolationSetUserPasswordErrorResponse SetUserPasswordErrorResponseType = "user.password_policy_violation"
 	UserPasswordTooLongSetUserPasswordErrorResponse         SetUserPasswordErrorResponseType = "user.password_too_long"
 	UserPermissionDeniedSetUserPasswordErrorResponse        SetUserPasswordErrorResponseType = "user.permission_denied"
@@ -92725,6 +100245,11 @@ func (s SetUserPasswordErrorResponse) IsUserNotFound() bool {
 // IsUserPasswordEmpty reports whether SetUserPasswordErrorResponse is UserPasswordEmpty.
 func (s SetUserPasswordErrorResponse) IsUserPasswordEmpty() bool {
 	return s.Type == UserPasswordEmptySetUserPasswordErrorResponse
+}
+
+// IsUserPasswordHashingBusy reports whether SetUserPasswordErrorResponse is UserPasswordHashingBusy.
+func (s SetUserPasswordErrorResponse) IsUserPasswordHashingBusy() bool {
+	return s.Type == UserPasswordHashingBusySetUserPasswordErrorResponse
 }
 
 // IsUserPasswordPolicyViolation reports whether SetUserPasswordErrorResponse is UserPasswordPolicyViolation.
@@ -93099,6 +100624,27 @@ func NewUserPasswordEmptySetUserPasswordErrorResponse(v UserPasswordEmpty) SetUs
 	return s
 }
 
+// SetUserPasswordHashingBusy sets SetUserPasswordErrorResponse to UserPasswordHashingBusy.
+func (s *SetUserPasswordErrorResponse) SetUserPasswordHashingBusy(v UserPasswordHashingBusy) {
+	s.Type = UserPasswordHashingBusySetUserPasswordErrorResponse
+	s.UserPasswordHashingBusy = v
+}
+
+// GetUserPasswordHashingBusy returns UserPasswordHashingBusy and true boolean if SetUserPasswordErrorResponse is UserPasswordHashingBusy.
+func (s SetUserPasswordErrorResponse) GetUserPasswordHashingBusy() (v UserPasswordHashingBusy, ok bool) {
+	if !s.IsUserPasswordHashingBusy() {
+		return v, false
+	}
+	return s.UserPasswordHashingBusy, true
+}
+
+// NewUserPasswordHashingBusySetUserPasswordErrorResponse returns new SetUserPasswordErrorResponse from UserPasswordHashingBusy.
+func NewUserPasswordHashingBusySetUserPasswordErrorResponse(v UserPasswordHashingBusy) SetUserPasswordErrorResponse {
+	var s SetUserPasswordErrorResponse
+	s.SetUserPasswordHashingBusy(v)
+	return s
+}
+
 // SetUserPasswordPolicyViolation sets SetUserPasswordErrorResponse to UserPasswordPolicyViolation.
 func (s *SetUserPasswordErrorResponse) SetUserPasswordPolicyViolation(v UserPasswordPolicyViolation) {
 	s.Type = UserPasswordPolicyViolationSetUserPasswordErrorResponse
@@ -93454,6 +101000,8 @@ type SubmitFlowStepErrorResponse struct {
 	FlowIntegrity               FlowIntegrity
 	FlowInvalidAction           FlowInvalidAction
 	FlowNotFound                FlowNotFound
+	FlowProofInvalid            FlowProofInvalid
+	FlowRateLimited             FlowRateLimited
 	FlowRestartRequired         FlowRestartRequired
 	FlowSSOUserSchemaMismatch   FlowSSOUserSchemaMismatch
 	FlowUnsupported             FlowUnsupported
@@ -93478,6 +101026,7 @@ type SubmitFlowStepErrorResponse struct {
 	UserInvalid                 UserInvalid
 	UserNotFound                UserNotFound
 	UserPasswordEmpty           UserPasswordEmpty
+	UserPasswordHashingBusy     UserPasswordHashingBusy
 	UserPasswordPolicyViolation UserPasswordPolicyViolation
 	UserPasswordTooLong         UserPasswordTooLong
 }
@@ -93503,6 +101052,8 @@ const (
 	FlowIntegritySubmitFlowStepErrorResponse               SubmitFlowStepErrorResponseType = "flow.integrity"
 	FlowInvalidActionSubmitFlowStepErrorResponse           SubmitFlowStepErrorResponseType = "flow.invalid_action"
 	FlowNotFoundSubmitFlowStepErrorResponse                SubmitFlowStepErrorResponseType = "flow.not_found"
+	FlowProofInvalidSubmitFlowStepErrorResponse            SubmitFlowStepErrorResponseType = "flow.proof_invalid"
+	FlowRateLimitedSubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "flow.rate_limited"
 	FlowRestartRequiredSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "flow.restart_required"
 	FlowSSOUserSchemaMismatchSubmitFlowStepErrorResponse   SubmitFlowStepErrorResponseType = "flow.sso_user_schema_mismatch"
 	FlowUnsupportedSubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "flow.unsupported"
@@ -93527,6 +101078,7 @@ const (
 	UserInvalidSubmitFlowStepErrorResponse                 SubmitFlowStepErrorResponseType = "user.invalid"
 	UserNotFoundSubmitFlowStepErrorResponse                SubmitFlowStepErrorResponseType = "user.not_found"
 	UserPasswordEmptySubmitFlowStepErrorResponse           SubmitFlowStepErrorResponseType = "user.password_empty"
+	UserPasswordHashingBusySubmitFlowStepErrorResponse     SubmitFlowStepErrorResponseType = "user.password_hashing_busy"
 	UserPasswordPolicyViolationSubmitFlowStepErrorResponse SubmitFlowStepErrorResponseType = "user.password_policy_violation"
 	UserPasswordTooLongSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "user.password_too_long"
 )
@@ -93609,6 +101161,16 @@ func (s SubmitFlowStepErrorResponse) IsFlowInvalidAction() bool {
 // IsFlowNotFound reports whether SubmitFlowStepErrorResponse is FlowNotFound.
 func (s SubmitFlowStepErrorResponse) IsFlowNotFound() bool {
 	return s.Type == FlowNotFoundSubmitFlowStepErrorResponse
+}
+
+// IsFlowProofInvalid reports whether SubmitFlowStepErrorResponse is FlowProofInvalid.
+func (s SubmitFlowStepErrorResponse) IsFlowProofInvalid() bool {
+	return s.Type == FlowProofInvalidSubmitFlowStepErrorResponse
+}
+
+// IsFlowRateLimited reports whether SubmitFlowStepErrorResponse is FlowRateLimited.
+func (s SubmitFlowStepErrorResponse) IsFlowRateLimited() bool {
+	return s.Type == FlowRateLimitedSubmitFlowStepErrorResponse
 }
 
 // IsFlowRestartRequired reports whether SubmitFlowStepErrorResponse is FlowRestartRequired.
@@ -93729,6 +101291,11 @@ func (s SubmitFlowStepErrorResponse) IsUserNotFound() bool {
 // IsUserPasswordEmpty reports whether SubmitFlowStepErrorResponse is UserPasswordEmpty.
 func (s SubmitFlowStepErrorResponse) IsUserPasswordEmpty() bool {
 	return s.Type == UserPasswordEmptySubmitFlowStepErrorResponse
+}
+
+// IsUserPasswordHashingBusy reports whether SubmitFlowStepErrorResponse is UserPasswordHashingBusy.
+func (s SubmitFlowStepErrorResponse) IsUserPasswordHashingBusy() bool {
+	return s.Type == UserPasswordHashingBusySubmitFlowStepErrorResponse
 }
 
 // IsUserPasswordPolicyViolation reports whether SubmitFlowStepErrorResponse is UserPasswordPolicyViolation.
@@ -94074,6 +101641,48 @@ func (s SubmitFlowStepErrorResponse) GetFlowNotFound() (v FlowNotFound, ok bool)
 func NewFlowNotFoundSubmitFlowStepErrorResponse(v FlowNotFound) SubmitFlowStepErrorResponse {
 	var s SubmitFlowStepErrorResponse
 	s.SetFlowNotFound(v)
+	return s
+}
+
+// SetFlowProofInvalid sets SubmitFlowStepErrorResponse to FlowProofInvalid.
+func (s *SubmitFlowStepErrorResponse) SetFlowProofInvalid(v FlowProofInvalid) {
+	s.Type = FlowProofInvalidSubmitFlowStepErrorResponse
+	s.FlowProofInvalid = v
+}
+
+// GetFlowProofInvalid returns FlowProofInvalid and true boolean if SubmitFlowStepErrorResponse is FlowProofInvalid.
+func (s SubmitFlowStepErrorResponse) GetFlowProofInvalid() (v FlowProofInvalid, ok bool) {
+	if !s.IsFlowProofInvalid() {
+		return v, false
+	}
+	return s.FlowProofInvalid, true
+}
+
+// NewFlowProofInvalidSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from FlowProofInvalid.
+func NewFlowProofInvalidSubmitFlowStepErrorResponse(v FlowProofInvalid) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetFlowProofInvalid(v)
+	return s
+}
+
+// SetFlowRateLimited sets SubmitFlowStepErrorResponse to FlowRateLimited.
+func (s *SubmitFlowStepErrorResponse) SetFlowRateLimited(v FlowRateLimited) {
+	s.Type = FlowRateLimitedSubmitFlowStepErrorResponse
+	s.FlowRateLimited = v
+}
+
+// GetFlowRateLimited returns FlowRateLimited and true boolean if SubmitFlowStepErrorResponse is FlowRateLimited.
+func (s SubmitFlowStepErrorResponse) GetFlowRateLimited() (v FlowRateLimited, ok bool) {
+	if !s.IsFlowRateLimited() {
+		return v, false
+	}
+	return s.FlowRateLimited, true
+}
+
+// NewFlowRateLimitedSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from FlowRateLimited.
+func NewFlowRateLimitedSubmitFlowStepErrorResponse(v FlowRateLimited) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetFlowRateLimited(v)
 	return s
 }
 
@@ -94578,6 +102187,27 @@ func (s SubmitFlowStepErrorResponse) GetUserPasswordEmpty() (v UserPasswordEmpty
 func NewUserPasswordEmptySubmitFlowStepErrorResponse(v UserPasswordEmpty) SubmitFlowStepErrorResponse {
 	var s SubmitFlowStepErrorResponse
 	s.SetUserPasswordEmpty(v)
+	return s
+}
+
+// SetUserPasswordHashingBusy sets SubmitFlowStepErrorResponse to UserPasswordHashingBusy.
+func (s *SubmitFlowStepErrorResponse) SetUserPasswordHashingBusy(v UserPasswordHashingBusy) {
+	s.Type = UserPasswordHashingBusySubmitFlowStepErrorResponse
+	s.UserPasswordHashingBusy = v
+}
+
+// GetUserPasswordHashingBusy returns UserPasswordHashingBusy and true boolean if SubmitFlowStepErrorResponse is UserPasswordHashingBusy.
+func (s SubmitFlowStepErrorResponse) GetUserPasswordHashingBusy() (v UserPasswordHashingBusy, ok bool) {
+	if !s.IsUserPasswordHashingBusy() {
+		return v, false
+	}
+	return s.UserPasswordHashingBusy, true
+}
+
+// NewUserPasswordHashingBusySubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from UserPasswordHashingBusy.
+func NewUserPasswordHashingBusySubmitFlowStepErrorResponse(v UserPasswordHashingBusy) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetUserPasswordHashingBusy(v)
 	return s
 }
 
@@ -96669,6 +104299,82 @@ func (s *TknInvalidTknidDetails) init() TknInvalidTknidDetails {
 	return m
 }
 
+// Why the server refused the request for now. Each member names its error
+// code; `req.rate_limited` joins them when the server's own rate limits land.
+// Retry after the number of seconds in the `Retry-After` header.
+// Ref: #
+// TooManyRequests represents sum type.
+type TooManyRequests struct {
+	Type                    TooManyRequestsType // switch on this field
+	UserPasswordHashingBusy UserPasswordHashingBusy
+}
+
+// TooManyRequestsType is oneOf type of TooManyRequests.
+type TooManyRequestsType string
+
+// Possible values for TooManyRequestsType.
+const (
+	UserPasswordHashingBusyTooManyRequests TooManyRequestsType = "user.password_hashing_busy"
+)
+
+// IsUserPasswordHashingBusy reports whether TooManyRequests is UserPasswordHashingBusy.
+func (s TooManyRequests) IsUserPasswordHashingBusy() bool {
+	return s.Type == UserPasswordHashingBusyTooManyRequests
+}
+
+// SetUserPasswordHashingBusy sets TooManyRequests to UserPasswordHashingBusy.
+func (s *TooManyRequests) SetUserPasswordHashingBusy(v UserPasswordHashingBusy) {
+	s.Type = UserPasswordHashingBusyTooManyRequests
+	s.UserPasswordHashingBusy = v
+}
+
+// GetUserPasswordHashingBusy returns UserPasswordHashingBusy and true boolean if TooManyRequests is UserPasswordHashingBusy.
+func (s TooManyRequests) GetUserPasswordHashingBusy() (v UserPasswordHashingBusy, ok bool) {
+	if !s.IsUserPasswordHashingBusy() {
+		return v, false
+	}
+	return s.UserPasswordHashingBusy, true
+}
+
+// NewUserPasswordHashingBusyTooManyRequests returns new TooManyRequests from UserPasswordHashingBusy.
+func NewUserPasswordHashingBusyTooManyRequests(v UserPasswordHashingBusy) TooManyRequests {
+	var s TooManyRequests
+	s.SetUserPasswordHashingBusy(v)
+	return s
+}
+
+// TooManyRequestsHeaders wraps TooManyRequests with response headers.
+type TooManyRequestsHeaders struct {
+	RetryAfter OptInt
+	Response   TooManyRequests
+}
+
+// GetRetryAfter returns the value of RetryAfter.
+func (s *TooManyRequestsHeaders) GetRetryAfter() OptInt {
+	return s.RetryAfter
+}
+
+// GetResponse returns the value of Response.
+func (s *TooManyRequestsHeaders) GetResponse() TooManyRequests {
+	return s.Response
+}
+
+// SetRetryAfter sets the value of RetryAfter.
+func (s *TooManyRequestsHeaders) SetRetryAfter(val OptInt) {
+	s.RetryAfter = val
+}
+
+// SetResponse sets the value of Response.
+func (s *TooManyRequestsHeaders) SetResponse(val TooManyRequests) {
+	s.Response = val
+}
+
+func (*TooManyRequestsHeaders) finishUserPasskeyRegistrationRes() {}
+func (*TooManyRequestsHeaders) getFlowStepRes()                   {}
+func (*TooManyRequestsHeaders) setUserPasswordRes()               {}
+func (*TooManyRequestsHeaders) submitFlowStepRes()                {}
+func (*TooManyRequestsHeaders) verifyChallengeProofRes()          {}
+
 // Merged schema.
 // Ref: #
 type Unavailable struct {
@@ -97938,6 +105644,197 @@ func (s *UserConflictDetails) init() UserConflictDetails {
 	return m
 }
 
+// The settings of a `user.create` policy, checked before a sign-up creates a
+// user. Every setting is optional; a setting left out switches its rule off,
+// and `{}` switches every rule off. Zitadel's own sign-up protection, a proof
+// of work on every sign-up with a password or a passkey and limits per
+// sign-up flow, applies either way: a policy chooses among challenges and
+// never switches it off. Sign-ups through a sign-in provider are not
+// challenged: each needs an account at the provider.
+// Ref: #
+type UserCreateConfig struct {
+	// The challenge a sign-up with a password or a passkey must solve before
+	// the user is created. `zitadel_pow` is Zitadel's built-in proof of work,
+	// which every such sign-up solves when no policy names a challenge.
+	Challenge OptUserCreateConfigChallenge `json:"challenge"`
+}
+
+// GetChallenge returns the value of Challenge.
+func (s *UserCreateConfig) GetChallenge() OptUserCreateConfigChallenge {
+	return s.Challenge
+}
+
+// SetChallenge sets the value of Challenge.
+func (s *UserCreateConfig) SetChallenge(val OptUserCreateConfigChallenge) {
+	s.Challenge = val
+}
+
+// The challenge a sign-up with a password or a passkey must solve before
+// the user is created. `zitadel_pow` is Zitadel's built-in proof of work,
+// which every such sign-up solves when no policy names a challenge.
+type UserCreateConfigChallenge string
+
+const (
+	UserCreateConfigChallengeZitadelPow UserCreateConfigChallenge = "zitadel_pow"
+)
+
+// AllValues returns all UserCreateConfigChallenge values.
+func (UserCreateConfigChallenge) AllValues() []UserCreateConfigChallenge {
+	return []UserCreateConfigChallenge{
+		UserCreateConfigChallengeZitadelPow,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s UserCreateConfigChallenge) MarshalText() ([]byte, error) {
+	switch s {
+	case UserCreateConfigChallengeZitadelPow:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *UserCreateConfigChallenge) UnmarshalText(data []byte) error {
+	switch UserCreateConfigChallenge(data) {
+	case UserCreateConfigChallengeZitadelPow:
+		*s = UserCreateConfigChallengeZitadelPow
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The sign-up as it reaches the server. A real sign-up proves the challenge
+// it solved; a dry run names it.
+// Ref: #
+type UserCreateEvaluateInput struct {
+	// The challenge the sign-up solved. `zitadel_pow` is Zitadel's built-in
+	// proof of work.
+	SolvedChallenge UserCreateEvaluateInputSolvedChallenge `json:"solved_challenge"`
+}
+
+// GetSolvedChallenge returns the value of SolvedChallenge.
+func (s *UserCreateEvaluateInput) GetSolvedChallenge() UserCreateEvaluateInputSolvedChallenge {
+	return s.SolvedChallenge
+}
+
+// SetSolvedChallenge sets the value of SolvedChallenge.
+func (s *UserCreateEvaluateInput) SetSolvedChallenge(val UserCreateEvaluateInputSolvedChallenge) {
+	s.SolvedChallenge = val
+}
+
+// The challenge the sign-up solved. `zitadel_pow` is Zitadel's built-in
+// proof of work.
+type UserCreateEvaluateInputSolvedChallenge string
+
+const (
+	UserCreateEvaluateInputSolvedChallengeZitadelPow UserCreateEvaluateInputSolvedChallenge = "zitadel_pow"
+)
+
+// AllValues returns all UserCreateEvaluateInputSolvedChallenge values.
+func (UserCreateEvaluateInputSolvedChallenge) AllValues() []UserCreateEvaluateInputSolvedChallenge {
+	return []UserCreateEvaluateInputSolvedChallenge{
+		UserCreateEvaluateInputSolvedChallengeZitadelPow,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s UserCreateEvaluateInputSolvedChallenge) MarshalText() ([]byte, error) {
+	switch s {
+	case UserCreateEvaluateInputSolvedChallengeZitadelPow:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *UserCreateEvaluateInputSolvedChallenge) UnmarshalText(data []byte) error {
+	switch UserCreateEvaluateInputSolvedChallenge(data) {
+	case UserCreateEvaluateInputSolvedChallengeZitadelPow:
+		*s = UserCreateEvaluateInputSolvedChallengeZitadelPow
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// A dry run of the sign-up policy for one sign-up.
+// Ref: #
+type UserCreateEvaluateRequest struct {
+	// The operation the policy guards.
+	Operation UserCreateEvaluateRequestOperation `json:"operation"`
+	Config    UserCreateConfig                   `json:"config"`
+	Input     UserCreateEvaluateInput            `json:"input"`
+}
+
+// GetOperation returns the value of Operation.
+func (s *UserCreateEvaluateRequest) GetOperation() UserCreateEvaluateRequestOperation {
+	return s.Operation
+}
+
+// GetConfig returns the value of Config.
+func (s *UserCreateEvaluateRequest) GetConfig() UserCreateConfig {
+	return s.Config
+}
+
+// GetInput returns the value of Input.
+func (s *UserCreateEvaluateRequest) GetInput() UserCreateEvaluateInput {
+	return s.Input
+}
+
+// SetOperation sets the value of Operation.
+func (s *UserCreateEvaluateRequest) SetOperation(val UserCreateEvaluateRequestOperation) {
+	s.Operation = val
+}
+
+// SetConfig sets the value of Config.
+func (s *UserCreateEvaluateRequest) SetConfig(val UserCreateConfig) {
+	s.Config = val
+}
+
+// SetInput sets the value of Input.
+func (s *UserCreateEvaluateRequest) SetInput(val UserCreateEvaluateInput) {
+	s.Input = val
+}
+
+// The operation the policy guards.
+type UserCreateEvaluateRequestOperation string
+
+const (
+	UserCreateEvaluateRequestOperationUserCreate UserCreateEvaluateRequestOperation = "user.create"
+)
+
+// AllValues returns all UserCreateEvaluateRequestOperation values.
+func (UserCreateEvaluateRequestOperation) AllValues() []UserCreateEvaluateRequestOperation {
+	return []UserCreateEvaluateRequestOperation{
+		UserCreateEvaluateRequestOperationUserCreate,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s UserCreateEvaluateRequestOperation) MarshalText() ([]byte, error) {
+	switch s {
+	case UserCreateEvaluateRequestOperationUserCreate:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *UserCreateEvaluateRequestOperation) UnmarshalText(data []byte) error {
+	switch UserCreateEvaluateRequestOperation(data) {
+	case UserCreateEvaluateRequestOperationUserCreate:
+		*s = UserCreateEvaluateRequestOperationUserCreate
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
 // Merged schema.
 // Ref: #
 type UserCreateFailedEvent struct {
@@ -98400,6 +106297,191 @@ func (s *UserCreateFailedPayload) GetKeyName() OptString {
 // SetKeyName sets the value of KeyName.
 func (s *UserCreateFailedPayload) SetKeyName(val OptString) {
 	s.KeyName = val
+}
+
+// One revision of a project's `user.create` policy. `id` is shared by every
+// revision of the operation's policy; `revision_id` names this revision.
+// Ref: #
+type UserCreatePolicy struct {
+	ID         PolicyID         `json:"id"`
+	RevisionID PolicyRevisionID `json:"revision_id"`
+	// The project the policy belongs to.
+	ProjectID ProjectID `json:"project_id"`
+	// The operation the policy guards.
+	Operation UserCreatePolicyOperation `json:"operation"`
+	Config    UserCreateConfig          `json:"config"`
+	// When the operation's policy was first published.
+	CreatedAt time.Time `json:"created_at"`
+	// When this revision was published.
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// GetID returns the value of ID.
+func (s *UserCreatePolicy) GetID() PolicyID {
+	return s.ID
+}
+
+// GetRevisionID returns the value of RevisionID.
+func (s *UserCreatePolicy) GetRevisionID() PolicyRevisionID {
+	return s.RevisionID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *UserCreatePolicy) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetOperation returns the value of Operation.
+func (s *UserCreatePolicy) GetOperation() UserCreatePolicyOperation {
+	return s.Operation
+}
+
+// GetConfig returns the value of Config.
+func (s *UserCreatePolicy) GetConfig() UserCreateConfig {
+	return s.Config
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *UserCreatePolicy) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetUpdatedAt returns the value of UpdatedAt.
+func (s *UserCreatePolicy) GetUpdatedAt() time.Time {
+	return s.UpdatedAt
+}
+
+// SetID sets the value of ID.
+func (s *UserCreatePolicy) SetID(val PolicyID) {
+	s.ID = val
+}
+
+// SetRevisionID sets the value of RevisionID.
+func (s *UserCreatePolicy) SetRevisionID(val PolicyRevisionID) {
+	s.RevisionID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *UserCreatePolicy) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetOperation sets the value of Operation.
+func (s *UserCreatePolicy) SetOperation(val UserCreatePolicyOperation) {
+	s.Operation = val
+}
+
+// SetConfig sets the value of Config.
+func (s *UserCreatePolicy) SetConfig(val UserCreateConfig) {
+	s.Config = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *UserCreatePolicy) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetUpdatedAt sets the value of UpdatedAt.
+func (s *UserCreatePolicy) SetUpdatedAt(val time.Time) {
+	s.UpdatedAt = val
+}
+
+// A publish of the sign-up policy, checked before a sign-up creates a user.
+// Ref: #
+type UserCreatePolicyInput struct {
+	// The operation the policy guards.
+	Operation UserCreatePolicyInputOperation `json:"operation"`
+	Config    UserCreateConfig               `json:"config"`
+}
+
+// GetOperation returns the value of Operation.
+func (s *UserCreatePolicyInput) GetOperation() UserCreatePolicyInputOperation {
+	return s.Operation
+}
+
+// GetConfig returns the value of Config.
+func (s *UserCreatePolicyInput) GetConfig() UserCreateConfig {
+	return s.Config
+}
+
+// SetOperation sets the value of Operation.
+func (s *UserCreatePolicyInput) SetOperation(val UserCreatePolicyInputOperation) {
+	s.Operation = val
+}
+
+// SetConfig sets the value of Config.
+func (s *UserCreatePolicyInput) SetConfig(val UserCreateConfig) {
+	s.Config = val
+}
+
+// The operation the policy guards.
+type UserCreatePolicyInputOperation string
+
+const (
+	UserCreatePolicyInputOperationUserCreate UserCreatePolicyInputOperation = "user.create"
+)
+
+// AllValues returns all UserCreatePolicyInputOperation values.
+func (UserCreatePolicyInputOperation) AllValues() []UserCreatePolicyInputOperation {
+	return []UserCreatePolicyInputOperation{
+		UserCreatePolicyInputOperationUserCreate,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s UserCreatePolicyInputOperation) MarshalText() ([]byte, error) {
+	switch s {
+	case UserCreatePolicyInputOperationUserCreate:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *UserCreatePolicyInputOperation) UnmarshalText(data []byte) error {
+	switch UserCreatePolicyInputOperation(data) {
+	case UserCreatePolicyInputOperationUserCreate:
+		*s = UserCreatePolicyInputOperationUserCreate
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The operation the policy guards.
+type UserCreatePolicyOperation string
+
+const (
+	UserCreatePolicyOperationUserCreate UserCreatePolicyOperation = "user.create"
+)
+
+// AllValues returns all UserCreatePolicyOperation values.
+func (UserCreatePolicyOperation) AllValues() []UserCreatePolicyOperation {
+	return []UserCreatePolicyOperation{
+		UserCreatePolicyOperationUserCreate,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s UserCreatePolicyOperation) MarshalText() ([]byte, error) {
+	switch s {
+	case UserCreatePolicyOperationUserCreate:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *UserCreatePolicyOperation) UnmarshalText(data []byte) error {
+	switch UserCreatePolicyOperation(data) {
+	case UserCreatePolicyOperationUserCreate:
+		*s = UserCreatePolicyOperationUserCreate
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
 }
 
 // Merged schema.
@@ -99910,6 +107992,59 @@ func (s *UserPasswordEmpty) SetDetails(val OptUserPasswordEmptyDetails) {
 type UserPasswordEmptyDetails map[string]jx.Raw
 
 func (s *UserPasswordEmptyDetails) init() UserPasswordEmptyDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type UserPasswordHashingBusy struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptUserPasswordHashingBusyDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *UserPasswordHashingBusy) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *UserPasswordHashingBusy) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *UserPasswordHashingBusy) GetDetails() OptUserPasswordHashingBusyDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *UserPasswordHashingBusy) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *UserPasswordHashingBusy) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *UserPasswordHashingBusy) SetDetails(val OptUserPasswordHashingBusyDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type UserPasswordHashingBusyDetails map[string]jx.Raw
+
+func (s *UserPasswordHashingBusyDetails) init() UserPasswordHashingBusyDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}
@@ -102957,6 +111092,7 @@ type VerifyChallengeProofErrorResponse struct {
 	UserInvalid                 UserInvalid
 	UserNotFound                UserNotFound
 	UserPasswordEmpty           UserPasswordEmpty
+	UserPasswordHashingBusy     UserPasswordHashingBusy
 	UserPasswordPolicyViolation UserPasswordPolicyViolation
 	UserPasswordTooLong         UserPasswordTooLong
 }
@@ -102983,6 +111119,7 @@ const (
 	UserInvalidVerifyChallengeProofErrorResponse                 VerifyChallengeProofErrorResponseType = "user.invalid"
 	UserNotFoundVerifyChallengeProofErrorResponse                VerifyChallengeProofErrorResponseType = "user.not_found"
 	UserPasswordEmptyVerifyChallengeProofErrorResponse           VerifyChallengeProofErrorResponseType = "user.password_empty"
+	UserPasswordHashingBusyVerifyChallengeProofErrorResponse     VerifyChallengeProofErrorResponseType = "user.password_hashing_busy"
 	UserPasswordPolicyViolationVerifyChallengeProofErrorResponse VerifyChallengeProofErrorResponseType = "user.password_policy_violation"
 	UserPasswordTooLongVerifyChallengeProofErrorResponse         VerifyChallengeProofErrorResponseType = "user.password_too_long"
 )
@@ -103070,6 +111207,11 @@ func (s VerifyChallengeProofErrorResponse) IsUserNotFound() bool {
 // IsUserPasswordEmpty reports whether VerifyChallengeProofErrorResponse is UserPasswordEmpty.
 func (s VerifyChallengeProofErrorResponse) IsUserPasswordEmpty() bool {
 	return s.Type == UserPasswordEmptyVerifyChallengeProofErrorResponse
+}
+
+// IsUserPasswordHashingBusy reports whether VerifyChallengeProofErrorResponse is UserPasswordHashingBusy.
+func (s VerifyChallengeProofErrorResponse) IsUserPasswordHashingBusy() bool {
+	return s.Type == UserPasswordHashingBusyVerifyChallengeProofErrorResponse
 }
 
 // IsUserPasswordPolicyViolation reports whether VerifyChallengeProofErrorResponse is UserPasswordPolicyViolation.
@@ -103439,6 +111581,27 @@ func NewUserPasswordEmptyVerifyChallengeProofErrorResponse(v UserPasswordEmpty) 
 	return s
 }
 
+// SetUserPasswordHashingBusy sets VerifyChallengeProofErrorResponse to UserPasswordHashingBusy.
+func (s *VerifyChallengeProofErrorResponse) SetUserPasswordHashingBusy(v UserPasswordHashingBusy) {
+	s.Type = UserPasswordHashingBusyVerifyChallengeProofErrorResponse
+	s.UserPasswordHashingBusy = v
+}
+
+// GetUserPasswordHashingBusy returns UserPasswordHashingBusy and true boolean if VerifyChallengeProofErrorResponse is UserPasswordHashingBusy.
+func (s VerifyChallengeProofErrorResponse) GetUserPasswordHashingBusy() (v UserPasswordHashingBusy, ok bool) {
+	if !s.IsUserPasswordHashingBusy() {
+		return v, false
+	}
+	return s.UserPasswordHashingBusy, true
+}
+
+// NewUserPasswordHashingBusyVerifyChallengeProofErrorResponse returns new VerifyChallengeProofErrorResponse from UserPasswordHashingBusy.
+func NewUserPasswordHashingBusyVerifyChallengeProofErrorResponse(v UserPasswordHashingBusy) VerifyChallengeProofErrorResponse {
+	var s VerifyChallengeProofErrorResponse
+	s.SetUserPasswordHashingBusy(v)
+	return s
+}
+
 // SetUserPasswordPolicyViolation sets VerifyChallengeProofErrorResponse to UserPasswordPolicyViolation.
 func (s *VerifyChallengeProofErrorResponse) SetUserPasswordPolicyViolation(v UserPasswordPolicyViolation) {
 	s.Type = UserPasswordPolicyViolationVerifyChallengeProofErrorResponse
@@ -103638,50 +111801,58 @@ func (s *WebhookDelivered) SetStatusCode(val int) {
 	s.StatusCode = val
 }
 
-func (*WebhookDelivered) authAttemptCreatedRes()         {}
-func (*WebhookDelivered) authAttemptHandedOffRes()       {}
-func (*WebhookDelivered) authCheckFailedRes()            {}
-func (*WebhookDelivered) authCheckSucceededRes()         {}
-func (*WebhookDelivered) authFactorPasskeyEnrolledRes()  {}
-func (*WebhookDelivered) authFactorPasswordSetRes()      {}
-func (*WebhookDelivered) authSsoAuthorizationFailedRes() {}
-func (*WebhookDelivered) authSsoExchangeFailedRes()      {}
-func (*WebhookDelivered) authSsoExchangeSucceededRes()   {}
-func (*WebhookDelivered) authTokenIssuedRes()            {}
-func (*WebhookDelivered) authTokenRevokedRes()           {}
-func (*WebhookDelivered) authzGrantedRes()               {}
-func (*WebhookDelivered) authzRevokedRes()               {}
-func (*WebhookDelivered) brandingCreatedRes()            {}
-func (*WebhookDelivered) deploymentCreatedRes()          {}
-func (*WebhookDelivered) flowdefCreatedRes()             {}
-func (*WebhookDelivered) flowdefDeletedRes()             {}
-func (*WebhookDelivered) flowdefUpdatedRes()             {}
-func (*WebhookDelivered) idpCreatedRes()                 {}
-func (*WebhookDelivered) idpIdentityLinkCreatedRes()     {}
-func (*WebhookDelivered) idpUpdatedRes()                 {}
-func (*WebhookDelivered) originAddedRes()                {}
-func (*WebhookDelivered) originRemovedRes()              {}
-func (*WebhookDelivered) policyCreatedRes()              {}
-func (*WebhookDelivered) policyUpdatedRes()              {}
-func (*WebhookDelivered) previewRemovedRes()             {}
-func (*WebhookDelivered) projectCreatedRes()             {}
-func (*WebhookDelivered) projectDeletedRes()             {}
-func (*WebhookDelivered) projectUpdatedRes()             {}
-func (*WebhookDelivered) releaseCreatedRes()             {}
-func (*WebhookDelivered) releaseRevokedRes()             {}
-func (*WebhookDelivered) requestApiRes()                 {}
-func (*WebhookDelivered) schemaCreatedRes()              {}
-func (*WebhookDelivered) sessionDeletedRes()             {}
-func (*WebhookDelivered) sessionEstablishedRes()         {}
-func (*WebhookDelivered) teamCreatedRes()                {}
-func (*WebhookDelivered) teamDeactivatedRes()            {}
-func (*WebhookDelivered) teamUpdatedRes()                {}
-func (*WebhookDelivered) userCreateFailedRes()           {}
-func (*WebhookDelivered) userCreatedRes()                {}
-func (*WebhookDelivered) userDeletedRes()                {}
-func (*WebhookDelivered) userUpdatedRes()                {}
-func (*WebhookDelivered) variableRemovedRes()            {}
-func (*WebhookDelivered) variableSetRes()                {}
+func (*WebhookDelivered) applicationCreatedRes()          {}
+func (*WebhookDelivered) applicationUpdatedRes()          {}
+func (*WebhookDelivered) authAttemptCreatedRes()          {}
+func (*WebhookDelivered) authAttemptHandedOffRes()        {}
+func (*WebhookDelivered) authCheckFailedRes()             {}
+func (*WebhookDelivered) authCheckSucceededRes()          {}
+func (*WebhookDelivered) authFactorPasskeyEnrolledRes()   {}
+func (*WebhookDelivered) authFactorPasswordSetRes()       {}
+func (*WebhookDelivered) authSsoAuthorizationFailedRes()  {}
+func (*WebhookDelivered) authSsoExchangeFailedRes()       {}
+func (*WebhookDelivered) authSsoExchangeSucceededRes()    {}
+func (*WebhookDelivered) authTokenIssuedRes()             {}
+func (*WebhookDelivered) authTokenRevokedRes()            {}
+func (*WebhookDelivered) authzGrantedRes()                {}
+func (*WebhookDelivered) authzRevokedRes()                {}
+func (*WebhookDelivered) brandingCreatedRes()             {}
+func (*WebhookDelivered) deploymentCreatedRes()           {}
+func (*WebhookDelivered) flowSignupChallengeConsumedRes() {}
+func (*WebhookDelivered) flowSignupChallengeIssuedRes()   {}
+func (*WebhookDelivered) flowdefCreatedRes()              {}
+func (*WebhookDelivered) flowdefDeletedRes()              {}
+func (*WebhookDelivered) flowdefUpdatedRes()              {}
+func (*WebhookDelivered) idpCreatedRes()                  {}
+func (*WebhookDelivered) idpIdentityLinkCreatedRes()      {}
+func (*WebhookDelivered) idpUpdatedRes()                  {}
+func (*WebhookDelivered) invitationAcceptedRes()          {}
+func (*WebhookDelivered) invitationCancelledRes()         {}
+func (*WebhookDelivered) invitationCreatedRes()           {}
+func (*WebhookDelivered) invitationRejectedRes()          {}
+func (*WebhookDelivered) originAddedRes()                 {}
+func (*WebhookDelivered) originRemovedRes()               {}
+func (*WebhookDelivered) policyCreatedRes()               {}
+func (*WebhookDelivered) policyUpdatedRes()               {}
+func (*WebhookDelivered) previewRemovedRes()              {}
+func (*WebhookDelivered) projectCreatedRes()              {}
+func (*WebhookDelivered) projectDeletedRes()              {}
+func (*WebhookDelivered) projectUpdatedRes()              {}
+func (*WebhookDelivered) releaseCreatedRes()              {}
+func (*WebhookDelivered) releaseRevokedRes()              {}
+func (*WebhookDelivered) requestApiRes()                  {}
+func (*WebhookDelivered) schemaCreatedRes()               {}
+func (*WebhookDelivered) sessionDeletedRes()              {}
+func (*WebhookDelivered) sessionEstablishedRes()          {}
+func (*WebhookDelivered) teamCreatedRes()                 {}
+func (*WebhookDelivered) teamDeactivatedRes()             {}
+func (*WebhookDelivered) teamUpdatedRes()                 {}
+func (*WebhookDelivered) userCreateFailedRes()            {}
+func (*WebhookDelivered) userCreatedRes()                 {}
+func (*WebhookDelivered) userDeletedRes()                 {}
+func (*WebhookDelivered) userUpdatedRes()                 {}
+func (*WebhookDelivered) variableRemovedRes()             {}
+func (*WebhookDelivered) variableSetRes()                 {}
 
 // Ref: #
 type WebhookNotDelivered struct {
@@ -103698,47 +111869,55 @@ func (s *WebhookNotDelivered) SetStatusCode(val int) {
 	s.StatusCode = val
 }
 
-func (*WebhookNotDelivered) authAttemptCreatedRes()         {}
-func (*WebhookNotDelivered) authAttemptHandedOffRes()       {}
-func (*WebhookNotDelivered) authCheckFailedRes()            {}
-func (*WebhookNotDelivered) authCheckSucceededRes()         {}
-func (*WebhookNotDelivered) authFactorPasskeyEnrolledRes()  {}
-func (*WebhookNotDelivered) authFactorPasswordSetRes()      {}
-func (*WebhookNotDelivered) authSsoAuthorizationFailedRes() {}
-func (*WebhookNotDelivered) authSsoExchangeFailedRes()      {}
-func (*WebhookNotDelivered) authSsoExchangeSucceededRes()   {}
-func (*WebhookNotDelivered) authTokenIssuedRes()            {}
-func (*WebhookNotDelivered) authTokenRevokedRes()           {}
-func (*WebhookNotDelivered) authzGrantedRes()               {}
-func (*WebhookNotDelivered) authzRevokedRes()               {}
-func (*WebhookNotDelivered) brandingCreatedRes()            {}
-func (*WebhookNotDelivered) deploymentCreatedRes()          {}
-func (*WebhookNotDelivered) flowdefCreatedRes()             {}
-func (*WebhookNotDelivered) flowdefDeletedRes()             {}
-func (*WebhookNotDelivered) flowdefUpdatedRes()             {}
-func (*WebhookNotDelivered) idpCreatedRes()                 {}
-func (*WebhookNotDelivered) idpIdentityLinkCreatedRes()     {}
-func (*WebhookNotDelivered) idpUpdatedRes()                 {}
-func (*WebhookNotDelivered) originAddedRes()                {}
-func (*WebhookNotDelivered) originRemovedRes()              {}
-func (*WebhookNotDelivered) policyCreatedRes()              {}
-func (*WebhookNotDelivered) policyUpdatedRes()              {}
-func (*WebhookNotDelivered) previewRemovedRes()             {}
-func (*WebhookNotDelivered) projectCreatedRes()             {}
-func (*WebhookNotDelivered) projectDeletedRes()             {}
-func (*WebhookNotDelivered) projectUpdatedRes()             {}
-func (*WebhookNotDelivered) releaseCreatedRes()             {}
-func (*WebhookNotDelivered) releaseRevokedRes()             {}
-func (*WebhookNotDelivered) requestApiRes()                 {}
-func (*WebhookNotDelivered) schemaCreatedRes()              {}
-func (*WebhookNotDelivered) sessionDeletedRes()             {}
-func (*WebhookNotDelivered) sessionEstablishedRes()         {}
-func (*WebhookNotDelivered) teamCreatedRes()                {}
-func (*WebhookNotDelivered) teamDeactivatedRes()            {}
-func (*WebhookNotDelivered) teamUpdatedRes()                {}
-func (*WebhookNotDelivered) userCreateFailedRes()           {}
-func (*WebhookNotDelivered) userCreatedRes()                {}
-func (*WebhookNotDelivered) userDeletedRes()                {}
-func (*WebhookNotDelivered) userUpdatedRes()                {}
-func (*WebhookNotDelivered) variableRemovedRes()            {}
-func (*WebhookNotDelivered) variableSetRes()                {}
+func (*WebhookNotDelivered) applicationCreatedRes()          {}
+func (*WebhookNotDelivered) applicationUpdatedRes()          {}
+func (*WebhookNotDelivered) authAttemptCreatedRes()          {}
+func (*WebhookNotDelivered) authAttemptHandedOffRes()        {}
+func (*WebhookNotDelivered) authCheckFailedRes()             {}
+func (*WebhookNotDelivered) authCheckSucceededRes()          {}
+func (*WebhookNotDelivered) authFactorPasskeyEnrolledRes()   {}
+func (*WebhookNotDelivered) authFactorPasswordSetRes()       {}
+func (*WebhookNotDelivered) authSsoAuthorizationFailedRes()  {}
+func (*WebhookNotDelivered) authSsoExchangeFailedRes()       {}
+func (*WebhookNotDelivered) authSsoExchangeSucceededRes()    {}
+func (*WebhookNotDelivered) authTokenIssuedRes()             {}
+func (*WebhookNotDelivered) authTokenRevokedRes()            {}
+func (*WebhookNotDelivered) authzGrantedRes()                {}
+func (*WebhookNotDelivered) authzRevokedRes()                {}
+func (*WebhookNotDelivered) brandingCreatedRes()             {}
+func (*WebhookNotDelivered) deploymentCreatedRes()           {}
+func (*WebhookNotDelivered) flowSignupChallengeConsumedRes() {}
+func (*WebhookNotDelivered) flowSignupChallengeIssuedRes()   {}
+func (*WebhookNotDelivered) flowdefCreatedRes()              {}
+func (*WebhookNotDelivered) flowdefDeletedRes()              {}
+func (*WebhookNotDelivered) flowdefUpdatedRes()              {}
+func (*WebhookNotDelivered) idpCreatedRes()                  {}
+func (*WebhookNotDelivered) idpIdentityLinkCreatedRes()      {}
+func (*WebhookNotDelivered) idpUpdatedRes()                  {}
+func (*WebhookNotDelivered) invitationAcceptedRes()          {}
+func (*WebhookNotDelivered) invitationCancelledRes()         {}
+func (*WebhookNotDelivered) invitationCreatedRes()           {}
+func (*WebhookNotDelivered) invitationRejectedRes()          {}
+func (*WebhookNotDelivered) originAddedRes()                 {}
+func (*WebhookNotDelivered) originRemovedRes()               {}
+func (*WebhookNotDelivered) policyCreatedRes()               {}
+func (*WebhookNotDelivered) policyUpdatedRes()               {}
+func (*WebhookNotDelivered) previewRemovedRes()              {}
+func (*WebhookNotDelivered) projectCreatedRes()              {}
+func (*WebhookNotDelivered) projectDeletedRes()              {}
+func (*WebhookNotDelivered) projectUpdatedRes()              {}
+func (*WebhookNotDelivered) releaseCreatedRes()              {}
+func (*WebhookNotDelivered) releaseRevokedRes()              {}
+func (*WebhookNotDelivered) requestApiRes()                  {}
+func (*WebhookNotDelivered) schemaCreatedRes()               {}
+func (*WebhookNotDelivered) sessionDeletedRes()              {}
+func (*WebhookNotDelivered) sessionEstablishedRes()          {}
+func (*WebhookNotDelivered) teamCreatedRes()                 {}
+func (*WebhookNotDelivered) teamDeactivatedRes()             {}
+func (*WebhookNotDelivered) teamUpdatedRes()                 {}
+func (*WebhookNotDelivered) userCreateFailedRes()            {}
+func (*WebhookNotDelivered) userCreatedRes()                 {}
+func (*WebhookNotDelivered) userDeletedRes()                 {}
+func (*WebhookNotDelivered) userUpdatedRes()                 {}
+func (*WebhookNotDelivered) variableRemovedRes()             {}
+func (*WebhookNotDelivered) variableSetRes()                 {}

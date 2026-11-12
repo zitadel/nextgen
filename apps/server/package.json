@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/server",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Zitadel server binary launcher.",
   "homepage": "https://github.com/zitadel/nextgen#readme",
   "bugs": {
@@ -36,6 +36,8 @@
     "check-generate-pruned": "cd ../.. && node scripts/task-guard.mjs --mutex generated-sources -- node scripts/check-go-generate.mjs --prune",
     "vet": "cd ../api && go vet ./...",
     "lint": "cd ../.. && node scripts/go-lint.mjs",
+    "check-pow-vectors": "cd ../.. && node docs/design/flowengine/testdata/generate-pow-v1-vectors.mjs --check",
+    "test-pow": "cd ../api && go test -race -count=1 -timeout 60s ./internal/crypto/pow",
     "test": "cd ../api && go test -v -count=1 -timeout 10m ./...",
     "test-postgres": "cd ../api && go test -v -count=1 -tags postgres_integration -timeout 10m ./...",
     "test-spanner": "cd ../api && go test -v -count=1 -tags spanner_integration -timeout 30m ./internal/api/integration_test/ ./internal/storage/dialect/spanner/ ./internal/storage/dialect/spanner/migration/ ./internal/storage/stmttest/",

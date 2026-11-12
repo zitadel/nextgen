@@ -4,10 +4,9 @@ import type { PromptContext, SetupAnswers, SetupPrompt } from "./types";
 
 /**
  * "Which fields should registration collect?" — picks the use case,
- * which owns the schema field set the scaffold collects (#448). Orthogonal to
- * the sign-in preset, so this asks first: what a user *is* before *how* they
- * sign in.
- * `--use-case` is authoritative; non-interactive runs keep the minimal
+ * which owns the schema field set the scaffold collects. Orthogonal to the
+ * sign-in preset, so this asks first: what a user *is* before *how* they sign
+ * in. `--use-case` is authoritative; non-interactive runs keep the minimal
  * default seeded by the command.
  */
 export class UseCasePrompt implements SetupPrompt {
@@ -28,16 +27,20 @@ export class UseCasePrompt implements SetupPrompt {
       consumer: "Email, first name and last name",
       business: "Email, first name, last name and company name",
     };
-    const useCase = await ctx.input({
-      kind: "select",
+    const useCase = await ctx.ask.select({
       name: "use case",
       message: "Which fields should registration collect? You can change them later.",
       initialValue: answers.useCase,
-      options: SETUP_USE_CASES.map((useCase) => ({
-        value: useCase,
-        label: labels[useCase],
-      })),
+      options: SETUP_USE_CASES.map((useCase) => {
+        return {
+          value: useCase,
+          label: labels[useCase],
+        };
+      }),
     });
-    return { ...answers, useCase };
+    return {
+      ...answers,
+      useCase,
+    };
   }
 }

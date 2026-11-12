@@ -95,7 +95,8 @@ func TestCombinedFlowLoginFlipToRegister(t *testing.T) {
 
 	// Submit the password → create_user fires → done + handoff token.
 	pwResp, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
-		Action: "submit",
+		GateProofs: currentSignupProofs(t, client, flowID, mustExtractZflow(t, idOK.SetCookie)),
+		Action:     "submit",
 		Fields: api.NewOptFlowSubmitRequestFields(api.FlowSubmitRequestFields{
 			"x-auth-methods#password": jx.Raw(`"` + newPass + `"`),
 		}),
@@ -409,6 +410,9 @@ func TestBackToIdentifierRotatesAuthAttempt(t *testing.T) {
 func mustSubmitOK(t *testing.T, client *helpers.ApiClient, flowID, zflow, action string, fields api.FlowSubmitRequestFields) *api.SubmitFlowStepOK {
 	t.Helper()
 	req := &api.FlowSubmitRequest{Action: action}
+	if action == "submit" && fields["x-auth-methods#password"] != nil {
+		req.GateProofs = currentSignupProofs(t, client, flowID, zflow)
+	}
 	if fields != nil {
 		req.Fields = api.NewOptFlowSubmitRequestFields(fields)
 	}

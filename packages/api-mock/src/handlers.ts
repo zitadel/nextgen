@@ -1,3 +1,4 @@
+import { signupGate, validSignupProof } from "./fixtures/signup-pow.js";
 /**
  * MSW handler factory for the mock Flow API.
  *
@@ -46,6 +47,7 @@ import {
   passkeyUpsellStep,
   passwordStep,
   recoverStep,
+  registerPasskeyStep,
   registerPasswordStep,
   registerStep,
   registerSsoStep,
@@ -420,7 +422,9 @@ export function setupMockHandlers(
     const step = snapshot.value as FlowStepName | "idle";
     switch (step) {
       case "register":
-        return withBranding(registerStep(input));
+        return withBranding(
+          snapshot.context.passkeyRegistration ? registerPasskeyStep(input) : registerStep(input),
+        );
       case "register-password":
         return withBranding(registerPasswordStep(input));
       case "recover":
@@ -510,6 +514,23 @@ export function setupMockHandlers(
         iss,
       };
 
+      // A sign-up spends the proof where the user is created: the password
+      // submit, or the attestation of a passkey registration.
+      const signingUp =
+        (before === "register-password" && body.action === "submit") ||
+        (before === "register" &&
+          body.action === "passkey_register" &&
+          Boolean(body.challenge_response) &&
+          snapshot.context.passkeyRegistration);
+      if (
+        signingUp &&
+        !validSignupProof(body.gate_proofs?.signup_pow, snapshot.context.sessionToken)
+      ) {
+        return HttpResponse.json(
+          { code: "flow.proof_invalid", message: "signup proof is missing or invalid" },
+          { status: 403 },
+        );
+      }
       const outcome = accountOutcome(before, body.action, email);
 
       // With account routing the collision is the switch to sign-in, as the
@@ -602,12 +623,13 @@ export function setupMockHandlers(
         fields: submitted,
         sso_provider_id: body.sso_provider_id ?? null,
         outcome,
+        attested: Boolean(body.challenge_response),
       });
       const after = actor.getSnapshot();
       const createdEmail = after.context.capturedFields.email;
       if (
         routesByAccount &&
-        (before === "register-password" || before === "register-sso") &&
+        (before === "register" || before === "register-password" || before === "register-sso") &&
         after.value === "done" &&
         createdEmail
       ) {
@@ -622,7 +644,15 @@ export function setupMockHandlers(
     }),
     getGetFlowStepMockHandler(async ({ params }) => {
       captured.push({ kind: "getFlowStep", flowId: String(params.id) });
-      return currentResponse();
+      const response = await currentResponse();
+      // As on the server, only GET prepares the announced signup challenge.
+      if (response.step.gates.signup_pow) {
+        response.step.gates = {
+          ...response.step.gates,
+          ...signupGate(actor.getSnapshot().context.sessionToken),
+        };
+      }
+      return response;
     }),
     // Both mounts the engine serves (`internal/api/flow_sso.go`): the
     // published path, and the one an SDK proxy forwards after stripping its

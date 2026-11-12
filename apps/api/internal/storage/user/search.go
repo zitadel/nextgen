@@ -110,3 +110,27 @@ func MergeSearchPages(pages [][]*domain.User, limit uint32) []*domain.User {
 	}
 	return merged
 }
+
+// SearchIndexArm names one range of a user search across projects by what its
+// rows carry.
+type SearchIndexArm struct {
+	ProjectID string
+	Key       domain.AttributeKey
+}
+
+// SearchIndexArms indexes ranges by the project and property each reads.
+func SearchIndexArms(ranges []domain.UserSearchRange) map[SearchIndexArm]int {
+	arms := make(map[SearchIndexArm]int, len(ranges))
+	for i, r := range ranges {
+		arms[SearchIndexArm{ProjectID: r.ProjectID, Key: r.Key}] = i
+	}
+	return arms
+}
+
+// MarkSearchIndexFull sets Full on each range that read limit rows.
+func MarkSearchIndexFull(ranges []domain.UserSearchRange, limit int) []domain.UserSearchRange {
+	for i := range ranges {
+		ranges[i].Full = limit > 0 && len(ranges[i].Hits) == limit
+	}
+	return ranges
+}

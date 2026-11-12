@@ -22,7 +22,12 @@ import {
 import { authMethods, type ConfigDocuments } from "@tests/helpers/config";
 import { it } from "@tests/helpers/fixtures";
 import { readJson } from "@tests/helpers/local-project";
-import { expectedPublicCliCommand, parseJson, runCliForTest } from "@tests/helpers/run-cli";
+import {
+  expectedPublicCliCommand,
+  parseJson,
+  runCliForTest,
+  stripAnsi,
+} from "@tests/helpers/run-cli";
 
 /**
  * A schema with both password and passkey enabled.
@@ -119,7 +124,7 @@ const LAST_WAY_REFUSAL = {
   code: "E_CONFIRMATION_REQUIRED",
   message: ".zitadel/schemas/default-human-user.json would have no way to sign in left",
   hint:
-    "Enable another method first, such as `zitadel auth-method sso enable --provider <name>`. " +
+    `Enable another method first, such as ${expectedPublicCliCommand("auth-method sso enable --provider '<name>'")}. ` +
     "If the schema's users are only managed through the API, ask a person first: Disable passkey anyway? " +
     "Nobody will be able to sign in to default-human-user. " +
     "Re-run with --force only once they agree (the first of details.suggested_args holds the exact arguments).",
@@ -201,13 +206,23 @@ describe("auth-method password and passkey", () => {
         data: {
           next_commands: [
             expectedPublicCliCommand(`deploy --dry-run --cwd ${dir}`),
-            expectedPublicCliCommand(`deploy -m '<what changed>' --cwd ${dir}`),
+            expectedPublicCliCommand(`deploy --message '<what changed>' --cwd ${dir}`),
           ],
         },
       });
     });
 
-    it("hands over the follow-ups as argument lists when the path needs quoting", async ({
+    it("carries the headline it draws as data.title", async ({ dir }) => {
+      await writeProject(dir, aProject(BOTH, aPasswordFlow()));
+
+      const result = await runCliForTest(authMethodJson(dir, "passkey", "disable"));
+
+      expect(parseJson(result.stdout)).toMatchObject({
+        data: { title: "Disabled passkey for default-human-user" },
+      });
+    });
+
+    it("quotes the path in the follow-ups, and hands it over as it is in the argument lists", async ({
       dir,
     }) => {
       const cwd = join(dir, "my project");
@@ -217,10 +232,13 @@ describe("auth-method password and passkey", () => {
 
       expect(parseJson(result.stdout)).toMatchObject({
         data: {
-          next_commands: [],
+          next_commands: [
+            expect.stringMatching(/ deploy --dry-run --cwd '[^']+my project'$/),
+            expect.stringMatching(/ deploy --message '<what changed>' --cwd '[^']+my project'$/),
+          ],
           next_args: [
             ["deploy", "--dry-run", "--cwd", cwd],
-            ["deploy", "-m", "<what changed>", "--cwd", cwd],
+            ["deploy", "--message", "<what changed>", "--cwd", cwd],
           ],
         },
       });
@@ -487,7 +505,7 @@ describe("auth-method password and passkey", () => {
           hint:
             "Edit those steps first; login flows are not edited for you. From each step, remove its x-auth-methods#password field. " +
             "Delete a step left with no field or sign-in method: retarget the transitions listed for it. " +
-            "`zitadel deploy --dry-run` checks the edited flow; then run the command again.",
+            `${expectedPublicCliCommand("deploy --dry-run")} checks the edited flow; then run the command again.`,
         });
       });
 
@@ -578,7 +596,7 @@ describe("auth-method password and passkey", () => {
           hint:
             "Edit those steps first; login flows are not edited for you. From each step, remove its passkey actions and their transitions. " +
             "Delete a step left with no field or sign-in method: point the purposes key it is the entry step of at another step. " +
-            "`zitadel deploy --dry-run` checks the edited flow; then run the command again.",
+            `${expectedPublicCliCommand("deploy --dry-run")} checks the edited flow; then run the command again.`,
         });
       });
     });
@@ -639,7 +657,7 @@ describe("auth-method password and passkey", () => {
         expect(parseJson(result.stdout)).toMatchObject({
           next_commands: [
             expectedPublicCliCommand(
-              `auth-method passkey disable --schema default-human-user --cwd ${dir} --force`,
+              `auth-method passkey disable --schema default-human-user --force --cwd ${dir}`,
             ),
             expectedPublicCliCommand(
               `auth-method password enable --schema default-human-user --cwd ${dir}`,
@@ -657,22 +675,27 @@ describe("auth-method password and passkey", () => {
         expect(parseJson(result.stdout)).toMatchObject({
           next_commands: [
             expectedPublicCliCommand(
-              `auth-method passkey disable --schema default-human-user --cwd ${dir} --force`,
+              `auth-method passkey disable --schema default-human-user --force --cwd ${dir}`,
             ),
           ],
         });
       });
 
-      it.for(["my users&calc", "--force"])(
-        "leaves the schema name %s out of runnable commands",
-        async (name, { dir }) => {
-          await writeProject(dir, { schemas: { [`${name}.json`]: aSchema(PASSKEY_ONLY, name) } });
+      it.for([
+        ["my users&calc", "--schema 'my users&calc'"],
+        ["--force", "--schema=--force"],
+      ])("quotes the schema name %s in the runnable commands", async ([name, option], { dir }) => {
+        await writeProject(dir, { schemas: { [`${name}.json`]: aSchema(PASSKEY_ONLY, name) } });
 
-          const result = await runCliForTest(authMethodJson(dir, "passkey", "disable"));
+        const result = await runCliForTest(authMethodJson(dir, "passkey", "disable"));
 
-          expect(parseJson(result.stdout)).toMatchObject({ next_commands: [] });
-        },
-      );
+        expect(parseJson(result.stdout)).toMatchObject({
+          next_commands: [
+            expectedPublicCliCommand(`auth-method passkey disable ${option} --force --cwd ${dir}`),
+            expectedPublicCliCommand(`auth-method password enable ${option} --cwd ${dir}`),
+          ],
+        });
+      });
 
       it("hands over the re-runs as argument lists for a schema name that needs quoting", async ({
         dir,
@@ -685,7 +708,7 @@ describe("auth-method password and passkey", () => {
         expect(parseJson(result.stdout)).toMatchObject({
           details: {
             suggested_args: [
-              ["auth-method", "passkey", "disable", "--schema", name, "--cwd", dir, "--force"],
+              ["auth-method", "passkey", "disable", "--schema", name, "--force", "--cwd", dir],
               ["auth-method", "password", "enable", "--schema", name, "--cwd", dir],
             ],
           },
@@ -699,7 +722,7 @@ describe("auth-method password and passkey", () => {
 
         expect(parseJson(result.stdout)).toHaveProperty(
           ["details", "suggested_args", 0],
-          ["auth-method", "passkey", "disable", "--schema=--force", "--cwd", dir, "--force"],
+          ["auth-method", "passkey", "disable", "--schema=--force", "--force", "--cwd", dir],
         );
       });
 
@@ -818,12 +841,34 @@ describe("auth-method password and passkey", () => {
       expect(parseJson(result.stdout)).toMatchObject({ warnings: [PASSKEY_NOT_OFFERED] });
     });
 
-    it("reports a skipped preview", async ({ dir }) => {
+    it("reports the preview as a dry run", async ({ dir }) => {
       await writeProject(dir, aProject(BOTH, aPasswordFlow()));
 
       const result = await runCliForTest(authMethodJson(dir, "passkey", "disable", "--dry-run"));
 
-      expect(parseJson(result.stdout)).toMatchObject({ status: "skipped", reason: "dry-run" });
+      expect(parseJson(result.stdout)).toMatchObject({ status: "ok", data: { dry_run: true } });
+    });
+
+    it("carries the headline it draws as data.title", async ({ dir }) => {
+      await writeProject(dir, aProject(BOTH, aPasswordFlow()));
+
+      const result = await runCliForTest(authMethodJson(dir, "passkey", "disable", "--dry-run"));
+
+      expect(parseJson(result.stdout)).toMatchObject({
+        data: { title: "Would disable passkey for default-human-user (dry run)" },
+      });
+    });
+
+    it("suggests the real command", async ({ dir }) => {
+      await writeProject(dir, aProject(BOTH, aPasswordFlow()));
+
+      const result = await runCliForTest(authMethodJson(dir, "passkey", "disable", "--dry-run"));
+
+      expect(parseJson(result.stdout)).toMatchObject({
+        data: {
+          next_commands: [expectedPublicCliCommand(`auth-method passkey disable --cwd ${dir}`)],
+        },
+      });
     });
 
     it("writes nothing", async ({ dir }) => {
@@ -869,7 +914,7 @@ describe("auth-method password and passkey", () => {
         expect(parseJson(result.stdout)).toMatchObject({
           next_commands: [
             expectedPublicCliCommand(
-              `auth-method passkey disable --schema default-human-user --cwd ${dir} --force --dry-run`,
+              `auth-method passkey disable --schema default-human-user --force --dry-run --cwd ${dir}`,
             ),
             expectedPublicCliCommand(
               `auth-method password enable --schema default-human-user --cwd ${dir}`,
@@ -886,8 +931,8 @@ describe("auth-method password and passkey", () => {
         );
 
         expect(parseJson(result.stdout)).toMatchObject({
-          status: "skipped",
-          reason: "dry-run",
+          status: "ok",
+          data: { dry_run: true },
           warnings: [WOULD_BE_LEFT_WITHOUT_SIGN_IN],
         });
       });
@@ -906,4 +951,41 @@ describe("auth-method password and passkey", () => {
     expect(suggested).not.toHaveLength(0);
     expect(Object.keys(COMMANDS)).toEqual(expect.arrayContaining(suggested));
   });
+
+  // It used to narrate "password is already enabled for …" and then close on
+  // "Nothing to enable for …", which reads as two separate findings.
+  it("says a method that is already on once, as the line it closes on", async ({ dir }) => {
+    await writeProject(dir, aProject(BOTH, aPasswordFlow()));
+
+    const result = await runCliForTest(authMethodText(dir, "password", "enable"));
+
+    expect(stripAnsi(result.stdout).split("default-human-user")).toHaveLength(2);
+    expect(stripAnsi(result.stdout)).not.toContain("password is already enabled for");
+  });
+
+  it("still closes on what it found when there was nothing to do", async ({ dir }) => {
+    await writeProject(dir, aProject(BOTH, aPasswordFlow()));
+
+    const result = await runCliForTest(authMethodText(dir, "password", "enable"));
+
+    expect(stripAnsi(result.stdout)).toContain("Nothing to enable for default-human-user");
+  });
+
+  it.for([
+    { method: "password", verb: "enable", methods: BOTH, flow: aPasswordFlow() },
+    { method: "passkey", verb: "enable", methods: BOTH, flow: aPasswordFlow() },
+    { method: "password", verb: "disable", methods: PASSKEY_ONLY, flow: PASSKEY_FLOW },
+    { method: "passkey", verb: "disable", methods: PASSWORD_ONLY, flow: aPasswordFlow() },
+  ])(
+    "closes a dry run of $method $verb that changes nothing on a headline that says it is one",
+    async ({ method, verb, methods, flow }, { dir }) => {
+      await writeProject(dir, aProject(methods, flow));
+
+      const result = await runCliForTest(authMethodText(dir, method, verb, "--dry-run"));
+
+      expect(stripAnsi(result.stdout)).toContain(
+        `Nothing to ${verb} for default-human-user (dry run)`,
+      );
+    },
+  );
 });

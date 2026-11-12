@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 
@@ -78,8 +79,10 @@ func NewFlowService(
 	v2Pool *DB,
 	stateMachine domain.FlowStateMachine,
 	builtinBases domain.BuiltinSchemaBases,
+	protection SignupProtection,
 ) FlowService {
 	return &flowService{
+		protection:   protection,
 		v2Pool:       v2Pool,
 		stateMachine: stateMachine,
 		builtinBases: builtinBases,
@@ -87,6 +90,7 @@ func NewFlowService(
 }
 
 type flowService struct {
+	protection   SignupProtection
 	v2Pool       *DB
 	stateMachine domain.FlowStateMachine
 	// builtinBases resolves a definition's user schema given as a built-in
@@ -254,6 +258,7 @@ func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (res doma
 	audit.BindPublicRequest(ctx, req.Definition.ProjectID, flowID, sessionID)
 
 	in := domain.FlowStartInput{
+		ID:            flowID,
 		Definition:    req.Definition,
 		Purpose:       req.Purpose,
 		Session:       domain.FlowSessionRef{ID: sessionID},
@@ -278,6 +283,9 @@ func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (res doma
 		}
 	}
 
+	if err := s.attachSignupGate(ctx, req.Definition, &result); err != nil {
+		return domain.FlowStepResult{}, err
+	}
 	return domain.FlowStepResult{State: result.State, Step: result.Step}, nil
 }
 
@@ -319,6 +327,9 @@ func (s *flowService) Submit(ctx context.Context, req SubmitFlowRequest) (res do
 	if err != nil {
 		return domain.FlowStepResult{}, err
 	}
+	if err := s.attachSignupGate(ctx, def, &result); err != nil {
+		return domain.FlowStepResult{}, err
+	}
 	return domain.FlowStepResult{
 		State:                 result.State,
 		Step:                  result.Step,
@@ -344,6 +355,20 @@ func (s *flowService) GetStep(ctx context.Context, req GetFlowStepRequest) (res 
 	if err != nil {
 		return domain.FlowStepResult{}, err
 	}
+	if err := s.attachSignupGate(ctx, def, &result); err != nil {
+		return domain.FlowStepResult{}, err
+	}
+	// A render may resolve parked SSO state. Return its updated cookie before
+	// attempting issuance, just as Start and Submit do.
+	if result.Step != nil && result.Step.SignupRequired && !result.Reseal {
+		if s.protection == nil {
+			return domain.FlowStepResult{}, domain.ErrFlowIntegrity()
+		}
+		result.Step.SignupChallenge, err = s.protection.Challenge(ctx, result.State)
+		if err != nil {
+			return domain.FlowStepResult{}, err
+		}
+	}
 	return domain.FlowStepResult{
 		State:                 result.State,
 		Step:                  result.Step,
@@ -356,4 +381,53 @@ func (s *flowService) GetStep(ctx context.Context, req GetFlowStepRequest) (res 
 func flowServesPurpose(def *domain.FlowDefinition, purpose domain.FlowDefinitionPurpose) bool {
 	_, ok := def.Purposes[purpose]
 	return ok
+}
+
+// attachSignupGate announces the sign-up gate on a step whose next submit
+// creates a user: one whose on_success is create_user, or one carrying a
+// passkey registration that creates its user. Runtime enforcement does not
+// depend on template markup or client-selected purpose.
+// def must be the definition result.State names: Process refuses cross-flow
+// transitions, so it always is today. Pivots must look the step up in theirs.
+func (s *flowService) attachSignupGate(ctx context.Context, def *domain.FlowDefinition, result *domain.FlowStepResult) error {
+	if result.Step == nil || result.State == nil {
+		return nil
+	}
+	step, ok := def.FindStep(result.Step.Name)
+	if ok && step.OnSuccess != nil && *step.OnSuccess == domain.FlowOnSuccessCreateUser {
+		result.Step.SignupRequired = true
+		return nil
+	}
+	creates, err := s.registrationCreatesUser(ctx, result)
+	if err != nil {
+		return err
+	}
+	result.Step.SignupRequired = creates
+	return nil
+}
+
+// registrationCreatesUser reports whether the step carries a passkey
+// registration that creates its user, which its attestation spends the
+// sign-up proof for. The attempt's stored challenge decides, as it does at
+// verification: the ceremony is provisional when no user was pinned at issue.
+func (s *flowService) registrationCreatesUser(ctx context.Context, result *domain.FlowStepResult) (bool, error) {
+	challenge := result.Step.Challenge
+	if challenge == nil || challenge.Method != domain.FlowChallengeMethodPasskeyRegister {
+		return false, nil
+	}
+	attempt, err := s.v2Pool.Statements().GetAuthAttemptByID(ctx, result.State.ProjectID, result.State.AuthAttemptID)
+	if errors.Is(err, domain.ErrAuthAttemptNotFound()) {
+		// Nothing to gate: the attestation is refused with the attempt.
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("flow service: read auth attempt: %w", err)
+	}
+	stored, ok := attempt.ChallengeByID(challenge.ChallengeID)
+	if !ok {
+		// A superseded ceremony fails as stale when its attestation arrives.
+		return false, nil
+	}
+	registration, ok := stored.(*domain.AuthChallengePasskeyRegistration)
+	return ok && registration.Provisional, nil
 }

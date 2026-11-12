@@ -15,10 +15,12 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-// Search reads a type through that type's list, behind one gate per read. The
-// mock refuses any statement a case does not expect, so a case that names its
-// reads also proves nothing else was read: no user is listed for a search
-// that asks for teams.
+// Search decides the project's list gate once, then reads a type behind it:
+// a team by its id through the teams list, a team by name from the search
+// entries, which a project the gate allows every row of reads in the one
+// statement for every project and kind (here one of each). The mock refuses any statement a case does not expect, so a case
+// that names its reads also proves nothing else was read: no user is listed
+// for a search that asks for teams.
 func TestSearch_Teams(t *testing.T) {
 	caller := ScopeContext{
 		ProjectID:     "proj_home",
@@ -29,22 +31,32 @@ func TestSearch_Teams(t *testing.T) {
 	team := func(id, name string) *domain.Team {
 		return &domain.Team{ID: id, ProjectID: "proj_home", Name: name}
 	}
-	nameContains := func(text string) database.Filter[domain.TeamField] {
-		return database.StringContainsFold(database.Col(domain.TeamFieldName), text)
+	match := func(id, title, text string, nameStart bool) domain.SearchEntryMatch {
+		return domain.SearchEntryMatch{ResourceID: id, ProjectID: "proj_home", Title: title, MatchedText: text, NameStart: nameStart}
 	}
-	idEquals := func(id string) database.Filter[domain.TeamField] {
-		return database.StringEqual(database.Col(domain.TeamFieldID), id)
+	repeat := func(n int, m domain.SearchEntryMatch) []domain.SearchEntryMatch {
+		out := make([]domain.SearchEntryMatch, n)
+		for i := range out {
+			out[i] = m
+		}
+		return out
 	}
+	// A read is a team list by id, a search of the entries of this project
+	// (after an id finds nothing), or one across the allowed projects.
 	type read struct {
-		filter database.Filter[domain.TeamField]
-		result database.ListResult[*domain.Team]
+		id      string
+		teams   []*domain.Team
+		prefix  string
+		rows    int
+		single  bool
+		matches []domain.SearchEntryMatch
 	}
 
 	for _, tt := range []struct {
 		name  string
 		query string
 		limit api.OptInt
-		// reads are the team lists the search makes, in order.
+		// reads are the reads the search makes, in order.
 		reads          []read
 		wantIDs        []string
 		wantIncomplete []api.SearchResultType
@@ -53,10 +65,13 @@ func TestSearch_Teams(t *testing.T) {
 			name:  "ranks the matches of the trimmed text",
 			query: "  pay ",
 			reads: []read{{
-				filter: nameContains("pay"),
-				result: database.ListResult[*domain.Team]{Items: []*domain.Team{
-					team("team_2", "Prepay"), team("team_1", "Payments"), team("team_3", "pay"),
-				}},
+				prefix: "pay",
+				rows:   24,
+				matches: []domain.SearchEntryMatch{
+					match("team_2", "Big Pay", "pay", false),
+					match("team_3", "pay", "pay", true),
+					match("team_1", "Payments", "payments", true),
+				},
 			}},
 			wantIDs: []string{"team_3", "team_1", "team_2"},
 		},
@@ -66,48 +81,56 @@ func TestSearch_Teams(t *testing.T) {
 			wantIDs: []string{},
 		},
 		{
-			name:  "an id finds its team without matching names",
-			query: "team_1",
-			reads: []read{{
-				filter: idEquals("team_1"),
-				result: database.ListResult[*domain.Team]{Items: []*domain.Team{team("team_1", "Payments")}},
-			}},
+			name:    "an id finds its team without matching names",
+			query:   "team_1",
+			reads:   []read{{id: "team_1", teams: []*domain.Team{team("team_1", "Payments")}}},
 			wantIDs: []string{"team_1"},
 		},
 		{
 			name:  "text shaped like an id that finds no team is matched as a name",
 			query: "team_blue",
 			reads: []read{
-				{filter: idEquals("team_blue")},
-				{
-					filter: nameContains("team_blue"),
-					result: database.ListResult[*domain.Team]{Items: []*domain.Team{team("team_9", "team_blue crew")}},
-				},
+				{id: "team_blue"},
+				{prefix: "team_blue", rows: 24, single: true, matches: []domain.SearchEntryMatch{match("team_9", "team_blue crew", "team_blue crew", true)}},
 			},
 			wantIDs: []string{"team_9"},
+		},
+		{
+			name:  "a team found by two of its texts is one result, ranked by the better",
+			query: "pay",
+			reads: []read{{
+				prefix: "pay",
+				rows:   24,
+				matches: []domain.SearchEntryMatch{
+					match("team_1", "Pay Pay", "pay", false),
+					match("team_1", "Pay Pay", "pay pay", true),
+				},
+			}},
+			wantIDs: []string{"team_1"},
 		},
 		{
 			name:  "more matches than the limit leave the type incomplete",
 			query: "pay",
 			limit: api.NewOptInt(1),
 			reads: []read{{
-				filter: nameContains("pay"),
-				result: database.ListResult[*domain.Team]{Items: []*domain.Team{
-					team("team_2", "Prepay"), team("team_1", "Payments"),
-				}},
+				prefix: "pay",
+				rows:   8,
+				matches: []domain.SearchEntryMatch{
+					match("team_1", "Payments", "payments", true),
+					match("team_2", "Payroll", "payroll", true),
+				},
 			}},
 			wantIDs:        []string{"team_1"},
 			wantIncomplete: []api.SearchResultType{api.SearchResultTypeTeam},
 		},
 		{
-			name:  "a read that did not reach the end leaves the type incomplete",
+			name:  "a read that stopped at its row limit leaves the type incomplete",
 			query: "pay",
+			limit: api.NewOptInt(1),
 			reads: []read{{
-				filter: nameContains("pay"),
-				result: database.ListResult[*domain.Team]{
-					Items:      []*domain.Team{team("team_1", "Payments")},
-					NextCursor: []byte("next"),
-				},
+				prefix:  "pay",
+				rows:    8,
+				matches: repeat(8, match("team_1", "Payments", "payments", true)),
 			}},
 			wantIDs:        []string{"team_1"},
 			wantIncomplete: []api.SearchResultType{api.SearchResultTypeTeam},
@@ -118,26 +141,47 @@ func TestSearch_Teams(t *testing.T) {
 			pool := servicemocks.NewMockPool(ctrl)
 			stmts := servicemocks.NewMockAllStatements(ctrl)
 			pool.EXPECT().Statements().Return(stmts).AnyTimes()
-			// One gate for the project, then one in front of every read.
-			gates := 1 + len(tt.reads)
-			stmts.EXPECT().ActiveSystemCatalogID(gomock.Any()).Return(domain.SystemCatalogID, nil).Times(gates)
-			stmts.EXPECT().CheckAuthz(gomock.Any(), gomock.Any()).Return(true, true, nil).Times(gates)
+			// One gate for the project, whatever the search reads behind it.
+			stmts.EXPECT().ActiveSystemCatalogID(gomock.Any()).Return(domain.SystemCatalogID, nil)
+			stmts.EXPECT().CheckAuthz(gomock.Any(), gomock.Any()).Return(true, true, nil)
 			var previous *gomock.Call
 			for _, r := range tt.reads {
-				call := stmts.EXPECT().ListTeams(gomock.Any(), gomock.Any()).DoAndReturn(
-					func(_ context.Context, opts *database.ListOptions[domain.TeamField]) (*database.ListResult[*domain.Team], error) {
-						filter, ok := opts.Filter.(database.AndFilter[domain.TeamField])
-						require.True(t, ok, "filter is %T", opts.Filter)
-						assert.Contains(t, filter.Filters, database.Equal(database.Col(domain.TeamFieldProjectID), "proj_home"))
-						assert.Contains(t, filter.Filters, r.filter)
-						assert.EqualValues(t, domain.SearchReadLimit, opts.Pagination.Limit)
-						return &r.result, nil
-					},
-				)
+				var call *gomock.Call
+				if r.id != "" {
+					call = stmts.EXPECT().ListTeams(gomock.Any(), gomock.Any()).DoAndReturn(
+						func(ctx context.Context, opts *database.ListOptions[domain.TeamField]) (*database.ListResult[*domain.Team], error) {
+							assert.True(t, service.AuthzListSkipOncePending(ctx), "read behind the project's gate")
+							filter, ok := opts.Filter.(database.AndFilter[domain.TeamField])
+							require.True(t, ok, "filter is %T", opts.Filter)
+							assert.Contains(t, filter.Filters, database.Equal(database.Col(domain.TeamFieldProjectID), "proj_home"))
+							assert.Contains(t, filter.Filters, database.StringEqual(database.Col(domain.TeamFieldID), r.id))
+							return &database.ListResult[*domain.Team]{Items: r.teams}, nil
+						},
+					).Call
+				} else if r.single {
+					call = stmts.EXPECT().SearchEntries(gomock.Any(), domain.ResourceKindTeam, "proj_home", r.prefix, r.rows).DoAndReturn(
+						func(ctx context.Context, _ domain.ResourceKind, _, _ string, limit int) ([]domain.SearchEntryMatch, bool, error) {
+							assert.True(t, service.AuthzListSkipOncePending(ctx), "read behind the project's gate")
+							return r.matches, len(r.matches) == limit, nil
+						},
+					).Call
+				} else {
+					call = stmts.EXPECT().SearchEntriesInProjects(gomock.Any(), []string{"proj_home"}, []domain.ResourceKind{domain.ResourceKindTeam}, r.prefix, r.rows).DoAndReturn(
+						func(ctx context.Context, _ []string, _ []domain.ResourceKind, _ string, limit int) ([]domain.SearchEntryRange, error) {
+							assert.True(t, service.AuthzListSkipOncePending(ctx), "read behind the projects' gates")
+							return []domain.SearchEntryRange{{
+								ProjectID: "proj_home",
+								Kind:      domain.ResourceKindTeam,
+								Matches:   r.matches,
+								Full:      len(r.matches) == limit,
+							}}, nil
+						},
+					).Call
+				}
 				if previous != nil {
 					call.After(previous)
 				}
-				previous = call.Call
+				previous = call
 			}
 			db := service.NewPool(pool)
 			h := Handler{pool: db, teamService: service.NewTeamService(db)}
@@ -159,6 +203,7 @@ func TestSearch_Teams(t *testing.T) {
 			}
 			assert.Equal(t, tt.wantIDs, ids)
 			assert.ElementsMatch(t, tt.wantIncomplete, got.IncompleteTypes)
+			assert.False(t, got.MoreProjects)
 		})
 	}
 }

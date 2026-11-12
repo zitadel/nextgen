@@ -135,6 +135,9 @@ type CreateAuthAttemptInput struct {
 	// RuntimeResolutionFromContext when the caller leaves them empty.
 	DeploymentID string
 	ReleaseID    string
+	// FlowID is the login flow creating the attempt. Never settable through
+	// the REST surface.
+	FlowID string
 }
 
 // BeginPasskeyEnrollmentInput starts a management-plane enrollment ceremony
@@ -303,8 +306,10 @@ type PasskeyRegistrationProof struct {
 	// persistence, and check success land atomically. The service invokes it
 	// with the stored challenge's authoritative user handle — a caller cannot
 	// create a row under a different id than the credential binds to. Only
-	// consulted for provisional ceremonies.
-	CreateUser func(userID string) []UserAction
+	// consulted for provisional ceremonies, once the attestation verified and
+	// before anything is written, so it is where a caller refuses the user:
+	// its error fails the verification without recording a failed check.
+	CreateUser func(ctx context.Context, userID string) ([]UserAction, error)
 }
 
 func (PasskeyRegistrationProof) proofCheckType() domain.AuthCheckType {
@@ -336,8 +341,8 @@ type authAttemptService struct {
 // whose rehash would not be stored.
 type verifyOnly struct{ crypto.HashVerifier }
 
-func (v verifyOnly) VerifyAndRehash(encoded, target string) (string, error) {
-	return "", v.VerifyHash(encoded, target)
+func (v verifyOnly) VerifyAndRehash(ctx context.Context, encoded, target string) (string, error) {
+	return "", v.VerifyHash(ctx, encoded, target)
 }
 
 func NewAuthAttemptService(
@@ -390,6 +395,7 @@ func (s *authAttemptService) Create(ctx context.Context, input CreateAuthAttempt
 	attempt.Internal = input.Internal
 	attempt.DeploymentID = input.DeploymentID
 	attempt.ReleaseID = input.ReleaseID
+	attempt.FlowID = input.FlowID
 	if resolution := RuntimeResolutionFromContext(ctx); resolution != nil {
 		if attempt.DeploymentID == "" && resolution.Deployment != nil {
 			attempt.DeploymentID = resolution.Deployment.ID
@@ -859,9 +865,9 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 		}
 		// A variable of its own: err is returned as is above, and the error
 		// response generator would count a wrong password as returnable there.
-		_, end := startSpan(ctx, "password.Verify")
+		verifyCtx, end := startSpan(ctx, "password.Verify")
 		start := time.Now()
-		updated, verifyErr := password.Verify(p.Password, verifier)
+		updated, verifyErr := password.Verify(verifyCtx, p.Password, verifier)
 		spanErr := verifyErr
 		if errors.Is(spanErr, crypto.ErrRehashFailed) {
 			// The password matched; the warning below logs the failed rehash.
@@ -876,8 +882,17 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 				slog.String("user_id", userFactor.UserID),
 				slog.Any("error", verifyErr),
 			)
-		case verifyErr != nil:
+		case errors.Is(verifyErr, domain.ErrUserPasswordInvalid()):
 			return passwordChallenge, nil, nil, domain.ErrAuthAttemptProofRejected(verifyErr)
+		case errors.Is(verifyErr, domain.ErrUserPasswordHashingBusy()):
+			// The check never ran: no failed check, as for a fault above, or
+			// the server's load would lock the user out. Rebuilt rather than
+			// returned as is, so the generator does not count the wrong
+			// password Verify also answers with as returnable here.
+			return nil, nil, nil, domain.ErrUserPasswordHashingBusy().WithParent(verifyErr)
+		case verifyErr != nil:
+			// The caller gave up while the check waited for its slot.
+			return nil, nil, nil, domain.ErrInternal(verifyErr)
 		case updated != "":
 			// Best-effort: the password already matched, and the next sign-in
 			// rehashes again.
@@ -955,8 +970,13 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 		var createActions []UserAction
 		if registrationChallenge.Provisional && p.CreateUser != nil {
 			// The factory receives the challenge's handle, so the created row
-			// cannot diverge from the user the credential binds to.
-			createActions = p.CreateUser(registrationChallenge.UserID)
+			// cannot diverge from the user the credential binds to. A refusal
+			// returns no challenge: the attestation verified, so no failure is
+			// recorded against it.
+			createActions, err = p.CreateUser(ctx, registrationChallenge.UserID)
+			if err != nil {
+				return nil, nil, nil, err
+			}
 			for _, action := range createActions {
 				if err := action.Prepare(ctx); err != nil {
 					return nil, nil, nil, err

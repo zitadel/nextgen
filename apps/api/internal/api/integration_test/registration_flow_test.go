@@ -200,6 +200,7 @@ func TestPasskeyRegistrationFlow(t *testing.T) {
 	zflow = mustExtractZflow(t, regIssueOK.SetCookie)
 
 	require.True(t, regIssueOK.Response.Step.Challenge.Set, "expected challenge on issue")
+	require.NotContains(t, regIssueOK.Response.Step.Gates, "signup_pow", "enrolling a passkey for a known user is no sign-up")
 	regChallenge := regIssueOK.Response.Step.Challenge.Value
 	regChallengeID, _ := regChallenge.ChallengeID.Get()
 	require.True(t, regChallenge.Options.Set, "expected creation options")

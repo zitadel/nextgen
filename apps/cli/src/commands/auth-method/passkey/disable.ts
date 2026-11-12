@@ -1,12 +1,15 @@
-import { AuthMethodCommand } from "@/commands/auth-method/command";
 import { Flags } from "@oclif/core";
 
+import { AuthMethodCommand } from "@/commands/auth-method/command";
 import { type Admitted, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
 
-/** `auth-method passkey disable` (ADR 070). */
+/**
+ * `zitadel auth-method passkey disable` — disable passkey sign-in for a user schema.
+ */
 export default class AuthMethodPasskeyDisable extends AuthMethodCommand {
   static override description = "Disable passkey sign-in for a user schema.";
   static override group = CommandGroups.authentication;
+
   static override examples = [
     "<%= config.bin %> auth-method passkey disable",
     "<%= config.bin %> auth-method passkey disable --schema customers",
@@ -25,12 +28,14 @@ export default class AuthMethodPasskeyDisable extends AuthMethodCommand {
   /**
    * Turn the method on or off for the schema `--schema` names.
    *
-   * @param input - The run's `--schema` and `--cwd`.
+   * @param input.flags - The run's `--schema` and `--cwd`.
    * @returns The result.
    * @throws {@link ZitadelError} When the schema cannot be chosen, or the change
    *   would leave no way to sign in and nobody agreed to it.
    */
-  protected async execute(input: Admitted<typeof AuthMethodPasskeyDisable>): Promise<JsonEnvelope> {
-    return this.toggle(input.flags, "passkey", false);
+  protected async execute({
+    flags,
+  }: Admitted<typeof AuthMethodPasskeyDisable>): Promise<JsonEnvelope> {
+    return this.toggle(flags, "passkey", false);
   }
 }

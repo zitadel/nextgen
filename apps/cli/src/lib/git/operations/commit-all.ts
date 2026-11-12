@@ -8,6 +8,7 @@ import type { Git } from "@/lib/git/git";
 import type { Check, Operation } from "@/lib/git/operation";
 import { StagingArea } from "@/lib/git/staging-area";
 import type { CommitOptions, CommitOutcome } from "@/lib/git/types";
+
 import { CurrentCommit } from "./current-commit";
 
 /**
@@ -94,7 +95,9 @@ export class CommitAll implements Operation<CommitOutcome> {
       if (sha === null) {
         throw new RepositoryError("the commit left no HEAD to record");
       }
-      await git.run(["reset", "--quiet", "--", "."]).catch(() => undefined);
+      await git.run(["reset", "--quiet", "--", "."]).catch(() => {
+        return undefined;
+      });
       return { committed: true, sha, author: identity.source };
     });
   }
