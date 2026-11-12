@@ -41,7 +41,8 @@ import {
 } from "@/lib/oclif";
 import { Destructive } from "@/lib/oclif/destructive";
 import { environmentFlags, projectEnvFile } from "@/lib/oclif/environment-flags";
-import { reads, type Refused, relatedFlags, whole } from "@/lib/oclif/flags";
+import { reads, type Refused, whole } from "@/lib/oclif/flags";
+import { relatedFlags } from "@/lib/suggestion/relations";
 import {
   asStepsShown,
   type NextSteps,

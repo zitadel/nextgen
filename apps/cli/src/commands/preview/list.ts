@@ -9,7 +9,8 @@ import {
   nonBlankString,
   PreviewCommand,
 } from "@/lib/oclif";
-import { reads, type Refused, relatedFlags, whole } from "@/lib/oclif/flags";
+import { reads, type Refused, whole } from "@/lib/oclif/flags";
+import { relatedFlags } from "@/lib/suggestion/relations";
 import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
 
 /** The columns `list` renders, in order. */

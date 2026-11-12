@@ -6,7 +6,7 @@ import type { Interfaces } from "@oclif/core";
 import { describe, expect, it } from "vitest";
 
 import { WORKFLOW_COMMANDS } from "@/index";
-import { relationsOf } from "@/lib/oclif/flags";
+import { relationsOf } from "@/lib/suggestion/relations";
 
 const commands = fileURLToPath(new URL("../../../../src/commands", import.meta.url));
 

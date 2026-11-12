@@ -27,7 +27,9 @@
 - The compiler checks the id and input against the target's `args` and `flags`;
   what is suggestible derives from `src/index.ts`, so add no mapping.
 - Declare `required`, `exclusive` and `dependsOn` through `relatedFlags`
-  (`src/lib/oclif/flags.ts`); `flags-declared.test.ts` fails on an inline one.
+  (`src/lib/suggestion/relations.ts`); `flags-declared.test.ts` fails on an inline one.
+- Keep everything about suggestions in `src/lib/suggestion/`, outside `lib/oclif`,
+  which domain libs may not import (`layering.test.ts`).
 - Never pass the run's `--cwd`/`--env`/`--env-file`/`--server`: the renderer adds
   them; set one only to aim elsewhere (a new app, a new environment).
 - Suggest the running command again with `this.again(id, { without, with })`,

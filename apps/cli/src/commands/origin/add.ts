@@ -10,7 +10,7 @@ import {
 } from "@/lib/oclif";
 import { dryRunResult } from "@/lib/oclif/crud/shared";
 import { escapeControlCharacters } from "@/lib/terminal-text";
-import { relatedFlags } from "@/lib/oclif/flags";
+import { relatedFlags } from "@/lib/suggestion/relations";
 
 /** The two kinds an origin pattern can be, as the `--kind` flag accepts them. */
 const ORIGIN_KINDS = ["primary", "preview"] as const;

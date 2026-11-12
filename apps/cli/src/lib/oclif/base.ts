@@ -22,7 +22,6 @@ import {
   helpOf,
   commandOf,
   isSuggestion,
-  type RELATIONS,
   type Scope,
   type Suggest,
   type Suggested,
@@ -49,15 +48,9 @@ import {
 } from "./command-telemetry";
 import type { CommandGroup } from "./groups";
 import { escapeControlCharacters, escapeJsonControlCharacters } from "@/lib/terminal-text";
-import {
-  type NextSteps,
-  nextStepsData,
-  type Rerun,
-  RunSuggestions,
-  renderNextSteps,
-  stepsOf,
-  typedScopeOf,
-} from "./next-steps";
+import type { RELATIONS } from "@/lib/suggestion/relations";
+import { type Rerun, RunSuggestions, typedScopeOf } from "@/lib/suggestion/run";
+import { type NextSteps, nextStepsData, renderNextSteps, stepsOf } from "./next-steps";
 import { painted } from "./rendering";
 import type {
   CommandResult,

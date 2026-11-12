@@ -4,7 +4,8 @@ import { z } from "zod";
 import { DeploymentService } from "@/lib/backend";
 import { GetReleaseByIdParams } from "@/lib/backend/schemas";
 import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
-import { reads, type Refused, relatedFlags } from "@/lib/oclif/flags";
+import { reads, type Refused } from "@/lib/oclif/flags";
+import { relatedFlags } from "@/lib/suggestion/relations";
 import { MESSAGE_MAX_LENGTH, messageTooLong } from "@/lib/publish";
 
 import { escapeControlCharacters } from "@/lib/terminal-text";

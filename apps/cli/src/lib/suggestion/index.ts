@@ -4,6 +4,8 @@ import { Cmd } from "@/lib/cmd";
 import { type ByName, type Named, named } from "@/lib/names";
 import { newestCliCommand, optionArgs, publicCliCommand } from "@/lib/public-cli";
 
+import type { RELATIONS } from "./relations";
+
 /**
  * A command the CLI suggests running next — a `next.commands` entry on a
  * result, a `nextCommands` entry on an error, the `retry` of an input question
@@ -21,7 +23,7 @@ import { newestCliCommand, optionArgs, publicCliCommand } from "@/lib/public-cli
  * or flag cannot be left out, a flag the target does not take cannot be
  * named, a value has the type the target parses it to, `exclusive` flags are
  * never both given and a `dependsOn` flag brings what it depends on (both
- * declared through `relatedFlags()` in `lib/oclif/flags.ts`, since oclif's own types
+ * declared through `relatedFlags()` in `./relations.ts`, since oclif's own types
  * erase them). The run renders it (`BaseCommand.suggest`) and puts its own
  * `--cwd`, `--env`, `--env-file` and `--server` back on, so a suggestion cannot
  * aim at a different project than the run did.
@@ -47,30 +49,6 @@ export interface NextTable {}
 
 /** The id of a command a run can suggest, such as `variable:get`. */
 export type SuggestionId = keyof NextTable & string;
-
-/**
- * Where `relatedFlags()` keeps the relations it was declared with. It is a symbol and
- * not enumerable, so oclif, which reads a command's flags by their names, never
- * sees it, while the type of a command's `flags` carries the relations for
- * {@link SuggestInput} to check against.
- */
-export const RELATIONS: unique symbol = Symbol("relations");
-
-/**
- * What one flag requires of the others: the `exclusive` flags it must not be
- * given with, the `dependsOn` flags it must be given with, and `required` when
- * it must be given at all. Names are the CLI spelling.
- */
-export type FlagRelation<Name extends string> = Readonly<{
-  exclusive?: readonly Name[];
-  dependsOn?: readonly Name[];
-  required?: true;
-}>;
-
-/** The relations of a set of flags, each keyed and naming flags of the same set. */
-export type FlagRelations<Defs> = {
-  readonly [Key in keyof Defs & string]?: FlagRelation<keyof Defs & string>;
-};
 
 declare const LOOSE_ARGS: unique symbol;
 
