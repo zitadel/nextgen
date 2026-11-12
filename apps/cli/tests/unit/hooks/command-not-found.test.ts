@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { unknownCommand, wantsJson } from "@/hooks/command-not-found";
+import { Invocation, UnknownCommand } from "@/hooks/command-not-found";
 
 const KNOWN: ReadonlyArray<readonly string[]> = [
   ["grants", "create"],
@@ -16,10 +16,10 @@ const KNOWN: ReadonlyArray<readonly string[]> = [
   ["deploy"],
 ];
 
-describe("unknownCommand", () => {
+describe("UnknownCommand", () => {
   describe("with a word that is nothing like any command", () => {
     it("names the word and points at the CLI's help", () => {
-      const { error } = unknownCommand("frobnicate", KNOWN);
+      const { error } = new UnknownCommand("frobnicate", KNOWN);
 
       expect(error).toMatchObject({
         code: "E_VALIDATION",
@@ -31,7 +31,7 @@ describe("unknownCommand", () => {
 
   describe("with a topic's command that does not exist", () => {
     it("names the topic and the word, and points at the topic's help", () => {
-      const { error } = unknownCommand("teams:delete", KNOWN);
+      const { error } = new UnknownCommand("teams:delete", KNOWN);
 
       expect(error).toMatchObject({
         message: "teams delete is not a zitadel command.",
@@ -40,13 +40,13 @@ describe("unknownCommand", () => {
     });
 
     it("never offers another topic's command of that name", () => {
-      const { error } = unknownCommand("teams:delete", KNOWN);
+      const { error } = new UnknownCommand("teams:delete", KNOWN);
 
       expect(error.nextCommands).not.toContain("zitadel grants delete");
     });
 
     it("leaves out the arguments typed after it", () => {
-      const { typed } = unknownCommand("teams:delete:team_secret_1", KNOWN);
+      const { typed } = new UnknownCommand("teams:delete:team_secret_1", KNOWN);
 
       expect(typed).toEqual(["teams", "delete"]);
     });
@@ -58,7 +58,7 @@ describe("unknownCommand", () => {
       ["env:extra", ["env"]],
       ["variable:list:extra", ["variable", "list"]],
     ])("%s names the command, not the argument", (id, command) => {
-      const { error, typed } = unknownCommand(id, KNOWN);
+      const { error, typed } = new UnknownCommand(id, KNOWN);
 
       expect({ typed, message: error.message }).toEqual({
         typed: command,
@@ -69,7 +69,7 @@ describe("unknownCommand", () => {
 
   describe("with nothing usable typed", () => {
     it.each([["--json"], ["-x"], [""]])("%j names no command", (id) => {
-      const { error } = unknownCommand(id, KNOWN);
+      const { error } = new UnknownCommand(id, KNOWN);
 
       expect(error.message).toBe("That is not a zitadel command.");
     });
@@ -83,14 +83,34 @@ describe("unknownCommand", () => {
       ["deplo", ["zitadel deploy --help"]],
       ["usrs:list", ["zitadel users --help"]],
     ])("%s suggests the help of the one it meant", (id, next) => {
-      const { error } = unknownCommand(id, KNOWN);
+      const { error } = new UnknownCommand(id, KNOWN);
 
       expect(error.nextCommands).toEqual(next);
     });
   });
 });
 
-describe("wantsJson", () => {
+describe("UnknownCommand.among", () => {
+  const DECLARED = [
+    { id: "deploy", aliases: [] },
+    { id: "deployment:list", aliases: ["deployments"] },
+    { id: "debug", hidden: true, aliases: [] },
+  ];
+
+  it("never suggests a hidden command", () => {
+    const { error } = UnknownCommand.among("debog", DECLARED);
+
+    expect(error.nextCommands).toEqual(["zitadel --help"]);
+  });
+
+  it("suggests the alias a word is a single edit from", () => {
+    const { error } = UnknownCommand.among("deploymnts", DECLARED);
+
+    expect(error.nextCommands).toEqual(["zitadel deployments --help"]);
+  });
+});
+
+describe("Invocation", () => {
   it.each([
     [["teams", "delete", "--json"], undefined, true],
     [["--json", "frobnicate"], undefined, true],
@@ -101,6 +121,6 @@ describe("wantsJson", () => {
     [["frobnicate"], "JSON", true],
     [["frobnicate"], "text", false],
   ])("%j with content type %s is %s", (argv, contentType, expected) => {
-    expect(wantsJson(argv, contentType)).toBe(expected);
+    expect(new Invocation(argv, contentType).wantsJson).toBe(expected);
   });
 });

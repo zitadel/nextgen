@@ -42,6 +42,7 @@ import type {
   SkippedEnvelope,
 } from "./types";
 import { Cmd } from "@/lib/cmd";
+import { Failure, JsonFailureOutput, TerminalFailureOutput } from "./failure";
 
 /**
  * The colour variables, which `bin/run.js` sets from `--color`/`--no-color`
@@ -659,13 +660,18 @@ export abstract class BaseCommand extends Interruptible(Command) {
         }),
       );
     }
+    const failure = new Failure(zitadelError, meta, takeReportedWarnings());
     if (this.jsonEnabled()) {
-      this.logJson(withWarnings(toErrorEnvelope(zitadelError, meta), takeReportedWarnings()));
+      new JsonFailureOutput((envelope) => {
+        this.logJson(envelope);
+      }).write(failure);
     } else if (zitadelError.code !== "E_CANCELLED") {
       // Ctrl-C is the person's own decision, and the terminal already shows it
       // (`^C`, or a cancelled prompt's "Cancelled."), so it gets no error
       // block. The exit code still says the command did not finish.
-      this.logAside(renderError(zitadelError, meta));
+      new TerminalFailureOutput((text) => {
+        this.logAside(text);
+      }).write(failure);
     }
     return this.exit(zitadelError.exitCode);
   }
@@ -794,24 +800,6 @@ function toEnvelope(result: CommandResult, meta: GlobalOptions): JsonEnvelope {
   };
 }
 
-/** Builds the failure envelope from a {@link ZitadelError} and the invocation metadata. */
-export function toErrorEnvelope(
-  error: ZitadelError,
-  meta: Pick<GlobalOptions, "cliVersion" | "command" | "source">,
-): ErrorEnvelope {
-  return {
-    status: "error",
-    cli_version: meta.cliVersion,
-    command: meta.command,
-    source: meta.source,
-    code: error.code,
-    message: error.message,
-    hint: error.hint,
-    next_commands: normalizePublicCliCommands(error.nextCommands, meta.cliVersion),
-    details: error.details,
-  };
-}
-
 /**
  * Renders a {@link CommandResult} as human-facing text for non-JSON mode. A
  * command may supply a bespoke `pretty` string (e.g. `deploy`'s summary);
@@ -845,31 +833,6 @@ function renderPretty(result: CommandResult, meta: GlobalOptions, next: string):
   return [`Skipped: ${escapeControlCharacters(result.reason)}${suffixBlock(meta)}`, next]
     .filter(Boolean)
     .join("\n");
-}
-
-/**
- * Renders a {@link ZitadelError} as a human-readable block for stderr: the
- * coded message, an optional hint, and any suggested next commands.
- */
-export function renderError(error: ZitadelError, meta: Pick<GlobalOptions, "cliVersion">): string {
-  // A failure names what it failed on — an origin, an id, a value — so the
-  // message and the hint carry what the server answered as readily as a
-  // success's rendering does, and are spelled out here for the same reason.
-  // The envelope keeps them as they came, so a reader parses the real text.
-  // Only the label is coloured, so there is nothing for the spelling to undo.
-  const lines = [
-    `${statusColor.fail(`Error ${error.code}:`)} ${escapeControlCharacters(error.message)}`,
-  ];
-  if (error.hint) {
-    lines.push(escapeControlCharacters(error.hint));
-  }
-  const next = renderNextSteps({
-    commands: normalizePublicCliCommands(error.nextCommands, meta.cliVersion),
-  });
-  if (next !== "") {
-    lines.push(next);
-  }
-  return lines.join("\n");
 }
 
 /**
