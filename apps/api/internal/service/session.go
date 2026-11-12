@@ -419,7 +419,8 @@ func emitSessionEstablished(ctx context.Context, stmts EventStatements, session 
 }
 
 // flowID names the login flow whose handoff minted the token; nil or empty
-// leaves the request's own flow, if any.
+// leaves the request's own flow, if any. The minted token is the event's
+// entity; token_id stays the credential the request presented, if any.
 func emitAuthTokenIssued(ctx context.Context, stmts EventStatements, projectID, tokenID string, sessionID, flowID, userID *string, scopes []string) error {
 	spec := audit.EmitSpec{
 		Type:       domain.EventTypeAuthTokenIssued,
@@ -427,7 +428,6 @@ func emitAuthTokenIssued(ctx context.Context, stmts EventStatements, projectID, 
 		ProjectID:  projectID,
 		EntityType: "token",
 		EntityID:   tokenID,
-		TokenID:    tokenID,
 		SessionID:  sessionID,
 		FlowID:     flowID,
 		Payload:    domain.AuthTokenIssuedPayload{Scopes: scopes},

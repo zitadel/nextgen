@@ -100,6 +100,16 @@ are not inputs to the live risk evaluator
   not duplicated in attempt payloads).
 - Factors: `entity_id` / payload `factor_id` + shared `request_id` when
   co-committed.
+- Actor: the request's authenticated caller. Three emitters name a user in
+  its place: the `auth.token.issued` of a user's token, a project claim and a
+  personal team's creation. `session.established` does not: its actor is the
+  exchange's caller, the app, and its user is the payload's `user_id`.
+  [events-for-people.md](events-for-people.md#4-the-actor-is-the-authenticated-caller)
+  proposes one rule.
+- Tokens: `token_id` is the credential the request presented, on every event,
+  and never the token an event is about; that one is `entity_id`. An export
+  joins the requests a token authenticates to its `auth.token.issued` by
+  `token_id` ↔ `entity_id`; `GET /events` has no `token_id` filter.
 
 ## Path A
 
@@ -116,7 +126,9 @@ Path B `auth.attempt.created` shares `flow_id` / `session_id` columns with
 Path A `request.api`. The attempt stores that `flow_id`: the handoff exchange
 is a service call that names no flow, so its `session.established`,
 `auth.token.issued` and `request.api` take `flow_id` from the attempt it
-consumed. Probes (`livez` / `readyz`) do not.
+consumed. The SSO callback arrives without the flow's cookie, so its
+`auth.sso.*` event and `request.api` take it from the attempt too. Probes
+(`livez` / `readyz`) do not.
 
 The class of the payload's `status` (`2xx`, `4xx`, …) is also written to the
 `status_class` column, and its `operation_id` with that class to
