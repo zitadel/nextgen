@@ -60,6 +60,7 @@ the dialect generator is the only mint path, not that create always overwrites.
 | application (error codes use `application.*`, not the prefix) | `app` |
 | application revision | `apprev` |
 | application client row | `client` |
+| application client secret row | `csec` |
 | IdP identity link (`idp_identity_links`, storage-only) | `idplink` |
 | policy (ADR 066) | `pol` |
 | policy revision | `polrev` |
