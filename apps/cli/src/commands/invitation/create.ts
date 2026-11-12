@@ -35,7 +35,10 @@ const NAME_MAX = 200;
 
 /** A name for who an invitation is for, as the API bounds it. */
 const NAME_SCHEMA = filled.pipe(
-  z.string().max(NAME_MAX, `it is longer than ${NAME_MAX} characters`),
+  z.string().refine((name) => {
+    // Counted in characters, as the API's maxLength is, not UTF-16 units.
+    return [...name].length <= NAME_MAX;
+  }, `it is longer than ${NAME_MAX} characters`),
 );
 
 /** Who `--name` says the invitation is for. */
@@ -98,16 +101,10 @@ export default class InvitationCreate extends Promptable(EnvironmentCommand) {
   };
 
   protected async execute({ flags }: Admitted<typeof InvitationCreate>): Promise<JsonEnvelope> {
-    const { client, projectId } = await this.connect();
-    const invitationService = new InvitationService(client, projectId);
-
-    const replaced =
-      flags.replaces === undefined
-        ? undefined
-        : await this.readReplaced(invitationService, flags.replaces);
     // A replacement without a name keeps the original's, so it is not asked.
-    const name = flags.name ?? (replaced === undefined ? await this.askName() : undefined);
+    const name = flags.name ?? (flags.replaces === undefined ? await this.askName() : undefined);
     const relation = flags.relation ?? (await this.askRelation());
+    // A dry run makes no request, so it answers before the connection.
     if (this.dryRun) {
       return this.emit(
         dryRunResult({
@@ -117,12 +114,19 @@ export default class InvitationCreate extends Promptable(EnvironmentCommand) {
             type: "project_member",
             project_member: { relation },
             ...(name === undefined ? {} : { metadata: { name } }),
-            ...(replaced === undefined ? {} : { replaces_invitation_id: replaced.id }),
+            ...(flags.replaces === undefined ? {} : { replaces_invitation_id: flags.replaces }),
           },
           next: await this.realRun(),
         }),
       );
     }
+
+    const { client, projectId } = await this.connect();
+    const invitationService = new InvitationService(client, projectId);
+    const replaced =
+      flags.replaces === undefined
+        ? undefined
+        : await this.readReplaced(invitationService, flags.replaces);
     if (!(await this.askToCreate(name ?? replaced?.metadata?.name, relation, replaced?.id))) {
       return this.emit({
         status: "skipped",
@@ -152,7 +156,7 @@ export default class InvitationCreate extends Promptable(EnvironmentCommand) {
         title: `Created ${escapeControlCharacters(invitation.id)}`,
         sections: [],
         lines: [
-          invitation.link,
+          escapeControlCharacters(invitation.link),
           `Whoever opens it gets the ${invitationRole(invitation)} role. It expires in 72 hours.`,
         ],
       },

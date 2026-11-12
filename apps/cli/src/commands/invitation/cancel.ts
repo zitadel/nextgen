@@ -27,6 +27,13 @@ const INVITATION_ID: Refused<string> = {
 /** The product event a cancel sends once the API confirms it (ADR 086, amended). */
 const INVITATION_CANCELLED = "invitation_cancelled";
 
+/** How a bare dry run is refused: picking an invitation would read the server. */
+const DRY_RUN_WITHOUT_ID_REFUSAL: Refusal = {
+  message: "A dry run needs the invitation to cancel",
+  hint: "Pass its id; find one with `zitadel invitation list --status pending`.",
+  next: ["invitation list --status pending"],
+};
+
 /** How a cancel of an invitation that has already finished is refused. */
 const NOT_PENDING_REFUSAL: Refusal = {
   message: "{id} is {status}, so there is nothing to cancel",
@@ -69,18 +76,19 @@ export default class InvitationCancel extends Destructive(EnvironmentCommand) {
   };
 
   protected async execute({ args }: Admitted<typeof InvitationCancel>): Promise<JsonEnvelope> {
-    const { client, projectId } = await this.connect();
-    const invitationService = new InvitationService(client, projectId);
-    // A bare cancel picks from the pending list even on a dry run, as a bare
-    // rollback resolves its target; a named one is read only to be cancelled.
-    const target = args.invitationId ?? (await this.pickPending(invitationService));
+    if (args.invitationId === undefined && this.dryRun) {
+      throw refusalError(DRY_RUN_WITHOUT_ID_REFUSAL, {}, (command) => {
+        return this.suggest(command);
+      });
+    }
+    const target = args.invitationId ?? (await this.pickPending());
     const invitationId = typeof target === "string" ? target : target.id;
 
     return this.emit(
       await this.confirmed({
         verb: "cancel",
         name: `cancel ${invitationId}`,
-        message: (invitation) => {
+        message: ({ invitation }) => {
           return `Cancel ${describe(invitation)} so its link stops working?`;
         },
         // A bare cancel picked its invitation, which a retry must name.
@@ -93,12 +101,20 @@ export default class InvitationCancel extends Destructive(EnvironmentCommand) {
             next: await this.realRun(),
           });
         },
-        prepare: () => {
-          return typeof target === "string"
-            ? this.readPending(invitationService, target)
-            : Promise.resolve(target);
+        // A dry run stops before this, so it needs no connection: the read
+        // that names a named invitation in the question happens here.
+        prepare: async () => {
+          const connection = await this.connect();
+          const invitation =
+            typeof target === "string"
+              ? await this.readPending(
+                  new InvitationService(connection.client, connection.projectId),
+                  target,
+                )
+              : target;
+          return { ...connection, invitation };
         },
-        apply: async (consent, invitation) => {
+        apply: async (consent, { client, projectId, invitation }) => {
           const unlocked = new InvitationService(consent.unlock(client), projectId);
           await unlocked.cancel(invitation.id);
           this.trackEvent(INVITATION_CANCELLED, {
@@ -123,8 +139,9 @@ export default class InvitationCancel extends Destructive(EnvironmentCommand) {
    * The pending invitation a person picks when the command line named none.
    * A script is told to name one instead.
    */
-  private async pickPending(invitationService: InvitationService): Promise<Invitation> {
-    const pending = await invitationService.pending();
+  private async pickPending(): Promise<Invitation> {
+    const { client, projectId } = await this.connect();
+    const pending = await new InvitationService(client, projectId).pending();
     if (pending.length === 0) {
       throw refusalError(NOTHING_PENDING_REFUSAL, {}, (command) => {
         return this.suggest(command);
@@ -180,5 +197,8 @@ function describe(invitation: Invitation): string {
 /** Who a pending invitation is for and when it expires, beside its id in the picker. */
 function pendingHint(invitation: Invitation): string {
   const whom = invitation.metadata?.name;
-  return `${whom === undefined ? "" : `${whom}, `}expires ${invitation.expires_at}`;
+  // The name is whatever an administrator typed; the picker draws hints as given.
+  return escapeControlCharacters(
+    `${whom === undefined ? "" : `${whom}, `}expires ${invitation.expires_at}`,
+  );
 }

@@ -8,12 +8,19 @@ const INVITATION = "inv_01JCQK5R7T9V1X3Z5B7D9F1H3J";
 /** One character past the longest name the API stores. */
 const TOO_LONG = "x".repeat(201);
 
+/** 200 characters that are 400 UTF-16 units: within the API's limit. */
+const WIDE = "😀".repeat(200);
+
 describe("invitation create", () => {
   describe("with --name", () => {
     it("takes a name, trimmed", async () => {
       await expect(parseFlag(InvitationCreate.flags.name, "  John Doe ", "name")).resolves.toBe(
         "John Doe",
       );
+    });
+
+    it("counts characters, not UTF-16 units, against the limit", async () => {
+      await expect(parseFlag(InvitationCreate.flags.name, WIDE, "name")).resolves.toBe(WIDE);
     });
 
     it.each([

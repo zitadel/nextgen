@@ -91,3 +91,64 @@ test("a numeric secret is the api call, which variable set rejects", () => {
     `${cli} api updateVariables`,
   );
 });
+
+function invitationRequest(options: {
+  query?: Record<string, string>;
+  body?: unknown;
+}): RequestData {
+  return {
+    method: "post",
+    path: {},
+    query: Object.fromEntries(
+      Object.entries(options.query ?? {}).map(([name, value]) => [name, { values: [value] }]),
+    ),
+    header: {},
+    cookie: {},
+    body: options.body,
+  } as unknown as RequestData;
+}
+
+function createInvitation(body: unknown): string {
+  return (
+    cliSample(
+      operation("createInvitation", "invitation create"),
+      "/invitations",
+      {},
+      invitationRequest({ body }),
+    ) ?? ""
+  );
+}
+
+test("a project invitation is created with flags, not --data", () => {
+  const sample = createInvitation({
+    type: "project_member",
+    project_member: { relation: "editor" },
+    metadata: { name: "John Doe" },
+    replaces_invitation_id: "inv_1",
+  });
+
+  expect(sample).toContain(
+    `${cli} invitation create --relation editor --name 'John Doe' --replaces inv_1`,
+  );
+});
+
+test("a team invitation is the api call, which invitation create cannot say", () => {
+  const sample = createInvitation({
+    type: "team_member",
+    team_member: { team_id: "team_1", role: "member" },
+  });
+
+  expect(sample).toContain(`${cli} api createInvitation`);
+});
+
+test("an invitation list keeps its status and type filters", () => {
+  const sample =
+    cliSample(
+      operation("listInvitations", "invitation list"),
+      "/invitations",
+      {},
+      invitationRequest({ query: { status: "pending", type: "project_member" } }),
+    ) ?? "";
+
+  expect(sample).toContain(`${cli} invitation list --status pending --type project_member`);
+});

@@ -187,8 +187,9 @@ nothing; `data.skills` and `data.directories` say what it added where.
     one fails with `E_VALIDATION`.
   - `invitation list [--status …] [--type …]` and `invitation get
     <invitation_id>` read them. `invitation cancel <invitation_id>` stops a
-    pending link and needs `--force` when non-interactive; one already
-    accepted, declined or expired fails with `E_VALIDATION`.
+    pending link and needs `--force` when non-interactive; its `--dry-run`
+    needs the id. One already accepted, declined or expired fails with
+    `E_VALIDATION`.
   - A project nobody has claimed refuses invitations until it is claimed
     (`zitadel claim`). Existing members are read with `grants list`.
 - **Telemetry.** The CLI sends anonymous usage telemetry by default, and
