@@ -26,6 +26,8 @@
   string: `this.suggest({ id: "variable:get", args: { name } })` (`src/lib/suggestion/`).
 - The compiler checks the id and input against the target's `args` and `flags`;
   what is suggestible derives from `src/index.ts`, so add no mapping.
+- A generated resource command is checked against `src/commands/resource-commands.gen.ts`;
+  regenerate it with `vitest run tests/unit/lib/oclif/reference.test.ts --update`.
 - Declare `required`, `exclusive` and `dependsOn` through `relatedFlags`
   (`src/lib/suggestion/relations.ts`); `flags-declared.test.ts` fails on an inline one.
 - Keep everything about suggestions in `src/lib/suggestion/`, outside `lib/oclif`,

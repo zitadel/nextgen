@@ -69,6 +69,40 @@ describe("NextTable", () => {
 });
 
 /**
+ * A generated resource command is checked as a written one is, against what
+ * `resource-commands.gen.ts` says it declares.
+ */
+describe("a suggestion of a generated resource command", () => {
+  it("does not compile without the id its target takes", () => {
+    // @ts-expect-error `users update` takes the user's id
+    checked({ id: "users:update", flags: { schema: "customer" } });
+
+    expect(checked({ id: "users:update", args: { id: "u_1" } })).toBeDefined();
+  });
+
+  it("does not compile with a flag or an argument its target does not take", () => {
+    // @ts-expect-error `users update` has no --nope
+    checked({ id: "users:update", args: { id: "u_1" }, flags: { nope: true } });
+    // @ts-expect-error `users list` takes no argument
+    checked({ id: "users:list", args: { id: "u_1" } });
+  });
+
+  it("does not compile with a single value for a flag given once per value", () => {
+    // @ts-expect-error --set takes a list, one entry per --set
+    checked({ id: "users:update", args: { id: "u_1" }, flags: { set: "name=x" } });
+
+    expect(
+      checked({ id: "users:update", args: { id: "u_1" }, flags: { set: ["name=x"] } }),
+    ).toBeDefined();
+  });
+
+  it("does not compile with two flags its target declares exclusive", () => {
+    // @ts-expect-error --data and --file are exclusive
+    checked({ id: "users:update", args: { id: "u_1" }, flags: { data: "{}", file: "user.json" } });
+  });
+});
+
+/**
  * Each mistake a hand-written suggestion could make, which the compiler now
  * refuses. A `@ts-expect-error` that stops erroring fails the typecheck, so
  * each line proves its mistake does not compile.

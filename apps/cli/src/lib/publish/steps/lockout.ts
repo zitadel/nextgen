@@ -492,7 +492,7 @@ async function lookupWarnings(
       const fix = ctx.suggest({
         id: "users:update",
         args: { id: "<user_id>" },
-        flags: { schema: "<revision_id>", set: `attributes.${identifier}=<value>` },
+        flags: { schema: "<revision_id>", set: [`attributes.${identifier}=<value>`] },
       });
       return {
         warnings: [

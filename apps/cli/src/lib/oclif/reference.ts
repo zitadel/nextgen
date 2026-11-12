@@ -91,6 +91,96 @@ const JSON_FLAG: FlagReference = {
   type: "boolean",
 };
 
+/**
+ * What a command declares that a suggestion of it must respect: each flag's
+ * kind and relations and each argument, every one it has, hidden or not. The
+ * reference test writes it for the generated resource commands, whose flags
+ * are built from their schemas at run time, so the compiler checks a
+ * suggestion of one as it checks one of a written command.
+ */
+export type CommandShape = Readonly<{
+  args: Readonly<Record<string, Readonly<{ required?: true; options?: readonly string[] }>>>;
+  flags: Readonly<Record<string, FlagShape>>;
+}>;
+
+/** One flag of a {@link CommandShape}. An absent field is the flag's default. */
+export type FlagShape = Readonly<{
+  type: "boolean" | "option";
+  allowNo?: true;
+  required?: true;
+  multiple?: true;
+  options?: readonly string[];
+  exclusive?: readonly string[];
+  dependsOn?: readonly string[];
+}>;
+
+/**
+ * The shape of each command in `commands`, by id (`users:get`), with the flags
+ * its family adds. The flags every command takes from {@link BaseCommand} are
+ * left out, since they are the same on every one.
+ *
+ * @param commands - The commands, by id.
+ * @returns Each command's shape, in id order.
+ */
+export function commandShapes(
+  commands: Readonly<Record<string, typeof Command>>,
+): Record<string, CommandShape> {
+  return Object.fromEntries(
+    Object.entries(commands)
+      .sort(([one], [other]) => {
+        return one.localeCompare(other);
+      })
+      .map(([id, command]) => {
+        const flags: Interfaces.FlagInput = { ...command.baseFlags, ...command.flags };
+        return [
+          id,
+          {
+            args: Object.fromEntries(
+              Object.entries(command.args ?? {}).map(([name, arg]) => {
+                return [
+                  name,
+                  {
+                    ...(arg.required === true && { required: true as const }),
+                    ...(arg.options !== undefined && { options: [...arg.options] }),
+                  },
+                ];
+              }),
+            ),
+            flags: Object.fromEntries(
+              Object.entries(flags)
+                .filter(([name]) => {
+                  return !(name in BaseCommand.baseFlags);
+                })
+                .map(([name, flag]) => {
+                  return [name, flagShape(flag)];
+                }),
+            ),
+          },
+        ];
+      }),
+  );
+}
+
+/**
+ * What a suggestion of a flag must respect.
+ *
+ * @param flag - The flag, as oclif declares it.
+ * @returns Its shape.
+ */
+function flagShape(flag: Interfaces.Flag<unknown>): FlagShape {
+  return {
+    type: flag.type,
+    ...(flag.type === "boolean" && flag.allowNo && { allowNo: true as const }),
+    ...(flag.required === true && { required: true as const }),
+    ...(flag.type === "option" && flag.multiple === true && { multiple: true as const }),
+    ...(flag.type === "option" && flag.options !== undefined && { options: [...flag.options] }),
+    ...(flag.exclusive !== undefined &&
+      flag.exclusive.length > 0 && { exclusive: [...flag.exclusive] }),
+    ...(flag.dependsOn !== undefined &&
+      flag.dependsOn.length > 0 && { dependsOn: [...flag.dependsOn] }),
+  };
+}
+
 /** The reference of a COMMANDS table (`src/index.ts`) whose binary is `bin`. */
 export function cliReference(
   commands: Readonly<Record<string, typeof Command>>,

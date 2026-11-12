@@ -65,7 +65,11 @@ import {
   UpdateTeamBody,
 } from "@/lib/backend/schemas";
 import { ZitadelError } from "@/lib/errors";
+import type { BaseCommand } from "@/lib/oclif/base";
 import type { LooseArgs } from "@/lib/suggestion";
+import type { RELATIONS } from "@/lib/suggestion/relations";
+
+import type { RESOURCE_COMMAND_SHAPES } from "./resource-commands.gen";
 import {
   buildResourceCommands,
   type CreateSpec,
@@ -1101,12 +1105,58 @@ export const RESOURCE_COMMANDS = buildResourceCommands<Platform>(RESOURCES, {
 });
 
 /**
- * A generated resource command as a suggestion is checked against it. Its
- * arguments and flags are built from the resource at run time, so the compiler
- * checks only that the command exists; the renderer refuses an argument or a
- * flag the command does not declare.
+ * A generated resource command missing from `resource-commands.gen.ts`, which
+ * only a command added since it was last written is, and its test fails for:
+ * the compiler checks only that it exists, and the renderer refuses an
+ * argument or a flag it does not declare.
  */
-type ResourceTarget = Readonly<{ args: LooseArgs; flags: Interfaces.FlagInput }>;
+type UnreadTarget = Readonly<{ args: LooseArgs; flags: Interfaces.FlagInput }>;
+
+/** What `resource-commands.gen.ts` says each generated resource command declares. */
+type Shapes = typeof RESOURCE_COMMAND_SHAPES;
+
+/** The value a flag or argument takes: one of its `options`, or what a command line carries. */
+type ValueOf<Shape> = Shape extends { readonly options: readonly (infer Option extends string)[] }
+  ? Option
+  : string | number;
+
+/** A flag of a {@link Shapes} entry, as oclif types it. */
+type FlagOf<Shape> = Shape extends { readonly type: "boolean" }
+  ? Interfaces.BooleanFlag<boolean>
+  : Shape extends { readonly multiple: true }
+    ? Interfaces.OptionFlag<ValueOf<Shape>[] | undefined>
+    : Interfaces.OptionFlag<ValueOf<Shape> | undefined>;
+
+/** The relations of a {@link Shapes} entry's flags, as `relatedFlags()` carries them. */
+type RelationsOf<Flags> = {
+  readonly [Name in keyof Flags as Flags[Name] extends
+    | { readonly required: true }
+    | { readonly exclusive: readonly string[] }
+    | { readonly dependsOn: readonly string[] }
+    ? Name
+    : never]: Pick<Flags[Name], keyof Flags[Name] & ("required" | "exclusive" | "dependsOn")>;
+};
+
+/**
+ * A generated resource command as a suggestion is checked against it: its
+ * arguments and flags, their values and their relations, as it declared them
+ * when `resource-commands.gen.ts` was last written from the commands.
+ */
+type ResourceTarget<Id> = Id extends keyof Shapes
+  ? Readonly<{
+      baseFlags: (typeof BaseCommand)["baseFlags"];
+      flags: { readonly [Name in keyof Shapes[Id]["flags"]]: FlagOf<Shapes[Id]["flags"][Name]> } & {
+        readonly [RELATIONS]?: RelationsOf<Shapes[Id]["flags"]>;
+      };
+      args: {
+        readonly [Name in keyof Shapes[Id]["args"]]: Interfaces.Arg<
+          Shapes[Id]["args"][Name] extends { readonly required: true }
+            ? ValueOf<Shapes[Id]["args"][Name]>
+            : ValueOf<Shapes[Id]["args"][Name]> | undefined
+        >;
+      };
+    }>
+  : UnreadTarget;
 
 /** The ids of a registry entry's commands: `users:list`, `sessions:revoke`. */
 type IdsOf<Topic extends string, Entry> = Entry extends {
@@ -1119,5 +1169,5 @@ type IdsOf<Topic extends string, Entry> = Entry extends {
 export type ResourceTable = {
   readonly [Id in {
     [Topic in keyof typeof RESOURCES & string]: IdsOf<Topic, (typeof RESOURCES)[Topic]>;
-  }[keyof typeof RESOURCES & string]]: ResourceTarget;
+  }[keyof typeof RESOURCES & string]]: ResourceTarget<Id>;
 };
