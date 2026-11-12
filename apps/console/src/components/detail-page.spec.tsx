@@ -1,4 +1,5 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { Box } from "lucide-react";
 import { describe, expect, it } from "vitest";
 
@@ -75,6 +76,24 @@ describe("detail header", () => {
     // The value keeps its name for a screen reader, paired as a term.
     expect(screen.getAllByRole("term")[0]).toHaveTextContent("Identifier");
     expect(screen.getAllByRole("definition")[0]).toHaveTextContent("maya@acme.com");
+  });
+
+  it("shows a long id short, its whole value in the title and read aloud", () => {
+    const id = "user_01M764GYFB2RTDEZWPB8S5H012";
+    renderHeader({ meta: [{ label: "User ID", value: id, copyable: true }] });
+    const value = screen.getByTitle(id);
+    // Drawn short, hidden from screen readers; the whole id is read once.
+    expect(value.querySelector("[aria-hidden]")).toHaveTextContent(/^user_01M7…H012$/);
+    expect(screen.getAllByText(id)).toHaveLength(1);
+    expect(within(value).getByText(id)).toBeInTheDocument();
+  });
+
+  it("copies the whole id, not its short form", async () => {
+    const id = "user_01M764GYFB2RTDEZWPB8S5H012";
+    const user = userEvent.setup();
+    renderHeader({ meta: [{ label: "User ID", value: id, copyable: true }] });
+    await user.click(screen.getByRole("button", { name: "Copy User ID" }));
+    expect(await navigator.clipboard.readText()).toBe(id);
   });
 
   it("leaves out an item without a value", () => {

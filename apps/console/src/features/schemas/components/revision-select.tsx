@@ -1,4 +1,4 @@
-import { IdText } from "@/components/id-text";
+import { IdText, mintedPrefixLength } from "@/components/id-text";
 import { Badge } from "@/components/ui/badge";
 import { SelectItem } from "@/components/ui/select";
 import { formatDateTime } from "@/lib/date";
@@ -21,9 +21,6 @@ export const REVISION_MENU = "w-81 min-w-(--radix-select-trigger-width)";
 export const REVISION_TRIGGER =
   "max-w-full min-w-0 gap-1.5 *:data-[slot=select-value]:min-w-0 *:data-[slot=select-value]:gap-1.5";
 
-/** A minted id's lowercase prefix; a URI or other named `$id` has none. */
-const MINTED_PREFIX = /^[a-z]+_(?=[^/:]*$)/;
-
 /**
  * A minted revision id cut to its prefix and its last six characters,
  * `sch_…ZNP02S`, which is where two revisions of one schema differ. An id
@@ -31,9 +28,8 @@ const MINTED_PREFIX = /^[a-z]+_(?=[^/:]*$)/;
  * full id goes in a `title` wherever this is shown.
  */
 export function shortRevisionId(id: string): string {
-  const prefix = MINTED_PREFIX.exec(id)?.[0].length ?? 0;
-  if (prefix === 0 || id.length - prefix <= 10) return id;
-  return `${id.slice(0, prefix)}…${id.slice(-6)}`;
+  const prefix = mintedPrefixLength(id);
+  return prefix === 0 ? id : `${id.slice(0, prefix)}…${id.slice(-6)}`;
 }
 
 /**
