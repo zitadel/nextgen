@@ -1,7 +1,13 @@
 package api
 
 import (
+	"go/ast"
+	"go/parser"
+	"go/token"
+	"maps"
+	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -14,38 +20,57 @@ import (
 // application's end users (Console ADR 0004 §1), so writing its configuration
 // is for its admins: the gate asks the admin relation of every such write,
 // where another project asks editor. These tests pin which resources that is,
-// by the gate contract's table, so a resource the API gains has to be classed
-// here before it ships.
+// from the gate's own declarations, so a resource the API gains has to be
+// classed here before it ships.
 
-// The resources a project deploys: what a release ships, a deployment serves
-// or an origin admits. Named by their denial, as the contract's rows are.
-var platformConfigurationDenied = []string{
-	brandingCodes.denied,
-	deploymentCodes.denied,
-	flowDefCodes.denied,
-	idpCodes.denied,
-	originCodes.denied,
-	policyCodes.denied,
-	releaseCodes.denied,
-	schemaCodes.denied,
-	variableCodes.denied,
+// The resources a project deploys or registers: what a release ships, a
+// deployment serves, an origin admits, and the applications whose clients sign
+// in to it. Keyed by the variable each is declared as.
+var platformConfigurationAccess = map[string]resourceAccess{
+	"applicationAccess":    applicationAccess,
+	"brandingAccess":       brandingAccess,
+	"deploymentAccess":     deploymentAccess,
+	"flowDefinitionAccess": flowDefinitionAccess,
+	"idpAccess":            idpAccess,
+	"originAccess":         originAccess,
+	"policyAccess":         policyAccess,
+	"releaseAccess":        releaseAccess,
+	"schemaAccess":         schemaAccess,
+	"variableAccess":       variableAccess,
 }
 
 // The resources that say who may use the platform, what they hold, and its
 // own record: written on the platform project as on any other.
-var platformOwnDenied = []string{
-	eventCodes.denied,
-	grantCodes.denied,
-	invitationCodes.denied,
-	projectCodes.denied,
-	sessionCodes.denied,
-	teamCodes.denied,
-	userCodes.denied,
+var platformOwnAccess = map[string]resourceAccess{
+	"eventsAccess":     eventsAccess,
+	"grantAccess":      grantAccess,
+	"invitationAccess": invitationAccess,
+	"projectAccess":    projectAccess,
+	"sessionAccess":    sessionAccess,
+	"teamAccess":       teamAccess,
+	"userAccess":       userAccess,
+}
+
+// deniedCodes names resources by their denial, as the contract's rows do.
+func deniedCodes(resources map[string]resourceAccess) []string {
+	var codes []string
+	for _, res := range resources {
+		codes = append(codes, res.denied().Code)
+	}
+	return codes
+}
+
+// CreateApplication is gated, and the contract's table has no row for it: it
+// still lists the operation as not implemented. This row holds it to the
+// platform project's admins until the table has one.
+var platformUnlistedWrites = []gateRow{
+	{op: "CreateApplication", relation: editor, target: onProject, denied: domain.ErrApplicationPermissionDenied().Code},
 }
 
 // The configuration writes that ask editor on a project, and so ask admin on
 // top of it on the reserved platform project. RemoveOrigin asks admin anywhere.
 var platformAdminOnlyOperations = []string{
+	"CreateApplication",
 	"CreateBranding",
 	"CreateDeployment", "RollbackDeployment", "RemovePreview",
 	"CreateFlowDefinition",
@@ -57,17 +82,104 @@ var platformAdminOnlyOperations = []string{
 	"UpdateVariables", "DeleteVariable",
 }
 
+// declaredResourceAccess reads the package for every resourceAccess it
+// declares, and whether each sets `configuration`.
+func declaredResourceAccess(t *testing.T) map[string]bool {
+	t.Helper()
+	files, err := filepath.Glob("*.go")
+	require.NoError(t, err)
+	fset := token.NewFileSet()
+	declared := map[string]bool{}
+	literals := 0
+	for _, name := range files {
+		if strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+		file, err := parser.ParseFile(fset, name, nil, parser.SkipObjectResolution)
+		require.NoError(t, err)
+		ast.Inspect(file, func(n ast.Node) bool {
+			if lit, ok := n.(*ast.CompositeLit); ok && isResourceAccess(lit) {
+				literals++
+			}
+			return true
+		})
+		for _, decl := range file.Decls {
+			gen, ok := decl.(*ast.GenDecl)
+			if !ok || gen.Tok != token.VAR {
+				continue
+			}
+			for _, spec := range gen.Specs {
+				value := spec.(*ast.ValueSpec)
+				for i, v := range value.Values {
+					if lit, ok := v.(*ast.CompositeLit); ok && isResourceAccess(lit) && i < len(value.Names) {
+						declared[value.Names[i].Name] = setsConfiguration(lit)
+					}
+				}
+			}
+		}
+	}
+	require.Len(t, declared, literals, "a resourceAccess built outside a package variable cannot be classed")
+	return declared
+}
+
+func isResourceAccess(lit *ast.CompositeLit) bool {
+	typ, ok := lit.Type.(*ast.Ident)
+	return ok && typ.Name == "resourceAccess"
+}
+
+func setsConfiguration(lit *ast.CompositeLit) bool {
+	for _, elt := range lit.Elts {
+		field, ok := elt.(*ast.KeyValueExpr)
+		if !ok {
+			continue
+		}
+		key, _ := field.Key.(*ast.Ident)
+		value, _ := field.Value.(*ast.Ident)
+		if key != nil && key.Name == "configuration" {
+			return value != nil && value.Name == "true"
+		}
+	}
+	return false
+}
+
 func TestEveryGatedResourceIsClassedForThePlatformProject(t *testing.T) {
 	t.Parallel()
+	const class = "class it as configuration, which only an admin writes on the reserved platform project, or as the platform project's own (Console ADR 0004 §1)"
+
+	// The resources the gate declares, read from its source: one whose
+	// operations have no row in the contract's table is classed as well.
+	declared := declaredResourceAccess(t)
+	require.NotEmpty(t, declared)
+	for name, flagged := range declared {
+		res, configuration := platformConfigurationAccess[name]
+		own, isOwn := platformOwnAccess[name]
+		if !assert.True(t, configuration != isOwn, "%s: %s", name, class) {
+			continue
+		}
+		if isOwn {
+			res = own
+		}
+		assert.Equal(t, configuration, flagged, "%s: its `configuration` says otherwise", name)
+		assert.Equal(t, configuration, res.configuration, "%s is classed under another resource's name", name)
+	}
+	classed := slices.Concat(slices.Collect(maps.Keys(platformConfigurationAccess)), slices.Collect(maps.Keys(platformOwnAccess)))
+	for _, name := range classed {
+		assert.Contains(t, declared, name, "%s is classed and no longer declared", name)
+	}
+
+	// Each has a denial of its own, which is how a row of the contract names it.
+	configurationDenied, ownDenied := deniedCodes(platformConfigurationAccess), deniedCodes(platformOwnAccess)
+	denials := slices.Sorted(slices.Values(slices.Concat(configurationDenied, ownDenied)))
+	assert.Len(t, slices.Compact(denials), len(classed), "two resources share a denial")
+
 	for _, row := range gateRows {
 		if row.denied == "" {
 			// A list gate narrows instead of refusing; its resource has other rows.
 			continue
 		}
-		configuration := slices.Contains(platformConfigurationDenied, row.denied)
-		own := slices.Contains(platformOwnDenied, row.denied)
-		assert.True(t, configuration != own,
-			"%s: class its resource as configuration, which only an admin writes on the reserved platform project, or as the platform project's own (Console ADR 0004 §1)", rowName(row))
+		configuration := slices.Contains(configurationDenied, row.denied)
+		own := slices.Contains(ownDenied, row.denied)
+		assert.True(t, configuration != own, "%s: its resource: %s", rowName(row), class)
 	}
 }
 
@@ -76,10 +188,11 @@ func TestEveryGatedResourceIsClassedForThePlatformProject(t *testing.T) {
 func TestPlatformProjectConfigurationWritesRefuseAnEditor(t *testing.T) {
 	t.Parallel()
 	ops := bundledOperations(t)
+	configurationDenied := deniedCodes(platformConfigurationAccess)
 	var held []string
 
-	for _, row := range gateRows {
-		if row.relation == viewer || !slices.Contains(platformConfigurationDenied, row.denied) {
+	for _, row := range slices.Concat(gateRows, platformUnlistedWrites) {
+		if row.relation == viewer || !slices.Contains(configurationDenied, row.denied) {
 			continue
 		}
 		if row.relation == admin {
@@ -122,13 +235,6 @@ func TestRequirePlatformConfigurationAdmin(t *testing.T) {
 	const customer = "proj_customer"
 	ctx := WithScopeContext(t.Context(), sessionPrincipal.scope)
 
-	configuration := []resourceAccess{
-		brandingAccess, deploymentAccess, flowDefinitionAccess, idpAccess, originAccess,
-		policyAccess, releaseAccess, schemaAccess, variableAccess,
-	}
-	own := []resourceAccess{
-		eventsAccess, grantAccess, invitationAccess, projectAccess, sessionAccess, teamAccess, userAccess,
-	}
 	// gate runs one access check on a handler whose platform project is
 	// `platform`, answering the i-th Check with answers[i], and returns the
 	// relations asked and the error.
@@ -144,7 +250,7 @@ func TestRequirePlatformConfigurationAdmin(t *testing.T) {
 		return asked, err
 	}
 
-	for _, res := range configuration {
+	for _, res := range platformConfigurationAccess {
 		denied := res.denied().Code
 		t.Run(denied, func(t *testing.T) {
 			t.Parallel()
@@ -176,7 +282,7 @@ func TestRequirePlatformConfigurationAdmin(t *testing.T) {
 			assert.Equal(t, []string{editor}, asked)
 		})
 	}
-	for _, res := range own {
+	for _, res := range platformOwnAccess {
 		t.Run(res.denied().Code, func(t *testing.T) {
 			t.Parallel()
 			asked, err := gate(t, domain.PlatformProjectID, domain.PlatformProjectID, res, opWrite, true)

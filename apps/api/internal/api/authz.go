@@ -64,10 +64,10 @@ type resourceAccess struct {
 	readMiss  func() domain.Error
 	writeMiss func() domain.Error
 	denied    func() domain.Error
-	// configuration marks what a release ships, a deployment serves or an
-	// origin admits: the configuration a project deploys. On the reserved
-	// platform project only its admins write it
-	// (requirePlatformConfigurationAdmin).
+	// configuration marks what a project deploys or registers: what a release
+	// ships, a deployment serves, an origin admits, and an application whose
+	// clients sign in to it. On the reserved platform project only its admins
+	// write it (requirePlatformConfigurationAdmin).
 	configuration bool
 }
 
@@ -182,10 +182,11 @@ var idpAccess = resourceAccess{
 // applicationAccess guards the project's registered applications. Create is
 // project-scoped; the get resolves the path id through RSI in the project.
 var applicationAccess = resourceAccess{
-	kind:      domain.ResourceKindApplication,
-	readMiss:  domain.ErrApplicationNotFound,
-	writeMiss: domain.ErrApplicationNotFound,
-	denied:    domain.ErrApplicationPermissionDenied,
+	kind:          domain.ResourceKindApplication,
+	readMiss:      domain.ErrApplicationNotFound,
+	writeMiss:     domain.ErrApplicationNotFound,
+	denied:        domain.ErrApplicationPermissionDenied,
+	configuration: true,
 }
 
 // deploymentAccess gates the record of what runs where (ADR 035, #532).
@@ -398,7 +399,7 @@ func (h *Handler) requireProjectAccess(ctx context.Context, projectID string, re
 // reserved platform project to that project's admins (Console ADR 0004 §1).
 // The project holds who may use the platform, never an application's end
 // users: each of its users can be granted any project and can claim, so what
-// signs someone in to it (an origin, a deployment, a schema, later an app) is
+// signs someone in to it (an origin, a deployment, a schema, an application) is
 // for the people who own the platform to change. A platform operator is one
 // of them (root ADR 075); an editor of the platform project is not.
 //

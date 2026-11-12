@@ -120,8 +120,9 @@ The reserved project is a **control project**, not a super-project:
 > Writing its configuration asks for its admin role. On the reserved project
 > the API asks `admin` of every configuration write that asks `editor` on
 > another project: origins, releases, deployments and their rollback,
-> previews, variables, schemas, flow definitions, policies, branding and
-> identity provider connections. A platform operator holds it (root ADR 075).
+> previews, variables, schemas, flow definitions, policies, branding,
+> identity provider connections and applications. A platform operator holds
+> it (root ADR 075).
 > Someone granted less is answered the resource's `permission_denied`. Reads,
 > and every write that says who may use the platform, ask what they ask on
 > any project.
