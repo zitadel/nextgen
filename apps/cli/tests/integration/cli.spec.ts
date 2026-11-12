@@ -477,6 +477,14 @@ describe("the cli", () => {
             127,
           ],
           [
+            "a mistyped subcommand of a command with subcommands",
+            ["env", "ls"],
+            "env:ls",
+            "env ls is not a zitadel command",
+            ["env --help"],
+            127,
+          ],
+          [
             "a typo only in case",
             ["DEPLOY"],
             "DEPLOY",

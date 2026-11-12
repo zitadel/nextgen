@@ -31,8 +31,8 @@ export class NotFound extends BaseCommand {
   static override strict = false;
   static override meta = { resolveServer: false };
 
-  /** Whether the words name no command, which exits as a shell does, rather than a command given a word it does not take. */
-  private nameless = true;
+  /** Whether it refused the words as naming no command, which exits as a shell does. */
+  private unknown = false;
 
   /**
    * Refuses what was typed.
@@ -74,35 +74,32 @@ export class NotFound extends BaseCommand {
         .filter((c) => c.length > parent.length && parent.every((w, i) => c[i] === w))
         .map((c) => c[parent.length] as string);
     };
-    // The candidates a word is a single edit, or a change of case, from.
-    const close = (word: string, candidates: readonly string[]): string[] => {
-      return [...new Set(candidates)].filter((candidate) => {
+    // The one candidate a word is a single edit, or a change of case, from.
+    const near = (word: string, candidates: readonly string[]): string | undefined => {
+      const close = [...new Set(candidates)].filter((candidate) => {
         return (
           candidate !== word &&
           (candidate.toLowerCase() === word.toLowerCase() || distance(word, candidate) <= 1)
         );
       });
-    };
-    // The one candidate a word is close to, when only one is.
-    const near = (word: string, candidates: readonly string[]): string | undefined => {
-      const found = close(word, candidates);
-      return found.length === 1 ? found[0] : undefined;
+      return close.length === 1 ? close[0] : undefined;
     };
 
     if (words[0] === undefined) {
       this.id = "(default)";
+      this.unknown = true;
       throw new ZitadelError("E_VALIDATION", "That is not a zitadel command", {
         nextCommands: [help([])],
       });
     }
 
-    // A real command followed by a word it does not take, unless that word is
-    // a typo of one or more of its subcommands: the command's own refusal.
+    // A real command with no subcommands followed by a word it does not take:
+    // the command's own refusal. After one with subcommands, the word is a
+    // subcommand that does not exist.
     for (let length = words.length - 1; length > 0; length -= 1) {
       const prefix = words.slice(0, length);
       const exists = known.some((c) => c.length === length && prefix.every((w, i) => c[i] === w));
-      if (exists && close(words[length] as string, under(prefix)).length === 0) {
-        this.nameless = false;
+      if (exists && under(prefix).length === 0) {
         this.id = prefix.join(":");
         throw new ZitadelError(
           "E_VALIDATION",
@@ -131,21 +128,22 @@ export class NotFound extends BaseCommand {
       next.push(help([]));
     }
     this.id = typed.join(":");
+    this.unknown = true;
     throw new ZitadelError("E_VALIDATION", `${typed.join(" ")} is not a zitadel command`, {
       nextCommands: next,
     });
   }
 
   /**
-   * Exits as a shell does for a command it cannot find, or with the refusal's
-   * own code when the command exists and was given a word it does not take.
-   * Any other failure, a cancel among them, keeps its own code.
+   * Exits as a shell does for a command it cannot find. Every other failure,
+   * the refusal of a word a real command does not take, a validation failure
+   * before it refused and a cancel among them, keeps its own code.
    *
    * @param code - The failure's exit code.
    * @returns Never.
    */
   public override exit(code = 0): never {
-    const refused = this.nameless && code === EXIT_CODES.E_VALIDATION;
+    const refused = this.unknown && code === EXIT_CODES.E_VALIDATION;
     return super.exit(refused ? UNKNOWN_COMMAND_EXIT_CODE : code);
   }
 
