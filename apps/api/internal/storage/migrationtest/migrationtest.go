@@ -11,7 +11,6 @@ import (
 	"maps"
 	"slices"
 	"strings"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -43,88 +42,72 @@ type Known map[int64][]string
 // goose's own bookkeeping table.
 func RoundTrip(t *testing.T, p *goose.Provider, snapshot func(t *testing.T) Schema, known Known) {
 	t.Helper()
-	RoundTripClaimed(t, p, snapshot, known, new(Claims).Next)
+	current, err := p.GetDBVersion(t.Context())
+	require.NoError(t, err)
+	require.Zero(t, current, "the round trip needs a database with no migrations applied")
+
+	var before Schema
+	for range p.ListSources() {
+		before = RoundTripNext(t, p, snapshot, known, before)
+	}
 }
 
-// Claims hands out migrations by their position in the provider's sources, in
-// order and each one once, to the walks that share it.
-type Claims struct{ next atomic.Int64 }
-
-// Next claims the first migration no walk has claimed yet.
-func (c *Claims) Next() int { return int(c.next.Add(1) - 1) }
-
-// RoundTripClaimed walks the migrations as RoundTrip does, but round-trips
-// only the ones claim hands it, asking again each time it is done with one,
-// and applies the ones in between unchecked. It returns the versions it
-// round-tripped.
+// RoundTripNext is one step of [RoundTrip]: it round-trips the first
+// migration p has not applied and returns the schema after its Up. before is
+// the schema the database has now; nil takes a snapshot.
 //
-// A dialect whose schema changes are slow runs several walks at once, each in
-// a database of its own, sharing one [Claims]: a walk that is free takes the
-// next migration, so an expensive one holds up only the walk that took it,
-// wherever it sits in the sequence. Every walk still applies each Up before
-// the last migration it takes, so the slowest walk lasts at least as long as
-// those Ups.
-func RoundTripClaimed(t *testing.T, p *goose.Provider, snapshot func(t *testing.T) Schema, known Known, claim func() int) []int64 {
+// A dialect whose schema changes are slow gives each migration a database of
+// its own, already at the version before it, and round-trips them side by
+// side.
+func RoundTripNext(t *testing.T, p *goose.Provider, snapshot func(t *testing.T) Schema, known Known, before Schema) Schema {
 	t.Helper()
 	ctx := t.Context()
 
 	sources := p.ListSources()
 	require.NotEmpty(t, sources, "the provider has no migrations to walk")
-	current, err := p.GetDBVersion(ctx)
-	require.NoError(t, err)
-	require.Zero(t, current, "the round trip needs a database with no migrations applied")
-
 	for v := range known {
 		require.True(t, slices.ContainsFunc(sources, func(s *goose.Source) bool { return s.Version == v }),
 			"known lists version %d, which has no migration", v)
 	}
+	current, err := p.GetDBVersion(ctx)
+	require.NoError(t, err)
+	next := slices.IndexFunc(sources, func(s *goose.Source) bool { return s.Version > current })
+	require.GreaterOrEqual(t, next, 0, "every migration is applied: none is left to round-trip")
+	source := sources[next]
+	name := source.Path
 
-	var walked []int64
-	var before Schema
-	applied := -1 // the position of the last migration applied
-	for i := claim(); i < len(sources); i = claim() {
-		require.Greater(t, i, applied, "claims must come in order")
-		if applied < i-1 {
-			began := time.Now()
-			_, err := p.UpTo(ctx, sources[i-1].Version)
-			require.NoError(t, err, "Up to %s", sources[i-1].Path)
-			t.Logf("up to %s, unchecked, in %s", sources[i-1].Path, time.Since(began).Round(time.Millisecond))
-			before = nil
-		}
-		if before == nil {
-			before = snapshot(t)
-		}
-
-		source := sources[i]
-		name := source.Path
-		began := time.Now()
-
-		_, err := p.UpByOne(ctx)
-		require.NoError(t, err, "Up of %s", name)
-		after := snapshot(t)
-
-		_, err = p.Down(ctx)
-		require.NoError(t, err, "Down of %s", name)
-		rolledBack := snapshot(t)
-		compareRolledBack(t, name, before, rolledBack, known[source.Version])
-
-		_, err = p.UpByOne(ctx)
-		require.NoError(t, err, "Up of %s again, after its Down", name)
-		assertSame(t, after, snapshot(t), "Up of %s again, after its Down, must give the schema its first Up gave", name)
-
-		// A walk that outlasts its timeout shows how far it got and where the
-		// time went.
-		t.Logf("%s: Up, Down and Up again in %s", name, time.Since(began).Round(time.Millisecond))
-		before, applied = after, i
-		walked = append(walked, source.Version)
+	if before == nil {
+		before = snapshot(t)
 	}
+	began := time.Now()
 
-	if applied >= 0 {
-		version, err := p.GetDBVersion(ctx)
-		require.NoError(t, err)
-		require.Equal(t, sources[applied].Version, version, "the walk must end at the last migration it took")
-	}
-	return walked
+	_, err = p.UpByOne(ctx)
+	require.NoError(t, err, "Up of %s", name)
+	after := snapshot(t)
+
+	_, err = p.Down(ctx)
+	require.NoError(t, err, "Down of %s", name)
+	rolledBack := snapshot(t)
+	compareRolledBack(t, name, before, rolledBack, known[source.Version])
+
+	_, err = p.UpByOne(ctx)
+	require.NoError(t, err, "Up of %s again, after its Down", name)
+	assertSame(t, after, snapshot(t), "Up of %s again, after its Down, must give the schema its first Up gave", name)
+
+	// A step that outlasts its timeout shows where the time went.
+	t.Logf("%s: Up, Down and Up again in %s", name, time.Since(began).Round(time.Millisecond))
+
+	version, err := p.GetDBVersion(ctx)
+	require.NoError(t, err)
+	require.Equal(t, source.Version, version, "the step must end at the migration it took")
+	return after
+}
+
+// AssertSame fails unless want and got hold the same objects with the same
+// definitions, and reports only the ones that differ.
+func AssertSame(t *testing.T, want, got Schema, msg string, args ...any) {
+	t.Helper()
+	assertSame(t, want, got, msg, args...)
 }
 
 // compareRolledBack asserts want and got are equal apart from the keys in
