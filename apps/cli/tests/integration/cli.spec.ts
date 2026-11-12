@@ -473,6 +473,12 @@ describe("the cli", () => {
           expect(result).toExitWith(127);
         });
 
+        it("exits 3 for a word a real command does not take, as its other refusals do", async () => {
+          const result = await runCliForTest(["deploy", "extra", "--json"]);
+
+          expect(result).toExitWith(3);
+        });
+
         it("writes nothing to stderr", async () => {
           const result = await runCliForTest(["teams", "delete", "x", "--json"]);
 
