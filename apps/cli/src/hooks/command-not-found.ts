@@ -2,11 +2,10 @@ import { type Hook, ux } from "@oclif/core";
 import { distance } from "fastest-levenshtein";
 
 import { ZitadelError } from "@/lib/errors";
-import { stderrColour } from "@/lib/oclif/base";
 import {
-  asideText,
   envelopeText,
   Failure,
+  type FailureOutput,
   JsonFailureOutput,
   TerminalFailureOutput,
 } from "@/lib/oclif/failure";
@@ -156,7 +155,7 @@ export class UnknownCommand {
    */
   private misspelled(words: readonly string[]): Refused {
     let depth = 0;
-    while (depth < words.length - 1 && this.isTopic(words.slice(0, depth + 1))) {
+    while (depth < words.length - 1 && this.isTopic(words.slice(0, depth + 1), this.commands)) {
       depth += 1;
     }
     const typed = words.slice(0, depth + 1);
@@ -193,10 +192,12 @@ export class UnknownCommand {
    * A topic is a name that only begins a command: oclif lists a command as a topic too.
    *
    * @param name - The words that may name a topic.
+   * @param among - The commands to look in: the visible ones for a topic a
+   *   refusal may name, so a topic only hidden commands are in is never offered.
    * @returns Whether some longer command begins with them.
    */
-  private isTopic(name: readonly string[]): boolean {
-    return this.known.some((command) => {
+  private isTopic(name: readonly string[], among: ReadonlyArray<readonly string[]>): boolean {
+    return among.some((command) => {
       return command.length > name.length && this.begins(name, command);
     });
   }
@@ -332,15 +333,20 @@ const hook: Hook<"command_not_found"> = async function ({ id, argv, config }) {
     process.argv.slice(2),
     config.scopedEnvVar("CONTENT_TYPE"),
   );
-  const output = invocation.wantsJson
+  const output: FailureOutput = invocation.wantsJson
     ? new JsonFailureOutput((envelope) => {
         ux.stdout(envelopeText(envelope, config.theme?.json));
       })
-    : new TerminalFailureOutput((summary) => {
-        // Nothing has been drawn yet, so the summary is written out as a run off a terminal writes it.
-        const ui = new Ui({ interactive: false, force: false }, "plain");
-        ux.stderr(asideText(ui.written(summary).replace(/\n+$/, ""), stderrColour()));
-      });
+    : new TerminalFailureOutput(
+        (summary) => {
+          // Nothing has been drawn yet, so the summary is written out as a run off a terminal writes it.
+          const ui = new Ui({ interactive: false, force: false }, "plain");
+          return ui.written(summary).replace(/\n+$/, "");
+        },
+        (text) => {
+          ux.stderr(text);
+        },
+      );
   output.write(failure);
   return this.exit(UNKNOWN_COMMAND_EXIT_CODE);
 };

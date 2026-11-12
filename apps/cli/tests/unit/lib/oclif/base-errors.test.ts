@@ -116,14 +116,6 @@ describe("BaseCommand errors", () => {
     ]);
   });
 
-  it("keeps the message as it came in the envelope, which a reader parses", async () => {
-    const cmd = new FailingCommand(true);
-
-    await cmd.fail(new ZitadelError("E_VALIDATION", "Refused \u001b[2Jwiped"));
-
-    expect(cmd.json).toEqual([expect.objectContaining({ message: "Refused \u001b[2Jwiped" })]);
-  });
-
   // Whether the block is written plain or spelled out, nothing a redirected
   // stderr collects may act on the terminal that later prints the file.
   it("keeps color codes out of a redirected stderr", async () => {

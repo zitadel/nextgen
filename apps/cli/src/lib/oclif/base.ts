@@ -959,7 +959,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
    * redirected, as in `2> error.log`, the codes are taken back out.
    */
   private logAside(text: string): void {
-    this.logToStderr(asideText(text, stderrColour()));
+    this.logToStderr(asideText(text));
   }
 
   /**
@@ -1014,9 +1014,14 @@ export abstract class BaseCommand extends Interruptible(Command) {
           failed: true,
         });
       }
-      new TerminalFailureOutput((summary) => {
-        this.logAside(this.ui.written(summary).replace(/\n+$/, ""));
-      }).write(failure);
+      new TerminalFailureOutput(
+        (summary) => {
+          return this.ui.written(summary).replace(/\n+$/, "");
+        },
+        (text) => {
+          this.logToStderr(text);
+        },
+      ).write(failure);
     }
     return this.exit(zitadelError.exitCode);
   }
@@ -1161,21 +1166,6 @@ function withReportedWarnings(result: CommandResult, reported: readonly string[]
   }
 
   return { ...result, warnings: [...reported, ...(result.warnings ?? [])] };
-}
-
-/**
- * What decides whether text on stderr keeps its colour: whether stderr is a
- * terminal, and whether colour was forced. Read here, where the colour
- * variables are read, for every writer of stderr, the unknown-command hook's
- * included.
- *
- * @returns Whether stderr is a terminal, and whether colour is forced.
- */
-export function stderrColour(): { tty: boolean; forced: boolean } {
-  return {
-    tty: Boolean(process.stderr.isTTY),
-    forced: Boolean(process.env[FORCE_COLOR.name]),
-  };
 }
 
 /** Wraps a {@link CommandResult} with the invocation metadata into the final envelope. */

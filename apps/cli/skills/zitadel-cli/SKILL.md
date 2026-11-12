@@ -547,9 +547,11 @@ from and of the topic. It is never run as a different command, and no
 arguments typed after it are repeated. Asking for help on such a name is the
 one exception, even with `--json`: with `--help` among the arguments, or as
 `zitadel help <name>`, the help layer answers with nothing on stdout, a plain
-`Command … not found` on stderr, and exit 2 (`zitadel help` given a flag it
-does not take, such as `--json`, exits 1 the same way). Treat an empty stdout
-as that case, never as an envelope. Everything else answers with an envelope
+`Command … not found` on stderr, and exit 2. `zitadel help` given a flag it
+does not take, such as `--json`, writes nothing to stdout either, but exits 1
+with `Nonexistent flag: --json` and a stack trace on stderr; that is the help
+layer refusing the flag, not the CLI failing. Treat an empty stdout as either
+case, never as an envelope. Everything else answers with an envelope
 too, errors included — an unknown flag, a missing argument and a resource that
 is not found are all `status: "error"` objects on stdout.
 

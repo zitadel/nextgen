@@ -42,6 +42,16 @@ describe("JsonFailureOutput", () => {
     ]);
   });
 
+  it("keeps the message as it came, which a reader parses", () => {
+    const written: ErrorEnvelope[] = [];
+
+    new JsonFailureOutput((envelope) => {
+      written.push(envelope);
+    }).write(new Failure(new ZitadelError("E_VALIDATION", "Refused \u001b[2Jwiped"), META));
+
+    expect(written).toEqual([expect.objectContaining({ message: "Refused \u001b[2Jwiped" })]);
+  });
+
   it("carries the warnings the run reported, and none when it reported none", () => {
     const written: ErrorEnvelope[] = [];
     const output = new JsonFailureOutput((envelope) => {
@@ -63,9 +73,14 @@ describe("TerminalFailureOutput", () => {
   it("draws the coded sentence, the hint and the commands to run next", () => {
     const drawn: Summary[] = [];
 
-    new TerminalFailureOutput((summary) => {
-      drawn.push(summary);
-    }).write(new Failure(refusal, META));
+    new TerminalFailureOutput(
+      (summary) => {
+        drawn.push(summary);
+        return "";
+      },
+      () => {},
+      { tty: true, forced: false },
+    ).write(new Failure(refusal, META));
 
     expect(drawn).toEqual([
       {
@@ -80,12 +95,38 @@ describe("TerminalFailureOutput", () => {
   });
 });
 
+describe("TerminalFailureOutput's stderr", () => {
+  it.each([
+    [{ tty: true, forced: false }, "\u001b[31mred\u001b[39m"],
+    [{ tty: false, forced: true }, "\u001b[31mred\u001b[39m"],
+    [{ tty: false, forced: false }, "red"],
+  ])("written to stderr %j is %j", (stderr, expected) => {
+    const written: string[] = [];
+
+    new TerminalFailureOutput(
+      () => {
+        return "\u001b[31mred\u001b[39m";
+      },
+      (text) => {
+        written.push(text);
+      },
+      stderr,
+    ).write(new Failure(refusal, META));
+
+    expect(written).toEqual([expected]);
+  });
+});
+
 describe("envelopeText", () => {
-  it("spells out a control character a value carries, so the text still parses", () => {
-    expect(JSON.parse(envelopeText({ message: "a\u001b[31mb" }, undefined))).toEqual({
-      message: "a\u001b[31mb",
+  // JSON.stringify leaves a format character such as the bidi override as it
+  // is, so it is the one the spelling exists for.
+  it("spells out a format character a value carries, so the text still parses", () => {
+    const text = envelopeText({ message: "a\u202eb" }, undefined);
+
+    expect({ raw: text.includes("\u202e"), parsed: JSON.parse(text) }).toEqual({
+      raw: false,
+      parsed: { message: "a\u202eb" },
     });
-    expect(envelopeText({ message: "a\u001b[31mb" }, undefined)).not.toContain("\u001b");
   });
 });
 

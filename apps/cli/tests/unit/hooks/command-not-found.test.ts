@@ -106,6 +106,7 @@ describe("UnknownCommand.among", () => {
     { id: "deploy", aliases: [] },
     { id: "deployment:list", aliases: ["deployments"] },
     { id: "debug", hidden: true, aliases: [] },
+    { id: "secret:list", hidden: true, aliases: [] },
   ];
 
   it("never suggests a hidden command", () => {
@@ -118,6 +119,12 @@ describe("UnknownCommand.among", () => {
     const { error } = UnknownCommand.among("debug:extra", DECLARED);
 
     expect(error.message).toBe("debug does not take the argument typed after it.");
+  });
+
+  it("never suggests the help of a topic only hidden commands are in", () => {
+    const { error } = UnknownCommand.among("secret:lst", DECLARED);
+
+    expect(error.nextCommands).toEqual(["zitadel --help"]);
   });
 
   it("suggests the alias a word is a single edit from", () => {

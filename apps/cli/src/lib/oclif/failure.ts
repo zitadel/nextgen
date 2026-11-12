@@ -25,19 +25,37 @@ export function envelopeText(json: unknown, theme: Record<string, string> | unde
   return escapeJsonControlCharacters(ux.colorizeJson(json, { pretty: true, theme }));
 }
 
+/** What decides whether text on stderr keeps its colour. */
+export type StderrColour = Readonly<{
+  /** Whether stderr is a terminal. */
+  tty: boolean;
+  /** Whether colour was forced (`--color` or `FORCE_COLOR`). */
+  forced: boolean;
+}>;
+
+/**
+ * Whether this process's stderr keeps colour, read once here for every writer
+ * of stderr.
+ *
+ * @returns Whether stderr is a terminal, and whether colour is forced.
+ */
+export function stderrColour(): StderrColour {
+  return {
+    tty: Boolean(process.stderr.isTTY),
+    forced: Boolean(process.env.FORCE_COLOR),
+  };
+}
+
 /**
  * Text as the CLI writes it to stderr. Colour is decided by stdout's terminal,
  * so with only stderr redirected, as in `2> error.log`, the codes are taken
  * back out unless colour was forced.
  *
  * @param text - The text, possibly coloured.
- * @param stderr - Whether stderr is a terminal, and whether colour is forced.
+ * @param stderr - What decides whether it keeps its colour; this process's by default.
  * @returns The text to write.
  */
-export function asideText(
-  text: string,
-  stderr: Readonly<{ tty: boolean; forced: boolean }>,
-): string {
+export function asideText(text: string, stderr: StderrColour = stderrColour()): string {
   return stderr.tty || stderr.forced ? text : stripVTControlCharacters(text);
 }
 
@@ -131,16 +149,30 @@ export class JsonFailureOutput implements FailureOutput {
   }
 }
 
-/** A failure as the summary a person reads on stderr: the CLI's one grammar for a failure. */
+/**
+ * A failure as the summary a person reads on stderr: the CLI's one grammar for
+ * a failure, with its colour taken out when only stderr is redirected.
+ */
 export class TerminalFailureOutput implements FailureOutput {
-  private readonly draw: (summary: Summary) => void;
+  private readonly render: (summary: Summary) => string;
+  private readonly emit: (text: string) => void;
+  private readonly stderr: StderrColour;
 
   /**
-   * @param draw - Draws a summary on stderr the way the entry point draws
-   *   everything else there.
+   * @param render - Lays a summary out as text, the way the entry point lays
+   *   out everything it draws.
+   * @param emit - Writes text to stderr.
+   * @param stderr - What decides whether the text keeps its colour; this
+   *   process's stderr by default.
    */
-  constructor(draw: (summary: Summary) => void) {
-    this.draw = draw;
+  constructor(
+    render: (summary: Summary) => string,
+    emit: (text: string) => void,
+    stderr: StderrColour = stderrColour(),
+  ) {
+    this.render = render;
+    this.emit = emit;
+    this.stderr = stderr;
   }
 
   /**
@@ -149,7 +181,7 @@ export class TerminalFailureOutput implements FailureOutput {
    * @param failure - The failure to draw.
    */
   write(failure: Failure): void {
-    this.draw(this.summary(failure));
+    this.emit(asideText(this.render(this.summary(failure)), this.stderr));
   }
 
   /**

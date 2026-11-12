@@ -14,5 +14,6 @@ or {
 } as $read where {
   $filename <: r".*/apps/cli/src/.*",
   $filename <: not r".*/lib/oclif/base\.ts$",
+  $filename <: not r".*/lib/oclif/failure\.ts$",
   register_diagnostic(span=$read, message="Read whether this run is coloured as `this.isColored`; the decision is made once in toMeta.", severity="error")
 }
