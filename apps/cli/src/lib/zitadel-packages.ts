@@ -1,5 +1,6 @@
 import { join } from "node:path";
 
+import { Cache } from "./upgrade/cache";
 import { ReleaseChannel } from "./upgrade/channel";
 import { npmDistTagForCliVersion } from "./public-cli";
 import { isCI } from "./skills-hint";
@@ -39,6 +40,6 @@ export function zitadelChannel(cliVersion: string, env: NodeJS.ProcessEnv): Rele
     packageName: ZITADEL_CLI,
     distTag: npmDistTagForCliVersion(cliVersion),
     registry: (env.npm_config_registry?.trim() || DEFAULT_REGISTRY).replace(/\/+$/, ""),
-    cacheFile: dir === undefined ? undefined : join(dir, "update-check.json"),
+    cache: new Cache(dir === undefined ? undefined : join(dir, "update-check.json")),
   });
 }

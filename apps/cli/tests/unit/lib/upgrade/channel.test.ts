@@ -1,262 +1,169 @@
-import { mkdtemp, readFile, rm, writeFile, mkdir } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { ReleaseChannel } from "@/lib/upgrade";
+import { Cache, ReleaseChannel } from "@/lib/upgrade";
 
-const REGISTRY = "https://registry.npmjs.org/-/package/@acme%2fcli/dist-tags";
+const REGISTRY = "https://registry.npmjs.org";
+const MIRROR = "https://mirror.example/npm";
 
 const server = setupServer();
-let configHome: string;
+let home: string;
 let requests: string[];
 
-function publishes(tags: Record<string, string>): void {
+function publishes(tags: Record<string, string>, registry = REGISTRY): void {
   server.use(
-    http.get(REGISTRY, ({ request }) => {
+    http.get(`${registry}/-/package/@acme%2fcli/dist-tags`, ({ request }) => {
       requests.push(request.url);
       return HttpResponse.json(tags);
     }),
   );
 }
 
-function env(extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
-  return { XDG_CONFIG_HOME: configHome, ...extra };
+function down(): void {
+  server.use(
+    http.get(`${REGISTRY}/-/package/@acme%2fcli/dist-tags`, () => {
+      requests.push("asked");
+      return HttpResponse.error();
+    }),
+  );
 }
 
-async function cacheHolds(lookup: Record<string, unknown>): Promise<void> {
-  const file = join(configHome, "acme", "update-check.json");
-  await mkdir(dirname(file), { recursive: true });
-  await writeFile(file, JSON.stringify(lookup));
-}
-
-function channel(
-  cliVersion: string,
-  environment: NodeJS.ProcessEnv,
-  cacheFile: string = join(configHome, "acme", "update-check.json"),
-): ReleaseChannel {
+function channel(options: { distTag?: string; registry?: string; file?: string } = {}) {
   return new ReleaseChannel({
     packageName: "@acme/cli",
-    distTag: cliVersion === "3.0.0-alpha.0" ? "alpha" : "latest",
-    registry: (environment.npm_config_registry ?? "https://registry.npmjs.org").replace(/\/+$/, ""),
-    cacheFile,
+    distTag: options.distTag ?? "latest",
+    registry: options.registry ?? REGISTRY,
+    cache: new Cache(options.file ?? join(home, "cache.json")),
   });
 }
 
-async function latestVersion(
-  cliVersion: string,
-  environment: NodeJS.ProcessEnv,
-  cacheFile?: string,
-) {
-  return (await channel(cliVersion, environment, cacheFile).latest())?.version;
+async function cacheHolds(entries: Record<string, unknown>): Promise<void> {
+  await writeFile(join(home, "cache.json"), JSON.stringify(entries));
 }
 
-async function freshVersion(cliVersion: string, environment: NodeJS.ProcessEnv) {
-  return (await channel(cliVersion, environment).latestFresh())?.version;
-}
+const DAY = 25 * 60 * 60 * 1000;
+const KEY = `${REGISTRY}/@acme/cli#latest`;
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterAll(() => server.close());
 beforeEach(async () => {
-  configHome = await mkdtemp(join(tmpdir(), "zitadel-update-check-"));
+  home = await mkdtemp(join(tmpdir(), "zitadel-channel-"));
   requests = [];
 });
 afterEach(async () => {
   server.resetHandlers();
-  await rm(configHome, { recursive: true, force: true });
+  await rm(home, { recursive: true, force: true });
 });
 
-describe("ReleaseChannel", () => {
-  it("reads the version on the CLI's own dist-tag", async () => {
+describe("ReleaseChannel.latest", () => {
+  it("reads the version on the dist-tag it is given", async () => {
     publishes({ latest: "2.0.0", alpha: "3.0.0-alpha.1" });
 
-    await expect(latestVersion("1.0.0", env())).resolves.toBe("2.0.0");
-    await rm(join(configHome, "acme"), { recursive: true });
-    await expect(latestVersion("3.0.0-alpha.0", env())).resolves.toBe("3.0.0-alpha.1");
+    const stable = await channel().latest();
+    const alpha = await channel({ distTag: "alpha", file: join(home, "other.json") }).latest();
+
+    expect([stable?.version, alpha?.version]).toEqual(["2.0.0", "3.0.0-alpha.1"]);
   });
 
-  it("asks the registry npm itself was pointed at", async () => {
-    server.use(
-      http.get("https://mirror.example/npm/-/package/@acme%2fcli/dist-tags", () =>
-        HttpResponse.json({ latest: "2.0.0" }),
-      ),
-    );
+  it("asks the registry it is given", async () => {
+    publishes({ latest: "2.0.0" }, MIRROR);
 
-    await expect(
-      latestVersion("1.0.0", env({ npm_config_registry: "https://mirror.example/npm/" })),
-    ).resolves.toBe("2.0.0");
+    const release = await channel({ registry: MIRROR }).latest();
+
+    expect(release?.version).toBe("2.0.0");
   });
 
   it("asks at most once a day", async () => {
     publishes({ latest: "2.0.0" });
 
-    await latestVersion("1.0.0", env());
-    await latestVersion("1.0.0", env());
+    await channel().latest();
+    await channel().latest();
 
     expect(requests).toHaveLength(1);
   });
 
   it("asks again once the answer is a day old", async () => {
-    await cacheHolds({
-      checked_at: Date.now() - 25 * 60 * 60 * 1000,
-      dist_tag: "latest",
-      registry: "https://registry.npmjs.org",
-      version: "1.5.0",
-    });
+    await cacheHolds({ [KEY]: { checked_at: Date.now() - DAY, version: "1.5.0" } });
     publishes({ latest: "2.0.0" });
 
-    await expect(latestVersion("1.0.0", env())).resolves.toBe("2.0.0");
+    expect((await channel().latest())?.version).toBe("2.0.0");
   });
 
   it("asks again when the answer claims to be from the future", async () => {
+    await cacheHolds({ [KEY]: { checked_at: Date.now() + DAY, version: "1.5.0" } });
+    publishes({ latest: "2.0.0" });
+
+    expect((await channel().latest())?.version).toBe("2.0.0");
+  });
+
+  it("does not take another dist-tag's or another registry's answer", async () => {
     await cacheHolds({
-      checked_at: Date.now() + 25 * 60 * 60 * 1000,
-      dist_tag: "latest",
-      registry: "https://registry.npmjs.org",
-      version: "1.5.0",
+      [`${REGISTRY}/@acme/cli#alpha`]: { checked_at: Date.now(), version: "9.0.0-alpha.1" },
+      [`${MIRROR}/@acme/cli#latest`]: { checked_at: Date.now(), version: "9.0.0" },
     });
     publishes({ latest: "2.0.0" });
 
-    await expect(latestVersion("1.0.0", env())).resolves.toBe("2.0.0");
-  });
-
-  it("does not take another dist-tag's answer", async () => {
-    await cacheHolds({
-      checked_at: Date.now(),
-      dist_tag: "alpha",
-      registry: "https://registry.npmjs.org",
-      version: "9.0.0-alpha.1",
-    });
-    publishes({ latest: "2.0.0" });
-
-    await expect(latestVersion("1.0.0", env())).resolves.toBe("2.0.0");
-  });
-
-  it("does not take another registry's answer", async () => {
-    await cacheHolds({
-      checked_at: Date.now(),
-      dist_tag: "latest",
-      registry: "https://mirror.example/npm",
-      version: "9.0.0",
-    });
-    publishes({ latest: "2.0.0" });
-
-    await expect(latestVersion("1.0.0", env())).resolves.toBe("2.0.0");
-  });
-
-  it("does not carry another registry's answer past a failed lookup", async () => {
-    await cacheHolds({
-      checked_at: Date.now(),
-      dist_tag: "latest",
-      registry: "https://mirror.example/npm",
-      version: "9.0.0",
-    });
-    server.use(http.get(REGISTRY, () => HttpResponse.error()));
-
-    await expect(latestVersion("1.0.0", env())).resolves.toBeUndefined();
-  });
-
-  it("does not take another registry's failure", async () => {
-    await cacheHolds({
-      checked_at: Date.now(),
-      dist_tag: "latest",
-      registry: "https://mirror.example/npm",
-    });
-    publishes({ latest: "2.0.0" });
-
-    await expect(latestVersion("1.0.0", env())).resolves.toBe("2.0.0");
+    expect((await channel().latest())?.version).toBe("2.0.0");
   });
 
   it("keeps what it knew when the registry stops answering", async () => {
-    await cacheHolds({
-      checked_at: Date.now() - 25 * 60 * 60 * 1000,
-      dist_tag: "latest",
-      registry: "https://registry.npmjs.org",
-      version: "1.5.0",
-    });
-    server.use(http.get(REGISTRY, () => HttpResponse.error()));
+    await cacheHolds({ [KEY]: { checked_at: Date.now() - DAY, version: "1.5.0" } });
+    down();
 
-    await expect(latestVersion("1.0.0", env())).resolves.toBe("1.5.0");
+    expect((await channel().latest())?.version).toBe("1.5.0");
   });
 
   it("remembers a failed lookup, so an offline machine waits only once a day", async () => {
-    server.use(
-      http.get(REGISTRY, () => {
-        requests.push("asked");
-        return HttpResponse.error();
-      }),
-    );
+    down();
 
-    await expect(latestVersion("1.0.0", env())).resolves.toBeUndefined();
-    await latestVersion("1.0.0", env());
+    const first = await channel().latest();
+    await channel().latest();
 
-    expect(requests).toHaveLength(1);
+    expect([first, requests]).toEqual([undefined, ["asked"]]);
   });
 
   it("skips the cache when asked for a fresh answer", async () => {
-    await cacheHolds({
-      checked_at: Date.now(),
-      dist_tag: "latest",
-      registry: "https://registry.npmjs.org",
-      version: "1.5.0",
-    });
+    await cacheHolds({ [KEY]: { checked_at: Date.now(), version: "1.5.0" } });
     publishes({ latest: "2.0.0" });
 
-    await expect(freshVersion("1.0.0", env())).resolves.toBe("2.0.0");
+    expect((await channel().latest({ fresh: true }))?.version).toBe("2.0.0");
   });
 
   it("answers nothing fresh when the registry is down, whatever it knew", async () => {
-    await cacheHolds({
-      checked_at: Date.now(),
-      dist_tag: "latest",
-      registry: "https://registry.npmjs.org",
-      version: "1.5.0",
-    });
-    server.use(http.get(REGISTRY, () => HttpResponse.error()));
+    await cacheHolds({ [KEY]: { checked_at: Date.now(), version: "1.5.0" } });
+    down();
 
-    await expect(freshVersion("1.0.0", env())).resolves.toBeUndefined();
+    await expect(channel().latest({ fresh: true })).resolves.toBeUndefined();
   });
 
   it("does not take a value that is not a version", async () => {
     publishes({ latest: "not-a-version" });
 
-    await expect(latestVersion("1.0.0", env())).resolves.toBeUndefined();
+    await expect(channel().latest()).resolves.toBeUndefined();
   });
 
-  // A file is as much an answer from outside as the response was, so it is held
-  // to what the registry would have had to answer to get there.
-  it("does not take a cached value that is not a version", async () => {
-    await cacheHolds({
-      checked_at: Date.now(),
-      dist_tag: "latest",
-      registry: "https://registry.npmjs.org",
-      version: "\u001b[2Jwiped",
-    });
+  it("does not take a cached value that is not a version, nor write it back", async () => {
+    await cacheHolds({ [KEY]: { checked_at: Date.now() - DAY, version: "\u001b[2Jwiped" } });
+    down();
 
-    await expect(latestVersion("1.0.0", env())).resolves.toBeUndefined();
+    const release = await channel().latest();
+
+    expect(release).toBeUndefined();
+    expect(await readFile(join(home, "cache.json"), "utf8")).not.toContain("wiped");
   });
 
   it("survives a home it cannot write to", async () => {
-    const file = join(configHome, "taken");
+    const file = join(home, "taken");
     await writeFile(file, "");
     publishes({ latest: "2.0.0" });
 
-    await expect(latestVersion("1.0.0", env(), join(file, "update-check.json"))).resolves.toBe(
-      "2.0.0",
-    );
-  });
+    const release = await channel({ file: join(file, "cache.json") }).latest();
 
-  it("writes the answer where the next run reads it", async () => {
-    publishes({ latest: "2.0.0" });
-
-    await latestVersion("1.0.0", env());
-
-    const cached = JSON.parse(
-      await readFile(join(configHome, "acme", "update-check.json"), "utf8"),
-    ) as Record<string, unknown>;
-    expect(cached).toMatchObject({ dist_tag: "latest", version: "2.0.0" });
+    expect(release?.version).toBe("2.0.0");
   });
 });

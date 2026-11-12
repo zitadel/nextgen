@@ -7,6 +7,7 @@ import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import {
+  Cache,
   InstallError,
   PackageInstaller,
   ReleaseChannel,
@@ -30,7 +31,7 @@ function upgrader(dryRun: boolean): Upgrader {
       packageName: "@zitadel/cli",
       distTag: "latest",
       registry: "https://registry.npmjs.org",
-      cacheFile: join(dir, "update-check.json"),
+      cache: new Cache(join(dir, "update-check.json")),
     }),
     installer: new PackageInstaller({
       cwd: dir,

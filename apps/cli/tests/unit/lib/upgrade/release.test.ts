@@ -15,6 +15,10 @@ describe("Release.isNewerThan", () => {
 });
 
 describe("Release.from", () => {
+  it.each([undefined, 5, "dev", "\u001b[2J"])("is undefined for %s", (value) => {
+    expect(Release.from(value)).toBeUndefined();
+  });
+
   it("is undefined without a version", () => {
     expect(Release.from(undefined)).toBeUndefined();
   });

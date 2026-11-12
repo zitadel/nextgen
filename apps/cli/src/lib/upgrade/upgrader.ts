@@ -47,7 +47,7 @@ export class Upgrader {
    * @throws A {@link ReleaseLookupError} when the latest release cannot be looked up.
    */
   async plan(): Promise<UpgradePlan> {
-    const latest = await this.options.channel.latestFresh();
+    const latest = await this.options.channel.latest({ fresh: true });
     if (latest === undefined) {
       throw new ReleaseLookupError();
     }

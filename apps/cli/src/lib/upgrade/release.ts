@@ -13,11 +13,13 @@ export class Release {
   }
 
   /**
-   * @param version - A version that may not be there.
-   * @returns The release, or `undefined` without a version.
+   * @param version - A value that may not be a version: an answer from outside.
+   * @returns The release, or `undefined` when it is not semver.
    */
-  static from(version: string | undefined): Release | undefined {
-    return version === undefined ? undefined : new Release(version);
+  static from(version: unknown): Release | undefined {
+    return typeof version === "string" && semver.valid(version) !== null
+      ? new Release(version)
+      : undefined;
   }
 
   /**

@@ -1,3 +1,4 @@
+export { Cache } from "./cache";
 export { ReleaseChannel } from "./channel";
 export { Dependencies, Dependency } from "./dependencies";
 export { InstallError, ReleaseLookupError } from "./errors";
