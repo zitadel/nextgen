@@ -37,7 +37,7 @@ npx @zitadel/cli@latest deploy
 
 When the method is already in the state you asked for, the command writes nothing and says `passkey is already enabled for default-human-user`. That is the case for both methods in a new project, so after a flow edit run `deploy` anyway. Add `--dry-run` to see what a command would do without writing.
 
-`enable` warns when no step of an active flow lets an existing user sign in with the method:
+`enable` warns when no step of a flow lets an existing user sign in with the method:
 
 ```text
 WARN  No login flow for default-human-user offers passkey yet. In .zitadel/flows/default-login.json, add a "kind": "passkey" action to a step reached from purposes.login, plus a transition under the action's name. A "kind": "passkey_register" action does the same for sign-up. See .zitadel/flows/README.md.
@@ -186,7 +186,6 @@ Remove every step that lists `x-auth-methods#password`. Retarget every transitio
 {
   "$schema": "../meta/flow-definition.json",
   "name": "default-login",
-  "status": "active",
   "user_schema": "human-user",
   "purposes": {
     "login": "passkey-first",

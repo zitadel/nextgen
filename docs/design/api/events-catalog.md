@@ -66,7 +66,7 @@ same TX (shared `request_id`).
 | **Project** | `name`, `origins` (full array as stored) | Secrets, key material |
 | **Origin** | `pattern`, `kind` | — |
 | **Team** | `name` | — |
-| **Flow definition** | `name`, `status`, `user_schema`, `purposes`, `audience` | Full `steps` graph |
+| **Flow definition** | `name`, `user_schema`, `purposes`, `audience` | Full `steps` graph |
 | **Branding** | `layout`, `logo_url`, `font_url`, `hero_url` | `liquid_template` |
 | **Policy** | `operation`, `revision_id`, `config` (the instance's settings) | — |
 | **Schema** | `kind`, `object_type` | Schema document body |
@@ -164,7 +164,7 @@ tracked below.
 | SSO exchange failed (token exchange, `id_token` or userinfo validation, configuration, or a server-side failure after a code arrived, including a callback refused before the exchange because its path names another connection than the state pins or its `iss` is not the connection's issuer) | `auth.sso.exchange.failed` | `auth` | `check` | `check_id`, `check_type` (`SSOCallback`), `auth_attempt_id` |
 | SSO exchange succeeded (`SetSSOCallbackResult`; not a sign-in: the identity may still match no account) | `auth.sso.exchange.succeeded` | `auth` | `check` | `check_id`, `check_type` (`SSOCallback`), `auth_attempt_id` |
 | Direct factor recorded (no challenge/proof cycle: sign-up establishing user+password/user factors, discoverable assertion pinning the resolved user, SSO bind recording the user and SSO factors) | `auth.check.succeeded` | `auth` | `check` | `check_id`, `check_type`, `auth_attempt_id` |
-| Flow definition create | `flowdef.created` | `admin` | `flow_definition` | `name`, `status`, `user_schema`, `purposes`, `audience` |
+| Flow definition create | `flowdef.created` | `admin` | `flow_definition` | `name`, `user_schema`, `purposes`, `audience` |
 | JSON schema create | `schema.created` | `admin` | `json_schema` | `kind`, `object_type` |
 | Branding create | `branding.created` | `admin` | `branding` | `layout`, `logo_url`, `font_url`, `hero_url` |
 | PolicyService publish (first revision of an operation's policy) | `policy.created` | `admin` | `policy` | `operation`, `revision_id`, `config` |

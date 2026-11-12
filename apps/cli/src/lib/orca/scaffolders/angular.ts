@@ -2,10 +2,11 @@ import { rm } from "node:fs/promises";
 import { basename, join } from "node:path";
 
 import { AbstractCLIScaffolder } from "./cli";
+import { frameworkCli } from "./framework-clis";
 import type { NodeEngines } from "./node-engines";
 
 /** The Angular CLI setup runs, for both `ng new` and the engine lookup. */
-const ANGULAR_CLI = "@angular/cli@latest";
+const ANGULAR_CLI = frameworkCli("@angular/cli");
 
 /**
  * Derives a valid Angular project name from the target directory. `ng new`
@@ -44,6 +45,7 @@ export class AngularScaffolder extends AbstractCLIScaffolder {
     fallback: "^22.22.3 || ^24.15.0 || >=26.0.0",
     enforcement: "refuse",
   };
+  override readonly pinnedPackages: ReadonlyArray<string> = [ANGULAR_CLI];
 
   protected async create(cwd: string, _framework: string): Promise<void> {
     this.runCommand(

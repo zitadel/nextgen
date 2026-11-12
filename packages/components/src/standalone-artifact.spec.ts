@@ -1,10 +1,10 @@
 /**
- * Guards the self-contained promise of `dist/standalone.mjs` for the DEV
- * build (`components:test` depends on `components:build` in moon.yml for
- * exactly this reason). The release build runs the same checks inline —
- * `components:build-release` invokes `scripts/check-standalone-artifact.mjs`
- * after building — so both artifacts are covered by one checker; see that
- * script for the failure modes it exists to catch.
+ * Guards the self-contained promise of `dist/standalone.mjs` (the `test` task
+ * depends on `build` in turbo.json for exactly this reason). A release packs
+ * that same build (`turbo run pack --filter=@zitadel/release`), so the
+ * published artifact is the one checked here; see
+ * `scripts/check-standalone-artifact.mjs` for the failure modes it exists to
+ * catch.
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";

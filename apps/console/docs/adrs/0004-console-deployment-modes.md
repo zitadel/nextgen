@@ -298,7 +298,7 @@ it does not choose a different Console login project and does not grant access.
 
 > **Amendment (2026-09-30, asked in #1300, removed in #1345):**
 > `VITE_CONSOLE_PROJECT_ID` is removed. Development takes the sign-in project
-> from `runtime.json` like production: `console:dev-real` and the real e2e lane
+> from `runtime.json` like production: the console's `dev:real` and the real e2e lane
 > serve the document from their instance (the seeded project, or
 > `proj_platform` with bootstrap in claim mode), and the api-mock serves one
 > naming its platform project. The pin had also

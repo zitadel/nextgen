@@ -440,7 +440,6 @@ func TestPasswordRegisterFlow_DuplicateEmail(t *testing.T) {
 func passwordLoginFlowDefinition(userSchemaURL string) api.FlowDefinition {
 	return api.FlowDefinition{
 		Name:       "password-login",
-		Status:     "active",
 		UserSchema: userSchemaURL,
 		Purposes:   api.FlowDefinitionPurposes{"login": "identifier"},
 		Steps: []api.FlowDefinitionStep{
@@ -478,7 +477,6 @@ func passwordRegisterFlowDefinition(userSchemaURL string) api.FlowDefinition {
 	return api.FlowDefinition{
 		Name:       "password-register",
 		UserSchema: userSchemaURL,
-		Status:     "active",
 		Purposes:   api.FlowDefinitionPurposes{"register": "signup"},
 		Steps: []api.FlowDefinitionStep{
 			{
@@ -506,7 +504,6 @@ func passwordLoginFlowWithNotFoundFlowDefinition(userSchemaURL string) api.FlowD
 	return api.FlowDefinition{
 		Name:       "password-login-with-not-found",
 		UserSchema: userSchemaURL,
-		Status:     "active",
 		Purposes:   api.FlowDefinitionPurposes{"login": "identifier"},
 		Steps: []api.FlowDefinitionStep{
 			{

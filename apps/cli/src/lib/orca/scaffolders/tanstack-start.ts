@@ -2,7 +2,14 @@ import { rm } from "node:fs/promises";
 import { join } from "node:path";
 
 import { AbstractCLIScaffolder } from "./cli";
+import { frameworkCli } from "./framework-clis";
 import type { NodeEngines } from "./node-engines";
+
+/**
+ * The TanStack CLI release setup runs. It still writes the packages its
+ * templates name at `latest` at the version npmjs reports when it runs.
+ */
+const TANSTACK_CLI = frameworkCli("@tanstack/cli");
 
 /**
  * Scaffolds a new TanStack Start app with the TanStack CLI, then removes the
@@ -25,17 +32,18 @@ export class TanStackStartScaffolder extends AbstractCLIScaffolder {
 
   readonly nodeEngines: NodeEngines = {
     label: "@tanstack/cli",
-    spec: "@tanstack/cli@latest",
+    spec: TANSTACK_CLI,
     fallback: "^20.19.0 || >=22.12.0",
     enforcement: "warn",
   };
+  override readonly pinnedPackages: ReadonlyArray<string> = [TANSTACK_CLI];
 
   protected async create(cwd: string, _framework: string): Promise<void> {
     this.runCommand(
       "npx",
       [
         "-y",
-        "@tanstack/cli@latest",
+        TANSTACK_CLI,
         "create",
         ".",
         "--framework",

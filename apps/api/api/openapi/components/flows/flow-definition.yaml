@@ -1,6 +1,6 @@
 x-meta-schema: true
 type: object
-required: [ name, status, user_schema, purposes, steps ]
+required: [ name, user_schema, purposes, steps ]
 description: |
   A flow definition is the configuration of one flow: the sequence of screens
   the login component (`<zitadel-login>`) walks a user through to sign in,
@@ -41,9 +41,6 @@ properties:
       supported: the `name` is part of the public contract another
       definition may reference. It acts as the human display label as well;
       there is no separate slug.
-
-  status:
-    $ref: flow-definition-status.yaml
 
   user_schema:
     type: string
