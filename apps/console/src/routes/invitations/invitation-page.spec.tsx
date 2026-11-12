@@ -142,6 +142,40 @@ describe("invitation page", () => {
     expect(tokens).toEqual([TOKEN]);
   });
 
+  it("names the inviter the lookup resolved, without reading anyone by id", async () => {
+    // MSW fails the test if the page asks for a user: no such read is stubbed.
+    stubLookup(() =>
+      HttpResponse.json(
+        lookup({
+          inviter: {
+            user_id: "user_admin",
+            identifier: "alex@example.com",
+            display: "Alex Morgan",
+          },
+        }),
+      ),
+    );
+    await openLink();
+    expect(await screen.findByText("Invited by Alex Morgan")).toBeInTheDocument();
+  });
+
+  it("falls back to the inviter's identifier, then their id", async () => {
+    stubLookup(() =>
+      HttpResponse.json(
+        lookup({ inviter: { user_id: "user_admin", identifier: "alex@example.com" } }),
+      ),
+    );
+    await openLink();
+    expect(await screen.findByText("Invited by alex@example.com")).toBeInTheDocument();
+  });
+
+  it("leaves the inviter out for an invitation a project secret created", async () => {
+    stubLookup(() => HttpResponse.json(lookup({ created_by: null, inviter: null })));
+    await openLink();
+    await screen.findByRole("heading", { name: "You're invited to join acme-app" });
+    expect(screen.queryByText(/Invited by/)).not.toBeInTheDocument();
+  });
+
   it("joins the project, clears the token and lands on Projects", async () => {
     stubLookup();
     const accepted = stubVerb("accept", () => HttpResponse.json(finished("accepted")));

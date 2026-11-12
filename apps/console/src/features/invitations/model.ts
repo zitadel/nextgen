@@ -6,6 +6,29 @@ export type Invitation = Awaited<ReturnType<typeof api.listInvitations>>["invita
 /** The lean view the invitation page gets for a token (root ADR 086 §3). */
 export type InvitationLookup = Awaited<ReturnType<typeof api.lookupInvitation>>;
 
+/**
+ * Who created an invitation, as the lookup resolves them for the invitation
+ * page (`inviter`, a user-ref): the invited person cannot read the project's
+ * users, so the server names the inviter rather than leaving the page an id to
+ * look up. Declared here until the generated client carries the field.
+ */
+export interface Inviter {
+  user_id: string;
+  identifier?: string | null;
+  display?: string | null;
+}
+
+/**
+ * The inviter's name as the page shows it: `display`, falling back to
+ * `identifier`, then `user_id` (ADR 058 §3). Nothing when a project secret
+ * created the invitation, or the server sent no inviter.
+ */
+export function inviterLabel(lookup: { inviter?: Inviter | null }): string | undefined {
+  const inviter = lookup.inviter;
+  if (!inviter) return undefined;
+  return inviter.display || inviter.identifier || inviter.user_id;
+}
+
 export type InvitationStatus = Invitation["status"];
 
 /** A project role an invitation grants, named as in `POST /grants`. */

@@ -17,6 +17,8 @@ import {
   describeExpiry,
   effectiveStatus,
   type InvitationLookup,
+  type Inviter,
+  inviterLabel,
   roleInProse,
 } from "../model";
 import { clearInvitationToken } from "../token";
@@ -55,10 +57,10 @@ export function isInvitationGone(cause: unknown): boolean {
  * kind keeps it, so reloading the page or reopening the link picks up where
  * it stopped.
  *
- * **No inviter line.** The design draws `Invited by <name>`, but the lookup
- * names the creator by id only, and the invitee cannot read the project's
- * members to resolve it. The line returns when the lookup carries a name; the
- * role and the expiry, which it does carry, stand there instead.
+ * **The inviter is the lookup's.** `inviter` is a user-ref the server resolves,
+ * because the invited person cannot read the project's users; the page shows
+ * it as it arrives and never looks anyone up by id. An invitation a project
+ * secret created has none, and the line is left out.
  */
 export function InvitationPage({ state }: { state: InvitationPageState }) {
   const [outcome, setOutcome] = useState<"declined" | "gone" | undefined>(undefined);
@@ -188,6 +190,7 @@ function OpenInvitation({
   }, "Could not decline the invitation. Try again.");
 
   const busy = accept.pending || decline.pending;
+  const inviter = inviterLabel(invitation as InvitationLookup & { inviter?: Inviter | null });
 
   return (
     <div className={`${CARD} gap-5`}>
@@ -195,6 +198,7 @@ function OpenInvitation({
         <h1 className={`${SECTION_HEADING} wrap-anywhere`}>
           You&apos;re invited to join {invitation.project_name}
         </h1>
+        {inviter && <p className={`${BODY} wrap-anywhere`}>Invited by {inviter}</p>}
         <p className={BODY}>
           You&apos;ll join as {roleInProse(invitation)}. {describeExpiry(invitation.expires_at)}.
         </p>
