@@ -31,7 +31,12 @@ describe("lib/upgrade", () => {
   });
 });
 
-/** What each allow-listed lib may itself import from the repo, so the dependency cannot widen unseen. */
+/**
+ * What each allow-listed lib may itself import from the repo, so the dependency
+ * cannot widen unseen. A subset check: shrinking is fine. It looks one level down
+ * only, because the full closure (errors, suggestion, backend, zitadel) is most of
+ * the CLI.
+ */
 const TRANSITIVE: Readonly<Record<string, readonly string[]>> = {
   "npm.ts": ["./fs", "./json"],
   "package-manager.ts": ["./cmd", "./fs", "./npm", "./public-cli"],
@@ -45,7 +50,7 @@ describe("what lib/upgrade reaches through lib/npm and lib/package-manager", () 
         return source.startsWith("./") || source.startsWith("@/");
       });
 
-      expect(own.sort()).toEqual([...known].sort());
+      expect(own.filter((source) => !known.includes(source))).toEqual([]);
     },
   );
 });

@@ -128,7 +128,8 @@
   only itself, node, `semver`, `lib/npm` and `lib/package-manager`, and
   everything of Zitadel or the CLI comes in through its interfaces from
   `src/lib/zitadel-upgrade`. `lib/package-manager` is the one dependency that
-  still reaches CLI code (`public-cli`, `cmd`), for how a command is spelled. `tests/unit/lib/upgrade/layering.test.ts` fails on
+  still reaches CLI code (`public-cli`, `cmd`, and through `errors` much of the
+  rest), for how a command is spelled. `tests/unit/lib/upgrade/layering.test.ts` fails on
   any other import there, dynamic ones included.
 - Say what a command is doing with `log` (`src/lib/log.ts`) from a command or a
   library alike, never a logger or stream of your own: the running command's
