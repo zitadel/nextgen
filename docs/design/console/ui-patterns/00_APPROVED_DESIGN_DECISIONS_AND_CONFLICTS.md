@@ -6,7 +6,7 @@
 
 | Decision | Approved intent | Canonical rule |
 |---|---|---|
-| DEC-01 | Resource-list header **44px**, header labels **`muted-foreground`**, body rows still **56px** | UI-01 |
+| DEC-01 | Resource-list header **44px**, header labels **`muted-foreground`**, body rows still **56px** (default `comfortable` density; compact lists see §4) | UI-01 |
 | DEC-02 | A row opens a real primary detail route only when one exists; nested actions/links remain independent | UI-01; UI-02 for link controls |
 | DEC-03 | Secondary referenced-configuration links muted at rest → foreground on hover, **no underline** | UI-02 |
 | DEC-05 | Keep `formatRecent()`'s **24h** rule; after 24h show localized date + time, per existing formatter | UI-03 |
@@ -42,7 +42,7 @@
 | Round 1 #4 | A row in the **Deployments** directory opens its corresponding detail view **under Deployments**, where Release details are shown; verify the actual destination against the existing Release detail route. | Deployments screen-level routing review |
 | Round 2 #7 | **Login Flow detail** title and MetaItems appear above/outside its configuration panel; no duplicate page title. This is a concrete application of the shared detail hierarchy. | Login Flow screen-level polishing |
 | Round 2 #9 application | Remove the specifically identified redundant subtitle beneath **Anmelden**, not all supporting text. | Sign-in screen-level polishing |
-| Additional Users approval | Primary identity: **Name + Email** as available, **ID in its own column**, without redundant email/username type chips. Actual data and avatar fallback require screen review. | Users screen-level polishing |
+| Additional Users approval | Primary identity: the server-resolved display name with the designated identifier beneath (`x-display` / `x-identifier`, ID as fallback; [ADR 058](../../../adrs/058-user-identity-designation-and-references.md) §3a), **ID in its own column**, without redundant identifier-property chips. Actual data and avatar fallback require screen review. | Users screen-level polishing |
 | Additional Team approval | An inactive **Team** is labelled `Inactive` rather than an unrelated `Disabled`/`Blocked` state; global status API mappings remain domain-specific. | Teams screen-level polishing |
 | Login Flows columns (2026-11-03) | Existing reviewed Figma layout uses **Name, Purpose, User Schema, Last Change, Actions**, **without Steps**. This does not define a global table variant or change any table widths. | Login Flows screen-level polishing |
 
@@ -58,11 +58,12 @@ These decisions do not belong in the seven reusable component guides. The curren
 - **Round 5 #24 (superseded):** The earlier Users landing is obsolete. D35 and Console ADR 0001 establish Project Overview as the landing with a selected project; unselected-project behavior follows the routing guard.
 - **Round 5 #25:** Keep Project/Team context navigation discoverable where supported. Do not infer a global Team scope that is not yet implemented (Console ADR 0005).
 - **Additional reviewed navigation:** Inactive sidebar entries use muted styling, and active state tracks the actual route. Screen-level review still governs precise placement.
+
 ## 4. Explicit conflicts with current `styling.md` / source code
 
 | Current technical baseline | Approved future design | Required reconciliation |
 |---|---|---|
-| Resource-list head **56px** and head label `foreground` | **44px**, `muted-foreground` | Update **resource-list variant only**, not panel heads or 56px body cells |
+| Resource-list head **56px** (`comfortable`) and head label `foreground`; `compact` density is **40px** head and rows (Events) | **44px**, `muted-foreground` for `comfortable` lists | Update the **resource-list head only**, not panel heads or 56px body cells. Head and body share `--resource-row` today, so the head needs its own height. Keep `compact` heads, rows and padding unchanged until a compact target is reviewed |
 | `RESOURCE_ROW_LINK` `hover:underline` | Resource-name link **without** hover underline | Shared link style and native focus QA |
 | `ResourceIdCell` already uses `IdText` with middle truncation | **12px monospace** is the reviewed typography target | Preserve middle elision and full-value Copy; verify typography implementation |
 | Current `RowMenu` default horizontal `Ellipsis` | Vertical ellipsis | Shared control icon update; preserve DropdownMenu/accessibility |
@@ -79,8 +80,10 @@ All other valid technical contracts remain unchanged: shadcn/new-york/Radix comp
 - **D13 is standing**, not a deferred design gate: no page-level Back buttons or breadcrumbs. Chevron navigation headings under D29, D30 and D40 implement navigation up through the sidebar, as described by Console ADR 0001.
 - **D23 is partly superseded by approved Users-table design intent:** D23 says the Columns menu is right-click-only and mandates an identifier-property chip; UI-01 expects a visible labelled Columns control, and the reviewed Users screen has no type chip. Open [PR #2817](https://github.com/zitadel/nextgen/pull/2817) proposes that change but is not merged. Its proposed D27 ID collides with the D27 already on main. Retain D23's pinning, Attributes popover, sticky menu and table widths.
 - D2's irreversible hard-delete premise conflicts with accepted [ADR 024](../../../adrs/024-user-team-lifecycle-ownership.md), which specifies deactivation/tombstoning before purge. Do not copy that older premise into a new general rule.
-- D35, D40 and the current shell are documented in Console ADR 0001; Search product UX decisions D32–D39 remain in the active decision log, alongside [ADR 087](../../../adrs/087-search.md), which is still **Proposed**.
-- This documentation PR does **not** freeze or archive the decisions log. Moving feature-specific decisions to their future maintained specifications or ADRs is separate work.
+- D35, D40 and the current shell are documented in Console ADR 0001; Search product UX decisions D32, D33, D37 and D39 remain in the active decision log, alongside [ADR 087](../../../adrs/087-search.md), which is still **Proposed**.
+- **D41** (2026-11-11) gives configuration details (login flows, identity providers, releases) the same detail layout as resources, with body rows on a 218px label rail. UI-04 owns the page-level hierarchy; follow D41 and `styling.md` for body-row geometry.
+- The decisions log stays **active**; it is not frozen or archived. Moving feature-specific decisions to maintained specifications or ADRs is separate work.
+
 ## 5. Remaining reviews — NOT pending global design decisions
 
 - **Engineering verification:** actual routes, API state→Badge mappings, configurable-column schema data/permissions, ID elision, `SUBSECTION_HEADING` mismatch, form exception/validation rollouts, accessible interactions and regression QA.
