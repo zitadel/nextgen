@@ -1,8 +1,14 @@
 import type { BoxAction } from "./box";
 import { serverKind } from "./oclif/server-kind";
 import type { ZitadelSecret } from "./project";
-import { publicCliCommand } from "./public-cli";
-import { type EnvironmentSelector, projectCommand, type SuggestedCommand } from "./suggestion";
+import type { Suggest, SuggestedCommand } from "./suggestion";
+
+/**
+ * Where a new project goes when this one can no longer be claimed: a directory
+ * the reader names, never the run's own, where setup would skip as already
+ * initialized.
+ */
+export const FRESH_DIRECTORY = "<new-directory>";
 
 /**
  * Mirrors domain.ClaimWindow (internal/domain/claim.go): the server refuses
@@ -137,49 +143,52 @@ export function claimState(input: {
  * plain `zitadel` command names). Names the claim window because the server
  * enforces it at claim time (`proj.claim_window_expired`), and names the
  * data-loss stake per product decision: temporary projects get purged after
- * the window. That supersedes the no-deletion stance in ADR 046 §Non-goals;
- * amending the ADR is the follow-up tracked on PR #1194.
+ * the window.
  */
 function claimSentence(deadline?: Date): string {
   const when =
     deadline === undefined
       ? `within ${CLAIM_WINDOW_DAYS} days of creation`
       : `before ${formatDeadline(deadline)}`;
-  return (
-    `Claim your Project ${when} to make it permanent and start collaborating with your team. ` +
-    "Until then, your Project is temporary and its data may be lost."
-  );
+  return `Claim your project ${when} to make it permanent and start collaborating with your team. Until then, your project is temporary and its data may be lost.`;
 }
 
 /**
- * The nudge for `next_actions`, quoting the command in prose. `selector` is the
- * environment suffix (e.g. ` --env-file .env.development.local`) the suggested
- * `claim` must carry so it targets the project this run is about rather than
- * whatever the next shell's environment resolves to; empty when none applies.
+ * The nudge for `next_actions`, quoting the command in prose. The command is
+ * rendered by `suggest`, so it carries the run's own scope and targets the
+ * project this run is about rather than whatever the next shell's environment
+ * resolves to.
+ *
+ * @param suggest - Renders a suggestion for the run that reports it.
+ * @param deadline - When the claim window closes, if it is known.
+ * @returns The nudge.
  */
-export function claimAction(
-  cliVersion: string,
-  deadline: Date | undefined,
-  selector: EnvironmentSelector,
-): string {
-  return `${claimSentence(deadline)} Run ${claimCommand(cliVersion, selector)}.`;
+export function claimAction(suggest: Suggest, deadline: Date | undefined): string {
+  return `${claimSentence(deadline)} Run ${claimCommand(suggest)}.`;
 }
 
-/** The same nudge for the human box, with the command on its own styled line. */
-export function claimBoxAction(
-  cliVersion: string,
-  deadline: Date | undefined,
-  selector: EnvironmentSelector,
-): BoxAction {
+/**
+ * The same nudge for the human box, with the command on its own styled line.
+ *
+ * @param suggest - Renders a suggestion for the run that reports it.
+ * @param deadline - When the claim window closes, if it is known.
+ * @returns The box action.
+ */
+export function claimBoxAction(suggest: Suggest, deadline: Date | undefined): BoxAction {
   return {
     text: claimSentence(deadline),
-    command: claimCommand(cliVersion, selector),
+    command: claimCommand(suggest),
   };
 }
 
-/** The command for `next_commands`. `selector` carries the environment suffix. */
-export function claimCommand(cliVersion: string, selector: EnvironmentSelector): SuggestedCommand {
-  return projectCommand("claim", selector, cliVersion);
+/**
+ * The command for `next_commands`.
+ *
+ * @param suggest - Renders a suggestion for the run that reports it.
+ * @returns The `claim` command.
+ */
+export function claimCommand(suggest: Suggest): SuggestedCommand {
+  return suggest({ id: "claim" });
 }
 
 /**
@@ -191,13 +200,16 @@ export function claimCommand(cliVersion: string, selector: EnvironmentSelector):
  * `zitadel claim` is safe either way — the server checks the grant before
  * the window, so an attached project answers with a clean already-claimed
  * skip, and only a genuinely unattached one gets the final refusal.
+ *
+ * @param suggest - Renders a suggestion for the run that reports it.
+ * @returns The nudge.
  */
-export function claimWindowClosedAction(cliVersion: string, selector: EnvironmentSelector): string {
+export function claimWindowClosedAction(suggest: Suggest): string {
   return (
     `The local record says this project's ${CLAIM_WINDOW_DAYS}-day claim window has ` +
-    `closed. Run ${claimCommand(cliVersion, selector)} to reconcile: a project ` +
+    `closed. Run ${claimCommand(suggest)} to reconcile: a project ` +
     "claimed from another machine confirms its team, and one never claimed can no " +
-    `longer be claimed. ${publicCliCommand("setup", cliVersion)} in a fresh directory ` +
+    `longer be claimed. ${suggest({ id: "setup", flags: { cwd: FRESH_DIRECTORY } })} in a fresh directory ` +
     "gets you a new project you can claim."
   );
 }

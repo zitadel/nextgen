@@ -94,7 +94,7 @@ export function ResourceTitle({
   filter?: ReactNode;
   /**
    * Keeps the filter on its own row under the title at every width, for one
-   * that wants the row's whole width (Logs' search, which fills with chips).
+   * that wants the row's whole width (Events' search, which fills with chips).
    */
   filterBelow?: boolean;
   /**
@@ -196,7 +196,7 @@ export const RESOURCE_STICKY_BODY =
  * `comfortable`, the default, is the design's 56px with 8px block padding: a
  * row with a second line under its name, or a mark beside it. `compact` is
  * 40px with 4px: one line a row, where the list is read by the screenful
- * (Logs). A compact row's menu takes `RowMenu`'s `icon-xs`, the 24px button
+ * (Events). A compact row's menu takes `RowMenu`'s `icon-xs`, the 24px button
  * a narrow menu column sizes itself for.
  */
 export const RESOURCE_DENSITY = {

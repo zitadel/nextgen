@@ -1,21 +1,38 @@
 import { ZitadelError, type ZitadelErrorCode } from "@/lib/errors";
-import type { SuggestedCommand } from "@/lib/suggestion";
+import type { Suggested, Suggestion } from "@/lib/suggestion";
 
 /**
  * How a command refuses, written once as text. Every placeholder is written
  * `{name}` and filled from the values the refusal is raised with: a flag, an
  * argument, or whatever the check that raised it hands over.
  */
-export type Refusal = Readonly<{
-  code?: ZitadelErrorCode;
-  message: string;
-  hint?: string;
-  next?: readonly string[];
-  details?: unknown;
-}>;
+// An interface rather than a type alias: a flag's refusal is part of its
+// command's type, and an interface member is only resolved when it is read, so
+// `next` can name the command table without the table depending on itself.
+export interface Refusal {
+  readonly code?: ZitadelErrorCode;
+  readonly message: string;
+  readonly hint?: string;
+  /**
+   * What to run next: a {@link Suggestion} checked against the command it
+   * names, or a whole `{name}` placeholder the refusal's `next` values fill
+   * with one or a list of them. The run that reports the refusal renders each
+   * with its own scope.
+   */
+  readonly next?: readonly (Suggestion | `{${string}}`)[];
+  readonly details?: unknown;
+}
 
 /** What a refusal's placeholders are filled from. */
 export type Placeholders = Readonly<Record<string, unknown>>;
+
+/**
+ * What a refusal's whole-placeholder `next` entries are filled from: each a
+ * follow-up the compiler checked, or a list of them. Kept apart from
+ * {@link Placeholders}, which takes any value, so a `next` entry can never be
+ * filled with a string written by hand.
+ */
+export type NextPlaceholders = Readonly<Record<string, Suggested | readonly Suggested[]>>;
 
 /**
  * The names a refusal's wording would leave unfilled, given the values it
@@ -26,11 +43,29 @@ export type Placeholders = Readonly<Record<string, unknown>>;
  * makes it a defect only a test can catch: a refusal's own test asserts this
  * is empty.
  */
-export function unmetBy(refusal: Refusal, values: Placeholders): string[] {
-  const unfilled = [refusal.message, refusal.hint ?? "", ...(refusal.next ?? [])]
-    .flatMap((template) => [...template.matchAll(PLACEHOLDER)])
-    .map((match) => match[1] as string)
-    .filter((name) => values[name] === undefined);
+export function unmetBy(
+  refusal: Refusal,
+  values: Placeholders,
+  next: NextPlaceholders = {},
+): string[] {
+  const namesIn = (templates: readonly string[]) => {
+    return templates.flatMap((template) => {
+      return [...template.matchAll(PLACEHOLDER)].map((match) => {
+        return match[1] as string;
+      });
+    });
+  };
+  const placeholders = (refusal.next ?? []).filter((entry) => {
+    return typeof entry === "string";
+  });
+  const unfilled = [
+    ...namesIn([refusal.message, refusal.hint ?? ""]).filter((name) => {
+      return values[name] === undefined;
+    }),
+    ...namesIn(placeholders).filter((name) => {
+      return next[name] === undefined;
+    }),
+  ];
   return [...new Set(unfilled)];
 }
 
@@ -71,13 +106,17 @@ function fill(details: unknown, values: Placeholders): unknown {
     return interpolate(details, values);
   }
   if (Array.isArray(details)) {
-    return details.map((one) => fill(one, values));
+    return details.map((one) => {
+      return fill(one, values);
+    });
   }
   // Only a plain object is rebuilt: anything else — a Date, a Map, a class —
   // would come apart into its entries and lose what it held.
   if (typeof details === "object" && details !== null && isPlain(details)) {
     return Object.fromEntries(
-      Object.entries(details).map(([key, one]) => [key, fill(one, values)]),
+      Object.entries(details).map(([key, one]) => {
+        return [key, fill(one, values)];
+      }),
     );
   }
   return details;
@@ -89,35 +128,39 @@ function fill(details: unknown, values: Placeholders): unknown {
  * check that found two steps — remove an origin, then add it back — writes one
  * entry and hands over both, and one that found a single step is unchanged.
  */
-function commandsOf(entry: string, values: Placeholders): string[] {
-  const whole = WHOLE_PLACEHOLDER.exec(entry);
-  const value = whole?.[1] === undefined ? undefined : values[whole[1]];
-  if (Array.isArray(value)) {
-    return value.map(String);
+function commandsOf(entry: Suggestion | `{${string}}`, next: NextPlaceholders): Suggested[] {
+  if (typeof entry !== "string") {
+    return [entry];
   }
-  return [interpolate(entry, values)];
+  const whole = WHOLE_PLACEHOLDER.exec(entry);
+  const value = whole?.[1] === undefined ? undefined : next[whole[1]];
+  if (value === undefined) {
+    return [];
+  }
+
+  return isSuggestedList(value) ? [...value] : [value];
+}
+
+/** Whether a `next` placeholder's value is a list of follow-ups rather than one. */
+function isSuggestedList(value: Suggested | readonly Suggested[]): value is readonly Suggested[] {
+  return Array.isArray(value);
 }
 
 /**
  * The error a {@link Refusal} describes, `E_VALIDATION` unless it names a code.
- * `suggest` turns each of its `next` commands into the suggestion the run's own
- * builders make, so a refusal names a command and never spells one out; a
- * refusal raised where no run exists, such as while a flag parses, has none.
+ * `values` fill its wording and `next` its whole-placeholder `next` entries.
+ * Its `next` commands stay suggestions for the run that reports it to render,
+ * so a refusal raised while a flag parses, before any run has settled, names
+ * the same follow-ups as one raised by the command.
  */
 export function refusalError(
   refusal: Refusal,
   values: Placeholders,
-  suggest?: (command: string) => SuggestedCommand,
+  next: NextPlaceholders = {},
 ): ZitadelError {
-  // A refusal raised where no run exists, such as while a flag parses, has
-  // nothing to build a suggestion with. It goes without its follow-ups rather
-  // than throwing, which would cost the refusal the code that says why.
-  const suggested =
-    suggest === undefined
-      ? undefined
-      : refusal.next?.flatMap((command) => {
-          return commandsOf(command, values).map((one) => suggest(one));
-        });
+  const suggested = refusal.next?.flatMap((entry) => {
+    return commandsOf(entry, next);
+  });
   return new ZitadelError(refusal.code ?? "E_VALIDATION", interpolate(refusal.message, values), {
     hint: refusal.hint === undefined ? undefined : interpolate(refusal.hint, values),
     nextCommands: suggested,

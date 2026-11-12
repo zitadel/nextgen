@@ -1,3 +1,5 @@
+import { escapeControlCharacters } from "./terminal-text";
+
 /**
  * A command line, held as a list of words.
  *
@@ -41,16 +43,50 @@ export class Cmd {
    * returned as it is. Anything else is wrapped in single quotes, with each
    * embedded single quote written as `'\''` (close the quote, an escaped
    * quote, reopen it), which is the one form every POSIX shell reads the same
-   * way.
+   * way. A word starting with `=` is quoted too, which a shell would expand.
+   *
+   * A value holding control characters (ESC, tab, newline) is written with
+   * ANSI-C quoting instead, `$'my\tdir'`, which bash and zsh both read back as
+   * the same value: backslash and single quote as `\\` and `\'`, tab, newline
+   * and carriage return as `\t`, `\n` and `\r`, and every other control
+   * character as its UTF-8 bytes, `\xNN` each. Spelling
+   * them out inside plain single quotes would change the value; this keeps a
+   * suggestion on one visible line without changing what it points at, and
+   * without letting it drive the reader's terminal.
    *
    * @param value - Any text, trusted or not.
    * @example
    * Cmd.quote("http://localhost:3000"); // "http://localhost:3000"
    * Cmd.quote("$(whoami)"); // "'$(whoami)'"
    * Cmd.quote("it's"); // "'it'\\''s'"
+   * Cmd.quote("my\tdir"); // "$'my\\tdir'"
    */
   static quote(value: string): string {
-    const isSafe = /^[A-Za-z0-9_.:@/=+-]+$/.test(value);
+    if (escapeControlCharacters(value, { keepLayout: false }) !== value) {
+      const named: Record<string, string> = {
+        "\\": "\\\\",
+        "'": "\\'",
+        "\t": "\\t",
+        "\n": "\\n",
+        "\r": "\\r",
+      };
+      const spelled = [...value].map((char) => {
+        if (named[char] !== undefined) {
+          return named[char];
+        }
+        if (escapeControlCharacters(char, { keepLayout: false }) === char) {
+          return char;
+        }
+        // Bytes rather than `\\u`, which the bash macOS ships cannot read.
+        return [...Buffer.from(char, "utf8")]
+          .map((byte) => {
+            return `\\x${byte.toString(16).padStart(2, "0")}`;
+          })
+          .join("");
+      });
+      return `$'${spelled.join("")}'`;
+    }
+    const isSafe = /^[A-Za-z0-9_.:@/+-][A-Za-z0-9_.:@/=+-]*$/.test(value);
     if (isSafe) {
       return value;
     }

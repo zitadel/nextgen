@@ -1,5 +1,5 @@
 import { resolveEnvironment } from "@/lib/environment";
-import { issuerFromPort, type FrameworkFacts, type Orca } from "@/lib/orca";
+import { type FrameworkFacts, issuerFromPort, type Orca } from "@/lib/orca";
 import type { PatchContext } from "@/lib/orca/patchers/types";
 import {
   readPreset,
@@ -37,9 +37,8 @@ export async function loadPatchContext(
     server: typeof config.server === "string" ? config.server : "",
     cliVersion,
     scaffoldedFramework: scaffold?.scaffolded_framework,
-    // Restore the posture setup recorded rather than re-deriving it — a
-    // manifest-less legacy scaffold cannot answer the fresh-vs-pre-existing
-    // hinge, and every scaffold before the record was full-page (ADR 044).
+    // Restore the posture setup recorded: a manifest-less scaffold cannot answer
+    // the fresh-vs-pre-existing hinge, and it is always full-page (ADR 044).
     posture: scaffold?.posture ?? "page",
     preset: readPreset(config),
     useCase: readUseCase(config),
@@ -48,14 +47,18 @@ export async function loadPatchContext(
       project_secret: secret.project_secret,
       preview_secret: secret.preview_secret,
       origins: [
-        ...(secret.primary_origins ?? []).map((pattern) => ({
-          pattern,
-          kind: "primary" as const,
-        })),
-        ...secret.preview_origins.map((pattern) => ({
-          pattern,
-          kind: "preview" as const,
-        })),
+        ...(secret.primary_origins ?? []).map((pattern) => {
+          return {
+            pattern,
+            kind: "primary" as const,
+          };
+        }),
+        ...secret.preview_origins.map((pattern) => {
+          return {
+            pattern,
+            kind: "preview" as const,
+          };
+        }),
       ],
       created_at: secret.created_at,
     },
@@ -70,9 +73,16 @@ export async function loadPatchContext(
  * `undefined` when no file sets it, or one the resolver cannot read.
  */
 export async function configuredIssuer(cwd: string): Promise<string | undefined> {
-  return resolveEnvironment({ cwd, env: {} }).then(
-    ({ values }) => values.ZITADEL_ISSUER?.value,
-    () => undefined,
+  return resolveEnvironment({
+    cwd,
+    env: {},
+  }).then(
+    ({ values }) => {
+      return values.ZITADEL_ISSUER?.value;
+    },
+    () => {
+      return undefined;
+    },
   );
 }
 

@@ -112,7 +112,10 @@ Login/flow HTTP and `POST /projects` emit when the handler stamps `project_id`
 (actor/token empty). Path B copies `request_id` from the HTTP request even
 without AuthGate. `createFlow` mints `flow_id` before `CreateAuthAttempt` so
 Path B `auth.attempt.created` shares `flow_id` / `session_id` columns with
-Path A `request.api`. Probes (`livez` / `readyz`) do not.
+Path A `request.api`. The attempt stores that `flow_id`: the handoff exchange
+is a service call that names no flow, so its `session.established`,
+`auth.token.issued` and `request.api` take `flow_id` from the attempt it
+consumed. Probes (`livez` / `readyz`) do not.
 
 The class of the payload's `status` (`2xx`, `4xx`, …) is also written to the
 `status_class` column, and its `operation_id` with that class to

@@ -6,16 +6,14 @@ import { Readable } from "node:stream";
 import { HttpResponse, http } from "msw";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
-
-import { cancel, confirm, isCancel, text } from "@clack/prompts";
-
 import VariableRm from "@/commands/variable/rm";
 import VariableSet from "@/commands/variable/set";
 import { DEFAULT_SERVER } from "@/lib/server";
 import { usePlatformServer } from "@tests/helpers/platform-project";
 import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
 import { asTerminal as asPerson } from "@tests/helpers/terminal";
+import { type Answer, answering } from "@tests/helpers/keyboard";
+import { runCommand } from "@tests/helpers/run-cli";
 
 const { server } = usePlatformServer();
 
@@ -221,7 +219,18 @@ describe("variable list", () => {
 
     const res = await asTerminal(() => runCliForTest(["variable", "list", ...plainArgs(cwd)]));
 
-    expect(res.stdout).toContain("No variables on the project.");
+    expect(res.stdout).toContain("No variables found");
+  });
+
+  it("says nothing was found, naming the preview set, when --preview holds none", async () => {
+    const cwd = await makeProject();
+    server.use(http.get("*/variables", () => HttpResponse.json({})));
+
+    const res = await asTerminal(() =>
+      runCliForTest(["variable", "list", "--preview", ...plainArgs(cwd)]),
+    );
+
+    expect(res.stdout).toContain("No preview variables found");
   });
 
   it("refuses to guess a server when nothing names one", async () => {
@@ -247,21 +256,27 @@ describe("variable list", () => {
     expect(json.message).toContain("ZITADEL_URL");
   });
 
-  it("prints the project and the server on a terminal, and neither on a pipe", async () => {
+  it("answers with the table alone, on a terminal as on a pipe", async () => {
     const cwd = await makeProject();
     server.use(http.get("*/variables", () => HttpResponse.json({ A: { primary: "b" } })));
 
     // The harness captures stdout, so process.stdout.isTTY is undefined here —
-    // the same condition a pipe or a redirect creates.
+    // the same condition a pipe or a redirect creates. The terminal run drops
+    // --non-interactive too: that flag is a person saying there is nobody to
+    // draw for, whatever the stream is.
     const piped = await runCliForTest(["variable", "list", ...plainArgs(cwd)]);
-    const terminal = await asTerminal(() => runCliForTest(["variable", "list", ...plainArgs(cwd)]));
+    const terminal = await asPerson(() =>
+      runCliForTest(["variable", "list", "--cwd", cwd, "--server", DEFAULT_SERVER]),
+    );
 
     expect(piped.exitCode).toBe(0);
-    expect(piped.stdout).not.toContain("Project   ");
-    expect(piped.stdout).not.toContain("Server    ");
     expect(piped.stdout.trim()).toBe("A\tb\t-");
-    expect(terminal.stdout).toContain("proj_test");
-    expect(terminal.stdout).toContain(DEFAULT_SERVER);
+    // A listing is the answer: the table at the margin, then one footer
+    // line. No chain and no box, but the footer does name where it ran.
+    expect(terminal.stdout).toContain("A");
+    expect(terminal.stdout).not.toContain("╭");
+    expect(terminal.stdout).not.toContain("┌");
+    expect(terminal.stdout).toMatch(/Found 1 variable · project /);
   });
 
   it("takes the server from ZITADEL_URL, not from zitadel.json", async () => {
@@ -305,6 +320,7 @@ describe("variable get", () => {
       data: { name: string; secret: boolean; value: string };
     };
     expect(json.data).toEqual({
+      title: "Read GOOGLE_CLIENT_ID",
       name: "GOOGLE_CLIENT_ID",
       secret: false,
       value: "999-prod",
@@ -977,11 +993,29 @@ describe("variable set --as", () => {
   });
 });
 
+/** The line a run ended on, as a person read it. */
+const lastLine = (shown: string): string | undefined => shown.trimEnd().split("\n").at(-1);
+
 describe("variable rm asked on a terminal", () => {
   // The built CLI bundles its own prompts, so a prompt can only be answered
   // by running the command from source, where `input` is the one module asked.
-  const removing = (cwd: string) =>
-    asPerson(() => VariableRm.run(["SUPPORT_EMAIL", "--cwd", cwd, "--server", DEFAULT_SERVER]));
+  let extraFlags: string[] = [];
+  const removingOn = async (serverUrl: string, cwd: string, ...answers: Answer[]) => {
+    const talk = answering(...answers);
+    const result = await asPerson(() =>
+      runCommand(VariableRm, "variable:rm", [
+        "SUPPORT_EMAIL",
+        "--cwd",
+        cwd,
+        "--server",
+        serverUrl,
+        ...extraFlags,
+      ]),
+    );
+    return { result, shown: talk.shown(), talk };
+  };
+  const removing = (cwd: string, ...answers: Answer[]) =>
+    removingOn(DEFAULT_SERVER, cwd, ...answers);
   const watchingDeletes = () => {
     const seen = { deleted: false };
     server.use(
@@ -994,34 +1028,101 @@ describe("variable rm asked on a terminal", () => {
   };
 
   afterEach(() => {
-    vi.mocked(confirm).mockReset();
-    vi.mocked(isCancel).mockReset();
-    vi.mocked(isCancel).mockReturnValue(false);
+    extraFlags = [];
+  });
+
+  it("asks whether to remove the variable, naming the project and a remote server", async () => {
+    const cwd = await makeProject();
+    watchingDeletes();
+
+    const { talk } = await removing(cwd, true);
+
+    expect(talk.asked()).toEqual([
+      "Remove SUPPORT_EMAIL from project proj_test on preview.zitadel.com?",
+    ]);
+  });
+
+  it("says only the preview value goes when asked with --preview", async () => {
+    const cwd = await makeProject();
+    watchingDeletes();
+    extraFlags = ["--preview"];
+
+    const { talk } = await removing(cwd, true);
+
+    expect(talk.asked()).toEqual([
+      "Remove the preview value of SUPPORT_EMAIL from project proj_test on preview.zitadel.com?",
+    ]);
+  });
+
+  it("names a local server by its host and port", async () => {
+    const cwd = await makeProject();
+    watchingDeletes();
+
+    const { talk } = await removingOn("http://localhost:8112", cwd, true);
+
+    expect(talk.asked()).toEqual([
+      "Remove SUPPORT_EMAIL from project proj_test on localhost:8112?",
+    ]);
+  });
+
+  it("asks nothing when forced", async () => {
+    const cwd = await makeProject();
+    watchingDeletes();
+    const talk = answering();
+
+    await asPerson(() =>
+      runCommand(VariableRm, "variable:rm", [
+        "SUPPORT_EMAIL",
+        "--cwd",
+        cwd,
+        "--server",
+        DEFAULT_SERVER,
+        "--force",
+      ]),
+    );
+
+    expect(talk.asked()).toEqual([]);
+  });
+
+  it("ends on the same line forced as it does answering", async () => {
+    const cwd = await makeProject();
+    watchingDeletes();
+
+    const answered = await removing(cwd, true);
+    const forced = answering();
+    await asPerson(() =>
+      runCommand(VariableRm, "variable:rm", [
+        "SUPPORT_EMAIL",
+        "--cwd",
+        cwd,
+        "--server",
+        DEFAULT_SERVER,
+        "--force",
+      ]),
+    );
+
+    expect(lastLine(answered.talk.plain())).toBe(lastLine(forced.plain()));
   });
 
   it("is skipped, removing nothing, when the answer is no", async () => {
     const cwd = await makeProject();
     const seen = watchingDeletes();
-    vi.mocked(confirm).mockResolvedValueOnce(false as never);
 
-    const envelope = await removing(cwd);
+    const { result } = await removing(cwd, false);
 
-    expect(JSON.parse(JSON.stringify(envelope))).toMatchObject({
+    expect(JSON.parse(JSON.stringify(result))).toMatchObject({
       status: "skipped",
       reason: "remove-cancelled",
     });
     expect(seen.deleted).toBe(false);
   });
 
-  it("fails, removing nothing, on Ctrl-C", async () => {
+  it("fails, removing nothing, when the person walks away", async () => {
     const cwd = await makeProject();
     const seen = watchingDeletes();
-    vi.mocked(isCancel).mockReturnValue(true);
-    vi.mocked(confirm).mockResolvedValueOnce(Symbol("cancel") as never);
 
     await expect(removing(cwd)).rejects.toThrow();
 
-    expect(cancel).toHaveBeenCalledWith("Cancelled.");
     expect(seen.deleted).toBe(false);
   });
 });
@@ -1029,15 +1130,19 @@ describe("variable rm asked on a terminal", () => {
 describe("variable set asked on a terminal", () => {
   it("asks what the value should be, as a question", async () => {
     const cwd = await makeProject();
-    vi.mocked(text).mockResolvedValueOnce("support@acme.example" as never);
+    const talk = answering("support@acme.example");
 
     await asPerson(() =>
-      VariableSet.run(["SUPPORT_EMAIL", "--cwd", cwd, "--server", DEFAULT_SERVER]),
-    ).catch(() => undefined);
-
-    expect(vi.mocked(text).mock.calls[0]?.[0].message).toBe(
-      "What should the value of SUPPORT_EMAIL be?",
+      runCommand(VariableSet, "variable:set", [
+        "SUPPORT_EMAIL",
+        "--cwd",
+        cwd,
+        "--server",
+        DEFAULT_SERVER,
+      ]),
     );
+
+    expect(talk.asked()).toEqual(["What should the value of SUPPORT_EMAIL be?"]);
   });
 });
 
@@ -1099,6 +1204,7 @@ describe("variable rm", () => {
     expect(kinds.at(-1)).toBeNull();
     const json = parseJson(res.stdout) as { data: Record<string, unknown> };
     expect(json.data).toEqual({
+      title: "Removed SUPPORT_EMAIL from the project",
       name: "SUPPORT_EMAIL",
       deleted: true,
       kinds: ["primary", "preview"],
@@ -1178,7 +1284,7 @@ describe("variable rm", () => {
     };
     expect(json.code).toBe("E_CONFIRMATION_REQUIRED");
     expect(json.next_commands.join(" ")).toContain("--force");
-    expect(json.hint).toContain("from the project");
+    expect(json.hint).toContain("from project proj_test on preview.zitadel.com");
   });
 });
 

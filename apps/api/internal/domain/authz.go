@@ -476,6 +476,14 @@ const (
 // ConstraintTeamID, when set (sk_team_ tokens), requires the checked or listed
 // object to belong to that team: users via authz_membership_edges, teams by id,
 // other kinds via resource_scope_index.team_id (Check binds ResourceTeamID).
+// AuthzCheckResult is one project's answer to a check asked of several
+// projects at once: whether the principal holds the relation there, and
+// whether a denial is a foothold (403) rather than a miss (404).
+type AuthzCheckResult struct {
+	Allowed  bool
+	Foothold bool
+}
+
 // ResourceID is the object being checked (empty for permission-level Check /
 // list materialization). ResourceTeamID is RSI.team_id for by-id Check.
 type AuthzCheckParams struct {

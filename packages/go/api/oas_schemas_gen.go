@@ -28497,6 +28497,7 @@ type FinishUserPasskeyRegistrationErrorResponse struct {
 	UserInvalid                 UserInvalid
 	UserNotFound                UserNotFound
 	UserPasswordEmpty           UserPasswordEmpty
+	UserPasswordHashingBusy     UserPasswordHashingBusy
 	UserPasswordPolicyViolation UserPasswordPolicyViolation
 	UserPasswordTooLong         UserPasswordTooLong
 	UserPermissionDenied        UserPermissionDenied
@@ -28523,6 +28524,7 @@ const (
 	UserInvalidFinishUserPasskeyRegistrationErrorResponse                 FinishUserPasskeyRegistrationErrorResponseType = "user.invalid"
 	UserNotFoundFinishUserPasskeyRegistrationErrorResponse                FinishUserPasskeyRegistrationErrorResponseType = "user.not_found"
 	UserPasswordEmptyFinishUserPasskeyRegistrationErrorResponse           FinishUserPasskeyRegistrationErrorResponseType = "user.password_empty"
+	UserPasswordHashingBusyFinishUserPasskeyRegistrationErrorResponse     FinishUserPasskeyRegistrationErrorResponseType = "user.password_hashing_busy"
 	UserPasswordPolicyViolationFinishUserPasskeyRegistrationErrorResponse FinishUserPasskeyRegistrationErrorResponseType = "user.password_policy_violation"
 	UserPasswordTooLongFinishUserPasskeyRegistrationErrorResponse         FinishUserPasskeyRegistrationErrorResponseType = "user.password_too_long"
 	UserPermissionDeniedFinishUserPasskeyRegistrationErrorResponse        FinishUserPasskeyRegistrationErrorResponseType = "user.permission_denied"
@@ -28606,6 +28608,11 @@ func (s FinishUserPasskeyRegistrationErrorResponse) IsUserNotFound() bool {
 // IsUserPasswordEmpty reports whether FinishUserPasskeyRegistrationErrorResponse is UserPasswordEmpty.
 func (s FinishUserPasskeyRegistrationErrorResponse) IsUserPasswordEmpty() bool {
 	return s.Type == UserPasswordEmptyFinishUserPasskeyRegistrationErrorResponse
+}
+
+// IsUserPasswordHashingBusy reports whether FinishUserPasskeyRegistrationErrorResponse is UserPasswordHashingBusy.
+func (s FinishUserPasskeyRegistrationErrorResponse) IsUserPasswordHashingBusy() bool {
+	return s.Type == UserPasswordHashingBusyFinishUserPasskeyRegistrationErrorResponse
 }
 
 // IsUserPasswordPolicyViolation reports whether FinishUserPasskeyRegistrationErrorResponse is UserPasswordPolicyViolation.
@@ -28956,6 +28963,27 @@ func (s FinishUserPasskeyRegistrationErrorResponse) GetUserPasswordEmpty() (v Us
 func NewUserPasswordEmptyFinishUserPasskeyRegistrationErrorResponse(v UserPasswordEmpty) FinishUserPasskeyRegistrationErrorResponse {
 	var s FinishUserPasskeyRegistrationErrorResponse
 	s.SetUserPasswordEmpty(v)
+	return s
+}
+
+// SetUserPasswordHashingBusy sets FinishUserPasskeyRegistrationErrorResponse to UserPasswordHashingBusy.
+func (s *FinishUserPasskeyRegistrationErrorResponse) SetUserPasswordHashingBusy(v UserPasswordHashingBusy) {
+	s.Type = UserPasswordHashingBusyFinishUserPasskeyRegistrationErrorResponse
+	s.UserPasswordHashingBusy = v
+}
+
+// GetUserPasswordHashingBusy returns UserPasswordHashingBusy and true boolean if FinishUserPasskeyRegistrationErrorResponse is UserPasswordHashingBusy.
+func (s FinishUserPasskeyRegistrationErrorResponse) GetUserPasswordHashingBusy() (v UserPasswordHashingBusy, ok bool) {
+	if !s.IsUserPasswordHashingBusy() {
+		return v, false
+	}
+	return s.UserPasswordHashingBusy, true
+}
+
+// NewUserPasswordHashingBusyFinishUserPasskeyRegistrationErrorResponse returns new FinishUserPasskeyRegistrationErrorResponse from UserPasswordHashingBusy.
+func NewUserPasswordHashingBusyFinishUserPasskeyRegistrationErrorResponse(v UserPasswordHashingBusy) FinishUserPasskeyRegistrationErrorResponse {
+	var s FinishUserPasskeyRegistrationErrorResponse
+	s.SetUserPasswordHashingBusy(v)
 	return s
 }
 
@@ -32344,8 +32372,10 @@ type FlowSubmitRequest struct {
 	// User input values. Keys match field names from the step's `fields` dictionary.
 	Fields OptFlowSubmitRequestFields `json:"fields"`
 	// Solutions for security gates. Keys match gate names from the step's `gates` dictionary.
-	// For password signup, the login component solves the built-in challenge
-	// with Web Crypto and submits its JSON proof under `signup_pow`.
+	// For sign-up, the login component solves the built-in challenge with Web
+	// Crypto and submits its JSON proof under `signup_pow`: with the password
+	// for a password sign-up, and with `challenge_response` for a passkey
+	// registration that creates the user.
 	GateProofs OptFlowSubmitRequestGateProofs `json:"gate_proofs"`
 	// Response to a pending challenge on the step. Required when the step has a
 	// `challenge` property (for example, after submitting a passkey action).
@@ -32505,8 +32535,10 @@ func (s *FlowSubmitRequestFields) init() FlowSubmitRequestFields {
 }
 
 // Solutions for security gates. Keys match gate names from the step's `gates` dictionary.
-// For password signup, the login component solves the built-in challenge
-// with Web Crypto and submits its JSON proof under `signup_pow`.
+// For sign-up, the login component solves the built-in challenge with Web
+// Crypto and submits its JSON proof under `signup_pow`: with the password
+// for a password sign-up, and with `challenge_response` for a passkey
+// registration that creates the user.
 type FlowSubmitRequestGateProofs map[string]string
 
 func (s *FlowSubmitRequestGateProofs) init() FlowSubmitRequestGateProofs {
@@ -36836,6 +36868,7 @@ type GetFlowStepErrorResponse struct {
 	UserInvalid                 UserInvalid
 	UserNotFound                UserNotFound
 	UserPasswordEmpty           UserPasswordEmpty
+	UserPasswordHashingBusy     UserPasswordHashingBusy
 	UserPasswordPolicyViolation UserPasswordPolicyViolation
 	UserPasswordTooLong         UserPasswordTooLong
 }
@@ -36884,6 +36917,7 @@ const (
 	UserInvalidGetFlowStepErrorResponse                 GetFlowStepErrorResponseType = "user.invalid"
 	UserNotFoundGetFlowStepErrorResponse                GetFlowStepErrorResponseType = "user.not_found"
 	UserPasswordEmptyGetFlowStepErrorResponse           GetFlowStepErrorResponseType = "user.password_empty"
+	UserPasswordHashingBusyGetFlowStepErrorResponse     GetFlowStepErrorResponseType = "user.password_hashing_busy"
 	UserPasswordPolicyViolationGetFlowStepErrorResponse GetFlowStepErrorResponseType = "user.password_policy_violation"
 	UserPasswordTooLongGetFlowStepErrorResponse         GetFlowStepErrorResponseType = "user.password_too_long"
 )
@@ -37081,6 +37115,11 @@ func (s GetFlowStepErrorResponse) IsUserNotFound() bool {
 // IsUserPasswordEmpty reports whether GetFlowStepErrorResponse is UserPasswordEmpty.
 func (s GetFlowStepErrorResponse) IsUserPasswordEmpty() bool {
 	return s.Type == UserPasswordEmptyGetFlowStepErrorResponse
+}
+
+// IsUserPasswordHashingBusy reports whether GetFlowStepErrorResponse is UserPasswordHashingBusy.
+func (s GetFlowStepErrorResponse) IsUserPasswordHashingBusy() bool {
+	return s.Type == UserPasswordHashingBusyGetFlowStepErrorResponse
 }
 
 // IsUserPasswordPolicyViolation reports whether GetFlowStepErrorResponse is UserPasswordPolicyViolation.
@@ -37909,6 +37948,27 @@ func (s GetFlowStepErrorResponse) GetUserPasswordEmpty() (v UserPasswordEmpty, o
 func NewUserPasswordEmptyGetFlowStepErrorResponse(v UserPasswordEmpty) GetFlowStepErrorResponse {
 	var s GetFlowStepErrorResponse
 	s.SetUserPasswordEmpty(v)
+	return s
+}
+
+// SetUserPasswordHashingBusy sets GetFlowStepErrorResponse to UserPasswordHashingBusy.
+func (s *GetFlowStepErrorResponse) SetUserPasswordHashingBusy(v UserPasswordHashingBusy) {
+	s.Type = UserPasswordHashingBusyGetFlowStepErrorResponse
+	s.UserPasswordHashingBusy = v
+}
+
+// GetUserPasswordHashingBusy returns UserPasswordHashingBusy and true boolean if GetFlowStepErrorResponse is UserPasswordHashingBusy.
+func (s GetFlowStepErrorResponse) GetUserPasswordHashingBusy() (v UserPasswordHashingBusy, ok bool) {
+	if !s.IsUserPasswordHashingBusy() {
+		return v, false
+	}
+	return s.UserPasswordHashingBusy, true
+}
+
+// NewUserPasswordHashingBusyGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from UserPasswordHashingBusy.
+func NewUserPasswordHashingBusyGetFlowStepErrorResponse(v UserPasswordHashingBusy) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetUserPasswordHashingBusy(v)
 	return s
 }
 
@@ -74359,6 +74419,52 @@ func (o OptSessTokenCreationFailedDetails) Or(d SessTokenCreationFailedDetails) 
 	return d
 }
 
+// NewOptSessTokenInvalidDetails returns new OptSessTokenInvalidDetails with value set to v.
+func NewOptSessTokenInvalidDetails(v SessTokenInvalidDetails) OptSessTokenInvalidDetails {
+	return OptSessTokenInvalidDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptSessTokenInvalidDetails is optional SessTokenInvalidDetails.
+type OptSessTokenInvalidDetails struct {
+	Value SessTokenInvalidDetails
+	Set   bool
+}
+
+// IsSet returns true if OptSessTokenInvalidDetails was set.
+func (o OptSessTokenInvalidDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptSessTokenInvalidDetails) Reset() {
+	var v SessTokenInvalidDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptSessTokenInvalidDetails) SetTo(v SessTokenInvalidDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptSessTokenInvalidDetails) Get() (v SessTokenInvalidDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptSessTokenInvalidDetails) Or(d SessTokenInvalidDetails) SessTokenInvalidDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptSessionDeletedEventDelegationType returns new OptSessionDeletedEventDelegationType with value set to v.
 func NewOptSessionDeletedEventDelegationType(v SessionDeletedEventDelegationType) OptSessionDeletedEventDelegationType {
 	return OptSessionDeletedEventDelegationType{
@@ -76055,6 +76161,52 @@ func (o OptUserPasswordEmptyDetails) Get() (v UserPasswordEmptyDetails, ok bool)
 
 // Or returns value if set, or given parameter if does not.
 func (o OptUserPasswordEmptyDetails) Or(d UserPasswordEmptyDetails) UserPasswordEmptyDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptUserPasswordHashingBusyDetails returns new OptUserPasswordHashingBusyDetails with value set to v.
+func NewOptUserPasswordHashingBusyDetails(v UserPasswordHashingBusyDetails) OptUserPasswordHashingBusyDetails {
+	return OptUserPasswordHashingBusyDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptUserPasswordHashingBusyDetails is optional UserPasswordHashingBusyDetails.
+type OptUserPasswordHashingBusyDetails struct {
+	Value UserPasswordHashingBusyDetails
+	Set   bool
+}
+
+// IsSet returns true if OptUserPasswordHashingBusyDetails was set.
+func (o OptUserPasswordHashingBusyDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptUserPasswordHashingBusyDetails) Reset() {
+	var v UserPasswordHashingBusyDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptUserPasswordHashingBusyDetails) SetTo(v UserPasswordHashingBusyDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptUserPasswordHashingBusyDetails) Get() (v UserPasswordHashingBusyDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptUserPasswordHashingBusyDetails) Or(d UserPasswordHashingBusyDetails) UserPasswordHashingBusyDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -81968,7 +82120,8 @@ func (s *PolicyUpdatedEventDelegationType) UnmarshalText(data []byte) error {
 // and the supplied salt. Match the first 16 derived bytes to key_prefix.
 // Submit gate_proofs.signup_pow as a JSON string containing protocol,
 // challenge_id and derived_key (the full 32 bytes in lowercase hex).
-// The proof is spent before password hashing, even if user creation fails.
+// The proof is spent before the user is created (for a password, before it
+// is hashed), even if user creation fails.
 // Ref: #
 type PowChallenge struct {
 	Protocol    string    `json:"protocol"`
@@ -93379,8 +93532,11 @@ type RuntimeGate struct {
 	// ceremonies (e.g. passkey) are modelled as credential auth_attempts via
 	// `x-credential` on a field, not as gates.
 	Kind RuntimeGateKind `json:"kind"`
-	// Implementation identifier. `zitadel_pow` protects password signup with
-	// the built-in proof-of-work solver. External providers are not supported.
+	// Implementation identifier. `zitadel_pow` protects sign-up with the
+	// built-in proof-of-work solver: a step that creates its user on submit
+	// (`create_user`), and a step carrying a passkey registration that creates
+	// its user, whose attestation carries the proof. External providers are
+	// not supported.
 	Provider  string          `json:"provider"`
 	Challenge OptPowChallenge `json:"challenge"`
 	// Reserved provider-specific configuration. The built-in signup gate uses
@@ -94794,24 +94950,16 @@ type SearchErrorResponse struct {
 	AuthCsrfInvalid         AuthCsrfInvalid
 	AuthUnauthorized        AuthUnauthorized
 	FlowdefInvalid          FlowdefInvalid
-	FlowdefNotFound         FlowdefNotFound
-	FlowdefPermissionDenied FlowdefPermissionDenied
-	IdpNotFound             IdpNotFound
-	IdpPermissionDenied     IdpPermissionDenied
 	Internal                Internal
-	SchNotFound             SchNotFound
-	SchPermissionDenied     SchPermissionDenied
 	FlowdefMissingProjectID FlowdefMissingProjectID
 	NotImplemented          NotImplemented
 	ProjNotFound            ProjNotFound
 	ProjPermissionDenied    ProjPermissionDenied
 	ReqInvalid              ReqInvalid
-	TeamTeamNotFound        TeamTeamNotFound
-	TeamPermissionDenied    TeamPermissionDenied
+	SessProjectMismatch     SessProjectMismatch
+	SessTokenInvalid        SessTokenInvalid
 	TeamProjectNotFound     TeamProjectNotFound
 	Unavailable             Unavailable
-	UserNotFound            UserNotFound
-	UserPermissionDenied    UserPermissionDenied
 }
 
 // SearchErrorResponseType is oneOf type of SearchErrorResponse.
@@ -94822,24 +94970,16 @@ const (
 	AuthCsrfInvalidSearchErrorResponse         SearchErrorResponseType = "auth.csrf_invalid"
 	AuthUnauthorizedSearchErrorResponse        SearchErrorResponseType = "auth.unauthorized"
 	FlowdefInvalidSearchErrorResponse          SearchErrorResponseType = "flowdef.invalid"
-	FlowdefNotFoundSearchErrorResponse         SearchErrorResponseType = "flowdef.not_found"
-	FlowdefPermissionDeniedSearchErrorResponse SearchErrorResponseType = "flowdef.permission_denied"
-	IdpNotFoundSearchErrorResponse             SearchErrorResponseType = "idp.not_found"
-	IdpPermissionDeniedSearchErrorResponse     SearchErrorResponseType = "idp.permission_denied"
 	InternalSearchErrorResponse                SearchErrorResponseType = "internal"
-	SchNotFoundSearchErrorResponse             SearchErrorResponseType = "sch.not_found"
-	SchPermissionDeniedSearchErrorResponse     SearchErrorResponseType = "sch.permission_denied"
 	FlowdefMissingProjectIDSearchErrorResponse SearchErrorResponseType = "flowdef.missing_project_id"
 	NotImplementedSearchErrorResponse          SearchErrorResponseType = "not_implemented"
 	ProjNotFoundSearchErrorResponse            SearchErrorResponseType = "proj.not_found"
 	ProjPermissionDeniedSearchErrorResponse    SearchErrorResponseType = "proj.permission_denied"
 	ReqInvalidSearchErrorResponse              SearchErrorResponseType = "req.invalid"
-	TeamTeamNotFoundSearchErrorResponse        SearchErrorResponseType = "team.team_not_found"
-	TeamPermissionDeniedSearchErrorResponse    SearchErrorResponseType = "team.permission_denied"
+	SessProjectMismatchSearchErrorResponse     SearchErrorResponseType = "sess.project_mismatch"
+	SessTokenInvalidSearchErrorResponse        SearchErrorResponseType = "sess.token_invalid"
 	TeamProjectNotFoundSearchErrorResponse     SearchErrorResponseType = "team.project_not_found"
 	UnavailableSearchErrorResponse             SearchErrorResponseType = "unavailable"
-	UserNotFoundSearchErrorResponse            SearchErrorResponseType = "user.not_found"
-	UserPermissionDeniedSearchErrorResponse    SearchErrorResponseType = "user.permission_denied"
 )
 
 // IsAuthCsrfInvalid reports whether SearchErrorResponse is AuthCsrfInvalid.
@@ -94857,34 +94997,8 @@ func (s SearchErrorResponse) IsFlowdefInvalid() bool {
 	return s.Type == FlowdefInvalidSearchErrorResponse
 }
 
-// IsFlowdefNotFound reports whether SearchErrorResponse is FlowdefNotFound.
-func (s SearchErrorResponse) IsFlowdefNotFound() bool {
-	return s.Type == FlowdefNotFoundSearchErrorResponse
-}
-
-// IsFlowdefPermissionDenied reports whether SearchErrorResponse is FlowdefPermissionDenied.
-func (s SearchErrorResponse) IsFlowdefPermissionDenied() bool {
-	return s.Type == FlowdefPermissionDeniedSearchErrorResponse
-}
-
-// IsIdpNotFound reports whether SearchErrorResponse is IdpNotFound.
-func (s SearchErrorResponse) IsIdpNotFound() bool { return s.Type == IdpNotFoundSearchErrorResponse }
-
-// IsIdpPermissionDenied reports whether SearchErrorResponse is IdpPermissionDenied.
-func (s SearchErrorResponse) IsIdpPermissionDenied() bool {
-	return s.Type == IdpPermissionDeniedSearchErrorResponse
-}
-
 // IsInternal reports whether SearchErrorResponse is Internal.
 func (s SearchErrorResponse) IsInternal() bool { return s.Type == InternalSearchErrorResponse }
-
-// IsSchNotFound reports whether SearchErrorResponse is SchNotFound.
-func (s SearchErrorResponse) IsSchNotFound() bool { return s.Type == SchNotFoundSearchErrorResponse }
-
-// IsSchPermissionDenied reports whether SearchErrorResponse is SchPermissionDenied.
-func (s SearchErrorResponse) IsSchPermissionDenied() bool {
-	return s.Type == SchPermissionDeniedSearchErrorResponse
-}
 
 // IsFlowdefMissingProjectID reports whether SearchErrorResponse is FlowdefMissingProjectID.
 func (s SearchErrorResponse) IsFlowdefMissingProjectID() bool {
@@ -94907,14 +95021,14 @@ func (s SearchErrorResponse) IsProjPermissionDenied() bool {
 // IsReqInvalid reports whether SearchErrorResponse is ReqInvalid.
 func (s SearchErrorResponse) IsReqInvalid() bool { return s.Type == ReqInvalidSearchErrorResponse }
 
-// IsTeamTeamNotFound reports whether SearchErrorResponse is TeamTeamNotFound.
-func (s SearchErrorResponse) IsTeamTeamNotFound() bool {
-	return s.Type == TeamTeamNotFoundSearchErrorResponse
+// IsSessProjectMismatch reports whether SearchErrorResponse is SessProjectMismatch.
+func (s SearchErrorResponse) IsSessProjectMismatch() bool {
+	return s.Type == SessProjectMismatchSearchErrorResponse
 }
 
-// IsTeamPermissionDenied reports whether SearchErrorResponse is TeamPermissionDenied.
-func (s SearchErrorResponse) IsTeamPermissionDenied() bool {
-	return s.Type == TeamPermissionDeniedSearchErrorResponse
+// IsSessTokenInvalid reports whether SearchErrorResponse is SessTokenInvalid.
+func (s SearchErrorResponse) IsSessTokenInvalid() bool {
+	return s.Type == SessTokenInvalidSearchErrorResponse
 }
 
 // IsTeamProjectNotFound reports whether SearchErrorResponse is TeamProjectNotFound.
@@ -94924,14 +95038,6 @@ func (s SearchErrorResponse) IsTeamProjectNotFound() bool {
 
 // IsUnavailable reports whether SearchErrorResponse is Unavailable.
 func (s SearchErrorResponse) IsUnavailable() bool { return s.Type == UnavailableSearchErrorResponse }
-
-// IsUserNotFound reports whether SearchErrorResponse is UserNotFound.
-func (s SearchErrorResponse) IsUserNotFound() bool { return s.Type == UserNotFoundSearchErrorResponse }
-
-// IsUserPermissionDenied reports whether SearchErrorResponse is UserPermissionDenied.
-func (s SearchErrorResponse) IsUserPermissionDenied() bool {
-	return s.Type == UserPermissionDeniedSearchErrorResponse
-}
 
 // SetAuthCsrfInvalid sets SearchErrorResponse to AuthCsrfInvalid.
 func (s *SearchErrorResponse) SetAuthCsrfInvalid(v AuthCsrfInvalid) {
@@ -94996,90 +95102,6 @@ func NewFlowdefInvalidSearchErrorResponse(v FlowdefInvalid) SearchErrorResponse 
 	return s
 }
 
-// SetFlowdefNotFound sets SearchErrorResponse to FlowdefNotFound.
-func (s *SearchErrorResponse) SetFlowdefNotFound(v FlowdefNotFound) {
-	s.Type = FlowdefNotFoundSearchErrorResponse
-	s.FlowdefNotFound = v
-}
-
-// GetFlowdefNotFound returns FlowdefNotFound and true boolean if SearchErrorResponse is FlowdefNotFound.
-func (s SearchErrorResponse) GetFlowdefNotFound() (v FlowdefNotFound, ok bool) {
-	if !s.IsFlowdefNotFound() {
-		return v, false
-	}
-	return s.FlowdefNotFound, true
-}
-
-// NewFlowdefNotFoundSearchErrorResponse returns new SearchErrorResponse from FlowdefNotFound.
-func NewFlowdefNotFoundSearchErrorResponse(v FlowdefNotFound) SearchErrorResponse {
-	var s SearchErrorResponse
-	s.SetFlowdefNotFound(v)
-	return s
-}
-
-// SetFlowdefPermissionDenied sets SearchErrorResponse to FlowdefPermissionDenied.
-func (s *SearchErrorResponse) SetFlowdefPermissionDenied(v FlowdefPermissionDenied) {
-	s.Type = FlowdefPermissionDeniedSearchErrorResponse
-	s.FlowdefPermissionDenied = v
-}
-
-// GetFlowdefPermissionDenied returns FlowdefPermissionDenied and true boolean if SearchErrorResponse is FlowdefPermissionDenied.
-func (s SearchErrorResponse) GetFlowdefPermissionDenied() (v FlowdefPermissionDenied, ok bool) {
-	if !s.IsFlowdefPermissionDenied() {
-		return v, false
-	}
-	return s.FlowdefPermissionDenied, true
-}
-
-// NewFlowdefPermissionDeniedSearchErrorResponse returns new SearchErrorResponse from FlowdefPermissionDenied.
-func NewFlowdefPermissionDeniedSearchErrorResponse(v FlowdefPermissionDenied) SearchErrorResponse {
-	var s SearchErrorResponse
-	s.SetFlowdefPermissionDenied(v)
-	return s
-}
-
-// SetIdpNotFound sets SearchErrorResponse to IdpNotFound.
-func (s *SearchErrorResponse) SetIdpNotFound(v IdpNotFound) {
-	s.Type = IdpNotFoundSearchErrorResponse
-	s.IdpNotFound = v
-}
-
-// GetIdpNotFound returns IdpNotFound and true boolean if SearchErrorResponse is IdpNotFound.
-func (s SearchErrorResponse) GetIdpNotFound() (v IdpNotFound, ok bool) {
-	if !s.IsIdpNotFound() {
-		return v, false
-	}
-	return s.IdpNotFound, true
-}
-
-// NewIdpNotFoundSearchErrorResponse returns new SearchErrorResponse from IdpNotFound.
-func NewIdpNotFoundSearchErrorResponse(v IdpNotFound) SearchErrorResponse {
-	var s SearchErrorResponse
-	s.SetIdpNotFound(v)
-	return s
-}
-
-// SetIdpPermissionDenied sets SearchErrorResponse to IdpPermissionDenied.
-func (s *SearchErrorResponse) SetIdpPermissionDenied(v IdpPermissionDenied) {
-	s.Type = IdpPermissionDeniedSearchErrorResponse
-	s.IdpPermissionDenied = v
-}
-
-// GetIdpPermissionDenied returns IdpPermissionDenied and true boolean if SearchErrorResponse is IdpPermissionDenied.
-func (s SearchErrorResponse) GetIdpPermissionDenied() (v IdpPermissionDenied, ok bool) {
-	if !s.IsIdpPermissionDenied() {
-		return v, false
-	}
-	return s.IdpPermissionDenied, true
-}
-
-// NewIdpPermissionDeniedSearchErrorResponse returns new SearchErrorResponse from IdpPermissionDenied.
-func NewIdpPermissionDeniedSearchErrorResponse(v IdpPermissionDenied) SearchErrorResponse {
-	var s SearchErrorResponse
-	s.SetIdpPermissionDenied(v)
-	return s
-}
-
 // SetInternal sets SearchErrorResponse to Internal.
 func (s *SearchErrorResponse) SetInternal(v Internal) {
 	s.Type = InternalSearchErrorResponse
@@ -95098,48 +95120,6 @@ func (s SearchErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalSearchErrorResponse(v Internal) SearchErrorResponse {
 	var s SearchErrorResponse
 	s.SetInternal(v)
-	return s
-}
-
-// SetSchNotFound sets SearchErrorResponse to SchNotFound.
-func (s *SearchErrorResponse) SetSchNotFound(v SchNotFound) {
-	s.Type = SchNotFoundSearchErrorResponse
-	s.SchNotFound = v
-}
-
-// GetSchNotFound returns SchNotFound and true boolean if SearchErrorResponse is SchNotFound.
-func (s SearchErrorResponse) GetSchNotFound() (v SchNotFound, ok bool) {
-	if !s.IsSchNotFound() {
-		return v, false
-	}
-	return s.SchNotFound, true
-}
-
-// NewSchNotFoundSearchErrorResponse returns new SearchErrorResponse from SchNotFound.
-func NewSchNotFoundSearchErrorResponse(v SchNotFound) SearchErrorResponse {
-	var s SearchErrorResponse
-	s.SetSchNotFound(v)
-	return s
-}
-
-// SetSchPermissionDenied sets SearchErrorResponse to SchPermissionDenied.
-func (s *SearchErrorResponse) SetSchPermissionDenied(v SchPermissionDenied) {
-	s.Type = SchPermissionDeniedSearchErrorResponse
-	s.SchPermissionDenied = v
-}
-
-// GetSchPermissionDenied returns SchPermissionDenied and true boolean if SearchErrorResponse is SchPermissionDenied.
-func (s SearchErrorResponse) GetSchPermissionDenied() (v SchPermissionDenied, ok bool) {
-	if !s.IsSchPermissionDenied() {
-		return v, false
-	}
-	return s.SchPermissionDenied, true
-}
-
-// NewSchPermissionDeniedSearchErrorResponse returns new SearchErrorResponse from SchPermissionDenied.
-func NewSchPermissionDeniedSearchErrorResponse(v SchPermissionDenied) SearchErrorResponse {
-	var s SearchErrorResponse
-	s.SetSchPermissionDenied(v)
 	return s
 }
 
@@ -95248,45 +95228,45 @@ func NewReqInvalidSearchErrorResponse(v ReqInvalid) SearchErrorResponse {
 	return s
 }
 
-// SetTeamTeamNotFound sets SearchErrorResponse to TeamTeamNotFound.
-func (s *SearchErrorResponse) SetTeamTeamNotFound(v TeamTeamNotFound) {
-	s.Type = TeamTeamNotFoundSearchErrorResponse
-	s.TeamTeamNotFound = v
+// SetSessProjectMismatch sets SearchErrorResponse to SessProjectMismatch.
+func (s *SearchErrorResponse) SetSessProjectMismatch(v SessProjectMismatch) {
+	s.Type = SessProjectMismatchSearchErrorResponse
+	s.SessProjectMismatch = v
 }
 
-// GetTeamTeamNotFound returns TeamTeamNotFound and true boolean if SearchErrorResponse is TeamTeamNotFound.
-func (s SearchErrorResponse) GetTeamTeamNotFound() (v TeamTeamNotFound, ok bool) {
-	if !s.IsTeamTeamNotFound() {
+// GetSessProjectMismatch returns SessProjectMismatch and true boolean if SearchErrorResponse is SessProjectMismatch.
+func (s SearchErrorResponse) GetSessProjectMismatch() (v SessProjectMismatch, ok bool) {
+	if !s.IsSessProjectMismatch() {
 		return v, false
 	}
-	return s.TeamTeamNotFound, true
+	return s.SessProjectMismatch, true
 }
 
-// NewTeamTeamNotFoundSearchErrorResponse returns new SearchErrorResponse from TeamTeamNotFound.
-func NewTeamTeamNotFoundSearchErrorResponse(v TeamTeamNotFound) SearchErrorResponse {
+// NewSessProjectMismatchSearchErrorResponse returns new SearchErrorResponse from SessProjectMismatch.
+func NewSessProjectMismatchSearchErrorResponse(v SessProjectMismatch) SearchErrorResponse {
 	var s SearchErrorResponse
-	s.SetTeamTeamNotFound(v)
+	s.SetSessProjectMismatch(v)
 	return s
 }
 
-// SetTeamPermissionDenied sets SearchErrorResponse to TeamPermissionDenied.
-func (s *SearchErrorResponse) SetTeamPermissionDenied(v TeamPermissionDenied) {
-	s.Type = TeamPermissionDeniedSearchErrorResponse
-	s.TeamPermissionDenied = v
+// SetSessTokenInvalid sets SearchErrorResponse to SessTokenInvalid.
+func (s *SearchErrorResponse) SetSessTokenInvalid(v SessTokenInvalid) {
+	s.Type = SessTokenInvalidSearchErrorResponse
+	s.SessTokenInvalid = v
 }
 
-// GetTeamPermissionDenied returns TeamPermissionDenied and true boolean if SearchErrorResponse is TeamPermissionDenied.
-func (s SearchErrorResponse) GetTeamPermissionDenied() (v TeamPermissionDenied, ok bool) {
-	if !s.IsTeamPermissionDenied() {
+// GetSessTokenInvalid returns SessTokenInvalid and true boolean if SearchErrorResponse is SessTokenInvalid.
+func (s SearchErrorResponse) GetSessTokenInvalid() (v SessTokenInvalid, ok bool) {
+	if !s.IsSessTokenInvalid() {
 		return v, false
 	}
-	return s.TeamPermissionDenied, true
+	return s.SessTokenInvalid, true
 }
 
-// NewTeamPermissionDeniedSearchErrorResponse returns new SearchErrorResponse from TeamPermissionDenied.
-func NewTeamPermissionDeniedSearchErrorResponse(v TeamPermissionDenied) SearchErrorResponse {
+// NewSessTokenInvalidSearchErrorResponse returns new SearchErrorResponse from SessTokenInvalid.
+func NewSessTokenInvalidSearchErrorResponse(v SessTokenInvalid) SearchErrorResponse {
 	var s SearchErrorResponse
-	s.SetTeamPermissionDenied(v)
+	s.SetSessTokenInvalid(v)
 	return s
 }
 
@@ -95329,48 +95309,6 @@ func (s SearchErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
 func NewUnavailableSearchErrorResponse(v Unavailable) SearchErrorResponse {
 	var s SearchErrorResponse
 	s.SetUnavailable(v)
-	return s
-}
-
-// SetUserNotFound sets SearchErrorResponse to UserNotFound.
-func (s *SearchErrorResponse) SetUserNotFound(v UserNotFound) {
-	s.Type = UserNotFoundSearchErrorResponse
-	s.UserNotFound = v
-}
-
-// GetUserNotFound returns UserNotFound and true boolean if SearchErrorResponse is UserNotFound.
-func (s SearchErrorResponse) GetUserNotFound() (v UserNotFound, ok bool) {
-	if !s.IsUserNotFound() {
-		return v, false
-	}
-	return s.UserNotFound, true
-}
-
-// NewUserNotFoundSearchErrorResponse returns new SearchErrorResponse from UserNotFound.
-func NewUserNotFoundSearchErrorResponse(v UserNotFound) SearchErrorResponse {
-	var s SearchErrorResponse
-	s.SetUserNotFound(v)
-	return s
-}
-
-// SetUserPermissionDenied sets SearchErrorResponse to UserPermissionDenied.
-func (s *SearchErrorResponse) SetUserPermissionDenied(v UserPermissionDenied) {
-	s.Type = UserPermissionDeniedSearchErrorResponse
-	s.UserPermissionDenied = v
-}
-
-// GetUserPermissionDenied returns UserPermissionDenied and true boolean if SearchErrorResponse is UserPermissionDenied.
-func (s SearchErrorResponse) GetUserPermissionDenied() (v UserPermissionDenied, ok bool) {
-	if !s.IsUserPermissionDenied() {
-		return v, false
-	}
-	return s.UserPermissionDenied, true
-}
-
-// NewUserPermissionDeniedSearchErrorResponse returns new SearchErrorResponse from UserPermissionDenied.
-func NewUserPermissionDeniedSearchErrorResponse(v UserPermissionDenied) SearchErrorResponse {
-	var s SearchErrorResponse
-	s.SetUserPermissionDenied(v)
 	return s
 }
 
@@ -95461,9 +95399,14 @@ type SearchResponse struct {
 	Results []SearchResult `json:"results"`
 	// The requested types whose matches are not all in `results`: there were
 	// more than `limit_per_type`, the text was too short to search that type,
-	// or the project holds more of that type than one search reads. Empty when
-	// every requested type is complete.
+	// a project holds more matches of that type than one search reads, or
+	// `more_projects` is true. Empty when every requested type is complete.
 	IncompleteTypes []SearchResultType `json:"incomplete_types"`
+	// True when a session searched without `project_id` and the person can act
+	// on more projects than one search reads: the results come from the
+	// newest 10 of them. Search another by naming it in `project_id`. Always
+	// false when the request names a project or uses a project secret.
+	MoreProjects bool `json:"more_projects"`
 }
 
 // GetResults returns the value of Results.
@@ -95476,6 +95419,11 @@ func (s *SearchResponse) GetIncompleteTypes() []SearchResultType {
 	return s.IncompleteTypes
 }
 
+// GetMoreProjects returns the value of MoreProjects.
+func (s *SearchResponse) GetMoreProjects() bool {
+	return s.MoreProjects
+}
+
 // SetResults sets the value of Results.
 func (s *SearchResponse) SetResults(val []SearchResult) {
 	s.Results = val
@@ -95484,6 +95432,11 @@ func (s *SearchResponse) SetResults(val []SearchResult) {
 // SetIncompleteTypes sets the value of IncompleteTypes.
 func (s *SearchResponse) SetIncompleteTypes(val []SearchResultType) {
 	s.IncompleteTypes = val
+}
+
+// SetMoreProjects sets the value of MoreProjects.
+func (s *SearchResponse) SetMoreProjects(val bool) {
+	s.MoreProjects = val
 }
 
 func (*SearchResponse) searchRes() {}
@@ -96127,6 +96080,59 @@ func (s *SessTokenCreationFailed) SetDetails(val OptSessTokenCreationFailedDetai
 type SessTokenCreationFailedDetails map[string]jx.Raw
 
 func (s *SessTokenCreationFailedDetails) init() SessTokenCreationFailedDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type SessTokenInvalid struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptSessTokenInvalidDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *SessTokenInvalid) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *SessTokenInvalid) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *SessTokenInvalid) GetDetails() OptSessTokenInvalidDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *SessTokenInvalid) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *SessTokenInvalid) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *SessTokenInvalid) SetDetails(val OptSessTokenInvalidDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type SessTokenInvalidDetails map[string]jx.Raw
+
+func (s *SessTokenInvalidDetails) init() SessTokenInvalidDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}
@@ -97586,6 +97592,7 @@ type SetUserPasswordErrorResponse struct {
 	UserInvalid                 UserInvalid
 	UserNotFound                UserNotFound
 	UserPasswordEmpty           UserPasswordEmpty
+	UserPasswordHashingBusy     UserPasswordHashingBusy
 	UserPasswordPolicyViolation UserPasswordPolicyViolation
 	UserPasswordTooLong         UserPasswordTooLong
 	UserPermissionDenied        UserPermissionDenied
@@ -97613,6 +97620,7 @@ const (
 	UserInvalidSetUserPasswordErrorResponse                 SetUserPasswordErrorResponseType = "user.invalid"
 	UserNotFoundSetUserPasswordErrorResponse                SetUserPasswordErrorResponseType = "user.not_found"
 	UserPasswordEmptySetUserPasswordErrorResponse           SetUserPasswordErrorResponseType = "user.password_empty"
+	UserPasswordHashingBusySetUserPasswordErrorResponse     SetUserPasswordErrorResponseType = "user.password_hashing_busy"
 	UserPasswordPolicyViolationSetUserPasswordErrorResponse SetUserPasswordErrorResponseType = "user.password_policy_violation"
 	UserPasswordTooLongSetUserPasswordErrorResponse         SetUserPasswordErrorResponseType = "user.password_too_long"
 	UserPermissionDeniedSetUserPasswordErrorResponse        SetUserPasswordErrorResponseType = "user.permission_denied"
@@ -97701,6 +97709,11 @@ func (s SetUserPasswordErrorResponse) IsUserNotFound() bool {
 // IsUserPasswordEmpty reports whether SetUserPasswordErrorResponse is UserPasswordEmpty.
 func (s SetUserPasswordErrorResponse) IsUserPasswordEmpty() bool {
 	return s.Type == UserPasswordEmptySetUserPasswordErrorResponse
+}
+
+// IsUserPasswordHashingBusy reports whether SetUserPasswordErrorResponse is UserPasswordHashingBusy.
+func (s SetUserPasswordErrorResponse) IsUserPasswordHashingBusy() bool {
+	return s.Type == UserPasswordHashingBusySetUserPasswordErrorResponse
 }
 
 // IsUserPasswordPolicyViolation reports whether SetUserPasswordErrorResponse is UserPasswordPolicyViolation.
@@ -98072,6 +98085,27 @@ func (s SetUserPasswordErrorResponse) GetUserPasswordEmpty() (v UserPasswordEmpt
 func NewUserPasswordEmptySetUserPasswordErrorResponse(v UserPasswordEmpty) SetUserPasswordErrorResponse {
 	var s SetUserPasswordErrorResponse
 	s.SetUserPasswordEmpty(v)
+	return s
+}
+
+// SetUserPasswordHashingBusy sets SetUserPasswordErrorResponse to UserPasswordHashingBusy.
+func (s *SetUserPasswordErrorResponse) SetUserPasswordHashingBusy(v UserPasswordHashingBusy) {
+	s.Type = UserPasswordHashingBusySetUserPasswordErrorResponse
+	s.UserPasswordHashingBusy = v
+}
+
+// GetUserPasswordHashingBusy returns UserPasswordHashingBusy and true boolean if SetUserPasswordErrorResponse is UserPasswordHashingBusy.
+func (s SetUserPasswordErrorResponse) GetUserPasswordHashingBusy() (v UserPasswordHashingBusy, ok bool) {
+	if !s.IsUserPasswordHashingBusy() {
+		return v, false
+	}
+	return s.UserPasswordHashingBusy, true
+}
+
+// NewUserPasswordHashingBusySetUserPasswordErrorResponse returns new SetUserPasswordErrorResponse from UserPasswordHashingBusy.
+func NewUserPasswordHashingBusySetUserPasswordErrorResponse(v UserPasswordHashingBusy) SetUserPasswordErrorResponse {
+	var s SetUserPasswordErrorResponse
+	s.SetUserPasswordHashingBusy(v)
 	return s
 }
 
@@ -98456,6 +98490,7 @@ type SubmitFlowStepErrorResponse struct {
 	UserInvalid                 UserInvalid
 	UserNotFound                UserNotFound
 	UserPasswordEmpty           UserPasswordEmpty
+	UserPasswordHashingBusy     UserPasswordHashingBusy
 	UserPasswordPolicyViolation UserPasswordPolicyViolation
 	UserPasswordTooLong         UserPasswordTooLong
 }
@@ -98507,6 +98542,7 @@ const (
 	UserInvalidSubmitFlowStepErrorResponse                 SubmitFlowStepErrorResponseType = "user.invalid"
 	UserNotFoundSubmitFlowStepErrorResponse                SubmitFlowStepErrorResponseType = "user.not_found"
 	UserPasswordEmptySubmitFlowStepErrorResponse           SubmitFlowStepErrorResponseType = "user.password_empty"
+	UserPasswordHashingBusySubmitFlowStepErrorResponse     SubmitFlowStepErrorResponseType = "user.password_hashing_busy"
 	UserPasswordPolicyViolationSubmitFlowStepErrorResponse SubmitFlowStepErrorResponseType = "user.password_policy_violation"
 	UserPasswordTooLongSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "user.password_too_long"
 )
@@ -98719,6 +98755,11 @@ func (s SubmitFlowStepErrorResponse) IsUserNotFound() bool {
 // IsUserPasswordEmpty reports whether SubmitFlowStepErrorResponse is UserPasswordEmpty.
 func (s SubmitFlowStepErrorResponse) IsUserPasswordEmpty() bool {
 	return s.Type == UserPasswordEmptySubmitFlowStepErrorResponse
+}
+
+// IsUserPasswordHashingBusy reports whether SubmitFlowStepErrorResponse is UserPasswordHashingBusy.
+func (s SubmitFlowStepErrorResponse) IsUserPasswordHashingBusy() bool {
+	return s.Type == UserPasswordHashingBusySubmitFlowStepErrorResponse
 }
 
 // IsUserPasswordPolicyViolation reports whether SubmitFlowStepErrorResponse is UserPasswordPolicyViolation.
@@ -99610,6 +99651,27 @@ func (s SubmitFlowStepErrorResponse) GetUserPasswordEmpty() (v UserPasswordEmpty
 func NewUserPasswordEmptySubmitFlowStepErrorResponse(v UserPasswordEmpty) SubmitFlowStepErrorResponse {
 	var s SubmitFlowStepErrorResponse
 	s.SetUserPasswordEmpty(v)
+	return s
+}
+
+// SetUserPasswordHashingBusy sets SubmitFlowStepErrorResponse to UserPasswordHashingBusy.
+func (s *SubmitFlowStepErrorResponse) SetUserPasswordHashingBusy(v UserPasswordHashingBusy) {
+	s.Type = UserPasswordHashingBusySubmitFlowStepErrorResponse
+	s.UserPasswordHashingBusy = v
+}
+
+// GetUserPasswordHashingBusy returns UserPasswordHashingBusy and true boolean if SubmitFlowStepErrorResponse is UserPasswordHashingBusy.
+func (s SubmitFlowStepErrorResponse) GetUserPasswordHashingBusy() (v UserPasswordHashingBusy, ok bool) {
+	if !s.IsUserPasswordHashingBusy() {
+		return v, false
+	}
+	return s.UserPasswordHashingBusy, true
+}
+
+// NewUserPasswordHashingBusySubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from UserPasswordHashingBusy.
+func NewUserPasswordHashingBusySubmitFlowStepErrorResponse(v UserPasswordHashingBusy) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetUserPasswordHashingBusy(v)
 	return s
 }
 
@@ -101701,6 +101763,82 @@ func (s *TknInvalidTknidDetails) init() TknInvalidTknidDetails {
 	return m
 }
 
+// Why the server refused the request for now. Each member names its error
+// code; `req.rate_limited` joins them when the server's own rate limits land.
+// Retry after the number of seconds in the `Retry-After` header.
+// Ref: #
+// TooManyRequests represents sum type.
+type TooManyRequests struct {
+	Type                    TooManyRequestsType // switch on this field
+	UserPasswordHashingBusy UserPasswordHashingBusy
+}
+
+// TooManyRequestsType is oneOf type of TooManyRequests.
+type TooManyRequestsType string
+
+// Possible values for TooManyRequestsType.
+const (
+	UserPasswordHashingBusyTooManyRequests TooManyRequestsType = "user.password_hashing_busy"
+)
+
+// IsUserPasswordHashingBusy reports whether TooManyRequests is UserPasswordHashingBusy.
+func (s TooManyRequests) IsUserPasswordHashingBusy() bool {
+	return s.Type == UserPasswordHashingBusyTooManyRequests
+}
+
+// SetUserPasswordHashingBusy sets TooManyRequests to UserPasswordHashingBusy.
+func (s *TooManyRequests) SetUserPasswordHashingBusy(v UserPasswordHashingBusy) {
+	s.Type = UserPasswordHashingBusyTooManyRequests
+	s.UserPasswordHashingBusy = v
+}
+
+// GetUserPasswordHashingBusy returns UserPasswordHashingBusy and true boolean if TooManyRequests is UserPasswordHashingBusy.
+func (s TooManyRequests) GetUserPasswordHashingBusy() (v UserPasswordHashingBusy, ok bool) {
+	if !s.IsUserPasswordHashingBusy() {
+		return v, false
+	}
+	return s.UserPasswordHashingBusy, true
+}
+
+// NewUserPasswordHashingBusyTooManyRequests returns new TooManyRequests from UserPasswordHashingBusy.
+func NewUserPasswordHashingBusyTooManyRequests(v UserPasswordHashingBusy) TooManyRequests {
+	var s TooManyRequests
+	s.SetUserPasswordHashingBusy(v)
+	return s
+}
+
+// TooManyRequestsHeaders wraps TooManyRequests with response headers.
+type TooManyRequestsHeaders struct {
+	RetryAfter OptInt
+	Response   TooManyRequests
+}
+
+// GetRetryAfter returns the value of RetryAfter.
+func (s *TooManyRequestsHeaders) GetRetryAfter() OptInt {
+	return s.RetryAfter
+}
+
+// GetResponse returns the value of Response.
+func (s *TooManyRequestsHeaders) GetResponse() TooManyRequests {
+	return s.Response
+}
+
+// SetRetryAfter sets the value of RetryAfter.
+func (s *TooManyRequestsHeaders) SetRetryAfter(val OptInt) {
+	s.RetryAfter = val
+}
+
+// SetResponse sets the value of Response.
+func (s *TooManyRequestsHeaders) SetResponse(val TooManyRequests) {
+	s.Response = val
+}
+
+func (*TooManyRequestsHeaders) finishUserPasskeyRegistrationRes() {}
+func (*TooManyRequestsHeaders) getFlowStepRes()                   {}
+func (*TooManyRequestsHeaders) setUserPasswordRes()               {}
+func (*TooManyRequestsHeaders) submitFlowStepRes()                {}
+func (*TooManyRequestsHeaders) verifyChallengeProofRes()          {}
+
 // Merged schema.
 // Ref: #
 type Unavailable struct {
@@ -102973,14 +103111,15 @@ func (s *UserConflictDetails) init() UserConflictDetails {
 // The settings of a `user.create` policy, checked before a sign-up creates a
 // user. Every setting is optional; a setting left out switches its rule off,
 // and `{}` switches every rule off. Zitadel's own sign-up protection, a proof
-// of work on every password sign-up and limits per sign-up flow, applies
-// either way: a policy chooses among challenges and never switches it off.
-// Sign-ups with a passkey or through a sign-in provider are not challenged.
+// of work on every sign-up with a password or a passkey and limits per
+// sign-up flow, applies either way: a policy chooses among challenges and
+// never switches it off. Sign-ups through a sign-in provider are not
+// challenged: each needs an account at the provider.
 // Ref: #
 type UserCreateConfig struct {
-	// The challenge a password sign-up must solve before the user is
-	// created. `zitadel_pow` is Zitadel's built-in proof of work, which every
-	// password sign-up solves when no policy names a challenge.
+	// The challenge a sign-up with a password or a passkey must solve before
+	// the user is created. `zitadel_pow` is Zitadel's built-in proof of work,
+	// which every such sign-up solves when no policy names a challenge.
 	Challenge OptUserCreateConfigChallenge `json:"challenge"`
 }
 
@@ -102994,9 +103133,9 @@ func (s *UserCreateConfig) SetChallenge(val OptUserCreateConfigChallenge) {
 	s.Challenge = val
 }
 
-// The challenge a password sign-up must solve before the user is
-// created. `zitadel_pow` is Zitadel's built-in proof of work, which every
-// password sign-up solves when no policy names a challenge.
+// The challenge a sign-up with a password or a passkey must solve before
+// the user is created. `zitadel_pow` is Zitadel's built-in proof of work,
+// which every such sign-up solves when no policy names a challenge.
 type UserCreateConfigChallenge string
 
 const (
@@ -105317,6 +105456,59 @@ func (s *UserPasswordEmpty) SetDetails(val OptUserPasswordEmptyDetails) {
 type UserPasswordEmptyDetails map[string]jx.Raw
 
 func (s *UserPasswordEmptyDetails) init() UserPasswordEmptyDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type UserPasswordHashingBusy struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptUserPasswordHashingBusyDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *UserPasswordHashingBusy) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *UserPasswordHashingBusy) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *UserPasswordHashingBusy) GetDetails() OptUserPasswordHashingBusyDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *UserPasswordHashingBusy) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *UserPasswordHashingBusy) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *UserPasswordHashingBusy) SetDetails(val OptUserPasswordHashingBusyDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type UserPasswordHashingBusyDetails map[string]jx.Raw
+
+func (s *UserPasswordHashingBusyDetails) init() UserPasswordHashingBusyDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}
@@ -108364,6 +108556,7 @@ type VerifyChallengeProofErrorResponse struct {
 	UserInvalid                 UserInvalid
 	UserNotFound                UserNotFound
 	UserPasswordEmpty           UserPasswordEmpty
+	UserPasswordHashingBusy     UserPasswordHashingBusy
 	UserPasswordPolicyViolation UserPasswordPolicyViolation
 	UserPasswordTooLong         UserPasswordTooLong
 }
@@ -108390,6 +108583,7 @@ const (
 	UserInvalidVerifyChallengeProofErrorResponse                 VerifyChallengeProofErrorResponseType = "user.invalid"
 	UserNotFoundVerifyChallengeProofErrorResponse                VerifyChallengeProofErrorResponseType = "user.not_found"
 	UserPasswordEmptyVerifyChallengeProofErrorResponse           VerifyChallengeProofErrorResponseType = "user.password_empty"
+	UserPasswordHashingBusyVerifyChallengeProofErrorResponse     VerifyChallengeProofErrorResponseType = "user.password_hashing_busy"
 	UserPasswordPolicyViolationVerifyChallengeProofErrorResponse VerifyChallengeProofErrorResponseType = "user.password_policy_violation"
 	UserPasswordTooLongVerifyChallengeProofErrorResponse         VerifyChallengeProofErrorResponseType = "user.password_too_long"
 )
@@ -108477,6 +108671,11 @@ func (s VerifyChallengeProofErrorResponse) IsUserNotFound() bool {
 // IsUserPasswordEmpty reports whether VerifyChallengeProofErrorResponse is UserPasswordEmpty.
 func (s VerifyChallengeProofErrorResponse) IsUserPasswordEmpty() bool {
 	return s.Type == UserPasswordEmptyVerifyChallengeProofErrorResponse
+}
+
+// IsUserPasswordHashingBusy reports whether VerifyChallengeProofErrorResponse is UserPasswordHashingBusy.
+func (s VerifyChallengeProofErrorResponse) IsUserPasswordHashingBusy() bool {
+	return s.Type == UserPasswordHashingBusyVerifyChallengeProofErrorResponse
 }
 
 // IsUserPasswordPolicyViolation reports whether VerifyChallengeProofErrorResponse is UserPasswordPolicyViolation.
@@ -108843,6 +109042,27 @@ func (s VerifyChallengeProofErrorResponse) GetUserPasswordEmpty() (v UserPasswor
 func NewUserPasswordEmptyVerifyChallengeProofErrorResponse(v UserPasswordEmpty) VerifyChallengeProofErrorResponse {
 	var s VerifyChallengeProofErrorResponse
 	s.SetUserPasswordEmpty(v)
+	return s
+}
+
+// SetUserPasswordHashingBusy sets VerifyChallengeProofErrorResponse to UserPasswordHashingBusy.
+func (s *VerifyChallengeProofErrorResponse) SetUserPasswordHashingBusy(v UserPasswordHashingBusy) {
+	s.Type = UserPasswordHashingBusyVerifyChallengeProofErrorResponse
+	s.UserPasswordHashingBusy = v
+}
+
+// GetUserPasswordHashingBusy returns UserPasswordHashingBusy and true boolean if VerifyChallengeProofErrorResponse is UserPasswordHashingBusy.
+func (s VerifyChallengeProofErrorResponse) GetUserPasswordHashingBusy() (v UserPasswordHashingBusy, ok bool) {
+	if !s.IsUserPasswordHashingBusy() {
+		return v, false
+	}
+	return s.UserPasswordHashingBusy, true
+}
+
+// NewUserPasswordHashingBusyVerifyChallengeProofErrorResponse returns new VerifyChallengeProofErrorResponse from UserPasswordHashingBusy.
+func NewUserPasswordHashingBusyVerifyChallengeProofErrorResponse(v UserPasswordHashingBusy) VerifyChallengeProofErrorResponse {
+	var s VerifyChallengeProofErrorResponse
+	s.SetUserPasswordHashingBusy(v)
 	return s
 }
 

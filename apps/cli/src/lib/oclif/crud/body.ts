@@ -3,6 +3,7 @@ import { text } from "node:stream/consumers";
 
 import { ZitadelError } from "@/lib/errors";
 import { parseJsonObject } from "@/lib/json";
+
 import type { Json } from "./types";
 
 /**

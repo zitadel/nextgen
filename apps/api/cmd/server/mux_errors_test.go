@@ -21,7 +21,7 @@ import (
 // is deprecated: no operation moved from there (ADR 077).
 func TestBuildHTTPMuxAnswersAPathNothingServes(t *testing.T) {
 	apiServers, err := api.NewServers(oasapi.UnimplementedHandler{}, api.NewSecurityHandler(nil),
-		apiServerOptions(muxTracerProvider, noop.NewMeterProvider(), consoleLink("/console"))...)
+		apiServerOptions(muxTracerProvider, noop.NewMeterProvider(), consoleLink("/console"), 0)...)
 	require.NoError(t, err)
 	mux, err := buildHTTPMux(ServerConfig{RequestIDHeader: "x-vercel-id"}, idgen.NewULID(), apiServers, idpCallbackEcho(), nil, nil, nil)
 	require.NoError(t, err)

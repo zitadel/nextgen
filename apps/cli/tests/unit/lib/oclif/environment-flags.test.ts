@@ -2,11 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { COMMANDS } from "@/index";
 import { BaseCommand } from "@/lib/oclif/base";
-import {
-  environmentFlags,
-  environmentSelectorSuffix,
-  projectEnvFile,
-} from "@/lib/oclif/environment-flags";
+import { environmentFlags, projectEnvFile } from "@/lib/oclif/environment-flags";
 import { parseFlag } from "@tests/helpers/inputs";
 
 /** `[name, char]` for every flag in a bag. */
@@ -88,31 +84,6 @@ describe("--env", () => {
       code: "E_VALIDATION",
       message: '"../escape" is not a usable environment name',
     });
-  });
-});
-
-describe("environmentSelectorSuffix", () => {
-  it("is empty for a run that named nothing", () => {
-    expect(environmentSelectorSuffix({})).toBe("");
-  });
-
-  it("keeps --cwd and --env-file as typed", () => {
-    expect(environmentSelectorSuffix({ cwd: "apps/web", envFile: "apps/web/.env.prod" })).toBe(
-      " --env-file apps/web/.env.prod --cwd apps/web",
-    );
-  });
-
-  it("quotes a value the shell would split", () => {
-    expect(environmentSelectorSuffix({ cwd: "my app" })).toBe(" --cwd 'my app'");
-  });
-
-  it.each([
-    ["an environment name", { envName: "--force" }, " --env=--force"],
-    ["an env file", { envFile: "--force" }, " --env-file=--force"],
-    ["a server", { server: "--force" }, " --server=--force"],
-    ["a directory", { cwd: "--force" }, " --cwd=--force"],
-  ])("joins a dash-prefixed %s to its flag, so the retry parses", (_name, input, expected) => {
-    expect(environmentSelectorSuffix(input)).toBe(expected);
   });
 });
 
