@@ -218,7 +218,7 @@ describe("users screen", () => {
       "Status",
       "Member of",
       "ID",
-      "",
+      "Actions",
     ]);
     expect(table.getByText("familyName: Patel · givenName: Maya")).toBeInTheDocument();
   });
@@ -266,7 +266,7 @@ describe("users screen", () => {
       "Status",
       "Member of",
       "ID",
-      "",
+      "Actions",
     ]);
     // The ID is the column that is cut to fit; the tooltip keeps it whole.
     expect(table.getByTitle("user_1")).toHaveTextContent("user_1");
