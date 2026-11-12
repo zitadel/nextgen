@@ -59,7 +59,7 @@ function IdentifierChip({ property }: { property?: string }) {
  * under it (the Users list); the header cell over it takes
  * `RESOURCE_STICKY_START` too. `card` adds the identity hover card. `links`
  * names the detail it opens and the schema the card does: the project's,
- * unless the root's People draws it (D41).
+ * unless the root's Users draws it (D41).
  */
 export function UserIdentityCell({
   user,

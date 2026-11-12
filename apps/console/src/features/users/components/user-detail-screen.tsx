@@ -26,8 +26,8 @@ import { UserProfileCard } from "@/features/users/components/user-profile-card";
 /**
  * User detail — the overview and authentication tabs. Drawn for a user of the
  * selected project, and at the root for one of the reserved platform
- * project's People (D41), whose schema reads as text and whose deletion
- * returns to People (`links`).
+ * project's users (D41), whose schema reads as text and whose deletion
+ * returns to the root's Users (`links`).
  *
  * Some of the design cannot be built yet, and what is missing is *data*, not
  * markup. Rather than render labels with nothing behind them, each is left out
@@ -48,7 +48,7 @@ export function UserDetailScreen({
   userId: string;
   /** The route's load (`fetchUserDetail`). */
   detail: LoadedUser;
-  /** Where the screen's links lead (`PROJECT_USER_LINKS`, `PEOPLE_USER_LINKS`). */
+  /** Where the screen's links lead (`PROJECT_USER_LINKS`, `PLATFORM_USER_LINKS`). */
   links: UserLinks;
 }) {
   const {

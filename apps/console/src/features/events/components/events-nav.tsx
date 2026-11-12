@@ -1,4 +1,4 @@
-import { Link, useMatch, useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import {
   ArrowLeftRight,
   Check,
@@ -41,6 +41,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 
+import { useEventsHome } from "../home";
 import {
   AUDIT_CATEGORIES,
   type AuditCategory,
@@ -54,7 +55,6 @@ import {
   EVENT_VIEWS,
   type EventsSearch,
   type EventView,
-  parseEventsSearch,
   TIME_RANGE_LABEL,
   TIME_RANGES,
   type TimeRange,
@@ -70,7 +70,8 @@ import {
 
 /**
  * The Events list of the sidebar (D30): what the shell shows in place of the
- * project's screens on `/events` and under an event's drawer, as Vercel's Logs
+ * project's screens on `/events`, or of the root's on the platform project's
+ * Events (D41, `useEventsHome`), and under an event's drawer, as Vercel's Logs
  * does. A picker chooses the list's view, and under it sit the filters chosen
  * from a list: the time, the category, the type or the status. Values that
  * are pasted, the ids and the operation, go in the search above the table
@@ -81,14 +82,6 @@ import {
  * the list and keeps its filters: a view or a filter chosen while it is open
  * closes it and narrows the list.
  */
-
-/** The filters the list is under, or the default ones away from the list. */
-function useEventsSearch(): { current: EventsSearch; onList: boolean } {
-  const list = useMatch({ from: "/_authed/events", shouldThrow: false });
-  return { current: list ? list.search : NO_FILTERS, onList: !!list };
-}
-
-const NO_FILTERS = parseEventsSearch({});
 
 /** A glyph per view, which is all the icon rail shows of it. */
 const VIEW_ICON: Record<EventView, LucideIcon> = {
@@ -104,7 +97,7 @@ const VIEW_ICON: Record<EventView, LucideIcon> = {
  * glyph alone.
  */
 export function EventViewPicker() {
-  const { current } = useEventsSearch();
+  const { home, current } = useEventsHome();
   const Icon = VIEW_ICON[current.view];
 
   return (
@@ -130,7 +123,7 @@ export function EventViewPicker() {
             return (
               // The router marks the view the list is in `aria-current="page"`.
               <DropdownMenuItem key={view} asChild className="items-start gap-3 py-2">
-                <Link to="/events" search={withView(current, view)}>
+                <Link to={home} search={withView(current, view)}>
                   <ViewIcon aria-hidden className="mt-0.5" />
                   <span className="flex min-w-0 flex-1 flex-col">
                     <span className="text-sm">{VIEW_LABEL[view]}</span>
@@ -160,9 +153,9 @@ const ANY = "any";
  * and the screen's own button opens the sidebar to reach it.
  */
 export function EventFilters() {
-  const { current } = useEventsSearch();
+  const { home, current } = useEventsHome();
   const navigate = useNavigate();
-  const go = (search: EventsSearch) => void navigate({ to: "/events", search });
+  const go = (search: EventsSearch) => void navigate({ to: home, search });
 
   return (
     <SidebarGroup

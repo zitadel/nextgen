@@ -55,10 +55,10 @@ export function useNavItems(view: NavView = "portal"): NavItem[] {
 /**
  * The root's list as the sidebar draws it (D41): Projects, the spine, then
  * the reserved platform project's own pages for someone who may act on it
- * (People, Authentication, Login flows, Branding, Audit log, which
- * `useNavItems` already leaves out for anyone else), then Settings. The root
- * is the platform, so its sidebar holds the root's screens and no project's:
- * a project's are reached by choosing the project.
+ * (Users and Events, which `useNavItems` already leaves out for anyone
+ * else), then Settings. The root is the platform, so its sidebar holds the
+ * root's screens and no project's: a project's are reached by choosing the
+ * project.
  *
  * Settings opens a list (D29): with nothing in it (no add-on) the row would
  * open nothing, so it is left out.

@@ -17,7 +17,7 @@ const lastAnswer = sessionKept((): { value: string | null | undefined } => ({ va
  * Whether the signed-in person may act on the reserved platform project, the
  * console's root (D41, Console ADR 0004 §5 amendment).
  *
- * Its pages (People, Authentication, Login flows, Branding, Audit log) are
+ * Its pages (Users and Events) are
  * rows of the root sidebar only for someone who can, which a platform
  * operator always can (root ADR 075) and a cloud customer, holding no grant
  * there, never can. Signing in to the project, or being homed in it, is not

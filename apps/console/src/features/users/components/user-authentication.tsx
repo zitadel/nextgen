@@ -25,7 +25,7 @@ export function UserAuthentication({
   passkeys: { created_at: string }[] | undefined;
   identityLinks: UserIdentityLink[] | undefined;
   idps: IdpConnection[] | null;
-  /** A provider's page: the project's, or the root's Authentication (D41). */
+  /** A provider's page; absent (the root's Users, D41), its name reads as text. */
   idpDetail: UserLinks["idp"];
 }) {
   return (
@@ -108,13 +108,17 @@ function identityLinkRows(
     return {
       key: link.id,
       label: idp ? (
-        <Link
-          to={idpDetail}
-          params={{ idpId: idp.id }}
-          className="hover:text-foreground hover:underline"
-        >
-          {idp.definition.display_name}
-        </Link>
+        idpDetail ? (
+          <Link
+            to={idpDetail}
+            params={{ idpId: idp.id }}
+            className="hover:text-foreground hover:underline"
+          >
+            {idp.definition.display_name}
+          </Link>
+        ) : (
+          idp.definition.display_name
+        )
       ) : (
         // The connection list may be refused (`idp.read`); the id is still
         // the honest name for it.

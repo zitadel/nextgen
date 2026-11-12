@@ -1,4 +1,4 @@
-import { Link, type LinkProps, useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { ApiError } from "@zitadel/api/runtime/fetch";
 import { ChevronDown, ChevronUp, Loader2 } from "lucide-react";
 import { createContext, type ReactNode, useContext, useEffect } from "react";
@@ -20,37 +20,16 @@ import {
   eventFilterValues,
   isFailure,
   type ProjectEvent,
-  type EventsSearch,
   sharing,
 } from "../model";
+import type { EventLink, EventLinks } from "../home";
 import { EventSubject } from "./event-subject";
 
-/** Where one of an events list's links leads. */
-export type EventLink = Pick<LinkProps, "to" | "params" | "search">;
-
 /**
- * Where an events list's links lead, which the route that draws it knows: the
- * project's Events (`/events`) or the root's Audit log (`/platform/audit-log`,
- * D41). The list and the drawer over it link only through these, so each
- * stays on its own route.
- */
-export interface EventLinks {
-  /** An event of the list, open in the drawer over it, under the list's filters. */
-  event: (eventId: string) => EventLink;
-  /** The list with no event open: where the drawer closes to. */
-  list: EventLink;
-  /**
-   * The list under other filters: what a row's menu and the drawer's Related
-   * events narrow it to. Unset for a list that has none to set (the root's
-   * Audit log, D41), which then offers no way to narrow it.
-   */
-  filtered?: (search: EventsSearch) => EventLink;
-}
-
-/**
- * The rows an events list draws, in its order, and where its links lead: what
- * the event panel steps through, and how it opens another event without
- * leaving the list's route. The list provides it; the panel beside it reads it.
+ * The rows an events list draws, in its order, and where its links lead
+ * (`eventLinks`): what the event panel steps through, and how it opens another
+ * event without leaving the list's route, a project's or the root's (D41).
+ * The list provides it; the panel beside it reads it.
  */
 export const EventRowsContext = createContext<
   { rows: ProjectEvent[]; links: EventLinks } | undefined
@@ -153,9 +132,7 @@ function typing(target: EventTarget | null): boolean {
  *
  * The arrows in its header, and ↑ and ↓ (or k and j) anywhere but a field,
  * open the previous and next row of the list. At the last row loaded they
- * stop: `Load more` is the list's. Where the list has no filters to set (the
- * root's Audit log, D41), it offers none either: no Related events, and the
- * request's steps open in the same drawer.
+ * stop: `Load more` is the list's.
  */
 export function EventPanel({
   event,
@@ -258,12 +235,10 @@ export function EventPanel({
             title="This login flow"
             timeline={flow}
             current={event.id}
-            all={
-              filtered && {
-                link: filtered(sharing("flow", event.flow_id)),
-                label: "List all of this login flow’s events",
-              }
-            }
+            all={{
+              link: filtered(sharing("flow", event.flow_id)),
+              label: "List all of this login flow’s events",
+            }}
           />
         ) : (
           request &&
@@ -273,7 +248,7 @@ export function EventPanel({
               timeline={request}
               current={event.id}
               all={
-                filtered && event.request_id
+                event.request_id
                   ? {
                       link: filtered(sharing("request", event.request_id)),
                       label: "List all of this request’s events",
@@ -294,24 +269,22 @@ export function EventPanel({
           </PanelSection>
         )}
 
-        {filtered && (
-          <PanelSection title="Related events">
-            <ul className="flex flex-wrap gap-2">
-              {related.map(({ filter, value }) => (
-                <li key={filter.key}>
-                  <Button asChild variant="outline" size="sm">
-                    <Link {...filtered(sharing(filter.key, value))}>Same {filter.name}</Link>
-                  </Button>
-                </li>
-              ))}
-              <li>
+        <PanelSection title="Related events">
+          <ul className="flex flex-wrap gap-2">
+            {related.map(({ filter, value }) => (
+              <li key={filter.key}>
                 <Button asChild variant="outline" size="sm">
-                  <Link {...filtered(around(event))}>Around this time</Link>
+                  <Link {...filtered(sharing(filter.key, value))}>Same {filter.name}</Link>
                 </Button>
               </li>
-            </ul>
-          </PanelSection>
-        )}
+            ))}
+            <li>
+              <Button asChild variant="outline" size="sm">
+                <Link {...filtered(around(event))}>Around this time</Link>
+              </Button>
+            </li>
+          </ul>
+        </PanelSection>
 
         <PanelSection title="Document">
           <DocumentViewer document={event} noun="event" cliHint={false} />
@@ -363,10 +336,7 @@ function Timeline({
   timeline: EventTimeline;
   /** The open event's id. */
   current: string;
-  /**
-   * The list under the filter that holds them all. Unset where the list has
-   * no filters to set (the root's Audit log, D41).
-   */
+  /** The list under the filter that holds them all. */
   all?: { link: EventLink; label: string };
 }) {
   return (

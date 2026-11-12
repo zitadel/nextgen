@@ -16,7 +16,7 @@ import {
 /**
  * What the Users screens read: the list's load, the search that follows it
  * without a new load (`useUserSearch`), and a user's detail. Each takes the
- * project it reads, so the selected project's Users and the root's People,
+ * project it reads, so the selected project's Users and the root's Users,
  * the reserved platform project's (D41), share them.
  */
 

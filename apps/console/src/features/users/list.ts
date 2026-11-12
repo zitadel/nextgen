@@ -44,7 +44,7 @@ export const OLDER_REVISIONS = "older";
 const LEGACY_LATEST = "latest";
 
 /**
- * `validateSearch` of a Users list (the project's, and the root's People):
+ * `validateSearch` of a Users list (the project's, and the root's):
  * the filter lives in the URL, as the Teams tabs do. It is a server-side
  * filter, so it belongs to the request the loader makes, is linkable and
  * survives a reload. Only what the filter can send is kept: a revision

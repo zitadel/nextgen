@@ -1,6 +1,6 @@
 import { Link, Outlet, useNavigate, useRouter } from "@tanstack/react-router";
 import { RefreshCw } from "lucide-react";
-import { type ReactNode, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 import { FormError } from "@/components/form-error";
 import { IdText } from "@/components/id-text";
@@ -36,6 +36,7 @@ import { LIST_PAGE_SIZE } from "@/lib/paging";
 import { cn } from "@/lib/utils";
 
 import { listProjectEvents } from "../api";
+import { type EventLinks, type EventsHome, eventLinks } from "../home";
 import type { EventsLoad } from "../load";
 import {
   around,
@@ -50,15 +51,23 @@ import {
   type ProjectEvent,
 } from "../model";
 import { useLiveEvents } from "../use-live-events";
-import { type EventLinks, EventRowsContext, EventSheet } from "./event-panel";
+import { EventRowsContext, EventSheet } from "./event-panel";
+import { EventSearchField } from "./event-search-field";
 import { EventSubject } from "./event-subject";
-import { ExportMenu, LiveDot, LiveStatus } from "./events-toolbar";
+import { ExportMenu, LiveDot, LiveStatus, SidebarFilters } from "./events-toolbar";
 
-/** The empty table's sentence, by what was asked for. */
-const NOTHING: Record<EventView, string> = {
-  audit: NO_AUDIT_EVENTS,
-  requests: "This project has no API requests.",
-  all: "This project has no events.",
+/** The empty table's sentence, by whose events they are and what was asked for. */
+const NOTHING: Record<EventsHome, Record<EventView, string>> = {
+  "/events": {
+    audit: NO_AUDIT_EVENTS,
+    requests: "This project has no API requests.",
+    all: "This project has no events.",
+  },
+  "/platform/events": {
+    audit: "The platform has no audit events.",
+    requests: "The platform has no API requests.",
+    all: "The platform has no events.",
+  },
 };
 
 /** Above the button, while a page came back short of its size with more behind it. */
@@ -66,8 +75,8 @@ const NOT_ALL_READ = "Not every event has been read yet for these filters.";
 
 /**
  * A list of a project's events, newest first, on the shared resource table
- * (D17, D30): the selected project's Events, and the root's Audit log of the
- * reserved platform project (D41), whose routes draw it with their own links.
+ * (D17, D30): the selected project's Events, and the root's, the reserved
+ * platform project's (D41). `home` says which, and every link stays there.
  *
  * A row names the event's type, what it was about, who caused it and when it
  * happened, to the millisecond, which tells the events of one request apart.
@@ -81,25 +90,21 @@ const NOT_ALL_READ = "Not every event has been read yet for these filters.";
  * holds is matched over a fixed number of events a request. The list then
  * says that not every event was read, and its button reads **Keep looking**.
  *
- * With `toolbar`, the project's Events: **Refresh** reads the list again from
- * the newest event, **Live** adds what is recorded after it every few seconds
- * (`useLiveEvents`): a green dot marks it on, a line under the toolbar says
- * when it last read, and the rows it adds fade in. **Export** copies or
- * downloads the rows loaded. Without it, the table and its pages alone.
+ * **Refresh** reads the list again from the newest event, **Live** adds what
+ * is recorded after it every few seconds (`useLiveEvents`): a green dot marks
+ * it on, a line under the toolbar says when it last read, and the rows it
+ * adds fade in. **Export** copies or downloads the rows loaded.
  */
 export function EventsScreen({
-  title,
+  home,
   projectId,
   loaded,
   search,
   eventId,
-  links,
-  nothing,
-  filter,
-  toolbar = false,
+  me,
 }: {
-  /** The page's heading. */
-  title: string;
+  /** Where the list lives: a project's Events, or the root's (D41). */
+  home: EventsHome;
   /** Whose events: the selected project's, or the platform project's at the root. */
   projectId: string;
   /** The loader's first page, with the filters and the range it answers. */
@@ -108,18 +113,14 @@ export function EventsScreen({
   search: EventsSearch;
   /** The event open in the drawer, if any. */
   eventId: string | undefined;
-  /** Where the rows, the drawer and its close lead, which the route knows. */
-  links: EventLinks;
-  /** What the empty table says, in place of the project's sentence for its view. */
-  nothing?: string;
-  /** Under the title: the search and the way to the sidebar's filters. */
-  filter?: ReactNode;
-  /** Live, Refresh and Export beside the title. */
-  toolbar?: boolean;
+  /** The signed-in person, whose activity the search offers. */
+  me?: string;
 }) {
   const router = useRouter();
   const navigate = useNavigate();
   const [refreshing, setRefreshing] = useState(false);
+  // Every link keeps the list's filters, the drawer's included.
+  const links = useMemo(() => eventLinks(home, search), [home, search]);
 
   // How many rows the newest page held, and of which load: a page that lands
   // after the list was read again says nothing about the one on screen.
@@ -135,7 +136,7 @@ export function EventsScreen({
     (page) => setNewest({ of: loaded, rows: page.items.length }),
   );
   // A range that has ended has nothing newer to follow.
-  const canGoLive = toolbar && !loaded.search.to;
+  const canGoLive = !loaded.search.to;
   const live = useLiveEvents({
     projectId,
     search: loaded.search,
@@ -169,38 +170,41 @@ export function EventsScreen({
       <Page>
         <ResourceTitle
           filterBelow
-          filter={filter}
+          filter={
+            <>
+              <SidebarFilters search={search} />
+              <EventSearchField home={home} current={search} me={me} />
+            </>
+          }
           action={
-            toolbar && (
-              <div className="flex items-center gap-2">
-                {canGoLive && (
-                  <Button
-                    variant="secondary"
-                    className="shrink-0 gap-2 px-3!"
-                    aria-pressed={live.on}
-                    onClick={live.toggle}
-                  >
-                    <LiveDot on={live.on} />
-                    Live
-                  </Button>
-                )}
-                {/* `px-2.5!`: `Button`'s `has-[>svg]:px-3` out-specifies a plain
-                    `px-2.5`. */}
+            <div className="flex items-center gap-2">
+              {canGoLive && (
                 <Button
                   variant="secondary"
-                  className="shrink-0 gap-1.5 px-2.5!"
-                  onClick={() => void refresh()}
-                  loading={refreshing}
+                  className="shrink-0 gap-2 px-3!"
+                  aria-pressed={live.on}
+                  onClick={live.toggle}
                 >
-                  <RefreshCw aria-hidden />
-                  Refresh
+                  <LiveDot on={live.on} />
+                  Live
                 </Button>
-                <ExportMenu events={events} />
-              </div>
-            )
+              )}
+              {/* `px-2.5!`: `Button`'s `has-[>svg]:px-3` out-specifies a plain
+                  `px-2.5`. */}
+              <Button
+                variant="secondary"
+                className="shrink-0 gap-1.5 px-2.5!"
+                onClick={() => void refresh()}
+                loading={refreshing}
+              >
+                <RefreshCw aria-hidden />
+                Refresh
+              </Button>
+              <ExportMenu events={events} />
+            </div>
           }
         >
-          {title}
+          Events
         </ResourceTitle>
 
         <FormError message={live.error} className="mt-3" />
@@ -238,7 +242,7 @@ export function EventsScreen({
                     ? "No events have matched so far."
                     : isNarrowed(loaded.search)
                       ? "No events match these filters."
-                      : (nothing ?? NOTHING[loaded.search.view])}
+                      : NOTHING[home][loaded.search.view]}
                 </ResourceEmptyRow>
               ) : (
                 events.map((event) => (
@@ -275,9 +279,8 @@ const FAILURE_STICKY =
   "transition-colors bg-[color-mix(in_oklab,var(--color-destructive)_5%,var(--color-card))] group-hover:bg-[color-mix(in_oklab,var(--color-destructive)_10%,var(--color-card))]";
 
 /**
- * One event. The whole row opens it in the drawer; where the list has filters
- * to set, its menu narrows the list by what the event carries, or reads the
- * minutes around it.
+ * One event. The whole row opens it in the drawer; its menu narrows the list
+ * by what the event carries, or reads the minutes around it.
  */
 function EventRow({
   event,
@@ -300,11 +303,9 @@ function EventRow({
   // A system actor has no id: its kind is all there is to name.
   const actor = event.actor_id || event.actor_type;
   // A value the list is narrowed to already would narrow it no further.
-  const narrowings = filtered
-    ? eventFilterValues(event).filter(
-        ({ filter, value }) => !isNarrowedTo(search, filter.key, value),
-      )
-    : [];
+  const narrowings = eventFilterValues(event).filter(
+    ({ filter, value }) => !isNarrowedTo(search, filter.key, value),
+  );
   const failure = isFailure(event);
 
   return (
@@ -353,20 +354,17 @@ function EventRow({
           <DropdownMenuItem asChild>
             <Link {...opens}>View event</Link>
           </DropdownMenuItem>
-          {filtered && (
-            <DropdownMenuItem asChild>
-              <Link {...filtered(around(event))}>Events around this one</Link>
-            </DropdownMenuItem>
-          )}
+          <DropdownMenuItem asChild>
+            <Link {...filtered(around(event))}>Events around this one</Link>
+          </DropdownMenuItem>
           {narrowings.length > 0 && <DropdownMenuSeparator />}
-          {filtered &&
-            narrowings.map(({ filter, value }) => (
-              <DropdownMenuItem key={filter.key} asChild>
-                <Link {...filtered(narrowedBy(search, filter.key, value))}>
-                  Only this {filter.name}
-                </Link>
-              </DropdownMenuItem>
-            ))}
+          {narrowings.map(({ filter, value }) => (
+            <DropdownMenuItem key={filter.key} asChild>
+              <Link {...filtered(narrowedBy(search, filter.key, value))}>
+                Only this {filter.name}
+              </Link>
+            </DropdownMenuItem>
+          ))}
         </RowMenu>
       </TableCell>
     </ResourceRow>

@@ -93,13 +93,17 @@ const ACCOUNT_ROUTE = "/_authed/account/";
 /** Events, whose list replaces the project's on the screen and under an event's drawer. */
 const EVENTS_PATH = "/events";
 
+/** The root's Events, the platform project's (D41), whose list replaces the root's the same way. */
+const PLATFORM_EVENTS_PATH = "/platform/events";
+
 /**
  * Which of the sidebar's lists is showing, and the **route** decides:
  * Projects is above every project, so it lists the root's screens, and so do
  * the person's profile (`/account`) and the platform project's pages (D41);
  * `/settings` with anything beneath it lists Settings' pages (D29); `/project`
  * with anything beneath it lists the selected project's Settings pages (D40);
- * `/events` with anything beneath it lists Events' views and filters (D30);
+ * `/events` with anything beneath it lists Events' views and filters (D30),
+ * and so does the root's Events (`/platform/events`, D41);
  * everything else lists the selected project's. Deriving it from the route
  * rather than from component state is what lets a settings or events URL
  * survive a refresh, and it keeps the shell consistent with ADR 0001's
@@ -115,14 +119,14 @@ function useShellView(): NavView {
   if (matchRoute({ to: SETTINGS_PATH, fuzzy: true })) return "settings";
   if (matchRoute({ to: PROJECT_SETTINGS_PATH, fuzzy: true })) return "project-settings";
   if (matchRoute({ to: EVENTS_PATH, fuzzy: true })) return "events";
+  if (matchRoute({ to: PLATFORM_EVENTS_PATH, fuzzy: true })) return "events";
   return atHome || atAccount || atPlatform ? "account" : "portal";
 }
 
 /**
  * Whether the screen is a root page of the reserved platform project (D41):
- * People, Authentication, Login flows, Branding, Audit log, and what opens
- * beneath one. The route says so (`staticData.platformRoot`), on the page or
- * on its layout.
+ * its Users and its Events, and what opens beneath one. The route says so
+ * (`staticData.platformRoot`), on the page or on its layout.
  */
 function usePlatformRootPage(): boolean {
   return useMatches({
@@ -237,8 +241,9 @@ const NAV_LABEL: Record<NavView, string> = {
  * the project: its General and Admins pages (D40).
  *
  * Events is one screen's own list, under a heading that leads back to the
- * project's: a picker of the list's views, not routes, and its filters in a
- * group of their own (D30). The events feature draws both.
+ * project's, or to the root's for the platform project's Events (D41): a
+ * picker of the list's views, not routes, and its filters in a group of
+ * their own (D30). The events feature draws both.
  *
  * Rows are Vercel's: 36px with a 1px gap, the glyph 12px in and the label 10px
  * after it. They keep that height in the rail, so collapsing moves nothing
@@ -250,6 +255,9 @@ function NavList({ view }: { view: NavView }) {
   const items = view === "account" ? accountListItems(own, settings) : own;
   const matchRoute = useMatchRoute();
   const entrance = useListEntrance(view);
+  // Events' list leads back to where it was opened from: a project's
+  // screens, or the root's when the events are the platform project's (D41).
+  const atPlatform = usePlatformRootPage();
 
   return (
     // Keyed by the list, so a new one mounts and plays its entrance once.
@@ -260,7 +268,12 @@ function NavList({ view }: { view: NavView }) {
           {view === "settings" && <ListHeading name="Settings" to="/projects" back="Projects" />}
           {view === "project-settings" && <ListHeading name="Settings" to="/" back="the project" />}
           {/* `/` is where a project lands, whichever screen that is. */}
-          {view === "events" && <ListHeading name="Events" to="/" back="the project" />}
+          {view === "events" &&
+            (atPlatform ? (
+              <ListHeading name="Events" to="/projects" back="Projects" />
+            ) : (
+              <ListHeading name="Events" to="/" back="the project" />
+            ))}
           {view === "events" && <EventViewPicker />}
           {items.map(({ to, nav: { icon: Icon, label: name } }) => (
             <SidebarMenuItem key={to}>
@@ -312,7 +325,7 @@ function listOf(to: string): NavView | undefined {
   const under = (path: string) => to === path || to.startsWith(`${path}/`);
   if (under(SETTINGS_PATH)) return "settings";
   if (under(PROJECT_SETTINGS_PATH)) return "project-settings";
-  if (under(EVENTS_PATH)) return "events";
+  if (under(EVENTS_PATH) || under(PLATFORM_EVENTS_PATH)) return "events";
   return undefined;
 }
 
@@ -395,7 +408,7 @@ function ListHeading({
 function ContextBar({ view, userId }: { view: NavView; userId?: string }) {
   // A page of the platform project manages the root, whichever project stays
   // selected in the URL (D36): the pill says the root there, so the bar never
-  // names a customer's project above the console's own people or sign-in.
+  // names a customer's project above the platform's own users or events.
   const root = usePlatformRootPage();
   return (
     <div className={TOP_BAR}>

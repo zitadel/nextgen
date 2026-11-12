@@ -1,6 +1,5 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Braces, Shield } from "lucide-react";
-import type { ReactNode } from "react";
 import {
   RESOURCE_CELL,
   RESOURCE_CELL_MUTED,
@@ -28,15 +27,14 @@ import {
   type SignInMethodRow,
   signInMethodRows,
 } from "@/features/authentication/model";
-import type { AuthenticationData } from "@/features/authentication/load";
 import type { SchemaEntry } from "@/features/schemas/model";
 
-/**
- * The page a connection opens: the project's, or the root's in the reserved
- * platform project (D41). The screen that draws the tables names it, so a row
- * never opens a project's page at the root.
- */
-export type IdpDetailRoute = "/authentication/idps/$idpId" | "/platform/authentication/idps/$idpId";
+/** What the loader hands the tabs. */
+export interface Loaded {
+  schemas: SchemaEntry[];
+  /** `null` without `idp.read`. */
+  idps: IdpConnection[] | null;
+}
 
 /** The first and last columns; the user schema column takes the rest. */
 const COLUMN = "w-1/4";
@@ -46,16 +44,7 @@ const COLUMN = "w-1/4";
  * — with the user schemas that allow it: "who can sign in with this?" at a
  * glance.
  */
-export function SignInMethods({
-  loaded,
-  detail,
-  empty,
-}: {
-  loaded: AuthenticationData;
-  detail: IdpDetailRoute;
-  /** What an empty table says, where it is not a project's (the root's, D41). */
-  empty?: ReactNode;
-}) {
+export function SignInMethods({ loaded }: { loaded: Loaded }) {
   const rows = signInMethodRows(loaded.schemas, loaded.idps);
 
   return (
@@ -71,10 +60,10 @@ export function SignInMethods({
         <TableBody>
           {rows.length === 0 ? (
             <ResourceEmptyRow colSpan={3}>
-              {empty ?? "No user schema in this project enables a sign-in method."}
+              No user schema in this project enables a sign-in method.
             </ResourceEmptyRow>
           ) : (
-            rows.map((row) => <MethodRow key={row.key} row={row} detail={detail} />)
+            rows.map((row) => <MethodRow key={row.key} row={row} />)
           )}
         </TableBody>
       </Table>
@@ -82,18 +71,22 @@ export function SignInMethods({
   );
 }
 
-function MethodRow({ row, detail }: { row: SignInMethodRow; detail: IdpDetailRoute }) {
+function MethodRow({ row }: { row: SignInMethodRow }) {
   const navigate = useNavigate();
   // A provider with a connection opens it; Passkey and Password have no page.
   const idpId = row.idpId;
 
   return (
     <ResourceRow
-      onOpen={idpId ? () => void navigate({ to: detail, params: { idpId } }) : undefined}
+      onOpen={
+        idpId
+          ? () => void navigate({ to: "/authentication/idps/$idpId", params: { idpId } })
+          : undefined
+      }
     >
       <TableCell className={`${RESOURCE_CELL} truncate`}>
         {idpId ? (
-          <Link to={detail} params={{ idpId }} className={RESOURCE_ROW_LINK}>
+          <Link to="/authentication/idps/$idpId" params={{ idpId }} className={RESOURCE_ROW_LINK}>
             {row.label}
           </Link>
         ) : row.missing ? (
@@ -137,17 +130,9 @@ function SchemaNames({ items }: { items: IdpReference[] }) {
 export function IdentityProviders({
   idps,
   schemas,
-  detail,
-  empty,
 }: {
   idps: IdpConnection[];
   schemas: SchemaEntry[];
-  detail: IdpDetailRoute;
-  /**
-   * What an empty table says, where it is not a project's (the root's, D41):
-   * the CLI hint is a project's, whose connections its own deploys carry.
-   */
-  empty?: ReactNode;
 }) {
   const users = schemasBySsoProvider(schemas);
 
@@ -165,17 +150,11 @@ export function IdentityProviders({
         <TableBody>
           {idps.length === 0 ? (
             <ResourceEmptyRow colSpan={4}>
-              {empty ?? (
-                <>
-                  This project has no identity providers. Add one with{" "}
-                  <InlineCode>zitadel auth-method sso enable</InlineCode>.
-                </>
-              )}
+              This project has no identity providers. Add one with{" "}
+              <InlineCode>zitadel auth-method sso enable</InlineCode>.
             </ResourceEmptyRow>
           ) : (
-            idps.map((idp) => (
-              <IdpRow key={idp.id} idp={idp} users={users.get(idp.slug) ?? []} detail={detail} />
-            ))
+            idps.map((idp) => <IdpRow key={idp.id} idp={idp} users={users.get(idp.slug) ?? []} />)
           )}
         </TableBody>
       </Table>
@@ -183,22 +162,20 @@ export function IdentityProviders({
   );
 }
 
-function IdpRow({
-  idp,
-  users,
-  detail,
-}: {
-  idp: IdpConnection;
-  users: IdpReference[];
-  detail: IdpDetailRoute;
-}) {
+function IdpRow({ idp, users }: { idp: IdpConnection; users: IdpReference[] }) {
   const navigate = useNavigate();
   const name = idp.definition.display_name;
 
   return (
-    <ResourceRow onOpen={() => void navigate({ to: detail, params: { idpId: idp.id } })}>
+    <ResourceRow
+      onOpen={() => void navigate({ to: "/authentication/idps/$idpId", params: { idpId: idp.id } })}
+    >
       <TableCell className={`${RESOURCE_CELL} truncate`}>
-        <Link to={detail} params={{ idpId: idp.id }} className={RESOURCE_ROW_LINK}>
+        <Link
+          to="/authentication/idps/$idpId"
+          params={{ idpId: idp.id }}
+          className={RESOURCE_ROW_LINK}
+        >
           <Shield aria-hidden strokeWidth={1.5} className={RESOURCE_ROW_ICON} />
           {name}
         </Link>
@@ -212,7 +189,7 @@ function IdpRow({
       <TableCell className={`${RESOURCE_CELL} text-right`}>
         <RowMenu name={name}>
           <DropdownMenuItem asChild>
-            <Link to={detail} params={{ idpId: idp.id }}>
+            <Link to="/authentication/idps/$idpId" params={{ idpId: idp.id }}>
               View connection
             </Link>
           </DropdownMenuItem>

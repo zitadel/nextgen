@@ -1,17 +1,13 @@
 import { createFileRoute, useParams, useRouteContext } from "@tanstack/react-router";
-import { useMemo } from "react";
 
-import type { EventLinks } from "@/features/events/components/event-panel";
-import { EventSearchField } from "@/features/events/components/event-search-field";
 import { EventsScreen } from "@/features/events/components/events-screen";
-import { SidebarFilters } from "@/features/events/components/events-toolbar";
 import { loadEvents } from "@/features/events/load";
 import { parseEventsSearch } from "@/features/events/model";
 import { requireProjectScope, useRequiredProjectScope } from "@/features/projects/project-scope";
 
 /**
  * Events: the project's events, newest first, on the shared resource table
- * (D17, D30, D38), drawn by `EventsScreen`, which the root's Audit log of the
+ * (D17, D30, D38), drawn by `EventsScreen`, which the root's Events of the
  * platform project shares (D41). An event is what the server recorded of a
  * sign-in step, a change to a record or an API request (`GET /events`), and
  * the screen, the route, the API and the CLI all call it that.
@@ -63,31 +59,15 @@ function ProjectEvents() {
   const search = Route.useSearch();
   const { eventId } = useParams({ strict: false });
   const { session } = useRouteContext({ from: "/_authed" });
-  // Every link keeps the list's filters, the drawer's included.
-  const links = useMemo<EventLinks>(
-    () => ({
-      event: (id) => ({ to: "/events/$eventId", params: { eventId: id }, search }),
-      list: { to: "/events", search },
-      filtered: (next) => ({ to: "/events", search: next }),
-    }),
-    [search],
-  );
 
   return (
     <EventsScreen
-      title="Events"
+      home="/events"
       projectId={projectId}
       loaded={Route.useLoaderData()}
       search={search}
       eventId={eventId}
-      links={links}
-      filter={
-        <>
-          <SidebarFilters search={search} />
-          <EventSearchField current={search} me={session.user_id || undefined} />
-        </>
-      }
-      toolbar
+      me={session.user_id || undefined}
     />
   );
 }

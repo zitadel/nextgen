@@ -92,7 +92,7 @@ test("a platform operator reaches every management screen without an error", asy
   // project's read with a refusal, so a link to one lands on Projects, whose
   // sidebar lists none of them. The embedded console has no add-on either, so
   // Projects is the root's only row.
-  await page.goto("/ui/console/platform/people");
+  await page.goto("/ui/console/platform/users");
   await expect(page).toHaveURL(/\/projects(\?|$)/);
   await expect(projectLink).toBeVisible();
   const root = page.getByRole("navigation", { name: "Account" });

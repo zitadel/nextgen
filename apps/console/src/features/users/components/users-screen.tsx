@@ -76,24 +76,16 @@ export interface UsersScreenProps {
   search: UsersSearch;
   /** Lays `patch` over the URL's filters; `replace` keeps it out of the history. */
   setSearch: (patch: Partial<UsersSearch>, options?: { replace?: boolean }) => void;
-  /** Where a row's links lead (`PROJECT_USER_LINKS`, `PEOPLE_USER_LINKS`). */
+  /** Where a row's links lead (`PROJECT_USER_LINKS`, `PLATFORM_USER_LINKS`). */
   links: UserLinks;
-  /** The page's title: Users in a project, People at the root (D41). */
-  title?: string;
 }
 
 /**
  * The Users list: the selected project's users, and at the root the reserved
- * platform project's, its People (D41), which `ManagedProject` names to the
- * screen and to its Add user sheet. The route keeps the filters in its URL.
+ * platform project's (D41), which `ManagedProject` names to the screen and to
+ * its Add user sheet. The route keeps the filters in its URL.
  */
-export function UsersScreen({
-  fromRoute,
-  search,
-  setSearch,
-  links,
-  title = "Users",
-}: UsersScreenProps) {
+export function UsersScreen({ fromRoute, search, setSearch, links }: UsersScreenProps) {
   const projectId = useRequiredProjectScope();
   const router = useRouter();
 
@@ -223,7 +215,7 @@ export function UsersScreen({
           </AddUserSheet>
         }
       >
-        {title}
+        Users
       </ResourceTitle>
 
       {/* The pinned columns give the table no fixed width. The ID gives way

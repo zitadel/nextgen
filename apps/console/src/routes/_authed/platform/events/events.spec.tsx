@@ -27,7 +27,7 @@ const AUDIT = ["auth", "session", "admin", "entity", "signal"];
 /** As many events as the list asks for at once (`LIST_PAGE_SIZE`). */
 const PAGE_SIZE = 25;
 
-/** One of the platform project's events: a deleted console account unless told otherwise. */
+/** One of the platform project's events: a deleted user unless told otherwise. */
 function event(id: string, overrides: Record<string, unknown> = {}) {
   return {
     id,
@@ -149,14 +149,27 @@ async function drawer() {
   return within(await screen.findByRole("dialog"));
 }
 
-describe("root audit log", () => {
-  it("lists the platform project's audit events, newest first, in the root's sidebar", async () => {
+/** The Events list of the sidebar: the heading back, then the view picker. */
+async function eventsNav() {
+  return within(await screen.findByRole("navigation", { name: "Events" }));
+}
+
+/** Opens a row's menu, by the event's type. */
+async function openRowMenu(name: string) {
+  const row = (await screen.findByRole("link", { name })).closest("tr") as HTMLElement;
+  await userEvent.click(within(row).getByRole("button", { name: /^Actions for/ }));
+  return within(await screen.findByRole("menu"));
+}
+
+describe("root events", () => {
+  it("lists the platform project's audit events first, under Events' own list in the sidebar", async () => {
     const queries = serveEvents([
       { data: [event("evt_2", { event_type: "user.created" }), event("evt_1")] },
     ]);
-    renderAt("/platform/audit-log");
+    renderAt("/platform/events");
 
-    expect(await screen.findByRole("heading", { name: "Audit log" })).toBeInTheDocument();
+    // Named as a project's are: they are events (D41).
+    expect(await screen.findByRole("heading", { name: "Events", level: 1 })).toBeInTheDocument();
     expect(await screen.findByRole("link", { name: "user.created" })).toBeInTheDocument();
     // The platform project's audit events, a page at a time, everything
     // retained: never the selected project's.
@@ -164,19 +177,44 @@ describe("root audit log", () => {
     expect(queries[0]?.getAll("category")).toEqual(AUDIT);
     expect(queries[0]?.get("limit")).toBe(String(PAGE_SIZE));
     expect(queries[0]?.has("created_after")).toBe(false);
-    // The sidebar is the root's list, with the page marked; Events' views and
-    // filters, and the search that sets them, are the project's.
-    const root = within(await screen.findByRole("navigation", { name: "Account" }));
-    expect(root.getByRole("link", { name: "Audit log" })).toHaveAttribute("data-active", "true");
-    expect(screen.queryByRole("navigation", { name: "Events" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
+    // The sidebar is Events' own list, as in a project: the views, the
+    // filters, and a heading that leads back up to the root's, not a project's.
+    const nav = await eventsNav();
+    expect(nav.getByRole("button", { name: "View: Audit events" })).toBeInTheDocument();
+    expect(nav.getByRole("link", { name: "Events: back to Projects" })).toHaveAttribute(
+      "href",
+      scopedPath("/projects"),
+    );
+    expect(screen.getByRole("group", { name: "Filters" })).toBeInTheDocument();
+    expect(screen.queryByRole("navigation", { name: "Account" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("navigation", { name: "Primary" })).not.toBeInTheDocument();
+    // And the search that sets the pasted filters.
+    expect(screen.getByRole("searchbox")).toBeInTheDocument();
   });
 
-  it("says so when nothing has been recorded", async () => {
+  it("says so when the platform has no audit events", async () => {
     serveEvents([{ data: [] }]);
-    renderAt("/platform/audit-log");
+    renderAt("/platform/events");
 
-    expect(await screen.findByText("There are no audit events yet.")).toBeInTheDocument();
+    expect(await screen.findByText("The platform has no audit events.")).toBeInTheDocument();
+  });
+
+  it("reads the API requests from the sidebar's view picker, on the root's route", async () => {
+    const queries = serveEvents([{ data: [event("evt_1")] }, { data: [request("evt_2")] }]);
+    const router = renderAt("/platform/events");
+    await screen.findByRole("link", { name: "user.deleted" });
+
+    await userEvent.click((await eventsNav()).getByRole("button", { name: /^View: / }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: /^API requests/ }));
+
+    expect(await screen.findByRole("link", { name: "request.api" })).toBeInTheDocument();
+    expect(queries[1]?.get("project_id")).toBe("proj_platform");
+    expect(queries[1]?.getAll("category")).toEqual(["request"]);
+    expect(router.state.resolvedLocation?.pathname).toBe("/platform/events");
+    expect(router.state.resolvedLocation?.search).toMatchObject({
+      view: "requests",
+      project: "proj_test",
+    });
   });
 
   it("opens an event in the drawer over the root list, without reading the list again", async () => {
@@ -184,43 +222,74 @@ describe("root audit log", () => {
       { data: [event("evt_2", { event_type: "user.created" }), event("evt_1")] },
     ]);
     const reads = serveEvent(event("evt_1"));
-    const router = renderAt("/platform/audit-log");
+    const router = renderAt("/platform/events");
 
     const link = await screen.findByRole("link", { name: "user.deleted" });
     // The root's own drawer; the selected project rides along, unnamed.
-    expect(link).toHaveAttribute("href", scopedPath("/platform/audit-log/evt_1"));
+    expect(link.getAttribute("href")).toMatch(/^\/platform\/events\/evt_1\?/);
+    expect(link.getAttribute("href")).toContain("project=proj_test");
     await userEvent.click(link);
 
     expect(await (await drawer()).findByRole("heading", { name: "user.deleted" })).toBeVisible();
     await waitFor(() =>
-      expect(router.state.resolvedLocation?.pathname).toBe("/platform/audit-log/evt_1"),
+      expect(router.state.resolvedLocation?.pathname).toBe("/platform/events/evt_1"),
     );
-    expect(router.state.resolvedLocation?.search).toEqual({ project: "proj_test" });
+    expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_test" });
     // The event is read within the platform project.
     expect(reads[0]?.get("project_id")).toBe("proj_platform");
     expect(link.closest("tr")).toHaveAttribute("aria-selected", "true");
     expect(queries).toHaveLength(1);
   });
 
-  it("offers no filter: a row's menu opens the event, and the drawer stays on the page", async () => {
+  it("narrows the root's list from a row's menu, and never leads into a project's Events", async () => {
+    const queries = serveEvents([{ data: [event("evt_1")] }]);
+    const router = renderAt("/platform/events");
+
+    const menu = await openRowMenu("user.deleted");
+    // As a project's list offers: the event, the minutes around it, then one
+    // item per value it carries.
+    expect(menu.getAllByRole("menuitem").map((item) => item.textContent)).toEqual([
+      "View event",
+      "Events around this one",
+      "Only this type",
+      "Only this actor",
+      "Only this resource",
+      "Only this resource type",
+      "Only this request",
+      "Only this session",
+    ]);
+    await userEvent.click(menu.getByRole("menuitem", { name: "Only this actor" }));
+
+    await waitFor(() => expect(queries.at(-1)?.get("actor_id")).toBe("user_operator"));
+    expect(queries.at(-1)?.get("project_id")).toBe("proj_platform");
+    expect(router.state.resolvedLocation?.pathname).toBe("/platform/events");
+    expect(router.state.resolvedLocation?.search).toMatchObject({
+      view: "audit",
+      actor: "user_operator",
+      project: "proj_test",
+    });
+    // Nothing on the page leads into a project's Events.
+    for (const link of screen.getAllByRole("link")) {
+      expect(link.getAttribute("href") ?? "").not.toMatch(/^\/events/);
+    }
+  });
+
+  it("follows an event's request and its related events in the root's drawer and list", async () => {
     const change = event("evt_1");
     const call = request("evt_0");
     serveEvents([{ data: [change] }], [call, change]);
     serveEvent(change, call);
-    const router = renderAt("/platform/audit-log");
-
-    const row = (await screen.findByRole("link", { name: "user.deleted" })).closest(
-      "tr",
-    ) as HTMLElement;
-    await userEvent.click(within(row).getByRole("button", { name: /^Actions for/ }));
-    const menu = within(await screen.findByRole("menu"));
-    expect(menu.getAllByRole("menuitem").map((item) => item.textContent)).toEqual(["View event"]);
-    await userEvent.click(menu.getByRole("menuitem", { name: "View event" }));
+    const router = renderAt("/platform/events/evt_1");
 
     const panel = await drawer();
     expect(await panel.findByRole("heading", { name: "user.deleted" })).toBeVisible();
-    // No Related events: they set the project's Events filters.
-    expect(panel.queryByRole("heading", { name: "Related events" })).not.toBeInTheDocument();
+    // Related events narrow the root's list.
+    const related = within(
+      panel.getByRole("heading", { name: "Related events" }).closest("section") as HTMLElement,
+    );
+    for (const link of related.getAllByRole("link")) {
+      expect(link.getAttribute("href")).toMatch(/^\/platform\/events\?/);
+    }
     // The request's API call opens in the same drawer, at the root.
     const steps = within(
       (await panel.findByRole("heading", { name: "This request" })).closest(
@@ -229,26 +298,20 @@ describe("root audit log", () => {
     );
     await userEvent.click(steps.getByRole("link"));
     await waitFor(() =>
-      expect(router.state.resolvedLocation?.pathname).toBe("/platform/audit-log/evt_0"),
+      expect(router.state.resolvedLocation?.pathname).toBe("/platform/events/evt_0"),
     );
     expect(await panel.findByRole("heading", { name: "request.api" })).toBeVisible();
-    // Nothing on the page leads into a project's Events.
-    for (const link of screen.getAllByRole("link")) {
-      expect(link.getAttribute("href") ?? "").not.toMatch(/^\/events/);
-    }
   });
 
-  it("closes the drawer back to the Audit log", async () => {
+  it("closes the drawer back to the root's Events", async () => {
     const queries = serveEvents([{ data: [event("evt_1")] }]);
     serveEvent(event("evt_1"));
-    const router = renderAt("/platform/audit-log/evt_1");
+    const router = renderAt("/platform/events/evt_1");
 
     await userEvent.click((await drawer()).getByRole("button", { name: "Close" }));
 
-    await waitFor(() =>
-      expect(router.state.resolvedLocation?.pathname).toBe("/platform/audit-log"),
-    );
-    expect(router.state.resolvedLocation?.search).toEqual({ project: "proj_test" });
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/platform/events"));
+    expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_test" });
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(queries).toHaveLength(1);
   });
@@ -260,7 +323,7 @@ describe("root audit log", () => {
       { data: [event("evt_b", { event_type: "user.created" })], next_page_token: "page-3" },
       { data: [event("evt_c", { event_type: "auth.check.succeeded", category: "auth" })] },
     ]);
-    renderAt("/platform/audit-log");
+    renderAt("/platform/events");
 
     await userEvent.click(await screen.findByRole("button", { name: "Load more" }));
     expect(await screen.findByRole("link", { name: "user.created" })).toBeInTheDocument();
@@ -288,11 +351,11 @@ describe("root audit log", () => {
     try {
       serveEvents([{ data: [] }]);
       serveEvent();
-      renderAt("/platform/audit-log/evt_gone");
+      renderAt("/platform/events/evt_gone");
 
       const panel = await drawer();
       expect(await panel.findByRole("heading", { name: "Event not found" })).toBeInTheDocument();
-      expect(panel.getByText("The audit log holds no event with this ID.")).toBeInTheDocument();
+      expect(panel.getByText("The platform holds no event with this ID.")).toBeInTheDocument();
     } finally {
       errorSpy.mockRestore();
       warnSpy.mockRestore();
@@ -306,10 +369,10 @@ describe("root audit log", () => {
         HttpResponse.json({ code: "proj.not_found", message: "not found" }, { status: 404 }),
       ),
     );
-    const router = renderAt("/platform/audit-log");
+    const router = renderAt("/platform/events");
 
     await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
-    expect(screen.queryByRole("heading", { name: "Audit log" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Events" })).not.toBeInTheDocument();
     expect(queries).toHaveLength(0);
   });
 });

@@ -49,7 +49,7 @@ async function renderAt(path: string) {
   return router;
 }
 
-describe("root people", () => {
+describe("root users", () => {
   it("lists the platform project's users by the URL's filter, and a row opens the root's detail", async () => {
     const queries: { project: string | null; body: Record<string, unknown> }[] = [];
     const schemaReads: (string | null)[] = [];
@@ -77,18 +77,18 @@ describe("root people", () => {
       http.get(`${USERS_URL}/user_1/password`, () => HttpResponse.json({})),
     );
     // Opened from a project, which stays selected (D36).
-    const router = await renderAt(`${scopedPath("/platform/people")}&status=active`);
+    const router = await renderAt(`${scopedPath("/platform/users")}&status=active`);
 
     const table = within(await screen.findByRole("table"));
-    // Titled for the root, not the project's Users (D41).
-    expect(screen.getByRole("heading", { name: "People", level: 1 })).toBeInTheDocument();
+    // Named as a project's are: they are users (D41).
+    expect(screen.getByRole("heading", { name: "Users", level: 1 })).toBeInTheDocument();
     const row = table.getByRole("link", { name: "maya@acme.com" });
     // The platform project's users, never the selection's, narrowed by the URL.
     expect(queries.map((query) => query.project)).toEqual([PLATFORM]);
     expect(queries[0]?.body.filter).toEqual([
       { field: "status", operation: "equals", value: "active" },
     ]);
-    expect(row.getAttribute("href")).toMatch(/^\/platform\/people\/user_1(\?|$)/);
+    expect(row.getAttribute("href")).toMatch(/^\/platform\/users\/user_1(\?|$)/);
     expect(row.getAttribute("href")).not.toContain(PLATFORM);
     // The root shows no schemas or teams, so their cells name them as text.
     expect(table.getByText("sch_people")).toBeInTheDocument();
@@ -98,7 +98,7 @@ describe("root people", () => {
 
     await userEvent.click(row);
     await waitFor(() =>
-      expect(router.state.resolvedLocation?.pathname).toBe("/platform/people/user_1"),
+      expect(router.state.resolvedLocation?.pathname).toBe("/platform/users/user_1"),
     );
     expect(router.state.resolvedLocation?.search).toEqual({ project: TEST_PROJECT_ID });
     expect(await screen.findByRole("heading", { name: "maya@acme.com" })).toBeInTheDocument();
@@ -109,7 +109,7 @@ describe("root people", () => {
     expect(screen.queryByRole("link", { name: "Staff" })).not.toBeInTheDocument();
   });
 
-  it("returns to People once a person is deleted", async () => {
+  it("returns to the root's Users once a user is deleted", async () => {
     let deleted = false;
     server.use(
       http.get(PLATFORM_URL, () => HttpResponse.json({ id: PLATFORM, name: "Platform" })),
@@ -128,7 +128,7 @@ describe("root people", () => {
       }),
       http.post(USERS_QUERY_URL, () => HttpResponse.json({ users: [] })),
     );
-    const router = await renderAt("/platform/people/user_1");
+    const router = await renderAt("/platform/users/user_1");
 
     await userEvent.click(await screen.findByRole("button", { name: "Delete user" }));
     await userEvent.type(screen.getByLabelText("Type DELETE to confirm"), "DELETE");
@@ -137,10 +137,40 @@ describe("root people", () => {
     );
 
     await waitFor(() => expect(deleted).toBe(true));
-    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/platform/people"));
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/platform/users"));
   });
 
-  it.each(["/platform/people", "/platform/people/user_1"])(
+  it("names a linked identity provider as text, since the root has no page for it", async () => {
+    server.use(
+      http.get(PLATFORM_URL, () => HttpResponse.json({ id: PLATFORM, name: "Platform" })),
+      http.get(`${USERS_URL}/user_1`, () => HttpResponse.json(USER)),
+      http.get(SCHEMA_URL, () =>
+        HttpResponse.json({ id: "sch_people", schema: { title: "Staff" } }),
+      ),
+      http.get(`${USERS_URL}/user_1/passkeys`, () => HttpResponse.json({ passkeys: [] })),
+      http.get(`${USERS_URL}/user_1/identity_links`, () =>
+        HttpResponse.json({
+          identity_links: [
+            { id: "idplink_1", connection_id: "idp_google", created_at: "2026-07-03T00:00:00Z" },
+          ],
+        }),
+      ),
+      http.post("http://localhost/api/v1/idps/query", () =>
+        HttpResponse.json({
+          idps: [{ id: "idp_google", slug: "google", definition: { display_name: "Google" } }],
+        }),
+      ),
+      http.get(`${USERS_URL}/user_1/password`, () => HttpResponse.json({})),
+    );
+    await renderAt("/platform/users/user_1");
+
+    await userEvent.click(await screen.findByRole("tab", { name: "Authentication" }));
+    const panel = within(screen.getByRole("tabpanel"));
+    expect(panel.getByText("Google")).toBeInTheDocument();
+    expect(panel.queryByRole("link")).not.toBeInTheDocument();
+  });
+
+  it.each(["/platform/users", "/platform/users/user_1"])(
     "sends someone who may not act on the platform project from %s to Projects",
     async (path) => {
       server.use(
@@ -152,7 +182,7 @@ describe("root people", () => {
 
       await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
       expect(await screen.findByRole("heading", { name: "Projects" })).toBeInTheDocument();
-      expect(screen.queryByRole("link", { name: "People" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "Users" })).not.toBeInTheDocument();
     },
   );
 });

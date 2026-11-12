@@ -68,17 +68,19 @@ between files are the sign the component is missing.
 - A project's sidebar lists its screens; opened without a selection, a screen
   asks for a project first (Projects with `?next=`, D31).
 - The root's sidebar (`nav.view: "account"`) lists Projects, the platform
-  project's pages and Settings, never a project's screens (D41). `/settings`
-  lists its own pages (`nav.view: "settings"`, D29), the add-on's; the person's
-  profile is `/account`, opened from the account menu.
+  project's pages (Users, Events) and Settings, never a project's screens
+  (D41). `/settings` lists its own pages (`nav.view: "settings"`, D29), the
+  add-on's; the person's profile is `/account`, opened from the account menu.
 - The reserved platform project is the root, never a project (D41): read its
   id only from `getPlatformProjectId()`, and send `exclude_platform` with every
   `listMyProjects`.
 - A root page of the platform project lives under `/platform`, sets
   `staticData.platformRoot`, guards with `requirePlatformRoot` and draws the
   project screen's components inside `ManagedProject`; never copy the screen.
-- A screen shared with the root takes its links and its project-worded copy
-  as props; never branch on being at the root inside it.
+- The root has a page for a resource of the platform project, named as a
+  project names it; never one for its configuration, the server's (D41).
+- A screen shared with the root is told where it lives by a prop (`UserLinks`,
+  `EventsHome`); only the sidebar's own parts read it from the route.
 - A project's Settings opens its own list too (`nav.view: "project-settings"`,
   D40); add a project setting as a page there, never as a tab.
 - Going up to Projects or Settings never drops the selected project (D36):

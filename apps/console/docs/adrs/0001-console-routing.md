@@ -243,7 +243,9 @@ the sidebar.
 > D34's amendment above. The platform's pages are routes under `/platform`
 > with `staticData.platformRoot` and `view: "account"`; the shell shows the
 > account list on them and on `/account`, and their pill says `All projects`
-> whichever project the URL keeps selected. `/settings` lists what an add-on
+> whichever project the URL keeps selected. The root's Events
+> (`/platform/events`) swaps in the Events list as `/events` does, under a
+> heading that leads back to Projects. `/settings` lists what an add-on
 > adds, and its row is left out while that is nothing.
 
 > **Amendment (2026-11-10, design decision D35):** `/` is a screen again, the

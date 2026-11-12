@@ -12,7 +12,7 @@ import type { UserTeam } from "@/features/users/model";
  *
  * Each name opens its team, as the Teams directory's own rows do — the embedded
  * entry carries the id, so the link costs no extra read. Without `link` (the
- * root's People, whose teams have no page, D41) the names read as text.
+ * root's Users, whose teams have no page, D41) the names read as text.
  *
  * `+more` is deliberately not a link. The response carries the capped list and a
  * boolean, not the names past the cap, so there is nothing to expand inline

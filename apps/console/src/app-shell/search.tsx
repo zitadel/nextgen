@@ -429,17 +429,7 @@ function SearchPalette({
     const openRootHit = (hit: SearchHit) => {
       switch (hit.type) {
         case "user":
-          return navigate({ to: "/platform/people/$userId", params: { userId: hit.id } });
-        case "flow_definition":
-          return navigate({
-            to: "/platform/login-flows/$definitionId",
-            params: { definitionId: hit.id },
-          });
-        case "idp":
-          return navigate({
-            to: "/platform/authentication/idps/$idpId",
-            params: { idpId: hit.id },
-          });
+          return navigate({ to: "/platform/users/$userId", params: { userId: hit.id } });
         default:
           return undefined;
       }
@@ -720,14 +710,12 @@ const PROFILE = "Profile";
 
 /**
  * The root page a hit in the reserved platform project opens, by kind (D41),
- * a row of the root sidebar: its users are People, its login flows and
- * identity providers how people sign in. Kinds the root has no page for are
- * absent, and such hits are left out.
+ * a row of the root sidebar: its users are the root's Users. Kinds the root
+ * has no page for (its teams, and its configuration, which is the server's)
+ * are absent, and such hits are left out.
  */
 const ROOT_PAGE: Partial<Record<SearchResultType, string>> = {
-  user: "People",
-  flow_definition: "Login flows",
-  idp: "Authentication",
+  user: "Users",
 };
 
 /** The list screen of each kind of hit: where its glyph comes from. */

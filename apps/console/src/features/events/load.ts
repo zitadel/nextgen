@@ -19,9 +19,9 @@ export interface EventsLoad extends EventPage {
 }
 
 /**
- * Reads an events list: the selected project's Events, and the root's Audit
- * log of the reserved platform project (D41), which share it. The time range
- * is counted back once, here, and `Load more` keeps it.
+ * Reads an events list: the selected project's Events, and the root's, the
+ * reserved platform project's (D41), which share it. The time range is
+ * counted back once, here, and `Load more` keeps it.
  */
 export async function loadEvents(projectId: string, search: EventsSearch): Promise<EventsLoad> {
   const createdAfter = rangeStart(search.since, new Date());

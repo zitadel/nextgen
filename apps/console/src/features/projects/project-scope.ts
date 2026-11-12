@@ -162,9 +162,9 @@ export function useProjectScope(): string | undefined {
 
 /**
  * The project a root page manages in place of the selection (D41): the
- * root's People, Authentication, Login flows, Branding and Audit log draw the
- * project screens' components for the reserved platform project, which is
- * never selected. Set by {@link ManagedProject} around such a page.
+ * root's Users and Events draw the project screens' components for the
+ * reserved platform project, which is never selected. Set by
+ * {@link ManagedProject} around such a page.
  */
 const ManagedProjectContext = createContext<string | undefined>(undefined);
 

@@ -64,15 +64,7 @@ const NAV_ORDER = [
 // The root's list (D41): Projects, the spine, then the platform project's own
 // pages, since the person here may act on it, then Settings. No project's
 // screens: those are reached by choosing the project.
-const ACCOUNT_ORDER = [
-  "Projects",
-  "People",
-  "Authentication",
-  "Login flows",
-  "Branding",
-  "Audit log",
-  "Settings",
-];
+const ACCOUNT_ORDER = ["Projects", "Users", "Events", "Settings"];
 // Settings' list: the heading that leads back, then what the add-on adds. The
 // platform project's pages are the root's rows and the profile the account
 // menu's, so neither is here.
@@ -98,8 +90,7 @@ const MY_USER = "*/api/v1/users/me";
 // The reserved platform project (D41): the console signs in to it, and its
 // read answers, so the person may act on it and the root lists its pages.
 const PLATFORM = "*/api/v1/projects/proj_platform";
-// Login flows, the root page the root list's tests open: one read.
-const FLOWS = "*/api/v1/flow_definitions";
+
 // What the palette asks once something is typed: users, then the other types.
 const SEARCH = "*/api/v1/search";
 interface SearchBody {
@@ -131,7 +122,7 @@ beforeEach(() => {
         updated_at: "2026-01-01T00:00:00Z",
       }),
     ),
-    http.get(FLOWS, () => HttpResponse.json({ flow_definitions: [] })),
+
     http.get(MY_PROJECTS, () =>
       HttpResponse.json({ projects: [{ id: "proj_1", name: "console-dev" }] }),
     ),
@@ -243,13 +234,14 @@ describe("app shell navigation", () => {
     expect(nav.getByRole("link", { name: "Projects" })).toHaveAttribute("data-active", "true");
     // One row for Settings: its pages are its own list's, not repeated here.
     expect(nav.getByRole("link", { name: "Settings" })).toHaveAttribute("href", "/settings");
-    // It opens a list of its own, and says so with an arrow.
+    // It opens a list of its own, and says so with an arrow, as the root's
+    // Events does: the views and filters of the platform project's events.
     expect(
       nav
         .getAllByRole("link")
         .filter((link) => link.querySelector("[data-opens-list]"))
         .map((link) => link.textContent?.trim()),
-    ).toEqual(["Settings"]);
+    ).toEqual(["Events", "Settings"]);
     expect(screen.queryByRole("navigation", { name: "Primary" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Switch project" })).toHaveTextContent(
       "All projects",
@@ -360,25 +352,34 @@ describe("app shell navigation", () => {
   it("opens the platform's pages from the root's list, under a pill that says the root", async () => {
     const router = renderShell("/projects");
     const nav = within(await screen.findByRole("navigation", { name: "Account" }));
-    await waitFor(() => expect(nav.getByRole("link", { name: "People" })).toBeInTheDocument());
-    // No project's screen is a row up here: a project's are reached by choosing it.
-    for (const name of ["Users", "Teams", "User schemas", "Deployments", "Events"]) {
+    // Users and Events up here are the platform project's own, on the root's routes.
+    await waitFor(() =>
+      expect(nav.getByRole("link", { name: "Users" })).toHaveAttribute(
+        "href",
+        scopedPath("/platform/users", "proj_1"),
+      ),
+    );
+    expect(nav.getByRole("link", { name: "Events" })).toHaveAttribute(
+      "href",
+      scopedPath("/platform/events", "proj_1"),
+    );
+    // No project's screen is a row up here: a project's are reached by choosing
+    // it, and the platform's configuration is the server's, so it has no page.
+    for (const name of ["Teams", "User schemas", "Login flows", "Branding", "Deployments"]) {
       expect(nav.queryByRole("link", { name })).not.toBeInTheDocument();
     }
     // On Projects the one project stays selected, and the pill names it (D36).
     const pill = screen.getByRole("button", { name: "Switch project" });
     await waitFor(() => expect(pill).toHaveTextContent("console-dev"));
 
-    await userEvent.click(nav.getByRole("link", { name: "Login flows" }));
-    await waitFor(() =>
-      expect(router.state.resolvedLocation?.pathname).toBe("/platform/login-flows"),
-    );
+    await userEvent.click(nav.getByRole("link", { name: "Users" }));
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/platform/users"));
     // Still the root's list, with the page marked, and never the project's.
-    expect(nav.getByRole("link", { name: "Login flows" })).toHaveAttribute("data-active", "true");
+    expect(nav.getByRole("link", { name: "Users" })).toHaveAttribute("data-active", "true");
     expect(nav.getByRole("link", { name: "Projects" })).toHaveAttribute("data-active", "false");
     expect(screen.queryByRole("navigation", { name: "Primary" })).not.toBeInTheDocument();
     // The selection rides along in the URL, but this page is the root's: the
-    // bar must not name a customer's project above the console's own flows.
+    // bar must not name a customer's project above the platform's own users.
     expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_1" });
     await waitFor(() => expect(pill).toHaveTextContent("All projects"));
     expect(pill).not.toHaveTextContent("console-dev");
@@ -395,7 +396,7 @@ describe("app shell navigation", () => {
         HttpResponse.json({ code: "proj.not_found", message: "Not found" }, { status: 404 }),
       ),
     );
-    const router = renderShell("/platform/login-flows");
+    const router = renderShell("/platform/users");
 
     // The page is not theirs, so it is Projects, whose list is the spine and Settings.
     await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
@@ -620,8 +621,9 @@ describe("events view", () => {
     await userEvent.click(screen.getByRole("button", { name: "Search" }));
     const dialog = within(await screen.findByRole("dialog", { name: "Go to" }));
     // The way to any other screen without going back up first.
-    expect(await dialog.findByRole("option", { name: "Teams" })).toBeInTheDocument();
-    expect(dialog.getByRole("option", { name: "Events" })).toBeInTheDocument();
+    const pages = within(await dialog.findByRole("group", { name: "Pages in console-dev" }));
+    expect(pages.getByRole("option", { name: "Teams" })).toBeInTheDocument();
+    expect(pages.getByRole("option", { name: "Events" })).toBeInTheDocument();
   });
 });
 
@@ -1392,8 +1394,13 @@ describe("search", () => {
     // The platform project's pages are the root's own rows (D41), so they read
     // as what is above every project, not as Settings'.
     await userEvent.clear(field);
-    await userEvent.type(field, "peop");
-    await waitFor(() => expect(rows(dialog.getByRole("listbox"))).toEqual(["People · Account"]));
+    await userEvent.type(field, "events");
+    await waitFor(() =>
+      expect(rows(dialog.getByRole("listbox"))).toEqual([
+        "Events · console-dev",
+        "Events · Account",
+      ]),
+    );
 
     // Profile is the account's, apart from Settings (D41).
     await userEvent.clear(field);
@@ -1824,16 +1831,13 @@ describe("search", () => {
     );
 
     // Names that start with the text before a word inside one; among those,
-    // the project's pages, then its team, then the project of that name, then
-    // what is above every project (the root's own pages, D41).
+    // the project's pages, then its team, then the project of that name.
     await waitFor(() =>
       expect(rows(dialog.getByRole("listbox"))).toEqual([
         "Login flows · console-dev",
         "Logistics · console-dev",
         "Logbook · logbook.example.com",
-        "Login flows · Account",
         "Jo Logan · jo@example.com · console-dev",
-        "Audit log · Account",
       ]),
     );
     // One list, not a group per kind.
@@ -1981,8 +1985,6 @@ describe("search", () => {
       expect(rows(dialog.getByRole("listbox"))).toEqual([
         "Logbook · proj_7",
         "Login flows · Choose a project",
-        "Login flows · Account",
-        "Audit log · Account",
       ]),
     );
 
@@ -2043,10 +2045,14 @@ describe("search", () => {
       "Go to a page, user, team or project, or run an action",
     );
 
-    // A project's page says that opening it asks for a project (D22).
+    // A project's page says that opening it asks for a project (D22); the
+    // root's own Users, the platform project's, is above every project (D41).
     await userEvent.type(field, "users");
-    expect(await dialog.findByRole("option", { name: /^Users/ })).toHaveTextContent(
-      "Choose a project",
+    await waitFor(() =>
+      expect(rows(dialog.getByRole("listbox"))).toEqual([
+        "Users · Choose a project",
+        "Users · Account",
+      ]),
     );
 
     // A person's name: no page is called that ("admin" would find the
@@ -2245,35 +2251,57 @@ describe("search", () => {
   // the root page they open, its kinds without one are left out, and opening
   // one keeps the selection in the URL (D36).
   it("reads a hit in the platform project as the root and opens it there", async () => {
+    const platformUser = {
+      id: "user_p",
+      schema: "sch_platform",
+      identifier: "ada@zitadel.example",
+      identifier_property: "email",
+      attributes: { email: "ada@zitadel.example" },
+      metadata: { status: "active", created_at: "2026-07-12T09:00:00Z" },
+    };
     server.use(
       http.post(SEARCH, async ({ request }) => {
         const body = (await request.json()) as SearchBody;
         return HttpResponse.json({
-          results: body.types.includes("team")
+          results: body.types.includes("user")
             ? [
+                {
+                  type: "user",
+                  id: "user_p",
+                  project_id: "proj_platform",
+                  title: "Ada Admin",
+                  subtitle: "ada@zitadel.example",
+                },
+                {
+                  type: "user",
+                  id: "user_1",
+                  project_id: "proj_1",
+                  title: "Ada Lovelace",
+                  subtitle: "ada@acme.example",
+                },
+              ]
+            : [
+                { type: "team", id: "team_p", project_id: "proj_platform", title: "Ada's team" },
                 {
                   type: "flow_definition",
                   id: "flow_p",
                   project_id: "proj_platform",
-                  title: "Sign in",
+                  title: "ada-sign-in",
                 },
-                { type: "team", id: "team_p", project_id: "proj_platform", title: "Sign-up team" },
-                { type: "flow_definition", id: "flow_1", project_id: "proj_1", title: "Sign up" },
-              ]
-            : [],
+              ],
           incomplete_types: [],
           more_projects: false,
         });
       }),
-      http.get("*/api/v1/flow_definitions/flow_p", () =>
-        HttpResponse.json({
-          id: "flow_p",
-          project_id: "proj_platform",
-          flow_definition: { name: "sign-in", status: "active", steps: [] },
-          created_at: "2026-01-01T00:00:00Z",
-          updated_at: "2026-01-01T00:00:00Z",
-        }),
+      http.get("*/api/v1/users/user_p", () => HttpResponse.json(platformUser)),
+      http.get("*/api/v1/schemas/sch_platform", () =>
+        HttpResponse.json({ id: "sch_platform", schema: { title: "Platform user" } }),
       ),
+      http.get("*/api/v1/users/user_p/passkeys", () => HttpResponse.json({ passkeys: [] })),
+      http.get("*/api/v1/users/user_p/identity_links", () =>
+        HttpResponse.json({ identity_links: [] }),
+      ),
+      http.get("*/api/v1/users/user_p/password", () => HttpResponse.json({})),
     );
     const router = renderShell("/projects");
     await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
@@ -2281,22 +2309,25 @@ describe("search", () => {
     const dialog = within(await screen.findByRole("dialog", { name: "Go to" }));
     await userEvent.type(
       dialog.getByPlaceholderText("Go to a page, user, team or project, or run an action"),
-      "sign",
+      "ada",
     );
 
-    // The selected project's hit first among equal matches (D39).
+    // The selected project's hit first among equal matches (D39); the
+    // platform project's user reads as the root's Users, which opens it.
     await waitFor(() =>
       expect(rows(dialog.getByRole("listbox"))).toEqual([
-        "Sign up · console-dev",
-        "Sign in · Login flows",
+        "Ada Lovelace · ada@acme.example · console-dev",
+        "Ada Admin · ada@zitadel.example · Users",
       ]),
     );
-    expect(dialog.queryByRole("option", { name: /Sign-up team/ })).not.toBeInTheDocument();
+    // Its teams have no root page, and its configuration is the server's.
+    expect(dialog.queryByRole("option", { name: /Ada's team/ })).not.toBeInTheDocument();
+    expect(dialog.queryByRole("option", { name: /ada-sign-in/ })).not.toBeInTheDocument();
     expect(dialog.queryByRole("option", { name: /Platform/ })).not.toBeInTheDocument();
 
-    await userEvent.click(dialog.getByRole("option", { name: /^Sign in/ }));
+    await userEvent.click(dialog.getByRole("option", { name: /^Ada Admin/ }));
     await waitFor(() =>
-      expect(router.state.resolvedLocation?.pathname).toBe("/platform/login-flows/flow_p"),
+      expect(router.state.resolvedLocation?.pathname).toBe("/platform/users/user_p"),
     );
     expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_1" });
   });
