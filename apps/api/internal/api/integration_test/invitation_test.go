@@ -6,11 +6,15 @@ import (
 	"encoding/json"
 	"net/url"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
+	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
 	api "go.zitadel.com/zitadel/v5/api"
 )
 
@@ -156,6 +160,162 @@ func TestInvitationCreate_UnclaimedProject(t *testing.T) {
 	conflict, ok := resp.(*api.CreateInvitationConflict)
 	require.True(t, ok, helpers.MustMarshal(t, resp))
 	assert.Equal(t, "inv.project_unclaimed", string(conflict.Code))
+}
+
+// TestInvitationAdminLimits covers what #2852's review checked by hand: the
+// pending cap and replace at it, pagination, a concurrent replace and another
+// project's ids.
+func TestInvitationAdminLimits(t *testing.T) {
+	t.Parallel()
+
+	newProject := func(t *testing.T) (*domain.Project, *helpers.ApiClient) {
+		t.Helper()
+		project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+		require.NoError(t, err)
+		claimProject(t, project.ID)
+		client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+		require.NoError(t, err)
+		harness.SetProjectSecretOnApiClient(t, client, project)
+		return project, client
+	}
+	create := func(t *testing.T, client *helpers.ApiClient, projectID api.ProjectID, replaces api.InvitationID) api.CreateInvitationRes {
+		t.Helper()
+		req := projectMemberInvitation(api.InvitationProjectMemberPayloadRelationViewer, "")
+		if replaces != "" {
+			req.ReplacesInvitationID = api.NewOptInvitationID(replaces)
+		}
+		resp, err := client.CreateInvitation(t.Context(), api.NewCreateInvitationProjectMemberRequestCreateInvitationRequest(req), api.CreateInvitationParams{ProjectID: projectID})
+		require.NoError(t, err)
+		return resp
+	}
+	createdID := func(t *testing.T, resp api.CreateInvitationRes) api.InvitationID {
+		t.Helper()
+		created, ok := resp.(*api.CreateInvitationResponse)
+		require.True(t, ok, helpers.MustMarshal(t, resp))
+		return created.CreateInvitationProjectMemberResponse.ID
+	}
+
+	t.Run("the pending cap, replace at it and pagination", func(t *testing.T) {
+		t.Parallel()
+		project, client := newProject(t)
+		projectID := api.ProjectID(project.ID)
+
+		// Seeded below the API, so the cap is reached without a hundred requests.
+		stmts := harness.EnsureServiceDB(t).Statements()
+		for range service.MaxPendingInvitations - 1 {
+			_, tokenHash, err := domain.NewInvitationToken()
+			require.NoError(t, err)
+			journeyID, err := domain.NewInvitationJourneyID()
+			require.NoError(t, err)
+			require.NoError(t, stmts.CreateInvitation(t.Context(), &domain.Invitation{
+				ProjectID:     project.ID,
+				Type:          domain.InvitationTypeProjectMember,
+				ProjectMember: &domain.InvitationProjectMember{Relation: "viewer"},
+				ExpiresAt:     time.Now().Add(domain.InvitationExpiration),
+				JourneyID:     journeyID,
+				TokenHash:     tokenHash,
+			}))
+		}
+		last := createdID(t, create(t, client, projectID, ""))
+
+		limited, ok := create(t, client, projectID, "").(*api.CreateInvitationConflict)
+		require.True(t, ok)
+		assert.Equal(t, "inv.pending_limit", string(limited.Code))
+		// A replace frees its original's place before the count.
+		createdID(t, create(t, client, projectID, last))
+
+		seen := map[api.InvitationID]bool{}
+		params := api.ListInvitationsParams{ProjectID: projectID, Limit: api.NewOptLimit(30)}
+		for pages := 0; ; pages++ {
+			require.Less(t, pages, 10, "pagination does not end")
+			resp, err := client.ListInvitations(t.Context(), params)
+			require.NoError(t, err)
+			page, ok := resp.(*api.ListInvitationsResponse)
+			require.True(t, ok, helpers.MustMarshal(t, resp))
+			require.LessOrEqual(t, len(page.Invitations), 30)
+			for _, inv := range page.Invitations {
+				id := inv.InvitationProjectMember.ID
+				require.False(t, seen[id], "%s listed twice", id)
+				seen[id] = true
+			}
+			token, ok := page.NextPageToken.Get()
+			if !ok {
+				break
+			}
+			params.PageToken = api.NewOptPageToken(token)
+		}
+		assert.Len(t, seen, service.MaxPendingInvitations)
+		assert.False(t, seen[last], "the replaced original is gone")
+	})
+
+	t.Run("of two concurrent replaces one wins", func(t *testing.T) {
+		t.Parallel()
+		project, client := newProject(t)
+		projectID := api.ProjectID(project.ID)
+		original := createdID(t, create(t, client, projectID, ""))
+
+		results := make([]api.CreateInvitationRes, 2)
+		var wg sync.WaitGroup
+		for i := range results {
+			wg.Go(func() {
+				resp, err := client.CreateInvitation(t.Context(),
+					api.NewCreateInvitationProjectMemberRequestCreateInvitationRequest(func() api.CreateInvitationProjectMemberRequest {
+						req := projectMemberInvitation(api.InvitationProjectMemberPayloadRelationViewer, "")
+						req.ReplacesInvitationID = api.NewOptInvitationID(original)
+						return req
+					}()),
+					api.CreateInvitationParams{ProjectID: projectID})
+				assert.NoError(t, err)
+				results[i] = resp
+			})
+		}
+		wg.Wait()
+
+		var won, lost int
+		for _, resp := range results {
+			switch resp.(type) {
+			case *api.CreateInvitationResponse:
+				won++
+			case *api.CreateInvitationNotFound:
+				lost++
+			default:
+				t.Errorf("unexpected answer: %s", helpers.MustMarshal(t, resp))
+			}
+		}
+		assert.Equal(t, 1, won)
+		assert.Equal(t, 1, lost)
+
+		listed, err := client.ListInvitations(t.Context(), api.ListInvitationsParams{ProjectID: projectID})
+		require.NoError(t, err)
+		page, ok := listed.(*api.ListInvitationsResponse)
+		require.True(t, ok)
+		assert.Len(t, page.Invitations, 1, "one invitation per journey")
+	})
+
+	t.Run("another project's invitation answers as unknown", func(t *testing.T) {
+		t.Parallel()
+		owner, ownerClient := newProject(t)
+		other, otherClient := newProject(t)
+		ownerID := api.ProjectID(owner.ID)
+		foreign := createdID(t, create(t, otherClient, api.ProjectID(other.ID), ""))
+
+		got, err := ownerClient.GetInvitation(t.Context(), api.GetInvitationParams{ID: foreign, ProjectID: ownerID})
+		require.NoError(t, err)
+		require.IsType(t, &api.GetInvitationNotFound{}, got, helpers.MustMarshal(t, got))
+
+		cancelled, err := ownerClient.CancelInvitation(t.Context(), api.CancelInvitationParams{ID: foreign, ProjectID: ownerID})
+		require.NoError(t, err)
+		require.IsType(t, &api.CancelInvitationNotFound{}, cancelled, helpers.MustMarshal(t, cancelled))
+
+		require.IsType(t, &api.CreateInvitationNotFound{}, create(t, ownerClient, ownerID, foreign))
+
+		// The other project's invitation is untouched.
+		still, err := otherClient.GetInvitation(t.Context(), api.GetInvitationParams{ID: foreign, ProjectID: api.ProjectID(other.ID)})
+		require.NoError(t, err)
+		inv, ok := still.(*api.Invitation)
+		require.True(t, ok, helpers.MustMarshal(t, still))
+		assert.Equal(t, api.InvitationStatusPending, inv.InvitationProjectMember.Status)
+	})
 }
 
 // TestInvitationRedeem covers #2853: a platform user's session looks an
