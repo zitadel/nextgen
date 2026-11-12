@@ -9,6 +9,7 @@ import {
   CommandGroup,
   CommandInput,
   CommandItem,
+  CommandItemText,
   CommandList,
   CommandSeparator,
 } from "@/components/ui/command";
@@ -362,15 +363,8 @@ export function ComboboxContent({
                             </span>
                           )}
                         </span>
-                      ) : option.description ? (
-                        <span className="flex min-w-0 flex-1 flex-col">
-                          <span className="truncate font-medium">{option.label}</span>
-                          <span className="truncate text-xs leading-4 text-muted-foreground">
-                            {option.description}
-                          </span>
-                        </span>
                       ) : (
-                        <span className="min-w-0 flex-1 truncate">{option.label}</span>
+                        <CommandItemText label={option.label} description={option.description} />
                       )}
                       {isSelected && indicator === "check" && (
                         <Check className="absolute right-2 size-4" aria-hidden />

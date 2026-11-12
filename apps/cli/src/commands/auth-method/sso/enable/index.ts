@@ -9,9 +9,9 @@ import {
   type IdpProvider,
   parseClientId,
   parseConnectionSlug,
+  type Parsed,
   parseDisplayName,
   parseIssuer,
-  type Parsed,
   parseScopes,
   type ProviderName,
   providerOf,
@@ -20,14 +20,13 @@ import {
   selectionName,
   validated,
 } from "@zitadel/config/idp";
-import { consola } from "consola";
 import { z } from "zod";
 
 import { AuthMethodCommand, type SchemaTarget } from "@/commands/auth-method/command";
 import {
   isCancelled,
-  OriginService,
   Origins,
+  OriginService,
   VariableService,
   VariableWrite,
   type ZitadelClient,
@@ -40,8 +39,8 @@ import {
   type CredentialNames,
   CredentialPrompt,
   customExample,
-  type GivenCredentials,
   ENABLE_FLAG_NAMES,
+  type GivenCredentials,
   loopbackIssuerWarning,
   ProviderChoice,
   type PublishedCredentials,
@@ -50,11 +49,13 @@ import {
   type SecretPublisher,
 } from "@/lib/idp";
 import { loopbackReach } from "@/lib/local-server/runtime";
+import { log } from "@/lib/log";
 import { type Admitted, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
 import { environmentFlags } from "@/lib/oclif/environment-flags";
 import { filled, reads, type Refused } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
-import { prose } from "@/lib/oclif/rendering";
+
+import type { SuggestedCommand } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { reportWarning } from "@/lib/warnings";
 import {
@@ -141,8 +142,9 @@ const PROVIDER_IS_NAMED_REFUSAL: Refusal = {
  * What a Project with no development issuer is refused for.
  */
 const NO_ISSUER_REFUSAL: Refusal = {
-  message: "This Project has no development issuer",
-  hint: "Run `zitadel setup` first, or set ZITADEL_ISSUER to the origin your app serves from.",
+  message: "This project has no development issuer",
+  hint: "Set the project up first, or set ZITADEL_ISSUER to the origin your app serves from.",
+  next: [{ id: "setup" }],
 };
 
 /**
@@ -306,18 +308,16 @@ type Payload = {
 };
 
 /**
- * Joins names as "a, b, and c" in the summary box.
- */
-const LIST = new Intl.ListFormat("en", { type: "conjunction" });
-
-/**
  * Nothing sent to the project, as a dry run reports it.
  */
-const NOTHING_PUBLISHED: PublishedCredentials = { clientId: undefined, secret: undefined };
+const NOTHING_PUBLISHED: PublishedCredentials = {
+  clientId: undefined,
+  secret: undefined,
+};
 
 /**
- * The `auth-method sso enable` command (ADR 070) — add a provider to a
- * Project's sign-in methods. It replaces the former `sso enable`.
+ * `zitadel auth-method sso enable` — add a provider to a Project's sign-in
+ * methods.
  *
  * One direct journey: the developer is told what to register with the
  * provider, gives back the credentials, and the Project's configuration is
@@ -331,6 +331,7 @@ const NOTHING_PUBLISHED: PublishedCredentials = { clientId: undefined, secret: u
 export default class AuthMethodSsoEnable extends AuthMethodCommand {
   static override description = "Add an identity provider to a user schema.";
   static override group = CommandGroups.authentication;
+
   static override examples = [
     "<%= config.bin %> auth-method sso enable --provider google",
     "<%= config.bin %> auth-method sso enable --provider google --schema customers",
@@ -338,7 +339,10 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     `<%= config.bin %> auth-method sso enable ${customExample(ENABLE_FLAG_NAMES)}`,
     `<%= config.bin %> auth-method sso enable ${customExample(ENABLE_FLAG_NAMES, true)} --client-id abc123 --non-interactive < secret.txt`,
   ];
-  static override baseFlags = { ...AuthMethodCommand.baseFlags, ...environmentFlags };
+  static override baseFlags = {
+    ...AuthMethodCommand.baseFlags,
+    ...environmentFlags,
+  };
   static override flags = {
     provider: Flags.string({
       options: [...IDP_PROVIDERS, CUSTOM_PROVIDER],
@@ -384,13 +388,12 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
    * Add the provider to the schema and its login flows, and publish its
    * credentials to the project.
    *
-   * @param input - The provider, its settings, the schema and the environment flags.
+   * @param input.flags - The provider, its settings, the schema and the environment flags.
    * @returns The result.
    * @throws {@link ZitadelError} When no provider is named, a setting is
    *   refused, the schema cannot be chosen, or no flow can offer the provider.
    */
-  protected async execute(input: Admitted<typeof AuthMethodSsoEnable>): Promise<JsonEnvelope> {
-    const flags = input.flags;
+  protected async execute({ flags }: Admitted<typeof AuthMethodSsoEnable>): Promise<JsonEnvelope> {
     if (flags.provider === undefined) {
       throw refusalError(PROVIDER_IS_NAMED_REFUSAL, {});
     }
@@ -404,7 +407,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     target.config.flows.resolveForSso(target.schema);
     // Resolved before anything else is asked for: being turned away after
     // typing a secret would mean typing it again.
-    const remote = await this.connect({ quiet: true });
+    const remote = await this.connect();
     // Read only to name more callback URIs: a platform that cannot answer still
     // gets the local one, and the run goes on. A cancelled run stops instead,
     // as OriginService.remove does.
@@ -416,7 +419,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         }
         return Origins.wrap([]);
       });
-    const selection = await choice.resolve(target, this.input);
+    const selection = await choice.resolve(target, this.ask);
     const provider = providerOf(selection);
     const options = {
       clientId: flags.clientId,
@@ -441,7 +444,10 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     });
     this.introduce(summary, target.schema, provider);
     if (this.dryRun) {
-      return this.previewResult(summary, preview, delivery.names, flags.clientId);
+      // What the developer typed, so the real run is one command away.
+      const real = await this.realRun();
+
+      return this.previewResult(summary, preview, delivery.names, flags.clientId, real);
     }
 
     const given = await prompt.ask(flags.clientId);
@@ -450,7 +456,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       return target.config.connections.enable(target.schema, located, options);
     });
     if (summary.reused) {
-      consola.success(`Reusing ${summary.connection.path}`);
+      log.done(`Reusing ${escapeControlCharacters(summary.connection.path)}`);
     }
     // The credentials go before the files: saving writes the connection first,
     // so a write that then fails would leave a connection on disk whose
@@ -465,8 +471,20 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       this.publisher(remote.client, remote.projectId),
     );
     const written = await this.write(target, change, undefined);
-    this.reportOutcome({ change, written, provider, given, schema: target.schema });
-    return this.result({ summary, change, written, published, delivery });
+    this.reportOutcome({
+      change,
+      written,
+      provider,
+      given,
+      schema: target.schema,
+    });
+    return this.result({
+      summary,
+      change,
+      written,
+      published,
+      delivery,
+    });
   }
 
   /**
@@ -499,8 +517,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     return new CredentialDelivery({
       connection: preview.document,
       reused: !preview.created,
-      selector: this.environmentSelector(),
-      cliVersion: this.cliVersion,
+      suggest: this.suggest,
     });
   }
 
@@ -522,10 +539,9 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       selection,
       reused: !preview.created,
       secretVariable: names.clientSecret,
-      ask: this.input,
+      ask: this.ask,
       developmentBuild: isDevelopmentBuild() && !this.nonInteractive,
-      selector: this.environmentSelector(),
-      cliVersion: this.cliVersion,
+      suggest: this.suggest,
     });
   }
 
@@ -589,36 +605,37 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
    * @param provider - The provider.
    */
   private introduce(summary: Summary, schema: UserSchema, provider: IdpProvider): void {
-    consola.info(`Project   ${escapeControlCharacters(summary.projectId)}`);
-    if (schema.methods.length > 0) {
-      consola.info(`Schema    ${schema.path} (${schema.methods.join(", ")})`);
-    } else {
-      consola.info(`Schema    ${schema.path}`);
-    }
+    log.info(
+      `Editing ${escapeControlCharacters(schema.path)}${schema.methods.length > 0 ? `, which offers ${escapeControlCharacters(schema.methods.join(", "))}` : ""}`,
+    );
     if (!summary.reused) {
-      consola.info(
+      log.info(
         `${escapeControlCharacters(provider.displayName, { keepLayout: false })} needs an OAuth application.`,
       );
     }
-    consola.info(`Callback URI   ${summary.callbackUri}`);
+    log.info(
+      `Callback URI   ${escapeControlCharacters(summary.callbackUri, { keepLayout: false })}`,
+    );
     for (const uri of summary.deployedCallbackUris) {
-      consola.info(`Callback URI   ${escapeControlCharacters(uri, { keepLayout: false })}`);
+      log.info(`Callback URI   ${escapeControlCharacters(uri, { keepLayout: false })}`);
     }
     if (summary.previewCallbackUris.length > 0) {
-      consola.info(
+      log.info(
         "Each preview URL needs its own callback URI at the provider, since it takes no wildcards:",
       );
       for (const uri of summary.previewCallbackUris) {
-        consola.info(`  ${escapeControlCharacters(uri, { keepLayout: false })}`);
+        log.info(`  ${escapeControlCharacters(uri, { keepLayout: false })}`);
       }
     }
     // A custom provider has no console to send the developer to: it is
     // theirs, and the issuer they gave is the only address known.
     if (!summary.reused && provider.consoleUrl === undefined) {
-      consola.info(`Register it as a client at ${provider.issuer}, with the callback URI above.`);
+      log.info(
+        `Register it as a client at ${escapeControlCharacters(provider.issuer)}, with the callback URI above.`,
+      );
     }
     if (!summary.reused && provider.consoleUrl !== undefined) {
-      consola.info(`Create it at   ${provider.consoleUrl}`);
+      log.info(`Create it at   ${escapeControlCharacters(provider.consoleUrl)}`);
     }
   }
 
@@ -630,30 +647,60 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
    * @param change - The change worked out before anything was asked.
    * @param names - The variables the credentials would go to.
    * @param givenClientId - The client id `--client-id` gave, if any.
-   * @returns The skipped result.
+   * @param real - The real run, as the developer typed it.
+   * @returns The dry run's result.
    */
   private previewResult(
     summary: Summary,
     change: DocumentChange<Connection>,
     names: CredentialNames,
     givenClientId: ClientId | undefined,
+    real: SuggestedCommand,
   ): JsonEnvelope {
     this.report(change);
     if (!this.isJson) {
       this.drawMapping(change);
     }
     const toStore = this.wouldStore(summary.reused, names, givenClientId);
-    const writes = change.changedPaths.map((file) => {
-      return `Would write ${file}`;
-    });
     const stores =
-      toStore.length > 0 ? [`Would store ${toStore.join(" and ")} on the project`] : [];
-    const payload = this.payload({ summary, change, published: NOTHING_PUBLISHED, names });
+      toStore.length > 0
+        ? [
+            `Would store ${new Intl.ListFormat("en", { type: "conjunction" }).format(toStore)} on the project`,
+          ]
+        : [];
+    const said = [
+      ...change.changedPaths.map((file) => {
+        return `Would write ${file}`;
+      }),
+      ...stores,
+    ];
+
+    const title = escapeControlCharacters(
+      said[0] === undefined ? "Nothing would change (dry run)" : `${said[0]} (dry run)`,
+    );
+
     return this.emit({
-      status: "skipped",
-      reason: "dry-run",
-      data: { ...payload, would_store: toStore },
-      pretty: prose([...writes, ...stores].join("\n")),
+      status: "ok",
+      data: {
+        ...this.payload({
+          summary,
+          change,
+          published: NOTHING_PUBLISHED,
+          names,
+        }),
+        title,
+        would_store: toStore,
+        dry_run: true,
+        next_args: [this.argsOf(real)],
+      },
+      summary: {
+        title,
+        sections: [],
+        lines: said.slice(1).map((line) => {
+          return escapeControlCharacters(line);
+        }),
+      },
+      next: { commands: [real] },
     });
   }
 
@@ -673,9 +720,12 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     reused: boolean,
     names: CredentialNames,
     givenClientId: ClientId | undefined,
-  ): readonly (ClientIdVariable | ClientSecretVariable | undefined)[] {
+  ): readonly (ClientIdVariable | ClientSecretVariable)[] {
+    // A credential the file holds as a value names no variable, so it is left out.
     if (!reused) {
-      return [names.clientId, names.clientSecret];
+      return [names.clientId, names.clientSecret].filter((name) => {
+        return name !== undefined;
+      });
     }
     if (givenClientId !== undefined && names.clientId !== undefined) {
       return [names.clientId];
@@ -725,7 +775,10 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     }
     const variableService = new VariableService(client, projectId);
     return async (name, value, options) => {
-      const write = VariableWrite.of({ secret: options.secret, preview: false });
+      const write = VariableWrite.of({
+        secret: options.secret,
+        preview: false,
+      });
       await variableService.set(name, value, write);
     };
   }
@@ -747,8 +800,8 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       reportWarning(`${provider.displayName} points at ${endpointIssuer}, not the provider`);
     }
     if (outcome.written.length === 0 && outcome.change.notices.length === 0) {
-      consola.info(
-        `${outcome.schema.name} and its login flow already offer ${escapeControlCharacters(provider.displayName, { keepLayout: false })}`,
+      log.info(
+        `${escapeControlCharacters(outcome.schema.name)} and its login flow already offer ${escapeControlCharacters(provider.displayName, { keepLayout: false })}`,
       );
     }
   }
@@ -769,36 +822,50 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
   private result(input: ResultInput): JsonEnvelope {
     const summary = input.summary;
     const name = summary.displayName;
-    const scopeArgs = this.environmentSelectorArgs();
-    const recovery = input.delivery.recoveryArgs(input.published, scopeArgs);
+    const recovery = input.delivery.unpublishedOf(input.published).map((missing) => {
+      return this.suggest({
+        id: "variable:set",
+        args: { name: missing.name },
+        flags: { secret: missing.secret },
+      });
+    });
     const unpublished = !summary.reused || input.written.length > 0;
     const stored = input.delivery.areStored(input.published);
-    const followUps = this.followUps(unpublished, scopeArgs, recovery);
-    const actions = [
-      `Deploy the configuration to make ${name} sign-in available in your app, then reload your app and test ${name} sign-in.`,
-    ];
+    const followUps = this.followUps(unpublished, recovery);
     const payload = this.payload({
       summary,
       change: input.change,
       published: input.published,
       names: input.delivery.names,
     });
-    const next = unpublished
-      ? { actions, commands: followUps.commands }
-      : { commands: followUps.commands };
 
     if (!this.isJson) {
       this.drawMapping(input.change);
     }
 
+    const title = this.title(name, unpublished);
+
     return this.emit({
       status: "ok",
       data: {
-        title: this.title(name, unpublished, stored),
+        title,
         ...payload,
         next_args: followUps.args,
       },
-      next,
+      summary: {
+        title: escapeControlCharacters(title),
+        sections: [],
+        lines: unpublished && stored ? ["Its credentials are stored in your project."] : [],
+      },
+      // The deploy commands are listed once, in `commands`, so the prose names none.
+      next: unpublished
+        ? {
+            actions: [
+              `Deploy it to make ${name} sign-in available in your app, then reload the app and test it`,
+            ],
+            commands: followUps.commands,
+          }
+        : { commands: followUps.commands },
     });
   }
 
@@ -849,7 +916,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       scopes.length === 0
         ? []
         : [
-            `Zitadel asks ${text(connection.displayName)} for these scopes: ${LIST.format(scopes.map(text))}.`,
+            `Zitadel asks ${text(connection.displayName)} for these scopes: ${new Intl.ListFormat("en", { type: "conjunction" }).format(scopes.map(text))}.`,
           ],
       unmapped.length === 0
         ? []
@@ -867,7 +934,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       usedBy.length === 0
         ? []
         : [
-            `This connection is used by ${LIST.format(usedBy.map(text))}, so a change here affects the people who sign in with it.`,
+            `This connection is used by ${new Intl.ListFormat("en", { type: "conjunction" }).format(usedBy.map(text))}, so a change here affects the people who sign in with it.`,
           ],
       [
         `To change which claim fills an attribute, edit claim_mapping in ${text(connection.path)} and run deploy.`,
@@ -875,7 +942,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     ].filter((section) => {
       return section.length > 0;
     });
-    consola.info(
+    log.info(
       sections
         .flatMap((section, at) => {
           return at === 0 ? section : ["", ...section];
@@ -885,22 +952,18 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
   }
 
   /**
-   * The result's title: whether the provider is configured, and whether its
-   * credentials are stored on the Project.
+   * The result's title: whether the provider is configured. The terminal and
+   * the envelope say it in these same words.
    *
    * @param name - The provider's display name.
    * @param unpublished - Whether the configuration has changes to deploy.
-   * @param stored - Whether both credentials reached the project.
    * @returns The title.
    */
-  private title(name: string, unpublished: boolean, stored: boolean): string {
+  private title(name: string, unpublished: boolean): string {
     if (!unpublished) {
-      return `${name} sign-in is already configured locally.`;
+      return `${name} sign-in is already configured locally`;
     }
-    if (stored) {
-      return `${name} sign-in is configured locally. Provider credentials are stored on your Project.`;
-    }
-    return `${name} sign-in is configured locally.`;
+    return `${name} sign-in is configured locally`;
   }
 
   /**
@@ -958,7 +1021,10 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     if (published === undefined || names.clientId === undefined) {
       return null;
     }
-    return { variable: names.clientId, published };
+    return {
+      variable: names.clientId,
+      published,
+    };
   }
 
   /**
@@ -971,6 +1037,9 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     if (secret === undefined) {
       return null;
     }
-    return { variable: secret.name, published: secret.published };
+    return {
+      variable: secret.name,
+      published: secret.published,
+    };
   }
 }

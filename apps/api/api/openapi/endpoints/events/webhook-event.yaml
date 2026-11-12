@@ -259,7 +259,7 @@ oneOf:
             $ref: payloads/empty-event-payload.yaml
   - title: flow.signup_challenge.issued
     description: |
-      A password signup proof-of-work challenge was issued.
+      A sign-up proof-of-work challenge was issued.
     allOf:
       - $ref: webhook-event-base.yaml
       - type: object

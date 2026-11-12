@@ -1,7 +1,7 @@
-import { PreviewService } from "@/lib/backend";
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
+import { PreviewService } from "@/lib/backend";
 import {
   type Admitted,
   CommandGroups,
@@ -10,6 +10,7 @@ import {
   PreviewCommand,
 } from "@/lib/oclif";
 import { reads, type Refused, whole } from "@/lib/oclif/flags";
+import { relatedFlags } from "@/lib/suggestion/relations";
 import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
 
 /** The columns `list` renders, in order. */
@@ -44,33 +45,35 @@ const LIMIT: Refused<number> = {
 export default class PreviewList extends Tabulatable(PreviewCommand) {
   static override description = "List the project's live previews, newest first.";
   static override group = CommandGroups.configuration;
+
   static override examples = [
     "<%= config.bin %> preview list",
     "<%= config.bin %> preview list --all",
     "<%= config.bin %> preview list --plain",
   ];
-  static override flags = {
-    limit: Flags.custom<number>({
-      parse: reads(LIMIT),
-    })({
-      min: LIMIT_MIN,
-      max: LIMIT_MAX,
-      description: "Page size (server default 20, max 100).",
-    }),
-    "page-token": nonBlankString({
-      description: "Continue from a previous page's next_page_token.",
-    }),
-    all: Flags.boolean({
-      char: "a",
-      description: "Fetch every page instead of one.",
-      exclusive: ["page-token"],
-    }),
-    plain: plainFlag,
-  };
+  static override flags = relatedFlags(
+    {
+      limit: Flags.custom<number>({
+        parse: reads(LIMIT),
+      })({
+        min: LIMIT_MIN,
+        max: LIMIT_MAX,
+        description: "Page size (server default 20, max 100).",
+      }),
+      "page-token": nonBlankString({
+        description: "Continue from a previous page's next_page_token.",
+      }),
+      all: Flags.boolean({
+        char: "a",
+        description: "Fetch every page instead of one.",
+      }),
+      plain: plainFlag,
+    },
+    { all: { exclusive: ["page-token"] } },
+  );
 
   protected async execute({ flags }: Admitted<typeof PreviewList>): Promise<JsonEnvelope> {
     const { client, projectId } = await this.connect();
-
     const previewService = new PreviewService(client, projectId);
     const listed = await previewService.page(
       {
@@ -90,14 +93,11 @@ export default class PreviewList extends Tabulatable(PreviewCommand) {
         created: preview.created_at,
       };
     });
-
     const columns = COLUMNS;
-    const empty = "No live previews.";
+    const empty = "No previews found";
     const footer: string[] = [];
     const page = {
       token: listed.next,
-      command: "preview list",
-      flags: flags.limit === undefined ? [] : [`--limit ${flags.limit}`],
     };
     const extra = {};
 

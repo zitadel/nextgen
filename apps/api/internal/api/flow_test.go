@@ -171,7 +171,7 @@ func newTestServerKeys(t *testing.T, openErr, sealErr error, middleware ...func(
 	oas, err := gen.NewServer(
 		handler,
 		api.NewSecurityHandler(tokenService),
-		gen.WithErrorHandler(api.OgenErrorHandler),
+		gen.WithErrorHandler(api.OgenErrorHandler(0)),
 	)
 	require.NoError(t, err)
 	var h http.Handler = oas

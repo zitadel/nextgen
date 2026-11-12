@@ -167,6 +167,30 @@ function CommandItem({ className, ...props }: React.ComponentProps<typeof Comman
   );
 }
 
+/**
+ * An item's text: its label, and beneath it, when there is one, a muted line
+ * that tells it from another of the same name or says where it is. One line
+ * fills the row; two stack a 14px label over a 12px description.
+ */
+function CommandItemText({
+  label,
+  description,
+}: {
+  label: React.ReactNode;
+  description?: React.ReactNode;
+}) {
+  return description ? (
+    <span data-slot="command-item-text" className="flex min-w-0 flex-1 flex-col">
+      <span className="truncate font-medium">{label}</span>
+      <span className="truncate text-xs leading-4 text-muted-foreground">{description}</span>
+    </span>
+  ) : (
+    <span data-slot="command-item-text" className="min-w-0 flex-1 truncate">
+      {label}
+    </span>
+  );
+}
+
 function CommandShortcut({ className, ...props }: React.ComponentProps<"span">) {
   return (
     <span
@@ -185,6 +209,7 @@ export {
   CommandEmpty,
   CommandGroup,
   CommandItem,
+  CommandItemText,
   CommandShortcut,
   CommandSeparator,
 };

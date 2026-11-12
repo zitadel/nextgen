@@ -12,11 +12,7 @@ vi.mock("@oclif/table", async (importOriginal) => {
 import { makeTable } from "@oclif/table";
 
 import { asTerminal, offTerminal } from "@tests/helpers/terminal";
-import {
-  aTableDrawnByARun,
-  aTabulatingCommand,
-  anUnscopedTabulatingCommand,
-} from "@tests/helpers/tabulate";
+import { aTableDrawnByARun, aTabulatingCommand } from "@tests/helpers/tabulate";
 
 const draw = (argv: string[] = []) => aTabulatingCommand(argv);
 
@@ -37,6 +33,23 @@ const printed = async (
   // A list arrives spelled out: its table is painted, its plain records are
   // what a pipe reads, and either way nothing escapes it again on the way out.
   return result.pretty?.text ?? "";
+};
+
+/**
+ * What a list is drawn from for a person at a terminal: its summary, whose
+ * headline is the count, whose lines are the table and whose extras sit beside
+ * the count.
+ */
+const summarised = async (
+  flags: { plain: boolean | undefined },
+  view: Parameters<ReturnType<typeof draw>["drawList"]>[1],
+  argv: string[] = [],
+) => {
+  const result = await draw(argv).drawList(flags, view);
+  if (result.status !== "ok") {
+    throw new Error(`expected an ok result, got ${result.status}`);
+  }
+  return result.summary;
 };
 
 describe("tabulate", () => {
@@ -162,50 +175,68 @@ describe("a list for a person", () => {
     rows,
     items: rows,
     singular: "thing",
-    empty: "No things.",
+    empty: "No things",
     footer: [],
     page: null,
     extra: {},
   };
 
-  it("draws the table, a blank line, a count and the footer", async () => {
-    const list = await asTerminal(() => printed({ plain: false }, { ...view, footer: ["More."] }));
+  it("states the count as its headline, the table under it and the footer beside it", async () => {
+    const summary = await asTerminal(() =>
+      summarised({ plain: false }, { ...view, footer: ["More."] }),
+    );
 
-    expect(list).toBe("  id\n ────\n  a\n\n1 thing\nMore.");
+    expect(summary).toEqual({
+      title: "Found 1 thing",
+      sections: [],
+      lines: ["  id", " ────", "  a"],
+      extras: ["More."],
+    });
+  });
+
+  it("builds the table once, and prints no second rendering of it", async () => {
+    const result = await asTerminal(() => draw().drawList({ plain: false }, view));
+
+    expect(makeTable).toHaveBeenCalledTimes(1);
+    expect(result).not.toHaveProperty("pretty");
   });
 
   it("says so when the list is empty", async () => {
-    expect(await asTerminal(() => printed({ plain: false }, { ...view, rows: [] }))).toBe(
-      "No things.",
-    );
+    expect(await asTerminal(() => summarised({ plain: false }, { ...view, rows: [] }))).toEqual({
+      title: "No things",
+      sections: [],
+    });
   });
 
   it("escapes a footer line, which names what the server answered", async () => {
     const footer = ["Frozen by dep_1\u001b[2J for https://a.example"];
 
-    const list = await asTerminal(() => printed({ plain: false }, { ...view, footer }));
+    const summary = await asTerminal(() => summarised({ plain: false }, { ...view, footer }));
 
-    expect(list).not.toContain("\u001b");
-    expect(list).toContain("Frozen by dep_1\\x1b[2J for https://a.example");
+    expect(JSON.stringify(summary)).not.toContain("\\u001b");
+    expect(summary?.extras).toEqual(["Frozen by dep_1\\x1b[2J for https://a.example"]);
   });
 
   it("escapes the empty line, which names what the server answered", async () => {
-    const empty = "dep_1\u001b[2J froze no variables.";
+    const empty = "dep_1\u001b[2J froze no variables";
 
-    const list = await asTerminal(() => printed({ plain: false }, { ...view, rows: [], empty }));
+    const summary = await asTerminal(() =>
+      summarised({ plain: false }, { ...view, rows: [], empty }),
+    );
 
-    expect(list).toBe("dep_1\\x1b[2J froze no variables.");
+    expect(summary?.title).toBe("dep_1\\x1b[2J froze no variables");
   });
 
   it("pluralises the count, with the plural when one is given", async () => {
     const rows = [{ id: "a" }, { id: "b" }];
 
-    expect(await asTerminal(() => printed({ plain: false }, { ...view, rows }))).toContain(
-      "2 things",
+    expect((await asTerminal(() => summarised({ plain: false }, { ...view, rows })))?.title).toBe(
+      "Found 2 things",
     );
     expect(
-      await asTerminal(() => printed({ plain: false }, { ...view, rows, plural: "people" })),
-    ).toContain("2 people");
+      (await asTerminal(() => summarised({ plain: false }, { ...view, rows, plural: "people" })))
+        ?.title,
+    ).toBe("Found 2 people");
   });
 
   it("draws nothing under --json", async () => {
@@ -223,7 +254,7 @@ describe("a list for a script", () => {
     rows,
     items: rows,
     singular: "thing",
-    empty: "No things.",
+    empty: "No things",
     footer: [],
     page: null,
     extra: {},
@@ -235,12 +266,63 @@ describe("a list for a script", () => {
     expect(await offTerminal(() => printed({ plain: undefined }, view))).toBe("a");
   });
 
+  it("builds no table for a plain run, which draws none", async () => {
+    await asTerminal(() => draw().drawList({ plain: true }, view));
+    await offTerminal(() => draw().drawList({ plain: false }, view));
+
+    expect(makeTable).not.toHaveBeenCalled();
+  });
+
   it("is a table for a terminal that did not ask for plain", async () => {
-    expect(await asTerminal(() => printed({ plain: undefined }, view))).toContain("──");
+    const summary = await asTerminal(() => summarised({ plain: undefined }, view));
+
+    expect(summary?.lines?.join("\n")).toContain("──");
   });
 
   it("prints nothing for an empty list", async () => {
     expect(await printed({ plain: true }, { ...view, rows: [] })).toBe("");
+  });
+
+  it("says what the footer says beside the rows, not in them", async () => {
+    const result = await draw().drawList(
+      { plain: true },
+      { ...view, footer: ["Deployment dep_1", "Origins: https://a.example"] },
+    );
+
+    expect(result).toMatchObject({
+      pretty: { kind: "piped", text: "a" },
+      footer: "Deployment dep_1\nOrigins: https://a.example",
+    });
+  });
+
+  it("says the list is empty beside the rows, so a pipe still hears it", async () => {
+    const result = await draw().drawList(
+      { plain: true },
+      { ...view, rows: [], items: [], empty: "No things" },
+    );
+
+    expect(result).toMatchObject({ pretty: { kind: "piped", text: "" }, footer: "No things" });
+  });
+
+  it("names the next page beside the rows", async () => {
+    const result = await draw().drawList({ plain: true }, { ...view, page: { token: "p2" } });
+
+    expect(result).toMatchObject({ footer: "More available: --page-token p2 (or --all)" });
+  });
+
+  it("says nothing beside the rows when there is nothing to add", async () => {
+    const result = await draw().drawList({ plain: true }, view);
+
+    expect(result).not.toHaveProperty("footer");
+  });
+
+  it("adds no footer under --json, which has an envelope for it", async () => {
+    const result = await draw(["--json"]).drawList(
+      { plain: true },
+      { ...view, footer: ["Deployment dep_1"] },
+    );
+
+    expect(result).not.toHaveProperty("footer");
   });
 
   it("emits one tab-separated record per line, with no header", async () => {
@@ -295,7 +377,7 @@ describe("emitList", () => {
     rows,
     items: rows,
     singular: "thing",
-    empty: "No things.",
+    empty: "No things",
     footer: [],
     page: null,
     extra: {},
@@ -345,7 +427,7 @@ describe("emitList", () => {
   it("reports the cursor under the property the platform spells it as", async () => {
     const result = await draw().drawList(
       { plain: true },
-      { ...view, page: { token: "p2", command: "thing list", flags: [], cursorKey: "nextCursor" } },
+      { ...view, page: { token: "p2", cursorKey: "nextCursor" } },
     );
 
     expect(result).toMatchObject({ data: { items: [{ id: "a" }], count: 1, nextCursor: "p2" } });
@@ -362,24 +444,6 @@ describe("emitList", () => {
     await expect(replacing).rejects.toThrow("may not replace count");
   });
 
-  it("refuses a paged list from a command that cannot suggest a follow-up, even on its last page", async () => {
-    const list = anUnscopedTabulatingCommand().drawList(
-      { plain: true },
-      { ...view, page: { token: null, command: "thing list", flags: [] } },
-    );
-
-    await expect(list).rejects.toThrow("override suggestFollowUp");
-  });
-
-  it("refuses to suggest a follow-up from a command that has none to suggest", async () => {
-    const list = anUnscopedTabulatingCommand().drawList(
-      { plain: true },
-      { ...view, page: { token: "p2", command: "thing list", flags: [] } },
-    );
-
-    await expect(list).rejects.toThrow("override suggestFollowUp");
-  });
-
   it("gives a pipe tab-separated rows, and sends the next steps beside them", async () => {
     const result = await draw().drawList({ plain: true }, view);
 
@@ -389,31 +453,50 @@ describe("emitList", () => {
   it("keeps the next steps with the table for a person", async () => {
     const result = await asTerminal(() => draw().drawList({ plain: false }, view));
 
-    expect(result).toMatchObject({ pretty: { kind: "painted" } });
+    expect(result).toMatchObject({ summary: { title: "Found 1 thing" } });
   });
 
   it("reports the next page's cursor, its command and a footer that names it", async () => {
-    const result = await draw().drawList(
+    const result = await draw(["--limit", "1"]).drawList(
       { plain: false },
-      { ...view, page: { token: "p2", command: "thing list", flags: ["--limit 1"] } },
+      { ...view, page: { token: "p2" } },
     );
 
     expect(result).toMatchObject({
       data: { next_page_token: "p2" },
-      next: { commands: [expect.stringContaining("thing list --limit 1 --page-token p2 --json")] },
+      next: { commands: [expect.stringMatching(/thing list --limit 1 --page-token p2$/)] },
+    });
+  });
+
+  it("asks for the next page with its token in place of the one the run was given", async () => {
+    const result = await draw(["--page-token", "p1", "--all"]).drawList(
+      { plain: false },
+      { ...view, page: { token: "p2" } },
+    );
+
+    expect(result).toMatchObject({
+      next: { commands: [expect.stringMatching(/thing list --page-token p2$/)] },
+    });
+  });
+
+  it("asks for the next page as JSON when the run was JSON", async () => {
+    const result = await draw(["--json"]).drawList(
+      { plain: false },
+      { ...view, page: { token: "p2" } },
+    );
+
+    expect(result).toMatchObject({
+      next: { commands: [expect.stringMatching(/thing list --page-token p2 --json$/)] },
     });
   });
 
   it("names the next page in the footer of a person's list", async () => {
     const result = await asTerminal(() =>
-      draw().drawList(
-        { plain: false },
-        { ...view, page: { token: "p2", command: "thing list", flags: [] } },
-      ),
+      draw().drawList({ plain: false }, { ...view, page: { token: "p2" } }),
     );
 
     expect(result).toMatchObject({
-      pretty: { text: expect.stringContaining("More available: --page-token p2 (or --all)") },
+      summary: { extras: ["More available: --page-token p2 (or --all)"] },
     });
   });
 
@@ -425,27 +508,39 @@ describe("emitList", () => {
           ...view,
           rows: [],
           items: [],
-          empty: "No things on this page.",
-          page: { token: "p2", command: "thing list", flags: [] },
+          empty: "No things on this page",
+          page: { token: "p2" },
         },
       ),
     );
 
     expect(result).toMatchObject({
       data: { items: [], next_page_token: "p2" },
-      pretty: { text: "No things on this page.\nMore available: --page-token p2 (or --all)" },
+      summary: {
+        title: "No things on this page",
+        extras: ["More available: --page-token p2 (or --all)"],
+      },
+    });
+  });
+
+  it("quotes a cursor holding a control character so a shell reads it back as it is", async () => {
+    const result = await asTerminal(() =>
+      draw().drawList({ plain: false }, { ...view, page: { token: "a\u001bb" } }),
+    );
+
+    expect(result).toMatchObject({
+      summary: { extras: ["More available: --page-token $'a\\x1bb' (or --all)"] },
     });
   });
 
   it("joins a cursor that starts with a dash to its option, so it stays one option", async () => {
     const result = await asTerminal(() =>
-      draw().drawList(
-        { plain: false },
-        { ...view, page: { token: "-p2", command: "thing list", flags: [] } },
-      ),
+      draw().drawList({ plain: false }, { ...view, page: { token: "-p2" } }),
     );
 
-    expect(result).toMatchObject({ pretty: { text: expect.stringContaining("--page-token=-p2") } });
+    expect(result).toMatchObject({
+      summary: { extras: [expect.stringContaining("--page-token=-p2")] },
+    });
   });
 });
 
@@ -519,5 +614,20 @@ describe("Tabulatable", () => {
     }
 
     expect(importing).toEqual([]);
+  });
+
+  it("is given its columns by a COLUMNS constant in every list command", async () => {
+    const root = fileURLToPath(new URL("../../../../src/commands", import.meta.url));
+    const without: string[] = [];
+
+    for (const file of await readdir(root, { recursive: true })) {
+      if (!file.endsWith(".ts")) continue;
+      const source = await readFile(join(root, file), "utf8");
+      if (source.includes("emitList(") && !source.includes("const COLUMNS")) {
+        without.push(file);
+      }
+    }
+
+    expect(without).toEqual([]);
   });
 });

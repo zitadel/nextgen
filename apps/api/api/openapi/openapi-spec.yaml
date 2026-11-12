@@ -64,9 +64,10 @@ tags:
       and team memberships.
   - name: Search
     description: |
-      Search finds the resources of a project that match a text, across
-      resource types in one request. It answers with references; the
-      resources themselves are read through their own operations.
+      Search finds the resources of a project, or of the projects a person
+      can act on, that match a text, across resource types in one request. It
+      answers with references; the resources themselves are read through their
+      own operations.
   - name: Schemas
     description: |
       Schemas define the typed shape of user data and of other configurable

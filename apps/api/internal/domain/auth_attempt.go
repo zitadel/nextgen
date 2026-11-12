@@ -101,6 +101,10 @@ type AuthAttempt struct {
 	// attempt ops; empty when create did not resolve a deployment.
 	DeploymentID string
 	ReleaseID    string
+
+	// FlowID is the login flow that created the attempt, so the handoff
+	// exchange can stamp it on the events it writes; empty outside a flow.
+	FlowID string
 }
 
 const AuthAttemptTTL = 15 * time.Minute

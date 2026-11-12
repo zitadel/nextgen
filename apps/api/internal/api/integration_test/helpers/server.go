@@ -96,7 +96,7 @@ func (h *Harness) EnsureAPIServers(t testing.TB) api.Servers {
 		servers, err := api.NewServers(
 			h.EnsureHandler(t),
 			h.EnsureSecurityHandler(t),
-			generated.WithErrorHandler(api.OgenErrorHandler),
+			generated.WithErrorHandler(api.OgenErrorHandler(0)),
 			generated.WithNotFound(api.OgenNotFound(nil)),
 			generated.WithMethodNotAllowed(api.OgenMethodNotAllowed),
 			generated.WithTracerProvider(api.NewOgenTracerProvider(otel.GetTracerProvider())),
