@@ -546,13 +546,12 @@ command it was one edit from and of the topic. It is never run as a different
 command, and no arguments typed after it are repeated. A stray extra word after
 a real command is that command refusing an argument it does not take: an
 `E_VALIDATION` envelope that exits 3, like any other refusal. Asking for help on such a name is the
-one exception, even with `--json`: with `--help` among the arguments, or as
-`zitadel help <name>`, the help layer answers with nothing on stdout, a plain
-`Command … not found` on stderr, and exit 2. `zitadel help` given a flag it
-does not take, such as `--json`, writes nothing to stdout either, but exits 1
-with `Nonexistent flag: --json` and a stack trace on stderr; that is the help
-layer refusing the flag, not the CLI failing. Treat an empty stdout as either
-case, never as an envelope. Everything else answers with an envelope
+one exception: the help layer answers, with nothing on stdout. With `--help`
+among the arguments, even with `--json`, and as `zitadel help <name>`, it is a
+plain `Command … not found` on stderr and exit 2. `zitadel help <name> --json`
+is the help layer refusing `--json`, which it does not take: `Nonexistent
+flag: --json` and a stack trace on stderr, and exit 1. Treat an empty stdout as
+either case, never as an envelope. Everything else answers with an envelope
 too, errors included — an unknown flag, a missing argument and a resource that
 is not found are all `status: "error"` objects on stdout.
 

@@ -68,6 +68,7 @@ export class NotFound extends BaseCommand {
     };
 
     if (words[0] === undefined) {
+      this.id = "(default)";
       throw new ZitadelError("E_VALIDATION", "That is not a zitadel command.", {
         nextCommands: [unscopedCommand("--help")],
       });
@@ -143,7 +144,8 @@ export class NotFound extends BaseCommand {
  *
  * It hands over only the words that name the command and `--json` when it was
  * asked for, since the flags typed belong to a command that does not exist and
- * would be refused as unknown. oclif joins the leading words into `id` and
+ * would be refused as unknown. A flag is skipped wherever it is typed, and so
+ * is the value of a flag every command takes one for (`--cwd /tmp`). oclif joins the leading words into `id` and
  * drops a flag after a word with a colon of its own, so the process's own
  * arguments are read when they spell this id, as they do when the CLI is the
  * program run; a run started inside another process (a test runner) gets
@@ -155,8 +157,20 @@ const hook: Hook<"command_not_found"> = async ({ id, argv, config }) => {
   const typed = spelled ? own : [...id.split(":"), ...(argv ?? [])];
   const end = typed.indexOf("--") === -1 ? typed.length : typed.indexOf("--");
   const json = typed.slice(0, end).includes("--json");
-  const first = typed.findIndex((word) => word.startsWith("-"));
-  const words = first === -1 ? typed : typed.slice(0, first);
+  const valued = new Set(
+    Object.entries(BaseCommand.baseFlags)
+      .filter(([, flag]) => flag.type === "option")
+      .flatMap(([name, flag]) => [`--${name}`, ...(flag.char ? [`-${flag.char}`] : [])]),
+  );
+  const words: string[] = [];
+  for (let index = 0; index < end; index += 1) {
+    const word = typed[index] as string;
+    if (valued.has(word)) {
+      index += 1;
+    } else if (!word.startsWith("-")) {
+      words.push(word);
+    }
+  }
   await NotFound.run([...words, ...(json ? ["--json"] : [])], config);
 };
 

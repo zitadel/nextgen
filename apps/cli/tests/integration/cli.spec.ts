@@ -536,10 +536,54 @@ describe("the cli", () => {
           },
         );
 
+        it.each([
+          [
+            "a flag before the words",
+            ["--json", "statu"],
+            "statu",
+            "statu is not a zitadel command.",
+            ["status --help"],
+          ],
+          [
+            "a flag and its value before the words",
+            ["--cwd", "/tmp", "statu", "--json"],
+            "statu",
+            "statu is not a zitadel command.",
+            ["status --help"],
+          ],
+          [
+            "no words at all",
+            ["--json"],
+            "(default)",
+            "That is not a zitadel command.",
+            ["--help"],
+          ],
+        ])("answers %s by what was typed", async (_, argv, command, message, next) => {
+          const result = await runCliForTest(argv);
+
+          expect(parseJson(result.stdout)).toEqual({
+            status: "error",
+            cli_version: cliVersion.version,
+            command,
+            source: "",
+            code: "E_VALIDATION",
+            message,
+            next_commands: next.map((step) => expectedPublicCliCommand(step)),
+          });
+        });
+
         it("prints no envelope for a --json after the pass-through", async () => {
           const result = await runCliForTest(["frobnicate", "--", "--json"]);
 
-          expect(result.stdout).toBe("");
+          expect({
+            exitCode: result.exitCode,
+            stdout: result.stdout,
+            stderr: result.stderr,
+          }).toEqual({
+            exitCode: 127,
+            stdout: "",
+            stderr: expect.stringContaining("frobnicate is not a zitadel command."),
+          });
         });
 
         it("exits 127, as a shell does for a command it cannot find", async () => {
