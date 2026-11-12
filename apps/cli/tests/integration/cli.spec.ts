@@ -628,6 +628,13 @@ describe("the cli", () => {
             ["--help"],
           ],
           [
+            "a flag-like word after a pass-through nothing came before",
+            ["--json", "--", "-x", "SECRET"],
+            "(default)",
+            "That is not a zitadel command",
+            ["--help"],
+          ],
+          [
             "a word after a pass-through nothing came before",
             ["--json", "--", "frobnicate"],
             "frobnicate",

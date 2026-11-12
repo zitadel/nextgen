@@ -169,8 +169,9 @@ export class NotFound extends BaseCommand {
  * It hands over only the words that name the command and `--json` when it was
  * asked for, since the flags typed belong to a command that does not exist and
  * would be refused as unknown. A flag is skipped wherever it is typed, and so
- * is any value it may take (`--cwd /tmp`). After `--` nothing is a flag, and
- * only when nothing was typed before it is a word there read as the name.
+ * is any value it may take (`--cwd /tmp`). The words after `--` are read as
+ * the name only when nothing was typed before it, and only up to the first one
+ * that reads as a flag.
  * oclif joins the leading words into `id` and drops a flag after a word with a
  * colon of its own, so the process's own arguments are read when they spell
  * this id, as they do when the CLI is the program run; a run started inside
@@ -236,8 +237,10 @@ const hook: Hook<"command_not_found"> = async ({ id, argv, config }) => {
       words.push(word);
       continue;
     }
+    // After `--` a word that reads as a flag is an argument, so it ends the
+    // name rather than letting a later word, a secret even, be named.
     if (passed) {
-      continue;
+      break;
     }
     if (word === "--json") {
       json = true;
