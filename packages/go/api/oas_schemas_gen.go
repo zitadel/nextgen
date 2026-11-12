@@ -11005,7 +11005,8 @@ type BundleResourceError struct {
 	// Additional error-specific context.
 	Details OptBundleResourceErrorDetails `json:"details"`
 	Kind    ReleasePointerKind            `json:"kind"`
-	// The resource's position in its kind's array in the bundle; `0` for the branding.
+	// The resource's position in its kind's array in the bundle; `0` for the branding and for the OAuth
+	// settings, which are single objects.
 	Index int `json:"index"`
 	// The resource's handle, when it declares one.
 	Handle OptString `json:"handle"`
@@ -13016,11 +13017,13 @@ func NewPasskeyFactorPayloadCompletedFactorPayload(v PasskeyFactorPayload) Compl
 // - two policies for the same `operation`;
 // - a schema without an `objectType`.
 // Each kind is optional, and the arrays may be empty: a project that never
-// ejected its branding omits `branding`. The bundle carries at least one
-// resource. The release it builds pins at most 50 resources, which counts the
-// resources the bundle carries plus those resolved from the project. The
-// server refuses anything outside that with `rel.invalid`. Unknown keys are
-// refused.
+// ejected its branding omits `branding`, and one that never turned on its
+// OAuth authorization server omits `oauth`. `branding` and `oauth` are
+// single objects, because a project has one of each. The bundle carries at
+// least one resource. The release it builds pins at most 50 resources, which
+// counts the resources the bundle carries plus those resolved from the
+// project. The server refuses anything outside that with `rel.invalid`.
+// Unknown keys are refused.
 // Ref: #
 type ConfigurationBundle struct {
 	// User schemas, one per `.zitadel/schemas/*.json`, in either form
@@ -13057,6 +13060,11 @@ type ConfigurationBundle struct {
 	// inlined, exactly as `POST /branding` takes it. A project has one
 	// branding, so this is a single object.
 	Branding OptBranding `json:"branding"`
+	// The project's OAuth settings. A project has one set of them, so this is
+	// a single object, and the release is its only writer: there is no
+	// per-kind create endpoint. Omit it to leave the project's OAuth
+	// authorization server off.
+	OAuth OptOAuthSettings `json:"oauth"`
 }
 
 // GetSchemas returns the value of Schemas.
@@ -13084,6 +13092,11 @@ func (s *ConfigurationBundle) GetBranding() OptBranding {
 	return s.Branding
 }
 
+// GetOAuth returns the value of OAuth.
+func (s *ConfigurationBundle) GetOAuth() OptOAuthSettings {
+	return s.OAuth
+}
+
 // SetSchemas sets the value of Schemas.
 func (s *ConfigurationBundle) SetSchemas(val []ConfigurationBundleSchemasItem) {
 	s.Schemas = val
@@ -13107,6 +13120,11 @@ func (s *ConfigurationBundle) SetPolicies(val []PublishPolicyRequest) {
 // SetBranding sets the value of Branding.
 func (s *ConfigurationBundle) SetBranding(val OptBranding) {
 	s.Branding = val
+}
+
+// SetOAuth sets the value of OAuth.
+func (s *ConfigurationBundle) SetOAuth(val OptOAuthSettings) {
+	s.OAuth = val
 }
 
 // ConfigurationBundleSchemasItem represents sum type.
@@ -25237,6 +25255,7 @@ func (*ErrorDetails) createProjectRes()        {}
 func (*ErrorDetails) createSessionRes()        {}
 func (*ErrorDetails) getBrandingByIdRes()      {}
 func (*ErrorDetails) getMyUserRes()            {}
+func (*ErrorDetails) getOAuthSettingsByIdRes() {}
 func (*ErrorDetails) initClaimRes()            {}
 func (*ErrorDetails) listFlowDefinitionsRes()  {}
 func (*ErrorDetails) listMyIdentityLinksRes()  {}
@@ -40549,6 +40568,186 @@ func (s *GetMyUserSchemaErrorResponseStatusCode) SetResponse(val GetMyUserSchema
 }
 
 func (*GetMyUserSchemaErrorResponseStatusCode) getMyUserSchemaRes() {}
+
+// GetOAuthSettingsByIdErrorResponse represents sum type.
+type GetOAuthSettingsByIdErrorResponse struct {
+	Type             GetOAuthSettingsByIdErrorResponseType // switch on this field
+	AuthUnauthorized AuthUnauthorized
+	Internal         Internal
+	NotImplemented   NotImplemented
+	ReqInvalid       ReqInvalid
+	Unavailable      Unavailable
+}
+
+// GetOAuthSettingsByIdErrorResponseType is oneOf type of GetOAuthSettingsByIdErrorResponse.
+type GetOAuthSettingsByIdErrorResponseType string
+
+// Possible values for GetOAuthSettingsByIdErrorResponseType.
+const (
+	AuthUnauthorizedGetOAuthSettingsByIdErrorResponse GetOAuthSettingsByIdErrorResponseType = "auth.unauthorized"
+	InternalGetOAuthSettingsByIdErrorResponse         GetOAuthSettingsByIdErrorResponseType = "internal"
+	NotImplementedGetOAuthSettingsByIdErrorResponse   GetOAuthSettingsByIdErrorResponseType = "not_implemented"
+	ReqInvalidGetOAuthSettingsByIdErrorResponse       GetOAuthSettingsByIdErrorResponseType = "req.invalid"
+	UnavailableGetOAuthSettingsByIdErrorResponse      GetOAuthSettingsByIdErrorResponseType = "unavailable"
+)
+
+// IsAuthUnauthorized reports whether GetOAuthSettingsByIdErrorResponse is AuthUnauthorized.
+func (s GetOAuthSettingsByIdErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedGetOAuthSettingsByIdErrorResponse
+}
+
+// IsInternal reports whether GetOAuthSettingsByIdErrorResponse is Internal.
+func (s GetOAuthSettingsByIdErrorResponse) IsInternal() bool {
+	return s.Type == InternalGetOAuthSettingsByIdErrorResponse
+}
+
+// IsNotImplemented reports whether GetOAuthSettingsByIdErrorResponse is NotImplemented.
+func (s GetOAuthSettingsByIdErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedGetOAuthSettingsByIdErrorResponse
+}
+
+// IsReqInvalid reports whether GetOAuthSettingsByIdErrorResponse is ReqInvalid.
+func (s GetOAuthSettingsByIdErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidGetOAuthSettingsByIdErrorResponse
+}
+
+// IsUnavailable reports whether GetOAuthSettingsByIdErrorResponse is Unavailable.
+func (s GetOAuthSettingsByIdErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableGetOAuthSettingsByIdErrorResponse
+}
+
+// SetAuthUnauthorized sets GetOAuthSettingsByIdErrorResponse to AuthUnauthorized.
+func (s *GetOAuthSettingsByIdErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedGetOAuthSettingsByIdErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if GetOAuthSettingsByIdErrorResponse is AuthUnauthorized.
+func (s GetOAuthSettingsByIdErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedGetOAuthSettingsByIdErrorResponse returns new GetOAuthSettingsByIdErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedGetOAuthSettingsByIdErrorResponse(v AuthUnauthorized) GetOAuthSettingsByIdErrorResponse {
+	var s GetOAuthSettingsByIdErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets GetOAuthSettingsByIdErrorResponse to Internal.
+func (s *GetOAuthSettingsByIdErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalGetOAuthSettingsByIdErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if GetOAuthSettingsByIdErrorResponse is Internal.
+func (s GetOAuthSettingsByIdErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalGetOAuthSettingsByIdErrorResponse returns new GetOAuthSettingsByIdErrorResponse from Internal.
+func NewInternalGetOAuthSettingsByIdErrorResponse(v Internal) GetOAuthSettingsByIdErrorResponse {
+	var s GetOAuthSettingsByIdErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets GetOAuthSettingsByIdErrorResponse to NotImplemented.
+func (s *GetOAuthSettingsByIdErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedGetOAuthSettingsByIdErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if GetOAuthSettingsByIdErrorResponse is NotImplemented.
+func (s GetOAuthSettingsByIdErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedGetOAuthSettingsByIdErrorResponse returns new GetOAuthSettingsByIdErrorResponse from NotImplemented.
+func NewNotImplementedGetOAuthSettingsByIdErrorResponse(v NotImplemented) GetOAuthSettingsByIdErrorResponse {
+	var s GetOAuthSettingsByIdErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
+// SetReqInvalid sets GetOAuthSettingsByIdErrorResponse to ReqInvalid.
+func (s *GetOAuthSettingsByIdErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidGetOAuthSettingsByIdErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if GetOAuthSettingsByIdErrorResponse is ReqInvalid.
+func (s GetOAuthSettingsByIdErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidGetOAuthSettingsByIdErrorResponse returns new GetOAuthSettingsByIdErrorResponse from ReqInvalid.
+func NewReqInvalidGetOAuthSettingsByIdErrorResponse(v ReqInvalid) GetOAuthSettingsByIdErrorResponse {
+	var s GetOAuthSettingsByIdErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets GetOAuthSettingsByIdErrorResponse to Unavailable.
+func (s *GetOAuthSettingsByIdErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableGetOAuthSettingsByIdErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if GetOAuthSettingsByIdErrorResponse is Unavailable.
+func (s GetOAuthSettingsByIdErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableGetOAuthSettingsByIdErrorResponse returns new GetOAuthSettingsByIdErrorResponse from Unavailable.
+func NewUnavailableGetOAuthSettingsByIdErrorResponse(v Unavailable) GetOAuthSettingsByIdErrorResponse {
+	var s GetOAuthSettingsByIdErrorResponse
+	s.SetUnavailable(v)
+	return s
+}
+
+// GetOAuthSettingsByIdErrorResponseStatusCode wraps GetOAuthSettingsByIdErrorResponse with StatusCode.
+type GetOAuthSettingsByIdErrorResponseStatusCode struct {
+	StatusCode int
+	Response   GetOAuthSettingsByIdErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *GetOAuthSettingsByIdErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *GetOAuthSettingsByIdErrorResponseStatusCode) GetResponse() GetOAuthSettingsByIdErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *GetOAuthSettingsByIdErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *GetOAuthSettingsByIdErrorResponseStatusCode) SetResponse(val GetOAuthSettingsByIdErrorResponse) {
+	s.Response = val
+}
+
+func (*GetOAuthSettingsByIdErrorResponseStatusCode) getOAuthSettingsByIdRes() {}
 
 // GetPolicyErrorResponse represents sum type.
 type GetPolicyErrorResponse struct {
@@ -58060,6 +58259,93 @@ func (s *OAuth2) SetScopes(val []string) {
 	s.Scopes = val
 }
 
+// The OAuth settings of a project: whether the project's OAuth authorization
+// server answers. It has one shape in two places: the `oauth` resource of the
+// bundle `buildRelease` (`POST /releases/build`) takes, which publishes it as
+// a new immutable revision, and the read-only revision
+// `getOAuthSettingsById` (`GET /oauth_settings/{oauth_settings_id}`)
+// returns. Locally it is the descriptor in `.zitadel/` that `zitadel deploy`
+// publishes with the rest of the bundle.
+// A release is the only writer: there is no operation that publishes OAuth
+// settings on their own. A release without `oauth` leaves the authorization
+// server off.
+// Ref: #
+type OAuthSettings struct {
+	// Editor affordance: path or URL of this file's JSON meta-schema, so an
+	// editor validates and autocompletes it. The CLI strips it before upload;
+	// the platform ignores it.
+	Schema OptString `json:"$schema"`
+	// Whether the project's OAuth authorization server answers. While it is
+	// `false`, or the deployed release pins no OAuth settings, the server
+	// publishes no authorization server metadata for the project and refuses
+	// every OAuth request to it.
+	Enabled bool `json:"enabled"`
+}
+
+// GetSchema returns the value of Schema.
+func (s *OAuthSettings) GetSchema() OptString {
+	return s.Schema
+}
+
+// GetEnabled returns the value of Enabled.
+func (s *OAuthSettings) GetEnabled() bool {
+	return s.Enabled
+}
+
+// SetSchema sets the value of Schema.
+func (s *OAuthSettings) SetSchema(val OptString) {
+	s.Schema = val
+}
+
+// SetEnabled sets the value of Enabled.
+func (s *OAuthSettings) SetEnabled(val bool) {
+	s.Enabled = val
+}
+
+// A stored OAuth settings revision. `oauth` echoes the canonical stored
+// settings, so a client such as the CLI can reconcile local files with the
+// server's stored state.
+// Ref: #
+type OAuthSettingsRevisionResponse struct {
+	// The unique identifier of this OAuth settings revision.
+	ID string `json:"id"`
+	// When this revision was published.
+	CreatedAt time.Time     `json:"created_at"`
+	OAuth     OAuthSettings `json:"oauth"`
+}
+
+// GetID returns the value of ID.
+func (s *OAuthSettingsRevisionResponse) GetID() string {
+	return s.ID
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *OAuthSettingsRevisionResponse) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetOAuth returns the value of OAuth.
+func (s *OAuthSettingsRevisionResponse) GetOAuth() OAuthSettings {
+	return s.OAuth
+}
+
+// SetID sets the value of ID.
+func (s *OAuthSettingsRevisionResponse) SetID(val string) {
+	s.ID = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *OAuthSettingsRevisionResponse) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetOAuth sets the value of OAuth.
+func (s *OAuthSettingsRevisionResponse) SetOAuth(val OAuthSettings) {
+	s.OAuth = val
+}
+
+func (*OAuthSettingsRevisionResponse) getOAuthSettingsByIdRes() {}
+
 // NewOptAttAlreadyHandedOffDetails returns new OptAttAlreadyHandedOffDetails with value set to v.
 func NewOptAttAlreadyHandedOffDetails(v AttAlreadyHandedOffDetails) OptAttAlreadyHandedOffDetails {
 	return OptAttAlreadyHandedOffDetails{
@@ -70657,6 +70943,52 @@ func (o OptNotImplementedDetails) Get() (v NotImplementedDetails, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptNotImplementedDetails) Or(d NotImplementedDetails) NotImplementedDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptOAuthSettings returns new OptOAuthSettings with value set to v.
+func NewOptOAuthSettings(v OAuthSettings) OptOAuthSettings {
+	return OptOAuthSettings{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptOAuthSettings is optional OAuthSettings.
+type OptOAuthSettings struct {
+	Value OAuthSettings
+	Set   bool
+}
+
+// IsSet returns true if OptOAuthSettings was set.
+func (o OptOAuthSettings) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptOAuthSettings) Reset() {
+	var v OAuthSettings
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptOAuthSettings) SetTo(v OAuthSettings) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptOAuthSettings) Get() (v OAuthSettings, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptOAuthSettings) Or(d OAuthSettings) OAuthSettings {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -90139,6 +90471,8 @@ type ReleasePointer struct {
 	// - `branding` — always `default`. A project has one branding, so there is
 	// nothing to distinguish. It is revisioned like everything else, and
 	// `revision_id` is what varies between releases.
+	// - `oauth` — always `default`, likewise: a project has one set of OAuth
+	// settings, and `revision_id` is what varies between releases.
 	// - `idp` — the connection's `slug`, so `google` and `github` are
 	// separate resources a release pins separately
 	// - `policy` — the policy's `operation`, so a project's password policy
@@ -90199,6 +90533,7 @@ const (
 	ReleasePointerKindBranding       ReleasePointerKind = "branding"
 	ReleasePointerKindIdp            ReleasePointerKind = "idp"
 	ReleasePointerKindPolicy         ReleasePointerKind = "policy"
+	ReleasePointerKindOAuth          ReleasePointerKind = "oauth"
 )
 
 // AllValues returns all ReleasePointerKind values.
@@ -90209,6 +90544,7 @@ func (ReleasePointerKind) AllValues() []ReleasePointerKind {
 		ReleasePointerKindBranding,
 		ReleasePointerKindIdp,
 		ReleasePointerKindPolicy,
+		ReleasePointerKindOAuth,
 	}
 }
 
@@ -90224,6 +90560,8 @@ func (s ReleasePointerKind) MarshalText() ([]byte, error) {
 	case ReleasePointerKindIdp:
 		return []byte(s), nil
 	case ReleasePointerKindPolicy:
+		return []byte(s), nil
+	case ReleasePointerKindOAuth:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -90247,6 +90585,9 @@ func (s *ReleasePointerKind) UnmarshalText(data []byte) error {
 		return nil
 	case ReleasePointerKindPolicy:
 		*s = ReleasePointerKindPolicy
+		return nil
+	case ReleasePointerKindOAuth:
+		*s = ReleasePointerKindOAuth
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)
