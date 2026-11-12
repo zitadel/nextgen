@@ -1,6 +1,8 @@
+import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { opensRow } from "./resource-list";
+import { Table, TableBody, TableCell, TableHeader, TableRow } from "./ui/table";
+import { ResourceMenuHead, opensRow } from "./resource-list";
 
 /** A click as `opensRow` reads it: only the fields it inspects. */
 function click(overrides: Record<string, unknown> = {}) {
@@ -48,5 +50,27 @@ describe("opensRow", () => {
       row.append(child);
       expect(opensRow(click({ target: child }))).toBe(false);
     }
+  });
+});
+
+describe("ResourceMenuHead", () => {
+  it.each([false, true])("names the row-menu column for a screen reader (narrow: %s)", (narrow) => {
+    // Blank on screen, but every cell under it has a header, as td-has-header asks.
+    render(
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <ResourceMenuHead narrow={narrow} />
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          <TableRow>
+            <TableCell>menu</TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>,
+    );
+    const head = screen.getByRole("columnheader", { name: "Actions" });
+    expect(head.querySelector(".sr-only")).toHaveTextContent("Actions");
   });
 });

@@ -449,6 +449,14 @@ type GetMyUserSchemaParams struct {
 	ProjectID OptProjectID `json:",omitempty,omitzero"`
 }
 
+// GetOAuthSettingsByIdParams is parameters of getOAuthSettingsById operation.
+type GetOAuthSettingsByIdParams struct {
+	// The OAuth settings revision ID: the `revision_id` of the `kind: oauth`
+	// pointer on the release that `buildRelease` (`POST /releases/build`) or
+	// `getReleaseById` (`GET /releases/{release_id}`) returns.
+	OAuthSettingsID string
+}
+
 // GetPolicyParams is parameters of getPolicy operation.
 type GetPolicyParams struct {
 	// The project ID: the `id` that `createProject` (`POST /projects`) returns. `zitadel setup` prints
