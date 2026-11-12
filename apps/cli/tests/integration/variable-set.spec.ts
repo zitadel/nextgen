@@ -426,7 +426,9 @@ describe("variable set", () => {
             primary: { held: true, secret: false, value: "bar" },
             preview: { held: true, secret: false, value: "bar" },
             next_actions: [DEPLOY_ACTION],
-            next_commands: [expectedPublicCliCommand(app.againAsRun("deploy -m '<what changed>'"))],
+            next_commands: [
+              expectedPublicCliCommand(app.againAsRun("deploy --message '<what changed>'")),
+            ],
           },
           warnings: [],
         });
@@ -450,7 +452,9 @@ describe("variable set", () => {
             primary: { held: true, secret: false, value: "bar" },
             preview: { held: true, secret: false, value: "bar" },
             next_actions: [DEPLOY_ACTION],
-            next_commands: [expectedPublicCliCommand(app.againAsRun("deploy -m '<what changed>'"))],
+            next_commands: [
+              expectedPublicCliCommand(app.againAsRun("deploy --message '<what changed>'")),
+            ],
           },
           warnings: [],
         });
@@ -476,7 +480,9 @@ describe("variable set", () => {
             primary: { held: true, secret: false, value: 5 },
             preview: { held: true, secret: false, value: 5 },
             next_actions: [DEPLOY_ACTION],
-            next_commands: [expectedPublicCliCommand(app.againAsRun("deploy -m '<what changed>'"))],
+            next_commands: [
+              expectedPublicCliCommand(app.againAsRun("deploy --message '<what changed>'")),
+            ],
           },
           warnings: [],
         });
@@ -500,7 +506,9 @@ describe("variable set", () => {
             primary: { held: true, secret: true },
             preview: { held: false },
             next_actions: [DEPLOY_ACTION],
-            next_commands: [expectedPublicCliCommand(app.againAsRun("deploy -m '<what changed>'"))],
+            next_commands: [
+              expectedPublicCliCommand(app.againAsRun("deploy --message '<what changed>'")),
+            ],
           },
           warnings: [],
         });
@@ -525,7 +533,9 @@ describe("variable set", () => {
             primary: { held: true, secret: false, value: "a\u001b[2Jwiped" },
             preview: { held: true, secret: false, value: "a\u001b[2Jwiped" },
             next_actions: [DEPLOY_ACTION],
-            next_commands: [expectedPublicCliCommand(app.againAsRun("deploy -m '<what changed>'"))],
+            next_commands: [
+              expectedPublicCliCommand(app.againAsRun("deploy --message '<what changed>'")),
+            ],
           },
           warnings: [],
         });
@@ -554,7 +564,7 @@ describe("variable set", () => {
             next_actions: [PREVIEW_ACTION],
             next_commands: [
               expectedPublicCliCommand(
-                app.againAsRun("preview --origin '<preview-url>' -m '<what changed>'"),
+                app.againAsRun("preview --origin '<preview-url>' --message '<what changed>'"),
               ),
             ],
           },
@@ -569,7 +579,7 @@ describe("variable set", () => {
 
         expect(JSON.parse(result.stdout).data.next_commands).toEqual([
           expectedPublicCliCommand(
-            app.againAsRun("preview --origin '<preview-url>' -m '<what changed>'"),
+            app.againAsRun("preview --origin '<preview-url>' --message '<what changed>'"),
           ),
         ]);
       });
@@ -848,7 +858,7 @@ describe("variable set", () => {
         expect(result).toPrint("Set FOO on the project");
         expect(result).toPrintRow("primary", "bar");
         expect(result).toPrintRow("preview", "bar");
-        expect(result).toPrint("deploy -m '<what changed>'");
+        expect(result).toPrint("deploy --message '<what changed>'");
       });
 
       it("says each step once", async () => {
@@ -856,7 +866,7 @@ describe("variable set", () => {
 
         const result = await offTerminal(() => app.run(["variable", "set", "FOO", "bar"]));
 
-        expect(result).toSayOnce("deploy -m '<what changed>'");
+        expect(result).toSayOnce("deploy --message '<what changed>'");
         expect(result).toSayOnce(DEPLOY_ACTION);
       });
     });

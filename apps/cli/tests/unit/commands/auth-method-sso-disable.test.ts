@@ -283,7 +283,7 @@ describe("auth-method sso disable", () => {
         data: {
           next_args: [
             ["deploy", "--dry-run", "--cwd", dir],
-            ["deploy", "-m", "<what changed>", "--cwd", dir],
+            ["deploy", "--message", "<what changed>", "--cwd", dir],
           ],
         },
       });
@@ -915,9 +915,9 @@ describe("auth-method sso disable", () => {
             "google",
             "--schema",
             DEFAULT_SCHEMA,
+            "--force",
             "--cwd",
             dir,
-            "--force",
           ],
         );
       });
@@ -940,7 +940,7 @@ describe("auth-method sso disable", () => {
         expect(parseJson(result.stdout)).toMatchObject({
           next_commands: [
             expectedPublicCliCommand(
-              `auth-method sso disable --provider google --schema default-human-user --cwd ${dir} --force`,
+              `auth-method sso disable --provider google --schema default-human-user --force --cwd ${dir}`,
             ),
             expectedPublicCliCommand(
               `auth-method password enable --schema default-human-user --cwd ${dir}`,
@@ -1007,10 +1007,10 @@ describe("auth-method sso disable", () => {
                 "google",
                 "--schema",
                 DEFAULT_SCHEMA,
-                "--cwd",
-                dir,
                 "--force",
                 "--dry-run",
+                "--cwd",
+                dir,
               ],
               ["auth-method", "password", "enable", "--schema", DEFAULT_SCHEMA, "--cwd", dir],
               ["auth-method", "passkey", "enable", "--schema", DEFAULT_SCHEMA, "--cwd", dir],

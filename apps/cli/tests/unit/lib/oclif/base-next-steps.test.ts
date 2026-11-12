@@ -7,7 +7,7 @@ import { asTerminal, offTerminal } from "@tests/helpers/terminal";
 import { publicCliCommand } from "@/lib/public-cli";
 import { json, prose, rows } from "@/lib/oclif/rendering";
 import type { CommandResult, JsonEnvelope } from "@/lib/oclif/types";
-import { type SuggestedCommand, unscopedCommand } from "@/lib/suggestion";
+import { type SuggestedCommand, shellCommand } from "@/lib/suggestion";
 import { takeReportedWarnings } from "@/lib/warnings";
 
 /** A command that records what `emit` prints, per stream, instead of writing it. */
@@ -41,7 +41,7 @@ function makeCommand(): NextStepsCommand {
   return new NextStepsCommand([], { version: "0.0.0-test" } as unknown as Config);
 }
 
-const DEPLOY: SuggestedCommand = unscopedCommand("deploy");
+const DEPLOY: SuggestedCommand = shellCommand(publicCliCommand("deploy", "0.0.0-test"));
 /** {@link DEPLOY} as the reader runs it. */
 const PUBLIC_DEPLOY = publicCliCommand("deploy", "0.0.0-test");
 

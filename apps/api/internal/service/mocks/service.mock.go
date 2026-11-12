@@ -520,44 +520,6 @@ func (c *MockAllStatementsCheckPlatformOperatorCall) DoAndReturn(f func(context.
 	return c
 }
 
-// ClearInvitationMetadata mocks base method.
-func (m *MockAllStatements) ClearInvitationMetadata(ctx context.Context, projectID, id string, now time.Time) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ClearInvitationMetadata", ctx, projectID, id, now)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// ClearInvitationMetadata indicates an expected call of ClearInvitationMetadata.
-func (mr *MockAllStatementsMockRecorder) ClearInvitationMetadata(ctx, projectID, id, now any) *MockAllStatementsClearInvitationMetadataCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ClearInvitationMetadata", reflect.TypeOf((*MockAllStatements)(nil).ClearInvitationMetadata), ctx, projectID, id, now)
-	return &MockAllStatementsClearInvitationMetadataCall{Call: call}
-}
-
-// MockAllStatementsClearInvitationMetadataCall wrap *gomock.Call
-type MockAllStatementsClearInvitationMetadataCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockAllStatementsClearInvitationMetadataCall) Return(arg0 error) *MockAllStatementsClearInvitationMetadataCall {
-	c.Call = c.Call.Return(arg0)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsClearInvitationMetadataCall) Do(f func(context.Context, string, string, time.Time) error) *MockAllStatementsClearInvitationMetadataCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsClearInvitationMetadataCall) DoAndReturn(f func(context.Context, string, string, time.Time) error) *MockAllStatementsClearInvitationMetadataCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
 // ConsumeSSOState mocks base method.
 func (m *MockAllStatements) ConsumeSSOState(ctx context.Context, projectID, stateHash, bindingNonce string) (*domain.SSOCallbackCheck, error) {
 	m.ctrl.T.Helper()
@@ -2312,6 +2274,44 @@ func (c *MockAllStatementsDeleteTokensBySessionIDCall) Do(f func(context.Context
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAllStatementsDeleteTokensBySessionIDCall) DoAndReturn(f func(context.Context, string, string) error) *MockAllStatementsDeleteTokensBySessionIDCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// DeleteUnacceptedInvitation mocks base method.
+func (m *MockAllStatements) DeleteUnacceptedInvitation(ctx context.Context, projectID, id string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteUnacceptedInvitation", ctx, projectID, id)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteUnacceptedInvitation indicates an expected call of DeleteUnacceptedInvitation.
+func (mr *MockAllStatementsMockRecorder) DeleteUnacceptedInvitation(ctx, projectID, id any) *MockAllStatementsDeleteUnacceptedInvitationCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteUnacceptedInvitation", reflect.TypeOf((*MockAllStatements)(nil).DeleteUnacceptedInvitation), ctx, projectID, id)
+	return &MockAllStatementsDeleteUnacceptedInvitationCall{Call: call}
+}
+
+// MockAllStatementsDeleteUnacceptedInvitationCall wrap *gomock.Call
+type MockAllStatementsDeleteUnacceptedInvitationCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsDeleteUnacceptedInvitationCall) Return(arg0 error) *MockAllStatementsDeleteUnacceptedInvitationCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsDeleteUnacceptedInvitationCall) Do(f func(context.Context, string, string) error) *MockAllStatementsDeleteUnacceptedInvitationCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsDeleteUnacceptedInvitationCall) DoAndReturn(f func(context.Context, string, string) error) *MockAllStatementsDeleteUnacceptedInvitationCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

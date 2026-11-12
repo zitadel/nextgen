@@ -1,6 +1,5 @@
 import { Flags } from "@oclif/core";
 
-import { Cmd } from "@/lib/cmd";
 import { type Assignment, readAssignment } from "@/lib/oclif/crud/assign";
 import {
   type BodyField,
@@ -23,10 +22,12 @@ import type {
 } from "@/lib/oclif/crud/types";
 import type { ZodLike } from "@/lib/oclif/crud/zod";
 import { nonBlankString } from "@/lib/oclif/flags";
-import { named } from "@/lib/oclif/names";
+import { named } from "@/lib/names";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { helpOf } from "@/lib/suggestion";
 import { json } from "@/lib/oclif/rendering";
 import type { CommandResult } from "@/lib/oclif/types";
+import { resourceSuggestion } from "@/lib/suggestion";
 import { escapeControlCharacters, escapeJsonControlCharacters } from "@/lib/terminal-text";
 import type { Summary } from "@/lib/ui";
 
@@ -158,7 +159,8 @@ const describeWrite = <
 /** What a write without a body to send is refused for. */
 const NEEDS_BODY_REFUSAL: Refusal = {
   message: "{command} needs a body",
-  hint: "Pass the body's fields as flags (see `{command} --help`), --set <path>=<value>, or --data '<json>' / --file <path>.",
+  hint: "Pass the body's fields as flags (the help below lists them), --set <path>=<value>, or --data '<json>' / --file <path>.",
+  next: ["{help}"],
 };
 
 const givesBody = (flags: Json, fields: readonly BodyField[]): boolean => {
@@ -190,9 +192,11 @@ abstract class WriteOperation<
     const { topic, spec, resource, options } = this.definition;
     const fields = fieldsOf(spec, options);
     if (!givesBody(flags, fields)) {
-      throw refusalError(NEEDS_BODY_REFUSAL, {
-        command: `${topic} ${this.verb}`,
-      });
+      throw refusalError(
+        NEEDS_BODY_REFUSAL,
+        { command: `${topic} ${this.verb}` },
+        { help: helpOf(`${topic}:${this.verb}`) },
+      );
     }
     const body = await resourceBody(
       {
@@ -251,7 +255,12 @@ abstract class WriteOperation<
         ? {
             next: {
               commands: [
-                this.suggest(`${topic} get ${Cmd.quote(String(resource.idOf(result)))} --json`),
+                this.suggest(
+                  resourceSuggestion(topic, "get", {
+                    args: { [named(idName(resource))]: String(resource.idOf(result)) },
+                    flags: { json: true },
+                  }),
+                ),
               ],
             },
           }

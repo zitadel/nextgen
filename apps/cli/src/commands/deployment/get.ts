@@ -7,6 +7,7 @@ import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } f
 import { type Refused, taken } from "@/lib/oclif/flags";
 import { json } from "@/lib/oclif/rendering";
 import { Tabulatable } from "@/lib/oclif/tabulatable";
+
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { variableCell } from "@/lib/variables";
 
@@ -19,7 +20,7 @@ const DEPLOYMENT_ID: Refused<string> = {
   refusal: {
     message: "Invalid {input}: {problem}",
     hint: "List the deployments to find one.",
-    next: ["deployment list"],
+    next: [{ id: "deployment:list" }],
     details: {
       argument: "{input}",
     },

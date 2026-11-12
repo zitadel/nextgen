@@ -9,7 +9,7 @@ import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } f
 import { type Refused, taken } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { PublishedConfiguration } from "@/lib/publish";
-import { DEPLOY_ARGS } from "@/lib/suggestion";
+import { WHAT_CHANGED } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { reportWarning } from "@/lib/warnings";
 import {
@@ -323,10 +323,10 @@ export default class Pull extends EnvironmentCommand {
       },
       next: {
         commands: this.dryRun
-          ? [this.suggest(args.target.kind === "latest" ? "pull" : `pull ${args.target.id}`)]
+          ? [await this.again("pull", { without: ["dryRun"] })]
           : args.target.kind !== "latest"
             ? []
-            : [this.suggest(DEPLOY_ARGS)],
+            : [this.suggest({ id: "deploy", flags: { message: WHAT_CHANGED } })],
       },
     });
   }
@@ -437,7 +437,7 @@ export default class Pull extends EnvironmentCommand {
         const releaseId = await configuration.fetchLiveReleaseId();
         if (releaseId === undefined) {
           throw new ZitadelError("E_NOT_FOUND", "Nothing is deployed to a primary origin yet", {
-            hint: `Deploy first with ${this.suggest(DEPLOY_ARGS)}, then pull.`,
+            hint: `Deploy first with ${this.suggest({ id: "deploy", flags: { message: WHAT_CHANGED } })}, then pull.`,
           });
         }
         return releaseId;

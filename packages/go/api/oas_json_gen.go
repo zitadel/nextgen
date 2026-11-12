@@ -17584,6 +17584,22 @@ func (s CancelInvitationErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case EvtInvalidCancelInvitationErrorResponse:
+		e.FieldStart("code")
+		e.Str("evt.invalid")
+		{
+			s := s.EvtInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case InternalCancelInvitationErrorResponse:
 		e.FieldStart("code")
 		e.Str("internal")
@@ -17712,6 +17728,9 @@ func (s *CancelInvitationErrorResponse) Decode(d *jx.Decoder) error {
 				case "auth.unauthorized":
 					s.Type = AuthUnauthorizedCancelInvitationErrorResponse
 					found = true
+				case "evt.invalid":
+					s.Type = EvtInvalidCancelInvitationErrorResponse
+					found = true
 				case "internal":
 					s.Type = InternalCancelInvitationErrorResponse
 					found = true
@@ -17750,6 +17769,10 @@ func (s *CancelInvitationErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case AuthUnauthorizedCancelInvitationErrorResponse:
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
+			return err
+		}
+	case EvtInvalidCancelInvitationErrorResponse:
+		if err := s.EvtInvalid.Decode(d); err != nil {
 			return err
 		}
 	case InternalCancelInvitationErrorResponse:
@@ -27162,11 +27185,91 @@ func (s CreateInvitationErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case EncKeyDecryptFailedCreateInvitationErrorResponse:
+		e.FieldStart("code")
+		e.Str("enc_key.decrypt_failed")
+		{
+			s := s.EncKeyDecryptFailed
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case EncKeyEncryptFailedCreateInvitationErrorResponse:
+		e.FieldStart("code")
+		e.Str("enc_key.encrypt_failed")
+		{
+			s := s.EncKeyEncryptFailed
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case EncKeyNotFoundCreateInvitationErrorResponse:
+		e.FieldStart("code")
+		e.Str("enc_key.not_found")
+		{
+			s := s.EncKeyNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case EvtInvalidCreateInvitationErrorResponse:
+		e.FieldStart("code")
+		e.Str("evt.invalid")
+		{
+			s := s.EvtInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case InternalCreateInvitationErrorResponse:
 		e.FieldStart("code")
 		e.Str("internal")
 		{
 			s := s.Internal
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case TknInvalidCreateInvitationErrorResponse:
+		e.FieldStart("code")
+		e.Str("tkn.invalid")
+		{
+			s := s.TknInvalid
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -27306,6 +27409,22 @@ func (s CreateInvitationErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case EncKeyUnknownAlgCreateInvitationErrorResponse:
+		e.FieldStart("code")
+		e.Str("enc_key.unknown_alg")
+		{
+			s := s.EncKeyUnknownAlg
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case UnavailableCreateInvitationErrorResponse:
 		e.FieldStart("code")
 		e.Str("unavailable")
@@ -27354,8 +27473,23 @@ func (s *CreateInvitationErrorResponse) Decode(d *jx.Decoder) error {
 				case "auth.unauthorized":
 					s.Type = AuthUnauthorizedCreateInvitationErrorResponse
 					found = true
+				case "enc_key.decrypt_failed":
+					s.Type = EncKeyDecryptFailedCreateInvitationErrorResponse
+					found = true
+				case "enc_key.encrypt_failed":
+					s.Type = EncKeyEncryptFailedCreateInvitationErrorResponse
+					found = true
+				case "enc_key.not_found":
+					s.Type = EncKeyNotFoundCreateInvitationErrorResponse
+					found = true
+				case "evt.invalid":
+					s.Type = EvtInvalidCreateInvitationErrorResponse
+					found = true
 				case "internal":
 					s.Type = InternalCreateInvitationErrorResponse
+					found = true
+				case "tkn.invalid":
+					s.Type = TknInvalidCreateInvitationErrorResponse
 					found = true
 				case "inv.invalid":
 					s.Type = InvInvalidCreateInvitationErrorResponse
@@ -27380,6 +27514,9 @@ func (s *CreateInvitationErrorResponse) Decode(d *jx.Decoder) error {
 					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidCreateInvitationErrorResponse
+					found = true
+				case "enc_key.unknown_alg":
+					s.Type = EncKeyUnknownAlgCreateInvitationErrorResponse
 					found = true
 				case "unavailable":
 					s.Type = UnavailableCreateInvitationErrorResponse
@@ -27406,8 +27543,28 @@ func (s *CreateInvitationErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
 			return err
 		}
+	case EncKeyDecryptFailedCreateInvitationErrorResponse:
+		if err := s.EncKeyDecryptFailed.Decode(d); err != nil {
+			return err
+		}
+	case EncKeyEncryptFailedCreateInvitationErrorResponse:
+		if err := s.EncKeyEncryptFailed.Decode(d); err != nil {
+			return err
+		}
+	case EncKeyNotFoundCreateInvitationErrorResponse:
+		if err := s.EncKeyNotFound.Decode(d); err != nil {
+			return err
+		}
+	case EvtInvalidCreateInvitationErrorResponse:
+		if err := s.EvtInvalid.Decode(d); err != nil {
+			return err
+		}
 	case InternalCreateInvitationErrorResponse:
 		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case TknInvalidCreateInvitationErrorResponse:
+		if err := s.TknInvalid.Decode(d); err != nil {
 			return err
 		}
 	case InvInvalidCreateInvitationErrorResponse:
@@ -27440,6 +27597,10 @@ func (s *CreateInvitationErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case ReqInvalidCreateInvitationErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case EncKeyUnknownAlgCreateInvitationErrorResponse:
+		if err := s.EncKeyUnknownAlg.Decode(d); err != nil {
 			return err
 		}
 	case UnavailableCreateInvitationErrorResponse:
@@ -27795,7 +27956,7 @@ func (s *CreateInvitationProjectMemberResponse) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("link")
-		json.EncodeURI(e, s.Link)
+		e.Str(s.Link)
 	}
 }
 
@@ -27964,8 +28125,8 @@ func (s *CreateInvitationProjectMemberResponse) Decode(d *jx.Decoder) error {
 		case "link":
 			requiredBitSet[1] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeURI(d)
-				s.Link = v
+				v, err := d.Str()
+				s.Link = string(v)
 				if err != nil {
 					return err
 				}
@@ -28312,7 +28473,7 @@ func (s CreateInvitationResponse) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("link")
-				json.EncodeURI(e, s.Link)
+				e.Str(s.Link)
 			}
 		}
 	case CreateInvitationTeamMemberResponseCreateInvitationResponse:
@@ -28380,7 +28541,7 @@ func (s CreateInvitationResponse) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("link")
-				json.EncodeURI(e, s.Link)
+				e.Str(s.Link)
 			}
 		}
 	}
@@ -28710,7 +28871,7 @@ func (s *CreateInvitationTeamMemberResponse) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("link")
-		json.EncodeURI(e, s.Link)
+		e.Str(s.Link)
 	}
 }
 
@@ -28879,8 +29040,8 @@ func (s *CreateInvitationTeamMemberResponse) Decode(d *jx.Decoder) error {
 		case "link":
 			requiredBitSet[1] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeURI(d)
-				s.Link = v
+				v, err := d.Str()
+				s.Link = string(v)
 				if err != nil {
 					return err
 				}

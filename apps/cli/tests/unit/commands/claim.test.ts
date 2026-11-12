@@ -11,6 +11,7 @@ import {
 import { HttpResponse, http, passthrough } from "msw";
 import { beforeEach, describe, expect, vi } from "vitest";
 
+import { cliPackageRoot } from "@tests/helpers/oclif-build";
 import { it, type Serve } from "@tests/helpers/fixtures";
 
 import {
@@ -514,7 +515,9 @@ describe("claim", () => {
     // by running the command from source, where `input` is the one module asked.
     const talk = answering(envProject.id);
     await Promise.all([
-      asTerminal(() => Claim.run(["--cwd", cwd, "--no-open", "--env", "production"])),
+      asTerminal(() =>
+        Claim.run(["--cwd", cwd, "--no-open", "--env", "production"], cliPackageRoot),
+      ),
       onChallengeMinted((challengeId) => completeClaimChallenge(challengeId, envProject.id)),
     ]);
 

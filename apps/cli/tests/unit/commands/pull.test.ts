@@ -16,6 +16,7 @@ import {
 } from "@tests/helpers/platform-project";
 import { runCliForTest } from "@tests/helpers/run-cli";
 import { rejectionOf } from "@tests/helpers/thrown-value";
+import { runCommand } from "@tests/helpers/run-cli";
 
 describe("fileList", () => {
   it("says what the paths under it are", () => {
@@ -112,7 +113,7 @@ describe("pull", () => {
       await mkdir(join(project.cwd, ".zitadel/branding/unreadable.json"), { recursive: true });
       server.use(liveAcrossTwoPages(LIVE_PRIMARY), answersTheLiveRelease());
 
-      const envelope = await Pull.run([
+      const envelope = await runCommand(Pull, "pull", [
         "latest",
         "--cwd",
         project.cwd,
@@ -231,7 +232,14 @@ describe("pull of a release pinning two handles that resolve to one file", () =>
         return undefined;
       });
       await rejectionOf(() => {
-        return Pull.run([RELEASE_ID, "--cwd", project.cwd, "--server", PLATFORM_URL, "--json"]);
+        return runCommand(Pull, "pull", [
+          RELEASE_ID,
+          "--cwd",
+          project.cwd,
+          "--server",
+          PLATFORM_URL,
+          "--json",
+        ]);
       });
       const said = printed.mock.calls.flat().join("\n");
       printed.mockRestore();
@@ -255,7 +263,7 @@ describe("pull's --json envelope", () => {
     dirs.push(project.cwd);
     server.use(liveAcrossTwoPages(LIVE_PRIMARY), answersTheLiveRelease());
 
-    const envelope = await Pull.run([
+    const envelope = await runCommand(Pull, "pull", [
       "latest",
       "--cwd",
       project.cwd,
@@ -315,7 +323,14 @@ describe("pull of a release whose revisions cannot be fetched", () => {
       return undefined;
     });
     await rejectionOf(() => {
-      return Pull.run([RELEASE_ID, "--cwd", project.cwd, "--server", PLATFORM_URL, "--json"]);
+      return runCommand(Pull, "pull", [
+        RELEASE_ID,
+        "--cwd",
+        project.cwd,
+        "--server",
+        PLATFORM_URL,
+        "--json",
+      ]);
     });
     const said = printed.mock.calls.flat().join("\n");
     printed.mockRestore();

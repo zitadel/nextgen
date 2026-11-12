@@ -162,10 +162,21 @@ describe("console", () => {
             title: "Would mint a console sign-in link (dry run)",
             dry_run: true,
             signed_in_as: "admin@zitadel.localhost",
-            next_commands: [expectedPublicCliCommand(`console --cwd ${app.path}`)],
+            next_commands: [expectedPublicCliCommand(app.againAsRun("console"))],
           },
           warnings: [],
         });
+      });
+
+      it("keeps --no-open in the real sign-in it suggests", async () => {
+        const app = await aSetUpApp();
+        await app.startLocalServer();
+
+        const result = await app.run(["console", "--dry-run", "--no-open", "--json"]);
+
+        expect(app.envelopeOf(result).data.next_commands).toEqual([
+          expectedPublicCliCommand(app.againAsRun("console --no-open")),
+        ]);
       });
 
       it("plans the sign-in from an app inside the directory the server was started in", async () => {
@@ -184,7 +195,7 @@ describe("console", () => {
             title: "Would mint a console sign-in link (dry run)",
             dry_run: true,
             signed_in_as: "admin@zitadel.localhost",
-            next_commands: [expectedPublicCliCommand(`console --cwd ${app.path}`)],
+            next_commands: [expectedPublicCliCommand(app.againAsRun("console"))],
           },
           warnings: [],
         });
@@ -216,7 +227,7 @@ describe("console", () => {
 
         const result = await shown(() => app.run(["console", "--dry-run"]));
 
-        expect(result).toSayOnce(expectedPublicCliCommand(`console --cwd ${app.path}`));
+        expect(result).toSayOnce(expectedPublicCliCommand(app.againAsRun("console")));
       });
 
       it("refuses a project with no local runtime, on stderr, once", async () => {

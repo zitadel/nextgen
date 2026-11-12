@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { useLocalServers } from "@tests/helpers/local-server";
 import { usePlatformMock } from "@tests/helpers/platform";
 import { nextPort } from "@tests/helpers/ports";
-import { aSetUpApp } from "@tests/helpers/project";
+import { aSetUpApp, MOCK_SERVER_URL } from "@tests/helpers/project";
 import { cliVersion, expectedPublicCliCommand } from "@tests/helpers/run-cli";
 import { asTerminal, offTerminal } from "@tests/helpers/terminal";
 
@@ -120,7 +120,7 @@ describe("start", () => {
             next_actions: [
               "Create an app with authentication. Run setup in this directory or a subdirectory.",
               "Setup asks for a framework and sign-in method, creates or updates your app, and installs its dependencies.",
-              `When a sign-in or a request fails, the server's log says why: run ${expectedPublicCliCommand("logs --follow")} in another terminal to watch it.`,
+              `When a sign-in or a request fails, the server's log says why: run ${expectedPublicCliCommand(`logs --follow --cwd ${app.path}`)} in another terminal to watch it.`,
             ],
             next_commands: [expectedPublicCliCommand(`setup --server local --cwd ${app.path}`)],
           },
@@ -158,7 +158,7 @@ describe("start", () => {
             next_actions: [
               "Create an app with authentication. Run setup in this directory or a subdirectory.",
               "Setup asks for a framework and sign-in method, creates or updates your app, and installs its dependencies.",
-              `When a sign-in or a request fails, the server's log says why: run ${expectedPublicCliCommand("logs --follow")} in another terminal to watch it.`,
+              `When a sign-in or a request fails, the server's log says why: run ${expectedPublicCliCommand(`logs --follow --cwd ${app.path}`)} in another terminal to watch it.`,
             ],
             next_commands: [expectedPublicCliCommand(`setup --server local --cwd ${app.path}`)],
           },
@@ -253,7 +253,7 @@ describe("start", () => {
             next_actions: [
               "Create an app with authentication. Run setup in this directory or a subdirectory.",
               "Setup asks for a framework and sign-in method, creates or updates your app, and installs its dependencies.",
-              `When a sign-in or a request fails, the server's log says why: run ${expectedPublicCliCommand("logs --follow")} in another terminal to watch it.`,
+              `When a sign-in or a request fails, the server's log says why: run ${expectedPublicCliCommand(`logs --follow --cwd ${app.path}`)} in another terminal to watch it.`,
             ],
             next_commands: [expectedPublicCliCommand(`setup --server local --cwd ${app.path}`)],
           },
@@ -294,7 +294,7 @@ describe("start", () => {
             next_actions: [
               "Create an app with authentication. Run setup in this directory or a subdirectory.",
               "Setup asks for a framework and sign-in method, creates or updates your app, and installs its dependencies.",
-              `When a sign-in or a request fails, the server's log says why: run ${expectedPublicCliCommand("logs --follow")} in another terminal to watch it.`,
+              `When a sign-in or a request fails, the server's log says why: run ${expectedPublicCliCommand(`logs --follow --cwd ${app.path}`)} in another terminal to watch it.`,
             ],
             next_commands: [expectedPublicCliCommand(`setup --server local --cwd ${app.path}`)],
           },
@@ -401,7 +401,9 @@ describe("start", () => {
               api: "http://localhost:8080",
               console: "http://localhost:8080/ui/console/",
             },
-            next_commands: [expectedPublicCliCommand(`start --cwd ${app.path}`)],
+            next_commands: [
+              expectedPublicCliCommand(`start --server ${MOCK_SERVER_URL} --cwd ${app.path}`),
+            ],
           },
           warnings: [],
         });
@@ -434,7 +436,9 @@ describe("start", () => {
               console: "http://localhost:9000/ui/console/",
             },
             next_commands: [
-              expectedPublicCliCommand(`start --port 9000 --runtime binary --cwd ${app.path}`),
+              expectedPublicCliCommand(
+                `start --port 9000 --runtime binary --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+              ),
             ],
           },
           warnings: [],
@@ -474,7 +478,7 @@ describe("start", () => {
             },
             next_commands: [
               expectedPublicCliCommand(
-                `start --runtime docker --image example.test/zitadel:1 --cwd ${app.path}`,
+                `start --runtime docker --image example.test/zitadel:1 --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
               ),
             ],
           },
@@ -557,7 +561,9 @@ describe("start", () => {
         );
 
         expect(result).toSayOnce(
-          expectedPublicCliCommand(`start --port 9000 --runtime binary --cwd ${app.path}`),
+          expectedPublicCliCommand(
+            `start --port 9000 --runtime binary --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+          ),
         );
       });
 

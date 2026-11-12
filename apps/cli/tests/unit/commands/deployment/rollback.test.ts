@@ -11,6 +11,7 @@ import {
   usePlatformServer,
 } from "@tests/helpers/platform-project";
 import { runCliForTest } from "@tests/helpers/run-cli";
+import { runCommand } from "@tests/helpers/run-cli";
 
 const SERVER = PLATFORM_URL;
 const { server, dirs } = usePlatformServer();
@@ -254,7 +255,9 @@ describe("deployment rollback asked on a terminal", () => {
   const rollingBackOn = async (serverUrl: string) => {
     const { cwd } = await twoDeploys();
     const talk = answering(false);
-    await asPerson(() => DeploymentRollback.run(["--cwd", cwd, "--server", serverUrl]));
+    await asPerson(() =>
+      runCommand(DeploymentRollback, "deployment:rollback", ["--cwd", cwd, "--server", serverUrl]),
+    );
     return talk;
   };
 

@@ -2,7 +2,7 @@ import { exactZitadelPins } from "@/lib/zitadel-pins";
 
 import { wrapForBox } from "./box";
 import { command, notice } from "./style";
-import { upgradeCommand } from "./suggestion";
+import type { SuggestedCommand } from "./suggestion";
 import { escapeControlCharacters } from "./terminal-text";
 import { drawBox } from "./ui/layout";
 import { isNewerVersion, latestCliVersion, updateCheckDisabled } from "./update-check";
@@ -12,9 +12,17 @@ import { isNewerVersion, latestCliVersion, updateCheckDisabled } from "./update-
  * release, or `undefined` when nothing is. It compares the project's pins as
  * well as the CLI: under `npx @zitadel/cli@latest` the CLI is the newest by
  * definition, and what has gone stale is the app.
+ *
+ * @param input.cliVersion - The release of the CLI that is running.
+ * @param input.upgrade - The `upgrade` command the box quotes, rendered by the caller.
+ * @param input.cwd - The directory whose pins are compared.
+ * @param input.env - The process environment.
+ * @param input.columns - The terminal width to wrap to, if any.
+ * @returns The box, or `undefined` when nothing is behind.
  */
 export async function updateNotice(input: {
   cliVersion: string;
+  upgrade: SuggestedCommand;
   cwd: string;
   env: NodeJS.ProcessEnv;
   columns?: number;
@@ -50,7 +58,7 @@ export async function updateNotice(input: {
     return undefined;
   }
   return drawBox(
-    wrapForBox([...behind, "", command(upgradeCommand(cliVersion))].join("\n"), columns),
+    wrapForBox([...behind, "", command(input.upgrade)].join("\n"), columns),
     "Update available",
     notice,
   );

@@ -196,7 +196,7 @@ describe("optionArgs", () => {
  * `npx @zitadel/cli@<version> …` form is the one that runs on their machine —
  * the CLI is not a dependency of the app it scaffolds — so it is the only
  * spelling human output uses, and {@link publicCliCommand}, through a
- * `lib/suggestion.ts` builder, is the only thing that writes it. Two spellings
+ * `lib/suggestion/` builder, is the only thing that writes it. Two spellings
  * reach the terminal by hand, and this scan refuses both: a command written
  * out as bare `zitadel …`, which does not exist on the reader's PATH, and a
  * backtick, which a terminal prints as a backtick rather than as code.

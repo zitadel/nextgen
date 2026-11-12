@@ -1,7 +1,7 @@
-import type { Config } from "@oclif/core";
 import { describe, expect, it } from "vitest";
 
 import { BaseCommand } from "@/lib/oclif/base";
+import { aConfigAt } from "@tests/helpers/suggestions";
 import { prose, rows } from "@/lib/oclif/rendering";
 import type { CommandResult, JsonEnvelope } from "@/lib/oclif/types";
 import { reportWarning, takeReportedWarnings } from "@/lib/warnings";
@@ -49,7 +49,7 @@ class WarningCommand extends BaseCommand {
 
 function makeCommand(): WarningCommand {
   takeReportedWarnings();
-  return new WarningCommand([], { version: "0.0.0-test" } as unknown as Config);
+  return new WarningCommand([], aConfigAt("0.0.0-test"));
 }
 
 describe("BaseCommand warnings", () => {

@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { HttpResponse, http } from "msw";
 import { afterEach, describe, expect } from "vitest";
 
+import { cliPackageRoot } from "@tests/helpers/oclif-build";
 import { it } from "@tests/helpers/fixtures";
 
 import EnvAdd from "@/commands/env/add";
@@ -166,7 +167,9 @@ describe("env add", () => {
 
       const { envelope } = await add(cwd, "--app-url", "https://app.acme.com");
 
-      expect(suggested(envelope).some((command) => command.includes("deploy -m"))).toBe(true);
+      expect(suggested(envelope).some((command) => command.includes("deploy --message"))).toBe(
+        true,
+      );
     });
 
     it("offers no deploy when the project has no origin for one to land on", async () => {
@@ -174,7 +177,9 @@ describe("env add", () => {
 
       const { envelope } = await add(cwd);
 
-      expect(suggested(envelope).some((command) => command.includes("deploy -m"))).toBe(false);
+      expect(suggested(envelope).some((command) => command.includes("deploy --message"))).toBe(
+        false,
+      );
     });
 
     it("tells a person to give the environment an origin before deploying to it", async () => {
@@ -221,7 +226,9 @@ describe("env add", () => {
 
       const { envelope } = await addBound(cwd);
 
-      expect(suggested(envelope).some((command) => command.includes("deploy -m"))).toBe(false);
+      expect(suggested(envelope).some((command) => command.includes("deploy --message"))).toBe(
+        false,
+      );
     });
 
     it("says what the environment serves until something is deployed to it", async () => {
@@ -241,7 +248,7 @@ describe("env add", () => {
 
       expect(asOneLine(out)).toContain(
         expectedPublicCliCommand(
-          `deploy -m '<what changed>' --env-file ${cwd}/.env.production.local`,
+          `deploy --message '<what changed>' --env-file ${cwd}/.env.production.local`,
         ),
       );
     });
@@ -251,7 +258,7 @@ describe("env add", () => {
 
       const out = stripAnsi(await addRendered(cwd, "--app-url", "https://app.acme.com"));
 
-      expect(out.split("deploy -m '<what changed>'")).toHaveLength(2);
+      expect(out.split("deploy --message '<what changed>'")).toHaveLength(2);
     });
 
     it("names the check of what resolves only once", async () => {
@@ -751,16 +758,19 @@ describe("env add asked on a terminal", () => {
   const adding = async (cwd: string, answers: readonly Answer[], ...extra: string[]) => {
     const talk = personAnswering(...answers);
     const result = await asTerminal(() =>
-      EnvAdd.run([
-        "staging",
-        "--cwd",
-        cwd,
-        "--server",
-        SERVER,
-        "--app-url",
-        "https://app.acme.com",
-        ...extra,
-      ]),
+      EnvAdd.run(
+        [
+          "staging",
+          "--cwd",
+          cwd,
+          "--server",
+          SERVER,
+          "--app-url",
+          "https://app.acme.com",
+          ...extra,
+        ],
+        cliPackageRoot,
+      ),
     );
     return { envelope: result, shown: talk.plain(), asked: talk.asked() };
   };
@@ -783,7 +793,7 @@ describe("env add asked on a terminal", () => {
     const cwd = await makeDeployableProject();
     const talk = personAnswering(SERVER, "");
 
-    await asTerminal(() => EnvAdd.run(["staging", "--cwd", cwd]));
+    await asTerminal(() => EnvAdd.run(["staging", "--cwd", cwd], cliPackageRoot));
 
     expect(talk.asked()).toEqual([
       "What is the URL of your Zitadel server?",
@@ -806,7 +816,7 @@ describe("env add asked on a terminal", () => {
 
     expect(
       (envelope as { data: { next_commands: string[] } }).data.next_commands.some((command) =>
-        command.includes("deploy -m"),
+        command.includes("deploy --message"),
       ),
     ).toBe(true);
   });
@@ -827,7 +837,7 @@ describe("env add asked on a terminal", () => {
 
     const { envelope } = await adding(cwd, [true]);
 
-    expect((envelope as { warnings: string[] }).warnings.join("\n")).toContain("deploy -m");
+    expect((envelope as { warnings: string[] }).warnings.join("\n")).toContain("deploy --message");
   });
 
   it("never asks for a project it only bound", async () => {
@@ -843,7 +853,9 @@ describe("env add asked on a terminal", () => {
 
     const talk = personAnswering("");
 
-    await asTerminal(() => EnvAdd.run(["staging", "--cwd", cwd, "--server", SERVER]));
+    await asTerminal(() =>
+      EnvAdd.run(["staging", "--cwd", cwd, "--server", SERVER], cliPackageRoot),
+    );
 
     expect(talk.asked()).not.toContain(OFFER);
   });

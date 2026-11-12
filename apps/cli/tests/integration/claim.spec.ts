@@ -427,7 +427,11 @@ describe("claim", () => {
           code: "E_VALIDATION",
           message:
             "--challenge-id takes the challenge_id that the --no-wait run returned, which starts with ch_",
-          next_commands: [expectedPublicCliCommand(`claim --no-wait --cwd ${app.path}`)],
+          next_commands: [
+            expectedPublicCliCommand(
+              `claim --no-wait --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+            ),
+          ],
         });
       });
     });

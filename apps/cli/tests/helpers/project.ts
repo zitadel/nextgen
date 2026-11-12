@@ -911,9 +911,24 @@ export class ScaffoldedApp {
     });
   }
 
-  /** The port a `doctor` run reported it checked. */
+  /**
+   * The port a `doctor` run reported it checked, whether it passed (in `data`)
+   * or found issues (in the error's `details`).
+   *
+   * @param result - The `doctor --json` run.
+   * @returns The port.
+   */
   doctoredPortOf(result: CliResult): number {
-    return this.envelopeOf<{ port: number }>(result).data.port;
+    const envelope = this.envelopeOf(result) as Readonly<{
+      data?: Readonly<{ port: number }>;
+      details?: Readonly<{ port: number }>;
+    }>;
+    const port = envelope.data?.port ?? envelope.details?.port;
+    if (port === undefined) {
+      throw new Error(`expected doctor to report its port, got: ${result.stdout}`);
+    }
+
+    return port;
   }
 
   /**
