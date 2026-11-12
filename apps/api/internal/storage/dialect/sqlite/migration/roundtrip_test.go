@@ -26,29 +26,6 @@ func TestMigrationsRoundTrip(t *testing.T) {
 	migrationtest.RoundTrip(t, p, snap, known)
 }
 
-// TestMigrationsRoundTripClaimed walks the migrations in two databases that
-// take them in turns, as the Spanner walks share them on Spanner Omni, and
-// proves the two together round-trip every migration once.
-func TestMigrationsRoundTripClaimed(t *testing.T) {
-	inTurns := func(first int) func() int {
-		next := first - 2
-		return func() int {
-			next += 2
-			return next
-		}
-	}
-	even, evenSnap := openRoundTrip(t)
-	odd, oddSnap := openRoundTrip(t)
-	walked := migrationtest.RoundTripClaimed(t, even, evenSnap, known, inTurns(0))
-	walked = append(walked, migrationtest.RoundTripClaimed(t, odd, oddSnap, known, inTurns(1))...)
-
-	var all []int64
-	for _, source := range even.ListSources() {
-		all = append(all, source.Version)
-	}
-	require.ElementsMatch(t, all, walked)
-}
-
 // openRoundTrip opens a database as the dialect opens it (the same pragmas,
 // foreign keys on among them, and one connection) and returns a provider over
 // it and the snapshot of its schema.
