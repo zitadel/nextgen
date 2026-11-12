@@ -66,7 +66,7 @@ jobs:
       # The remote-cache step trades this for a Turborepo token.
       id-token: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           # The base `--affected` compares with.
           fetch-depth: 0
@@ -106,7 +106,7 @@ jobs:
       # this job compiles; a key keeps its first save. A pull request or a
       # merge group restores its own entry or main's, which the nightly run
       # saves.
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v7
         with:
           go-version-file: apps/api/go.mod
           cache: true
@@ -118,11 +118,11 @@ jobs:
             tools/oidc-mock/go.sum
             go.work.sum
 
-      - uses: pnpm/action-setup@v5
+      - uses: pnpm/action-setup@v6
         with:
           run_install: false
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: pnpm

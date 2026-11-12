@@ -70,7 +70,7 @@ jobs:
       GIT_CONFIG_KEY_1: advice.defaultBranchName
       GIT_CONFIG_VALUE_1: "false"
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           # export/push land on the long-lived sync branch; figma-rest always
           # generates from main (the script asserts CURRENT_BRANCH == main
@@ -118,12 +118,12 @@ jobs:
           git push -q origin HEAD:design-tokens/figma-sync
 
       - name: Set up pnpm
-        uses: pnpm/action-setup@v5
+        uses: pnpm/action-setup@v6
         with:
           run_install: false
 
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: pnpm

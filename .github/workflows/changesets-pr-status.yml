@@ -18,11 +18,11 @@ jobs:
     outputs:
       comment-body: ${{ steps.pr-status.outputs.comment-body }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Generate Changesets status
         id: pr-status
-        uses: changesets/action/pr-status@v1
+        uses: changesets/action/pr-status@v2
 
   pr-comment:
     needs: pr-status
@@ -32,6 +32,6 @@ jobs:
       pull-requests: write
     steps:
       - name: Comment on PR
-        uses: changesets/action/pr-comment@v1
+        uses: changesets/action/pr-comment@v2
         with:
           body: ${{ needs.pr-status.outputs.comment-body }}
