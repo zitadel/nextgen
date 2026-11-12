@@ -87,11 +87,11 @@ func TestCreateApplication(t *testing.T) {
 		assert.Equal(t, api.ErrorCode(domain.ErrApplicationClientIDTaken().Code), resp.(*api.CreateApplicationConflict).Code)
 	})
 
-	t.Run("an unknown id is application.not_found", func(t *testing.T) {
+	t.Run("an unknown id is app.not_found", func(t *testing.T) {
 		assertAuthzError(t, f.get(t, "app_missing"), domain.ErrApplicationNotFound().Code)
 	})
 
-	t.Run("a rule of the authorization server is application.invalid", func(t *testing.T) {
+	t.Run("a rule of the authorization server is app.invalid", func(t *testing.T) {
 		noRedirect := webClient("web", "")
 		noRedirect.RedirectUris = nil
 		resp := f.put(t, api.Application{Slug: "cli", Name: "CLI", Clients: []api.ApplicationClient{noRedirect}})
