@@ -2,6 +2,7 @@ import { Flags } from "@oclif/core";
 import { z } from "zod";
 
 import {
+  type Invitation,
   type InvitationRelation,
   InvitationService,
   invitationGrant,
@@ -9,7 +10,9 @@ import {
 } from "@/lib/backend";
 import { GetInvitationParams } from "@/lib/backend/schemas";
 import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
+import { dryRunResult } from "@/lib/oclif/crud/shared";
 import { filled, reads, type Refused } from "@/lib/oclif/flags";
+import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { Promptable } from "@/lib/oclif/promptable";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import type { Parsed } from "@zitadel/config/idp";
@@ -57,6 +60,13 @@ const REPLACES: Refused<string> = {
   },
 };
 
+/** How a `--replaces` naming an accepted invitation is refused. */
+const REPLACES_ACCEPTED_REFUSAL: Refusal = {
+  message: "{id} was already accepted, so there is nothing to replace",
+  hint: "Create a new invitation instead.",
+  next: ["invitation create"],
+};
+
 /**
  * `zitadel invitation create` — invite someone into the project with a link.
  *
@@ -91,9 +101,29 @@ export default class InvitationCreate extends Promptable(EnvironmentCommand) {
     const { client, projectId } = await this.connect();
     const invitationService = new InvitationService(client, projectId);
 
-    const name = flags.name ?? (await this.askName());
+    const replaced =
+      flags.replaces === undefined
+        ? undefined
+        : await this.readReplaced(invitationService, flags.replaces);
+    // A replacement without a name keeps the original's, so it is not asked.
+    const name = flags.name ?? (replaced === undefined ? await this.askName() : undefined);
     const relation = flags.relation ?? (await this.askRelation());
-    if (!(await this.askToCreate(name, relation, flags.replaces))) {
+    if (this.dryRun) {
+      return this.emit(
+        dryRunResult({
+          verb: "create",
+          topic: "invitation",
+          body: {
+            type: "project_member",
+            project_member: { relation },
+            ...(name === undefined ? {} : { metadata: { name } }),
+            ...(replaced === undefined ? {} : { replaces_invitation_id: replaced.id }),
+          },
+          next: await this.realRun(),
+        }),
+      );
+    }
+    if (!(await this.askToCreate(name ?? replaced?.metadata?.name, relation, replaced?.id))) {
       return this.emit({
         status: "skipped",
         reason: "create-cancelled",
@@ -143,12 +173,29 @@ export default class InvitationCreate extends Promptable(EnvironmentCommand) {
     }
     const answer = await this.ask.text({
       name: "name",
-      message:
-        "Who is this invitation for? Other administrators see the name; leave it blank to skip.",
+      message: "Who is this invitation for?",
+      placeholder: "Shown to other administrators; leave blank to skip",
       flag: "--name",
       parse: parseAnsweredName,
     });
     return answer === "" ? undefined : answer;
+  }
+
+  /**
+   * The invitation `--replaces` names, read before anything is asked: the
+   * server refuses to replace one that was accepted.
+   */
+  private async readReplaced(
+    invitationService: InvitationService,
+    invitationId: string,
+  ): Promise<Invitation> {
+    const invitation = await invitationService.get(invitationId);
+    if (invitation.status === "accepted") {
+      throw refusalError(REPLACES_ACCEPTED_REFUSAL, { id: invitation.id }, (command) => {
+        return this.suggest(command);
+      });
+    }
+    return invitation;
   }
 
   /** The role the invitation grants, asked when `--relation` did not give it. */
