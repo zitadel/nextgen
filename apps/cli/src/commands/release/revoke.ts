@@ -1,9 +1,11 @@
 import { Args, Flags } from "@oclif/core";
 import { z } from "zod";
 
-import { ReleaseService } from "@/lib/backend";
+import { ReleaseInUseError, ReleaseService, type ServingOrigin } from "@/lib/backend";
 import { RevokeReleaseParams } from "@/lib/backend/schemas";
 import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
+import { toZitadelError, ZitadelError } from "@/lib/errors";
+import type { Suggestion } from "@/lib/suggestion";
 import { Destructive } from "@/lib/oclif/destructive";
 import { mutatedData } from "@/lib/oclif/envelope";
 import { type Refused, taken } from "@/lib/oclif/flags";
@@ -96,7 +98,39 @@ export default class ReleaseRevoke extends Destructive(EnvironmentCommand) {
         },
         apply: async (consent, { client, projectId }) => {
           const releaseService = new ReleaseService(consent.unlock(client), projectId);
-          const release = await releaseService.revoke(args.releaseId);
+          const release = await releaseService.revoke(args.releaseId).catch((error: unknown) => {
+            if (!(error instanceof ReleaseInUseError)) {
+              throw error;
+            }
+            const base = toZitadelError(error);
+            const previews = error.origins.filter((served: ServingOrigin) => {
+              return served.kind === "preview";
+            });
+            const hasPrimary = previews.length < error.origins.length;
+            const served = new Intl.ListFormat("en", { type: "conjunction" }).format(
+              error.origins.map((origin: ServingOrigin) => {
+                return `${origin.origin} (${origin.kind}, ${origin.deployment_id})`;
+              }),
+            );
+            const steps: string[] = [];
+            const nextCommands: Suggestion[] = [];
+            if (hasPrimary) {
+              steps.push("put another release live on each primary origin");
+              nextCommands.push({ id: "deploy" }, { id: "deployment:rollback" });
+            }
+            if (previews.length > 0) {
+              steps.push("remove each preview");
+            }
+            for (const preview of previews) {
+              nextCommands.push({ id: "preview:rm", args: { url: preview.origin } });
+            }
+
+            throw new ZitadelError(base.code, base.message, {
+              hint: `Served by ${served}. Revoke it again after you ${steps.join(" and ")}.`,
+              nextCommands,
+              details: base.details,
+            });
+          });
           const title = `Revoked ${escapeControlCharacters(release.id)}`;
 
           return {

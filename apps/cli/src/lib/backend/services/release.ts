@@ -5,11 +5,50 @@ import type {
   GetReleaseById200,
   GetReleaseById200PointersItem,
   GetReleaseById200PointersItemKind,
+  RevokeRelease409DetailsOriginsItem,
 } from "@zitadel/api/generated/model";
+import { z } from "zod";
 
 import { ApiService } from "@/lib/backend/api-service";
 import type { ZitadelClient } from "@/lib/backend/client";
 import { ConflictError } from "@/lib/backend/errors";
+
+/** One origin that serves a release, the deployment that pins it there, and whether it is a primary origin or a preview. */
+export type ServingOrigin = Readonly<RevokeRelease409DetailsOriginsItem>;
+
+/**
+ * The refusal to revoke a release an origin still serves, carrying every such
+ * origin. Raised only when the server's answer names them, so a caller that
+ * catches it always has at least one.
+ */
+export class ReleaseInUseError extends ConflictError {
+  override readonly name: string = "ReleaseInUseError";
+  readonly origins: readonly ServingOrigin[];
+
+  constructor(
+    message: string,
+    origins: readonly ServingOrigin[],
+    options: ConstructorParameters<typeof ConflictError>[1] = {},
+  ) {
+    super(message, options);
+    this.origins = origins;
+  }
+}
+
+/** The origins a `rel.in_use` answer names, as the API documents them. */
+const InUseBody = z.object({
+  details: z.object({
+    origins: z
+      .array(
+        z.object({
+          origin: z.string(),
+          deployment_id: z.string(),
+          kind: z.enum(["primary", "preview"]),
+        }),
+      )
+      .min(1),
+  }),
+});
 
 /** What building a release takes: the bundle, a message and the commit it was built from. */
 export type ReleaseInput = Readonly<BuildReleaseBody>;
@@ -101,10 +140,28 @@ export class ReleaseService extends ApiService {
    *
    * @param releaseId - The release to revoke.
    * @returns The release, now revoked.
+   * @throws ReleaseInUseError when an origin still serves the release, naming
+   * each such origin.
    */
   async revoke(releaseId: string): Promise<Release> {
-    return this.client.revokeRelease(releaseId, {
-      project_id: this.projectId,
-    });
+    try {
+      return await this.client.revokeRelease(releaseId, {
+        project_id: this.projectId,
+      });
+    } catch (error) {
+      if (error instanceof ConflictError && error.serverCode === "rel.in_use") {
+        const served = InUseBody.safeParse(error.body);
+        if (served.success) {
+          throw new ReleaseInUseError(error.message, served.data.details.origins, {
+            status: error.status,
+            url: error.url,
+            body: error.body,
+            requestId: error.requestId,
+            cause: error,
+          });
+        }
+      }
+      throw error;
+    }
   }
 }

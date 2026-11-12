@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { ReleaseService } from "@/lib/backend/services/release";
+import { ConflictError } from "@/lib/backend/errors";
+import { ReleaseInUseError, ReleaseService } from "@/lib/backend/services/release";
 import { fakeClient } from "@tests/helpers/fake-client";
 
 const INPUT = {
@@ -59,5 +60,68 @@ describe("ReleaseService.revoke", () => {
     await releaseService.revoke("rel_1");
 
     expect(revokeRelease).toHaveBeenCalledWith("rel_1", { project_id: "proj_1" });
+  });
+
+  describe("when an origin still serves the release", () => {
+    const PRIMARY = { origin: "https://app.acme.com", deployment_id: "dep_1", kind: "primary" };
+    const PREVIEW = { origin: "https://x.vercel.app", deployment_id: "dep_2", kind: "preview" };
+
+    /** A service whose server refuses the revoke with the answer `body`. */
+    function refusedWith(body: unknown): ReleaseService {
+      const revokeRelease = async () => {
+        throw new ConflictError("release: still served by an origin", {
+          status: 409,
+          url: "https://zitadel.test/api/v1/releases/rel_1/revoke",
+          body,
+        });
+      };
+
+      return new ReleaseService(fakeClient({ revokeRelease }), "proj_1");
+    }
+
+    it("fails with every origin that serves it", async () => {
+      const releaseService = refusedWith({
+        code: "rel.in_use",
+        message: "release: still served by an origin",
+        details: { origins: [PRIMARY, PREVIEW] },
+      });
+
+      await expect(releaseService.revoke("rel_1")).rejects.toMatchObject({
+        name: "ReleaseInUseError",
+        origins: [PRIMARY, PREVIEW],
+      });
+    });
+
+    it("fails as a conflict that keeps the server's answer", async () => {
+      const releaseService = refusedWith({
+        code: "rel.in_use",
+        message: "release: still served by an origin",
+        details: { origins: [PRIMARY] },
+      });
+
+      await expect(releaseService.revoke("rel_1")).rejects.toBeInstanceOf(ConflictError);
+      await expect(releaseService.revoke("rel_1")).rejects.toMatchObject({
+        status: 409,
+        serverCode: "rel.in_use",
+      });
+    });
+
+    it.each([
+      ["another code", { code: "rel.revoked", message: "revoked" }],
+      ["no origins", { code: "rel.in_use", message: "in use", details: { origins: [] } }],
+      [
+        "an origin of no known kind",
+        {
+          code: "rel.in_use",
+          message: "in use",
+          details: { origins: [{ ...PRIMARY, kind: "other" }] },
+        },
+      ],
+      ["no details", { code: "rel.in_use", message: "in use" }],
+    ])("fails as the plain conflict it was when the answer has %s", async (_, body) => {
+      const releaseService = refusedWith(body);
+
+      await expect(releaseService.revoke("rel_1")).rejects.not.toBeInstanceOf(ReleaseInUseError);
+    });
   });
 });

@@ -296,6 +296,8 @@ describe("release revoke", () => {
           source: MOCK_SERVER_URL,
           code: "E_CONFLICT",
           message: "release: still served by an origin",
+          hint: expect.any(String),
+          next_commands: expect.any(Array),
           details: {
             status: 409,
             url: expect.stringMatching(
@@ -323,6 +325,76 @@ describe("release revoke", () => {
             },
           },
         });
+      });
+
+      it("names each origin that serves the release", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        const served = await app.deployData();
+
+        const result = await app.run([
+          "release",
+          "revoke",
+          served.release_id ?? "",
+          "--force",
+          "--non-interactive",
+          "--json",
+        ]);
+
+        expect(result).toHintAt("https://app.example.com");
+      });
+
+      it("names the deployment that pins the release", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        const served = await app.deployData();
+
+        const result = await app.run([
+          "release",
+          "revoke",
+          served.release_id ?? "",
+          "--force",
+          "--non-interactive",
+          "--json",
+        ]);
+
+        expect(result).toHintAt(served.deployment_id ?? "");
+      });
+
+      it("suggests rolling back", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        const served = await app.deployData();
+
+        const result = await app.run([
+          "release",
+          "revoke",
+          served.release_id ?? "",
+          "--force",
+          "--non-interactive",
+          "--json",
+        ]);
+
+        expect(result).toSuggest("deployment rollback");
+      });
+
+      it("suggests removing a preview that serves the release", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        const served = await app.deployData();
+        await app.addOrigin("https://*-acme.vercel.app", "preview");
+        await app.previewData("https://x-acme.vercel.app");
+
+        const result = await app.run([
+          "release",
+          "revoke",
+          served.release_id ?? "",
+          "--force",
+          "--non-interactive",
+          "--json",
+        ]);
+
+        expect(result).toSuggest("preview rm https://x-acme.vercel.app");
       });
 
       it("revokes nothing when an origin still serves the release", async () => {
