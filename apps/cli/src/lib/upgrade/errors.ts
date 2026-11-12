@@ -3,6 +3,10 @@
  * a caller words the failure for its own person, with its own suggestions.
  */
 export class ReleaseLookupError extends Error {
+  /**
+   * Takes no arguments: there is nothing to say beyond the fact that the lookup
+   * found no release.
+   */
   constructor() {
     super("Could not look up the latest release");
     this.name = "ReleaseLookupError";

@@ -84,7 +84,7 @@ export default class Upgrade extends Suggestible(BaseCommand) {
    * drawn, and every suggested command is built for the new release and run from
    * the directory the person typed.
    *
-   * @param input.flags - The parsed flags.
+   * @param input - The parsed input, of which only the flags are read.
    * @returns The result, which is also the `--json` envelope.
    * @throws A `ZitadelError` `E_NETWORK` when the latest release cannot be looked
    * up, and `E_VALIDATION` when the install fails.

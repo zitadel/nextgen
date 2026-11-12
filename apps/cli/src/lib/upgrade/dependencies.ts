@@ -29,6 +29,8 @@ export class Dependency {
   /**
    * Whether the specifier is one exact version. A range, a dist-tag or a `file:`
    * specifier is a resolution choice the person made, so it is not an exact pin.
+   *
+   * @returns `true` for an exact pin.
    */
   get isExact(): boolean {
     return semver.valid(this.specifier) !== null;
