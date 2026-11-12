@@ -181,6 +181,8 @@ describe.sequential("task graph cache and ordering contracts", () => {
     const uncached = new Set([
       "@zitadel/server#build",
       "@zitadel/server#test:postgres",
+      // The proof-of-work race run: a probe, never replayed.
+      "@zitadel/server#test:pow",
       "//#check-go-work",
     ]);
     const goTasks = [...baseline.values()].filter(
@@ -408,6 +410,12 @@ describe.sequential("task graph cache and ordering contracts", () => {
       "apps/cloud-functions/app/.well-known/workflow/v1/.gitignore": "*",
       "apps/cloud-functions/app/.well-known/workflow/v1/flow/route.js": "export {};\n",
       "apps/demo-next/next-env.d.ts": '/// <reference types="next" />\n',
+      // What the e2e lanes write beside their specs.
+      "e2e/console/test-results/smoke/.last-run.json": "{}\n",
+      "e2e/console/playwright-report/real/index.html": "<html></html>\n",
+      "e2e/demo-next/test-results/mock/.last-run.json": "{}\n",
+      "e2e/demo-next/playwright-report/real/index.html": "<html></html>\n",
+      "e2e/demo-nuxt/test-results/mock/.last-run.json": "{}\n",
     };
     try {
       for (const [file, content] of Object.entries(generated)) write(file, content);

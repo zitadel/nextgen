@@ -53,8 +53,9 @@ scripts, which build through turbo (`turbo run @zitadel/<package>#<task>`).
   `check-adrs`, `check-go-work` and `check-typecheck`);
   a `test` runs the tests that need no service (the server's runs
   `test:unit` and `test:sqlite`), and Go tests wait for no check. The
-  server's `test:postgres` (Docker) and `test:spanner` (the emulator) stay
-  apart.
+  server's `test:postgres` (Docker), `test:spanner` (the emulator) and
+  `test:pow` (the proof-of-work race run) stay apart; the gate names the
+  first and the last.
 - The e2e lanes are `@zitadel/e2e`'s
   `console-smoke`, `console-real`, `console-embedded`, `console-platform`,
   `console-deployment`, `demo-next-mock`, `demo-next-real`, `demo-nuxt-mock`,
