@@ -539,12 +539,13 @@ claim window that has closed, which retrying never recovers. Ctrl-C exits
 130: a command waiting on the server, or on an answer at a prompt, stops at
 once with `E_CANCELLED`, and any other command exits within a second, possibly
 without an envelope. In human mode a cancel prints no error block. A name the
-CLI cannot resolve to a command is an `E_VALIDATION` envelope like any other,
-but it exits 127, as a shell does for a command it cannot find: an unknown
-command, an unknown subcommand, and a stray extra word after a real command
-alike. Its `next_commands` are the `--help` of the command it was one edit
-from and of the topic. It is never run as a different command, and no
-arguments typed after it are repeated. Asking for help on such a name is the
+CLI cannot resolve to a command, an unknown command or an unknown subcommand,
+is an `E_VALIDATION` envelope like any other, but it exits 127, as a shell
+does for a command it cannot find. Its `next_commands` are the `--help` of the
+command it was one edit from and of the topic. It is never run as a different
+command, and no arguments typed after it are repeated. A stray extra word after
+a real command is that command refusing an argument it does not take: an
+`E_VALIDATION` envelope that exits 3, like any other refusal. Asking for help on such a name is the
 one exception, even with `--json`: with `--help` among the arguments, or as
 `zitadel help <name>`, the help layer answers with nothing on stdout, a plain
 `Command … not found` on stderr, and exit 2. `zitadel help` given a flag it

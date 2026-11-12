@@ -156,32 +156,26 @@ export class JsonFailureOutput implements FailureOutput {
 export class TerminalFailureOutput implements FailureOutput {
   private readonly render: (summary: Summary) => string;
   private readonly emit: (text: string) => void;
-  private readonly stderr: StderrColour;
 
   /**
    * @param render - Lays a summary out as text, the way the entry point lays
    *   out everything it draws.
    * @param emit - Writes text to stderr.
-   * @param stderr - What decides whether the text keeps its colour; this
-   *   process's stderr by default.
    */
-  constructor(
-    render: (summary: Summary) => string,
-    emit: (text: string) => void,
-    stderr: StderrColour = stderrColour(),
-  ) {
+  constructor(render: (summary: Summary) => string, emit: (text: string) => void) {
     this.render = render;
     this.emit = emit;
-    this.stderr = stderr;
   }
 
   /**
-   * Draws the failure.
+   * Draws the failure. Whether it keeps its colour is read from this process's
+   * stderr as it is written, never handed in, so no entry point can decide it
+   * differently.
    *
    * @param failure - The failure to draw.
    */
   write(failure: Failure): void {
-    this.emit(asideText(this.render(this.summary(failure)), this.stderr));
+    this.emit(asideText(this.render(this.summary(failure)), stderrColour()));
   }
 
   /**

@@ -1,5 +1,5 @@
 import type { Config } from "@oclif/core";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { ZitadelError } from "@/lib/errors";
 import { unscopedCommand } from "@/lib/suggestion";
@@ -114,18 +114,6 @@ describe("BaseCommand errors", () => {
     expect(cmd.stderr).toEqual([
       "Error: More than one deployment is live. (E_VALIDATION)\nLive origins: https://a.example\\x1b[2Jwiped.",
     ]);
-  });
-
-  // Whether the block is written plain or spelled out, nothing a redirected
-  // stderr collects may act on the terminal that later prints the file.
-  it("keeps color codes out of a redirected stderr", async () => {
-    vi.stubEnv("FORCE_COLOR", "");
-    const cmd = new FailingCommand(false);
-
-    await cmd.fail(new ZitadelError("E_VALIDATION", "\u001b[31mBad port\u001b[39m"));
-
-    expect(cmd.stderr.join("\n")).not.toContain("\u001b");
-    expect(cmd.stderr.join("\n")).toContain("Bad port");
   });
 
   it("stops a spinner the failed command left drawing", async () => {

@@ -67,6 +67,17 @@ describe("UnknownCommand", () => {
     });
   });
 
+  describe("as the exit code says it", () => {
+    it.each([
+      ["frobnicate", 127],
+      ["teams:delete", 127],
+      ["doctor:extra", 3],
+      ["variable:list:extra", 3],
+    ])("%s exits %s: a shell's code only for a name that is no command", (id, code) => {
+      expect(new UnknownCommand(id, KNOWN).exitCode).toBe(code);
+    });
+  });
+
   describe("as the envelope names it", () => {
     it.each([
       ["teams:delete:team_secret_1", "teams:delete"],

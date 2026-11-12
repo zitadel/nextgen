@@ -34,6 +34,8 @@ export class UnknownCommand {
   readonly typed: readonly string[];
   /** The refusal. */
   readonly error: ZitadelError;
+  /** Whether the words name a command that exists, followed by a word it does not take. */
+  private readonly exists: boolean;
 
   /** The commands a refusal may suggest: the visible ones and their aliases. */
   private readonly commands: ReadonlyArray<readonly string[]>;
@@ -60,6 +62,18 @@ export class UnknownCommand {
       this.nothingUsable(words) ?? this.unwantedArgument(words) ?? this.misspelled(words);
     this.typed = refused.typed;
     this.error = refused.error;
+    this.exists = refused.exists;
+  }
+
+  /**
+   * The code the run exits with: a shell's 127 for a name that is no command,
+   * and the refusal's own code for a command that exists and was given a word
+   * it does not take, as that command refuses an argument it does not take.
+   *
+   * @returns The exit code.
+   */
+  get exitCode(): number {
+    return this.exists ? this.error.exitCode : UNKNOWN_COMMAND_EXIT_CODE;
   }
 
   /**
@@ -111,6 +125,7 @@ export class UnknownCommand {
     }
     return {
       typed: [],
+      exists: false,
       error: new ZitadelError("E_VALIDATION", "That is not a zitadel command.", {
         nextCommands: [unscopedCommand("--help")],
       }),
@@ -136,6 +151,7 @@ export class UnknownCommand {
       }
       return {
         typed: command,
+        exists: true,
         error: new ZitadelError(
           "E_VALIDATION",
           `${command.join(" ")} does not take the argument typed after it.`,
@@ -172,6 +188,7 @@ export class UnknownCommand {
     }
     return {
       typed,
+      exists: false,
       error: new ZitadelError("E_VALIDATION", `${typed.join(" ")} is not a zitadel command.`, {
         nextCommands: next,
       }),
@@ -245,7 +262,7 @@ export class UnknownCommand {
 }
 
 /** What a refusal names, and the refusal. */
-type Refused = Readonly<{ typed: readonly string[]; error: ZitadelError }>;
+type Refused = Readonly<{ typed: readonly string[]; exists: boolean; error: ZitadelError }>;
 
 /**
  * What was typed on the command line, read as oclif reads it for a command,
@@ -314,7 +331,9 @@ export class Invocation {
 /**
  * Refuses a command that does not exist the way every other failure is
  * refused: one error envelope on stdout under `--json`, the error block on
- * stderr otherwise, and the exit code a shell gives a command it cannot find.
+ * stderr otherwise, and the exit code a shell gives a command it cannot find,
+ * or the refusal's own code when the command exists and the word after it is
+ * one it does not take.
  *
  * It never offers to run another command. oclif's own prompt does, and takes
  * the closest name for the one typed, dropping its flags: `teams delete x
@@ -348,7 +367,7 @@ const hook: Hook<"command_not_found"> = async function ({ id, argv, config }) {
         },
       );
   output.write(failure);
-  return this.exit(UNKNOWN_COMMAND_EXIT_CODE);
+  return this.exit(unknown.exitCode);
 };
 
 export default hook;

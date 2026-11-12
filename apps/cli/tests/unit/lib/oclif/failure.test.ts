@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ZitadelError } from "@/lib/errors";
 import {
@@ -79,7 +79,6 @@ describe("TerminalFailureOutput", () => {
         return "";
       },
       () => {},
-      { tty: true, forced: false },
     ).write(new Failure(refusal, META));
 
     expect(drawn).toEqual([
@@ -96,11 +95,24 @@ describe("TerminalFailureOutput", () => {
 });
 
 describe("TerminalFailureOutput's stderr", () => {
+  const found = Object.getOwnPropertyDescriptor(process.stderr, "isTTY");
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    if (found === undefined) {
+      Reflect.deleteProperty(process.stderr, "isTTY");
+    } else {
+      Object.defineProperty(process.stderr, "isTTY", found);
+    }
+  });
+
   it.each([
-    [{ tty: true, forced: false }, "\u001b[31mred\u001b[39m"],
-    [{ tty: false, forced: true }, "\u001b[31mred\u001b[39m"],
-    [{ tty: false, forced: false }, "red"],
-  ])("written to stderr %j is %j", (stderr, expected) => {
+    [{ tty: true, forced: "" }, "\u001b[31mred\u001b[39m"],
+    [{ tty: false, forced: "1" }, "\u001b[31mred\u001b[39m"],
+    [{ tty: false, forced: "" }, "red"],
+  ])("written to this process's stderr %j is %j", (stderr, expected) => {
+    Object.defineProperty(process.stderr, "isTTY", { value: stderr.tty, configurable: true });
+    vi.stubEnv("FORCE_COLOR", stderr.forced);
     const written: string[] = [];
 
     new TerminalFailureOutput(
@@ -110,7 +122,6 @@ describe("TerminalFailureOutput's stderr", () => {
       (text) => {
         written.push(text);
       },
-      stderr,
     ).write(new Failure(refusal, META));
 
     expect(written).toEqual([expected]);
