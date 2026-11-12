@@ -55,11 +55,13 @@ export class ReleaseChannel {
    */
   private async lookup(fresh: boolean): Promise<Release | undefined> {
     const cached = await this.cache.read(this.distTag, this.registry.url);
-    // A timestamp ahead of now (the clock moved back, or the file was edited) is
-    // no answer to trust for however long it says, so it is asked again.
-    const age = cached === undefined ? Number.POSITIVE_INFINITY : Date.now() - cached.checked_at;
-    if (!fresh && cached !== undefined && age >= 0 && age < CACHE_MAX_AGE_MS) {
-      return Release.from(cached.version);
+    if (!fresh && cached !== undefined) {
+      // A timestamp ahead of now (the clock moved back, or the file was edited) is
+      // no answer to trust for however long it says, so it is asked again.
+      const age = Date.now() - cached.checked_at;
+      if (age >= 0 && age < CACHE_MAX_AGE_MS) {
+        return Release.from(cached.version);
+      }
     }
     const answered = await this.registry.version(this.distTag);
     const known = answered ?? cached?.version;
