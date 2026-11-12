@@ -352,7 +352,7 @@ describe("auth-method sso enable", () => {
         data: {
           next_args: [
             ["deploy", "--dry-run", "--cwd", cwd],
-            ["deploy", "-m", "<what changed>", "--cwd", cwd],
+            ["deploy", "--message", "<what changed>", "--cwd", cwd],
           ],
         },
       });
@@ -391,9 +391,9 @@ describe("auth-method sso enable", () => {
 
     it.for([
       { output: "piped text", command: "deploy --dry-run", run: authMethodText },
-      { output: "piped text", command: "deploy -m", run: authMethodText },
+      { output: "piped text", command: "deploy --message", run: authMethodText },
       { output: "--json", command: "deploy --dry-run", run: authMethodJson },
-      { output: "--json", command: "deploy -m", run: authMethodJson },
+      { output: "--json", command: "deploy --message", run: authMethodJson },
     ])("names $command once in $output", async ({ command, run }, { dir }) => {
       const cwd = await aProject(dir);
 
@@ -1206,7 +1206,7 @@ describe("auth-method sso enable", () => {
       expect(parseJson(result.stdout)).toMatchObject({
         next_commands: [
           expect.stringContaining(
-            "auth-method sso enable --provider google --client-id <client-id> --server https://api.zitadel.cloud",
+            "auth-method sso enable --provider google --client-id '<client-id>' --server https://api.zitadel.cloud",
           ),
         ],
       });
@@ -1612,7 +1612,7 @@ describe("auth-method sso enable", () => {
         data: {
           next_commands: [
             expect.stringMatching(/ deploy --dry-run --cwd '[^']+my project'$/),
-            expect.stringMatching(/ deploy -m '<what changed>' --cwd '[^']+my project'$/),
+            expect.stringMatching(/ deploy --message '<what changed>' --cwd '[^']+my project'$/),
           ],
         },
       });

@@ -567,7 +567,9 @@ describe("deploy", () => {
             resources: 4,
             targets: "primary",
             diff: NO_BASELINE,
-            next_commands: [expectedPublicCliCommand(app.againAsRun("deploy -m '<what changed>'"))],
+            next_commands: [
+              expectedPublicCliCommand(app.againAsRun("deploy --message '<what changed>'")),
+            ],
           },
           warnings: [],
         });
@@ -593,7 +595,9 @@ describe("deploy", () => {
             resources: 4,
             targets: "primary",
             diff: NO_BASELINE,
-            next_commands: [expectedPublicCliCommand(app.againAsRun("deploy -m '<what changed>'"))],
+            next_commands: [
+              expectedPublicCliCommand(app.againAsRun("deploy --message '<what changed>'")),
+            ],
           },
           warnings: [
             '.zitadel/flows/default-login.json: step "password" collects x-auth-methods#password on the login path but no upstream step collects an identifier field — the engine cannot resolve which user to challenge',
@@ -620,7 +624,7 @@ describe("deploy", () => {
             targets: "primary",
             diff: NO_BASELINE,
             next_commands: [
-              expectedPublicCliCommand(app.againAsRun("deploy -m '<what changed>' --force")),
+              expectedPublicCliCommand(app.againAsRun("deploy --message '<what changed>' --force")),
             ],
           },
           warnings: [NO_EMAIL_LOCKOUT],
@@ -646,7 +650,7 @@ describe("deploy", () => {
             targets: "primary",
             diff: NO_BASELINE,
             next_commands: [
-              expectedPublicCliCommand(app.againAsRun("deploy -m '<what changed>' --force")),
+              expectedPublicCliCommand(app.againAsRun("deploy --message '<what changed>' --force")),
             ],
           },
           warnings: [
@@ -675,7 +679,9 @@ describe("deploy", () => {
             resources: 4,
             targets: "primary",
             diff: NO_BASELINE,
-            next_commands: [expectedPublicCliCommand(app.againAsRun("deploy -m '<what changed>'"))],
+            next_commands: [
+              expectedPublicCliCommand(app.againAsRun("deploy --message '<what changed>'")),
+            ],
           },
           warnings: [],
         });
@@ -699,7 +705,9 @@ describe("deploy", () => {
             resources: 4,
             targets: "primary",
             diff: NO_BASELINE,
-            next_commands: [expectedPublicCliCommand(app.againAsRun("deploy -m '<what changed>'"))],
+            next_commands: [
+              expectedPublicCliCommand(app.againAsRun("deploy --message '<what changed>'")),
+            ],
           },
           warnings: [],
         });
@@ -724,7 +732,7 @@ describe("deploy", () => {
             targets: "primary",
             diff: NO_BASELINE,
             next_commands: [
-              expectedPublicCliCommand(app.againAsRun("deploy -m '<what changed>' --force")),
+              expectedPublicCliCommand(app.againAsRun("deploy --message '<what changed>' --force")),
             ],
           },
           warnings: [expect.stringContaining("(1 of them has an SSO link)")],
@@ -930,7 +938,9 @@ describe("deploy", () => {
           message: LOCKOUT_MESSAGE,
           hint: `Ask a person first: Deploy to ${await app.projectPlace()} even though the users above will not be able to sign in? Pass --force only once they agree.`,
           next_commands: [
-            expectedPublicCliCommand(app.againAsRun("deploy --dry-run -m 'a nickname' --force")),
+            expectedPublicCliCommand(
+              app.againAsRun("deploy --dry-run --force --message 'a nickname'"),
+            ),
           ],
           details: {
             question: `Deploy to ${await app.projectPlace()} even though the users above will not be able to sign in?`,
@@ -958,7 +968,7 @@ describe("deploy", () => {
             targets: "primary",
             diff: NO_BASELINE,
             next_commands: [
-              expectedPublicCliCommand(app.againAsRun("deploy -m '<what changed>' --force")),
+              expectedPublicCliCommand(app.againAsRun("deploy --message '<what changed>' --force")),
             ],
           },
           warnings: [NO_EMAIL_LOCKOUT],
@@ -1213,7 +1223,9 @@ describe("deploy", () => {
             resources: 5,
             targets: "primary",
             diff: NO_BASELINE,
-            next_commands: [expectedPublicCliCommand(app.againAsRun("deploy -m '<what changed>'"))],
+            next_commands: [
+              expectedPublicCliCommand(app.againAsRun("deploy --message '<what changed>'")),
+            ],
           },
           warnings: [],
         });
@@ -1420,7 +1432,7 @@ describe("deploy", () => {
           source: MOCK_SERVER_URL,
           code: "E_CONFLICT",
           message: "Another deploy changed the targets since this one was prepared",
-          hint: `Rerun ${expectedPublicCliCommand(app.againAsRun("deploy -m 'test deploy'"))}; it will build and deploy against the current state.`,
+          hint: `Rerun ${expectedPublicCliCommand(app.againAsRun("deploy --message 'test deploy'"))}; it will build and deploy against the current state.`,
           next_commands: [expectedPublicCliCommand(app.againAsRun("deployment list --live"))],
           details: {
             current_deployment: {
@@ -1452,7 +1464,7 @@ describe("deploy", () => {
         const result = await app.deploy(["-m", "add a nickname", "--force"]);
 
         expect(result).toHintAt(
-          expectedPublicCliCommand(app.againAsRun("deploy -m 'add a nickname' --force")),
+          expectedPublicCliCommand(app.againAsRun("deploy --message 'add a nickname' --force")),
         );
       });
 
@@ -1475,7 +1487,7 @@ describe("deploy", () => {
               targets: "primary",
               diff: NO_BASELINE,
               next_commands: [
-                expectedPublicCliCommand(app.againAsRun("deploy -m '<what changed>'")),
+                expectedPublicCliCommand(app.againAsRun("deploy --message '<what changed>'")),
               ],
             },
             warnings: [],
@@ -1510,7 +1522,9 @@ describe("deploy", () => {
               targets: "primary",
               diff: NO_BASELINE,
               next_commands: [
-                expectedPublicCliCommand(app.againAsRun("deploy -m 'add a nickname' --force")),
+                expectedPublicCliCommand(
+                  app.againAsRun("deploy --message 'add a nickname' --force"),
+                ),
               ],
             },
             warnings: [],
@@ -1535,7 +1549,7 @@ describe("deploy", () => {
               diff: NO_BASELINE,
               next_commands: [
                 expectedPublicCliCommand(
-                  `deploy -m '<what changed>' --env staging --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+                  `deploy --message '<what changed>' --env staging --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
                 ),
               ],
             },
@@ -1572,7 +1586,7 @@ describe("deploy", () => {
                 ],
               },
               next_commands: [
-                expectedPublicCliCommand(app.againAsRun("deploy -m '<what changed>'")),
+                expectedPublicCliCommand(app.againAsRun("deploy --message '<what changed>'")),
               ],
             },
             warnings: [],
@@ -1807,7 +1821,7 @@ describe("deploy", () => {
                 targets: "primary",
                 diff: NO_BASELINE,
                 next_commands: [
-                  expectedPublicCliCommand(app.againAsRun("deploy -m '<what changed>'")),
+                  expectedPublicCliCommand(app.againAsRun("deploy --message '<what changed>'")),
                 ],
               },
               warnings: [warning],
@@ -1836,7 +1850,7 @@ describe("deploy", () => {
               targets: "primary",
               diff: NO_BASELINE,
               next_commands: [
-                expectedPublicCliCommand(app.againAsRun("deploy -m '<what changed>'")),
+                expectedPublicCliCommand(app.againAsRun("deploy --message '<what changed>'")),
               ],
             },
             warnings: [],
@@ -1867,7 +1881,9 @@ describe("deploy", () => {
             resources: 5,
             targets: "primary",
             diff: NO_BASELINE,
-            next_commands: [expectedPublicCliCommand(app.againAsRun("deploy -m '<what changed>'"))],
+            next_commands: [
+              expectedPublicCliCommand(app.againAsRun("deploy --message '<what changed>'")),
+            ],
           },
           warnings: [],
         });
@@ -1896,7 +1912,9 @@ describe("deploy", () => {
             resources: 5,
             targets: "primary",
             diff: NO_BASELINE,
-            next_commands: [expectedPublicCliCommand(app.againAsRun("deploy -m '<what changed>'"))],
+            next_commands: [
+              expectedPublicCliCommand(app.againAsRun("deploy --message '<what changed>'")),
+            ],
           },
           warnings: [],
         });
@@ -1921,7 +1939,9 @@ describe("deploy", () => {
             resources: 5,
             targets: "primary",
             diff: NO_BASELINE,
-            next_commands: [expectedPublicCliCommand(app.againAsRun("deploy -m '<what changed>'"))],
+            next_commands: [
+              expectedPublicCliCommand(app.againAsRun("deploy --message '<what changed>'")),
+            ],
           },
           warnings: [
             '.zitadel/idps/acme-sso.json: claim_mapping reads "email", which a provider only returns for the "email" scope, and oidc.scopes is "openid". Add "email" to oidc.scopes, or read another claim.',
@@ -2017,7 +2037,7 @@ describe("deploy", () => {
         const result = await app.run(["deploy", "--dry-run", "--non-interactive"]);
 
         expect(result).toSayOnce(
-          expectedPublicCliCommand(app.againAsRun("deploy -m '<what changed>'")),
+          expectedPublicCliCommand(app.againAsRun("deploy --message '<what changed>'")),
         );
       });
 

@@ -28497,6 +28497,7 @@ type FinishUserPasskeyRegistrationErrorResponse struct {
 	UserInvalid                 UserInvalid
 	UserNotFound                UserNotFound
 	UserPasswordEmpty           UserPasswordEmpty
+	UserPasswordHashingBusy     UserPasswordHashingBusy
 	UserPasswordPolicyViolation UserPasswordPolicyViolation
 	UserPasswordTooLong         UserPasswordTooLong
 	UserPermissionDenied        UserPermissionDenied
@@ -28523,6 +28524,7 @@ const (
 	UserInvalidFinishUserPasskeyRegistrationErrorResponse                 FinishUserPasskeyRegistrationErrorResponseType = "user.invalid"
 	UserNotFoundFinishUserPasskeyRegistrationErrorResponse                FinishUserPasskeyRegistrationErrorResponseType = "user.not_found"
 	UserPasswordEmptyFinishUserPasskeyRegistrationErrorResponse           FinishUserPasskeyRegistrationErrorResponseType = "user.password_empty"
+	UserPasswordHashingBusyFinishUserPasskeyRegistrationErrorResponse     FinishUserPasskeyRegistrationErrorResponseType = "user.password_hashing_busy"
 	UserPasswordPolicyViolationFinishUserPasskeyRegistrationErrorResponse FinishUserPasskeyRegistrationErrorResponseType = "user.password_policy_violation"
 	UserPasswordTooLongFinishUserPasskeyRegistrationErrorResponse         FinishUserPasskeyRegistrationErrorResponseType = "user.password_too_long"
 	UserPermissionDeniedFinishUserPasskeyRegistrationErrorResponse        FinishUserPasskeyRegistrationErrorResponseType = "user.permission_denied"
@@ -28606,6 +28608,11 @@ func (s FinishUserPasskeyRegistrationErrorResponse) IsUserNotFound() bool {
 // IsUserPasswordEmpty reports whether FinishUserPasskeyRegistrationErrorResponse is UserPasswordEmpty.
 func (s FinishUserPasskeyRegistrationErrorResponse) IsUserPasswordEmpty() bool {
 	return s.Type == UserPasswordEmptyFinishUserPasskeyRegistrationErrorResponse
+}
+
+// IsUserPasswordHashingBusy reports whether FinishUserPasskeyRegistrationErrorResponse is UserPasswordHashingBusy.
+func (s FinishUserPasskeyRegistrationErrorResponse) IsUserPasswordHashingBusy() bool {
+	return s.Type == UserPasswordHashingBusyFinishUserPasskeyRegistrationErrorResponse
 }
 
 // IsUserPasswordPolicyViolation reports whether FinishUserPasskeyRegistrationErrorResponse is UserPasswordPolicyViolation.
@@ -28956,6 +28963,27 @@ func (s FinishUserPasskeyRegistrationErrorResponse) GetUserPasswordEmpty() (v Us
 func NewUserPasswordEmptyFinishUserPasskeyRegistrationErrorResponse(v UserPasswordEmpty) FinishUserPasskeyRegistrationErrorResponse {
 	var s FinishUserPasskeyRegistrationErrorResponse
 	s.SetUserPasswordEmpty(v)
+	return s
+}
+
+// SetUserPasswordHashingBusy sets FinishUserPasskeyRegistrationErrorResponse to UserPasswordHashingBusy.
+func (s *FinishUserPasskeyRegistrationErrorResponse) SetUserPasswordHashingBusy(v UserPasswordHashingBusy) {
+	s.Type = UserPasswordHashingBusyFinishUserPasskeyRegistrationErrorResponse
+	s.UserPasswordHashingBusy = v
+}
+
+// GetUserPasswordHashingBusy returns UserPasswordHashingBusy and true boolean if FinishUserPasskeyRegistrationErrorResponse is UserPasswordHashingBusy.
+func (s FinishUserPasskeyRegistrationErrorResponse) GetUserPasswordHashingBusy() (v UserPasswordHashingBusy, ok bool) {
+	if !s.IsUserPasswordHashingBusy() {
+		return v, false
+	}
+	return s.UserPasswordHashingBusy, true
+}
+
+// NewUserPasswordHashingBusyFinishUserPasskeyRegistrationErrorResponse returns new FinishUserPasskeyRegistrationErrorResponse from UserPasswordHashingBusy.
+func NewUserPasswordHashingBusyFinishUserPasskeyRegistrationErrorResponse(v UserPasswordHashingBusy) FinishUserPasskeyRegistrationErrorResponse {
+	var s FinishUserPasskeyRegistrationErrorResponse
+	s.SetUserPasswordHashingBusy(v)
 	return s
 }
 
@@ -36840,6 +36868,7 @@ type GetFlowStepErrorResponse struct {
 	UserInvalid                 UserInvalid
 	UserNotFound                UserNotFound
 	UserPasswordEmpty           UserPasswordEmpty
+	UserPasswordHashingBusy     UserPasswordHashingBusy
 	UserPasswordPolicyViolation UserPasswordPolicyViolation
 	UserPasswordTooLong         UserPasswordTooLong
 }
@@ -36888,6 +36917,7 @@ const (
 	UserInvalidGetFlowStepErrorResponse                 GetFlowStepErrorResponseType = "user.invalid"
 	UserNotFoundGetFlowStepErrorResponse                GetFlowStepErrorResponseType = "user.not_found"
 	UserPasswordEmptyGetFlowStepErrorResponse           GetFlowStepErrorResponseType = "user.password_empty"
+	UserPasswordHashingBusyGetFlowStepErrorResponse     GetFlowStepErrorResponseType = "user.password_hashing_busy"
 	UserPasswordPolicyViolationGetFlowStepErrorResponse GetFlowStepErrorResponseType = "user.password_policy_violation"
 	UserPasswordTooLongGetFlowStepErrorResponse         GetFlowStepErrorResponseType = "user.password_too_long"
 )
@@ -37085,6 +37115,11 @@ func (s GetFlowStepErrorResponse) IsUserNotFound() bool {
 // IsUserPasswordEmpty reports whether GetFlowStepErrorResponse is UserPasswordEmpty.
 func (s GetFlowStepErrorResponse) IsUserPasswordEmpty() bool {
 	return s.Type == UserPasswordEmptyGetFlowStepErrorResponse
+}
+
+// IsUserPasswordHashingBusy reports whether GetFlowStepErrorResponse is UserPasswordHashingBusy.
+func (s GetFlowStepErrorResponse) IsUserPasswordHashingBusy() bool {
+	return s.Type == UserPasswordHashingBusyGetFlowStepErrorResponse
 }
 
 // IsUserPasswordPolicyViolation reports whether GetFlowStepErrorResponse is UserPasswordPolicyViolation.
@@ -37913,6 +37948,27 @@ func (s GetFlowStepErrorResponse) GetUserPasswordEmpty() (v UserPasswordEmpty, o
 func NewUserPasswordEmptyGetFlowStepErrorResponse(v UserPasswordEmpty) GetFlowStepErrorResponse {
 	var s GetFlowStepErrorResponse
 	s.SetUserPasswordEmpty(v)
+	return s
+}
+
+// SetUserPasswordHashingBusy sets GetFlowStepErrorResponse to UserPasswordHashingBusy.
+func (s *GetFlowStepErrorResponse) SetUserPasswordHashingBusy(v UserPasswordHashingBusy) {
+	s.Type = UserPasswordHashingBusyGetFlowStepErrorResponse
+	s.UserPasswordHashingBusy = v
+}
+
+// GetUserPasswordHashingBusy returns UserPasswordHashingBusy and true boolean if GetFlowStepErrorResponse is UserPasswordHashingBusy.
+func (s GetFlowStepErrorResponse) GetUserPasswordHashingBusy() (v UserPasswordHashingBusy, ok bool) {
+	if !s.IsUserPasswordHashingBusy() {
+		return v, false
+	}
+	return s.UserPasswordHashingBusy, true
+}
+
+// NewUserPasswordHashingBusyGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from UserPasswordHashingBusy.
+func NewUserPasswordHashingBusyGetFlowStepErrorResponse(v UserPasswordHashingBusy) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetUserPasswordHashingBusy(v)
 	return s
 }
 
@@ -76111,6 +76167,52 @@ func (o OptUserPasswordEmptyDetails) Or(d UserPasswordEmptyDetails) UserPassword
 	return d
 }
 
+// NewOptUserPasswordHashingBusyDetails returns new OptUserPasswordHashingBusyDetails with value set to v.
+func NewOptUserPasswordHashingBusyDetails(v UserPasswordHashingBusyDetails) OptUserPasswordHashingBusyDetails {
+	return OptUserPasswordHashingBusyDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptUserPasswordHashingBusyDetails is optional UserPasswordHashingBusyDetails.
+type OptUserPasswordHashingBusyDetails struct {
+	Value UserPasswordHashingBusyDetails
+	Set   bool
+}
+
+// IsSet returns true if OptUserPasswordHashingBusyDetails was set.
+func (o OptUserPasswordHashingBusyDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptUserPasswordHashingBusyDetails) Reset() {
+	var v UserPasswordHashingBusyDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptUserPasswordHashingBusyDetails) SetTo(v UserPasswordHashingBusyDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptUserPasswordHashingBusyDetails) Get() (v UserPasswordHashingBusyDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptUserPasswordHashingBusyDetails) Or(d UserPasswordHashingBusyDetails) UserPasswordHashingBusyDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptUserPasswordPolicyViolationDetails returns new OptUserPasswordPolicyViolationDetails with value set to v.
 func NewOptUserPasswordPolicyViolationDetails(v UserPasswordPolicyViolationDetails) OptUserPasswordPolicyViolationDetails {
 	return OptUserPasswordPolicyViolationDetails{
@@ -97490,6 +97592,7 @@ type SetUserPasswordErrorResponse struct {
 	UserInvalid                 UserInvalid
 	UserNotFound                UserNotFound
 	UserPasswordEmpty           UserPasswordEmpty
+	UserPasswordHashingBusy     UserPasswordHashingBusy
 	UserPasswordPolicyViolation UserPasswordPolicyViolation
 	UserPasswordTooLong         UserPasswordTooLong
 	UserPermissionDenied        UserPermissionDenied
@@ -97517,6 +97620,7 @@ const (
 	UserInvalidSetUserPasswordErrorResponse                 SetUserPasswordErrorResponseType = "user.invalid"
 	UserNotFoundSetUserPasswordErrorResponse                SetUserPasswordErrorResponseType = "user.not_found"
 	UserPasswordEmptySetUserPasswordErrorResponse           SetUserPasswordErrorResponseType = "user.password_empty"
+	UserPasswordHashingBusySetUserPasswordErrorResponse     SetUserPasswordErrorResponseType = "user.password_hashing_busy"
 	UserPasswordPolicyViolationSetUserPasswordErrorResponse SetUserPasswordErrorResponseType = "user.password_policy_violation"
 	UserPasswordTooLongSetUserPasswordErrorResponse         SetUserPasswordErrorResponseType = "user.password_too_long"
 	UserPermissionDeniedSetUserPasswordErrorResponse        SetUserPasswordErrorResponseType = "user.permission_denied"
@@ -97605,6 +97709,11 @@ func (s SetUserPasswordErrorResponse) IsUserNotFound() bool {
 // IsUserPasswordEmpty reports whether SetUserPasswordErrorResponse is UserPasswordEmpty.
 func (s SetUserPasswordErrorResponse) IsUserPasswordEmpty() bool {
 	return s.Type == UserPasswordEmptySetUserPasswordErrorResponse
+}
+
+// IsUserPasswordHashingBusy reports whether SetUserPasswordErrorResponse is UserPasswordHashingBusy.
+func (s SetUserPasswordErrorResponse) IsUserPasswordHashingBusy() bool {
+	return s.Type == UserPasswordHashingBusySetUserPasswordErrorResponse
 }
 
 // IsUserPasswordPolicyViolation reports whether SetUserPasswordErrorResponse is UserPasswordPolicyViolation.
@@ -97976,6 +98085,27 @@ func (s SetUserPasswordErrorResponse) GetUserPasswordEmpty() (v UserPasswordEmpt
 func NewUserPasswordEmptySetUserPasswordErrorResponse(v UserPasswordEmpty) SetUserPasswordErrorResponse {
 	var s SetUserPasswordErrorResponse
 	s.SetUserPasswordEmpty(v)
+	return s
+}
+
+// SetUserPasswordHashingBusy sets SetUserPasswordErrorResponse to UserPasswordHashingBusy.
+func (s *SetUserPasswordErrorResponse) SetUserPasswordHashingBusy(v UserPasswordHashingBusy) {
+	s.Type = UserPasswordHashingBusySetUserPasswordErrorResponse
+	s.UserPasswordHashingBusy = v
+}
+
+// GetUserPasswordHashingBusy returns UserPasswordHashingBusy and true boolean if SetUserPasswordErrorResponse is UserPasswordHashingBusy.
+func (s SetUserPasswordErrorResponse) GetUserPasswordHashingBusy() (v UserPasswordHashingBusy, ok bool) {
+	if !s.IsUserPasswordHashingBusy() {
+		return v, false
+	}
+	return s.UserPasswordHashingBusy, true
+}
+
+// NewUserPasswordHashingBusySetUserPasswordErrorResponse returns new SetUserPasswordErrorResponse from UserPasswordHashingBusy.
+func NewUserPasswordHashingBusySetUserPasswordErrorResponse(v UserPasswordHashingBusy) SetUserPasswordErrorResponse {
+	var s SetUserPasswordErrorResponse
+	s.SetUserPasswordHashingBusy(v)
 	return s
 }
 
@@ -98360,6 +98490,7 @@ type SubmitFlowStepErrorResponse struct {
 	UserInvalid                 UserInvalid
 	UserNotFound                UserNotFound
 	UserPasswordEmpty           UserPasswordEmpty
+	UserPasswordHashingBusy     UserPasswordHashingBusy
 	UserPasswordPolicyViolation UserPasswordPolicyViolation
 	UserPasswordTooLong         UserPasswordTooLong
 }
@@ -98411,6 +98542,7 @@ const (
 	UserInvalidSubmitFlowStepErrorResponse                 SubmitFlowStepErrorResponseType = "user.invalid"
 	UserNotFoundSubmitFlowStepErrorResponse                SubmitFlowStepErrorResponseType = "user.not_found"
 	UserPasswordEmptySubmitFlowStepErrorResponse           SubmitFlowStepErrorResponseType = "user.password_empty"
+	UserPasswordHashingBusySubmitFlowStepErrorResponse     SubmitFlowStepErrorResponseType = "user.password_hashing_busy"
 	UserPasswordPolicyViolationSubmitFlowStepErrorResponse SubmitFlowStepErrorResponseType = "user.password_policy_violation"
 	UserPasswordTooLongSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "user.password_too_long"
 )
@@ -98623,6 +98755,11 @@ func (s SubmitFlowStepErrorResponse) IsUserNotFound() bool {
 // IsUserPasswordEmpty reports whether SubmitFlowStepErrorResponse is UserPasswordEmpty.
 func (s SubmitFlowStepErrorResponse) IsUserPasswordEmpty() bool {
 	return s.Type == UserPasswordEmptySubmitFlowStepErrorResponse
+}
+
+// IsUserPasswordHashingBusy reports whether SubmitFlowStepErrorResponse is UserPasswordHashingBusy.
+func (s SubmitFlowStepErrorResponse) IsUserPasswordHashingBusy() bool {
+	return s.Type == UserPasswordHashingBusySubmitFlowStepErrorResponse
 }
 
 // IsUserPasswordPolicyViolation reports whether SubmitFlowStepErrorResponse is UserPasswordPolicyViolation.
@@ -99514,6 +99651,27 @@ func (s SubmitFlowStepErrorResponse) GetUserPasswordEmpty() (v UserPasswordEmpty
 func NewUserPasswordEmptySubmitFlowStepErrorResponse(v UserPasswordEmpty) SubmitFlowStepErrorResponse {
 	var s SubmitFlowStepErrorResponse
 	s.SetUserPasswordEmpty(v)
+	return s
+}
+
+// SetUserPasswordHashingBusy sets SubmitFlowStepErrorResponse to UserPasswordHashingBusy.
+func (s *SubmitFlowStepErrorResponse) SetUserPasswordHashingBusy(v UserPasswordHashingBusy) {
+	s.Type = UserPasswordHashingBusySubmitFlowStepErrorResponse
+	s.UserPasswordHashingBusy = v
+}
+
+// GetUserPasswordHashingBusy returns UserPasswordHashingBusy and true boolean if SubmitFlowStepErrorResponse is UserPasswordHashingBusy.
+func (s SubmitFlowStepErrorResponse) GetUserPasswordHashingBusy() (v UserPasswordHashingBusy, ok bool) {
+	if !s.IsUserPasswordHashingBusy() {
+		return v, false
+	}
+	return s.UserPasswordHashingBusy, true
+}
+
+// NewUserPasswordHashingBusySubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from UserPasswordHashingBusy.
+func NewUserPasswordHashingBusySubmitFlowStepErrorResponse(v UserPasswordHashingBusy) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetUserPasswordHashingBusy(v)
 	return s
 }
 
@@ -101604,6 +101762,82 @@ func (s *TknInvalidTknidDetails) init() TknInvalidTknidDetails {
 	}
 	return m
 }
+
+// Why the server refused the request for now. Each member names its error
+// code; `req.rate_limited` joins them when the server's own rate limits land.
+// Retry after the number of seconds in the `Retry-After` header.
+// Ref: #
+// TooManyRequests represents sum type.
+type TooManyRequests struct {
+	Type                    TooManyRequestsType // switch on this field
+	UserPasswordHashingBusy UserPasswordHashingBusy
+}
+
+// TooManyRequestsType is oneOf type of TooManyRequests.
+type TooManyRequestsType string
+
+// Possible values for TooManyRequestsType.
+const (
+	UserPasswordHashingBusyTooManyRequests TooManyRequestsType = "user.password_hashing_busy"
+)
+
+// IsUserPasswordHashingBusy reports whether TooManyRequests is UserPasswordHashingBusy.
+func (s TooManyRequests) IsUserPasswordHashingBusy() bool {
+	return s.Type == UserPasswordHashingBusyTooManyRequests
+}
+
+// SetUserPasswordHashingBusy sets TooManyRequests to UserPasswordHashingBusy.
+func (s *TooManyRequests) SetUserPasswordHashingBusy(v UserPasswordHashingBusy) {
+	s.Type = UserPasswordHashingBusyTooManyRequests
+	s.UserPasswordHashingBusy = v
+}
+
+// GetUserPasswordHashingBusy returns UserPasswordHashingBusy and true boolean if TooManyRequests is UserPasswordHashingBusy.
+func (s TooManyRequests) GetUserPasswordHashingBusy() (v UserPasswordHashingBusy, ok bool) {
+	if !s.IsUserPasswordHashingBusy() {
+		return v, false
+	}
+	return s.UserPasswordHashingBusy, true
+}
+
+// NewUserPasswordHashingBusyTooManyRequests returns new TooManyRequests from UserPasswordHashingBusy.
+func NewUserPasswordHashingBusyTooManyRequests(v UserPasswordHashingBusy) TooManyRequests {
+	var s TooManyRequests
+	s.SetUserPasswordHashingBusy(v)
+	return s
+}
+
+// TooManyRequestsHeaders wraps TooManyRequests with response headers.
+type TooManyRequestsHeaders struct {
+	RetryAfter OptInt
+	Response   TooManyRequests
+}
+
+// GetRetryAfter returns the value of RetryAfter.
+func (s *TooManyRequestsHeaders) GetRetryAfter() OptInt {
+	return s.RetryAfter
+}
+
+// GetResponse returns the value of Response.
+func (s *TooManyRequestsHeaders) GetResponse() TooManyRequests {
+	return s.Response
+}
+
+// SetRetryAfter sets the value of RetryAfter.
+func (s *TooManyRequestsHeaders) SetRetryAfter(val OptInt) {
+	s.RetryAfter = val
+}
+
+// SetResponse sets the value of Response.
+func (s *TooManyRequestsHeaders) SetResponse(val TooManyRequests) {
+	s.Response = val
+}
+
+func (*TooManyRequestsHeaders) finishUserPasskeyRegistrationRes() {}
+func (*TooManyRequestsHeaders) getFlowStepRes()                   {}
+func (*TooManyRequestsHeaders) setUserPasswordRes()               {}
+func (*TooManyRequestsHeaders) submitFlowStepRes()                {}
+func (*TooManyRequestsHeaders) verifyChallengeProofRes()          {}
 
 // Merged schema.
 // Ref: #
@@ -105232,6 +105466,59 @@ func (s *UserPasswordEmptyDetails) init() UserPasswordEmptyDetails {
 
 // Merged schema.
 // Ref: #
+type UserPasswordHashingBusy struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptUserPasswordHashingBusyDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *UserPasswordHashingBusy) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *UserPasswordHashingBusy) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *UserPasswordHashingBusy) GetDetails() OptUserPasswordHashingBusyDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *UserPasswordHashingBusy) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *UserPasswordHashingBusy) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *UserPasswordHashingBusy) SetDetails(val OptUserPasswordHashingBusyDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type UserPasswordHashingBusyDetails map[string]jx.Raw
+
+func (s *UserPasswordHashingBusyDetails) init() UserPasswordHashingBusyDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
 type UserPasswordPolicyViolation struct {
 	// Merged property.
 	Code string `json:"code"`
@@ -108269,6 +108556,7 @@ type VerifyChallengeProofErrorResponse struct {
 	UserInvalid                 UserInvalid
 	UserNotFound                UserNotFound
 	UserPasswordEmpty           UserPasswordEmpty
+	UserPasswordHashingBusy     UserPasswordHashingBusy
 	UserPasswordPolicyViolation UserPasswordPolicyViolation
 	UserPasswordTooLong         UserPasswordTooLong
 }
@@ -108295,6 +108583,7 @@ const (
 	UserInvalidVerifyChallengeProofErrorResponse                 VerifyChallengeProofErrorResponseType = "user.invalid"
 	UserNotFoundVerifyChallengeProofErrorResponse                VerifyChallengeProofErrorResponseType = "user.not_found"
 	UserPasswordEmptyVerifyChallengeProofErrorResponse           VerifyChallengeProofErrorResponseType = "user.password_empty"
+	UserPasswordHashingBusyVerifyChallengeProofErrorResponse     VerifyChallengeProofErrorResponseType = "user.password_hashing_busy"
 	UserPasswordPolicyViolationVerifyChallengeProofErrorResponse VerifyChallengeProofErrorResponseType = "user.password_policy_violation"
 	UserPasswordTooLongVerifyChallengeProofErrorResponse         VerifyChallengeProofErrorResponseType = "user.password_too_long"
 )
@@ -108382,6 +108671,11 @@ func (s VerifyChallengeProofErrorResponse) IsUserNotFound() bool {
 // IsUserPasswordEmpty reports whether VerifyChallengeProofErrorResponse is UserPasswordEmpty.
 func (s VerifyChallengeProofErrorResponse) IsUserPasswordEmpty() bool {
 	return s.Type == UserPasswordEmptyVerifyChallengeProofErrorResponse
+}
+
+// IsUserPasswordHashingBusy reports whether VerifyChallengeProofErrorResponse is UserPasswordHashingBusy.
+func (s VerifyChallengeProofErrorResponse) IsUserPasswordHashingBusy() bool {
+	return s.Type == UserPasswordHashingBusyVerifyChallengeProofErrorResponse
 }
 
 // IsUserPasswordPolicyViolation reports whether VerifyChallengeProofErrorResponse is UserPasswordPolicyViolation.
@@ -108748,6 +109042,27 @@ func (s VerifyChallengeProofErrorResponse) GetUserPasswordEmpty() (v UserPasswor
 func NewUserPasswordEmptyVerifyChallengeProofErrorResponse(v UserPasswordEmpty) VerifyChallengeProofErrorResponse {
 	var s VerifyChallengeProofErrorResponse
 	s.SetUserPasswordEmpty(v)
+	return s
+}
+
+// SetUserPasswordHashingBusy sets VerifyChallengeProofErrorResponse to UserPasswordHashingBusy.
+func (s *VerifyChallengeProofErrorResponse) SetUserPasswordHashingBusy(v UserPasswordHashingBusy) {
+	s.Type = UserPasswordHashingBusyVerifyChallengeProofErrorResponse
+	s.UserPasswordHashingBusy = v
+}
+
+// GetUserPasswordHashingBusy returns UserPasswordHashingBusy and true boolean if VerifyChallengeProofErrorResponse is UserPasswordHashingBusy.
+func (s VerifyChallengeProofErrorResponse) GetUserPasswordHashingBusy() (v UserPasswordHashingBusy, ok bool) {
+	if !s.IsUserPasswordHashingBusy() {
+		return v, false
+	}
+	return s.UserPasswordHashingBusy, true
+}
+
+// NewUserPasswordHashingBusyVerifyChallengeProofErrorResponse returns new VerifyChallengeProofErrorResponse from UserPasswordHashingBusy.
+func NewUserPasswordHashingBusyVerifyChallengeProofErrorResponse(v UserPasswordHashingBusy) VerifyChallengeProofErrorResponse {
+	var s VerifyChallengeProofErrorResponse
+	s.SetUserPasswordHashingBusy(v)
 	return s
 }
 

@@ -3,7 +3,6 @@ import { Flags } from "@oclif/core";
 import { z } from "zod";
 
 import { Origins } from "@/lib/backend";
-import { Cmd } from "@/lib/cmd";
 import { CANCELLED, confirmationHint, ZitadelError } from "@/lib/errors";
 import {
   type Admitted,
@@ -24,7 +23,13 @@ import {
   Publisher,
 } from "@/lib/publish";
 import { configIsDirty } from "@/lib/publish/git";
-import { DEPLOY_ARGS, shellCommand } from "@/lib/suggestion";
+import {
+  type NextOf,
+  type Suggested,
+  type SuggestedCommand,
+  shellCommand,
+  WHAT_CHANGED,
+} from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { reportWarning } from "@/lib/warnings";
 
@@ -64,7 +69,7 @@ export function missingPrimaryOrigin(input: {
   origins: Origins;
   issuer: string | undefined;
   setupProject: boolean;
-}): { hint: string; next: readonly string[] } {
+}): { hint: string; next: readonly Suggested[] } {
   const preview =
     input.issuer === undefined ? undefined : input.origins.heldAsPreview(input.issuer);
   if (preview !== undefined) {
@@ -72,11 +77,19 @@ export function missingPrimaryOrigin(input: {
     if (input.setupProject) {
       return {
         hint: `${held} Make it primary, then deploy.`,
-        next: ["doctor --fix"],
+        next: [{ id: "doctor", flags: { fix: true } }],
       };
     }
-    const remove = `origin rm ${Cmd.quote(preview)} --force`;
-    const add = `origin add ${Cmd.quote(preview)} --kind primary`;
+    const remove: NextOf<"origin:rm"> = {
+      id: "origin:rm",
+      args: { pattern: preview },
+      flags: { force: true },
+    };
+    const add: NextOf<"origin:add"> = {
+      id: "origin:add",
+      args: { pattern: preview },
+      flags: { kind: "primary" },
+    };
     return {
       hint: `${held} Remove it and add it back as primary, then deploy.`,
       // Both steps, in the order they must run: removing the pattern leaves
@@ -85,7 +98,11 @@ export function missingPrimaryOrigin(input: {
     };
   }
   if (input.issuer !== undefined) {
-    const add = `origin add ${Cmd.quote(Origins.originOf(input.issuer))} --kind primary`;
+    const add: NextOf<"origin:add"> = {
+      id: "origin:add",
+      args: { pattern: Origins.originOf(input.issuer) },
+      flags: { kind: "primary" },
+    };
     return {
       hint: "Add the URL the app serves from as a primary origin, then deploy.",
       next: [add],
@@ -93,7 +110,7 @@ export function missingPrimaryOrigin(input: {
   }
   return {
     hint: "Add a primary origin for the URL the app serves from, then deploy.",
-    next: ["origin list"],
+    next: [{ id: "origin:list" }],
   };
 }
 
@@ -194,15 +211,13 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
       compare: true,
       json: this.isJson,
       color: this.isColored,
-      suggest: (args) => {
-        return this.suggest(args);
-      },
+      suggest: this.suggest,
     });
     for (const warning of prepared.warnings) {
       reportWarning(warning);
     }
     this.narrate(prepared.notices);
-    if (!(await this.confirmLockouts(prepared.lockouts, flags.message))) {
+    if (!(await this.confirmLockouts(prepared.lockouts))) {
       return this.emit({
         status: "skipped",
         reason: "deploy-cancelled",
@@ -214,12 +229,14 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
     }
     const { resourceCount } = prepared;
     this.recordTelemetry({ resources: resourceCount });
-    // The deploy again as it was typed: the message and `--force` the person
-    // gave, so a retry or the real run after a dry run asks for the same thing.
-    const again = [
-      flags.message === undefined ? DEPLOY_ARGS : `deploy ${Cmd.option("-m", flags.message)}`,
-      ...(flags.force ? ["--force"] : []),
-    ].join(" ");
+    // The deploy again as it was typed (message and `--force` included), so a retry
+    // or the real run after a dry run asks for the same thing.
+    const again = async (): Promise<SuggestedCommand> => {
+      return this.again("deploy", {
+        without: ["dryRun"],
+        with: flags.message === undefined ? { message: WHAT_CHANGED } : {},
+      });
+    };
     const resources = `${resourceCount} ${new Intl.PluralRules("en").select(resourceCount) === "one" ? "resource" : "resources"}`;
 
     if (this.dryRun) {
@@ -239,7 +256,7 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
           sections: [],
         },
         next: {
-          commands: [this.suggest(again)],
+          commands: [await again()],
         },
       });
     }
@@ -276,12 +293,12 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
           "E_CONFLICT",
           "Another deploy changed the targets since this one was prepared",
           {
-            hint: `Rerun ${this.suggest(again)}; it will build and deploy against the current state.`,
+            hint: `Rerun ${await again()}; it will build and deploy against the current state.`,
             details:
               publication.current === undefined
                 ? undefined
                 : { current_deployment: publication.current },
-            nextCommands: [this.suggest("deployment list --live")],
+            nextCommands: [this.suggest({ id: "deployment:list", flags: { live: true } })],
           },
         );
       }
@@ -329,7 +346,7 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
       },
       next: {
         commands: [
-          this.suggest("deployment list"),
+          this.suggest({ id: "deployment:list" }),
           ...(configUncommitted ? [shellCommand(commitConfig(this.cwd, message))] : []),
         ],
       },
@@ -348,15 +365,11 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
    * keeps `--dry-run`.
    *
    * @param lockouts - What the lockout check found.
-   * @param typed - The message the person gave with `-m`, kept on the re-run.
    * @returns Whether the deploy goes ahead.
    * @throws {@link ZitadelError} With `E_CONFIRMATION_REQUIRED` when nobody can
    *   be asked and `--force` was not given.
    */
-  private async confirmLockouts(
-    lockouts: readonly string[],
-    typed: string | undefined,
-  ): Promise<boolean> {
+  private async confirmLockouts(lockouts: readonly string[]): Promise<boolean> {
     if (lockouts.length === 0) {
       return true;
     }
@@ -380,15 +393,7 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
         {
           hint: confirmationHint(question),
           details: { question },
-          nextCommands: [
-            this.suggest(
-              [
-                "deploy --dry-run",
-                ...(typed === undefined ? [] : [Cmd.option("-m", typed)]),
-                "--force",
-              ].join(" "),
-            ),
-          ],
+          nextCommands: [await this.again("deploy", { with: { dryRun: true, force: true } })],
         },
       );
     }
@@ -416,16 +421,11 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
         return undefined;
       },
     );
-    throw refusalError(
-      NO_PRIMARY_ORIGIN_REFUSAL,
-      missingPrimaryOrigin({
-        origins,
-        issuer: environment.values.ZITADEL_ISSUER?.value,
-        setupProject: setupProject === projectId,
-      }),
-      (next) => {
-        return this.suggest(next);
-      },
-    );
+    const missing = missingPrimaryOrigin({
+      origins,
+      issuer: environment.values.ZITADEL_ISSUER?.value,
+      setupProject: setupProject === projectId,
+    });
+    throw refusalError(NO_PRIMARY_ORIGIN_REFUSAL, { hint: missing.hint }, { next: missing.next });
   }
 }

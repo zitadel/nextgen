@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "@tests/helpers/platform";
-import { aSetUpApp } from "@tests/helpers/project";
+import { aSetUpApp, MOCK_SERVER_URL } from "@tests/helpers/project";
 import { cliVersion, expectedPublicCliCommand } from "@tests/helpers/run-cli";
 
 const platform = usePlatformMock();
@@ -80,12 +80,24 @@ describe("auth-method password enable", () => {
             notices: [],
             title: "Enabled password for default-human-user",
             next_args: [
-              ["deploy", "--dry-run", "--cwd", app.path],
-              ["deploy", "-m", "<what changed>", "--cwd", app.path],
+              ["deploy", "--dry-run", "--server", MOCK_SERVER_URL, "--cwd", app.path],
+              [
+                "deploy",
+                "--message",
+                "<what changed>",
+                "--server",
+                MOCK_SERVER_URL,
+                "--cwd",
+                app.path,
+              ],
             ],
             next_commands: [
-              expectedPublicCliCommand(`deploy --dry-run --cwd ${app.path}`),
-              expectedPublicCliCommand(`deploy -m '<what changed>' --cwd ${app.path}`),
+              expectedPublicCliCommand(
+                `deploy --dry-run --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+              ),
+              expectedPublicCliCommand(
+                `deploy --message '<what changed>' --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+              ),
             ],
           },
           warnings: [],
@@ -165,9 +177,21 @@ describe("auth-method password enable", () => {
               notices: [],
               title: "Would enable password for default-human-user (dry run)",
               dry_run: true,
-              next_args: [["auth-method", "password", "enable", "--cwd", app.path]],
+              next_args: [
+                [
+                  "auth-method",
+                  "password",
+                  "enable",
+                  "--server",
+                  MOCK_SERVER_URL,
+                  "--cwd",
+                  app.path,
+                ],
+              ],
               next_commands: [
-                expectedPublicCliCommand(`auth-method password enable --cwd ${app.path}`),
+                expectedPublicCliCommand(
+                  `auth-method password enable --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+                ),
               ],
             },
             warnings: [],
@@ -206,11 +230,21 @@ describe("auth-method password enable", () => {
               title: "Would enable password for default-human-user (dry run)",
               dry_run: true,
               next_args: [
-                ["auth-method", "password", "enable", "--schema", SCHEMA, "--cwd", app.path],
+                [
+                  "auth-method",
+                  "password",
+                  "enable",
+                  "--schema",
+                  SCHEMA,
+                  "--server",
+                  MOCK_SERVER_URL,
+                  "--cwd",
+                  app.path,
+                ],
               ],
               next_commands: [
                 expectedPublicCliCommand(
-                  `auth-method password enable --schema ${SCHEMA} --cwd ${app.path}`,
+                  `auth-method password enable --schema ${SCHEMA} --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
                 ),
               ],
             },
@@ -238,9 +272,21 @@ describe("auth-method password enable", () => {
               notices: [],
               title: "Nothing to enable for default-human-user (dry run)",
               dry_run: true,
-              next_args: [["auth-method", "password", "enable", "--cwd", app.path]],
+              next_args: [
+                [
+                  "auth-method",
+                  "password",
+                  "enable",
+                  "--server",
+                  MOCK_SERVER_URL,
+                  "--cwd",
+                  app.path,
+                ],
+              ],
               next_commands: [
-                expectedPublicCliCommand(`auth-method password enable --cwd ${app.path}`),
+                expectedPublicCliCommand(
+                  `auth-method password enable --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+                ),
               ],
             },
             warnings: [],
@@ -332,7 +378,7 @@ describe("auth-method password enable", () => {
 
         const result = await app.enableMethodRendered("password");
 
-        expect(result).toPrint(`deploy --dry-run --cwd ${app.path}`);
+        expect(result).toPrint(`deploy --dry-run --server ${MOCK_SERVER_URL} --cwd ${app.path}`);
       });
 
       it("says what it would enable on a dry run, as the envelope titles it", async () => {

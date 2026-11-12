@@ -1,8 +1,9 @@
-import type { Config } from "@oclif/core";
 import { describe, expect, it, vi } from "vitest";
 
 import { ZitadelError } from "@/lib/errors";
-import { unscopedCommand } from "@/lib/suggestion";
+import { resourceSuggestion } from "@/lib/suggestion";
+
+import { aConfigAt } from "@tests/helpers/suggestions";
 import { BaseCommand } from "@/lib/oclif/base";
 import { DrawnSpinner } from "@/lib/ui/spinner";
 import { printing, stripAnsi } from "@tests/helpers/run-cli";
@@ -10,7 +11,7 @@ import { asTerminal } from "@tests/helpers/terminal";
 
 /** A command that fails with a given error and records what it prints. */
 class FailingCommand extends BaseCommand {
-  public static override readonly id = "errors-test";
+  public static override readonly id: string = "origin:add";
   public readonly stderr: string[] = [];
   declare public ui: BaseCommand["ui"];
   public readonly json: unknown[] = [];
@@ -19,7 +20,7 @@ class FailingCommand extends BaseCommand {
   private readonly flags: Record<string, unknown>;
 
   constructor(asJson: boolean, argv: string[] = [], flags: Record<string, unknown> = {}) {
-    super(argv, { version: "0.0.0-test" } as unknown as Config);
+    super(argv, aConfigAt("0.0.0-test"));
     this.asJson = asJson;
     this.flags = flags;
   }
@@ -75,6 +76,11 @@ class FailingWhileParsing extends FailingCommand {
       this.exitCode = (exit as { oclif?: { exit?: number } }).oclif?.exit;
     }
   }
+}
+
+/** The same, run under an id the CLI has no command for. */
+class NamelessCommand extends FailingCommand {
+  public static override readonly id = "not-a-command";
 }
 
 /** The same, as one of the ten wizards, which is what has a chain to close. */
@@ -222,7 +228,21 @@ describe("the one block every failure is shown as", () => {
     );
 
     expect(cmd.stderr[0]).toBe(
-      "Error: Missing required flag kind (E_VALIDATION)\n\nNext:\n  $ npx @zitadel/cli@test errors-test --help",
+      "Error: Missing required flag kind (E_VALIDATION)\n\nNext:\n  $ npx @zitadel/cli@test origin add --help",
+    );
+  });
+
+  it("offers the CLI's own help for a command line that names no command", async () => {
+    const cmd = new NamelessCommand(false);
+
+    await cmd.fail(
+      refused(
+        "The following error occurred:\n  Missing required flag kind\nSee more help with --help",
+      ),
+    );
+
+    expect(cmd.stderr[0]).toBe(
+      "Error: Missing required flag kind (E_VALIDATION)\n\nNext:\n  $ npx @zitadel/cli@test --help",
     );
   });
 
@@ -238,7 +258,7 @@ describe("the one block every failure is shown as", () => {
     expect(cmd.json).toEqual([
       expect.objectContaining({
         message: "Missing required flag kind",
-        next_commands: ["npx @zitadel/cli@test errors-test --help"],
+        next_commands: ["npx @zitadel/cli@test origin add --help"],
       }),
     ]);
   });
@@ -248,7 +268,7 @@ describe("the one block every failure is shown as", () => {
 // raised it does not know where the run was pointed.
 describe("the follow-ups of a failure", () => {
   const start = new ZitadelError("E_VALIDATION", "Not running", {
-    nextCommands: [unscopedCommand("start")],
+    nextCommands: [{ id: "start" }],
   });
 
   it("carry the directory the run was given", async () => {
@@ -276,7 +296,7 @@ describe("the follow-ups of a failure", () => {
 
     await cmd.fail(
       new ZitadelError("E_VALIDATION", "Not running", {
-        nextCommands: [unscopedCommand("start --cwd /work")],
+        nextCommands: [{ id: "start", flags: { cwd: "/work" } }],
       }),
     );
 
@@ -292,6 +312,58 @@ describe("the follow-ups of a failure", () => {
 
     expect(cmd.json).toEqual([
       expect.objectContaining({ next_commands: ["npx @zitadel/cli@test start --cwd /work/app"] }),
+    ]);
+  });
+});
+
+describe("the follow-ups of a failure raised while a flag parsed", () => {
+  it("carry the environment and server the command line named", async () => {
+    const cmd = new FailingWhileParsing(true, [
+      "release",
+      "--env",
+      "production",
+      "--server",
+      "https://staging.example",
+      "--cwd",
+      "/work/app",
+    ]);
+
+    await cmd.failParsing(
+      new ZitadelError("E_VALIDATION", "Bad id", { nextCommands: [{ id: "release:list" }] }),
+    );
+
+    expect(cmd.json).toEqual([
+      expect.objectContaining({
+        next_commands: [
+          "npx @zitadel/cli@test release list --env production --server https://staging.example --cwd /work/app",
+        ],
+      }),
+    ]);
+  });
+});
+
+describe("a failure whose follow-up cannot be rendered", () => {
+  const broken = new ZitadelError("E_VALIDATION", "Not running", {
+    nextCommands: [resourceSuggestion("events", "create"), { id: "start" }],
+  });
+
+  it("is still reported, with its code and message", async () => {
+    const cmd = new FailingCommand(true);
+
+    await cmd.fail(broken);
+
+    expect(cmd.json).toEqual([
+      expect.objectContaining({ status: "error", code: "E_VALIDATION", message: "Not running" }),
+    ]);
+  });
+
+  it("leaves out only the follow-up it cannot render", async () => {
+    const cmd = new FailingCommand(true);
+
+    await cmd.fail(broken);
+
+    expect(cmd.json).toEqual([
+      expect.objectContaining({ next_commands: ["npx @zitadel/cli@test start"] }),
     ]);
   });
 });

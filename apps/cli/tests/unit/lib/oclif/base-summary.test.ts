@@ -1,5 +1,5 @@
-import type { Config } from "@oclif/core";
 import { stripVTControlCharacters as stripAnsi } from "node:util";
+import { aConfigAt } from "@tests/helpers/suggestions";
 import { mkdirSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -56,7 +56,7 @@ class AnsweringCommand extends SummarisingCommand {
 
 /** Runs `result` through `emit` at a terminal and returns what was drawn. */
 async function drawn(result: CommandResult): Promise<string> {
-  const command = new SummarisingCommand([], { version: "0.0.0-test" } as unknown as Config);
+  const command = new SummarisingCommand([], aConfigAt("0.0.0-test"));
 
   const { stdout } = await printing(() => asTerminal(() => command.finish(result)));
 
@@ -73,7 +73,7 @@ async function written(
   options: { terminal?: boolean; plain?: boolean; source?: string } = {},
 ): Promise<string> {
   const Command = options.plain === true ? AnsweringCommand : SummarisingCommand;
-  const command = new Command([], { version: "0.0.0-test" } as unknown as Config);
+  const command = new Command([], aConfigAt("0.0.0-test"));
   const run = () => command.finish(result, { "non-interactive": true }, options.source ?? "mock");
   await (options.terminal === true ? asTerminal(run) : run());
   return stripAnsi(command.logged.join("\n"));
@@ -143,7 +143,7 @@ describe("BaseCommand endings for a skip", () => {
   });
 
   it("keeps the summary out of the envelope, which still carries the reason", async () => {
-    const command = new SummarisingCommand([], { version: "0.0.0-test" } as unknown as Config);
+    const command = new SummarisingCommand([], aConfigAt("0.0.0-test"));
 
     const { result: envelope } = await printing(() => asTerminal(() => command.finish(CANCELLED)));
 
@@ -268,7 +268,7 @@ describe("looking for the skills offer", () => {
     result: CommandResult,
     flags: Record<string, unknown> = {},
   ): Promise<string> {
-    const command = new Command([], { version: "0.0.0-test" } as unknown as Config);
+    const command = new Command([], aConfigAt("0.0.0-test"));
     const { stdout } = await printing(() => asTerminal(() => command.finish(result, flags)));
     return stripAnsi(stdout);
   }

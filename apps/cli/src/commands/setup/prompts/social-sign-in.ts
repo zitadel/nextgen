@@ -29,7 +29,7 @@ import {
   type CustomFlagValues,
   callbackUriFor,
   loopbackIssuerWarning,
-  ssoEnableArgs,
+  ssoEnableFlags,
 } from "@/lib/idp";
 import { issuerFromPort } from "@/lib/orca";
 import type { Questions } from "@/lib/ui";
@@ -183,7 +183,7 @@ export class SocialSignInPrompt implements SetupPrompt {
         ctx.say(
           [
             `Skipped ${entry.displayName}. Once its OAuth application exists, add it with:`,
-            ctx.suggest(ssoEnableArgs(selection)),
+            ctx.suggest({ id: "auth-method:sso:enable", flags: ssoEnableFlags(selection) }),
           ].join("\n"),
         );
         continue;

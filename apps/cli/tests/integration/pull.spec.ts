@@ -155,7 +155,7 @@ describe("pull", () => {
             pulled: PINNED,
             skipped: SKIPPED,
             next_commands: [
-              expectedPublicCliCommand(checkout.againAsRun("deploy -m '<what changed>'")),
+              expectedPublicCliCommand(checkout.againAsRun("deploy --message '<what changed>'")),
             ],
           },
           warnings: SKIPPED_WARNINGS,
@@ -197,7 +197,7 @@ describe("pull", () => {
             ],
             skipped: SKIPPED,
             next_commands: [
-              expectedPublicCliCommand(checkout.againAsRun("deploy -m '<what changed>'")),
+              expectedPublicCliCommand(checkout.againAsRun("deploy --message '<what changed>'")),
             ],
           },
           warnings: SKIPPED_WARNINGS,
@@ -296,7 +296,7 @@ describe("pull", () => {
           source: MOCK_SERVER_URL,
           code: "E_NOT_FOUND",
           message: "Nothing is deployed to a primary origin yet",
-          hint: `Deploy first with ${expectedPublicCliCommand(`deploy -m '<what changed>' --env staging --server ${MOCK_SERVER_URL} --cwd ${project.path}`)}, then pull.`,
+          hint: `Deploy first with ${expectedPublicCliCommand(`deploy --message '<what changed>' --env staging --server ${MOCK_SERVER_URL} --cwd ${project.path}`)}, then pull.`,
         });
       });
 
@@ -489,7 +489,7 @@ describe("pull", () => {
         const result = await checkout.run(["pull"]);
 
         expect(result).toSayOnce(
-          expectedPublicCliCommand(checkout.againAsRun("deploy -m '<what changed>'")),
+          expectedPublicCliCommand(checkout.againAsRun("deploy --message '<what changed>'")),
         );
       });
 

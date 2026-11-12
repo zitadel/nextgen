@@ -283,7 +283,7 @@ describe("wrapCommand", () => {
   });
 
   it("pastes back as the command it was", () => {
-    const command = `npx @zitadel/cli@0.1.0 deploy -m '<what changed>' --server http://localhost:9 ${"-".repeat(90)}`;
+    const command = `npx @zitadel/cli@0.1.0 deploy --message '<what changed>' --server http://localhost:9 ${"-".repeat(90)}`;
 
     expect(pasted(wrapCommand(command, 40, "  "), "  ")).toBe(command);
   });
@@ -392,7 +392,7 @@ describe("Frame", () => {
   // cannot be run. It is written the way a shell writes one over several
   // lines, so the box keeps its ceiling and what is copied out still runs.
   it("never widens for a command longer than it is", () => {
-    const command = `npx @zitadel/cli@0.1.0 deploy -m '<what changed>' --server http://localhost:9`;
+    const command = `npx @zitadel/cli@0.1.0 deploy --message '<what changed>' --server http://localhost:9`;
 
     expect(widest(new Frame("Summary", [], [{ text: "Next:", command }]).render())).toBe(WIDTH);
   });
@@ -408,7 +408,7 @@ describe("Frame", () => {
   });
 
   it("writes a command too long to fit as the one command it is", () => {
-    const command = `npx @zitadel/cli@0.1.0 deploy -m '<what changed>' --server http://localhost:9`;
+    const command = `npx @zitadel/cli@0.1.0 deploy --message '<what changed>' --server http://localhost:9`;
     const box = new Frame("Summary", [], [{ text: "Next:", command }]).render();
 
     expect(

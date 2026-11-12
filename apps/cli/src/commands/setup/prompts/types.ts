@@ -7,7 +7,7 @@ import {
 } from "@zitadel/config/idp";
 
 import type { FrameworkChoice } from "@/lib/orca";
-import type { SuggestedCommand } from "@/lib/suggestion";
+import type { Suggest } from "@/lib/suggestion";
 import type { Questions, Spinner } from "@/lib/ui";
 import type { PasswordMinLength } from "@/lib/zitadel";
 
@@ -146,7 +146,7 @@ export type PromptContext = {
    * selector setup's own recovery commands carry, so it reaches the project
    * setup creates and not one the shell's environment names.
    */
-  readonly suggest: (args: string) => SuggestedCommand;
+  readonly suggest: Suggest;
   /**
    * The app directory setup runs in. {@link import("./server").ServerPrompt}
    * reads the local runtime metadata (`.zitadel/local/runtime.json`) under it
