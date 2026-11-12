@@ -618,7 +618,8 @@ func TestEventStatements_Get_NotFound(t *testing.T) {
 }
 
 func TestEventStatements_DeleteOlderThan(t *testing.T) {
-	forEachDialect(t, func(t *testing.T, d dialect) {
+	// It deletes every event older than an hour from now: all of them.
+	forEachDialectAlone(t, func(t *testing.T, d dialect) {
 		projectID, _ := uniqueEventIDs(t)
 		ensureEventProject(t, d.stmts, projectID)
 
@@ -637,7 +638,8 @@ func TestEventStatements_DeleteOlderThan(t *testing.T) {
 }
 
 func TestEventStatements_DeleteOlderThan_OrphanedProject(t *testing.T) {
-	forEachDialect(t, func(t *testing.T, d dialect) {
+	// It deletes every event older than an hour from now: all of them.
+	forEachDialectAlone(t, func(t *testing.T, d dialect) {
 		projectID, eventID := uniqueEventIDs(t)
 		project := newTestProject(projectID)
 		require.NoError(t, d.stmts.CreateProject(t.Context(), project))

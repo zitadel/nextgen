@@ -8,9 +8,15 @@ import (
 
 	"github.com/zitadel/nextgen/internal/storage/dbtest"
 	"github.com/zitadel/nextgen/internal/storage/dialect/spanner"
+	"github.com/zitadel/nextgen/internal/storage/testdb"
 )
 
 func init() {
+	// The emulator dbtest.Spanner starts otherwise runs one read-write
+	// transaction at a time and aborts the rest.
+	if !testdb.SpannerProvisions() && !testdb.SpannerSharesDatabase() {
+		oneAtATime = true
+	}
 	registerDialect(
 		"spanner",
 		dbtest.Spanner,
