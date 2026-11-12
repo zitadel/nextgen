@@ -1,4 +1,5 @@
 import { readZitadelConfig, readZitadelSecret } from "@/lib/project";
+
 import { AbstractSanityCheck, type CheckContext } from "./types";
 
 /** Verifies `.zitadel/secret`'s project_id matches `zitadel.json`'s project. */

@@ -20,7 +20,7 @@ vi.mock("@/auth/session", async (importOriginal) => {
 vi.mock("@/addon/analytics", () => ({ trackEvent: vi.fn() }));
 
 /**
- * The Invitations tab of the project page (root ADR 086, #2855): the table of
+ * Project Settings → Invitations (root ADR 086, #2855): the table of
  * a project's invitations, and creating, replacing and cancelling one. Every
  * request names the route's project.
  */
@@ -57,7 +57,7 @@ interface ListRead {
   pageToken: string | null;
 }
 
-/** The project page's reads, with `list` answering the invitations one. */
+/** The Settings layout's project read, with `list` answering the invitations one. */
 function stubPage(
   list: (read: ListRead) => Response = () =>
     HttpResponse.json({ invitations: [], next_page_token: null }),
@@ -73,12 +73,6 @@ function stubPage(
         updated_at: "2026-07-08T09:00:00Z",
       }),
     ),
-    http.get(`${API}/variables`, () => HttpResponse.json({})),
-    http.get(`${API}/deployments`, () =>
-      HttpResponse.json({ deployments: [], next_page_token: null }),
-    ),
-    http.get(`${API}/projects/:id/admins`, () => HttpResponse.json({ admins: [] })),
-    http.post(`${API}/grants/query`, () => HttpResponse.json({ grants: [] })),
     http.get(INVITATIONS_URL, ({ request }) => {
       const params = new URL(request.url).searchParams;
       const read = { projectId: params.get("project_id"), pageToken: params.get("page_token") };
@@ -111,10 +105,11 @@ function stubCreate() {
 
 async function openInvitations() {
   const router = createAppRouter({
-    history: createMemoryHistory({ initialEntries: [scopedPath("/project", PROJECT_ID)] }),
+    history: createMemoryHistory({
+      initialEntries: [scopedPath("/project/invitations", PROJECT_ID)],
+    }),
   });
   render(<RouterProvider router={router} />);
-  await userEvent.click(await screen.findByRole("tab", { name: "Invitations" }));
   return within(await screen.findByRole("region", { name: "Invitations" }));
 }
 
@@ -122,7 +117,7 @@ function row(name: string) {
   return within(screen.getByRole("row", { name: new RegExp(name) }));
 }
 
-/** The tab row's button; an empty table draws a second one under it. */
+/** The heading row's button; an empty table draws a second one under it. */
 function inviteButton(): HTMLElement {
   const [button] = screen.getAllByRole("button", { name: "Invite member" });
   if (!button) throw new Error("No Invite member button on screen.");
@@ -202,7 +197,8 @@ describe("project invitations", () => {
     );
     const section = await openInvitations();
     expect(section.getByText("This operation is not implemented yet.")).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "General" })).toBeInTheDocument();
+    // The Settings layout and its header stay.
+    expect(screen.getByRole("heading", { name: "acme-app" })).toBeInTheDocument();
   });
 
   it("loads the next page with the token it was given", async () => {

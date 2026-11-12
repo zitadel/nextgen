@@ -52,11 +52,7 @@ export type InvitationsRead =
   | { invitations: Invitation[]; nextPageToken?: string }
   | { error: string };
 
-/**
- * `GET /invitations`: one page, newest first, in any status. The page it is
- * read for carries more than invitations, so a failed read costs the tab its
- * table rather than the page everything else on it.
- */
+/** `GET /invitations`: one page, newest first, in any status. */
 export async function readInvitations(
   projectId: string,
   pageToken?: string,
@@ -210,7 +206,7 @@ function InvitationsTable({
   );
 }
 
-/** The tab's one action, drawn on the tab row beside the tabs. */
+/** The page's one action, drawn on its heading's row. */
 export function InviteMemberButton({
   projectId,
   projectName,

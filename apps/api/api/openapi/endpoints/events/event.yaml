@@ -4,6 +4,8 @@ description: |
   An event of any type. Read event_type to tell which type it is; each type
   carries its own typed payload.
 oneOf:
+  - $ref: types/application-created-event.yaml
+  - $ref: types/application-updated-event.yaml
   - $ref: types/auth-attempt-created-event.yaml
   - $ref: types/auth-attempt-handed_off-event.yaml
   - $ref: types/auth-check-failed-event.yaml
@@ -19,12 +21,18 @@ oneOf:
   - $ref: types/authz-revoked-event.yaml
   - $ref: types/branding-created-event.yaml
   - $ref: types/deployment-created-event.yaml
+  - $ref: types/flow-signup_challenge-consumed-event.yaml
+  - $ref: types/flow-signup_challenge-issued-event.yaml
   - $ref: types/flowdef-created-event.yaml
   - $ref: types/flowdef-deleted-event.yaml
   - $ref: types/flowdef-updated-event.yaml
   - $ref: types/idp-created-event.yaml
   - $ref: types/idp-identity_link-created-event.yaml
   - $ref: types/idp-updated-event.yaml
+  - $ref: types/invitation-accepted-event.yaml
+  - $ref: types/invitation-cancelled-event.yaml
+  - $ref: types/invitation-created-event.yaml
+  - $ref: types/invitation-rejected-event.yaml
   - $ref: types/origin-added-event.yaml
   - $ref: types/origin-removed-event.yaml
   - $ref: types/policy-created-event.yaml
@@ -51,6 +59,8 @@ oneOf:
 discriminator:
   propertyName: event_type
   mapping:
+    application.created: types/application-created-event.yaml
+    application.updated: types/application-updated-event.yaml
     auth.attempt.created: types/auth-attempt-created-event.yaml
     auth.attempt.handed_off: types/auth-attempt-handed_off-event.yaml
     auth.check.failed: types/auth-check-failed-event.yaml
@@ -66,12 +76,18 @@ discriminator:
     authz.revoked: types/authz-revoked-event.yaml
     branding.created: types/branding-created-event.yaml
     deployment.created: types/deployment-created-event.yaml
+    flow.signup_challenge.consumed: types/flow-signup_challenge-consumed-event.yaml
+    flow.signup_challenge.issued: types/flow-signup_challenge-issued-event.yaml
     flowdef.created: types/flowdef-created-event.yaml
     flowdef.deleted: types/flowdef-deleted-event.yaml
     flowdef.updated: types/flowdef-updated-event.yaml
     idp.created: types/idp-created-event.yaml
     idp.identity_link.created: types/idp-identity_link-created-event.yaml
     idp.updated: types/idp-updated-event.yaml
+    invitation.accepted: types/invitation-accepted-event.yaml
+    invitation.cancelled: types/invitation-cancelled-event.yaml
+    invitation.created: types/invitation-created-event.yaml
+    invitation.rejected: types/invitation-rejected-event.yaml
     origin.added: types/origin-added-event.yaml
     origin.removed: types/origin-removed-event.yaml
     policy.created: types/policy-created-event.yaml

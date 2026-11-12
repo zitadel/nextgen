@@ -26,14 +26,15 @@ type Harness struct {
 	// all what it must not contain (see Harness.ServerLog).
 	serverLog serverLog
 
-	httpClient      dependency[*http.Client]
-	testServer      dependency[*httptest.Server]
-	hasherFactory   dependency[*crypto.HasherFactory]
-	passwordPolicy  dependency[*service.PasswordPolicy]
-	policyService   dependency[*service.PolicyService]
-	masterKeys      dependency[*domain.MasterKeys]
-	secretGenerator dependency[secrets.Generator]
-	joseSigner      dependency[jose.Signer]
+	httpClient       dependency[*http.Client]
+	testServer       dependency[*httptest.Server]
+	hasherFactory    dependency[*crypto.HasherFactory]
+	passwordPolicy   dependency[*service.PasswordPolicy]
+	userCreatePolicy dependency[*service.UserCreatePolicy]
+	policyService    dependency[*service.PolicyService]
+	masterKeys       dependency[*domain.MasterKeys]
+	secretGenerator  dependency[secrets.Generator]
+	joseSigner       dependency[jose.Signer]
 
 	apiServers      dependency[*api.Servers]
 	handler         dependency[*api.Handler]
@@ -54,6 +55,7 @@ type Harness struct {
 	releaseService        dependency[service.ReleaseService]
 	deploymentService     dependency[*service.DeploymentService]
 	idpConnectionService  dependency[service.IDPConnectionService]
+	applicationService    dependency[service.ApplicationService]
 	eventService          dependency[*service.EventService]
 	keyService            dependency[service.KeyService]
 	variableService       dependency[service.VariableService]

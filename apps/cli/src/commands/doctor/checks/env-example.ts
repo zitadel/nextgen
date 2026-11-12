@@ -23,12 +23,23 @@ export class EnvExampleCheck extends AbstractSanityCheck {
 
   override async fix(ctx: CheckContext): Promise<void> {
     const path = join(ctx.cwd, ".env.example");
-    const existing = await readFile(path, "utf8").catch(() => "");
-    const missing = REQUIRED_KEYS.filter((key) => !existing.includes(`${key}=`));
+    const existing = await readFile(path, "utf8").catch(() => {
+      return "";
+    });
+    const missing = REQUIRED_KEYS.filter((key) => {
+      return !existing.includes(`${key}=`);
+    });
     if (missing.length === 0 || ctx.dryRun) {
       return;
     }
     const prefix = existing.length > 0 && !existing.endsWith("\n") ? "\n" : "";
-    await writeFile(path, `${existing}${prefix}${missing.map((key) => `${key}=`).join("\n")}\n`);
+    await writeFile(
+      path,
+      `${existing}${prefix}${missing
+        .map((key) => {
+          return `${key}=`;
+        })
+        .join("\n")}\n`,
+    );
   }
 }

@@ -1,9 +1,8 @@
 import { Args, Flags } from "@oclif/core";
-import { z, type ZodType } from "zod";
+import { type ZodType, z } from "zod";
 
 import type { Placeholders } from "./refusal";
 import { type Refusal, refusalError } from "./refusal";
-import { type SuggestedCommand, unscopedCommand } from "@/lib/suggestion";
 
 /**
  * What a flag or argument is refused for, with the schema that decides it.
@@ -18,40 +17,17 @@ export type Refused<T> = Readonly<{
   values?: Placeholders;
 }>;
 
-/**
- * How a refusal raised while a flag parses names a follow-up command.
- *
- * It is unscoped, naming the command without the `--env`, `--env-file` or
- * `--server` a scoped suggestion repeats: the environment is resolved from the
- * flags, so there is none to repeat until they have all been read. The
- * command is whatever oclif hands a `parse`, so one invoked outside a run
- * suggests nothing rather than guessing a version.
- */
-export function suggesterOf(command: unknown): ((next: string) => SuggestedCommand) | undefined {
-  const version = (command as { config?: { version?: unknown } } | undefined)?.config?.version;
-  if (typeof version !== "string") {
-    return undefined;
-  }
-  return (next) => {
-    return unscopedCommand(next, version);
-  };
-}
-
-function read<T>(refused: Refused<T>, value: string, input: string, command: unknown): T {
+function read<T>(refused: Refused<T>, value: string, input: string): T {
   const parsed = refused.schema.safeParse(value);
   if (parsed.success) {
     return parsed.data;
   }
-  throw refusalError(
-    refused.refusal,
-    {
-      ...refused.values,
-      value,
-      input,
-      problem: parsed.error.issues[0]?.message ?? "it is not valid",
-    },
-    suggesterOf(command),
-  );
+  throw refusalError(refused.refusal, {
+    ...refused.values,
+    value,
+    input,
+    problem: parsed.error.issues[0]?.message ?? "it is not valid",
+  });
 }
 
 /**
@@ -67,15 +43,15 @@ function read<T>(refused: Refused<T>, value: string, input: string, command: unk
  * same way, and the value the command is handed is already the parsed type.
  */
 export function reads<T>(refused: Refused<T>) {
-  return async (value: string, command: unknown, definition: { name: string }): Promise<T> => {
-    return read(refused, value, `--${definition.name}`, command);
+  return async (value: string, _command: unknown, definition: { name: string }): Promise<T> => {
+    return read(refused, value, `--${definition.name}`);
   };
 }
 
 /** The `parse` an argument gives `Args.custom`, named as it is. See {@link reads}. */
 export function taken<T>(refused: Refused<T>) {
-  return async (value: string, command: unknown, definition: { name: string }): Promise<T> => {
-    return read(refused, value, definition.name, command);
+  return async (value: string, _command: unknown, definition: { name: string }): Promise<T> => {
+    return read(refused, value, definition.name);
   };
 }
 

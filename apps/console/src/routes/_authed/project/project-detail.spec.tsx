@@ -17,8 +17,8 @@ vi.mock("@/auth/session", async (importOriginal) => {
 
 const PROJECT_ID = "proj_1";
 const PROJECT_URL = `http://localhost/api/v1/projects/${PROJECT_ID}`;
-// The page also reads the project's admins and grants for its admins tab (#1238,
-// #1462), its variables and its password policy; empty answers keep these tests
+// The project's Settings also read its admins and grants on their Admins page
+// (#1238, #1462), its variables and its password policy; empty answers keep these tests
 // about the project itself. The person can act on the project, so the context
 // switcher names it from their list rather than by its id while its own read is
 // in flight.
@@ -27,9 +27,6 @@ beforeEach(() =>
     http.get(`${PROJECT_URL}/admins`, () => HttpResponse.json({ admins: [] })),
     http.post("http://localhost/api/v1/grants/query", () => HttpResponse.json({ grants: [] })),
     http.get("http://localhost/api/v1/variables", () => HttpResponse.json({})),
-    http.get("http://localhost/api/v1/invitations", () =>
-      HttpResponse.json({ invitations: [], next_page_token: null }),
-    ),
     http.get("http://localhost/api/v1/deployments", () =>
       HttpResponse.json({ deployments: [], next_page_token: null }),
     ),
@@ -62,11 +59,12 @@ describe("project detail", () => {
   it("opens the page a project link names, with that project selected", async () => {
     // `/projects/{id}` is kept for links that name a project; the page lives at
     // the scoped `/project`, so the sidebar and switcher follow the one named.
+    // Its Settings open on their first page, General (D40).
     server.use(http.get(PROJECT_URL, () => HttpResponse.json(project())));
     const router = await renderDetail(`/projects/${PROJECT_ID}`);
 
     expect(await screen.findByRole("heading", { name: "River" })).toBeInTheDocument();
-    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/project"));
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/project/general"));
     expect(router.state.resolvedLocation?.search).toMatchObject({ project: PROJECT_ID });
   });
 

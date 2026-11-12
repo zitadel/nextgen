@@ -1,0 +1,31 @@
+title: UserCreatePolicyTest
+type: object
+description: Test cases for the sign-up policy, checked before a sign-up creates a user.
+required:
+  - operation
+  - cases
+properties:
+  operation:
+    type: string
+    enum:
+      - user.create
+    description: The operation whose policy the cases test.
+  cases:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+        - input
+        - expect
+      properties:
+        name:
+          type: string
+          minLength: 1
+          description: What the case shows, printed with its result.
+        input:
+          $ref: ../policies/evaluate/user-create-evaluate-input.yaml
+        expect:
+          $ref: policy-test-expect.yaml

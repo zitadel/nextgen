@@ -47,9 +47,9 @@ function readVariableName(input: string, label: string): string {
   throw refusalError(
     problem === "too-long" ? VARIABLE_NAME_TOO_LONG_REFUSAL : VARIABLE_NAME_INVALID_REFUSAL,
     {
-      // Quoted and escaped: a name is refused before anything reads it, and a
-      // newline or escape sequence in it would otherwise reach the terminal.
-      value: JSON.stringify(value),
+      // Quoted but raw: the envelope carries the name as it was typed, and the
+      // terminal rendering spells out a newline or escape sequence in it.
+      value: `"${value}"`,
       length: value.length,
       max: VariableService.nameMaxLength,
     },

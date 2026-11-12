@@ -9,7 +9,7 @@ import PoliciesTest, {
   type PolicyUnderTest,
 } from "@/commands/policies/test";
 import { PolicyService } from "@/lib/backend";
-import { PolicyTest } from "@/lib/zitadel";
+import { PolicyTest, SignupPolicy } from "@/lib/zitadel";
 import { PASSWORD_POLICY } from "@tests/helpers/config";
 import { fakeClient } from "@tests/helpers/fake-client";
 import { it as withDir } from "@tests/helpers/fixtures";
@@ -125,7 +125,8 @@ function answeringBackwards(cases: number): PolicyService {
   return new PolicyService(
     fakeClient({
       evaluatePolicy: (evaluation) => {
-        const length = String(evaluation.input.password).length;
+        const input = evaluation.input;
+        const length = "password" in input ? input.password.length : 0;
         return new Promise((resolve) => {
           waiting.push({
             length,
@@ -245,6 +246,46 @@ describe("PoliciesTest.runPolicyTests", () => {
       );
 
       expect(results[0]?.policy).toEqual(POLICY_FILE);
+    });
+  });
+
+  describe("with a sign-up test file", () => {
+    it("sends each case in the operation's own shape, with its policy and no facts", async () => {
+      const evaluatePolicy = vi.fn(async () => {
+        return { allowed: true };
+      });
+      const service = new PolicyService(fakeClient({ evaluatePolicy }), PROJECT_ID);
+      const test = PolicyTest.of({
+        path: PolicyTest.fileName(SignupPolicy.OPERATION),
+        body: {
+          operation: SignupPolicy.OPERATION,
+          cases: [
+            {
+              name: "the built-in proof of work",
+              input: { solved_challenge: "zitadel_pow" },
+              expect: { allowed: true },
+            },
+          ],
+        },
+      });
+      const policies = new Map<string, PolicyUnderTest>([
+        [
+          SignupPolicy.OPERATION,
+          { config: { challenge: "zitadel_pow" }, source: { file: SignupPolicy.PATH } },
+        ],
+      ]);
+
+      const results = await aCommand().runCases(service, [test], policies);
+
+      expect(evaluatePolicy).toHaveBeenCalledWith(
+        {
+          operation: SignupPolicy.OPERATION,
+          config: { challenge: "zitadel_pow" },
+          input: { solved_challenge: "zitadel_pow" },
+        },
+        { project_id: PROJECT_ID },
+      );
+      expect(results[0]?.cases[0]?.passed).toBe(true);
     });
   });
 });

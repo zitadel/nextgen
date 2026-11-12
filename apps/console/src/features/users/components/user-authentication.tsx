@@ -1,15 +1,9 @@
 import { passwordState } from "@/features/authentication/model";
 import { Link } from "@tanstack/react-router";
-import { Fragment, type ReactNode } from "react";
-import { Separator } from "@/components/ui/separator";
+import type { ReactNode } from "react";
+import { DETAIL_VALUE, DetailRow, DetailRows } from "@/components/detail-page";
 import { formatDate, formatDateTime } from "@/lib/date";
 import type { IdpConnection, UserIdentityLink } from "@/features/authentication/model";
-
-// An authentication row: a muted label, its value on the right. 4px block
-// padding, and 18px to the rule between rows (the list's `gap-4.5`).
-const ROW = "flex items-center justify-between gap-4 py-1";
-const ROW_LABEL = "text-muted-foreground min-w-0 truncate text-sm font-medium";
-const ROW_VALUE = "text-foreground shrink-0 text-sm";
 
 /** How the user signs in: their password, their passkeys, each linked provider account. */
 export function UserAuthentication({
@@ -41,24 +35,16 @@ interface AuthenticationRow {
   value: ReactNode;
 }
 
-/** The Authentication card's rows: a muted label, its value, a rule between each. */
+/** The Authentication card's rows: each method's label on the rail, its state beside it. */
 function AuthenticationRows({ rows }: { rows: AuthenticationRow[] }) {
   return (
-    <ul className="flex flex-col gap-4.5">
-      {rows.map((row, index) => (
-        <Fragment key={row.key}>
-          {index > 0 && (
-            <li role="none">
-              <Separator />
-            </li>
-          )}
-          <li className={ROW}>
-            <span className={ROW_LABEL}>{row.label}</span>
-            <span className={ROW_VALUE}>{row.value}</span>
-          </li>
-        </Fragment>
+    <DetailRows as="ul">
+      {rows.map((row) => (
+        <DetailRow key={row.key} label={<span className="min-w-0 truncate">{row.label}</span>}>
+          <span className={DETAIL_VALUE}>{row.value}</span>
+        </DetailRow>
       ))}
-    </ul>
+    </DetailRows>
   );
 }
 

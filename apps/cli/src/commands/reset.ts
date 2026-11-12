@@ -1,7 +1,7 @@
 import { join } from "node:path";
-
 import { Flags } from "@oclif/core";
 
+import { startedServer } from "@/commands/local-server/started";
 import { LOCAL_ADMIN_FILE } from "@/lib/local-server/admin-credential";
 import {
   DEFAULT_LOCAL_SERVER_URL,
@@ -10,14 +10,18 @@ import {
   readRuntimeMetadata,
 } from "@/lib/local-server/runtime";
 import { LocalServer } from "@/lib/local-server/server";
-import { startedServer } from "./local-server/started";
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
 import { Destructive } from "@/lib/oclif/destructive";
+import { type Fact, section } from "@/lib/ui";
 
+/**
+ * `zitadel reset` — delete the local Zitadel server runtime and data.
+ */
 export default class Reset extends Destructive(BaseCommand) {
   static override description = "Delete the local Zitadel server runtime and data.";
   static override group = CommandGroups.localDevelopment;
   static override groupOrder = 4;
+
   static override flags = {
     force: Flags.boolean({
       char: "f",
@@ -46,36 +50,69 @@ export default class Reset extends Destructive(BaseCommand) {
     const described = {
       backend: runtime?.backend ?? "missing",
       ...(runtime?.backend === "binary"
-        ? { pid: runtime.pid, log_path: runtime.log_path }
+        ? {
+            pid: runtime.pid,
+            log_path: runtime.log_path,
+          }
         : { container_name: containerName }),
-      data_deleted: true,
     };
-
-    const dataDir = localRuntimePaths(this.meta.cwd).dataDir;
-    const adminFile = join(this.meta.cwd, LOCAL_ADMIN_FILE);
+    const owner: Fact =
+      runtime?.backend === "binary"
+        ? ["Process", String(runtime.pid)]
+        : ["Container", containerName];
+    const facts = section(undefined, ["Runtime", runtime?.backend ?? "missing"], owner);
 
     return this.emit(
       await this.confirmed({
         verb: "reset",
         name: "delete the local runtime and its data",
         message: [
-          `Permanently delete the local Zitadel server's data in ${dataDir}?`,
+          `Permanently delete the local Zitadel server's data in ${localRuntimePaths(this.cwd).dataDir}?`,
           "",
-          "It stops and removes the local server if one is running, so `status` no longer reports it.",
+          "It stops and removes the local server if one is running, so the status command no longer reports it.",
           "It deletes the server's database: every organization, user, application and setting you created. This cannot be undone.",
-          `Kept: ${adminFile}, the local admin sign-in, and everything else in your project.`,
-          `Run \`${this.suggestUnscoped("start")}\` afterwards to set up a fresh server.`,
+          `Kept: ${join(this.cwd, LOCAL_ADMIN_FILE)}, the local admin sign-in, and everything else in your project.`,
+          `Run ${this.suggest({ id: "start" })} afterwards to set up a fresh server.`,
         ].join("\n"),
-        preview: () => ({
-          status: "ok",
-          data: { title: "Local Zitadel server runtime reset plan.", runtime: described },
-          next: { commands: [this.suggestUnscoped("reset --force")] },
-        }),
-        apply: async (consent) => {
-          await LocalServer.at(this.cwd, { cliVersion: this.cliVersion }).reset(consent);
+        preview: async () => {
+          const title = "Would reset the local Zitadel server runtime (dry run)";
           return {
             status: "ok",
-            data: { title: "Local Zitadel server runtime reset.", runtime: described },
+            data: {
+              dry_run: true,
+              title,
+              runtime: {
+                ...described,
+                data_deleted: false,
+              },
+            },
+            summary: {
+              title,
+              sections: [facts],
+            },
+            next: {
+              commands: [await this.again("reset", { without: ["dryRun"], with: { force: true } })],
+            },
+          };
+        },
+        apply: async (consent) => {
+          await LocalServer.at(this.cwd, {
+            cliVersion: this.cliVersion,
+          }).reset(consent);
+          const title = "Local Zitadel server runtime reset";
+          return {
+            status: "ok",
+            data: {
+              title,
+              runtime: {
+                ...described,
+                data_deleted: true,
+              },
+            },
+            summary: {
+              title,
+              sections: [facts],
+            },
           };
         },
       }),

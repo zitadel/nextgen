@@ -51,7 +51,7 @@
     },
     {
       "name": "Search",
-      "description": "Search finds the resources of a project that match a text, across\nresource types in one request. It answers with references; the\nresources themselves are read through their own operations.\n"
+      "description": "Search finds the resources of a project, or of the projects a person\ncan act on, that match a text, across resource types in one request. It\nanswers with references; the resources themselves are read through their\nown operations.\n"
     },
     {
       "name": "Schemas",
@@ -60,6 +60,10 @@
     {
       "name": "Branding",
       "description": "Branding sets how the login looks: its layout, asset URLs and Liquid\ntemplate. Each publish creates an immutable revision. The login renders\nthe revision the deployed release pins.\n"
+    },
+    {
+      "name": "OAuth Settings",
+      "description": "OAuth settings say whether a project's OAuth authorization server\nanswers. A release publishes them as an immutable revision, and this\noperation reads one back. There is no operation that publishes them on\ntheir own.\n"
     },
     {
       "name": "Identity Providers",
@@ -993,6 +997,21 @@
               }
             }
           },
+          "429": {
+            "description": "The server is hashing or checking as many passwords as it allows right\nnow and could not take on another within its wait. Nothing was changed;\nretry after the number of seconds in the `Retry-After` header.\n",
+            "headers": {
+              "Retry-After": {
+                "$ref": "#/components/headers/retry-after"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/too-many-requests"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Something went wrong on the server. This was not your fault.",
             "content": {
@@ -1153,6 +1172,21 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "The server is hashing or checking as many passwords as it allows right\nnow and could not take on another within its wait. Nothing was changed;\nretry after the number of seconds in the `Retry-After` header.\n",
+            "headers": {
+              "Retry-After": {
+                "$ref": "#/components/headers/retry-after"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/too-many-requests"
                 }
               }
             }
@@ -2023,7 +2057,7 @@
       "get": {
         "operationId": "getFlowStep",
         "summary": "Get the current step of a flow",
-        "description": "Returns the current step of a flow without advancing it. Use it to render\nthe step again after a page reload or a network error.\n\nThe flow endpoints are the runtime calls the login component\n(`<zitadel-login>`) makes, step by step. `createFlow` (`POST /flow`) starts a flow, and\n`submitFlowStep` (`POST /flow/{id}/submit`) advances it.\n\nReuses the deployment sealed into `_zflow` at `createFlow`; it does not\nre-resolve from `Origin`. If that release was revoked since the attempt\nstarted, the response is `409` with `rel.revoked`.\n",
+        "description": "Returns the current step of a flow without advancing it. Use it to render\nthe step again after a page reload or a network error.\n\nThe flow endpoints are the runtime calls the login component\n(`<zitadel-login>`) makes, step by step. `createFlow` (`POST /flow`) starts a flow, and\n`submitFlowStep` (`POST /flow/{id}/submit`) advances it.\n\nFor a sign-up step, prepares `step.gates.signup_pow.challenge`: one that\ncreates its user on submit, or one carrying a passkey registration that\ncreates its user.\nReuses challenges with more than a minute remaining; otherwise issues a\nnew one. If this render resolves parked SSO state, it first returns the\nupdated cookie; fetch the step again to obtain its puzzle.\n\nReuses the deployment sealed into `_zflow` at `createFlow`; it does not\nre-resolve from `Origin`. If that release was revoked since the attempt\nstarted, the response is `409` with `rel.revoked`.\n",
         "tags": [
           "Flows"
         ],
@@ -2094,6 +2128,21 @@
               }
             }
           },
+          "429": {
+            "description": "The server is hashing or checking as many passwords as it allows right\nnow and could not take on another within its wait. Nothing was changed;\nretry after the number of seconds in the `Retry-After` header.\n",
+            "headers": {
+              "Retry-After": {
+                "$ref": "#/components/headers/retry-after"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/too-many-requests"
+                }
+              }
+            }
+          },
           "default": {
             "$ref": "#/components/responses/getFlowStep-error-response"
           }
@@ -2104,7 +2153,7 @@
       "post": {
         "operationId": "submitFlowStep",
         "summary": "Submit a flow step",
-        "description": "Submits the user's input for the current step of a flow. The server\nvalidates it, processes it (for example, verifies a credential), advances\nthe flow through any invisible steps, and returns the next visible step.\nThe flow endpoints are the runtime calls the login component\n(`<zitadel-login>`) makes, step by step; `createFlow` (`POST /flow`) starts a flow.\n\nThe response sets an updated encrypted `HttpOnly` cookie (`_zflow`)\nwith the new flow state. The server is stateless: all orchestration\nstate is carried in this cookie between requests.\n\n**Important:** The `id` in the response may differ from the `id` used in\nthe request. This happens when a flow pivots (pushes a new flow onto the\nstack) or when a stacked flow completes (auto-pops to the parent flow).\nAlways use the `id` from the latest response for the next request.\n\n## Flow completion\n\nWhen `step.type` is `complete`, the flow is terminal. The `step.behavior`\nfield tells the frontend what to do:\n\n| `behavior`   | Action                                                     |\n|------------- |------------------------------------------------------------|\n| `redirect`   | Navigate to `redirect_uri` (OIDC/SAML auth request done). |\n| `show`       | Render the step as a success screen, such as registration. |\n\nA `complete` step is only returned when the **entire flow stack** is done.\nIf a stacked flow (for example, recovery pivoted from login) finishes, the\nserver auto-pops to the parent flow and returns the parent's next step.\nThe frontend never sees a `complete` for intermediate flows.\n\n## External sign-in\n\n`{action: \"sso\", sso_provider_id, return_target}` on a step that offers\n`sso_providers` returns the server-emitted `sso-redirect` step, whose\n`redirect_url` the frontend navigates to.\n\n- The flow state does not change, but `_zflow` is re-sealed like on\n  every response, so its ten-minute window restarts at this submission;\n  the external sign-in and the return must complete within it.\n- A second `Set-Cookie` line carries the browser-binding cookie the\n  callback checks: `HttpOnly`, `Path=/`, `SameSite=Lax`.\n- On every host except http loopback it is `__Host-_zsso` with `Secure`.\n- When the request host is http loopback (local development, where\n  Safari rejects `Secure`), it is `_zsso` with no `Secure`; the\n  `__Host-` prefix is dropped because it requires `Secure`.\n\nAn identity provider (an external sign-in such as Google) whose\n`client_id` is a `${{ NAME }}` reference has it filled from the project's\nvariables. A provider the server cannot start a sign-in with, including a\nreference with no variable behind it, re-renders the step with\n`error.sso_unavailable`.\n\nReuses the deployment sealed into `_zflow` at `createFlow`; it does not\nre-resolve from `Origin`. If that release was revoked since the attempt\nstarted, the response is `409` with `rel.revoked`.\n",
+        "description": "Submits the user's input for the current step of a flow. The server\nvalidates it, processes it (for example, verifies a credential), advances\nthe flow through any invisible steps, and returns the next visible step.\nThe flow endpoints are the runtime calls the login component\n(`<zitadel-login>`) makes, step by step; `createFlow` (`POST /flow`) starts a flow.\n\nThe response sets an updated encrypted `HttpOnly` cookie (`_zflow`)\nwith the new flow state. The server is stateless: all orchestration\nstate is carried in this cookie between requests.\n\nSign-up additionally requires a single-use `gate_proofs.signup_pow`\nsolution for `step.gates.signup_pow`: a password sign-up (`create_user`)\nsends it with the submit, and a passkey registration that creates its user\nsends it with the attestation in `challenge_response`. Pending\nchallenges and rate counters are stored on the server. Invalid or spent\nproofs return `403 flow.proof_invalid`; exhausted per-flow budgets return\n`429 flow.rate_limited`. GET the current step to obtain or refresh its\nchallenge before solving. Start and Submit announce the gate without a puzzle.\n\n**Important:** The `id` in the response may differ from the `id` used in\nthe request. This happens when a flow pivots (pushes a new flow onto the\nstack) or when a stacked flow completes (auto-pops to the parent flow).\nAlways use the `id` from the latest response for the next request.\n\n## Flow completion\n\nWhen `step.type` is `complete`, the flow is terminal. The `step.behavior`\nfield tells the frontend what to do:\n\n| `behavior`   | Action                                                     |\n|------------- |------------------------------------------------------------|\n| `redirect`   | Navigate to `redirect_uri` (OIDC/SAML auth request done). |\n| `show`       | Render the step as a success screen, such as registration. |\n\nA `complete` step is only returned when the **entire flow stack** is done.\nIf a stacked flow (for example, recovery pivoted from login) finishes, the\nserver auto-pops to the parent flow and returns the parent's next step.\nThe frontend never sees a `complete` for intermediate flows.\n\n## External sign-in\n\n`{action: \"sso\", sso_provider_id, return_target}` on a step that offers\n`sso_providers` returns the server-emitted `sso-redirect` step, whose\n`redirect_url` the frontend navigates to.\n\n- The flow state does not change, but `_zflow` is re-sealed like on\n  every response, so its ten-minute window restarts at this submission;\n  the external sign-in and the return must complete within it.\n- A second `Set-Cookie` line carries the browser-binding cookie the\n  callback checks: `HttpOnly`, `Path=/`, `SameSite=Lax`.\n- On every host except http loopback it is `__Host-_zsso` with `Secure`.\n- When the request host is http loopback (local development, where\n  Safari rejects `Secure`), it is `_zsso` with no `Secure`; the\n  `__Host-` prefix is dropped because it requires `Secure`.\n\nAn identity provider (an external sign-in such as Google) whose\n`client_id` is a `${{ NAME }}` reference has it filled from the project's\nvariables. A provider the server cannot start a sign-in with, including a\nreference with no variable behind it, re-renders the step with\n`error.sso_unavailable`.\n\nReuses the deployment sealed into `_zflow` at `createFlow`; it does not\nre-resolve from `Origin`. If that release was revoked since the attempt\nstarted, the response is `409` with `rel.revoked`.\n",
         "tags": [
           "Flows"
         ],
@@ -2190,6 +2239,21 @@
                       "message": "the release this attempt runs on was revoked"
                     }
                   }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "The server is hashing or checking as many passwords as it allows right\nnow and could not take on another within its wait. Nothing was changed;\nretry after the number of seconds in the `Retry-After` header.\n",
+            "headers": {
+              "Retry-After": {
+                "$ref": "#/components/headers/retry-after"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/too-many-requests"
                 }
               }
             }
@@ -2408,6 +2472,21 @@
                       "message": "the submitted proof was rejected"
                     }
                   }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "The server is hashing or checking as many passwords as it allows right\nnow and could not take on another within its wait. Nothing was changed;\nretry after the number of seconds in the `Retry-After` header.\n",
+            "headers": {
+              "Retry-After": {
+                "$ref": "#/components/headers/retry-after"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/too-many-requests"
                 }
               }
             }
@@ -5608,8 +5687,8 @@
     "/search": {
       "post": {
         "operationId": "search",
-        "summary": "Search a project",
-        "description": "Finds the resources of a project that match a text, across resource types.\n\n`query` is what the person typed and `types` names the kinds of result to\nlook for; only those are searched. Each result is a reference: its `type`,\nits `id`, a `title` and sometimes a `subtitle`. Read the resource itself\nwith the type's own operation, for example `GetUserByID`\n(`GET /users/{user_id}`) or `getTeam` (`GET /teams/{team_id}`).\n\nWhat a type matches on:\n- `user`: the start of the value they carry as `identifier` or of a part\n  of their `display` name, from three characters on\n- `team`: its name\n- `schema`: the `title` and the `objectType` of a user schema\n- `flow_definition`: its name\n- `idp`: the `slug` and the `display_name` of an identity provider\n  connection\n\nA user matches from the start of the value; every other type matches the\ntext anywhere in it. Matching ignores case. A `query` that is the `id` of\na resource of a requested type finds that one. A schema and a flow\ndefinition are found at their newest revision. `project_id` names the\nproject to search; without it, the credential's own project is searched. A\ncaller with access to part of the project finds only what that access\ncovers.\n\nAuthenticate with the project secret (`oauth2`) or a console session cookie\n(`sessionCookie`). A preview secret is refused, as on every management\noperation.\n\nResults come best match first, at most `limit_per_type` of each type, and\ntypes can be mixed in the order. `incomplete_types` lists the types that\nhave more to show: page those with the type's own list, such as\n`queryUsers` (`POST /users/query`) or `queryTeams` (`POST /teams/query`).\n\nHow text is matched and ranked can change, and later versions can match\nmore of a resource. Treat the results as suggestions; to filter by an exact\nrule, use the type's own list.\n",
+        "summary": "Search projects",
+        "description": "Finds the resources of one project, or of the projects a person can act on, that match a text, across resource types.\n\n`query` is what the person typed and `types` names the kinds of result to\nlook for; only those are searched. Each result is a reference: its `type`,\nits `id`, its `project_id`, a `title` and sometimes a `subtitle`. Read the\nresource itself with the type's own operation, for example `GetUserByID`\n(`GET /users/{user_id}`) or `getTeam` (`GET /teams/{team_id}`), in the\nresult's project.\n\nWhat a type matches on:\n- `user`: the start of the value they carry as `identifier` or of a part\n  of their `display` name, from three characters on\n- `team`: its name\n- `schema`: the `title` and the `objectType` of a user schema\n- `flow_definition`: its name\n- `idp`: the `slug` and the `display_name` of an identity provider\n  connection\n\nA user matches from the start of a value. Every other type matches from\nthe start of a name or of a word in it, so `staff` finds \"Partner Staff\"\nand `sso` finds `partner-sso`. Matching ignores case. A `query` that is the\n`id` of a resource of a requested type finds that one. A schema and a flow\ndefinition are found at their newest revision.\n\n`project_id` names the project to search. Without it, a project secret\nsearches its own project, and a console session searches the projects the\nperson can act on: the ones `listMyProjects` (`GET /users/me/projects`)\nlists, at most the newest 10 by when each was created (`order=desc`).\n`more_projects` says the person can act on more than that; search one of\nthe others by naming it. A caller with access to part of a project finds\nonly what that access covers.\n\nAuthenticate with the project secret (`oauth2`) or a console session cookie\n(`sessionCookie`). A preview secret is refused, as on every management\noperation.\n\nResults come best match first, at most `limit_per_type` of each type\nacross every searched project, and types can be mixed in the order.\n`incomplete_types` lists the types that have more to show: page those with\nthe type's own list, such as `queryUsers` (`POST /users/query`) or\n`queryTeams` (`POST /teams/query`).\n\nHow text is matched and ranked can change, and later versions can match\nmore of a resource. Treat the results as suggestions; to filter by an exact\nrule, use the type's own list.\n",
         "tags": [
           "Search"
         ],
@@ -5625,7 +5704,14 @@
         ],
         "parameters": [
           {
-            "$ref": "#/components/parameters/project-id-query"
+            "name": "project_id",
+            "in": "query",
+            "required": false,
+            "description": "The project to search, by the `id` that `createProject` (`POST /projects`)\nreturns. Omit it to search the credential's own project with a project\nsecret, or the projects the person can act on with a session.\n",
+            "schema": {
+              "$ref": "#/components/schemas/project-id"
+            },
+            "example": "proj_01KWH1P4MYS7F0N9WD3P2E4YM5"
           }
         ],
         "requestBody": {
@@ -5839,6 +5925,56 @@
           },
           "default": {
             "$ref": "#/components/responses/getBrandingById-error-response"
+          }
+        }
+      }
+    },
+    "/oauth_settings/{oauth_settings_id}": {
+      "get": {
+        "operationId": "getOAuthSettingsById",
+        "summary": "Get an OAuth settings revision by ID",
+        "description": "Returns one OAuth settings revision, including its stored settings. Pass\nthe `revision_id` of the `kind: oauth` pointer on a release, which\n`buildRelease` (`POST /releases/build`) and `getReleaseById`\n(`GET /releases/{release_id}`) return.\n\nA release is the only writer of OAuth settings, so there is no operation\nthat publishes a revision on its own: put `oauth` in the bundle that\n`buildRelease` takes.\n",
+        "tags": [
+          "OAuth Settings"
+        ],
+        "security": [
+          {
+            "oauth2": [
+              "oauth_settings.read"
+            ]
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/oauth-settings-id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The OAuth settings revision.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/oauth-settings-revision-response"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No OAuth settings revision was found with the given ID.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/getOAuthSettingsById-error-response"
           }
         }
       }
@@ -6769,7 +6905,7 @@
       "post": {
         "operationId": "createApplication",
         "summary": "Create or revise a registered application",
-        "description": "Creates or revises a registered application that authenticates its users\nvia Zitadel. If the slug does not already exist in the project, a new\napplication is created. If one with that slug already exists, a revision\nis created.\n\nA revision gets a new `revision_id` and does not modify the application's\n`id`. Sending an unchanged document also creates a revision. Each client\nis matched to the stored one by its slug and keeps its `client_id`: a\nrevision that changes a client's `client_id` is rejected with\n`application.field_immutable`. A revision keeps every client of the\nstored document: one that omits a client is also rejected with\n`application.field_immutable`, since removing a client is not available\nyet. A client with a new slug is a new client. It takes the `client_id`\nthe document supplies, or the server generates one, and every response\ncarries it in `definition`. A `client_id` another client of the project\nholds, or ever held, is rejected with `application.client_id_taken`.\n\nEvery new client gets a secret, generated by the server and returned once\nin `client_secrets`. The server stores only its hash, so no later read\nreturns it.\n\nThe document is validated against the `application.json` schema before\nanything is stored, and then against the rules the authorization server\napplies: `refresh_token` comes with `authorization_code`, a client with\n`authorization_code` has at least one redirect URI, and each redirect\nURI meets the rules `redirect_uris` states. A document that breaks one\nis refused with `application.invalid`, whose details identify the\nsetting.\n\nIf the document is refused, no change is stored and an existing\napplication keeps its current revision.\n",
+        "description": "Creates or revises a registered application that authenticates its users\nvia Zitadel. If the slug does not already exist in the project, a new\napplication is created. If one with that slug already exists, a revision\nis created.\n\nA revision gets a new `revision_id` and does not modify the application's\n`id`. Sending an unchanged document also creates a revision. Each client\nis matched to the stored one by its slug and keeps its `client_id`: a\nrevision that changes a client's `client_id` is rejected with\n`app.field_immutable`. A revision keeps every client of the\nstored document: one that omits a client is also rejected with\n`app.field_immutable`, since removing a client is not available\nyet. A client with a new slug is a new client. It takes the `client_id`\nthe document supplies, or the server generates one, and every response\ncarries it in `definition`. A `client_id` another client of the project\nholds, or ever held, is rejected with `app.client_id_taken`.\n\nEvery new client gets a secret, generated by the server and returned once\nin `client_secrets`. The server stores only its hash, so no later read\nreturns it.\n\nThe document is validated against the `application.json` schema before\nanything is stored, and then against the rules the authorization server\napplies: `refresh_token` comes with `authorization_code`, a client with\n`authorization_code` has at least one redirect URI, and each redirect\nURI meets the rules `redirect_uris` states. A document that breaks one\nis refused with `app.invalid`, whose details identify the\nsetting.\n\nIf the document is refused, no change is stored and an existing\napplication keeps its current revision.\n",
         "tags": [
           "Applications"
         ],
@@ -6786,7 +6922,7 @@
           },
           {
             "$ref": "#/components/parameters/idempotency-key",
-            "description": "Optional retry key. A retry carrying the same key within the retry\nwindow returns the first response, `client_secrets` included,\ninstead of creating another revision. Without it, a retry after a\nlost response finds the clients already stored and returns no\nsecret.\n"
+            "description": "Optional. Once honored, a retry with the same key and body returns\nthe first request's status and a new secret for each client the first\nrequest created, and writes no revision.\n\nNot honored yet: sending the same request again, for example after\nits response was lost, creates another revision and returns no\nsecret, because the clients the first request created are already\nstored.\n"
           }
         ],
         "requestBody": {
@@ -6998,7 +7134,7 @@
             }
           },
           "409": {
-            "description": "A `client_id` in the document is held, or was once held, by another\nclient of the project. Pick another id, or leave it out so the\nserver generates one.\n",
+            "description": "A `client_id` in the document is held, or was once held, by another\nclient of the project (`app.client_id_taken`). Pick another\nid, or leave it out so the server generates one.\n\nOr another revision of the same application was created at the same\ninstant (`app.revision_conflict`). Send the document again.\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -7099,7 +7235,7 @@
             }
           },
           "404": {
-            "description": "No application with this ID exists in the given project.\n",
+            "description": "No application with this ID exists in the given project\n(`app.not_found`).\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -7225,6 +7361,15 @@
                       "history_depth": 4
                     }
                   }
+                },
+                "signupPolicy": {
+                  "summary": "The default sign-up policy",
+                  "value": {
+                    "operation": "user.create",
+                    "config": {
+                      "challenge": "zitadel_pow"
+                    }
+                  }
                 }
               }
             }
@@ -7324,6 +7469,18 @@
                         false,
                         true
                       ]
+                    }
+                  }
+                },
+                "signup": {
+                  "summary": "A sign-up that solved the built-in proof of work",
+                  "value": {
+                    "operation": "user.create",
+                    "config": {
+                      "challenge": "zitadel_pow"
+                    },
+                    "input": {
+                      "solved_challenge": "zitadel_pow"
                     }
                   }
                 }
@@ -7828,7 +7985,7 @@
         "operationId": "buildRelease",
         "x-zitadel-cli": "deploy",
         "summary": "Build a release from files",
-        "description": "Builds a release from the resources in `.zitadel/` as authored on disk,\ngrouped by kind, in one transaction.\n\nA release is a snapshot of the project's configuration. A failure anywhere\nleaves no revision and no release. The caller records nothing. The CLI's\n`deploy` command builds its release with this operation.\n\nIf the project already holds a release with the same content, the same\n`content_hash`, the request answers `200` with that release and allocates\nnothing, however long ago it was built. Metadata is excluded from the\ncomparison, so the same content under a different `message` is the same\nrelease.\n\nOtherwise every resource is compared with the project's newest revision of\nthe same handle. Unchanged content reuses that revision, and changed\ncontent allocates a new one. The request answers `201` with the new\nrelease. A policy whose config matches only an older revision allocates a\nnew one too, so the policy reads back as the config the build carried.\n\nA structurally malformed request is refused while decoding with\n`req.invalid`, naming the offending fields. A well-formed bundle is then\nchecked resource by resource, as each kind's create endpoint checks it,\nand every failure is reported at once. The request answers `400` with\n`rel.invalid`, and `details.resources` lists each resource that failed.\nFix each listed resource and build again. A handle that resolves neither\nin the bundle nor in the project answers `rel.unresolved_reference`,\nnaming the pointer and the handle. Add the missing resource to the bundle.\n\nBuilding writes revisions, so besides `release.write` it needs the write\nscope of every kind the bundle carries a resource of: `schema.write`,\n`flow_definition.write`, `branding.write`, `idp.write` and `policy.write`,\nas the per-kind create endpoints do. A missing scope answers `403` with\n`rel.permission_denied`, naming the kind. Request a token with that scope.\nAn empty kind needs no scope.\n\nBuilding a release does not deploy it. A release is not tied to an origin,\nand the same release can later be deployed to any number of origins\nunchanged. Pass the returned `id` to `createDeployment` (`POST /deployments`).\n",
+        "description": "Builds a release from the resources in `.zitadel/` as authored on disk,\ngrouped by kind, in one transaction.\n\nA release is a snapshot of the project's configuration. A failure anywhere\nleaves no revision and no release. The caller records nothing. The CLI's\n`deploy` command builds its release with this operation.\n\nIf the project already holds a release with the same content, the same\n`content_hash`, the request answers `200` with that release and allocates\nnothing, however long ago it was built. Metadata is excluded from the\ncomparison, so the same content under a different `message` is the same\nrelease.\n\nOtherwise every resource is compared with the project's newest revision of\nthe same handle. Unchanged content reuses that revision, and changed\ncontent allocates a new one. The request answers `201` with the new\nrelease. A policy whose config matches only an older revision allocates a\nnew one too, so the policy reads back as the config the build carried.\n\nA structurally malformed request is refused while decoding with\n`req.invalid`, naming the offending fields. A well-formed bundle is then\nchecked resource by resource, as each kind's create endpoint checks it,\nand every failure is reported at once. The request answers `400` with\n`rel.invalid`, and `details.resources` lists each resource that failed.\nFix each listed resource and build again. A handle that resolves neither\nin the bundle nor in the project answers `rel.unresolved_reference`,\nnaming the pointer and the handle. Add the missing resource to the bundle.\n\nBuilding writes revisions, so besides `release.write` it needs the write\nscope of every kind the bundle carries a resource of: `schema.write`,\n`flow_definition.write`, `branding.write`, `idp.write`, `policy.write`\nand `oauth_settings.write`, as the per-kind create endpoints do. A missing scope answers `403` with\n`rel.permission_denied`, naming the kind. Request a token with that scope.\nAn empty kind needs no scope.\n\nBuilding a release does not deploy it. A release is not tied to an origin,\nand the same release can later be deployed to any number of origins\nunchanged. Pass the returned `id` to `createDeployment` (`POST /deployments`).\n",
         "tags": [
           "Releases"
         ],
@@ -7854,7 +8011,7 @@
               "examples": {
                 "bundle": {
                   "summary": "Built from the files on disk",
-                  "description": "The CLI's form: the schemas, flow definitions and branding as\nauthored, the flow naming its schema by `objectType`. The\nschema's `metaSchema` is the one the server publishes at\n`/user-schema.json`. The server reuses whichever revisions\nalready match and allocates the rest.\n",
+                  "description": "The CLI's form: the schemas, flow definitions, branding and\nOAuth settings as authored, the flow naming its schema by\n`objectType`. The\nschema's `metaSchema` is the one the server publishes at\n`/user-schema.json`. The server reuses whichever revisions\nalready match and allocates the rest.\n",
                   "value": {
                     "bundle": {
                       "schemas": [
@@ -7965,6 +8122,9 @@
                       "branding": {
                         "layout": "centered",
                         "liquid_template": "<main>{{ step.name }}</main>"
+                      },
+                      "oauth": {
+                        "enabled": true
                       }
                     },
                     "message": "add phone_number to human-user",
@@ -8034,7 +8194,7 @@
                 "examples": {
                   "builtFromBundle": {
                     "summary": "Built from a bundle",
-                    "description": "Each pointer carries the handle the server read from the\nresource, and the revision it reused or allocated for it. The\nhandle is `objectType` for a schema, `name` for a flow\ndefinition, `default` for branding and `slug` for an IdP\nconnection.\n",
+                    "description": "Each pointer carries the handle the server read from the\nresource, and the revision it reused or allocated for it. The\nhandle is `objectType` for a schema, `name` for a flow\ndefinition, `default` for branding and for OAuth settings,\nand `slug` for an IdP connection.\n",
                     "value": {
                       "id": "rel_01KX3RG8A7F0N9WD3P2E4YM5C1",
                       "project_id": "proj_01KWH1P4MYS7F0N9WD3P2E4YM5",
@@ -8068,6 +8228,11 @@
                           "kind": "idp",
                           "handle": "google",
                           "revision_id": "idprev_01KWHF2XY6RN7F0N9WD3P2E4YM"
+                        },
+                        {
+                          "kind": "oauth",
+                          "handle": "default",
+                          "revision_id": "oauthset_01KWHG3M5QZ27F0N9WD3P2E4YM"
                         }
                       ]
                     }
@@ -8265,7 +8430,7 @@
         "x-zitadel-cli": "release revoke",
         "x-zitadel-destructive": true,
         "summary": "Revoke a release",
-        "description": "Revokes a release, so that its content is never served again. Pass the\n`id` that `createRelease` (`POST /releases`), `buildRelease` (`POST /releases/build`) or `listReleases` (`GET /releases`) returns. It\nrecords a `release.revoked` event.\n\nFrom then on the release cannot be deployed. Every path that would serve\nit refuses it with `rel.revoked`, including a build that pins its digest.\n\nA release that any origin still serves cannot be revoked. An origin serves\nthe release of the newest deployment to it, so the call answers `409` with\n`rel.in_use`, naming each such origin and that deployment. Deploy another\nrelease there or roll back first, then revoke. Revoking therefore never\ntakes an origin down. Deployments that named the release earlier stay in\nthe history.\n\nThe call is idempotent: revoking a release that is already revoked answers\n`200` with the release unchanged, and `revoked_at` still names the first\nrevocation. There is no un-revoke. To serve that configuration again,\nchange it and build a new release: rebuilding unchanged content returns\nthe same revoked release.\n\nThe call takes no body. The lookup is scoped to the project in\n`project_id`, so a release ID of another project answers not found exactly\nas an unknown ID does.\n",
+        "description": "Revokes a release, so that its content is never served again. Pass the\n`id` that `createRelease` (`POST /releases`), `buildRelease` (`POST /releases/build`) or `listReleases` (`GET /releases`) returns. It\nrecords a `release.revoked` event.\n\nFrom then on the release cannot be deployed. Every path that would serve\nit refuses it with `rel.revoked`, including a build that pins its digest.\n\nA release that any origin still serves cannot be revoked. An origin serves\nthe release of the newest deployment to it, so the call answers `409` with\n`rel.in_use`, naming each such origin, that deployment and whether the\norigin is primary or a preview. Deploy another release to a primary origin\nor roll it back, and remove a preview, then revoke. Revoking therefore\nnever takes an origin down. Deployments that named the release earlier stay in\nthe history.\n\nThe call is idempotent: revoking a release that is already revoked answers\n`200` with the release unchanged, and `revoked_at` still names the first\nrevocation. There is no un-revoke. To serve that configuration again,\nchange it and build a new release: rebuilding unchanged content returns\nthe same revoked release.\n\nThe call takes no body. The lookup is scoped to the project in\n`project_id`, so a release ID of another project answers not found exactly\nas an unknown ID does.\n",
         "tags": [
           "Releases"
         ],
@@ -8336,7 +8501,7 @@
             }
           },
           "409": {
-            "description": "At least one origin still serves the release. `details.origins`\nnames each such origin and the newest deployment to it.\n",
+            "description": "At least one origin still serves the release. `details.origins`\nnames each such origin, the newest deployment to it and whether it\nserves the release as a primary origin or a preview.\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -8345,7 +8510,7 @@
                 "examples": {
                   "stillServed": {
                     "summary": "Two origins still serve the release",
-                    "description": "Deploy another release to these origins, or roll them back,\nthen revoke.\n",
+                    "description": "Deploy another release to the primary origin or roll it back,\nremove the preview, then revoke.\n",
                     "value": {
                       "code": "rel.in_use",
                       "message": "release: still served by an origin",
@@ -8353,11 +8518,13 @@
                         "origins": [
                           {
                             "origin": "https://app.acme.com",
-                            "deployment_id": "dep_01KX4SB9C8E1F0N9WD3P2E4YM5"
+                            "deployment_id": "dep_01KX4SB9C8E1F0N9WD3P2E4YM5",
+                            "kind": "primary"
                           },
                           {
                             "origin": "https://acme-git-sso-acmeinc.vercel.app",
-                            "deployment_id": "dep_01KX4SD2F7H3F0N9WD3P2E4YM5"
+                            "deployment_id": "dep_01KX4SD2F7H3F0N9WD3P2E4YM5",
+                            "kind": "preview"
                           }
                         ]
                       }
@@ -8725,7 +8892,7 @@
       "post": {
         "operationId": "createInvitation",
         "summary": "Create an invitation",
-        "description": "Creates an invitation for a project, or replaces an existing one, and\nreturns the invitation and its one-shot link.\n\nSend `type` and the object named after it. `project_member` takes\n`relation` (`viewer`, `editor` or `admin`). `team_member` takes `team_id`\nand `role`, and answers `501` `not_implemented` until team invitations\nship. Optional `metadata.name` labels who the link is for. Optional\n`replaces_invitation_id` replaces that invitation: the new row keeps the\noriginal's `journey_id`, and a pending original is deleted in the same\ntransaction.\n\nThe `link` appears only in this response. Share it out of band; whoever\nopens it and is signed in can redeem the role. It expires in 72 hours.\nRefused for an unclaimed project, on a server without a platform project,\nand when the project's pending-invitation cap is reached.\n\nAuthenticate with a project secret (`oauth2`) or a console session cookie\n(`sessionCookie`). Creation needs the same project `admin` check as\n`createGrant` (`POST /grants`). Cookie requests follow that scheme's CSRF\nrules.\n",
+        "description": "Creates an invitation for a project, or replaces an existing one, and\nreturns the invitation and its one-shot link.\n\nSend `type` and the object named after it. `project_member` takes\n`relation` (`viewer`, `editor` or `admin`). `team_member` takes `team_id`\nand `role`, and answers `501` `not_implemented` until team invitations\nship. Optional `metadata.name` labels who the link is for. Optional\n`replaces_invitation_id` replaces that invitation: the new row keeps the\noriginal's `journey_id`, and the original is deleted in the same\ntransaction unless it was accepted.\n\nThe `link` appears only in this response. Share it out of band; whoever\nopens it and is signed in can redeem the role. It expires in 72 hours.\nRefused for an unclaimed project, on a server without a platform project,\nand when the project's pending-invitation cap is reached.\n\nAuthenticate with a project secret (`oauth2`) or a console session cookie\n(`sessionCookie`). Creation needs the same project `admin` check as\n`createGrant` (`POST /grants`). Cookie requests follow that scheme's CSRF\nrules.\n",
         "tags": [
           "Invitations"
         ],
@@ -8833,7 +9000,7 @@
             }
           },
           "404": {
-            "description": "Project not found, or the invitation to replace was not found.",
+            "description": "Project not found, or the invitation to replace was not found or was\nalready accepted.\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -10775,6 +10942,122 @@
     }
   },
   "webhooks": {
+    "flow.signup_challenge.issued": {
+      "post": {
+        "operationId": "flowSignupChallengeIssued",
+        "summary": "flow.signup_challenge.issued",
+        "description": "A sign-up proof-of-work challenge was issued.\n\nThe body is the event as `GET /events` returns it.\n",
+        "tags": [
+          "Event Webhooks"
+        ],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/flow-signup_challenge-issued-event"
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "$ref": "#/components/responses/webhook-delivered"
+          },
+          "default": {
+            "$ref": "#/components/responses/webhook-not-delivered"
+          }
+        }
+      }
+    },
+    "flow.signup_challenge.consumed": {
+      "post": {
+        "operationId": "flowSignupChallengeConsumed",
+        "summary": "flow.signup_challenge.consumed",
+        "description": "A signup proof was spent before attempting user creation.\n\nThe body is the event as `GET /events` returns it.\n",
+        "tags": [
+          "Event Webhooks"
+        ],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/flow-signup_challenge-consumed-event"
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "$ref": "#/components/responses/webhook-delivered"
+          },
+          "default": {
+            "$ref": "#/components/responses/webhook-not-delivered"
+          }
+        }
+      }
+    },
+    "application.created": {
+      "post": {
+        "operationId": "applicationCreated",
+        "summary": "application.created",
+        "description": "A registered application was created.\n\nThe body is the event as `GET /events` returns it.\n",
+        "tags": [
+          "Event Webhooks"
+        ],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/application-created-event"
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "$ref": "#/components/responses/webhook-delivered"
+          },
+          "default": {
+            "$ref": "#/components/responses/webhook-not-delivered"
+          }
+        }
+      }
+    },
+    "application.updated": {
+      "post": {
+        "operationId": "applicationUpdated",
+        "summary": "application.updated",
+        "description": "A registered application was revised. The payload holds the new\nrevision, the name when it changed, and the clients the revision added.\n\nThe body is the event as `GET /events` returns it.\n",
+        "tags": [
+          "Event Webhooks"
+        ],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/application-updated-event"
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "$ref": "#/components/responses/webhook-delivered"
+          },
+          "default": {
+            "$ref": "#/components/responses/webhook-not-delivered"
+          }
+        }
+      }
+    },
     "auth.attempt.created": {
       "post": {
         "operationId": "authAttemptCreated",
@@ -11372,6 +11655,122 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/idp-updated-event"
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "$ref": "#/components/responses/webhook-delivered"
+          },
+          "default": {
+            "$ref": "#/components/responses/webhook-not-delivered"
+          }
+        }
+      }
+    },
+    "invitation.accepted": {
+      "post": {
+        "operationId": "invitationAccepted",
+        "summary": "invitation.accepted",
+        "description": "An invitation was accepted. Grant events the acceptance writes carry\nthis event's `request_id`; there are none when the user already holds an\nidentical active grant.\n\nNot sent yet: the contract is published ahead of the code that sends it.\n\nThe body is the event as `GET /events` returns it.\n",
+        "tags": [
+          "Event Webhooks"
+        ],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/invitation-accepted-event"
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "$ref": "#/components/responses/webhook-delivered"
+          },
+          "default": {
+            "$ref": "#/components/responses/webhook-not-delivered"
+          }
+        }
+      }
+    },
+    "invitation.cancelled": {
+      "post": {
+        "operationId": "invitationCancelled",
+        "summary": "invitation.cancelled",
+        "description": "A pending invitation was cancelled by an administrator, or an unaccepted\none was deleted by its replacement.\n\nThe body is the event as `GET /events` returns it.\n",
+        "tags": [
+          "Event Webhooks"
+        ],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/invitation-cancelled-event"
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "$ref": "#/components/responses/webhook-delivered"
+          },
+          "default": {
+            "$ref": "#/components/responses/webhook-not-delivered"
+          }
+        }
+      }
+    },
+    "invitation.created": {
+      "post": {
+        "operationId": "invitationCreated",
+        "summary": "invitation.created",
+        "description": "An invitation was created, new or as the replacement of another.\n\nThe body is the event as `GET /events` returns it.\n",
+        "tags": [
+          "Event Webhooks"
+        ],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/invitation-created-event"
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "$ref": "#/components/responses/webhook-delivered"
+          },
+          "default": {
+            "$ref": "#/components/responses/webhook-not-delivered"
+          }
+        }
+      }
+    },
+    "invitation.rejected": {
+      "post": {
+        "operationId": "invitationRejected",
+        "summary": "invitation.rejected",
+        "description": "An invitation was declined.\n\nNot sent yet: the contract is published ahead of the code that sends it.\n\nThe body is the event as `GET /events` returns it.\n",
+        "tags": [
+          "Event Webhooks"
+        ],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/invitation-rejected-event"
               }
             }
           }
@@ -12082,6 +12481,8 @@
               "project.write": "Permission to create and manage projects",
               "branding.read": "Permission to read branding revisions",
               "branding.write": "Permission to publish branding revisions",
+              "oauth_settings.read": "Permission to read OAuth settings revisions",
+              "oauth_settings.write": "Permission to publish OAuth settings revisions through a release",
               "policy.read": "Permission to read operation policies",
               "policy.write": "Permission to publish operation policies",
               "idp.read": "Permission to read identity provider connections",
@@ -12136,6 +12537,8 @@
               "project.write": "Permission to create and manage projects",
               "branding.read": "Permission to read branding revisions",
               "branding.write": "Permission to publish branding revisions",
+              "oauth_settings.read": "Permission to read OAuth settings revisions",
+              "oauth_settings.write": "Permission to publish OAuth settings revisions through a release",
               "policy.read": "Permission to read operation policies",
               "policy.write": "Permission to publish operation policies",
               "idp.read": "Permission to read identity provider connections",
@@ -13246,6 +13649,26 @@
           }
         ]
       },
+      "user-password_hashing_busy": {
+        "description": "The server is hashing too many passwords right now. Try again in a moment.\n\nError code: user.password_hashing_busy\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "user.password_hashing_busy"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
       "user-password_policy_violation": {
         "description": "The password does not meet the password policy.\n\nError code: user.password_policy_violation\n",
         "allOf": [
@@ -13307,6 +13730,20 @@
             "type": "string",
             "format": "date-time",
             "description": "The timestamp when the passkey was created."
+          }
+        }
+      },
+      "too-many-requests": {
+        "description": "Why the server refused the request for now. Each member names its error\ncode; `req.rate_limited` joins them when the server's own rate limits land.\nRetry after the number of seconds in the `Retry-After` header.\n",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/user-password_hashing_busy"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "code",
+          "mapping": {
+            "user.password_hashing_busy": "#/components/schemas/user-password_hashing_busy"
           }
         }
       },
@@ -14430,14 +14867,61 @@
           }
         }
       },
-      "gate": {
+      "pow-challenge": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "protocol",
+          "challenge_id",
+          "profile_id",
+          "salt",
+          "nonce",
+          "key_prefix",
+          "expires_at"
+        ],
+        "description": "A short-lived, single-use signup challenge scoped to this project and flow.\nFor pbkdf2_sha256_5000_l1, try counters 0 through 511, deriving 32 bytes with\nPBKDF2-HMAC-SHA256 (5000 iterations), password nonce || uint32_be(counter),\nand the supplied salt. Match the first 16 derived bytes to key_prefix.\nSubmit gate_proofs.signup_pow as a JSON string containing protocol,\nchallenge_id and derived_key (the full 32 bytes in lowercase hex).\nThe proof is spent before the user is created (for a password, before it\nis hashed), even if user creation fails.\n",
+        "properties": {
+          "protocol": {
+            "type": "string",
+            "example": "zitadel_pow_poc_v1"
+          },
+          "challenge_id": {
+            "type": "string",
+            "example": "ch_example"
+          },
+          "profile_id": {
+            "type": "string",
+            "example": "pbkdf2_sha256_5000_l1"
+          },
+          "salt": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{32}$",
+            "x-zitadel-pattern-message": "must be 32 lowercase hex digits"
+          },
+          "nonce": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{32}$",
+            "x-zitadel-pattern-message": "must be 32 lowercase hex digits"
+          },
+          "key_prefix": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{32}$",
+            "x-zitadel-pattern-message": "must be 32 lowercase hex digits"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "runtime-gate": {
         "type": "object",
         "additionalProperties": false,
         "required": [
           "kind",
           "provider"
         ],
-        "description": "A gate is a security check, such as a captcha, that must be satisfied\nbefore this step's submission is accepted. The server may also inject gates\nat runtime based on policy or risk evaluation.\n",
+        "description": "A runtime security challenge that must be satisfied before this step's submission\nis accepted. The engine may also inject gates at runtime based on policy\nor risk evaluation.\n",
         "properties": {
           "kind": {
             "type": "string",
@@ -14445,20 +14929,20 @@
               "captcha"
             ],
             "example": "captcha",
-            "description": "The gate category. Only `captcha` is defined today. Authenticator\nceremonies, such as passkey, are not gates: they are modeled as\ncredential authentication attempts (`auth_attempts`) with `x-credential`\non a field.\n"
+            "description": "The gate category. Only `captcha` is currently defined. Authenticator\nceremonies (e.g. passkey) are modelled as credential auth_attempts via\n`x-credential` on a field, not as gates.\n"
           },
           "provider": {
             "type": "string",
-            "description": "The provider within the gate kind, for example `altcha`, `turnstile` or\n`hcaptcha`. The server looks up an implementation in its provider\nregistry.\n",
-            "example": "altcha"
+            "description": "Implementation identifier. `zitadel_pow` protects sign-up with the\nbuilt-in proof-of-work solver: a step that creates its user on submit\n(`create_user`), and a step carrying a passkey registration that creates\nits user, whose attestation carries the proof. External providers are\nnot supported.\n",
+            "example": "zitadel_pow"
+          },
+          "challenge": {
+            "$ref": "#/components/schemas/pow-challenge"
           },
           "config": {
             "type": "object",
-            "description": "Provider-specific configuration consumed by the implementation when\nissuing the per-render challenge. Opaque to the server.\n",
-            "additionalProperties": true,
-            "example": {
-              "site_key": "0x4AAAAAAA-example-site-key"
-            }
+            "description": "Reserved provider-specific configuration. The built-in signup gate uses\n`challenge` and does not accept caller-selected cost parameters.\n",
+            "additionalProperties": true
           }
         }
       },
@@ -14658,7 +15142,7 @@
             "type": "object",
             "description": "Security gates, the security checks that must be satisfied before the\nstep can be submitted.\nThe server injects gates dynamically based on policy, even if they\nare not declared in the flow definition.\n",
             "additionalProperties": {
-              "$ref": "#/components/schemas/gate"
+              "$ref": "#/components/schemas/runtime-gate"
             },
             "default": {}
           },
@@ -15116,6 +15600,26 @@
           }
         ]
       },
+      "flow-rate_limited": {
+        "description": "Signup request limit reached; retry after one minute\n\nError code: flow.rate_limited\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "flow.rate_limited"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
       "flow-restart_required": {
         "description": "The flow must be restarted\n\nError code: flow.restart_required\n",
         "allOf": [
@@ -15302,7 +15806,7 @@
           },
           "gate_proofs": {
             "type": "object",
-            "description": "Solutions for security gates. Keys match gate names from the step's `gates` dictionary.\nThe login component collects these from `<zl-captcha>` component events.\n",
+            "description": "Solutions for security gates. Keys match gate names from the step's `gates` dictionary.\nFor sign-up, the login component solves the built-in challenge with Web\nCrypto and submits its JSON proof under `signup_pow`: with the password\nfor a password sign-up, and with `challenge_response` for a passkey\nregistration that creates the user.\n",
             "additionalProperties": {
               "type": "string"
             }
@@ -15338,6 +15842,26 @@
             "example": "https://login.example.com/login?flow=flow_2"
           }
         }
+      },
+      "flow-proof_invalid": {
+        "description": "Signup proof is missing, invalid, expired or already used; refresh the step\n\nError code: flow.proof_invalid\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "flow.proof_invalid"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
       },
       "session-id": {
         "type": "string",
@@ -17793,6 +18317,34 @@
           }
         }
       },
+      "gate": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "provider"
+        ],
+        "description": "A reserved gate declaration. Gates declared in a flow definition are not\ncurrently enforced. Required signup gates are attached by the server based\non `on_success: create_user`, independently of this declaration.\n",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "captcha"
+            ],
+            "example": "captcha",
+            "description": "The gate category. Only `captcha` is defined today. Authenticator\nceremonies, such as passkey, are not gates: they are modeled as\ncredential authentication attempts (`auth_attempts`) with `x-credential`\non a field.\n"
+          },
+          "provider": {
+            "type": "string",
+            "description": "Reserved implementation identifier. Declaring a provider does not enable it.\n"
+          },
+          "config": {
+            "type": "object",
+            "description": "Reserved provider-specific configuration. It has no runtime effect.\n",
+            "additionalProperties": true
+          }
+        }
+      },
       "flow-definition-step": {
         "type": "object",
         "required": [
@@ -18739,8 +19291,8 @@
           }
         }
       },
-      "idp-permission_denied": {
-        "description": "Identity provider connection: the caller's project role does not allow this operation\n\nError code: idp.permission_denied\n",
+      "sess-token_invalid": {
+        "description": "The session token is invalid (either malformed or expired).\n\nError code: sess.token_invalid\n",
         "allOf": [
           {
             "$ref": "#/components/schemas/error-details"
@@ -18750,7 +19302,7 @@
             "properties": {
               "code": {
                 "type": "string",
-                "const": "idp.permission_denied"
+                "const": "sess.token_invalid"
               }
             },
             "required": [
@@ -18798,7 +19350,8 @@
         "description": "The best matches of each requested type.",
         "required": [
           "results",
-          "incomplete_types"
+          "incomplete_types",
+          "more_projects"
         ],
         "properties": {
           "results": {
@@ -18811,10 +19364,14 @@
           "incomplete_types": {
             "type": "array",
             "uniqueItems": true,
-            "description": "The requested types whose matches are not all in `results`: there were\nmore than `limit_per_type`, the text was too short to search that type,\nor the project holds more of that type than one search reads. Empty when\nevery requested type is complete.\n",
+            "description": "The requested types whose matches are not all in `results`: there were\nmore than `limit_per_type`, the text was too short to search that type,\na project holds more matches of that type than one search reads, or\n`more_projects` is true. Empty when every requested type is complete.\n",
             "items": {
               "$ref": "#/components/schemas/search-result-type"
             }
+          },
+          "more_projects": {
+            "type": "boolean",
+            "description": "True when a session searched without `project_id` and the person can act\non more projects than one search reads: the results come from the\nnewest 10 of them. Search another by naming it in `project_id`. Always\nfalse when the request names a project or uses a project secret.\n"
           }
         }
       },
@@ -18940,6 +19497,50 @@
           },
           "branding": {
             "$ref": "#/components/schemas/branding"
+          }
+        }
+      },
+      "oauth-settings": {
+        "x-meta-schema": true,
+        "type": "object",
+        "description": "The OAuth settings of a project: whether the project's OAuth authorization\nserver answers. It has one shape in two places: the `oauth` resource of the\nbundle `buildRelease` (`POST /releases/build`) takes, which publishes it as\na new immutable revision, and the read-only revision\n`getOAuthSettingsById` (`GET /oauth_settings/{oauth_settings_id}`)\nreturns. Locally it is the descriptor in `.zitadel/` that `zitadel deploy`\npublishes with the rest of the bundle.\n\nA release is the only writer: there is no operation that publishes OAuth\nsettings on their own. A release without `oauth` leaves the authorization\nserver off.\n",
+        "additionalProperties": false,
+        "required": [
+          "enabled"
+        ],
+        "properties": {
+          "$schema": {
+            "type": "string",
+            "description": "Editor affordance: path or URL of this file's JSON meta-schema, so an\neditor validates and autocompletes it. The CLI strips it before upload;\nthe platform ignores it.\n"
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether the project's OAuth authorization server answers. While it is\n`false`, or the deployed release pins no OAuth settings, the server\npublishes no authorization server metadata for the project and refuses\nevery OAuth request to it.\n",
+            "example": true
+          }
+        }
+      },
+      "oauth-settings-revision-response": {
+        "type": "object",
+        "description": "A stored OAuth settings revision. `oauth` echoes the canonical stored\nsettings, so a client such as the CLI can reconcile local files with the\nserver's stored state.\n",
+        "required": [
+          "id",
+          "created_at",
+          "oauth"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The unique identifier of this OAuth settings revision.",
+            "example": "oauthset_01KWHG3M5QZ27F0N9WD3P2E4YM"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When this revision was published."
+          },
+          "oauth": {
+            "$ref": "#/components/schemas/oauth-settings"
           }
         }
       },
@@ -19191,6 +19792,26 @@
               "code": {
                 "type": "string",
                 "const": "idp.field_immutable"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "idp-permission_denied": {
+        "description": "Identity provider connection: the caller's project role does not allow this operation\n\nError code: idp.permission_denied\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "idp.permission_denied"
               }
             },
             "required": [
@@ -19524,6 +20145,126 @@
           }
         }
       },
+      "app-client_id_taken": {
+        "description": "Application: another client of the project holds this client_id\n\nError code: app.client_id_taken\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "app.client_id_taken"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "app-field_immutable": {
+        "description": "Application: a revision may not change a client's client_id or remove a client\n\nError code: app.field_immutable\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "app.field_immutable"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "app-invalid": {
+        "description": "Application: invalid\n\nError code: app.invalid\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "app.invalid"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "app-not_found": {
+        "description": "Application: not found\n\nError code: app.not_found\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "app.not_found"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "app-permission_denied": {
+        "description": "Application: the caller's project role does not allow this operation\n\nError code: app.permission_denied\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "app.permission_denied"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "app-revision_conflict": {
+        "description": "Application: another revision of the same application was created at the same instant\n\nError code: app.revision_conflict\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "app.revision_conflict"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
       "application-response": {
         "type": "object",
         "description": "An application at its newest revision, with its document as `definition`.\nIt never carries a client secret.\n",
@@ -19620,7 +20361,8 @@
         "type": "string",
         "description": "An operation a policy can guard; the policy catalog lists them.",
         "enum": [
-          "auth.factor.password.set"
+          "auth.factor.password.set",
+          "user.create"
         ]
       },
       "pol-not_found": {
@@ -19756,18 +20498,90 @@
           }
         }
       },
+      "user-create-config": {
+        "title": "UserCreatePolicyConfig",
+        "type": "object",
+        "additionalProperties": false,
+        "description": "The settings of a `user.create` policy, checked before a sign-up creates a\nuser. Every setting is optional; a setting left out switches its rule off,\nand `{}` switches every rule off. Zitadel's own sign-up protection, a proof\nof work on every sign-up with a password or a passkey and limits per\nsign-up flow, applies either way: a policy chooses among challenges and\nnever switches it off. Sign-ups through a sign-in provider are not\nchallenged: each needs an account at the provider.\n",
+        "properties": {
+          "challenge": {
+            "type": "string",
+            "enum": [
+              "zitadel_pow"
+            ],
+            "description": "The challenge a sign-up with a password or a passkey must solve before\nthe user is created. `zitadel_pow` is Zitadel's built-in proof of work,\nwhich every such sign-up solves when no policy names a challenge.\n"
+          }
+        }
+      },
+      "user-create-policy": {
+        "title": "UserCreatePolicy",
+        "type": "object",
+        "description": "One revision of a project's `user.create` policy. `id` is shared by every\nrevision of the operation's policy; `revision_id` names this revision.\n",
+        "required": [
+          "id",
+          "revision_id",
+          "project_id",
+          "operation",
+          "config",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "id": {
+            "readOnly": true,
+            "$ref": "#/components/schemas/policy-id"
+          },
+          "revision_id": {
+            "readOnly": true,
+            "$ref": "#/components/schemas/policy-revision-id"
+          },
+          "project_id": {
+            "readOnly": true,
+            "description": "The project the policy belongs to.",
+            "$ref": "#/components/schemas/project-id"
+          },
+          "operation": {
+            "type": "string",
+            "enum": [
+              "user.create"
+            ],
+            "readOnly": true,
+            "description": "The operation the policy guards."
+          },
+          "config": {
+            "readOnly": true,
+            "$ref": "#/components/schemas/user-create-config"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true,
+            "description": "When the operation's policy was first published."
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true,
+            "description": "When this revision was published."
+          }
+        }
+      },
       "policy": {
         "title": "Policy",
         "description": "One revision of a project's policy for an operation, typed by `operation`.\n`id` is shared by every revision of the operation's policy; `revision_id`\nnames this revision.\n",
         "oneOf": [
           {
             "$ref": "#/components/schemas/password-set-policy"
+          },
+          {
+            "$ref": "#/components/schemas/user-create-policy"
           }
         ],
         "discriminator": {
           "propertyName": "operation",
           "mapping": {
-            "auth.factor.password.set": "#/components/schemas/password-set-policy"
+            "auth.factor.password.set": "#/components/schemas/password-set-policy",
+            "user.create": "#/components/schemas/user-create-policy"
           }
         }
       },
@@ -19818,18 +20632,43 @@
           }
         }
       },
+      "user-create-policy-input": {
+        "title": "UserCreatePolicyInput",
+        "type": "object",
+        "description": "A publish of the sign-up policy, checked before a sign-up creates a user.",
+        "required": [
+          "operation",
+          "config"
+        ],
+        "properties": {
+          "operation": {
+            "type": "string",
+            "enum": [
+              "user.create"
+            ],
+            "description": "The operation the policy guards."
+          },
+          "config": {
+            "$ref": "#/components/schemas/user-create-config"
+          }
+        }
+      },
       "publish-policy-request": {
         "title": "PublishPolicyRequest",
         "description": "One publish of the project's policy for an operation. `operation` selects\nthe operation's template, and `config` sets that template's settings. A\nsetting left out is off, and `{}` switches every rule off. The policy catalog\nlists the settings each operation accepts.\n",
         "oneOf": [
           {
             "$ref": "#/components/schemas/password-set-policy-input"
+          },
+          {
+            "$ref": "#/components/schemas/user-create-policy-input"
           }
         ],
         "discriminator": {
           "propertyName": "operation",
           "mapping": {
-            "auth.factor.password.set": "#/components/schemas/password-set-policy-input"
+            "auth.factor.password.set": "#/components/schemas/password-set-policy-input",
+            "user.create": "#/components/schemas/user-create-policy-input"
           }
         }
       },
@@ -19941,18 +20780,65 @@
           }
         }
       },
+      "user-create-evaluate-input": {
+        "title": "UserCreateEvaluateInput",
+        "type": "object",
+        "additionalProperties": false,
+        "description": "The sign-up as it reaches the server. A real sign-up proves the challenge\nit solved; a dry run names it.\n",
+        "required": [
+          "solved_challenge"
+        ],
+        "properties": {
+          "solved_challenge": {
+            "type": "string",
+            "enum": [
+              "zitadel_pow"
+            ],
+            "description": "The challenge the sign-up solved. `zitadel_pow` is Zitadel's built-in\nproof of work.\n"
+          }
+        }
+      },
+      "user-create-evaluate-request": {
+        "title": "UserCreateEvaluateRequest",
+        "type": "object",
+        "description": "A dry run of the sign-up policy for one sign-up.",
+        "required": [
+          "operation",
+          "config",
+          "input"
+        ],
+        "properties": {
+          "operation": {
+            "type": "string",
+            "enum": [
+              "user.create"
+            ],
+            "description": "The operation the policy guards."
+          },
+          "config": {
+            "$ref": "#/components/schemas/user-create-config"
+          },
+          "input": {
+            "$ref": "#/components/schemas/user-create-evaluate-input"
+          }
+        }
+      },
       "evaluate-policy-request": {
         "title": "EvaluatePolicyRequest",
         "description": "One dry run of an operation's policy. `operation` selects the operation's\ntemplate. `config` is the policy to evaluate, checked exactly as a publish\nchecks it. `input` is what the operation's request carries, in the\noperation's own terms. `facts` states what the operation would look up at\nruntime. The policy catalog lists the fields each operation accepts.\n",
         "oneOf": [
           {
             "$ref": "#/components/schemas/password-set-evaluate-request"
+          },
+          {
+            "$ref": "#/components/schemas/user-create-evaluate-request"
           }
         ],
         "discriminator": {
           "propertyName": "operation",
           "mapping": {
-            "auth.factor.password.set": "#/components/schemas/password-set-evaluate-request"
+            "auth.factor.password.set": "#/components/schemas/password-set-evaluate-request",
+            "user.create": "#/components/schemas/user-create-evaluate-request"
           }
         }
       },
@@ -19970,7 +20856,7 @@
           },
           "code": {
             "type": "string",
-            "description": "The error code an API call of the operation would answer with, set\nonly when it would refuse, for example `user.password_empty` or\n`user.password_policy_violation`.\n"
+            "description": "The error code an API call of the operation would answer with, set\nonly when it would refuse, for example `user.password_empty`,\n`user.password_policy_violation` or, for a sign-up, `flow.proof_invalid`.\n"
           },
           "violations": {
             "type": "object",
@@ -20008,7 +20894,7 @@
       "release-content-hash": {
         "title": "ReleaseContentHash",
         "type": "string",
-        "description": "The content digest of a release: `sha256:` followed by 64 lowercase hex\ncharacters. Always the full digest; no short form is accepted anywhere.\n\nThe digest covers the content of the resources the release pins and\nnothing else. Revision ids, metadata and the project are not part of it.\nA bundle that carries every resource it references therefore has the same\ndigest on every project, and a client can compute it before sending\nanything. When a bundle leaves a referenced resource to the project, the\nrelease pins the project's revision of it too, and the digest covers that\nresource as the project holds it.\n\nTo compute it:\n\n1. Take every resource in the release as the `bundle` of\n   `POST /releases/build` carries it, with `kind` set to `schema`,\n   `flow_definition`, `branding` or `idp`, and `handle` set to the\n   schema's `objectType`, the flow definition's `name`, `default` for\n   branding, or the identity provider's `slug`.\n   A `schema-url` entry's content is the entry as written, and its handle\n   is the `objectType` of the document the URL serves.\n2. Build the JSON document\n   `{\"version\": 1, \"resources\": [{\"kind\": …, \"handle\": …, \"content\": …}, …]}`,\n   with `resources` sorted by `kind`, then by `handle`.\n3. Serialise that document as canonical JSON (RFC 8785).\n4. The digest is the SHA-256 of those bytes, written as `sha256:` and\n   lowercase hex.\n\nA release built from `pointers` has the digest its pinned revisions would\nhave if they were sent as a bundle.\n\nThe digest identifies a release on the wire but never appears in a path,\nwhich takes the `rel_` id. Fields that look a release up by content say\nso by name: the `content_hash` filter of `GET /releases`, and\n`content_hash` in place of `release_id` on `POST /deployments`.\n",
+        "description": "The content digest of a release: `sha256:` followed by 64 lowercase hex\ncharacters. Always the full digest; no short form is accepted anywhere.\n\nThe digest covers the content of the resources the release pins and\nnothing else. Revision ids, metadata and the project are not part of it.\nA bundle that carries every resource it references therefore has the same\ndigest on every project, and a client can compute it before sending\nanything. When a bundle leaves a referenced resource to the project, the\nrelease pins the project's revision of it too, and the digest covers that\nresource as the project holds it.\n\nTo compute it:\n\n1. Take every resource in the release as the `bundle` of\n   `POST /releases/build` carries it, with `kind` set to `schema`,\n   `flow_definition`, `branding`, `idp` or `oauth`, and `handle` set to the\n   schema's `objectType`, the flow definition's `name`, `default` for\n   branding and oauth, or the identity provider's `slug`.\n   A `schema-url` entry's content is the entry as written, and its handle\n   is the `objectType` of the document the URL serves.\n2. Build the JSON document\n   `{\"version\": 1, \"resources\": [{\"kind\": …, \"handle\": …, \"content\": …}, …]}`,\n   with `resources` sorted by `kind`, then by `handle`.\n3. Serialise that document as canonical JSON (RFC 8785).\n4. The digest is the SHA-256 of those bytes, written as `sha256:` and\n   lowercase hex.\n\nA release built from `pointers` has the digest its pinned revisions would\nhave if they were sent as a bundle.\n\nThe digest identifies a release on the wire but never appears in a path,\nwhich takes the `rel_` id. Fields that look a release up by content say\nso by name: the `content_hash` filter of `GET /releases`, and\n`content_hash` in place of `release_id` on `POST /deployments`.\n",
         "pattern": "^sha256:[0-9a-f]{64}$",
         "x-zitadel-pattern-message": "must be sha256: followed by 64 lowercase hex digits",
         "minLength": 71,
@@ -20202,7 +21088,8 @@
           "flow_definition",
           "branding",
           "idp",
-          "policy"
+          "policy",
+          "oauth"
         ],
         "example": "schema"
       },
@@ -20377,7 +21264,7 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 256,
-            "description": "Which resource this pointer pins, independent of which revision of it.\n`revision_id` chooses the revision, and `handle` says what the revision\nis a revision *of*. The server determines it when the release is\nassembled; the caller does not supply it:\n\n- `schema` — the document's `objectType`, so `human-user` and\n  `machine-user` are separate resources a release pins separately\n- `flow_definition` — the definition's `name`, likewise for\n  `default-login` and `b2b-login`\n- `branding` — always `default`. A project has one branding, so there is\n  nothing to distinguish. It is revisioned like everything else, and\n  `revision_id` is what varies between releases.\n- `idp` — the connection's `slug`, so `google` and `github` are\n  separate resources a release pins separately\n- `policy` — the policy's `operation`, so a project's password policy\n  is one resource however often it is revised\n\nResources inside a release reference each other by handle, not by\nrevision ID. The same handle therefore names the same resource in every\nrelease.\n",
+            "description": "Which resource this pointer pins, independent of which revision of it.\n`revision_id` chooses the revision, and `handle` says what the revision\nis a revision *of*. The server determines it when the release is\nassembled; the caller does not supply it:\n\n- `schema` — the document's `objectType`, so `human-user` and\n  `machine-user` are separate resources a release pins separately\n- `flow_definition` — the definition's `name`, likewise for\n  `default-login` and `b2b-login`\n- `branding` — always `default`. A project has one branding, so there is\n  nothing to distinguish. It is revisioned like everything else, and\n  `revision_id` is what varies between releases.\n- `oauth` — always `default`, likewise: a project has one set of OAuth\n  settings, and `revision_id` is what varies between releases.\n- `idp` — the connection's `slug`, so `google` and `github` are\n  separate resources a release pins separately\n- `policy` — the policy's `operation`, so a project's password policy\n  is one resource however often it is revised\n\nResources inside a release reference each other by handle, not by\nrevision ID. The same handle therefore names the same resource in every\nrelease.\n",
             "example": "human-user"
           },
           "revision_id": {
@@ -20450,7 +21337,7 @@
       "configuration-bundle": {
         "title": "ConfigurationBundle",
         "type": "object",
-        "description": "The resources of a project's `.zitadel/` directory as authored on disk,\ngrouped by kind.\n\nResources reference each other by handle. A flow definition's\n`user_schema` names a schema by its `objectType`. A flow step's\n`sso_providers`, like a schema's `x-auth-methods.sso.providers`, name\nidentity provider (IdP) connections by `slug`. A reference resolves to the\nresource with that handle in this bundle. Failing that, it resolves to the\nproject's newest revision of it, which the release then pins as well. A\nhandle that neither holds refuses the release, naming the pointer and the\nhandle. A bundle that references only resources it carries builds the same\nrelease on any project.\n\nA handle names one resource of its kind in a bundle. The server refuses the\nrelease with `rel.invalid`, with an entry for each such resource, when the\nbundle holds:\n- two schemas with the same `objectType`;\n- two flow definitions with the same `name`;\n- two IdP connections with the same `slug`;\n- two policies for the same `operation`;\n- a schema without an `objectType`.\n\nEach kind is optional, and the arrays may be empty: a project that never\nejected its branding omits `branding`. The bundle carries at least one\nresource. The release it builds pins at most 50 resources, which counts the\nresources the bundle carries plus those resolved from the project. The\nserver refuses anything outside that with `rel.invalid`. Unknown keys are\nrefused.\n",
+        "description": "The resources of a project's `.zitadel/` directory as authored on disk,\ngrouped by kind.\n\nResources reference each other by handle. A flow definition's\n`user_schema` names a schema by its `objectType`. A flow step's\n`sso_providers`, like a schema's `x-auth-methods.sso.providers`, name\nidentity provider (IdP) connections by `slug`. A reference resolves to the\nresource with that handle in this bundle. Failing that, it resolves to the\nproject's newest revision of it, which the release then pins as well. A\nhandle that neither holds refuses the release, naming the pointer and the\nhandle. A bundle that references only resources it carries builds the same\nrelease on any project.\n\nA handle names one resource of its kind in a bundle. The server refuses the\nrelease with `rel.invalid`, with an entry for each such resource, when the\nbundle holds:\n- two schemas with the same `objectType`;\n- two flow definitions with the same `name`;\n- two IdP connections with the same `slug`;\n- two policies for the same `operation`;\n- a schema without an `objectType`.\n\nEach kind is optional, and the arrays may be empty: a project that never\nejected its branding omits `branding`, and one that never turned on its\nOAuth authorization server omits `oauth`. `branding` and `oauth` are\nsingle objects, because a project has one of each. The bundle carries at\nleast one resource. The release it builds pins at most 50 resources, which\ncounts the resources the bundle carries plus those resolved from the\nproject. The server refuses anything outside that with `rel.invalid`.\nUnknown keys are refused.\n",
         "additionalProperties": false,
         "properties": {
           "schemas": {
@@ -20502,6 +21389,10 @@
           "branding": {
             "$ref": "#/components/schemas/branding",
             "description": "The descriptor from `.zitadel/branding/branding.json` with its template\ninlined, exactly as `POST /branding` takes it. A project has one\nbranding, so this is a single object.\n"
+          },
+          "oauth": {
+            "$ref": "#/components/schemas/oauth-settings",
+            "description": "The project's OAuth settings. A project has one set of them, so this is\na single object, and the release is its only writer: there is no\nper-kind create endpoint. Omit it to leave the project's OAuth\nauthorization server off.\n"
           }
         }
       },
@@ -20556,7 +21447,7 @@
               "index": {
                 "type": "integer",
                 "minimum": 0,
-                "description": "The resource's position in its kind's array in the bundle; `0` for the branding."
+                "description": "The resource's position in its kind's array in the bundle; `0` for the branding and for the OAuth settings, which are single objects."
               },
               "handle": {
                 "type": "string",
@@ -20619,6 +21510,16 @@
         "x-zitadel-pattern-message": "must be a deployment ID: dep_ followed by letters, digits, _ or -",
         "example": "dep_01KX4SB9C8E1F0N9WD3P2E4YM5"
       },
+      "deployment-kind": {
+        "title": "DeploymentKind",
+        "type": "string",
+        "description": "`primary` for the project's primary origins, `preview` for preview URLs.\n",
+        "enum": [
+          "primary",
+          "preview"
+        ],
+        "example": "primary"
+      },
       "revoke-release-conflict": {
         "title": "RevokeReleaseConflict",
         "type": "object",
@@ -20650,7 +21551,8 @@
                   "type": "object",
                   "required": [
                     "origin",
-                    "deployment_id"
+                    "deployment_id",
+                    "kind"
                   ],
                   "properties": {
                     "origin": {
@@ -20659,6 +21561,10 @@
                     "deployment_id": {
                       "$ref": "#/components/schemas/deployment-id",
                       "description": "The newest deployment to the origin, which pins the release."
+                    },
+                    "kind": {
+                      "$ref": "#/components/schemas/deployment-kind",
+                      "description": "Whether the origin serves the release as a primary origin or as\na preview. A deploy or a rollback frees a primary origin;\nremoving the preview frees a preview.\n"
                     }
                   }
                 }
@@ -21102,7 +22008,7 @@
           "rejected",
           "expired"
         ],
-        "description": "Lifecycle status of the invitation. `expired` is derived on read from\n`expires_at`; `accepted` and `rejected` are final. Cancel and replace of a\npending invitation delete the row rather than leaving a cancelled status.\n"
+        "description": "Lifecycle status of the invitation. `expired` is derived on read from\n`expires_at`; `accepted` and `rejected` are final. Cancel and replace delete\nthe row rather than leaving a cancelled status.\n"
       },
       "inv-not_found": {
         "description": "Invitation not found\n\nError code: inv.not_found\n",
@@ -21153,7 +22059,7 @@
       },
       "invitation-metadata": {
         "title": "InvitationMetadata",
-        "description": "What the administrator entered at creation, so other administrators know who\nthe link is for. It is only displayed, never matched. Null once the\ninvitation is accepted or declined. Cancel and replace of a pending\ninvitation delete the row, so the metadata goes with it.\n",
+        "description": "What the administrator entered at creation, so other administrators know who\nthe link is for. It is only displayed, never matched. Null once the\ninvitation is accepted or declined. Cancel deletes the row with it; replace\nmoves it to the new invitation unless that sends its own.\n",
         "type": "object",
         "required": [
           "name"
@@ -21207,7 +22113,7 @@
             "$ref": "#/components/schemas/project-id"
           },
           "metadata": {
-            "description": "Who the administrator said the link is for. Null after accept or decline.\nCancel and replace of a pending invitation delete the row.\n",
+            "description": "Who the administrator said the link is for. Null after accept or decline.\nCancel and replace delete the row.\n",
             "oneOf": [
               {
                 "$ref": "#/components/schemas/invitation-metadata"
@@ -21429,7 +22335,7 @@
             "$ref": "#/components/schemas/invitation-metadata"
           },
           "replaces_invitation_id": {
-            "description": "When set, this create replaces that invitation: the new invitation keeps\nthe original's `journey_id`, and a pending original is deleted in the\nsame transaction. Use the `id` that `createInvitation`\n(`POST /invitations`) or `listInvitations` (`GET /invitations`) returns.\n",
+            "description": "When set, this create replaces that invitation: the new invitation keeps\nthe original's `journey_id` and, without `metadata` of its own, the\noriginal's metadata. The original is deleted in the same transaction. An\naccepted invitation cannot be replaced. Use the `id` that\n`createInvitation` (`POST /invitations`) or `listInvitations`\n(`GET /invitations`) returns.\n",
             "$ref": "#/components/schemas/invitation-id"
           }
         }
@@ -21602,7 +22508,6 @@
             "properties": {
               "link": {
                 "type": "string",
-                "format": "uri",
                 "description": "The browser URL to share. It carries the redeem token in the fragment.\nOnly this create or replace response returns it.\n",
                 "example": "https://console.example.com/invitations/accept#token=dGhpc2lzYXRva2Vu"
               }
@@ -21625,7 +22530,6 @@
             "properties": {
               "link": {
                 "type": "string",
-                "format": "uri",
                 "description": "The browser URL to share. It carries the redeem token in the fragment.\nOnly this create or replace response returns it.\n"
               }
             }
@@ -22063,6 +22967,83 @@
             "$ref": "#/components/schemas/event-metadata"
           }
         }
+      },
+      "application-payload": {
+        "title": "ApplicationPayload",
+        "type": "object",
+        "description": "Payload for `application.created`, which holds every field, and\n`application.updated`, which holds the new `revision_id`, `name` when it\nchanged, and `client_ids` when the revision added a client. The application\nID is the event's `entity_id`. The application document and the client\nsecrets are never included.\n",
+        "required": [
+          "revision_id"
+        ],
+        "properties": {
+          "slug": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "client_ids": {
+            "type": "array",
+            "description": "The `client_id` of each client the write created. Each of them got a new\nsecret.\n",
+            "items": {
+              "type": "string"
+            }
+          },
+          "revision_id": {
+            "type": "string",
+            "description": "The revision the write appended."
+          }
+        }
+      },
+      "application-created-event": {
+        "title": "ApplicationCreatedEvent",
+        "description": "An event of type application.created, with the shared event fields and its own payload.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/event-base"
+          },
+          {
+            "type": "object",
+            "required": [
+              "event_type",
+              "payload"
+            ],
+            "properties": {
+              "event_type": {
+                "type": "string",
+                "const": "application.created"
+              },
+              "payload": {
+                "$ref": "#/components/schemas/application-payload"
+              }
+            }
+          }
+        ]
+      },
+      "application-updated-event": {
+        "title": "ApplicationUpdatedEvent",
+        "description": "An event of type application.updated, with the shared event fields and its own payload.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/event-base"
+          },
+          {
+            "type": "object",
+            "required": [
+              "event_type",
+              "payload"
+            ],
+            "properties": {
+              "event_type": {
+                "type": "string",
+                "const": "application.updated"
+              },
+              "payload": {
+                "$ref": "#/components/schemas/application-payload"
+              }
+            }
+          }
+        ]
       },
       "empty-event-payload": {
         "title": "EmptyEventPayload",
@@ -22554,6 +23535,56 @@
           }
         ]
       },
+      "flow-signup_challenge-consumed-event": {
+        "title": "FlowSignupChallengeConsumedEvent",
+        "description": "An event of type flow.signup_challenge.consumed, with the shared event fields and its own payload.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/event-base"
+          },
+          {
+            "type": "object",
+            "required": [
+              "event_type",
+              "payload"
+            ],
+            "properties": {
+              "event_type": {
+                "type": "string",
+                "const": "flow.signup_challenge.consumed"
+              },
+              "payload": {
+                "$ref": "#/components/schemas/empty-event-payload"
+              }
+            }
+          }
+        ]
+      },
+      "flow-signup_challenge-issued-event": {
+        "title": "FlowSignupChallengeIssuedEvent",
+        "description": "An event of type flow.signup_challenge.issued, with the shared event fields and its own payload.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/event-base"
+          },
+          {
+            "type": "object",
+            "required": [
+              "event_type",
+              "payload"
+            ],
+            "properties": {
+              "event_type": {
+                "type": "string",
+                "const": "flow.signup_challenge.issued"
+              },
+              "payload": {
+                "$ref": "#/components/schemas/empty-event-payload"
+              }
+            }
+          }
+        ]
+      },
       "flowdef-payload": {
         "title": "FlowdefPayload",
         "type": "object",
@@ -22784,6 +23815,377 @@
               },
               "payload": {
                 "$ref": "#/components/schemas/idp-payload"
+              }
+            }
+          }
+        ]
+      },
+      "invitation-accepted-common-payload": {
+        "title": "InvitationAcceptedCommonPayload",
+        "description": "Fields every `invitation.accepted` payload carries, whatever its `type`.\n",
+        "type": "object",
+        "required": [
+          "journey_id",
+          "user_id"
+        ],
+        "properties": {
+          "journey_id": {
+            "type": "string",
+            "description": "Shared by an invitation and every invitation that replaces it."
+          },
+          "user_id": {
+            "type": "string"
+          }
+        }
+      },
+      "invitation-accepted-project-member-payload": {
+        "title": "InvitationAcceptedProjectMemberPayload",
+        "description": "An `invitation.accepted` payload for a `project_member` invitation.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/invitation-accepted-common-payload"
+          },
+          {
+            "type": "object",
+            "required": [
+              "type",
+              "project_member"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "project_member"
+                ]
+              },
+              "project_member": {
+                "$ref": "#/components/schemas/invitation-project-member-payload"
+              }
+            }
+          }
+        ]
+      },
+      "invitation-accepted-team-member-payload": {
+        "title": "InvitationAcceptedTeamMemberPayload",
+        "description": "An `invitation.accepted` payload for a `team_member` invitation.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/invitation-accepted-common-payload"
+          },
+          {
+            "type": "object",
+            "required": [
+              "type",
+              "team_member"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "team_member"
+                ]
+              },
+              "team_member": {
+                "$ref": "#/components/schemas/invitation-team-member-payload"
+              }
+            }
+          }
+        ]
+      },
+      "invitation-accepted-payload": {
+        "title": "InvitationAcceptedPayload",
+        "description": "Payload for `invitation.accepted`. The invitation ID is the event's\n`entity_id`, and `user_id` is the user who redeemed the link. Discriminate\non `type`; the object named after it says what the invitation granted. Grant\nevents the acceptance writes, such as `authz.granted`, carry this event's\n`request_id`. There are none when the user already holds an identical\nactive grant.\n",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/invitation-accepted-project-member-payload"
+          },
+          {
+            "$ref": "#/components/schemas/invitation-accepted-team-member-payload"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "project_member": "#/components/schemas/invitation-accepted-project-member-payload",
+            "team_member": "#/components/schemas/invitation-accepted-team-member-payload"
+          }
+        }
+      },
+      "invitation-accepted-event": {
+        "title": "InvitationAcceptedEvent",
+        "description": "An event of type invitation.accepted, with the shared event fields and its own payload.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/event-base"
+          },
+          {
+            "type": "object",
+            "required": [
+              "event_type",
+              "payload"
+            ],
+            "properties": {
+              "event_type": {
+                "type": "string",
+                "const": "invitation.accepted"
+              },
+              "payload": {
+                "$ref": "#/components/schemas/invitation-accepted-payload"
+              }
+            }
+          }
+        ]
+      },
+      "invitation-cancelled-by-administrator-payload": {
+        "title": "InvitationCancelledByAdministratorPayload",
+        "description": "An `invitation.cancelled` payload for an invitation an administrator\ncancelled.\n",
+        "type": "object",
+        "required": [
+          "journey_id",
+          "reason"
+        ],
+        "properties": {
+          "journey_id": {
+            "type": "string",
+            "description": "Shared by an invitation and every invitation that replaces it."
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "cancelled"
+            ]
+          }
+        }
+      },
+      "invitation-cancelled-by-replacement-payload": {
+        "title": "InvitationCancelledByReplacementPayload",
+        "description": "An `invitation.cancelled` payload for an invitation a replacement\ncancelled.\n",
+        "type": "object",
+        "required": [
+          "journey_id",
+          "reason",
+          "replaced_by_invitation_id"
+        ],
+        "properties": {
+          "journey_id": {
+            "type": "string",
+            "description": "Shared by an invitation and every invitation that replaces it."
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "replaced"
+            ]
+          },
+          "replaced_by_invitation_id": {
+            "type": "string",
+            "description": "The invitation that replaced this one."
+          }
+        }
+      },
+      "invitation-cancelled-payload": {
+        "title": "InvitationCancelledPayload",
+        "description": "Payload for `invitation.cancelled`. The invitation ID is the event's\n`entity_id`. Discriminate on `reason`: `cancelled` when an administrator\ncancelled it, `replaced` when a replacement cancelled it, which then names\nthe replacement in `replaced_by_invitation_id`.\n",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/invitation-cancelled-by-administrator-payload"
+          },
+          {
+            "$ref": "#/components/schemas/invitation-cancelled-by-replacement-payload"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "reason",
+          "mapping": {
+            "cancelled": "#/components/schemas/invitation-cancelled-by-administrator-payload",
+            "replaced": "#/components/schemas/invitation-cancelled-by-replacement-payload"
+          }
+        }
+      },
+      "invitation-cancelled-event": {
+        "title": "InvitationCancelledEvent",
+        "description": "An event of type invitation.cancelled, with the shared event fields and its own payload.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/event-base"
+          },
+          {
+            "type": "object",
+            "required": [
+              "event_type",
+              "payload"
+            ],
+            "properties": {
+              "event_type": {
+                "type": "string",
+                "const": "invitation.cancelled"
+              },
+              "payload": {
+                "$ref": "#/components/schemas/invitation-cancelled-payload"
+              }
+            }
+          }
+        ]
+      },
+      "invitation-created-common-payload": {
+        "title": "InvitationCreatedCommonPayload",
+        "description": "Fields every `invitation.created` payload carries, whatever its `type`.\n",
+        "type": "object",
+        "required": [
+          "journey_id",
+          "expires_at"
+        ],
+        "properties": {
+          "journey_id": {
+            "type": "string",
+            "description": "Shared by an invitation and every invitation that replaces it."
+          },
+          "replaces_invitation_id": {
+            "type": "string",
+            "description": "The invitation this one replaces, when it was created as a replacement."
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "invitation-created-project-member-payload": {
+        "title": "InvitationCreatedProjectMemberPayload",
+        "description": "An `invitation.created` payload for a `project_member` invitation.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/invitation-created-common-payload"
+          },
+          {
+            "type": "object",
+            "required": [
+              "type",
+              "project_member"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "project_member"
+                ]
+              },
+              "project_member": {
+                "$ref": "#/components/schemas/invitation-project-member-payload"
+              }
+            }
+          }
+        ]
+      },
+      "invitation-created-team-member-payload": {
+        "title": "InvitationCreatedTeamMemberPayload",
+        "description": "An `invitation.created` payload for a `team_member` invitation.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/invitation-created-common-payload"
+          },
+          {
+            "type": "object",
+            "required": [
+              "type",
+              "team_member"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "team_member"
+                ]
+              },
+              "team_member": {
+                "$ref": "#/components/schemas/invitation-team-member-payload"
+              }
+            }
+          }
+        ]
+      },
+      "invitation-created-payload": {
+        "title": "InvitationCreatedPayload",
+        "description": "Payload for `invitation.created`. The invitation ID is the event's\n`entity_id`. Discriminate on `type`; the object named after it says what\nthe invitation's link grants. The metadata entered at creation and the\nlink's token never appear.\n",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/invitation-created-project-member-payload"
+          },
+          {
+            "$ref": "#/components/schemas/invitation-created-team-member-payload"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "project_member": "#/components/schemas/invitation-created-project-member-payload",
+            "team_member": "#/components/schemas/invitation-created-team-member-payload"
+          }
+        }
+      },
+      "invitation-created-event": {
+        "title": "InvitationCreatedEvent",
+        "description": "An event of type invitation.created, with the shared event fields and its own payload.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/event-base"
+          },
+          {
+            "type": "object",
+            "required": [
+              "event_type",
+              "payload"
+            ],
+            "properties": {
+              "event_type": {
+                "type": "string",
+                "const": "invitation.created"
+              },
+              "payload": {
+                "$ref": "#/components/schemas/invitation-created-payload"
+              }
+            }
+          }
+        ]
+      },
+      "invitation-rejected-payload": {
+        "title": "InvitationRejectedPayload",
+        "type": "object",
+        "description": "Payload for `invitation.rejected`. The invitation ID is the event's\n`entity_id`, and `user_id` is the user who declined it.\n",
+        "required": [
+          "journey_id",
+          "user_id"
+        ],
+        "properties": {
+          "journey_id": {
+            "type": "string",
+            "description": "Shared by an invitation and every invitation that replaces it."
+          },
+          "user_id": {
+            "type": "string"
+          }
+        }
+      },
+      "invitation-rejected-event": {
+        "title": "InvitationRejectedEvent",
+        "description": "An event of type invitation.rejected, with the shared event fields and its own payload.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/event-base"
+          },
+          {
+            "type": "object",
+            "required": [
+              "event_type",
+              "payload"
+            ],
+            "properties": {
+              "event_type": {
+                "type": "string",
+                "const": "invitation.rejected"
+              },
+              "payload": {
+                "$ref": "#/components/schemas/invitation-rejected-payload"
               }
             }
           }
@@ -23650,6 +25052,12 @@
         "description": "An event of any type. Read event_type to tell which type it is; each type\ncarries its own typed payload.\n",
         "oneOf": [
           {
+            "$ref": "#/components/schemas/application-created-event"
+          },
+          {
+            "$ref": "#/components/schemas/application-updated-event"
+          },
+          {
             "$ref": "#/components/schemas/auth-attempt-created-event"
           },
           {
@@ -23695,6 +25103,12 @@
             "$ref": "#/components/schemas/deployment-created-event"
           },
           {
+            "$ref": "#/components/schemas/flow-signup_challenge-consumed-event"
+          },
+          {
+            "$ref": "#/components/schemas/flow-signup_challenge-issued-event"
+          },
+          {
             "$ref": "#/components/schemas/flowdef-created-event"
           },
           {
@@ -23711,6 +25125,18 @@
           },
           {
             "$ref": "#/components/schemas/idp-updated-event"
+          },
+          {
+            "$ref": "#/components/schemas/invitation-accepted-event"
+          },
+          {
+            "$ref": "#/components/schemas/invitation-cancelled-event"
+          },
+          {
+            "$ref": "#/components/schemas/invitation-created-event"
+          },
+          {
+            "$ref": "#/components/schemas/invitation-rejected-event"
           },
           {
             "$ref": "#/components/schemas/origin-added-event"
@@ -23785,6 +25211,8 @@
         "discriminator": {
           "propertyName": "event_type",
           "mapping": {
+            "application.created": "#/components/schemas/application-created-event",
+            "application.updated": "#/components/schemas/application-updated-event",
             "auth.attempt.created": "#/components/schemas/auth-attempt-created-event",
             "auth.attempt.handed_off": "#/components/schemas/auth-attempt-handed_off-event",
             "auth.check.failed": "#/components/schemas/auth-check-failed-event",
@@ -23800,12 +25228,18 @@
             "authz.revoked": "#/components/schemas/authz-revoked-event",
             "branding.created": "#/components/schemas/branding-created-event",
             "deployment.created": "#/components/schemas/deployment-created-event",
+            "flow.signup_challenge.consumed": "#/components/schemas/flow-signup_challenge-consumed-event",
+            "flow.signup_challenge.issued": "#/components/schemas/flow-signup_challenge-issued-event",
             "flowdef.created": "#/components/schemas/flowdef-created-event",
             "flowdef.deleted": "#/components/schemas/flowdef-deleted-event",
             "flowdef.updated": "#/components/schemas/flowdef-updated-event",
             "idp.created": "#/components/schemas/idp-created-event",
             "idp.identity_link.created": "#/components/schemas/idp-identity_link-created-event",
             "idp.updated": "#/components/schemas/idp-updated-event",
+            "invitation.accepted": "#/components/schemas/invitation-accepted-event",
+            "invitation.cancelled": "#/components/schemas/invitation-cancelled-event",
+            "invitation.created": "#/components/schemas/invitation-created-event",
+            "invitation.rejected": "#/components/schemas/invitation-rejected-event",
             "origin.added": "#/components/schemas/origin-added-event",
             "origin.removed": "#/components/schemas/origin-removed-event",
             "policy.created": "#/components/schemas/policy-created-event",
@@ -24142,16 +25576,6 @@
         "enum": [
           "release"
         ]
-      },
-      "deployment-kind": {
-        "title": "DeploymentKind",
-        "type": "string",
-        "description": "`primary` for the project's primary origins, `preview` for preview URLs.\n",
-        "enum": [
-          "primary",
-          "preview"
-        ],
-        "example": "primary"
       },
       "deployment-target": {
         "title": "DeploymentTarget",
@@ -24842,6 +26266,13 @@
           "message": "The password must not be empty."
         }
       },
+      "user-password_hashing_busy": {
+        "summary": "user.password_hashing_busy",
+        "value": {
+          "code": "user.password_hashing_busy",
+          "message": "The server is hashing too many passwords right now. Try again in a moment."
+        }
+      },
       "user-password_policy_violation": {
         "summary": "user.password_policy_violation",
         "value": {
@@ -25024,6 +26455,13 @@
           "message": "flow not found"
         }
       },
+      "flow-rate_limited": {
+        "summary": "flow.rate_limited",
+        "value": {
+          "code": "flow.rate_limited",
+          "message": "signup request limit reached; retry after one minute"
+        }
+      },
       "flow-restart_required": {
         "summary": "flow.restart_required",
         "value": {
@@ -25078,6 +26516,13 @@
         "value": {
           "code": "idp.scopes_missing_openid",
           "message": "identity provider connection: OIDC scopes must contain openid"
+        }
+      },
+      "flow-proof_invalid": {
+        "summary": "flow.proof_invalid",
+        "value": {
+          "code": "flow.proof_invalid",
+          "message": "signup proof is missing, invalid, expired or already used; refresh the step"
         }
       },
       "proj-mismatch": {
@@ -25416,11 +26861,11 @@
           "message": "the team still owns a project and cannot be deactivated while it does"
         }
       },
-      "idp-permission_denied": {
-        "summary": "idp.permission_denied",
+      "sess-token_invalid": {
+        "summary": "sess.token_invalid",
         "value": {
-          "code": "idp.permission_denied",
-          "message": "identity provider connection: the caller's project role does not allow this operation"
+          "code": "sess.token_invalid",
+          "message": "The session token is invalid (either malformed or expired)."
         }
       },
       "brnd-not_found": {
@@ -25458,11 +26903,60 @@
           "message": "identity provider connection: the field is fixed for the life of the connection"
         }
       },
+      "idp-permission_denied": {
+        "summary": "idp.permission_denied",
+        "value": {
+          "code": "idp.permission_denied",
+          "message": "identity provider connection: the caller's project role does not allow this operation"
+        }
+      },
       "idp-revision_conflict": {
         "summary": "idp.revision_conflict",
         "value": {
           "code": "idp.revision_conflict",
           "message": "identity provider connection: another revision of the same connection was created at the same instant"
+        }
+      },
+      "app-client_id_taken": {
+        "summary": "app.client_id_taken",
+        "value": {
+          "code": "app.client_id_taken",
+          "message": "application: another client of the project holds this client_id"
+        }
+      },
+      "app-field_immutable": {
+        "summary": "app.field_immutable",
+        "value": {
+          "code": "app.field_immutable",
+          "message": "application: a revision may not change a client's client_id or remove a client"
+        }
+      },
+      "app-invalid": {
+        "summary": "app.invalid",
+        "value": {
+          "code": "app.invalid",
+          "message": "application: invalid"
+        }
+      },
+      "app-not_found": {
+        "summary": "app.not_found",
+        "value": {
+          "code": "app.not_found",
+          "message": "application: not found"
+        }
+      },
+      "app-permission_denied": {
+        "summary": "app.permission_denied",
+        "value": {
+          "code": "app.permission_denied",
+          "message": "application: the caller's project role does not allow this operation"
+        }
+      },
+      "app-revision_conflict": {
+        "summary": "app.revision_conflict",
+        "value": {
+          "code": "app.revision_conflict",
+          "message": "application: another revision of the same application was created at the same instant"
         }
       },
       "pol-not_found": {
@@ -26507,6 +28001,9 @@
                   "$ref": "#/components/schemas/user-password_empty"
                 },
                 {
+                  "$ref": "#/components/schemas/user-password_hashing_busy"
+                },
+                {
                   "$ref": "#/components/schemas/user-password_policy_violation"
                 },
                 {
@@ -26535,6 +28032,7 @@
                   "user.invalid": "#/components/schemas/user-invalid",
                   "user.not_found": "#/components/schemas/user-not_found",
                   "user.password_empty": "#/components/schemas/user-password_empty",
+                  "user.password_hashing_busy": "#/components/schemas/user-password_hashing_busy",
                   "user.password_policy_violation": "#/components/schemas/user-password_policy_violation",
                   "user.password_too_long": "#/components/schemas/user-password_too_long",
                   "user.permission_denied": "#/components/schemas/user-permission_denied"
@@ -26589,6 +28087,9 @@
               },
               "user.password_empty": {
                 "$ref": "#/components/examples/user-password_empty"
+              },
+              "user.password_hashing_busy": {
+                "$ref": "#/components/examples/user-password_hashing_busy"
               },
               "user.password_policy_violation": {
                 "$ref": "#/components/examples/user-password_policy_violation"
@@ -26728,6 +28229,9 @@
                   "$ref": "#/components/schemas/user-password_empty"
                 },
                 {
+                  "$ref": "#/components/schemas/user-password_hashing_busy"
+                },
+                {
                   "$ref": "#/components/schemas/user-password_policy_violation"
                 },
                 {
@@ -26757,6 +28261,7 @@
                   "user.invalid": "#/components/schemas/user-invalid",
                   "user.not_found": "#/components/schemas/user-not_found",
                   "user.password_empty": "#/components/schemas/user-password_empty",
+                  "user.password_hashing_busy": "#/components/schemas/user-password_hashing_busy",
                   "user.password_policy_violation": "#/components/schemas/user-password_policy_violation",
                   "user.password_too_long": "#/components/schemas/user-password_too_long",
                   "user.permission_denied": "#/components/schemas/user-permission_denied"
@@ -26814,6 +28319,9 @@
               },
               "user.password_empty": {
                 "$ref": "#/components/examples/user-password_empty"
+              },
+              "user.password_hashing_busy": {
+                "$ref": "#/components/examples/user-password_hashing_busy"
               },
               "user.password_policy_violation": {
                 "$ref": "#/components/examples/user-password_policy_violation"
@@ -27690,6 +29198,9 @@
                   "$ref": "#/components/schemas/flow-not_found"
                 },
                 {
+                  "$ref": "#/components/schemas/flow-rate_limited"
+                },
+                {
                   "$ref": "#/components/schemas/flow-restart_required"
                 },
                 {
@@ -27759,6 +29270,9 @@
                   "$ref": "#/components/schemas/user-password_empty"
                 },
                 {
+                  "$ref": "#/components/schemas/user-password_hashing_busy"
+                },
+                {
                   "$ref": "#/components/schemas/user-password_policy_violation"
                 },
                 {
@@ -27783,6 +29297,7 @@
                   "flow.integrity": "#/components/schemas/flow-integrity",
                   "flow.invalid_action": "#/components/schemas/flow-invalid_action",
                   "flow.not_found": "#/components/schemas/flow-not_found",
+                  "flow.rate_limited": "#/components/schemas/flow-rate_limited",
                   "flow.restart_required": "#/components/schemas/flow-restart_required",
                   "flow.sso_user_schema_mismatch": "#/components/schemas/flow-sso_user_schema_mismatch",
                   "flow.unsupported": "#/components/schemas/flow-unsupported",
@@ -27806,6 +29321,7 @@
                   "user.invalid": "#/components/schemas/user-invalid",
                   "user.not_found": "#/components/schemas/user-not_found",
                   "user.password_empty": "#/components/schemas/user-password_empty",
+                  "user.password_hashing_busy": "#/components/schemas/user-password_hashing_busy",
                   "user.password_policy_violation": "#/components/schemas/user-password_policy_violation",
                   "user.password_too_long": "#/components/schemas/user-password_too_long"
                 }
@@ -27856,6 +29372,9 @@
               },
               "flow.not_found": {
                 "$ref": "#/components/examples/flow-not_found"
+              },
+              "flow.rate_limited": {
+                "$ref": "#/components/examples/flow-rate_limited"
               },
               "flow.restart_required": {
                 "$ref": "#/components/examples/flow-restart_required"
@@ -27926,6 +29445,9 @@
               "user.password_empty": {
                 "$ref": "#/components/examples/user-password_empty"
               },
+              "user.password_hashing_busy": {
+                "$ref": "#/components/examples/user-password_hashing_busy"
+              },
               "user.password_policy_violation": {
                 "$ref": "#/components/examples/user-password_policy_violation"
               },
@@ -27989,6 +29511,12 @@
                 },
                 {
                   "$ref": "#/components/schemas/flow-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/flow-proof_invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/flow-rate_limited"
                 },
                 {
                   "$ref": "#/components/schemas/flow-restart_required"
@@ -28063,6 +29591,9 @@
                   "$ref": "#/components/schemas/user-password_empty"
                 },
                 {
+                  "$ref": "#/components/schemas/user-password_hashing_busy"
+                },
+                {
                   "$ref": "#/components/schemas/user-password_policy_violation"
                 },
                 {
@@ -28088,6 +29619,8 @@
                   "flow.integrity": "#/components/schemas/flow-integrity",
                   "flow.invalid_action": "#/components/schemas/flow-invalid_action",
                   "flow.not_found": "#/components/schemas/flow-not_found",
+                  "flow.proof_invalid": "#/components/schemas/flow-proof_invalid",
+                  "flow.rate_limited": "#/components/schemas/flow-rate_limited",
                   "flow.restart_required": "#/components/schemas/flow-restart_required",
                   "flow.sso_user_schema_mismatch": "#/components/schemas/flow-sso_user_schema_mismatch",
                   "flow.unsupported": "#/components/schemas/flow-unsupported",
@@ -28112,6 +29645,7 @@
                   "user.invalid": "#/components/schemas/user-invalid",
                   "user.not_found": "#/components/schemas/user-not_found",
                   "user.password_empty": "#/components/schemas/user-password_empty",
+                  "user.password_hashing_busy": "#/components/schemas/user-password_hashing_busy",
                   "user.password_policy_violation": "#/components/schemas/user-password_policy_violation",
                   "user.password_too_long": "#/components/schemas/user-password_too_long"
                 }
@@ -28165,6 +29699,12 @@
               },
               "flow.not_found": {
                 "$ref": "#/components/examples/flow-not_found"
+              },
+              "flow.proof_invalid": {
+                "$ref": "#/components/examples/flow-proof_invalid"
+              },
+              "flow.rate_limited": {
+                "$ref": "#/components/examples/flow-rate_limited"
               },
               "flow.restart_required": {
                 "$ref": "#/components/examples/flow-restart_required"
@@ -28237,6 +29777,9 @@
               },
               "user.password_empty": {
                 "$ref": "#/components/examples/user-password_empty"
+              },
+              "user.password_hashing_busy": {
+                "$ref": "#/components/examples/user-password_hashing_busy"
               },
               "user.password_policy_violation": {
                 "$ref": "#/components/examples/user-password_policy_violation"
@@ -28584,6 +30127,9 @@
                   "$ref": "#/components/schemas/user-password_empty"
                 },
                 {
+                  "$ref": "#/components/schemas/user-password_hashing_busy"
+                },
+                {
                   "$ref": "#/components/schemas/user-password_policy_violation"
                 },
                 {
@@ -28610,6 +30156,7 @@
                   "user.invalid": "#/components/schemas/user-invalid",
                   "user.not_found": "#/components/schemas/user-not_found",
                   "user.password_empty": "#/components/schemas/user-password_empty",
+                  "user.password_hashing_busy": "#/components/schemas/user-password_hashing_busy",
                   "user.password_policy_violation": "#/components/schemas/user-password_policy_violation",
                   "user.password_too_long": "#/components/schemas/user-password_too_long"
                 }
@@ -28666,6 +30213,9 @@
               },
               "user.password_empty": {
                 "$ref": "#/components/examples/user-password_empty"
+              },
+              "user.password_hashing_busy": {
+                "$ref": "#/components/examples/user-password_hashing_busy"
               },
               "user.password_policy_violation": {
                 "$ref": "#/components/examples/user-password_policy_violation"
@@ -31583,25 +33133,7 @@
                   "$ref": "#/components/schemas/flowdef-invalid"
                 },
                 {
-                  "$ref": "#/components/schemas/flowdef-not_found"
-                },
-                {
-                  "$ref": "#/components/schemas/flowdef-permission_denied"
-                },
-                {
-                  "$ref": "#/components/schemas/idp-not_found"
-                },
-                {
-                  "$ref": "#/components/schemas/idp-permission_denied"
-                },
-                {
                   "$ref": "#/components/schemas/internal"
-                },
-                {
-                  "$ref": "#/components/schemas/sch-not_found"
-                },
-                {
-                  "$ref": "#/components/schemas/sch-permission_denied"
                 },
                 {
                   "$ref": "#/components/schemas/flowdef-missing_project_id"
@@ -31619,22 +33151,16 @@
                   "$ref": "#/components/schemas/req-invalid"
                 },
                 {
-                  "$ref": "#/components/schemas/team-team_not_found"
+                  "$ref": "#/components/schemas/sess-project_mismatch"
                 },
                 {
-                  "$ref": "#/components/schemas/team-permission_denied"
+                  "$ref": "#/components/schemas/sess-token_invalid"
                 },
                 {
                   "$ref": "#/components/schemas/team-project_not_found"
                 },
                 {
                   "$ref": "#/components/schemas/unavailable"
-                },
-                {
-                  "$ref": "#/components/schemas/user-not_found"
-                },
-                {
-                  "$ref": "#/components/schemas/user-permission_denied"
                 }
               ],
               "discriminator": {
@@ -31643,24 +33169,16 @@
                   "auth.csrf_invalid": "#/components/schemas/auth-csrf_invalid",
                   "auth.unauthorized": "#/components/schemas/auth-unauthorized",
                   "flowdef.invalid": "#/components/schemas/flowdef-invalid",
-                  "flowdef.not_found": "#/components/schemas/flowdef-not_found",
-                  "flowdef.permission_denied": "#/components/schemas/flowdef-permission_denied",
-                  "idp.not_found": "#/components/schemas/idp-not_found",
-                  "idp.permission_denied": "#/components/schemas/idp-permission_denied",
                   "internal": "#/components/schemas/internal",
-                  "sch.not_found": "#/components/schemas/sch-not_found",
-                  "sch.permission_denied": "#/components/schemas/sch-permission_denied",
                   "flowdef.missing_project_id": "#/components/schemas/flowdef-missing_project_id",
                   "not_implemented": "#/components/schemas/not_implemented",
                   "proj.not_found": "#/components/schemas/proj-not_found",
                   "proj.permission_denied": "#/components/schemas/proj-permission_denied",
                   "req.invalid": "#/components/schemas/req-invalid",
-                  "team.team_not_found": "#/components/schemas/team-team_not_found",
-                  "team.permission_denied": "#/components/schemas/team-permission_denied",
+                  "sess.project_mismatch": "#/components/schemas/sess-project_mismatch",
+                  "sess.token_invalid": "#/components/schemas/sess-token_invalid",
                   "team.project_not_found": "#/components/schemas/team-project_not_found",
-                  "unavailable": "#/components/schemas/unavailable",
-                  "user.not_found": "#/components/schemas/user-not_found",
-                  "user.permission_denied": "#/components/schemas/user-permission_denied"
+                  "unavailable": "#/components/schemas/unavailable"
                 }
               }
             },
@@ -31674,26 +33192,8 @@
               "flowdef.invalid": {
                 "$ref": "#/components/examples/flowdef-invalid"
               },
-              "flowdef.not_found": {
-                "$ref": "#/components/examples/flowdef-not_found"
-              },
-              "flowdef.permission_denied": {
-                "$ref": "#/components/examples/flowdef-permission_denied"
-              },
-              "idp.not_found": {
-                "$ref": "#/components/examples/idp-not_found"
-              },
-              "idp.permission_denied": {
-                "$ref": "#/components/examples/idp-permission_denied"
-              },
               "internal": {
                 "$ref": "#/components/examples/internal"
-              },
-              "sch.not_found": {
-                "$ref": "#/components/examples/sch-not_found"
-              },
-              "sch.permission_denied": {
-                "$ref": "#/components/examples/sch-permission_denied"
               },
               "flowdef.missing_project_id": {
                 "$ref": "#/components/examples/flowdef-missing_project_id"
@@ -31710,23 +33210,17 @@
               "req.invalid": {
                 "$ref": "#/components/examples/req-invalid"
               },
-              "team.team_not_found": {
-                "$ref": "#/components/examples/team-team_not_found"
+              "sess.project_mismatch": {
+                "$ref": "#/components/examples/sess-project_mismatch"
               },
-              "team.permission_denied": {
-                "$ref": "#/components/examples/team-permission_denied"
+              "sess.token_invalid": {
+                "$ref": "#/components/examples/sess-token_invalid"
               },
               "team.project_not_found": {
                 "$ref": "#/components/examples/team-project_not_found"
               },
               "unavailable": {
                 "$ref": "#/components/examples/unavailable"
-              },
-              "user.not_found": {
-                "$ref": "#/components/examples/user-not_found"
-              },
-              "user.permission_denied": {
-                "$ref": "#/components/examples/user-permission_denied"
               }
             }
           }
@@ -31937,6 +33431,59 @@
               },
               "brnd.permission_denied": {
                 "$ref": "#/components/examples/brnd-permission_denied"
+              },
+              "internal": {
+                "$ref": "#/components/examples/internal"
+              },
+              "not_implemented": {
+                "$ref": "#/components/examples/not_implemented"
+              },
+              "req.invalid": {
+                "$ref": "#/components/examples/req-invalid"
+              },
+              "unavailable": {
+                "$ref": "#/components/examples/unavailable"
+              }
+            }
+          }
+        }
+      },
+      "getOAuthSettingsById-error-response": {
+        "description": "Error response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/auth-unauthorized"
+                },
+                {
+                  "$ref": "#/components/schemas/internal"
+                },
+                {
+                  "$ref": "#/components/schemas/not_implemented"
+                },
+                {
+                  "$ref": "#/components/schemas/req-invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/unavailable"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "code",
+                "mapping": {
+                  "auth.unauthorized": "#/components/schemas/auth-unauthorized",
+                  "internal": "#/components/schemas/internal",
+                  "not_implemented": "#/components/schemas/not_implemented",
+                  "req.invalid": "#/components/schemas/req-invalid",
+                  "unavailable": "#/components/schemas/unavailable"
+                }
+              }
+            },
+            "examples": {
+              "auth.unauthorized": {
+                "$ref": "#/components/examples/auth-unauthorized"
               },
               "internal": {
                 "$ref": "#/components/examples/internal"
@@ -32331,7 +33878,28 @@
             "schema": {
               "oneOf": [
                 {
+                  "$ref": "#/components/schemas/app-client_id_taken"
+                },
+                {
+                  "$ref": "#/components/schemas/app-field_immutable"
+                },
+                {
+                  "$ref": "#/components/schemas/app-invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/app-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/app-permission_denied"
+                },
+                {
+                  "$ref": "#/components/schemas/app-revision_conflict"
+                },
+                {
                   "$ref": "#/components/schemas/auth-unauthorized"
+                },
+                {
+                  "$ref": "#/components/schemas/evt-invalid"
                 },
                 {
                   "$ref": "#/components/schemas/internal"
@@ -32349,7 +33917,14 @@
               "discriminator": {
                 "propertyName": "code",
                 "mapping": {
+                  "app.client_id_taken": "#/components/schemas/app-client_id_taken",
+                  "app.field_immutable": "#/components/schemas/app-field_immutable",
+                  "app.invalid": "#/components/schemas/app-invalid",
+                  "app.not_found": "#/components/schemas/app-not_found",
+                  "app.permission_denied": "#/components/schemas/app-permission_denied",
+                  "app.revision_conflict": "#/components/schemas/app-revision_conflict",
                   "auth.unauthorized": "#/components/schemas/auth-unauthorized",
+                  "evt.invalid": "#/components/schemas/evt-invalid",
                   "internal": "#/components/schemas/internal",
                   "not_implemented": "#/components/schemas/not_implemented",
                   "req.invalid": "#/components/schemas/req-invalid",
@@ -32358,8 +33933,29 @@
               }
             },
             "examples": {
+              "app.client_id_taken": {
+                "$ref": "#/components/examples/app-client_id_taken"
+              },
+              "app.field_immutable": {
+                "$ref": "#/components/examples/app-field_immutable"
+              },
+              "app.invalid": {
+                "$ref": "#/components/examples/app-invalid"
+              },
+              "app.not_found": {
+                "$ref": "#/components/examples/app-not_found"
+              },
+              "app.permission_denied": {
+                "$ref": "#/components/examples/app-permission_denied"
+              },
+              "app.revision_conflict": {
+                "$ref": "#/components/examples/app-revision_conflict"
+              },
               "auth.unauthorized": {
                 "$ref": "#/components/examples/auth-unauthorized"
+              },
+              "evt.invalid": {
+                "$ref": "#/components/examples/evt-invalid"
               },
               "internal": {
                 "$ref": "#/components/examples/internal"
@@ -32384,6 +33980,12 @@
             "schema": {
               "oneOf": [
                 {
+                  "$ref": "#/components/schemas/app-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/app-permission_denied"
+                },
+                {
                   "$ref": "#/components/schemas/auth-unauthorized"
                 },
                 {
@@ -32402,6 +34004,8 @@
               "discriminator": {
                 "propertyName": "code",
                 "mapping": {
+                  "app.not_found": "#/components/schemas/app-not_found",
+                  "app.permission_denied": "#/components/schemas/app-permission_denied",
                   "auth.unauthorized": "#/components/schemas/auth-unauthorized",
                   "internal": "#/components/schemas/internal",
                   "not_implemented": "#/components/schemas/not_implemented",
@@ -32411,6 +34015,12 @@
               }
             },
             "examples": {
+              "app.not_found": {
+                "$ref": "#/components/examples/app-not_found"
+              },
+              "app.permission_denied": {
+                "$ref": "#/components/examples/app-permission_denied"
+              },
               "auth.unauthorized": {
                 "$ref": "#/components/examples/auth-unauthorized"
               },
@@ -33823,7 +35433,22 @@
                   "$ref": "#/components/schemas/auth-unauthorized"
                 },
                 {
+                  "$ref": "#/components/schemas/enc_key-decrypt_failed"
+                },
+                {
+                  "$ref": "#/components/schemas/enc_key-encrypt_failed"
+                },
+                {
+                  "$ref": "#/components/schemas/enc_key-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/evt-invalid"
+                },
+                {
                   "$ref": "#/components/schemas/internal"
+                },
+                {
+                  "$ref": "#/components/schemas/tkn-invalid"
                 },
                 {
                   "$ref": "#/components/schemas/inv-invalid"
@@ -33850,6 +35475,9 @@
                   "$ref": "#/components/schemas/req-invalid"
                 },
                 {
+                  "$ref": "#/components/schemas/enc_key-unknown_alg"
+                },
+                {
                   "$ref": "#/components/schemas/unavailable"
                 }
               ],
@@ -33858,7 +35486,12 @@
                 "mapping": {
                   "auth.csrf_invalid": "#/components/schemas/auth-csrf_invalid",
                   "auth.unauthorized": "#/components/schemas/auth-unauthorized",
+                  "enc_key.decrypt_failed": "#/components/schemas/enc_key-decrypt_failed",
+                  "enc_key.encrypt_failed": "#/components/schemas/enc_key-encrypt_failed",
+                  "enc_key.not_found": "#/components/schemas/enc_key-not_found",
+                  "evt.invalid": "#/components/schemas/evt-invalid",
                   "internal": "#/components/schemas/internal",
+                  "tkn.invalid": "#/components/schemas/tkn-invalid",
                   "inv.invalid": "#/components/schemas/inv-invalid",
                   "inv.not_found": "#/components/schemas/inv-not_found",
                   "inv.pending_limit": "#/components/schemas/inv-pending_limit",
@@ -33867,6 +35500,7 @@
                   "inv.project_unclaimed": "#/components/schemas/inv-project_unclaimed",
                   "not_implemented": "#/components/schemas/not_implemented",
                   "req.invalid": "#/components/schemas/req-invalid",
+                  "enc_key.unknown_alg": "#/components/schemas/enc_key-unknown_alg",
                   "unavailable": "#/components/schemas/unavailable"
                 }
               }
@@ -33878,8 +35512,23 @@
               "auth.unauthorized": {
                 "$ref": "#/components/examples/auth-unauthorized"
               },
+              "enc_key.decrypt_failed": {
+                "$ref": "#/components/examples/enc_key-decrypt_failed"
+              },
+              "enc_key.encrypt_failed": {
+                "$ref": "#/components/examples/enc_key-encrypt_failed"
+              },
+              "enc_key.not_found": {
+                "$ref": "#/components/examples/enc_key-not_found"
+              },
+              "evt.invalid": {
+                "$ref": "#/components/examples/evt-invalid"
+              },
               "internal": {
                 "$ref": "#/components/examples/internal"
+              },
+              "tkn.invalid": {
+                "$ref": "#/components/examples/tkn-invalid"
               },
               "inv.invalid": {
                 "$ref": "#/components/examples/inv-invalid"
@@ -33904,6 +35553,9 @@
               },
               "req.invalid": {
                 "$ref": "#/components/examples/req-invalid"
+              },
+              "enc_key.unknown_alg": {
+                "$ref": "#/components/examples/enc_key-unknown_alg"
               },
               "unavailable": {
                 "$ref": "#/components/examples/unavailable"
@@ -34214,6 +35866,9 @@
                   "$ref": "#/components/schemas/auth-unauthorized"
                 },
                 {
+                  "$ref": "#/components/schemas/evt-invalid"
+                },
+                {
                   "$ref": "#/components/schemas/internal"
                 },
                 {
@@ -34237,6 +35892,7 @@
                 "mapping": {
                   "auth.csrf_invalid": "#/components/schemas/auth-csrf_invalid",
                   "auth.unauthorized": "#/components/schemas/auth-unauthorized",
+                  "evt.invalid": "#/components/schemas/evt-invalid",
                   "internal": "#/components/schemas/internal",
                   "inv.not_found": "#/components/schemas/inv-not_found",
                   "inv.permission_denied": "#/components/schemas/inv-permission_denied",
@@ -34252,6 +35908,9 @@
               },
               "auth.unauthorized": {
                 "$ref": "#/components/examples/auth-unauthorized"
+              },
+              "evt.invalid": {
+                "$ref": "#/components/examples/evt-invalid"
               },
               "internal": {
                 "$ref": "#/components/examples/internal"
@@ -35468,6 +37127,16 @@
         },
         "example": "brnd_01KWH1P4MYS7F0N9WD3P2E4YM5"
       },
+      "oauth-settings-id": {
+        "name": "oauth_settings_id",
+        "in": "path",
+        "required": true,
+        "description": "The OAuth settings revision ID: the `revision_id` of the `kind: oauth`\npointer on the release that `buildRelease` (`POST /releases/build`) or\n`getReleaseById` (`GET /releases/{release_id}`) returns.\n",
+        "schema": {
+          "type": "string"
+        },
+        "example": "oauthset_01KWHG3M5QZ27F0N9WD3P2E4YM"
+      },
       "idp-id": {
         "name": "id",
         "in": "path",
@@ -35605,6 +37274,15 @@
       }
     },
     "headers": {
+      "retry-after": {
+        "description": "Whole seconds to wait before retrying the request; at least 1. The server\nsends it with every 429 it answers itself; a 429 from a proxy or edge in\nfront of it may come without one.\n",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "example": 1
+      },
       "cache-control-private-no-store": {
         "description": "Prevents browsers and shared caches from storing session-specific responses.",
         "schema": {

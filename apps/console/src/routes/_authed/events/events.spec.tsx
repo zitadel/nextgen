@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { _resetLiveForTesting } from "@/features/events/use-live-events";
-import { formatLogTime } from "@/lib/date";
+import { formatEventTime } from "@/lib/date";
 import { scopedPath } from "@/test/project-scope.fixture";
 import { server } from "@/test/msw";
 import { createAppRouter } from "../../../router";
@@ -82,18 +82,23 @@ function isRequestRead(query: URLSearchParams): boolean {
   return query.get("order") === "asc" && query.has("request_id");
 }
 
+/** Whether a `GET /events` is the drawer's read of one login flow's events, oldest first. */
+function isFlowRead(query: URLSearchParams): boolean {
+  return query.get("order") === "asc" && query.has("flow_id") && !query.has("created_after");
+}
+
 /**
  * `GET /events`, answering each of the list's calls with the next of `pages`;
- * records their queries. The drawer's read of a request's events is answered
- * apart, with none unless `serveRequestEvents` says otherwise, and is not
- * recorded: it is not the list's.
+ * records their queries. The drawer's read of a request's or a login flow's
+ * events is answered apart, with none unless `serveRequestEvents` or
+ * `serveFlowEvents` says otherwise, and is not recorded: it is not the list's.
  */
 function serveEvents(...pages: { data: unknown[]; next_page_token?: string }[]) {
   const queries: URLSearchParams[] = [];
   server.use(
     http.get(EVENTS_URL, ({ request: call }) => {
       const query = new URL(call.url).searchParams;
-      if (isRequestRead(query)) return HttpResponse.json({ data: [] });
+      if (isRequestRead(query) || isFlowRead(query)) return HttpResponse.json({ data: [] });
       queries.push(query);
       const page = pages[Math.min(queries.length, pages.length) - 1];
       return HttpResponse.json(page);
@@ -109,6 +114,20 @@ function serveRequestEvents(data: unknown[], more = false) {
     http.get(EVENTS_URL, ({ request: call }) => {
       const query = new URL(call.url).searchParams;
       if (!isRequestRead(query)) return undefined;
+      queries.push(query);
+      return HttpResponse.json({ data, next_page_token: more ? "more" : undefined });
+    }),
+  );
+  return queries;
+}
+
+/** The drawer's read of one login flow's events: these, oldest first; records the queries. */
+function serveFlowEvents(data: unknown[], more = false) {
+  const queries: URLSearchParams[] = [];
+  server.use(
+    http.get(EVENTS_URL, ({ request: call }) => {
+      const query = new URL(call.url).searchParams;
+      if (!isFlowRead(query)) return undefined;
       queries.push(query);
       return HttpResponse.json({ data, next_page_token: more ? "more" : undefined });
     }),
@@ -148,25 +167,25 @@ async function renderAt(path: string) {
   return router;
 }
 
-/** The Logs list of the sidebar: the heading back, then the view picker. */
-async function logsNav() {
-  return within(await screen.findByRole("navigation", { name: "Logs" }));
+/** The Events list of the sidebar: the heading back, then the view picker. */
+async function eventsNav() {
+  return within(await screen.findByRole("navigation", { name: "Events" }));
 }
 
 /** The sidebar's view picker, which names the view the list is in. */
 async function viewPicker(view: string) {
-  return (await logsNav()).getByRole("button", { name: `View: ${view}` });
+  return (await eventsNav()).getByRole("button", { name: `View: ${view}` });
 }
 
 /** Chooses a view from the sidebar's picker. */
 async function chooseView(view: string) {
-  await userEvent.click((await logsNav()).getByRole("button", { name: /^View: / }));
+  await userEvent.click((await eventsNav()).getByRole("button", { name: /^View: / }));
   await userEvent.click(await screen.findByRole("menuitem", { name: new RegExp(`^${view}`) }));
 }
 
 /** The search above the table, where pasted values narrow the list. */
 const find = () =>
-  screen.findByRole("searchbox", { name: "Search logs by ID, event type or operation" });
+  screen.findByRole("searchbox", { name: "Search events by ID, event type or operation" });
 
 /** Types a term into the search and applies it. */
 async function searchFor(term: string) {
@@ -201,12 +220,12 @@ function expectServed(query: URLSearchParams | undefined) {
   if (categories.includes("request")) expect(categories).toEqual(["request"]);
 }
 
-describe("logs", () => {
+describe("events", () => {
   it("opens on the audit events, and says so when the project has none", async () => {
     const queries = serveEvents({ data: [] });
     await renderAt("/events");
 
-    expect(await screen.findByRole("heading", { name: "Logs" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Events" })).toBeInTheDocument();
     expect(await viewPicker("Audit events")).toBeInTheDocument();
     expect(screen.getByText("This project has no audit events.")).toBeInTheDocument();
     // The selected project's events, a page at a time, without the API
@@ -251,7 +270,7 @@ describe("logs", () => {
     );
     expect(first.getByText("DELETE deleteUserByID")).toBeInTheDocument();
     expect(first.getByText("204")).toBeInTheDocument();
-    expect(first.getByText(formatLogTime(OCCURRED_AT))).toBeInTheDocument();
+    expect(first.getByText(formatEventTime(OCCURRED_AT))).toBeInTheDocument();
 
     // Any other event reads as the record it touched, and who caused it.
     const second = within(changeRow as HTMLElement);
@@ -461,6 +480,77 @@ describe("logs", () => {
     expect(panel.getByText("12 ms")).toBeInTheDocument();
   });
 
+  it("lists the whole login flow of a sign-in event in the drawer, in place of its one request", async () => {
+    const signIn = { flow_id: "flow_1", session_id: "sess_1", actor_id: null, actor_type: null };
+    const attempt = event("evt_attempt", {
+      ...signIn,
+      event_type: "auth.attempt.created",
+      category: "auth",
+      entity_type: "auth_attempt",
+      entity_id: "att_1",
+      request_id: "req_create",
+    });
+    const check = event("evt_check", {
+      ...signIn,
+      event_type: "auth.check.succeeded",
+      category: "auth",
+      entity_type: "check",
+      entity_id: "ch_1",
+      request_id: "req_submit",
+      payload: { check_id: "ch_1", check_type: "Password", auth_attempt_id: "att_1" },
+    });
+    // The exchange is another request, by a service: only the flow ties it in.
+    const established = event("evt_session", {
+      ...signIn,
+      event_type: "session.established",
+      category: "session",
+      actor_type: "service",
+      entity_type: "session",
+      entity_id: "sess_1",
+      request_id: "req_exchange",
+      payload: { user_id: "user_admin" },
+    });
+    serveEvents({ data: [established, check, attempt] });
+    serveEvent(attempt, check, established);
+    const requestQueries = serveRequestEvents([attempt]);
+    const flowQueries = serveFlowEvents([attempt, check, established], true);
+    await renderAt("/events/evt_attempt");
+
+    const panel = await drawer();
+    const section = within(
+      (await panel.findByRole("heading", { name: "This login flow" })).closest(
+        "section",
+      ) as HTMLElement,
+    );
+    // One range of the flow index, oldest first, and no read of the request.
+    expect(flowQueries[0]?.get("flow_id")).toBe("flow_1");
+    expect(flowQueries[0]?.get("order")).toBe("asc");
+    expect(flowQueries[0]?.has("category")).toBe(false);
+    expect(requestQueries).toHaveLength(0);
+    expect(panel.queryByRole("heading", { name: "This request" })).toBeNull();
+
+    const steps = section.getAllByRole("listitem");
+    expect(steps.map((step) => within(step).getByText(/^(auth|session)\./).textContent)).toEqual([
+      "auth.attempt.created",
+      "auth.check.succeeded",
+      "session.established",
+    ]);
+    expect(
+      within(steps[0] as HTMLElement)
+        .getByText("auth.attempt.created")
+        .closest("[aria-current]"),
+    ).not.toBeNull();
+    // More than the drawer holds: the list under the flow, in every view.
+    expect(
+      section.getByRole("link", { name: "List all of this login flow’s events" }),
+    ).toHaveAttribute("href", expect.stringContaining("flow=flow_1"));
+
+    // A later step of the flow opens in the drawer, under the same timeline.
+    await userEvent.click(within(steps[2] as HTMLElement).getByRole("link"));
+    expect(await panel.findByRole("heading", { name: "session.established" })).toBeVisible();
+    expect(panel.getByRole("heading", { name: "This login flow" })).toBeVisible();
+  });
+
   it("closes the drawer back to the list, under the same filters", async () => {
     const queries = serveEvents({ data: [event("evt_1")] });
     serveEvent(event("evt_1"));
@@ -564,7 +654,7 @@ describe("logs", () => {
   });
 });
 
-describe("logs views", () => {
+describe("events views", () => {
   it("chooses the view from a picker in the sidebar, in place of the project's screens", async () => {
     serveEvents({ data: [] });
     await renderAt("/events");
@@ -619,7 +709,7 @@ describe("logs views", () => {
   });
 });
 
-describe("logs filters", () => {
+describe("events filters", () => {
   it("narrows the audit events to one category, and back to all of them", async () => {
     const queries = serveEvents({ data: [event("evt_1")] });
     const router = await renderAt("/events");
@@ -686,14 +776,23 @@ describe("logs filters", () => {
     const group = await filters();
     fireEvent.change(group.getByLabelText("From"), { target: { value: "2026-11-10T08:00" } });
     fireEvent.change(group.getByLabelText("To"), { target: { value: "2026-11-10T09:30" } });
-    await userEvent.click(group.getByRole("button", { name: "Apply range" }));
 
-    // The viewer's local time, sent as the moments it names.
+    // Read as it is changed, after a pause: there is nothing to press. The
+    // viewer's local time, sent as the moments it names.
     const from = new Date("2026-11-10T08:00").toISOString();
     const to = new Date("2026-11-10T09:30").toISOString();
-    await waitFor(() => expect(queries.at(-1)?.get("created_before")).toBe(to));
+    await waitFor(() => expect(queries.at(-1)?.get("created_before")).toBe(to), {
+      timeout: 3000,
+    });
     expect(queries.at(-1)?.get("created_after")).toBe(from);
     expect(router.state.resolvedLocation?.search).toMatchObject({ from, to });
+    expect(group.queryByRole("button", { name: "Apply range" })).not.toBeInTheDocument();
+    // A start that is not before the end is said, and not read.
+    const reads = queries.length;
+    fireEvent.change(group.getByLabelText("From"), { target: { value: "2026-11-10T10:00" } });
+    expect(await group.findByRole("alert")).toHaveTextContent("The start must be before the end.");
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    expect(queries.length).toBe(reads);
     expect(router.state.resolvedLocation?.search.since).toBeUndefined();
   });
 
@@ -737,7 +836,9 @@ describe("logs filters", () => {
       "2 types",
     );
 
-    await userEvent.click((await filters()).getByRole("button", { name: "Only failures" }));
+    // The shortcut is the list's first row, so the types it ticks show under it.
+    await userEvent.click((await filters()).getByRole("combobox", { name: "Event types" }));
+    await userEvent.click(await screen.findByRole("option", { name: /^Only failures/ }));
 
     await waitFor(() =>
       expect(queries.at(-1)?.getAll("event_type")).toEqual([
@@ -748,7 +849,7 @@ describe("logs filters", () => {
       ]),
     );
     expect((await filters()).getByRole("combobox", { name: "Event types" })).toHaveTextContent(
-      "Failures",
+      "Only failures",
     );
   });
 
@@ -786,13 +887,14 @@ describe("logs filters", () => {
     expect(
       (await filters()).queryByRole("combobox", { name: "Event types" }),
     ).not.toBeInTheDocument();
-    await userEvent.click((await filters()).getByRole("button", { name: "Only failed requests" }));
+    await userEvent.click((await filters()).getByRole("combobox", { name: "Status classes" }));
+    await userEvent.click(await screen.findByRole("option", { name: /^Only failed requests/ }));
 
     await waitFor(() => expect(queries.at(-1)?.getAll("status_class")).toEqual(["4xx", "5xx"]));
     // One range of the status index each: no category beside them.
     expect(queries.at(-1)?.has("category")).toBe(false);
     expect((await filters()).getByRole("combobox", { name: "Status classes" })).toHaveTextContent(
-      "4xx, 5xx",
+      "Only failed requests",
     );
 
     await searchFor("createUser");
@@ -1059,7 +1161,7 @@ describe("logs filters", () => {
   });
 });
 
-describe("logs search", () => {
+describe("events search", () => {
   it("says in the field what it takes", async () => {
     serveEvents({ data: [] });
     await renderAt("/events");
@@ -1182,7 +1284,7 @@ describe("logs search", () => {
   });
 });
 
-describe("logs with the sidebar as an icon rail", () => {
+describe("events with the sidebar as an icon rail", () => {
   afterEach(() => {
     // biome-ignore lint/suspicious/noDocumentCookie: the sidebar keeps its state in this cookie
     document.cookie = "sidebar_state=; path=/; max-age=0";
@@ -1193,7 +1295,7 @@ describe("logs with the sidebar as an icon rail", () => {
     serveEvents({ data: [] });
     await renderAt("/events");
 
-    await screen.findByRole("heading", { name: "Logs" });
+    await screen.findByRole("heading", { name: "Events" });
     expect(screen.queryByRole("button", { name: /^Views and filters/ })).not.toBeInTheDocument();
   });
 
@@ -1235,7 +1337,7 @@ describe("logs with the sidebar as an icon rail", () => {
       await screen.findByRole("button", { name: "Views and filters: Audit events" }),
     );
 
-    // The whole Logs list, over the page: its view picker and its filters.
+    // The whole Events list, over the page: its view picker and its filters.
     const sheet = within(await screen.findByRole("dialog"));
     expect(sheet.getByRole("group", { name: "Filters" })).toBeInTheDocument();
     await userEvent.click(sheet.getByRole("button", { name: "View: Audit events" }));
@@ -1263,7 +1365,7 @@ describe("event drawer", () => {
     expect(queries[0]?.get("project_id")).toBe("proj_test");
     expect(panel.getByText("evt_1")).toBeInTheDocument();
     expect(panel.getByRole("button", { name: "Copy Event ID" })).toBeInTheDocument();
-    expect(panel.getByText(formatLogTime(OCCURRED_AT))).toBeInTheDocument();
+    expect(panel.getByText(formatEventTime(OCCURRED_AT))).toBeInTheDocument();
 
     const details = within(
       panel.getByRole("heading", { name: "Details" }).closest("section") as HTMLElement,
@@ -1337,7 +1439,7 @@ describe("event drawer", () => {
     await waitFor(() => expect(queries.at(-1)?.getAll("category")).toEqual(["auth"]));
   });
 
-  it("says the event is gone when the project does not hold it, and closes back to Logs", async () => {
+  it("says the event is gone when the project does not hold it, and closes back to Events", async () => {
     // The loader error is expected: silence the error boundary's dump and the
     // router's route-match warning.
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);

@@ -16,7 +16,9 @@ export class SvelteDetector implements Detector {
   readonly versionFloor = "5";
 
   async detect(cwd: string): Promise<FrameworkFacts | null> {
-    const pkg = await readPackageJson(cwd).catch(() => undefined);
+    const pkg = await readPackageJson(cwd).catch(() => {
+      return undefined;
+    });
     if (
       !pkg ||
       hasDependency(pkg, "@sveltejs/kit") ||

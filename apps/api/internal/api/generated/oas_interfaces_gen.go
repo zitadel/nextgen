@@ -9,6 +9,14 @@ type AddOriginRes interface {
 	addOriginRes()
 }
 
+type ApplicationCreatedRes interface {
+	applicationCreatedRes()
+}
+
+type ApplicationUpdatedRes interface {
+	applicationUpdatedRes()
+}
+
 type AuthAttemptCreatedRes interface {
 	authAttemptCreatedRes()
 }
@@ -177,6 +185,14 @@ type FinishUserPasskeyRegistrationRes interface {
 	finishUserPasskeyRegistrationRes()
 }
 
+type FlowSignupChallengeConsumedRes interface {
+	flowSignupChallengeConsumedRes()
+}
+
+type FlowSignupChallengeIssuedRes interface {
+	flowSignupChallengeIssuedRes()
+}
+
 type FlowdefCreatedRes interface {
 	flowdefCreatedRes()
 }
@@ -269,6 +285,10 @@ type GetMyUserSchemaRes interface {
 	getMyUserSchemaRes()
 }
 
+type GetOAuthSettingsByIdRes interface {
+	getOAuthSettingsByIdRes()
+}
+
 type GetPolicyRes interface {
 	getPolicyRes()
 }
@@ -331,6 +351,22 @@ type IdpUpdatedRes interface {
 
 type InitClaimRes interface {
 	initClaimRes()
+}
+
+type InvitationAcceptedRes interface {
+	invitationAcceptedRes()
+}
+
+type InvitationCancelledRes interface {
+	invitationCancelledRes()
+}
+
+type InvitationCreatedRes interface {
+	invitationCreatedRes()
+}
+
+type InvitationRejectedRes interface {
+	invitationRejectedRes()
 }
 
 type IssueChallengeRes interface {

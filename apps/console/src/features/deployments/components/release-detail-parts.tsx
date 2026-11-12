@@ -1,7 +1,7 @@
 import { Ellipsis, GitCommitHorizontal } from "lucide-react";
-import { Fragment, type ReactNode, useState } from "react";
+import { useState } from "react";
 import { DeploySheet } from "@/features/deployments/components/deploy-sheet";
-import { DetailRow, DetailSection } from "@/components/detail-page";
+import { DETAIL_VALUE, DetailRow, DetailRows, DetailSection } from "@/components/detail-page";
 import { DocumentViewer } from "@/components/document-viewer";
 import { RevokeReleaseDialog } from "@/features/deployments/components/revoke-release-dialog";
 import { RollbackSheet } from "@/features/deployments/components/rollback-sheet";
@@ -20,7 +20,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Separator } from "@/components/ui/separator";
 import type { Deployment } from "@/features/deployments/deployment";
 import type { PolicySetting } from "@/features/deployments/policy";
 import { type PointerGroup, type Release, shortSha } from "@/features/deployments/release";
@@ -102,18 +101,15 @@ export function ReleaseActions({
 }
 
 /**
- * One kind's pointers: the heading in a 216px column at `lg`, with the list
- * flush against it, and stacked above the list below `lg`. Each pointer is an
- * accordion row that opens to its document.
+ * One kind's pointers: the kind as the row's label, and an accordion row per
+ * pointer that opens to its document.
  */
 export function PointerGroupSection({ group }: { group: PointerGroup }) {
   return (
-    <section className="flex flex-col gap-4 py-3 lg:flex-row lg:items-start lg:gap-0">
-      <h2 className="text-sm leading-5 text-muted-foreground lg:w-54 lg:shrink-0">{group.label}</h2>
+    <DetailRow align="control" label={<h3>{group.label}</h3>}>
       <Accordion type="multiple" className="min-w-0 flex-1">
         {/* 12px above and below the rule between rows, a 48px row pitch as the
-            frame draws it; the group's own rule follows the last row at the
-            section gap. */}
+            frame draws it; the rule between groups is `DetailRows`'. */}
         {group.pointers.map((pointer) => (
           <AccordionItem
             key={pointer.revisionId}
@@ -126,7 +122,10 @@ export function PointerGroupSection({ group }: { group: PointerGroup }) {
                 label; this row is one line, centred. `min-w-0` lets the row
                 shrink below the pill's text, which is what makes the pill
                 truncate on a phone instead of pushing the chevron off the card. */}
-            <AccordionTrigger className="min-w-0 items-center py-0.5 hover:no-underline [&>svg]:translate-y-0">
+            <AccordionTrigger
+              level={4}
+              className="min-w-0 items-center py-0.5 hover:no-underline [&>svg]:translate-y-0"
+            >
               {/* The literal space is for the accessible name: a flex row drops it
                   visually, and without it the row reads "Customersch_1". */}
               <span className="flex min-w-0 flex-wrap items-center gap-2">
@@ -163,70 +162,55 @@ export function PointerGroupSection({ group }: { group: PointerGroup }) {
           </AccordionItem>
         ))}
       </Accordion>
-    </section>
+    </DetailRow>
   );
 }
 
 /**
- * A policy's settings above its document, ruled off as the deployments below
- * them are, with 12px from the text to each rule.
+ * A policy's settings above its document, as labelled rows. They sit in the
+ * pointer group's value column, so they stack on that column's width rather
+ * than the viewport's.
  */
 function PolicySettingsRows({ settings }: { settings: PolicySetting[] }) {
   return (
-    <div className="flex flex-col gap-3">
-      {settings.map((setting, index) => (
-        <Fragment key={setting.label}>
-          {index > 0 && <Separator />}
-          <DetailRow label={setting.label}>
-            <span className="min-w-0 text-sm leading-5 text-foreground">{setting.value}</span>
-          </DetailRow>
-        </Fragment>
+    <DetailRows container>
+      {settings.map((setting) => (
+        <DetailRow key={setting.label} label={setting.label}>
+          <span className={DETAIL_VALUE}>{setting.value}</span>
+        </DetailRow>
       ))}
-    </div>
+    </DetailRows>
   );
 }
 
-/** The card of labelled values under the panel: message, commit, author. */
+/** The card of labelled values under the release content: message, commit, author. */
 export function ReleaseMetadata({ release }: { release: Release }) {
   const { message, git_sha, git_dirty, created_by } = release.metadata;
   return (
     <DetailSection title="Metadata">
-      <div className="flex flex-col gap-4.5">
-        <MetadataRow label="Message">{message || "—"}</MetadataRow>
-        <Separator />
+      <DetailRows>
+        <DetailRow label="Message">
+          <span className={DETAIL_VALUE}>{message || "—"}</span>
+        </DetailRow>
         {/* `git_dirty` means the tree had uncommitted changes, so the commit
             names what the release was built near, not what it was built from. */}
-        <MetadataRow label="Git commit">
-          {git_sha ? (
-            <span title={git_sha}>
-              {shortSha(git_sha)}
-              {git_dirty && <span className="text-muted-foreground"> · uncommitted changes</span>}
-            </span>
-          ) : (
-            "—"
-          )}
-        </MetadataRow>
-        <Separator />
+        <DetailRow label="Git commit">
+          <span className={DETAIL_VALUE}>
+            {git_sha ? (
+              <span title={git_sha}>
+                {shortSha(git_sha)}
+                {git_dirty && <span className="text-muted-foreground"> · uncommitted changes</span>}
+              </span>
+            ) : (
+              "—"
+            )}
+          </span>
+        </DetailRow>
         {/* The identity id, or nothing: a release built from CI carries none. */}
-        <MetadataRow label="Created by">{created_by || "—"}</MetadataRow>
-      </div>
+        <DetailRow label="Created by">
+          <span className={DETAIL_VALUE}>{created_by || "—"}</span>
+        </DetailRow>
+      </DetailRows>
     </DetailSection>
-  );
-}
-
-/**
- * The label in the same 216px column the pointer groups use at `lg`, with the
- * value beside it; on a phone the value sits at the row's end.
- */
-function MetadataRow({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="flex items-start justify-between gap-4 py-1 lg:justify-start lg:gap-0">
-      <span className="shrink-0 text-sm leading-5 font-medium text-muted-foreground lg:w-54">
-        {label}
-      </span>
-      <span className="min-w-0 text-right text-sm leading-5 text-foreground wrap-anywhere lg:text-left">
-        {children}
-      </span>
-    </div>
   );
 }

@@ -1,5 +1,5 @@
 import { Link, useMatch, useMatchRoute } from "@tanstack/react-router";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
 import {
@@ -17,12 +17,17 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 
-import { LogFilters, LogViewPicker } from "@/features/events/components/logs-nav";
+import { EventFilters, EventViewPicker } from "@/features/events/components/events-nav";
 
 import { ContextSwitcher } from "./context-switcher";
 import { ZitadelLogo } from "./logo";
 import { SearchDialog, SearchTrigger, useSearchShortcut } from "./search";
-import { accountListItems, useNavItems, useRequestedNavItem } from "./use-nav-items";
+import {
+  PROJECT_SETTINGS_PATH,
+  accountListItems,
+  useNavItems,
+  useRequestedNavItem,
+} from "./use-nav-items";
 import { cn } from "@/lib/utils";
 import type { NavView } from "@/nav";
 import { SETTINGS_PATH, type ShellUser, UserMenuItem } from "./user-menu";
@@ -36,11 +41,12 @@ import { SETTINGS_PATH, type ShellUser, UserMenuItem } from "./user-menu";
  * the sidebar surface uses `background` per the design (see `ui/sidebar.tsx`).
  *
  * Every screen is drawn in this one frame (D27). What changes with where the
- * person is is the sidebar's list and what the project pill says
- * (`useShellView`), never the frame, so going from a project to Projects, and
- * from there into Settings, moves nothing but the list. Opening a list from a
- * row of another slides it in from the right, and the way back from the left
- * (`useListEntrance`).
+ * person is is the sidebar's list (`useShellView`), never the frame or the
+ * selected project (D36), so going from a project to Projects, and from there
+ * into Settings, moves nothing but the list. Both Settings rows open a list of
+ * their own: Projects' the root settings, a project's that project's (D40).
+ * Opening a list from a row of another slides it in from the right, and the
+ * way back from the left (`useListEntrance`).
  */
 export function AppShell({
   children,
@@ -58,7 +64,12 @@ export function AppShell({
 
   return (
     <SidebarProvider defaultOpen={readSidebarOpen()}>
-      <SearchDialog open={searchOpen} onOpenChange={setSearchOpen} />
+      <SearchDialog
+        open={searchOpen}
+        onOpenChange={setSearchOpen}
+        userId={user?.userId}
+        allProjects={view === "account" || view === "settings"}
+      />
       <AppSidebar
         view={view}
         user={user}
@@ -81,27 +92,34 @@ export function AppShell({
 /** The console's home: Projects, the list of every project. */
 const HOME_ROUTE = "/_authed/projects/";
 
-/** Logs, whose list replaces the project's on the screen and on an event's page. */
-const LOGS_PATH = "/events";
+/** Events, whose list replaces the project's on the screen and under an event's drawer. */
+const EVENTS_PATH = "/events";
 
 /**
  * Which of the sidebar's lists is showing, and the **route** decides:
  * Projects is above every project, so it lists the account's screens;
- * `/settings` with anything beneath it lists Settings' pages (D29); `/events`
- * with anything beneath it lists Logs' views and filters (D30); everything
- * else lists the selected project's. Deriving it from the route rather than
- * from component state is what lets a settings or logs URL survive a refresh,
- * and it keeps the shell consistent with ADR 0001's route-driven nav.
+ * `/settings` with anything beneath it lists Settings' pages (D29); `/project`
+ * with anything beneath it lists the selected project's Settings pages (D40);
+ * `/events` with anything beneath it lists Events' views and filters (D30);
+ * everything else lists the selected project's. Deriving it from the route
+ * rather than from component state is what lets a settings or events URL
+ * survive a refresh, and it keeps the shell consistent with ADR 0001's
+ * route-driven nav.
  */
 function useShellView(): NavView {
   const matchRoute = useMatchRoute();
   const atHome = !!useMatch({ from: HOME_ROUTE, shouldThrow: false });
   if (matchRoute({ to: SETTINGS_PATH, fuzzy: true })) return "settings";
-  if (matchRoute({ to: LOGS_PATH, fuzzy: true })) return "logs";
+  if (matchRoute({ to: PROJECT_SETTINGS_PATH, fuzzy: true })) return "project-settings";
+  if (matchRoute({ to: EVENTS_PATH, fuzzy: true })) return "events";
   return atHome ? "account" : "portal";
 }
 
-/** Home is Projects, the list of every project, from any screen. */
+/**
+ * Home is Projects, the list of every project, from any screen. The selected
+ * project rides along (`_authed` retains `?project=`) and stays selected there
+ * (D36).
+ */
 function HomeLink({ className }: { className: string }) {
   return (
     <Link to="/projects" aria-label="Home" className={`inline-flex items-center ${className}`}>
@@ -162,8 +180,6 @@ function AppSidebar({
 
       <SidebarFooter>
         <SidebarMenu>
-          {/* Documentation is parked: it needs a published URL for the docs
-              site to point at, and a row that does nothing reads as broken. */}
           <UserMenuItem user={user} onSignOut={onSignOut} />
         </SidebarMenu>
       </SidebarFooter>
@@ -188,22 +204,25 @@ const NAV_LABEL: Record<NavView, string> = {
   portal: "Primary",
   account: "Account",
   settings: "Settings",
-  logs: "Logs",
+  "project-settings": "Project settings",
+  events: "Events",
 };
 
 /**
  * The sidebar's nav: one flat list of the view's routes (`staticData.nav`,
  * Console ADR 0001). Portal is the project's screens. Account is what sits
  * above every project: Projects, the home, then the project's screens, then
- * what an add-on lists, then Settings (D34). The pill there names no project,
- * so a project's screen chosen from it drops the selection the URL still
- * carries and asks for one (D31), marking its row while it asks (D22).
+ * what an add-on lists, then Settings (D34). A project's screen chosen from it
+ * opens in the selected project (D36); with none selected it asks for one
+ * (D31), marking its row while it asks (D22).
  * Settings is that row's own list, under a heading that leads back:
  * the person's profile, alone while accounts are not surfaced (Console ADR
  * 0005 §3), then what an add-on lists. A row stays marked on the screens
- * beneath it, so a resource's detail keeps its list marked.
+ * beneath it, so a resource's detail keeps its list marked. The project's
+ * Settings row opens a list the same way, under a heading that leads back to
+ * the project: its General and Admins pages (D40).
  *
- * Logs is one screen's own list, under a heading that leads back to the
+ * Events is one screen's own list, under a heading that leads back to the
  * project's: a picker of the list's views, not routes, and its filters in a
  * group of their own (D30). The events feature draws both.
  *
@@ -214,8 +233,7 @@ const NAV_LABEL: Record<NavView, string> = {
 function NavList({ view }: { view: NavView }) {
   const own = useNavItems(view);
   const project = useNavItems("portal");
-  const account = view === "account";
-  const items = account ? accountListItems(own, project) : own;
+  const items = view === "account" ? accountListItems(own, project) : own;
   // On Projects' way to a screen (`?next=`), that screen's row is the marked one.
   const requested = useRequestedNavItem(project);
   const matchRoute = useMatchRoute();
@@ -228,40 +246,75 @@ function NavList({ view }: { view: NavView }) {
         <SidebarMenu className="gap-px">
           {/* Projects is the account list's first screen. */}
           {view === "settings" && <ListHeading name="Settings" to="/projects" back="Projects" />}
+          {view === "project-settings" && <ListHeading name="Settings" to="/" back="the project" />}
           {/* `/` is where a project lands, whichever screen that is. */}
-          {view === "logs" && <ListHeading name="Logs" to="/" back="the project" />}
-          {view === "logs" && <LogViewPicker />}
-          {items.map(({ to, scope, nav: { icon: Icon, label: name } }) => (
+          {view === "events" && <ListHeading name="Events" to="/" back="the project" />}
+          {view === "events" && <EventViewPicker />}
+          {items.map(({ to, nav: { icon: Icon, label: name } }) => (
             <SidebarMenuItem key={to}>
               <SidebarMenuButton
                 asChild
                 isActive={requested ? requested.to === to : !!matchRoute({ to, fuzzy: to !== "/" })}
                 tooltip={name}
               >
-                <Link
-                  to={to}
-                  // An explicit `undefined` is what stops `_authed` retaining it.
-                  search={account && scope === "project" ? { project: undefined } : undefined}
-                  title={name}
-                >
+                <Link to={to} title={name}>
                   <Icon aria-hidden />
-                  <span>{name}</span>
+                  {/* Cut short itself: with the arrow after it, it is no
+                      longer the button's last child, which is what the
+                      button truncates. */}
+                  <span className="truncate">{name}</span>
+                  {opensList(view, to) && (
+                    // The account row's arrow in the footer, which opens a menu
+                    // as this row opens a list. Not drawn in the rail.
+                    <ChevronRight
+                      aria-hidden
+                      data-opens-list
+                      className="text-sidebar-foreground ml-auto group-data-[collapsible=icon]:hidden"
+                    />
+                  )}
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
           ))}
         </SidebarMenu>
       </SidebarGroup>
-      {view === "logs" && <LogFilters />}
+      {view === "events" && <EventFilters />}
     </div>
   );
 }
 
 /**
  * How deep each list sits: Projects' and a project's are where the console
- * starts; Settings' and Logs' open from a row of one (D29, D30).
+ * starts; both Settings' and Events' open from a row of one (D29, D30, D40).
  */
-const LIST_DEPTH: Record<NavView, number> = { portal: 0, account: 0, settings: 1, logs: 1 };
+const LIST_DEPTH: Record<NavView, number> = {
+  portal: 0,
+  account: 0,
+  settings: 1,
+  "project-settings": 1,
+  events: 1,
+};
+
+/** The list a row's screen shows, where it is not the project's or the account's. */
+function listOf(to: string): NavView | undefined {
+  const under = (path: string) => to === path || to.startsWith(`${path}/`);
+  if (under(SETTINGS_PATH)) return "settings";
+  if (under(PROJECT_SETTINGS_PATH)) return "project-settings";
+  if (under(EVENTS_PATH)) return "events";
+  return undefined;
+}
+
+/**
+ * Whether a row of the list `view` names swaps the sidebar for a list one
+ * level down (Events and Settings in a project's list, Settings in the
+ * account's), rather than opening a screen beside it. Such a row carries an
+ * arrow, so the swap is no surprise. A row of the list it is already in (Settings' Profile) does
+ * not: the rule is the depth, so a new list needs no change here.
+ */
+function opensList(view: NavView, to: string): boolean {
+  const target = listOf(to);
+  return target !== undefined && LIST_DEPTH[target] > LIST_DEPTH[view];
+}
 
 /** A short fade and slide, with the design's motion tokens; none for reduced motion. */
 const LIST_MOTION =
@@ -331,8 +384,8 @@ function ContextBar({ view, userId }: { view: NavView; userId?: string }) {
   return (
     <div className={TOP_BAR}>
       {/* The signed-in person, whose recent projects the switcher keeps. */}
-      {/* Above every project the pill says so, and its list leads into one.
-          Logs is inside a project, like the project's own list. */}
+      {/* Above every project, with none selected, the pill says so, and its
+          list leads into one. */}
       <ContextSwitcher userId={userId} allProjects={view === "account" || view === "settings"} />
     </div>
   );

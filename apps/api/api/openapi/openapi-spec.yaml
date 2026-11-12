@@ -64,9 +64,10 @@ tags:
       and team memberships.
   - name: Search
     description: |
-      Search finds the resources of a project that match a text, across
-      resource types in one request. It answers with references; the
-      resources themselves are read through their own operations.
+      Search finds the resources of a project, or of the projects a person
+      can act on, that match a text, across resource types in one request. It
+      answers with references; the resources themselves are read through their
+      own operations.
   - name: Schemas
     description: |
       Schemas define the typed shape of user data and of other configurable
@@ -76,6 +77,12 @@ tags:
       Branding sets how the login looks: its layout, asset URLs and Liquid
       template. Each publish creates an immutable revision. The login renders
       the revision the deployed release pins.
+  - name: OAuth Settings
+    description: |
+      OAuth settings say whether a project's OAuth authorization server
+      answers. A release publishes them as an immutable revision, and this
+      operation reads one back. There is no operation that publishes them on
+      their own.
   - name: Identity Providers
     description: |
       Identity providers are the external login providers a project offers.
@@ -269,6 +276,8 @@ paths:
     $ref: endpoints/branding/methods.yaml
   /branding/{id}:
     $ref: endpoints/branding/by_id/methods.yaml
+  /oauth_settings/{oauth_settings_id}:
+    $ref: endpoints/oauth_settings/by_id/methods.yaml
   /idps:
     $ref: endpoints/idps/methods.yaml
   /idps/query:
@@ -337,6 +346,14 @@ paths:
 # One per domain event type, keyed by its event_type. gen_event_schemas writes
 # the files and fails until this list names exactly the domain's event types.
 webhooks:
+  flow.signup_challenge.issued:
+    $ref: endpoints/events/webhooks/flow-signup_challenge-issued.yaml
+  flow.signup_challenge.consumed:
+    $ref: endpoints/events/webhooks/flow-signup_challenge-consumed.yaml
+  application.created:
+    $ref: endpoints/events/webhooks/application-created.yaml
+  application.updated:
+    $ref: endpoints/events/webhooks/application-updated.yaml
   auth.attempt.created:
     $ref: endpoints/events/webhooks/auth-attempt-created.yaml
   auth.attempt.handed_off:
@@ -379,6 +396,14 @@ webhooks:
     $ref: endpoints/events/webhooks/idp-identity_link-created.yaml
   idp.updated:
     $ref: endpoints/events/webhooks/idp-updated.yaml
+  invitation.accepted:
+    $ref: endpoints/events/webhooks/invitation-accepted.yaml
+  invitation.cancelled:
+    $ref: endpoints/events/webhooks/invitation-cancelled.yaml
+  invitation.created:
+    $ref: endpoints/events/webhooks/invitation-created.yaml
+  invitation.rejected:
+    $ref: endpoints/events/webhooks/invitation-rejected.yaml
   origin.added:
     $ref: endpoints/events/webhooks/origin-added.yaml
   origin.removed:

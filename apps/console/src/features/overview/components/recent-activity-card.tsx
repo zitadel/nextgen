@@ -3,18 +3,18 @@ import { Link } from "@tanstack/react-router";
 import { CARD_ACTION_BUTTON, DetailSection } from "@/components/detail-page";
 import { Button } from "@/components/ui/button";
 import { EventSubject } from "@/features/events/components/event-subject";
-import type { LogEvent } from "@/features/events/model";
+import { type ProjectEvent, NO_AUDIT_EVENTS } from "@/features/events/model";
 import type { CardRead } from "@/features/overview/api";
 import { formatRecent } from "@/lib/date";
 
 /**
- * The project's newest audit events, the sign-ins and changes Logs lists
+ * The project's newest audit events, the sign-ins and changes Events lists
  * first: each its type, what it was about and when, opening the event. The
- * card's action is Logs, where the rest are. A project that is not claimed yet
+ * card's action is Events, where the rest are. A project that is not claimed yet
  * reads none, except to a platform operator: its events stay hidden until the
  * claim.
  */
-export function RecentActivityCard({ activity }: { activity: CardRead<LogEvent[]> }) {
+export function RecentActivityCard({ activity }: { activity: CardRead<ProjectEvent[]> }) {
   return (
     <DetailSection
       title="Recent activity"
@@ -24,7 +24,7 @@ export function RecentActivityCard({ activity }: { activity: CardRead<LogEvent[]
       action={
         <Button asChild variant="secondary" size="sm" className={CARD_ACTION_BUTTON}>
           <Link to="/events" search={{ view: "audit" }}>
-            Logs
+            Events
           </Link>
         </Button>
       }
@@ -32,8 +32,8 @@ export function RecentActivityCard({ activity }: { activity: CardRead<LogEvent[]
       {activity.error !== undefined ? (
         <p className="text-sm leading-5 text-muted-foreground">{activity.error}</p>
       ) : activity.value.length === 0 ? (
-        // Logs' own sentence for its empty audit view, which this card heads.
-        <p className="text-sm leading-5 text-muted-foreground">This project has no audit events.</p>
+        // Events' own sentence for its empty audit view, which this card heads.
+        <p className="text-sm leading-5 text-muted-foreground">{NO_AUDIT_EVENTS}</p>
       ) : (
         <ul className="-my-1 flex flex-col divide-y divide-border">
           {activity.value.map((event) => (
@@ -45,7 +45,7 @@ export function RecentActivityCard({ activity }: { activity: CardRead<LogEvent[]
   );
 }
 
-function ActivityRow({ event }: { event: LogEvent }) {
+function ActivityRow({ event }: { event: ProjectEvent }) {
   return (
     <li className="flex min-w-0 flex-col gap-1 py-2.5 sm:flex-row sm:items-center sm:gap-6">
       <Link

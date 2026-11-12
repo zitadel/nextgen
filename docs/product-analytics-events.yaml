@@ -623,7 +623,7 @@ components:
         plan: "#2859"
         trigger: >-
           The API confirmed an invitation made from the project's Invitations
-          tab, a replacement (`Regenerate link`) included. Only the cloud build
+          settings, a replacement (`Regenerate link`) included. Only the cloud build
           sends it, to Vercel like `copied_command`; Mixpanel follows once the
           Console has a sink for it.
         destinations: [vercel, mixpanel]
