@@ -9,9 +9,6 @@ import { DEFAULT_SETUP_PRESET, DEFAULT_SETUP_USE_CASE } from "@zitadel/config/de
 import { HttpResponse, http, passthrough } from "msw";
 import { beforeEach, describe, expect, vi } from "vitest";
 
-/** The CLI's commands, which a run reads to render what it suggests. */
-const config = await Config.load(cliPackageRoot);
-
 vi.mock("@clack/prompts", async () => {
   return (await import("@tests/helpers/clack")).clackDouble();
 });
@@ -72,6 +69,9 @@ import { aNextApp, suggestedCommands } from "@tests/helpers/setup";
 import { aSuggest } from "@tests/helpers/suggest";
 import { asTerminal } from "@tests/helpers/terminal";
 import { rejectionOf, thrownBy } from "@tests/helpers/thrown-value";
+
+/** The CLI's commands, which a run reads to render what it suggests. */
+const config = await Config.load(cliPackageRoot);
 
 const { server } = usePlatformServer();
 

@@ -297,6 +297,32 @@ describe("the follow-ups of a failure", () => {
   });
 });
 
+describe("the follow-ups of a failure raised while a flag parsed", () => {
+  it("carry the environment and server the command line named", async () => {
+    const cmd = new FailingWhileParsing(true, [
+      "release",
+      "--env",
+      "production",
+      "--server",
+      "https://staging.example",
+      "--cwd",
+      "/work/app",
+    ]);
+
+    await cmd.failParsing(
+      new ZitadelError("E_VALIDATION", "Bad id", { nextCommands: [{ id: "release:list" }] }),
+    );
+
+    expect(cmd.json).toEqual([
+      expect.objectContaining({
+        next_commands: [
+          "npx @zitadel/cli@test release list --env production --server https://staging.example --cwd /work/app",
+        ],
+      }),
+    ]);
+  });
+});
+
 describe("a failure whose follow-up cannot be rendered", () => {
   const broken = new ZitadelError("E_VALIDATION", "Not running", {
     nextCommands: [resourceSuggestion("events", "create"), { id: "start" }],
