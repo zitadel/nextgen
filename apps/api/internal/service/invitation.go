@@ -321,10 +321,11 @@ func (s *InvitationService) Accept(ctx context.Context, token, userID string, in
 	if s.platformProjectID == "" {
 		return nil, domain.ErrInvitationPlatformRequired()
 	}
-	now := time.Now().UTC()
 	var accepted *domain.Invitation
 	err = s.db.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		stmts := tx.Statements()
+		// Read per attempt, so a retried transaction rechecks expiry.
+		now := time.Now().UTC()
 		entity, err := pendingInvitationByToken(ctx, stmts, token, now)
 		if err != nil {
 			return err
@@ -398,10 +399,10 @@ func (s *InvitationService) Reject(ctx context.Context, token, userID string) (_
 	ctx, end := startSpan(ctx, "InvitationService.Reject")
 	defer end(&err)
 
-	now := time.Now().UTC()
 	var rejected *domain.Invitation
 	err = s.db.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		stmts := tx.Statements()
+		now := time.Now().UTC()
 		entity, err := pendingInvitationByToken(ctx, stmts, token, now)
 		if err != nil {
 			return err
