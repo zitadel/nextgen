@@ -1,4 +1,3 @@
-import type { PasswordMinLength } from "@/lib/zitadel";
 import type { SetupPreset, SetupUseCase } from "@zitadel/config/defaults";
 import {
   type ConnectionEndpoints,
@@ -7,9 +6,10 @@ import {
   providerOf,
 } from "@zitadel/config/idp";
 
-import type { Asker } from "@/lib/input";
 import type { FrameworkChoice } from "@/lib/orca";
 import type { SuggestedCommand } from "@/lib/suggestion";
+import type { Questions, Spinner } from "@/lib/ui";
+import type { PasswordMinLength } from "@/lib/zitadel";
 
 /**
  * The collected wizard state, threaded through every {@link SetupPrompt}. A
@@ -68,7 +68,13 @@ export function completeSso(drafts: readonly SsoDraft[]): SsoAnswer[] {
     if (clientId === undefined || secret === undefined) {
       throw new Error(`no credentials were collected for ${providerOf(draft.selection).slug}`);
     }
-    return { ...draft, credentials: { clientId, secret } };
+    return {
+      ...draft,
+      credentials: {
+        clientId,
+        secret,
+      },
+    };
   });
 }
 
@@ -103,11 +109,31 @@ export type SetupAnswers = {
 /** Read-only facts a prompt may need. */
 export type PromptContext = {
   /**
-   * How a prompt asks its question: the command's `this.input`, so every
-   * question the wizard asks behaves like every other question the CLI asks.
-   * It cannot ask a `confirm`, so `--force` never answers one of its questions.
+   * How a prompt asks its question: the typed questions every other command
+   * asks through, so every question the wizard asks behaves like every other
+   * question the CLI asks. It cannot ask a destructive `confirm`, so
+   * setup's `--force`, which means "overwrite files", never answers one of its
+   * questions.
    */
-  readonly input: Asker;
+  readonly ask: Questions;
+  /**
+   * Something the person must read or go and do outside the terminal, such as
+   * registering an OAuth application, as the one boxed thing a prompt draws.
+   * It goes through the UI package for the same reason `ask` does: a prompt
+   * that drew its own box would draw one that matches nothing else.
+   */
+  readonly note: (title: string, lines: readonly string[]) => void;
+  /**
+   * One line in the chain that is not a question, such as what happens now
+   * that a provider was skipped.
+   */
+  readonly say: (text: string) => void;
+  /**
+   * A spinner for a probe that takes long enough to need saying so, stopped or
+   * cleared by the prompt that started it. It draws nothing when nobody is
+   * watching, so a prompt never tests for a terminal.
+   */
+  readonly spinner: (label: string, options?: { guide?: boolean }) => Spinner;
   /**
    * The framework of the app setup integrates: its id and the name a question
    * shows ("Next.js"). Nothing more: a new app does not exist while the wizard

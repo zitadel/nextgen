@@ -28,9 +28,15 @@ export type Placeholders = Readonly<Record<string, unknown>>;
  */
 export function unmetBy(refusal: Refusal, values: Placeholders): string[] {
   const unfilled = [refusal.message, refusal.hint ?? "", ...(refusal.next ?? [])]
-    .flatMap((template) => [...template.matchAll(PLACEHOLDER)])
-    .map((match) => match[1] as string)
-    .filter((name) => values[name] === undefined);
+    .flatMap((template) => {
+      return [...template.matchAll(PLACEHOLDER)];
+    })
+    .map((match) => {
+      return match[1] as string;
+    })
+    .filter((name) => {
+      return values[name] === undefined;
+    });
   return [...new Set(unfilled)];
 }
 
@@ -71,13 +77,17 @@ function fill(details: unknown, values: Placeholders): unknown {
     return interpolate(details, values);
   }
   if (Array.isArray(details)) {
-    return details.map((one) => fill(one, values));
+    return details.map((one) => {
+      return fill(one, values);
+    });
   }
   // Only a plain object is rebuilt: anything else — a Date, a Map, a class —
   // would come apart into its entries and lose what it held.
   if (typeof details === "object" && details !== null && isPlain(details)) {
     return Object.fromEntries(
-      Object.entries(details).map(([key, one]) => [key, fill(one, values)]),
+      Object.entries(details).map(([key, one]) => {
+        return [key, fill(one, values)];
+      }),
     );
   }
   return details;
@@ -116,7 +126,9 @@ export function refusalError(
     suggest === undefined
       ? undefined
       : refusal.next?.flatMap((command) => {
-          return commandsOf(command, values).map((one) => suggest(one));
+          return commandsOf(command, values).map((one) => {
+            return suggest(one);
+          });
         });
   return new ZitadelError(refusal.code ?? "E_VALIDATION", interpolate(refusal.message, values), {
     hint: refusal.hint === undefined ? undefined : interpolate(refusal.hint, values),

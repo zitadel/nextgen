@@ -1,5 +1,6 @@
 import { upgradeCommand } from "@/lib/suggestion";
 import { isNewerVersion, latestCliVersion, updateCheckDisabled } from "@/lib/update-check";
+
 import type { CheckOutcome } from "./types";
 
 /**
@@ -17,9 +18,16 @@ export async function checkCliVersion(input: {
   const { cliVersion, env, typedCwd } = input;
   const base = { name: "cli-version" };
   if (updateCheckDisabled(env)) {
-    return { ...base, status: "pass", message: `CLI ${cliVersion}; update check is off` };
+    return {
+      ...base,
+      status: "pass",
+      message: `CLI ${cliVersion}; update check is off`,
+    };
   }
-  const latest = await latestCliVersion({ cliVersion, env });
+  const latest = await latestCliVersion({
+    cliVersion,
+    env,
+  });
   if (latest === undefined) {
     return {
       ...base,
@@ -28,7 +36,11 @@ export async function checkCliVersion(input: {
     };
   }
   if (!isNewerVersion(latest, cliVersion)) {
-    return { ...base, status: "pass", message: `CLI ${cliVersion} is the latest version` };
+    return {
+      ...base,
+      status: "pass",
+      message: `CLI ${cliVersion} is the latest version`,
+    };
   }
   return {
     ...base,

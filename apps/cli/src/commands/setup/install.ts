@@ -1,28 +1,27 @@
-import { consola } from "consola";
-
 import type { BoxAction } from "@/lib/box";
 import { ZitadelError } from "@/lib/errors";
+import { log } from "@/lib/log";
 import { customizeAndPublishActions, verifyLoginAction } from "@/lib/journey-guidance";
 import {
   detectPackageManager,
   devCommandFor,
   inDirectory,
   installCommandFor,
-  runPackageCommand,
   type PackageCommand,
   type PackageManager,
+  runPackageCommand,
 } from "@/lib/package-manager";
 import {
   type EnvironmentSelector,
   projectCommand,
-  shellCommand,
   type SuggestedCommand,
+  shellCommand,
 } from "@/lib/suggestion";
 
 type InstallReason = "dry-run" | "skip-install" | "no-dependency-changes";
 
 export type SetupInstall = {
-  status: "completed" | "skipped" | "not-needed";
+  status: "completed" | "would-run" | "skipped" | "not-needed";
   package_manager: PackageManager;
   command: string;
   reason?: InstallReason;
@@ -68,6 +67,12 @@ export type SetupInstallInput = {
   selector: EnvironmentSelector;
   scaffoldedFramework: boolean;
   skipInstall: boolean;
+  /**
+   * How the install is drawn: the command's `this.ui.task`, so the step sits
+   * in the same chain as every other one setup reports. Passed in rather than
+   * reached for, because this module draws nothing itself.
+   */
+  task: <T>(label: string, work: () => Promise<T>, done?: (result: T) => string) => Promise<T>;
   run?: typeof runPackageCommand;
 };
 
@@ -108,12 +113,18 @@ export async function installDependenciesForSetup(
 
   if (input.dryRun || input.skipInstall) {
     return outcome({
-      install: {
-        status: "skipped",
-        package_manager: packageManager,
-        command: installCommand.display,
-        reason: input.dryRun ? "dry-run" : "skip-install",
-      },
+      install: input.dryRun
+        ? {
+            status: "would-run",
+            package_manager: packageManager,
+            command: installCommand.display,
+          }
+        : {
+            status: "skipped",
+            package_manager: packageManager,
+            command: installCommand.display,
+            reason: "skip-install",
+          },
       devCommand: shownDev,
       installCommand: shownInstall,
       cliVersion: input.cliVersion,
@@ -123,17 +134,29 @@ export async function installDependenciesForSetup(
     });
   }
 
-  consola.start(`Installing dependencies with ${installCommand.display}`);
-  try {
-    await (input.run ?? runPackageCommand)(installCommand, {
-      cwd: input.cwd,
-      env: input.env,
-      redirectStdoutToStderr: input.json,
+  const label = `Installing dependencies with ${installCommand.display}`;
+  const install = async (): Promise<void> => {
+    try {
+      await (input.run ?? runPackageCommand)(installCommand, {
+        cwd: input.cwd,
+        env: input.env,
+        redirectStdoutToStderr: input.json,
+      });
+    } catch (error) {
+      throw installFailed(error, installCommand, devCommand, shownInstall, input.cwd);
+    }
+  };
+
+  if (input.json) {
+    await input.task(label, install, () => {
+      return "Installed dependencies";
     });
-  } catch (error) {
-    throw installFailed(error, installCommand, devCommand, shownInstall, input.cwd);
+  } else {
+    // The package manager writes to the terminal itself, so no spinner may draw over it.
+    log.start(label);
+    await install();
+    log.done("Installed dependencies");
   }
-  consola.success("Installed dependencies");
 
   return outcome({
     install: {
@@ -169,9 +192,17 @@ function outcome(input: {
   ];
   const boxActions: BoxAction[] = [
     ...(input.includeInstallCommand
-      ? [{ text: "Install dependencies:", command: input.installCommand }]
+      ? [
+          {
+            text: "Setup did not install the new dependencies, so install them first:",
+            command: input.installCommand,
+          },
+        ]
       : []),
-    { text: `Start your project (then open ${input.issuer}/register):`, command: input.devCommand },
+    {
+      text: `Start your project (then open ${input.issuer}/register):`,
+      command: input.devCommand,
+    },
     { text: verifyLoginAction() },
     // The dev server holds the terminal it starts in, and every later command
     // reads `.zitadel/` from this directory.
@@ -179,9 +210,10 @@ function outcome(input: {
       text: "The dev server keeps its terminal busy. Open a second terminal in this directory for further commands.",
     },
     {
-      text: "Once login works, this shows your next steps (customizing is covered in your README's Zitadel section):",
+      text: "Once login works, this shows your next steps:",
       command: statusCommand,
     },
+    { text: "Customizing the login is covered in your README's Zitadel section." },
   ];
   return {
     install: input.install,
@@ -191,9 +223,15 @@ function outcome(input: {
       ...verifyActions,
       ...customizeAndPublishActions(input.cliVersion, input.selector),
     ],
+    // The status command is in the box's steps, so a script gets it too.
     nextCommands: input.includeInstallCommand
-      ? [shellCommand(input.installCommand), shellCommand(input.devCommand), planCommand]
-      : [shellCommand(input.devCommand), planCommand],
+      ? [
+          shellCommand(input.installCommand),
+          shellCommand(input.devCommand),
+          planCommand,
+          statusCommand,
+        ]
+      : [shellCommand(input.devCommand), planCommand, statusCommand],
   };
 }
 
@@ -207,7 +245,11 @@ function installFailed(
   return new ZitadelError("E_VALIDATION", `Dependency install failed: ${installCommand.display}`, {
     hint: `Run ${installCommand.display} in ${cwd}, then start the app with ${devCommand.display}.`,
     nextCommands: [shellCommand(shownInstall)],
-    details: { command: installCommand.display, cwd, original: errorShape(error) },
+    details: {
+      command: installCommand.display,
+      cwd,
+      original: errorShape(error),
+    },
   });
 }
 

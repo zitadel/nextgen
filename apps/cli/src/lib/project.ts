@@ -60,7 +60,7 @@ export async function readZitadelConfig(cwd: string): Promise<Record<string, unk
   } catch (error) {
     if (isErrno(error, "ENOENT")) {
       throw new ZitadelError("E_VALIDATION", "zitadel.json was not found", {
-        hint: "Run `zitadel setup` first.",
+        hint: "Set the project up first.",
         nextCommands: [unscopedCommand("setup")],
       });
     }

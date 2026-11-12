@@ -95,7 +95,10 @@ export async function assertMountsRootComponent(
   }
   // Several candidates only come from JSX that renders siblings, such as a
   // toaster beside the app; the one named like the root is the one to report.
-  const mountedRoot = foreign.find((file) => stem(file) === stem(root.path)) ?? foreign[0];
+  const mountedRoot =
+    foreign.find((file) => {
+      return stem(file) === stem(root.path);
+    }) ?? foreign[0];
   if (mountedRoot === undefined) {
     return;
   }
@@ -148,9 +151,23 @@ function withoutComments(html: string): string {
   // An unterminated comment runs to the end of the input, so everything from
   // its `<!--` on is dropped.
   const comments = [...html.matchAll(/<!--[\s\S]*?(?:-->|$)/g)];
-  const textStarts = [0, ...comments.map((comment) => comment.index + comment[0].length)];
-  const textEnds = [...comments.map((comment) => comment.index), html.length];
-  return textEnds.map((end, i) => html.slice(textStarts[i], end)).join("");
+  const textStarts = [
+    0,
+    ...comments.map((comment) => {
+      return comment.index + comment[0].length;
+    }),
+  ];
+  const textEnds = [
+    ...comments.map((comment) => {
+      return comment.index;
+    }),
+    html.length,
+  ];
+  return textEnds
+    .map((end, i) => {
+      return html.slice(textStarts[i], end);
+    })
+    .join("");
 }
 
 /**
@@ -353,9 +370,15 @@ async function resolveLocalModule(
   const withoutExtension = base.slice(0, base.length - extension.length);
   const candidates = [
     base,
-    ...SCRIPT_EXTENSIONS.map((ext) => `${base}${ext}`),
-    ...(TYPESCRIPT_FOR_JAVASCRIPT[extension] ?? []).map((ext) => `${withoutExtension}${ext}`),
-    ...SCRIPT_EXTENSIONS.map((ext) => posix.join(base, `index${ext}`)),
+    ...SCRIPT_EXTENSIONS.map((ext) => {
+      return `${base}${ext}`;
+    }),
+    ...(TYPESCRIPT_FOR_JAVASCRIPT[extension] ?? []).map((ext) => {
+      return `${withoutExtension}${ext}`;
+    }),
+    ...SCRIPT_EXTENSIONS.map((ext) => {
+      return posix.join(base, `index${ext}`);
+    }),
   ];
   for (const candidate of candidates) {
     if (candidate === managed || (await isFile(join(cwd, candidate)))) {

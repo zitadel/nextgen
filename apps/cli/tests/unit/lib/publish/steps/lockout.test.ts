@@ -434,7 +434,7 @@ describe("lockoutStep", () => {
 
       expect(said).toEqual([
         expect.stringContaining(
-          "users update <user_id> --schema <revision_id> --set attributes.username=<value>",
+          "users update '<user_id>' --schema '<revision_id>' --set 'attributes.username=<value>'",
         ),
       ]);
     });
@@ -451,7 +451,7 @@ describe("lockoutStep", () => {
       const said = await everythingSaid(context);
 
       expect(said).toEqual([
-        expect.stringContaining("--set attributes.username=<value> --env staging"),
+        expect.stringContaining("--set 'attributes.username=<value>' --env staging"),
       ]);
     });
 
@@ -466,7 +466,7 @@ describe("lockoutStep", () => {
 
       const said = await everythingSaid(context);
 
-      expect(said).toEqual([expect.stringContaining("--set attributes.account.handle=<value>")]);
+      expect(said).toEqual([expect.stringContaining("--set 'attributes.account.handle=<value>'")]);
     });
 
     it("does not read an inherited property as the identifier", async () => {

@@ -138,7 +138,9 @@ const RENAME_BODY = [
 
 /** `lines`, each indented by two more spaces. */
 function nested(lines: readonly string[]): string[] {
-  return lines.map((line) => (line === "" ? "" : `  ${line}`));
+  return lines.map((line) => {
+    return line === "" ? "" : `  ${line}`;
+  });
 }
 
 /** How the Vite proxy entry reads the project id: from `.env.local` through Vite's `loadEnv`. */
@@ -283,5 +285,9 @@ export function proxyConfSessionCookieStatementsV1(): string[] {
 
 /** `lines`, each indented by `indent` (blank lines stay blank), joined with `eol`. */
 export function indented(lines: readonly string[], indent: string, eol = "\n"): string {
-  return lines.map((line) => (line === "" ? "" : `${indent}${line}`)).join(eol);
+  return lines
+    .map((line) => {
+      return line === "" ? "" : `${indent}${line}`;
+    })
+    .join(eol);
 }

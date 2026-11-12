@@ -5,6 +5,7 @@ import { ZitadelError } from "@/lib/errors";
 import { Failure, JsonFailureOutput, TerminalFailureOutput } from "@/lib/oclif/failure";
 import { type SuggestedCommand, unscopedCommand } from "@/lib/suggestion";
 import { escapeJsonControlCharacters } from "@/lib/terminal-text";
+import { Ui } from "@/lib/ui";
 import { closest } from "@/lib/zitadel/utils/spelling";
 
 /** The exit code a shell reports for a command it cannot find, which scripts already branch on. */
@@ -269,8 +270,10 @@ const hook: Hook<"command_not_found"> = async function ({ id, argv, config }) {
           ),
         );
       })
-    : new TerminalFailureOutput((text) => {
-        ux.stderr(text);
+    : new TerminalFailureOutput((summary) => {
+        // Nothing has been drawn yet, so the summary is written out as a run off a terminal writes it.
+        const ui = new Ui({ interactive: false, force: false }, "plain");
+        ux.stderr(ui.written(summary).replace(/\n+$/, ""));
       });
   output.write(failure);
   return this.exit(UNKNOWN_COMMAND_EXIT_CODE);

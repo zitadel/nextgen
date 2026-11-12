@@ -18,50 +18,17 @@
  * `lib/oclif`, and none of `lib/backend`: nothing here calls the server. It
  * depends sideways only on `lib/zitadel` (the configuration a provider is
  * added to) and shared utilities under `apps/cli/src/lib/` — today
- * `lib/errors` (`ZitadelError`), `lib/input` (`Asker`), `lib/warnings`
+ * `lib/errors` (`ZitadelError`), `lib/ui` (`Questions`), `lib/warnings`
  * (`reportWarning`) and `lib/suggestion` (the suggested follow-up commands).
  */
-export {
-  customFlagText,
-  selectionFromFlags,
-  type CustomFlagNames,
-  checkGivenCustomFlags,
-  customExample,
-  customFlagValues,
-  ENABLE_FLAG_KEYS,
-  flagText,
-  SETUP_FLAG_KEYS,
-  loopbackIssuerWarning,
-  type LoopbackReach,
-  ENABLE_FLAG_NAMES,
-  givenCustomFlags,
-  SETUP_FLAG_NAMES,
-  ssoEnableArgs,
-  type CustomFlagValues,
-} from "./custom";
 
 export { callbackUriFor } from "./callback";
-
-export { askConnectionEndpoints } from "./endpoints";
-
-export {
-  ProviderChoice,
-  type ProviderFlags,
-  type ProviderRun,
-  type ProviderTarget,
-  type StoredSettings,
-} from "./provider";
-
-export { CredentialPrompt, type PromptRun } from "./prompt";
-
-export { CredentialDelivery, type DeliveryRun } from "./delivery";
-
 export {
   type CredentialNames,
   type GivenCredentials,
   type PublishedCredentials,
-  publishClientId,
   type PublishState,
+  publishClientId,
   reportClientIdOutcome,
   reportSecretOutcome,
   republishArgs,
@@ -71,3 +38,31 @@ export {
   type SecretPublisher,
   storeClientSecret,
 } from "./credentials";
+export {
+  type CustomFlagNames,
+  type CustomFlagValues,
+  checkGivenCustomFlags,
+  customExample,
+  customFlagText,
+  customFlagValues,
+  ENABLE_FLAG_KEYS,
+  ENABLE_FLAG_NAMES,
+  flagText,
+  givenCustomFlags,
+  type LoopbackReach,
+  loopbackIssuerWarning,
+  SETUP_FLAG_KEYS,
+  SETUP_FLAG_NAMES,
+  selectionFromFlags,
+  ssoEnableArgs,
+} from "./custom";
+export { CredentialDelivery, type DeliveryRun } from "./delivery";
+export { askConnectionEndpoints } from "./endpoints";
+export { CredentialPrompt, type PromptRun } from "./prompt";
+export {
+  ProviderChoice,
+  type ProviderFlags,
+  type ProviderRun,
+  type ProviderTarget,
+  type StoredSettings,
+} from "./provider";

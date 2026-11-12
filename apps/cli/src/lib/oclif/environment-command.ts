@@ -1,22 +1,22 @@
-import { consola } from "consola";
-
 import { createZitadelClient } from "@/lib/backend";
 import { type Environment, requireValueInteractive, resolveEnvironment } from "@/lib/environment";
 import { resolveCwd } from "@/lib/paths";
 import { BaseCommand, type MetaOptions } from "./base";
-import { byName } from "./names";
 import { CREDENTIALS, type CredentialKind } from "./credentials";
 import {
   ENVIRONMENT_SELECTOR_OPTIONS,
   environmentFlags,
   environmentSelectorSuffix,
 } from "./environment-flags";
-import type { ConnectOptions, Connection, GlobalOptions } from "./types";
+import { byName } from "./names";
+import { Suggestible } from "./suggestible";
+import type { Connection, ConnectOptions, GlobalOptions } from "./types";
 
 export type { Connection } from "./types";
-import { type EnvironmentSelector, projectCommand, type SuggestedCommand } from "@/lib/suggestion";
-import { optionArgs } from "@/lib/public-cli";
+
 import { Cmd } from "@/lib/cmd";
+import { optionArgs } from "@/lib/public-cli";
+import type { EnvironmentSelector, SuggestedCommand } from "@/lib/suggestion";
 import { userAgent } from "@/lib/user-agent";
 
 /**
@@ -29,7 +29,7 @@ import { userAgent } from "@/lib/user-agent";
  * Which credential it authenticates with is `static credential`; the project
  * secret unless a subclass says otherwise.
  */
-export abstract class EnvironmentCommand extends BaseCommand {
+export abstract class EnvironmentCommand extends Suggestible(BaseCommand) {
   static override baseFlags = { ...BaseCommand.baseFlags, ...environmentFlags };
 
   static credential: CredentialKind = "project";
@@ -39,7 +39,7 @@ export abstract class EnvironmentCommand extends BaseCommand {
   /** What the invocation resolved to; set by {@link toMeta}. */
   protected environment!: Environment;
 
-  /** `--cwd` as typed, reproduced by {@link environmentSelector}. */
+  /** `--cwd` as typed, reproduced by {@link selector}. */
   private cwdFlag: string | undefined;
 
   /**
@@ -56,8 +56,9 @@ export abstract class EnvironmentCommand extends BaseCommand {
     options: MetaOptions = {},
   ): Promise<GlobalOptions> {
     const flags = byName(given);
-    const text = (value: unknown): string | undefined =>
-      typeof value === "string" ? value : undefined;
+    const text = (value: unknown): string | undefined => {
+      return typeof value === "string" ? value : undefined;
+    };
     this.cwdFlag = text(flags.cwd);
     // A command that only edits files in the project directory resolves none:
     // a stray ZITADEL_ENV must not stop it, and it names no server or project.
@@ -71,6 +72,7 @@ export abstract class EnvironmentCommand extends BaseCommand {
       envName: text(flags.env),
       envFile: text(flags.envFile),
     });
+
     return super.toMeta(given, {
       resolveServer: false,
       source: this.environment.values.ZITADEL_URL?.value ?? "",
@@ -91,7 +93,12 @@ export abstract class EnvironmentCommand extends BaseCommand {
    * invocation used no selector.
    */
   protected environmentSelector(): EnvironmentSelector {
+    // A command that resolved no environment has only its directory to put back.
+    if ((this.environment as Environment | undefined) === undefined) {
+      return this.cwdSelector();
+    }
     const { environment } = this;
+
     return environmentSelectorSuffix({
       cwd: this.cwdFlag,
       envFile: environment.envFile,
@@ -103,12 +110,20 @@ export abstract class EnvironmentCommand extends BaseCommand {
     });
   }
 
+  protected override selector(): EnvironmentSelector {
+    return this.environmentSelector();
+  }
+
   /**
    * {@link environmentSelector} as arguments, for a result that reports its
    * follow-ups as argument lists too (`next_args`).
    */
   protected environmentSelectorArgs(): string[] {
+    if ((this.environment as Environment | undefined) === undefined) {
+      return this.cwdFlag === undefined ? [] : optionArgs("--cwd", this.cwdFlag);
+    }
     const { environment } = this;
+
     return [
       ...(environment.envFile !== undefined
         ? optionArgs("--env-file", environment.envFile)
@@ -120,16 +135,6 @@ export abstract class EnvironmentCommand extends BaseCommand {
         : []),
       ...(this.cwdFlag === undefined ? [] : optionArgs("--cwd", this.cwdFlag)),
     ];
-  }
-
-  /**
-   * A `zitadel` command aimed at this run's project: `args` with this run's
-   * {@link environmentSelector} appended, in the public `npx` form. Use it for
-   * every suggestion a project command makes; a command that deliberately
-   * leaves the project uses {@link BaseCommand.suggestUnscoped}.
-   */
-  protected suggest(args: string): SuggestedCommand {
-    return projectCommand(args, this.environmentSelector(), this.meta.cliVersion);
   }
 
   /** A follow-up the framework suggests, such as a list's next page, aimed at this project. */
@@ -147,6 +152,7 @@ export abstract class EnvironmentCommand extends BaseCommand {
       return super.retryCommand(words);
     }
     const line = Cmd.of(words).without(ENVIRONMENT_SELECTOR_OPTIONS);
+
     return this.suggest(line.toString());
   }
 
@@ -155,10 +161,8 @@ export abstract class EnvironmentCommand extends BaseCommand {
    * credential. It fails, naming the variable, when the server, the project or
    * the credential is missing.
    *
-   * Which project and server the command is about is worth stating to a person,
-   * but those lines share stdout with the result, so they are printed only on a
-   * terminal: on a pipe the result travels alone, and `--json` silences them
-   * either way. `quiet` is for a command whose own output is that summary.
+   * Which project and server the command is about is recorded for its ending
+   * to state once, at its foot; nothing is printed here.
    *
    * One connection is opened per set of options and shared by every caller,
    * a requirement that needs the project and the command's own `execute`
@@ -172,7 +176,9 @@ export abstract class EnvironmentCommand extends BaseCommand {
     // two "Project/Server" lines and two credential prompts.
     const key = JSON.stringify(
       Object.fromEntries(
-        Object.entries(options).sort(([one], [other]) => one.localeCompare(other)),
+        Object.entries(options).sort(([one], [other]) => {
+          return one.localeCompare(other);
+        }),
       ),
     );
     const already = this.connections.get(key);
@@ -186,6 +192,7 @@ export abstract class EnvironmentCommand extends BaseCommand {
       throw error;
     });
     this.connections.set(key, open);
+
     return open;
   }
 
@@ -196,21 +203,20 @@ export abstract class EnvironmentCommand extends BaseCommand {
     // value still says which credential it was after.
     this.recordTelemetry({ credential, has_env_file: environment.envFile !== undefined });
     // On a terminal a missing value is prompted for and persisted to
-    // `.env.<name>.local` (#1313); non-interactively each still throws, naming
+    // `.env.<name>.local`; non-interactively each still throws, naming
     // the sources consulted, so a scripted run stays deterministic.
     // A dry run writes nothing, and an answer is persisted to a file, so it
     // never asks: a missing value fails it exactly as a scripted run.
     const ask = {
-      cwd: this.meta.cwd,
-      interactive: !this.meta.nonInteractive && !this.meta.dryRun && options.prompt !== false,
+      cwd: this.cwd,
+      interactive: !this.nonInteractive && !this.dryRun && options.prompt !== false,
+      ask: this.ui.questions(),
     };
     const server = await requireValueInteractive(environment, "ZITADEL_URL", ask);
     const projectId = await requireValueInteractive(environment, "ZITADEL_PROJECT_ID", ask);
     const token = await requireValueInteractive(environment, CREDENTIALS[credential], ask);
-    if (this.isOnScreen && !options.quiet) {
-      consola.info(`Project   ${projectId}`);
-      consola.info(`Server    ${server}`);
-    }
+    this.ui.ranAgainst(projectId, server);
+
     return {
       client: createZitadelClient({
         userAgent: userAgent(),
@@ -241,7 +247,7 @@ export abstract class EnvironmentCommand extends BaseCommand {
  * the CLI only chooses which token to present.
  *
  * Which one that is, is {@link PREVIEW_CREDENTIAL}: the project secret for now,
- * because the server does not accept the narrower preview token yet (#1575).
+ * because the server does not accept the narrower preview token yet.
  * Every message naming the variable derives it from there, so moving back to
  * `preview` is this one constant.
  */

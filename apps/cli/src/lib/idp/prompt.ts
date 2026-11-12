@@ -2,20 +2,20 @@ import {
   type ClientId,
   type ClientSecretVariable,
   type ConnectionEndpoints,
+  type ProviderSelection,
   parseClientId,
   parseClientSecret,
   providerOf,
-  type ProviderSelection,
   selectionName,
 } from "@zitadel/config/idp";
 
-import type { Asker } from "@/lib/input";
 import {
   type EnvironmentSelector,
   inShell,
   projectCommand,
   type SuggestedCommand,
 } from "@/lib/suggestion";
+import type { Questions } from "@/lib/ui";
 
 import type { GivenCredentials } from "./credentials";
 import { askConnectionEndpoints } from "./endpoints";
@@ -40,9 +40,9 @@ export type PromptRun = {
   readonly secretVariable: ClientSecretVariable | undefined;
 
   /**
-   * How a question is asked: the running command's `input`.
+   * How a question is asked: the running command's `this.ask`.
    */
-  readonly ask: Asker;
+  readonly ask: Questions;
 
   /**
    * Whether this is a development build that may ask where the provider
@@ -103,23 +103,26 @@ export class CredentialPrompt {
     const provider = providerOf(this.run.selection);
     if (this.run.reused) {
       // Only read so that a rerun can replace a secret the project holds.
-      const secret = await this.run.ask({
-        kind: "secret",
+      const secret = await this.run.ask.secret({
         name: "client secret",
         message: `What is the client secret of your ${provider.displayName} OAuth app?`,
         parse: parseClientSecret,
         stdin: true,
         optional: true,
       });
-      return { endpoints: undefined, clientId: givenClientId, secret };
+
+      return {
+        endpoints: undefined,
+        clientId: givenClientId,
+        secret,
+      };
     }
     // Before the credentials: on a development run (ZITADEL_CLI_DEV) the
     // provider may be a local stand-in, and the client is registered with
     // whatever answers. Not asked of a custom connection, whose issuer the
     // developer has already given.
     const endpoints = await this.askEndpoints();
-    const clientId = await this.run.ask({
-      kind: "text",
+    const clientId = await this.run.ask.text({
       name: `client id for ${provider.displayName}`,
       message: `What is the client ID of your ${provider.displayName} OAuth app?`,
       flag: "--client-id",
@@ -128,15 +131,19 @@ export class CredentialPrompt {
       retry: this.retryFor("<client-id>", ""),
     });
     const secretVariable = this.run.secretVariable;
-    const secret = await this.run.ask({
-      kind: "secret",
+    const secret = await this.run.ask.secret({
       name: `client secret for ${secretVariable}`,
       message: `What is the client secret of your ${provider.displayName} OAuth app? It will be stored on the project as ${secretVariable}.`,
       parse: parseClientSecret,
       stdin: true,
       retry: this.retryFor(clientId, `printf '%s' "$CLIENT_SECRET" | `),
     });
-    return { endpoints, clientId, secret };
+
+    return {
+      endpoints,
+      clientId,
+      secret,
+    };
   }
 
   /**
@@ -149,6 +156,7 @@ export class CredentialPrompt {
     if (selection.kind !== "catalog") {
       return undefined;
     }
+
     return askConnectionEndpoints({
       provider: selection.id,
       developmentBuild: this.run.developmentBuild,
@@ -174,6 +182,7 @@ export class CredentialPrompt {
       this.run.selector,
       this.run.cliVersion,
     );
+
     return inShell(command, { before: pipe });
   }
 }

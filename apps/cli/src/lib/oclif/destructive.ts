@@ -1,22 +1,13 @@
 import { Consent, type Gate } from "@/lib/consent";
-import { Cmd } from "@/lib/cmd";
-import { inShell } from "@/lib/suggestion";
-import type { BaseCommand } from "./base";
+import { CANCELLED } from "@/lib/errors";
+
+import { ANSWERING, type BaseCommand } from "./base";
 import { Promptable } from "./promptable";
 import type { CommandResult } from "./types";
 
 /** A class that can be extended, abstract or not, whatever arguments it takes. */
 // biome-ignore lint/suspicious/noExplicitAny: the constructor of any command, which a mixin cannot name
 type CommandClass<T extends BaseCommand> = abstract new (...args: any[]) => T;
-
-/** Flags that say how a run answers, not what it does, so a retry leaves them out. */
-const ANSWERING = new Set(["force", "json", "non-interactive"]);
-
-/**
- * The `user:password@` of a URL, which a retry never prints: everything in the
- * authority up to its last `@`, since a password may hold one.
- */
-const CREDENTIALS = /(\w+:\/\/)[^/?#\s]*@/g;
 
 /** A result that ends a run before anyone is asked, from {@link DestructiveChange.prepare}. */
 export class Settled {
@@ -28,7 +19,13 @@ export class Settled {
 }
 
 /** A destructive change: the question that guards it, and the change. */
-export type DestructiveChange<Ready = undefined> = Gate & {
+export type DestructiveChange<Ready = undefined> = Omit<Gate, "message"> & {
+  /**
+   * The question as the prompt shows it. A function words it from what
+   * `prepare` read, for a question that names the project and server the
+   * change is made on, which only the connection knows.
+   */
+  message: string | ((ready: Ready) => string | Promise<string>);
   /** The result of a dry run, which never asks, never reads and never acts. */
   preview: () => CommandResult | Promise<CommandResult>;
   /**
@@ -69,19 +66,31 @@ export function Destructive<TBase extends CommandClass<BaseCommand>>(Base: TBase
       preview,
       prepare,
       apply,
+      message,
       ...gate
     }: DestructiveChange<Ready>): Promise<CommandResult> {
-      if (this.meta.dryRun) {
+      if (this.dryRun) {
         return preview();
       }
       const ready = prepare === undefined ? undefined : await prepare();
       if (ready instanceof Settled) {
         return ready.result;
       }
-      const consent = await this.consent(gate);
+      const consent = await this.consent({
+        ...gate,
+        message: typeof message === "function" ? await message(ready as Ready) : message,
+      });
       if (consent === undefined) {
-        return { status: "skipped", reason: `${gate.verb}-cancelled` };
+        return {
+          status: "skipped",
+          reason: `${gate.verb}-cancelled`,
+          summary: {
+            title: CANCELLED,
+            sections: [],
+          },
+        };
       }
+
       // Without a `prepare`, `Ready` is its default, `undefined`.
       return apply(consent, ready as Ready);
     }
@@ -97,44 +106,34 @@ export function Destructive<TBase extends CommandClass<BaseCommand>>(Base: TBase
      * `arguments` in their place), `--force`, then each flag but the ones that
      * only say how to answer, with a URL's credentials left out and the
      * selector put back on by {@link BaseCommand.retryCommand}. Arguments that
-     * read as flags go last, after a `--`.
+     * read as flags go last, after a `--` ({@link BaseCommand.typedRun}).
      */
     protected async consent(gate: Gate): Promise<Consent | undefined> {
-      const { raw } = await this.parse();
-      const definitions: Record<string, { type: string } | undefined> = {
-        ...this.ctor.baseFlags,
-        ...this.ctor.flags,
+      const retry = await this.typedRun({
+        add: ["--force"],
+        leave: ANSWERING,
+        arguments: gate.arguments,
+      });
+      const session = {
+        interactive: !this.nonInteractive,
+        force: this.force,
+        dryRun: this.dryRun,
       };
-      const redact = (word: string) => word.replace(CREDENTIALS, "$1");
-      const positional = (
-        gate.arguments ?? raw.flatMap((token) => (token.type === "arg" ? [token.input] : []))
-      ).map(redact);
-      const flags = raw.flatMap((token) => {
-        if (token.type !== "flag" || ANSWERING.has(token.flag)) {
-          return [];
-        }
-        // A boolean's input is the flag as typed (`--no-color`, `-v`). A value
-        // that starts with `-` stays one word with its flag, or it reads as one.
-        const value = redact(token.input);
-        if (definitions[token.flag]?.type === "boolean") {
-          return [token.input];
-        }
-        return value.startsWith("-") ? [`--${token.flag}=${value}`] : [`--${token.flag}`, value];
-      });
-      const delimited = positional.some((word) => word.startsWith("-"));
-      const command = this.retryCommand([
-        ...(this.id ?? "").split(":").filter((word) => word !== ""),
-        ...(delimited ? [] : positional),
-        "--force",
-        ...flags,
-      ]);
-      const retry = delimited ? inShell(command, { after: ` -- ${Cmd.of(positional)}` }) : command;
-      return Consent.request("retry" in gate ? gate : { ...gate, retry }, {
-        interactive: !this.meta.nonInteractive,
-        force: this.meta.force,
-        dryRun: this.meta.dryRun,
-      });
+
+      return Consent.request(
+        "retry" in gate
+          ? gate
+          : {
+              ...gate,
+              retry,
+            },
+        {
+          ...session,
+          confirmer: this.ui.confirmer(session),
+        },
+      );
     }
   }
+
   return DestructiveCommand;
 }

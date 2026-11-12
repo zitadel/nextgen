@@ -11,7 +11,7 @@ vi.mock("@/lib/local-server/server", async (importOriginal) => {
   };
 });
 
-import { confirm, isCancel, log, multiselect, note, password, select, text } from "@clack/prompts";
+import { confirm, isCancel, multiselect, password, select, text } from "@clack/prompts";
 import { IDP_PROVIDERS } from "@zitadel/config/idp";
 
 import {
@@ -29,7 +29,7 @@ import {
   UseCasePrompt,
 } from "@/commands/setup/prompts";
 import { ZitadelError } from "@/lib/errors";
-import { type Asker, input } from "@/lib/input";
+import { asker } from "@/lib/input";
 import { LocalServer } from "@/lib/local-server/server";
 import { environmentSelectorSuffix } from "@/lib/oclif/environment-flags";
 import { projectCommand } from "@/lib/suggestion";
@@ -109,20 +109,41 @@ const QUESTIONS = {
 
 /**
  * How the wizard asks: interactively, without `--force`.
- *
- * @param question - The question.
- * @returns The answer.
  */
-const ask: Asker = (question) => {
-  return input(question, { interactive: true, force: false });
-};
+const ask = asker({ interactive: true, force: false });
+
+/**
+ * The boxes a prompt drew, as setup's own context would have drawn them.
+ */
+const noted = vi.fn<(title: string, lines: readonly string[]) => void>();
+
+/**
+ * The lines a prompt said, as setup's own context would have said them.
+ */
+const said = vi.fn<(text: string) => void>();
+
+/**
+ * A box a prompt drew, as the one string the reader sees.
+ *
+ * @param call - Which box, counting from the first.
+ * @returns The box's title and body.
+ */
+function noteShown(call = 0): { title?: string; body: string } {
+  const [title, lines] = noted.mock.calls[call] ?? [];
+  return { title, body: (lines ?? []).join("\n") };
+}
 
 /**
  * What every prompt is given, as setup builds it: its suggestions are aimed
  * at the project setup creates.
  */
 const CONTEXT: PromptContext = {
-  input: ask,
+  ask,
+  note: noted,
+  say: said,
+  spinner: () => {
+    return { message: vi.fn(), stop: vi.fn(), clear: vi.fn() };
+  },
   framework: FRAMEWORK,
   cwd: APP_DIR,
   suggest: (args) => {
@@ -375,7 +396,7 @@ describe("ServerPrompt", () => {
   });
 
   describe("when no local server is detected", () => {
-    it("lists the local server as unavailable, saying how to start it", async () => {
+    it("lists the local server as unavailable, and says to start it", async () => {
       vi.mocked(select).mockResolvedValueOnce(CLOUD);
 
       await new ServerPrompt().ask(setupAnswers(), CONTEXT);
@@ -385,7 +406,7 @@ describe("ServerPrompt", () => {
         {
           value: "__local_not_running__",
           label: "Local server",
-          hint: "not running — run zitadel start first",
+          hint: "not running — start it first",
           disabled: true,
         },
         { value: CUSTOM_SERVER, label: "Custom URL (self-hosted)" },
@@ -906,7 +927,7 @@ describe("SocialSignInPrompt", () => {
 
       await new SocialSignInPrompt().ask(setupAnswers({ devPort: 4321 }), CONTEXT);
 
-      expect(vi.mocked(note).mock.calls[0]?.[0]).toContain(GOOGLE_CALLBACK);
+      expect(noteShown().body).toContain(GOOGLE_CALLBACK);
     });
 
     it("names the project variable the client secret is saved as", async () => {
@@ -1017,7 +1038,7 @@ describe("SocialSignInPrompt", () => {
     it("says how to add it later", async () => {
       await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
 
-      expect(log.info).toHaveBeenCalledWith(
+      expect(said).toHaveBeenCalledWith(
         [
           "Skipped Google. Once its OAuth application exists, add it with:",
           "npx @zitadel/cli@1.2.3 auth-method sso enable --provider google --env-file .env.development.local",
@@ -1104,7 +1125,7 @@ describe("SocialSignInPrompt", () => {
 
       await new SocialSignInPrompt().ask(setupAnswers({ devPort: 4321 }), CONTEXT);
 
-      expect(vi.mocked(note).mock.calls[0]?.[0]).toContain(shown);
+      expect(noteShown().body).toContain(shown);
     });
 
     it("leaves nothing undefined in the note", async () => {
@@ -1114,7 +1135,7 @@ describe("SocialSignInPrompt", () => {
 
       await new SocialSignInPrompt().ask(setupAnswers({ devPort: 4321 }), CONTEXT);
 
-      expect(vi.mocked(note).mock.calls[0]?.[0]).not.toContain("undefined");
+      expect(noteShown().body).not.toContain("undefined");
     });
 
     it("titles the note after the connection", async () => {
@@ -1124,7 +1145,7 @@ describe("SocialSignInPrompt", () => {
 
       await new SocialSignInPrompt().ask(setupAnswers({ devPort: 4321 }), CONTEXT);
 
-      expect(vi.mocked(note).mock.calls[0]?.[1]).toBe("Acme SSO sign-in");
+      expect(noteShown().title).toBe("Acme SSO sign-in");
     });
 
     describe("on a development build", () => {
@@ -1155,7 +1176,7 @@ describe("SocialSignInPrompt", () => {
     it.each([
       ["slug", "Acme", "Use lowercase letters"],
       ["slug", "google", "built-in provider"],
-      ["displayName", "  ", "Enter the name shown on the sign-in button"],
+      ["displayName", "  ", "The name shown on the sign-in button is empty"],
       ["issuer", "http://sso.acme.example", "Use an https:// URL"],
       ["scopes", "profile email", "openid"],
     ] as const)("refuses the %s %j as the server would", async (question, value, says) => {
@@ -1230,7 +1251,7 @@ describe("SocialSignInPrompt", () => {
       it("names the command that adds the connection as described later", async () => {
         await new SocialSignInPrompt().ask(setupAnswers(), CONTEXT);
 
-        expect(vi.mocked(log.info).mock.calls[0]?.[0]).toContain(
+        expect(said.mock.calls[0]?.[0]).toContain(
           "npx @zitadel/cli@1.2.3 auth-method sso enable --provider custom --slug acme-sso",
         );
       });

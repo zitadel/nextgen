@@ -1,3 +1,5 @@
+import { stripVTControlCharacters as stripAnsi } from "node:util";
+
 import {
   BackendError,
   ConflictError,
@@ -10,10 +12,21 @@ import {
 import { isObject } from "./json";
 import type { SuggestedCommand } from "./suggestion";
 import {
-  ConfigError,
   ConflictError as ConfigConflictError,
+  ConfigError,
   NotFoundError as ConfigNotFoundError,
 } from "./zitadel";
+
+/**
+ * The one sentence a cancellation ends on, wherever it is reported.
+ *
+ * One word, in the past tense and without a full stop, like every other
+ * closing line. It says nothing about what was or was not changed, because
+ * Ctrl-C can land after the work as easily as before it, and a sentence that
+ * is sometimes a lie is worse than a short one that is always true. A command
+ * that does know says so on a line under this one.
+ */
+export const CANCELLED = "Cancelled";
 
 /**
  * Closed set of failure categories the CLI can surface. Every error the
@@ -122,6 +135,18 @@ export class ZitadelError extends Error {
   }
 }
 
+/**
+ * A prompt the person walked away from. A drawn prompt closes its own chain
+ * when that happens, so whoever ends the run needs to tell this from any
+ * other cancellation, which leaves the chain open: the class says so, where a
+ * match on the message would break the day the message is reworded.
+ */
+export class PromptCancelled extends ZitadelError {
+  constructor() {
+    super("E_CANCELLED", "Cancelled by user");
+  }
+}
+
 /** What to do about a request that got no usable response, by its reason. */
 const NETWORK_HINTS: Record<UnavailableReason, string> = {
   unreachable: "Check your connection and the server URL (ZITADEL_URL or --server).",
@@ -153,7 +178,69 @@ function configErrorCode(error: ConfigError): ZitadelErrorCode {
   if (error instanceof ConfigNotFoundError) {
     return "E_NOT_FOUND";
   }
+
   return "E_VALIDATION";
+}
+
+/**
+ * oclif's footer under a command line it refused. It is oclif's own name for
+ * what this CLI calls `Next:`, and finding it is the only way to tell one of
+ * its parse errors from an ordinary failure: they arrive as plain `Error`s
+ * carrying a rendered block rather than a type of their own.
+ */
+const OCLIF_HELP = /\n *See more help with --help\s*$/;
+
+/** The heading oclif puts over the flags it rejected, which nothing else writes. */
+const OCLIF_PREAMBLE = /^The following errors? occurred:\n/;
+
+/** A failure's message as one sentence, which is how a person is shown it. */
+export type FailureText = {
+  /** What `Error: ` introduces, before the code in brackets. Said once, wherever the failure is drawn. */
+  readonly sentence: string;
+  /** The command line itself was refused, so `--help` is what to run next. */
+  readonly misuse: boolean;
+};
+
+/**
+ * A failure's message as the CLI says it to a person.
+ *
+ * It is the human rendering alone: `--json` carries `message` exactly as it
+ * was thrown, so a script that matches on it is unaffected by anything here.
+ *
+ * The message is said as it was thrown: a failure reads the same in the
+ * envelope's `message` and on a terminal, so nothing is capitalised or trimmed
+ * on the way. Only oclif's own rendering of a refused command line — a heading,
+ * an indented reason and a `--help` footer — is folded back into the one
+ * sentence the CLI states every other failure as, with the footer handed to
+ * the caller as {@link FailureText.misuse} so it can be offered under `Next:`
+ * like any other command the CLI suggests.
+ */
+export function failureText(message: string): FailureText {
+  if (!OCLIF_HELP.test(message)) {
+    return {
+      sentence: message,
+      misuse: false,
+    };
+  }
+  const [head = "", ...rest] = stripAnsi(message.replace(OCLIF_HELP, ""))
+    .replace(OCLIF_PREAMBLE, "")
+    .split("\n")
+    .map((line) => {
+      return line.trim();
+    })
+    .filter((line) => {
+      return line !== "";
+    });
+  const listed = rest.map((line) => {
+    return line.split(/\s{2,}/)[0] ?? line;
+  });
+
+  return {
+    sentence: head.endsWith(":")
+      ? `${head} ${listed.join(", ")}`.trim()
+      : [head, ...rest].join("; "),
+    misuse: true,
+  };
 }
 
 /**
@@ -245,6 +332,7 @@ function fromBackendError(error: BackendError): ZitadelError {
             : error instanceof UnavailableError
               ? "E_NETWORK"
               : "E_VALIDATION";
+
     return new ZitadelError(code, error.message, {
       ...(error.hint === undefined ? {} : { hint: error.hint }),
       ...(error.details === undefined ? {} : { details: error.details }),
@@ -276,6 +364,7 @@ function fromBackendError(error: BackendError): ZitadelError {
     const message = wrongServer
       ? `${error.message} — ${error.url} has no such endpoint; is this a Zitadel platform API?`
       : error.message;
+
     return new ZitadelError("E_NOT_FOUND", message, { details });
   }
   // A 409 is the platform refusing because of the state it holds — a
@@ -314,15 +403,16 @@ function fromBackendError(error: BackendError): ZitadelError {
     ...(resources.length > 0 ? [`${resources.join("; ")}.`] : []),
     ...(fields.length > 0
       ? [
-          `The server rejected ${fields.length === 1 ? "this field" : "these fields"}: ${fields.join(", ")}.`,
+          `The server rejected ${new Intl.PluralRules("en").select(fields.length) === "one" ? "this field" : "these fields"}: ${fields.join(", ")}.`,
         ]
       : []),
     ...(missing.length > 0
       ? [
-          `The server reports ${missing.length === 1 ? "this endpoint" : "these endpoints"} missing: ${missing.join(", ")}.`,
+          `The server reports ${new Intl.PluralRules("en").select(missing.length) === "one" ? "this endpoint" : "these endpoints"} missing: ${missing.join(", ")}.`,
         ]
       : []),
   ].join(" ");
+
   return new ZitadelError(code, error.message, {
     ...(hint !== "" ? { hint } : {}),
     details,
@@ -361,6 +451,7 @@ function listedInDetails(
       }
     }
   }
+
   return listedInDetails((body as { details?: unknown }).details, key, seen, depth + 1);
 }
 
@@ -391,6 +482,7 @@ function rejectedResources(body: unknown): string[] {
     }
     node = (node as { details?: unknown }).details;
   }
+
   return lines;
 }
 
@@ -410,7 +502,12 @@ function resourceLine(item: unknown): string | undefined {
   if (text === "") {
     return undefined;
   }
-  const subject = [kind, handle].filter((v) => typeof v === "string" && v !== "").join(" ");
+  const subject = [kind, handle]
+    .filter((part) => {
+      return typeof part === "string" && part !== "";
+    })
+    .join(" ");
+
   return subject === "" ? text : `${subject}: ${text}`;
 }
 
@@ -427,16 +524,6 @@ function resourceLine(item: unknown): string | undefined {
  */
 export function isCancellation(error: unknown): boolean {
   return error instanceof ZitadelError && error.code === "E_CANCELLED";
-}
-
-/**
- * Whether a request reached a server that has no such endpoint: a 404 without
- * the platform's error envelope. A Zitadel API answers a miss it knows about
- * with the envelope, so this is a route the server does not serve, such as one
- * added in a later release.
- */
-export function isMissingEndpoint(error: unknown): boolean {
-  return error instanceof NotFoundError && error.status === 404 && error.serverCode === undefined;
 }
 
 function isErrnoException(error: unknown): error is NodeJS.ErrnoException {

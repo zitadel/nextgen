@@ -2,7 +2,8 @@ import { Readable } from "node:stream";
 
 import { describe, expect, it } from "vitest";
 
-import { type Asker, input } from "@/lib/input";
+import { asker } from "@/lib/input";
+import type { Questions } from "@/lib/ui";
 import { CredentialPrompt, type PromptRun } from "@/lib/idp";
 import { environmentSelectorSuffix } from "@/lib/oclif/environment-flags";
 import { ZitadelError } from "@/lib/errors";
@@ -20,14 +21,12 @@ import {
  * @param piped - What was piped in on stdin; `undefined` stands for a terminal.
  * @returns The asker.
  */
-function asking(piped: string | undefined): Asker {
+function asking(piped: string | undefined): Questions {
   const stdin =
     piped === undefined
       ? Object.assign(Readable.from([]), { isTTY: true })
       : Readable.from([piped]);
-  return (question) => {
-    return input(question, { interactive: false, force: false, stdin });
-  };
+  return asker({ interactive: false, force: false, stdin });
 }
 
 /**
