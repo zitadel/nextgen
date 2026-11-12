@@ -43,6 +43,7 @@ const (
 	ResourceKindIDPConnection  ResourceKind = "idp_connection"
 	ResourceKindDeployment     ResourceKind = "deployment"
 	ResourceKindPolicy         ResourceKind = "policy"
+	ResourceKindApplication    ResourceKind = "application"
 	ResourceKindOAuthSettings  ResourceKind = "oauth_settings"
 )
 
