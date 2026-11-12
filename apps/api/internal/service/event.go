@@ -12,18 +12,23 @@ import (
 
 // ListEventsRequest is the input for listing project audit events (ADR 049).
 type ListEventsRequest struct {
-	ProjectID     string
-	Categories    []string
-	EventTypes    []string
-	ActorID       string
-	ClientID      string
-	SessionID     string
-	FlowID        string
-	RequestID     string
-	Fingerprint   string
-	EntityType    string
-	EntityID      string
-	TeamID        string
+	ProjectID   string
+	Categories  []string
+	EventTypes  []string
+	ActorID     string
+	ClientID    string
+	SessionID   string
+	FlowID      string
+	RequestID   string
+	Fingerprint string
+	EntityType  string
+	EntityID    string
+	TeamID      string
+	// OperationIDs and StatusClasses match request.api events by the
+	// operation they record and the class of their response status
+	// (domain.HTTPStatusClass), each any of the values named.
+	OperationIDs  []string
+	StatusClasses []string
 	CreatedAfter  *time.Time
 	CreatedBefore *time.Time
 	Order         string
@@ -204,11 +209,13 @@ func (s *EventService) fetchEvents(projectID string) events.FetchFunc {
 // eventRead is how one list is read, so that no read goes further than its
 // page or its budget, whatever the filter and the data.
 type eventRead struct {
-	// within is the one id the index leads with, after the project: nothing
-	// for a read by category, by type or by time alone.
+	// within is what the index leads with after the project, in every range
+	// of the read: one id, or one resource type. Nothing for a read by
+	// category, type, operation, status class or time alone.
 	within database.Filter[domain.EventField]
 	// each is the field read one value at a time, each a range of the index,
-	// and merged (events.ListEach): the category or the event type.
+	// and merged (events.ListEach): the category, the event type, the status
+	// class, or the operation with its status class (events.OperationStatus).
 	each   domain.EventField
 	values []string
 	// match is what the index does not hold. It is tried row by row over the
@@ -222,16 +229,22 @@ type eventRead struct {
 // time bounds and the page token narrow any of them:
 //
 //   - A request or a login flow holds few events and has an index by time.
-//   - A session, a resource and an actor can each hold as many events as the
-//     project, most of them of one category, so their indexes hold the
-//     category before the time. Their read is a range per category, the ones
-//     named or every one, merged.
-//   - Several event types, or several categories, are a range each of the
-//     type's or the category's index, merged.
+//   - A session, a resource, an actor and a resource type can each hold as
+//     many events as the project, most of them of one category, so their
+//     indexes hold the category before the time. Their read is a range per
+//     category, the ones named or every one, merged.
+//   - An operation's index holds it with the status class, as one key
+//     (events.OperationStatus), so its failed calls are a range apart from
+//     its successful ones. Its read is a range per operation and status
+//     class, the classes named or every one.
+//   - Several status classes, event types or categories are a range each of
+//     the class's, the type's or the category's index, merged.
 //
-// Of several ids, the first in that order reads and the others are matched,
-// as is everything no index holds: the application, the fingerprint, the
-// resource type and the team.
+// Of the ids, the first in that order reads, and the resource type reads only
+// beside none of them; the others are matched. Without either, operations
+// read before status classes, and those before types and categories. What a
+// read does not take is matched, as is what no index holds: the application,
+// the fingerprint and the team.
 func planEventRead(req ListEventsRequest) eventRead {
 	var read eventRead
 	equal := func(field domain.EventField, value string) database.Filter[domain.EventField] {
@@ -249,6 +262,7 @@ func planEventRead(req ListEventsRequest) eventRead {
 		{domain.EventFieldSessionID, req.SessionID, true},
 		{domain.EventFieldEntityID, req.EntityID, true},
 		{domain.EventFieldActorID, req.ActorID, true},
+		{domain.EventFieldEntityType, req.EntityType, true},
 	} {
 		switch {
 		case id.value == "":
@@ -259,21 +273,61 @@ func planEventRead(req ListEventsRequest) eventRead {
 		}
 	}
 
-	switch {
-	case byCategory:
-		read.each, read.values = domain.EventFieldCategory, req.Categories
-		if len(read.values) == 0 {
-			for _, category := range domain.EventCategories() {
-				read.values = append(read.values, string(category))
+	// The operation_status keys of the operations named, in the classes
+	// named or every class (events.OperationStatus): what a read by
+	// operation ranges over, or matches.
+	var operations []string
+	if len(req.OperationIDs) > 0 {
+		classes := req.StatusClasses
+		if len(classes) == 0 {
+			for _, class := range domain.HTTPStatusClasses() {
+				classes = append(classes, string(class))
 			}
 		}
-		read.match = appendAnyOf(read.match, domain.EventFieldEventType, req.EventTypes)
+		for _, operation := range req.OperationIDs {
+			for _, class := range classes {
+				operations = append(operations, events.OperationStatus(operation, domain.HTTPStatusClass(class)))
+			}
+		}
+	}
+
+	// What the read does not take of the categories, the types and the
+	// requests' operations and status classes, in that order.
+	matchRest := func(categories, types, requests bool) {
+		if categories {
+			read.match = appendAnyOf(read.match, domain.EventFieldCategory, req.Categories)
+		}
+		if types {
+			read.match = appendAnyOf(read.match, domain.EventFieldEventType, req.EventTypes)
+		}
+		if requests && len(operations) > 0 {
+			read.match = appendAnyOf(read.match, domain.EventFieldOperationStatus, operations)
+		} else if requests {
+			read.match = appendAnyOf(read.match, domain.EventFieldStatusClass, req.StatusClasses)
+		}
+	}
+
+	switch {
+	case byCategory:
+		categories := req.Categories
+		if len(categories) == 0 {
+			for _, category := range domain.EventCategories() {
+				categories = append(categories, string(category))
+			}
+		}
+		read.each, read.values = domain.EventFieldCategory, categories
+		matchRest(false, true, true)
 	case read.within != nil:
-		read.match = appendAnyOf(read.match, domain.EventFieldCategory, req.Categories)
-		read.match = appendAnyOf(read.match, domain.EventFieldEventType, req.EventTypes)
+		matchRest(true, true, true)
+	case len(operations) > 0:
+		read.each, read.values = domain.EventFieldOperationStatus, operations
+		matchRest(true, true, false)
+	case len(req.StatusClasses) > 0:
+		read.each, read.values = domain.EventFieldStatusClass, req.StatusClasses
+		matchRest(true, true, false)
 	case len(req.EventTypes) > 0:
 		read.each, read.values = domain.EventFieldEventType, req.EventTypes
-		read.match = appendAnyOf(read.match, domain.EventFieldCategory, req.Categories)
+		matchRest(true, false, false)
 	case len(req.Categories) > 0:
 		read.each, read.values = domain.EventFieldCategory, req.Categories
 	}
@@ -284,7 +338,6 @@ func planEventRead(req ListEventsRequest) eventRead {
 	}{
 		{domain.EventFieldClientID, req.ClientID},
 		{domain.EventFieldFingerprint, req.Fingerprint},
-		{domain.EventFieldEntityType, req.EntityType},
 		{domain.EventFieldTeamID, req.TeamID},
 	} {
 		if unindexed.value != "" {

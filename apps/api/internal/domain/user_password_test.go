@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -18,7 +19,7 @@ import (
 // 72 bytes.
 type limitedHasher struct{ maxBytes int }
 
-func (h limitedHasher) Hash(password string) (string, error) {
+func (h limitedHasher) Hash(_ context.Context, password string) (string, error) {
 	if len(password) > h.maxBytes {
 		return "", crypto.ErrPasswordTooLong
 	}
@@ -29,11 +30,11 @@ func (h limitedHasher) Hash(password string) (string, error) {
 // what was hashed.
 type plainHasher struct{}
 
-func (plainHasher) Hash(password string) (string, error) {
+func (plainHasher) Hash(_ context.Context, password string) (string, error) {
 	return "plain$" + password, nil
 }
 
-func (plainHasher) VerifyAndRehash(encoded, password string) (string, error) {
+func (plainHasher) VerifyAndRehash(_ context.Context, encoded, password string) (string, error) {
 	if encoded != "plain$"+password {
 		return "", errors.New("mismatch")
 	}
@@ -58,7 +59,7 @@ func TestHashPassword(t *testing.T) {
 
 	t.Run("hashes the normalized password", func(t *testing.T) {
 		t.Parallel()
-		hash, err := HashPassword(decomposed, plainHasher{})
+		hash, err := HashPassword(t.Context(), decomposed, plainHasher{})
 		require.NoError(t, err)
 		assert.Equal(t, "plain$"+composed, hash)
 	})
@@ -67,7 +68,7 @@ func TestHashPassword(t *testing.T) {
 		t.Parallel()
 		// 64 code points but 128 bytes: the limit counts code points.
 		password := strings.Repeat("ü", MaxPasswordLength)
-		hash, err := HashPassword(password, plainHasher{})
+		hash, err := HashPassword(t.Context(), password, plainHasher{})
 		require.NoError(t, err)
 		assert.Equal(t, "plain$"+password, hash, "nothing is truncated")
 	})
@@ -76,27 +77,27 @@ func TestHashPassword(t *testing.T) {
 		t.Parallel()
 		// 128 code points as typed, 64 once each pair composes.
 		password := strings.Repeat("ü", MaxPasswordLength)
-		hash, err := HashPassword(password, plainHasher{})
+		hash, err := HashPassword(t.Context(), password, plainHasher{})
 		require.NoError(t, err)
 		assert.Equal(t, "plain$"+strings.Repeat("ü", MaxPasswordLength), hash)
 	})
 
 	t.Run("rejects more than 64 code points", func(t *testing.T) {
 		t.Parallel()
-		_, err := HashPassword(strings.Repeat("a", MaxPasswordLength+1), plainHasher{})
+		_, err := HashPassword(t.Context(), strings.Repeat("a", MaxPasswordLength+1), plainHasher{})
 		assert.ErrorIs(t, err, ErrUserPasswordTooLong())
 	})
 
 	t.Run("rejects what the hashing algorithm cannot take in full", func(t *testing.T) {
 		t.Parallel()
 		// 64 code points, accepted by the length rule, but 128 bytes.
-		_, err := HashPassword(strings.Repeat("ü", MaxPasswordLength), limitedHasher{maxBytes: 72})
+		_, err := HashPassword(t.Context(), strings.Repeat("ü", MaxPasswordLength), limitedHasher{maxBytes: 72})
 		assert.ErrorIs(t, err, ErrUserPasswordTooLong())
 	})
 
 	t.Run("rejects an empty password", func(t *testing.T) {
 		t.Parallel()
-		_, err := HashPassword("", plainHasher{})
+		_, err := HashPassword(t.Context(), "", plainHasher{})
 		assert.ErrorIs(t, err, ErrUserPasswordEmpty())
 	})
 }
@@ -106,14 +107,14 @@ func TestUserPassword_Verify(t *testing.T) {
 
 	t.Run("either composition matches a normalized hash", func(t *testing.T) {
 		t.Parallel()
-		hash, err := HashPassword(composed, plainHasher{})
+		hash, err := HashPassword(t.Context(), composed, plainHasher{})
 		require.NoError(t, err)
 		pw := &UserPassword{EncodedHash: hash}
-		_, err = pw.Verify(composed, plainHasher{})
+		_, err = pw.Verify(t.Context(), composed, plainHasher{})
 		assert.NoError(t, err)
-		_, err = pw.Verify(decomposed, plainHasher{})
+		_, err = pw.Verify(t.Context(), decomposed, plainHasher{})
 		assert.NoError(t, err)
-		_, err = pw.Verify("cafe-au-lait", plainHasher{})
+		_, err = pw.Verify(t.Context(), "cafe-au-lait", plainHasher{})
 		assert.ErrorIs(t, err, ErrUserPasswordInvalid())
 	})
 
@@ -121,7 +122,7 @@ func TestUserPassword_Verify(t *testing.T) {
 		t.Parallel()
 		long := strings.Repeat("a", MaxPasswordLength+1)
 		pw := &UserPassword{EncodedHash: "plain$" + long}
-		_, err := pw.Verify(long, plainHasher{})
+		_, err := pw.Verify(t.Context(), long, plainHasher{})
 		assert.NoError(t, err)
 	})
 
@@ -138,11 +139,60 @@ func TestUserPassword_Verify(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			verifier := cryptomock.NewMockRehashingVerifier(gomock.NewController(t))
-			verifier.EXPECT().VerifyAndRehash("old", "secret").Return(tt.updated, tt.err)
-			updated, err := (&UserPassword{EncodedHash: "old"}).Verify("secret", verifier)
+			verifier.EXPECT().VerifyAndRehash(gomock.Any(), "old", "secret").Return(tt.updated, tt.err)
+			updated, err := (&UserPassword{EncodedHash: "old"}).Verify(t.Context(), "secret", verifier)
 			assert.Equal(t, tt.updated, updated)
 			assert.ErrorIs(t, err, tt.err)
 			assert.NotErrorIs(t, err, ErrUserPasswordInvalid())
 		})
 	}
+}
+
+// busyHasher is a hasher whose limiter refused the slot.
+type busyHasher struct{}
+
+func (busyHasher) Hash(context.Context, string) (string, error) { return "", crypto.ErrHashingBusy }
+
+func (busyHasher) VerifyAndRehash(context.Context, string, string) (string, error) {
+	return "", crypto.ErrHashingBusy
+}
+
+// ctxHasher answers with whatever ended the context it was given.
+type ctxHasher struct{}
+
+func (ctxHasher) VerifyAndRehash(ctx context.Context, _, _ string) (string, error) {
+	return "", ctx.Err()
+}
+
+// A server that is hashing as much as it allows is not a verdict on the
+// password: the caller gets a code of its own, never "invalid".
+func TestHashPassword_busy(t *testing.T) {
+	t.Parallel()
+
+	_, err := HashPassword(t.Context(), composed, busyHasher{})
+	assert.ErrorIs(t, err, ErrUserPasswordHashingBusy())
+	assert.ErrorIs(t, err, crypto.ErrHashingBusy, "the cause stays attached for the log")
+	assert.NotErrorIs(t, err, ErrInternal(nil))
+}
+
+func TestUserPassword_Verify_checkDidNotRun(t *testing.T) {
+	t.Parallel()
+
+	pw := &UserPassword{EncodedHash: "plain$" + composed}
+
+	t.Run("busy is reported as busy", func(t *testing.T) {
+		t.Parallel()
+		_, err := pw.Verify(t.Context(), composed, busyHasher{})
+		assert.ErrorIs(t, err, ErrUserPasswordHashingBusy())
+		assert.NotErrorIs(t, err, ErrUserPasswordInvalid())
+	})
+
+	t.Run("the caller's own context passes through", func(t *testing.T) {
+		t.Parallel()
+		ctx, cancel := context.WithCancel(t.Context())
+		cancel()
+		_, err := pw.Verify(ctx, composed, ctxHasher{})
+		assert.ErrorIs(t, err, context.Canceled)
+		assert.NotErrorIs(t, err, ErrUserPasswordInvalid())
+	})
 }

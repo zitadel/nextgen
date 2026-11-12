@@ -105,7 +105,14 @@ func setLauncherEnv(t *testing.T, dataDir string) {
 		"MASTER_KEY_PREVIOUS_PEM_B64",
 		"NEXTGEN_DATABASE_POSTGRES",
 		"NEXTGEN_EVENTS_REQUEST_FLUSH_WAIT",
+		"NEXTGEN_INSTRUMENTATION_LOG_EXPORTER_BATCH_DURATION",
+		"NEXTGEN_INSTRUMENTATION_LOG_EXPORTER_TYPE",
 		"NEXTGEN_INSTRUMENTATION_LOG_FORMAT",
+		"NEXTGEN_INSTRUMENTATION_METRIC_EXPORTER_BATCH_DURATION",
+		"NEXTGEN_INSTRUMENTATION_METRIC_EXPORTER_TYPE",
+		"NEXTGEN_INSTRUMENTATION_SERVICE_NAME",
+		"NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_BATCH_DURATION",
+		"NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_TYPE",
 		"NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT",
 		"NEXTGEN_PLATFORM_OPERATORS",
 		"NEXTGEN_SERVER_ADDRESS",
@@ -115,6 +122,7 @@ func setLauncherEnv(t *testing.T, dataDir string) {
 		"NEXTGEN_SERVER_IDLE_TIMEOUT",
 		"NEXTGEN_SERVER_PUBLIC_BASE",
 		"NEXTGEN_SERVER_REQUEST_ID_HEADER",
+		"OTEL_EXPORTER_OTLP_ENDPOINT",
 		"PORT",
 		"VERCEL_BRANCH_URL",
 		"VERCEL_ENV",
@@ -718,6 +726,36 @@ func TestPrepareServerKeepsExplicitDefaults(t *testing.T) {
 
 	assert.Equal(t, "https://cloud.example.com", os.Getenv("NEXTGEN_SERVER_PUBLIC_BASE"))
 	assert.Equal(t, "text", os.Getenv("NEXTGEN_INSTRUMENTATION_LOG_FORMAT"))
+}
+
+func TestPrepareServerExportsTelemetryOnlyWithAnOTLPEndpoint(t *testing.T) {
+	prepare := func(t *testing.T, endpoint string) {
+		t.Helper()
+		setLauncherEnv(t, t.TempDir())
+		t.Setenv("VERCEL_ENV", "production")
+		t.Setenv("CLOUD_DATABASE_URL", pooledURL)
+		t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", endpoint)
+		t.Setenv("NEXTGEN_INSTRUMENTATION_LOG_EXPORTER_TYPE", "stderr")
+		_, err := prepareServer(nil)
+		require.NoError(t, err)
+	}
+
+	t.Run("without", func(t *testing.T) {
+		prepare(t, "")
+		assert.Empty(t, os.Getenv("NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_TYPE"), "no exporter would retry localhost:4318")
+		assert.Empty(t, os.Getenv("NEXTGEN_INSTRUMENTATION_METRIC_EXPORTER_TYPE"))
+		assert.Empty(t, os.Getenv("NEXTGEN_INSTRUMENTATION_SERVICE_NAME"))
+	})
+	t.Run("with", func(t *testing.T) {
+		prepare(t, "https://otlp.example.com/otlp")
+		for _, signal := range []string{"TRACE", "METRIC"} {
+			prefix := "NEXTGEN_INSTRUMENTATION_" + signal + "_EXPORTER_"
+			assert.Equal(t, "http", os.Getenv(prefix+"TYPE"), signal)
+			assert.NotEmpty(t, os.Getenv(prefix+"BATCH_DURATION"), "the cloud names its export cadence")
+		}
+		assert.Equal(t, "stderr", os.Getenv("NEXTGEN_INSTRUMENTATION_LOG_EXPORTER_TYPE"), "a configured exporter wins")
+		assert.Equal(t, "nextgen-cloud", os.Getenv("NEXTGEN_INSTRUMENTATION_SERVICE_NAME"))
+	})
 }
 
 func TestConsoleOrigins(t *testing.T) {

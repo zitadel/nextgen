@@ -141,16 +141,18 @@ func TestReleaseErrorResponseConflicts(t *testing.T) {
 	assert.Equal(t, http.StatusConflict, releaseErrorResponse(domain.ErrReleaseInUse(domain.ReleaseInUseDetails{})).StatusCode)
 }
 
-// The 409 names every origin still serving the release, so the caller can
-// deploy elsewhere or roll back before revoking again.
+// The 409 names every origin still serving the release and its kind, so the
+// caller can deploy, roll back or remove the preview before revoking again.
 func TestReleaseInUseResponseCarriesOrigins(t *testing.T) {
 	resp, ok := releaseInUseResponse(t.Context(), domain.ErrReleaseInUse(domain.ReleaseInUseDetails{Origins: []domain.ReleaseInUseOrigin{
-		{Origin: "https://app.acme.com", DeploymentID: "dep_1"},
+		{Origin: "https://app.acme.com", DeploymentID: "dep_1", Kind: domain.DeploymentOriginKindPrimary},
+		{Origin: "https://pr-1-acme.vercel.app", DeploymentID: "dep_2", Kind: domain.DeploymentOriginKindPreview},
 	}}))
 	require.True(t, ok)
 	assert.Equal(t, api.ErrorCode(domain.ErrReleaseInUse(domain.ReleaseInUseDetails{}).Code), resp.Code)
 	assert.Equal(t, []api.RevokeReleaseConflictDetailsOriginsItem{
-		{Origin: "https://app.acme.com", DeploymentID: "dep_1"},
+		{Origin: "https://app.acme.com", DeploymentID: "dep_1", Kind: api.DeploymentKindPrimary},
+		{Origin: "https://pr-1-acme.vercel.app", DeploymentID: "dep_2", Kind: api.DeploymentKindPreview},
 	}, resp.Details.Origins)
 }
 

@@ -13,7 +13,9 @@ export function envValueEdit(key: string, value: string): (source: string | unde
   return (source) => {
     const existing = source ?? "";
     if (assignment.test(existing)) {
-      return existing.replace(assignment, (_line, prefix: string) => `${prefix}${value}`);
+      return existing.replace(assignment, (_line, prefix: string) => {
+        return `${prefix}${value}`;
+      });
     }
     const eol = existing.includes("\r\n") ? "\r\n" : "\n";
     const separator = existing === "" || existing.endsWith("\n") ? "" : eol;
@@ -65,14 +67,16 @@ export function replaceOrigin(
   previous: string,
   next: string,
 ): unknown[] {
-  const isOrigin = (pattern: unknown) => pattern === previous || pattern === next;
+  const isOrigin = (pattern: unknown) => {
+    return pattern === previous || pattern === next;
+  };
   const first = patterns.findIndex(isOrigin);
   if (first === -1) {
     return [...patterns, next];
   }
-  return patterns.flatMap((pattern, index) =>
-    isOrigin(pattern) ? (index === first ? [next] : []) : [pattern],
-  );
+  return patterns.flatMap((pattern, index) => {
+    return isOrigin(pattern) ? (index === first ? [next] : []) : [pattern];
+  });
 }
 
 /** The `.env.local` op that points the app's `ZITADEL_ISSUER` at its new origin. */

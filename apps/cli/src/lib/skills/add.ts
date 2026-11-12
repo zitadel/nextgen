@@ -1,7 +1,6 @@
 import { existsSync } from "node:fs";
 import { cp, readdir, rm } from "node:fs/promises";
 import { join } from "node:path";
-
 import * as rosie from "rosie-skills";
 
 /** Where most coding agents read a project's skills: Codex, Cursor, GitHub Copilot, Gemini CLI and more. */
@@ -17,8 +16,12 @@ export const CLAUDE_SKILLS_DIR = ".claude/skills";
 export async function bundledSkills(packageRoot: string): Promise<string[]> {
   const entries = await readdir(bundleDir(packageRoot), { withFileTypes: true });
   return entries
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => entry.name)
+    .filter((entry) => {
+      return entry.isDirectory();
+    })
+    .map((entry) => {
+      return entry.name;
+    })
     .sort();
 }
 
@@ -39,7 +42,9 @@ export async function skillDirs(projectDir: string): Promise<string[]> {
  */
 async function claudeCodeInstalled(): Promise<boolean> {
   try {
-    return (await rosie.agents()).some((agent) => agent.name === "claude" && agent.detected);
+    return (await rosie.agents()).some((agent) => {
+      return agent.name === "claude" && agent.detected;
+    });
   } catch {
     return false;
   }

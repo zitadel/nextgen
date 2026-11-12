@@ -113,6 +113,26 @@ func TestListEvents_FilterPlans(t *testing.T) {
 			),
 			search: "SEARCH events USING INDEX idx_events_project_actor_category (project_id=? AND actor_id=? AND category=?",
 		},
+		{
+			name: "one resource type in one category",
+			filter: database.And(
+				database.Equal(database.Col(domain.EventFieldEntityType), "user"),
+				database.Equal(database.Col(domain.EventFieldCategory), "auth"),
+			),
+			search: "SEARCH events USING INDEX idx_events_project_entity_type_category (project_id=? AND entity_type=? AND category=?",
+		},
+		{
+			// One read of the merge across status classes, as for an
+			// operation with no class named.
+			name:   "one operation in one status class",
+			filter: database.Equal(database.Col(domain.EventFieldOperationStatus), "createUser 5xx"),
+			search: "SEARCH events USING INDEX idx_events_project_operation_status (project_id=? AND operation_status=?",
+		},
+		{
+			name:   "one status class",
+			filter: database.Equal(database.Col(domain.EventFieldStatusClass), "4xx"),
+			search: "SEARCH events USING INDEX idx_events_project_status (project_id=? AND status_class=?",
+		},
 	} {
 		for _, page := range []struct {
 			name   string
@@ -176,6 +196,24 @@ func TestScanEvents_Plans(t *testing.T) {
 			within: database.And(equal(domain.EventFieldEntityID, "user_2"), equal(domain.EventFieldCategory, "entity")),
 			match:  database.And(equal(domain.EventFieldActorID, "user_1")),
 			search: "SEARCH events USING INDEX idx_events_project_entity_category (project_id=? AND entity_id=? AND category=?",
+		},
+		{
+			name:   "a type and a fingerprint, over one resource type in one category",
+			within: database.And(equal(domain.EventFieldEntityType, "user"), equal(domain.EventFieldCategory, "entity")),
+			match:  database.And(equal(domain.EventFieldEventType, "user.created"), equal(domain.EventFieldFingerprint, "fp_1")),
+			search: "SEARCH events USING INDEX idx_events_project_entity_type_category (project_id=? AND entity_type=? AND category=?",
+		},
+		{
+			name:   "a type and a category, over one operation in one status class",
+			within: equal(domain.EventFieldOperationStatus, "createUser 4xx"),
+			match:  database.And(equal(domain.EventFieldEventType, "request.api"), equal(domain.EventFieldCategory, "request")),
+			search: "SEARCH events USING INDEX idx_events_project_operation_status (project_id=? AND operation_status=?",
+		},
+		{
+			name:   "an operation, over one session in one category",
+			within: database.And(equal(domain.EventFieldSessionID, "sess_1"), equal(domain.EventFieldCategory, "request")),
+			match:  database.And(database.Or(equal(domain.EventFieldOperationStatus, "createUser 4xx"), equal(domain.EventFieldOperationStatus, "createUser 5xx"))),
+			search: "SEARCH events USING INDEX idx_events_project_session_category (project_id=? AND session_id=? AND category=?",
 		},
 		{
 			name:   "several categories, over one type",

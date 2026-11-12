@@ -45,6 +45,7 @@ func releaseInUseResponse(ctx context.Context, err error) (*api.RevokeReleaseCon
 		origins[i] = api.RevokeReleaseConflictDetailsOriginsItem{
 			Origin:       api.Origin(origin.Origin),
 			DeploymentID: api.DeploymentID(origin.DeploymentID),
+			Kind:         api.DeploymentKind(origin.Kind.String()),
 		}
 	}
 	return &api.RevokeReleaseConflict{

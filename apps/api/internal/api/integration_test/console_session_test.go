@@ -94,19 +94,20 @@ func TestConsoleManagementAcceptsSession(t *testing.T) {
 
 	t.Run("identity providers", func(t *testing.T) {
 		t.Parallel()
-		// Connections are created with the secret only (#998). The platform
-		// project is shared, so the slug is this test's own.
-		secret, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
-		require.NoError(t, err)
-		harness.SetProjectSecretOnApiClient(t, secret, console)
-		created := idpFixture{project: console, client: secret}.create(t, helpers.OIDCConnection(strings.ToLower(claimerID)))
+		// Connections are created with the secret only (#998). A deploy of
+		// the shared platform project pins every connection in it, and this
+		// one references a variable the platform project has no value for,
+		// so the connection lives in a project of this test's own, which
+		// holds the variable and goes with the test.
+		owned := newIdpFixture(t)
+		harness.SeedProjectAdmin(t, owned.project.ID, claimerID)
+		created := owned.create(t, helpers.OIDCConnection("google"))
 
-		read := idpFixture{project: console, client: session}
+		read := idpFixture{project: owned.project, client: session}
 		require.Contains(t, idpIDs(read.queryOK(t, &api.QueryIdpsRequest{}).Idps), created.ID)
 		got := read.get(t, created.ID)
 		require.IsType(t, &api.IdpResponse{}, got, helpers.MustMarshal(t, got))
-		revision, err := session.GetIdpRevisionById(t.Context(), api.GetIdpRevisionByIdParams{ProjectID: api.ProjectID(console.ID), RevisionID: created.RevisionID})
-		require.NoError(t, err)
+		revision := read.getRevision(t, created.RevisionID)
 		require.IsType(t, &api.IdpResponse{}, revision, helpers.MustMarshal(t, revision))
 	})
 

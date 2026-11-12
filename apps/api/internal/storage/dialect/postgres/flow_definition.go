@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -21,10 +22,14 @@ const (
 		`(project_id, id, name, schema_version, status, purposes, definition, created_at, updated_at) ` +
 		`VALUES ($1, $2, $3, $4, $5` + statusCast + `, $6` + purposeArrCast + `, $7, NOW(), NOW()) RETURNING created_at, updated_at`
 
-	deleteFlowDefinitionStmt = `DELETE FROM zitadel_nextgen.flow_definitions WHERE project_id = $1 AND id = $2`
+	deleteFlowDefinitionStmt = `DELETE FROM zitadel_nextgen.flow_definitions WHERE project_id = $1 AND id = $2 RETURNING name`
 
 	flowDefinitionQuery = `SELECT project_id, id, name, schema_version, status, definition, created_at, updated_at ` +
 		`FROM zitadel_nextgen.flow_definitions`
+
+	// newestFlowDefinitionByNameStmt is one descent of
+	// idx_flow_definitions_name_revision.
+	newestFlowDefinitionByNameStmt = flowDefinitionQuery + ` WHERE project_id = $1 AND name = $2 ORDER BY created_at DESC LIMIT 1`
 
 	// latestRevisionPerName keeps only the newest revision of each flow name.
 	//
@@ -76,7 +81,11 @@ func (f flowDefinitionStatements) CreateFlowDefinition(ctx context.Context, enti
 		}
 		entity.CreatedAt, entity.UpdatedAt = entity.CreatedAt.UTC(), entity.UpdatedAt.UTC()
 		rsi := newResourceScopeStatements(tx)
-		return rsi.UpsertResourceScope(ctx, domain.NewResourceScope(domain.ResourceKindFlowDefinition, entity.ProjectID, entity.ID))
+		if err := rsi.UpsertResourceScope(ctx, domain.NewResourceScope(domain.ResourceKindFlowDefinition, entity.ProjectID, entity.ID)); err != nil {
+			return err
+		}
+		// The new revision is the newest of its name, so search answers with it.
+		return writeSearchEntry(ctx, tx, domain.FlowDefinitionSearchEntry(entity))
 	})
 }
 
@@ -143,16 +152,36 @@ func (f flowDefinitionStatements) ListFlowDefinitions(ctx context.Context, filte
 // DeleteFlowDefinitionByID implements [service.FlowDefinitionStatements].
 func (f flowDefinitionStatements) DeleteFlowDefinitionByID(ctx context.Context, projectID, id string) error {
 	return withTransaction(ctx, f.client, func(ctx context.Context, tx queryExecutor) error {
-		tag, err := tx.Exec(ctx, deleteFlowDefinitionStmt, projectID, id)
-		if err != nil {
+		var name string
+		if err := tx.QueryRow(ctx, deleteFlowDefinitionStmt, projectID, id).Scan(&name); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return nil
+			}
 			return wrapError(err)
 		}
-		if tag.RowsAffected() == 0 {
-			return nil
-		}
 		rsi := newResourceScopeStatements(tx)
-		return rsi.DeleteResourceScope(ctx, domain.ResourceKindFlowDefinition, projectID, id)
+		if err := rsi.DeleteResourceScope(ctx, domain.ResourceKindFlowDefinition, projectID, id); err != nil {
+			return err
+		}
+		return f.replaceSearchEntry(ctx, tx, projectID, name)
 	})
+}
+
+// replaceSearchEntry points the search entry of a flow name at its newest
+// revision left, or removes it when none is.
+func (f flowDefinitionStatements) replaceSearchEntry(ctx context.Context, tx queryExecutor, projectID, name string) error {
+	rows, err := tx.Query(ctx, newestFlowDefinitionByNameStmt, projectID, name)
+	if err != nil {
+		return wrapError(err)
+	}
+	newest, err := pgx.CollectRows(rows, f.scanFlowDefinition)
+	if err != nil {
+		return wrapError(err)
+	}
+	if len(newest) == 0 {
+		return deleteSearchEntry(ctx, tx, projectID, domain.ResourceKindFlowDefinition, name)
+	}
+	return writeSearchEntry(ctx, tx, domain.FlowDefinitionSearchEntry(newest[0]))
 }
 
 func (f flowDefinitionStatements) scanFlowDefinition(row pgx.CollectableRow) (*domain.FlowDefinition, error) {

@@ -7,7 +7,7 @@
 import type { flowConfigSchema } from "@zitadel/config/schemas";
 import { PURPOSE_FLIP_TARGETS } from "@zitadel/config/validate";
 
-import { type PropertyPath, type StepName, stepName } from "@/lib/zitadel/names";
+import { type StepName, stepName } from "@/lib/zitadel/names";
 import type { Connection } from "@/lib/zitadel/resources/connections/connection";
 import type { Flow } from "@/lib/zitadel/resources/flows/flow";
 import type { ContractValue } from "@/lib/zitadel/resources/document";
@@ -238,22 +238,6 @@ export type MethodUse = {
 };
 
 /**
- * A step reached while walking a flow, and the provider chosen on the way
- * there.
- */
-export type Visit = {
-  /**
-   * The step reached.
-   */
-  readonly step: Step;
-
-  /**
-   * The provider chosen on the way, or `undefined` when none was.
-   */
-  readonly provider: string | undefined;
-};
-
-/**
  * A provider a flow step offers.
  */
 export type Offer = {
@@ -286,35 +270,4 @@ export type PinnedOffer = Offer & {
    * The local schema the offer's flow runs against.
    */
   readonly schema: UserSchema;
-};
-
-/**
- * A way to sign up that reaches a step creating a user without ever asking
- * for a property the schema requires, from a provider that does not supply it.
- */
-export type SignUpGap = {
-  /**
-   * The flow the way runs through.
-   */
-  readonly flow: Flow;
-
-  /**
-   * The schema the flow runs against.
-   */
-  readonly schema: UserSchema;
-
-  /**
-   * The step that creates the user.
-   */
-  readonly step: Step;
-
-  /**
-   * The provider the person signed up with.
-   */
-  readonly connection: Connection;
-
-  /**
-   * The required property's dotted path.
-   */
-  readonly path: PropertyPath;
 };

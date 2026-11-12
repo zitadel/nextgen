@@ -1,0 +1,17 @@
+title: UserCreateEvaluateRequest
+type: object
+description: A dry run of the sign-up policy for one sign-up.
+required:
+  - operation
+  - config
+  - input
+properties:
+  operation:
+    type: string
+    enum:
+      - user.create
+    description: The operation the policy guards.
+  config:
+    $ref: ../user-create-config.yaml
+  input:
+    $ref: user-create-evaluate-input.yaml

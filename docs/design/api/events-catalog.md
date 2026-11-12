@@ -112,7 +112,18 @@ Login/flow HTTP and `POST /projects` emit when the handler stamps `project_id`
 (actor/token empty). Path B copies `request_id` from the HTTP request even
 without AuthGate. `createFlow` mints `flow_id` before `CreateAuthAttempt` so
 Path B `auth.attempt.created` shares `flow_id` / `session_id` columns with
-Path A `request.api`. Probes (`livez` / `readyz`) do not.
+Path A `request.api`. The attempt stores that `flow_id`: the handoff exchange
+is a service call that names no flow, so its `session.established`,
+`auth.token.issued` and `request.api` take `flow_id` from the attempt it
+consumed. Probes (`livez` / `readyz`) do not.
+
+The class of the payload's `status` (`2xx`, `4xx`, …) is also written to the
+`status_class` column, and its `operation_id` with that class to
+`operation_status` (`createUser 4xx`), which the `GET /events` filters
+`status_class` and `operation_id` read from an index
+(`RequestAPIPayload.Indexed`). A request refused before an operation ran has a
+class and no operation. Every other event leaves both empty, and so do the
+requests stored before the columns existed.
 
 Path A buffer: flush on batch size **N≈100** or age **T≈1s**. Capacity **C**
 (default 2000); drop only when full; never block the request.
@@ -142,6 +153,8 @@ tracked below.
 | Session delete token peers (`DeleteTokensBySessionID`; token ids unavailable) | `auth.token.revoked` | `auth` | `token` | _(empty; `session_id` column set, `entity_id` empty)_ |
 | `CreateSession` / `ExchangeSession` | `session.established` | `session` | `session` | `user_id` (secondary) |
 | `DeleteSessionByID` (operator/API revoke) | `session.deleted` | `session` | `session` | `reason` (`revoked`) |
+| Signup challenge issued | `flow.signup_challenge.issued` | `auth` | `challenge` | _(empty; challenge ID and flow ID on event columns)_ |
+| Signup proof consumed | `flow.signup_challenge.consumed` | `auth` | `challenge` | _(empty; challenge ID and flow ID on event columns)_ |
 | `CreateAuthAttempt` | `auth.attempt.created` | `auth` | `auth_attempt` | _(empty; `flow_id` / `session_id` columns)_ |
 | `HandoffAuthAttempt` | `auth.attempt.handed_off` | `auth` | `auth_attempt` | _(empty; `session_id` column set)_ |
 | Challenge failed | `auth.check.failed` | `auth` | `check` | `check_id`, `check_type`, `auth_attempt_id` |
@@ -168,6 +181,8 @@ tracked below.
 | GrantService revoke (`RevokeAuthzAssignment`) | `authz.revoked` | `admin` | `authz_assignment` | `principal_type`, `principal_id`, `relation` |
 | `DeleteUserByID` revoking the user's assignments (`RevokeAuthzAssignmentsByPrincipal`; one event per assignment, on its own project) | `authz.revoked` | `admin` | `authz_assignment` | `principal_type`, `principal_id`, `relation` |
 | Startup reconcile of the platform operators configuration (`CreateAuthzAssignment` / `RevokeAuthzAssignment` on the platform operator relation, [ADR 075](../../adrs/075-platform-operators.md)); actor type `system` | `authz.granted`, `authz.revoked` | `admin` | `authz_assignment` | `principal_type`, `principal_id`, `relation` |
+| InvitationService create, and the new row of a replace | `invitation.created` | `admin` | `invitation` | `type` and its object (`project_member` with `relation`), `journey_id`, `replaces_invitation_id`, `expires_at`; never the metadata or the token |
+| InvitationService cancel of a pending invitation, and the original a replace deletes | `invitation.cancelled` | `admin` | `invitation` | `journey_id`, `reason` (`cancelled` or `replaced`), `replaced_by_invitation_id` |
 | Set password (`entity_id` / `factor_id` = password row id) | `auth.factor.password.set` | `auth` | `user_password` | `user_id`, `factor_id` |
 | Create passkey (`entity_id` / `factor_id` = credential id) | `auth.factor.passkey.enrolled` | `auth` | `user_passkey` | `user_id`, `factor_id` |
 
@@ -196,7 +211,18 @@ every supported deployment; that removal is its own breaking change.
 Types whose API contract is published before their producer lands. Each has
 a `domain.EventType` constant and an events API schema, so clients can be
 built against it, but nothing emits it yet. A type moves to Path B with its
-producer. None today.
+producer.
+
+Invitation events ([ADR 086 §5](../../adrs/086-invitations.md#5-events)) are
+`admin` category with `entity_type` `invitation`. `type` names the
+invitation's kind, and the object of the same name (`project_member` with
+`relation`, or `team_member` with `team_id` and `role`) says what it grants. No payload
+carries the invitation's metadata or its token.
+
+| `event_type` | Payload | Producer |
+|--------------|---------|----------|
+| `invitation.accepted` | `type` and its object, `journey_id`, `user_id` (secondary) | InvitationService accept, sharing its `request_id` with the grant service's authz events when it writes any (none when the user already holds an identical active grant) ([#2853](https://github.com/zitadel/nextgen/issues/2853)) |
+| `invitation.rejected` | `journey_id`, `user_id` (secondary) | InvitationService decline ([#2853](https://github.com/zitadel/nextgen/issues/2853)) |
 
 ## Deferred
 

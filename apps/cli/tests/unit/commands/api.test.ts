@@ -1,14 +1,16 @@
 import { afterEach, beforeEach, describe, expect, vi } from "vitest";
 
-vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
-
-import { select, text } from "@clack/prompts";
 import { Config } from "@oclif/core";
 
-import Api from "@/commands/api/index";
+import Api, { readOperation } from "@/commands/api/index";
+
+import { ZitadelError } from "@/lib/errors";
 import { it } from "@tests/helpers/fixtures";
 import { makeProject } from "@tests/helpers/local-project";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
+import { type Answer, answering } from "@tests/helpers/keyboard";
+import { runCliForTest, stripAnsi } from "@tests/helpers/run-cli";
+import { asTerminal } from "@tests/helpers/terminal";
 
 // The prompts of `zitadel api` run without an operation. The specs run the
 // built CLI, which bundles its own prompts, so a prompt is answered only by
@@ -37,12 +39,24 @@ afterEach(() => {
   restore(process.stdout, tty.stdout);
   restore(process.stdin, tty.stdin);
   vi.restoreAllMocks();
-  vi.mocked(select).mockReset();
-  vi.mocked(text).mockReset();
 });
 
 /**
- * Run `zitadel api` from source in a linked Project written to `dir`, with its
+ * Run `zitadel api` from source in a project written to `dir`, with a person giving
+ * `answers` at the prompts it draws, and give back the result and what was asked.
+ */
+async function asking(dir: string, answers: Answer[], ...argv: string[]) {
+  const cwd = await makeProject(dir, { linked: true });
+  const config = await Config.load({ root: cliPackageRoot });
+  const talk = answering(...answers);
+  const result = await asTerminal(() =>
+    Api.run(["--cwd", cwd, "--no-telemetry", "--server", "http://localhost:8080", ...argv], config),
+  );
+  return { result, talk };
+}
+
+/**
+ * Run `zitadel api` from source in a linked project written to `dir`, with its
  * output kept out of the test log.
  */
 async function api(dir: string, ...argv: string[]) {
@@ -78,34 +92,41 @@ describe("zitadel api help", () => {
 });
 
 describe("zitadel api without an operation, at a terminal", () => {
+  const choosingRevokeSession = ["Sessions", "DELETE /sessions/{session_id}", "sess_1"];
+
   it("asks for the part of the API, the operation and its path parameters", async ({ dir }) => {
-    vi.mocked(select).mockResolvedValueOnce("Sessions" as never);
-    vi.mocked(select).mockResolvedValueOnce("revokeSession" as never);
-    vi.mocked(text).mockResolvedValueOnce("sess_1" as never);
+    const { result } = await asking(dir, choosingRevokeSession, "--dry-run");
 
-    const envelope = await api(dir, "--dry-run");
-
-    expect(envelope).toMatchObject({
+    expect(result).toMatchObject({
       status: "ok",
       data: { operation: "revokeSession", url: "http://localhost:8080/api/v1/sessions/sess_1" },
     });
-    expect(vi.mocked(select).mock.calls.map(([question]) => question.message)).toEqual([
+  });
+
+  it("words each of its three questions as a question", async ({ dir }) => {
+    const { talk } = await asking(dir, choosingRevokeSession, "--dry-run");
+
+    expect(talk.asked()).toEqual([
       "Which part of the API would you like to use?",
       "Which operation would you like to run?",
+      "What is the value of session_id?",
     ]);
-    expect(vi.mocked(text).mock.calls[0]?.[0].message).toBe("What is the value of session_id?");
+  });
+
+  it("asks before a destructive call, naming the project and the server", async ({ dir }) => {
+    const { talk } = await asking(dir, [...choosingRevokeSession, false]);
+
+    expect(talk.asked().at(-1)).toBe(
+      "Call revokeSession in project proj_01TEST on localhost:8080? Revoke a session.",
+    );
   });
 
   it("offers only what the CLI can call", async ({ dir }) => {
-    vi.mocked(select).mockResolvedValueOnce("Sessions" as never);
-    vi.mocked(select).mockResolvedValueOnce("getSession" as never);
-    vi.mocked(text).mockResolvedValueOnce("sess_1" as never);
+    const { talk } = await asking(dir, choosingRevokeSession, "--dry-run");
 
-    await api(dir, "--dry-run");
-
-    const offered = vi.mocked(select).mock.calls[1]?.[0].options.map((option) => option.value);
-    expect(offered).toContain("getSession");
-    expect(offered).not.toContain("getMySession");
+    const operations = JSON.stringify(talk.options()[1]);
+    expect(operations).toContain("GET /sessions/{session_id}");
+    expect(operations).not.toContain("GET /sessions/me");
   });
 });
 
@@ -117,5 +138,67 @@ describe("zitadel api for an operation that needs no credential", () => {
       status: "ok",
       data: { url: "http://localhost:8080/api/v1/livez" },
     });
+  });
+});
+
+describe("zitadel api, rendered for a terminal", () => {
+  it("answers with the response and one footer, drawing no box", async ({ dir }) => {
+    const cwd = await makeProject(dir, { linked: true });
+
+    const res = await asTerminal(() =>
+      runCliForTest([
+        "api",
+        "getLive",
+        "--dry-run",
+        "--cwd",
+        cwd,
+        "--no-telemetry",
+        "--server",
+        "http://localhost:8080",
+      ]),
+    );
+
+    // A call that answers is drawn like every other answer: the response at
+    // the margin and one footer line, with no chain and no box around it.
+    // Asserting on the box's wording here would pass however it is drawn.
+    const shown = stripAnsi(res.stdout);
+    expect(shown).not.toContain("╭");
+    expect(shown).toContain("curl -X GET 'http://localhost:8080/api/v1/livez'");
+    expect(shown).toContain("Would call getLive");
+    expect(shown).toContain("project proj_01TEST");
+  });
+});
+
+describe("zitadel api for an operation the CLI cannot call", () => {
+  it("suggests listing what it can call", () => {
+    const error = ((): unknown => {
+      try {
+        readOperation("getMyUser", undefined);
+      } catch (thrown) {
+        return thrown;
+      }
+      return undefined;
+    })();
+
+    expect(error).toBeInstanceOf(ZitadelError);
+    expect((error as ZitadelError).nextCommands).toEqual([{ id: "api:ls" }]);
+  });
+});
+
+describe("zitadel api, answering a call at a terminal", () => {
+  it("draws its summary, with the response under it", async ({ dir, serve }) => {
+    const url = await serve((_request, response) => {
+      response.setHeader("content-type", "application/json");
+      response.end(JSON.stringify({ status: "serving" }));
+    });
+    const cwd = await makeProject(dir, { linked: true });
+
+    const res = await asTerminal(() =>
+      runCliForTest(["api", "getLive", "--cwd", cwd, "--no-telemetry", "--server", url]),
+    );
+
+    const shown = stripAnsi(res.stdout);
+    expect(shown).toContain("Called getLive");
+    expect(shown).toContain("serving");
   });
 });
