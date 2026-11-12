@@ -783,7 +783,11 @@ func TestWebhookShipper_SkipsAProjectThePreClaimGateHides(t *testing.T) {
 	stored := src.get("hook_1")
 	assert.Empty(t, stored.CursorEventID)
 	assert.Nil(t, stored.LastErrorAt, "hidden is not failing")
-	assert.Equal(t, []string{"hook_1"}, src.released)
+	// Given back, not left to its lease. The test's clock stands still, so
+	// the round may take the webhook again the instant it is back: once or
+	// more, never anything but this webhook.
+	require.NotEmpty(t, src.released)
+	assert.Subset(t, []string{"hook_1"}, src.released)
 
 	src.mu.Lock()
 	src.hidden["proj_unclaimed"] = false
