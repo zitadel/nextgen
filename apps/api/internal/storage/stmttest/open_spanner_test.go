@@ -12,8 +12,10 @@ import (
 )
 
 func init() {
-	// The emulator dbtest.Spanner starts otherwise runs one read-write
-	// transaction at a time and aborts the rest.
+	// With neither ZITADEL_TEST_SPANNER_INSTANCE nor ZITADEL_TEST_SPANNER_URL
+	// set, dbtest.Spanner starts the emulator. The emulator runs one
+	// read-write transaction at a time and aborts the rest, so there the
+	// tests run one at a time.
 	if !testdb.SpannerProvisions() && !testdb.SpannerSharesDatabase() {
 		oneAtATime = true
 	}
