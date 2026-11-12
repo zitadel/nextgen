@@ -437,6 +437,40 @@ func TestRunLogsTheErrorItReturns(t *testing.T) {
 	assert.Equal(t, err.Error(), runError["err"])
 }
 
+// oauth.enabled is off unless the environment or the file turns it on.
+func TestLoadConfigOAuthEnabled(t *testing.T) {
+	emptyConfig := func(t *testing.T) string {
+		t.Helper()
+		configPath := filepath.Join(t.TempDir(), "nextgen.yaml")
+		require.NoError(t, os.WriteFile(configPath, nil, 0o600))
+		return configPath
+	}
+
+	t.Run("defaults to off", func(t *testing.T) {
+		t.Setenv("NEXTGEN_SERVER_DATA_DIR", t.TempDir())
+		cfg, err := loadConfig(emptyConfig(t))
+		require.NoError(t, err)
+		assert.False(t, cfg.OAuth.Enabled)
+	})
+
+	t.Run("is set from the environment", func(t *testing.T) {
+		t.Setenv("NEXTGEN_SERVER_DATA_DIR", t.TempDir())
+		t.Setenv("NEXTGEN_OAUTH_ENABLED", "true")
+		cfg, err := loadConfig(emptyConfig(t))
+		require.NoError(t, err)
+		assert.True(t, cfg.OAuth.Enabled)
+	})
+
+	t.Run("is set from yaml", func(t *testing.T) {
+		t.Setenv("NEXTGEN_SERVER_DATA_DIR", t.TempDir())
+		configPath := filepath.Join(t.TempDir(), "nextgen.yaml")
+		require.NoError(t, os.WriteFile(configPath, []byte("oauth:\n  enabled: true\n"), 0o600))
+		cfg, err := loadConfig(configPath)
+		require.NoError(t, err)
+		assert.True(t, cfg.OAuth.Enabled)
+	})
+}
+
 // The hashing bound is on by default and every field is left at zero, which
 // the limiter resolves itself: one hash per CPU, a budget from the process's
 // memory limit, a second's wait before a refusal.

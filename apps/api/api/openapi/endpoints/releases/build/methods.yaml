@@ -33,8 +33,8 @@ post:
 
     Building writes revisions, so besides `release.write` it needs the write
     scope of every kind the bundle carries a resource of: `schema.write`,
-    `flow_definition.write`, `branding.write`, `idp.write` and `policy.write`,
-    as the per-kind create endpoints do. A missing scope answers `403` with
+    `flow_definition.write`, `branding.write`, `idp.write`, `policy.write`
+    and `oauth_settings.write`, as the per-kind create endpoints do. A missing scope answers `403` with
     `rel.permission_denied`, naming the kind. Request a token with that scope.
     An empty kind needs no scope.
 
@@ -58,8 +58,9 @@ post:
           bundle:
             summary: Built from the files on disk
             description: |
-              The CLI's form: the schemas, flow definitions and branding as
-              authored, the flow naming its schema by `objectType`. The
+              The CLI's form: the schemas, flow definitions, branding and
+              OAuth settings as authored, the flow naming its schema by
+              `objectType`. The
               schema's `metaSchema` is the one the server publishes at
               `/user-schema.json`. The server reuses whichever revisions
               already match and allocates the rest.
@@ -128,6 +129,8 @@ post:
                 branding:
                   layout: centered
                   liquid_template: '<main>{{ step.name }}</main>'
+                oauth:
+                  enabled: true
               message: add phone_number to human-user
               git_sha: 4a5b6c7d8e9f0a1b2c3d4e5f60718293a4b5c6d7
               git_dirty: false
@@ -183,8 +186,8 @@ post:
                 Each pointer carries the handle the server read from the
                 resource, and the revision it reused or allocated for it. The
                 handle is `objectType` for a schema, `name` for a flow
-                definition, `default` for branding and `slug` for an IdP
-                connection.
+                definition, `default` for branding and for OAuth settings,
+                and `slug` for an IdP connection.
               value:
                 id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
                 project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
@@ -210,6 +213,9 @@ post:
                   - kind: idp
                     handle: google
                     revision_id: idprev_01KWHF2XY6RN7F0N9WD3P2E4YM
+                  - kind: oauth
+                    handle: default
+                    revision_id: oauthset_01KWHG3M5QZ27F0N9WD3P2E4YM
     '400':
       description: |
         The bundle cannot build a release. A bundle whose resources fail

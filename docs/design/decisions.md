@@ -16,12 +16,16 @@
 
 ## Decisions
 
-### D41 · Webhooks is a project screen, after Events — 2026-11-11
+### D42 · Webhooks is a project screen, after Events — 2026-11-11
 A project's events can be sent to endpoints of the customer's own ([ADR 089](../adrs/089-project-webhooks.md)), and the sidebar gains Webhooks for them, after Events and before Settings: Events shows the events, Webhooks sends them on, and Settings stays last (D30). It is a row of the project's list and not one of Events' own, whose rows are the views and filters of one screen. The name is the API's and the CLI's.
 The list is a resource table (D17): the endpoint with its note under it (D20), what it receives (`All events`, one type by name, or how many), its state and its last delivery. The API has no status field, so the console works the state out of `enabled` and the two delivery times: Active, Failing, Disabled, and Disabled after repeated failures for one that is off with its last attempt failed, which is how the server leaves a webhook it gave up on. A project holds ten webhooks; at ten the list says so and holds Add. No search, no `Load more` and no count: ten rows are one page.
 Add opens a drawer (D15) with the endpoint, a note and the events: all of them, or a selection from the types Events filters by, under the same captions. A webhook opens on a page of its own, as a team does, with a card each for delivery (and Disable or Enable), the fields with their Save, the signing secret's rotation and the delete. Rotating and deleting are confirmed; the delete is not typed out (D2), since a webhook can be added again.
 The signing secret is shown once, in a dialog after the webhook is created and after a rotation, with its copy button and a link to the guide on checking signatures. The console keeps it only while that dialog is open. Actions show whatever the person may do, as in D33: a viewer is offered Add and gets the server's refusal.
 → Design review of the list's columns, the webhook's page and the secret dialog, none of which has a design. Gate the actions on effective permissions when the console can read them (Console ADR 0004 §5).
+
+### D41 · Configuration and resources share one detail layout — 2026-11-11 · [standing]
+Supersedes the look half of D0a. Login flows, identity providers and releases draw the same detail screen as users, teams and project settings: a header, then body cards of labelled rows on one 218px label rail, 16px either side of the rule between rows and no rule after the last, labels in medium weight, inputs and a section's aside starting on the rail. Configuration still differs in what it allows (D0b), not in how it looks.
+→ Designs follow the shared layout.
 
 ### D40 · A project's Settings opens its own list, as the root Settings do — 2026-11-11 · [standing]
 Amends D35, whose project Settings was one page with General and Admins tabs. On Projects, Settings carried an arrow and swapped the sidebar for its own list (D29); in a project, a row of the same name and glyph opened a page beside the project's screens. As Vercel's team and project Settings both do, a project's Settings now opens a list too: General (the project's name, origins, variables and policies), then Admins, under a heading that leads back to the project. Both pages keep the project's header (its name, ID and created date). The root Settings are the platform project's (Profile, and on the hosted cloud Billing, Support and Email), so the two lists hold different pages; only the way they open is shared. Search lists a project's Settings pages among its pages, marked Settings and the project.
@@ -168,8 +172,8 @@ Minimal (email) · Consumer (email, given name, family name) · Business (+ comp
 ### D0b · Schemas are read-only in the portal — 2026-07-23 · [standing]
 No editing; changes go through the CLI only. Version switching is view-only (skip between versions, no restore/apply).
 
-### D0a · Resources vs. schemas are different page patterns — 2026-07-23 · [standing]
-Users/teams/projects are resources; schemas are configuration, not resources — they should look different. MVP permissions: account creator = owner; invited users get admin; evolve later.
+### D0a · Resources vs. schemas are different page patterns — 2026-07-23 · [superseded in part by D41]
+Users/teams/projects are resources; schemas are configuration, not resources — they should look different (superseded by D41: the detail screens share one layout). MVP permissions: account creator = owner; invited users get admin; evolve later.
 
 ---
 

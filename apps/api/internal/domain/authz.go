@@ -43,6 +43,8 @@ const (
 	ResourceKindIDPConnection  ResourceKind = "idp_connection"
 	ResourceKindDeployment     ResourceKind = "deployment"
 	ResourceKindPolicy         ResourceKind = "policy"
+	ResourceKindApplication    ResourceKind = "application"
+	ResourceKindOAuthSettings  ResourceKind = "oauth_settings"
 )
 
 func (k ResourceKind) String() string { return string(k) }

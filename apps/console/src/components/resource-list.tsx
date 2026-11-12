@@ -299,8 +299,10 @@ export function ResourceHeadCell({
 }
 
 /**
- * The empty header cell over the row menus. `narrow` for a column that is the
- * menu's button and no wider, with {@link RESOURCE_MENU_CELL_NARROW} beneath.
+ * The header cell over the row menus: blank on screen, "Actions" to a screen
+ * reader, so the menu cells have a column header like every other cell.
+ * `narrow` for a column that is the menu's button and no wider, with
+ * {@link RESOURCE_MENU_CELL_NARROW} beneath.
  */
 export function ResourceMenuHead({
   className,
@@ -317,7 +319,9 @@ export function ResourceMenuHead({
         narrow ? "w-[calc(var(--resource-menu,2.25rem)+1rem)] px-2" : "px-6",
         className,
       )}
-    />
+    >
+      <span className="sr-only">Actions</span>
+    </TableHead>
   );
 }
 
