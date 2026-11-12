@@ -82,8 +82,8 @@ type Handler interface {
 	// naming the pointer and the handle. Add the missing resource to the bundle.
 	// Building writes revisions, so besides `release.write` it needs the write
 	// scope of every kind the bundle carries a resource of: `schema.write`,
-	// `flow_definition.write`, `branding.write`, `idp.write` and `policy.write`,
-	// as the per-kind create endpoints do. A missing scope answers `403` with
+	// `flow_definition.write`, `branding.write`, `idp.write`, `policy.write`
+	// and `oauth_settings.write`, as the per-kind create endpoints do. A missing scope answers `403` with
 	// `rel.permission_denied`, naming the kind. Request a token with that scope.
 	// An empty kind needs no scope.
 	// Building a release does not deploy it. A release is not tied to an origin,
@@ -889,6 +889,18 @@ type Handler interface {
 	//
 	// GET /users/me/schema
 	GetMyUserSchema(ctx context.Context, params GetMyUserSchemaParams) (GetMyUserSchemaRes, error)
+	// GetOAuthSettingsById implements getOAuthSettingsById operation.
+	//
+	// Returns one OAuth settings revision, including its stored settings. Pass
+	// the `revision_id` of the `kind: oauth` pointer on a release, which
+	// `buildRelease` (`POST /releases/build`) and `getReleaseById`
+	// (`GET /releases/{release_id}`) return.
+	// A release is the only writer of OAuth settings, so there is no operation
+	// that publishes a revision on its own: put `oauth` in the bundle that
+	// `buildRelease` takes.
+	//
+	// GET /oauth_settings/{oauth_settings_id}
+	GetOAuthSettingsById(ctx context.Context, params GetOAuthSettingsByIdParams) (GetOAuthSettingsByIdRes, error)
 	// GetPolicy implements getPolicy operation.
 	//
 	// Returns a policy as its newest revision. A revision applies once a deployed

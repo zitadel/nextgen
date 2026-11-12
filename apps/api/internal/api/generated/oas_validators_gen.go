@@ -16412,6 +16412,8 @@ func (s ReleasePointerKind) Validate() error {
 		return nil
 	case "policy":
 		return nil
+	case "oauth":
+		return nil
 	default:
 		return errors.Errorf("invalid value: %v", s)
 	}
