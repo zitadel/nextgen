@@ -17,8 +17,9 @@ const viewer = { type: "project_member", project_member: { relation: "viewer" } 
 describe("describeExpiry", () => {
   it.each([
     ["2026-11-13T12:00:00Z", "Expires in 3 days"],
-    // 71 hours: two whole days, never rounded up to time the link lacks.
-    ["2026-11-13T11:00:00Z", "Expires in 2 days"],
+    // A link made a minute ago still reads as the three days it was given.
+    ["2026-11-13T11:59:00Z", "Expires in 3 days"],
+    ["2026-11-12T23:00:00Z", "Expires in 2 days"],
     ["2026-11-11T12:00:00Z", "Expires in 1 day"],
     ["2026-11-11T11:59:00Z", "Expires in 23 hours"],
     ["2026-11-10T13:30:00Z", "Expires in 1 hour"],

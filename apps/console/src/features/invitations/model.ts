@@ -100,16 +100,21 @@ export function effectiveStatus(
 const HOUR_MS = 60 * 60 * 1000;
 
 /**
- * How long a pending invitation has left: `Expires in 2 days`. Whole days, then
- * whole hours, each rounded down so the line never promises time the link does
- * not have. `now` is a parameter so a test can pin it.
+ * How long a pending invitation has left: `Expires in 3 days`. Days are
+ * rounded to the nearest, so a link made a moment ago reads as the 72 hours it
+ * was given rather than `2 days`; under a day it counts whole hours, rounded
+ * down, where an hour more or less matters. `now` is a parameter so a test can
+ * pin it.
  */
 export function describeExpiry(expiresAt: string, now: Date = new Date()): string {
-  const hours = Math.floor((Date.parse(expiresAt) - now.getTime()) / HOUR_MS);
+  const hours = (Date.parse(expiresAt) - now.getTime()) / HOUR_MS;
   if (Number.isNaN(hours)) return "";
   if (hours < 1) return "Expires in less than an hour";
-  if (hours < 24) return `Expires in ${hours} ${hours === 1 ? "hour" : "hours"}`;
-  const days = Math.floor(hours / 24);
+  if (hours < 24) {
+    const whole = Math.floor(hours);
+    return `Expires in ${whole} ${whole === 1 ? "hour" : "hours"}`;
+  }
+  const days = Math.round(hours / 24);
   return `Expires in ${days} ${days === 1 ? "day" : "days"}`;
 }
 
