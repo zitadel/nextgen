@@ -2,6 +2,7 @@ import semver from "semver";
 
 import { addExactCommandFor, detectPackageManager } from "@/lib/package-manager";
 import { exactZitadelPins } from "@/lib/zitadel-pins";
+
 import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
 
 /**
@@ -27,7 +28,10 @@ export class DependencyVersionCheck implements SanityCheck {
   readonly path = "package.json";
 
   async run(ctx: CheckContext): Promise<CheckOutcome> {
-    const base = { name: this.name, path: this.path };
+    const base = {
+      name: this.name,
+      path: this.path,
+    };
     if (semver.valid(ctx.cliVersion) === null) {
       // A dev or placeholder CLI version has no train to compare against.
       return {
@@ -36,34 +40,50 @@ export class DependencyVersionCheck implements SanityCheck {
         message: `CLI version ${ctx.cliVersion} is not an exact release; skipping the pin comparison`,
       };
     }
-    const exact = await exactZitadelPins(ctx.cwd).catch(() => undefined);
+    const exact = await exactZitadelPins(ctx.cwd).catch(() => {
+      return undefined;
+    });
     if (exact === undefined) {
       // A missing or unparsable package.json is the dependency check's
       // failure to report; double-flagging the same root cause helps nobody.
-      return { ...base, status: "pass", message: "no package.json to compare pins against" };
+      return {
+        ...base,
+        status: "pass",
+        message: "No package.json to compare pins against",
+      };
     }
-    const mismatched = exact.filter(([, version]) => !semver.eq(version, ctx.cliVersion));
+    const mismatched = exact.filter(([, version]) => {
+      return !semver.eq(version, ctx.cliVersion);
+    });
     if (mismatched.length > 0) {
       // Repair with the project's own package manager and an exact-save flag:
       // a bare `npm install` would switch managers on a pnpm/yarn/bun project
       // and write a caret range — exactly the float this check ignores.
       const remedy = addExactCommandFor(
         await detectPackageManager(ctx.cwd),
-        mismatched.map(([name]) => `${name}@${ctx.cliVersion}`),
+        mismatched.map(([name]) => {
+          return `${name}@${ctx.cliVersion}`;
+        }),
       ).display;
       return {
         ...base,
         status: "warn",
         message:
-          `${mismatched.map(([name, version]) => `${name}@${version}`).join(", ")} ` +
+          `${mismatched
+            .map(([name, version]) => {
+              return `${name}@${version}`;
+            })
+            .join(", ")} ` +
           `does not match this CLI's version (${ctx.cliVersion}); scaffolded files and ` +
           `guidance target the CLI's train`,
         details: {
-          mismatched: mismatched.map(([name, version]) => ({
-            name,
-            declared: version,
-            expected: ctx.cliVersion,
-          })),
+          mismatched: mismatched.map(([name, version]) => {
+            return {
+              name,
+              declared: version,
+              expected: ctx.cliVersion,
+            };
+          }),
           remedy_command: remedy,
         },
       };
@@ -74,7 +94,7 @@ export class DependencyVersionCheck implements SanityCheck {
       message:
         exact.length > 0
           ? `Zitadel package pins match the CLI version (${exact.length} compared)`
-          : "no exactly-pinned Zitadel packages to compare",
+          : "No exactly-pinned Zitadel packages to compare",
     };
   }
 

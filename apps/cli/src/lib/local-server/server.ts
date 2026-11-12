@@ -1,10 +1,10 @@
 import { join } from "node:path";
 
-import consola from "consola";
+import { log } from "@/lib/log";
 
 import { Consent } from "@/lib/consent";
 import { ZitadelError, errorMessage } from "@/lib/errors";
-import { unscopedCommand } from "@/lib/suggestion";
+import { type EnvironmentSelector, projectCommand } from "@/lib/suggestion";
 import { currentUser } from "@/lib/uidgid";
 import type { ResolvedEnv } from "./env-vars";
 import { assertDockerAvailable, startFailure } from "./internal/failures";
@@ -111,11 +111,11 @@ export type SweepResult = Readonly<
  *
  * The rule this class keeps: every directory runs its own server, on its own
  * port, with its own data and its own admin credential, and the CLI only talks
- * to the server that directory's own `.zitadel/local/runtime.json` names. What
- * this replaced (issue #1863) was a second directory silently attaching to the
- * first one's server on port 8080 and signing in with a password that server
- * never imported. So nothing here falls back to a default port, and a recorded
- * URL is never trusted on its own: see {@link LocalServer.resolveUrl}.
+ * to the server that directory's own `.zitadel/local/runtime.json` names. A
+ * second directory never silently attaches to another's server on port 8080
+ * and signs in with a password that server never imported, so nothing here
+ * falls back to a default port, and a recorded URL is never trusted on its own:
+ * see {@link LocalServer.resolveUrl}.
  *
  * A directory has at most one server, a process (`binary`) or a container
  * (`docker`), and the record says which. The commands call this class and
@@ -127,18 +127,24 @@ export type SweepResult = Readonly<
 export class LocalServer {
   private readonly cwd: string;
   private readonly cliVersion: string;
+  private readonly selector: EnvironmentSelector;
 
-  private constructor(cwd: string, cliVersion: string) {
+  private constructor(cwd: string, cliVersion: string, selector: EnvironmentSelector) {
     this.cwd = cwd;
     this.cliVersion = cliVersion;
+    this.selector = selector;
   }
 
   /**
-   * The server of a directory. `cliVersion` is only used to word the commands
-   * that errors suggest, so they name the CLI release the user is running.
+   * The server of a directory. `cliVersion` and `selector` are only used to
+   * word the commands that errors suggest, so they name the CLI release the
+   * user is running and carry the `--cwd` the run was given.
    */
-  static at(cwd: string, options: { cliVersion: string }): LocalServer {
-    return new LocalServer(cwd, options.cliVersion);
+  static at(
+    cwd: string,
+    options: { cliVersion: string; selector: EnvironmentSelector },
+  ): LocalServer {
+    return new LocalServer(cwd, options.cliVersion, options.selector);
   }
 
   /**
@@ -222,7 +228,9 @@ export class LocalServer {
    */
   static async nextFreePort(port: number): Promise<number | undefined> {
     const count = Math.max(0, Math.min(port + 20, 65535) - port);
-    for (const next of Array.from({ length: count }, (_, index) => port + 1 + index)) {
+    for (const next of Array.from({ length: count }, (_, index) => {
+      return port + 1 + index;
+    })) {
       if (await LocalServer.isPortFree(next)) {
         return next;
       }
@@ -235,8 +243,11 @@ export class LocalServer {
     const alive =
       runtime.backend === "binary"
         ? await BinaryLauncher.isRecordRunning(runtime)
-        : (await DockerLauncher.inspect(runtime.container_name).catch(() => undefined))?.running ===
-          true;
+        : (
+            await DockerLauncher.inspect(runtime.container_name).catch(() => {
+              return undefined;
+            })
+          )?.running === true;
     return alive && (await checkLocalServerHealth(runtime.server_url));
   }
 
@@ -259,7 +270,11 @@ export class LocalServer {
         stop_result: await BinaryLauncher.stopPid(processInfo.pid),
       });
     }
-    if (results.some((result) => result.stop_result.status === "failed")) {
+    if (
+      results.some((result) => {
+        return result.stop_result.status === "failed";
+      })
+    ) {
       throw new ZitadelError("E_VALIDATION", "Some managed local runtime processes did not stop", {
         hint: "Inspect the failed process IDs and stop them manually, then rerun `zitadel stop --all`.",
         details: { supported: true, results },
@@ -293,9 +308,9 @@ export class LocalServer {
   ): Promise<{ runtime: RuntimeMetadata; alreadyRunning: boolean }> {
     // One start at a time per directory: two at once would pick the same port
     // and run two servers over one data directory. The second finds the first's.
-    return withStartLock(join(localRuntimePaths(this.cwd).runtimeDir, "start.lock"), () =>
-      this.startLocked(config, options),
-    );
+    return withStartLock(join(localRuntimePaths(this.cwd).runtimeDir, "start.lock"), () => {
+      return this.startLocked(config, options);
+    });
   }
 
   /**
@@ -338,7 +353,7 @@ export class LocalServer {
           existing.server_version !== version &&
           (await BinaryLauncher.isRecordRunning(existing))
         ) {
-          consola.info(
+          log.info(
             `Restarting the local Zitadel server on ${version}: it ran ${existing.server_version}. Its data stays.`,
           );
         }
@@ -357,13 +372,15 @@ export class LocalServer {
           {
             port: options.port,
             previousPort: other?.port,
-            reusable: (record) => version === undefined || record.server_version === version,
+            reusable: (record) => {
+              return version === undefined || record.server_version === version;
+            },
           },
         );
       }
 
       const { image } = config;
-      await assertDockerAvailable(this.cliVersion);
+      await assertDockerAvailable(this.cliVersion, this.selector);
       if (existing?.backend === "binary") {
         await BinaryLauncher.stopRecord(existing);
       }
@@ -381,11 +398,13 @@ export class LocalServer {
         {
           port: options.port,
           previousPort: other?.port,
-          reusable: (record) => record.image === image,
+          reusable: (record) => {
+            return record.image === image;
+          },
         },
       );
     } catch (error) {
-      throw await startFailure(error, this.cliVersion);
+      throw await startFailure(error, this.cliVersion, this.selector);
     }
   }
 
@@ -401,8 +420,12 @@ export class LocalServer {
     const { container, dockerError } =
       runtime?.backend === "docker"
         ? await DockerLauncher.inspect(runtime.container_name).then(
-            (inspected) => ({ container: inspected, dockerError: undefined }),
-            (error: unknown) => ({ container: undefined, dockerError: errorMessage(error) }),
+            (inspected) => {
+              return { container: inspected, dockerError: undefined };
+            },
+            (error: unknown) => {
+              return { container: undefined, dockerError: errorMessage(error) };
+            },
           )
         : { container: undefined, dockerError: undefined };
     const healthy = runtime ? await checkLocalServerHealth(runtime.server_url) : false;
@@ -478,6 +501,8 @@ export class LocalServer {
     tail: number;
     level?: LogLevel;
     print: (lines: readonly LogLine[]) => void;
+    /** The run's Ctrl-C: once it aborts, following stops, even before it began. */
+    signal: AbortSignal;
   }): Promise<RuntimeMetadata> {
     const runtime = await this.recordedRuntime();
     const reader = new LogLineReader();
@@ -486,12 +511,13 @@ export class LocalServer {
       appended: (text) => options.print(atLeast(reader.read(text), options.level)),
     };
     if (runtime.backend === "binary") {
-      await BinaryLauncher.followLogs(runtime.log_path, sink);
+      await BinaryLauncher.followLogs(runtime.log_path, sink, { signal: options.signal });
     } else {
       await DockerLauncher.followLogs(
         runtime.container_name,
         options.level ? "all" : options.tail,
         sink,
+        options.signal,
       );
     }
     options.print(atLeast(reader.end(), options.level));
@@ -504,7 +530,7 @@ export class LocalServer {
     if (!runtime) {
       throw new ZitadelError("E_VALIDATION", "Local Zitadel runtime has not been started", {
         hint: "Run `zitadel start` first.",
-        nextCommands: [unscopedCommand("start", this.cliVersion)],
+        nextCommands: [projectCommand("start", this.selector, this.cliVersion)],
       });
     }
     return runtime;

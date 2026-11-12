@@ -164,7 +164,7 @@ func TestImport_teamPlaceholderNameTaken(t *testing.T) {
 }
 
 // A user schema that identifies users by `email` must see the imported user's
-// email in the unique-attributes registry, or sign-in cannot resolve them.
+// email as a unique claim, or sign-in cannot resolve them.
 func TestImport_uniqueAttributesFollowSchema(t *testing.T) {
 	ctx := t.Context()
 	v2Pool := testPool(t)

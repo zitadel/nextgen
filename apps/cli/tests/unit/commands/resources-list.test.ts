@@ -133,6 +133,7 @@ describe("zitadel resources", () => {
       "not_equals",
       "contains",
     ]);
+    expect(find("users", "identifier")?.operations).toEqual(["starts_with"]);
     expect(find("events", "category")?.combine).toBe("or");
     expect(find("schemas", "revisions")?.values).toEqual(["all", "latest"]);
 
@@ -171,5 +172,13 @@ describe("zitadel resources", () => {
     expect(res.stdout).toContain("users");
     expect(res.stdout).toContain("list, get, create, update, delete");
     expect(res.stdout).toContain(`${Object.keys(RESOURCES).length} resources`);
+  });
+
+  it("ends the table with how to reach a command's flags", async () => {
+    const res = await asTerminal(() =>
+      runCliForTest(["resources", "--non-interactive", "--no-telemetry"]),
+    );
+
+    expect(res.stdout).toContain("Add --help to any command for its flags.");
   });
 });

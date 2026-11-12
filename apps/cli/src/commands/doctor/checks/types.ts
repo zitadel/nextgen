@@ -1,6 +1,7 @@
 import type { Consent, Gate } from "@/lib/consent";
-import { ZitadelError, type ZitadelErrorCode, errorMessage } from "@/lib/errors";
+import { errorMessage, ZitadelError, type ZitadelErrorCode } from "@/lib/errors";
 import type { Orca } from "@/lib/orca";
+import type { EnvironmentSelector } from "@/lib/suggestion";
 
 /** Pass/fail/advisory outcome of a single {@link SanityCheck}. */
 export type CheckOutcome = {
@@ -24,6 +25,8 @@ export type CheckContext = {
   readonly cwd: string;
   readonly orca: Orca;
   readonly cliVersion: string;
+  /** The run's `--cwd`, `--env` and `--server`, so a command a check suggests targets the same project. */
+  readonly selector: EnvironmentSelector;
   /** When true, {@link SanityCheck.fix} must preview without writing. */
   readonly dryRun: boolean;
   /** Aborts what a check has in flight, as Ctrl-C does for the command running it. */
@@ -70,7 +73,12 @@ export abstract class AbstractSanityCheck implements SanityCheck {
   async run(ctx: CheckContext): Promise<CheckOutcome> {
     try {
       await this.verify(ctx);
-      return { name: this.name, status: "pass", message: this.summary, path: this.path };
+      return {
+        name: this.name,
+        status: "pass",
+        message: this.summary,
+        path: this.path,
+      };
     } catch (error) {
       return {
         name: this.name,
@@ -78,7 +86,10 @@ export abstract class AbstractSanityCheck implements SanityCheck {
         message: isMissingFile(error) ? `${this.path} was not found` : errorMessage(error),
         path: this.path,
         ...(error instanceof ZitadelError
-          ? { code: error.code, ...(error.hint === undefined ? {} : { hint: error.hint }) }
+          ? {
+              code: error.code,
+              ...(error.hint === undefined ? {} : { hint: error.hint }),
+            }
           : {}),
       };
     }

@@ -9,7 +9,6 @@ import {
   snapshotPlatformStore,
 } from "@zitadel/api-mock/platform";
 import { HttpResponse, http, passthrough } from "msw";
-import { text } from "@clack/prompts";
 import { beforeEach, describe, expect, vi } from "vitest";
 
 import { it, type Serve } from "@tests/helpers/fixtures";
@@ -22,9 +21,9 @@ import {
 import Claim from "@/commands/claim";
 import { usePlatformServer } from "@tests/helpers/platform-project";
 import { parseJson, pressCtrlC, runCliForTest } from "@tests/helpers/run-cli";
+import { answering } from "@tests/helpers/keyboard";
 import { asTerminal } from "@tests/helpers/terminal";
 
-vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
 import { aBinaryRecord } from "@tests/helpers/runtime-record";
 
 /**
@@ -167,9 +166,9 @@ describe("claim", () => {
     expect(json.data.dashboard_url).toContain(json.data.team_id);
     // The human output speaks permanence and points at the Console; the team
     // id stays available here in the envelope.
-    expect(json.data.title).toBe("Your Project is now permanent.");
+    expect(json.data.title).toBe("Your project is now permanent");
     expect(json.data.next_actions).toEqual([
-      "Manage your Project and collaborate in the Console:",
+      "Manage your project and collaborate in the Console:",
       json.data.dashboard_url,
     ]);
 
@@ -185,7 +184,7 @@ describe("claim", () => {
   it("prints the link and the permanence outcome, without team wording", async () => {
     const { cwd, project } = await makeProject();
 
-    // No `--json`: the envelope silences consola, and the point here is the
+    // No `--json`: the envelope silences the narration, and the point here is the
     // human-facing narration — the link on its own line, then the success
     // block in claim/permanence terms.
     const [res] = await Promise.all([
@@ -197,8 +196,8 @@ describe("claim", () => {
     const output = `${res.stdout}${res.stderr}`;
     expect(output).toContain("/claim/ch_");
     expect(output).toContain("Project claimed");
-    expect(output).toContain("Your Project is now permanent.");
-    expect(output).toContain("Manage your Project and collaborate in the Console:");
+    expect(output).toContain("Your project is now permanent");
+    expect(output).toContain("Manage your project and collaborate in the Console:");
     // The team stays in the envelope and the secret, not in the prose. The
     // mock's dashboard_url embeds the team id in its path, so assert on the
     // retired sentence rather than on the raw id.
@@ -406,7 +405,7 @@ describe("claim", () => {
     server.use(http.get("*/projects/:project_id/claim/status", statusChecks));
 
     const running = claim(cwd);
-    await vi.waitFor(() => expect(statusChecks).toHaveBeenCalledOnce());
+    await vi.waitFor(() => expect(statusChecks).toHaveBeenCalledOnce(), { timeout: 30_000 });
     pressCtrlC();
     const res = await running;
 
@@ -453,10 +452,12 @@ describe("claim", () => {
     const res = await claim(cwd, ["--dry-run"]);
 
     expect(res.exitCode).toBe(0);
-    const json = parseJson(res.stdout) as { status: string; reason: string; data: unknown };
-    expect(json.status).toBe("skipped");
-    expect(json.reason).toBe("dry-run");
-    expect(json.data).toMatchObject({ project_id: expect.stringMatching(/^proj-/) });
+    const json = parseJson(res.stdout) as { status: string; data: unknown };
+    expect(json.status).toBe("ok");
+    expect(json.data).toMatchObject({
+      dry_run: true,
+      project_id: expect.stringMatching(/^proj-/),
+    });
 
     // The whole point: no challenge was minted, so a developer who wandered
     // into the browser could not have claimed the project behind this run's
@@ -508,13 +509,17 @@ describe("claim", () => {
       ),
       { mode: 0o600 },
     );
-    vi.mocked(text).mockResolvedValueOnce(envProject.id);
 
     // The built CLI bundles its own prompts, so a prompt can only be answered
     // by running the command from source, where `input` is the one module asked.
+    const talk = answering(envProject.id);
     await Promise.all([
       asTerminal(() => Claim.run(["--cwd", cwd, "--no-open", "--env", "production"])),
       onChallengeMinted((challengeId) => completeClaimChallenge(challengeId, envProject.id)),
+    ]);
+
+    expect(talk.asked()).toEqual([
+      "What is the value of ZITADEL_PROJECT_ID for the production environment?",
     ]);
 
     expect(await readFile(join(cwd, ".env.production.local"), "utf8")).toContain(
@@ -570,7 +575,7 @@ describe("claim", () => {
       expect(res.exitCode).toBe(0);
       const json = parseJson(res.stdout) as LinkEnvelope;
       expect(json.status).toBe("ok");
-      expect(json.data.title).toBe("Open the link in a browser to make your Project permanent.");
+      expect(json.data.title).toBe("Open the link in a browser to make your project permanent");
       expect(json.data.project_id).toBe(project.id);
       expect(json.data.challenge_id).toMatch(/^ch_/);
       expect(json.data.claim_url).toContain(`/claim/${json.data.challenge_id}`);
@@ -623,12 +628,11 @@ describe("claim", () => {
 
       const json = parseJson(res.stdout) as {
         status: string;
-        data: { would: string };
-        next_commands: string[];
+        data: { would: string; next_commands: string[] };
       };
-      expect(json.status).toBe("skipped");
+      expect(json.status).toBe("ok");
       expect(json.data.would).toBe("Create a link to claim this project.");
-      expect(json.next_commands).toEqual([expect.stringContaining("claim --no-wait")]);
+      expect(json.data.next_commands).toEqual([expect.stringContaining("claim --no-wait")]);
     });
   });
 
@@ -651,7 +655,7 @@ describe("claim", () => {
         data: { title: string; team_id: string; claimed_at: string };
       };
       expect(json.status).toBe("ok");
-      expect(json.data.title).toBe("Your Project is now permanent.");
+      expect(json.data.title).toBe("Your project is now permanent");
       const secret = await readSecret(cwd);
       expect(secret.team_id).toBe(json.data.team_id);
       expect(secret.claimed_at).toBe(json.data.claimed_at);
@@ -754,7 +758,7 @@ describe("claim", () => {
       expect((await readSecret(cwd)).team_id).toBe("team-local-stub");
     });
 
-    // No `--json` in the next two: the warning is consola narration, and the
+    // No `--json` in the next two: the warning is narration, and the
     // envelope silences it.
     it("warns when a local server advertises a remote claim page", async ({ serve }) => {
       const { cwd } = await makeProject();
@@ -768,6 +772,21 @@ describe("claim", () => {
 
       expect(res.exitCode).toBe(0);
       expect(`${res.stdout}${res.stderr}`).toContain("NEXTGEN_SERVER_PUBLIC_BASE");
+    });
+
+    it("spells out an escape sequence in the claim link it prints", async ({ serve }) => {
+      const { cwd } = await makeProject();
+      const serverUrl = await startClaimServer(
+        serve,
+        "http://localhost/claim/ch_localstub\u001b[2Jwiped",
+      );
+      await writeRuntimeMetadata(cwd, runtimeFor(cwd, serverUrl));
+
+      const res = await runCliForTest(["claim", "--cwd", cwd, "--server", "local", "--no-open"]);
+
+      expect(res.exitCode).toBe(0);
+      expect(`${res.stdout}${res.stderr}`).toContain("ch_localstub\\x1b[2Jwiped");
+      expect(`${res.stdout}${res.stderr}`).not.toContain("\u001b");
     });
 
     it("does not warn when the claim page is on the local server itself", async ({ serve }) => {

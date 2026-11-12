@@ -11,9 +11,9 @@ import type { Connection, Credential } from "@/lib/zitadel";
 import {
   type CredentialNames,
   type GivenCredentials,
-  publishClientId,
   type PublishedCredentials,
   type PublishState,
+  publishClientId,
   reportClientIdOutcome,
   reportSecretOutcome,
   republishArgs,
@@ -90,6 +90,7 @@ export class CredentialDelivery {
     if (credentials === undefined) {
       return credentialVariables(connection.slug);
     }
+
     return {
       clientId: CredentialDelivery.variableOf(credentials.clientId),
       clientSecret: CredentialDelivery.variableOf(credentials.clientSecret),
@@ -129,7 +130,11 @@ export class CredentialDelivery {
     if (secret !== undefined) {
       reportSecretOutcome(secret, this.run.cliVersion, this.run.reused, this.run.selector);
     }
-    return { clientId, secret };
+
+    return {
+      clientId,
+      secret,
+    };
   }
 
   /**
@@ -143,6 +148,7 @@ export class CredentialDelivery {
     if (published.secret?.published !== "stored") {
       return false;
     }
+
     return published.clientId !== "deferred" && published.clientId !== "failed";
   }
 
@@ -161,10 +167,19 @@ export class CredentialDelivery {
     extraArgs: readonly string[],
   ): readonly (readonly string[])[] {
     const names = this.names;
+
     return republishArgs(
       [
-        { name: names.clientId, secret: false, published: published.clientId },
-        { name: names.clientSecret, secret: true, published: published.secret?.published },
+        {
+          name: names.clientId,
+          secret: false,
+          published: published.clientId,
+        },
+        {
+          name: names.clientSecret,
+          secret: true,
+          published: published.secret?.published,
+        },
       ],
       extraArgs,
     );
@@ -185,7 +200,12 @@ export class CredentialDelivery {
     if (given.clientId === undefined || name === undefined) {
       return undefined;
     }
-    return publishClientId({ name, value: given.clientId, publish });
+
+    return publishClientId({
+      name,
+      value: given.clientId,
+      publish,
+    });
   }
 
   /**
@@ -203,7 +223,12 @@ export class CredentialDelivery {
     if (given.secret === undefined || name === undefined) {
       return undefined;
     }
-    return storeClientSecret({ name, value: given.secret, publish });
+
+    return storeClientSecret({
+      name,
+      value: given.secret,
+      publish,
+    });
   }
 
   /**
@@ -219,6 +244,7 @@ export class CredentialDelivery {
     if (credential.kind === "literal") {
       return undefined;
     }
+
     return credential.variable;
   }
 }

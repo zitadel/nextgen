@@ -18,6 +18,7 @@ Example file: [`docs/operations/nextgen.example.yaml`](../operations/nextgen.exa
 | `server.public_base`     | `NEXTGEN_SERVER_PUBLIC_BASE`     | `https://nextgen.zitadel.cloud`                                     | Public origin browsers reach this deployment at; feeds the claim and dashboard URLs. Set to `http://localhost:8080` when running the server locally by hand; the CLI runtime (`zitadel start`) sets it itself. With platform bootstrap on, it is the platform project's one primary origin, so servers sharing a database need the same value. |
 | `server.console_origins` | `NEXTGEN_SERVER_CONSOLE_ORIGINS` | — (none) | Other origins the console is reached at, beside the origin of `server.public_base`, such as another hostname in front of the deployment. Like that origin, they may open any project's flow to preview its login; signing in to the platform project works only at `server.public_base`. A comma-separated list in the environment. |
 | `server.request_id_header` | `NEXTGEN_SERVER_REQUEST_ID_HEADER` | — (unset)                                                      | A header a proxy in front of the server sets to its own ID for each request, such as Vercel's `x-vercel-id`. The server then uses that ID in its logs, `X-Request-Id`, audit events and error pages. Set it only behind a proxy that overwrites the header, or a client chooses its own ID. |
+| `server.idle_timeout`    | `NEXTGEN_SERVER_IDLE_TIMEOUT`    | `60s`                                                               | How long the server keeps a connection open while it waits for the next request. Behind a proxy that reuses its connections, set it above the proxy's own idle timeout, or to `0` to never close one: a `POST` the proxy sends as the server closes the connection ends as the proxy's 502. |
 
 ## Platform
 
@@ -109,6 +110,19 @@ session:
   default_ttl: 168h # a week
   max_ttl: 720h
 ```
+
+## Request audit events
+
+| YAML key                    | Environment                         | Default | Description                                                     |
+| --------------------------- | ----------------------------------- | ------- | --------------------------------------------------------------- |
+| `events.request.flush_wait` | `NEXTGEN_EVENTS_REQUEST_FLUSH_WAIT` | `0s`    | How long a request waits for its audit event to be written      |
+
+The server writes a request's audit event up to a second after the response,
+many requests in one write. A server that runs only while it serves a request,
+such as a Vercel function, may not get to that write before it is paused. Set
+`flush_wait`, to `2s` for example, and a request ends once its event is
+written, or after that long when the database does not answer. Requests in
+flight together still share a write.
 
 ## Audit event retention
 
@@ -308,8 +322,8 @@ is `zitadel_auth_attempt_outcomes_total`.
 | `db.client.connection.max` | updowncounter | `{connection}` | `db.client.connection.pool.name`: `postgres`, `sqlite` | The most connections a database pool will open. |
 | `zitadel.auth.credential.validation.duration` | histogram | `s` | `result`: `valid`, `revoked`, `invalid`, `error` | Duration of validating a bearer credential: decrypting it, checking its claims and, for a revocable one, reading its token record. |
 | `zitadel.auth.token.revocation_checks` | counter | `{check}` | `result`: `active`, `revoked`, `error` | Token record lookups made to see whether a credential was revoked. Credentials that cannot be revoked, or that carry no token id, are not checked and not counted. |
-| `zitadel.auth.password.verification.duration` | histogram | `s` | `purpose`: `login`, `history`; `result`: `match`, `updated`, `mismatch`, `error` | Duration of verifying a password against its stored hash. `updated` is a match on a hash outdated for the project's method, so the verify also computed (or attempted) a new hash: two hashes for one sign-in; it occurs for the `login` purpose only. |
-| `zitadel.auth.attempt.outcomes` | counter | `{proof}` | `check`: `user`, `password`, `passkey`, `passkey_registration`; `result`: `success`, `rejected`, `error` | Authentication proofs verified through auth attempts, by kind of proof and outcome. SSO sign-ins are not counted. |
+| `zitadel.auth.password.verification.duration` | histogram | `s` | `purpose`: `login`, `history`; `result`: `match`, `updated`, `mismatch`, `error`, `busy` | Duration of verifying a password against its stored hash. `updated` is a match on a hash outdated for the project's method, so the verify also computed (or attempted) a new hash: two hashes for one sign-in; it occurs for the `login` purpose only. |
+| `zitadel.auth.attempt.outcomes` | counter | `{proof}` | `check`: `user`, `password`, `passkey`, `passkey_registration`; `result`: `success`, `rejected`, `error`, `busy` | Authentication proofs verified through auth attempts, by kind of proof and outcome. SSO sign-ins are not counted. |
 | `zitadel.crypto.key_chain.resolution.duration` | histogram | `s` | `key.kind`: `master`, `project` | Duration of unwrapping an encryption key that was not in the crypter cache, including resolving any wrapping key that is not cached either. Only a resolution that produced a crypter is recorded; a failed unwrap is not. Reading the key row is a storage statement and is part of db.client.operation.duration. |
 | `zitadel.flow.step.transitions` | counter | `{transition}` | `operation`: `start`, `submit`, `render`; `result`: `step`, `complete`, `error` | Flow engine operations, by entry point and where they left the flow. Step names are defined per project and are deliberately not an attribute. |
 | `zitadel.audit.insert.duration` | histogram | `s` | `source`: `request`, `event` | Duration of one audit insert: a single event in its transaction, or one attempt to write a batch of buffered request events (a retried batch is timed per attempt). |
@@ -317,6 +331,11 @@ is `zitadel_auth_attempt_outcomes_total`.
 | `zitadel.cache.lookups` | counter | - | `cache`: fixed in code; `result`: `hit`, `miss` | Cache lookups, split into hits and misses. |
 | `zitadel.cache.evictions` | counter | - | `cache`: fixed in code | Entries dropped from a cache because it was full. |
 | `zitadel.cache.entries` | gauge | - | `cache`: fixed in code | Entries currently held in a cache. |
+| `zitadel.password_hashing.in_flight` | gauge | - |  | Password hashes currently running. |
+| `zitadel.password_hashing.waiting` | gauge | - |  | Password hashes waiting for a slot. |
+| `zitadel.password_hashing.memory_reserved` | gauge | `By` |  | Memory the running password hashes are budgeted to use. |
+| `zitadel.password_hashing.rejected` | counter | - |  | Password hashes refused because no slot freed up within the configured wait. |
+| `zitadel.password_hashing.wait_duration` | histogram | `s` |  | Time a password hash waited for a slot, whether it got one or not; 0 when one was free. |
 
 ## Config file search paths
 

@@ -1,3 +1,4 @@
+import { unscopedCommand } from "@/lib/suggestion";
 import type { Config } from "@oclif/core";
 
 import { BaseCommand } from "@/lib/oclif/base";
@@ -14,7 +15,7 @@ class Unscoped extends Tabulatable(BaseCommand) {
   }
 
   protected async execute() {
-    return this.emit({ status: "ok", data: {} });
+    return this.emit({ summary: { title: "Done", sections: [] }, status: "ok", data: {} });
   }
 
   drawList(...args: Parameters<Unscoped["listResult"]>) {
@@ -24,7 +25,7 @@ class Unscoped extends Tabulatable(BaseCommand) {
 
 class Drawing extends Unscoped {
   protected override suggestFollowUp(args: string) {
-    return this.suggestUnscoped(args);
+    return unscopedCommand(args, "0.0.0-test");
   }
 
   draw: Tabulate = (columns, items) => this.tabulate(columns, items);
@@ -53,7 +54,7 @@ class Running extends Drawing {
 
   protected override async execute() {
     this.drawn = await this.tabulate(["id"], [{ id: "user_1" }]);
-    return this.emit({ status: "ok", data: {} });
+    return this.emit({ summary: { title: "Done", sections: [] }, status: "ok", data: {} });
   }
 }
 

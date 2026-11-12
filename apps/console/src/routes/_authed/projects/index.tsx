@@ -1,13 +1,13 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { Boxes, Plus, Search } from "lucide-react";
+import { Boxes, Plus } from "lucide-react";
 import { useCallback, useState } from "react";
 
-import { api } from "@/api/zitadel";
-import { consoleSessionProject, validateNextSearch } from "@/auth/session";
+import { validateNextSearch } from "@/auth/session";
 import { useNavItems, useRequestedNavItem } from "@/app-shell/use-nav-items";
 import { NewProjectCard } from "@/features/projects/components/new-project-card";
 import { NewProjectSheet } from "@/features/projects/components/new-project-sheet";
 import { ProjectLifecycle } from "@/features/projects/components/project-lifecycle";
+import { ProjectPicker } from "@/features/projects/components/project-picker";
 import { ProjectMark } from "@/components/project-mark";
 import {
   LoadMore,
@@ -26,15 +26,18 @@ import {
 } from "@/components/resource-list";
 import { Button } from "@/components/ui/button";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table";
 import { useLoadMore } from "@/hooks/use-load-more";
-import { useSearchDraft } from "@/hooks/use-search-draft";
 import { formatDate } from "@/lib/date";
 import { primaryHost } from "@/features/projects/model";
 import { useSelectProjectTarget } from "@/features/projects/project-scope";
 import { Page } from "@/components/layout";
-import { LIST_PAGE_SIZE } from "@/lib/paging";
+import { SearchField } from "@/components/search-field";
+import { searchTerm } from "@/lib/search-params";
+import { cn } from "@/lib/utils";
+import { listProjectsPage } from "@/features/projects/my-projects";
+import { FormError } from "@/components/form-error";
+import { useSearchedLoad } from "@/hooks/use-searched-load";
 
 /**
  * Projects overview — every project the person can act on.
@@ -44,12 +47,14 @@ import { LIST_PAGE_SIZE } from "@/lib/paging";
  * project (D27). It is where the console lands when there are several
  * projects and none is selected yet (`routes/_authed/index.tsx`), and where
  * the `_authed` guard sends a screen that needs a project while none is
- * selected, passing it as `?next=`. The page is then the way to that screen —
- * `Continue to Teams` (D22) — and a row goes on there with the project
- * selected.
+ * selected, passing it as `?next=`. The page is then the way to that screen,
+ * `Continue to Teams` (D22), and draws the choice alone rather than the list
+ * (`ProjectPicker`, D31): the same projects, search and paging, and choosing
+ * one goes on there with the project selected.
  *
- * It is a list screen like every other: the title row with its search and its
- * action, then the table. A project is created from the app it connects, so
+ * Opened for itself it is a list screen like every other: the title row with
+ * its search and its action, then the table. A project is created from the
+ * app it connects, so
  * `New project` opens a drawer with the CLI's `setup` command and how a
  * project goes from that command to production, not a form. With no project
  * yet there is nothing to list, so the page is that command and that guide
@@ -74,43 +79,27 @@ export const Route = createFileRoute("/_authed/projects/")({
   // First in the account sidebar; no `scope`, since it is above every project.
   staticData: { nav: { label: "Projects", view: "account", order: 1, icon: Boxes } },
   // `next` is sanitized like the login screen's: only a router-relative path
-  // is followed. The search lives in the URL like a filter tab: it belongs to
-  // the request the loader makes, so a searched list survives a reload, and
-  // changing it re-runs the loader, which resets the paged-in rows.
+  // is followed. The search lives in the URL like a filter tab, so a searched
+  // list survives a reload.
   validateSearch: (search: Record<string, unknown>): ProjectsSearch => ({
     ...validateNextSearch(search),
-    q: typeof search.q === "string" && search.q.trim() !== "" ? search.q.trim() : undefined,
+    q: searchTerm(search.q),
   }),
-  loaderDeps: ({ search }) => ({ q: search.q }),
-  loader: async ({ deps }) => {
-    // The projects the signed-in person can act on (root ADR 053 §6), read with
-    // the session cookie — not `POST /projects/query`, which the server pins to
-    // the calling credential's one home project (#1237).
-    const page = await api.listMyProjects({
-      limit: LIST_PAGE_SIZE,
-      order: NEWEST_FIRST,
-      name_contains: deps.q,
-      ...consoleSessionProject(),
-    });
-    return { projects: page.projects, nextPageToken: page.next_page_token ?? undefined, q: deps.q };
-  },
+  // As on Users, the term is no loader dep: a new term is not a new match, so
+  // the field being typed in stays mounted, and the screen reads a term that
+  // comes after the load itself (`useSearchedLoad`).
+  // `location.search` is the URL's, which `validateSearch` has not been over.
+  loader: ({ location }) => listProjectsPage(searchTerm((location.search as { q?: unknown }).q)),
   component: ProjectsScreen,
 });
 
 type ProjectsSearch = { next?: string; q?: string };
 
-/**
- * The list's order, by creation time rather than by id: an id says nothing
- * about when a project was made (root ADR 047). The loader and `Load more`
- * both send it, since a page token only continues the order it came from.
- */
-const NEWEST_FIRST = "desc";
-
 /** The Name cell clamps at 280px and truncates, as the Users table's User cell does. */
 const NAME_CLAMP = "max-w-70";
 
 function ProjectsScreen() {
-  const loaded = Route.useLoaderData();
+  const fromRoute = Route.useLoaderData();
   const navigate = useNavigate({ from: Route.fullPath });
   const selectTarget = useSelectProjectTarget();
   // Opened on the way to a screen that needs a project (`?next=`), the page
@@ -123,20 +112,19 @@ function ProjectsScreen() {
     [navigate],
   );
 
+  const { loaded, searching, searchError } = useSearchedLoad(
+    search.q,
+    fromRoute,
+    () => listProjectsPage(search.q),
+    "Could not search the projects.",
+  );
+
   const paging = useLoadMore(
     loaded,
     async (pageToken) => {
-      const page = await api.listMyProjects({
-        limit: LIST_PAGE_SIZE,
-        page_token: pageToken,
-        // The order and the search the token was issued under: a page token
-        // answers one question, and asking another with it is not a narrower
-        // list but a meaningless one, or a refused one.
-        order: NEWEST_FIRST,
-        name_contains: loaded.q,
-        ...consoleSessionProject(),
-      });
-      return { items: page.projects, nextPageToken: page.next_page_token ?? undefined };
+      // The search the token was issued under.
+      const page = await listProjectsPage(loaded.q, pageToken);
+      return { items: page.projects, nextPageToken: page.nextPageToken };
     },
     "Could not load more projects.",
   );
@@ -151,12 +139,39 @@ function ProjectsScreen() {
   // Nothing to list and nothing searched for: the person has no project yet.
   const none = projects.length === 0 && !loaded.q;
 
+  // On the way to a screen that needs a project, the page is the choice of
+  // one and nothing else (D31). With no project yet there is none to choose,
+  // so the page below is the way to a first one, still named for the screen.
+  if (requested && !none) {
+    return (
+      <Page>
+        <FormError message={searchError} className="mb-3" />
+        <ProjectPicker
+          label={requested.nav.label}
+          icon={requested.nav.icon}
+          projects={projects}
+          query={search.q ?? ""}
+          searched={loaded.q}
+          onSearch={onSearch}
+          paging={paging}
+        />
+      </Page>
+    );
+  }
+
   return (
     <Page>
-      {/* On the way to a screen that needs a project, the title names it
-          (D22): choosing a project goes on there. */}
       <ResourceTitle
-        filter={searchable && <ProjectSearch query={search.q ?? ""} onSearch={onSearch} />}
+        filter={
+          searchable && (
+            <SearchField
+              label="Search projects"
+              query={search.q ?? ""}
+              onSearch={onSearch}
+              className="w-full sm:w-64"
+            />
+          )
+        }
         action={
           // The first project's command is the page itself, below.
           !none && (
@@ -186,7 +201,12 @@ function ProjectsScreen() {
           {/* As the Users table: the Name cell clamps, the ID takes the slack
               and truncates first, and the date and row menu keep their own
               width. */}
-          <div className={`${RESOURCE_TABLE_WRAP} ${RESOURCE_TABLE_TOP}`}>
+          <FormError message={searchError} className="mt-3" />
+          {/* The rows of the last search stand, dimmed, until the next answers. */}
+          <div
+            aria-busy={searching || undefined}
+            className={cn(RESOURCE_TABLE_WRAP, RESOURCE_TABLE_TOP, searching && "opacity-60")}
+          >
             <Table className="text-xs">
               <TableHeader>
                 <ResourceHeaderRow>
@@ -252,33 +272,6 @@ function ProjectsScreen() {
         </>
       )}
     </Page>
-  );
-}
-
-/**
- * The list's search field, beside the title as a list's filter is (D25). A
- * pause in typing settles the term into the URL (`?q=`), whose loader sends it
- * to the server (`useSearchDraft`).
- */
-function ProjectSearch({ query, onSearch }: { query: string; onSearch: (q: string) => void }) {
-  const [draft, setDraft] = useSearchDraft(query, onSearch);
-
-  return (
-    <div className="relative w-full sm:w-64">
-      <Search
-        aria-hidden
-        strokeWidth={1.5}
-        className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2"
-      />
-      <Input
-        type="search"
-        value={draft}
-        onChange={(event) => setDraft(event.target.value)}
-        placeholder="Search projects"
-        aria-label="Search projects"
-        className="pl-8"
-      />
-    </div>
   );
 }
 

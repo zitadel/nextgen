@@ -16,12 +16,22 @@ func coerceUserStatus(v any) (any, error) {
 	}
 }
 
-// NewSchema binds user list/filter/order fields for one dialect's table names.
+// SchemaSQL is what the user schema binding needs from one dialect.
+type SchemaSQL struct {
+	// TablePrefix qualifies every table name on a dialect that uses a schema.
+	TablePrefix string
+}
+
+// NewSchema binds user list/filter/order fields for one dialect's SQL.
 // SchemaObjectType is the object type of the user's schema, read from the
 // schema row. It reads as "" for a schema without an object type and, on
 // dialects without a users-to-schemas foreign key, for a missing schema row,
 // so not_equals still matches those users.
-func NewSchema(usersTable, jsonSchemasTable string) database.Schema[domain.UserField, domain.User] {
+//
+// The two search fields name the columns a search read joins in (see
+// search.go), so they sort and resume such a read and nothing else.
+func NewSchema(dialect SchemaSQL) database.Schema[domain.UserField, domain.User] {
+	usersTable, jsonSchemasTable := dialect.TablePrefix+"users", dialect.TablePrefix+"json_schemas"
 	return database.NewSchema(map[domain.UserField]database.FieldBinding[domain.User]{
 		domain.UserFieldProjectID: {
 			SQLName:  "project_id",
@@ -62,6 +72,18 @@ func NewSchema(usersTable, jsonSchemasTable string) database.Schema[domain.UserF
 		domain.UserFieldSchemaObjectType: {
 			SQLName: `COALESCE((SELECT s.object_type FROM ` + jsonSchemasTable + ` s` +
 				` WHERE s.project_id = ` + usersTable + `.project_id AND s.url = ` + usersTable + `.schema_url), '')`,
+			Computed: true,
+		},
+		domain.UserFieldSearchText: {
+			SQLName:  SearchTextColumn,
+			Accessor: func(u *domain.User) any { return u.MatchedText },
+			Coerce:   database.CoerceString,
+			Computed: true,
+		},
+		domain.UserFieldSearchUserID: {
+			SQLName:  SearchUserIDColumn,
+			Accessor: func(u *domain.User) any { return u.ID },
+			Coerce:   database.CoerceString,
 			Computed: true,
 		},
 	})

@@ -57,6 +57,7 @@ const NOT_RESOURCES: Readonly<Record<string, string>> = {
   // Registered applications are written through the API by other systems,
   // not from `.zitadel/`; the CLI has no command for them yet (#2788).
   applications: "registered applications are written through the API, not the CLI (#2788)",
+  search: "finds resources across types (ADR 087); a `zitadel search` command is not built yet",
 };
 
 /**

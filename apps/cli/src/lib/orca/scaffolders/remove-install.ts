@@ -12,8 +12,10 @@ import { join } from "node:path";
  */
 export async function removeInstall(cwd: string): Promise<void> {
   await Promise.all(
-    ["node_modules", "pnpm-lock.yaml", "package-lock.json", "yarn.lock", "bun.lockb"].map((entry) =>
-      rm(join(cwd, entry), { recursive: true, force: true }),
+    ["node_modules", "pnpm-lock.yaml", "package-lock.json", "yarn.lock", "bun.lockb"].map(
+      (entry) => {
+        return rm(join(cwd, entry), { recursive: true, force: true });
+      },
     ),
   );
 }

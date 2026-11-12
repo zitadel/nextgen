@@ -1,6 +1,5 @@
 import { publicCliCommand } from "./public-cli";
-import { type EnvironmentSelector, projectCommand } from "./suggestion";
-import { DEPLOY_ARGS } from "./suggestion";
+import { DEPLOY_ARGS, type EnvironmentSelector, projectCommand } from "./suggestion";
 
 /**
  * Guidance copy that commands share, so the story doesn't fork; most of it is
@@ -22,10 +21,7 @@ import { DEPLOY_ARGS } from "./suggestion";
  */
 export function verifyLoginAction(openUrl?: string): string {
   const open = openUrl ? `open ${openUrl}, ` : "";
-  return (
-    `Verify auth in the browser: ${open}register a user, log out, ` +
-    "log in again with the same user, and confirm /profile shows Signed in."
-  );
+  return `Verify auth in the browser: ${open}register a user, sign out, sign in again with the same user, and confirm /profile shows Signed in.`;
 }
 
 /**
@@ -71,17 +67,11 @@ export function customizeAndPublishActions(
 
 /**
  * How to change the login's look after setup. Setup never ejects a template
- * or publishes a branding revision (#1039): the app embeds the maintained
+ * or publishes a branding revision: the app embeds the maintained
  * `<zitadel-login>`, so its look is the app's own CSS (`--zl-*` tokens) and
  * layout around it. Taking ownership of the widget's structure stays the
  * opt-in `branding eject`, surfaced here so it remains discoverable.
  */
 export function brandingGuidanceAction(cliVersion: string): string {
-  return (
-    "Change how the login looks: it is a component in your app, so theme it with `--zl-*` " +
-    "custom properties in your own stylesheet and build any page layout around it in your " +
-    "code. To change the widget's structure, " +
-    `${publicCliCommand("branding eject", cliVersion)} scaffolds an editable template ` +
-    "in .zitadel/branding/."
-  );
+  return `Change how the login looks: it is a component in your app, so theme it with --zl-* custom properties in your own stylesheet and build any page layout around it in your code. To change the widget's structure, ${publicCliCommand("branding eject", cliVersion)} scaffolds an editable template in .zitadel/branding/.`;
 }

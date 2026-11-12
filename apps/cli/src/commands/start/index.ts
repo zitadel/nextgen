@@ -1,22 +1,22 @@
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
+import { startedServer } from "@/commands/local-server/started";
+import { Cmd } from "@/lib/cmd";
 import { serverLogAction } from "@/lib/journey-guidance";
 import { ensureLocalAdmin } from "@/lib/local-server/admin-credential";
 import { EMPTY_SUMMARY, loadProjectEnv } from "@/lib/local-server/env-vars";
-import { startedServer } from "@/commands/local-server/started";
-import { type Refused, reads, whole } from "@/lib/oclif/flags";
 import {
   DEFAULT_LOCAL_SERVER_PORT,
-  PLATFORM_PROJECT_ID,
   defaultLocalServerImageForCliVersion,
   ensureLocalState,
   localContainerName,
   localServerUrl,
+  PLATFORM_PROJECT_ID,
   peekRuntimeMetadata,
-  resolveRuntimeBackend,
   RUNTIME_BACKENDS,
   type RuntimeMetadata,
+  resolveRuntimeBackend,
 } from "@/lib/local-server/runtime";
 import { LocalServer } from "@/lib/local-server/server";
 import {
@@ -26,9 +26,12 @@ import {
   type JsonEnvelope,
   nonBlankString,
 } from "@/lib/oclif";
+import { type Refused, reads, whole } from "@/lib/oclif/flags";
 import type { NextSteps } from "@/lib/oclif/next-steps";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { Suggestible } from "@/lib/oclif/suggestible";
 import type { SuggestedCommand } from "@/lib/suggestion";
+import { type Fact, section } from "@/lib/ui";
 
 /**
  * How an image beside the binary runtime is refused: an image is a container's,
@@ -36,7 +39,7 @@ import type { SuggestedCommand } from "@/lib/suggestion";
  */
 const IMAGE_NEEDS_DOCKER_REFUSAL: Refusal = {
   message: "--image requires --runtime docker",
-  hint: "Use `zitadel start --runtime docker --image <tag>`, or omit --image for the npm binary runtime.",
+  hint: "Pass --runtime docker with --image <tag>, or omit --image for the npm binary runtime.",
 };
 
 const MIN_PORT = 1;
@@ -58,10 +61,14 @@ const PORT: Refused<number> = {
   },
 };
 
-export default class Start extends BaseCommand {
+/**
+ * `zitadel start` — start a local Zitadel server.
+ */
+export default class Start extends Suggestible(BaseCommand) {
   static override description = "Start a local Zitadel server.";
   static override group = CommandGroups.gettingStarted;
   static override groupOrder = 2;
+
   static override flags = {
     image: nonBlankString({ description: "Container image to run." }),
     port: Flags.custom<number>({
@@ -102,17 +109,20 @@ export default class Start extends BaseCommand {
       flags.image ??
       this.env.ZITADEL_LOCAL_IMAGE ??
       defaultLocalServerImageForCliVersion(this.cliVersion);
-    const containerName = localContainerName(this.cwd);
     if (this.dryRun) {
+      const title = "Would start the local Zitadel server (dry run)";
+      const imaged: Fact[] = runtimeBackend === "docker" ? [["Image", image]] : [];
+
       return this.emit({
         status: "ok",
         data: {
-          title: "Local Zitadel server start plan.",
+          dry_run: true,
+          title,
           runtime: {
             backend: runtimeBackend,
             ...(runtimeBackend === "docker"
               ? {
-                  container_name: containerName,
+                  container_name: localContainerName(this.cwd),
                   image,
                 }
               : {}),
@@ -123,7 +133,31 @@ export default class Start extends BaseCommand {
             console: `${serverUrl}/ui/console/`,
           },
         },
-        next: { commands: [this.suggestUnscoped("start")] },
+        summary: {
+          title,
+          sections: [
+            section(
+              undefined,
+              ["Runtime", runtimeBackend],
+              ...imaged,
+              ["Port", String(port)],
+              ["API", serverUrl],
+              ["Console", `${serverUrl}/ui/console/`],
+            ),
+          ],
+        },
+        next: {
+          commands: [
+            this.suggest(
+              [
+                "start",
+                ...(flags.port === undefined ? [] : [Cmd.option("--port", String(flags.port))]),
+                ...(flags.runtime === undefined ? [] : [Cmd.option("--runtime", flags.runtime)]),
+                ...(flags.image === undefined ? [] : [Cmd.option("--image", flags.image)]),
+              ].join(" "),
+            ),
+          ],
+        },
       });
     }
 
@@ -140,22 +174,38 @@ export default class Start extends BaseCommand {
     // same merged environment the server receives — the project's env files
     // over the shell — so a `false` in `.env.local` turns both off rather than
     // being overridden by the user file forcing the bootstrap back on.
-    const serverEnv = { ...this.env, ...env.values };
+    const serverEnv = {
+      ...this.env,
+      ...env.values,
+    };
     const local = platformBootstrapEnabled(serverEnv)
       ? await ensureLocalAdmin(this.cwd, serverEnv.NEXTGEN_SCHEMA_BUILTIN_PUBLIC_BASE)
       : undefined;
 
     const { runtime, alreadyRunning } = await LocalServer.at(this.cwd, {
       cliVersion: this.cliVersion,
+      selector: this.cwdSelector(),
     }).start(
       runtimeBackend === "docker"
-        ? { backend: "docker", image, env, userFile: local?.userFile }
-        : { backend: "binary", env, userFile: local?.userFile },
+        ? {
+            backend: "docker",
+            image,
+            env,
+            userFile: local?.userFile,
+          }
+        : {
+            backend: "binary",
+            env,
+            userFile: local?.userFile,
+          },
       { port: flags.port },
     );
     // The envelope's `source` named the port guessed before one was chosen; an
     // agent that follows it would target a different server than the one started.
-    this.meta = { ...this.meta, source: runtime.server_url };
+    this.meta = {
+      ...this.meta,
+      source: runtime.server_url,
+    };
 
     // Setup reads the server from the directory start ran in, so a run from
     // elsewhere carries it: `setup --server local` from the shell's directory
@@ -163,7 +213,23 @@ export default class Start extends BaseCommand {
     return this.emit({
       status: "ok",
       data: readyData(runtime, alreadyRunning),
-      next: readyNext(this.cliVersion, this.suggestUnscoped("setup --server local")),
+      summary: {
+        title: alreadyRunning
+          ? "Local Zitadel server is already running"
+          : "Local Zitadel server is ready",
+        sections: [
+          section(
+            undefined,
+            runtime.backend === "binary"
+              ? ["Process", String(runtime.pid)]
+              : ["Container", runtime.container_name],
+            ["API", runtime.server_url],
+            ["Console", `${runtime.server_url}/ui/console/`],
+            ["Data", runtime.data_dir],
+          ),
+        ],
+      },
+      next: readyNext(this.cliVersion, this.suggest("setup --server local")),
     });
   }
 
@@ -198,8 +264,8 @@ function platformBootstrapEnabled(env: NodeJS.ProcessEnv): boolean {
 function readyData(metadata: RuntimeMetadata, alreadyRunning: boolean) {
   return {
     title: alreadyRunning
-      ? "Local Zitadel server is already running."
-      : "Local Zitadel server is ready.",
+      ? "Local Zitadel server is already running"
+      : "Local Zitadel server is ready",
     runtime: {
       backend: metadata.backend,
       ...(metadata.backend === "docker"

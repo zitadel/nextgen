@@ -1,6 +1,6 @@
-import { type PolicyEvaluation, PolicyService, ReleaseService } from "@/lib/backend";
 import { Args } from "@oclif/core";
 
+import { type PolicyEvaluation, PolicyService, ReleaseService } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
 import { mapBounded } from "@/lib/map-bounded";
 import {
@@ -10,16 +10,19 @@ import {
   type JsonEnvelope,
   nonBlankString,
 } from "@/lib/oclif";
-import { reportWarning } from "@/lib/warnings";
 import { prose } from "@/lib/oclif/rendering";
+import { escapeControlCharacters } from "@/lib/terminal-text";
+import { reportWarning } from "@/lib/warnings";
 import {
   CONFIG_DIRECTORIES,
   DiskStore,
+  PASSWORD_POLICY_OPERATION,
   type PolicyCase,
   type PolicyCaseResult,
   type PolicyExpectation,
   type PolicyOperation,
   PolicyTest,
+  USER_CREATE_POLICY_OPERATION,
   ZitadelConfig,
 } from "@/lib/zitadel";
 
@@ -89,6 +92,16 @@ export type PolicySuiteResult = {
 };
 
 /**
+ * One operation's evaluate request.
+ *
+ * @typeParam Operation - The operation.
+ */
+type EvaluationOf<Operation extends PolicyOperation> = Extract<
+  PolicyEvaluation,
+  { operation: Operation }
+>;
+
+/**
  * One case to evaluate, and the test file it belongs to.
  */
 type CaseRun = {
@@ -98,14 +111,14 @@ type CaseRun = {
   readonly suite: number;
 
   /**
-   * The operation the file tests.
-   */
-  readonly operation: PolicyOperation;
-
-  /**
    * The case.
    */
   readonly testCase: PolicyCase;
+
+  /**
+   * The evaluate request the case sends, in its operation's own shape.
+   */
+  readonly request: PolicyEvaluation;
 };
 
 /**
@@ -151,7 +164,7 @@ const EVALUATE_CONCURRENCY = 8;
 
 /**
  * `zitadel policies test` — evaluate the cases in
- * `.zitadel/policies/<operation>.test.json` on the server (#1445).
+ * `.zitadel/policies/<operation>.test.json` on the server.
  *
  * @remarks
  * Against the sibling policy files by default, or with `--release` against
@@ -170,6 +183,7 @@ A policy's cases live beside it in <operation>.test.json, such as auth.factor.pa
 
 The server evaluates every case, so the command needs a connection to it. By default the cases run against the policy files in .zitadel/policies/; --release runs them against the policies a release pins. Testing publishes nothing and leaves the live policies as they are.`;
   static override group = CommandGroups.configuration;
+
   static override examples = [
     "<%= config.bin %> policies test",
     "<%= config.bin %> policies test auth.factor.password.set",
@@ -192,15 +206,14 @@ The server evaluates every case, so the command needs a connection to it. By def
   /**
    * Evaluate the test cases and report each one.
    *
-   * @param input - The operation to test, if only one, and `--release`.
+   * @param input.args - The operation to test, if only one.
+   * @param input.flags - `--release`.
    * @returns The results.
    * @throws {@link ZitadelError} With `E_VALIDATION` when a test or policy file
    *   is not valid, or a case fails.
    */
-  protected async execute(input: Admitted<typeof PoliciesTest>): Promise<JsonEnvelope> {
-    const operation = input.args.operation;
-    const release = input.flags.release;
-    const operations = operation === undefined ? [] : [operation];
+  protected async execute({ args, flags }: Admitted<typeof PoliciesTest>): Promise<JsonEnvelope> {
+    const operations = args.operation === undefined ? [] : [args.operation];
     const config = await ZitadelConfig.loadKinds(new DiskStore(this.cwd), ["policies"]);
     const selected = config.policies.selectTests(operations);
     const tests = selected.documents;
@@ -212,12 +225,18 @@ The server evaluates every case, so the command needs a connection to it. By def
     }
     if (tests.length === 0) {
       const directory = CONFIG_DIRECTORIES.policies;
+
       return this.emit({
         status: "skipped",
         reason: "no-policy-tests",
         pretty: prose(
           `No policy test files in ${directory}/. Add <operation>.test.json beside a policy; ${directory}/README.md shows one.`,
         ),
+        summary: {
+          title: `No policy test files in ${directory}`,
+          sections: [],
+          lines: [`Add <operation>.test.json beside a policy; ${directory}/README.md shows one.`],
+        },
       });
     }
 
@@ -227,7 +246,7 @@ The server evaluates every case, so the command needs a connection to it. By def
     const policies = await this.policiesUnderTest(
       config,
       operations,
-      release,
+      flags.release,
       policyService,
       releaseService,
     );
@@ -239,7 +258,7 @@ The server evaluates every case, so the command needs a connection to it. By def
     const failed = cases.filter((testCase) => {
       return !testCase.passed;
     }).length;
-    const source = release === undefined ? "files" : "release";
+    const source = flags.release === undefined ? "files" : "release";
     this.recordTelemetry({
       policy_source: source,
       case_count: cases.length,
@@ -248,19 +267,22 @@ The server evaluates every case, so the command needs a connection to it. By def
 
     const data = {
       source,
-      release_id: release,
+      release_id: flags.release,
       operations: results,
       passed: cases.length - failed,
       failed,
     };
-    const pretty = this.renderPolicyTestResults(results, release);
+    const pretty = this.renderPolicyTestResults(results, flags.release);
     if (failed > 0) {
       // The results are the explanation: the hint shows them on a terminal,
       // and under --json they travel in the error's details.
       throw new ZitadelError(
         "E_VALIDATION",
         `${failed} of ${cases.length} policy test cases failed`,
-        { details: data, hint: pretty },
+        {
+          details: data,
+          hint: pretty,
+        },
       );
     }
 
@@ -268,6 +290,11 @@ The server evaluates every case, so the command needs a connection to it. By def
       status: "ok",
       data,
       pretty: prose(pretty),
+      summary: {
+        title: `${cases.length} passed`,
+        sections: [],
+        lines: escapeControlCharacters(pretty).split("\n").slice(0, -2),
+      },
     });
   }
 
@@ -372,6 +399,64 @@ The server evaluates every case, so the command needs a connection to it. By def
   }
 
   /**
+   * The evaluate request of every case of a test file, in its operation's own
+   * shape: the input, the facts where the operation has any, and the rules.
+   *
+   * @remarks
+   * The rules were read for this operation, which the policies are keyed by,
+   * so they hold this operation's settings, and the server checks them as a
+   * deploy would.
+   *
+   * @param test - The test file.
+   * @param suite - Its position among the files.
+   * @param config - The rules of its operation's policy; `{}` when there is none.
+   * @returns One run per case, in the file's order.
+   */
+  private caseRuns(
+    test: PolicyTest,
+    suite: number,
+    config: PolicyEvaluation["config"],
+  ): readonly CaseRun[] {
+    const value = test.value;
+    switch (value.operation) {
+      case PASSWORD_POLICY_OPERATION: {
+        const operation = value.operation;
+        const settings = config as EvaluationOf<typeof operation>["config"];
+        return value.cases.map((testCase): CaseRun => {
+          const facts = testCase.facts;
+          return {
+            suite,
+            testCase,
+            request: {
+              operation,
+              config: settings,
+              input: testCase.input,
+              // A case without facts sends none: the key is dropped on the
+              // wire. The case holds its facts read-only, so the request takes
+              // its own copy of the list.
+              facts:
+                facts === undefined
+                  ? undefined
+                  : { ...facts, history_matches: facts.history_matches?.slice() },
+            },
+          };
+        });
+      }
+      case USER_CREATE_POLICY_OPERATION: {
+        const operation = value.operation;
+        const settings = config as EvaluationOf<typeof operation>["config"];
+        return value.cases.map((testCase): CaseRun => {
+          return {
+            suite,
+            testCase,
+            request: { operation, config: settings, input: testCase.input },
+          };
+        });
+      }
+    }
+  }
+
+  /**
    * Evaluate every case of every test file against its operation's policy, or
    * `{}` when there is none.
    *
@@ -391,30 +476,17 @@ The server evaluates every case, so the command needs a connection to it. By def
     policies: ReadonlyMap<string, PolicyUnderTest>,
   ): Promise<readonly PolicySuiteResult[]> {
     const runs = tests.flatMap((test, suite) => {
-      const operation = test.operation;
-      return test.cases.map((testCase): CaseRun => {
-        return { suite, operation, testCase };
-      });
+      return this.caseRuns(test, suite, policies.get(test.operation)?.config ?? {});
     });
     const outcomes = await mapBounded(
       runs,
       EVALUATE_CONCURRENCY,
       async (run): Promise<CaseOutcome> => {
-        const config = policies.get(run.operation)?.config ?? {};
-        const facts = run.testCase.facts;
-        // A case without facts sends none: the key is dropped on the wire. The
-        // case holds its facts read-only, so the request takes its own copy of
-        // the list.
-        const actual = await service.evaluate({
-          operation: run.operation,
-          config,
-          input: run.testCase.input,
-          facts:
-            facts === undefined
-              ? undefined
-              : { ...facts, history_matches: facts.history_matches?.slice() },
-        });
-        return { suite: run.suite, result: PolicyTest.resultOf(run.testCase, actual) };
+        const actual = await service.evaluate(run.request);
+        return {
+          suite: run.suite,
+          result: PolicyTest.resultOf(run.testCase, actual),
+        };
       },
     );
     return tests.map((test, suite): PolicySuiteResult => {

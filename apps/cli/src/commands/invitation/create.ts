@@ -1,17 +1,12 @@
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
-import {
-  type CreatedInvitation,
-  type InvitationRelation,
-  InvitationService,
-  invitationRole,
-} from "@/lib/backend";
+import { type InvitationRelation, InvitationService, invitationRole } from "@/lib/backend";
 import { GetInvitationParams } from "@/lib/backend/schemas";
 import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { filled, reads, type Refused } from "@/lib/oclif/flags";
 import { Promptable } from "@/lib/oclif/promptable";
-import { prose } from "@/lib/oclif/rendering";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 import type { Parsed } from "@zitadel/config/idp";
 
 /** The project roles an invitation can grant, least first. */
@@ -95,7 +90,10 @@ export default class InvitationCreate extends Promptable(EnvironmentCommand) {
         status: "skipped",
         reason: "create-cancelled",
         data: {},
-        pretty: prose("Nothing was created."),
+        summary: {
+          title: "Nothing was created",
+          sections: [],
+        },
       });
     }
 
@@ -112,7 +110,14 @@ export default class InvitationCreate extends Promptable(EnvironmentCommand) {
     return this.emit({
       status: "ok",
       data: invitation,
-      pretty: prose(created(invitation)),
+      summary: {
+        title: `Created ${escapeControlCharacters(invitation.id)}`,
+        sections: [],
+        lines: [
+          invitation.link,
+          `Whoever opens it gets the ${invitationRole(invitation)} role. It expires in 72 hours.`,
+        ],
+      },
       next: {
         commands: [this.suggest("invitation list --status pending")],
       },
@@ -128,8 +133,7 @@ export default class InvitationCreate extends Promptable(EnvironmentCommand) {
     if (this.nonInteractive) {
       return undefined;
     }
-    const answer = await this.input({
-      kind: "text",
+    const answer = await this.ask.text({
       name: "name",
       message:
         "Who is this invitation for? Other administrators see the name; leave it blank to skip.",
@@ -141,8 +145,7 @@ export default class InvitationCreate extends Promptable(EnvironmentCommand) {
 
   /** The role the invitation grants, asked when `--relation` did not give it. */
   private async askRelation(): Promise<InvitationRelation> {
-    return this.input({
-      kind: "select",
+    return this.ask.select({
       name: "relation",
       message: "Which role should whoever accepts receive on the project?",
       flag: "--relation",
@@ -170,8 +173,7 @@ export default class InvitationCreate extends Promptable(EnvironmentCommand) {
     }
     const whom = name === undefined ? "an invitation" : `an invitation for ${name}`;
     const replacing = replaces === undefined ? "" : `, replacing ${replaces}`;
-    return this.input({
-      kind: "yes-no",
+    return this.ask.yesNo({
       name: "creation",
       message: `Create ${whom} as ${relation}${replacing}?`,
       initialValue: true,
@@ -191,16 +193,4 @@ function parseAnsweredName(value: string): Parsed<string> {
   return parsed.success
     ? { ok: true, value: parsed.data }
     : { ok: false, problem: parsed.error.issues[0]?.message ?? "it is not valid" };
-}
-
-/**
- * What a person reads after a create: the link, then what it does. The link
- * stands on a line of its own so it copies cleanly.
- */
-function created(invitation: CreatedInvitation): string {
-  return [
-    invitation.link,
-    "",
-    `Whoever opens it gets the ${invitationRole(invitation)} role. It expires in 72 hours.`,
-  ].join("\n");
 }

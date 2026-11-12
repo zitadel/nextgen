@@ -1,8 +1,10 @@
-import { DeploymentService } from "@/lib/backend";
+import { Args } from "@oclif/core";
+import { z } from "zod";
+
+import { DeploymentService, type Variable } from "@/lib/backend";
+import { GetDeploymentVariablesParams } from "@/lib/backend/schemas";
 import { Cmd } from "@/lib/cmd";
 import { ZitadelError } from "@/lib/errors";
-import { DEPLOY_ARGS } from "@/lib/suggestion";
-
 import {
   type Admitted,
   CommandGroups,
@@ -10,34 +12,74 @@ import {
   type JsonEnvelope,
   nonBlankString,
 } from "@/lib/oclif";
+import { type Refused, taken } from "@/lib/oclif/flags";
+import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
+import { DEPLOY_ARGS } from "@/lib/suggestion";
 import { variableCell } from "@/lib/variables";
+
+/**
+ * The deployment `variable resolve` reads. The schema is the API spec's own, so
+ * a value that is not one is refused before anything is called, and says what
+ * one looks like.
+ */
+const DEPLOYMENT_ID: Refused<string> = {
+  schema: z.string().trim().pipe(GetDeploymentVariablesParams.shape.deployment_id),
+  refusal: {
+    message: "Invalid {input}: {problem}",
+    hint: "List the deployments to find one, or omit it to read the live deployment.",
+    next: ["deployment list"],
+    details: {
+      argument: "{input}",
+    },
+  },
+};
+
+/** What naming both a deployment and an origin is refused for: the deployment already says which. */
+const DEPLOYMENT_AND_ORIGIN_REFUSAL: Refusal = {
+  message: "Name a deployment or an origin, not both.",
+  hint: "A deployment id already says which deployment to read; `--origin` only picks the live one.",
+};
 
 /** The columns `resolve` renders, in order. */
 const COLUMNS = ["name", "value"] as const;
 
 /**
- * `zitadel variable resolve` — show the variables a target actually runs.
+ * `zitadel variable resolve [DEPLOYMENT_ID]` — show the variables a deployment
+ * actually runs.
  *
- * Not the store's current values but the map frozen onto the deployment that is
- * live on the target: what a later `variable set` has not reached. `--origin`
- * names one of the project's origins. Without it, resolving is unambiguous only
- * when a single deployment is live across the project; when several are — a
+ * Not the store's current values but the map frozen onto a deployment: what a
+ * later `variable set` has not reached. A deployment id names one, live or not,
+ * as `deployment get` does, and `--origin` cannot accompany it.
+ *
+ * Without an id, the deployment live on the target is read. `--origin` names
+ * one of the project's origins. Without it, resolving is unambiguous only when
+ * a single deployment is live across the project; when several are — a
  * different release or frozen map on each origin — the live origins are named
- * and `--origin` is required rather than resolving from an arbitrary one
- * (#1617). A target with nothing deployed is a miss that says how to reach it:
+ * and `--origin` is required rather than resolving from an arbitrary one.
+ * A target with nothing deployed is a miss that says how to reach it:
  * `deploy` goes to every primary origin, including one added since the last
  * deploy, and a preview origin is only ever served by a pull-request build,
  * never by `deploy`.
  */
 export default class VariableResolve extends Tabulatable(EnvironmentCommand) {
-  static override description = "Show the variables the live deployment froze for a target.";
+  static override description = "Show the variables a deployment froze, the live one by default.";
   static override group = CommandGroups.configuration;
+
   static override examples = [
     "<%= config.bin %> variable resolve",
     "<%= config.bin %> variable resolve --origin https://app.acme.com",
+    "<%= config.bin %> variable resolve dep_01KX5N7C9D2E7F0N9WD3P2E4YM6",
     "<%= config.bin %> variable resolve --json",
   ];
+  static override args = {
+    deployment_id: Args.custom<string>({
+      parse: taken(DEPLOYMENT_ID),
+    })({
+      required: false,
+      description: "The deployment to read; the live one when omitted.",
+    }),
+  };
   static override flags = {
     origin: nonBlankString({
       description: "The origin whose live deployment to read.",
@@ -45,9 +87,19 @@ export default class VariableResolve extends Tabulatable(EnvironmentCommand) {
     plain: plainFlag,
   };
 
-  protected async execute({ flags }: Admitted<typeof VariableResolve>): Promise<JsonEnvelope> {
+  protected async execute({
+    args,
+    flags,
+  }: Admitted<typeof VariableResolve>): Promise<JsonEnvelope> {
+    if (args.deploymentId !== undefined && flags.origin !== undefined) {
+      throw refusalError(DEPLOYMENT_AND_ORIGIN_REFUSAL, {});
+    }
     const { client, projectId } = await this.connect();
     const deploymentService = new DeploymentService(client, projectId);
+    if (args.deploymentId !== undefined) {
+      const items = await deploymentService.variables(args.deploymentId);
+      return this.render(flags, args.deploymentId, items, "", {});
+    }
     const found = await deploymentService.liveOn(flags.origin);
     switch (found.outcome) {
       case "live": {
@@ -71,19 +123,19 @@ export default class VariableResolve extends Tabulatable(EnvironmentCommand) {
         switch (found.reason) {
           case "none": {
             throw new ZitadelError("E_NOT_FOUND", "Nothing is deployed to the project.", {
-              hint: `Deploy first with \`${this.suggest(DEPLOY_ARGS)}\`, then resolve its variables.`,
+              hint: "Deploy first, then resolve its variables.",
               nextCommands: [this.suggest(DEPLOY_ARGS)],
             });
           }
           case "primary": {
             throw new ZitadelError("E_NOT_FOUND", `Nothing is deployed to ${flags.origin}.`, {
-              hint: `Deploy to it first with \`${this.suggest(DEPLOY_ARGS)}\`, then resolve its variables.`,
+              hint: "Deploy to it first, then resolve its variables.",
               nextCommands: [this.suggest(DEPLOY_ARGS)],
             });
           }
           case "preview": {
             throw new ZitadelError("E_NOT_FOUND", `Nothing is deployed to ${flags.origin}.`, {
-              hint: "A preview URL is served by a pull-request build, not by `deploy`; resolve its variables once that build has deployed it.",
+              hint: "A preview URL is served by a pull-request build, not by a deploy from here; resolve its variables once that build has deployed it.",
             });
           }
           case "unknown-origin": {
@@ -104,9 +156,28 @@ export default class VariableResolve extends Tabulatable(EnvironmentCommand) {
     // this names exactly what the resolved map runs on — the chosen origin,
     // stated in the output.
     const live = found.deployment;
-    const servedOrigins = [...live.origins].sort();
-    const where = servedOrigins.join(", ");
     const items = await deploymentService.variables(live.id);
+    const origins = [...live.origins].sort();
+    return this.render(flags, live.id, items, ` for ${origins.join(", ")}`, { origins });
+  }
+
+  /**
+   * The list of what a deployment froze, as the run's one answer.
+   *
+   * @param flags - The run's flags, which choose the rendering.
+   * @param deploymentId - The deployment the variables were frozen by.
+   * @param items - The frozen variables.
+   * @param where - The suffix naming the origins the deployment serves, or empty.
+   * @param carried - The origins the envelope carries beside the deployment id, or none.
+   * @returns The envelope to print.
+   */
+  private async render(
+    flags: Admitted<typeof VariableResolve>["flags"],
+    deploymentId: string,
+    items: readonly Variable[],
+    where: string,
+    carried: { origins?: string[] },
+  ): Promise<JsonEnvelope> {
     this.recordTelemetry({
       variable_count: items.length,
     });
@@ -115,12 +186,12 @@ export default class VariableResolve extends Tabulatable(EnvironmentCommand) {
       return variableCell(item);
     });
     const columns = COLUMNS;
-    const empty = `${live.id} froze no variables for ${where}.`;
-    const footer = [`Frozen by ${live.id} for ${where}`];
+    const empty = `${deploymentId} froze no variables${where}`;
+    const footer = [`Frozen by ${deploymentId}${where}`];
     const page = null;
     const extra = {
-      deployment_id: live.id,
-      origins: servedOrigins,
+      deployment_id: deploymentId,
+      ...carried,
     };
 
     return this.emitList(flags, {

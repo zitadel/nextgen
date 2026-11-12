@@ -83,8 +83,14 @@ export async function adminSessionCookie(
   );
   const cookie = res.headers
     .getSetCookie()
-    .map((value) => value.split(";", 1)[0] ?? "")
-    .find((pair) => SESSION_COOKIES.some((name) => pair.startsWith(`${name}=`)));
+    .map((value) => {
+      return value.split(";", 1)[0] ?? "";
+    })
+    .find((pair) => {
+      return SESSION_COOKIES.some((name) => {
+        return pair.startsWith(`${name}=`);
+      });
+    });
   if (!res.ok || !cookie) {
     throw new ZitadelError(
       "E_AUTH",
@@ -114,7 +120,7 @@ async function signIn(
       {
         // `zitadel start` adopts a healthy running server untouched, so it
         // cannot fix this on its own: the server has to stop first.
-        hint: "Stop it with `zitadel stop`, then run `zitadel start` so it boots with the platform project and the local admin.",
+        hint: "Stop it, then start it again so it boots with the platform project and the local admin.",
         nextCommands: [unscopedCommand("stop"), unscopedCommand("start")],
         details: { server_url: serverUrl },
       },

@@ -1756,7 +1756,23 @@ describe("api-mock idp and variable contract details", () => {
     });
 
     expect(repointed.status).toBe(400);
-    expect(((await repointed.json()) as { code: string }).code).toBe("idp.field_immutable");
+    expect(await repointed.json()).toMatchObject({
+      code: "idp.field_immutable",
+      details: { details: { fields: ["oidc.issuer"] } },
+    });
+
+    // An absent subject_claim reads as `sub`, so dropping an explicit one is no
+    // change, while naming another claim is.
+    const implicitSub = await putIdp(projectId, { ...base, subject_claim: undefined });
+
+    expect(implicitSub.status).toBe(200);
+
+    const otherClaim = await putIdp(projectId, { ...base, subject_claim: "oid" });
+
+    expect(otherClaim.status).toBe(400);
+    expect(await otherClaim.json()).toMatchObject({
+      details: { details: { fields: ["subject_claim"] } },
+    });
   });
 
   test("accepts a revision that changes something mutable", async () => {
@@ -2094,7 +2110,19 @@ describe("api-mock releases and deployments", () => {
     });
 
     expect(res.status).toBe(400);
-    expect(((await res.json()) as { code: string }).code).toBe("idp.field_immutable");
+    expect(await res.json()).toMatchObject({
+      code: "rel.invalid",
+      details: {
+        resources: [
+          {
+            kind: "idp",
+            handle: "google",
+            code: "idp.field_immutable",
+            details: { details: { fields: ["oidc.issuer"] } },
+          },
+        ],
+      },
+    });
   });
 
   test("evaluates a password policy as a password set would, storing nothing", async () => {

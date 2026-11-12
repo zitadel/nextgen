@@ -5,13 +5,9 @@ import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { HttpResponse, http } from "msw";
-import { afterEach, describe, expect, vi } from "vitest";
+import { afterEach, describe, expect } from "vitest";
 
 import { it } from "@tests/helpers/fixtures";
-
-vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
-
-import { confirm, text } from "@clack/prompts";
 
 import EnvAdd from "@/commands/env/add";
 import {
@@ -20,7 +16,10 @@ import {
   runCliForTest,
   stripAnsi,
 } from "@tests/helpers/run-cli";
-import { asTerminal } from "@tests/helpers/terminal";
+import { type Answer, answering } from "@tests/helpers/keyboard";
+import { asOneLine, asTerminal } from "@tests/helpers/terminal";
+
+const personAnswering = (...answers: Answer[]) => answering(...answers);
 
 const SERVER = "https://api.zitadel.example";
 
@@ -132,7 +131,7 @@ async function addRendered(cwd: string, ...extra: string[]): Promise<string> {
     "--non-interactive",
     ...extra,
   ]);
-  return result.stdout;
+  return asOneLine(result.stdout);
 }
 
 const names = (variables: Added["platform"]["production"]): string[] =>
@@ -181,11 +180,32 @@ describe("env add", () => {
     it("tells a person to give the environment an origin before deploying to it", async () => {
       const cwd = await makeProject("next");
 
-      const out = stripAnsi(await addRendered(cwd));
+      const out = await addRendered(cwd);
 
       expect(out).toContain(
-        `Give it an origin first: zitadel origin add '<your-app-url>' --kind primary --env-file ${cwd}/.env.production.local`,
+        `Give it an origin first: ${expectedPublicCliCommand(
+          "origin add '<your-app-url>' --kind primary",
+        )} --env-file ${cwd}/.env.production.local`,
       );
+    });
+
+    it("heads its answer with the environment it added, not the file it happened to write", async () => {
+      const cwd = await makeProject("next");
+
+      const out = await addRendered(cwd);
+
+      expect(out).toContain(
+        "Added the production environment, bound to proj_new .env.production.local holds",
+      );
+      expect(out).not.toContain("Summary");
+    });
+
+    it("names the file whose variables it lists, rather than calling it 'it'", async () => {
+      const cwd = await makeProject("next");
+
+      const out = await addRendered(cwd);
+
+      expect(out).toContain(".env.production.local holds ZITADEL_URL,");
     });
 
     it("reports no deployment when it made none", async () => {
@@ -207,7 +227,7 @@ describe("env add", () => {
     it("says what the environment serves until something is deployed to it", async () => {
       const cwd = await makeProject("next");
 
-      const out = stripAnsi(await addRendered(cwd));
+      const out = await addRendered(cwd);
 
       expect(out).toContain(
         "Nothing is deployed to production yet, so sign-in is refused until .zitadel/ is deployed.",
@@ -217,10 +237,12 @@ describe("env add", () => {
     it("names the deploy a person should run, against the new environment", async () => {
       const cwd = await makeProject("next");
 
-      const out = stripAnsi(await addRendered(cwd, "--app-url", "https://app.acme.com"));
+      const out = await addRendered(cwd, "--app-url", "https://app.acme.com");
 
-      expect(out).toContain(
-        `$ ${expectedPublicCliCommand(`deploy -m '<what changed>' --env-file ${cwd}/.env.production.local`)}`,
+      expect(asOneLine(out)).toContain(
+        expectedPublicCliCommand(
+          `deploy -m '<what changed>' --env-file ${cwd}/.env.production.local`,
+        ),
       );
     });
 
@@ -642,7 +664,7 @@ describe("env add", () => {
         "--non-interactive",
       ]);
 
-      const out = stripAnsi(result.stdout);
+      const out = asOneLine(result.stdout);
       expect(out).not.toContain("copy it from .env.production.local");
       expect(out).toContain("copy it from wherever you got this project");
     });
@@ -671,8 +693,8 @@ describe("env add", () => {
 
 /**
  * The deploy `env add` offers runs only when a person is there to accept it,
- * so it is driven the way `branding eject`'s prompt is: the command from
- * source, with clack doubled and the streams pretending to be a terminal.
+ * so it is driven the way `eject`'s question is: the command from source, with a
+ * person typing at the plain questions it asks on a terminal.
  */
 describe("env add asked on a terminal", () => {
   /** A project holding resources that validate, so a deploy can be built from it. */
@@ -723,8 +745,12 @@ describe("env add asked on a terminal", () => {
     );
   }
 
-  const adding = (cwd: string, ...extra: string[]) =>
-    asTerminal(() =>
+  const OFFER = "Would you like to deploy .zitadel/ to it now?";
+
+  /** Adds `staging` with a person at the terminal giving `answers`. */
+  const adding = async (cwd: string, answers: readonly Answer[], ...extra: string[]) => {
+    const talk = personAnswering(...answers);
+    const result = await asTerminal(() =>
       EnvAdd.run([
         "staging",
         "--cwd",
@@ -736,36 +762,30 @@ describe("env add asked on a terminal", () => {
         ...extra,
       ]),
     );
-
-  afterEach(() => {
-    vi.mocked(confirm).mockReset();
-  });
+    return { envelope: result, shown: talk.plain(), asked: talk.asked() };
+  };
 
   it("deploys the project when the offer is accepted", async ({ server }) => {
     const cwd = await makeDeployableProject();
     platformDeploys(server);
-    vi.mocked(confirm).mockResolvedValueOnce(true as never);
 
-    const envelope = (await adding(cwd)) as { data: { deployment: unknown } };
+    const { envelope, asked } = await adding(cwd, [true]);
 
-    expect(envelope.data.deployment).toMatchObject({
+    expect((envelope as { data: { deployment: unknown } }).data.deployment).toMatchObject({
       release_id: "rel_1",
       deployment_id: "dep_1",
       origins: ["https://app.acme.com"],
     });
-    expect(vi.mocked(confirm).mock.calls[0]?.[0].message).toBe(
-      "Would you like to deploy .zitadel/ to it now?",
-    );
+    expect(asked).toContain(OFFER);
   });
 
   it("asks where the server and the app are, as questions", async () => {
     const cwd = await makeDeployableProject();
-    vi.mocked(text).mockResolvedValueOnce(SERVER as never);
-    vi.mocked(text).mockResolvedValueOnce("" as never);
+    const talk = personAnswering(SERVER, "");
 
     await asTerminal(() => EnvAdd.run(["staging", "--cwd", cwd]));
 
-    expect(vi.mocked(text).mock.calls.map(([question]) => question.message)).toEqual([
+    expect(talk.asked()).toEqual([
       "What is the URL of your Zitadel server?",
       "What URL is your app served from? You can leave this empty to skip it.",
     ]);
@@ -773,57 +793,68 @@ describe("env add asked on a terminal", () => {
 
   it("deploys nothing when the offer is declined", async () => {
     const cwd = await makeDeployableProject();
-    vi.mocked(confirm).mockResolvedValueOnce(false as never);
 
-    const envelope = (await adding(cwd)) as { data: { deployment: unknown } };
+    const { envelope } = await adding(cwd, [false]);
 
-    expect(envelope.data.deployment).toBeNull();
+    expect((envelope as { data: { deployment: unknown } }).data.deployment).toBeNull();
   });
 
   it("still names the deploy after the offer is declined", async () => {
     const cwd = await makeDeployableProject();
-    vi.mocked(confirm).mockResolvedValueOnce(false as never);
 
-    const envelope = (await adding(cwd)) as { data: { next_commands: string[] } };
+    const { envelope } = await adding(cwd, [false]);
 
-    expect(envelope.data.next_commands.some((command) => command.includes("deploy -m"))).toBe(true);
+    expect(
+      (envelope as { data: { next_commands: string[] } }).data.next_commands.some((command) =>
+        command.includes("deploy -m"),
+      ),
+    ).toBe(true);
   });
 
   it("binds the environment even when the deploy fails", async ({ server }) => {
     const cwd = await makeDeployableProject();
     platformRefusesTheRelease(server);
-    vi.mocked(confirm).mockResolvedValueOnce(true as never);
 
-    const envelope = (await adding(cwd)) as { status: string; data: { deployment: unknown } };
+    const { envelope } = await adding(cwd, [true]);
 
-    expect(envelope.status).toBe("ok");
-    expect(envelope.data.deployment).toBeNull();
+    expect((envelope as { status: string }).status).toBe("ok");
+    expect((envelope as { data: { deployment: unknown } }).data.deployment).toBeNull();
   });
 
   it("warns, naming the deploy to re-run, when the deploy fails", async ({ server }) => {
     const cwd = await makeDeployableProject();
     platformRefusesTheRelease(server);
-    vi.mocked(confirm).mockResolvedValueOnce(true as never);
 
-    const envelope = (await adding(cwd)) as { warnings: string[] };
+    const { envelope } = await adding(cwd, [true]);
 
-    expect(envelope.warnings.join("\n")).toContain("deploy -m");
+    expect((envelope as { warnings: string[] }).warnings.join("\n")).toContain("deploy -m");
   });
 
   it("never asks for a project it only bound", async () => {
     const cwd = await makeDeployableProject();
 
-    await adding(cwd, "--project", "proj_existing");
+    const { asked } = await adding(cwd, [], "--project", "proj_existing");
 
-    expect(confirm).not.toHaveBeenCalled();
+    expect(asked).not.toContain(OFFER);
   });
 
   it("never asks when the environment has no origin for a deploy to land on", async () => {
     const cwd = await makeDeployableProject();
-    vi.mocked(text).mockResolvedValueOnce("" as never);
+
+    const talk = personAnswering("");
 
     await asTerminal(() => EnvAdd.run(["staging", "--cwd", cwd, "--server", SERVER]));
 
-    expect(confirm).not.toHaveBeenCalled();
+    expect(talk.asked()).not.toContain(OFFER);
+  });
+
+  it("ends on one footer saying which project it created, and on which server", async () => {
+    const cwd = await makeDeployableProject();
+
+    const { shown } = await adding(cwd, [false]);
+
+    const footer = shown.trimEnd().split("\n").at(-1);
+    expect(footer).toContain("Added the staging environment");
+    expect(footer).toContain("project proj_new on api.zitadel.example");
   });
 });

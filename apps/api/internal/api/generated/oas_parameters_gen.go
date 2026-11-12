@@ -6969,12 +6969,25 @@ type ListEventsParams struct {
 	RequestID OptString `json:",omitempty,omitzero"`
 	// Only events with this device fingerprint ID.
 	Fingerprint OptString `json:",omitempty,omitzero"`
-	// Only events that affected this type of resource.
+	// Only events that affected this type of resource, such as `user`.
 	EntityType OptString `json:",omitempty,omitzero"`
 	// Only events that affected the resource with this ID.
 	EntityID OptString `json:",omitempty,omitzero"`
 	// Only events emitted under this team, as stored on the event.
 	TeamID OptString `json:",omitempty,omitzero"`
+	// Only `request.api` events of this API operation, the
+	// `payload.operation_id` they record, such as `createUser`. Repeat the
+	// parameter to match any of up to 10 operations. Requests recorded by a
+	// server version before this filter existed are not matched; they leave
+	// the list as retention removes them.
+	OperationID []string `json:",omitempty"`
+	// Only `request.api` events whose response status, the `payload.status`
+	// they record, is in this class: `4xx` is 400 to 499. Repeat the
+	// parameter to match any of several classes: `4xx` and `5xx` are the
+	// failed requests. Requests recorded by a server version before this
+	// filter existed are not matched; they leave the list as retention
+	// removes them.
+	StatusClass []ListEventsStatusClassItem `json:",omitempty"`
 	// Inclusive lower bound on `created_at` (RFC 3339).
 	CreatedAfter OptDateTime `json:",omitempty,omitzero"`
 	// Exclusive upper bound on `created_at` (RFC 3339).
@@ -7096,6 +7109,24 @@ func unpackListEventsParams(packed middleware.Parameters) (params ListEventsPara
 		}
 		if v, ok := packed[key]; ok {
 			params.TeamID = v.(OptString)
+		}
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "operation_id",
+			In:   "query",
+		}
+		if v, ok := packed[key]; ok {
+			params.OperationID = v.([]string)
+		}
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "status_class",
+			In:   "query",
+		}
+		if v, ok := packed[key]; ok {
+			params.StatusClass = v.([]ListEventsStatusClassItem)
 		}
 	}
 	{
@@ -7672,6 +7703,130 @@ func decodeListEventsParams(args [0]string, argsEscaped bool, r *http.Request) (
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
 			Name: "team_id",
+			In:   "query",
+			Err:  err,
+		}
+	}
+	// Decode query: operation_id.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "operation_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				return d.DecodeArray(func(d uri.Decoder) error {
+					var paramsDotOperationIDVal string
+					if err := func() error {
+						val, err := d.DecodeValue()
+						if err != nil {
+							return err
+						}
+
+						c, err := conv.ToString(val)
+						if err != nil {
+							return err
+						}
+
+						paramsDotOperationIDVal = c
+						return nil
+					}(); err != nil {
+						return err
+					}
+					params.OperationID = append(params.OperationID, paramsDotOperationIDVal)
+					return nil
+				})
+			}); err != nil {
+				return err
+			}
+			if err := func() error {
+				if params.OperationID == nil {
+					return nil // optional
+				}
+				if err := (validate.Array{
+					MinLength:    0,
+					MinLengthSet: false,
+					MaxLength:    10,
+					MaxLengthSet: true,
+				}).ValidateLength(len(params.OperationID)); err != nil {
+					return errors.Wrap(err, "array")
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "operation_id",
+			In:   "query",
+			Err:  err,
+		}
+	}
+	// Decode query: status_class.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "status_class",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				return d.DecodeArray(func(d uri.Decoder) error {
+					var paramsDotStatusClassVal ListEventsStatusClassItem
+					if err := func() error {
+						val, err := d.DecodeValue()
+						if err != nil {
+							return err
+						}
+
+						c, err := conv.ToString(val)
+						if err != nil {
+							return err
+						}
+
+						paramsDotStatusClassVal = ListEventsStatusClassItem(c)
+						return nil
+					}(); err != nil {
+						return err
+					}
+					params.StatusClass = append(params.StatusClass, paramsDotStatusClassVal)
+					return nil
+				})
+			}); err != nil {
+				return err
+			}
+			if err := func() error {
+				var failures []validate.FieldError
+				for i, elem := range params.StatusClass {
+					if err := func() error {
+						if err := elem.Validate(); err != nil {
+							return err
+						}
+						return nil
+					}(); err != nil {
+						failures = append(failures, validate.FieldError{
+							Name:  fmt.Sprintf("[%d]", i),
+							Error: err,
+						})
+					}
+				}
+				if len(failures) > 0 {
+					return &validate.Error{Fields: failures}
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "status_class",
 			In:   "query",
 			Err:  err,
 		}
@@ -14037,6 +14192,95 @@ func decodeRollbackDeploymentParams(args [1]string, argsEscaped bool, r *http.Re
 		return params, &ogenerrors.DecodeParamError{
 			Name: "deployment_id",
 			In:   "path",
+			Err:  err,
+		}
+	}
+	return params, nil
+}
+
+// SearchParams is parameters of search operation.
+type SearchParams struct {
+	// The project to search, by the `id` that `createProject` (`POST /projects`)
+	// returns. Omit it to search the credential's own project with a project
+	// secret, or the projects the person can act on with a session.
+	ProjectID OptProjectID `json:",omitempty,omitzero"`
+}
+
+func unpackSearchParams(packed middleware.Parameters) (params SearchParams) {
+	{
+		key := middleware.ParameterKey{
+			Name: "project_id",
+			In:   "query",
+		}
+		if v, ok := packed[key]; ok {
+			params.ProjectID = v.(OptProjectID)
+		}
+	}
+	return params
+}
+
+func decodeSearchParams(args [0]string, argsEscaped bool, r *http.Request) (params SearchParams, _ error) {
+	q := uri.NewQueryDecoder(r.URL.Query())
+	// Decode query: project_id.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotProjectIDVal ProjectID
+				if err := func() error {
+					var paramsDotProjectIDValVal string
+					if err := func() error {
+						val, err := d.DecodeValue()
+						if err != nil {
+							return err
+						}
+
+						c, err := conv.ToString(val)
+						if err != nil {
+							return err
+						}
+
+						paramsDotProjectIDValVal = c
+						return nil
+					}(); err != nil {
+						return err
+					}
+					paramsDotProjectIDVal = ProjectID(paramsDotProjectIDValVal)
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.ProjectID.SetTo(paramsDotProjectIDVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+			if err := func() error {
+				if value, ok := params.ProjectID.Get(); ok {
+					if err := func() error {
+						if err := value.Validate(); err != nil {
+							return err
+						}
+						return nil
+					}(); err != nil {
+						return err
+					}
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "project_id",
+			In:   "query",
 			Err:  err,
 		}
 	}

@@ -137,18 +137,14 @@ export function claimState(input: {
  * plain `zitadel` command names). Names the claim window because the server
  * enforces it at claim time (`proj.claim_window_expired`), and names the
  * data-loss stake per product decision: temporary projects get purged after
- * the window. That supersedes the no-deletion stance in ADR 046 §Non-goals;
- * amending the ADR is the follow-up tracked on PR #1194.
+ * the window.
  */
 function claimSentence(deadline?: Date): string {
   const when =
     deadline === undefined
       ? `within ${CLAIM_WINDOW_DAYS} days of creation`
       : `before ${formatDeadline(deadline)}`;
-  return (
-    `Claim your Project ${when} to make it permanent and start collaborating with your team. ` +
-    "Until then, your Project is temporary and its data may be lost."
-  );
+  return `Claim your project ${when} to make it permanent and start collaborating with your team. Until then, your project is temporary and its data may be lost.`;
 }
 
 /**

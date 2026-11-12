@@ -12,6 +12,15 @@ post:
     with the new flow state. The server is stateless: all orchestration
     state is carried in this cookie between requests.
 
+    Sign-up additionally requires a single-use `gate_proofs.signup_pow`
+    solution for `step.gates.signup_pow`: a password sign-up (`create_user`)
+    sends it with the submit, and a passkey registration that creates its user
+    sends it with the attestation in `challenge_response`. Pending
+    challenges and rate counters are stored on the server. Invalid or spent
+    proofs return `403 flow.proof_invalid`; exhausted per-flow budgets return
+    `429 flow.rate_limited`. GET the current step to obtain or refresh its
+    challenge before solving. Start and Submit announce the gate without a puzzle.
+
     **Important:** The `id` in the response may differ from the `id` used in
     the request. This happens when a flow pivots (pushes a new flow onto the
     stack) or when a stacked flow completes (auto-pops to the parent flow).
@@ -131,5 +140,17 @@ post:
               value:
                 code: rel.revoked
                 message: 'the release this attempt runs on was revoked'
+    '429':
+      description: |
+        The server is hashing or checking as many passwords as it allows right
+        now and could not take on another within its wait. Nothing was changed;
+        retry after the number of seconds in the `Retry-After` header.
+      headers:
+        Retry-After:
+          $ref: ../../../components/headers/retry-after.yaml
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/schemas/too-many-requests.yaml
     default:
       $ref: submitFlowStep-error-response.yaml

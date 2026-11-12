@@ -1,12 +1,12 @@
 import { Flags } from "@oclif/core";
-import { reportWarning } from "@/lib/warnings";
 import { z } from "zod";
-import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
-import { Publisher } from "@/lib/publish";
 
-import { reads, type Refused } from "@/lib/oclif/flags";
-import { MESSAGE_MAX_LENGTH, messageTooLong } from "@/lib/publish";
-import { prose } from "@/lib/oclif/rendering";
+import { Cmd } from "@/lib/cmd";
+import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
+import { type Refused, reads } from "@/lib/oclif/flags";
+import { MESSAGE_MAX_LENGTH, messageTooLong, Publisher } from "@/lib/publish";
+import { escapeControlCharacters } from "@/lib/terminal-text";
+import { reportWarning } from "@/lib/warnings";
 
 /**
  * What `-m/--message` records. It refuses a blank message, which would record
@@ -31,9 +31,13 @@ const MESSAGE: Refused<string> = {
   },
 };
 
+/**
+ * `zitadel release create` — build a release from .zitadel/ without deploying it.
+ */
 export default class ReleaseCreate extends EnvironmentCommand {
   static override description = "Build a release from .zitadel/ without deploying it.";
   static override group = CommandGroups.configuration;
+
   static override examples = [
     "<%= config.bin %> release create",
     "<%= config.bin %> release create -m 'add phone_number to human-user'",
@@ -68,19 +72,34 @@ export default class ReleaseCreate extends EnvironmentCommand {
     for (const warning of prepared.warnings) {
       reportWarning(warning);
     }
-    for (const notice of prepared.notices) {
-      process.stdout.write(notice);
-    }
+    this.narrate(prepared.notices);
     // `release create` carries the same no-mutation promise every command does
     // under `--dry-run`: validate the bundle the same way, then stop before the
     // release is posted so nothing is written server-side.
     if (this.dryRun) {
+      const title = `Validated ${prepared.resourceCount} ${new Intl.PluralRules("en").select(prepared.resourceCount) === "one" ? "resource" : "resources"} and created no release (dry run)`;
+
       return this.emit({
         status: "ok",
-        data: { dry_run: true, resources: prepared.resourceCount },
-        pretty: prose(
-          `Validated ${prepared.resourceCount} resource${prepared.resourceCount === 1 ? "" : "s"}. No release was created (dry run).`,
-        ),
+        data: {
+          dry_run: true,
+          title,
+          resources: prepared.resourceCount,
+        },
+        summary: {
+          title,
+          sections: [],
+        },
+        next: {
+          commands: [
+            this.suggest(
+              [
+                "release create",
+                ...(flags.message === undefined ? [] : [Cmd.option("--message", flags.message)]),
+              ].join(" "),
+            ),
+          ],
+        },
       });
     }
 
@@ -89,15 +108,21 @@ export default class ReleaseCreate extends EnvironmentCommand {
       message: flags.message,
     });
 
+    const title = `Created ${escapeControlCharacters(release.id)}`;
+
     return this.emit({
       status: "ok",
       data: {
+        title,
         release_id: release.id,
         content_hash: release.content_hash,
         resources: prepared.resourceCount,
       },
-      next: { commands: [this.suggest(`deployment create --release ${release.id}`)] },
-      pretty: prose(`Created ${release.id} (${release.content_hash})`),
+      summary: {
+        title,
+        sections: [],
+      },
+      next: { commands: [this.suggest(`deployment create --release ${Cmd.quote(release.id)}`)] },
     });
   }
 }

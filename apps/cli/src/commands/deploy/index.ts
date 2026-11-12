@@ -1,4 +1,10 @@
 import { resolve } from "node:path";
+import { Flags } from "@oclif/core";
+import { z } from "zod";
+
+import { Origins } from "@/lib/backend";
+import { Cmd } from "@/lib/cmd";
+import { CANCELLED, confirmationHint, ZitadelError } from "@/lib/errors";
 import {
   type Admitted,
   CommandGroups,
@@ -6,24 +12,21 @@ import {
   EnvironmentCommand,
   type JsonEnvelope,
 } from "@/lib/oclif";
-import { Origins } from "@/lib/backend";
-import { Publisher } from "@/lib/publish";
-import { Flags } from "@oclif/core";
-import { z } from "zod";
-
-import { Cmd } from "@/lib/cmd";
-import { confirmationHint, ZitadelError } from "@/lib/errors";
 import { Destructive } from "@/lib/oclif/destructive";
 import { reads, type Refused } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { readZitadelSecret } from "@/lib/project";
-import { deployMessage, MESSAGE_MAX_LENGTH, messageTooLong } from "@/lib/publish";
+import {
+  abbreviate,
+  deployMessage,
+  MESSAGE_MAX_LENGTH,
+  messageTooLong,
+  Publisher,
+} from "@/lib/publish";
 import { configIsDirty } from "@/lib/publish/git";
-import { DEPLOY_ARGS, shellCommand, type SuggestedCommand } from "@/lib/suggestion";
+import { DEPLOY_ARGS, shellCommand } from "@/lib/suggestion";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 import { reportWarning } from "@/lib/warnings";
-import { prose } from "@/lib/oclif/rendering";
-
-/** How a non-interactive deploy with no message to fall back on is refused. */
 
 /**
  * What `-m/--message` records. It refuses a blank message, which would record
@@ -61,22 +64,21 @@ export function missingPrimaryOrigin(input: {
   origins: Origins;
   issuer: string | undefined;
   setupProject: boolean;
-  suggest: (command: string) => SuggestedCommand;
 }): { hint: string; next: readonly string[] } {
   const preview =
     input.issuer === undefined ? undefined : input.origins.heldAsPreview(input.issuer);
   if (preview !== undefined) {
-    const held = `It holds its issuer ${preview} as a preview origin, as \`zitadel setup\` 0.1.0 registered it, so adding it as primary conflicts.`;
+    const held = `It holds its issuer ${preview} as a preview origin, as setup 0.1.0 registered it, so adding it as primary conflicts.`;
     if (input.setupProject) {
       return {
-        hint: `${held} Run \`${input.suggest("doctor --fix")}\` to make it primary, then deploy.`,
+        hint: `${held} Make it primary, then deploy.`,
         next: ["doctor --fix"],
       };
     }
     const remove = `origin rm ${Cmd.quote(preview)} --force`;
     const add = `origin add ${Cmd.quote(preview)} --kind primary`;
     return {
-      hint: `${held} Remove it with \`${input.suggest(remove)}\`, add it back with \`${input.suggest(add)}\`, then deploy.`,
+      hint: `${held} Remove it and add it back as primary, then deploy.`,
       // Both steps, in the order they must run: removing the pattern leaves
       // the project admitting every origin until it is added back.
       next: [remove, add],
@@ -85,20 +87,15 @@ export function missingPrimaryOrigin(input: {
   if (input.issuer !== undefined) {
     const add = `origin add ${Cmd.quote(Origins.originOf(input.issuer))} --kind primary`;
     return {
-      hint: `Add the URL the app serves from with \`${input.suggest(add)}\`, then deploy.`,
+      hint: "Add the URL the app serves from as a primary origin, then deploy.",
       next: [add],
     };
   }
   return {
-    hint: `Add one with \`${input.suggest("origin add <url> --kind primary")}\`, then deploy.`,
+    hint: "Add a primary origin for the URL the app serves from, then deploy.",
     next: ["origin list"],
   };
 }
-
-/**
- * What a deploy that would leave existing users unable to sign in asks.
- */
-const LOCKOUT_QUESTION = "Deploy anyway? The users above will not be able to sign in.";
 
 /**
  * The action a lockout refusal names: "Cannot … without --force".
@@ -123,7 +120,9 @@ const NO_PRIMARY_ORIGIN_REFUSAL: Refusal = {
  * deploy ran. It carries the message the deploy used, so it can be run as it is.
  */
 function commitConfig(deployed: string, message: string | undefined): string {
-  const quote = (text: string): string => `'${text.replaceAll("'", "'\\''")}'`;
+  const quote = (text: string): string => {
+    return `'${text.replaceAll("'", "'\\''")}'`;
+  };
   const git = resolve(deployed) === process.cwd() ? "git" : `git -C ${quote(deployed)}`;
   return `${git} add .zitadel && ${git} commit -m ${quote(message ?? "<what changed>")} -- .zitadel`;
 }
@@ -136,15 +135,13 @@ function commitConfig(deployed: string, message: string | undefined): string {
  * git diff, then creates the release and deploys it to every primary origin
  * (primary origins are never named one by one). `--dry-run` stops after the
  * diff, writing nothing to the server.
- *
- * It replaces `plan` and `apply`: a release is published as one immutable unit
- * and deployed, rather than each resource being synced in place.
  */
 export default class Deploy extends Destructive(EnvironmentCommand) {
   static override description =
     "Apply your local configuration to Zitadel.\n\nBuilds a release from .zitadel/ and deploys it to the project. Use --dry-run to preview what would change.";
   static override group = CommandGroups.configuration;
   static override groupOrder = 1;
+
   static override examples = [
     "<%= config.bin %> deploy -m 'add phone_number to human-user'",
     "<%= config.bin %> deploy --dry-run",
@@ -204,27 +201,46 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
     for (const warning of prepared.warnings) {
       reportWarning(warning);
     }
-    for (const notice of prepared.notices) {
-      process.stdout.write(notice);
-    }
-    if (!(await this.confirmLockouts(prepared.lockouts))) {
-      return this.emit({ status: "skipped", reason: "deploy-cancelled" });
+    this.narrate(prepared.notices);
+    if (!(await this.confirmLockouts(prepared.lockouts, flags.message))) {
+      return this.emit({
+        status: "skipped",
+        reason: "deploy-cancelled",
+        summary: {
+          title: CANCELLED,
+          sections: [],
+        },
+      });
     }
     const { resourceCount } = prepared;
     this.recordTelemetry({ resources: resourceCount });
+    // The deploy again as it was typed: the message and `--force` the person
+    // gave, so a retry or the real run after a dry run asks for the same thing.
+    const again = [
+      flags.message === undefined ? DEPLOY_ARGS : `deploy ${Cmd.option("-m", flags.message)}`,
+      ...(flags.force ? ["--force"] : []),
+    ].join(" ");
+    const resources = `${resourceCount} ${new Intl.PluralRules("en").select(resourceCount) === "one" ? "resource" : "resources"}`;
 
     if (this.dryRun) {
+      const title = `Validated ${resources} and deployed nothing (dry run)`;
+
       return this.emit({
         status: "ok",
         data: {
           dry_run: true,
+          title,
           resources: resourceCount,
           targets: "primary",
           ...prepared.report,
         },
-        pretty: prose(
-          `Validated ${resourceCount} resource${resourceCount === 1 ? "" : "s"}. Nothing was deployed (dry run).`,
-        ),
+        summary: {
+          title,
+          sections: [],
+        },
+        next: {
+          commands: [this.suggest(again)],
+        },
       });
     }
 
@@ -242,21 +258,25 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
       message,
     });
     switch (publication.outcome) {
-      case "revoked":
+      case "revoked": {
         throw new ZitadelError(
           "E_CONFLICT",
           `This content was already released as ${release.id}, which is revoked`,
           {
             hint: "A revoked release can never be served again. Change the configuration so it builds a new release, then deploy.",
-            details: { release_id: release.id, content_hash: release.content_hash },
+            details: {
+              release_id: release.id,
+              content_hash: release.content_hash,
+            },
           },
         );
-      case "raced":
+      }
+      case "raced": {
         throw new ZitadelError(
           "E_CONFLICT",
           "Another deploy changed the targets since this one was prepared",
           {
-            hint: `Re-run \`zitadel ${DEPLOY_ARGS}${this.environmentSelector()}\`; it will build and deploy against the current state.`,
+            hint: `Rerun ${this.suggest(again)}; it will build and deploy against the current state.`,
             details:
               publication.current === undefined
                 ? undefined
@@ -264,8 +284,10 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
             nextCommands: [this.suggest("deployment list --live")],
           },
         );
-      case "deployed":
+      }
+      case "deployed": {
         break;
+      }
     }
     const { deployment } = publication;
 
@@ -276,9 +298,23 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
     // deployed in git (the warning above says to commit before the next deploy).
     const configUncommitted = prepared.gitDirty && (await configIsDirty(this.cwd));
 
+    const title = `Deployed ${resources}`;
+    let live = `Release ${escapeControlCharacters(abbreviate(release.content_hash))} is now live.`;
+    if (servedOrigins.length > 0) {
+      live = `Release ${escapeControlCharacters(abbreviate(release.content_hash))} is now live on ${new Intl.ListFormat(
+        "en",
+        { type: "conjunction" },
+      ).format(
+        servedOrigins.map((origin) => {
+          return escapeControlCharacters(origin);
+        }),
+      )}.`;
+    }
+
     return this.emit({
       status: "ok",
       data: {
+        title,
         release_id: release.id,
         content_hash: release.content_hash,
         deployment_id: deployment.id,
@@ -286,21 +322,17 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
         origins: servedOrigins,
         ...prepared.report,
       },
+      summary: {
+        title,
+        sections: [],
+        lines: [live],
+      },
       next: {
         commands: [
           this.suggest("deployment list"),
           ...(configUncommitted ? [shellCommand(commitConfig(this.cwd, message))] : []),
         ],
       },
-      pretty: prose(
-        [
-          `Deployed ${release.content_hash}`,
-          `  ${resourceCount} resource${resourceCount === 1 ? "" : "s"} to ${servedOrigins.length} origin${servedOrigins.length === 1 ? "" : "s"}`,
-          ...servedOrigins.map((served) => {
-            return `  - ${served}`;
-          }),
-        ].join("\n"),
-      ),
     });
   }
 
@@ -316,22 +348,28 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
    * keeps `--dry-run`.
    *
    * @param lockouts - What the lockout check found.
+   * @param typed - The message the person gave with `-m`, kept on the re-run.
    * @returns Whether the deploy goes ahead.
    * @throws {@link ZitadelError} With `E_CONFIRMATION_REQUIRED` when nobody can
    *   be asked and `--force` was not given.
    */
-  private async confirmLockouts(lockouts: readonly string[]): Promise<boolean> {
+  private async confirmLockouts(
+    lockouts: readonly string[],
+    typed: string | undefined,
+  ): Promise<boolean> {
     if (lockouts.length === 0) {
       return true;
     }
     for (const lockout of lockouts) {
       reportWarning(lockout);
     }
+    const { projectId, server } = await this.connect();
+    const question = `Deploy to project ${projectId} on ${server.replace(/^https?:\/\//, "")} even though the users above will not be able to sign in?`;
     if (!this.dryRun) {
       const consent = await this.consent({
         verb: "deploy",
         name: LOCKOUT_ACTION,
-        message: LOCKOUT_QUESTION,
+        message: question,
       });
       return consent !== undefined;
     }
@@ -340,9 +378,17 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
         "E_CONFIRMATION_REQUIRED",
         `Cannot ${LOCKOUT_ACTION} without --force in non-interactive mode`,
         {
-          hint: confirmationHint(LOCKOUT_QUESTION),
-          details: { question: LOCKOUT_QUESTION },
-          nextCommands: [this.suggest("deploy --dry-run --force")],
+          hint: confirmationHint(question),
+          details: { question },
+          nextCommands: [
+            this.suggest(
+              [
+                "deploy --dry-run",
+                ...(typed === undefined ? [] : [Cmd.option("-m", typed)]),
+                "--force",
+              ].join(" "),
+            ),
+          ],
         },
       );
     }
@@ -376,9 +422,6 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
         origins,
         issuer: environment.values.ZITADEL_ISSUER?.value,
         setupProject: setupProject === projectId,
-        suggest: (command) => {
-          return this.suggest(command);
-        },
       }),
       (next) => {
         return this.suggest(next);

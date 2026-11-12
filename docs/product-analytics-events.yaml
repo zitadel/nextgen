@@ -106,10 +106,11 @@ properties:
   # Calls to action
   snippet:
     type: string
-    values: [all, start, setup, dev, plan, apply, skills]
+    values: [all, start, setup, dev, dry_run, deploy, skills]
     description: >-
       What a copy button copied, never its text: the CLI command it runs
-      (`start`, `setup`, `plan`, `apply`), `dev` for the app's dev server,
+      (`start`, `setup`, `dry_run` for `deploy --dry-run`, `deploy`), `dev` for
+      the app's dev server,
       `skills` for the coding agents' skills, or `all` for the website's whole
       block of commands.
 

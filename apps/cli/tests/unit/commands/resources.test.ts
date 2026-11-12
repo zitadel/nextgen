@@ -56,7 +56,7 @@ import {
   parseSort,
   type ResourceDescriptor,
 } from "@/lib/oclif/crud";
-import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
+import { expectedPublicCliCommand, parseJson, runCliForTest } from "@tests/helpers/run-cli";
 
 const SERVER = "https://api.zitadel.cloud";
 const OPERATIONS = ["equals", "greater_than"] as const;
@@ -927,6 +927,7 @@ describe("users get / create / update / delete", () => {
     expect(res.exitCode).toBe(0);
     expect(hits.length > 0).toBe(true);
     expect((parseJson(res.stdout) as { data: unknown }).data).toEqual({
+      title: "Deleted user user_1",
       id: "user_1",
       deleted: true,
     });
@@ -1622,9 +1623,13 @@ describe("dry runs", () => {
     expect(res.exitCode).toBe(0);
     expect((parseJson(res.stdout) as { data: unknown }).data).toEqual({
       dry_run: true,
+      title: "Would deactivate team team_1 (dry run)",
       verb: "deactivate",
       topic: "teams",
       id: "team_1",
+      next_commands: [
+        expectedPublicCliCommand(`teams deactivate team_1 --server ${SERVER} --cwd ${cwd}`),
+      ],
     });
   });
 
@@ -1682,6 +1687,7 @@ describe("delete outcomes", () => {
     expect(res.exitCode).toBe(0);
     // ADR 024: the API deactivates the team and leaves it readable.
     expect((parseJson(res.stdout) as { data: unknown }).data).toEqual({
+      title: "Deactivated team team_1",
       id: "team_1",
       deactivated: true,
     });
@@ -1695,6 +1701,7 @@ describe("delete outcomes", () => {
 
     const res = await run(cwd, ["users", "delete", "user_1", "--force"]);
     expect((parseJson(res.stdout) as { data: unknown }).data).toEqual({
+      title: "Deleted user user_1",
       id: "user_1",
       deleted: true,
     });
@@ -1728,6 +1735,7 @@ describe("other resources", () => {
     const res = await run(cwd, ["sessions", "revoke", "sess_1", "--force"]);
     expect(res.exitCode).toBe(0);
     expect((parseJson(res.stdout) as { data: unknown }).data).toEqual({
+      title: "Revoked session sess_1",
       id: "sess_1",
       revoked: true,
     });
@@ -1769,6 +1777,12 @@ describe("other resources", () => {
       "category=auth",
       "--filter",
       "created_at=greater_than_or_equal:2026-01-01T00:00:00Z",
+      "--filter",
+      "operation_id=createUser",
+      "--filter",
+      "status_class=4xx",
+      "--filter",
+      "status_class=5xx",
       "--limit",
       "5",
     ]);
@@ -1776,6 +1790,8 @@ describe("other resources", () => {
     const params = new URL(urls.at(-1) ?? "").searchParams;
     expect(params.get("project_id")).toBe("proj_test");
     expect(params.getAll("category")).toEqual(["entity", "auth"]);
+    expect(params.getAll("operation_id")).toEqual(["createUser"]);
+    expect(params.getAll("status_class")).toEqual(["4xx", "5xx"]);
     expect(params.get("created_after")).toBe("2026-01-01T00:00:00Z");
     expect(params.get("limit")).toBe("5");
     const json = parseJson(res.stdout) as { data: { items: Array<{ id: string }> } };
@@ -2164,11 +2180,26 @@ describe("the query resources' filters", () => {
     ["idps", QueryIdpsBodyFilterItemOperation],
     ["projects", QueryProjectsBodyFilterItemOperation],
   ] as const)("offer the operations the %s query takes, and no other", (topic, operations) => {
-    const offered = new Set(
+    const offered = new Set<string>(
       (RESOURCES[topic].list?.filters ?? []).flatMap((filter) => filter.operations),
     );
+    // Every query's enum holds `starts_with`, but only a field an index answers
+    // it for takes it, so a resource without such a field offers it nowhere.
+    const expected = Object.values(operations).filter(
+      (operation) => operation !== "starts_with" || offered.has(operation),
+    );
 
-    expect([...offered].sort()).toEqual(Object.values(operations).sort());
+    expect([...offered].sort()).toEqual(expected.sort());
+  });
+
+  it("offer starts_with on the fields an index answers it for, and no other", () => {
+    const fields = Object.entries(RESOURCES).flatMap(([topic, resource]) =>
+      (resource.list?.filters ?? [])
+        .filter((filter) => (filter.operations as readonly string[]).includes("starts_with"))
+        .map((filter) => `${topic}.${filter.field}`),
+    );
+
+    expect(fields).toEqual(["users.identifier"]);
   });
 });
 
@@ -2388,8 +2419,8 @@ describe("the registry builders", () => {
   it("refuses an operation the query body does not take", () => {
     list({
       body: QueryUsersBody,
-      // @ts-expect-error a user query takes no `starts_with` operation
-      filters: [{ field: "status", operations: ["starts_with"] }],
+      // @ts-expect-error a user query takes no `ends_with` operation
+      filters: [{ field: "status", operations: ["ends_with"] }],
       call: ({ client }, body) => client.queryUsers(body),
       items: (page: QueryUsers200) => page.users,
       next: (page: QueryUsers200) => page.next_page_token,
@@ -2649,7 +2680,7 @@ describe("the id of a resource whose id has a format", () => {
     await expect(parseArg(positional(topic), value, "id")).rejects.toMatchObject({
       code: "E_VALIDATION",
       message: expect.stringContaining(`must be ${IDS[topic][1]} ID`),
-      hint: `Find one with \`zitadel ${topic} list\`.`,
+      hint: "List them to find one.",
     });
   });
 
@@ -2662,7 +2693,7 @@ describe("the id of a resource whose id has a format", () => {
     expect(positionals.length).toBeGreaterThan(0);
     for (const arg of positionals) {
       await expect(parseArg(arg, "nope", "id")).rejects.toMatchObject({
-        hint: `Find one with \`zitadel ${topic} list\`.`,
+        hint: "List them to find one.",
       });
     }
   });

@@ -10,18 +10,29 @@ get:
 
     A project that is not claimed yet returns an empty list: its events are
     stored but stay invisible until the
-    [claim](/docs/concepts/project-team-user#claim) succeeds.
+    [claim](/docs/concepts/project-team-user#claim) succeeds. The deployment's
+    platform operators read them from the start.
 
     Team-scoped credentials see only the events whose `team_id` matches the
     credential's team. Team-scoped credentials are not issued today.
 
     Each item carries an `event_type` that says which type of event it is, and
     the matching `payload`. To read one event, pass its `id` to `getEvent` (`GET /events/{id}`).
+
+    Filters combine. These are answered from an index and fill their pages: no
+    filter, `category`, `event_type`, `status_class`, `operation_id` with or
+    without `status_class`, `request_id`, `flow_id`, and `session_id`,
+    `entity_id`, `actor_id` or `entity_type` with or without `category`, each
+    with or without the time bounds. Any other filter or combination is
+    matched event by event, over at most a few thousand events per request.
+    Such a page can hold fewer events than `limit`, or none, and still carry
+    `next_page_token`: keep passing the token until a response has none.
   tags:
     - Events
   security:
     - oauth2:
         - events.read
+    - sessionCookie: []
   parameters:
     - $ref: ../../components/parameters/project-id.yaml
     - name: category
@@ -85,7 +96,7 @@ get:
         type: string
     - name: entity_type
       in: query
-      description: Only events that affected this type of resource.
+      description: Only events that affected this type of resource, such as `user`.
       schema:
         type: string
     - name: entity_id
@@ -98,6 +109,42 @@ get:
       description: Only events emitted under this team, as stored on the event.
       schema:
         type: string
+    - name: operation_id
+      in: query
+      description: |
+        Only `request.api` events of this API operation, the
+        `payload.operation_id` they record, such as `createUser`. Repeat the
+        parameter to match any of up to 10 operations. Requests recorded by a
+        server version before this filter existed are not matched; they leave
+        the list as retention removes them.
+      style: form
+      explode: true
+      schema:
+        type: array
+        maxItems: 10
+        items:
+          type: string
+    - name: status_class
+      in: query
+      description: |
+        Only `request.api` events whose response status, the `payload.status`
+        they record, is in this class: `4xx` is 400 to 499. Repeat the
+        parameter to match any of several classes: `4xx` and `5xx` are the
+        failed requests. Requests recorded by a server version before this
+        filter existed are not matched; they leave the list as retention
+        removes them.
+      style: form
+      explode: true
+      schema:
+        type: array
+        items:
+          type: string
+          enum:
+            - 1xx
+            - 2xx
+            - 3xx
+            - 4xx
+            - 5xx
     - name: created_after
       in: query
       description: Inclusive lower bound on `created_at` (RFC 3339).

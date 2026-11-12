@@ -169,12 +169,14 @@ func (f *historyFixture) kept(historyReads, verifications int, current string, p
 		rows[i] = &domain.UserPassword{EncodedHash: h}
 	}
 	f.stmts.EXPECT().GetUserPasswordHistory(gomock.Any(), "p", "u").Return(rows, nil).Times(historyReads)
-	f.verifier.EXPECT().VerifyHash(gomock.Any(), gomock.Any()).DoAndReturn(func(hash, _ string) error {
+	f.verifier.EXPECT().VerifyHash(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, hash, _ string) error {
 		switch hash {
 		case "match":
 			return nil
 		case "unreadable":
 			return errors.New("no verifier for this hash")
+		case "busy":
+			return crypto.ErrHashingBusy
 		}
 		return crypto.ErrHashMismatch
 	}).Times(verifications)
@@ -272,7 +274,7 @@ func TestSetPasswordAction_RejectsAStaleHistoryCheck(t *testing.T) {
 			f := newHistoryFixture(t, 1)
 			f.kept(0, 1, "a")
 			hasher := cryptomock.NewMockPasswordHasher(gomock.NewController(t))
-			hasher.EXPECT().Hash("candidate").Return("hash", nil)
+			hasher.EXPECT().Hash(gomock.Any(), "candidate").Return("hash", nil)
 			action := service.NewSetUserPasswordAction(
 				service.SetPasswordInput{ProjectID: "p", UserID: "u", Password: "candidate", SelfService: true},
 				service.FixedProjectHasherResolver{Hasher: hasher}, f.gate)

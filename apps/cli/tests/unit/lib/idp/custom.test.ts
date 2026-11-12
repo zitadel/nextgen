@@ -295,8 +295,22 @@ describe("loopbackIssuerWarning", () => {
       "e.g.",
     );
 
-    expect(loopbackIssuerWarning(selection, "container")).toContain("--runtime binary");
+    expect(loopbackIssuerWarning(selection, "container")).toContain("binary runtime");
   });
+
+  it.each(["container", "unknown"] as const)(
+    "spells no command in backticks when the reach is %s",
+    (reach) => {
+      const selection = selectionFromFlags(
+        "custom",
+        { ...valid, issuer: "http://localhost:9100" },
+        flag,
+        "e.g.",
+      );
+
+      expect(loopbackIssuerWarning(selection, reach)).not.toContain("`");
+    },
+  );
 
   it("says nothing about an issuer elsewhere or about a catalog provider", () => {
     expect(
