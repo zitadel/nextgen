@@ -118,7 +118,7 @@ jobs:
             tools/oidc-mock/go.sum
             go.work.sum
 
-      - uses: pnpm/action-setup@v5
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
         with:
           run_install: false
 
@@ -138,7 +138,7 @@ jobs:
         id: remote-cache
         if: ${{ !(github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork) }}
         continue-on-error: true
-        uses: vercel/setup-turborepo-remote-cache-action@v1.1.0
+        uses: vercel/setup-turborepo-remote-cache-action@49d7b1b46ba4c9251e1977986bfe18336feabc8f # v1.1.0
         with:
           team: ${{ vars.TURBO_TEAM }}
 

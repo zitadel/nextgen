@@ -385,7 +385,7 @@ func listEventsOptions(req ListEventsRequest, read eventRead) (*database.ListOpt
 		cursor = []byte(req.PageToken)
 	}
 
-	orderBy := events.CreatedAtDesc()
+	var orderBy database.OrderBy[domain.EventField]
 	switch req.Order {
 	case "", "desc":
 		orderBy = events.CreatedAtDesc()
