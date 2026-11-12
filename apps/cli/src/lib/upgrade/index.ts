@@ -1,9 +1,8 @@
 export type { BreakingChange, ChangeSource } from "./change-source";
-export { Dependency } from "./dependency";
 export { DistTagRegistry } from "./dist-tag-registry";
 export { InstallError, ReleaseLookupError } from "./errors";
 export { LookupCache } from "./lookup-cache";
-export { PackageInstaller, type PlannedInstall } from "./package-installer";
+export { PackageInstaller } from "./package-installer";
 export { Release } from "./release";
 export { ReleaseChannel } from "./release-channel";
 export type { Refresh, RefreshOutcome, Refresher } from "./refresher";

@@ -4,17 +4,24 @@ import { join } from "node:path";
 
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { ZitadelReleaseChannel } from "@/lib/zitadel-upgrade";
 
 const REGISTRY = "https://registry.npmjs.org/-/package/@zitadel%2fcli/dist-tags";
 
 const server = setupServer();
+let home: string;
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterAll(() => server.close());
-afterEach(() => server.resetHandlers());
+beforeEach(async () => {
+  home = await mkdtemp(join(tmpdir(), "zitadel-release-channel-"));
+});
+afterEach(async () => {
+  server.resetHandlers();
+  await rm(home, { recursive: true, force: true });
+});
 
 describe("ZitadelReleaseChannel.latestFresh", () => {
   it("reads the version on the dist-tag of the CLI's own channel", async () => {
@@ -31,7 +38,6 @@ describe("ZitadelReleaseChannel.latestFresh", () => {
 
 describe("ZitadelReleaseChannel cache", () => {
   it("keeps the answer in the CLI's config directory, where the next run reads it", async () => {
-    const home = await mkdtemp(join(tmpdir(), "zitadel-release-channel-"));
     server.use(http.get(REGISTRY, () => HttpResponse.json({ latest: "2.0.0" })));
 
     await new ZitadelReleaseChannel("1.0.0", { XDG_CONFIG_HOME: home }).latestFresh();
@@ -39,7 +45,6 @@ describe("ZitadelReleaseChannel cache", () => {
     const cached = JSON.parse(
       await readFile(join(home, "zitadel", "cli", "update-check.json"), "utf8"),
     ) as Record<string, unknown>;
-    await rm(home, { recursive: true, force: true });
     expect(cached).toMatchObject({ dist_tag: "latest", version: "2.0.0" });
   });
 });

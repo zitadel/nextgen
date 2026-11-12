@@ -19,7 +19,7 @@ const hook: Hook<"finally"> = async ({ config }) => {
     return;
   }
   try {
-    const { UpdateNotice } = await import("@/lib/zitadel-upgrade");
+    const { UpdateNotice } = await import("@/lib/zitadel-upgrade/update-notice");
     const notice = await new UpdateNotice({
       cliVersion: config.version,
       cwd: process.cwd(),

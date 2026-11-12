@@ -67,7 +67,12 @@ export class ZitadelUpgrader {
         typedCwd: options.typedCwd,
         redirectStdoutToStderr: options.json,
       }),
-      refresher: new ZitadelRefresher(options),
+      refresher: new ZitadelRefresher({
+        cwd: options.cwd,
+        env: options.env,
+        noTelemetry: options.noTelemetry,
+        signal: options.signal,
+      }),
     });
   }
 

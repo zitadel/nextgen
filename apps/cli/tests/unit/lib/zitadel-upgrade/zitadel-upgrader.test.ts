@@ -9,7 +9,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import { ZitadelError } from "@/lib/errors";
 import { shellCommand } from "@/lib/suggestion";
 import { ZitadelUpgrader } from "@/lib/zitadel-upgrade";
-import { rejectionOf } from "../../../helpers/thrown-value";
+import { rejectionOf } from "@tests/helpers/thrown-value";
 
 const REGISTRY = "https://registry.npmjs.org/-/package/@zitadel%2fcli/dist-tags";
 const RELEASES = "https://api.github.com/repos/zitadel/nextgen/releases";
@@ -99,5 +99,30 @@ describe("ZitadelUpgrader.apply", () => {
       false,
       "skipped",
     ]);
+  });
+});
+
+describe("ZitadelUpgrader.apply when the install fails", () => {
+  it("refuses with E_VALIDATION, naming the cause and offering the install, then the upgrade", async () => {
+    await writeFile(
+      join(dir, "package.json"),
+      JSON.stringify({ dependencies: { "@zitadel/sdk-next": "1.0.0" } }),
+    );
+    const upgrade = upgrader(false);
+    const plan = await upgrade.plan();
+    await rm(dir, { recursive: true, force: true });
+
+    const error = await rejectionOf(() => {
+      return upgrade.apply(plan);
+    });
+
+    expect(error).toBeInstanceOf(ZitadelError);
+    const refusal = error as ZitadelError;
+    expect([
+      refusal.code,
+      refusal.hint?.endsWith("Nothing else changed; fix that and rerun."),
+    ]).toEqual(["E_VALIDATION", true]);
+    expect(refusal.nextCommands?.[0]).toContain("@zitadel/sdk-next@2.0.0");
+    expect(refusal.nextCommands?.[1]).toBe("zitadel upgrade");
   });
 });

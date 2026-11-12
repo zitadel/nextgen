@@ -14,7 +14,7 @@ import {
   ScopedDependencies,
   UpgradePlan,
 } from "@/lib/upgrade";
-import { rejectionOf } from "../../../helpers/thrown-value";
+import { rejectionOf } from "@tests/helpers/thrown-value";
 
 const server = setupServer(
   http.get("https://api.github.com/repos/zitadel/nextgen/releases", () => {

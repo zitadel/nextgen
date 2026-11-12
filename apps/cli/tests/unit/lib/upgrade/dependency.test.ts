@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { Dependency } from "@/lib/upgrade";
+import { Dependency } from "@/lib/upgrade/dependency";
 
 describe("Dependency", () => {
   it.each([
@@ -17,6 +17,7 @@ describe("Dependency", () => {
     ["2.0.0", "2.0.0", false, false],
     ["3.0.0", "2.0.0", false, true],
     ["^1.0.0", "2.0.0", false, false],
+    ["1.0.0", "dev", false, false],
   ])("%s against %s: behind %s, ahead %s", (specifier, version, behind, ahead) => {
     const dependency = new Dependency("@zitadel/api", specifier);
 

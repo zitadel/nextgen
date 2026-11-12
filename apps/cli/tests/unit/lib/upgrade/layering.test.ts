@@ -5,7 +5,11 @@ import { describe, expect, it } from "vitest";
 
 const LIBRARY = join(import.meta.dirname, "../../../../src/lib/upgrade");
 
-/** The only things `lib/upgrade` may import: itself, node, semver and the two generic npm libs. */
+/**
+ * The only things `lib/upgrade` may import: itself, node, semver and the two npm
+ * libs. This checks direct imports only: `lib/package-manager` itself reaches
+ * `public-cli` and `cmd` for how a command is spelled.
+ */
 const ALLOWED = /^(\.\/|node:|semver$|@\/lib\/npm$|@\/lib\/package-manager$)/;
 
 /** Every module a source imports: `from "x"`, `import "x"` and `import("x")`. */
