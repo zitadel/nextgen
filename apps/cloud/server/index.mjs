@@ -19,12 +19,13 @@
 // - receives the server's spans and metrics as OTLP/HTTP protobuf on a
 //   loopback collector. Spans are sorted by request (spans.mjs) and each
 //   request's spans handed to reportSpans once the response is done, in
-//   waitUntil. Metrics are queued as Vercel data points (metrics.mjs), and
-//   every request, once its response is done, sends what is queued: Vercel
-//   ties a data point to the invocation reporting it and takes
-//   metricsPerRequest of them from one. So a data point is reported by
-//   whichever request ends next, and those of an instance's last request
-//   wait for the instance to serve again.
+//   waitUntil. Metrics are aggregated into Vercel data points (metrics.mjs),
+//   as a collector would, and sent from a request's waitUntil, because Vercel
+//   ties a data point to the invocation reporting it. A request sends them
+//   when it is the last one in flight, after the server's next export, so an
+//   instance never goes idle holding metrics; while other requests are in
+//   flight, only once the oldest has waited metricHoldMs. A busy instance
+//   therefore sends a counter once per interval instead of once per request.
 //
 // Logs pass straight through: the launcher writes to this process's stdout
 // and stderr, as it does under the Go preset. If the launcher exits, so does
@@ -46,6 +47,12 @@ const requestContext = Symbol.for("@vercel/request-context");
 const runtimeIpc = Symbol.for("@vercel/rusty-runtime-ipc");
 // Vercel records up to 100 data points per invocation.
 const metricsPerRequest = 100;
+// How long a busy instance aggregates metrics before a request sends them.
+const metricHoldMs = 10_000;
+// How long the last request in flight waits for the server's next metric
+// export, which carries what that request recorded. The launcher sets the
+// server's export interval to 100ms.
+const metricWaitMs = 300;
 // How long a finished response waits for its server span. The launcher sets
 // the server's batch timeout to 100ms.
 const spanWaitMs = 1000;
@@ -64,6 +71,8 @@ const clientTraceContext = new Set(["traceparent", "tracestate", "baggage"]);
 
 const router = new SpanRouter();
 const metrics = new MetricQueue();
+let inFlight = 0;
+let onMetricExport = [];
 let started;
 
 function listen(server) {
@@ -83,8 +92,26 @@ async function freePort() {
 // The OTLP/HTTP paths the server exports to, and what takes each export.
 const collectors = {
   "/v1/traces": (body) => router.ingest(decodeTraceRequest(body)),
-  "/v1/metrics": (body) => metrics.ingest(decodeMetricsRequest(body)),
+  "/v1/metrics": (body) => {
+    metrics.ingest(decodeMetricsRequest(body));
+    const waiting = onMetricExport;
+    onMetricExport = [];
+    for (const resolve of waiting) {
+      resolve();
+    }
+  },
 };
+
+// Resolves on the server's next metric export, or after metricWaitMs.
+function nextMetricExport() {
+  return new Promise((resolve) => {
+    const timer = setTimeout(resolve, metricWaitMs);
+    onMetricExport.push(() => {
+      clearTimeout(timer);
+      resolve();
+    });
+  });
+}
 
 function collectorHandler(req, res) {
   const collect = req.method === "POST" ? collectors[req.url] : undefined;
@@ -204,6 +231,11 @@ export default async function handler(req, res) {
     return;
   }
 
+  inFlight++;
+  const closed = new Promise((resolve) => res.once("close", resolve)).then(() => {
+    inFlight--;
+  });
+
   const context = globalThis[requestContext]?.get?.();
   const telemetry = context?.telemetry;
   const root = telemetry?.rootSpanContext;
@@ -245,13 +277,21 @@ export default async function handler(req, res) {
 
   if (typeof context?.waitUntil === "function") {
     context.waitUntil(
-      new Promise((resolve) => res.once("close", resolve))
-        .then(() => (entry ? router.close(entry, spanWaitMs) : null))
-        .then((spans) => {
+      closed
+        .then(() =>
+          Promise.all([
+            entry ? router.close(entry, spanWaitMs) : null,
+            inFlight === 0 ? nextMetricExport() : null,
+          ]),
+        )
+        .then(([spans]) => {
           if (spans) {
             telemetry.reportSpans(spans);
           }
-          sendMetrics();
+          // Another request may have arrived while this one waited; it sends.
+          if (inFlight === 0 || metrics.age >= metricHoldMs) {
+            sendMetrics();
+          }
         })
         .catch((error) => console.error("server wrapper: reporting telemetry failed:", error)),
     );

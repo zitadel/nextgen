@@ -1,28 +1,35 @@
-// Turns the server's exported metrics into Vercel custom metrics. Vercel takes
-// a metric as single data points, `metric(name, value, attributes)`, each
-// tied to the function invocation that reports it and aggregated when it is
+// Turns the server's exported metrics into Vercel custom metrics, as an
+// OpenTelemetry collector in front of a backend would: it takes the server's
+// frequent exports, aggregates them, and sends less often. Vercel takes a
+// metric as single data points, `metric(name, value, attributes)`, each tied
+// to the function invocation that reports it and aggregated when it is
 // queried; the server exports OTLP, where a data point is already an
 // aggregate. The launcher asks the SDK for delta temporality, so every export
-// carries what happened since the last one, and each kind is replayed as the
-// data points that aggregate back to it:
+// carries what happened since the last one, and each kind becomes the data
+// points that aggregate back to it:
 //
-// - a counter (delta sum): one data point with the increase. Query its sum.
-// - a histogram (delta): one data point per recorded value. The export keeps
-//   only the bucket a value fell into, so a value is replayed as the middle of
-//   its bucket, within the point's min and max; where the values share one
-//   bucket, as their mean, which keeps the sum exact. Query percentiles.
+// - a counter (delta sum): its increases are added up per series, and sent as
+//   one data point however many exports raised it. Query its sum.
 // - a gauge or an up-down counter (the SDK keeps the latter cumulative, so it
-//   is the current level): one data point when the level changed, and again
-//   every levelRepeatMs, so a steady level stays on a chart without a data
-//   point per export. Query its average or maximum.
+//   is the current level): the latest level per series, when it changed, and
+//   again every levelRepeatMs, so a steady level stays on a chart. Query its
+//   average or maximum.
+// - a histogram (delta): one data point per recorded value, because Vercel has
+//   no data point that stands for several values. The export keeps only the
+//   bucket a value fell into, so a value is sent as the middle of its bucket,
+//   within the point's min and max; where the values share one bucket, as
+//   their mean, which keeps the sum exact. Query percentiles.
 //
 // A cumulative counter is turned into its increase; a cumulative or
 // exponential histogram and a summary have no replay and are counted in
 // `unsupported`.
 //
-// Data points wait in a queue until a request takes them (take): Vercel
-// accepts 100 per invocation, and each is billed as one Observability event.
-// The queue is bounded; past maxQueued the oldest are dropped and counted.
+// Data points wait until a request takes them (take): Vercel accepts 100 per
+// invocation, and each is billed as one Observability event. The wrapper
+// takes them when the instance is about to go idle, or once the oldest has
+// waited long enough (age), so a busy instance sends a counter once per
+// interval, not once per request. The histogram values held are bounded; past
+// maxQueued the oldest are dropped and counted.
 //
 // Vercel has no sampling for custom metrics, so what it already has another
 // way is not sent (notReported).
@@ -122,9 +129,14 @@ function histogramValues(point) {
 }
 
 export class MetricQueue {
-  #queue = [];
-  // Per series: the last cumulative counter value, or the last level sent.
+  // Counter increases and levels waiting to be sent, one entry per series.
+  #aggregates = new Map();
+  // Histogram values waiting to be sent, one entry per value.
+  #values = [];
+  // Per series: the last cumulative counter value, or the last level queued.
   #series = new Map();
+  // When the oldest waiting data point arrived.
+  #since = null;
   #maxQueued;
   #levelRepeatMs;
   #now;
@@ -144,51 +156,71 @@ export class MetricQueue {
     this.#now = now;
   }
 
-  #push(name, value, attributes) {
-    if (!Number.isFinite(value)) {
-      return;
-    }
-    this.#queue.push({ name, value, attributes });
-    if (this.#queue.length > this.#maxQueued) {
-      this.#queue.shift();
-      this.dropped++;
-    }
+  #arrived() {
+    this.#since ??= this.#now();
   }
 
   #level(name, point) {
-    if (point.value === undefined) {
+    if (!Number.isFinite(point.value)) {
       return;
     }
     const attributes = attributesOf(point);
     const key = seriesKey(name, attributes);
+    const waiting = this.#aggregates.get(key);
+    if (waiting) {
+      // Not sent yet: the latest level replaces it.
+      waiting.value = point.value;
+      this.#series.set(key, { value: point.value, at: this.#series.get(key).at });
+      return;
+    }
     const last = this.#series.get(key);
     const now = this.#now();
     if (last && last.value === point.value && now - last.at < this.#levelRepeatMs) {
       return;
     }
     this.#series.set(key, { value: point.value, at: now });
-    this.#push(name, point.value, attributes);
+    this.#aggregates.set(key, { name, value: point.value, attributes });
+    this.#arrived();
   }
 
   #increase(name, point, temporality) {
-    if (point.value === undefined) {
+    if (!Number.isFinite(point.value)) {
       return;
     }
     const attributes = attributesOf(point);
+    const key = seriesKey(name, attributes);
     let increase = point.value;
     if (temporality === CUMULATIVE) {
-      const key = seriesKey(name, attributes);
       const last = this.#series.get(key);
       this.#series.set(key, { value: point.value });
       // A smaller value is a restarted counter: all of it is new.
       increase = last && point.value >= last.value ? point.value - last.value : point.value;
     }
-    if (increase !== 0) {
-      this.#push(name, increase, attributes);
+    if (increase === 0) {
+      return;
+    }
+    const waiting = this.#aggregates.get(key);
+    if (waiting) {
+      waiting.value += increase;
+      return;
+    }
+    this.#aggregates.set(key, { name, value: increase, attributes });
+    this.#arrived();
+  }
+
+  #value(name, value, attributes) {
+    if (!Number.isFinite(value)) {
+      return;
+    }
+    this.#values.push({ name, value, attributes });
+    this.#arrived();
+    if (this.#values.length > this.#maxQueued) {
+      this.#values.shift();
+      this.dropped++;
     }
   }
 
-  /** Queues the data points of one export (decodeMetricsRequest's result). */
+  /** Takes in the data points of one export (decodeMetricsRequest's result). */
   ingest(request) {
     for (const rm of request.resourceMetrics ?? []) {
       for (const sm of rm.scopeMetrics ?? []) {
@@ -216,7 +248,7 @@ export class MetricQueue {
             for (const point of metric.histogram.dataPoints) {
               const attributes = attributesOf(point);
               for (const value of histogramValues(point)) {
-                this.#push(name, value, attributes);
+                this.#value(name, value, attributes);
               }
             }
           } else {
@@ -227,12 +259,33 @@ export class MetricQueue {
     }
   }
 
-  /** Removes and returns up to max queued data points, oldest first. */
+  /**
+   * Removes and returns up to max waiting data points: the counters and
+   * levels first, one per series, then the histogram values, oldest first.
+   */
   take(max) {
-    return this.#queue.splice(0, max);
+    const taken = [];
+    for (const [key, point] of this.#aggregates) {
+      if (taken.length === max) {
+        break;
+      }
+      this.#aggregates.delete(key);
+      taken.push(point);
+    }
+    taken.push(...this.#values.splice(0, max - taken.length));
+    // What is left has waited as long; it goes with the next request.
+    if (this.queued === 0) {
+      this.#since = null;
+    }
+    return taken;
+  }
+
+  /** How long the oldest waiting data point has waited, in milliseconds. */
+  get age() {
+    return this.#since === null ? 0 : this.#now() - this.#since;
   }
 
   get queued() {
-    return this.#queue.length;
+    return this.#aggregates.size + this.#values.length;
   }
 }
