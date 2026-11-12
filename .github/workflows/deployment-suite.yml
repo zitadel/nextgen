@@ -149,12 +149,13 @@ jobs:
 
       # Vercel's remote cache over OIDC, as in ci.yml: without it the CLI's
       # suite rebuilds every package it packs. A failed exchange runs on the
-      # local cache only (the step prints Vercel's answer).
+      # local cache only (the step prints Vercel's answer). Pinned by commit:
+      # the job's environment holds the bypass secret.
       - name: Set up Turborepo remote cache
         id: remote-cache
         if: steps.suite.outputs.present == 'true'
         continue-on-error: true
-        uses: vercel/setup-turborepo-remote-cache-action@v1.1.0
+        uses: vercel/setup-turborepo-remote-cache-action@49d7b1b46ba4c9251e1977986bfe18336feabc8f # v1.1.0
         with:
           team: ${{ vars.TURBO_TEAM }}
 
