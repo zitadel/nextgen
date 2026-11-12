@@ -1,5 +1,4 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { CircleUser } from "lucide-react";
 import { DETAIL_CARD, DETAIL_TITLE } from "@/components/detail-page";
 import { Page, SettingsColumn } from "@/components/layout";
 import { SettingsCard, SettingsSection } from "@/components/settings-card";
@@ -33,7 +32,7 @@ import {
 } from "@/features/users/components/own-profile-form";
 
 /**
- * Settings → Profile: the person's own profile, generated from their
+ * Profile, at `/account`: the person's own profile, generated from their
  * own user schema as Add user is (`schemaFields`): a row per property, nothing
  * named in code. The schema's
  * `x-identifier` is read-only (D16); the rest saves through `PATCH /users/me`.
@@ -47,10 +46,9 @@ import {
  * Read-only: setting a password or adding and removing the rest has no
  * self-service endpoint yet.
  */
-export const Route = createFileRoute("/_authed/settings/profile")({
-  staticData: {
-    nav: { label: "Profile", view: "settings", order: 1, icon: CircleUser },
-  },
+export const Route = createFileRoute("/_authed/account/")({
+  // No sidebar row: the account menu's first row opens it, as Vercel's account
+  // settings open from the avatar, apart from the team's Settings (D42).
   loader: async () => {
     // A failed schema read leaves the identifier alone (below), and a failed
     // sign-in method read costs its list, never the screen.

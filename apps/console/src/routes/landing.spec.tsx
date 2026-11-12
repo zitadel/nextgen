@@ -222,18 +222,14 @@ describe("landing routes", () => {
     expect(router.state.resolvedLocation?.search).not.toHaveProperty("project");
   });
 
-  it("lands on the profile from settings", async () => {
-    // Settings has no landing page of its own: the sidebar's row forwards to
-    // the profile, its list's first page.
-    server.use(
-      http.get("http://localhost/api/v1/users/me", () =>
-        HttpResponse.json({ id: "user_1", attributes: { email: "maya@example.com" } }),
-      ),
-    );
+  it("forwards Settings to its list's first page, and says so when it holds none", async () => {
+    // No add-on here, so the root's Settings hold nothing (D42); the person's
+    // profile is the account menu's, at /account.
     const router = await renderAt("/settings");
 
-    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/settings/profile"));
-    expect(await screen.findByRole("heading", { name: "Profile" })).toBeInTheDocument();
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/settings"));
+    expect(await screen.findByRole("heading", { name: "Settings" })).toBeInTheDocument();
+    expect(screen.getByText("Nothing here is yours to set.")).toBeInTheDocument();
     // No Admins row survives from when that screen lived here.
     expect(screen.queryByRole("link", { name: /Admins/ })).not.toBeInTheDocument();
   });
