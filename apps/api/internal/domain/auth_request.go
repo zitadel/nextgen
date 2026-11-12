@@ -2,9 +2,14 @@ package domain
 
 import "time"
 
-// PrefixAuthRequest prefixes a stored authorization request's id, the handle
-// the login page receives as auth_request (ADR 081 §8).
-const PrefixAuthRequest ResourcePrefix = "authreq"
+const (
+	// PrefixAuthRequest prefixes a stored authorization request's id, the
+	// handle the login page receives as auth_request (ADR 081 §8).
+	PrefixAuthRequest ResourcePrefix = "authreq"
+	// AuthRequestTTL is how long a request and its binding cookie live. It
+	// matches AuthAttemptTTL, so a request outlives the flow it opens.
+	AuthRequestTTL = AuthAttemptTTL
+)
 
 // AuthRequest is an authorization request the endpoint validated and stored
 // for the login to complete. It records the issuer and the deployment it was
@@ -27,4 +32,14 @@ type AuthRequest struct {
 	BindingHash string
 	CreatedAt   time.Time
 	ExpiresAt   time.Time
+}
+
+// NewAuthRequestBinding mints the nonce of the cookie that binds a request to
+// its browser: 16 random bytes, of which only the HashSecret is stored.
+func NewAuthRequestBinding() (nonce, hash string, err error) {
+	nonce, err = randomSecret(16)
+	if err != nil {
+		return "", "", err
+	}
+	return nonce, HashSecret(nonce), nil
 }

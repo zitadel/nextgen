@@ -26,6 +26,9 @@ type client struct {
 	id           string
 	redirectURIs []string
 	grantTypes   []oidc.GrantType
+	// settings are the issuer's, read when the client was resolved, so
+	// Authorize stores the deployment the client came from.
+	settings Settings
 }
 
 // newClient wraps doc, the client holding clientID, for the request to
