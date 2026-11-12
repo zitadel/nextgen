@@ -199,21 +199,25 @@ func (s *GrantService) EnsureUserGrant(ctx context.Context, stmts AllStatements,
 	if err := s.loadPrincipal(ctx, stmts, home, domain.AuthzPrincipalTypeUser, userID); err != nil {
 		return err
 	}
+	// Every assignment the user holds on the project, expired ones included.
 	held, err := stmts.ListAuthzAssignments(ctx, projectID, domain.AuthzPrincipalTypeUser, userID, false)
 	if err != nil {
 		return err
 	}
 	var expired []*domain.AuthzAssignment
 	for _, asgn := range held {
-		// Delegated rows sit outside the unique binding the write targets.
+		// Only a managed, direct grant of the same relation can collide;
+		// delegated rows sit outside the unique binding the write targets.
 		if !isManagedGrant(asgn) || asgn.DelegationID != nil || asgn.Relation != relation {
 			continue
 		}
+		// Still active: the user already has the relation.
 		if asgn.ExpiresAt == nil || now.Before(*asgn.ExpiresAt) {
 			return nil
 		}
 		expired = append(expired, asgn)
 	}
+	// Expired rows still hold the unique binding, so clear them first.
 	for _, asgn := range expired {
 		if err := stmts.RevokeAuthzAssignment(ctx, projectID, asgn.ID); err != nil {
 			return err
@@ -226,6 +230,7 @@ func (s *GrantService) EnsureUserGrant(ctx context.Context, stmts AllStatements,
 			return err
 		}
 	}
+	// No active grant left: write a permanent one and emit authz.granted.
 	_, err = s.writeGrant(ctx, stmts, CreateGrantInput{ProjectID: projectID, Relation: relation}, domain.AuthzPrincipalTypeUser, userID)
 	return err
 }
