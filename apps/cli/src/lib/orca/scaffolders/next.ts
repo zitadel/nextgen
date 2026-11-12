@@ -1,16 +1,17 @@
 import { AbstractCLIScaffolder } from "./cli";
+import { frameworkCliVersion } from "./framework-clis";
 import type { NodeEngines } from "./node-engines";
 
 /**
- * The `create-next-app` release setup runs, pinned exactly so a fresh app is
- * the one the patcher was written against. `create-next-app` writes `next` at
- * its own version, so this is also the Next.js every fresh app runs, until its
- * developer upgrades it. Its route protection is `nextgenMiddleware`, which
- * runs in Next's Middleware / Proxy, and 16.2.x had several bypasses of that
- * layer: keep the pin on a release with no high or critical advisory, as
- * `@zitadel/cli#check-advisories` checks.
+ * The `create-next-app` release setup runs ({@link frameworkCliVersion}), so a
+ * fresh app is the one the patcher was written against. `create-next-app`
+ * writes `next` at its own version, so this is also the Next.js every fresh
+ * app runs, until its developer upgrades it. Its route protection is
+ * `nextgenMiddleware`, which runs in Next's Middleware / Proxy, and 16.2.x had
+ * several bypasses of that layer: keep the pin on a release with no high or
+ * critical advisory, as `@zitadel/cli#check-advisories` checks.
  */
-const CREATE_NEXT_APP_VERSION = "16.4.2";
+const CREATE_NEXT_APP_VERSION = frameworkCliVersion("create-next-app");
 
 /** Scaffolds a new Next.js App Router project with `create-next-app`. */
 export class NextScaffolder extends AbstractCLIScaffolder {

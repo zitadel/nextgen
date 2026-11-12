@@ -192,16 +192,20 @@ scripts, which build through turbo (`turbo run @zitadel/<package>#<task>`).
 - Outputs may lie outside the package (`$TURBO_ROOT$/internal/staticui/
   console/dist/**`). Framework caches are excluded (`!.next/cache/**`).
 - `cache: false` for anything that is not a pure function of its inputs: the
-  journeys (they install scaffolders' latest releases from npm), the
+  journey run by hand (`journey`), the
   deployment lanes, the database lanes, `install-browsers`, `pack`, the
   server binaries (the local one stamps Git HEAD and branch, the platform
   ones the release version and the commit), generation, `//#check-go-work`
   (its answer depends on every module's imports), and dev servers. Their
   inputs still decide when they count as affected, which gates the CI lanes.
-- The console and demo lanes and `@zitadel/testing#test:integration` are
-  cached: they boot servers and browsers, but only on the repo's own builds,
-  so a later push that leaves their inputs alone restores their pass instead
-  of rerunning them.
+- The console and demo lanes, the CI journeys (`journey:<id>`) and
+  `@zitadel/testing#test:integration` are cached: they boot servers and
+  browsers, but only on the repo's own builds, so a later push that leaves
+  their inputs alone restores their pass instead of rerunning them. A journey
+  runs each framework CLI at the CLI's pin
+  (`apps/cli/src/lib/orca/scaffolders/framework-clis/package.json`, bumped by
+  Dependabot); only the npm ranges those releases write resolve at run time,
+  so the nightly run sets `TURBO_FORCE` and reruns them.
 - Each journey depends on the builds of exactly what it installs
   (`journey-packages` plus its framework's SDK), and packs only those; so an
   SDK change selects only the journeys that install it.
@@ -229,7 +233,7 @@ scripts, which build through turbo (`turbo run @zitadel/<package>#<task>`).
   framework inference adds (`VITE_*` for Vite packages, `NEXT_*` for Next.js)
   and what the task lists. `env` names variables that change the output and
   are hashed (`CONSOLE_ADDON`, `GOFLAGS`, the cached e2e lanes' `ZITADEL_*`
-  and `NEXTGEN_*`); `passThroughEnv`
+  and `NEXTGEN_*`, the journeys' `JOURNEY_*` but `JOURNEY_WORK_DIR`); `passThroughEnv`
   names variables a task reads at run time without affecting its output
   (`PLAYWRIGHT_*` for the e2e lanes, `DOCKER_*` for the database lanes). The Go
   cache locations pass through globally.
@@ -311,9 +315,9 @@ cache key of every task in the run
 ([vercel/turborepo#14770](https://github.com/vercel/turborepo/issues/14770),
 by design): the task's dependencies miss the cache and rebuild. A script that
 CI or another script runs through turbo therefore takes its options from the
-environment, listed in the task's `passThroughEnv`: `RELEASE_SKIP_CONTAINER=1`
-for the release snapshot, `JOURNEY_CI=1`, `JOURNEY_MATRIX`, … for the journey
-runner (`e2e/journey/README.md`).
+environment: `RELEASE_SKIP_CONTAINER=1` for the release snapshot
+(`passThroughEnv`), `JOURNEY_RUNTIME`, `JOURNEY_MATRIX`, … for the journey
+runner (`e2e/journey/README.md`; `env` on the cached journeys).
 
 `--affected` and `turbo query affected` match the diff against each task's
 `inputs` and follow task edges, so a console change still reaches the
@@ -324,7 +328,7 @@ lanes, so a lane starts once its own dependencies are done) on GitHub's
 32-core arm64 runner, with `--concurrency=100%` (a task per core; the script
 keeps turbo's default of 10, which a laptop can take), measured from the pull request's or the merge group's base; a
 dispatch and the nightly run on `main` measure from the repository's first
-commit, so they run every task. It keeps setup-go's and setup-node's caches
+commit, so they run every task, and the nightly reads no cache. It keeps setup-go's and setup-node's caches
 and reads and writes Vercel's remote cache over OIDC; a fork's pull request
 gets no token and runs with the local cache only. A Changesets version PR
 runs like any other: the release checks are tasks of the graph

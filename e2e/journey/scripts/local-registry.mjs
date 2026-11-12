@@ -16,13 +16,8 @@ export const packageDirs = [...PUBLIC_PACKAGE_DIRS];
 // Verdaccio serves a proxied packument from its storage until it is `maxage`
 // old, then asks npmjs again; the default is 2m, which makes a long journey
 // run ask npmjs again for packuments it fetched minutes earlier. An hour skips
-// those repeat checks within a run.
-//
-// Longer is not better: npmjs releases reach the journey up to `maxage` late
-// (`nuxi@latest` and `@angular/cli@latest` resolve `latest` here), and `nuxi init` downloads its starter template from GitHub,
-// which has adopted a new nuxt release as soon as two hours after it was
-// published. A packument cached past that point lacks the version the
-// template asks for, and the nuxt install fails until the entry expires.
+// those repeat checks within a run, and a store that a later run reuses
+// (`resetStorage: false`) still sees an npmjs release within the hour.
 export const UPLINK_MAXAGE = "1h";
 
 export function localRegistryPaths(workDir) {

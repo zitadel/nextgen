@@ -344,23 +344,43 @@ describe.sequential("task graph cache and ordering contracts", () => {
     });
   });
 
-  // The cached e2e lanes and the kit's suite boot what a switch replaces
-  // (another server binary, a server setting, a lane's port), so their key
-  // holds the switches; the telemetry opt-outs change no result.
+  // The cached e2e lanes, the CI journeys and the kit's suite boot what a
+  // switch replaces (another server binary, a server setting, a lane's port),
+  // so their key holds the switches; the telemetry opt-outs change no result.
   test("a cached lane's key holds the switches that change what it tests", () => {
     const lanes = [...baseline.values()].filter(
       ({ taskId, command, resolvedTaskDefinition }) =>
         resolvedTaskDefinition.cache &&
         // Their input-only bases run nothing.
         command !== "<NONEXISTENT>" &&
-        /^@zitadel\/(e2e#(console|demo)-|testing#test:integration$)/.test(taskId),
+        /^@zitadel\/(e2e#((console|demo)-|journey:)|testing#test:integration$)/.test(taskId),
     );
-    expect(lanes.length).toBeGreaterThanOrEqual(8);
+    expect(lanes.length).toBeGreaterThanOrEqual(21);
     const switched = dry({ ZITADEL_SERVER_BINARY: "/elsewhere/nextgen" });
     const optedOut = dry({ ZITADEL_TELEMETRY: "0", ZITADEL_TELEMETRY_ENV: "development" });
     for (const { taskId, hash } of lanes) {
       expect(switched.get(taskId).hash, taskId).not.toBe(hash);
       expect(optedOut.get(taskId).hash, taskId).toBe(hash);
+    }
+  });
+
+  // A journey's key also holds the runner's own switches (another runtime,
+  // image or tarball set), but not the work dir CI sets, so CI's runs and a
+  // bare shell's share entries.
+  test("a cached journey's key holds the runner's switches, not CI's work dir", () => {
+    const journeys = [...baseline.values()].filter(
+      ({ taskId, resolvedTaskDefinition }) =>
+        resolvedTaskDefinition.cache && taskId.startsWith("@zitadel/e2e#journey:"),
+    );
+    expect(journeys.length).toBeGreaterThanOrEqual(13);
+    const docker = dry({ JOURNEY_RUNTIME: "docker" });
+    const ci = dry({
+      JOURNEY_WORK_DIR: "/home/runner/work/_temp/ci-journey",
+      TESTCONTAINERS_RYUK_DISABLED: "true",
+    });
+    for (const { taskId, hash } of journeys) {
+      expect(docker.get(taskId).hash, taskId).not.toBe(hash);
+      expect(ci.get(taskId).hash, taskId).toBe(hash);
     }
   });
 

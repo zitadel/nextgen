@@ -117,9 +117,10 @@ dir, which the runner reads.
 ## CI gate
 
 The required PR CI job runs the framework matrix against the default binary
-runtime. The matrix skips SvelteKit, TanStack Start, SolidStart and Qwik Router
-(`ciExcludedFrameworkIds` in `scripts/frameworks.mjs`): their scaffolders track
-upstream `create-*@latest` releases, so a red lane could come from outside the PR.
+runtime, one cached turbo task per journey: setup runs each framework CLI at
+the CLI's pin, so a pass holds until the repo changes. The matrix skips
+SvelteKit, TanStack Start, SolidStart and Qwik Router
+(`ciExcludedFrameworkIds` in `scripts/frameworks.mjs` says why).
 They stay registered and run by hand with `--framework`. It does not use public Zitadel packages or GHCR images; it publishes
 the current workflow's package tarballs to Verdaccio and runs the same `npx`
 local setup flow against the generated app. The Docker fallback journey remains
