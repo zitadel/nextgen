@@ -18,14 +18,7 @@ import { newestCliCommand } from "@/lib/public-cli";
 import { type BreakingChange, breakingChanges, RELEASE_NOTES_URL } from "@/lib/release-notes";
 import { SHARED_SKILLS_DIR } from "@/lib/skills/add";
 import { arrow, command, dim, mark, strong, url } from "@/lib/style";
-import {
-  declaredOf,
-  renderSuggestion,
-  type SuggestedCommand,
-  type SuggestRest,
-  shellCommand,
-  suggestion,
-} from "@/lib/suggestion";
+import { type Suggest, type SuggestedCommand, shellCommand } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { isNewerVersion, latestCliVersion } from "@/lib/update-check";
 import { exactZitadelPins, floatingZitadelSpecs } from "@/lib/zitadel-pins";
@@ -72,7 +65,7 @@ export default class Upgrade extends BaseCommand {
     if (latest === undefined) {
       throw new ZitadelError("E_NETWORK", "Could not look up the latest Zitadel release", {
         hint: "Check the connection to the npm registry, then rerun.",
-        nextCommands: [this.suggest("upgrade")],
+        nextCommands: [this.suggest({ id: "upgrade" })],
       });
     }
     // A CLI ahead of the dist-tag (a prerelease) is what its own files target,
@@ -133,11 +126,13 @@ export default class Upgrade extends BaseCommand {
     }
 
     const commands: SuggestedCommand[] = [
-      ...(this.dryRun && !upToDate ? [this.suggest("upgrade")] : []),
-      ...(refresh === "failed" ? [this.atTarget(target, "doctor", { flags: { fix: true } })] : []),
-      ...(refresh === "issues" ? [this.atTarget(target, "doctor")] : []),
+      ...(this.dryRun && !upToDate ? [this.suggest({ id: "upgrade" })] : []),
+      ...(refresh === "failed"
+        ? [this.atTarget(target)({ id: "doctor", flags: { fix: true } })]
+        : []),
+      ...(refresh === "issues" ? [this.atTarget(target)({ id: "doctor" })] : []),
       ...(install !== undefined && !this.dryRun && existsSync(join(this.cwd, SHARED_SKILLS_DIR))
-        ? [this.atTarget(target, "skills:add")]
+        ? [this.atTarget(target)({ id: "skills:add" })]
         : []),
     ];
     const actions = [
@@ -215,22 +210,10 @@ export default class Upgrade extends BaseCommand {
    * for `target` rather than for the release that is running.
    *
    * @param target - The release the command runs as.
-   * @param id - The command, as oclif names it.
-   * @param rest - Its arguments and flags, by the names code reads them.
-   * @returns The command.
-   * @throws {Error} When `id` is no command this CLI loaded.
+   * @returns The renderer.
    */
-  private atTarget<const Id extends string>(
-    target: string,
-    id: Id,
-    ...rest: SuggestRest<Id>
-  ): SuggestedCommand {
-    return renderSuggestion(
-      suggestion(id, ...rest),
-      declaredOf(id, this.config.findCommand(id)),
-      this.scope(),
-      target,
-    );
+  private atTarget(target: string): Suggest {
+    return this.suggestWith(this.scope(), target);
   }
 
   private async install(install: PackageCommand, installCommand: SuggestedCommand): Promise<void> {
@@ -243,7 +226,7 @@ export default class Upgrade extends BaseCommand {
     } catch (error) {
       throw new ZitadelError("E_VALIDATION", "Could not install the new packages", {
         hint: `${errorMessage(error)}. Nothing else changed; fix that and rerun.`,
-        nextCommands: [installCommand, this.suggest("upgrade")],
+        nextCommands: [installCommand, this.suggest({ id: "upgrade" })],
       });
     }
   }

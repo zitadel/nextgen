@@ -226,7 +226,7 @@ describe("asker", () => {
           name: "client secret",
           message: "Secret",
           stdin: true,
-          retry: suggest("start"),
+          retry: suggest({ id: "start" }),
           parse: (): Parsed<string> => ({ ok: false, problem: "Too short." }),
         })
         .catch((caught: ZitadelError) => caught);
@@ -274,7 +274,7 @@ describe("asker", () => {
       await expect(
         asker(scripted).text({
           ...typed(),
-          retry: suggest("auth-method:sso:enable", { flags: { clientId: "<id>" as ClientId } }),
+          retry: suggest({ id: "auth-method:sso:enable", flags: { clientId: "<id>" as ClientId } }),
         }),
       ).rejects.toMatchObject({
         nextCommands: ["npx @zitadel/cli@0.1.0 auth-method sso enable --client-id '<id>'"],
@@ -285,7 +285,7 @@ describe("asker", () => {
       await expect(
         asker(scripted).text({
           ...typed(),
-          retry: suggest("auth-method:sso:enable", { flags: { clientId: "<id>" as ClientId } }),
+          retry: suggest({ id: "auth-method:sso:enable", flags: { clientId: "<id>" as ClientId } }),
         }),
       ).rejects.toMatchObject({
         hint: "For example: npx @zitadel/cli@0.1.0 auth-method sso enable --client-id '<id>'",
@@ -300,7 +300,7 @@ describe("asker", () => {
         asker(scripted)[method]({
           name: "x",
           message: "X",
-          retry: suggest("start", { flags: { port: 9081 } }),
+          retry: suggest({ id: "start", flags: { port: 9081 } }),
           options,
         }),
       ).rejects.toMatchObject({ nextCommands: ["npx @zitadel/cli@0.1.0 start --port 9081"] });
@@ -440,7 +440,7 @@ describe("asker", () => {
       await expect(
         asker(scripted).confirm({
           ...question,
-          retry: suggest("reset", { flags: { force: true } }),
+          retry: suggest({ id: "reset", flags: { force: true } }),
         }),
       ).rejects.toMatchObject({
         code: "E_CONFIRMATION_REQUIRED",

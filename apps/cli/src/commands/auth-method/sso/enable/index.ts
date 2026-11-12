@@ -54,7 +54,7 @@ import { type Admitted, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
 import { environmentFlags } from "@/lib/oclif/environment-flags";
 import { filled, reads, type Refused } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
-import { suggestion } from "@/lib/suggestion";
+
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { reportWarning } from "@/lib/warnings";
 import {
@@ -143,7 +143,7 @@ const PROVIDER_IS_NAMED_REFUSAL: Refusal = {
 const NO_ISSUER_REFUSAL: Refusal = {
   message: "This project has no development issuer",
   hint: "Set the project up first, or set ZITADEL_ISSUER to the origin your app serves from.",
-  next: [suggestion("setup")],
+  next: [{ id: "setup" }],
 };
 
 /**
@@ -444,7 +444,8 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     this.introduce(summary, target.schema, provider);
     if (this.dryRun) {
       // What the developer typed, so the real run is one command away.
-      const real = this.follow("auth-method:sso:enable", {
+      const real = this.follow({
+        id: "auth-method:sso:enable",
         flags: {
           provider: flags.provider,
           ...(target.schemaGiven === undefined ? {} : { schema: target.schemaGiven }),
@@ -526,7 +527,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     return new CredentialDelivery({
       connection: preview.document,
       reused: !preview.created,
-      suggest: this.suggester,
+      suggest: this.suggest,
     });
   }
 
@@ -550,7 +551,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       secretVariable: names.clientSecret,
       ask: this.ask,
       developmentBuild: isDevelopmentBuild() && !this.nonInteractive,
-      suggest: this.suggester,
+      suggest: this.suggest,
     });
   }
 
@@ -832,7 +833,8 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     const summary = input.summary;
     const name = summary.displayName;
     const recovery = input.delivery.unpublishedOf(input.published).map((missing) => {
-      return this.follow("variable:set", {
+      return this.follow({
+        id: "variable:set",
         args: { name: missing.name },
         flags: missing.secret ? { secret: true } : {},
       });

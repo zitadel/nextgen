@@ -4,7 +4,7 @@ import { log } from "@/lib/log";
 
 import { Consent } from "@/lib/consent";
 import { ZitadelError, errorMessage } from "@/lib/errors";
-import { suggestion } from "@/lib/suggestion";
+
 import { currentUser } from "@/lib/uidgid";
 import type { ResolvedEnv } from "./env-vars";
 import { assertDockerAvailable, startFailure } from "./internal/failures";
@@ -526,7 +526,7 @@ export class LocalServer {
     if (!runtime) {
       throw new ZitadelError("E_VALIDATION", "Local Zitadel runtime has not been started", {
         hint: "Run `zitadel start` first.",
-        nextCommands: [suggestion("start")],
+        nextCommands: [{ id: "start" }],
       });
     }
     return runtime;

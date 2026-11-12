@@ -6,7 +6,7 @@ import { GetReleaseByIdParams } from "@/lib/backend/schemas";
 import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { reads, type Refused, relatedFlags } from "@/lib/oclif/flags";
 import { MESSAGE_MAX_LENGTH, messageTooLong } from "@/lib/publish";
-import { suggestion } from "@/lib/suggestion";
+
 import { escapeControlCharacters } from "@/lib/terminal-text";
 
 /**
@@ -19,7 +19,7 @@ const RELEASE: Refused<string> = {
   refusal: {
     message: "Invalid {input}: {problem}",
     hint: "List the releases to find one.",
-    next: [suggestion("release:list")],
+    next: [{ id: "release:list" }],
     details: {
       argument: "{input}",
     },
@@ -99,7 +99,8 @@ export default class DeploymentCreate extends EnvironmentCommand {
         },
         next: {
           commands: [
-            this.suggest("deployment:create", {
+            this.suggest({
+              id: "deployment:create",
               flags: { release: flags.release, message: flags.message },
             }),
           ],
@@ -139,7 +140,7 @@ export default class DeploymentCreate extends EnvironmentCommand {
                 )}.`,
               ],
       },
-      next: { commands: [this.suggest("deployment:list")] },
+      next: { commands: [this.suggest({ id: "deployment:list" })] },
     });
   }
 }

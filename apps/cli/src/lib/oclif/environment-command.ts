@@ -9,7 +9,6 @@ import type { Connection, ConnectOptions, GlobalOptions } from "./types";
 
 export type { Connection } from "./types";
 
-import type { Scope } from "@/lib/suggestion";
 import { userAgent } from "@/lib/user-agent";
 
 /**
@@ -32,9 +31,6 @@ export abstract class EnvironmentCommand extends BaseCommand {
   /** What the invocation resolved to; set by {@link toMeta}. */
   protected environment!: Environment;
 
-  /** `--cwd` as typed, reproduced by {@link scope}. */
-  private cwdFlag: string | undefined;
-
   /**
    * Resolve the environment, then build the invocation context from its server.
    *
@@ -52,7 +48,6 @@ export abstract class EnvironmentCommand extends BaseCommand {
     const text = (value: unknown): string | undefined => {
       return typeof value === "string" ? value : undefined;
     };
-    this.cwdFlag = text(flags.cwd);
     // A command that only edits files in the project directory resolves none:
     // a stray ZITADEL_ENV must not stop it, and it names no server or project.
     if (options.environment === false) {
@@ -70,34 +65,6 @@ export abstract class EnvironmentCommand extends BaseCommand {
       resolveServer: false,
       source: this.environment.values.ZITADEL_URL?.value ?? "",
     });
-  }
-
-  /**
-   * The run's scope, with how it chose its environment: only what was passed on
-   * the command line, since a name that came from `ZITADEL_ENV` or a platform
-   * signal needs none — the next run in the same environment inherits it. A
-   * suggested command must resolve the same server, project and credential this
-   * run did; without these it would fall back to the default environment and
-   * quietly target the wrong project. A run that resolved no environment has
-   * only its directory to put back.
-   *
-   * @returns The scope.
-   */
-  protected override scope(): Scope {
-    if ((this.environment as Environment | undefined) === undefined) {
-      return super.scope();
-    }
-    const { environment } = this;
-    const server = environment.values.ZITADEL_URL;
-
-    return {
-      ...(this.cwdFlag === undefined ? {} : { cwd: this.cwdFlag }),
-      ...(environment.envFile === undefined ? {} : { envFile: environment.envFile }),
-      ...(environment.envFile === undefined && environment.name.source === "--env"
-        ? { env: environment.name.value }
-        : {}),
-      ...(server?.source === "--server" ? { server: server.value } : {}),
-    };
   }
 
   /**

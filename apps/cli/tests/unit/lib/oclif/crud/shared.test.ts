@@ -5,7 +5,7 @@ import { aSuggest } from "@tests/helpers/suggest";
 import { article, capitalize, dryRunResult, idArg, parseOrThrow } from "@/lib/oclif/crud/shared";
 
 /** A dry run's real command, as a run renders it. */
-const REAL = aSuggest()("users:delete", { args: { id: "user_1" } });
+const REAL = aSuggest()({ id: "users:delete", args: { id: "user_1" } });
 
 describe("parseOrThrow", () => {
   const schema = z.object({ name: z.string() }).strict();

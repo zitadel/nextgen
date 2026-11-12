@@ -171,7 +171,9 @@ describe("release revoke", () => {
           message:
             "Invalid release_id: must be a release ID: rel_ followed by letters, digits, _ or -",
           hint: "List the releases to find one.",
-          next_commands: [expectedPublicCliCommand(`release list --cwd ${app.path}`)],
+          next_commands: [
+            expectedPublicCliCommand(`release list --server ${MOCK_SERVER_URL} --cwd ${app.path}`),
+          ],
           details: { argument: "release_id" },
         });
       });
@@ -190,7 +192,9 @@ describe("release revoke", () => {
           message:
             "Invalid release_id: must be a release ID: rel_ followed by letters, digits, _ or -",
           hint: "List the releases to find one.",
-          next_commands: [expectedPublicCliCommand(`release list --cwd ${app.path}`)],
+          next_commands: [
+            expectedPublicCliCommand(`release list --server ${MOCK_SERVER_URL} --cwd ${app.path}`),
+          ],
           details: { argument: "release_id" },
         });
       });

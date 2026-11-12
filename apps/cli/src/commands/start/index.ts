@@ -217,7 +217,7 @@ export default class Start extends BaseCommand {
           ),
         ],
       },
-      next: readyNext(this.suggester),
+      next: readyNext(this.suggest),
     });
   }
 
@@ -286,6 +286,6 @@ function readyNext(suggest: Suggest): NextSteps<SuggestedCommand> {
       "Setup asks for a framework and sign-in method, creates or updates your app, and installs its dependencies.",
       serverLogAction(suggest),
     ],
-    commands: [suggest("setup", { flags: { server: "local" } })],
+    commands: [suggest({ id: "setup", flags: { server: "local" } })],
   };
 }

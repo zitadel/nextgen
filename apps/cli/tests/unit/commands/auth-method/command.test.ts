@@ -10,7 +10,7 @@ import AuthMethodPasskeyDisable from "@/commands/auth-method/passkey/disable";
 import AuthMethodSsoDisable from "@/commands/auth-method/sso/disable";
 import { Consent } from "@/lib/consent";
 import { ZitadelError } from "@/lib/errors";
-import { suggestion } from "@/lib/suggestion";
+
 import { BrokenFilesError, type Change, DiskStore, Schemas, UserSchema } from "@/lib/zitadel";
 import { answering, type Person } from "@tests/helpers/keyboard";
 import { recordLog } from "@tests/helpers/log";
@@ -137,8 +137,9 @@ class ChangeWriter extends AuthMethodPasskeyDisable {
     return this.confirmIfNoSignInLeft(
       target,
       {
-        real: this.follow("auth-method:passkey:disable", { flags: { force: true } }),
-        dryRun: this.follow("auth-method:passkey:disable", {
+        real: this.follow({ id: "auth-method:passkey:disable", flags: { force: true } }),
+        dryRun: this.follow({
+          id: "auth-method:passkey:disable",
           flags: { force: true, dryRun: true },
         }),
       },
@@ -892,7 +893,7 @@ describe("readSchemaTarget", () => {
         return target(cwd);
       });
 
-      expect(error).toMatchObject({ nextCommands: [suggestion("setup")] });
+      expect(error).toMatchObject({ nextCommands: [{ id: "setup" }] });
     });
   });
 

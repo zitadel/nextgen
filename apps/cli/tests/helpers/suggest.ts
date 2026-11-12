@@ -2,11 +2,11 @@ import { Config } from "@oclif/core";
 
 import {
   declaredOf,
-  renderSuggestion,
+  type LooseNext,
   type Scope,
   type Suggest,
   type SuggestWords,
-  suggestion,
+  suggesterFor,
   suggestionWords,
 } from "@/lib/suggestion";
 
@@ -27,14 +27,7 @@ const config = await Config.load(cliPackageRoot);
  * @returns The renderer.
  */
 export function aSuggest(scope: Scope = {}, cliVersion: string = SUGGEST_CLI_VERSION): Suggest {
-  return (id, ...rest) => {
-    return renderSuggestion(
-      suggestion(id, ...rest),
-      declaredOf(id, config.findCommand(id)),
-      scope,
-      cliVersion,
-    );
-  };
+  return suggesterFor(config, scope, cliVersion);
 }
 
 /**
@@ -45,13 +38,8 @@ export function aSuggest(scope: Scope = {}, cliVersion: string = SUGGEST_CLI_VER
  * @returns The renderer.
  */
 export function aSuggestWords(scope: Scope = {}): SuggestWords {
-  return (id, ...rest) => {
-    return suggestionWords(
-      id,
-      suggestion(id, ...rest).input,
-      declaredOf(id, config.findCommand(id)),
-      scope,
-    );
+  return (next: LooseNext) => {
+    return suggestionWords(next.id, next, declaredOf(next.id, config.findCommand(next.id)), scope);
   };
 }
 

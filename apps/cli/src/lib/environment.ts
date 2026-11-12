@@ -11,7 +11,7 @@ import type { Questions } from "./ui";
 import { hasZitadelSecret, readZitadelSecret } from "./project";
 import { appendManagedEnvValue } from "./fs-safe";
 import { parseServer, resolveServer, serverOrigin } from "./server";
-import { type Suggest, suggestion } from "./suggestion";
+import type { Suggest } from "./suggestion";
 
 /**
  * The values a command reads from an environment. Each resolves on its own, so
@@ -328,8 +328,8 @@ export function requireValue(environment: Environment, key: EnvironmentKey): str
           // shell's: `setup` and `env add` both write their files there.
           nextCommands: [
             name === "development"
-              ? suggestion("setup", { flags: elsewhere })
-              : suggestion("env:add", { args: { name }, flags: elsewhere }),
+              ? { id: "setup", flags: elsewhere }
+              : { id: "env:add", args: { name }, flags: elsewhere },
           ],
         }
       : {}),

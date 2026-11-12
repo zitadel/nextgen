@@ -183,7 +183,7 @@ export class SocialSignInPrompt implements SetupPrompt {
         ctx.say(
           [
             `Skipped ${entry.displayName}. Once its OAuth application exists, add it with:`,
-            ctx.suggest("auth-method:sso:enable", { flags: ssoEnableFlags(selection) }),
+            ctx.suggest({ id: "auth-method:sso:enable", flags: ssoEnableFlags(selection) }),
           ].join("\n"),
         );
         continue;

@@ -154,8 +154,8 @@ export default class Status extends EnvironmentCommand {
         overview: exploreAllCommands(this.cliVersion),
       },
       next: {
-        actions: nextActionsFor(project, users, this.suggester),
-        commands: nextCommandsFor(serverLifecycle, project, users, this.suggester),
+        actions: nextActionsFor(project, users, this.suggest),
+        commands: nextCommandsFor(serverLifecycle, project, users, this.suggest),
       },
     });
   }
@@ -369,21 +369,21 @@ function nextCommandsFor(
 ): SuggestedCommand[] {
   const commands: SuggestedCommand[] = [];
   if (serverLifecycle !== "running") {
-    commands.push(suggest("start"));
+    commands.push(suggest({ id: "start" }));
   }
   if (project.lifecycle === "not-configured" && project.environment !== undefined) {
-    commands.push(suggest("env:add", { args: { name: project.environment } }));
+    commands.push(suggest({ id: "env:add", args: { name: project.environment } }));
   } else if (project.lifecycle === "not-configured") {
     if (project.env_file === undefined) {
-      commands.push(suggest("setup", { flags: { server: "local" } }));
+      commands.push(suggest({ id: "setup", flags: { server: "local" } }));
     }
   } else if (project.lifecycle === "orphaned-config") {
     commands.push(
-      suggest("setup", { flags: { force: true } }),
-      suggest("doctor", { flags: { fix: true } }),
+      suggest({ id: "setup", flags: { force: true } }),
+      suggest({ id: "doctor", flags: { fix: true } }),
     );
   } else {
-    commands.push(suggest("doctor"));
+    commands.push(suggest({ id: "doctor" }));
     // Suggested even when the local record says the window has closed: the
     // record can be stale (claimed from another machine reads detached), and
     // `claim` is the safe reconciliation — the server checks the grant
@@ -397,9 +397,9 @@ function nextCommandsFor(
       // and the verify mission lives in next_actions. A full `deploy` joins
       // once users exist ("some") or when the probe can't tell ("unknown"
       // keeps the lifecycle-only behavior rather than withholding on no signal).
-      commands.push(suggest("deploy", { flags: { dryRun: true } }));
+      commands.push(suggest({ id: "deploy", flags: { dryRun: true } }));
     } else {
-      commands.push(suggest("deploy", { flags: { message: WHAT_CHANGED } }));
+      commands.push(suggest({ id: "deploy", flags: { message: WHAT_CHANGED } }));
     }
   }
   return commands;

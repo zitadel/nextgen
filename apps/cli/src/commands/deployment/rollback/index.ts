@@ -15,20 +15,20 @@ import { reads, type Refused, taken } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { Tabulatable } from "@/lib/oclif/tabulatable";
 import { MESSAGE_MAX_LENGTH, messageTooLong } from "@/lib/publish";
-import { suggestion } from "@/lib/suggestion";
+
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { reportWarning } from "@/lib/warnings";
 
 const NOTHING_DEPLOYED_REFUSAL: Refusal = {
   message: "There is no deployment to roll back",
   hint: "Nothing has been deployed yet; list the deployments to check.",
-  next: [suggestion("deployment:list")],
+  next: [{ id: "deployment:list" }],
 };
 
 const NOTHING_EARLIER_REFUSAL: Refusal = {
   message: "There is no earlier deployment to roll back to",
   hint: "Name a deployment to roll back to, or list the deployments to see which there are.",
-  next: [suggestion("deployment:list")],
+  next: [{ id: "deployment:list" }],
 };
 
 /**
@@ -40,7 +40,7 @@ const DEPLOYMENT_ID: Refused<string> = {
   refusal: {
     message: "Invalid {input}: {problem}",
     hint: "List the deployments to find one, or omit it to undo the last deploy.",
-    next: [suggestion("deployment:list")],
+    next: [{ id: "deployment:list" }],
     details: {
       argument: "{input}",
     },
@@ -192,7 +192,8 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
             },
             next: {
               commands: [
-                this.suggest("deployment:rollback", {
+                this.suggest({
+                  id: "deployment:rollback",
                   args: { deploymentId: target.id },
                   flags: { force: true, message: flags.message },
                 }),

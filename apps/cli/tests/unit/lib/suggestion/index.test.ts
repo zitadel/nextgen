@@ -1,38 +1,42 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 
-import type { WORKFLOW_COMMANDS } from "@/index";
 import {
   distinct,
   helpCommand,
   inShell,
   isSuggestion,
-  type NextTable,
+  type Next,
   type SuggestedCommand,
   type SuggestionId,
+  type Suggestion,
   shellCommand,
-  suggestion,
   WHAT_CHANGED,
 } from "@/lib/suggestion";
 
 const VERSION = "1.0.0-alpha.25";
 
-/** The hand-written commands whose `NextTable` entry is missing or names another class. */
-type Unlisted = {
-  [Id in keyof typeof WORKFLOW_COMMANDS]: Id extends SuggestionId
-    ? NextTable[Id] extends (typeof WORKFLOW_COMMANDS)[Id]
-      ? never
-      : Id
-    : Id;
-}[keyof typeof WORKFLOW_COMMANDS];
+/**
+ * Holds `next` to the type every suggestion is written as, so a
+ * `@ts-expect-error` above a call proves that suggestion does not compile.
+ *
+ * @param next - The suggestion.
+ * @returns It, unchanged.
+ */
+function checked(next: Next): Next {
+  return next;
+}
 
 describe("NextTable", () => {
-  it("lists every hand-written command, as the class the command table runs", () => {
-    expectTypeOf<Unlisted>().toBeNever();
-  });
-
-  it("lists the generated resource commands", () => {
+  it("names a generated resource command under each verb its descriptor has", () => {
     expectTypeOf<"users:get">().toExtend<SuggestionId>();
     expectTypeOf<"release:list">().toExtend<SuggestionId>();
+    expectTypeOf<"sessions:revoke">().toExtend<SuggestionId>();
+    expectTypeOf<"teams:deactivate">().toExtend<SuggestionId>();
+  });
+
+  it("names no generated command for a verb its descriptor lacks", () => {
+    expectTypeOf<"events:create">().not.toExtend<SuggestionId>();
+    expectTypeOf<"sessions:delete">().not.toExtend<SuggestionId>();
   });
 });
 
@@ -41,69 +45,73 @@ describe("NextTable", () => {
  * refuses. A `@ts-expect-error` that stops erroring fails the typecheck, so
  * each line proves its mistake does not compile.
  */
-describe("suggestion", () => {
+describe("a suggestion", () => {
   it("does not compile without an argument its target requires", () => {
     // @ts-expect-error `variable get` requires its NAME
-    suggestion("variable:get");
+    checked({ id: "variable:get" });
 
-    expectTypeOf(suggestion("variable:get", { args: { name: "FOO" } })).not.toBeNever();
+    expect(checked({ id: "variable:get", args: { name: "FOO" } })).toBeDefined();
   });
 
   it("does not compile without a flag its target requires", () => {
     // @ts-expect-error `deployment create` requires --release
-    suggestion("deployment:create");
+    checked({ id: "deployment:create" });
     // @ts-expect-error `origin add` requires --kind
-    suggestion("origin:add", { args: { pattern: "https://app.example" } });
+    checked({ id: "origin:add", args: { pattern: "https://app.example" } });
 
-    expectTypeOf(suggestion("deployment:create", { flags: { release: "rel_1" } })).not.toBeNever();
+    expect(checked({ id: "deployment:create", flags: { release: "rel_1" } })).toBeDefined();
   });
 
   it("does not compile with a flag its target does not take", () => {
     // @ts-expect-error `deploy` has no --nope
-    suggestion("deploy", { flags: { nope: true } });
+    checked({ id: "deploy", flags: { nope: true } });
     // @ts-expect-error `setup` has no --message
-    suggestion("setup", { flags: { message: WHAT_CHANGED } });
+    checked({ id: "setup", flags: { message: WHAT_CHANGED } });
+    // @ts-expect-error `setup` chooses no environment, so it takes no --env
+    checked({ id: "setup", flags: { env: "production" } });
     // @ts-expect-error `start` takes no argument
-    suggestion("start", { args: { name: "x" } });
+    checked({ id: "start", args: { name: "x" } });
   });
 
   it("does not compile with a value of a type its target does not parse to", () => {
     // @ts-expect-error --kind is primary or preview
-    suggestion("origin:add", { args: { pattern: "x" }, flags: { kind: "tertiary" } });
+    checked({ id: "origin:add", args: { pattern: "x" }, flags: { kind: "tertiary" } });
     // @ts-expect-error --port is a number
-    suggestion("start", { flags: { port: "9080" } });
+    checked({ id: "start", flags: { port: "9080" } });
   });
 
   it("does not compile with two flags its target declares exclusive", () => {
     // @ts-expect-error --all and --page-token are exclusive
-    suggestion("deployment:list", { flags: { all: true, pageToken: "next" } });
+    checked({ id: "deployment:list", flags: { all: true, pageToken: "next" } });
     // @ts-expect-error --no-wait and --timeout are exclusive
-    suggestion("claim", { flags: { noWait: true, timeout: 120 } });
+    checked({ id: "claim", flags: { noWait: true, timeout: 120 } });
 
-    expectTypeOf(suggestion("deployment:list", { flags: { all: true } })).not.toBeNever();
+    expect(checked({ id: "deployment:list", flags: { all: true } })).toBeDefined();
   });
 
   it("does not compile with a flag whose dependsOn is left out", () => {
     // @ts-expect-error --force depends on --fix
-    suggestion("doctor", { flags: { force: true } });
+    checked({ id: "doctor", flags: { force: true } });
 
-    expectTypeOf(suggestion("doctor", { flags: { fix: true, force: true } })).not.toBeNever();
+    expect(checked({ id: "doctor", flags: { fix: true, force: true } })).toBeDefined();
   });
 
   it("does not compile for a command that does not exist, or a command line as text", () => {
     // @ts-expect-error there is no `deplyo`
-    suggestion("deplyo");
+    checked({ id: "deplyo" });
     // @ts-expect-error a suggestion names its target by id, never as a command line
-    suggestion("deploy --dry-run");
+    checked({ id: "deploy --dry-run" });
+    // @ts-expect-error the generated `events` resource has no create
+    checked({ id: "events:create" });
   });
 
   it("is not a command line until a run renders it", () => {
-    const deploy = suggestion("deploy", { flags: { message: WHAT_CHANGED } });
+    const deploy: Suggestion = { id: "deploy", flags: { message: WHAT_CHANGED } };
 
     // @ts-expect-error a deferred suggestion is not a rendered command
     const rendered: SuggestedCommand = deploy;
 
-    expect(rendered).toEqual({ id: "deploy", input: { flags: { message: "<what changed>" } } });
+    expect(rendered).toEqual({ id: "deploy", flags: { message: "<what changed>" } });
     expect(isSuggestion(deploy)).toBe(true);
   });
 
@@ -117,17 +125,16 @@ describe("suggestion", () => {
 
 describe("distinct", () => {
   it("keeps the first of two suggestions that name the same command with the same input", () => {
-    const logs = suggestion("logs");
+    const logs: Suggestion = { id: "logs" };
 
-    expect(
-      distinct([logs, suggestion("stop", { flags: { all: true } }), suggestion("logs")]),
-    ).toEqual([logs, suggestion("stop", { flags: { all: true } })]);
+    expect(distinct([logs, { id: "stop", flags: { all: true } }, { id: "logs" }])).toEqual([
+      logs,
+      { id: "stop", flags: { all: true } },
+    ]);
   });
 
   it("keeps two suggestions of one command with different input", () => {
-    expect(
-      distinct([suggestion("start"), suggestion("start", { flags: { port: 9081 } })]),
-    ).toHaveLength(2);
+    expect(distinct([{ id: "start" }, { id: "start", flags: { port: 9081 } }])).toHaveLength(2);
   });
 
   it("keeps a rendered command once", () => {

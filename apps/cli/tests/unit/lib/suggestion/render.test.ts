@@ -6,7 +6,6 @@ import {
   declaredOf,
   renderSuggestion,
   spelled,
-  suggestion,
   suggestionWords,
 } from "@/lib/suggestion";
 
@@ -223,7 +222,7 @@ describe("renderSuggestion", () => {
   it("renders a deferred suggestion with the run's scope", () => {
     expect(
       renderSuggestion(
-        suggestion("variable:get", { args: { name: "FOO" } }),
+        { id: "variable:get", args: { name: "FOO" } },
         PROJECT,
         { env: "production" },
         VERSION,

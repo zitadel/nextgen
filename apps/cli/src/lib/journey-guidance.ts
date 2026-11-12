@@ -32,7 +32,7 @@ export function verifyLoginAction(openUrl?: string): string {
 export function serverLogAction(suggest: Suggest): string {
   return (
     "When a sign-in or a request fails, the server's log says why: run " +
-    `${suggest("logs", { flags: { follow: true } })} in another terminal to watch it.`
+    `${suggest({ id: "logs", flags: { follow: true } })} in another terminal to watch it.`
   );
 }
 
@@ -58,8 +58,8 @@ export function customizeAndPublishActions(suggest: Suggest): string[] {
     "Customize what you ask for and how people sign in: edit .zitadel/schemas/ to change " +
       "the information you collect, and .zitadel/flows/ to change the sign-up/sign-in " +
       "experience. Each folder has a README with examples.",
-    `See your changes before they go live: ${suggest("deploy", { flags: { dryRun: true } })} to ` +
-      `preview, then ${suggest("deploy", { flags: { message: WHAT_CHANGED } })} to publish. The project ` +
+    `See your changes before they go live: ${suggest({ id: "deploy", flags: { dryRun: true } })} to ` +
+      `preview, then ${suggest({ id: "deploy", flags: { message: WHAT_CHANGED } })} to publish. The project ` +
       "serves only what is deployed, so an edit takes effect once you deploy it.",
   ];
 }
@@ -72,5 +72,5 @@ export function customizeAndPublishActions(suggest: Suggest): string[] {
  * opt-in `branding eject`, surfaced here so it remains discoverable.
  */
 export function brandingGuidanceAction(suggest: Suggest): string {
-  return `Change how the login looks: it is a component in your app, so theme it with --zl-* custom properties in your own stylesheet and build any page layout around it in your code. To change the widget's structure, ${suggest("branding:eject")} scaffolds an editable template in .zitadel/branding/.`;
+  return `Change how the login looks: it is a component in your app, so theme it with --zl-* custom properties in your own stylesheet and build any page layout around it in your code. To change the widget's structure, ${suggest({ id: "branding:eject" })} scaffolds an editable template in .zitadel/branding/.`;
 }

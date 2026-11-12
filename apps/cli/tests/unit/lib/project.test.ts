@@ -1,5 +1,5 @@
 import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
-import { suggestion } from "@/lib/suggestion";
+
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -76,7 +76,7 @@ describe("readZitadelConfig", () => {
       expect(zerr.code).toBe("E_VALIDATION");
       expect(zerr.message).toContain("zitadel.json was not found");
       expect(zerr.hint).toBe("Set the project up first.");
-      expect(zerr.nextCommands).toEqual([suggestion("setup")]);
+      expect(zerr.nextCommands).toEqual([{ id: "setup" }]);
     }
   });
 
@@ -116,10 +116,7 @@ describe("readZitadelSecret", () => {
       expect(zerr.code).toBe("E_VALIDATION");
       expect(zerr.message).toContain(".zitadel/secret was not found");
       expect(zerr.hint).toContain("zitadel doctor --fix");
-      expect(zerr.nextCommands).toEqual([
-        suggestion("setup"),
-        suggestion("doctor", { flags: { fix: true } }),
-      ]);
+      expect(zerr.nextCommands).toEqual([{ id: "setup" }, { id: "doctor", flags: { fix: true } }]);
     }
   });
 

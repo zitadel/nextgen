@@ -251,7 +251,7 @@ abstract class WriteOperation<
         ? {
             next: {
               commands: [
-                this.rendered(
+                this.suggest(
                   resourceSuggestion(topic, "get", {
                     args: { [named(idName(resource))]: String(resource.idOf(result)) },
                     flags: { json: true },

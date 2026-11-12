@@ -370,7 +370,7 @@ export default class Eject extends Destructive(BaseCommand) {
 
   protected async execute({ flags }: Admitted<typeof Eject>): Promise<JsonEnvelope> {
     const dir = typeof flags.cwd === "string" ? flags.cwd : undefined;
-    const setItUp = this.suggest("setup");
+    const setItUp = this.suggest({ id: "setup" });
 
     const result = await this.confirmed({
       verb: "eject",
@@ -382,7 +382,7 @@ export default class Eject extends Destructive(BaseCommand) {
           await ejectProject(this.cwd, "plan"),
           dir,
           setItUp,
-          this.suggest("eject", { flags: { force: true } }),
+          this.suggest({ id: "eject", flags: { force: true } }),
         );
       },
       apply: async (consent) => {
@@ -394,7 +394,7 @@ export default class Eject extends Destructive(BaseCommand) {
       result.status === "skipped" && result.reason === "eject-cancelled"
         ? {
             ...result,
-            next: { commands: [this.suggest("eject")] },
+            next: { commands: [this.suggest({ id: "eject" })] },
             summary: {
               title: CANCELLED,
               sections: [],
@@ -402,7 +402,7 @@ export default class Eject extends Destructive(BaseCommand) {
               next: [
                 {
                   text: "Remove it whenever you like:",
-                  command: this.suggest("eject"),
+                  command: this.suggest({ id: "eject" }),
                 },
               ],
             },

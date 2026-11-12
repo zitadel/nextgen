@@ -83,7 +83,7 @@ export default class OriginAdd extends EnvironmentCommand {
         title,
         sections: [],
       },
-      next: { commands: [this.suggest("origin:list")] },
+      next: { commands: [this.suggest({ id: "origin:list" })] },
     });
   }
 }

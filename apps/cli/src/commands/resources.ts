@@ -124,6 +124,27 @@ export const update = <B, U>(
 // Marks a descriptor `resource()` checked; `RESOURCES` takes no other, so an
 // entry written as a plain object cannot skip the checks.
 const checked = Symbol("checked");
+
+/** Carries, for the type system alone, the verbs a descriptor's commands take. */
+declare const verbs: unique symbol;
+
+/**
+ * The verbs a resource's commands take, from its descriptor as written: `list`
+ * and `get` always, `create` and `update` when it has them, and its delete
+ * under the verb that delete is named by (`revoke`, `deactivate`).
+ */
+type VerbsOf<Ops> =
+  | "list"
+  | "get"
+  | (Ops extends { readonly create: object } ? "create" : never)
+  | (Ops extends { readonly update: object } ? "update" : never)
+  | (Ops extends { readonly delete: infer Delete }
+      ? Delete extends { readonly verb: infer Verb extends string }
+        ? Verb
+        : Delete extends object
+          ? "delete"
+          : never
+      : never);
 type Checked = ResourceDescriptor<Platform> & { readonly [checked]: true };
 
 /** A registry of descriptors `resource()` checked: the type `RESOURCES` satisfies. */
@@ -262,21 +283,24 @@ export const resource = <
   CB extends Json,
   UB extends Json,
   Id extends keyof T & keyof R & string,
+  // The descriptor as written, so the command table knows which verbs it has.
+  Ops extends Readonly<{ create?: unknown; update?: unknown; delete?: unknown }>,
 >(
-  descriptor: Omit<
-    ResourceDescriptor<Platform>,
-    "list" | "get" | "create" | "update" | "idField" | "idOf" | "columns" | "heading" | "detail"
-  > & {
-    list: ListSpec<Platform, B, P, T>;
-    get: GetSpec<Platform, R>;
-    create?: CreateSpec<Platform, CB, Written<NoInfer<Id>>>;
-    update?: UpdateSpec<Platform, UB, Written<NoInfer<Id>>>;
-    idField: Id;
-    columns: readonly NoInfer<FieldPath<T>>[];
-    heading: NoInfer<FieldPath<R>>;
-    detail: readonly NoInfer<FieldPath<R>>[];
-  },
-): Checked & { readonly get: GetSpec<Platform, R> } => {
+  descriptor: Ops &
+    Omit<
+      ResourceDescriptor<Platform>,
+      "list" | "get" | "create" | "update" | "idField" | "idOf" | "columns" | "heading" | "detail"
+    > & {
+      list: ListSpec<Platform, B, P, T>;
+      get: GetSpec<Platform, R>;
+      create?: CreateSpec<Platform, CB, Written<NoInfer<Id>>>;
+      update?: UpdateSpec<Platform, UB, Written<NoInfer<Id>>>;
+      idField: Id;
+      columns: readonly NoInfer<FieldPath<T>>[];
+      heading: NoInfer<FieldPath<R>>;
+      detail: readonly NoInfer<FieldPath<R>>[];
+    },
+): Checked & { readonly get: GetSpec<Platform, R> } & Readonly<{ [verbs]?: VerbsOf<Ops> }> => {
   return {
     ...descriptor,
     idOf: (written: Readonly<Record<Id, unknown>>) => {
@@ -1084,7 +1108,16 @@ export const RESOURCE_COMMANDS = buildResourceCommands<Platform>(RESOURCES, {
  */
 type ResourceTarget = Readonly<{ args: LooseArgs; flags: Interfaces.FlagInput }>;
 
+/** The ids of a registry entry's commands: `users:list`, `sessions:revoke`. */
+type IdsOf<Topic extends string, Entry> = Entry extends {
+  readonly [verbs]?: infer Verb extends string;
+}
+  ? `${Topic}:${Verb}`
+  : never;
+
 /** Every generated resource command a run can suggest, by id (`users:get`). */
 export type ResourceTable = {
-  readonly [Id in `${keyof typeof RESOURCES & string}:${"list" | "get" | "create" | "update" | "delete"}`]: ResourceTarget;
+  readonly [Id in {
+    [Topic in keyof typeof RESOURCES & string]: IdsOf<Topic, (typeof RESOURCES)[Topic]>;
+  }[keyof typeof RESOURCES & string]]: ResourceTarget;
 };

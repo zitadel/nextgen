@@ -4,6 +4,13 @@ import type { ZitadelSecret } from "./project";
 import type { Suggest, SuggestedCommand } from "./suggestion";
 
 /**
+ * Where a new project goes when this one can no longer be claimed: a directory
+ * the reader names, never the run's own, where setup would skip as already
+ * initialized.
+ */
+export const FRESH_DIRECTORY = "<new-directory>";
+
+/**
  * Mirrors domain.ClaimWindow (internal/domain/claim.go): the server refuses
  * `claim/init` and `claim/complete` with `proj.claim_window_expired` once the
  * project is more than this many days old. Keep the two in sync — drift here
@@ -181,7 +188,7 @@ export function claimBoxAction(suggest: Suggest, deadline: Date | undefined): Bo
  * @returns The `claim` command.
  */
 export function claimCommand(suggest: Suggest): SuggestedCommand {
-  return suggest("claim");
+  return suggest({ id: "claim" });
 }
 
 /**
@@ -202,7 +209,7 @@ export function claimWindowClosedAction(suggest: Suggest): string {
     `The local record says this project's ${CLAIM_WINDOW_DAYS}-day claim window has ` +
     `closed. Run ${claimCommand(suggest)} to reconcile: a project ` +
     "claimed from another machine confirms its team, and one never claimed can no " +
-    `longer be claimed. ${suggest("setup")} in a fresh directory ` +
+    `longer be claimed. ${suggest({ id: "setup", flags: { cwd: FRESH_DIRECTORY } })} in a fresh directory ` +
     "gets you a new project you can claim."
   );
 }

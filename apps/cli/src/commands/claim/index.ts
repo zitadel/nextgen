@@ -14,7 +14,7 @@ import { reads, type Refused, relatedFlags, whole } from "@/lib/oclif/flags";
 import { hasZitadelSecret, readZitadelSecret, writeZitadelSecret } from "@/lib/project";
 import { normalizePublicCliCommand } from "@/lib/public-cli";
 import { isLoopbackUrl } from "@/lib/server";
-import { type SuggestedCommand, suggestion } from "@/lib/suggestion";
+import type { SuggestedCommand } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { section } from "@/lib/ui";
 import { reportWarning } from "@/lib/warnings";
@@ -100,7 +100,7 @@ const CHALLENGE_ID: Refused<string> = {
   refusal: {
     message:
       "--challenge-id takes the challenge_id that the --no-wait run returned, which starts with ch_",
-    next: [suggestion("claim", { flags: { noWait: true } })],
+    next: [{ id: "claim", flags: { noWait: true } }],
   },
 };
 
@@ -167,8 +167,8 @@ export default class Claim extends EnvironmentCommand {
     // following the suggestion never blocks with the link out of sight.
     const startOver =
       flags.noWait || flags.challengeId !== undefined
-        ? this.suggest("claim", { flags: { noWait: true } })
-        : this.suggest("claim", { flags: { noOpen: flags.noOpen, timeout: flags.timeout } });
+        ? this.suggest({ id: "claim", flags: { noWait: true } })
+        : this.suggest({ id: "claim", flags: { noOpen: flags.noOpen, timeout: flags.timeout } });
 
     // The project to claim is the one the resolved environment points at — the
     // same project (and credential) `connect()` authenticates — so a
@@ -242,7 +242,7 @@ export default class Claim extends EnvironmentCommand {
           commands: [
             flags.challengeId === undefined
               ? startOver
-              : this.suggest("claim", { flags: { challengeId: flags.challengeId } }),
+              : this.suggest({ id: "claim", flags: { challengeId: flags.challengeId } }),
           ],
         },
       });
@@ -481,7 +481,7 @@ export default class Claim extends EnvironmentCommand {
     challenge: { claim_url: string; challenge_id: string; expires_at: string },
   ): JsonEnvelope {
     this.recordTelemetry({ claim_outcome: "link_issued" });
-    const wait = this.suggest("claim", { flags: { challengeId: challenge.challenge_id } });
+    const wait = this.suggest({ id: "claim", flags: { challengeId: challenge.challenge_id } });
 
     const title = "Open the link in a browser to make your project permanent";
 

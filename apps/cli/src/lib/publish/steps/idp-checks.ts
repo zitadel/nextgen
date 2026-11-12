@@ -95,7 +95,8 @@ function variableSet(
   secret: boolean,
   mode: PipelineMode,
 ): SuggestedCommand {
-  return suggest("variable:set", {
+  return suggest({
+    id: "variable:set",
     args: { name: variable },
     flags: { secret, preview: mode === "preview" },
   });

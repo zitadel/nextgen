@@ -1,11 +1,11 @@
-import { Config } from "@oclif/core";
+import { Config, Flags } from "@oclif/core";
 import { describe, expect } from "vitest";
 
 import { it } from "@tests/helpers/fixtures";
 
 import { BaseCommand } from "@/lib/oclif/base";
 import { EnvironmentCommand } from "@/lib/oclif/environment-command";
-import { suggestion, WHAT_CHANGED } from "@/lib/suggestion";
+import { WHAT_CHANGED } from "@/lib/suggestion";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
 
 /** Suggests commands and keeps the directory alone as its scope, as `start` does. */
@@ -23,8 +23,8 @@ class DirectoryProbe extends BaseCommand {
     const { flags } = await this.parse(DirectoryProbe);
     await this.toMeta(flags);
     return {
-      deploy: this.suggest("deploy", { flags: { message: WHAT_CHANGED } }),
-      setup: this.suggest("setup"),
+      deploy: this.suggest({ id: "deploy", flags: { message: WHAT_CHANGED } }),
+      setup: this.suggest({ id: "setup" }),
     };
   }
 }
@@ -45,14 +45,58 @@ class EnvironmentProbe extends EnvironmentCommand {
     const { flags } = await this.parse(EnvironmentProbe);
     await this.toMeta(flags);
     return {
-      deploy: this.suggest("deploy", { flags: { message: WHAT_CHANGED } }),
-      setup: this.suggest("setup"),
-      origin: this.suggest("origin:add", {
+      deploy: this.suggest({ id: "deploy", flags: { message: WHAT_CHANGED } }),
+      setup: this.suggest({ id: "setup" }),
+      origin: this.suggest({
+        id: "origin:add",
         args: { pattern: "-weird" },
         flags: { kind: "primary", env: "staging" },
       }),
-      deferred: this.rendered(suggestion("variable:get", { args: { name: "FOO" } })),
+      deferred: this.suggest({ id: "variable:get", args: { name: "FOO" } }),
     };
+  }
+}
+
+/** Resolves no environment, as the `auth-method` commands do, yet takes the flags. */
+class FilesOnlyProbe extends EnvironmentCommand {
+  static override meta = { resolveServer: false, environment: false };
+
+  protected async execute(): Promise<never> {
+    throw new Error("unused");
+  }
+
+  /**
+   * What this run suggests for `deploy` once its flags are read.
+   *
+   * @returns The suggestion.
+   */
+  async probe() {
+    const { flags } = await this.parse(FilesOnlyProbe);
+    await this.toMeta(flags, { resolveServer: false, environment: false });
+    return this.suggest({ id: "deploy", flags: { dryRun: true } });
+  }
+}
+
+/** Takes a switch named for what it turns off, as `claim --no-open` does. */
+class SwitchProbe extends BaseCommand {
+  public static override readonly id: string = "console";
+  static override flags = {
+    "no-open": Flags.boolean({ description: "Print the link instead of opening it." }),
+  };
+
+  protected async execute(): Promise<never> {
+    throw new Error("unused");
+  }
+
+  /**
+   * This run again, as a dry run offers it.
+   *
+   * @returns The command.
+   */
+  async probe() {
+    const { flags } = await this.parse(SwitchProbe);
+    await this.toMeta(flags);
+    return this.realRun();
   }
 }
 
@@ -109,5 +153,24 @@ describe("BaseCommand.suggest", () => {
     const { deploy } = await new DirectoryProbe(["--cwd", dir], config).probe();
 
     expect(deploy).toMatch(new RegExp(`deploy --message '<what changed>' --cwd ${dir}$`));
+  });
+
+  it("carries the environment typed to a command that resolved none", async ({ dir }) => {
+    const deploy = await new FilesOnlyProbe(
+      ["--cwd", dir, "--env", "staging", "--server", "https://a.example"],
+      config,
+    ).probe();
+
+    expect(deploy).toMatch(
+      new RegExp(`deploy --dry-run --env staging --server https://a.example --cwd ${dir}$`),
+    );
+  });
+});
+
+describe("BaseCommand.rerun", () => {
+  it("keeps a switch named for what it turns off", async () => {
+    const real = await new SwitchProbe(["--no-open", "--dry-run"], config).probe();
+
+    expect(real).toMatch(/console --no-open$/);
   });
 });

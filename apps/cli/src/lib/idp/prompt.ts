@@ -173,7 +173,8 @@ export class CredentialPrompt {
     if (selection.kind !== "catalog") {
       return undefined;
     }
-    const command = this.run.suggest("auth-method:sso:enable", {
+    const command = this.run.suggest({
+      id: "auth-method:sso:enable",
       flags: {
         provider: selectionName(selection),
         clientId,

@@ -173,8 +173,8 @@ function outcome(input: {
   suggest: Suggest;
   includeInstallCommand: boolean;
 }): SetupInstallOutcome {
-  const planCommand = input.suggest("deploy", { flags: { dryRun: true } });
-  const statusCommand = input.suggest("status");
+  const planCommand = input.suggest({ id: "deploy", flags: { dryRun: true } });
+  const statusCommand = input.suggest({ id: "status" });
   const verifyActions = [
     ...(input.includeInstallCommand ? [`Install dependencies: ${input.installCommand}`] : []),
     `Start your project: ${input.devCommand} (then open ${input.issuer}/register)`,

@@ -60,10 +60,6 @@ import {
 } from "@/lib/project";
 import { isLoopbackUrl } from "@/lib/server";
 import {
-  aimed,
-  type Render,
-  type Scope,
-  suggestion,
   type Suggest,
   type SuggestedCommand,
   shellCommand,
@@ -189,32 +185,7 @@ export default class Doctor extends Destructive(BaseCommand) {
     return hostedServer ?? localServerUrl(port);
   }
 
-  /**
-   * How the command line chose the project: doctor honours `--env`,
-   * `--env-file` and `--server` without resolving an environment, so its scope
-   * is read from the flags as typed rather than from a resolution.
-   */
-  private chosen: Scope = {};
-
-  /**
-   * The run's scope with the project selection it was given, so a suggestion
-   * checks the same project this run did.
-   *
-   * @returns The scope.
-   */
-  protected override scope(): Scope {
-    return { ...super.scope(), ...this.chosen };
-  }
-
   protected async execute({ flags }: Admitted<typeof Doctor>): Promise<JsonEnvelope> {
-    this.chosen = {
-      ...(flags.envFile === undefined
-        ? flags.env === undefined
-          ? {}
-          : { env: flags.env }
-        : { envFile: flags.envFile }),
-      ...(flags.server === undefined ? {} : { server: flags.server }),
-    };
     const { port, hostedServer, cwd } = await this.checks(flags, this.cwd);
     const nearest = await this.started.of(cwd);
     const existingRuntime = nearest?.runtime;
@@ -239,7 +210,7 @@ export default class Doctor extends Destructive(BaseCommand) {
             image,
             port,
             this.localServers(),
-            this.suggester,
+            this.suggest,
             parentRuntimeDir,
           )
         : [];
@@ -248,7 +219,7 @@ export default class Doctor extends Destructive(BaseCommand) {
       cwd: this.cwd,
       orca: createOrca(),
       cliVersion: this.cliVersion,
-      suggest: this.suggester,
+      suggest: this.suggest,
       dryRun: this.dryRun,
       signal: this.signal,
       consent: (gate) => {
@@ -304,7 +275,7 @@ export default class Doctor extends Destructive(BaseCommand) {
     const versionCheck = await checkCliVersion({
       cliVersion: this.cliVersion,
       env: this.env,
-      suggest: this.suggester,
+      suggest: this.suggest,
     });
     const checks = [versionCheck, ...runtimeChecks, ...projectChecks, ...environmentChecks];
     const failed = checks.filter((check) => {
@@ -352,14 +323,18 @@ export default class Doctor extends Destructive(BaseCommand) {
       join(this.cwd, ".env.development.local"),
       Promise.resolve(projectId),
     ))
-      ? aimedAt(this.renderer, {
+      ? this.suggestWith({
+          ...this.scope(),
           envFile: projectEnvFile(flags.cwd, ".env.development.local"),
           server: projectServer,
         })
       : bareResolves && flags.env === undefined && flags.envFile === undefined
-        ? aimedAt(this.renderer, { server: projectServer })
+        ? this.suggestWith({
+            ...this.scope(),
+            server: projectServer,
+          })
         : undefined;
-    const warningAdvice = advisoryForWarnings(warnings, this.suggester, claimSuggest);
+    const warningAdvice = advisoryForWarnings(warnings, this.suggest, claimSuggest);
     this.ui.ranAgainst(projectId, projectServer ?? this.meta.source);
     // A server that is running is one a sign-in or a request can fail
     // against, and its log is where the reason is.
@@ -370,7 +345,7 @@ export default class Doctor extends Destructive(BaseCommand) {
       })?.status === "pass";
     const nextActions = [
       ...(warningAdvice?.nextActions ?? []),
-      ...(serving ? [serverLogAction(this.suggester)] : []),
+      ...(serving ? [serverLogAction(this.suggest)] : []),
     ];
     this.recordTelemetry({
       runtime: runtimeBackend,
@@ -426,7 +401,7 @@ export default class Doctor extends Destructive(BaseCommand) {
     const reportInput = {
       checks,
       cliVersion: this.cliVersion,
-      suggest: this.suggester,
+      suggest: this.suggest,
       projectConfigured: hasConfig,
       hostedServer,
       runtime: runtimeBackend,
@@ -445,7 +420,7 @@ export default class Doctor extends Destructive(BaseCommand) {
         failed,
         image,
         port,
-        this.suggester,
+        this.suggest,
         (id, ...rest) => {
           return this.suggestArgs(id, ...rest);
         },
@@ -554,20 +529,6 @@ export default class Doctor extends Destructive(BaseCommand) {
 }
 
 /**
- * `suggest` with every suggestion aimed at a file or a server the run's own
- * scope would not name: a `claim` pinned to the project setup wrote.
- *
- * @param render - Renders a follow-up for the run that reports it.
- * @param scope - Where every suggestion made through the result is aimed.
- * @returns A suggester that aims what it is given.
- */
-function aimedAt(render: Render, scope: Scope): Suggest {
-  return (id, ...rest) => {
-    return render(aimed(suggestion(id, ...rest), scope));
-  };
-}
-
-/**
  * What to do about the checks that failed: the hint doctor prints and the
  * commands it suggests. The checks are weighed in the order a reader would fix
  * them — the machine before the project — so one run advises on the first
@@ -598,12 +559,12 @@ export function failureAdvice(
   if (failedNames.has("server-binary")) {
     return {
       hint: "The Zitadel server npm package is not available. Reinstall the CLI package, then retry.",
-      nextCommands: [suggest("doctor")],
+      nextCommands: [suggest({ id: "doctor" })],
     };
   }
 
   if (failedNames.has("docker-cli")) {
-    const advice = dockerRuntimeGuidance("doctor");
+    const advice = dockerRuntimeGuidance("doctor", suggest({ id: "doctor" }));
     return {
       hint: advice.hint,
       nextCommands: [advice.check, suggest(advice.retry)],
@@ -613,22 +574,22 @@ export function failureAdvice(
   if (failedNames.has("image")) {
     return {
       hint: "The local Zitadel image is not available. Check Docker registry access, build it locally, or pass --image / ZITADEL_LOCAL_IMAGE.",
-      nextCommands: [shellCommand(`docker pull ${Cmd.quote(image)}`), suggest("doctor")],
+      nextCommands: [shellCommand(`docker pull ${Cmd.quote(image)}`), suggest({ id: "doctor" })],
     };
   }
 
   if (failedNames.has("state-dir")) {
     return {
-      hint: `The local Zitadel state directory is not writable. Fix directory permissions, then rerun ${suggest("doctor")}.`,
-      nextCommands: [suggest("doctor")],
+      hint: `The local Zitadel state directory is not writable. Fix directory permissions, then rerun ${suggest({ id: "doctor" })}.`,
+      nextCommands: [suggest({ id: "doctor" })],
     };
   }
 
   if (failedNames.has("port")) {
     const fallbackPort = port === DEFAULT_LOCAL_SERVER_PORT ? port + 1 : DEFAULT_LOCAL_SERVER_PORT;
-    const stopCommand = suggest("stop", { flags: { all: true } });
-    const retryCommand = suggest("doctor");
-    const alternatePortCommand = suggest("doctor", { flags: { port: fallbackPort } });
+    const stopCommand = suggest({ id: "stop", flags: { all: true } });
+    const retryCommand = suggest({ id: "doctor" });
+    const alternatePortCommand = suggest({ id: "doctor", flags: { port: fallbackPort } });
     return {
       hint:
         `Port ${String(port)} is already in use. Stop the process using it, ` +
@@ -646,14 +607,14 @@ export function failureAdvice(
     // `start` does not look in parents.
     const start = (cwd?: string) => {
       return {
-        command: suggest("start", { flags: { cwd } }),
-        words: suggestWords("start", { flags: { cwd } }),
+        command: suggest({ id: "start", flags: { cwd } }),
+        words: suggestWords({ id: "start", flags: { cwd } }),
       };
     };
     const reset = (cwd?: string) => {
       return {
-        command: suggest("reset", { flags: { force: true, cwd } }),
-        words: suggestWords("reset", { flags: { force: true, cwd } }),
+        command: suggest({ id: "reset", flags: { force: true, cwd } }),
+        words: suggestWords({ id: "reset", flags: { force: true, cwd } }),
       };
     };
     const recovery =
@@ -684,14 +645,14 @@ export function failureAdvice(
   if (typed?.hint !== undefined) {
     return {
       hint: typed.hint,
-      nextCommands: [suggest("doctor")],
+      nextCommands: [suggest({ id: "doctor" })],
     };
   }
 
   if (failedNames.has("environment")) {
     return {
-      hint: `The resolved environment could not connect. Check the server, project and credential it resolves with ${suggest("env")}, then rerun ${suggest("doctor")}.`,
-      nextCommands: [suggest("env"), suggest("doctor")],
+      hint: `The resolved environment could not connect. Check the server, project and credential it resolves with ${suggest({ id: "env" })}, then rerun ${suggest({ id: "doctor" })}.`,
+      nextCommands: [suggest({ id: "env" }), suggest({ id: "doctor" })],
     };
   }
 
@@ -699,7 +660,7 @@ export function failureAdvice(
     return !LOCAL_RUNTIME_CHECK_NAMES.has(check.name);
   });
   if (hasProjectFailure) {
-    const fix = suggest("doctor", { flags: { fix: true } });
+    const fix = suggest({ id: "doctor", flags: { fix: true } });
 
     return {
       hint: `Run ${fix} to re-apply missing managed files.`,
@@ -708,8 +669,8 @@ export function failureAdvice(
   }
 
   return {
-    hint: `Fix the reported checks, then rerun ${suggest("doctor")}.`,
-    nextCommands: [suggest("doctor")],
+    hint: `Fix the reported checks, then rerun ${suggest({ id: "doctor" })}.`,
+    nextCommands: [suggest({ id: "doctor" })],
   };
 }
 
@@ -751,7 +712,7 @@ export function advisoryForWarnings(
       return check.name === "docker-cli";
     })
   ) {
-    const advice = dockerRuntimeGuidance("doctor");
+    const advice = dockerRuntimeGuidance("doctor", suggest({ id: "doctor" }));
     nextActions.push(...advice.nextActions);
     nextCommands.push(advice.check, suggest(advice.retry));
   }
@@ -768,7 +729,7 @@ export function advisoryForWarnings(
     // authoritatively.
     if (local === undefined) {
       nextActions.push(
-        `Claim this project with ${suggest("claim")} once .env.development.local sets ZITADEL_PROJECT_ID and ZITADEL_PROJECT_SECRET to the project in .zitadel/secret; until then claim would resolve a different project.`,
+        `Claim this project with ${suggest({ id: "claim" })} once .env.development.local sets ZITADEL_PROJECT_ID and ZITADEL_PROJECT_SECRET to the project in .zitadel/secret; until then claim would resolve a different project.`,
       );
     } else {
       fix(
@@ -788,7 +749,7 @@ export function advisoryForWarnings(
     fix(
       "managed-runtime-processes",
       "Check the other local Zitadel servers before starting another; stop --all stops every one.",
-      suggest("stop", { flags: { all: true } }),
+      suggest({ id: "stop", flags: { all: true } }),
     );
   }
 
@@ -829,7 +790,7 @@ export function advisoryForWarnings(
     fix(
       "issuer-origin",
       "Make the app's issuer a primary origin; a deploy lands only on primary origins, and setup 0.1.0 registered it as a preview one.",
-      suggest("doctor", { flags: { fix: true, force: true } }),
+      suggest({ id: "doctor", flags: { fix: true, force: true } }),
     );
   }
 
@@ -843,7 +804,7 @@ export function advisoryForWarnings(
     fix(
       "meta-schemas",
       "Write this CLI version's editor schemas into .zitadel/meta/; editors and agents read the dialect from there.",
-      suggest("doctor", { flags: { fix: true } }),
+      suggest({ id: "doctor", flags: { fix: true } }),
     );
   }
 
@@ -1262,7 +1223,7 @@ async function check(
 function imageUnavailableMessage(image: string, error: unknown, suggest: Suggest): string {
   const detail = errorMessage(error);
   const suffix = detail.trim() ? ` (${detail.trim()})` : "";
-  return `Image ${image} is not available to Docker${suffix}; ${suggest("start")} may need a pull or a different image.`;
+  return `Image ${image} is not available to Docker${suffix}; ${suggest({ id: "start" })} may need a pull or a different image.`;
 }
 
 /** The project `.zitadel/secret` records, or nothing when it cannot be read. */

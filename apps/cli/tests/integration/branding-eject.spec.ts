@@ -51,8 +51,12 @@ describe("branding eject", () => {
             files_written: EJECTED_FILES,
             next_actions: NEXT_ACTIONS,
             next_commands: [
-              expectedPublicCliCommand(`deploy --dry-run --cwd ${app.path}`),
-              expectedPublicCliCommand(`deploy --message '<what changed>' --cwd ${app.path}`),
+              expectedPublicCliCommand(
+                `deploy --dry-run --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+              ),
+              expectedPublicCliCommand(
+                `deploy --message '<what changed>' --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+              ),
             ],
           },
           warnings: [],
@@ -78,8 +82,12 @@ describe("branding eject", () => {
             files_written: EJECTED_FILES,
             next_actions: NEXT_ACTIONS,
             next_commands: [
-              expectedPublicCliCommand(`deploy --dry-run --cwd ${app.path}`),
-              expectedPublicCliCommand(`deploy --message '<what changed>' --cwd ${app.path}`),
+              expectedPublicCliCommand(
+                `deploy --dry-run --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+              ),
+              expectedPublicCliCommand(
+                `deploy --message '<what changed>' --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+              ),
             ],
           },
           warnings: [],
@@ -105,8 +113,12 @@ describe("branding eject", () => {
             files_written: EJECTED_FILES,
             next_actions: NEXT_ACTIONS,
             next_commands: [
-              expectedPublicCliCommand(`deploy --dry-run --cwd ${app.path}`),
-              expectedPublicCliCommand(`deploy --message '<what changed>' --cwd ${app.path}`),
+              expectedPublicCliCommand(
+                `deploy --dry-run --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+              ),
+              expectedPublicCliCommand(
+                `deploy --message '<what changed>' --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+              ),
             ],
           },
           warnings: [],
@@ -141,8 +153,12 @@ describe("branding eject", () => {
             files_written: EJECTED_FILES,
             next_actions: NEXT_ACTIONS,
             next_commands: [
-              expectedPublicCliCommand(`deploy --dry-run --cwd ${app.path}`),
-              expectedPublicCliCommand(`deploy --message '<what changed>' --cwd ${app.path}`),
+              expectedPublicCliCommand(
+                `deploy --dry-run --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+              ),
+              expectedPublicCliCommand(
+                `deploy --message '<what changed>' --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+              ),
             ],
           },
           warnings: [],
@@ -165,8 +181,12 @@ describe("branding eject", () => {
             files_written: EJECTED_FILES,
             next_actions: NEXT_ACTIONS,
             next_commands: [
-              expectedPublicCliCommand(`deploy --dry-run --cwd ${app.path}`),
-              expectedPublicCliCommand(`deploy --message '<what changed>' --cwd ${app.path}`),
+              expectedPublicCliCommand(
+                `deploy --dry-run --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+              ),
+              expectedPublicCliCommand(
+                `deploy --message '<what changed>' --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+              ),
             ],
           },
           warnings: [],
@@ -198,8 +218,12 @@ describe("branding eject", () => {
             files_written: [".zitadel/branding/branding.json", ".zitadel/branding/login.liquid"],
             next_actions: NEXT_ACTIONS,
             next_commands: [
-              expectedPublicCliCommand(`deploy --dry-run --cwd ${app.path}`),
-              expectedPublicCliCommand(`deploy --message '<what changed>' --cwd ${app.path}`),
+              expectedPublicCliCommand(
+                `deploy --dry-run --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+              ),
+              expectedPublicCliCommand(
+                `deploy --message '<what changed>' --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+              ),
             ],
           },
           warnings: [],
@@ -508,7 +532,11 @@ describe("branding eject", () => {
           "--non-interactive",
         ]);
 
-        expect(result).toSayOnce(expectedPublicCliCommand(`deploy --dry-run --cwd ${app.path}`));
+        expect(result).toSayOnce(
+          expectedPublicCliCommand(
+            `deploy --dry-run --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+          ),
+        );
       });
 
       it("spells out an escape sequence in a design it refuses", async () => {

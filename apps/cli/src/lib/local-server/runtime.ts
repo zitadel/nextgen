@@ -6,7 +6,7 @@ import { dirname, join, resolve } from "node:path";
 
 import { isErrno, ZitadelError, errorMessage } from "@/lib/errors";
 import { isTrainVersion } from "@/lib/public-cli";
-import { suggestion } from "@/lib/suggestion";
+
 import { readIfExists } from "@/lib/fs";
 import { parseJsonObject } from "@/lib/json";
 import { ancestors } from "@/lib/paths";
@@ -411,7 +411,7 @@ export function localServerNotRunning(serverUrl?: string): ZitadelError {
     hint: serverUrl
       ? `No healthy local server responded at ${serverUrl}.`
       : "No local server has been started in this directory or a parent. Run `zitadel start`, or name a server another directory started with --server <url>.",
-    nextCommands: [suggestion("start")],
+    nextCommands: [{ id: "start" }],
     details: { server_url: serverUrl },
   });
 }
@@ -575,7 +575,7 @@ function explicitUrlPort(value: string): number | undefined {
 function malformedRuntime(input: Record<string, unknown>): ZitadelError {
   return new ZitadelError("E_VALIDATION", `${LOCAL_RUNTIME_FILE} is malformed`, {
     hint: "Run `zitadel reset --force`, then `zitadel start`.",
-    nextCommands: [suggestion("reset", { flags: { force: true } }), suggestion("start")],
+    nextCommands: [{ id: "reset", flags: { force: true } }, { id: "start" }],
     details: input,
   });
 }
@@ -594,8 +594,8 @@ export function retargetMalformedRuntime(error: unknown, dir: string): unknown {
   return new ZitadelError(error.code, error.message, {
     hint: "Reset the local runtime, then start it again, each with the --cwd of the directory that holds it.",
     nextCommands: [
-      suggestion("reset", { flags: { force: true, cwd: dir } }),
-      suggestion("start", { flags: { cwd: dir } }),
+      { id: "reset", flags: { force: true, cwd: dir } },
+      { id: "start", flags: { cwd: dir } },
     ],
     details: {
       ...(error.details as Record<string, unknown>),

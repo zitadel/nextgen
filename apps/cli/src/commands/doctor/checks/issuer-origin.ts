@@ -66,7 +66,7 @@ export class IssuerOriginCheck implements SanityCheck {
       message:
         `The project has no primary origin to deploy to: it holds ${finding.pattern} as a ` +
         "preview origin, as setup 0.1.0 registered it. Run " +
-        `${ctx.suggest("doctor", { flags: { fix: true } })} to make it primary.`,
+        `${ctx.suggest({ id: "doctor", flags: { fix: true } })} to make it primary.`,
       details: {
         pattern: finding.pattern,
         server: finding.server,

@@ -8,12 +8,7 @@ import { nonBlankString } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import type { JsonEnvelope } from "@/lib/oclif/types";
 import { optionArgs } from "@/lib/public-cli";
-import {
-  type SuggestedCommand,
-  type SuggestRest,
-  suggestion,
-  WHAT_CHANGED,
-} from "@/lib/suggestion";
+import { type Checked, type SuggestedCommand, WHAT_CHANGED } from "@/lib/suggestion";
 import { publishedIds } from "@/lib/sync/state";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { reportWarning } from "@/lib/warnings";
@@ -128,7 +123,7 @@ const NO_SCHEMA_REFUSAL: Refusal = {
   code: "E_NOT_FOUND",
   message: "This project has no user schema under .zitadel/schemas",
   hint: "Set the project up first.",
-  next: [suggestion("setup")],
+  next: [{ id: "setup" }],
 };
 
 /**
@@ -381,14 +376,13 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
   /**
    * A follow-up as a command and as its words, both from the same typed input.
    *
-   * @param id - The target, as oclif names it.
-   * @param rest - Its arguments and flags, by the names code reads them.
+   * @param next - The target and its arguments and flags, by the names code reads them.
    * @returns The command and its words.
    */
-  protected follow<const Id extends string>(id: Id, ...rest: SuggestRest<Id>): Follow {
+  protected follow<const Id extends string>(next: Checked<Id>): Follow {
     return {
-      command: this.suggest(id, ...rest),
-      args: this.suggestArgs(id, ...rest),
+      command: this.suggest(next),
+      args: this.suggestArgs(next),
     };
   }
 
@@ -498,7 +492,8 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
       }
 
       return [
-        this.follow(`auth-method:${method}:enable`, {
+        this.follow({
+          id: `auth-method:${method}:enable`,
           flags: target.schemaFlag === undefined ? {} : { schema: target.schemaFlag },
         }),
       ];
@@ -587,8 +582,8 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
     const follows = changed
       ? [
           ...leading,
-          this.follow("deploy", { flags: { dryRun: true } }),
-          this.follow("deploy", { flags: { message: WHAT_CHANGED } }),
+          this.follow({ id: "deploy", flags: { dryRun: true } }),
+          this.follow({ id: "deploy", flags: { message: WHAT_CHANGED } }),
         ]
       : leading;
 
@@ -631,8 +626,9 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
     const confirmed = await this.confirmIfNoSignInLeft(
       target,
       {
-        real: this.follow(`auth-method:${method}:disable`, { flags: forced }),
-        dryRun: this.follow(`auth-method:${method}:disable`, {
+        real: this.follow({ id: `auth-method:${method}:disable`, flags: forced }),
+        dryRun: this.follow({
+          id: `auth-method:${method}:disable`,
           flags: { ...forced, dryRun: true },
         }),
       },
@@ -687,8 +683,9 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
       );
       const schemaGiven = target.schemaGiven === undefined ? {} : { schema: target.schemaGiven };
       const real = enabled
-        ? this.follow(`auth-method:${method}:enable`, { flags: schemaGiven })
-        : this.follow(`auth-method:${method}:disable`, {
+        ? this.follow({ id: `auth-method:${method}:enable`, flags: schemaGiven })
+        : this.follow({
+            id: `auth-method:${method}:disable`,
             flags: { ...schemaGiven, ...(this.force ? { force: true } : {}) },
           });
 

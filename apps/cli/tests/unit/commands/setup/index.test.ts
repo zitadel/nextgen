@@ -3560,7 +3560,7 @@ describe("refuseUnusableFlags", () => {
       refusal: {
         code: "E_VALIDATION",
         message: "setup no longer applies a login template, so --design was removed",
-        nextCommands: [{ id: "branding:eject", input: {} }],
+        nextCommands: [{ id: "branding:eject" }],
       },
     },
     {

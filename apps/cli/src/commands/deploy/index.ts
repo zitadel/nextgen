@@ -24,10 +24,10 @@ import {
 } from "@/lib/publish";
 import { configIsDirty } from "@/lib/publish/git";
 import {
+  type NextOf,
   type Suggested,
   type SuggestedCommand,
   shellCommand,
-  suggestion,
   WHAT_CHANGED,
 } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
@@ -77,14 +77,19 @@ export function missingPrimaryOrigin(input: {
     if (input.setupProject) {
       return {
         hint: `${held} Make it primary, then deploy.`,
-        next: [suggestion("doctor", { flags: { fix: true } })],
+        next: [{ id: "doctor", flags: { fix: true } }],
       };
     }
-    const remove = suggestion("origin:rm", { args: { pattern: preview }, flags: { force: true } });
-    const add = suggestion("origin:add", {
+    const remove: NextOf<"origin:rm"> = {
+      id: "origin:rm",
+      args: { pattern: preview },
+      flags: { force: true },
+    };
+    const add: NextOf<"origin:add"> = {
+      id: "origin:add",
       args: { pattern: preview },
       flags: { kind: "primary" },
-    });
+    };
     return {
       hint: `${held} Remove it and add it back as primary, then deploy.`,
       // Both steps, in the order they must run: removing the pattern leaves
@@ -93,10 +98,11 @@ export function missingPrimaryOrigin(input: {
     };
   }
   if (input.issuer !== undefined) {
-    const add = suggestion("origin:add", {
+    const add: NextOf<"origin:add"> = {
+      id: "origin:add",
       args: { pattern: Origins.originOf(input.issuer) },
       flags: { kind: "primary" },
-    });
+    };
     return {
       hint: "Add the URL the app serves from as a primary origin, then deploy.",
       next: [add],
@@ -104,7 +110,7 @@ export function missingPrimaryOrigin(input: {
   }
   return {
     hint: "Add a primary origin for the URL the app serves from, then deploy.",
-    next: [suggestion("origin:list")],
+    next: [{ id: "origin:list" }],
   };
 }
 
@@ -205,7 +211,7 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
       compare: true,
       json: this.isJson,
       color: this.isColored,
-      suggest: this.suggester,
+      suggest: this.suggest,
     });
     for (const warning of prepared.warnings) {
       reportWarning(warning);
@@ -292,7 +298,7 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
               publication.current === undefined
                 ? undefined
                 : { current_deployment: publication.current },
-            nextCommands: [this.suggest("deployment:list", { flags: { live: true } })],
+            nextCommands: [this.suggest({ id: "deployment:list", flags: { live: true } })],
           },
         );
       }
@@ -340,7 +346,7 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
       },
       next: {
         commands: [
-          this.suggest("deployment:list"),
+          this.suggest({ id: "deployment:list" }),
           ...(configUncommitted ? [shellCommand(commitConfig(this.cwd, message))] : []),
         ],
       },
@@ -415,13 +421,11 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
         return undefined;
       },
     );
-    throw refusalError(
-      NO_PRIMARY_ORIGIN_REFUSAL,
-      missingPrimaryOrigin({
-        origins,
-        issuer: environment.values.ZITADEL_ISSUER?.value,
-        setupProject: setupProject === projectId,
-      }),
-    );
+    const missing = missingPrimaryOrigin({
+      origins,
+      issuer: environment.values.ZITADEL_ISSUER?.value,
+      setupProject: setupProject === projectId,
+    });
+    throw refusalError(NO_PRIMARY_ORIGIN_REFUSAL, { hint: missing.hint }, { next: missing.next });
   }
 }

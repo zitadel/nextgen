@@ -75,7 +75,7 @@ export default class Stop extends BaseCommand {
           title,
           sections: [section(undefined, ...facts)],
         },
-        next: { commands: [this.suggest("stop")] },
+        next: { commands: [this.suggest({ id: "stop" })] },
       });
     }
 
@@ -197,7 +197,7 @@ export default class Stop extends BaseCommand {
         title,
         sections: [section(undefined, ...found)],
       },
-      next: { commands: [this.suggest("stop", { flags: { all: true } })] },
+      next: { commands: [this.suggest({ id: "stop", flags: { all: true } })] },
       ...(discovery.supported
         ? {}
         : { warnings: ["managed-runtime-processes: discovery unavailable"] }),

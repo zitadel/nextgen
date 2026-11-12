@@ -17,7 +17,7 @@ import {
   readRuntimeMetadata,
   sameLocalServer,
 } from "./runtime";
-import { shellCommand, suggestion } from "@/lib/suggestion";
+import { shellCommand } from "@/lib/suggestion";
 
 /**
  * The local admin's two files under `.zitadel/local/` (gitignored):
@@ -117,8 +117,8 @@ function malformedAdminFile(cause?: unknown): ZitadelError {
     hint: `Delete ${LOCAL_ADMIN_FILE} and run \`zitadel reset --force\`, then \`zitadel start\`. Both are needed: reset keeps ${LOCAL_ADMIN_FILE}, and deleting it alone leaves the server holding the old password.`,
     nextCommands: [
       shellCommand(`rm ${LOCAL_ADMIN_FILE}`),
-      suggestion("reset", { flags: { force: true } }),
-      suggestion("start"),
+      { id: "reset", flags: { force: true } },
+      { id: "start" },
     ],
     ...(cause ? { details: { cause: errorMessage(cause) } } : {}),
   });

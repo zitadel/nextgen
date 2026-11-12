@@ -125,11 +125,11 @@ import { hostUnlessDefault, type ResolvedServer, resolveServer } from "@/lib/ser
 import { id as styleId, path as stylePath, url as styleUrl } from "@/lib/style";
 import {
   inShell,
+  type NextOf,
   type Scope,
   type Suggest,
   type SuggestedCommand,
   type SuggestFlags,
-  suggestion,
   WHAT_CHANGED,
 } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
@@ -416,7 +416,8 @@ export function ssoRecovery(
     // outranks the process environment, unlike `--env`), so `--server local`
     // alone cannot send a production token to the local server.
     commands: remaining.map((selection) => {
-      return suggest("auth-method:sso:enable", {
+      return suggest({
+        id: "auth-method:sso:enable",
         flags: { ...ssoEnableFlags(selection), server: "local" },
       });
     }),
@@ -450,7 +451,7 @@ const NO_LOCAL_SERVER_REFUSAL: Refusal = {
   hint:
     "{reason}Start local Zitadel first, then rerun setup. {scripting}{recovery}" +
     "After setup succeeds, follow its next_commands to start the app and verify registration, logout, and login in the browser.",
-  next: [suggestion("start"), "{setup}"],
+  next: [{ id: "start" }, "{setup}"],
 };
 
 /** How a `--cwd` that is a file, or lies under one, is refused. */
@@ -556,19 +557,22 @@ async function resolveSetupServer(
     }
     const retry = retryOptionsOf(flags);
     const recovery = ssoRecovery(retry, suggest);
-    throw refusalError(NO_LOCAL_SERVER_REFUSAL, {
-      reason: normalized.hint ? `${normalized.hint} ` : "",
-      scripting:
-        retry.sso && retry.sso.length > 0
-          ? "The rerun asks for the client id and secret, because a command carries neither. " +
-            "To script it instead, add --sso-client-id and --non-interactive, and pipe the secret in. "
-          : "",
-      recovery:
-        recovery.commands.length > 0
-          ? `${recovery.hint}${recovery.commands.join(" ")} `
-          : recovery.hint,
-      setup: suggestion("setup", { flags: setupRetryFlags(retry) }),
-    });
+    throw refusalError(
+      NO_LOCAL_SERVER_REFUSAL,
+      {
+        reason: normalized.hint ? `${normalized.hint} ` : "",
+        scripting:
+          retry.sso && retry.sso.length > 0
+            ? "The rerun asks for the client id and secret, because a command carries neither. " +
+              "To script it instead, add --sso-client-id and --non-interactive, and pipe the secret in. "
+            : "",
+        recovery:
+          recovery.commands.length > 0
+            ? `${recovery.hint}${recovery.commands.join(" ")} `
+            : recovery.hint,
+      },
+      { setup: { id: "setup", flags: setupRetryFlags(retry) } },
+    );
   }
 }
 
@@ -638,19 +642,21 @@ async function refuseOtherReleasesServer(
     return;
   }
   // The start command names the server's own directory, so the typed --cwd is not added.
-  const start =
-    nearest.dir === meta.cwd
-      ? suggestion("start")
-      : suggestion("start", { flags: { cwd: nearest.dir } });
-  throw refusalError(SERVER_VERSION_REFUSAL, {
-    running: runtime.server_version,
-    expected,
-    serverUrl: runtime.server_url,
-    start,
-    where:
-      nearest.dir === meta.cwd ? "" : `Run start in ${nearest.dir}, where the server was started. `,
-    setup: suggestion("setup", { flags: setupRetryFlags(retryOptionsOf(flags)) }),
-  });
+  const start: NextOf<"start"> =
+    nearest.dir === meta.cwd ? { id: "start" } : { id: "start", flags: { cwd: nearest.dir } };
+  throw refusalError(
+    SERVER_VERSION_REFUSAL,
+    {
+      running: runtime.server_version,
+      expected,
+      serverUrl: runtime.server_url,
+      where:
+        nearest.dir === meta.cwd
+          ? ""
+          : `Run start in ${nearest.dir}, where the server was started. `,
+    },
+    { start, setup: { id: "setup", flags: setupRetryFlags(retryOptionsOf(flags)) } },
+  );
 }
 
 /**
@@ -735,7 +741,7 @@ export type SetupFlagsToCheck = Readonly<{
 const DESIGN_REMOVED_REFUSAL: Refusal = {
   message: "setup no longer applies a login template, so --design was removed",
   hint: `Rerun setup without --design. ${PAGE_LAYOUT_HINT} To own the widget's structure after setup, eject one of: ${BRANDING_DESIGNS.join(", ")}.`,
-  next: [suggestion("branding:eject")],
+  next: [{ id: "branding:eject" }],
 };
 
 const CLIENT_ID_NEEDS_SSO_REFUSAL: Refusal = {
@@ -1182,7 +1188,7 @@ export default class Setup extends Destructive(BaseCommand) {
 
   protected async execute({ flags }: Admitted<typeof Setup>): Promise<JsonEnvelope> {
     refuseUnusableFlags(flags, this.nonInteractive);
-    const preflight = await setupPreflight(flags, this.meta, this.suggester);
+    const preflight = await setupPreflight(flags, this.meta, this.suggest);
     this.meta = {
       ...this.meta,
       source: preflight.server.value,
@@ -1236,7 +1242,7 @@ export default class Setup extends Destructive(BaseCommand) {
       this.nonInteractive,
       this.dryRun,
       wizardQuestions,
-      this.suggester,
+      this.suggest,
     );
 
     const orca = createOrca();
@@ -1341,7 +1347,7 @@ export default class Setup extends Destructive(BaseCommand) {
         id: app.framework,
         displayName: orca.displayName(app.framework),
       },
-      suggest: this.suggester,
+      suggest: this.suggest,
       cwd: this.cwd,
       frameworkChosen: scaffoldedFramework || flags.framework !== undefined,
       serverFlag: this.meta.serverFlag,
@@ -1365,7 +1371,7 @@ export default class Setup extends Destructive(BaseCommand) {
         portInUseWarning(
           answers.devPort,
           await LocalServer.nextFreePort(answers.devPort),
-          this.suggester,
+          this.suggest,
         ),
       );
     }
@@ -1513,7 +1519,7 @@ export default class Setup extends Destructive(BaseCommand) {
         : await createProjectWithLocalHint(
             unauthClient,
             answers.server,
-            this.suggester,
+            this.suggest,
             projectName,
             issuer,
             retry,
@@ -1600,12 +1606,12 @@ export default class Setup extends Destructive(BaseCommand) {
           hint: this.configurationFailureHint(
             cause,
             newApp !== undefined,
-            this.suggest("setup", { flags: rerun }),
+            this.suggest({ id: "setup", flags: rerun }),
           ),
           nextCommands:
             cause.nextCommands ??
             (newApp === undefined
-              ? [this.suggest("setup", { flags: { ...rerun, force: true } })]
+              ? [this.suggest({ id: "setup", flags: { ...rerun, force: true } })]
               : []),
           details: cause.details,
         });
@@ -1707,10 +1713,10 @@ export default class Setup extends Destructive(BaseCommand) {
               `${answer.endpoints.issuer}, not the provider`,
           );
         }
-        reportClientIdOutcome(idVariable, clientId, this.suggester);
+        reportClientIdOutcome(idVariable, clientId, this.suggest);
         // The wizard refuses an empty secret, so a deferred publish here only
         // ever means there was no project to publish to.
-        reportSecretOutcome(secret, false, this.suggester);
+        reportSecretOutcome(secret, false, this.suggest);
       }
     }
 
@@ -1747,7 +1753,7 @@ export default class Setup extends Destructive(BaseCommand) {
       env: this.env,
       issuer,
       json: this.isJson,
-      suggest: this.suggester,
+      suggest: this.suggest,
       scaffoldedFramework,
       skipInstall: Boolean(flags.skipInstall),
       task: (label, work, done) => {
@@ -1776,7 +1782,7 @@ export default class Setup extends Destructive(BaseCommand) {
     });
     // A failed deploy leaves the project with no release, so the deploy that
     // fixes it leads both surfaces.
-    const deployCommand = this.suggest("deploy", { flags: { message: WHAT_CHANGED } });
+    const deployCommand = this.suggest({ id: "deploy", flags: { message: WHAT_CHANGED } });
     const deployStep =
       deployment === undefined && !this.dryRun
         ? {
@@ -1843,7 +1849,7 @@ export default class Setup extends Destructive(BaseCommand) {
           // so an unattached project is one the local admin never sees. A
           // server started by hand has no local admin anywhere, hence the "if".
           reportWarning(
-            `No local admin for ${answers.server} in ${this.cwd} or its parents, so the project is not attached to a team and the local console will not list it. If ${this.suggest("start")} started this server, run setup from the directory it ran in, or one inside it.`,
+            `No local admin for ${answers.server} in ${this.cwd} or its parents, so the project is not attached to a team and the local console will not list it. If ${this.suggest({ id: "start" })} started this server, run setup from the directory it ran in, or one inside it.`,
           );
         }
         if (admin) {
@@ -1893,9 +1899,9 @@ export default class Setup extends Destructive(BaseCommand) {
         (isLocal && (this.dryRun || hostsPlatform)));
     const claimNudge = nudgeClaim
       ? {
-          actions: [claimAction(this.suggester, deadline)],
-          boxActions: [claimBoxAction(this.suggester, deadline)],
-          commands: [claimCommand(this.suggester)],
+          actions: [claimAction(this.suggest, deadline)],
+          boxActions: [claimBoxAction(this.suggest, deadline)],
+          commands: [claimCommand(this.suggest)],
         }
       : {
           actions: [],
@@ -1906,7 +1912,7 @@ export default class Setup extends Destructive(BaseCommand) {
     // else for them, so the command would open an empty console otherwise.
     // `console` finds the server from its directory up, so a run with `--cwd`
     // passes it on.
-    const consoleCommand = this.suggest("console");
+    const consoleCommand = this.suggest({ id: "console" });
     const consoleStep = ownedByLocalAdmin
       ? {
           actions: [
@@ -1927,7 +1933,10 @@ export default class Setup extends Destructive(BaseCommand) {
         };
     // A run that skipped social sign-in says how to add it later, the way
     // `consoleStep` says how to open the console.
-    const ssoCommand = this.suggest("auth-method:sso:enable", { flags: { provider: "google" } });
+    const ssoCommand = this.suggest({
+      id: "auth-method:sso:enable",
+      flags: { provider: "google" },
+    });
     const ssoStep =
       answers.sso.length === 0
         ? {
@@ -2178,7 +2187,7 @@ export default class Setup extends Destructive(BaseCommand) {
         actions: [
           ...deployStep.actions,
           ...installOutcome.nextActions,
-          brandingGuidanceAction(this.suggester),
+          brandingGuidanceAction(this.suggest),
           ...consoleStep.actions,
           ...ssoStep.actions,
           ...claimNudge.actions,
@@ -2204,7 +2213,7 @@ export default class Setup extends Destructive(BaseCommand) {
                 },
               ];
             }),
-            this.suggester,
+            this.suggest,
           ),
           ...deployStep.commands,
           ...installOutcome.nextCommands,
@@ -2330,7 +2339,7 @@ export default class Setup extends Destructive(BaseCommand) {
     if (!signupPolicy) {
       reportWarning(
         scaffold.signupPolicy === undefined
-          ? `The server does not take a sign-up policy yet, so setup wrote none. Upgrade the server, then add ${SignupPolicy.PATH} and run ${this.suggest("deploy", { flags: { message: WHAT_CHANGED } })}.`
+          ? `The server does not take a sign-up policy yet, so setup wrote none. Upgrade the server, then add ${SignupPolicy.PATH} and run ${this.suggest({ id: "deploy", flags: { message: WHAT_CHANGED } })}.`
           : `The server does not take a sign-up policy yet, so every deploy fails while ${SignupPolicy.PATH} is there. Upgrade the server, or move the file out of ${CONFIG_DIRECTORIES.policies}/ until you do.`,
       );
     }
@@ -2465,7 +2474,7 @@ export default class Setup extends Destructive(BaseCommand) {
         narrate: (notices) => {
           this.narrate(notices);
         },
-        suggest: this.suggester,
+        suggest: this.suggest,
       });
       deploying.done(
         `Deployed ${escapeControlCharacters(abbreviate(deployment.contentHash))} to ${deployment.origins.length} ${new Intl.PluralRules("en").select(deployment.origins.length) === "one" ? "origin" : "origins"}`,
@@ -2477,7 +2486,7 @@ export default class Setup extends Destructive(BaseCommand) {
       }
       deploying.done("Left .zitadel/ undeployed");
       reportWarning(
-        `The project was set up but its first deploy failed: ${toZitadelError(error).message}. Run ${this.suggest("deploy", { flags: { message: WHAT_CHANGED } })} to publish .zitadel/.`,
+        `The project was set up but its first deploy failed: ${toZitadelError(error).message}. Run ${this.suggest({ id: "deploy", flags: { message: WHAT_CHANGED } })} to publish .zitadel/.`,
       );
       return undefined;
     }
@@ -2549,7 +2558,8 @@ export default class Setup extends Destructive(BaseCommand) {
     // nothing and never reaches the old origin.
     const cleanup =
       move.refused && move.staleOrigin !== undefined
-        ? this.suggest("origin:rm", {
+        ? this.suggest({
+            id: "origin:rm",
             args: { pattern: move.staleOrigin },
             flags: { force: true },
           })
@@ -2558,7 +2568,7 @@ export default class Setup extends Destructive(BaseCommand) {
     const deploy =
       move.undeployed === undefined
         ? undefined
-        : this.suggest("deploy", { flags: { message: WHAT_CHANGED } });
+        : this.suggest({ id: "deploy", flags: { message: WHAT_CHANGED } });
     if (deploy !== undefined) {
       reportWarning(
         `${move.issuer} serves nothing until the next deploy: ${move.undeployed}. Run ${deploy}.`,
@@ -2667,12 +2677,13 @@ async function resolveScaffoldFramework(
       nextCommands:
         guidance.serverFlag === "local" && suggested
           ? [
-              suggestion("setup", {
+              {
+                id: "setup",
                 flags: setupRetryFlags({
                   ...guidance.retry,
                   framework: suggested,
                 }),
-              }),
+              },
             ]
           : [],
       details: { frameworks: choices },
@@ -2876,7 +2887,7 @@ function connectionRefusal(path: string, selection: ProviderSelection): ZitadelE
       "A connection file is yours to keep, so setup never replaces or removes one. " +
       "Remove it and run setup again to scaffold a fresh one, or keep it and enable the " +
       "provider afterwards to reuse it.",
-    nextCommands: [suggestion("auth-method:sso:enable", { flags: ssoEnableFlags(selection) })],
+    nextCommands: [{ id: "auth-method:sso:enable", flags: ssoEnableFlags(selection) }],
     details: { file: path },
   });
 }
@@ -3043,10 +3054,13 @@ export async function ssoFromFlags(
     stdin: true,
     // A concrete rerun for an agent, never carrying the value: the secret is
     // piped from the caller's own environment.
-    retry: inShell(suggest("setup", { flags: { sso: flags.sso, ssoClientId: ID_TO_FILL_IN } }), {
-      before: `printf '%s' "$CLIENT_SECRET" | `,
-      after: " ...",
-    }),
+    retry: inShell(
+      suggest({ id: "setup", flags: { sso: flags.sso, ssoClientId: ID_TO_FILL_IN } }),
+      {
+        before: `printf '%s' "$CLIENT_SECRET" | `,
+        after: " ...",
+      },
+    ),
   });
   return {
     selection,
@@ -3118,14 +3132,14 @@ async function createProjectWithLocalHint(
     });
   } catch (error) {
     const normalized = toZitadelError(error);
-    const retryCommand = suggest("setup", { flags: setupRetryFlags(retry) });
+    const retryCommand = suggest({ id: "setup", flags: setupRetryFlags(retry) });
     const sso = ssoRecovery(retry, suggest);
     throw new ZitadelError(normalized.code, normalized.message, {
       hint:
         `${normalized.hint ? `${normalized.hint} ` : ""}` +
         "If you meant to use a local Zitadel server, start it first " +
         `and retry setup with the commands below. ${sso.hint}`.trimEnd(),
-      nextCommands: [suggest("start"), retryCommand, ...sso.commands],
+      nextCommands: [suggest({ id: "start" }), retryCommand, ...sso.commands],
       details: {
         server,
         original: normalized.details,
@@ -3190,7 +3204,7 @@ function describeWrittenFile(relPath: string, dryRun: boolean): string | null {
 export function portInUseWarning(port: number, free: number | undefined, suggest: Suggest): string {
   return free === undefined
     ? `Port ${port} and the ports after it are already in use. If that is not this app's dev server, run setup with --dev-port and a free port.`
-    : `Port ${port} is already in use. If that is not this app's dev server, run setup with a free port: ${suggest("setup", { flags: { devPort: free } })}`;
+    : `Port ${port} is already in use. If that is not this app's dev server, run setup with a free port: ${suggest({ id: "setup", flags: { devPort: free } })}`;
 }
 
 /**

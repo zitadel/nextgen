@@ -188,16 +188,28 @@ describe("auth-method sso disable", () => {
             notices: [GOOGLE_STAYS_NOTICE, STEPS_STAY_NOTICE],
             title: "Removed google from default-human-user",
             next_args: [
-              ["deploy", "--dry-run", "--cwd", app.path],
-              ["deploy", "--message", "<what changed>", "--cwd", app.path],
+              ["deploy", "--dry-run", "--server", MOCK_SERVER_URL, "--cwd", app.path],
+              [
+                "deploy",
+                "--message",
+                "<what changed>",
+                "--server",
+                MOCK_SERVER_URL,
+                "--cwd",
+                app.path,
+              ],
             ],
             next_actions: [
               "To stop publishing the connection, delete .zitadel/idps/google.json before the deploy below.",
               `Once that deploy is live, remove its credentials: ${expectedPublicCliCommand(`variable rm GOOGLE_CLIENT_ID --server ${MOCK_SERVER_URL} --cwd ${app.path}`)} and ${expectedPublicCliCommand(`variable rm GOOGLE_CLIENT_SECRET --server ${MOCK_SERVER_URL} --cwd ${app.path}`)}`,
             ],
             next_commands: [
-              expectedPublicCliCommand(`deploy --dry-run --cwd ${app.path}`),
-              expectedPublicCliCommand(`deploy --message '<what changed>' --cwd ${app.path}`),
+              expectedPublicCliCommand(
+                `deploy --dry-run --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+              ),
+              expectedPublicCliCommand(
+                `deploy --message '<what changed>' --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+              ),
             ],
           },
           warnings: [],
@@ -224,16 +236,28 @@ describe("auth-method sso disable", () => {
             notices: [ACME_STAYS_NOTICE, STEPS_STAY_NOTICE],
             title: "Removed acme-sso from default-human-user",
             next_args: [
-              ["deploy", "--dry-run", "--cwd", app.path],
-              ["deploy", "--message", "<what changed>", "--cwd", app.path],
+              ["deploy", "--dry-run", "--server", MOCK_SERVER_URL, "--cwd", app.path],
+              [
+                "deploy",
+                "--message",
+                "<what changed>",
+                "--server",
+                MOCK_SERVER_URL,
+                "--cwd",
+                app.path,
+              ],
             ],
             next_actions: [
               "To stop publishing the connection, delete .zitadel/idps/acme-sso.json before the deploy below.",
               `Once that deploy is live, remove its credentials: ${expectedPublicCliCommand(`variable rm ACME_SSO_CLIENT_ID --server ${MOCK_SERVER_URL} --cwd ${app.path}`)} and ${expectedPublicCliCommand(`variable rm ACME_SSO_CLIENT_SECRET --server ${MOCK_SERVER_URL} --cwd ${app.path}`)}`,
             ],
             next_commands: [
-              expectedPublicCliCommand(`deploy --dry-run --cwd ${app.path}`),
-              expectedPublicCliCommand(`deploy --message '<what changed>' --cwd ${app.path}`),
+              expectedPublicCliCommand(
+                `deploy --dry-run --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+              ),
+              expectedPublicCliCommand(
+                `deploy --message '<what changed>' --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+              ),
             ],
           },
           warnings: [],
@@ -264,16 +288,28 @@ describe("auth-method sso disable", () => {
             ],
             title: "Removed google from default-human-user",
             next_args: [
-              ["deploy", "--dry-run", "--cwd", app.path],
-              ["deploy", "--message", "<what changed>", "--cwd", app.path],
+              ["deploy", "--dry-run", "--server", MOCK_SERVER_URL, "--cwd", app.path],
+              [
+                "deploy",
+                "--message",
+                "<what changed>",
+                "--server",
+                MOCK_SERVER_URL,
+                "--cwd",
+                app.path,
+              ],
             ],
             next_actions: [
               "To stop publishing the connection, delete .zitadel/idps/google.json before the deploy below.",
               `Once that deploy is live, remove its credentials: ${expectedPublicCliCommand(`variable rm GOOGLE_CLIENT_ID --server ${MOCK_SERVER_URL} --cwd ${app.path}`)} and ${expectedPublicCliCommand(`variable rm GOOGLE_CLIENT_SECRET --server ${MOCK_SERVER_URL} --cwd ${app.path}`)}`,
             ],
             next_commands: [
-              expectedPublicCliCommand(`deploy --dry-run --cwd ${app.path}`),
-              expectedPublicCliCommand(`deploy --message '<what changed>' --cwd ${app.path}`),
+              expectedPublicCliCommand(
+                `deploy --dry-run --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+              ),
+              expectedPublicCliCommand(
+                `deploy --message '<what changed>' --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+              ),
             ],
           },
           warnings: [LEFT_WITH_NONE_WARNING],
@@ -327,13 +363,13 @@ describe("auth-method sso disable", () => {
             hint: `Enable another method first, such as ${expectedPublicCliCommand("auth-method sso enable --provider '<name>'")}. If the schema's users are only managed through the API, ask a person first: ${QUESTION} Re-run with --force only once they agree (the first of details.suggested_args holds the exact arguments).`,
             next_commands: [
               expectedPublicCliCommand(
-                `auth-method sso disable --provider google --schema ${SCHEMA} --force --cwd ${app.path}`,
+                `auth-method sso disable --provider google --schema ${SCHEMA} --force --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
               ),
               expectedPublicCliCommand(
-                `auth-method password enable --schema ${SCHEMA} --cwd ${app.path}`,
+                `auth-method password enable --schema ${SCHEMA} --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
               ),
               expectedPublicCliCommand(
-                `auth-method passkey enable --schema ${SCHEMA} --cwd ${app.path}`,
+                `auth-method passkey enable --schema ${SCHEMA} --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
               ),
             ],
             details: {
@@ -350,11 +386,33 @@ describe("auth-method sso disable", () => {
                   "--schema",
                   SCHEMA,
                   "--force",
+                  "--server",
+                  MOCK_SERVER_URL,
                   "--cwd",
                   app.path,
                 ],
-                ["auth-method", "password", "enable", "--schema", SCHEMA, "--cwd", app.path],
-                ["auth-method", "passkey", "enable", "--schema", SCHEMA, "--cwd", app.path],
+                [
+                  "auth-method",
+                  "password",
+                  "enable",
+                  "--schema",
+                  SCHEMA,
+                  "--server",
+                  MOCK_SERVER_URL,
+                  "--cwd",
+                  app.path,
+                ],
+                [
+                  "auth-method",
+                  "passkey",
+                  "enable",
+                  "--schema",
+                  SCHEMA,
+                  "--server",
+                  MOCK_SERVER_URL,
+                  "--cwd",
+                  app.path,
+                ],
               ],
             },
           });
@@ -367,7 +425,7 @@ describe("auth-method sso disable", () => {
           const result = await app.disableSso(GOOGLE, ["--dry-run"]);
 
           expect(result).toSuggest(
-            `auth-method sso disable --provider google --schema ${SCHEMA} --force --dry-run --cwd ${app.path}`,
+            `auth-method sso disable --provider google --schema ${SCHEMA} --force --dry-run --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
           );
         });
 
@@ -387,7 +445,7 @@ describe("auth-method sso disable", () => {
           const result = await app.disableSso(GOOGLE);
 
           expect(result).toSuggest(
-            `auth-method sso disable --provider google --schema ${SCHEMA} --force --cwd ${app.path}`,
+            `auth-method sso disable --provider google --schema ${SCHEMA} --force --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
           );
         });
 
@@ -553,11 +611,21 @@ describe("auth-method sso disable", () => {
               title: "Would remove google from default-human-user (dry run)",
               dry_run: true,
               next_args: [
-                ["auth-method", "sso", "disable", "--provider", GOOGLE, "--cwd", app.path],
+                [
+                  "auth-method",
+                  "sso",
+                  "disable",
+                  "--provider",
+                  GOOGLE,
+                  "--server",
+                  MOCK_SERVER_URL,
+                  "--cwd",
+                  app.path,
+                ],
               ],
               next_commands: [
                 expectedPublicCliCommand(
-                  `auth-method sso disable --provider google --cwd ${app.path}`,
+                  `auth-method sso disable --provider google --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
                 ),
               ],
             },
@@ -597,13 +665,15 @@ describe("auth-method sso disable", () => {
                   "--provider",
                   GOOGLE,
                   "--force",
+                  "--server",
+                  MOCK_SERVER_URL,
                   "--cwd",
                   app.path,
                 ],
               ],
               next_commands: [
                 expectedPublicCliCommand(
-                  `auth-method sso disable --provider google --force --cwd ${app.path}`,
+                  `auth-method sso disable --provider google --force --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
                 ),
               ],
             },
@@ -649,11 +719,21 @@ describe("auth-method sso disable", () => {
               title: "default-human-user does not offer google, so nothing would change (dry run)",
               dry_run: true,
               next_args: [
-                ["auth-method", "sso", "disable", "--provider", GOOGLE, "--cwd", app.path],
+                [
+                  "auth-method",
+                  "sso",
+                  "disable",
+                  "--provider",
+                  GOOGLE,
+                  "--server",
+                  MOCK_SERVER_URL,
+                  "--cwd",
+                  app.path,
+                ],
               ],
               next_commands: [
                 expectedPublicCliCommand(
-                  `auth-method sso disable --provider google --cwd ${app.path}`,
+                  `auth-method sso disable --provider google --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
                 ),
               ],
             },
@@ -736,7 +816,7 @@ describe("auth-method sso disable", () => {
 
         const result = await app.disableSsoRendered(GOOGLE);
 
-        expect(result).toPrint(`deploy --dry-run --cwd ${app.path}`);
+        expect(result).toPrint(`deploy --dry-run --server ${MOCK_SERVER_URL} --cwd ${app.path}`);
       });
 
       it("tells how to remove the connection and its credentials", async () => {
@@ -799,7 +879,7 @@ describe("auth-method sso disable", () => {
         const result = await app.disableSsoRendered(GOOGLE);
 
         expect(result).toSay(
-          `${QUESTION} Re-run with --force only once they agree.\n\nNext:\n  $ ${expectedPublicCliCommand(`auth-method sso disable --provider google --schema ${SCHEMA} --force --cwd ${app.path}`)}\n  $ ${expectedPublicCliCommand(`auth-method password enable --schema ${SCHEMA} --cwd ${app.path}`)}\n  $ ${expectedPublicCliCommand(`auth-method passkey enable --schema ${SCHEMA} --cwd ${app.path}`)}`,
+          `${QUESTION} Re-run with --force only once they agree.\n\nNext:\n  $ ${expectedPublicCliCommand(`auth-method sso disable --provider google --schema ${SCHEMA} --force --server ${MOCK_SERVER_URL} --cwd ${app.path}`)}\n  $ ${expectedPublicCliCommand(`auth-method password enable --schema ${SCHEMA} --server ${MOCK_SERVER_URL} --cwd ${app.path}`)}\n  $ ${expectedPublicCliCommand(`auth-method passkey enable --schema ${SCHEMA} --server ${MOCK_SERVER_URL} --cwd ${app.path}`)}`,
         );
       });
 

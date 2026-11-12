@@ -326,7 +326,7 @@ export default class Pull extends EnvironmentCommand {
           ? [await this.again("pull", { without: ["dryRun"] })]
           : args.target.kind !== "latest"
             ? []
-            : [this.suggest("deploy", { flags: { message: WHAT_CHANGED } })],
+            : [this.suggest({ id: "deploy", flags: { message: WHAT_CHANGED } })],
       },
     });
   }
@@ -437,7 +437,7 @@ export default class Pull extends EnvironmentCommand {
         const releaseId = await configuration.fetchLiveReleaseId();
         if (releaseId === undefined) {
           throw new ZitadelError("E_NOT_FOUND", "Nothing is deployed to a primary origin yet", {
-            hint: `Deploy first with ${this.suggest("deploy", { flags: { message: WHAT_CHANGED } })}, then pull.`,
+            hint: `Deploy first with ${this.suggest({ id: "deploy", flags: { message: WHAT_CHANGED } })}, then pull.`,
           });
         }
         return releaseId;

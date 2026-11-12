@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { Origins } from "@/lib/backend";
-import { suggestion } from "@/lib/suggestion";
+
 import Deploy, { missingPrimaryOrigin } from "@/commands/deploy/index";
 import { parseFlag } from "@tests/helpers/inputs";
 
@@ -21,7 +21,7 @@ describe("missingPrimaryOrigin", () => {
   it("suggests doctor --fix for setup's project holding its issuer as a preview origin", () => {
     const outcome = outcomeFor({ origins: PREVIEW_ISSUER });
 
-    expect(outcome.next).toEqual([suggestion("doctor", { flags: { fix: true } })]);
+    expect(outcome.next).toEqual([{ id: "doctor", flags: { fix: true } }]);
     expect(outcome.hint).not.toContain("doctor --fix");
   });
 
@@ -35,8 +35,8 @@ describe("missingPrimaryOrigin", () => {
     const outcome = outcomeFor({ origins: PREVIEW_ISSUER, setupProject: false });
 
     expect(outcome.next).toEqual([
-      suggestion("origin:rm", { args: { pattern: ISSUER }, flags: { force: true } }),
-      suggestion("origin:add", { args: { pattern: ISSUER }, flags: { kind: "primary" } }),
+      { id: "origin:rm", args: { pattern: ISSUER }, flags: { force: true } },
+      { id: "origin:add", args: { pattern: ISSUER }, flags: { kind: "primary" } },
     ]);
     expect(outcome.hint).not.toContain("origin add");
   });
@@ -47,13 +47,13 @@ describe("missingPrimaryOrigin", () => {
     });
 
     expect(outcome.next).toEqual([
-      suggestion("origin:add", { args: { pattern: ISSUER }, flags: { kind: "primary" } }),
+      { id: "origin:add", args: { pattern: ISSUER }, flags: { kind: "primary" } },
     ]);
   });
 
   it("adds the issuer as its origin, without a trailing slash", () => {
     expect(outcomeFor({ issuer: `${ISSUER}/` }).next).toEqual([
-      suggestion("origin:add", { args: { pattern: ISSUER }, flags: { kind: "primary" } }),
+      { id: "origin:add", args: { pattern: ISSUER }, flags: { kind: "primary" } },
     ]);
   });
 
@@ -62,7 +62,7 @@ describe("missingPrimaryOrigin", () => {
   });
 
   it("suggests origin list when no issuer resolves", () => {
-    expect(outcomeFor({ issuer: undefined }).next).toEqual([suggestion("origin:list")]);
+    expect(outcomeFor({ issuer: undefined }).next).toEqual([{ id: "origin:list" }]);
   });
 });
 

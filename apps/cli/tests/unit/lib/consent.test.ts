@@ -22,7 +22,7 @@ const GATE: Gate = {
   verb: "remove",
   name: "remove API_URL from the project",
   message: "Remove API_URL from the project?",
-  retry: suggest("variable:rm", { args: { name: "API_URL" }, flags: { force: true } }),
+  retry: suggest({ id: "variable:rm", args: { name: "API_URL" }, flags: { force: true } }),
 };
 /** A client as every command gets one; nothing here sends a request. */
 const aClient = () => createZitadelClient({ signal, baseUrl: "http://localhost:8080" });

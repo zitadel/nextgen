@@ -72,7 +72,7 @@ export default class Reset extends Destructive(BaseCommand) {
           "It stops and removes the local server if one is running, so the status command no longer reports it.",
           "It deletes the server's database: every organization, user, application and setting you created. This cannot be undone.",
           `Kept: ${join(this.cwd, LOCAL_ADMIN_FILE)}, the local admin sign-in, and everything else in your project.`,
-          `Run ${this.suggest("start")} afterwards to set up a fresh server.`,
+          `Run ${this.suggest({ id: "start" })} afterwards to set up a fresh server.`,
         ].join("\n"),
         preview: () => {
           const title = "Would reset the local Zitadel server runtime (dry run)";
@@ -90,7 +90,7 @@ export default class Reset extends Destructive(BaseCommand) {
               title,
               sections: [facts],
             },
-            next: { commands: [this.suggest("reset", { flags: { force: true } })] },
+            next: { commands: [this.suggest({ id: "reset", flags: { force: true } })] },
           };
         },
         apply: async (consent) => {

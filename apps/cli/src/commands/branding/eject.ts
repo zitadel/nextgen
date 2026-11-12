@@ -21,7 +21,7 @@ import { Promptable } from "@/lib/oclif/promptable";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { hasZitadelConfig } from "@/lib/project";
 import { normalizePublicCliProse } from "@/lib/public-cli";
-import { suggestion, WHAT_CHANGED } from "@/lib/suggestion";
+import { WHAT_CHANGED } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import {
   Branding,
@@ -41,7 +41,7 @@ const DESIGN_CATALOG = BRANDING_DESIGNS.join(", ");
 const NOT_A_PROJECT_REFUSAL: Refusal = {
   message: "This directory is not a Zitadel project",
   hint: "Run setup first; branding files live under .zitadel/.",
-  next: [suggestion("setup")],
+  next: [{ id: "setup" }],
 };
 
 /**
@@ -52,7 +52,7 @@ const NOT_A_PROJECT_REFUSAL: Refusal = {
 const RETIRED_DESIGN_REFUSAL: Refusal = {
   message: "The {design} design was retired: it was page layout, not widget structure",
   hint: `${PAGE_LAYOUT_HINT} To own the widget's structure, eject one of: ${DESIGN_CATALOG}.`,
-  next: [suggestion("branding:eject", { flags: { design: "centered" } })],
+  next: [{ id: "branding:eject", flags: { design: "centered" } }],
 };
 
 /**
@@ -279,8 +279,8 @@ export default class BrandingEject extends Promptable(BaseCommand) {
           "Validate the template and see the diff with a dry run, then publish it.",
         ],
         commands: [
-          this.suggest("deploy", { flags: { dryRun: true } }),
-          this.suggest("deploy", { flags: { message: WHAT_CHANGED } }),
+          this.suggest({ id: "deploy", flags: { dryRun: true } }),
+          this.suggest({ id: "deploy", flags: { message: WHAT_CHANGED } }),
         ],
       },
     });

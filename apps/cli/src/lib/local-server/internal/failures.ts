@@ -1,5 +1,5 @@
 import { ZitadelError, toZitadelError } from "@/lib/errors";
-import { distinct, suggestion } from "@/lib/suggestion";
+import { distinct } from "@/lib/suggestion";
 import { listenersForPort, type TcpListener } from "@/lib/prober/ports";
 import {
   dockerRuntimeGuidance,
@@ -35,9 +35,9 @@ function startupCleanupFailedError(error: unknown, stopResult: StopOutcome): Zit
       hint: "Inspect the local runtime process and stop it manually, then rerun `zitadel start`.",
       nextCommands: distinct([
         ...(startupError.nextCommands ?? []),
-        suggestion("stop", { flags: { all: true } }),
-        suggestion("logs"),
-        suggestion("reset", { flags: { force: true } }),
+        { id: "stop", flags: { all: true } },
+        { id: "logs" },
+        { id: "reset", flags: { force: true } },
       ]),
       details: {
         startup_error: {
@@ -69,7 +69,7 @@ function dockerUnavailableError(error: unknown): ZitadelError {
   const advice = dockerRuntimeGuidance("start");
   return new ZitadelError("E_VALIDATION", "Docker is not reachable", {
     hint: advice.hint,
-    nextCommands: [advice.check, suggestion(advice.retry)],
+    nextCommands: [advice.check, advice.retry],
     details: { message: dockerUnavailableMessage(error) },
   });
 }
@@ -88,7 +88,7 @@ export async function startFailure(error: unknown): Promise<unknown> {
         ? serverExitedError(record.server_url, details, error.logTail)
         : new ZitadelError("E_NETWORK", "Local Zitadel server did not become healthy", {
             hint: "Inspect the local runtime logs, then reset the local runtime if needed.",
-            nextCommands: [suggestion("logs"), suggestion("reset", { flags: { force: true } })],
+            nextCommands: [{ id: "logs" }, { id: "reset", flags: { force: true } }],
             details: {
               ...details,
               server_url: record.server_url,
@@ -114,7 +114,7 @@ export async function startFailure(error: unknown): Promise<unknown> {
   if (error instanceof NoFreePortError) {
     return new ZitadelError("E_PORT_IN_USE", error.message, {
       hint: "Free a port, or choose one with --port.",
-      nextCommands: [suggestion("start", { flags: { port: 9080 } })],
+      nextCommands: [{ id: "start", flags: { port: 9080 } }],
       details: { first_port: error.firstPort },
     });
   }
@@ -136,8 +136,8 @@ function portInUseError(
   return new ZitadelError("E_PORT_IN_USE", `Port ${String(port)} is already in use`, {
     hint: `Stop the process using ${serverUrl}, run \`zitadel stop --all\` for managed local runtimes, or choose another port.`,
     nextCommands: [
-      suggestion("stop", { flags: { all: true } }),
-      suggestion("start", { flags: { port: fallbackPort } }),
+      { id: "stop", flags: { all: true } },
+      { id: "start", flags: { port: fallbackPort } },
     ],
     details: { port, server_url: serverUrl, listeners },
   });
@@ -158,7 +158,7 @@ function serverExitedError(
     "Local Zitadel server process exited before becoming healthy",
     {
       hint: "Inspect the local runtime logs, then retry after fixing the startup error.",
-      nextCommands: [suggestion("logs"), suggestion("reset", { flags: { force: true } })],
+      nextCommands: [{ id: "logs" }, { id: "reset", flags: { force: true } }],
       details: { ...details, server_url: serverUrl, ...(logTail ? { log_tail: logTail } : {}) },
     },
   );

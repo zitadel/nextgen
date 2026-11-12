@@ -9,7 +9,6 @@ import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "@/
 import { reads, type Refused, whole } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { painted, prose } from "@/lib/oclif/rendering";
-import { suggestion } from "@/lib/suggestion";
 
 /** How many lines `--tail` shows when it is not given. */
 const DEFAULT_TAIL = 200;
@@ -42,7 +41,7 @@ const FOLLOW_IS_NOT_JSON_REFUSAL: Refusal = {
 const NOT_STARTED_REFUSAL: Refusal = {
   message: "Local Zitadel runtime has not been started",
   hint: "Start the local server first.",
-  next: [suggestion("start")],
+  next: [{ id: "start" }],
 };
 
 /**

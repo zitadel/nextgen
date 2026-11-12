@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import { interpolate, refusalError, unmetBy } from "@/lib/oclif/refusal";
-import { suggestion } from "@/lib/suggestion";
 
 describe("interpolate", () => {
   it("fills each placeholder from the values", () => {
@@ -50,29 +49,22 @@ describe("refusalError", () => {
         message: "No primary origin",
         next: ["{next}"],
       },
+      {},
       {
         next: [
-          suggestion("origin:rm", {
-            args: { pattern: "http://localhost:3000" },
-            flags: { force: true },
-          }),
-          suggestion("origin:add", {
+          { id: "origin:rm", args: { pattern: "http://localhost:3000" }, flags: { force: true } },
+          {
+            id: "origin:add",
             args: { pattern: "http://localhost:3000" },
             flags: { kind: "primary" },
-          }),
+          },
         ],
       },
     );
 
     expect(error.nextCommands).toEqual([
-      suggestion("origin:rm", {
-        args: { pattern: "http://localhost:3000" },
-        flags: { force: true },
-      }),
-      suggestion("origin:add", {
-        args: { pattern: "http://localhost:3000" },
-        flags: { kind: "primary" },
-      }),
+      { id: "origin:rm", args: { pattern: "http://localhost:3000" }, flags: { force: true } },
+      { id: "origin:add", args: { pattern: "http://localhost:3000" }, flags: { kind: "primary" } },
     ]);
   });
 
@@ -80,12 +72,18 @@ describe("refusalError", () => {
     const error = refusalError(
       {
         message: "No server",
-        next: [suggestion("start", { flags: { port: 8080 } })],
+        next: [{ id: "start", flags: { port: 8080 } }],
       },
       {},
     );
 
-    expect(error.nextCommands).toEqual([suggestion("start", { flags: { port: 8080 } })]);
+    expect(error.nextCommands).toEqual([{ id: "start", flags: { port: 8080 } }]);
+  });
+
+  it("fills a next placeholder only from the next values, never from a string among the others", () => {
+    const error = refusalError({ message: "No server", next: ["{next}"] }, { next: "deploy -m x" });
+
+    expect(error.nextCommands).toEqual([]);
   });
 
   it("names nothing for a placeholder no value fills", () => {
@@ -129,13 +127,10 @@ describe("refusalError raised where no run exists", () => {
   });
 
   it("keeps its next command for the run that reports it", () => {
-    const error = refusalError(
-      { code: "E_CONFLICT", message: "No", next: [suggestion("start")] },
-      {},
-    );
+    const error = refusalError({ code: "E_CONFLICT", message: "No", next: [{ id: "start" }] }, {});
 
     expect(error.code).toBe("E_CONFLICT");
-    expect(error.nextCommands).toEqual([suggestion("start")]);
+    expect(error.nextCommands).toEqual([{ id: "start" }]);
   });
 });
 
@@ -190,7 +185,13 @@ describe("unmetBy", () => {
     };
 
     expect(
-      unmetBy(refusal, { value: "0", min: 1, max: 65_535, retry: suggestion("start") }),
+      unmetBy(refusal, { value: "0", min: 1, max: 65_535 }, { retry: { id: "start" } }),
     ).toEqual([]);
+  });
+
+  it("counts a next placeholder the next values leave unfilled, whatever the other values hold", () => {
+    const refusal = { message: "No server", next: ["{retry}" as const] };
+
+    expect(unmetBy(refusal, { retry: "start" })).toEqual(["retry"]);
   });
 });

@@ -1,5 +1,5 @@
 import { http, HttpResponse } from "msw";
-import { suggestion } from "@/lib/suggestion";
+
 import { afterEach, describe, expect } from "vitest";
 
 import { it } from "@tests/helpers/fixtures";
@@ -224,7 +224,7 @@ describe("local admin sign-in", () => {
     expect(error).toMatchObject({
       code: "E_VALIDATION",
       message: expect.stringContaining("does not host the platform project") as string,
-      nextCommands: [suggestion("stop"), suggestion("start")],
+      nextCommands: [{ id: "stop" }, { id: "start" }],
     });
     // Nothing is attempted against a server that cannot sign the admin in.
     expect(calls).toEqual([]);
@@ -250,12 +250,13 @@ describe("local admin sign-in", () => {
     expect(error).toMatchObject({
       code: "E_AUTH",
       message: "The local server could not find the local admin",
-      nextCommands: [suggestion("logs")],
+      nextCommands: [{ id: "logs" }],
     });
     expect((error as { hint: string }).hint).toContain("zitadel reset --force");
-    expect((error as { nextCommands: unknown[] }).nextCommands).not.toContainEqual(
-      suggestion("reset", { flags: { force: true } }),
-    );
+    expect((error as { nextCommands: unknown[] }).nextCommands).not.toContainEqual({
+      id: "reset",
+      flags: { force: true },
+    });
   });
 
   it("reports a rejected password with the server's own message", async ({ server }) => {

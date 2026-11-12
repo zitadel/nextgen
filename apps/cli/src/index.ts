@@ -104,10 +104,8 @@ export const WORKFLOW_COMMANDS = {
 } as const satisfies Record<string, typeof Command>;
 
 /**
- * Every command the CLI runs: the hand-written ones, keyed by id so a type test
- * can hold each against the entry it adds to `NextTable`
- * (`tests/unit/lib/suggestion/index.test.ts`), then the generated resource
- * commands.
+ * Every command the CLI runs: the hand-written ones, then the generated
+ * resource commands.
  */
 export const COMMANDS: Record<string, typeof Command> = {
   ...WORKFLOW_COMMANDS,

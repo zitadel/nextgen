@@ -108,28 +108,27 @@ export function Destructive<TBase extends CommandClass<BaseCommand>>(Base: TBase
      * run's scope put back on ({@link BaseCommand.rerun}).
      */
     protected async consent(gate: Gate): Promise<Consent | undefined> {
-      const retry = await this.rerun({
-        with: { force: true },
-        arguments: gate.arguments,
-      });
+      // Rebuilt only when the gate names no retry of its own.
+      const retried =
+        "retry" in gate
+          ? gate
+          : {
+              ...gate,
+              retry: await this.rerun({
+                with: { force: true },
+                arguments: gate.arguments,
+              }),
+            };
       const session = {
         interactive: !this.nonInteractive,
         force: this.force,
         dryRun: this.dryRun,
       };
 
-      return Consent.request(
-        "retry" in gate
-          ? gate
-          : {
-              ...gate,
-              retry,
-            },
-        {
-          ...session,
-          confirmer: this.ui.confirmer(session),
-        },
-      );
+      return Consent.request(retried, {
+        ...session,
+        confirmer: this.ui.confirmer(session),
+      });
     }
   }
 

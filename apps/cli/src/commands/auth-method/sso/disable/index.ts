@@ -20,15 +20,6 @@ const NAME_PROVIDER_REFUSAL: Refusal = {
 };
 
 /**
- * The flags that name the project a removal's `variable rm` commands reach.
- */
-type SelectorFlags = {
-  readonly env?: string | undefined;
-  readonly envFile?: string | undefined;
-  readonly server?: string | undefined;
-};
-
-/**
  * `zitadel auth-method sso disable` — remove one provider from a schema
  * and from the login flows that run against it.
  *
@@ -75,8 +66,8 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
     const confirmed = await this.confirmIfNoSignInLeft(
       target,
       {
-        real: this.follow("auth-method:sso:disable", { flags: forced }),
-        dryRun: this.follow("auth-method:sso:disable", { flags: { ...forced, dryRun: true } }),
+        real: this.follow({ id: "auth-method:sso:disable", flags: forced }),
+        dryRun: this.follow({ id: "auth-method:sso:disable", flags: { ...forced, dryRun: true } }),
       },
       (options) => {
         return config.connections.disable(schema, provider, options);
@@ -123,7 +114,8 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
           ? `Would remove ${provider} from ${where} (dry run)`
           : `${schema.name} does not offer ${provider}, so nothing would change (dry run)`,
       );
-      const real = this.follow("auth-method:sso:disable", {
+      const real = this.follow({
+        id: "auth-method:sso:disable",
         flags: {
           provider,
           ...(target.schemaGiven === undefined ? {} : { schema: target.schemaGiven }),
@@ -150,7 +142,7 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
     this.report(change);
     const followUps = this.followUps(change.changed);
     const unused = change.changed ? change.after.connections.findUnused(provider) : undefined;
-    const actions = unused === undefined ? [] : this.removalActions(unused, flags);
+    const actions = unused === undefined ? [] : this.removalActions(unused);
 
     const title = escapeControlCharacters(
       change.changed ? `Removed ${provider} from ${where}` : unchanged,
@@ -206,24 +198,15 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
    * scope, so they reach the project this run named.
    *
    * @param unused - The connection, and the variables only it reads.
-   * @param flags - The environment flags the run was given: this command
-   *   resolves no environment, so the project they name is spelled out.
    * @returns The actions, the file's deletion first.
    */
-  private removalActions(unused: UnusedConnection, flags: SelectorFlags): readonly string[] {
+  private removalActions(unused: UnusedConnection): readonly string[] {
     const deletion = `To stop publishing the connection, delete ${unused.connection.path} before the deploy below.`;
     if (unused.variables.length === 0) {
       return [deletion];
     }
     const commands = unused.variables.map((name) => {
-      return this.suggest("variable:rm", {
-        args: { name },
-        flags: {
-          ...(flags.env === undefined ? {} : { env: flags.env }),
-          ...(flags.envFile === undefined ? {} : { envFile: flags.envFile }),
-          ...(flags.server === undefined ? {} : { server: flags.server }),
-        },
-      });
+      return this.suggest({ id: "variable:rm", args: { name } });
     });
     return [
       deletion,

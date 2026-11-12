@@ -190,7 +190,11 @@ describe("deployment get", () => {
           message:
             "Invalid deployment_id: must be a deployment ID: dep_ followed by letters, digits, _ or -",
           hint: "List the deployments to find one.",
-          next_commands: [expectedPublicCliCommand(`deployment list --cwd ${app.path}`)],
+          next_commands: [
+            expectedPublicCliCommand(
+              `deployment list --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+            ),
+          ],
           details: { argument: "deployment_id" },
         });
       });
@@ -210,7 +214,11 @@ describe("deployment get", () => {
           message:
             "Invalid deployment_id: must be a deployment ID: dep_ followed by letters, digits, _ or -",
           hint: "List the deployments to find one.",
-          next_commands: [expectedPublicCliCommand(`deployment list --cwd ${app.path}`)],
+          next_commands: [
+            expectedPublicCliCommand(
+              `deployment list --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+            ),
+          ],
           details: { argument: "deployment_id" },
         });
       });

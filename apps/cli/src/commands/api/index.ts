@@ -33,7 +33,6 @@ import { Destructive } from "@/lib/oclif/destructive";
 import { reads, type Refused } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { json, prose, type Rendering } from "@/lib/oclif/rendering";
-import { declaredOf, renderSuggestion, suggestion } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import type { Summary } from "@/lib/ui";
 import { userAgent } from "@/lib/user-agent";
@@ -61,7 +60,7 @@ const METHOD: Refused<string> = {
 const UNCALLABLE_REFUSAL: Refusal = {
   message: "{reason}",
   hint: "Call it from the app it belongs to, through the SDK; the api ls command marks what the CLI can call.",
-  next: [suggestion("api:ls")],
+  next: [{ id: "api:ls" }],
 };
 
 const NOTHING_TO_PAGE_REFUSAL: Refusal = {
@@ -89,7 +88,7 @@ function resolveTarget(ref: string, method?: string): Target {
     if (error instanceof InvalidError) {
       throw new ZitadelError("E_VALIDATION", error.message, {
         hint: error.hint,
-        nextCommands: [suggestion("api:ls", { flags: { json: true } })],
+        nextCommands: [{ id: "api:ls", flags: { json: true } }],
       });
     }
     throw error;
@@ -311,12 +310,9 @@ export default class Api extends Destructive(EnvironmentCommand) {
       next: this.jsonEnabled()
         ? {
             commands: [
-              renderSuggestion(
-                suggestion("api:ls"),
-                declaredOf("api:ls", this.config.findCommand("api:ls")),
-                typeof flags.cwd === "string" ? { cwd: flags.cwd } : {},
-                this.config.version,
-              ),
+              this.suggestWith(typeof flags.cwd === "string" ? { cwd: flags.cwd } : {})({
+                id: "api:ls",
+              }),
             ],
           }
         : undefined,
@@ -512,7 +508,7 @@ export default class Api extends Destructive(EnvironmentCommand) {
         (operation.auth !== "secret" || hasSecret)
       );
     });
-    const retry = this.suggest("api:ls", { flags: { json: true } });
+    const retry = this.suggest({ id: "api:ls", flags: { json: true } });
     const tags = [
       ...new Set(
         callable.map((operation) => {

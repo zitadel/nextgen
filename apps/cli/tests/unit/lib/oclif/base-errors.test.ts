@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { ZitadelError } from "@/lib/errors";
-import { suggestion } from "@/lib/suggestion";
+import { resourceSuggestion } from "@/lib/suggestion";
+
 import { aConfigAt } from "@tests/helpers/suggest";
 import { BaseCommand } from "@/lib/oclif/base";
 import { DrawnSpinner } from "@/lib/ui/spinner";
@@ -248,7 +249,7 @@ describe("the one block every failure is shown as", () => {
 // raised it does not know where the run was pointed.
 describe("the follow-ups of a failure", () => {
   const start = new ZitadelError("E_VALIDATION", "Not running", {
-    nextCommands: [suggestion("start")],
+    nextCommands: [{ id: "start" }],
   });
 
   it("carry the directory the run was given", async () => {
@@ -276,7 +277,7 @@ describe("the follow-ups of a failure", () => {
 
     await cmd.fail(
       new ZitadelError("E_VALIDATION", "Not running", {
-        nextCommands: [suggestion("start", { flags: { cwd: "/work" } })],
+        nextCommands: [{ id: "start", flags: { cwd: "/work" } }],
       }),
     );
 
@@ -292,6 +293,32 @@ describe("the follow-ups of a failure", () => {
 
     expect(cmd.json).toEqual([
       expect.objectContaining({ next_commands: ["npx @zitadel/cli@test start --cwd /work/app"] }),
+    ]);
+  });
+});
+
+describe("a failure whose follow-up cannot be rendered", () => {
+  const broken = new ZitadelError("E_VALIDATION", "Not running", {
+    nextCommands: [resourceSuggestion("events", "create"), { id: "start" }],
+  });
+
+  it("is still reported, with its code and message", async () => {
+    const cmd = new FailingCommand(true);
+
+    await cmd.fail(broken);
+
+    expect(cmd.json).toEqual([
+      expect.objectContaining({ status: "error", code: "E_VALIDATION", message: "Not running" }),
+    ]);
+  });
+
+  it("leaves out only the follow-up it cannot render", async () => {
+    const cmd = new FailingCommand(true);
+
+    await cmd.fail(broken);
+
+    expect(cmd.json).toEqual([
+      expect.objectContaining({ next_commands: ["npx @zitadel/cli@test start"] }),
     ]);
   });
 });

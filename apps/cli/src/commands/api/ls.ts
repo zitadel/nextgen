@@ -97,8 +97,8 @@ export default class ApiLs extends Tabulatable(BaseCommand) {
       next: {
         commands: [
           items.length === 0
-            ? this.suggest("api:ls")
-            : this.suggest("api", { args: { operation: "<operation-id>" } }),
+            ? this.suggest({ id: "api:ls" })
+            : this.suggest({ id: "api", args: { operation: "<operation-id>" } }),
         ],
       },
     });

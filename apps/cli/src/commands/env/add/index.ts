@@ -24,14 +24,7 @@ import { interpolate, type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { PUBLIC_PROJECT_ID_VARIABLE } from "@/lib/orca/patchers/rule/public-project-id";
 import { readZitadelConfig } from "@/lib/project";
 import { DEFAULT_SERVER, parseServer, resolveServer } from "@/lib/server";
-import {
-  declaredOf,
-  renderSuggestion,
-  type Scope,
-  type Suggest,
-  suggestion,
-  WHAT_CHANGED,
-} from "@/lib/suggestion";
+import { type Scope, type Suggest, WHAT_CHANGED } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { userAgent } from "@/lib/user-agent";
 import { reportWarning } from "@/lib/warnings";
@@ -397,14 +390,7 @@ export default class EnvAdd extends Promptable(BaseCommand) {
       envFile: projectEnvFile(flags.cwd, environment.file),
       ...(flags.cwd === undefined ? {} : { cwd: flags.cwd }),
     };
-    const suggestOnNew: Suggest = (id, ...rest) => {
-      return renderSuggestion(
-        suggestion(id, ...rest),
-        declaredOf(id, this.config.findCommand(id)),
-        newEnvironment,
-        this.cliVersion,
-      );
-    };
+    const suggestOnNew = this.suggestWith(newEnvironment);
     // A created project already holds its app URL as a primary origin, which
     // closes it; only a bound one (`--project`) still needs the pattern added.
     const needsOrigin = flags.project !== undefined;
@@ -463,12 +449,12 @@ export default class EnvAdd extends Promptable(BaseCommand) {
       if (writtenKeys.has("ZITADEL_PROJECT_SECRET")) {
         if (issuer === undefined) {
           originGuidance = [
-            `Allow this project's origin: ${suggestOnNew("origin:add", { args: { pattern: "<your-app-url>" }, flags: { kind: "primary" } })}`,
+            `Allow this project's origin: ${suggestOnNew({ id: "origin:add", args: { pattern: "<your-app-url>" }, flags: { kind: "primary" } })}`,
           ];
         }
       } else {
         originGuidance = [
-          `Allow this project's origin once ZITADEL_PROJECT_SECRET is in ${environment.file}: ${suggestOnNew("origin:add", { args: { pattern: issuer ?? "<your-app-url>" }, flags: { kind: "primary" } })}`,
+          `Allow this project's origin once ZITADEL_PROJECT_SECRET is in ${environment.file}: ${suggestOnNew({ id: "origin:add", args: { pattern: issuer ?? "<your-app-url>" }, flags: { kind: "primary" } })}`,
         ];
       }
     }
@@ -485,8 +471,8 @@ export default class EnvAdd extends Promptable(BaseCommand) {
       if (!hasSomewhereToLand) {
         deployGuidance = [
           ...deployGuidance,
-          `Give it an origin first: ${suggestOnNew("origin:add", { args: { pattern: "<your-app-url>" }, flags: { kind: "primary" } })}`,
-          `Then deploy to it: ${suggestOnNew("deploy", { flags: { message: WHAT_CHANGED } })}`,
+          `Give it an origin first: ${suggestOnNew({ id: "origin:add", args: { pattern: "<your-app-url>" }, flags: { kind: "primary" } })}`,
+          `Then deploy to it: ${suggestOnNew({ id: "deploy", flags: { message: WHAT_CHANGED } })}`,
         ];
       }
     }
@@ -553,7 +539,8 @@ export default class EnvAdd extends Promptable(BaseCommand) {
             ? // The renderer quotes the origin: an IPv6 issuer like http://[::1]:3000
               // carries brackets a shell such as zsh would treat as a glob.
               [
-                suggestOnNew("origin:add", {
+                suggestOnNew({
+                  id: "origin:add",
                   args: { pattern: issuer },
                   flags: { kind: "primary" },
                 }),
@@ -565,9 +552,9 @@ export default class EnvAdd extends Promptable(BaseCommand) {
           // project someone else owns and may already serve a release of
           // their own, so this run does not propose replacing it.
           ...(hasSomewhereToLand && deployment === undefined
-            ? [suggestOnNew("deploy", { flags: { message: WHAT_CHANGED } })]
+            ? [suggestOnNew({ id: "deploy", flags: { message: WHAT_CHANGED } })]
             : []),
-          suggestOnNew("env"),
+          suggestOnNew({ id: "env" }),
         ],
       },
     });
@@ -615,7 +602,7 @@ export default class EnvAdd extends Promptable(BaseCommand) {
       return deployment;
     } catch (error) {
       reportWarning(
-        `The environment was bound but the first deploy failed: ${toZitadelError(error).message}. Run ${opts.suggest("deploy", { flags: { message: WHAT_CHANGED } })} to publish it.`,
+        `The environment was bound but the first deploy failed: ${toZitadelError(error).message}. Run ${opts.suggest({ id: "deploy", flags: { message: WHAT_CHANGED } })} to publish it.`,
       );
       return undefined;
     }

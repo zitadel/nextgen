@@ -1,7 +1,7 @@
 import { execa } from "execa";
 
 import { ZitadelError, isErrno } from "@/lib/errors";
-import { suggestion } from "@/lib/suggestion";
+
 import {
   EMPTY_ENV,
   EMPTY_SUMMARY,
@@ -463,7 +463,7 @@ function dockerError(action: string, args: string[], cause: unknown): ZitadelErr
       : { command: ["docker", ...args], cause };
   return new ZitadelError("E_VALIDATION", `${action} failed`, {
     hint: "Check that Docker is installed, running, and reachable from this shell.",
-    nextCommands: [suggestion("doctor")],
+    nextCommands: [{ id: "doctor" }],
     details,
   });
 }

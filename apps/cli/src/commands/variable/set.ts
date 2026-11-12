@@ -132,10 +132,10 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
         ].join(" "),
         next:
           args.value === undefined
-            ? inShell(this.suggest("variable:set", real), {
+            ? inShell(this.suggest({ id: "variable:set", ...real }), {
                 after: " < value.txt",
               })
-            : this.suggest("variable:set", real),
+            : this.suggest({ id: "variable:set", ...real }),
       });
 
       return this.emit({
@@ -163,9 +163,12 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
       message: `What should the value of ${args.name} be?`,
       stdin: true,
       // The scope this.suggest appends must precede the stdin redirection.
-      retry: inShell(this.suggest("variable:set", pipeInput(args.name, write, flags.as)), {
-        after: " < value.txt",
-      }),
+      retry: inShell(
+        this.suggest({ id: "variable:set", ...pipeInput(args.name, write, flags.as) }),
+        {
+          after: " < value.txt",
+        },
+      ),
       parse: (raw: string) => {
         return parseVariableValue(raw, flags.as);
       },
@@ -194,7 +197,8 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
             hint: "Set the preview value with --secret, piped in or prompted for.",
             nextCommands: [
               inShell(
-                this.suggest("variable:set", {
+                this.suggest({
+                  id: "variable:set",
                   args: { name: args.name },
                   flags: { secret: true, preview: true },
                 }),
@@ -235,7 +239,7 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
           actions: [
             "The new value applies after the next deploy: sign-ins keep using the variables the last deploy froze.",
           ],
-          commands: [this.suggest("deploy", { flags: { message: WHAT_CHANGED } })],
+          commands: [this.suggest({ id: "deploy", flags: { message: WHAT_CHANGED } })],
         };
         if (write.preview) {
           next = {
@@ -246,7 +250,8 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
           };
           if (verdict === "preview") {
             next.commands = [
-              this.suggest("preview", {
+              this.suggest({
+                id: "preview",
                 flags: { origin: ["<preview-url>"], message: WHAT_CHANGED },
               }),
             ];

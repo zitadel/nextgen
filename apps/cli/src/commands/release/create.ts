@@ -64,7 +64,7 @@ export default class ReleaseCreate extends EnvironmentCommand {
       compare: false,
       json: this.isJson,
       color: this.isColored,
-      suggest: this.suggester,
+      suggest: this.suggest,
     });
     for (const warning of prepared.warnings) {
       reportWarning(warning);
@@ -88,7 +88,7 @@ export default class ReleaseCreate extends EnvironmentCommand {
           sections: [],
         },
         next: {
-          commands: [this.suggest("release:create", { flags: { message: flags.message } })],
+          commands: [this.suggest({ id: "release:create", flags: { message: flags.message } })],
         },
       });
     }
@@ -112,7 +112,9 @@ export default class ReleaseCreate extends EnvironmentCommand {
         title,
         sections: [],
       },
-      next: { commands: [this.suggest("deployment:create", { flags: { release: release.id } })] },
+      next: {
+        commands: [this.suggest({ id: "deployment:create", flags: { release: release.id } })],
+      },
     });
   }
 }

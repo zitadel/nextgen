@@ -7,7 +7,7 @@ import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } f
 import { Destructive } from "@/lib/oclif/destructive";
 import { mutatedData } from "@/lib/oclif/envelope";
 import { type Refused, taken } from "@/lib/oclif/flags";
-import { suggestion } from "@/lib/suggestion";
+
 import { escapeControlCharacters } from "@/lib/terminal-text";
 
 /**
@@ -19,7 +19,7 @@ const RELEASE_ID: Refused<string> = {
   refusal: {
     message: "Invalid {input}: {problem}",
     hint: "List the releases to find one.",
-    next: [suggestion("release:list")],
+    next: [{ id: "release:list" }],
     details: {
       argument: "{input}",
     },
@@ -82,7 +82,8 @@ export default class ReleaseRevoke extends Destructive(EnvironmentCommand) {
             },
             next: {
               commands: [
-                this.suggest("release:revoke", {
+                this.suggest({
+                  id: "release:revoke",
                   args: { releaseId: args.releaseId },
                   flags: { force: true },
                 }),

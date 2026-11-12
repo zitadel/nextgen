@@ -14,7 +14,7 @@ import {
 import { type Refused, taken } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
-import { suggestion, WHAT_CHANGED } from "@/lib/suggestion";
+import { WHAT_CHANGED } from "@/lib/suggestion";
 import { variableCell } from "@/lib/variables";
 
 /**
@@ -27,7 +27,7 @@ const DEPLOYMENT_ID: Refused<string> = {
   refusal: {
     message: "Invalid {input}: {problem}",
     hint: "List the deployments to find one, or omit it to read the live deployment.",
-    next: [suggestion("deployment:list")],
+    next: [{ id: "deployment:list" }],
     details: {
       argument: "{input}",
     },
@@ -113,7 +113,7 @@ export default class VariableResolve extends Tabulatable(EnvironmentCommand) {
           {
             hint: `Live origins: ${found.origins.join(", ")}.`,
             nextCommands: found.origins.map((entry) => {
-              return this.suggest("variable:resolve", { flags: { origin: entry } });
+              return this.suggest({ id: "variable:resolve", flags: { origin: entry } });
             }),
           },
         );
@@ -123,13 +123,13 @@ export default class VariableResolve extends Tabulatable(EnvironmentCommand) {
           case "none": {
             throw new ZitadelError("E_NOT_FOUND", "Nothing is deployed to the project.", {
               hint: "Deploy first, then resolve its variables.",
-              nextCommands: [this.suggest("deploy", { flags: { message: WHAT_CHANGED } })],
+              nextCommands: [this.suggest({ id: "deploy", flags: { message: WHAT_CHANGED } })],
             });
           }
           case "primary": {
             throw new ZitadelError("E_NOT_FOUND", `Nothing is deployed to ${flags.origin}.`, {
               hint: "Deploy to it first, then resolve its variables.",
-              nextCommands: [this.suggest("deploy", { flags: { message: WHAT_CHANGED } })],
+              nextCommands: [this.suggest({ id: "deploy", flags: { message: WHAT_CHANGED } })],
             });
           }
           case "preview": {
@@ -143,7 +143,7 @@ export default class VariableResolve extends Tabulatable(EnvironmentCommand) {
               `${flags.origin} is not an origin of the project.`,
               {
                 hint: "Check the origin for a typo, or list the project's origins.",
-                nextCommands: [this.suggest("origin:list")],
+                nextCommands: [this.suggest({ id: "origin:list" })],
               },
             );
           }

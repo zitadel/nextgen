@@ -21,7 +21,7 @@ import { aSuggest } from "@tests/helpers/suggest";
 
 const CLAUDE = { name: "claude", display: "Claude Code", detected: true, installPath: "/x" };
 /** The `skills add` the hint names, as a run renders it. */
-const skillsAdd = aSuggest({}, "1.2.3")("skills:add");
+const skillsAdd = aSuggest({}, "1.2.3")({ id: "skills:add" });
 
 /** The environment of a user whose config home is `dir`. */
 const envIn = (dir: string): NodeJS.ProcessEnv => ({ XDG_CONFIG_HOME: dir });

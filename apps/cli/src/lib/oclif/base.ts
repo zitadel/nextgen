@@ -8,7 +8,7 @@ import { nonBlankString, serverFlag } from "./flags";
 import { Interruptible } from "./interruptible";
 import { log } from "@/lib/log";
 
-import { failureText, toZitadelError, ZitadelError } from "@/lib/errors";
+import { errorMessage, failureText, toZitadelError, ZitadelError } from "@/lib/errors";
 import { isObject } from "@/lib/json";
 import { type LocalServers, PsLocalServers } from "@/lib/local-server/processes";
 import { resolveCwd } from "@/lib/paths";
@@ -16,21 +16,20 @@ import { normalizePublicCliCommands, publicCliCommand, spellOutCommands } from "
 import { hostUnlessDefault, resolveServer, SERVER_VARIABLE } from "@/lib/server";
 import { statusColor } from "@/lib/style";
 import {
+  type Again,
   commandOf,
   type Declared,
   declaredOf,
+  type LooseNext,
   helpCommand,
   isSuggestion,
   type RELATIONS,
-  type Render,
-  renderSuggestion,
   type Scope,
   type Suggest,
   type Suggested,
   type SuggestedCommand,
-  type Again,
   type SuggestWords,
-  suggestion,
+  suggesterFor,
   suggestionWords,
 } from "@/lib/suggestion";
 import { type Properties, Telemetry, type TelemetryDeps } from "@/lib/telemetry";
@@ -307,8 +306,11 @@ export abstract class BaseCommand extends Interruptible(Command) {
 
   private reading: ReturnType<BaseCommand["parse"]> | undefined;
 
-  /** `--cwd` as typed, carried into the unscoped follow-ups this run suggests. */
-  private typedCwd: string | undefined;
+  /**
+   * How the command line chose the project, as typed: `--cwd`, `--env` or
+   * `--env-file`, and `--server`, carried into the commands this run suggests.
+   */
+  private typedScope: Scope = {};
 
   /** Whether the flags were read and the run's context settled, as opposed to a failure before it. */
   private settled = false;
@@ -422,14 +424,17 @@ export abstract class BaseCommand extends Interruptible(Command) {
   }
 
   /**
-   * What this run puts back on every command it suggests: the directory it
-   * addressed, as typed. A command that resolves an environment adds how it
-   * chose it (`EnvironmentCommand`).
+   * What this run puts back on every command it suggests: how its command line
+   * chose the project (`--cwd`, `--env` or `--env-file`, `--server`), as typed.
+   * Only what was typed is carried: a name that came from `ZITADEL_ENV` or a
+   * platform signal needs none, because the next run in the same environment
+   * inherits it. The renderer gives the environment half only to a target
+   * that takes it.
    *
    * @returns The scope, holding only what the command line named.
    */
   protected scope(): Scope {
-    return this.typedCwd === undefined ? {} : { cwd: this.typedCwd };
+    return this.typedScope;
   }
 
   /**
@@ -438,62 +443,42 @@ export abstract class BaseCommand extends Interruptible(Command) {
    * requires cannot be left out, each value has the type the command parses it
    * to, `exclusive` flags are never both given and a `dependsOn` flag brings
    * what it depends on. The run's `--cwd`, `--env`, `--env-file` and
-   * `--server` go back on as the target takes them ({@link scope}).
+   * `--server` go back on as the target takes them ({@link scope}). A
+   * follow-up rendered already is returned as it is.
    *
-   * @param id - The target, as oclif names it (`variable:get`).
-   * @param rest - Its arguments and flags, by the names code reads them.
+   * It is a property, so it can be handed to a helper as it is
+   * (`customizeAndPublishActions(this.suggest)`).
+   *
+   * @param next - The target and its arguments and flags, by the names code reads them.
    * @returns The command, in the public `npx @zitadel/cli@<version>` form.
-   * @throws {Error} When `id` is no command this CLI loaded.
+   * @throws {Error} When the target is no command this CLI loaded.
    */
-  protected readonly suggest: Suggest = (id, ...rest) => {
-    return this.rendered(suggestion(id, ...rest));
+  protected readonly suggest: Suggest = (next: Suggested | LooseNext) => {
+    return this.suggestWith(this.scope())(next as Suggested);
   };
+
+  /**
+   * {@link suggest} aimed at a scope of its own rather than this run's, such as
+   * the environment a command just created, or run as another release.
+   *
+   * @param scope - What every suggestion is aimed at, in place of this run's.
+   * @param cliVersion - The release the suggestions run as.
+   * @returns The renderer.
+   */
+  protected suggestWith(scope: Scope, cliVersion: string = this.cliVersion): Suggest {
+    return suggesterFor(this.config, scope, cliVersion);
+  }
 
   /**
    * {@link suggest} as the words after the CLI, for a result that reports its
    * follow-ups as argument lists too (`next_args`).
    *
-   * @param id - The target, as oclif names it.
-   * @param rest - Its arguments and flags, by the names code reads them.
+   * @param next - The target and its arguments and flags.
    * @returns The words, unquoted, one per shell word.
    */
-  protected readonly suggestArgs: SuggestWords = (id, ...rest) => {
-    const { input } = suggestion(id, ...rest);
-
-    return suggestionWords(id, input, this.declared(id), this.scope());
+  protected readonly suggestArgs: SuggestWords = (next: LooseNext) => {
+    return suggestionWords(next.id, next, this.declared(next.id), this.scope());
   };
-
-  /**
-   * {@link suggest} as a value, for a helper outside the command that names
-   * what to run next on this run's behalf.
-   */
-  protected get suggester(): Suggest {
-    return (id, ...rest) => {
-      return this.suggest(id, ...rest);
-    };
-  }
-
-  /** {@link rendered} as a value, for a helper that reports deferred follow-ups. */
-  protected get renderer(): Render {
-    return (next) => {
-      return this.rendered(next);
-    };
-  }
-
-  /**
-   * A follow-up as this run reports it: rendered already, or rendered now with
-   * this run's scope.
-   *
-   * @param next - The follow-up.
-   * @returns The command to run.
-   */
-  protected rendered(next: Suggested): SuggestedCommand {
-    if (!isSuggestion(next)) {
-      return next;
-    }
-
-    return renderSuggestion(next, this.declared(next.id), this.scope(), this.cliVersion);
-  }
 
   /**
    * This run again, rebuilt from the command line as oclif parsed it rather
@@ -574,8 +559,11 @@ export abstract class BaseCommand extends Interruptible(Command) {
       if (token.type !== "flag" || name === undefined || dropped.has(name)) {
         continue;
       }
-      if (target.flags.get(token.flag)?.type === "boolean") {
-        typed[name] = !token.input.startsWith("--no-");
+      const definition = target.flags.get(token.flag);
+      if (definition?.type === "boolean") {
+        // Only a switch that takes `--no-` is turned off by it; a switch named
+        // `no-open` is on when it is typed.
+        typed[name] = !(definition.allowNo === true && token.input === `--no-${token.flag}`);
         continue;
       }
       const before = typed[name];
@@ -670,7 +658,12 @@ export abstract class BaseCommand extends Interruptible(Command) {
   ): Promise<GlobalOptions> {
     const flags = byName(given);
     const cwd = resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined);
-    this.typedCwd = typeof flags.cwd === "string" ? flags.cwd : undefined;
+    this.typedScope = typedScopeOf({
+      cwd: flags.cwd,
+      env: flags.env,
+      envFile: flags.envFile,
+      server: flags.server,
+    });
     const serverFlag = typeof flags.server === "string" ? flags.server : undefined;
     const source = await this.serverOf(cwd, serverFlag, options);
     const json = this.jsonEnabled();
@@ -757,7 +750,12 @@ export abstract class BaseCommand extends Interruptible(Command) {
   private async metaFromArgv(meta: GlobalOptions): Promise<GlobalOptions> {
     const typed = argvValue(this.argv, "--cwd", "-c");
     const serverFlag = argvValue(this.argv, "--server");
-    this.typedCwd = typed;
+    this.typedScope = typedScopeOf({
+      cwd: typed,
+      env: argvValue(this.argv, "--env", "-e"),
+      envFile: argvValue(this.argv, "--env-file"),
+      server: serverFlag,
+    });
     const cwd = resolveCwd(typed);
     try {
       const source = await this.serverOf(cwd, serverFlag, this.command.meta);
@@ -780,10 +778,18 @@ export abstract class BaseCommand extends Interruptible(Command) {
       return error;
     }
 
+    // A follow-up that cannot be rendered is a defect in the suggestion, not
+    // in the run: it is left out rather than let the failure the person is
+    // being told about turn into a crash of its own.
     return new ZitadelError(error.code, error.message, {
       hint: error.hint,
-      nextCommands: error.nextCommands.map((next) => {
-        return this.rendered(next);
+      nextCommands: error.nextCommands.flatMap((next) => {
+        try {
+          return [this.suggest(next)];
+        } catch (cause) {
+          log.debug(`Left out a follow-up that could not be rendered: ${errorMessage(cause)}`);
+          return [];
+        }
       }),
       details: error.details,
     });
@@ -1028,7 +1034,9 @@ export abstract class BaseCommand extends Interruptible(Command) {
           },
         ];
     const skills =
-      this.skillsOffered && changed ? [claimSkills(process.env, this.suggest("skills:add"))] : [];
+      this.skillsOffered && changed
+        ? [claimSkills(process.env, this.suggest({ id: "skills:add" }))]
+        : [];
     return {
       ...summary,
       next: [
@@ -1447,3 +1455,27 @@ function warningLine(warning: string): string {
 
 /** The last step of every box: where to find every command. */
 const OVERVIEW = "Explore all commands:";
+
+/**
+ * The scope a command line typed, without what it left out: `--env-file`
+ * outranks `--env`, which the two cannot be given together for anyway.
+ *
+ * @param typed - The flags as parsed, each a string when it was given.
+ * @returns The scope.
+ */
+function typedScopeOf(typed: Readonly<Record<keyof Scope, unknown>>): Scope {
+  const text = (value: unknown): string | undefined => {
+    return typeof value === "string" ? value : undefined;
+  };
+  const cwd = text(typed.cwd);
+  const envFile = text(typed.envFile);
+  const env = envFile === undefined ? text(typed.env) : undefined;
+  const server = text(typed.server);
+
+  return {
+    ...(cwd === undefined ? {} : { cwd }),
+    ...(envFile === undefined ? {} : { envFile }),
+    ...(env === undefined ? {} : { env }),
+    ...(server === undefined ? {} : { server }),
+  };
+}

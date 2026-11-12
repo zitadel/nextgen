@@ -2,22 +2,22 @@ import type { Interfaces } from "@oclif/core";
 
 import type { ByName, Named } from "@/lib/names";
 
-import { commandOf, type Scope } from "./render";
+import { commandOf, type Declaring, declaredOf, renderSuggestion, type Scope } from "./render";
 
 /**
  * A command the CLI suggests running next — a `next.commands` entry on a
  * result, a `nextCommands` entry on an error, the `retry` of an input question
  * — and how the compiler holds each one to the command it names.
  *
- * A suggestion is never written as a string. It names its target by id and
- * gives the target's own arguments and flags as values:
+ * A suggestion is never written as a string. It is an object naming its target
+ * by id, with the target's own arguments and flags as values:
  *
  * ```ts
- * this.suggest("variable:get", { args: { name: "FOO" }, flags: { json: true } });
+ * this.suggest({ id: "variable:get", args: { name: "FOO" }, flags: { json: true } });
  * ```
  *
- * The id is checked against {@link NextTable}, which every command adds itself
- * to, and the input against what that command declares: a required argument
+ * The id is checked against {@link NextTable}, and the rest against what that
+ * command declares: a required argument
  * or flag cannot be left out, a flag the target does not take cannot be
  * named, a value has the type the target parses it to, `exclusive` flags are
  * never both given and a `dependsOn` flag brings what it depends on (both
@@ -37,24 +37,12 @@ declare const suggestedCommand: unique symbol;
 export type SuggestedCommand = string & { readonly [suggestedCommand]: true };
 
 /**
- * The commands a run can suggest, by id. Each command adds its own entry
- * beside its class, so there is no table to keep in step with the commands:
- *
- * ```ts
- * declare module "@/lib/suggestion" {
- *   interface NextTable {
- *     "variable:get": typeof VariableGet;
- *   }
- * }
- * ```
- *
- * It is an interface, not `typeof COMMANDS`, because every command extends a
- * base whose `suggest` reads this table: a type computed from the command
- * table would be circular (TS2506), while an interface member resolves only
- * when a suggestion asks for it. `tests/types/suggestion.test-d.ts` fails when
- * a command in `COMMANDS` is missing here.
+ * The commands a run can suggest, by id. `src/index.ts` derives it once from
+ * the command table it hands oclif (`WORKFLOW_COMMANDS` and the resource
+ * registry), so there is nothing to keep in step with the commands. It is an
+ * interface so that module can extend it without this one importing a command.
  */
-// biome-ignore lint/suspicious/noEmptyInterface: each command merges its own entry in
+// biome-ignore lint/suspicious/noEmptyInterface: `src/index.ts` extends it with the command table
 export interface NextTable {}
 
 /** The id of a command a run can suggest, such as `variable:get`. */
@@ -245,16 +233,24 @@ type FlagsInput<Id> =
  */
 export type SuggestInput<Id> = ArgsInput<Target<Id>> & FlagsInput<Id>;
 
+/** A suggestion of `Id`: the id, and the target's own arguments and flags. */
+export type NextOf<Id extends SuggestionId> = Readonly<{ id: Id }> & SuggestInput<Id>;
+
 /**
- * The rest of a suggestion's parameters: the input, left out when nothing in
- * it is required, and a sentence instead of a parameter when `Id` is no
- * command at all.
+ * A suggestion of `Id` as a parameter checks it: `Id` is read from the object's
+ * own `id`, and resolved against the command table only once a call asks for
+ * it, so naming a suggestion in a signature costs the command classes nothing.
  */
-export type SuggestRest<Id> = Id extends SuggestionId
-  ? Record<never, never> extends SuggestInput<Id>
-    ? [input?: SuggestInput<Id>]
-    : [input: SuggestInput<Id>]
-  : [unknownCommand: `${Id & string} is not a command`];
+export type Checked<Id extends string> = Id extends SuggestionId
+  ? NextOf<Id>
+  : Readonly<{ id: `${Id} is not a command` }>;
+
+/**
+ * A suggestion the compiler checks: one member per command, told apart by its
+ * `id`, so an object naming a command that does not exist, or giving it what
+ * it does not take, does not compile.
+ */
+export type Next = { [Id in SuggestionId]: NextOf<Id> }[SuggestionId];
 
 /** The flags of `Id` by the names code reads them, for a rerun's `without`. */
 export type SuggestFlagName<Id> = Named<FlagKey<Target<Id>>>;
@@ -270,23 +266,42 @@ export type LooseInput = Readonly<{
   rest?: readonly string[];
 }>;
 
+/** A suggestion once its id is no longer known to the compiler. */
+export type LooseNext = LooseInput & Readonly<{ id: string }>;
+
+declare const runtimeChecked: unique symbol;
+
 /**
- * Renders a suggestion for the run it is handed by: `BaseCommand.suggest` as a
+ * A suggestion of a generated resource command whose id is only known at run
+ * time (`${topic}:list` in the generic resource layer), which the renderer
+ * checks instead of the compiler. Only {@link resourceSuggestion} makes one.
+ */
+export type RuntimeNext = LooseNext & { readonly [runtimeChecked]: true };
+
+/**
+ * A suggestion checked where it is written and rendered later, by the run
+ * that reports it. Code that raises a failure below a command, where no run is
+ * at hand, names its follow-ups as these; the command's failure handler
+ * renders each with the run's own `--cwd`, `--env`, `--env-file` and
+ * `--server`, so a refusal raised deep in a library is aimed at the same
+ * project as one raised by the command.
+ */
+export type Suggestion = Next | RuntimeNext;
+
+/** A follow-up as an error carries it: rendered already, or for the run to render. */
+export type Suggested = SuggestedCommand | Suggestion;
+
+/**
+ * Renders a follow-up for the run it is handed by: `BaseCommand.suggest` as a
  * value, for a helper outside the command that names what to run next.
  */
-export type Suggest = <const Id extends string>(
-  id: Id,
-  ...rest: SuggestRest<Id>
-) => SuggestedCommand;
-
-/**
- * Renders a follow-up for the run it is handed by: `BaseCommand.rendered` as a
- * value, for a helper that holds deferred suggestions and must report them now.
- */
-export type Render = (next: Suggested) => SuggestedCommand;
+export interface Suggest {
+  <const Id extends string>(next: Checked<Id>): SuggestedCommand;
+  (next: Suggested): SuggestedCommand;
+}
 
 /** {@link Suggest} as the words after the CLI, for a result that reports argument lists. */
-export type SuggestWords = <const Id extends string>(id: Id, ...rest: SuggestRest<Id>) => string[];
+export type SuggestWords = <const Id extends string>(next: Checked<Id>) => string[];
 
 /** The running command again, with what changes checked against it. */
 export type Again = <const Id extends SuggestionId>(
@@ -297,58 +312,6 @@ export type Again = <const Id extends SuggestionId>(
   }>,
 ) => Promise<SuggestedCommand>;
 
-declare const deferred: unique symbol;
-
-/**
- * A suggestion checked where it is written and rendered later, by the run
- * that reports it. Code that raises a failure below a command, where no run is
- * at hand, names its follow-ups as these; the command's failure handler
- * renders each with the run's own `--cwd`, `--env`, `--env-file` and
- * `--server`, so a refusal raised deep in a library is aimed at the same
- * project as one raised by the command.
- */
-export type Suggestion = Readonly<{ id: string; input: LooseInput }> & {
-  readonly [deferred]: true;
-};
-
-/** A follow-up as an error carries it: rendered already, or for the run to render. */
-export type Suggested = SuggestedCommand | Suggestion;
-
-/**
- * A suggestion of `id`, checked against the command it names and rendered by
- * the run that reports it. See {@link Suggestion}.
- */
-export function suggestion<const Id extends string>(id: Id, ...rest: SuggestRest<Id>): Suggestion {
-  const input = (rest[0] ?? {}) as LooseInput;
-
-  // The brand is a type alone: nothing at run time tells a suggestion apart
-  // from another object with an id, which is why only this function makes one.
-  return Object.freeze({ id, input }) as unknown as Suggestion;
-}
-
-/**
- * `next` aimed at a directory, an environment or a server of its own rather
- * than the one the run would put back on it: a `claim` pinned to the project
- * file setup wrote. Choosing either half of the environment replaces the run's
- * whole selection when it is rendered.
- *
- * @param next - The suggestion.
- * @param scope - Where it is aimed.
- * @returns The same suggestion, with those flags given.
- */
-export function aimed(next: Suggestion, scope: Scope): Suggestion {
-  const flags = Object.fromEntries(
-    Object.entries(scope).filter(([, value]) => {
-      return value !== undefined;
-    }),
-  );
-
-  return Object.freeze({
-    id: next.id,
-    input: { ...next.input, flags: { ...next.input.flags, ...flags } },
-  }) as unknown as Suggestion;
-}
-
 /**
  * A suggestion of a generated resource command (`users:get`, `release:list`)
  * whose id is only known at run time, so the compiler cannot check it against a
@@ -357,16 +320,16 @@ export function aimed(next: Suggestion, scope: Scope): Suggestion {
  * no command.
  *
  * @param topic - The resource's topic, as oclif names it (`users`).
- * @param verb - The operation on it.
+ * @param verb - The operation on it, under the verb its command is named by.
  * @param input - The target's arguments and flags, by the names code reads them.
  * @returns The suggestion, for the run that reports it to render.
  */
 export function resourceSuggestion(
   topic: string,
-  verb: "list" | "get" | "create" | "update" | "delete",
+  verb: "list" | "get" | "create" | "update" | "delete" | "revoke" | "deactivate",
   input: LooseInput = {},
-): Suggestion {
-  return Object.freeze({ id: `${topic}:${verb}`, input }) as unknown as Suggestion;
+): RuntimeNext {
+  return { ...input, id: `${topic}:${verb}` } as RuntimeNext;
 }
 
 /** Whether `next` is still to be rendered. */
@@ -385,13 +348,43 @@ export function distinct(suggested: readonly Suggested[]): Suggested[] {
   const seen = new Set<string>();
 
   return suggested.filter((next) => {
-    const key = isSuggestion(next) ? JSON.stringify([next.id, next.input]) : next;
+    const key = isSuggestion(next) ? JSON.stringify(next) : next;
     if (seen.has(key)) {
       return false;
     }
     seen.add(key);
     return true;
   });
+}
+
+/**
+ * Renders suggestions against the commands `commands` loaded, with `scope` put
+ * back on each and the CLI named as `cliVersion` runs it: the one way a
+ * suggestion is rendered, whether by a run (`BaseCommand.suggest`), a hook or
+ * a help class.
+ *
+ * @param commands - Where each target's declaration is found: oclif's config.
+ * @param scope - What every suggestion is aimed at.
+ * @param cliVersion - The release of the CLI the commands run.
+ * @returns The renderer.
+ */
+export function suggesterFor(
+  commands: Readonly<{ findCommand: (id: string) => Declaring | undefined }>,
+  scope: Scope,
+  cliVersion: string,
+): Suggest {
+  return (next: Suggested | LooseNext) => {
+    if (typeof next === "string") {
+      return next;
+    }
+
+    return renderSuggestion(
+      next,
+      declaredOf(next.id, commands.findCommand(next.id)),
+      scope,
+      cliVersion,
+    );
+  };
 }
 
 /** A command that is not the CLI (`npm install …`, `rm …`), suggested as written. */
@@ -435,6 +428,7 @@ export function helpCommand(command: string, cliVersion: string): SuggestedComma
 export {
   commandOf,
   type Declared,
+  type Declaring,
   declaredOf,
   renderSuggestion,
   type Scope,

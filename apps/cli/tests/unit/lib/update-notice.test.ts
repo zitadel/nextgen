@@ -17,7 +17,7 @@ let dir: string;
 function notice(cliVersion: string, env: NodeJS.ProcessEnv = {}) {
   return updateNotice({
     cliVersion,
-    upgrade: aSuggest({}, cliVersion)("upgrade"),
+    upgrade: aSuggest({}, cliVersion)({ id: "upgrade" }),
     cwd: dir,
     env: { XDG_CONFIG_HOME: dir, ...env },
     columns: 80,

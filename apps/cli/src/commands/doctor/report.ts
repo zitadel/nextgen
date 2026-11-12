@@ -217,7 +217,7 @@ function skipReason(
   if (category === "project" && !input.projectConfigured) {
     return {
       reason: "no zitadel.json in this directory",
-      command: input.suggest("setup"),
+      command: input.suggest({ id: "setup" }),
     };
   }
   return undefined;

@@ -1,26 +1,38 @@
 import { ZitadelError, type ZitadelErrorCode } from "@/lib/errors";
-import { isSuggestion, type Suggested, type Suggestion } from "@/lib/suggestion";
+import type { Suggested, Suggestion } from "@/lib/suggestion";
 
 /**
  * How a command refuses, written once as text. Every placeholder is written
  * `{name}` and filled from the values the refusal is raised with: a flag, an
  * argument, or whatever the check that raised it hands over.
  */
-export type Refusal = Readonly<{
-  code?: ZitadelErrorCode;
-  message: string;
-  hint?: string;
+// An interface rather than a type alias: a flag's refusal is part of its
+// command's type, and an interface member is only resolved when it is read, so
+// `next` can name the command table without the table depending on itself.
+export interface Refusal {
+  readonly code?: ZitadelErrorCode;
+  readonly message: string;
+  readonly hint?: string;
   /**
    * What to run next: a {@link Suggestion} checked against the command it
-   * names, or a whole `{name}` placeholder the values fill with one or a list
-   * of them. The run that reports the refusal renders each with its own scope.
+   * names, or a whole `{name}` placeholder the refusal's `next` values fill
+   * with one or a list of them. The run that reports the refusal renders each
+   * with its own scope.
    */
-  next?: readonly (Suggestion | `{${string}}`)[];
-  details?: unknown;
-}>;
+  readonly next?: readonly (Suggestion | `{${string}}`)[];
+  readonly details?: unknown;
+}
 
 /** What a refusal's placeholders are filled from. */
 export type Placeholders = Readonly<Record<string, unknown>>;
+
+/**
+ * What a refusal's whole-placeholder `next` entries are filled from: each a
+ * follow-up the compiler checked, or a list of them. Kept apart from
+ * {@link Placeholders}, which takes any value, so a `next` entry can never be
+ * filled with a string written by hand.
+ */
+export type NextPlaceholders = Readonly<Record<string, Suggested | readonly Suggested[]>>;
 
 /**
  * The names a refusal's wording would leave unfilled, given the values it
@@ -31,20 +43,29 @@ export type Placeholders = Readonly<Record<string, unknown>>;
  * makes it a defect only a test can catch: a refusal's own test asserts this
  * is empty.
  */
-export function unmetBy(refusal: Refusal, values: Placeholders): string[] {
+export function unmetBy(
+  refusal: Refusal,
+  values: Placeholders,
+  next: NextPlaceholders = {},
+): string[] {
+  const namesIn = (templates: readonly string[]) => {
+    return templates.flatMap((template) => {
+      return [...template.matchAll(PLACEHOLDER)].map((match) => {
+        return match[1] as string;
+      });
+    });
+  };
   const placeholders = (refusal.next ?? []).filter((entry) => {
     return typeof entry === "string";
   });
-  const unfilled = [refusal.message, refusal.hint ?? "", ...placeholders]
-    .flatMap((template) => {
-      return [...template.matchAll(PLACEHOLDER)];
-    })
-    .map((match) => {
-      return match[1] as string;
-    })
-    .filter((name) => {
+  const unfilled = [
+    ...namesIn([refusal.message, refusal.hint ?? ""]).filter((name) => {
       return values[name] === undefined;
-    });
+    }),
+    ...namesIn(placeholders).filter((name) => {
+      return next[name] === undefined;
+    }),
+  ];
   return [...new Set(unfilled)];
 }
 
@@ -107,31 +128,38 @@ function fill(details: unknown, values: Placeholders): unknown {
  * check that found two steps — remove an origin, then add it back — writes one
  * entry and hands over both, and one that found a single step is unchanged.
  */
-function commandsOf(entry: Suggestion | `{${string}}`, values: Placeholders): Suggested[] {
+function commandsOf(entry: Suggestion | `{${string}}`, next: NextPlaceholders): Suggested[] {
   if (typeof entry !== "string") {
     return [entry];
   }
   const whole = WHOLE_PLACEHOLDER.exec(entry);
-  const value = whole?.[1] === undefined ? undefined : values[whole[1]];
-  const given: unknown[] = Array.isArray(value) ? value : value === undefined ? [] : [value];
+  const value = whole?.[1] === undefined ? undefined : next[whole[1]];
+  if (value === undefined) {
+    return [];
+  }
 
-  return given.filter((one): one is Suggested => {
-    return (
-      typeof one === "string" ||
-      (typeof one === "object" && one !== null && isSuggestion(one as Suggested))
-    );
-  });
+  return isSuggestedList(value) ? [...value] : [value];
+}
+
+/** Whether a `next` placeholder's value is a list of follow-ups rather than one. */
+function isSuggestedList(value: Suggested | readonly Suggested[]): value is readonly Suggested[] {
+  return Array.isArray(value);
 }
 
 /**
  * The error a {@link Refusal} describes, `E_VALIDATION` unless it names a code.
+ * `values` fill its wording and `next` its whole-placeholder `next` entries.
  * Its `next` commands stay suggestions for the run that reports it to render,
  * so a refusal raised while a flag parses, before any run has settled, names
  * the same follow-ups as one raised by the command.
  */
-export function refusalError(refusal: Refusal, values: Placeholders): ZitadelError {
+export function refusalError(
+  refusal: Refusal,
+  values: Placeholders,
+  next: NextPlaceholders = {},
+): ZitadelError {
   const suggested = refusal.next?.flatMap((entry) => {
-    return commandsOf(entry, values);
+    return commandsOf(entry, next);
   });
   return new ZitadelError(refusal.code ?? "E_VALIDATION", interpolate(refusal.message, values), {
     hint: refusal.hint === undefined ? undefined : interpolate(refusal.hint, values),

@@ -2,7 +2,7 @@ import { Cmd } from "@/lib/cmd";
 import { named } from "@/lib/names";
 import { newestCliCommand, optionArgs, publicCliCommand } from "@/lib/public-cli";
 
-import type { LooseInput, SuggestedCommand, Suggestion } from "./index";
+import type { LooseInput, LooseNext, SuggestedCommand } from "./index";
 
 /**
  * What the renderer needs to know of a suggestion's target, read from the
@@ -304,10 +304,10 @@ export function declaredOf(id: string, loaded: Declaring | undefined): Declared 
  * @returns The command.
  */
 export function renderSuggestion(
-  next: Suggestion,
+  next: LooseNext,
   target: Declared,
   scope: Scope,
   cliVersion: string,
 ): SuggestedCommand {
-  return commandOf(suggestionWords(next.id, next.input, target, scope), cliVersion);
+  return commandOf(suggestionWords(next.id, next, target, scope), cliVersion);
 }

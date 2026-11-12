@@ -1,5 +1,5 @@
 import { chmod, mkdir, readFile, stat, writeFile } from "node:fs/promises";
-import { suggestion } from "@/lib/suggestion";
+
 import { join } from "node:path";
 
 import { describe, expect, vi } from "vitest";
@@ -183,8 +183,8 @@ describe("readNearestRuntimeMetadata", () => {
 
     await expect(readNearestRuntimeMetadata(app)).rejects.toMatchObject({
       nextCommands: [
-        suggestion("reset", { flags: { force: true, cwd } }),
-        suggestion("start", { flags: { cwd } }),
+        { id: "reset", flags: { force: true, cwd } },
+        { id: "start", flags: { cwd } },
       ],
     });
   });
@@ -195,7 +195,7 @@ describe("readNearestRuntimeMetadata", () => {
     await malformedRecordAt(cwd);
 
     await expect(readNearestRuntimeMetadata(cwd)).rejects.toMatchObject({
-      nextCommands: [suggestion("reset", { flags: { force: true } }), suggestion("start")],
+      nextCommands: [{ id: "reset", flags: { force: true } }, { id: "start" }],
     });
   });
 });
@@ -328,8 +328,8 @@ describe("retargetMalformedRuntime", () => {
     const retargeted = retargetMalformedRuntime(malformed, dir) as ZitadelError;
 
     expect(retargeted.nextCommands).toEqual([
-      suggestion("reset", { flags: { force: true, cwd: dir } }),
-      suggestion("start", { flags: { cwd: dir } }),
+      { id: "reset", flags: { force: true, cwd: dir } },
+      { id: "start", flags: { cwd: dir } },
     ]);
     expect(retargeted.details).toEqual({
       x: 1,

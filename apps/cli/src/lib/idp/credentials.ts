@@ -187,10 +187,10 @@ export function republishCommand(
   suggest: Suggest,
 ): SuggestedCommand {
   if (secret) {
-    return suggest("variable:set", { args: { name }, flags: { secret: true } });
+    return suggest({ id: "variable:set", args: { name }, flags: { secret: true } });
   }
 
-  return suggest("variable:set", { args: { name } });
+  return suggest({ id: "variable:set", args: { name } });
 }
 
 /**

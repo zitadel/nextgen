@@ -134,8 +134,16 @@ describe("claim copy", () => {
     expect(closed).toContain("claim window has closed");
     expect(closed).toContain("npx @zitadel/cli@0.1.0 claim");
     expect(closed).toContain("no longer be claimed");
-    expect(closed).toContain("npx @zitadel/cli@0.1.0 setup");
+    expect(closed).toContain(
+      "npx @zitadel/cli@0.1.0 setup --cwd '<new-directory>' in a fresh directory",
+    );
     expect(closed).not.toMatch(/delete|removed|expire/i);
+  });
+
+  it("points the fresh setup at a new directory, not the one the run was given", () => {
+    expect(claimWindowClosedAction(aSuggest({ cwd: "app" }))).toContain(
+      "setup --cwd '<new-directory>' in a fresh directory",
+    );
   });
 
   // `unclaimed` is banned from the public docs by the vocabulary gate; keeping

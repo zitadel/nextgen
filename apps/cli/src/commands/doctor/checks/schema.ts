@@ -72,7 +72,7 @@ export class SchemaCheck extends AbstractSanityCheck {
           message:
             `No schema files found in ${CONFIG_DIRECTORIES.schemas} — this project predates editable ` +
             "schema configuration or setup was interrupted. New projects scaffold editable " +
-            `defaults via ${ctx.suggest("setup")}.`,
+            `defaults via ${ctx.suggest({ id: "setup" })}.`,
           path: this.path,
         };
       }

@@ -271,7 +271,7 @@ export default class Preview extends PreviewCommand {
       compare: false,
       json: this.isJson,
       color: this.isColored,
-      suggest: this.suggester,
+      suggest: this.suggest,
     });
     for (const warning of prepared.warnings) {
       reportWarning(warning);
@@ -308,7 +308,8 @@ export default class Preview extends PreviewCommand {
         },
         next: {
           commands: [
-            this.suggest("preview", {
+            this.suggest({
+              id: "preview",
               flags: {
                 origin: [...urls],
                 ttl: flags.ttl?.canonical,

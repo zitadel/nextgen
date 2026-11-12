@@ -8,7 +8,7 @@ import { consoleSignInUrl } from "@/lib/local-server/sign-in";
 import { log } from "@/lib/log";
 import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
-import { suggestion } from "@/lib/suggestion";
+
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { section } from "@/lib/ui";
 
@@ -16,7 +16,7 @@ import { section } from "@/lib/ui";
 const NO_LOCAL_ADMIN_REFUSAL: Refusal = {
   message: "No local admin in this directory or its parents",
   hint: "Run this from the directory the local server was started in, or one inside it. If it was never started, start it first; that is what creates the local admin the console signs in as.",
-  next: [suggestion("start")],
+  next: [{ id: "start" }],
 };
 
 /**
@@ -79,7 +79,7 @@ export default class Console extends BaseCommand {
           title,
           sections: [section(undefined, ["Signed in as", escapeControlCharacters(admin.email)])],
         },
-        next: { commands: [this.suggest("console")] },
+        next: { commands: [this.suggest({ id: "console" })] },
       });
     }
 
@@ -107,7 +107,7 @@ export default class Console extends BaseCommand {
       },
       next: {
         actions: [
-          `The link signs you in once. Run ${this.suggest("console")} again for a fresh one.`,
+          `The link signs you in once. Run ${this.suggest({ id: "console" })} again for a fresh one.`,
         ],
       },
     });
