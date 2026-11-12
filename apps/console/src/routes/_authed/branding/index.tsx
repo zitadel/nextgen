@@ -274,7 +274,7 @@ function BrandingScreen() {
           )}
         </PreviewStage>
 
-        <Card className="min-h-0 overflow-hidden border-foreground/10 p-0 shadow-xs">
+        <Card className="min-h-0 overflow-hidden p-0 shadow-xs outline-foreground/10">
           <SettingsPanel revision={revision} />
         </Card>
       </div>
