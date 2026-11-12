@@ -158,24 +158,51 @@ export class NotFound extends BaseCommand {
 const hook: Hook<"command_not_found"> = async ({ id, argv, config }) => {
   const own = process.argv.slice(2);
   const spelled = own.some((_, index) => own.slice(0, index + 1).join(":") === id);
-  const typed = spelled ? own : [...id.split(":"), ...(argv ?? [])];
+  const parts = id.split(":");
+  // A flag oclif took for the id is one word, colons and all
+  // (`--token:secret:more`), so it is never split into words of its own.
+  const cut = parts.findIndex((part) => {
+    return part.startsWith("-");
+  });
+  const leading = cut === -1 ? parts : [...parts.slice(0, cut), parts.slice(cut).join(":")];
+  const typed = spelled ? own : [...leading, ...(argv ?? [])];
   const end = typed.indexOf("--") === -1 ? typed.length : typed.indexOf("--");
-  // The flags every command takes, split by whether they take a value. A flag
-  // that is none of them may take one, so the word after it is never read as a
-  // command name: it may be a value, a secret even, and is never repeated.
-  const flags = Object.entries(BaseCommand.baseFlags);
-  const valued = new Set(flags.filter(([, f]) => f.type === "option").map(([name]) => name));
-  const switches = new Set([
-    "json",
-    ...flags.filter(([, f]) => f.type === "boolean").map(([n]) => n),
-  ]);
-  const named = (letter: string): string | undefined => {
-    return flags.find(([, f]) => f.char === letter)?.[0];
+  // A flag may take the word after it as its value, a secret even, so that
+  // word is never read as a command name. Only a name that is a switch in
+  // every command that declares it takes none; a letter means something else
+  // in every command, so only the base flags' letters are known. A flag every
+  // command takes a value for takes the next word whatever it is, as oclif
+  // would; any other leaves a word that is a flag itself, such as `--json`.
+  const base = Object.entries(BaseCommand.baseFlags);
+  const switches = new Map<string, boolean>([["json", true]]);
+  for (const [name, flag] of [
+    ...base,
+    ...config.commands.flatMap((command) => {
+      return Object.entries(command.flags);
+    }),
+  ]) {
+    switches.set(name, (switches.get(name) ?? true) && flag.type === "boolean");
+  }
+  const valued = new Set(
+    base.flatMap(([name, flag]) => {
+      return flag.type === "option" ? [name] : [];
+    }),
+  );
+  const lettered = (letter: string): [string, (typeof base)[number][1]] | undefined => {
+    return base.find(([, flag]) => {
+      return flag.char === letter;
+    });
   };
   const words: string[] = [];
   let json = false;
   for (let index = 0; index < end; index += 1) {
     const word = typed[index] as string;
+    const next = typed[index + 1];
+    const takesNext = (always: boolean): void => {
+      if (always || (next !== undefined && !next.startsWith("-"))) {
+        index += 1;
+      }
+    };
     if (!word.startsWith("-")) {
       words.push(word);
       continue;
@@ -186,21 +213,26 @@ const hook: Hook<"command_not_found"> = async ({ id, argv, config }) => {
     }
     if (word.startsWith("--")) {
       const name = word.slice(2).replace(/^no-/, "");
-      if (!word.includes("=") && !switches.has(name)) {
-        index += 1;
+      if (!word.includes("=") && switches.get(name) !== true) {
+        takesNext(valued.has(name));
       }
       continue;
     }
     // A cluster of short flags (`-nc`): the first letter that takes a value
     // takes the rest of the cluster, or the next word when it is the last one.
+    // A letter that is no base flag may be a flag of its own, with the next
+    // word its value, so it takes that word too.
     for (const [position, letter] of [...word.slice(1)].entries()) {
-      const name = named(letter);
-      if (name === undefined || valued.has(name)) {
-        if (position === word.length - 2) {
-          index += 1;
-        }
-        break;
+      const flag = lettered(letter);
+      if (flag?.[1].type === "boolean") {
+        continue;
       }
+      if (flag === undefined) {
+        takesNext(false);
+      } else if (position === word.length - 2) {
+        takesNext(true);
+      }
+      break;
     }
   }
   await NotFound.run([...words, ...(json ? ["--json"] : [])], config);
