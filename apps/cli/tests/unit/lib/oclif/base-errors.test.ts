@@ -11,7 +11,7 @@ import { asTerminal } from "@tests/helpers/terminal";
 
 /** A command that fails with a given error and records what it prints. */
 class FailingCommand extends BaseCommand {
-  public static override readonly id = "errors-test";
+  public static override readonly id: string = "origin:add";
   public readonly stderr: string[] = [];
   declare public ui: BaseCommand["ui"];
   public readonly json: unknown[] = [];
@@ -76,6 +76,11 @@ class FailingWhileParsing extends FailingCommand {
       this.exitCode = (exit as { oclif?: { exit?: number } }).oclif?.exit;
     }
   }
+}
+
+/** The same, run under an id the CLI has no command for. */
+class NamelessCommand extends FailingCommand {
+  public static override readonly id = "not-a-command";
 }
 
 /** The same, as one of the ten wizards, which is what has a chain to close. */
@@ -223,7 +228,21 @@ describe("the one block every failure is shown as", () => {
     );
 
     expect(cmd.stderr[0]).toBe(
-      "Error: Missing required flag kind (E_VALIDATION)\n\nNext:\n  $ npx @zitadel/cli@test errors-test --help",
+      "Error: Missing required flag kind (E_VALIDATION)\n\nNext:\n  $ npx @zitadel/cli@test origin add --help",
+    );
+  });
+
+  it("offers the CLI's own help for a command line that names no command", async () => {
+    const cmd = new NamelessCommand(false);
+
+    await cmd.fail(
+      refused(
+        "The following error occurred:\n  Missing required flag kind\nSee more help with --help",
+      ),
+    );
+
+    expect(cmd.stderr[0]).toBe(
+      "Error: Missing required flag kind (E_VALIDATION)\n\nNext:\n  $ npx @zitadel/cli@test --help",
     );
   });
 
@@ -239,7 +258,7 @@ describe("the one block every failure is shown as", () => {
     expect(cmd.json).toEqual([
       expect.objectContaining({
         message: "Missing required flag kind",
-        next_commands: ["npx @zitadel/cli@test errors-test --help"],
+        next_commands: ["npx @zitadel/cli@test origin add --help"],
       }),
     ]);
   });

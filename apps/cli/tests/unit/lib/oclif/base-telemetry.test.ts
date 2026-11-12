@@ -1,7 +1,7 @@
-import type { Config } from "@oclif/core";
 import { describe, expect, it } from "vitest";
 
 import { BaseCommand } from "@/lib/oclif/base";
+import { aConfigAt } from "@tests/helpers/suggestions";
 import type { Telemetry, TelemetryDeps } from "@/lib/telemetry";
 
 /** Minimal recording stand-in for the generic Telemetry client. */
@@ -67,7 +67,7 @@ class TestCommand extends BaseCommand {
 }
 
 function makeCommand(): TestCommand {
-  return new TestCommand([], { version: "0.0.0-test" } as unknown as Config);
+  return new TestCommand([], aConfigAt("0.0.0-test"));
 }
 
 describe("BaseCommand telemetry lifecycle", () => {

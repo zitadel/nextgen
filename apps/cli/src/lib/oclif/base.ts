@@ -19,7 +19,8 @@ import {
   type Again,
   declaredOf,
   type LooseNext,
-  helpCommand,
+  helpOf,
+  commandOf,
   isSuggestion,
   type RELATIONS,
   type Scope,
@@ -991,9 +992,15 @@ export abstract class BaseCommand extends Interruptible(Command) {
     const reason: unknown = this.signal.reason;
     const cancelled =
       this.signal.aborted && reason instanceof ZitadelError && reason.code === "E_CANCELLED";
+    // A command line oclif refused may name no command, and then the CLI's
+    // own help is the one to read.
+    const help =
+      this.config.findCommand(meta.command) === undefined
+        ? commandOf(["--help"], meta.cliVersion)
+        : this.suggest(helpOf(meta.command));
     const zitadelError = presentedFailure(
       this.suggestions.renderedFailure(cancelled ? reason : toZitadelError(error)),
-      meta,
+      help,
     );
     this.meta = meta;
     this.openTelemetry(process.argv.includes("--no-telemetry") ? false : undefined);
@@ -1310,19 +1317,20 @@ function failureSummary(error: ZitadelError, meta: GlobalOptions): Summary {
  * A failure as every rendering of it states it. oclif refuses a command line
  * in its own words, so the sentence is its first line and the step is the
  * command's help, in the envelope and on the terminal alike.
+ *
+ * @param error - The failure.
+ * @param help - The help of the command the run named.
+ * @returns The failure as it is reported.
  */
-function presentedFailure(error: ZitadelError, meta: GlobalOptions): ZitadelError {
+function presentedFailure(error: ZitadelError, help: SuggestedCommand): ZitadelError {
   const { sentence, misuse } = failureText(error.message);
   if (!misuse) {
     return error;
   }
-  const command = meta.command.replaceAll(":", " ").trim();
 
   return new ZitadelError(error.code, sentence, {
     hint: error.hint,
-    nextCommands: error.nextCommands?.length
-      ? error.nextCommands
-      : [helpCommand(command, meta.cliVersion)],
+    nextCommands: error.nextCommands?.length ? error.nextCommands : [help],
     details: error.details,
   });
 }

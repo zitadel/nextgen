@@ -1,11 +1,14 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 
+import { aSuggest } from "@tests/helpers/suggestions";
+
 import {
   commandOf,
   type Declared,
   declaredOf,
   distinct,
-  helpCommand,
+  type HelpNext,
+  helpOf,
   inShell,
   isSuggestion,
   type Next,
@@ -161,15 +164,54 @@ describe("distinct", () => {
   });
 });
 
-describe("helpCommand", () => {
-  it("is the command's help", () => {
-    expect(helpCommand("variable get", VERSION)).toBe(
+describe("a suggested help", () => {
+  const help = (next: HelpNext): HelpNext => {
+    return next;
+  };
+
+  it("is the command's help, named by its id", () => {
+    expect(aSuggest({ cwd: "apps/web" }, VERSION)(help({ id: "variable:get", help: true }))).toBe(
       "npx @zitadel/cli@1.0.0-alpha.25 variable get --help",
     );
   });
 
-  it("is the CLI's help for no command", () => {
-    expect(helpCommand("", VERSION)).toBe("npx @zitadel/cli@1.0.0-alpha.25 --help");
+  it("does not compile for a command that does not exist", () => {
+    // @ts-expect-error there is no `varaible get`
+    help({ id: "varaible:get", help: true });
+    // @ts-expect-error a help names its command by id, never as a command line
+    help({ id: "variable get", help: true });
+
+    expect(help({ id: "deploy", help: true })).toBeDefined();
+  });
+
+  it("does not compile with flags, which the help would not read", () => {
+    // @ts-expect-error the help takes no flags
+    help({ id: "deploy", help: true, flags: { message: WHAT_CHANGED } });
+
+    expect(help({ id: "deploy", help: true })).toBeDefined();
+  });
+
+  it("is the help of a command only known at run time", () => {
+    expect(aSuggest({}, VERSION)(helpOf("variable:get"))).toBe(
+      "npx @zitadel/cli@1.0.0-alpha.25 variable get --help",
+    );
+  });
+
+  it("refuses, when rendered, a command known at run time that does not exist", () => {
+    expect(() => {
+      return aSuggest({}, VERSION)(helpOf("varaible:get"));
+    }).toThrow("varaible:get is not a command");
+  });
+
+  it("refuses, when rendered, input the help would not read", () => {
+    expect(() => {
+      return suggestionWords(
+        "variable:get",
+        { help: true, args: { name: "API_KEY" } },
+        { flags: new Map(), args: ["name"], requiredArgs: ["name"] },
+        {},
+      );
+    }).toThrow("variable:get's help takes no arguments or flags");
   });
 });
 

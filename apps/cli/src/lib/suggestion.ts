@@ -268,10 +268,19 @@ export type LooseInput = Readonly<{
    * of a command that takes any number of them (`api <operation> <param>…`).
    */
   rest?: readonly string[];
+  /** The target's help instead of a run of it, so nothing else is given. */
+  help?: true;
 }>;
 
 /** A suggestion once its id is no longer known to the compiler. */
 export type LooseNext = LooseInput & Readonly<{ id: string }>;
+
+/**
+ * The help of the command `id` (`variable get --help`): oclif's own `--help`,
+ * which no command declares, so it takes no other input. The id is checked
+ * like any suggestion's: the compiler rejects one that is no command.
+ */
+export type HelpNext = Readonly<{ id: SuggestionId; help: true }>;
 
 declare const runtimeChecked: unique symbol;
 
@@ -290,7 +299,7 @@ export type RuntimeNext = LooseNext & { readonly [runtimeChecked]: true };
  * `--server`, so a refusal raised deep in a library is aimed at the same
  * project as one raised by the command.
  */
-export type Suggestion = Next | RuntimeNext;
+export type Suggestion = Next | HelpNext | RuntimeNext;
 
 /** A follow-up as an error carries it: rendered already, or for the run to render. */
 export type Suggested = SuggestedCommand | Suggestion;
@@ -334,6 +343,19 @@ export function resourceSuggestion(
   input: LooseInput = {},
 ): RuntimeNext {
   return { ...input, id: `${topic}:${verb}` } as RuntimeNext;
+}
+
+/**
+ * The help of a command whose id is only known at run time, such as the one a
+ * refused command line named or a generated resource command
+ * (`users:create`). The renderer checks the id, and throws on one that is no
+ * command, as it does for {@link resourceSuggestion}.
+ *
+ * @param id - The command's id, as oclif names it (`variable:get`).
+ * @returns The suggestion, for the run that reports it to render.
+ */
+export function helpOf(id: string): RuntimeNext {
+  return { id, help: true } as RuntimeNext;
 }
 
 /** Whether `next` is still to be rendered. */
@@ -427,27 +449,6 @@ export function inShell(
   shell: { before?: string; after?: string },
 ): SuggestedCommand {
   return `${shell.before ?? ""}${command}${shell.after ?? ""}` as SuggestedCommand;
-}
-
-/**
- * The help of `command`, which a refusal of the command line names: oclif's
- * own `--help`, which is no flag a command declares, so it is the one
- * suggestion not checked against a target.
- *
- * @param command - The command as it is typed (`variable get`), or `""` for the CLI.
- * @param cliVersion - The release of the CLI that is running.
- * @returns The command.
- */
-export function helpCommand(command: string, cliVersion: string): SuggestedCommand {
-  return commandOf(
-    [
-      ...command.split(" ").filter((word) => {
-        return word !== "";
-      }),
-      "--help",
-    ],
-    cliVersion,
-  );
 }
 
 /**
@@ -616,6 +617,18 @@ export function suggestionWords(
   target: Declared,
   scope: Scope,
 ): string[] {
+  const words = id.split(":").filter((word) => {
+    return word !== "";
+  });
+  if (input.help === true) {
+    // The target was looked up to get here, so the id is a command. Its help
+    // reads nothing else, and is the same in every directory.
+    if (input.args !== undefined || input.flags !== undefined || input.rest !== undefined) {
+      throw new Error(`${id}'s help takes no arguments or flags`);
+    }
+
+    return [...words, "--help"];
+  }
   const given = input.flags ?? {};
   const options: string[] = [];
   for (const [name, value] of Object.entries(given)) {
@@ -670,9 +683,6 @@ export function suggestionWords(
   if (unknown.length > 0) {
     throw new Error(`${id} declares no argument ${unknown.join(", ")}`);
   }
-  const words = id.split(":").filter((word) => {
-    return word !== "";
-  });
   const delimited = positional.some((word) => {
     return word.startsWith("-");
   });

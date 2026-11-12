@@ -36,6 +36,8 @@
   `{ id, … }` object; the failure handler renders it with the run's scope.
 - A helper that renders now takes a `Suggest` (`this.suggest`, or `suggestWith(scope)`
   aimed elsewhere); a runtime-only resource id is `resourceSuggestion(topic, verb)`.
+- Point at a command's help as `{ id, help: true }` (`helpOf(id)` for a runtime
+  id), never as `<command> --help` written in a hint.
 - `shellCommand` is for anything that is not the CLI; `inShell` wraps a pipe or
   redirection around a suggestion.
 - Pass a result's next steps as `next` (`src/lib/oclif/next-steps.ts`), never
