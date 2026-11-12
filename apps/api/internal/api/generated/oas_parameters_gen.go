@@ -6959,6 +6959,12 @@ type ListEventsParams struct {
 	EventType []string `json:",omitempty"`
 	// Only events triggered by this actor ID.
 	ActorID OptString `json:",omitempty,omitzero"`
+	// Only events that concern this user ID, whoever triggered them: the
+	// user's sign-ins, sessions and credentials, and the changes made to
+	// the user. Events recorded by a server version before this filter
+	// existed are not matched; they leave the list as retention removes
+	// them.
+	UserID OptString `json:",omitempty,omitzero"`
 	// Only events produced by this application or agent.
 	ClientID OptString `json:",omitempty,omitzero"`
 	// Only events of this session ID.
@@ -7037,6 +7043,15 @@ func unpackListEventsParams(packed middleware.Parameters) (params ListEventsPara
 		}
 		if v, ok := packed[key]; ok {
 			params.ActorID = v.(OptString)
+		}
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "user_id",
+			In:   "query",
+		}
+		if v, ok := packed[key]; ok {
+			params.UserID = v.(OptString)
 		}
 	}
 	{
@@ -7375,6 +7390,47 @@ func decodeListEventsParams(args [0]string, argsEscaped bool, r *http.Request) (
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
 			Name: "actor_id",
+			In:   "query",
+			Err:  err,
+		}
+	}
+	// Decode query: user_id.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "user_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotUserIDVal string
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToString(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotUserIDVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.UserID.SetTo(paramsDotUserIDVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "user_id",
 			In:   "query",
 			Err:  err,
 		}

@@ -28,7 +28,7 @@ not a `user.*` event, and enrolling a passkey is
 `auth.factor.passkey.enrolled`. A consumer syncing user records filters on
 `user.*` without receiving sign-in or credential traffic; a security consumer
 gets every credential change from `auth.factor.*`. A credential event names
-its user in the payload's `user_id`.
+its user in `user_id`, on the envelope and in the payload.
 
 **Compound transactions:** emit one Path B event per semantic mutation in the
 same TX (shared `request_id`).
@@ -37,9 +37,9 @@ same TX (shared `request_id`).
 
 ## Payload rules
 
-1. **Envelope owns identity** — `entity_type` / `entity_id` / `session_id` /
-   `token_id` / `client_id` / `flow_id` / `request_id` / actor identify the
-   subject. Do **not** put the primary entity id in `payload` again.
+1. **Envelope owns identity** — `entity_type` / `entity_id` / `user_id` /
+   `session_id` / `token_id` / `client_id` / `flow_id` / `request_id` / actor
+   identify the subject. Do **not** put the primary entity id in `payload` again.
    Exceptions: join events (membership) or a **secondary** id (e.g. `user_id`
    on a factor event; `auth_attempt_id` on a check event).
 2. **Create** — full **allowlisted snapshot** of fields the mutate API
@@ -86,7 +86,7 @@ same TX (shared `request_id`).
 ### SIEM join path
 
 Event **columns** carry correlation: `request_id`, `session_id`, `flow_id`,
-`client_id`, `token_id`, `actor_id`, `entity_id`.
+`client_id`, `token_id`, `actor_id`, `entity_id`, `user_id`.
 
 Path A `request.api` may also carry observed requestor context on metadata
 (`ip`, `user_agent`, `origin` under `client`). Join Path B mutations to that
@@ -109,6 +109,28 @@ are not inputs to the live risk evaluator
   and never the token an event is about; that one is `entity_id`. An export
   joins the requests a token authenticates to its `auth.token.issued` by
   `token_id` ↔ `entity_id`; `GET /events` has no `token_id` filter.
+
+### The user an event concerns
+
+`user_id` is the user an event is about, whoever acted, and a filter of
+`GET /events` that reads its own index. An emitter sets it through
+`EmitSpec.UserID`, for these types and no other:
+
+- The user as a record: `user.created`, `user.updated`, `user.deleted`.
+- A session or a token that belongs to a user: `session.established`,
+  `session.deleted`, `auth.token.issued`, `auth.token.revoked`.
+- A sign-in, once its attempt has resolved a user: `auth.attempt.created`,
+  `auth.attempt.handed_off`, `auth.check.succeeded`, `auth.check.failed`,
+  `auth.sso.authorization.failed`, `auth.sso.exchange.failed`,
+  `auth.sso.exchange.succeeded`.
+- A credential or an identity of a user: `auth.factor.password.set`,
+  `auth.factor.passkey.enrolled`, `idp.identity_link.created`.
+- A grant to a user: `authz.granted`, `authz.revoked`.
+
+An event of these types that concerns no user leaves it empty: an anonymous
+session, a check before the identifier resolved, a grant to a team or a key.
+`TestUserEventsSetUserID` holds the emitters to this list. The payload's
+`user_id` stays where it is.
 
 ## Path A
 

@@ -292,6 +292,7 @@ func emitAuthzGranted(ctx context.Context, stmts EventStatements, a *domain.Auth
 		ProjectID:  a.ProjectID,
 		EntityType: "authz_assignment",
 		EntityID:   a.ID,
+		UserID:     a.PrincipalUserID(),
 		Payload: domain.AuthzGrantedPayload{
 			PrincipalType: a.PrincipalType.String(),
 			PrincipalID:   a.PrincipalID,

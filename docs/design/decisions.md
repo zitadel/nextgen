@@ -16,6 +16,10 @@
 
 ## Decisions
 
+### D41 · Events narrows to what happened to a user — 2026-11-11
+Amends D30, whose filters named who did something (Actor) and what it was done to (Resource). A sign-in has no actor until it ends, and its checks, its session and its token are records of their own, so neither filter found what happened to one person's account. Events now has a User filter: `user:` in the search, "Only this user" on a row and in the panel, `user_id` in the CSV. It lists the events that concern the user, whoever acted, a rejected password included. A pasted `user_…` ID asks which is meant, what happened to its account or what it did, as another ID asks actor or resource; the account's reading holds the changes to the user too, so the resource is not offered a third time. The rows and the Actor column are unchanged.
+→ The rows themselves, a sentence each with names for the IDs, are open in [events-for-people.md](api/events-for-people.md#7-in-the-console).
+
 ### D40 · A project's Settings opens its own list, as the root Settings do — 2026-11-11 · [standing]
 Amends D35, whose project Settings was one page with General and Admins tabs. On Projects, Settings carried an arrow and swapped the sidebar for its own list (D29); in a project, a row of the same name and glyph opened a page beside the project's screens. As Vercel's team and project Settings both do, a project's Settings now opens a list too: General (the project's name, origins, variables and policies), then Admins, under a heading that leads back to the project. Both pages keep the project's header (its name, ID and created date). The root Settings are the platform project's (Profile, and on the hosted cloud Billing, Support and Email), so the two lists hold different pages; only the way they open is shared. Search lists a project's Settings pages among its pages, marked Settings and the project.
 → Design review of the pages without tabs: Admins' heading row with its Add button.

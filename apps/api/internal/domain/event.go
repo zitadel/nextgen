@@ -183,6 +183,11 @@ type Event struct {
 	EntityType *string
 	EntityID   *string
 
+	// UserID is the user the event concerns, whoever acted: the user a
+	// session, a token, a sign-in check or a credential belongs to, and the
+	// user a change was made to. Nil on an event that concerns no user.
+	UserID *string
+
 	ClientID       string
 	TokenID        string
 	DelegationType string
@@ -263,6 +268,7 @@ const (
 	EventFieldFlowID
 	EventFieldOperationStatus
 	EventFieldStatusClass
+	EventFieldUserID
 )
 
 func ErrEventNotFound() Error {

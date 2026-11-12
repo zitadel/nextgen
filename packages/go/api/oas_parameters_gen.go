@@ -623,6 +623,12 @@ type ListEventsParams struct {
 	EventType []string `json:",omitempty"`
 	// Only events triggered by this actor ID.
 	ActorID OptString `json:",omitempty,omitzero"`
+	// Only events that concern this user ID, whoever triggered them: the
+	// user's sign-ins, sessions and credentials, and the changes made to
+	// the user. Events recorded by a server version before this filter
+	// existed are not matched; they leave the list as retention removes
+	// them.
+	UserID OptString `json:",omitempty,omitzero"`
 	// Only events produced by this application or agent.
 	ClientID OptString `json:",omitempty,omitzero"`
 	// Only events of this session ID.

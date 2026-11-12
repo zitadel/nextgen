@@ -13558,8 +13558,8 @@ func (s *Server) handleListDeploymentsRequest(args [0]string, argsEscaped bool, 
 // Filters combine. These are answered from an index and fill their pages: no
 // filter, `category`, `event_type`, `status_class`, `operation_id` with or
 // without `status_class`, `request_id`, `flow_id`, and `session_id`,
-// `entity_id`, `actor_id` or `entity_type` with or without `category`, each
-// with or without the time bounds. Any other filter or combination is
+// `entity_id`, `user_id`, `actor_id` or `entity_type` with or without
+// `category`, each with or without the time bounds. Any other filter or combination is
 // matched event by event, over at most a few thousand events per request.
 // Such a page can hold fewer events than `limit`, or none, and still carry
 // `next_page_token`: keep passing the token until a response has none.
@@ -13737,6 +13737,10 @@ func (s *Server) handleListEventsRequest(args [0]string, argsEscaped bool, w htt
 					Name: "actor_id",
 					In:   "query",
 				}: params.ActorID,
+				{
+					Name: "user_id",
+					In:   "query",
+				}: params.UserID,
 				{
 					Name: "client_id",
 					In:   "query",

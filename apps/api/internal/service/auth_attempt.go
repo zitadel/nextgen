@@ -415,6 +415,7 @@ func (s *authAttemptService) Create(ctx context.Context, input CreateAuthAttempt
 			ProjectID:  attempt.ProjectID,
 			EntityType: "auth_attempt",
 			EntityID:   attempt.ID,
+			UserID:     attempt.ResolvedUserID(),
 			SessionID:  attempt.SessionID,
 			Payload:    domain.AuthAttemptCreatedPayload{},
 		})
@@ -521,6 +522,7 @@ func (s *authAttemptService) SetSSOCallbackResult(ctx context.Context, projectID
 			ProjectID:  projectID,
 			EntityType: "check",
 			EntityID:   check.ID,
+			UserID:     attempt.ResolvedUserID(),
 			SessionID:  attempt.SessionID,
 			FlowID:     &attempt.FlowID,
 			Payload: domain.AuthCheckPayload{
@@ -576,7 +578,7 @@ func (s *authAttemptService) VerifyProof(ctx context.Context, input VerifyProofI
 		if err := tx.Statements().AuthAttemptChallengeSucceeded(ctx, input.ProjectID, input.AttemptID, factor, challenge.GetID()); err != nil {
 			return err
 		}
-		return emitAuthCheck(ctx, tx.Statements(), attempt, challenge, true)
+		return emitAuthCheck(ctx, tx.Statements(), attempt, challenge, factor)
 	})
 	if err != nil {
 		// A provisional registration's create-user action can lose the
@@ -621,6 +623,7 @@ func (s *authAttemptService) Handoff(ctx context.Context, input HandoffInput) (_
 			ProjectID:  attempt.ProjectID,
 			EntityType: "auth_attempt",
 			EntityID:   attempt.ID,
+			UserID:     attempt.ResolvedUserID(),
 			SessionID:  attempt.SessionID,
 			Payload:    domain.AuthAttemptHandedOffPayload{},
 		})
@@ -653,6 +656,7 @@ func emitDirectAuthFactor(ctx context.Context, stmts EventStatements, attempt *d
 		ProjectID:  attempt.ProjectID,
 		EntityType: "check",
 		EntityID:   checkID,
+		UserID:     checkUserID(attempt, factor),
 		SessionID:  attempt.SessionID,
 		Payload: domain.AuthCheckPayload{
 			CheckID:       checkID,
@@ -662,9 +666,30 @@ func emitDirectAuthFactor(ctx context.Context, stmts EventStatements, attempt *d
 	})
 }
 
-func emitAuthCheck(ctx context.Context, stmts EventStatements, attempt *domain.AuthAttempt, challenge domain.AuthChallenge, succeeded bool) error {
+// checkUserID is the user a check's event concerns: the one the check itself
+// resolved, when its factor names one, else the one the attempt already had.
+// factor is nil for a check that failed.
+func checkUserID(attempt *domain.AuthAttempt, factor domain.AuthFactor) string {
+	var userID string
+	switch f := factor.(type) {
+	case *domain.AuthFactorUser:
+		userID = f.UserID
+	case *domain.AuthFactorPasskey:
+		userID = f.UserID
+	case *domain.AuthFactorPasskeyRegistration:
+		userID = f.UserID
+	}
+	if userID != "" {
+		return userID
+	}
+	return attempt.ResolvedUserID()
+}
+
+// emitAuthCheck records a check's outcome. factor is the verified factor of a
+// check that succeeded, nil for one that failed.
+func emitAuthCheck(ctx context.Context, stmts EventStatements, attempt *domain.AuthAttempt, challenge domain.AuthChallenge, factor domain.AuthFactor) error {
 	eventType := domain.EventTypeAuthCheckFailed
-	if succeeded {
+	if factor != nil {
 		eventType = domain.EventTypeAuthCheckSucceeded
 	}
 	return audit.Emit(ctx, stmts, audit.EmitSpec{
@@ -673,6 +698,7 @@ func emitAuthCheck(ctx context.Context, stmts EventStatements, attempt *domain.A
 		ProjectID:  attempt.ProjectID,
 		EntityType: "check",
 		EntityID:   challenge.GetID(),
+		UserID:     checkUserID(attempt, factor),
 		SessionID:  attempt.SessionID,
 		Payload: domain.AuthCheckPayload{
 			CheckID:       challenge.GetID(),
@@ -1016,6 +1042,7 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 				ProjectID:  attempt.ProjectID,
 				EntityType: "user_passkey",
 				EntityID:   newPasskey.ID,
+				UserID:     registrationChallenge.UserID,
 				SessionID:  attempt.SessionID,
 				Payload: domain.AuthFactorPayload{
 					UserID:   registrationChallenge.UserID,
@@ -1041,7 +1068,7 @@ func (s *authAttemptService) recordProofFailure(ctx context.Context, attempt *do
 		if err := tx.Statements().AuthAttemptChallengeFailed(ctx, attempt.ProjectID, attempt.ID, challenge); err != nil {
 			return err
 		}
-		return emitAuthCheck(ctx, tx.Statements(), attempt, challenge, false)
+		return emitAuthCheck(ctx, tx.Statements(), attempt, challenge, nil)
 	})
 }
 
@@ -1137,7 +1164,7 @@ func (s *authAttemptService) FinishPasskeyEnrollment(ctx context.Context, input 
 		if err := tx.Statements().AuthAttemptChallengeSucceeded(ctx, attempt.ProjectID, attempt.ID, factor, challenge.GetID()); err != nil {
 			return err
 		}
-		if err := emitAuthCheck(ctx, tx.Statements(), attempt, challenge, true); err != nil {
+		if err := emitAuthCheck(ctx, tx.Statements(), attempt, challenge, factor); err != nil {
 			return err
 		}
 		// Consume the internal attempt in the same transaction: the ceremony
