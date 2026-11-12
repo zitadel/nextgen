@@ -285,6 +285,10 @@ type GetMyUserSchemaRes interface {
 	getMyUserSchemaRes()
 }
 
+type GetOAuthSettingsByIdRes interface {
+	getOAuthSettingsByIdRes()
+}
+
 type GetPolicyRes interface {
 	getPolicyRes()
 }

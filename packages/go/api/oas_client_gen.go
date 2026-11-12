@@ -102,8 +102,8 @@ type Invoker interface {
 	// naming the pointer and the handle. Add the missing resource to the bundle.
 	// Building writes revisions, so besides `release.write` it needs the write
 	// scope of every kind the bundle carries a resource of: `schema.write`,
-	// `flow_definition.write`, `branding.write`, `idp.write` and `policy.write`,
-	// as the per-kind create endpoints do. A missing scope answers `403` with
+	// `flow_definition.write`, `branding.write`, `idp.write`, `policy.write`
+	// and `oauth_settings.write`, as the per-kind create endpoints do. A missing scope answers `403` with
 	// `rel.permission_denied`, naming the kind. Request a token with that scope.
 	// An empty kind needs no scope.
 	// Building a release does not deploy it. A release is not tied to an origin,
@@ -909,6 +909,18 @@ type Invoker interface {
 	//
 	// GET /users/me/schema
 	GetMyUserSchema(ctx context.Context, params GetMyUserSchemaParams) (GetMyUserSchemaRes, error)
+	// GetOAuthSettingsById invokes getOAuthSettingsById operation.
+	//
+	// Returns one OAuth settings revision, including its stored settings. Pass
+	// the `revision_id` of the `kind: oauth` pointer on a release, which
+	// `buildRelease` (`POST /releases/build`) and `getReleaseById`
+	// (`GET /releases/{release_id}`) return.
+	// A release is the only writer of OAuth settings, so there is no operation
+	// that publishes a revision on its own: put `oauth` in the bundle that
+	// `buildRelease` takes.
+	//
+	// GET /oauth_settings/{oauth_settings_id}
+	GetOAuthSettingsById(ctx context.Context, params GetOAuthSettingsByIdParams) (GetOAuthSettingsByIdRes, error)
 	// GetPolicy invokes getPolicy operation.
 	//
 	// Returns a policy as its newest revision. A revision applies once a deployed
@@ -2285,8 +2297,8 @@ func (c *Client) sendBeginUserPasskeyRegistration(ctx context.Context, request *
 // naming the pointer and the handle. Add the missing resource to the bundle.
 // Building writes revisions, so besides `release.write` it needs the write
 // scope of every kind the bundle carries a resource of: `schema.write`,
-// `flow_definition.write`, `branding.write`, `idp.write` and `policy.write`,
-// as the per-kind create endpoints do. A missing scope answers `403` with
+// `flow_definition.write`, `branding.write`, `idp.write`, `policy.write`
+// and `oauth_settings.write`, as the per-kind create endpoints do. A missing scope answers `403` with
 // `rel.permission_denied`, naming the kind. Request a token with that scope.
 // An empty kind needs no scope.
 // Building a release does not deploy it. A release is not tied to an origin,
@@ -9284,6 +9296,149 @@ func (c *Client) sendGetMyUserSchema(ctx context.Context, params GetMyUserSchema
 
 	stage = "DecodeResponse"
 	result, err := decodeGetMyUserSchemaResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// GetOAuthSettingsById invokes getOAuthSettingsById operation.
+//
+// Returns one OAuth settings revision, including its stored settings. Pass
+// the `revision_id` of the `kind: oauth` pointer on a release, which
+// `buildRelease` (`POST /releases/build`) and `getReleaseById`
+// (`GET /releases/{release_id}`) return.
+// A release is the only writer of OAuth settings, so there is no operation
+// that publishes a revision on its own: put `oauth` in the bundle that
+// `buildRelease` takes.
+//
+// GET /oauth_settings/{oauth_settings_id}
+func (c *Client) GetOAuthSettingsById(ctx context.Context, params GetOAuthSettingsByIdParams) (GetOAuthSettingsByIdRes, error) {
+	res, err := c.sendGetOAuthSettingsById(ctx, params)
+	return res, err
+}
+
+func (c *Client) sendGetOAuthSettingsById(ctx context.Context, params GetOAuthSettingsByIdParams) (res GetOAuthSettingsByIdRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("getOAuthSettingsById"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.URLTemplateKey.String("/oauth_settings/{oauth_settings_id}"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, GetOAuthSettingsByIdOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [2]string
+	pathParts[0] = "/oauth_settings/"
+	{
+		// Encode "oauth_settings_id" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "oauth_settings_id",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			return e.EncodeValue(conv.StringToString(params.OAuthSettingsID))
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "GET", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, GetOAuthSettingsByIdOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+		{
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, GetOAuthSettingsByIdOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+				{0b00000010},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeGetOAuthSettingsByIdResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}
