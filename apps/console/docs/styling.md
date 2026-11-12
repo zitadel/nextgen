@@ -286,10 +286,8 @@ is not a resource with an id.
 
 `DetailHeader` is the title row (a resource's icon tile, carrying the glyph of
 its sidebar entry, the title, a status beside it) over one identity line: the `meta`
-items, each value after its muted label, the id `copyable` and always in its
-short form (`shortId`: prefix, first and last four, `proj_01KW…4YM5`) while
-the copy button and title carry the whole id, a rule between items. A
-release's title keeps its whole id. A `labelHidden` item (a user's email) stands
+items, each value after its muted label, the id `copyable` and cut in the
+middle, a rule between items. A `labelHidden` item (a user's email) stands
 alone in the foreground. A screen whose list is not a sidebar entry (an
 identity provider, listed in a tab of Authentication) takes a `parent` link to
 that list, 8px over the title. The line stacks under `sm`. An `action` (a

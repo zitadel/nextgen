@@ -9,7 +9,7 @@ import {
 } from "react";
 
 import { Card, CardContent, CardDescription } from "@/components/ui/card";
-import { IdText, shortId } from "@/components/id-text";
+import { IdText } from "@/components/id-text";
 import { CopyButton } from "@/components/ui/copy-button";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
@@ -284,8 +284,8 @@ export interface DetailMetaItem {
    */
   labelHidden?: boolean;
   /**
-   * An id: shown in the foreground in its short form (`shortId`) with a copy
-   * button that copies the whole value, which is also its title.
+   * Shown in the foreground with a copy button, and cut in the middle rather
+   * than widening the page: an id, or anything else a person copies.
    */
   copyable?: boolean;
 }
@@ -352,9 +352,9 @@ export function DetailHeader({
           </div>
         </div>
         {items.length > 0 && (
-          // One line from `sm`, never wrapped: an id with no short form that
-          // does not fit is cut in the middle rather than pushing the next
-          // value onto a line that would start with a rule.
+          // One line from `sm`, never wrapped: a long id is cut in the middle
+          // to make room rather than pushing the next value onto a line that
+          // would start with a rule.
           <dl className="text-muted-foreground flex flex-col gap-1 text-xs leading-4 sm:flex-row sm:items-center sm:gap-0">
             {items.map((item, index) => (
               <div
@@ -378,18 +378,8 @@ export function DetailHeader({
                 >
                   {item.copyable ? (
                     <>
-                      {/* The short form is as short as the design draws it, so it
-                          never gives way; an id with none (a URI) is cut in the
-                          middle rather than widening the page. */}
-                      <IdText
-                        id={shortId(item.value)}
-                        label={item.value}
-                        title={item.value}
-                        className={cn(
-                          "text-foreground",
-                          shortId(item.value) !== item.value && "shrink-0",
-                        )}
-                      />
+                      {/* One line, cut in the middle: a URI id must not widen the page. */}
+                      <IdText id={item.value} title={item.value} className="text-foreground" />
                       <CopyButton value={item.value} label={`Copy ${item.label}`} size="inline" />
                     </>
                   ) : (
