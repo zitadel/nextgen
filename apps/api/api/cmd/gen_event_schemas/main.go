@@ -71,6 +71,9 @@ var payloadByEventType = map[string]string{
 	"release.created": "release-created-payload.yaml",
 	"release.revoked": "release-revoked-payload.yaml",
 
+	"application.created": "application-payload.yaml",
+	"application.updated": "application-payload.yaml",
+
 	"idp.created": "idp-payload.yaml",
 	"idp.updated": "idp-payload.yaml",
 
@@ -195,6 +198,10 @@ var webhookByEventType = map[string]webhookDoc{
 		"build of the project's configuration, which a deployment makes live."},
 	"release.revoked": {description: "A release was revoked."},
 
+	"application.created": {description: "A registered application was created."},
+	"application.updated": {description: "A registered application was revised. The payload holds the new " +
+		"revision, the name when it changed, and the clients the revision added."},
+
 	"idp.created": {description: "An identity provider (IdP) connection was created."},
 	"idp.updated": {description: "An IdP connection was revised. `data` holds the new " +
 		"revision and the fields that changed."},
@@ -219,15 +226,14 @@ var webhookByEventType = map[string]webhookDoc{
 	"authz.granted": {description: "A role on a project was granted."},
 	"authz.revoked": {description: "A role on a project was revoked."},
 
-	"invitation.created": {description: "An invitation was created, new or as the replacement of another.",
-		status: statusContracted},
+	"invitation.created": {description: "An invitation was created, new or as the replacement of another."},
 	"invitation.accepted": {description: "An invitation was accepted. The grant events the acceptance writes " +
 		"share its `request_id`, which is on the event that `getEvent` (`GET /events/{id}`) returns; there are " +
 		"none when the user already holds an identical active grant.",
 		status: statusContracted},
 	"invitation.rejected": {description: "An invitation was declined.", status: statusContracted},
 	"invitation.cancelled": {description: "A pending invitation was cancelled by an administrator, " +
-		"or by a replacement.", status: statusContracted},
+		"or an unaccepted one was deleted by its replacement."},
 
 	"auth.factor.password.set":     {description: "A user's password was set."},
 	"auth.factor.passkey.enrolled": {description: "A passkey was enrolled for a user."},

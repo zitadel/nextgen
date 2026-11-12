@@ -57,6 +57,7 @@ const (
 	GetMySessionCsrfTokenOperation         OperationName = "GetMySessionCsrfToken"
 	GetMyUserOperation                     OperationName = "GetMyUser"
 	GetMyUserSchemaOperation               OperationName = "GetMyUserSchema"
+	GetOAuthSettingsByIdOperation          OperationName = "GetOAuthSettingsById"
 	GetPolicyOperation                     OperationName = "GetPolicy"
 	GetPolicyRevisionOperation             OperationName = "GetPolicyRevision"
 	GetProjectOperation                    OperationName = "GetProject"

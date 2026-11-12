@@ -38,7 +38,7 @@ import {
 import { formatRecent } from "@/lib/date";
 
 /**
- * Webhooks: the endpoints the project's events are sent to (D41, root ADR
+ * Webhooks: the endpoints the project's events are sent to (D42, root ADR
  * 088), on the shared resource table. The server POSTs each event a webhook
  * names to its URL, signed with the webhook's secret.
  *
