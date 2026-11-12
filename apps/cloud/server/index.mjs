@@ -89,18 +89,22 @@ async function freePort() {
   return port;
 }
 
-// The OTLP/HTTP paths the server exports to, and what takes each export.
-const collectors = {
-  "/v1/traces": (body) => router.ingest(decodeTraceRequest(body)),
-  "/v1/metrics": (body) => {
-    metrics.ingest(decodeMetricsRequest(body));
-    const waiting = onMetricExport;
-    onMetricExport = [];
-    for (const resolve of waiting) {
-      resolve();
-    }
-  },
-};
+// The OTLP/HTTP paths the server exports to, and what takes each export. A
+// Map, so a path can only name one of these, never an inherited property.
+const collectors = new Map([
+  ["/v1/traces", (body) => router.ingest(decodeTraceRequest(body))],
+  [
+    "/v1/metrics",
+    (body) => {
+      metrics.ingest(decodeMetricsRequest(body));
+      const waiting = onMetricExport;
+      onMetricExport = [];
+      for (const resolve of waiting) {
+        resolve();
+      }
+    },
+  ],
+]);
 
 // Resolves on the server's next metric export, or after metricWaitMs.
 function nextMetricExport() {
@@ -114,7 +118,7 @@ function nextMetricExport() {
 }
 
 function collectorHandler(req, res) {
-  const collect = req.method === "POST" ? collectors[req.url] : undefined;
+  const collect = req.method === "POST" ? collectors.get(req.url) : undefined;
   if (!collect) {
     res.writeHead(404).end();
     return;
@@ -139,7 +143,8 @@ function collectorHandler(req, res) {
       // An empty Export*ServiceResponse: everything was accepted.
       res.writeHead(200, { "content-type": "application/x-protobuf" }).end();
     } catch (error) {
-      console.error(`server wrapper: dropping an export to ${req.url}:`, error);
+      // The path is an argument, not part of the format string.
+      console.error("server wrapper: dropping an export to %s:", req.url, error);
       res.writeHead(400).end();
     }
   });
