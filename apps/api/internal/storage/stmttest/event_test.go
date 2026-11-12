@@ -49,6 +49,7 @@ func sampleEvent(projectID, id string) *domain.Event {
 		ActorType:  &actorType,
 		EntityType: &entityType,
 		EntityID:   &entityID,
+		UserID:     &entityID,
 		ClientID:   "app_test",
 		Payload:    payload,
 		Metadata:   json.RawMessage(`{}`),
@@ -76,6 +77,8 @@ func TestEventStatements_InsertAndGet(t *testing.T) {
 		assert.Equal(t, entity.ClientID, got.ClientID)
 		require.NotNil(t, got.ActorID)
 		assert.Equal(t, *entity.ActorID, *got.ActorID)
+		require.NotNil(t, got.UserID, "the user the event concerns is read back")
+		assert.Equal(t, *entity.UserID, *got.UserID)
 		assert.JSONEq(t, string(entity.Payload), string(got.Payload))
 		assert.Nil(t, got.OperationID, "only a request event names an operation")
 		assert.Nil(t, got.StatusClass)
@@ -108,6 +111,7 @@ func TestEventStatements_InsertAndGet_RequestColumns(t *testing.T) {
 		assert.Equal(t, "createUser", *got.OperationID)
 		require.NotNil(t, got.StatusClass)
 		assert.Equal(t, domain.HTTPStatusClassClientError, *got.StatusClass)
+		assert.Nil(t, got.UserID, "a request concerns no user")
 	})
 }
 
@@ -201,9 +205,10 @@ func TestEventStatements_ListKeyset_Desc(t *testing.T) {
 }
 
 // The reads the events indexes serve (migrations events_filter_indexes,
-// events_value_indexes and events_request_indexes): by category, type, actor,
-// resource and resource type, by operation and status class, and the events
-// of one request, session or login flow. Each returns exactly its rows.
+// events_value_indexes, events_request_indexes and events_user_id): by
+// category, type, actor, user, resource and resource type, by operation and
+// status class, and the events of one request, session or login flow. Each
+// returns exactly its rows.
 func TestEventStatements_ListByIndexedFilters(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID, _ := uniqueEventIDs(t)
@@ -219,6 +224,7 @@ func TestEventStatements_ListByIndexedFilters(t *testing.T) {
 			category    domain.EventCategory
 			actor       *string
 			entity      *string
+			user        *string
 			request     *string
 			session     *string
 			flow        *string
@@ -226,17 +232,17 @@ func TestEventStatements_ListByIndexedFilters(t *testing.T) {
 			statusClass *domain.HTTPStatusClass
 		}{
 			{id: "evt-001", eventType: domain.EventTypeRequestAPI, category: domain.EventCategoryRequest, actor: &alice, request: &request, session: &session, operation: &createUser, statusClass: &ok},
-			{id: "evt-002", eventType: domain.EventTypeUserCreated, category: domain.EventCategoryEntity, actor: &alice, entity: &resource, request: &request},
-			{id: "evt-003", eventType: domain.EventTypeAuthCheckSucceeded, category: domain.EventCategoryAuth, session: &session, flow: &flow},
+			{id: "evt-002", eventType: domain.EventTypeUserCreated, category: domain.EventCategoryEntity, actor: &alice, entity: &resource, user: &resource, request: &request},
+			{id: "evt-003", eventType: domain.EventTypeAuthCheckSucceeded, category: domain.EventCategoryAuth, user: &resource, session: &session, flow: &flow},
 			{id: "evt-004", eventType: domain.EventTypeAuthCheckSucceeded, category: domain.EventCategoryAuth, actor: &service},
-			{id: "evt-005", eventType: domain.EventTypeUserDeleted, category: domain.EventCategoryEntity, actor: &service, entity: &resource},
+			{id: "evt-005", eventType: domain.EventTypeUserDeleted, category: domain.EventCategoryEntity, actor: &service, entity: &resource, user: &resource},
 			{id: "evt-006", eventType: domain.EventTypeRequestAPI, category: domain.EventCategoryRequest, actor: &service, operation: &createUser, statusClass: &failed},
 			{id: "evt-007", eventType: domain.EventTypeRequestAPI, category: domain.EventCategoryRequest, actor: &service, operation: &getMyUser, statusClass: &failed},
 			{id: "evt-008", eventType: domain.EventTypeRequestAPI, category: domain.EventCategoryRequest, statusClass: &failed},
 		} {
 			event := sampleEvent(projectID, seed.id)
 			event.EventType, event.Category = seed.eventType, seed.category
-			event.ActorID, event.EntityID = seed.actor, seed.entity
+			event.ActorID, event.EntityID, event.UserID = seed.actor, seed.entity, seed.user
 			if seed.category == domain.EventCategoryRequest {
 				event.EntityType = nil
 			}
@@ -261,6 +267,11 @@ func TestEventStatements_ListByIndexedFilters(t *testing.T) {
 			"actor in one category": {
 				filter: database.And(equal(domain.EventFieldActorID, alice), equal(domain.EventFieldCategory, string(domain.EventCategoryEntity))),
 				want:   []string{"evt-002"},
+			},
+			// Whoever acted: nobody yet, in the user's own sign-in check.
+			"user in one category": {
+				filter: database.And(equal(domain.EventFieldUserID, resource), equal(domain.EventFieldCategory, string(domain.EventCategoryAuth))),
+				want:   []string{"evt-003"},
 			},
 			"resource type in one category": {
 				filter: database.And(equal(domain.EventFieldEntityType, "user"), equal(domain.EventFieldCategory, string(domain.EventCategoryAuth))),
@@ -296,6 +307,20 @@ func TestEventStatements_ListByIndexedFilters(t *testing.T) {
 			page, err := events.ListEach(t.Context(), d.stmts.ListEvents, opts, domain.EventFieldCategory, categories)
 			require.NoError(t, err)
 			assert.Equal(t, []string{"evt-002", "evt-001"}, eventIDs(page.Items))
+		})
+		// One user across every category: the sign-in check, and what two
+		// other actors did to the user.
+		t.Run("user across categories", func(t *testing.T) {
+			opts := events.ListOptions(projectID, 10)
+			opts.Pagination.OrderBy = events.CreatedAtDesc()
+			opts.Filter = database.And(opts.Filter, equal(domain.EventFieldUserID, resource))
+			categories := make([]string, 0, len(domain.EventCategories()))
+			for _, category := range domain.EventCategories() {
+				categories = append(categories, string(category))
+			}
+			page, err := events.ListEach(t.Context(), d.stmts.ListEvents, opts, domain.EventFieldCategory, categories)
+			require.NoError(t, err)
+			assert.Equal(t, []string{"evt-005", "evt-003", "evt-002"}, eventIDs(page.Items))
 		})
 		// One operation across every status class: a read per class, merged.
 		t.Run("operation across status classes", func(t *testing.T) {

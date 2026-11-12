@@ -296,6 +296,13 @@ schema's object type and exclude the newest revision's URL:
 `users list --filter schema_object_type=equals:<type> --filter
 schema=not_equals:<newest-url> --all --json`.
 
+To find what happened to one user's account, whoever did it: `events list
+--filter user_id=<user-id> --json` returns the user's sign-ins with the
+passwords that were rejected, their sessions and credentials, and the changes
+made to the user. Add `--filter category=auth` for the sign-ins alone.
+`--filter actor_id=<user-id>` is the other question, what that user did. Only
+events recorded by a server that has this filter carry `user_id`.
+
 To find the API requests that failed: `events list --filter status_class=4xx
 --filter status_class=5xx --json`, and add `--filter operation_id=<operation>`
 (such as `createUser`) for one operation. Only requests recorded by a server

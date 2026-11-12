@@ -15,8 +15,11 @@ type EmitSpec struct {
 	ProjectID  string
 	EntityType string
 	EntityID   string
-	Payload    any
-	SessionID  *string
+	// UserID is the user the event concerns, whoever acted
+	// (domain.Event.UserID). Empty when it concerns none.
+	UserID    string
+	Payload   any
+	SessionID *string
 	// FlowID, when set and not empty, is the event's login flow in place of
 	// the request's own. The handoff exchange sets it: a service call whose
 	// flow is the one of the attempt it consumed.
@@ -37,6 +40,10 @@ func Emit(ctx context.Context, stmts EventInserter, spec EmitSpec) error {
 	// the spec's project wins over the actor context's.
 	if spec.ProjectID != "" {
 		ev.ProjectID = spec.ProjectID
+	}
+	if spec.UserID != "" {
+		userID := spec.UserID
+		ev.UserID = &userID
 	}
 	if spec.SessionID != nil {
 		ev.SessionID = spec.SessionID

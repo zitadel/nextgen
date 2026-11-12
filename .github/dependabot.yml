@@ -5,7 +5,6 @@ updates:
   # this pull request (apps/cli/src/lib/orca/scaffolders/framework-clis.ts).
   # One grouped pull request a week, which the fresh-app journeys test. It
   # changes what setup scaffolds, so add a changeset before it merges.
-  # Security updates for the rest of the repository need no entry.
   - package-ecosystem: npm
     directory: /apps/cli/src/lib/orca/scaffolders/framework-clis
     schedule:
@@ -19,8 +18,61 @@ updates:
     commit-message:
       prefix: fix
       include: scope
-  # Third-party actions are pinned to a commit SHA (CodeQL actions/unpinned-tag);
-  # this keeps the pins and their version comments current.
+
+  # The pnpm workspace and its catalog: one pull request a month with every
+  # minor and patch release at least a week old. Majors stay manual. A bump
+  # of a published package's runtime dependency needs a changeset before it
+  # merges (.changeset/README.md#decision-table).
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 7
+    # update-types affects version updates only, so majors still arrive as
+    # security updates.
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    groups:
+      npm:
+        update-types: [minor, patch]
+      npm-security:
+        applies-to: security-updates
+        patterns: ["*"]
+    commit-message:
+      prefix: build
+      include: scope
+
+  # Every module in go.work. Dependabot bumps each go.mod alone; run
+  # `node scripts/check-go-work.mjs --fix` on the branch if check-go-work fails.
+  - package-ecosystem: gomod
+    directories:
+      - /apps/api
+      - /packages/config/defaults
+      - /packages/design-tokens
+      - /packages/go
+      - /tools/bench
+      - /tools/oidc-mock
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 7
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    groups:
+      go:
+        update-types: [minor, patch]
+      go-security:
+        applies-to: security-updates
+        patterns: ["*"]
+    commit-message:
+      prefix: build
+      include: scope
+
+  # The actions the workflows use, majors included: they are pinned by major
+  # tag, so nothing else proposes a new one.
   - package-ecosystem: github-actions
     directory: /
     schedule:
@@ -28,7 +80,7 @@ updates:
     cooldown:
       default-days: 7
     groups:
-      github-actions:
+      actions:
         patterns: ["*"]
     commit-message:
       prefix: ci

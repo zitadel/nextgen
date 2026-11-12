@@ -108,7 +108,11 @@ jobs:
   publish:
     needs: changesets
     if: ${{ github.event_name == 'workflow_dispatch' || needs.changesets.outputs.publish_should_run == 'true' }}
-    runs-on: depot-ubuntu-24.04-16
+    # A GitHub-hosted runner, which npm requires to sign provenance; the
+    # same 32-core arm64 group as CI. The server binaries cross-compile with
+    # cgo off, so the host's architecture does not reach the release.
+    runs-on:
+      group: 32-arm-linux
     timeout-minutes: 90
     env:
       # A release builds everything itself: it neither restores nor saves
@@ -121,8 +125,6 @@ jobs:
           ref: ${{ github.event_name == 'push' && github.sha || 'main' }}
           fetch-depth: 0
 
-      # Go builds through GOCACHEPROG (`depot gocache`) on Depot, which keeps
-      # Depot's files in GOCACHE.
       - uses: actions/setup-go@v6
         with:
           go-version-file: apps/api/go.mod
@@ -185,8 +187,7 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.before || 'HEAD^' }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Depot runners are self-hosted from npm's provenance verifier's
-          # perspective. Keep trusted publishing via OIDC, but do not request
-          # npm provenance until the release job runs on GitHub-hosted runners.
-          PNPM_CONFIG_PROVENANCE: "false"
+          # Trusted publishing via OIDC, with a signed provenance statement
+          # linking each npm package to this workflow run.
+          PNPM_CONFIG_PROVENANCE: "true"
           RECOVER_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.recover_version || '' }}
