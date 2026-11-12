@@ -591,6 +591,7 @@ export const RESOURCES = {
       "actor_type",
       "entity_type",
       "entity_id",
+      "user_id",
       "request_id",
       "occurred_at",
     ],
@@ -615,6 +616,10 @@ export const RESOURCES = {
         },
         {
           field: "actor_id",
+          operations: ["equals"],
+        },
+        {
+          field: "user_id",
           operations: ["equals"],
         },
         {

@@ -1176,7 +1176,7 @@ describe("events search", () => {
     await userEvent.click(await find());
 
     expect(await screen.findByText(/name the filter:/)).toHaveTextContent(
-      "actor:, resource:, resource_type:, app:, device:",
+      "actor:, user:, resource:, resource_type:, app:, device:",
     );
   });
 
@@ -1247,17 +1247,37 @@ describe("events search", () => {
     const router = await renderAt("/events");
     await screen.findByRole("link", { name: "user.deleted" });
 
-    await searchFor("user_gone");
+    await searchFor("team_gone");
 
     // Enter chose nothing: both readings are offered.
     expect(queries).toHaveLength(1);
     expect(await screen.findByText("This ID can be either. Choose one:")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^Actor user_gone/ })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: /^Resource user_gone/ }));
+    expect(screen.getByRole("button", { name: /^Actor team_gone/ })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /^Resource team_gone/ }));
 
-    await waitFor(() => expect(queries.at(-1)?.get("entity_id")).toBe("user_gone"));
+    await waitFor(() => expect(queries.at(-1)?.get("entity_id")).toBe("team_gone"));
     expect(queries.at(-1)?.has("actor_id")).toBe(false);
-    expect(router.state.resolvedLocation?.search).toMatchObject({ resource: "user_gone" });
+    expect(router.state.resolvedLocation?.search).toMatchObject({ resource: "team_gone" });
+  });
+
+  it("asks whether a user's ID is the account or the actor", async () => {
+    const queries = serveEvents({ data: [event("evt_1")] });
+    const router = await renderAt("/events");
+    await screen.findByRole("link", { name: "user.deleted" });
+
+    await searchFor("user_gone");
+
+    expect(queries).toHaveLength(1);
+    expect(await screen.findByText("This ID can be either. Choose one:")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Actor user_gone/ })).toBeInTheDocument();
+    // What happened to the account, whoever did it: its sign-ins too.
+    await userEvent.click(
+      screen.getByRole("button", { name: "User user_gone, what happened to its account" }),
+    );
+
+    await waitFor(() => expect(queries.at(-1)?.get("user_id")).toBe("user_gone"));
+    expect(queries.at(-1)?.has("actor_id")).toBe(false);
+    expect(router.state.resolvedLocation?.search).toMatchObject({ user: "user_gone" });
   });
 
   it("reaches the choices with the arrow key", async () => {
@@ -1266,10 +1286,10 @@ describe("events search", () => {
     await screen.findByRole("link", { name: "user.deleted" });
 
     await userEvent.type(await find(), "user_admin{ArrowDown}");
-    expect(await screen.findByRole("button", { name: /^Actor user_admin/ })).toHaveFocus();
+    expect(await screen.findByRole("button", { name: /^User user_admin/ })).toHaveFocus();
     await userEvent.keyboard("{Enter}");
 
-    await waitFor(() => expect(queries.at(-1)?.get("actor_id")).toBe("user_admin"));
+    await waitFor(() => expect(queries.at(-1)?.get("user_id")).toBe("user_admin"));
   });
 
   it("is not a text search, and says so", async () => {

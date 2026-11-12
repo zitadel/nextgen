@@ -91,7 +91,7 @@ MCP, `llms.txt`, Open Graph images, `.md` pages) live under `/docs` here.
 - `guides/` leads to one outcome; `get-started/` does the same for a reader
   new to Zitadel, from nothing to a working sign-in.
 - `reference/` describes the exact contract; operation pages come from the
-  spec ([`api/openapi/AGENTS.md`](../../api/openapi/AGENTS.md#descriptions--the-first-sentence-stands-alone)).
+  spec ([`api/openapi/AGENTS.md`](../api/api/openapi/AGENTS.md#descriptions--the-first-sentence-stands-alone)).
 - `sdks/` holds one page per package: install it, wire it up, check it works.
 - In a guide, list prerequisites before the first command, and say where each
   required input comes from: "the project ID that `zitadel setup` prints".

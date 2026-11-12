@@ -1588,6 +1588,10 @@ type ApplicationCreatedEvent struct {
 	EntityType OptNilString `json:"entity_type"`
 	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a
+	// session, a token, a sign-in check or a credential belongs to, or the
+	// user a change was made to. Absent on an event that concerns no user.
+	UserID OptNilString `json:"user_id"`
 	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
 	// The ID of the token in use when the event was emitted, when there was one.
@@ -1663,6 +1667,11 @@ func (s *ApplicationCreatedEvent) GetEntityType() OptNilString {
 // GetEntityID returns the value of EntityID.
 func (s *ApplicationCreatedEvent) GetEntityID() OptNilString {
 	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *ApplicationCreatedEvent) GetUserID() OptNilString {
+	return s.UserID
 }
 
 // GetClientID returns the value of ClientID.
@@ -1773,6 +1782,11 @@ func (s *ApplicationCreatedEvent) SetEntityType(val OptNilString) {
 // SetEntityID sets the value of EntityID.
 func (s *ApplicationCreatedEvent) SetEntityID(val OptNilString) {
 	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *ApplicationCreatedEvent) SetUserID(val OptNilString) {
+	s.UserID = val
 }
 
 // SetClientID sets the value of ClientID.
@@ -2175,6 +2189,10 @@ type ApplicationUpdatedEvent struct {
 	EntityType OptNilString `json:"entity_type"`
 	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a
+	// session, a token, a sign-in check or a credential belongs to, or the
+	// user a change was made to. Absent on an event that concerns no user.
+	UserID OptNilString `json:"user_id"`
 	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
 	// The ID of the token in use when the event was emitted, when there was one.
@@ -2250,6 +2268,11 @@ func (s *ApplicationUpdatedEvent) GetEntityType() OptNilString {
 // GetEntityID returns the value of EntityID.
 func (s *ApplicationUpdatedEvent) GetEntityID() OptNilString {
 	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *ApplicationUpdatedEvent) GetUserID() OptNilString {
+	return s.UserID
 }
 
 // GetClientID returns the value of ClientID.
@@ -2360,6 +2383,11 @@ func (s *ApplicationUpdatedEvent) SetEntityType(val OptNilString) {
 // SetEntityID sets the value of EntityID.
 func (s *ApplicationUpdatedEvent) SetEntityID(val OptNilString) {
 	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *ApplicationUpdatedEvent) SetUserID(val OptNilString) {
+	s.UserID = val
 }
 
 // SetClientID sets the value of ClientID.
@@ -3048,6 +3076,10 @@ type AuthAttemptCreatedEvent struct {
 	EntityType OptNilString `json:"entity_type"`
 	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a
+	// session, a token, a sign-in check or a credential belongs to, or the
+	// user a change was made to. Absent on an event that concerns no user.
+	UserID OptNilString `json:"user_id"`
 	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
 	// The ID of the token in use when the event was emitted, when there was one.
@@ -3123,6 +3155,11 @@ func (s *AuthAttemptCreatedEvent) GetEntityType() OptNilString {
 // GetEntityID returns the value of EntityID.
 func (s *AuthAttemptCreatedEvent) GetEntityID() OptNilString {
 	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *AuthAttemptCreatedEvent) GetUserID() OptNilString {
+	return s.UserID
 }
 
 // GetClientID returns the value of ClientID.
@@ -3233,6 +3270,11 @@ func (s *AuthAttemptCreatedEvent) SetEntityType(val OptNilString) {
 // SetEntityID sets the value of EntityID.
 func (s *AuthAttemptCreatedEvent) SetEntityID(val OptNilString) {
 	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *AuthAttemptCreatedEvent) SetUserID(val OptNilString) {
+	s.UserID = val
 }
 
 // SetClientID sets the value of ClientID.
@@ -3495,6 +3537,10 @@ type AuthAttemptHandedOffEvent struct {
 	EntityType OptNilString `json:"entity_type"`
 	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a
+	// session, a token, a sign-in check or a credential belongs to, or the
+	// user a change was made to. Absent on an event that concerns no user.
+	UserID OptNilString `json:"user_id"`
 	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
 	// The ID of the token in use when the event was emitted, when there was one.
@@ -3570,6 +3616,11 @@ func (s *AuthAttemptHandedOffEvent) GetEntityType() OptNilString {
 // GetEntityID returns the value of EntityID.
 func (s *AuthAttemptHandedOffEvent) GetEntityID() OptNilString {
 	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *AuthAttemptHandedOffEvent) GetUserID() OptNilString {
+	return s.UserID
 }
 
 // GetClientID returns the value of ClientID.
@@ -3680,6 +3731,11 @@ func (s *AuthAttemptHandedOffEvent) SetEntityType(val OptNilString) {
 // SetEntityID sets the value of EntityID.
 func (s *AuthAttemptHandedOffEvent) SetEntityID(val OptNilString) {
 	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *AuthAttemptHandedOffEvent) SetUserID(val OptNilString) {
+	s.UserID = val
 }
 
 // SetClientID sets the value of ClientID.
@@ -4151,6 +4207,10 @@ type AuthCheckFailedEvent struct {
 	EntityType OptNilString `json:"entity_type"`
 	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a
+	// session, a token, a sign-in check or a credential belongs to, or the
+	// user a change was made to. Absent on an event that concerns no user.
+	UserID OptNilString `json:"user_id"`
 	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
 	// The ID of the token in use when the event was emitted, when there was one.
@@ -4226,6 +4286,11 @@ func (s *AuthCheckFailedEvent) GetEntityType() OptNilString {
 // GetEntityID returns the value of EntityID.
 func (s *AuthCheckFailedEvent) GetEntityID() OptNilString {
 	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *AuthCheckFailedEvent) GetUserID() OptNilString {
+	return s.UserID
 }
 
 // GetClientID returns the value of ClientID.
@@ -4336,6 +4401,11 @@ func (s *AuthCheckFailedEvent) SetEntityType(val OptNilString) {
 // SetEntityID sets the value of EntityID.
 func (s *AuthCheckFailedEvent) SetEntityID(val OptNilString) {
 	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *AuthCheckFailedEvent) SetUserID(val OptNilString) {
+	s.UserID = val
 }
 
 // SetClientID sets the value of ClientID.
@@ -4640,6 +4710,10 @@ type AuthCheckSucceededEvent struct {
 	EntityType OptNilString `json:"entity_type"`
 	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a
+	// session, a token, a sign-in check or a credential belongs to, or the
+	// user a change was made to. Absent on an event that concerns no user.
+	UserID OptNilString `json:"user_id"`
 	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
 	// The ID of the token in use when the event was emitted, when there was one.
@@ -4715,6 +4789,11 @@ func (s *AuthCheckSucceededEvent) GetEntityType() OptNilString {
 // GetEntityID returns the value of EntityID.
 func (s *AuthCheckSucceededEvent) GetEntityID() OptNilString {
 	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *AuthCheckSucceededEvent) GetUserID() OptNilString {
+	return s.UserID
 }
 
 // GetClientID returns the value of ClientID.
@@ -4825,6 +4904,11 @@ func (s *AuthCheckSucceededEvent) SetEntityType(val OptNilString) {
 // SetEntityID sets the value of EntityID.
 func (s *AuthCheckSucceededEvent) SetEntityID(val OptNilString) {
 	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *AuthCheckSucceededEvent) SetUserID(val OptNilString) {
+	s.UserID = val
 }
 
 // SetClientID sets the value of ClientID.
@@ -5140,6 +5224,10 @@ type AuthFactorPasskeyEnrolledEvent struct {
 	EntityType OptNilString `json:"entity_type"`
 	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a
+	// session, a token, a sign-in check or a credential belongs to, or the
+	// user a change was made to. Absent on an event that concerns no user.
+	UserID OptNilString `json:"user_id"`
 	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
 	// The ID of the token in use when the event was emitted, when there was one.
@@ -5215,6 +5303,11 @@ func (s *AuthFactorPasskeyEnrolledEvent) GetEntityType() OptNilString {
 // GetEntityID returns the value of EntityID.
 func (s *AuthFactorPasskeyEnrolledEvent) GetEntityID() OptNilString {
 	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *AuthFactorPasskeyEnrolledEvent) GetUserID() OptNilString {
+	return s.UserID
 }
 
 // GetClientID returns the value of ClientID.
@@ -5325,6 +5418,11 @@ func (s *AuthFactorPasskeyEnrolledEvent) SetEntityType(val OptNilString) {
 // SetEntityID sets the value of EntityID.
 func (s *AuthFactorPasskeyEnrolledEvent) SetEntityID(val OptNilString) {
 	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *AuthFactorPasskeyEnrolledEvent) SetUserID(val OptNilString) {
+	s.UserID = val
 }
 
 // SetClientID sets the value of ClientID.
@@ -5587,6 +5685,10 @@ type AuthFactorPasswordSetEvent struct {
 	EntityType OptNilString `json:"entity_type"`
 	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a
+	// session, a token, a sign-in check or a credential belongs to, or the
+	// user a change was made to. Absent on an event that concerns no user.
+	UserID OptNilString `json:"user_id"`
 	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
 	// The ID of the token in use when the event was emitted, when there was one.
@@ -5662,6 +5764,11 @@ func (s *AuthFactorPasswordSetEvent) GetEntityType() OptNilString {
 // GetEntityID returns the value of EntityID.
 func (s *AuthFactorPasswordSetEvent) GetEntityID() OptNilString {
 	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *AuthFactorPasswordSetEvent) GetUserID() OptNilString {
+	return s.UserID
 }
 
 // GetClientID returns the value of ClientID.
@@ -5772,6 +5879,11 @@ func (s *AuthFactorPasswordSetEvent) SetEntityType(val OptNilString) {
 // SetEntityID sets the value of EntityID.
 func (s *AuthFactorPasswordSetEvent) SetEntityID(val OptNilString) {
 	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *AuthFactorPasswordSetEvent) SetUserID(val OptNilString) {
+	s.UserID = val
 }
 
 // SetClientID sets the value of ClientID.
@@ -6138,6 +6250,10 @@ type AuthSSOAuthorizationFailedEvent struct {
 	EntityType OptNilString `json:"entity_type"`
 	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a
+	// session, a token, a sign-in check or a credential belongs to, or the
+	// user a change was made to. Absent on an event that concerns no user.
+	UserID OptNilString `json:"user_id"`
 	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
 	// The ID of the token in use when the event was emitted, when there was one.
@@ -6213,6 +6329,11 @@ func (s *AuthSSOAuthorizationFailedEvent) GetEntityType() OptNilString {
 // GetEntityID returns the value of EntityID.
 func (s *AuthSSOAuthorizationFailedEvent) GetEntityID() OptNilString {
 	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *AuthSSOAuthorizationFailedEvent) GetUserID() OptNilString {
+	return s.UserID
 }
 
 // GetClientID returns the value of ClientID.
@@ -6323,6 +6444,11 @@ func (s *AuthSSOAuthorizationFailedEvent) SetEntityType(val OptNilString) {
 // SetEntityID sets the value of EntityID.
 func (s *AuthSSOAuthorizationFailedEvent) SetEntityID(val OptNilString) {
 	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *AuthSSOAuthorizationFailedEvent) SetUserID(val OptNilString) {
+	s.UserID = val
 }
 
 // SetClientID sets the value of ClientID.
@@ -6585,6 +6711,10 @@ type AuthSSOExchangeFailedEvent struct {
 	EntityType OptNilString `json:"entity_type"`
 	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a
+	// session, a token, a sign-in check or a credential belongs to, or the
+	// user a change was made to. Absent on an event that concerns no user.
+	UserID OptNilString `json:"user_id"`
 	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
 	// The ID of the token in use when the event was emitted, when there was one.
@@ -6660,6 +6790,11 @@ func (s *AuthSSOExchangeFailedEvent) GetEntityType() OptNilString {
 // GetEntityID returns the value of EntityID.
 func (s *AuthSSOExchangeFailedEvent) GetEntityID() OptNilString {
 	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *AuthSSOExchangeFailedEvent) GetUserID() OptNilString {
+	return s.UserID
 }
 
 // GetClientID returns the value of ClientID.
@@ -6770,6 +6905,11 @@ func (s *AuthSSOExchangeFailedEvent) SetEntityType(val OptNilString) {
 // SetEntityID sets the value of EntityID.
 func (s *AuthSSOExchangeFailedEvent) SetEntityID(val OptNilString) {
 	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *AuthSSOExchangeFailedEvent) SetUserID(val OptNilString) {
+	s.UserID = val
 }
 
 // SetClientID sets the value of ClientID.
@@ -7032,6 +7172,10 @@ type AuthSSOExchangeSucceededEvent struct {
 	EntityType OptNilString `json:"entity_type"`
 	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a
+	// session, a token, a sign-in check or a credential belongs to, or the
+	// user a change was made to. Absent on an event that concerns no user.
+	UserID OptNilString `json:"user_id"`
 	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
 	// The ID of the token in use when the event was emitted, when there was one.
@@ -7107,6 +7251,11 @@ func (s *AuthSSOExchangeSucceededEvent) GetEntityType() OptNilString {
 // GetEntityID returns the value of EntityID.
 func (s *AuthSSOExchangeSucceededEvent) GetEntityID() OptNilString {
 	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *AuthSSOExchangeSucceededEvent) GetUserID() OptNilString {
+	return s.UserID
 }
 
 // GetClientID returns the value of ClientID.
@@ -7217,6 +7366,11 @@ func (s *AuthSSOExchangeSucceededEvent) SetEntityType(val OptNilString) {
 // SetEntityID sets the value of EntityID.
 func (s *AuthSSOExchangeSucceededEvent) SetEntityID(val OptNilString) {
 	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *AuthSSOExchangeSucceededEvent) SetUserID(val OptNilString) {
+	s.UserID = val
 }
 
 // SetClientID sets the value of ClientID.
@@ -7479,6 +7633,10 @@ type AuthTokenIssuedEvent struct {
 	EntityType OptNilString `json:"entity_type"`
 	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a
+	// session, a token, a sign-in check or a credential belongs to, or the
+	// user a change was made to. Absent on an event that concerns no user.
+	UserID OptNilString `json:"user_id"`
 	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
 	// The ID of the token in use when the event was emitted, when there was one.
@@ -7554,6 +7712,11 @@ func (s *AuthTokenIssuedEvent) GetEntityType() OptNilString {
 // GetEntityID returns the value of EntityID.
 func (s *AuthTokenIssuedEvent) GetEntityID() OptNilString {
 	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *AuthTokenIssuedEvent) GetUserID() OptNilString {
+	return s.UserID
 }
 
 // GetClientID returns the value of ClientID.
@@ -7664,6 +7827,11 @@ func (s *AuthTokenIssuedEvent) SetEntityType(val OptNilString) {
 // SetEntityID sets the value of EntityID.
 func (s *AuthTokenIssuedEvent) SetEntityID(val OptNilString) {
 	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *AuthTokenIssuedEvent) SetUserID(val OptNilString) {
+	s.UserID = val
 }
 
 // SetClientID sets the value of ClientID.
@@ -7942,6 +8110,10 @@ type AuthTokenRevokedEvent struct {
 	EntityType OptNilString `json:"entity_type"`
 	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a
+	// session, a token, a sign-in check or a credential belongs to, or the
+	// user a change was made to. Absent on an event that concerns no user.
+	UserID OptNilString `json:"user_id"`
 	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
 	// The ID of the token in use when the event was emitted, when there was one.
@@ -8017,6 +8189,11 @@ func (s *AuthTokenRevokedEvent) GetEntityType() OptNilString {
 // GetEntityID returns the value of EntityID.
 func (s *AuthTokenRevokedEvent) GetEntityID() OptNilString {
 	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *AuthTokenRevokedEvent) GetUserID() OptNilString {
+	return s.UserID
 }
 
 // GetClientID returns the value of ClientID.
@@ -8127,6 +8304,11 @@ func (s *AuthTokenRevokedEvent) SetEntityType(val OptNilString) {
 // SetEntityID sets the value of EntityID.
 func (s *AuthTokenRevokedEvent) SetEntityID(val OptNilString) {
 	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *AuthTokenRevokedEvent) SetUserID(val OptNilString) {
+	s.UserID = val
 }
 
 // SetClientID sets the value of ClientID.
@@ -8480,6 +8662,10 @@ type AuthzGrantedEvent struct {
 	EntityType OptNilString `json:"entity_type"`
 	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a
+	// session, a token, a sign-in check or a credential belongs to, or the
+	// user a change was made to. Absent on an event that concerns no user.
+	UserID OptNilString `json:"user_id"`
 	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
 	// The ID of the token in use when the event was emitted, when there was one.
@@ -8555,6 +8741,11 @@ func (s *AuthzGrantedEvent) GetEntityType() OptNilString {
 // GetEntityID returns the value of EntityID.
 func (s *AuthzGrantedEvent) GetEntityID() OptNilString {
 	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *AuthzGrantedEvent) GetUserID() OptNilString {
+	return s.UserID
 }
 
 // GetClientID returns the value of ClientID.
@@ -8665,6 +8856,11 @@ func (s *AuthzGrantedEvent) SetEntityType(val OptNilString) {
 // SetEntityID sets the value of EntityID.
 func (s *AuthzGrantedEvent) SetEntityID(val OptNilString) {
 	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *AuthzGrantedEvent) SetUserID(val OptNilString) {
+	s.UserID = val
 }
 
 // SetClientID sets the value of ClientID.
@@ -8965,6 +9161,10 @@ type AuthzRevokedEvent struct {
 	EntityType OptNilString `json:"entity_type"`
 	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a
+	// session, a token, a sign-in check or a credential belongs to, or the
+	// user a change was made to. Absent on an event that concerns no user.
+	UserID OptNilString `json:"user_id"`
 	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
 	// The ID of the token in use when the event was emitted, when there was one.
@@ -9040,6 +9240,11 @@ func (s *AuthzRevokedEvent) GetEntityType() OptNilString {
 // GetEntityID returns the value of EntityID.
 func (s *AuthzRevokedEvent) GetEntityID() OptNilString {
 	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *AuthzRevokedEvent) GetUserID() OptNilString {
+	return s.UserID
 }
 
 // GetClientID returns the value of ClientID.
@@ -9150,6 +9355,11 @@ func (s *AuthzRevokedEvent) SetEntityType(val OptNilString) {
 // SetEntityID sets the value of EntityID.
 func (s *AuthzRevokedEvent) SetEntityID(val OptNilString) {
 	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *AuthzRevokedEvent) SetUserID(val OptNilString) {
+	s.UserID = val
 }
 
 // SetClientID sets the value of ClientID.
@@ -10061,6 +10271,10 @@ type BrandingCreatedEvent struct {
 	EntityType OptNilString `json:"entity_type"`
 	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a
+	// session, a token, a sign-in check or a credential belongs to, or the
+	// user a change was made to. Absent on an event that concerns no user.
+	UserID OptNilString `json:"user_id"`
 	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
 	// The ID of the token in use when the event was emitted, when there was one.
@@ -10136,6 +10350,11 @@ func (s *BrandingCreatedEvent) GetEntityType() OptNilString {
 // GetEntityID returns the value of EntityID.
 func (s *BrandingCreatedEvent) GetEntityID() OptNilString {
 	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *BrandingCreatedEvent) GetUserID() OptNilString {
+	return s.UserID
 }
 
 // GetClientID returns the value of ClientID.
@@ -10246,6 +10465,11 @@ func (s *BrandingCreatedEvent) SetEntityType(val OptNilString) {
 // SetEntityID sets the value of EntityID.
 func (s *BrandingCreatedEvent) SetEntityID(val OptNilString) {
 	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *BrandingCreatedEvent) SetUserID(val OptNilString) {
+	s.UserID = val
 }
 
 // SetClientID sets the value of ClientID.
@@ -25352,6 +25576,10 @@ type DeploymentCreatedEvent struct {
 	EntityType OptNilString `json:"entity_type"`
 	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a
+	// session, a token, a sign-in check or a credential belongs to, or the
+	// user a change was made to. Absent on an event that concerns no user.
+	UserID OptNilString `json:"user_id"`
 	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
 	// The ID of the token in use when the event was emitted, when there was one.
@@ -25427,6 +25655,11 @@ func (s *DeploymentCreatedEvent) GetEntityType() OptNilString {
 // GetEntityID returns the value of EntityID.
 func (s *DeploymentCreatedEvent) GetEntityID() OptNilString {
 	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *DeploymentCreatedEvent) GetUserID() OptNilString {
+	return s.UserID
 }
 
 // GetClientID returns the value of ClientID.
@@ -25537,6 +25770,11 @@ func (s *DeploymentCreatedEvent) SetEntityType(val OptNilString) {
 // SetEntityID sets the value of EntityID.
 func (s *DeploymentCreatedEvent) SetEntityID(val OptNilString) {
 	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *DeploymentCreatedEvent) SetUserID(val OptNilString) {
+	s.UserID = val
 }
 
 // SetClientID sets the value of ClientID.
@@ -32502,6 +32740,10 @@ type FlowSignupChallengeConsumedEvent struct {
 	EntityType OptNilString `json:"entity_type"`
 	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a
+	// session, a token, a sign-in check or a credential belongs to, or the
+	// user a change was made to. Absent on an event that concerns no user.
+	UserID OptNilString `json:"user_id"`
 	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
 	// The ID of the token in use when the event was emitted, when there was one.
@@ -32577,6 +32819,11 @@ func (s *FlowSignupChallengeConsumedEvent) GetEntityType() OptNilString {
 // GetEntityID returns the value of EntityID.
 func (s *FlowSignupChallengeConsumedEvent) GetEntityID() OptNilString {
 	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *FlowSignupChallengeConsumedEvent) GetUserID() OptNilString {
+	return s.UserID
 }
 
 // GetClientID returns the value of ClientID.
@@ -32687,6 +32934,11 @@ func (s *FlowSignupChallengeConsumedEvent) SetEntityType(val OptNilString) {
 // SetEntityID sets the value of EntityID.
 func (s *FlowSignupChallengeConsumedEvent) SetEntityID(val OptNilString) {
 	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *FlowSignupChallengeConsumedEvent) SetUserID(val OptNilString) {
+	s.UserID = val
 }
 
 // SetClientID sets the value of ClientID.
@@ -32949,6 +33201,10 @@ type FlowSignupChallengeIssuedEvent struct {
 	EntityType OptNilString `json:"entity_type"`
 	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a
+	// session, a token, a sign-in check or a credential belongs to, or the
+	// user a change was made to. Absent on an event that concerns no user.
+	UserID OptNilString `json:"user_id"`
 	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
 	// The ID of the token in use when the event was emitted, when there was one.
@@ -33024,6 +33280,11 @@ func (s *FlowSignupChallengeIssuedEvent) GetEntityType() OptNilString {
 // GetEntityID returns the value of EntityID.
 func (s *FlowSignupChallengeIssuedEvent) GetEntityID() OptNilString {
 	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *FlowSignupChallengeIssuedEvent) GetUserID() OptNilString {
+	return s.UserID
 }
 
 // GetClientID returns the value of ClientID.
@@ -33134,6 +33395,11 @@ func (s *FlowSignupChallengeIssuedEvent) SetEntityType(val OptNilString) {
 // SetEntityID sets the value of EntityID.
 func (s *FlowSignupChallengeIssuedEvent) SetEntityID(val OptNilString) {
 	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *FlowSignupChallengeIssuedEvent) SetUserID(val OptNilString) {
+	s.UserID = val
 }
 
 // SetClientID sets the value of ClientID.
@@ -34302,6 +34568,10 @@ type FlowdefCreatedEvent struct {
 	EntityType OptNilString `json:"entity_type"`
 	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a
+	// session, a token, a sign-in check or a credential belongs to, or the
+	// user a change was made to. Absent on an event that concerns no user.
+	UserID OptNilString `json:"user_id"`
 	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
 	// The ID of the token in use when the event was emitted, when there was one.
@@ -34377,6 +34647,11 @@ func (s *FlowdefCreatedEvent) GetEntityType() OptNilString {
 // GetEntityID returns the value of EntityID.
 func (s *FlowdefCreatedEvent) GetEntityID() OptNilString {
 	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *FlowdefCreatedEvent) GetUserID() OptNilString {
+	return s.UserID
 }
 
 // GetClientID returns the value of ClientID.
@@ -34487,6 +34762,11 @@ func (s *FlowdefCreatedEvent) SetEntityType(val OptNilString) {
 // SetEntityID sets the value of EntityID.
 func (s *FlowdefCreatedEvent) SetEntityID(val OptNilString) {
 	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *FlowdefCreatedEvent) SetUserID(val OptNilString) {
+	s.UserID = val
 }
 
 // SetClientID sets the value of ClientID.
@@ -34749,6 +35029,10 @@ type FlowdefDeletedEvent struct {
 	EntityType OptNilString `json:"entity_type"`
 	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a
+	// session, a token, a sign-in check or a credential belongs to, or the
+	// user a change was made to. Absent on an event that concerns no user.
+	UserID OptNilString `json:"user_id"`
 	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
 	// The ID of the token in use when the event was emitted, when there was one.
@@ -34824,6 +35108,11 @@ func (s *FlowdefDeletedEvent) GetEntityType() OptNilString {
 // GetEntityID returns the value of EntityID.
 func (s *FlowdefDeletedEvent) GetEntityID() OptNilString {
 	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *FlowdefDeletedEvent) GetUserID() OptNilString {
+	return s.UserID
 }
 
 // GetClientID returns the value of ClientID.
@@ -34934,6 +35223,11 @@ func (s *FlowdefDeletedEvent) SetEntityType(val OptNilString) {
 // SetEntityID sets the value of EntityID.
 func (s *FlowdefDeletedEvent) SetEntityID(val OptNilString) {
 	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *FlowdefDeletedEvent) SetUserID(val OptNilString) {
+	s.UserID = val
 }
 
 // SetClientID sets the value of ClientID.
@@ -35707,6 +36001,10 @@ type FlowdefUpdatedEvent struct {
 	EntityType OptNilString `json:"entity_type"`
 	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a
+	// session, a token, a sign-in check or a credential belongs to, or the
+	// user a change was made to. Absent on an event that concerns no user.
+	UserID OptNilString `json:"user_id"`
 	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
 	// The ID of the token in use when the event was emitted, when there was one.
@@ -35782,6 +36080,11 @@ func (s *FlowdefUpdatedEvent) GetEntityType() OptNilString {
 // GetEntityID returns the value of EntityID.
 func (s *FlowdefUpdatedEvent) GetEntityID() OptNilString {
 	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *FlowdefUpdatedEvent) GetUserID() OptNilString {
+	return s.UserID
 }
 
 // GetClientID returns the value of ClientID.
@@ -35892,6 +36195,11 @@ func (s *FlowdefUpdatedEvent) SetEntityType(val OptNilString) {
 // SetEntityID sets the value of EntityID.
 func (s *FlowdefUpdatedEvent) SetEntityID(val OptNilString) {
 	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *FlowdefUpdatedEvent) SetUserID(val OptNilString) {
+	s.UserID = val
 }
 
 // SetClientID sets the value of ClientID.
@@ -46544,6 +46852,10 @@ type IdpCreatedEvent struct {
 	EntityType OptNilString `json:"entity_type"`
 	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a
+	// session, a token, a sign-in check or a credential belongs to, or the
+	// user a change was made to. Absent on an event that concerns no user.
+	UserID OptNilString `json:"user_id"`
 	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
 	// The ID of the token in use when the event was emitted, when there was one.
@@ -46619,6 +46931,11 @@ func (s *IdpCreatedEvent) GetEntityType() OptNilString {
 // GetEntityID returns the value of EntityID.
 func (s *IdpCreatedEvent) GetEntityID() OptNilString {
 	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *IdpCreatedEvent) GetUserID() OptNilString {
+	return s.UserID
 }
 
 // GetClientID returns the value of ClientID.
@@ -46729,6 +47046,11 @@ func (s *IdpCreatedEvent) SetEntityType(val OptNilString) {
 // SetEntityID sets the value of EntityID.
 func (s *IdpCreatedEvent) SetEntityID(val OptNilString) {
 	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *IdpCreatedEvent) SetUserID(val OptNilString) {
+	s.UserID = val
 }
 
 // SetClientID sets the value of ClientID.
@@ -47196,6 +47518,10 @@ type IdpIdentityLinkCreatedEvent struct {
 	EntityType OptNilString `json:"entity_type"`
 	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a
+	// session, a token, a sign-in check or a credential belongs to, or the
+	// user a change was made to. Absent on an event that concerns no user.
+	UserID OptNilString `json:"user_id"`
 	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
 	// The ID of the token in use when the event was emitted, when there was one.
@@ -47271,6 +47597,11 @@ func (s *IdpIdentityLinkCreatedEvent) GetEntityType() OptNilString {
 // GetEntityID returns the value of EntityID.
 func (s *IdpIdentityLinkCreatedEvent) GetEntityID() OptNilString {
 	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *IdpIdentityLinkCreatedEvent) GetUserID() OptNilString {
+	return s.UserID
 }
 
 // GetClientID returns the value of ClientID.
@@ -47381,6 +47712,11 @@ func (s *IdpIdentityLinkCreatedEvent) SetEntityType(val OptNilString) {
 // SetEntityID sets the value of EntityID.
 func (s *IdpIdentityLinkCreatedEvent) SetEntityID(val OptNilString) {
 	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *IdpIdentityLinkCreatedEvent) SetUserID(val OptNilString) {
+	s.UserID = val
 }
 
 // SetClientID sets the value of ClientID.
@@ -48129,6 +48465,10 @@ type IdpUpdatedEvent struct {
 	EntityType OptNilString `json:"entity_type"`
 	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a
+	// session, a token, a sign-in check or a credential belongs to, or the
+	// user a change was made to. Absent on an event that concerns no user.
+	UserID OptNilString `json:"user_id"`
 	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
 	// The ID of the token in use when the event was emitted, when there was one.
@@ -48204,6 +48544,11 @@ func (s *IdpUpdatedEvent) GetEntityType() OptNilString {
 // GetEntityID returns the value of EntityID.
 func (s *IdpUpdatedEvent) GetEntityID() OptNilString {
 	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *IdpUpdatedEvent) GetUserID() OptNilString {
+	return s.UserID
 }
 
 // GetClientID returns the value of ClientID.
@@ -48314,6 +48659,11 @@ func (s *IdpUpdatedEvent) SetEntityType(val OptNilString) {
 // SetEntityID sets the value of EntityID.
 func (s *IdpUpdatedEvent) SetEntityID(val OptNilString) {
 	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *IdpUpdatedEvent) SetUserID(val OptNilString) {
+	s.UserID = val
 }
 
 // SetClientID sets the value of ClientID.
@@ -49435,6 +49785,10 @@ type InvitationAcceptedEvent struct {
 	EntityType OptNilString `json:"entity_type"`
 	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a
+	// session, a token, a sign-in check or a credential belongs to, or the
+	// user a change was made to. Absent on an event that concerns no user.
+	UserID OptNilString `json:"user_id"`
 	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
 	// The ID of the token in use when the event was emitted, when there was one.
@@ -49510,6 +49864,11 @@ func (s *InvitationAcceptedEvent) GetEntityType() OptNilString {
 // GetEntityID returns the value of EntityID.
 func (s *InvitationAcceptedEvent) GetEntityID() OptNilString {
 	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *InvitationAcceptedEvent) GetUserID() OptNilString {
+	return s.UserID
 }
 
 // GetClientID returns the value of ClientID.
@@ -49620,6 +49979,11 @@ func (s *InvitationAcceptedEvent) SetEntityType(val OptNilString) {
 // SetEntityID sets the value of EntityID.
 func (s *InvitationAcceptedEvent) SetEntityID(val OptNilString) {
 	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *InvitationAcceptedEvent) SetUserID(val OptNilString) {
+	s.UserID = val
 }
 
 // SetClientID sets the value of ClientID.
@@ -50263,6 +50627,10 @@ type InvitationCancelledEvent struct {
 	EntityType OptNilString `json:"entity_type"`
 	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a
+	// session, a token, a sign-in check or a credential belongs to, or the
+	// user a change was made to. Absent on an event that concerns no user.
+	UserID OptNilString `json:"user_id"`
 	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
 	// The ID of the token in use when the event was emitted, when there was one.
@@ -50338,6 +50706,11 @@ func (s *InvitationCancelledEvent) GetEntityType() OptNilString {
 // GetEntityID returns the value of EntityID.
 func (s *InvitationCancelledEvent) GetEntityID() OptNilString {
 	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *InvitationCancelledEvent) GetUserID() OptNilString {
+	return s.UserID
 }
 
 // GetClientID returns the value of ClientID.
@@ -50448,6 +50821,11 @@ func (s *InvitationCancelledEvent) SetEntityType(val OptNilString) {
 // SetEntityID sets the value of EntityID.
 func (s *InvitationCancelledEvent) SetEntityID(val OptNilString) {
 	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *InvitationCancelledEvent) SetUserID(val OptNilString) {
+	s.UserID = val
 }
 
 // SetClientID sets the value of ClientID.
@@ -50783,6 +51161,10 @@ type InvitationCreatedEvent struct {
 	EntityType OptNilString `json:"entity_type"`
 	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a
+	// session, a token, a sign-in check or a credential belongs to, or the
+	// user a change was made to. Absent on an event that concerns no user.
+	UserID OptNilString `json:"user_id"`
 	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
 	// The ID of the token in use when the event was emitted, when there was one.
@@ -50858,6 +51240,11 @@ func (s *InvitationCreatedEvent) GetEntityType() OptNilString {
 // GetEntityID returns the value of EntityID.
 func (s *InvitationCreatedEvent) GetEntityID() OptNilString {
 	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *InvitationCreatedEvent) GetUserID() OptNilString {
+	return s.UserID
 }
 
 // GetClientID returns the value of ClientID.
@@ -50968,6 +51355,11 @@ func (s *InvitationCreatedEvent) SetEntityType(val OptNilString) {
 // SetEntityID sets the value of EntityID.
 func (s *InvitationCreatedEvent) SetEntityID(val OptNilString) {
 	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *InvitationCreatedEvent) SetUserID(val OptNilString) {
+	s.UserID = val
 }
 
 // SetClientID sets the value of ClientID.
@@ -52273,6 +52665,10 @@ type InvitationRejectedEvent struct {
 	EntityType OptNilString `json:"entity_type"`
 	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a
+	// session, a token, a sign-in check or a credential belongs to, or the
+	// user a change was made to. Absent on an event that concerns no user.
+	UserID OptNilString `json:"user_id"`
 	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
 	// The ID of the token in use when the event was emitted, when there was one.
@@ -52348,6 +52744,11 @@ func (s *InvitationRejectedEvent) GetEntityType() OptNilString {
 // GetEntityID returns the value of EntityID.
 func (s *InvitationRejectedEvent) GetEntityID() OptNilString {
 	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *InvitationRejectedEvent) GetUserID() OptNilString {
+	return s.UserID
 }
 
 // GetClientID returns the value of ClientID.
@@ -52458,6 +52859,11 @@ func (s *InvitationRejectedEvent) SetEntityType(val OptNilString) {
 // SetEntityID sets the value of EntityID.
 func (s *InvitationRejectedEvent) SetEntityID(val OptNilString) {
 	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *InvitationRejectedEvent) SetUserID(val OptNilString) {
+	s.UserID = val
 }
 
 // SetClientID sets the value of ClientID.
@@ -79732,6 +80138,10 @@ type OriginAddedEvent struct {
 	EntityType OptNilString `json:"entity_type"`
 	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a
+	// session, a token, a sign-in check or a credential belongs to, or the
+	// user a change was made to. Absent on an event that concerns no user.
+	UserID OptNilString `json:"user_id"`
 	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
 	// The ID of the token in use when the event was emitted, when there was one.
@@ -79807,6 +80217,11 @@ func (s *OriginAddedEvent) GetEntityType() OptNilString {
 // GetEntityID returns the value of EntityID.
 func (s *OriginAddedEvent) GetEntityID() OptNilString {
 	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *OriginAddedEvent) GetUserID() OptNilString {
+	return s.UserID
 }
 
 // GetClientID returns the value of ClientID.
@@ -79917,6 +80332,11 @@ func (s *OriginAddedEvent) SetEntityType(val OptNilString) {
 // SetEntityID sets the value of EntityID.
 func (s *OriginAddedEvent) SetEntityID(val OptNilString) {
 	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *OriginAddedEvent) SetUserID(val OptNilString) {
+	s.UserID = val
 }
 
 // SetClientID sets the value of ClientID.
@@ -80512,6 +80932,10 @@ type OriginRemovedEvent struct {
 	EntityType OptNilString `json:"entity_type"`
 	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a
+	// session, a token, a sign-in check or a credential belongs to, or the
+	// user a change was made to. Absent on an event that concerns no user.
+	UserID OptNilString `json:"user_id"`
 	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
 	// The ID of the token in use when the event was emitted, when there was one.
@@ -80587,6 +81011,11 @@ func (s *OriginRemovedEvent) GetEntityType() OptNilString {
 // GetEntityID returns the value of EntityID.
 func (s *OriginRemovedEvent) GetEntityID() OptNilString {
 	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *OriginRemovedEvent) GetUserID() OptNilString {
+	return s.UserID
 }
 
 // GetClientID returns the value of ClientID.
@@ -80697,6 +81126,11 @@ func (s *OriginRemovedEvent) SetEntityType(val OptNilString) {
 // SetEntityID sets the value of EntityID.
 func (s *OriginRemovedEvent) SetEntityID(val OptNilString) {
 	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *OriginRemovedEvent) SetUserID(val OptNilString) {
+	s.UserID = val
 }
 
 // SetClientID sets the value of ClientID.
@@ -83668,6 +84102,10 @@ type PolicyCreatedEvent struct {
 	EntityType OptNilString `json:"entity_type"`
 	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a
+	// session, a token, a sign-in check or a credential belongs to, or the
+	// user a change was made to. Absent on an event that concerns no user.
+	UserID OptNilString `json:"user_id"`
 	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
 	// The ID of the token in use when the event was emitted, when there was one.
@@ -83743,6 +84181,11 @@ func (s *PolicyCreatedEvent) GetEntityType() OptNilString {
 // GetEntityID returns the value of EntityID.
 func (s *PolicyCreatedEvent) GetEntityID() OptNilString {
 	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *PolicyCreatedEvent) GetUserID() OptNilString {
+	return s.UserID
 }
 
 // GetClientID returns the value of ClientID.
@@ -83853,6 +84296,11 @@ func (s *PolicyCreatedEvent) SetEntityType(val OptNilString) {
 // SetEntityID sets the value of EntityID.
 func (s *PolicyCreatedEvent) SetEntityID(val OptNilString) {
 	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *PolicyCreatedEvent) SetUserID(val OptNilString) {
+	s.UserID = val
 }
 
 // SetClientID sets the value of ClientID.
@@ -84218,6 +84666,10 @@ type PolicyUpdatedEvent struct {
 	EntityType OptNilString `json:"entity_type"`
 	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a
+	// session, a token, a sign-in check or a credential belongs to, or the
+	// user a change was made to. Absent on an event that concerns no user.
+	UserID OptNilString `json:"user_id"`
 	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
 	// The ID of the token in use when the event was emitted, when there was one.
@@ -84293,6 +84745,11 @@ func (s *PolicyUpdatedEvent) GetEntityType() OptNilString {
 // GetEntityID returns the value of EntityID.
 func (s *PolicyUpdatedEvent) GetEntityID() OptNilString {
 	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *PolicyUpdatedEvent) GetUserID() OptNilString {
+	return s.UserID
 }
 
 // GetClientID returns the value of ClientID.
@@ -84403,6 +84860,11 @@ func (s *PolicyUpdatedEvent) SetEntityType(val OptNilString) {
 // SetEntityID sets the value of EntityID.
 func (s *PolicyUpdatedEvent) SetEntityID(val OptNilString) {
 	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *PolicyUpdatedEvent) SetUserID(val OptNilString) {
+	s.UserID = val
 }
 
 // SetClientID sets the value of ClientID.
@@ -84802,6 +85264,10 @@ type PreviewRemovedEvent struct {
 	EntityType OptNilString `json:"entity_type"`
 	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a
+	// session, a token, a sign-in check or a credential belongs to, or the
+	// user a change was made to. Absent on an event that concerns no user.
+	UserID OptNilString `json:"user_id"`
 	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
 	// The ID of the token in use when the event was emitted, when there was one.
@@ -84877,6 +85343,11 @@ func (s *PreviewRemovedEvent) GetEntityType() OptNilString {
 // GetEntityID returns the value of EntityID.
 func (s *PreviewRemovedEvent) GetEntityID() OptNilString {
 	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *PreviewRemovedEvent) GetUserID() OptNilString {
+	return s.UserID
 }
 
 // GetClientID returns the value of ClientID.
@@ -84987,6 +85458,11 @@ func (s *PreviewRemovedEvent) SetEntityType(val OptNilString) {
 // SetEntityID sets the value of EntityID.
 func (s *PreviewRemovedEvent) SetEntityID(val OptNilString) {
 	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *PreviewRemovedEvent) SetUserID(val OptNilString) {
+	s.UserID = val
 }
 
 // SetClientID sets the value of ClientID.
@@ -86140,6 +86616,10 @@ type ProjectCreatedEvent struct {
 	EntityType OptNilString `json:"entity_type"`
 	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a
+	// session, a token, a sign-in check or a credential belongs to, or the
+	// user a change was made to. Absent on an event that concerns no user.
+	UserID OptNilString `json:"user_id"`
 	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
 	// The ID of the token in use when the event was emitted, when there was one.
@@ -86215,6 +86695,11 @@ func (s *ProjectCreatedEvent) GetEntityType() OptNilString {
 // GetEntityID returns the value of EntityID.
 func (s *ProjectCreatedEvent) GetEntityID() OptNilString {
 	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *ProjectCreatedEvent) GetUserID() OptNilString {
+	return s.UserID
 }
 
 // GetClientID returns the value of ClientID.
@@ -86325,6 +86810,11 @@ func (s *ProjectCreatedEvent) SetEntityType(val OptNilString) {
 // SetEntityID sets the value of EntityID.
 func (s *ProjectCreatedEvent) SetEntityID(val OptNilString) {
 	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *ProjectCreatedEvent) SetUserID(val OptNilString) {
+	s.UserID = val
 }
 
 // SetClientID sets the value of ClientID.
@@ -86587,6 +87077,10 @@ type ProjectDeletedEvent struct {
 	EntityType OptNilString `json:"entity_type"`
 	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a
+	// session, a token, a sign-in check or a credential belongs to, or the
+	// user a change was made to. Absent on an event that concerns no user.
+	UserID OptNilString `json:"user_id"`
 	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
 	// The ID of the token in use when the event was emitted, when there was one.
@@ -86662,6 +87156,11 @@ func (s *ProjectDeletedEvent) GetEntityType() OptNilString {
 // GetEntityID returns the value of EntityID.
 func (s *ProjectDeletedEvent) GetEntityID() OptNilString {
 	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *ProjectDeletedEvent) GetUserID() OptNilString {
+	return s.UserID
 }
 
 // GetClientID returns the value of ClientID.
@@ -86772,6 +87271,11 @@ func (s *ProjectDeletedEvent) SetEntityType(val OptNilString) {
 // SetEntityID sets the value of EntityID.
 func (s *ProjectDeletedEvent) SetEntityID(val OptNilString) {
 	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *ProjectDeletedEvent) SetUserID(val OptNilString) {
+	s.UserID = val
 }
 
 // SetClientID sets the value of ClientID.
@@ -87340,6 +87844,10 @@ type ProjectUpdatedEvent struct {
 	EntityType OptNilString `json:"entity_type"`
 	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a
+	// session, a token, a sign-in check or a credential belongs to, or the
+	// user a change was made to. Absent on an event that concerns no user.
+	UserID OptNilString `json:"user_id"`
 	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
 	// The ID of the token in use when the event was emitted, when there was one.
@@ -87415,6 +87923,11 @@ func (s *ProjectUpdatedEvent) GetEntityType() OptNilString {
 // GetEntityID returns the value of EntityID.
 func (s *ProjectUpdatedEvent) GetEntityID() OptNilString {
 	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *ProjectUpdatedEvent) GetUserID() OptNilString {
+	return s.UserID
 }
 
 // GetClientID returns the value of ClientID.
@@ -87525,6 +88038,11 @@ func (s *ProjectUpdatedEvent) SetEntityType(val OptNilString) {
 // SetEntityID sets the value of EntityID.
 func (s *ProjectUpdatedEvent) SetEntityID(val OptNilString) {
 	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *ProjectUpdatedEvent) SetUserID(val OptNilString) {
+	s.UserID = val
 }
 
 // SetClientID sets the value of ClientID.
@@ -91785,6 +92303,10 @@ type ReleaseCreatedEvent struct {
 	EntityType OptNilString `json:"entity_type"`
 	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a
+	// session, a token, a sign-in check or a credential belongs to, or the
+	// user a change was made to. Absent on an event that concerns no user.
+	UserID OptNilString `json:"user_id"`
 	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
 	// The ID of the token in use when the event was emitted, when there was one.
@@ -91860,6 +92382,11 @@ func (s *ReleaseCreatedEvent) GetEntityType() OptNilString {
 // GetEntityID returns the value of EntityID.
 func (s *ReleaseCreatedEvent) GetEntityID() OptNilString {
 	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *ReleaseCreatedEvent) GetUserID() OptNilString {
+	return s.UserID
 }
 
 // GetClientID returns the value of ClientID.
@@ -91970,6 +92497,11 @@ func (s *ReleaseCreatedEvent) SetEntityType(val OptNilString) {
 // SetEntityID sets the value of EntityID.
 func (s *ReleaseCreatedEvent) SetEntityID(val OptNilString) {
 	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *ReleaseCreatedEvent) SetUserID(val OptNilString) {
+	s.UserID = val
 }
 
 // SetClientID sets the value of ClientID.
@@ -92641,6 +93173,10 @@ type ReleaseRevokedEvent struct {
 	EntityType OptNilString `json:"entity_type"`
 	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a
+	// session, a token, a sign-in check or a credential belongs to, or the
+	// user a change was made to. Absent on an event that concerns no user.
+	UserID OptNilString `json:"user_id"`
 	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
 	// The ID of the token in use when the event was emitted, when there was one.
@@ -92716,6 +93252,11 @@ func (s *ReleaseRevokedEvent) GetEntityType() OptNilString {
 // GetEntityID returns the value of EntityID.
 func (s *ReleaseRevokedEvent) GetEntityID() OptNilString {
 	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *ReleaseRevokedEvent) GetUserID() OptNilString {
+	return s.UserID
 }
 
 // GetClientID returns the value of ClientID.
@@ -92826,6 +93367,11 @@ func (s *ReleaseRevokedEvent) SetEntityType(val OptNilString) {
 // SetEntityID sets the value of EntityID.
 func (s *ReleaseRevokedEvent) SetEntityID(val OptNilString) {
 	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *ReleaseRevokedEvent) SetUserID(val OptNilString) {
+	s.UserID = val
 }
 
 // SetClientID sets the value of ClientID.
@@ -93911,6 +94457,10 @@ type RequestAPIEvent struct {
 	EntityType OptNilString `json:"entity_type"`
 	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a
+	// session, a token, a sign-in check or a credential belongs to, or the
+	// user a change was made to. Absent on an event that concerns no user.
+	UserID OptNilString `json:"user_id"`
 	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
 	// The ID of the token in use when the event was emitted, when there was one.
@@ -93986,6 +94536,11 @@ func (s *RequestAPIEvent) GetEntityType() OptNilString {
 // GetEntityID returns the value of EntityID.
 func (s *RequestAPIEvent) GetEntityID() OptNilString {
 	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *RequestAPIEvent) GetUserID() OptNilString {
+	return s.UserID
 }
 
 // GetClientID returns the value of ClientID.
@@ -94096,6 +94651,11 @@ func (s *RequestAPIEvent) SetEntityType(val OptNilString) {
 // SetEntityID sets the value of EntityID.
 func (s *RequestAPIEvent) SetEntityID(val OptNilString) {
 	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *RequestAPIEvent) SetUserID(val OptNilString) {
+	s.UserID = val
 }
 
 // SetClientID sets the value of ClientID.
@@ -96844,6 +97404,10 @@ type SchemaCreatedEvent struct {
 	EntityType OptNilString `json:"entity_type"`
 	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a
+	// session, a token, a sign-in check or a credential belongs to, or the
+	// user a change was made to. Absent on an event that concerns no user.
+	UserID OptNilString `json:"user_id"`
 	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
 	// The ID of the token in use when the event was emitted, when there was one.
@@ -96919,6 +97483,11 @@ func (s *SchemaCreatedEvent) GetEntityType() OptNilString {
 // GetEntityID returns the value of EntityID.
 func (s *SchemaCreatedEvent) GetEntityID() OptNilString {
 	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *SchemaCreatedEvent) GetUserID() OptNilString {
+	return s.UserID
 }
 
 // GetClientID returns the value of ClientID.
@@ -97029,6 +97598,11 @@ func (s *SchemaCreatedEvent) SetEntityType(val OptNilString) {
 // SetEntityID sets the value of EntityID.
 func (s *SchemaCreatedEvent) SetEntityID(val OptNilString) {
 	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *SchemaCreatedEvent) SetUserID(val OptNilString) {
+	s.UserID = val
 }
 
 // SetClientID sets the value of ClientID.
@@ -98726,6 +99300,10 @@ type SessionDeletedEvent struct {
 	EntityType OptNilString `json:"entity_type"`
 	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a
+	// session, a token, a sign-in check or a credential belongs to, or the
+	// user a change was made to. Absent on an event that concerns no user.
+	UserID OptNilString `json:"user_id"`
 	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
 	// The ID of the token in use when the event was emitted, when there was one.
@@ -98801,6 +99379,11 @@ func (s *SessionDeletedEvent) GetEntityType() OptNilString {
 // GetEntityID returns the value of EntityID.
 func (s *SessionDeletedEvent) GetEntityID() OptNilString {
 	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *SessionDeletedEvent) GetUserID() OptNilString {
+	return s.UserID
 }
 
 // GetClientID returns the value of ClientID.
@@ -98911,6 +99494,11 @@ func (s *SessionDeletedEvent) SetEntityType(val OptNilString) {
 // SetEntityID sets the value of EntityID.
 func (s *SessionDeletedEvent) SetEntityID(val OptNilString) {
 	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *SessionDeletedEvent) SetUserID(val OptNilString) {
+	s.UserID = val
 }
 
 // SetClientID sets the value of ClientID.
@@ -99189,6 +99777,10 @@ type SessionEstablishedEvent struct {
 	EntityType OptNilString `json:"entity_type"`
 	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a
+	// session, a token, a sign-in check or a credential belongs to, or the
+	// user a change was made to. Absent on an event that concerns no user.
+	UserID OptNilString `json:"user_id"`
 	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
 	// The ID of the token in use when the event was emitted, when there was one.
@@ -99264,6 +99856,11 @@ func (s *SessionEstablishedEvent) GetEntityType() OptNilString {
 // GetEntityID returns the value of EntityID.
 func (s *SessionEstablishedEvent) GetEntityID() OptNilString {
 	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *SessionEstablishedEvent) GetUserID() OptNilString {
+	return s.UserID
 }
 
 // GetClientID returns the value of ClientID.
@@ -99374,6 +99971,11 @@ func (s *SessionEstablishedEvent) SetEntityType(val OptNilString) {
 // SetEntityID sets the value of EntityID.
 func (s *SessionEstablishedEvent) SetEntityID(val OptNilString) {
 	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *SessionEstablishedEvent) SetUserID(val OptNilString) {
+	s.UserID = val
 }
 
 // SetClientID sets the value of ClientID.
@@ -102362,6 +102964,10 @@ type TeamCreatedEvent struct {
 	EntityType OptNilString `json:"entity_type"`
 	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a
+	// session, a token, a sign-in check or a credential belongs to, or the
+	// user a change was made to. Absent on an event that concerns no user.
+	UserID OptNilString `json:"user_id"`
 	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
 	// The ID of the token in use when the event was emitted, when there was one.
@@ -102437,6 +103043,11 @@ func (s *TeamCreatedEvent) GetEntityType() OptNilString {
 // GetEntityID returns the value of EntityID.
 func (s *TeamCreatedEvent) GetEntityID() OptNilString {
 	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *TeamCreatedEvent) GetUserID() OptNilString {
+	return s.UserID
 }
 
 // GetClientID returns the value of ClientID.
@@ -102547,6 +103158,11 @@ func (s *TeamCreatedEvent) SetEntityType(val OptNilString) {
 // SetEntityID sets the value of EntityID.
 func (s *TeamCreatedEvent) SetEntityID(val OptNilString) {
 	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *TeamCreatedEvent) SetUserID(val OptNilString) {
+	s.UserID = val
 }
 
 // SetClientID sets the value of ClientID.
@@ -102809,6 +103425,10 @@ type TeamDeactivatedEvent struct {
 	EntityType OptNilString `json:"entity_type"`
 	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a
+	// session, a token, a sign-in check or a credential belongs to, or the
+	// user a change was made to. Absent on an event that concerns no user.
+	UserID OptNilString `json:"user_id"`
 	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
 	// The ID of the token in use when the event was emitted, when there was one.
@@ -102884,6 +103504,11 @@ func (s *TeamDeactivatedEvent) GetEntityType() OptNilString {
 // GetEntityID returns the value of EntityID.
 func (s *TeamDeactivatedEvent) GetEntityID() OptNilString {
 	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *TeamDeactivatedEvent) GetUserID() OptNilString {
+	return s.UserID
 }
 
 // GetClientID returns the value of ClientID.
@@ -102994,6 +103619,11 @@ func (s *TeamDeactivatedEvent) SetEntityType(val OptNilString) {
 // SetEntityID sets the value of EntityID.
 func (s *TeamDeactivatedEvent) SetEntityID(val OptNilString) {
 	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *TeamDeactivatedEvent) SetUserID(val OptNilString) {
+	s.UserID = val
 }
 
 // SetClientID sets the value of ClientID.
@@ -103770,6 +104400,10 @@ type TeamUpdatedEvent struct {
 	EntityType OptNilString `json:"entity_type"`
 	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a
+	// session, a token, a sign-in check or a credential belongs to, or the
+	// user a change was made to. Absent on an event that concerns no user.
+	UserID OptNilString `json:"user_id"`
 	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
 	// The ID of the token in use when the event was emitted, when there was one.
@@ -103845,6 +104479,11 @@ func (s *TeamUpdatedEvent) GetEntityType() OptNilString {
 // GetEntityID returns the value of EntityID.
 func (s *TeamUpdatedEvent) GetEntityID() OptNilString {
 	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *TeamUpdatedEvent) GetUserID() OptNilString {
+	return s.UserID
 }
 
 // GetClientID returns the value of ClientID.
@@ -103955,6 +104594,11 @@ func (s *TeamUpdatedEvent) SetEntityType(val OptNilString) {
 // SetEntityID sets the value of EntityID.
 func (s *TeamUpdatedEvent) SetEntityID(val OptNilString) {
 	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *TeamUpdatedEvent) SetUserID(val OptNilString) {
+	s.UserID = val
 }
 
 // SetClientID sets the value of ClientID.
@@ -105859,6 +106503,10 @@ type UserCreateFailedEvent struct {
 	EntityType OptNilString `json:"entity_type"`
 	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a
+	// session, a token, a sign-in check or a credential belongs to, or the
+	// user a change was made to. Absent on an event that concerns no user.
+	UserID OptNilString `json:"user_id"`
 	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
 	// The ID of the token in use when the event was emitted, when there was one.
@@ -105934,6 +106582,11 @@ func (s *UserCreateFailedEvent) GetEntityType() OptNilString {
 // GetEntityID returns the value of EntityID.
 func (s *UserCreateFailedEvent) GetEntityID() OptNilString {
 	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *UserCreateFailedEvent) GetUserID() OptNilString {
+	return s.UserID
 }
 
 // GetClientID returns the value of ClientID.
@@ -106044,6 +106697,11 @@ func (s *UserCreateFailedEvent) SetEntityType(val OptNilString) {
 // SetEntityID sets the value of EntityID.
 func (s *UserCreateFailedEvent) SetEntityID(val OptNilString) {
 	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *UserCreateFailedEvent) SetUserID(val OptNilString) {
+	s.UserID = val
 }
 
 // SetClientID sets the value of ClientID.
@@ -106508,6 +107166,10 @@ type UserCreatedEvent struct {
 	EntityType OptNilString `json:"entity_type"`
 	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a
+	// session, a token, a sign-in check or a credential belongs to, or the
+	// user a change was made to. Absent on an event that concerns no user.
+	UserID OptNilString `json:"user_id"`
 	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
 	// The ID of the token in use when the event was emitted, when there was one.
@@ -106583,6 +107245,11 @@ func (s *UserCreatedEvent) GetEntityType() OptNilString {
 // GetEntityID returns the value of EntityID.
 func (s *UserCreatedEvent) GetEntityID() OptNilString {
 	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *UserCreatedEvent) GetUserID() OptNilString {
+	return s.UserID
 }
 
 // GetClientID returns the value of ClientID.
@@ -106693,6 +107360,11 @@ func (s *UserCreatedEvent) SetEntityType(val OptNilString) {
 // SetEntityID sets the value of EntityID.
 func (s *UserCreatedEvent) SetEntityID(val OptNilString) {
 	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *UserCreatedEvent) SetUserID(val OptNilString) {
+	s.UserID = val
 }
 
 // SetClientID sets the value of ClientID.
@@ -107005,6 +107677,10 @@ type UserDeletedEvent struct {
 	EntityType OptNilString `json:"entity_type"`
 	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a
+	// session, a token, a sign-in check or a credential belongs to, or the
+	// user a change was made to. Absent on an event that concerns no user.
+	UserID OptNilString `json:"user_id"`
 	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
 	// The ID of the token in use when the event was emitted, when there was one.
@@ -107080,6 +107756,11 @@ func (s *UserDeletedEvent) GetEntityType() OptNilString {
 // GetEntityID returns the value of EntityID.
 func (s *UserDeletedEvent) GetEntityID() OptNilString {
 	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *UserDeletedEvent) GetUserID() OptNilString {
+	return s.UserID
 }
 
 // GetClientID returns the value of ClientID.
@@ -107190,6 +107871,11 @@ func (s *UserDeletedEvent) SetEntityType(val OptNilString) {
 // SetEntityID sets the value of EntityID.
 func (s *UserDeletedEvent) SetEntityID(val OptNilString) {
 	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *UserDeletedEvent) SetUserID(val OptNilString) {
+	s.UserID = val
 }
 
 // SetClientID sets the value of ClientID.
@@ -108835,6 +109521,10 @@ type UserUpdatedEvent struct {
 	EntityType OptNilString `json:"entity_type"`
 	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a
+	// session, a token, a sign-in check or a credential belongs to, or the
+	// user a change was made to. Absent on an event that concerns no user.
+	UserID OptNilString `json:"user_id"`
 	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
 	// The ID of the token in use when the event was emitted, when there was one.
@@ -108910,6 +109600,11 @@ func (s *UserUpdatedEvent) GetEntityType() OptNilString {
 // GetEntityID returns the value of EntityID.
 func (s *UserUpdatedEvent) GetEntityID() OptNilString {
 	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *UserUpdatedEvent) GetUserID() OptNilString {
+	return s.UserID
 }
 
 // GetClientID returns the value of ClientID.
@@ -109020,6 +109715,11 @@ func (s *UserUpdatedEvent) SetEntityType(val OptNilString) {
 // SetEntityID sets the value of EntityID.
 func (s *UserUpdatedEvent) SetEntityID(val OptNilString) {
 	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *UserUpdatedEvent) SetUserID(val OptNilString) {
+	s.UserID = val
 }
 
 // SetClientID sets the value of ClientID.
@@ -109946,6 +110646,10 @@ type VariableRemovedEvent struct {
 	EntityType OptNilString `json:"entity_type"`
 	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a
+	// session, a token, a sign-in check or a credential belongs to, or the
+	// user a change was made to. Absent on an event that concerns no user.
+	UserID OptNilString `json:"user_id"`
 	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
 	// The ID of the token in use when the event was emitted, when there was one.
@@ -110021,6 +110725,11 @@ func (s *VariableRemovedEvent) GetEntityType() OptNilString {
 // GetEntityID returns the value of EntityID.
 func (s *VariableRemovedEvent) GetEntityID() OptNilString {
 	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *VariableRemovedEvent) GetUserID() OptNilString {
+	return s.UserID
 }
 
 // GetClientID returns the value of ClientID.
@@ -110131,6 +110840,11 @@ func (s *VariableRemovedEvent) SetEntityType(val OptNilString) {
 // SetEntityID sets the value of EntityID.
 func (s *VariableRemovedEvent) SetEntityID(val OptNilString) {
 	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *VariableRemovedEvent) SetUserID(val OptNilString) {
+	s.UserID = val
 }
 
 // SetClientID sets the value of ClientID.
@@ -110547,6 +111261,10 @@ type VariableSetEvent struct {
 	EntityType OptNilString `json:"entity_type"`
 	// The ID of the resource the event affected.
 	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a
+	// session, a token, a sign-in check or a credential belongs to, or the
+	// user a change was made to. Absent on an event that concerns no user.
+	UserID OptNilString `json:"user_id"`
 	// The application or agent that produced the event.
 	ClientID string `json:"client_id"`
 	// The ID of the token in use when the event was emitted, when there was one.
@@ -110622,6 +111340,11 @@ func (s *VariableSetEvent) GetEntityType() OptNilString {
 // GetEntityID returns the value of EntityID.
 func (s *VariableSetEvent) GetEntityID() OptNilString {
 	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *VariableSetEvent) GetUserID() OptNilString {
+	return s.UserID
 }
 
 // GetClientID returns the value of ClientID.
@@ -110732,6 +111455,11 @@ func (s *VariableSetEvent) SetEntityType(val OptNilString) {
 // SetEntityID sets the value of EntityID.
 func (s *VariableSetEvent) SetEntityID(val OptNilString) {
 	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *VariableSetEvent) SetUserID(val OptNilString) {
+	s.UserID = val
 }
 
 // SetClientID sets the value of ClientID.

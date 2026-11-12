@@ -204,11 +204,12 @@ For product direction and the four pillars, see [VISION.md](VISION.md).
 ## CI
 
 Pull requests are gated by the GitHub Actions context `full-pr`, shown in the
-pull request UI as `ci / full-pr`: generated-file checks, lint, type checks,
-builds, unit and browser tests, the Go database lanes, the release's npm
-tarballs for all five server platforms, and the end-to-end suites against
-them. Changesets version PRs run the same check. The full
-step list is in [CONTRIBUTING.md](CONTRIBUTING.md#what-ci-runs).
+pull request UI as `ci / full-pr`. It runs, as far as the change reaches them,
+generated-file checks, lint, type checks, builds, unit and browser tests, the
+SQLite and Postgres lanes, the release's npm tarballs for all five server
+platforms, and the end-to-end suites against them. Changesets version PRs run
+the same check. The full step list is in
+[CONTRIBUTING.md](CONTRIBUTING.md#what-ci-runs).
 
 ## Releases
 

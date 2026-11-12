@@ -15,6 +15,10 @@
 > configures every moon task for turbo, leaves moon fully working, and ports
 > the scripts and one CI workflow. Moon stays the runner of record until the
 > cutover phase below.
+>
+> **Outcome:** the cutover landed in #2881 on 2026-11-12 and moon is gone
+> ([ADR 089](../../adrs/089-turborepo-task-runner.md)); this document is
+> history. The current rules are in [turborepo.md](turborepo.md).
 
 ## Short answer
 

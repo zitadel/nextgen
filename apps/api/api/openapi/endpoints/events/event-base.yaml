@@ -76,6 +76,14 @@ properties:
     oneOf:
       - type: string
       - type: 'null'
+  user_id:
+    description: |
+      The ID of the user the event concerns, whoever triggered it: the user a
+      session, a token, a sign-in check or a credential belongs to, or the
+      user a change was made to. Absent on an event that concerns no user.
+    oneOf:
+      - type: string
+      - type: 'null'
   client_id:
     type: string
     description: The application or agent that produced the event.

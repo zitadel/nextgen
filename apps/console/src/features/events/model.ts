@@ -41,8 +41,8 @@ interface EventField {
 }
 
 /**
- * The envelope values an event carries, in reading order: who, through what,
- * on what, and the ids that tie it to other events. A value the event does
+ * The envelope values an event carries, in reading order: who, whose account,
+ * through what, on what, and the ids that tie it to other events. A value the event does
  * not carry has no row, since the server stores an unset one as empty or
  * `null` and neither says anything.
  */
@@ -51,6 +51,7 @@ export function eventFields(event: ProjectEvent): EventField[] {
     { label: "Category", value: event.category },
     { label: "Actor", value: event.actor_id, id: true },
     { label: "Actor type", value: event.actor_type },
+    { label: "User", value: event.user_id, id: true },
     { label: "Application", value: event.client_id, id: true },
     { label: "Token", value: event.token_id, id: true },
     { label: "Delegation", value: event.delegation_type },
@@ -257,6 +258,7 @@ export function isFailure(event: ProjectEvent): boolean {
 export const VALUE_FILTERS = [
   { key: "type", label: "Type", name: "type", prefix: "type" },
   { key: "actor", label: "Actor", name: "actor", prefix: "actor" },
+  { key: "user", label: "User", name: "user", prefix: "user" },
   { key: "resource", label: "Resource", name: "resource", prefix: "resource" },
   { key: "resource_type", label: "Resource type", name: "resource type", prefix: "resource_type" },
   { key: "client", label: "Application", name: "application", prefix: "app" },
@@ -279,6 +281,7 @@ const FILTER_BY_KEY = Object.fromEntries(VALUE_FILTERS.map((filter) => [filter.k
 const EVENT_VALUE: Record<ValueFilterKey, (event: ProjectEvent) => string | null | undefined> = {
   type: (event) => event.event_type,
   actor: (event) => event.actor_id,
+  user: (event) => event.user_id,
   resource: (event) => event.entity_id,
   resource_type: (event) => event.entity_type,
   client: (event) => event.client_id,
@@ -459,6 +462,7 @@ export function eventsQuery(
   | "category"
   | "event_type"
   | "actor_id"
+  | "user_id"
   | "entity_id"
   | "entity_type"
   | "client_id"
@@ -487,6 +491,7 @@ export function eventsQuery(
     category,
     event_type: served.type,
     actor_id: served.actor,
+    user_id: served.user,
     entity_id: served.resource,
     entity_type: served.resource_type,
     client_id: served.client,
@@ -635,13 +640,16 @@ const PREFIXES: Record<string, ValueFilterKey> = {
  * server holds, never by text, so a term says which field, or is read by its
  * shape:
  *
- * - `actor:…`, `resource:…`, `resource_type:…`, `app:…`, `device:…` and the
- *   other filters' prefixes ({@link VALUE_FILTERS}) name the filter.
+ * - `actor:…`, `user:…`, `resource:…`, `resource_type:…`, `app:…`, `device:…`
+ *   and the other filters' prefixes ({@link VALUE_FILTERS}) name the filter.
  * - `evt_…` is an event, and opens it.
  * - `req_…` (or a 32-digit trace id), `sess_…`, `flow_…` and `app_…` are a
  *   request, a session, a login flow and an application.
  * - Words joined by dots are an event type, and one camel-cased word, as
  *   `createUser`, is an API operation.
+ * - `user_…` may be whose account something happened to or who did
+ *   something, so it means both a user and an actor, and the person says
+ *   which. What happened to the account holds the changes to the user too.
  * - Any other id may be who did something or what it was done to, so it
  *   means both an actor and a resource, and the person says which.
  *
@@ -663,6 +671,7 @@ export function searchMeanings(term: string): SearchMeaning[] {
   if (value.startsWith("sess_")) return [filter("session")];
   if (value.startsWith("flow_")) return [filter("flow")];
   if (value.startsWith("app_")) return [filter("client")];
+  if (value.startsWith("user_")) return [filter("user"), filter("actor")];
   if (EVENT_TYPE.test(value)) return [filter("type")];
   if (OPERATION.test(value)) return [filter("operation")];
   return [filter("actor"), filter("resource")];
@@ -679,6 +688,7 @@ const CSV_COLUMNS = [
   ["actor_type", (event: ProjectEvent) => event.actor_type],
   ["entity_type", (event: ProjectEvent) => event.entity_type],
   ["entity_id", (event: ProjectEvent) => event.entity_id],
+  ["user_id", (event: ProjectEvent) => event.user_id],
   ["client_id", (event: ProjectEvent) => event.client_id],
   ["request_id", (event: ProjectEvent) => event.request_id],
   ["session_id", (event: ProjectEvent) => event.session_id],

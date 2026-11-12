@@ -27,7 +27,7 @@ One Vercel deployment, seven [services](https://vercel.com/docs/services):
 
 | Service | Built by | Serves |
 |---|---|---|
-| `server` | Go preset, rooted at the Go module `apps/api`; the build command enters the repo root and installs, because Vercel's Go builder runs no `installCommand`, and then runs `node_modules/.bin/turbo run deploy --filter=@zitadel/cloud`. turbo goes by its path because, unlike the JS builders, the Go builder puts no `node_modules/.bin` on `PATH`. `@zitadel/cloud`'s `build` compiles `apps/api/cmd/cloud-launcher` without the console (`-tags noconsole`), then `migrate` migrates and `deploy` hands the binary to the preset, none of them cached | `/api/*`, the API; its own root paths, `/console/runtime.json`, `/livez`, `/readyz`, `/csp-report`, `/cron/events-retention` and the IdP callbacks (`/idp/{slug}/callback`, `/__nextgen/idp/{slug}/callback`); and until 1.0.0 the root paths of the API's resources (`/users`, `/flow`, … in one rule). Nothing else |
+| `server` | a Node.js function, `apps/cloud/server/index.mjs`, rooted at `apps/cloud`: it runs the launcher and hands the server's spans to Vercel Tracing and its metrics to Vercel custom metrics, which only a Node.js function can. The build command enters the repo root, puts Go on `PATH` (`apps/cloud/install-go.sh`, as the Node.js build image has none), and then runs `node_modules/.bin/turbo run deploy --filter=@zitadel/cloud`. `@zitadel/cloud`'s `build` compiles `apps/api/cmd/cloud-launcher` without the console (`-tags noconsole`), then `migrate` migrates and `deploy` checks the binary is in `dist/`, where the function's `includeFiles` ships it from, none of them cached | `/api/*`, the API; its own root paths, `/console/runtime.json`, `/livez`, `/readyz`, `/csp-report`, `/cron/events-retention` and the IdP callbacks (`/idp/{slug}/callback`, `/__nextgen/idp/{slug}/callback`); and until 1.0.0 the root paths of the API's resources (`/users`, `/flow`, … in one rule). Nothing else |
 | `console` | Vite; `turbo run build` with `CONSOLE_BASE_PATH=/console/` and `CONSOLE_ADDON=../cloud-console`, which compiles in the cloud's add-on ([`apps/cloud-console`](../../apps/cloud-console/AGENTS.md)): it reports Vercel Web Analytics and Speed Insights, adds the unlisted sign-up page `/console/signup`, and adds Billing and Support to Settings, which until their systems are live say the cloud is free during the preview and point to GitHub issues, starts onboarding on each signed-in page and on the CLI's claim page, and reports `signup_completed` when the sign-in widget makes an account; in previews it also adds Email and sends the sign-in widget's calls through BotID's check in `cloud-functions`; the service serves the build where it lands, `apps/api/internal/staticui/console/dist` | `/console/*` (bare `/console` redirects to the slash form; `/ui/console` and `/ui/console/*` redirect here with a 307) |
 | `docs` | Next.js; `turbo run build --filter=@zitadel/docs`, after `@zitadel/components`, `@zitadel/api-mock` and the `@zitadel/api` client the mock calls, which the live examples render, and the docs' typecheck. The build's cache key holds the deployment's ID, which Skew Protection bakes into it, so it never comes from the cache | `/docs` and `/docs/*`: pages, assets (`/docs/_next/`), search, `llms.txt`, each page's `.md` and the MCP server |
 | `website` | Next.js; `turbo run build --filter=@zitadel/website`, after the atoms of `@zitadel/components` its showcase renders; keyed by the deployment's ID, as the docs' | `/`, the front page, `/changelog` (`/changelog/` redirects there) with its entries' pages and its feed under it, `/changelog/*`, and their assets at `/_next/*`; the host's `/llms.txt`; the host's favicons at `/favicon.ico` and `/favicons/*`, which the console, the login UI and the docs link; and every path no other service claims, which its 404 answers ([ADR 076](../adrs/076-error-pages-and-unmatched-routes.md)) |
@@ -283,7 +283,7 @@ Environment variables (add secrets with
 | `WEBSITE_SPEED_INSIGHTS_SAMPLE_RATE` | Production, Preview | `0.01`: the same for the website |
 | `BOOTSTRAP_ADMIN_USER_JSON_B64` | Production; sensitive | production's `admin-user.b64`: the root admin document |
 | `BOOTSTRAP_ADMIN_USER_JSON_B64` | Preview; sensitive | preview's `admin-user.b64` |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | Production; optional | the OTLP/HTTP endpoint of the telemetry backend, path included (Grafana Cloud: `https://otlp-gateway-prod-<region>.grafana.net/otlp`); set, the launcher turns on the server's trace, metric and log export to it; unset exports nothing |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | Production; optional | the OTLP/HTTP endpoint of the telemetry backend, path included (Grafana Cloud: `https://otlp-gateway-prod-<region>.grafana.net/otlp`); set, the launcher turns on the server's log export to it; traces and metrics go to Vercel through the `server` service's wrapper either way; unset exports no logs |
 | `OTEL_EXPORTER_OTLP_HEADERS` | Production; sensitive; with the endpoint | the backend's credentials, kept in 1Password (Grafana Cloud: `Authorization=Basic%20<base64 of instanceID:token>`) |
 | `NEXTGEN_PLATFORM_OPERATORS` | Production or Preview; optional | the platform operators' user ids, comma-separated; unset means the root admin alone |
 | `ENABLE_EXPERIMENTAL_COREPACK` | Production, Preview | `1`: the builds run package scripts that call `pnpm`, which must be the workspace's pinned version |
@@ -547,11 +547,10 @@ restart keeps its state; deleting the directory starts over.
 `--local-config`), so what it needs lives there, in fields a deployment does
 not use:
 
-- The `server` service is rooted at the Go module, `apps/api`, and its
-  `entrypoint` names `cmd/cloud-launcher/main.go` there. In dev, Vercel's Go
-  builder builds that package and starts it on `$PORT`; a
-  deployment's build command compiles the same package through turbo, and
-  the builder takes that binary instead. Without
+- The `server` service is the Node.js wrapper `apps/cloud/server/index.mjs`,
+  which starts the launcher in `apps/cloud/dist/` and forwards to it. The
+  script compiles the launcher first (`build-launcher.sh`, Go on PATH), as a
+  deployment's build command does through turbo. Without
   `CLOUD_DATABASE_URL` and outside a deployment, the launcher serves from
   SQLite and migrates it at startup.
 - The `console` service's `devCommand` builds it with the add-on
@@ -806,7 +805,7 @@ project and imports the root admin.
 - The server has no read/write split yet; reads in another region need one
   before a replica helps.
 - The server's region is its service's `functions` entry, keyed by its
-  `entrypoint` path; the Go preset ignores a key that does not match it
+  `entrypoint` path; Vercel ignores a key that does not match it
   ([zitadel/nextgen#1871](https://github.com/zitadel/nextgen/pull/1871)).
   `TestVercelJSONKeepsTheServerInFrankfurt` holds the two together.
 - Writes stay in Frankfurt. Nothing in this setup has to change to add a

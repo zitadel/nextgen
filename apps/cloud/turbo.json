@@ -6,9 +6,10 @@
   // the launcher's Go tests run in @zitadel/server#test
   // (`go -C apps/api test ./...`).
   "tasks": {
-    // The `server` service's function binary (build-launcher.sh), which
-    // `migrate` runs and `deploy` hands to Vercel. Go's compiler cache persists
-    // in Vercel's branch build cache. Always link fresh commit/date metadata:
+    // The binary the `server` service's function runs (build-launcher.sh),
+    // which `migrate` runs too and the function ships through includeFiles.
+    // Go's compiler cache persists in Vercel's branch build cache. Always
+    // link fresh commit/date metadata:
     // the build date orders platform configuration deployments. Branch builds
     // and CI can write the team's remote cache; a planted executable there
     // could run in production with its secrets. Never cache this task.
@@ -40,10 +41,10 @@
       "dependsOn": ["build"],
       "passThroughEnv": ["*"]
     },
-    // The last step of the `server` service's build, whose command installs
-    // first, as Vercel's Go builder runs no installCommand, and then runs
-    // this task: deploy.sh copies the migrated launcher to
-    // $VERCEL_OUTPUT_FILE, where the builder takes the function from.
+    // The last step of the `server` service's build, whose command puts Go
+    // on PATH (install-go.sh) and then runs this task. The service is a
+    // Node.js function (server/index.mjs) that ships the migrated launcher
+    // through its includeFiles, so deploy.sh has nothing left to hand over.
     "deploy": {
       "cache": false,
       "dependsOn": ["migrate"]
