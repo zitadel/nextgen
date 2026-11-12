@@ -230,7 +230,6 @@ func oauthSettingsUnsupportedBadRequest(ctx context.Context) *api.BuildReleaseBa
 		Code:    api.ErrorCode(err.Code),
 		Message: err.Message,
 		Kind:    api.ReleasePointerKindOAuth,
-		Index:   0,
 		Handle:  api.NewOptString(domain.ReleaseOAuthHandle),
 	}})
 }

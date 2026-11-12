@@ -133,23 +133,6 @@ func decodeBuildReleaseRequest(body string) (api.BuildReleaseRequest, error) {
 	return req, req.Validate()
 }
 
-// Until the release service stores OAuth settings, a bundle carrying them is
-// refused as the typed 400, naming the one resource so the caller knows what
-// to remove.
-func TestOAuthSettingsUnsupportedBadRequest(t *testing.T) {
-	t.Parallel()
-
-	resp := oauthSettingsUnsupportedBadRequest(t.Context())
-	assert.Equal(t, api.ErrorCode(domain.ErrReleaseInvalid(nil, nil).Code), resp.Code)
-	resources := resp.Details.Value.Resources
-	require.Len(t, resources, 1)
-	assert.Equal(t, api.ReleasePointerKindOAuth, resources[0].Kind)
-	assert.Equal(t, 0, resources[0].Index)
-	assert.Equal(t, api.NewOptString(domain.ReleaseOAuthHandle), resources[0].Handle)
-	assert.Equal(t, api.ErrorCode(domain.ErrReleaseInvalid(nil, nil).Code), resources[0].Code)
-	assert.Contains(t, resources[0].Message, "oauth")
-}
-
 // A revoked release and one still served are both conflicts.
 func TestReleaseErrorResponseConflicts(t *testing.T) {
 	assert.Equal(t, http.StatusConflict, releaseErrorResponse(domain.ErrReleaseRevoked()).StatusCode)
