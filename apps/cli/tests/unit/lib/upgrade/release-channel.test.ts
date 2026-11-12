@@ -6,9 +6,9 @@ import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { ReleaseChannel, ZITADEL } from "@/lib/upgrade";
+import { DistTagRegistry, LookupCache, ReleaseChannel, UpgradeTarget } from "@/lib/upgrade";
 
-const REGISTRY = "https://registry.npmjs.org/-/package/@zitadel%2fcli/dist-tags";
+const REGISTRY = "https://registry.npmjs.org/-/package/@acme%2fcli/dist-tags";
 
 const server = setupServer();
 let configHome: string;
@@ -28,17 +28,35 @@ function env(extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
 }
 
 async function cacheHolds(lookup: Record<string, unknown>): Promise<void> {
-  const file = join(configHome, "zitadel", "cli", "update-check.json");
+  const file = join(configHome, "acme", "update-check.json");
   await mkdir(dirname(file), { recursive: true });
   await writeFile(file, JSON.stringify(lookup));
 }
 
-async function latestVersion(cliVersion: string, environment: NodeJS.ProcessEnv) {
-  return (await new ReleaseChannel(ZITADEL, cliVersion, environment).latest())?.version;
+const ACME = new UpgradeTarget("@acme/", "@acme/cli");
+
+function channel(
+  cliVersion: string,
+  environment: NodeJS.ProcessEnv,
+  cacheFile: string = join(configHome, "acme", "update-check.json"),
+): ReleaseChannel {
+  return new ReleaseChannel(
+    cliVersion === "3.0.0-alpha.0" ? "alpha" : "latest",
+    DistTagRegistry.of(environment, ACME),
+    LookupCache.at(cacheFile),
+  );
+}
+
+async function latestVersion(
+  cliVersion: string,
+  environment: NodeJS.ProcessEnv,
+  cacheFile?: string,
+) {
+  return (await channel(cliVersion, environment, cacheFile).latest())?.version;
 }
 
 async function freshVersion(cliVersion: string, environment: NodeJS.ProcessEnv) {
-  return (await new ReleaseChannel(ZITADEL, cliVersion, environment).latestFresh())?.version;
+  return (await channel(cliVersion, environment).latestFresh())?.version;
 }
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
@@ -57,13 +75,13 @@ describe("ReleaseChannel", () => {
     publishes({ latest: "2.0.0", alpha: "3.0.0-alpha.1" });
 
     await expect(latestVersion("1.0.0", env())).resolves.toBe("2.0.0");
-    await rm(join(configHome, "zitadel"), { recursive: true });
+    await rm(join(configHome, "acme"), { recursive: true });
     await expect(latestVersion("3.0.0-alpha.0", env())).resolves.toBe("3.0.0-alpha.1");
   });
 
   it("asks the registry npm itself was pointed at", async () => {
     server.use(
-      http.get("https://mirror.example/npm/-/package/@zitadel%2fcli/dist-tags", () =>
+      http.get("https://mirror.example/npm/-/package/@acme%2fcli/dist-tags", () =>
         HttpResponse.json({ latest: "2.0.0" }),
       ),
     );
@@ -215,7 +233,9 @@ describe("ReleaseChannel", () => {
     await writeFile(file, "");
     publishes({ latest: "2.0.0" });
 
-    await expect(latestVersion("1.0.0", env({ XDG_CONFIG_HOME: file }))).resolves.toBe("2.0.0");
+    await expect(latestVersion("1.0.0", env(), join(file, "update-check.json"))).resolves.toBe(
+      "2.0.0",
+    );
   });
 
   it("writes the answer where the next run reads it", async () => {
@@ -224,19 +244,8 @@ describe("ReleaseChannel", () => {
     await latestVersion("1.0.0", env());
 
     const cached = JSON.parse(
-      await readFile(join(configHome, "zitadel", "cli", "update-check.json"), "utf8"),
+      await readFile(join(configHome, "acme", "update-check.json"), "utf8"),
     ) as Record<string, unknown>;
     expect(cached).toMatchObject({ dist_tag: "latest", version: "2.0.0" });
-  });
-});
-
-describe("ReleaseChannel.isDisabled", () => {
-  it.each([
-    [{ ZITADEL_UPDATE_CHECK: "0" }, true],
-    [{ CI: "true" }, true],
-    [{ CI: "false" }, false],
-    [{}, false],
-  ])("for %o is %s", (environment, disabled) => {
-    expect(new ReleaseChannel(ZITADEL, "1.0.0", environment).isDisabled()).toBe(disabled);
   });
 });

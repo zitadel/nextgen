@@ -1,22 +1,12 @@
-import { npmDistTagForCliVersion } from "@/lib/public-cli";
-import { isCI } from "@/lib/skills-hint";
-
-import { DistTagRegistry } from "./dist-tag-registry";
-import { LookupCache } from "./lookup-cache";
+import type { DistTagRegistry } from "./dist-tag-registry";
+import type { LookupCache } from "./lookup-cache";
 import { Release } from "./release";
-import type { UpgradeTarget } from "./upgrade-target";
 
 const CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
-/** The newest published release on this CLI's dist-tag, asked of the registry at most once a day. */
+/** The newest published release on one dist-tag, asked of the registry at most once a day. */
 export class ReleaseChannel {
-  /** What is being upgraded. */
-  private readonly target: UpgradeTarget;
-
-  /** The run's environment. */
-  private readonly env: NodeJS.ProcessEnv;
-
-  /** The dist-tag this CLI's releases are published on. */
+  /** The dist-tag the releases are published on. */
   private readonly distTag: string;
 
   /** The registry asked for the dist-tag. */
@@ -26,30 +16,20 @@ export class ReleaseChannel {
   private readonly cache: LookupCache;
 
   /**
-   * @param target - What is being upgraded.
-   * @param cliVersion - The running CLI's version, which decides the dist-tag.
-   * @param env - The run's environment.
+   * @param distTag - The dist-tag the releases are published on.
+   * @param registry - The registry to ask.
+   * @param cache - Where answers are kept between runs.
    */
-  constructor(target: UpgradeTarget, cliVersion: string, env: NodeJS.ProcessEnv) {
-    this.target = target;
-    this.env = env;
-    this.distTag = npmDistTagForCliVersion(cliVersion);
-    this.registry = DistTagRegistry.of(env, target);
-    this.cache = LookupCache.of(env);
-  }
-
-  /**
-   * Whether this run stays off the registry: asked to, or on CI, where no person
-   * reads a notice.
-   */
-  isDisabled(): boolean {
-    return this.env[this.target.updateCheckVariable] === "0" || isCI(this.env);
+  constructor(distTag: string, registry: DistTagRegistry, cache: LookupCache) {
+    this.distTag = distTag;
+    this.registry = registry;
+    this.cache = cache;
   }
 
   /**
    * The newest release, from the cache when it is under a day old. Never throws:
    * a lookup is advice, so an offline machine, a registry that does not answer or
-   * an unwritable cache costs the answer, not the command.
+   * an unwritable cache costs the answer, not the caller.
    *
    * @returns The release, or `undefined` when nobody can say.
    */

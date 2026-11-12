@@ -18,7 +18,8 @@ import { isDeepStrictEqual } from "node:util";
 import { META_SCHEMA_DIR, metaSchemaFiles } from "@zitadel/config/meta-schemas";
 import semver from "semver";
 
-import { ScopedDependencies, ZITADEL } from "@/lib/upgrade";
+import { ScopedDependencies } from "@/lib/upgrade";
+import { ZITADEL } from "@/lib/zitadel-upgrade";
 
 import { isErrno } from "./errors";
 import { pathExists, readIfExists } from "./fs";

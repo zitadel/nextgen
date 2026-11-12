@@ -2,8 +2,7 @@ import { arrow, command, dim, mark } from "@/lib/style";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { RELEASE_NOTES_URL } from "@/lib/release-notes";
 
-import type { Refresh } from "./project-installer";
-import type { UpgradePlan } from "./upgrade-plan";
+import type { Refresh, UpgradePlan } from "@/lib/upgrade";
 
 /** What an upgrade run did, as the lines a person reads and the data a script parses. */
 export class UpgradeReport {

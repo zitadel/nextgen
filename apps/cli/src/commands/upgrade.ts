@@ -9,7 +9,7 @@ import { newestCliCommand } from "@/lib/public-cli";
 import { SHARED_SKILLS_DIR } from "@/lib/skills/add";
 import { strong } from "@/lib/style";
 import { type SuggestedCommand, unscopedCommand } from "@/lib/suggestion";
-import { BreakingChangesBanner, Upgrader, ZITADEL } from "@/lib/upgrade";
+import { BreakingChangesBanner, ZITADEL, ZitadelUpgrader } from "@/lib/zitadel-upgrade";
 
 /**
  * `zitadel upgrade` — move this project to the latest release.
@@ -38,7 +38,7 @@ export default class Upgrade extends Suggestible(BaseCommand) {
   };
 
   protected async execute({ flags }: Admitted<typeof Upgrade>): Promise<JsonEnvelope> {
-    const upgrader = new Upgrader(ZITADEL, {
+    const upgrader = new ZitadelUpgrader({
       cliVersion: this.cliVersion,
       cwd: this.cwd,
       typedCwd: flags.cwd,
@@ -74,7 +74,7 @@ export default class Upgrade extends Suggestible(BaseCommand) {
     ];
     const actions = plan.cliBehind
       ? [
-          `This CLI is still ${this.cliVersion}. Run the newest with ${newestCliCommand("<command>", this.cliVersion)}, or if you installed it globally, update it with npm install --global ${ZITADEL.cliPackage}@${plan.target}.`,
+          `This CLI is still ${this.cliVersion}. Run the newest with ${newestCliCommand("<command>", this.cliVersion)}, or if you installed it globally, update it with npm install --global ${ZITADEL.packageName}@${plan.target}.`,
         ]
       : [];
 

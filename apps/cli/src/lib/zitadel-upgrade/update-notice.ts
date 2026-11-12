@@ -3,10 +3,10 @@ import { command, notice } from "@/lib/style";
 import { upgradeCommand } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { drawBox } from "@/lib/ui/layout";
+import { ScopedDependencies } from "@/lib/upgrade";
 
-import { ReleaseChannel } from "./release-channel";
-import { ScopedDependencies } from "./scoped-dependencies";
-import type { UpgradeTarget } from "./upgrade-target";
+import { ZITADEL } from "./zitadel";
+import { ZitadelReleaseChannel } from "./zitadel-release-channel";
 
 /**
  * The box `--version` ends with when something is behind the latest release. It
@@ -14,8 +14,6 @@ import type { UpgradeTarget } from "./upgrade-target";
  * CLI is the newest by definition, and what has gone stale is the app.
  */
 export class UpdateNotice {
-  /** What is being upgraded. */
-  private readonly target: UpgradeTarget;
   /** What the run was given. */
   private readonly options: Readonly<{
     cliVersion: string;
@@ -25,14 +23,12 @@ export class UpdateNotice {
   }>;
 
   /**
-   * @param target - What is being upgraded.
    * @param options.cliVersion - The running CLI's version.
    * @param options.cwd - The project directory.
    * @param options.env - The run's environment.
    * @param options.columns - The terminal's width.
    */
   constructor(
-    target: UpgradeTarget,
     options: Readonly<{
       cliVersion: string;
       cwd: string;
@@ -40,14 +36,13 @@ export class UpdateNotice {
       columns?: number;
     }>,
   ) {
-    this.target = target;
     this.options = options;
   }
 
   /** The box, or `undefined` when nothing is behind, the check is off or the lookup found nothing. */
   async render(): Promise<string | undefined> {
     const { cliVersion, cwd, env, columns } = this.options;
-    const channel = new ReleaseChannel(this.target, cliVersion, env);
+    const channel = new ZitadelReleaseChannel(cliVersion, env);
     if (channel.isDisabled()) {
       return undefined;
     }
@@ -55,7 +50,7 @@ export class UpdateNotice {
     if (release === undefined) {
       return undefined;
     }
-    const dependencies = await ScopedDependencies.read(cwd, this.target.scope).catch(() => {
+    const dependencies = await ScopedDependencies.read(cwd, ZITADEL.scope).catch(() => {
       return undefined;
     });
     // A version on either side of the arrow is semver by the time it is here, so

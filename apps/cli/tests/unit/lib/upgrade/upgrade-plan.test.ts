@@ -2,7 +2,8 @@ import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
-import { Release, ScopedDependencies, UpgradePlan, ZITADEL } from "@/lib/upgrade";
+import { breakingChanges } from "@/lib/release-notes";
+import { Release, ScopedDependencies, UpgradePlan } from "@/lib/upgrade";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -23,7 +24,8 @@ async function plan(cliVersion: string, latest: string, dependencies: Record<str
   return UpgradePlan.create({
     cliVersion,
     latest: new Release(latest),
-    dependencies: await ScopedDependencies.read(dir, ZITADEL.scope),
+    dependencies: await ScopedDependencies.read(dir, "@zitadel/"),
+    changes: { breakingChanges },
   });
 }
 

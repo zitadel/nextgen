@@ -8,7 +8,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 
 import { ZitadelError } from "@/lib/errors";
 import { shellCommand } from "@/lib/suggestion";
-import { Upgrader, ZITADEL } from "@/lib/upgrade";
+import { ZitadelUpgrader } from "@/lib/zitadel-upgrade";
 import { rejectionOf } from "../../../helpers/thrown-value";
 
 const REGISTRY = "https://registry.npmjs.org/-/package/@zitadel%2fcli/dist-tags";
@@ -17,8 +17,8 @@ const RELEASES = "https://api.github.com/repos/zitadel/nextgen/releases";
 const server = setupServer();
 let dir: string;
 
-function upgrader(dryRun: boolean): Upgrader {
-  return new Upgrader(ZITADEL, {
+function upgrader(dryRun: boolean): ZitadelUpgrader {
+  return new ZitadelUpgrader({
     cliVersion: "1.0.0",
     cwd: dir,
     typedCwd: undefined,
@@ -45,7 +45,7 @@ afterEach(async () => {
   await rm(dir, { recursive: true, force: true });
 });
 
-describe("Upgrader.plan", () => {
+describe("ZitadelUpgrader.plan", () => {
   it("moves the exact pins that are behind the latest release", async () => {
     await writeFile(
       join(dir, "package.json"),
@@ -69,7 +69,7 @@ describe("Upgrader.plan", () => {
   });
 });
 
-describe("Upgrader.apply", () => {
+describe("ZitadelUpgrader.apply", () => {
   it("installs nothing on a dry run and says what would move", async () => {
     const manifest = JSON.stringify({ dependencies: { "@zitadel/sdk-next": "1.0.0" } });
     await writeFile(join(dir, "package.json"), manifest);

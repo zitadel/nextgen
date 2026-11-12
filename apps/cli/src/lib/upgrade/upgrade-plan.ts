@@ -1,7 +1,6 @@
 import semver from "semver";
 
-import { type BreakingChange, breakingChanges } from "@/lib/release-notes";
-
+import type { BreakingChange, ChangeSource } from "./change-source";
 import type { Dependency } from "./dependency";
 import type { Release } from "./release";
 import type { ScopedDependencies } from "./scoped-dependencies";
@@ -41,13 +40,15 @@ export class UpgradePlan {
    * @param input.latest - What the registry answered. A CLI ahead of it (a
    * prerelease) is what its own files target, so it is never moved back.
    * @param input.dependencies - The project's dependencies.
+   * @param input.changes - Where the breaking changes are read from.
    */
   static async create(input: {
     cliVersion: string;
     latest: Release;
     dependencies: ScopedDependencies | undefined;
+    changes: ChangeSource;
   }): Promise<UpgradePlan> {
-    const { cliVersion, latest, dependencies } = input;
+    const { cliVersion, latest, dependencies, changes } = input;
     const target = latest.isNewerThan(cliVersion) ? latest.version : cliVersion;
     const packages = (dependencies?.exact() ?? [])
       .filter((dependency) => {
@@ -72,7 +73,7 @@ export class UpgradePlan {
       target,
       packages,
       dependencies?.floating() ?? [],
-      upToDate ? [] : await breakingChanges(oldest ?? "0.0.0", target),
+      upToDate ? [] : await changes.breakingChanges(oldest ?? "0.0.0", target),
     );
   }
 

@@ -1,7 +1,8 @@
 import semver from "semver";
 
 import { addExactCommandFor, detectPackageManager } from "@/lib/package-manager";
-import { ScopedDependencies, ZITADEL } from "@/lib/upgrade";
+import { ScopedDependencies } from "@/lib/upgrade";
+import { ZITADEL } from "@/lib/zitadel-upgrade";
 
 import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
 

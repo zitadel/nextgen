@@ -1,5 +1,5 @@
 import { upgradeCommand } from "@/lib/suggestion";
-import { ReleaseChannel, ZITADEL } from "@/lib/upgrade";
+import { ZitadelReleaseChannel } from "@/lib/zitadel-upgrade";
 
 import type { CheckOutcome } from "./types";
 
@@ -17,7 +17,7 @@ export async function checkCliVersion(input: {
 }): Promise<CheckOutcome> {
   const { cliVersion, env, typedCwd } = input;
   const base = { name: "cli-version" };
-  const channel = new ReleaseChannel(ZITADEL, cliVersion, env);
+  const channel = new ZitadelReleaseChannel(cliVersion, env);
   if (channel.isDisabled()) {
     return {
       ...base,

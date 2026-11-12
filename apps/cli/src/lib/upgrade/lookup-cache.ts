@@ -1,9 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { dirname } from "node:path";
 
 import semver from "semver";
-
-import { telemetryConfigDir } from "@/lib/telemetry/identity";
 
 /** A lookup's answer, kept between runs so a command asks the registry at most once a day. */
 export type CachedLookup = Readonly<{
@@ -13,7 +11,7 @@ export type CachedLookup = Readonly<{
   version?: string;
 }>;
 
-/** The file a lookup's answer is kept in, under the CLI's config directory. */
+/** The file a lookup's answer is kept in. */
 export class LookupCache {
   /** The file answers are kept in, or `undefined` when there is no home to write to. */
   private readonly file: string | undefined;
@@ -23,12 +21,11 @@ export class LookupCache {
   }
 
   /**
-   * @param env - The run's environment, which decides the config directory.
-   * @returns A cache that remembers nothing when there is no home to write to.
+   * @param file - Where answers are kept.
+   * @returns A cache that remembers nothing when there is no file to write to.
    */
-  static of(env: NodeJS.ProcessEnv): LookupCache {
-    const dir = telemetryConfigDir(env);
-    return new LookupCache(dir === undefined ? undefined : join(dir, "update-check.json"));
+  static at(file: string | undefined): LookupCache {
+    return new LookupCache(file);
   }
 
   /**

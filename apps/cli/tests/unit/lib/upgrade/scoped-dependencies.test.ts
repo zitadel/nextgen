@@ -1,6 +1,6 @@
 import { describe, expect } from "vitest";
 
-import { ScopedDependencies, ZITADEL } from "@/lib/upgrade";
+import { ScopedDependencies } from "@/lib/upgrade";
 import { it } from "@tests/helpers/fixtures";
 import { write } from "@tests/helpers/git-repo";
 import { rejectionOf } from "@tests/helpers/thrown-value";
@@ -21,14 +21,14 @@ function summary(dependencies: ScopedDependencies | undefined, kind: "exact" | "
 
 describe("ScopedDependencies.read", () => {
   it("is undefined without a package.json", async ({ dir }) => {
-    await expect(ScopedDependencies.read(dir, ZITADEL.scope)).resolves.toBeUndefined();
+    await expect(ScopedDependencies.read(dir, "@zitadel/")).resolves.toBeUndefined();
   });
 
   it("refuses a package.json that is not valid JSON", async ({ dir }) => {
     await write(dir, { "package.json": "{ not json" });
 
     const error = await rejectionOf(() => {
-      return ScopedDependencies.read(dir, ZITADEL.scope);
+      return ScopedDependencies.read(dir, "@zitadel/");
     });
 
     expect(error).toBeInstanceOf(SyntaxError);
@@ -47,7 +47,7 @@ describe("ScopedDependencies.exact", () => {
   it("lists only the exact pins of the scope", async ({ dir }) => {
     await write(dir, { "package.json": MIXED });
 
-    const dependencies = await ScopedDependencies.read(dir, ZITADEL.scope);
+    const dependencies = await ScopedDependencies.read(dir, "@zitadel/");
 
     expect(summary(dependencies, "exact")).toEqual([
       ["@zitadel/sdk-next", "1.2.3"],
@@ -60,7 +60,7 @@ describe("ScopedDependencies.floating", () => {
   it("lists the dependencies of the scope that are not exact pins", async ({ dir }) => {
     await write(dir, { "package.json": MIXED });
 
-    const dependencies = await ScopedDependencies.read(dir, ZITADEL.scope);
+    const dependencies = await ScopedDependencies.read(dir, "@zitadel/");
 
     expect(summary(dependencies, "floating")).toEqual([["@zitadel/api", "^1.2.3"]]);
   });

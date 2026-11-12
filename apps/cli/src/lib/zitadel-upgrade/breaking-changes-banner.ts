@@ -1,6 +1,7 @@
-import { RELEASE_NOTES_URL, type BreakingChange } from "@/lib/release-notes";
+import { RELEASE_NOTES_URL } from "@/lib/release-notes";
 import { mark, strong, url } from "@/lib/style";
 import { escapeControlCharacters } from "@/lib/terminal-text";
+import type { BreakingChange } from "@/lib/upgrade";
 
 /** The breaking changes an upgrade crosses, shown before anything changes so the person can still stop. */
 export class BreakingChangesBanner {
