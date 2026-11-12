@@ -428,7 +428,7 @@ describe("the cli", () => {
           expect(parseJson(result.stdout)).toEqual({
             status: "error",
             cli_version: cliVersion.version,
-            command: "teams delete",
+            command: "teams:delete",
             source: "",
             code: "E_VALIDATION",
             message: "teams delete is not a zitadel command.",
@@ -442,7 +442,7 @@ describe("the cli", () => {
           expect(parseJson(result.stdout)).toEqual({
             status: "error",
             cli_version: cliVersion.version,
-            command: "variable lst",
+            command: "variable:lst",
             source: "",
             code: "E_VALIDATION",
             message: "variable lst is not a zitadel command.",
@@ -522,7 +522,9 @@ describe("the cli", () => {
             runCliForTest(["variable", "lst"], { NO_COLOR: "1" }),
           );
 
-          expect(result.stderr).toContain(`  $ ${expectedPublicCliCommand("variable list")}`);
+          expect(result.stderr).toContain(
+            `  $ ${expectedPublicCliCommand("variable list --help")}`,
+          );
         });
       });
     });

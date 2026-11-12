@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { stripVTControlCharacters } from "node:util";
 
 import { Command, Flags, type Interfaces, ux } from "@oclif/core";
 
@@ -42,20 +41,25 @@ import {
   vercelEventKeys,
 } from "./command-telemetry";
 import type { CommandGroup } from "./groups";
-import { escapeControlCharacters, escapeJsonControlCharacters } from "@/lib/terminal-text";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 import { type NextSteps, nextStepsData, renderNextSteps, stepsOf } from "./next-steps";
 import { painted } from "./rendering";
 import type {
   CommandResult,
-  ErrorEnvelope,
   EnvelopeMeta,
   FlagVariable,
   GlobalOptions,
   JsonEnvelope,
-  SkippedEnvelope,
 } from "./types";
 import { Cmd } from "@/lib/cmd";
-import { Failure, JsonFailureOutput, TerminalFailureOutput } from "./failure";
+import {
+  asideText,
+  envelopeText,
+  Failure,
+  JsonFailureOutput,
+  TerminalFailureOutput,
+  withWarnings,
+} from "./failure";
 
 /**
  * The colour variables, which `bin/run.js` sets from `--color`/`--no-color`
@@ -947,14 +951,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
    * @param json - The envelope to write.
    */
   protected override logJson(json: unknown): void {
-    ux.stdout(
-      escapeJsonControlCharacters(
-        ux.colorizeJson(json, {
-          pretty: true,
-          theme: this.config.theme?.json,
-        }),
-      ),
-    );
+    ux.stdout(envelopeText(json, this.config.theme?.json));
   }
 
   /**
@@ -962,9 +959,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
    * redirected, as in `2> error.log`, the codes are taken back out.
    */
   private logAside(text: string): void {
-    this.logToStderr(
-      process.stderr.isTTY || process.env[FORCE_COLOR.name] ? text : stripVTControlCharacters(text),
-    );
+    this.logToStderr(asideText(text, stderrColour()));
   }
 
   /**
@@ -1169,14 +1164,18 @@ function withReportedWarnings(result: CommandResult, reported: readonly string[]
 }
 
 /**
- * Add reported warnings to a skipped or error envelope. Those envelopes carry
- * `warnings` only when there are some, so their shape is otherwise unchanged.
+ * What decides whether text on stderr keeps its colour: whether stderr is a
+ * terminal, and whether colour was forced. Read here, where the colour
+ * variables are read, for every writer of stderr, the unknown-command hook's
+ * included.
+ *
+ * @returns Whether stderr is a terminal, and whether colour is forced.
  */
-function withWarnings<T extends SkippedEnvelope | ErrorEnvelope>(
-  envelope: T,
-  warnings: readonly string[],
-): T {
-  return warnings.length === 0 ? envelope : { ...envelope, warnings: [...warnings] };
+export function stderrColour(): { tty: boolean; forced: boolean } {
+  return {
+    tty: Boolean(process.stderr.isTTY),
+    forced: Boolean(process.env[FORCE_COLOR.name]),
+  };
 }
 
 /** Wraps a {@link CommandResult} with the invocation metadata into the final envelope. */

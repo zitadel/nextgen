@@ -1,11 +1,60 @@
+import { stripVTControlCharacters } from "node:util";
+
+import { ux } from "@oclif/core";
+
 import type { ZitadelError } from "@/lib/errors";
 import { normalizePublicCliCommands, spellOutCommands } from "@/lib/public-cli";
-import { escapeControlCharacters } from "@/lib/terminal-text";
+import { escapeControlCharacters, escapeJsonControlCharacters } from "@/lib/terminal-text";
 
 import type { Summary } from "@/lib/ui";
 import { NEXT_LABEL } from "@/lib/ui/summary";
 
-import type { ErrorEnvelope, GlobalOptions } from "./types";
+import type { ErrorEnvelope, GlobalOptions, SkippedEnvelope } from "./types";
+
+/**
+ * An envelope as the CLI writes it to stdout: pretty-printed, coloured by the
+ * theme when stdout is a terminal, and with every control character a value
+ * carries spelled out, so what a reader parses is the real text and what a
+ * terminal prints is safe.
+ *
+ * @param json - The envelope.
+ * @param theme - The colours oclif paints JSON in.
+ * @returns The text to write.
+ */
+export function envelopeText(json: unknown, theme: Record<string, string> | undefined): string {
+  return escapeJsonControlCharacters(ux.colorizeJson(json, { pretty: true, theme }));
+}
+
+/**
+ * Text as the CLI writes it to stderr. Colour is decided by stdout's terminal,
+ * so with only stderr redirected, as in `2> error.log`, the codes are taken
+ * back out unless colour was forced.
+ *
+ * @param text - The text, possibly coloured.
+ * @param stderr - Whether stderr is a terminal, and whether colour is forced.
+ * @returns The text to write.
+ */
+export function asideText(
+  text: string,
+  stderr: Readonly<{ tty: boolean; forced: boolean }>,
+): string {
+  return stderr.tty || stderr.forced ? text : stripVTControlCharacters(text);
+}
+
+/**
+ * Adds reported warnings to a skipped or error envelope. Those envelopes carry
+ * `warnings` only when there are some, so their shape is otherwise unchanged.
+ *
+ * @param envelope - The envelope.
+ * @param warnings - The warnings the run reported.
+ * @returns The envelope, with the warnings when there are any.
+ */
+export function withWarnings<T extends SkippedEnvelope | ErrorEnvelope>(
+  envelope: T,
+  warnings: readonly string[],
+): T {
+  return warnings.length === 0 ? envelope : { ...envelope, warnings: [...warnings] };
+}
 
 /** Where a failure happened, as the envelope and the error block name it. */
 export type FailureMeta = Pick<GlobalOptions, "cliVersion" | "command" | "source">;
@@ -78,7 +127,7 @@ export class JsonFailureOutput implements FailureOutput {
       next_commands: normalizePublicCliCommands(error.nextCommands, meta.cliVersion),
       details: error.details,
     };
-    return warnings.length === 0 ? envelope : { ...envelope, warnings: [...warnings] };
+    return withWarnings(envelope, warnings);
   }
 }
 

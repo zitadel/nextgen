@@ -2,9 +2,15 @@ import { type Hook, ux } from "@oclif/core";
 import { distance } from "fastest-levenshtein";
 
 import { ZitadelError } from "@/lib/errors";
-import { Failure, JsonFailureOutput, TerminalFailureOutput } from "@/lib/oclif/failure";
+import { stderrColour } from "@/lib/oclif/base";
+import {
+  asideText,
+  envelopeText,
+  Failure,
+  JsonFailureOutput,
+  TerminalFailureOutput,
+} from "@/lib/oclif/failure";
 import { type SuggestedCommand, unscopedCommand } from "@/lib/suggestion";
-import { escapeJsonControlCharacters } from "@/lib/terminal-text";
 import { Ui } from "@/lib/ui";
 import { closest } from "@/lib/zitadel/utils/spelling";
 
@@ -30,15 +36,24 @@ export class UnknownCommand {
   /** The refusal. */
   readonly error: ZitadelError;
 
+  /** The commands a refusal may suggest: the visible ones and their aliases. */
   private readonly commands: ReadonlyArray<readonly string[]>;
+  /** Every command that exists, hidden ones included, for telling a command from a typo. */
+  private readonly known: ReadonlyArray<readonly string[]>;
 
   /**
    * @param id - What oclif made of the words typed, joined by `:`.
    * @param commands - Every command a person may run, as the words that name it
    *   (`["variable", "list"]`): visible ones and their aliases.
+   * @param hidden - The hidden commands, which exist but are never suggested.
    */
-  constructor(id: string, commands: ReadonlyArray<readonly string[]>) {
+  constructor(
+    id: string,
+    commands: ReadonlyArray<readonly string[]>,
+    hidden: ReadonlyArray<readonly string[]> = [],
+  ) {
     this.commands = commands;
+    this.known = [...commands, ...hidden];
     const words = id.split(":").filter((word) => {
       return word !== "";
     });
@@ -49,8 +64,18 @@ export class UnknownCommand {
   }
 
   /**
-   * The refusal for what was typed, among the commands a person may run: every
-   * command that is not hidden, and each of its aliases.
+   * The command as every envelope names it: oclif's id, or `(default)` when no
+   * word named one.
+   *
+   * @returns The id.
+   */
+  get command(): string {
+    return this.typed.length === 0 ? "(default)" : this.typed.join(":");
+  }
+
+  /**
+   * The refusal for what was typed, among the commands the CLI declares. Only
+   * a command that is not hidden, or one of its aliases, is ever suggested.
    *
    * @param id - What oclif made of the words typed, joined by `:`.
    * @param commands - The commands the CLI declares, as oclif lists them.
@@ -60,17 +85,19 @@ export class UnknownCommand {
     id: string,
     commands: ReadonlyArray<Readonly<{ id: string; hidden?: boolean; aliases: readonly string[] }>>,
   ): UnknownCommand {
-    const runnable = commands
-      .filter((command) => {
-        return command.hidden !== true;
-      })
-      .flatMap((command) => {
-        return [command.id, ...command.aliases];
-      })
-      .map((commandId) => {
-        return commandId.split(":");
-      });
-    return new UnknownCommand(id, runnable);
+    const named = (hidden: boolean): string[][] => {
+      return commands
+        .filter((command) => {
+          return (command.hidden === true) === hidden;
+        })
+        .flatMap((command) => {
+          return [command.id, ...command.aliases];
+        })
+        .map((commandId) => {
+          return commandId.split(":");
+        });
+    };
+    return new UnknownCommand(id, named(false), named(true));
   }
 
   /**
@@ -157,7 +184,7 @@ export class UnknownCommand {
    * @returns Whether they name one exactly.
    */
   private isCommand(name: readonly string[]): boolean {
-    return this.commands.some((command) => {
+    return this.known.some((command) => {
       return command.length === name.length && this.begins(name, command);
     });
   }
@@ -169,7 +196,7 @@ export class UnknownCommand {
    * @returns Whether some longer command begins with them.
    */
   private isTopic(name: readonly string[]): boolean {
-    return this.commands.some((command) => {
+    return this.known.some((command) => {
       return command.length > name.length && this.begins(name, command);
     });
   }
@@ -191,11 +218,17 @@ export class UnknownCommand {
   /**
    * @param word - The word typed.
    * @param candidates - The words it may have meant.
-   * @returns The candidate a single edit from it, if there is one.
+   * @returns The candidate a single edit from it, or the one it differs from
+   *   only in case, if there is one.
    */
   private oneEditFrom(word: string, candidates: readonly string[]): string | undefined {
     const guess = closest(word, candidates);
-    return guess !== undefined && distance(word, guess) <= 1 ? guess : undefined;
+    if (guess === undefined) {
+      return undefined;
+    }
+    return guess.toLowerCase() === word.toLowerCase() || distance(word, guess) <= 1
+      ? guess
+      : undefined;
   }
 
   /**
@@ -230,7 +263,43 @@ export class Invocation {
     this.contentType = contentType;
   }
 
-  /** Whether the run asked for JSON: a `--json` before any `--`, or the content type. */
+  /**
+   * What was typed, as the words themselves.
+   *
+   * oclif joins the leading words into the id with `:` and hands over the rest,
+   * but drops a flag after a word that has a colon of its own, and the id cannot
+   * be split back into words without inventing flags (`frobnicate:--json`). The
+   * process's own arguments are the words when they spell this id, as they do
+   * when the CLI is the program run; a run started inside another process (a
+   * test runner) gets oclif's words, and never that process's own flags.
+   *
+   * @param id - What oclif made of the leading words, joined by `:`.
+   * @param argv - The words oclif handed over after them.
+   * @param processArgv - The process's arguments after the program.
+   * @param contentType - The CLI's `CONTENT_TYPE` environment variable, if set.
+   * @returns The invocation.
+   */
+  static typed(
+    id: string,
+    argv: readonly string[],
+    processArgv: readonly string[],
+    contentType: string | undefined,
+  ): Invocation {
+    const leading: string[] = [];
+    for (const word of processArgv) {
+      leading.push(word);
+      if (leading.join(":") === id) {
+        return new Invocation(processArgv, contentType);
+      }
+    }
+    return new Invocation(argv, contentType);
+  }
+
+  /**
+   * Whether the run asked for JSON: a `--json` before any `--`, or the content type.
+   *
+   * @returns Whether the failure is written as an envelope.
+   */
   get wantsJson(): boolean {
     if (this.contentType?.toLowerCase() === "json") {
       return true;
@@ -254,26 +323,23 @@ const hook: Hook<"command_not_found"> = async function ({ id, argv, config }) {
   const unknown = UnknownCommand.among(id, config.commands);
   const failure = new Failure(unknown.error, {
     cliVersion: config.version,
-    command: unknown.typed.join(" "),
+    command: unknown.command,
     source: "",
   });
-  // oclif drops `--json` from the words it hands over when a later word has a colon.
-  const invocation = new Invocation(
-    [...id.split(":"), ...(argv ?? []), ...process.argv.slice(2)],
+  const invocation = Invocation.typed(
+    id,
+    argv ?? [],
+    process.argv.slice(2),
     config.scopedEnvVar("CONTENT_TYPE"),
   );
   const output = invocation.wantsJson
     ? new JsonFailureOutput((envelope) => {
-        ux.stdout(
-          escapeJsonControlCharacters(
-            ux.colorizeJson(envelope, { pretty: true, theme: config.theme?.json }),
-          ),
-        );
+        ux.stdout(envelopeText(envelope, config.theme?.json));
       })
     : new TerminalFailureOutput((summary) => {
         // Nothing has been drawn yet, so the summary is written out as a run off a terminal writes it.
         const ui = new Ui({ interactive: false, force: false }, "plain");
-        ux.stderr(ui.written(summary).replace(/\n+$/, ""));
+        ux.stderr(asideText(ui.written(summary).replace(/\n+$/, ""), stderrColour()));
       });
   output.write(failure);
   return this.exit(UNKNOWN_COMMAND_EXIT_CODE);
