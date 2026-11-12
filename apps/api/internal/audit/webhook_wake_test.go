@@ -287,7 +287,9 @@ func TestWebhookShipper_AFailingHookIsBoundedAndPaused(t *testing.T) {
 			clock := &fakeClock{t: webhookT0}
 			src := newFakeWebhookSource(testWebhook("hook_a", "proj_a", "https://endpoint.example"))
 			shipper := newHookedWebhookShipper(src, http.DefaultClient, hook, clock)
-			shipper.wake.client = &http.Client{Transport: hook.Client().Transport, Timeout: 100 * time.Millisecond}
+			// Under the wake-up's own bound, with room for the TLS handshake of
+			// the first call on a busy machine: cut short, the hook never sees it.
+			shipper.wake.client = &http.Client{Transport: hook.Client().Transport, Timeout: webhookWakeTimeout / 2}
 			wake := func() { shipper.Wake(t.Context(), "proj_a", []domain.EventType{domain.EventTypeUserCreated}) }
 
 			start := time.Now()
