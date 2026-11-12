@@ -138,6 +138,7 @@ func (h *Harness) EnsureHandler(t testing.TB) *api.Handler {
 			releaseService,
 			h.EnsureDeploymentService(t),
 			h.EnsureIDPConnectionService(t),
+			h.EnsureApplicationService(t),
 			h.EnsureEventService(t),
 			h.EnsureTokenService(t),
 			h.EnsureKeyService(t),
@@ -146,7 +147,9 @@ func (h *Harness) EnsureHandler(t testing.TB) *api.Handler {
 			service.NewVariableService(db, h.EnsureKeyService(t)),
 			db,
 			platform.ID,
-		).WithBuiltinSchemaBases(BuiltinSchemaBases()).WithRuntimeResolver(service.NewRuntimeResolver(db, releaseService, ConsoleOrigin)).WithPolicyService(h.EnsurePolicyService(t)).WithWebhookService(service.NewWebhookService(db, h.EnsureKeyService(t)))
+		).WithBuiltinSchemaBases(BuiltinSchemaBases()).WithRuntimeResolver(service.NewRuntimeResolver(db, releaseService, ConsoleOrigin)).WithPolicyService(h.EnsurePolicyService(t)).
+			WithInvitationService(service.NewInvitationService(db, h.EnsureKeyService(t), ConsoleOrigin+"/ui/console", platform.ID)).
+			WithWebhookService(service.NewWebhookService(db, h.EnsureKeyService(t)))
 	}
 	return h.handler.value
 }

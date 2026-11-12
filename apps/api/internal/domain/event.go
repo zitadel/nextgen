@@ -139,6 +139,9 @@ const (
 	EventTypeReleaseCreated EventType = "release.created"
 	EventTypeReleaseRevoked EventType = "release.revoked"
 
+	EventTypeApplicationCreated EventType = "application.created"
+	EventTypeApplicationUpdated EventType = "application.updated"
+
 	EventTypeIDPCreated EventType = "idp.created"
 	EventTypeIDPUpdated EventType = "idp.updated"
 
@@ -201,6 +204,8 @@ func WrittenEventTypes() []EventType {
 		EventTypePreviewRemoved,
 		EventTypeAuthzGranted, EventTypeAuthzRevoked,
 		EventTypeAuthFactorPasswordSet, EventTypeAuthFactorPasskeyEnrolled,
+		EventTypeApplicationCreated, EventTypeApplicationUpdated,
+		EventTypeInvitationCreated, EventTypeInvitationCancelled,
 		EventTypeWebhookCreated, EventTypeWebhookUpdated, EventTypeWebhookDeleted, EventTypeWebhookSecretRotated,
 	}
 }

@@ -89,6 +89,7 @@ see [§ Drift notes](#drift-notes).
 | `billing` | read-write-only | Tier/subscription/payment — no `billing.create`. |
 | `branding` | manage | Immutable revisions: `write` publishes a revision; no update or delete. Already matches OpenAPI. |
 | `policy` | manage | Operation policies (ADR 066), immutable revisions: `write` publishes a revision; no update or delete. |
+| `oauth_settings` | manage | A project's OAuth settings, immutable revisions: `write` publishes a revision through a release (the only writer); no update or delete. |
 | `domain`, `origin`, `webhook` | manage | Project-scoped collections; `write` = create + update; `delete` separate. Class covers the full set; grant `write` and/or `delete`, never a `manage` permission. |
 | `feature` | read-write-only | Project feature configuration has no independent create/delete lifecycle. |
 | `import` | job-lifecycle | Start job (`create`); poll status (`read`). |
@@ -129,6 +130,8 @@ the target catalog for the planned paths in
 | `branding.write` | `POST /branding` | Publish a new immutable revision; no separate create/delete permission. |
 | `policy.read` | `GET /policies/revisions/{revision_id}` | Read operation policy revisions. |
 | `policy.write` | `POST /policies` | Publish a new immutable policy revision. |
+| `oauth_settings.read` | `GET /oauth_settings/{oauth_settings_id}` | Read an OAuth settings revision. |
+| `oauth_settings.write` | `POST /releases/build` with `oauth` in the bundle | Publish a new immutable OAuth settings revision; a release is the only writer. |
 | `domain.read` | Read/list `/projects/{id}/domains` | Domain context known to Zitadel; does not imply DNS/TLS infrastructure management. |
 | `domain.write` | Add/update a domain | Create + manage. |
 | `domain.delete` | Remove a domain | |
@@ -399,6 +402,7 @@ Full control over a project and its project-scoped resources.
 project.create, project.read, project.write, project.delete,
 branding.read, branding.write,
 policy.read, policy.write,
+oauth_settings.read, oauth_settings.write,
 domain.read, domain.write, domain.delete,
 feature.read, feature.write,
 origin.read, origin.write, origin.delete,
@@ -433,6 +437,7 @@ Read-only access to all project resources.
 project.read,
 branding.read,
 policy.read,
+oauth_settings.read,
 domain.read,
 feature.read,
 origin.read,

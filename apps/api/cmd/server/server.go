@@ -50,7 +50,9 @@ import (
 	"github.com/zitadel/nextgen/internal/instrumentation/metrics"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/instrumentation/zotel"
+	"github.com/zitadel/nextgen/internal/oauth"
 	"github.com/zitadel/nextgen/internal/policy"
+	"github.com/zitadel/nextgen/internal/secrets"
 	"github.com/zitadel/nextgen/internal/securityheaders"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/serviceping"
@@ -314,9 +316,11 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	}
 	claimService := service.NewClaimService(serviceDBPool, consoleBase, cfg.Platform.ResolvedProjectID())
 	grantService := service.NewGrantService(serviceDBPool, userRefs, cfg.Platform.ResolvedProjectID())
+	invitationService := service.NewInvitationService(serviceDBPool, keyService, consoleBase, cfg.Platform.ResolvedProjectID())
 	brandingService := service.NewBrandingService(serviceDBPool)
 	variableService := service.NewVariableService(serviceDBPool, keyService)
 	idpConnectionService := service.NewIDPConnectionService(serviceDBPool, schemaValidator)
+	applicationService := service.NewApplicationService(serviceDBPool, schemaValidator, secrets.NewRandomSecretGenerator())
 	deploymentService := service.NewDeploymentService(serviceDBPool, variableService)
 	eventService := service.NewEventService(serviceDBPool, cfg.Platform.ResolvedProjectID())
 	// Operation policies (ADR 066). Every template is compiled and checked
@@ -487,6 +491,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 			releaseService,
 			deploymentService,
 			idpConnectionService,
+			applicationService,
 			eventService,
 			tokenService,
 			keyService,
@@ -497,7 +502,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 			// Resolved, not the raw pin: in bootstrap mode project_id is empty
 			// and an empty handler pin rejects every claim/complete session.
 			cfg.Platform.ResolvedProjectID(),
-		).WithPersonalTeamEnsurer(personalTeams).WithBuiltinSchemaBases(builtinBases).WithRuntimeResolver(runtimeResolver).WithPolicyService(policyService).WithWebhookService(service.NewWebhookService(serviceDBPool, keyService)).WithReadinessCheck(pool),
+		).WithPersonalTeamEnsurer(personalTeams).WithBuiltinSchemaBases(builtinBases).WithRuntimeResolver(runtimeResolver).WithPolicyService(policyService).WithInvitationService(invitationService).WithWebhookService(service.NewWebhookService(serviceDBPool, keyService)).WithReadinessCheck(pool),
 		// The same platform project the handler resolves: sessions homed there
 		// can reach the platform operator path (ADR 075).
 		api.NewSecurityHandler(tokenService).WithPlatformProject(cfg.Platform.ResolvedProjectID()),
@@ -508,11 +513,36 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		return fmt.Errorf("failed to build api servers: %w", err)
 	}
 
+	// The OAuth authorization server (ADR 081), behind oauth.enabled. Until
+	// a project can enable OAuth, no origin is admitted as an issuer and no
+	// project has it enabled, so every issuer answers 404.
+	var oauthHandlers *oauth.Handlers
+	if cfg.OAuth.Enabled {
+		publicBase, err := url.Parse(cfg.Server.PublicBase)
+		if err != nil {
+			return fmt.Errorf("failed to parse server public base: %w", err)
+		}
+		// Endpoint URLs and the platform issuer keep the public base's path,
+		// but spell its origin as a browser does, without a default port.
+		origin, err := publicOrigin(cfg.Server.PublicBase)
+		if err != nil {
+			return err
+		}
+		publicBase.Scheme, publicBase.Host, _ = strings.Cut(origin, "://")
+		oauthHandlers = oauth.New(oauth.Config{
+			PublicBase:      publicBase,
+			PlatformEnabled: cfg.Platform.ResolvedProjectID() == domain.PlatformProjectID,
+			Admission:       oauth.DenyAll{},
+			Settings:        oauth.NotEnabled{},
+		})
+	}
+
 	mux, err := buildHTTPMux(cfg.Server, idgen.NewULID(), apiServers,
 		api.NewIDPCallbackHandler(ssoCallback),
 		standaloneRuntimeResolver(projectService, tokenService, keyService, cfg.Platform.ResolvedProjectID()),
 		requestEventBuf,
-		retentionJob.Trigger())
+		retentionJob.Trigger(),
+		oauthHandlers)
 	if err != nil {
 		return fmt.Errorf("failed to build http mux: %w", err)
 	}
@@ -799,6 +829,8 @@ func readConfig(configPath string, overrides ...configOverride) (Config, error) 
 	v.SetDefault("platform.operators", []string{})
 	// Zero: a request does not wait for its event to be written.
 	v.SetDefault("events.request.flush_wait", time.Duration(0))
+	// Off: the OAuth authorization server is not mounted (ADR 081).
+	v.SetDefault("oauth.enabled", false)
 	v.SetDefault("events.retention.window", 30*24*time.Hour)
 	v.SetDefault("events.retention.interval", time.Hour)
 	v.SetDefault("events.retention.enabled", true)
@@ -979,7 +1011,16 @@ func idleTimeout(configured time.Duration) time.Duration {
 	return configured
 }
 
-func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiServers api.Servers, idpCallbackHandler http.Handler, runtime runtimeResolver, requestEvents *audit.RequestBuffer, retentionTrigger http.Handler) (http.Handler, error) {
+func buildHTTPMux(
+	cfg ServerConfig,
+	reqIdGen middleware.RequestIDGenerator,
+	apiServers api.Servers,
+	idpCallbackHandler http.Handler,
+	runtime runtimeResolver,
+	requestEvents *audit.RequestBuffer,
+	retentionTrigger http.Handler,
+	oauthHandlers *oauth.Handlers,
+) (http.Handler, error) {
 	mux := http.NewServeMux()
 
 	if cfg.ConsoleEnabled {
@@ -1056,6 +1097,14 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiS
 	// pages. Outside the API's chain: a browser posts it without the CSRF
 	// token or a session, and nobody's audit trail needs it.
 	mux.Handle(securityheaders.ReportPath, observe(securityheaders.Report()))
+	// The OAuth authorization server, with oauth.enabled: the well-known
+	// metadata paths and the endpoints under oauth.Prefix, each mounted
+	// explicitly so the API's root catch-all does not swallow them. Outside
+	// the API's chain: an OAuth client's requests carry neither the CSRF
+	// token nor a session cookie, and the handlers start their own spans.
+	if oauthHandlers != nil {
+		oauthHandlers.Mount(mux, observe)
+	}
 	// The API under /api/v1 (including the embedded OpenAPI document), the
 	// probes at the root, and the root alias for every other path until
 	// 1.0.0 (ADR 077).

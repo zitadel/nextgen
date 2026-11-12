@@ -4,6 +4,38 @@ description: |
   An event as a project's webhook receives it. Read type to tell which
   event type it is; each type carries its own data.
 oneOf:
+  - title: application.created
+    description: |
+      A registered application was created.
+    allOf:
+      - $ref: webhook-event-base.yaml
+      - type: object
+        required:
+          - type
+          - data
+        properties:
+          type:
+            type: string
+            const: application.created
+          data:
+            $ref: payloads/application-payload.yaml
+  - title: application.updated
+    description: |
+      A registered application was revised. The payload holds the new
+      revision, the name when it changed, and the clients the revision
+      added.
+    allOf:
+      - $ref: webhook-event-base.yaml
+      - type: object
+        required:
+          - type
+          - data
+        properties:
+          type:
+            type: string
+            const: application.updated
+          data:
+            $ref: payloads/application-payload.yaml
   - title: auth.attempt.created
     description: |
       An authentication attempt started. See [Sessions and auth
@@ -397,11 +429,8 @@ oneOf:
             $ref: payloads/invitation-accepted-payload.yaml
   - title: invitation.cancelled
     description: |
-      A pending invitation was cancelled by an administrator, or by a
-      replacement.
-
-      Not sent yet: the contract is published ahead of the code that sends
-      it.
+      A pending invitation was cancelled by an administrator, or an
+      unaccepted one was deleted by its replacement.
     allOf:
       - $ref: webhook-event-base.yaml
       - type: object
@@ -417,9 +446,6 @@ oneOf:
   - title: invitation.created
     description: |
       An invitation was created, new or as the replacement of another.
-
-      Not sent yet: the contract is published ahead of the code that sends
-      it.
     allOf:
       - $ref: webhook-event-base.yaml
       - type: object

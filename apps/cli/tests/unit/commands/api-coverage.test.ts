@@ -62,6 +62,11 @@ const NOT_RESOURCES: Readonly<Record<string, string>> = {
   // The OpenAPI contract lands first (ADR 089); the CLI commands follow.
   webhooks: "not yet exposed — `zitadel webhook` lands with the webhooks CLI surface",
   search: "finds resources across types (ADR 087); a `zitadel search` command is not built yet",
+  // OAuth settings are written only through a release, so there is nothing to
+  // create or update here; reading them is `zitadel oauth`'s, which comes with
+  // the authorization server (#2793).
+  oauth_settings:
+    "written only through a release; the CLI command comes with `zitadel oauth` (#2793)",
 };
 
 /**
