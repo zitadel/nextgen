@@ -3,7 +3,7 @@ import { command, notice } from "@/lib/style";
 import { upgradeCommand } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { drawBox } from "@/lib/ui/layout";
-import { ScopedDependencies } from "@/lib/upgrade";
+import { ScopedDependencies } from "@/lib/upgrade/scoped-dependencies";
 
 import { ZITADEL } from "./zitadel";
 import { ZitadelReleaseChannel } from "./zitadel-release-channel";

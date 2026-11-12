@@ -1,5 +1,9 @@
 /** The newest release could not be looked up. */
 export class ReleaseLookupError extends Error {
+  /**
+   * The message is generic on purpose: a caller words the failure for its own
+   * person, as the Zitadel upgrader does when it turns this into a `ZitadelError`.
+   */
   constructor() {
     super("Could not look up the latest release");
     this.name = "ReleaseLookupError";

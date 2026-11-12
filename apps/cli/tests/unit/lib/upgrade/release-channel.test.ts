@@ -112,6 +112,18 @@ describe("ReleaseChannel", () => {
     await expect(latestVersion("1.0.0", env())).resolves.toBe("2.0.0");
   });
 
+  it("asks again when the answer claims to be from the future", async () => {
+    await cacheHolds({
+      checked_at: Date.now() + 25 * 60 * 60 * 1000,
+      dist_tag: "latest",
+      registry: "https://registry.npmjs.org",
+      version: "1.5.0",
+    });
+    publishes({ latest: "2.0.0" });
+
+    await expect(latestVersion("1.0.0", env())).resolves.toBe("2.0.0");
+  });
+
   it("does not take another dist-tag's answer", async () => {
     await cacheHolds({
       checked_at: Date.now(),

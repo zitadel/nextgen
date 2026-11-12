@@ -20,8 +20,6 @@ export type UpgraderOptions = Readonly<{
 
 /** What {@link Upgrader.apply} did. */
 export type UpgradeResult = Readonly<{
-  /** What was decided. */
-  plan: UpgradePlan;
   /** How the refresh ended. */
   refresh: Refresh;
   /** Whether the new packages were installed; a dry run installs nothing. */
@@ -88,7 +86,6 @@ export class Upgrader {
     }
     const refreshes = install !== undefined && (await refresher.appliesTo());
     return {
-      plan,
       refresh: await this.refresh(plan, refreshes),
       installed: installs,
       installCommand: install?.display,

@@ -31,6 +31,25 @@ describe("lib/upgrade", () => {
   });
 });
 
+/** What each allow-listed lib may itself import from the repo, so the dependency cannot widen unseen. */
+const TRANSITIVE: Readonly<Record<string, readonly string[]>> = {
+  "npm.ts": ["./fs", "./json"],
+  "package-manager.ts": ["./cmd", "./fs", "./npm", "./public-cli"],
+};
+
+describe("what lib/upgrade reaches through lib/npm and lib/package-manager", () => {
+  it.each(Object.entries(TRANSITIVE))(
+    "%s imports no more of the repo than it did",
+    (file, known) => {
+      const own = importsIn(readFileSync(join(LIBRARY, "..", file), "utf8")).filter((source) => {
+        return source.startsWith("./") || source.startsWith("@/");
+      });
+
+      expect(own.sort()).toEqual([...known].sort());
+    },
+  );
+});
+
 describe("importsIn", () => {
   it("sees a static, a bare and a dynamic import", () => {
     const source =

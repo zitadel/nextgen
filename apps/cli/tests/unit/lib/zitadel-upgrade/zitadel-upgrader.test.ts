@@ -122,6 +122,7 @@ describe("ZitadelUpgrader.apply when the install fails", () => {
       refusal.code,
       refusal.hint?.endsWith("Nothing else changed; fix that and rerun."),
     ]).toEqual(["E_VALIDATION", true]);
+    expect(refusal.hint).not.toMatch(/^\. /);
     expect(refusal.nextCommands?.[0]).toContain("@zitadel/sdk-next@2.0.0");
     expect(refusal.nextCommands?.[1]).toBe("zitadel upgrade");
   });

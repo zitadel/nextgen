@@ -1,4 +1,4 @@
-import { UpgradeTarget } from "@/lib/upgrade";
+import { UpgradeTarget } from "@/lib/upgrade/upgrade-target";
 
 /** The Zitadel packages that move together, and the CLI whose dist-tag names the newest release. */
 export const ZITADEL = new UpgradeTarget("@zitadel/", "@zitadel/cli");

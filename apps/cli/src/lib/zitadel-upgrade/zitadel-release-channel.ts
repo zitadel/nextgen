@@ -3,7 +3,9 @@ import { join } from "node:path";
 import { npmDistTagForCliVersion } from "@/lib/public-cli";
 import { isCI } from "@/lib/skills-hint";
 import { telemetryConfigDir } from "@/lib/telemetry/identity";
-import { DistTagRegistry, LookupCache, ReleaseChannel } from "@/lib/upgrade";
+import { DistTagRegistry } from "@/lib/upgrade/dist-tag-registry";
+import { LookupCache } from "@/lib/upgrade/lookup-cache";
+import { ReleaseChannel } from "@/lib/upgrade/release-channel";
 
 import { UPDATE_CHECK_VARIABLE, ZITADEL } from "./zitadel";
 
