@@ -19,6 +19,10 @@ import { aFakeServerBinary, trackLocalServer, useLocalServers } from "@tests/hel
 import { forcedConsent } from "@tests/helpers/consent";
 import { it } from "@tests/helpers/fixtures";
 import { aBinaryRecord, aDockerRecord } from "@tests/helpers/runtime-record";
+import { aSuggest } from "@tests/helpers/suggestions";
+
+/** The start a refused start would offer again. */
+const RETRY = aSuggest()({ id: "start" });
 
 const dirs: string[] = [];
 const children: ChildProcess[] = [];
@@ -428,7 +432,7 @@ describe("LocalServer", () => {
       const remove = vi.spyOn(DockerLauncher, "remove").mockResolvedValue(true);
 
       await expect(
-        at(cwd).start({ backend: "binary", env: none }, { port: await holdAPort() }),
+        at(cwd).start({ backend: "binary", env: none }, { port: await holdAPort(), retry: RETRY }),
       ).rejects.toMatchObject({ code: "E_PORT_IN_USE" });
 
       expect(remove).not.toHaveBeenCalled();
@@ -439,7 +443,7 @@ describe("LocalServer", () => {
       vi.spyOn(DockerLauncher, "remove").mockResolvedValue(true);
       vi.stubEnv("ZITADEL_SERVER_BINARY", await aFakeServerBinary("plain"));
 
-      const { runtime } = await at(cwd).start({ backend: "binary", env: none });
+      const { runtime } = await at(cwd).start({ backend: "binary", env: none }, { retry: RETRY });
 
       trackLocalServer(runtime.backend === "binary" ? runtime.pid : 0);
       expect(runtime.port).toBe(port);

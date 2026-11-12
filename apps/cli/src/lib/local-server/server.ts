@@ -8,6 +8,7 @@ import { ZitadelError, errorMessage } from "@/lib/errors";
 import { currentUser } from "@/lib/uidgid";
 import type { ResolvedEnv } from "./env-vars";
 import { assertDockerAvailable, startFailure } from "./internal/failures";
+import type { SuggestedCommand } from "@/lib/suggestion";
 import { BinaryLauncher, type StopBinaryRuntimeResult } from "./internal/binary-launcher";
 import { DockerLauncher, type DockerResult } from "./internal/docker-launcher";
 import {
@@ -59,6 +60,17 @@ type CommonRunConfig = Readonly<{
 export type RunConfig =
   | (CommonRunConfig & Readonly<{ backend: "binary" }>)
   | (CommonRunConfig & Readonly<{ backend: "docker"; image: string }>);
+
+/** How {@link LocalServer.start} is asked to start. */
+export type StartOptions = Readonly<{
+  /** The port to take as asked or refuse, never move; the first free one when absent. */
+  port?: number;
+  /**
+   * The run to repeat once what stopped it is fixed (Docker answering), as it
+   * was typed: the command's `this.again`, so its flags are kept.
+   */
+  retry: SuggestedCommand;
+}>;
 
 /**
  * Where a directory's server stands. `missing`: the directory never started one
@@ -300,7 +312,7 @@ export class LocalServer {
    */
   async start(
     config: RunConfig,
-    options: { port?: number } = {},
+    options: StartOptions,
   ): Promise<{ runtime: RuntimeMetadata; alreadyRunning: boolean }> {
     // One start at a time per directory: two at once would pick the same port
     // and run two servers over one data directory. The second finds the first's.
@@ -319,7 +331,7 @@ export class LocalServer {
    */
   private async startLocked(
     config: RunConfig,
-    options: { port?: number },
+    options: StartOptions,
   ): Promise<{ runtime: RuntimeMetadata; alreadyRunning: boolean }> {
     const existing = await readRuntimeMetadata(this.cwd);
     const paths = localRuntimePaths(this.cwd);
@@ -376,7 +388,7 @@ export class LocalServer {
       }
 
       const { image } = config;
-      await assertDockerAvailable();
+      await assertDockerAvailable(options.retry);
       if (existing?.backend === "binary") {
         await BinaryLauncher.stopRecord(existing);
       }

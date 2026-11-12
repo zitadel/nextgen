@@ -585,7 +585,7 @@ export function failureAdvice(
   }
 
   if (failedNames.has("docker-cli")) {
-    const advice = dockerRuntimeGuidance("doctor", again.rerun);
+    const advice = dockerRuntimeGuidance(again.rerun);
     return {
       hint: advice.hint,
       nextCommands: [advice.check, again.rerun],
@@ -735,7 +735,7 @@ export function advisoryForWarnings(
       return check.name === "docker-cli";
     })
   ) {
-    const advice = dockerRuntimeGuidance("doctor", again.rerun);
+    const advice = dockerRuntimeGuidance(again.rerun);
     nextActions.push(...advice.nextActions);
     nextCommands.push(advice.check, again.rerun);
   }

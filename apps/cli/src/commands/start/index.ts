@@ -186,7 +186,7 @@ export default class Start extends BaseCommand {
             env,
             userFile: local?.userFile,
           },
-      { port: flags.port },
+      { port: flags.port, retry: await this.again("start", {}) },
     );
     // The envelope's `source` named the port guessed before one was chosen; an
     // agent that follows it would target a different server than the one started.

@@ -352,7 +352,9 @@ describe("local runtime commands", () => {
     expect(envelope.hint).toContain("managed local runtime");
     expect(envelope.hint).toContain("--server <url>");
     expect(envelope.next_commands).toContain("docker version");
-    expect(envelope.next_commands).toContain(expectedPublicCliCommand(`start --cwd ${cwd}`));
+    expect(envelope.next_commands).toContain(
+      expectedPublicCliCommand(`start --runtime docker --port ${port} --cwd ${cwd}`),
+    );
     expect(envelope.details.message).toContain("remote or cloud setup can continue");
 
     const dockerCalls = await readDockerCalls(fake.logPath);

@@ -1,5 +1,5 @@
 import { ZitadelError, toZitadelError } from "@/lib/errors";
-import { distinct } from "@/lib/suggestion";
+import { distinct, type SuggestedCommand } from "@/lib/suggestion";
 import { listenersForPort, type TcpListener } from "@/lib/prober/ports";
 import {
   dockerRuntimeGuidance,
@@ -54,19 +54,28 @@ function startupCleanupFailedError(error: unknown, stopResult: StopOutcome): Zit
 /**
  * Fails early, with the guidance for starting Docker, when the daemon does not
  * answer: better than a start that fails halfway with a raw `docker` error.
+ *
+ * @param retry - The run to repeat once Docker answers, as it was typed.
+ * @throws {ZitadelError} When Docker does not answer.
  */
-export async function assertDockerAvailable(): Promise<void> {
+export async function assertDockerAvailable(retry: SuggestedCommand): Promise<void> {
   const result = await DockerLauncher.available().catch((error: unknown) => {
-    throw dockerUnavailableError(error);
+    throw dockerUnavailableError(error, retry);
   });
   if (result.status !== 0) {
-    throw dockerUnavailableError(result.stderr || "docker version failed");
+    throw dockerUnavailableError(result.stderr || "docker version failed", retry);
   }
 }
 
-/** The error for a Docker daemon that is missing or not running. */
-function dockerUnavailableError(error: unknown): ZitadelError {
-  const advice = dockerRuntimeGuidance("start");
+/**
+ * The error for a Docker daemon that is missing or not running.
+ *
+ * @param error - What asking Docker failed with.
+ * @param retry - The run to repeat once Docker answers, as it was typed.
+ * @returns The error.
+ */
+function dockerUnavailableError(error: unknown, retry: SuggestedCommand): ZitadelError {
+  const advice = dockerRuntimeGuidance(retry);
   return new ZitadelError("E_VALIDATION", "Docker is not reachable", {
     hint: advice.hint,
     nextCommands: [advice.check, advice.retry],
