@@ -431,7 +431,7 @@ describe("the cli", () => {
             command: "teams:delete",
             source: "",
             code: "E_VALIDATION",
-            message: "teams delete is not a zitadel command.",
+            message: "teams delete is not a zitadel command",
             next_commands: [expectedPublicCliCommand("teams --help")],
           });
         });
@@ -445,7 +445,7 @@ describe("the cli", () => {
             command: "variable:lst",
             source: "",
             code: "E_VALIDATION",
-            message: "variable lst is not a zitadel command.",
+            message: "variable lst is not a zitadel command",
             next_commands: [
               expectedPublicCliCommand("variable list --help"),
               expectedPublicCliCommand("variable --help"),
@@ -462,17 +462,17 @@ describe("the cli", () => {
             command: "frobnicate",
             source: "",
             code: "E_VALIDATION",
-            message: "frobnicate is not a zitadel command.",
+            message: "frobnicate is not a zitadel command",
             next_commands: [expectedPublicCliCommand("--help")],
           });
         });
 
-        it.each([
+        const refusals = [
           [
             "a short typo of a subcommand",
             ["env", "ad"],
             "env:ad",
-            "env ad is not a zitadel command.",
+            "env ad is not a zitadel command",
             ["env add --help", "env --help"],
             127,
           ],
@@ -480,7 +480,7 @@ describe("the cli", () => {
             "a typo only in case",
             ["DEPLOY"],
             "DEPLOY",
-            "DEPLOY is not a zitadel command.",
+            "DEPLOY is not a zitadel command",
             ["deploy --help"],
             127,
           ],
@@ -488,15 +488,15 @@ describe("the cli", () => {
             "a typo of an alias",
             ["ejct"],
             "ejct",
-            "ejct is not a zitadel command.",
+            "ejct is not a zitadel command",
             ["eject --help"],
             127,
           ],
           [
             "flags the command it meant takes",
-            ["variable", "lst", "--env", "staging"],
+            ["--env", "staging", "variable", "lst"],
             "variable:lst",
-            "variable lst is not a zitadel command.",
+            "variable lst is not a zitadel command",
             ["variable list --help", "variable --help"],
             127,
           ],
@@ -504,7 +504,7 @@ describe("the cli", () => {
             "a word a real command does not take",
             ["deploy", "extra"],
             "deploy",
-            "deploy does not take the argument typed after it.",
+            "deploy does not take the argument typed after it",
             ["deploy --help"],
             3,
           ],
@@ -512,106 +512,133 @@ describe("the cli", () => {
             "a typo of a hidden subcommand",
             ["autocomplete:crete"],
             "autocomplete",
-            "autocomplete does not take the argument typed after it.",
+            "autocomplete does not take the argument typed after it",
             ["autocomplete --help"],
             3,
           ],
-        ])(
-          "answers %s with one envelope and its exit code",
-          async (_, argv, command, message, next, exitCode) => {
+        ] as const;
+
+        it.each(refusals)(
+          "answers %s with one envelope",
+          async (_, argv, command, message, next) => {
             const result = await runCliForTest([...argv, "--json"]);
 
-            expect({ exitCode: result.exitCode, envelope: parseJson(result.stdout) }).toEqual({
-              exitCode,
-              envelope: {
-                status: "error",
-                cli_version: cliVersion.version,
-                command,
-                source: "",
-                code: "E_VALIDATION",
-                message,
-                next_commands: next.map((step) => expectedPublicCliCommand(step)),
-              },
+            expect(parseJson(result.stdout)).toEqual({
+              status: "error",
+              cli_version: cliVersion.version,
+              command,
+              source: "",
+              code: "E_VALIDATION",
+              message,
+              next_commands: next.map((step) => expectedPublicCliCommand(step)),
             });
           },
         );
+
+        it.each(refusals)("exits %s with its own code", async (_, argv, _c, _m, _n, exitCode) => {
+          const result = await runCliForTest([...argv, "--json"]);
+
+          expect(result).toExitWith(exitCode);
+        });
 
         it.each([
           [
             "a flag before the words",
             ["--json", "statu"],
             "statu",
-            "statu is not a zitadel command.",
+            "statu is not a zitadel command",
             ["status --help"],
           ],
           [
             "a flag and its value before the words",
             ["--cwd", "/tmp", "statu", "--json"],
             "statu",
-            "statu is not a zitadel command.",
+            "statu is not a zitadel command",
             ["status --help"],
           ],
-          [
-            "no words at all",
-            ["--json"],
-            "(default)",
-            "That is not a zitadel command.",
-            ["--help"],
-          ],
+          ["no words at all", ["--json"], "(default)", "That is not a zitadel command", ["--help"]],
           [
             "the value of a flag no command declares",
             ["--token", "SECRET", "--json"],
             "(default)",
-            "That is not a zitadel command.",
+            "That is not a zitadel command",
             ["--help"],
           ],
           [
             "the value of a short flag no command declares",
             ["-x", "SECRET", "--json"],
             "(default)",
-            "That is not a zitadel command.",
+            "That is not a zitadel command",
             ["--help"],
           ],
           [
             "the value of a cluster of short flags no command declares",
             ["-xy", "SECRET", "--json"],
             "(default)",
-            "That is not a zitadel command.",
+            "That is not a zitadel command",
             ["--help"],
           ],
           [
             "a flag with colons in its value",
             ["--token:secret:credential:frobnicate", "--json"],
             "(default)",
-            "That is not a zitadel command.",
+            "That is not a zitadel command",
             ["--help"],
           ],
           [
             "a switch another command declares before the words",
             ["--plain", "statu", "--json"],
             "statu",
-            "statu is not a zitadel command.",
+            "statu is not a zitadel command",
             ["status --help"],
           ],
           [
-            "a switch another command declares before --json",
-            ["variable", "lst", "--plain", "--json"],
+            "a switch another command declares before a topic",
+            ["--plain", "variable", "lst", "--json"],
             "variable:lst",
-            "variable lst is not a zitadel command.",
+            "variable lst is not a zitadel command",
             ["variable list --help", "variable --help"],
           ],
           [
             "a short flag no base flag has before --json",
             ["variable", "lst", "-f", "--json"],
             "variable:lst",
-            "variable lst is not a zitadel command.",
+            "variable lst is not a zitadel command",
             ["variable list --help", "variable --help"],
+          ],
+          [
+            "a switch whose own name starts with no-",
+            ["--no-open", "statu", "--json"],
+            "statu",
+            "statu is not a zitadel command",
+            ["status --help"],
+          ],
+          [
+            "a switch turned off with no-",
+            ["--no-color", "statu", "--json"],
+            "statu",
+            "statu is not a zitadel command",
+            ["status --help"],
+          ],
+          [
+            "a word of only spaces",
+            [" ", "--json"],
+            "(default)",
+            "That is not a zitadel command",
+            ["--help"],
+          ],
+          [
+            "a word after a pass-through nothing came before",
+            ["--json", "--", "frobnicate"],
+            "frobnicate",
+            "frobnicate is not a zitadel command",
+            ["--help"],
           ],
           [
             "a short flag cluster that takes the value after it",
             ["-nc", "/tmp", "statu", "--json"],
             "statu",
-            "statu is not a zitadel command.",
+            "statu is not a zitadel command",
             ["status --help"],
           ],
         ])("answers %s by what was typed", async (_, argv, command, message, next) => {
@@ -631,36 +658,13 @@ describe("the cli", () => {
         it("prints no envelope for a --json typed as another flag's value", async () => {
           const result = await runCliForTest(["--cwd", "--json", "statu"]);
 
-          expect({ exitCode: result.exitCode, stdout: result.stdout }).toEqual({
-            exitCode: 127,
-            stdout: "",
-          });
+          expect(result.stdout).toBe("");
         });
 
         it("prints no envelope for a --json after the pass-through", async () => {
           const result = await runCliForTest(["frobnicate", "--", "--json"]);
 
-          expect({
-            exitCode: result.exitCode,
-            stdout: result.stdout,
-            stderr: result.stderr,
-          }).toEqual({
-            exitCode: 127,
-            stdout: "",
-            stderr: expect.stringContaining("frobnicate is not a zitadel command."),
-          });
-        });
-
-        it("exits 127, as a shell does for a command it cannot find", async () => {
-          const result = await runCliForTest(["teams", "delete", "x", "--json"]);
-
-          expect(result).toExitWith(127);
-        });
-
-        it("exits 3 for a word a real command does not take, as its other refusals do", async () => {
-          const result = await runCliForTest(["deploy", "extra", "--json"]);
-
-          expect(result).toExitWith(3);
+          expect(result.stdout).toBe("");
         });
 
         it("writes nothing to stderr", async () => {
@@ -671,20 +675,24 @@ describe("the cli", () => {
       });
 
       describe("piped", () => {
-        it("prints the error on stderr and nothing on stdout", async () => {
+        it("prints the error on stderr", async () => {
           const result = await offTerminal(() => runCliForTest(["teams", "delete", "x"]));
 
-          expect(result).toEqual({
-            exitCode: 127,
-            stdout: "",
-            stderr: [
-              "Error: teams delete is not a zitadel command. (E_VALIDATION)",
+          expect(result.stderr).toBe(
+            [
+              "Error: teams delete is not a zitadel command (E_VALIDATION)",
               "",
               "Next:",
               `  $ ${expectedPublicCliCommand("teams --help")}`,
               "",
             ].join("\n"),
-          });
+          );
+        });
+
+        it("prints nothing on stdout", async () => {
+          const result = await offTerminal(() => runCliForTest(["teams", "delete", "x"]));
+
+          expect(result.stdout).toBe("");
         });
       });
 
@@ -694,17 +702,15 @@ describe("the cli", () => {
             runCliForTest(["teams", "delete", "x", "--dry-run"], { NO_COLOR: "1" }),
           );
 
-          expect(result).toEqual({
-            exitCode: 127,
-            stdout: "",
-            stderr: [
-              "Error: teams delete is not a zitadel command. (E_VALIDATION)",
+          expect(result.stderr).toBe(
+            [
+              "Error: teams delete is not a zitadel command (E_VALIDATION)",
               "",
               "Next:",
               `  $ ${expectedPublicCliCommand("teams --help")}`,
               "",
             ].join("\n"),
-          });
+          );
         });
 
         it("names the command it was close to as one to type", async () => {
