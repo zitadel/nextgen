@@ -11,8 +11,7 @@ import type { Questions } from "./ui";
 import { hasZitadelSecret, readZitadelSecret } from "./project";
 import { appendManagedEnvValue } from "./fs-safe";
 import { parseServer, resolveServer, serverOrigin } from "./server";
-import { type SuggestedCommand, unscopedCommand } from "./suggestion";
-import { Cmd } from "./cmd";
+import { type Suggest, suggestion } from "./suggestion";
 
 /**
  * The values a command reads from an environment. Each resolves on its own, so
@@ -318,6 +317,7 @@ export function requireValue(environment: Environment, key: EnvironmentKey): str
   });
   const file = environment.envFile ?? (bound ? boundFile : undefined);
   const unbound = file === undefined && environment.values.ZITADEL_PROJECT_ID === undefined;
+  const elsewhere = environment.cwd === process.cwd() ? {} : { cwd: environment.cwd };
   throw new ZitadelError("E_VALIDATION", `${key} is not set for the ${name} environment`, {
     hint: unbound
       ? `${consulted} Set ${key} in ${boundFile} or the process environment, or run \`zitadel env add ${name}\`.`
@@ -327,11 +327,9 @@ export function requireValue(environment: Environment, key: EnvironmentKey): str
           // Run in the directory this run addressed, which need not be the
           // shell's: `setup` and `env add` both write their files there.
           nextCommands: [
-            unscopedCommand(
-              `${name === "development" ? "setup" : `env add ${name}`}${
-                environment.cwd === process.cwd() ? "" : ` ${Cmd.option("--cwd", environment.cwd)}`
-              }`,
-            ),
+            name === "development"
+              ? suggestion("setup", { flags: elsewhere })
+              : suggestion("env:add", { args: { name }, flags: elsewhere }),
           ],
         }
       : {}),
@@ -460,7 +458,7 @@ export async function deployInitialRelease(input: {
   json: boolean;
   color: boolean;
   message: string;
-  suggest: (args: string) => SuggestedCommand;
+  suggest: Suggest;
   narrate: (notices: readonly string[]) => void;
 }): Promise<InitialDeployment> {
   const publisher = new Publisher(input.client, input.projectId);

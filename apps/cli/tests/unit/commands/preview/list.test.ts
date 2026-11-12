@@ -62,7 +62,7 @@ describe("preview list", () => {
 
     const { stderr } = await firstPagePiped(cwd);
 
-    expect(stderr).toContain("preview list --limit 1 --page-token p2");
+    expect(stderr).toContain("preview list --limit 1 --plain --page-token p2");
   });
 
   it("lists every page's previews with --all", async () => {

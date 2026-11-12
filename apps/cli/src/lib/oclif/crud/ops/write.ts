@@ -1,6 +1,5 @@
 import { Flags } from "@oclif/core";
 
-import { Cmd } from "@/lib/cmd";
 import { type Assignment, readAssignment } from "@/lib/oclif/crud/assign";
 import {
   type BodyField,
@@ -23,10 +22,11 @@ import type {
 } from "@/lib/oclif/crud/types";
 import type { ZodLike } from "@/lib/oclif/crud/zod";
 import { nonBlankString } from "@/lib/oclif/flags";
-import { named } from "@/lib/oclif/names";
+import { named } from "@/lib/names";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { json } from "@/lib/oclif/rendering";
 import type { CommandResult } from "@/lib/oclif/types";
+import { resourceSuggestion } from "@/lib/suggestion";
 import { escapeControlCharacters, escapeJsonControlCharacters } from "@/lib/terminal-text";
 import type { Summary } from "@/lib/ui";
 
@@ -251,7 +251,12 @@ abstract class WriteOperation<
         ? {
             next: {
               commands: [
-                this.suggest(`${topic} get ${Cmd.quote(String(resource.idOf(result)))} --json`),
+                this.rendered(
+                  resourceSuggestion(topic, "get", {
+                    args: { [named(idName(resource))]: String(resource.idOf(result)) },
+                    flags: { json: true },
+                  }),
+                ),
               ],
             },
           }

@@ -4,10 +4,7 @@ import { IDP_PROVIDERS } from "@zitadel/config/idp";
 import { AuthMethodCommand } from "@/commands/auth-method/command";
 import { CANCELLED } from "@/lib/errors";
 import { type Admitted, CommandGroups, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
-import { environmentSelectorSuffix } from "@/lib/oclif/environment-flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
-import { optionArgs } from "@/lib/public-cli";
-import { portableSuggestions, projectCommand } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import type { UnusedConnection, UserSchema } from "@/lib/zitadel";
 
@@ -26,7 +23,6 @@ const NAME_PROVIDER_REFUSAL: Refusal = {
  * The flags that name the project a removal's `variable rm` commands reach.
  */
 type SelectorFlags = {
-  readonly cwd?: string | undefined;
   readonly env?: string | undefined;
   readonly envFile?: string | undefined;
   readonly server?: string | undefined;
@@ -75,16 +71,17 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
     const config = target.config;
     const schema = target.schema;
     const provider = flags.provider ?? this.refuseUnnamedProvider(schema);
-    const retryArgs = [
-      "auth-method",
-      "sso",
-      "disable",
-      ...optionArgs("--provider", provider),
-      ...optionArgs("--schema", target.schemaFlag),
-    ];
-    const confirmed = await this.confirmIfNoSignInLeft(target, retryArgs, (options) => {
-      return config.connections.disable(schema, provider, options);
-    });
+    const forced = { provider, schema: target.schemaFlag, force: true } as const;
+    const confirmed = await this.confirmIfNoSignInLeft(
+      target,
+      {
+        real: this.follow("auth-method:sso:disable", { flags: forced }),
+        dryRun: this.follow("auth-method:sso:disable", { flags: { ...forced, dryRun: true } }),
+      },
+      (options) => {
+        return config.connections.disable(schema, provider, options);
+      },
+    );
     if (confirmed === undefined) {
       return this.emit({
         status: "skipped",
@@ -126,15 +123,13 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
           ? `Would remove ${provider} from ${where} (dry run)`
           : `${schema.name} does not offer ${provider}, so nothing would change (dry run)`,
       );
-      const real = [
-        "auth-method",
-        "sso",
-        "disable",
-        ...optionArgs("--provider", provider),
-        ...target.schemaArgs,
-        ...target.cwdArgs,
-        ...(this.force ? ["--force"] : []),
-      ];
+      const real = this.follow("auth-method:sso:disable", {
+        flags: {
+          provider,
+          ...(target.schemaGiven === undefined ? {} : { schema: target.schemaGiven }),
+          ...(this.force ? { force: true } : {}),
+        },
+      });
 
       return this.emit({
         status: "ok",
@@ -142,18 +137,18 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
           ...data,
           title: wouldTitle,
           dry_run: true,
-          next_args: [real],
+          next_args: [real.args],
         },
         summary: {
           title: wouldTitle,
           sections: [],
         },
-        next: { commands: portableSuggestions([real], this.cliVersion) },
+        next: { commands: [real.command] },
       });
     }
     await this.write(target, change, confirmed.consent);
     this.report(change);
-    const followUps = this.followUps(change.changed, target.cwdArgs);
+    const followUps = this.followUps(change.changed);
     const unused = change.changed ? change.after.connections.findUnused(provider) : undefined;
     const actions = unused === undefined ? [] : this.removalActions(unused, flags);
 
@@ -207,11 +202,12 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
    * @remarks
    * In the other order the live release would offer a provider whose
    * credentials are gone, and the deploy would refuse a connection whose
-   * variables are missing. The `variable rm` commands carry the run's
-   * `--env`/`--env-file`/`--server`, so they reach the project this run named.
+   * variables are missing. The `variable rm` commands carry the run's own
+   * scope, so they reach the project this run named.
    *
    * @param unused - The connection, and the variables only it reads.
-   * @param flags - The run's `--cwd` and environment flags.
+   * @param flags - The environment flags the run was given: this command
+   *   resolves no environment, so the project they name is spelled out.
    * @returns The actions, the file's deletion first.
    */
   private removalActions(unused: UnusedConnection, flags: SelectorFlags): readonly string[] {
@@ -219,14 +215,15 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
     if (unused.variables.length === 0) {
       return [deletion];
     }
-    const selector = environmentSelectorSuffix({
-      cwd: flags.cwd,
-      envFile: flags.envFile,
-      envName: flags.env,
-      server: flags.server,
-    });
     const commands = unused.variables.map((name) => {
-      return projectCommand(`variable rm ${name}`, selector, this.cliVersion);
+      return this.suggest("variable:rm", {
+        args: { name },
+        flags: {
+          ...(flags.env === undefined ? {} : { env: flags.env }),
+          ...(flags.envFile === undefined ? {} : { envFile: flags.envFile }),
+          ...(flags.server === undefined ? {} : { server: flags.server }),
+        },
+      });
     });
     return [
       deletion,

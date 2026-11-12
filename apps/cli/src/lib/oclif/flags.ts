@@ -1,7 +1,7 @@
-import { Args, Flags } from "@oclif/core";
+import { Args, Flags, type Interfaces } from "@oclif/core";
 import { type ZodType, z } from "zod";
 
-import { type SuggestedCommand, unscopedCommand } from "@/lib/suggestion";
+import { type FlagRelations, RELATIONS } from "@/lib/suggestion";
 
 import type { Placeholders } from "./refusal";
 import { type Refusal, refusalError } from "./refusal";
@@ -19,41 +19,17 @@ export type Refused<T> = Readonly<{
   values?: Placeholders;
 }>;
 
-/**
- * How a refusal raised while a flag parses names a follow-up command.
- *
- * It is unscoped, naming the command without the `--env`, `--env-file` or
- * `--server` a scoped suggestion repeats: the environment is resolved from the
- * flags, so there is none to repeat until they have all been read. The
- * command is whatever oclif hands a `parse`, so one invoked outside a run
- * suggests nothing. The suggestion is the bare spelling, which the command's
- * failure handler writes out in full with the `--cwd` the run was given.
- */
-export function suggesterOf(command: unknown): ((next: string) => SuggestedCommand) | undefined {
-  const version = (command as { config?: { version?: unknown } } | undefined)?.config?.version;
-  if (typeof version !== "string") {
-    return undefined;
-  }
-  return (next) => {
-    return unscopedCommand(next);
-  };
-}
-
-function read<T>(refused: Refused<T>, value: string, input: string, command: unknown): T {
+function read<T>(refused: Refused<T>, value: string, input: string): T {
   const parsed = refused.schema.safeParse(value);
   if (parsed.success) {
     return parsed.data;
   }
-  throw refusalError(
-    refused.refusal,
-    {
-      ...refused.values,
-      value,
-      input,
-      problem: parsed.error.issues[0]?.message ?? "it is not valid",
-    },
-    suggesterOf(command),
-  );
+  throw refusalError(refused.refusal, {
+    ...refused.values,
+    value,
+    input,
+    problem: parsed.error.issues[0]?.message ?? "it is not valid",
+  });
 }
 
 /**
@@ -69,15 +45,15 @@ function read<T>(refused: Refused<T>, value: string, input: string, command: unk
  * same way, and the value the command is handed is already the parsed type.
  */
 export function reads<T>(refused: Refused<T>) {
-  return async (value: string, command: unknown, definition: { name: string }): Promise<T> => {
-    return read(refused, value, `--${definition.name}`, command);
+  return async (value: string, _command: unknown, definition: { name: string }): Promise<T> => {
+    return read(refused, value, `--${definition.name}`);
   };
 }
 
 /** The `parse` an argument gives `Args.custom`, named as it is. See {@link reads}. */
 export function taken<T>(refused: Refused<T>) {
-  return async (value: string, command: unknown, definition: { name: string }): Promise<T> => {
-    return read(refused, value, definition.name, command);
+  return async (value: string, _command: unknown, definition: { name: string }): Promise<T> => {
+    return read(refused, value, definition.name);
   };
 }
 
@@ -151,3 +127,85 @@ export const serverFlag = Flags.custom<string>({
     },
   }),
 });
+
+/** The flags a command declares, carrying the relations {@link relatedFlags} declared them with. */
+export type Flagged<Defs, Relations> = Requiring<Defs, Relations> & {
+  readonly [RELATIONS]?: Relations;
+};
+
+/**
+ * `Defs` with each flag its relations declare `required` parsed to a value
+ * that is there, as oclif types a flag declared `required: true` inline, so
+ * moving the declaration into {@link relatedFlags} costs the command nothing.
+ */
+export type Requiring<Defs, Relations> = {
+  [Key in keyof Defs]: Key extends keyof Relations
+    ? Relations[Key] extends { readonly required: true }
+      ? Defs[Key] extends Interfaces.OptionFlag<infer Value, infer Options>
+        ? Interfaces.OptionFlag<Exclude<Value, undefined>, Options>
+        : Defs[Key]
+      : Defs[Key]
+    : Defs[Key];
+};
+
+/**
+ * A command's own flags and the relations between them, declared in one place.
+ *
+ * oclif's `Flags.*` types erase `exclusive`, `dependsOn` and `required`, so a
+ * suggested command could not be checked against them. Here they are given
+ * once, typed against the flags beside them, and applied to the flags handed
+ * to oclif, so the parser and the compiler read the same declaration. A
+ * relation written inline on a flag instead is refused by a unit test
+ * (`tests/unit/lib/oclif/flags-declared.test.ts`).
+ *
+ * @param defs - The flags, as `Flags.*` declares them, by CLI spelling.
+ * @param relations - What each flag requires of the others, by CLI spelling.
+ * @returns The flags with their relations applied, typed with the relations.
+ * @throws {Error} When a relation names a flag `defs` does not declare.
+ * @example
+ * static override flags = relatedFlags(
+ *   { fix: Flags.boolean({ … }), force: Flags.boolean({ … }) },
+ *   { force: { dependsOn: ["fix"] } },
+ * );
+ */
+export function relatedFlags<
+  const Defs extends object,
+  const Relations extends FlagRelations<Defs> = Record<never, never>,
+>(defs: Defs, relations?: Relations): Flagged<Defs, Relations> {
+  // Constrained to `object` rather than oclif's `FlagInput`, whose `any` would
+  // be inferred into every `Flags.boolean` here and erase its type.
+  const declared = { ...defs } as Record<string, Interfaces.Flag<unknown>>;
+  for (const [name, relation] of Object.entries(relations ?? {})) {
+    const definition = declared[name];
+    if (definition === undefined) {
+      throw new Error(`flags(): a relation names --${name}, which is not declared`);
+    }
+    const { exclusive, dependsOn, required } = relation as {
+      exclusive?: readonly string[];
+      dependsOn?: readonly string[];
+      required?: true;
+    };
+    declared[name] = {
+      ...definition,
+      ...(exclusive === undefined ? {} : { exclusive: [...exclusive] }),
+      ...(dependsOn === undefined ? {} : { dependsOn: [...dependsOn] }),
+      ...(required === undefined ? {} : { required: true }),
+    } as Interfaces.Flag<unknown>;
+  }
+  // Not enumerable, so oclif — which reads the flags by name, and spreads them
+  // into the base flags — never sees it.
+  Object.defineProperty(declared, RELATIONS, { value: relations ?? {}, enumerable: false });
+
+  return declared as Flagged<Defs, Relations>;
+}
+
+/**
+ * The relations a command's flags were declared with through {@link relatedFlags},
+ * or an empty record for flags declared without it.
+ *
+ * @param declared - A command's `flags`.
+ * @returns The relations, by CLI spelling.
+ */
+export function relationsOf(declared: object): FlagRelations<Record<string, unknown>> {
+  return (declared as { [RELATIONS]?: FlagRelations<Record<string, unknown>> })[RELATIONS] ?? {};
+}

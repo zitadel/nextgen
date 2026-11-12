@@ -5,7 +5,6 @@ import type { Parsed } from "@zitadel/config/idp";
 import { z } from "zod";
 
 import { createZitadelClient, ProjectService } from "@/lib/backend";
-import { Cmd } from "@/lib/cmd";
 import { deployInitialRelease, type InitialDeployment, isEnvironmentName } from "@/lib/environment";
 import { toZitadelError } from "@/lib/errors";
 import { writeManagedEnvFile } from "@/lib/fs-safe";
@@ -18,15 +17,21 @@ import {
   type JsonEnvelope,
   nonBlankString,
 } from "@/lib/oclif";
-import { environmentSelectorSuffix, projectEnvFile } from "@/lib/oclif/environment-flags";
+import { projectEnvFile } from "@/lib/oclif/environment-flags";
 import { type Refused, reads, taken } from "@/lib/oclif/flags";
 import { Promptable } from "@/lib/oclif/promptable";
 import { interpolate, type Refusal, refusalError } from "@/lib/oclif/refusal";
-import { Suggestible } from "@/lib/oclif/suggestible";
 import { PUBLIC_PROJECT_ID_VARIABLE } from "@/lib/orca/patchers/rule/public-project-id";
 import { readZitadelConfig } from "@/lib/project";
 import { DEFAULT_SERVER, parseServer, resolveServer } from "@/lib/server";
-import { DEPLOY_ARGS, type EnvironmentSelector, projectCommand } from "@/lib/suggestion";
+import {
+  declaredOf,
+  renderSuggestion,
+  type Scope,
+  type Suggest,
+  suggestion,
+  WHAT_CHANGED,
+} from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { userAgent } from "@/lib/user-agent";
 import { reportWarning } from "@/lib/warnings";
@@ -135,7 +140,7 @@ export function readAppUrl(answer: string): Parsed<string | undefined> {
  * platform builds from git), so the command ends by printing exactly which
  * values the platform and the pipeline need.
  */
-export default class EnvAdd extends Suggestible(Promptable(BaseCommand)) {
+export default class EnvAdd extends Promptable(BaseCommand) {
   static override description = "Bind an environment to a project, creating the project if needed.";
   static override group = CommandGroups.configuration;
 
@@ -200,15 +205,7 @@ export default class EnvAdd extends Suggestible(Promptable(BaseCommand)) {
         parse: parseServer,
         // The rerun keeps every choice this run made, so binding a project
         // (`--project`) stays a bind rather than creating a new project.
-        retry: this.suggest(
-          [
-            `env add ${Cmd.quote(args.name)}`,
-            "--server https://api.zitadel.cloud",
-            ...(flags.project === undefined ? [] : [Cmd.option("--project", flags.project)]),
-            ...(flags.appUrl === undefined ? [] : [Cmd.option("--app-url", flags.appUrl)]),
-            ...(flags.force ? ["--force"] : []),
-          ].join(" "),
-        ),
+        retry: await this.again("env:add", { with: { server: "https://api.zitadel.cloud" } }),
       }));
 
     const appUrl =
@@ -253,17 +250,7 @@ export default class EnvAdd extends Suggestible(Promptable(BaseCommand)) {
           ],
         },
         next: {
-          commands: [
-            this.suggest(
-              [
-                `env add ${Cmd.quote(args.name)}`,
-                `--server ${Cmd.quote(server)}`,
-                ...(flags.project === undefined ? [] : [Cmd.option("--project", flags.project)]),
-                ...(flags.appUrl === undefined ? [] : [Cmd.option("--app-url", flags.appUrl)]),
-                ...(flags.force ? ["--force"] : []),
-              ].join(" "),
-            ),
-          ],
+          commands: [await this.again("env:add", { without: ["dryRun"], with: { server } })],
         },
       });
     }
@@ -406,10 +393,18 @@ export default class EnvAdd extends Suggestible(Promptable(BaseCommand)) {
     // a follow-up run in a shell exporting another project's ZITADEL_* values
     // still acts on the project this run bound. This run's own selection is
     // not it either way.
-    const newEnvironment = environmentSelectorSuffix({
+    const newEnvironment: Scope = {
       envFile: projectEnvFile(flags.cwd, environment.file),
       ...(flags.cwd === undefined ? {} : { cwd: flags.cwd }),
-    });
+    };
+    const suggestOnNew: Suggest = (id, ...rest) => {
+      return renderSuggestion(
+        suggestion(id, ...rest),
+        declaredOf(id, this.config.findCommand(id)),
+        newEnvironment,
+        this.cliVersion,
+      );
+    };
     // A created project already holds its app URL as a primary origin, which
     // closes it; only a bound one (`--project`) still needs the pattern added.
     const needsOrigin = flags.project !== undefined;
@@ -447,7 +442,7 @@ export default class EnvAdd extends Suggestible(Promptable(BaseCommand)) {
             server,
             projectId,
             projectSecret,
-            selector: newEnvironment,
+            suggest: suggestOnNew,
           })
         : undefined;
     const render = (variables: PlatformVariable[]): string[] => {
@@ -468,12 +463,12 @@ export default class EnvAdd extends Suggestible(Promptable(BaseCommand)) {
       if (writtenKeys.has("ZITADEL_PROJECT_SECRET")) {
         if (issuer === undefined) {
           originGuidance = [
-            `Allow this project's origin: ${projectCommand("origin add '<your-app-url>' --kind primary", newEnvironment, this.cliVersion)}`,
+            `Allow this project's origin: ${suggestOnNew("origin:add", { args: { pattern: "<your-app-url>" }, flags: { kind: "primary" } })}`,
           ];
         }
       } else {
         originGuidance = [
-          `Allow this project's origin once ZITADEL_PROJECT_SECRET is in ${environment.file}: ${projectCommand(`origin add ${issuer === undefined ? "'<your-app-url>'" : Cmd.quote(issuer)} --kind primary`, newEnvironment, this.cliVersion)}`,
+          `Allow this project's origin once ZITADEL_PROJECT_SECRET is in ${environment.file}: ${suggestOnNew("origin:add", { args: { pattern: issuer ?? "<your-app-url>" }, flags: { kind: "primary" } })}`,
         ];
       }
     }
@@ -490,8 +485,8 @@ export default class EnvAdd extends Suggestible(Promptable(BaseCommand)) {
       if (!hasSomewhereToLand) {
         deployGuidance = [
           ...deployGuidance,
-          `Give it an origin first: ${projectCommand("origin add '<your-app-url>' --kind primary", newEnvironment, this.cliVersion)}`,
-          `Then deploy to it: ${projectCommand(DEPLOY_ARGS, newEnvironment, this.cliVersion)}`,
+          `Give it an origin first: ${suggestOnNew("origin:add", { args: { pattern: "<your-app-url>" }, flags: { kind: "primary" } })}`,
+          `Then deploy to it: ${suggestOnNew("deploy", { flags: { message: WHAT_CHANGED } })}`,
         ];
       }
     }
@@ -555,14 +550,13 @@ export default class EnvAdd extends Suggestible(Promptable(BaseCommand)) {
       next: {
         commands: [
           ...(needsOrigin && issuer !== undefined && writtenKeys.has("ZITADEL_PROJECT_SECRET")
-            ? // Cmd.quote quotes the origin: an IPv6 issuer like http://[::1]:3000
+            ? // The renderer quotes the origin: an IPv6 issuer like http://[::1]:3000
               // carries brackets a shell such as zsh would treat as a glob.
               [
-                projectCommand(
-                  `origin add ${Cmd.quote(issuer)} --kind primary`,
-                  newEnvironment,
-                  this.cliVersion,
-                ),
+                suggestOnNew("origin:add", {
+                  args: { pattern: issuer },
+                  flags: { kind: "primary" },
+                }),
               ]
             : []),
           // Only a created project is offered a deploy: it is this run's own,
@@ -571,9 +565,9 @@ export default class EnvAdd extends Suggestible(Promptable(BaseCommand)) {
           // project someone else owns and may already serve a release of
           // their own, so this run does not propose replacing it.
           ...(hasSomewhereToLand && deployment === undefined
-            ? [projectCommand(DEPLOY_ARGS, newEnvironment, this.cliVersion)]
+            ? [suggestOnNew("deploy", { flags: { message: WHAT_CHANGED } })]
             : []),
-          projectCommand("env", newEnvironment, this.cliVersion),
+          suggestOnNew("env"),
         ],
       },
     });
@@ -593,7 +587,7 @@ export default class EnvAdd extends Suggestible(Promptable(BaseCommand)) {
     server: string;
     projectId: string;
     projectSecret: string;
-    selector: EnvironmentSelector;
+    suggest: Suggest;
   }): Promise<InitialDeployment | undefined> {
     log.start("Deploying .zitadel/ to the new environment");
     try {
@@ -613,9 +607,7 @@ export default class EnvAdd extends Suggestible(Promptable(BaseCommand)) {
         narrate: (notices) => {
           this.narrate(notices);
         },
-        suggest: (args) => {
-          return projectCommand(args, opts.selector, this.cliVersion);
-        },
+        suggest: opts.suggest,
       });
       log.done(
         `Deployed ${escapeControlCharacters(deployment.contentHash)} to ${deployment.origins.length} ${new Intl.PluralRules("en").select(deployment.origins.length) === "one" ? "origin" : "origins"}`,
@@ -623,7 +615,7 @@ export default class EnvAdd extends Suggestible(Promptable(BaseCommand)) {
       return deployment;
     } catch (error) {
       reportWarning(
-        `The environment was bound but the first deploy failed: ${toZitadelError(error).message}. Run ${projectCommand(DEPLOY_ARGS, opts.selector, this.cliVersion)} to publish it.`,
+        `The environment was bound but the first deploy failed: ${toZitadelError(error).message}. Run ${opts.suggest("deploy", { flags: { message: WHAT_CHANGED } })} to publish it.`,
       );
       return undefined;
     }

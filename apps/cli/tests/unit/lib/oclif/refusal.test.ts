@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { interpolate, refusalError, unmetBy } from "@/lib/oclif/refusal";
-import { unscopedCommand } from "@/lib/suggestion";
+import { suggestion } from "@/lib/suggestion";
 
 describe("interpolate", () => {
   it("fills each placeholder from the values", () => {
@@ -37,7 +37,6 @@ describe("refusalError", () => {
         value: "99999",
         min: 1,
       },
-      (command) => unscopedCommand(command, "1.0.0"),
     );
 
     expect(error.code).toBe("E_VALIDATION");
@@ -52,36 +51,51 @@ describe("refusalError", () => {
         next: ["{next}"],
       },
       {
-        next: ["origin rm http://localhost:3000 --force", "origin add http://localhost:3000"],
+        next: [
+          suggestion("origin:rm", {
+            args: { pattern: "http://localhost:3000" },
+            flags: { force: true },
+          }),
+          suggestion("origin:add", {
+            args: { pattern: "http://localhost:3000" },
+            flags: { kind: "primary" },
+          }),
+        ],
       },
-      (command) => unscopedCommand(command, "1.0.0"),
     );
 
     expect(error.nextCommands).toEqual([
-      unscopedCommand("origin rm http://localhost:3000 --force", "1.0.0"),
-      unscopedCommand("origin add http://localhost:3000", "1.0.0"),
+      suggestion("origin:rm", {
+        args: { pattern: "http://localhost:3000" },
+        flags: { force: true },
+      }),
+      suggestion("origin:add", {
+        args: { pattern: "http://localhost:3000" },
+        flags: { kind: "primary" },
+      }),
     ]);
   });
 
-  it("turns each next command into a suggestion through the builder it is given", () => {
+  it("keeps each next command a suggestion, for the run that reports it to render", () => {
     const error = refusalError(
       {
         message: "No server",
-        next: ["start --port {port}"],
+        next: [suggestion("start", { flags: { port: 8080 } })],
       },
-      {
-        port: 8080,
-      },
-      (command) => unscopedCommand(command, "1.0.0"),
+      {},
     );
 
-    expect(error.nextCommands).toEqual([unscopedCommand("start --port 8080", "1.0.0")]);
+    expect(error.nextCommands).toEqual([suggestion("start", { flags: { port: 8080 } })]);
+  });
+
+  it("names nothing for a placeholder no value fills", () => {
+    const error = refusalError({ message: "No server", next: ["{next}"] }, {});
+
+    expect(error.nextCommands).toEqual([]);
   });
 
   it("carries no hint and no suggestions when the refusal has none", () => {
-    const error = refusalError({ message: "No" }, {}, (command) =>
-      unscopedCommand(command, "1.0.0"),
-    );
+    const error = refusalError({ message: "No" }, {});
 
     expect(error.hint).toBeUndefined();
     expect(error.nextCommands).toBeUndefined();
@@ -101,7 +115,6 @@ describe("refusalError with a code and details", () => {
       {
         name: "flow",
       },
-      (command) => unscopedCommand(command, "1.0.0"),
     );
 
     expect(error.code).toBe("E_NOT_FOUND");
@@ -110,16 +123,19 @@ describe("refusalError with a code and details", () => {
   });
 });
 
-describe("refusalError without a way to suggest", () => {
+describe("refusalError raised where no run exists", () => {
   it("raises a refusal that names no next command", () => {
     expect(refusalError({ message: "No" }, {}).message).toBe("No");
   });
 
-  it("raises one that names a next command without its follow-ups", () => {
-    const error = refusalError({ code: "E_CONFLICT", message: "No", next: ["start"] }, {});
+  it("keeps its next command for the run that reports it", () => {
+    const error = refusalError(
+      { code: "E_CONFLICT", message: "No", next: [suggestion("start")] },
+      {},
+    );
 
     expect(error.code).toBe("E_CONFLICT");
-    expect(error.nextCommands).toBeUndefined();
+    expect(error.nextCommands).toEqual([suggestion("start")]);
   });
 });
 
@@ -170,9 +186,11 @@ describe("unmetBy", () => {
     const refusal = {
       message: "{value} is not a TCP port",
       hint: "Use a TCP port from {min} to {max}.",
-      next: ["start --port {min}"],
+      next: ["{retry}" as const],
     };
 
-    expect(unmetBy(refusal, { value: "0", min: 1, max: 65_535 })).toEqual([]);
+    expect(
+      unmetBy(refusal, { value: "0", min: 1, max: 65_535, retry: suggestion("start") }),
+    ).toEqual([]);
   });
 });

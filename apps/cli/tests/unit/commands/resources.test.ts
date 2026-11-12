@@ -1183,7 +1183,7 @@ describe("next page suggestion", () => {
     expect(res.exitCode).toBe(0);
     const json = parseJson(res.stdout) as { data: { next_commands: string[] } };
     expect(json.data.next_commands[0]).toContain(
-      "events list --limit 1 --filter category=entity --filter category=auth --page-token p2 --json",
+      "events list --filter category=entity --filter category=auth --limit 1 --page-token p2 --json",
     );
   });
 

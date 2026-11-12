@@ -321,7 +321,12 @@ Each invocation prints one JSON object:
   `E_CONFLICT`) and `message`, usually with a `hint`, and `details` when there
   is structured context.
 - `next_commands`: the suggested follow-ups, inside `data` on success and at
-  the top level on a no-op or failure. Prefer these over free-text hints.
+  the top level on a no-op or failure. Prefer these over free-text hints. Each
+  is runnable as written: it names flags by their long form (`--message`, not
+  `-m`) and repeats the `--cwd`, `--env`, `--env-file` and `--server` the run was
+  given (the environment ones only for a command that takes them), so following
+  it acts on the same project. A retry or a dry run's real command keeps every
+  flag the run was given.
 - A command named in a `hint`, a `warning` or a `next_actions` line is written
   the same way `next_commands` writes it — `npx @zitadel/cli@<version> …`,
   unquoted — so prose and follow-up never name the same command two ways.
@@ -407,8 +412,8 @@ Each invocation prints one JSON object:
 - `variable set` stores the value on the project, but a sign-in keeps using the
   variables the last `deploy` froze, so the change applies after the next
   `deploy`. The envelope's `data.next_actions` says so and `data.next_commands`
-  holds `deploy -m '<what changed>'`. With `--preview` it points to
-  `preview --origin '<preview-url>' -m '<what changed>'` instead, since a primary
+  holds `deploy --message '<what changed>'`. With `--preview` it points to
+  `preview --origin '<preview-url>' --message '<what changed>'` instead, since a primary
   `deploy` leaves the preview value unapplied; a pull-request build that sets its
   own preview URL can drop `--origin`. In an environment other than
   `preview` or `development`, where `preview` skips, no command is suggested; nor in a

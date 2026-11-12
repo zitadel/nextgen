@@ -1,5 +1,5 @@
 import { publicCliCommand } from "./public-cli";
-import { DEPLOY_ARGS, type EnvironmentSelector, projectCommand } from "./suggestion";
+import { type Suggest, WHAT_CHANGED } from "./suggestion";
 
 /**
  * Guidance copy that commands share, so the story doesn't fork; most of it is
@@ -29,10 +29,10 @@ export function verifyLoginAction(openUrl?: string): string {
  * `start` and `doctor`. A sign-in step only says that a provider or a check
  * failed, because the login is public; the server logs why.
  */
-export function serverLogAction(cliVersion: string): string {
+export function serverLogAction(suggest: Suggest): string {
   return (
     "When a sign-in or a request fails, the server's log says why: run " +
-    `${publicCliCommand("logs --follow", cliVersion)} in another terminal to watch it.`
+    `${suggest("logs", { flags: { follow: true } })} in another terminal to watch it.`
   );
 }
 
@@ -47,20 +47,19 @@ export function exploreAllCommands(cliVersion: string): string {
 }
 
 /**
- * The customize/publish pair, in Elina's tested wording. `selector` is the
- * run's environment selection, so the quoted commands publish to the project
- * the run was about.
+ * The customize/publish pair, in Elina's tested wording. The quoted commands
+ * are rendered by `suggest`, so they publish to the project the run was about.
+ *
+ * @param suggest - Renders a suggestion for the run that reports it.
+ * @returns The two actions.
  */
-export function customizeAndPublishActions(
-  cliVersion: string,
-  selector: EnvironmentSelector,
-): string[] {
+export function customizeAndPublishActions(suggest: Suggest): string[] {
   return [
     "Customize what you ask for and how people sign in: edit .zitadel/schemas/ to change " +
       "the information you collect, and .zitadel/flows/ to change the sign-up/sign-in " +
       "experience. Each folder has a README with examples.",
-    `See your changes before they go live: ${projectCommand("deploy --dry-run", selector, cliVersion)} to ` +
-      `preview, then ${projectCommand(DEPLOY_ARGS, selector, cliVersion)} to publish. The project ` +
+    `See your changes before they go live: ${suggest("deploy", { flags: { dryRun: true } })} to ` +
+      `preview, then ${suggest("deploy", { flags: { message: WHAT_CHANGED } })} to publish. The project ` +
       "serves only what is deployed, so an edit takes effect once you deploy it.",
   ];
 }
@@ -72,6 +71,6 @@ export function customizeAndPublishActions(
  * layout around it. Taking ownership of the widget's structure stays the
  * opt-in `branding eject`, surfaced here so it remains discoverable.
  */
-export function brandingGuidanceAction(cliVersion: string): string {
-  return `Change how the login looks: it is a component in your app, so theme it with --zl-* custom properties in your own stylesheet and build any page layout around it in your code. To change the widget's structure, ${publicCliCommand("branding eject", cliVersion)} scaffolds an editable template in .zitadel/branding/.`;
+export function brandingGuidanceAction(suggest: Suggest): string {
+  return `Change how the login looks: it is a component in your app, so theme it with --zl-* custom properties in your own stylesheet and build any page layout around it in your code. To change the widget's structure, ${suggest("branding:eject")} scaffolds an editable template in .zitadel/branding/.`;
 }

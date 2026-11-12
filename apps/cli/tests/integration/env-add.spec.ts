@@ -274,7 +274,7 @@ describe("env add", () => {
             deployment: null,
             next_commands: [
               expectedPublicCliCommand(
-                `deploy -m '<what changed>' --env-file ${app.path}/.env.production.local --cwd ${app.path}`,
+                `deploy --message '<what changed>' --env-file ${app.path}/.env.production.local --cwd ${app.path}`,
               ),
               expectedPublicCliCommand(
                 `env --env-file ${app.path}/.env.production.local --cwd ${app.path}`,
@@ -728,7 +728,7 @@ describe("env add", () => {
           `Give it an origin first: ${expectedPublicCliCommand(`origin add '<your-app-url>' --kind primary --env-file ${app.path}/.env.production.local --cwd ${app.path}`)}`,
         );
         expect(result).toPrint(
-          `Then deploy to it: ${expectedPublicCliCommand(`deploy -m '<what changed>' --env-file ${app.path}/.env.production.local --cwd ${app.path}`)}`,
+          `Then deploy to it: ${expectedPublicCliCommand(`deploy --message '<what changed>' --env-file ${app.path}/.env.production.local --cwd ${app.path}`)}`,
         );
       });
 
@@ -746,7 +746,7 @@ describe("env add", () => {
 
         expect(added).toSayOnce(
           expectedPublicCliCommand(
-            `deploy -m '<what changed>' --env-file ${app.path}/.env.production.local --cwd ${app.path}`,
+            `deploy --message '<what changed>' --env-file ${app.path}/.env.production.local --cwd ${app.path}`,
           ),
         );
       });

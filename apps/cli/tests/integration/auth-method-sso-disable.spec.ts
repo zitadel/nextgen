@@ -189,7 +189,7 @@ describe("auth-method sso disable", () => {
             title: "Removed google from default-human-user",
             next_args: [
               ["deploy", "--dry-run", "--cwd", app.path],
-              ["deploy", "-m", "<what changed>", "--cwd", app.path],
+              ["deploy", "--message", "<what changed>", "--cwd", app.path],
             ],
             next_actions: [
               "To stop publishing the connection, delete .zitadel/idps/google.json before the deploy below.",
@@ -197,7 +197,7 @@ describe("auth-method sso disable", () => {
             ],
             next_commands: [
               expectedPublicCliCommand(`deploy --dry-run --cwd ${app.path}`),
-              expectedPublicCliCommand(`deploy -m '<what changed>' --cwd ${app.path}`),
+              expectedPublicCliCommand(`deploy --message '<what changed>' --cwd ${app.path}`),
             ],
           },
           warnings: [],
@@ -225,7 +225,7 @@ describe("auth-method sso disable", () => {
             title: "Removed acme-sso from default-human-user",
             next_args: [
               ["deploy", "--dry-run", "--cwd", app.path],
-              ["deploy", "-m", "<what changed>", "--cwd", app.path],
+              ["deploy", "--message", "<what changed>", "--cwd", app.path],
             ],
             next_actions: [
               "To stop publishing the connection, delete .zitadel/idps/acme-sso.json before the deploy below.",
@@ -233,7 +233,7 @@ describe("auth-method sso disable", () => {
             ],
             next_commands: [
               expectedPublicCliCommand(`deploy --dry-run --cwd ${app.path}`),
-              expectedPublicCliCommand(`deploy -m '<what changed>' --cwd ${app.path}`),
+              expectedPublicCliCommand(`deploy --message '<what changed>' --cwd ${app.path}`),
             ],
           },
           warnings: [],
@@ -265,7 +265,7 @@ describe("auth-method sso disable", () => {
             title: "Removed google from default-human-user",
             next_args: [
               ["deploy", "--dry-run", "--cwd", app.path],
-              ["deploy", "-m", "<what changed>", "--cwd", app.path],
+              ["deploy", "--message", "<what changed>", "--cwd", app.path],
             ],
             next_actions: [
               "To stop publishing the connection, delete .zitadel/idps/google.json before the deploy below.",
@@ -273,7 +273,7 @@ describe("auth-method sso disable", () => {
             ],
             next_commands: [
               expectedPublicCliCommand(`deploy --dry-run --cwd ${app.path}`),
-              expectedPublicCliCommand(`deploy -m '<what changed>' --cwd ${app.path}`),
+              expectedPublicCliCommand(`deploy --message '<what changed>' --cwd ${app.path}`),
             ],
           },
           warnings: [LEFT_WITH_NONE_WARNING],
@@ -327,7 +327,7 @@ describe("auth-method sso disable", () => {
             hint: `Enable another method first, such as ${expectedPublicCliCommand("auth-method sso enable --provider '<name>'")}. If the schema's users are only managed through the API, ask a person first: ${QUESTION} Re-run with --force only once they agree (the first of details.suggested_args holds the exact arguments).`,
             next_commands: [
               expectedPublicCliCommand(
-                `auth-method sso disable --provider google --schema ${SCHEMA} --cwd ${app.path} --force`,
+                `auth-method sso disable --provider google --schema ${SCHEMA} --force --cwd ${app.path}`,
               ),
               expectedPublicCliCommand(
                 `auth-method password enable --schema ${SCHEMA} --cwd ${app.path}`,
@@ -349,9 +349,9 @@ describe("auth-method sso disable", () => {
                   GOOGLE,
                   "--schema",
                   SCHEMA,
+                  "--force",
                   "--cwd",
                   app.path,
-                  "--force",
                 ],
                 ["auth-method", "password", "enable", "--schema", SCHEMA, "--cwd", app.path],
                 ["auth-method", "passkey", "enable", "--schema", SCHEMA, "--cwd", app.path],
@@ -367,7 +367,7 @@ describe("auth-method sso disable", () => {
           const result = await app.disableSso(GOOGLE, ["--dry-run"]);
 
           expect(result).toSuggest(
-            `auth-method sso disable --provider google --schema ${SCHEMA} --cwd ${app.path} --force --dry-run`,
+            `auth-method sso disable --provider google --schema ${SCHEMA} --force --dry-run --cwd ${app.path}`,
           );
         });
 
@@ -387,7 +387,7 @@ describe("auth-method sso disable", () => {
           const result = await app.disableSso(GOOGLE);
 
           expect(result).toSuggest(
-            `auth-method sso disable --provider google --schema ${SCHEMA} --cwd ${app.path} --force`,
+            `auth-method sso disable --provider google --schema ${SCHEMA} --force --cwd ${app.path}`,
           );
         });
 
@@ -596,14 +596,14 @@ describe("auth-method sso disable", () => {
                   "disable",
                   "--provider",
                   GOOGLE,
+                  "--force",
                   "--cwd",
                   app.path,
-                  "--force",
                 ],
               ],
               next_commands: [
                 expectedPublicCliCommand(
-                  `auth-method sso disable --provider google --cwd ${app.path} --force`,
+                  `auth-method sso disable --provider google --force --cwd ${app.path}`,
                 ),
               ],
             },
@@ -799,7 +799,7 @@ describe("auth-method sso disable", () => {
         const result = await app.disableSsoRendered(GOOGLE);
 
         expect(result).toSay(
-          `${QUESTION} Re-run with --force only once they agree.\n\nNext:\n  $ ${expectedPublicCliCommand(`auth-method sso disable --provider google --schema ${SCHEMA} --cwd ${app.path} --force`)}\n  $ ${expectedPublicCliCommand(`auth-method password enable --schema ${SCHEMA} --cwd ${app.path}`)}\n  $ ${expectedPublicCliCommand(`auth-method passkey enable --schema ${SCHEMA} --cwd ${app.path}`)}`,
+          `${QUESTION} Re-run with --force only once they agree.\n\nNext:\n  $ ${expectedPublicCliCommand(`auth-method sso disable --provider google --schema ${SCHEMA} --force --cwd ${app.path}`)}\n  $ ${expectedPublicCliCommand(`auth-method password enable --schema ${SCHEMA} --cwd ${app.path}`)}\n  $ ${expectedPublicCliCommand(`auth-method passkey enable --schema ${SCHEMA} --cwd ${app.path}`)}`,
         );
       });
 

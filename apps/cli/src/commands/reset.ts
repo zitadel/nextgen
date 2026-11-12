@@ -12,13 +12,12 @@ import {
 import { LocalServer } from "@/lib/local-server/server";
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
 import { Destructive } from "@/lib/oclif/destructive";
-import { Suggestible } from "@/lib/oclif/suggestible";
 import { type Fact, section } from "@/lib/ui";
 
 /**
  * `zitadel reset` — delete the local Zitadel server runtime and data.
  */
-export default class Reset extends Suggestible(Destructive(BaseCommand)) {
+export default class Reset extends Destructive(BaseCommand) {
   static override description = "Delete the local Zitadel server runtime and data.";
   static override group = CommandGroups.localDevelopment;
   static override groupOrder = 4;
@@ -91,13 +90,12 @@ export default class Reset extends Suggestible(Destructive(BaseCommand)) {
               title,
               sections: [facts],
             },
-            next: { commands: [this.suggest("reset --force")] },
+            next: { commands: [this.suggest("reset", { flags: { force: true } })] },
           };
         },
         apply: async (consent) => {
           await LocalServer.at(this.cwd, {
             cliVersion: this.cliVersion,
-            selector: this.cwdSelector(),
           }).reset(consent);
           const title = "Local Zitadel server runtime reset";
           return {

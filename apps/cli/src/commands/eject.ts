@@ -14,7 +14,6 @@ import {
   type JsonEnvelope,
 } from "@/lib/oclif";
 import { Destructive } from "@/lib/oclif/destructive";
-import { Suggestible } from "@/lib/oclif/suggestible";
 import { createOrca } from "@/lib/orca";
 import { AGENTS_HEADER, removeGuidanceSection } from "@/lib/orca/patchers/rule/guidance";
 import type { EjectActions } from "@/lib/orca/patchers/types";
@@ -351,7 +350,7 @@ function ejected(
  * (user-replaced files are preserved); `zitadel.json` is removed; `.env.local`
  * is renamed to a timestamped backup; and `.zitadel/` is removed wholesale.
  */
-export default class Eject extends Suggestible(Destructive(BaseCommand)) {
+export default class Eject extends Destructive(BaseCommand) {
   static override description = "Remove managed files and local Zitadel state.";
   static override group = CommandGroups.localDevelopment;
   static override groupOrder = 5;
@@ -383,7 +382,7 @@ export default class Eject extends Suggestible(Destructive(BaseCommand)) {
           await ejectProject(this.cwd, "plan"),
           dir,
           setItUp,
-          this.suggest("eject --force"),
+          this.suggest("eject", { flags: { force: true } }),
         );
       },
       apply: async (consent) => {

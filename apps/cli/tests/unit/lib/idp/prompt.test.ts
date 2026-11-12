@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { asker } from "@/lib/input";
 import type { Questions } from "@/lib/ui";
 import { CredentialPrompt, type PromptRun } from "@/lib/idp";
-import { environmentSelectorSuffix } from "@/lib/oclif/environment-flags";
+import { aSuggest } from "@tests/helpers/suggest";
 import { ZitadelError } from "@/lib/errors";
 import {
   acmeSelection,
@@ -42,8 +42,7 @@ function promptFor(overrides: Partial<PromptRun> = {}): CredentialPrompt {
     secretVariable: secretVariable("google"),
     ask: asking("shh\n"),
     developmentBuild: false,
-    selector: environmentSelectorSuffix({}),
-    cliVersion: "1.0.0",
+    suggest: aSuggest({}, "1.0.0"),
     ...overrides,
   });
 }

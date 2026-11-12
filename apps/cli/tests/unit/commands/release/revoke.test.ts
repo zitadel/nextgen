@@ -9,6 +9,7 @@ import {
   usePlatformServer,
 } from "@tests/helpers/platform-project";
 import { asTerminal as asPerson } from "@tests/helpers/terminal";
+import { runCommand } from "@tests/helpers/run-command";
 
 const { dirs } = usePlatformServer();
 
@@ -45,7 +46,9 @@ describe("release revoke asked on a terminal", () => {
     });
     dirs.push(cwd);
     const talk = answering(false);
-    await asPerson(() => ReleaseRevoke.run([RELEASE, "--cwd", cwd, "--server", serverUrl]));
+    await asPerson(() =>
+      runCommand(ReleaseRevoke, "release:revoke", [RELEASE, "--cwd", cwd, "--server", serverUrl]),
+    );
     return talk;
   };
 

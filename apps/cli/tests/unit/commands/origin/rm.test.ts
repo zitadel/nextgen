@@ -11,6 +11,7 @@ import { it } from "@tests/helpers/fixtures";
 import { asTerminal as asPerson } from "@tests/helpers/terminal";
 
 import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
+import { runCommand } from "@tests/helpers/run-command";
 
 const SERVER = "https://api.zitadel.example";
 
@@ -200,7 +201,13 @@ describe("origin rm asked on a terminal", () => {
     const cwd = await anAppDir();
     const talk = answering(false);
     await asPerson(() =>
-      OriginRm.run(["https://app.acme.com", "--cwd", cwd, "--server", serverUrl]),
+      runCommand(OriginRm, "origin:rm", [
+        "https://app.acme.com",
+        "--cwd",
+        cwd,
+        "--server",
+        serverUrl,
+      ]),
     );
     return talk;
   };
@@ -218,7 +225,13 @@ describe("origin rm asked on a terminal", () => {
     const talk = answering(false);
 
     await asPerson(() => {
-      return OriginRm.run(["https://app\u001b[31m.acme.com", "--cwd", cwd, "--server", SERVER]);
+      return runCommand(OriginRm, "origin:rm", [
+        "https://app\u001b[31m.acme.com",
+        "--cwd",
+        cwd,
+        "--server",
+        SERVER,
+      ]);
     });
 
     expect(talk.asked()).toEqual([

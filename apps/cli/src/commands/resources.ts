@@ -1,3 +1,4 @@
+import type { Interfaces } from "@oclif/core";
 import { isVariableReference } from "@zitadel/config/idp";
 
 import {
@@ -64,6 +65,7 @@ import {
   UpdateTeamBody,
 } from "@/lib/backend/schemas";
 import { ZitadelError } from "@/lib/errors";
+import type { LooseArgs } from "@/lib/suggestion";
 import {
   buildResourceCommands,
   type CreateSpec,
@@ -1073,3 +1075,16 @@ export const RESOURCE_COMMANDS = buildResourceCommands<Platform>(RESOURCES, {
     };
   },
 });
+
+/**
+ * A generated resource command as a suggestion is checked against it. Its
+ * arguments and flags are built from the resource at run time, so the compiler
+ * checks only that the command exists; the renderer refuses an argument or a
+ * flag the command does not declare.
+ */
+type ResourceTarget = Readonly<{ args: LooseArgs; flags: Interfaces.FlagInput }>;
+
+/** Every generated resource command a run can suggest, by id (`users:get`). */
+export type ResourceTable = {
+  readonly [Id in `${keyof typeof RESOURCES & string}:${"list" | "get" | "create" | "update" | "delete"}`]: ResourceTarget;
+};

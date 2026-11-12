@@ -6,7 +6,7 @@ import { pathExistsStrict } from "./fs";
 import { enforceMode } from "./fs-safe";
 import { isObject, parseJsonObject, stableStringify } from "./json";
 import { DEFAULT_SERVER } from "./server";
-import { unscopedCommand } from "./suggestion";
+import { suggestion } from "./suggestion";
 
 /**
  * Reports whether `cwd` has already been initialized, i.e. a committed
@@ -61,7 +61,7 @@ export async function readZitadelConfig(cwd: string): Promise<Record<string, unk
     if (isErrno(error, "ENOENT")) {
       throw new ZitadelError("E_VALIDATION", "zitadel.json was not found", {
         hint: "Set the project up first.",
-        nextCommands: [unscopedCommand("setup")],
+        nextCommands: [suggestion("setup")],
       });
     }
     throw error;
@@ -103,7 +103,7 @@ export async function readZitadelSecret(cwd: string): Promise<ZitadelSecret> {
     if (isErrno(error, "ENOENT")) {
       throw new ZitadelError("E_VALIDATION", ".zitadel/secret was not found", {
         hint: "Run `zitadel setup` first, or restore the project secret with `zitadel doctor --fix`.",
-        nextCommands: [unscopedCommand("setup"), unscopedCommand("doctor --fix")],
+        nextCommands: [suggestion("setup"), suggestion("doctor", { flags: { fix: true } })],
       });
     }
     throw error;

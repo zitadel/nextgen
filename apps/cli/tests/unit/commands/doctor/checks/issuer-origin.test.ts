@@ -10,8 +10,8 @@ import { takeReportedWarnings } from "@/lib/warnings";
 import { aCheckContext, declined, forced } from "@tests/helpers/check-context";
 import { it } from "@tests/helpers/fixtures";
 import { write } from "@tests/helpers/git-repo";
+import { aSuggest } from "@tests/helpers/suggest";
 import { usePlatformServer } from "@tests/helpers/platform-project";
-import { asEnvironmentSelector, projectCommand, unscopedCommand } from "@/lib/suggestion";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
 /**
@@ -183,18 +183,20 @@ describe("IssuerOriginCheck.run", () => {
 
       const outcome = await check.run(aCheckContext(dir));
 
-      expect(outcome.message).toContain(unscopedCommand("doctor --fix", "0.1.0-alpha.0"));
+      expect(outcome.message).toContain("npx @zitadel/cli@0.1.0-alpha.0 doctor --fix");
     });
 
     it("carries the run's environment selection into the doctor --fix it names", async ({
       dir,
     }) => {
       await aProject(dir, AS_PREVIEW);
-      const selector = asEnvironmentSelector(" --env staging");
+      const suggest = aSuggest({ env: "staging" }, "0.1.0-alpha.0");
 
-      const outcome = await check.run(aCheckContext(dir, { selector }));
+      const outcome = await check.run(aCheckContext(dir, { suggest }));
 
-      expect(outcome.message).toContain(projectCommand("doctor --fix", selector, "0.1.0-alpha.0"));
+      expect(outcome.message).toContain(
+        "npx @zitadel/cli@0.1.0-alpha.0 doctor --fix --env staging",
+      );
     });
 
     it("matches an issuer written with a trailing slash", async ({ dir }) => {

@@ -1,8 +1,8 @@
-import type { Config } from "@oclif/core";
 import { describe, expect, it, vi } from "vitest";
 
 import { ZitadelError } from "@/lib/errors";
-import { unscopedCommand } from "@/lib/suggestion";
+import { suggestion } from "@/lib/suggestion";
+import { aConfigAt } from "@tests/helpers/suggest";
 import { BaseCommand } from "@/lib/oclif/base";
 import { DrawnSpinner } from "@/lib/ui/spinner";
 import { printing, stripAnsi } from "@tests/helpers/run-cli";
@@ -19,7 +19,7 @@ class FailingCommand extends BaseCommand {
   private readonly flags: Record<string, unknown>;
 
   constructor(asJson: boolean, argv: string[] = [], flags: Record<string, unknown> = {}) {
-    super(argv, { version: "0.0.0-test" } as unknown as Config);
+    super(argv, aConfigAt("0.0.0-test"));
     this.asJson = asJson;
     this.flags = flags;
   }
@@ -248,7 +248,7 @@ describe("the one block every failure is shown as", () => {
 // raised it does not know where the run was pointed.
 describe("the follow-ups of a failure", () => {
   const start = new ZitadelError("E_VALIDATION", "Not running", {
-    nextCommands: [unscopedCommand("start")],
+    nextCommands: [suggestion("start")],
   });
 
   it("carry the directory the run was given", async () => {
@@ -276,7 +276,7 @@ describe("the follow-ups of a failure", () => {
 
     await cmd.fail(
       new ZitadelError("E_VALIDATION", "Not running", {
-        nextCommands: [unscopedCommand("start --cwd /work")],
+        nextCommands: [suggestion("start", { flags: { cwd: "/work" } })],
       }),
     );
 

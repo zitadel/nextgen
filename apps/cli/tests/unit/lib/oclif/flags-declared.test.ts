@@ -2,7 +2,11 @@ import { readFile, readdir } from "node:fs/promises";
 import { join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import type { Interfaces } from "@oclif/core";
 import { describe, expect, it } from "vitest";
+
+import { WORKFLOW_COMMANDS } from "@/index";
+import { relationsOf } from "@/lib/oclif/flags";
 
 const commands = fileURLToPath(new URL("../../../../src/commands", import.meta.url));
 
@@ -87,5 +91,34 @@ describe("what a flag is refused for", () => {
     });
 
     expect(taken).toEqual([]);
+  });
+});
+
+describe("what a flag requires of the others", () => {
+  it("is declared through relatedFlags, so a suggested command is checked against it", () => {
+    // The generated resource commands are typed loosely, so the renderer checks
+    // their relations when it renders one; only a hand-written command has types
+    // to carry them.
+    const inline = Object.entries(WORKFLOW_COMMANDS).flatMap(([id, command]) => {
+      const flags = (command.flags ?? {}) as Record<string, Interfaces.Flag<unknown>>;
+      const related = relationsOf(flags);
+      return Object.entries(flags).flatMap(([name, flag]) => {
+        const relation = related[name];
+        const kinds = [
+          ...(flag.required === true && relation?.required !== true ? ["required"] : []),
+          ...((flag.exclusive?.length ?? 0) > 0 && relation?.exclusive === undefined
+            ? ["exclusive"]
+            : []),
+          ...((flag.dependsOn?.length ?? 0) > 0 && relation?.dependsOn === undefined
+            ? ["dependsOn"]
+            : []),
+        ];
+        return kinds.map((kind) => {
+          return `${id} --${name} ${kind}`;
+        });
+      });
+    });
+
+    expect(inline).toEqual([]);
   });
 });

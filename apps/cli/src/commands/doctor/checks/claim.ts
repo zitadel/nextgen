@@ -1,6 +1,5 @@
 import { CLAIM_WINDOW_DAYS, claimState } from "@/lib/claim-state";
 import { readProjectServer, readZitadelConfig, readZitadelSecret } from "@/lib/project";
-import { unscopedCommand } from "@/lib/suggestion";
 
 import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
 
@@ -57,7 +56,7 @@ export class ClaimCheck implements SanityCheck {
       // envelope's advisory can switch to the same reconciliation wording;
       // the claim command itself stays suggested either way, since the local
       // record may be stale and the server answers authoritatively.
-      const claim = unscopedCommand("claim", ctx.cliVersion);
+      const claim = ctx.suggest("claim");
       const message = state.claimable
         ? `Claim your project within ${CLAIM_WINDOW_DAYS} days of creation to make it ` +
           "permanent and start collaborating with your team. Until then, your project " +
@@ -65,7 +64,7 @@ export class ClaimCheck implements SanityCheck {
         : `The local record says this project's ${CLAIM_WINDOW_DAYS}-day claim window has ` +
           `closed. Run ${claim} to reconcile: a project claimed from another ` +
           "machine confirms its team, and one never claimed can no longer be claimed. " +
-          `${unscopedCommand("setup", ctx.cliVersion)} in a fresh directory gets you a new project you can claim.`;
+          `${ctx.suggest("setup")} in a fresh directory gets you a new project you can claim.`;
       return {
         name: this.name,
         status: "warn",

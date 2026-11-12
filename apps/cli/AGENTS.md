@@ -22,15 +22,21 @@
   (`src/lib/scaffold-manifest.ts`).
 - Claim: [ADR 046](../../docs/adrs/046-claim-lifecycle-v2.md).
 - The fresh-app journey: [`e2e/journey/AGENTS.md`](../../e2e/journey/AGENTS.md).
-- A command the CLI suggests running next (`next.commands` on a result,
-  `nextCommands` on an error, an input question's `retry`) is a
-  `SuggestedCommand` from `src/lib/suggestion.ts`, and only its builders make
-  one; a raw string does not typecheck there (#1689).
-- Build every suggested command with `this.suggest(args)` from the `Suggestible`
-  mixin (`src/lib/oclif/suggestible.ts`); the target's own flags decide whether
-  the environment selector goes on (`env-file` present) or only `--cwd`.
-- `unscopedCommand` is for an error raised outside a command (`project.ts`),
-  `shellCommand` for anything that is not the CLI, and `inShell` adds a pipe or
+- Never write a suggested command (`next.commands`, `nextCommands`, a `retry`) as a
+  string: `this.suggest("variable:get", { args: { name } })` (`src/lib/suggestion/`).
+- The compiler checks the id and input against the target's `args` and `flags`;
+  what is suggestible derives from `src/index.ts`, so add no mapping.
+- Declare `required`, `exclusive` and `dependsOn` through `relatedFlags`
+  (`src/lib/oclif/flags.ts`); `flags-declared.test.ts` fails on an inline one.
+- Never pass the run's `--cwd`/`--env`/`--env-file`/`--server`: the renderer adds
+  them; set one only to aim elsewhere (a new app, a new environment).
+- Suggest the running command again with `this.again(id, { without, with })`,
+  which keeps everything the run was given.
+- Without a run at hand (a library error, a `Refusal`'s `next`), use
+  `suggestion(id, input)`; the failure handler renders it with the run's scope.
+- A helper that renders now takes a `Suggest` (`this.suggester`); a resource id
+  known only at run time is `resourceSuggestion(topic, verb, input)`.
+- `shellCommand` is for anything that is not the CLI; `inShell` wraps a pipe or
   redirection around a suggestion.
 - Pass a result's next steps as `next` (`src/lib/oclif/next-steps.ts`), never
   in its data: `emit` writes them to the envelope and prints every one.
@@ -50,8 +56,8 @@
 ## Command code
 
 - Name the CLI one way in anything a person reads — a hint, a warning, a box
-  line, a description: the public `npx @zitadel/cli@<version> …` form, from a
-  `src/lib/suggestion.ts` builder, never bare `zitadel …` and never in
+  line, a description: the public `npx @zitadel/cli@<version> …` form, from
+  `this.suggest`, never bare `zitadel …` and never in
   backticks. `tests/unit/lib/public-cli.test.ts` scans `src/commands` for both,
   and exempts only a `hint:` line (see the rule on quoting a command below).
   - Say it once: when the run's own step already prints the command, the
@@ -101,15 +107,8 @@
 - No `flags/`, `args/` or `rules/` directory, and no helper module beside a
   command.
 - Write every refusal once, as a `Refusal` template with `{name}` placeholders
-  (`src/lib/oclif/refusal.ts`), never a `ZitadelError` built by hand. Thread
-  `this.suggest(...)` in where one names a follow-up: a refusal raised without
-  a suggester goes without its follow-ups.
-  - A refusal raised while a flag parses names its follow-ups too, unscoped —
-    the environment comes from the flags, so there is none to repeat yet, but
-    the failure handler puts the `--cwd` read from the command line on any bare
-    `zitadel …` follow-up, as it does for one raised below a command. A
-    flag whose own `parse` refuses in more than one way passes
-    `suggesterOf(command)` (`src/lib/oclif/flags.ts`), as `--design` does.
+  (`src/lib/oclif/refusal.ts`), never a `ZitadelError` built by hand; its `next`
+  entries are `suggestion(...)` values.
   - A `next` entry that is only a placeholder takes its value as it is, so a
     check that found two steps hands over both.
 - Declare a flag or argument by its CLI spelling and read it as code reads it
@@ -202,8 +201,8 @@
   `this.emitList(flags, {...})`.
 - Leave plain, the list JSON, the footer and the next-page command to
   `emitList`; a command never builds them.
-- A paged list's `page.flags` repeats the flags its token needs, and the command
-  overrides `suggestFollowUp` (`EnvironmentCommand` does).
+- A paged list's next page is the run again with the new `--page-token`
+  (`emitList` builds it), so the token goes with the flags that issued it.
 - A command that deletes, revokes or rolls back extends `Destructive(...)`
   (`src/lib/oclif/destructive.ts`) and does it in `this.confirmed({ ... })`.
 - Every destructive operation takes a `Consent` (`src/lib/consent.ts`); the

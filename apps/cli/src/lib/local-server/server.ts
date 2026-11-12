@@ -4,7 +4,7 @@ import { log } from "@/lib/log";
 
 import { Consent } from "@/lib/consent";
 import { ZitadelError, errorMessage } from "@/lib/errors";
-import { type EnvironmentSelector, projectCommand } from "@/lib/suggestion";
+import { suggestion } from "@/lib/suggestion";
 import { currentUser } from "@/lib/uidgid";
 import type { ResolvedEnv } from "./env-vars";
 import { assertDockerAvailable, startFailure } from "./internal/failures";
@@ -127,24 +127,20 @@ export type SweepResult = Readonly<
 export class LocalServer {
   private readonly cwd: string;
   private readonly cliVersion: string;
-  private readonly selector: EnvironmentSelector;
 
-  private constructor(cwd: string, cliVersion: string, selector: EnvironmentSelector) {
+  private constructor(cwd: string, cliVersion: string) {
     this.cwd = cwd;
     this.cliVersion = cliVersion;
-    this.selector = selector;
   }
 
   /**
-   * The server of a directory. `cliVersion` and `selector` are only used to
-   * word the commands that errors suggest, so they name the CLI release the
-   * user is running and carry the `--cwd` the run was given.
+   * The server of a directory. `cliVersion` names the release the user is
+   * running, which the server it launches matches. The commands its failures
+   * suggest are rendered by the run that reports them, so they carry the
+   * `--cwd` the run was given.
    */
-  static at(
-    cwd: string,
-    options: { cliVersion: string; selector: EnvironmentSelector },
-  ): LocalServer {
-    return new LocalServer(cwd, options.cliVersion, options.selector);
+  static at(cwd: string, options: { cliVersion: string }): LocalServer {
+    return new LocalServer(cwd, options.cliVersion);
   }
 
   /**
@@ -380,7 +376,7 @@ export class LocalServer {
       }
 
       const { image } = config;
-      await assertDockerAvailable(this.cliVersion, this.selector);
+      await assertDockerAvailable();
       if (existing?.backend === "binary") {
         await BinaryLauncher.stopRecord(existing);
       }
@@ -404,7 +400,7 @@ export class LocalServer {
         },
       );
     } catch (error) {
-      throw await startFailure(error, this.cliVersion, this.selector);
+      throw await startFailure(error);
     }
   }
 
@@ -530,7 +526,7 @@ export class LocalServer {
     if (!runtime) {
       throw new ZitadelError("E_VALIDATION", "Local Zitadel runtime has not been started", {
         hint: "Run `zitadel start` first.",
-        nextCommands: [projectCommand("start", this.selector, this.cliVersion)],
+        nextCommands: [suggestion("start")],
       });
     }
     return runtime;

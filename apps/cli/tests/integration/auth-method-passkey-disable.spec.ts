@@ -102,11 +102,11 @@ describe("auth-method passkey disable", () => {
             title: "Disabled passkey for default-human-user",
             next_args: [
               ["deploy", "--dry-run", "--cwd", app.path],
-              ["deploy", "-m", "<what changed>", "--cwd", app.path],
+              ["deploy", "--message", "<what changed>", "--cwd", app.path],
             ],
             next_commands: [
               expectedPublicCliCommand(`deploy --dry-run --cwd ${app.path}`),
-              expectedPublicCliCommand(`deploy -m '<what changed>' --cwd ${app.path}`),
+              expectedPublicCliCommand(`deploy --message '<what changed>' --cwd ${app.path}`),
             ],
           },
           warnings: [],
@@ -135,11 +135,11 @@ describe("auth-method passkey disable", () => {
             title: "Disabled passkey for default-human-user",
             next_args: [
               ["deploy", "--dry-run", "--cwd", app.path],
-              ["deploy", "-m", "<what changed>", "--cwd", app.path],
+              ["deploy", "--message", "<what changed>", "--cwd", app.path],
             ],
             next_commands: [
               expectedPublicCliCommand(`deploy --dry-run --cwd ${app.path}`),
-              expectedPublicCliCommand(`deploy -m '<what changed>' --cwd ${app.path}`),
+              expectedPublicCliCommand(`deploy --message '<what changed>' --cwd ${app.path}`),
             ],
           },
           warnings: [LEFT_WITH_NONE_WARNING],
@@ -299,7 +299,7 @@ describe("auth-method passkey disable", () => {
             hint: `Enable another method first, such as ${expectedPublicCliCommand("auth-method sso enable --provider '<name>'")}. If the schema's users are only managed through the API, ask a person first: ${QUESTION} Re-run with --force only once they agree (the first of details.suggested_args holds the exact arguments).`,
             next_commands: [
               expectedPublicCliCommand(
-                `auth-method passkey disable --schema ${SCHEMA} --cwd ${app.path} --force`,
+                `auth-method passkey disable --schema ${SCHEMA} --force --cwd ${app.path}`,
               ),
               expectedPublicCliCommand(
                 `auth-method password enable --schema ${SCHEMA} --cwd ${app.path}`,
@@ -316,9 +316,9 @@ describe("auth-method passkey disable", () => {
                   "disable",
                   "--schema",
                   SCHEMA,
+                  "--force",
                   "--cwd",
                   app.path,
-                  "--force",
                 ],
                 ["auth-method", "password", "enable", "--schema", SCHEMA, "--cwd", app.path],
               ],
@@ -333,7 +333,7 @@ describe("auth-method passkey disable", () => {
           const result = await app.disableMethod("passkey", ["--dry-run"]);
 
           expect(result).toSuggest(
-            `auth-method passkey disable --schema ${SCHEMA} --cwd ${app.path} --force --dry-run`,
+            `auth-method passkey disable --schema ${SCHEMA} --force --dry-run --cwd ${app.path}`,
           );
         });
 
@@ -353,7 +353,7 @@ describe("auth-method passkey disable", () => {
           const result = await app.disableMethod("passkey");
 
           expect(result).toSuggestExactly(
-            `auth-method passkey disable --schema ${SCHEMA} --cwd ${app.path} --force`,
+            `auth-method passkey disable --schema ${SCHEMA} --force --cwd ${app.path}`,
           );
         });
 
@@ -429,9 +429,9 @@ describe("auth-method passkey disable", () => {
               notices: [{ severity: "warning", message: WOULD_LEAVE_NONE_WARNING }],
               title: "Would disable passkey for default-human-user (dry run)",
               dry_run: true,
-              next_args: [["auth-method", "passkey", "disable", "--cwd", app.path, "--force"]],
+              next_args: [["auth-method", "passkey", "disable", "--force", "--cwd", app.path]],
               next_commands: [
-                expectedPublicCliCommand(`auth-method passkey disable --cwd ${app.path} --force`),
+                expectedPublicCliCommand(`auth-method passkey disable --force --cwd ${app.path}`),
               ],
             },
             warnings: [WOULD_LEAVE_NONE_WARNING],
@@ -599,7 +599,7 @@ describe("auth-method passkey disable", () => {
         const result = await app.disableMethodRendered("passkey");
 
         expect(result).toSay(
-          `${QUESTION} Re-run with --force only once they agree.\n\nNext:\n  $ ${expectedPublicCliCommand(`auth-method passkey disable --schema ${SCHEMA} --cwd ${app.path} --force`)}\n  $ ${expectedPublicCliCommand(`auth-method password enable --schema ${SCHEMA} --cwd ${app.path}`)}`,
+          `${QUESTION} Re-run with --force only once they agree.\n\nNext:\n  $ ${expectedPublicCliCommand(`auth-method passkey disable --schema ${SCHEMA} --force --cwd ${app.path}`)}\n  $ ${expectedPublicCliCommand(`auth-method password enable --schema ${SCHEMA} --cwd ${app.path}`)}`,
         );
       });
 

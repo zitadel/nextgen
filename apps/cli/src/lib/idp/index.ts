@@ -31,12 +31,13 @@ export {
   publishClientId,
   reportClientIdOutcome,
   reportSecretOutcome,
-  republishArgs,
   republishCommand,
   republishCommands,
   type SecretOutcome,
   type SecretPublisher,
   storeClientSecret,
+  type Unpublished,
+  unpublished,
 } from "./credentials";
 export {
   type CustomFlagNames,

@@ -15,7 +15,7 @@ import {
 } from "@/lib/backend";
 import { BuildReleaseBody as BuildReleaseBodySchema } from "@/lib/backend/schemas";
 import { isCancellation, ZitadelError } from "@/lib/errors";
-import type { SuggestedCommand } from "@/lib/suggestion";
+import type { Suggest } from "@/lib/suggestion";
 import { type ConfigurationBundle, DiskStore, ZitadelConfig } from "@/lib/zitadel";
 import { SSO_RULES } from "@/lib/zitadel/rules/sso";
 
@@ -76,7 +76,7 @@ export type PrepareRequest = {
    * A command against the project this run addresses, for a step's error to
    * suggest its fix.
    */
-  readonly suggest: (args: string) => SuggestedCommand;
+  readonly suggest: Suggest;
 };
 
 /**

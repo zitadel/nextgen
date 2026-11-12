@@ -1,4 +1,3 @@
-import { Cmd } from "@/lib/cmd";
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
@@ -272,9 +271,7 @@ export default class Preview extends PreviewCommand {
       compare: false,
       json: this.isJson,
       color: this.isColored,
-      suggest: (args) => {
-        return this.suggest(args);
-      },
+      suggest: this.suggester,
     });
     for (const warning of prepared.warnings) {
       reportWarning(warning);
@@ -311,17 +308,14 @@ export default class Preview extends PreviewCommand {
         },
         next: {
           commands: [
-            this.suggest(
-              [
-                "preview",
-                ...urls.map((url) => {
-                  return Cmd.option("--origin", url);
-                }),
-                ...(flags.ttl === undefined ? [] : [Cmd.option("--ttl", flags.ttl.canonical)]),
-                ...(flags.message === undefined ? [] : [Cmd.option("-m", flags.message)]),
-                ...(flags.strict ? ["--strict"] : []),
-              ].join(" "),
-            ),
+            this.suggest("preview", {
+              flags: {
+                origin: [...urls],
+                ttl: flags.ttl?.canonical,
+                message: flags.message,
+                strict: flags.strict,
+              },
+            }),
           ],
         },
       });

@@ -8,7 +8,7 @@ import { consoleSignInUrl } from "@/lib/local-server/sign-in";
 import { log } from "@/lib/log";
 import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
-import { Suggestible } from "@/lib/oclif/suggestible";
+import { suggestion } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { section } from "@/lib/ui";
 
@@ -16,7 +16,7 @@ import { section } from "@/lib/ui";
 const NO_LOCAL_ADMIN_REFUSAL: Refusal = {
   message: "No local admin in this directory or its parents",
   hint: "Run this from the directory the local server was started in, or one inside it. If it was never started, start it first; that is what creates the local admin the console signs in as.",
-  next: ["start"],
+  next: [suggestion("start")],
 };
 
 /**
@@ -24,7 +24,7 @@ const NO_LOCAL_ADMIN_REFUSAL: Refusal = {
  * admin `zitadel start` created. Every run mints a fresh one-time link, so the
  * command is also how you get back in after the session ends.
  */
-export default class Console extends Suggestible(BaseCommand) {
+export default class Console extends BaseCommand {
   static override description =
     "Open the local console, signed in as the local admin.\n\nThe local admin is the one the start command created. Run this in the directory it ran in, or one inside it: the local admin is read from the nearest .zitadel/local/ on the way up.";
   static override group = CommandGroups.localDevelopment;
@@ -59,9 +59,7 @@ export default class Console extends Suggestible(BaseCommand) {
     const localDir = (await findLocalAdminDir(this.cwd)) ?? this.cwd;
     const admin = await readLocalAdmin(localDir);
     if (admin === undefined) {
-      throw refusalError(NO_LOCAL_ADMIN_REFUSAL, {}, (next) => {
-        return this.suggest(next);
-      });
+      throw refusalError(NO_LOCAL_ADMIN_REFUSAL, {});
     }
 
     // A link is minted by running the real login flow, which burns a one-time

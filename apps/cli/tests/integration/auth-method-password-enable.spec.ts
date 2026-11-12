@@ -81,11 +81,11 @@ describe("auth-method password enable", () => {
             title: "Enabled password for default-human-user",
             next_args: [
               ["deploy", "--dry-run", "--cwd", app.path],
-              ["deploy", "-m", "<what changed>", "--cwd", app.path],
+              ["deploy", "--message", "<what changed>", "--cwd", app.path],
             ],
             next_commands: [
               expectedPublicCliCommand(`deploy --dry-run --cwd ${app.path}`),
-              expectedPublicCliCommand(`deploy -m '<what changed>' --cwd ${app.path}`),
+              expectedPublicCliCommand(`deploy --message '<what changed>' --cwd ${app.path}`),
             ],
           },
           warnings: [],

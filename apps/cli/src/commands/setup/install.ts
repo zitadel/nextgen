@@ -11,12 +11,7 @@ import {
   type PackageManager,
   runPackageCommand,
 } from "@/lib/package-manager";
-import {
-  type EnvironmentSelector,
-  projectCommand,
-  type SuggestedCommand,
-  shellCommand,
-} from "@/lib/suggestion";
+import { type Suggest, type SuggestedCommand, shellCommand } from "@/lib/suggestion";
 
 type InstallReason = "dry-run" | "skip-install" | "no-dependency-changes";
 
@@ -44,7 +39,6 @@ export type SetupInstallOutcome = {
 };
 
 export type SetupInstallInput = {
-  cliVersion: string;
   cwd: string;
   /**
    * `--cwd` as typed. The suggested install and dev commands then name the
@@ -58,13 +52,13 @@ export type SetupInstallInput = {
   issuer: string;
   json: boolean;
   /**
-   * The selector pinning the project setup just created, for the follow-ups
-   * below. Without it a bare `status`/`deploy` resolves the environment as the
-   * next shell does, where the process environment outranks the `.env` files:
-   * in a shell holding production values the follow-up would read — or publish
-   * to — another project.
+   * Renders the follow-ups below for the run. The run pins them to the project
+   * setup just created: without that a bare `status`/`deploy` resolves the
+   * environment as the next shell does, where the process environment outranks
+   * the `.env` files, and in a shell holding production values the follow-up
+   * would read — or publish to — another project.
    */
-  selector: EnvironmentSelector;
+  suggest: Suggest;
   scaffoldedFramework: boolean;
   skipInstall: boolean;
   /**
@@ -104,9 +98,8 @@ export async function installDependenciesForSetup(
       },
       devCommand: shownDev,
       installCommand: shownInstall,
-      cliVersion: input.cliVersion,
       issuer: input.issuer,
-      selector: input.selector,
+      suggest: input.suggest,
       includeInstallCommand: false,
     });
   }
@@ -127,9 +120,8 @@ export async function installDependenciesForSetup(
           },
       devCommand: shownDev,
       installCommand: shownInstall,
-      cliVersion: input.cliVersion,
       issuer: input.issuer,
-      selector: input.selector,
+      suggest: input.suggest,
       includeInstallCommand: true,
     });
   }
@@ -166,9 +158,8 @@ export async function installDependenciesForSetup(
     },
     devCommand: shownDev,
     installCommand: shownInstall,
-    cliVersion: input.cliVersion,
     issuer: input.issuer,
-    selector: input.selector,
+    suggest: input.suggest,
     includeInstallCommand: false,
   });
 }
@@ -178,13 +169,12 @@ function outcome(input: {
   devCommand: string;
   /** {@link SetupInstall.command} as the reader runs it. */
   installCommand: string;
-  cliVersion: string;
   issuer: string;
-  selector: EnvironmentSelector;
+  suggest: Suggest;
   includeInstallCommand: boolean;
 }): SetupInstallOutcome {
-  const planCommand = projectCommand("deploy --dry-run", input.selector, input.cliVersion);
-  const statusCommand = projectCommand("status", input.selector, input.cliVersion);
+  const planCommand = input.suggest("deploy", { flags: { dryRun: true } });
+  const statusCommand = input.suggest("status");
   const verifyActions = [
     ...(input.includeInstallCommand ? [`Install dependencies: ${input.installCommand}`] : []),
     `Start your project: ${input.devCommand} (then open ${input.issuer}/register)`,
@@ -219,10 +209,7 @@ function outcome(input: {
     install: input.install,
     devCommand: input.devCommand,
     boxActions,
-    nextActions: [
-      ...verifyActions,
-      ...customizeAndPublishActions(input.cliVersion, input.selector),
-    ],
+    nextActions: [...verifyActions, ...customizeAndPublishActions(input.suggest)],
     // The status command is in the box's steps, so a script gets it too.
     nextCommands: input.includeInstallCommand
       ? [

@@ -1,20 +1,18 @@
 import { describe, expect, it } from "vitest";
 
 import { customizeAndPublishActions } from "@/lib/journey-guidance";
-import { environmentSelectorSuffix } from "@/lib/oclif/environment-flags";
+import { aSuggest } from "@tests/helpers/suggest";
 
 describe("customizeAndPublishActions", () => {
   it("quotes the publish commands with the run's environment", () => {
-    const actions = customizeAndPublishActions(
-      "1.0.0-alpha.25",
-      environmentSelectorSuffix({ envName: "production" }),
-    );
+    const actions = customizeAndPublishActions(aSuggest({ env: "production" }));
 
-    expect(actions.join("\n")).toContain("--env production");
+    expect(actions.join("\n")).toContain("deploy --dry-run --env production");
+    expect(actions.join("\n")).toContain("deploy --message '<what changed>' --env production");
   });
 
   it("adds no selector for the default environment", () => {
-    const actions = customizeAndPublishActions("1.0.0-alpha.25", environmentSelectorSuffix({}));
+    const actions = customizeAndPublishActions(aSuggest());
 
     expect(actions.join("\n")).not.toContain("--env");
   });

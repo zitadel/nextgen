@@ -3,10 +3,10 @@ import { z } from "zod";
 
 import { DeploymentService } from "@/lib/backend";
 import { GetReleaseByIdParams } from "@/lib/backend/schemas";
-import { Cmd } from "@/lib/cmd";
 import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
-import { reads, type Refused } from "@/lib/oclif/flags";
+import { reads, type Refused, relatedFlags } from "@/lib/oclif/flags";
 import { MESSAGE_MAX_LENGTH, messageTooLong } from "@/lib/publish";
+import { suggestion } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 
 /**
@@ -19,7 +19,7 @@ const RELEASE: Refused<string> = {
   refusal: {
     message: "Invalid {input}: {problem}",
     hint: "List the releases to find one.",
-    next: ["release list"],
+    next: [suggestion("release:list")],
     details: {
       argument: "{input}",
     },
@@ -60,20 +60,22 @@ export default class DeploymentCreate extends EnvironmentCommand {
   static override examples = [
     "<%= config.bin %> deployment create --release rel_01KX3RG8A7F0N9WD3P2E4YM5C1",
   ];
-  static override flags = {
-    release: Flags.custom<string>({
-      parse: reads(RELEASE),
-    })({
-      description: "The release id to deploy.",
-      required: true,
-    }),
-    message: Flags.custom<string>({
-      parse: reads(MESSAGE),
-    })({
-      char: "m",
-      description: "A short summary of why this deploys.",
-    }),
-  };
+  static override flags = relatedFlags(
+    {
+      release: Flags.custom<string>({
+        parse: reads(RELEASE),
+      })({
+        description: "The release id to deploy.",
+      }),
+      message: Flags.custom<string>({
+        parse: reads(MESSAGE),
+      })({
+        char: "m",
+        description: "A short summary of why this deploys.",
+      }),
+    },
+    { release: { required: true } },
+  );
 
   protected async execute({ flags }: Admitted<typeof DeploymentCreate>): Promise<JsonEnvelope> {
     // A dry run makes no request, so it answers before the connection — the
@@ -97,13 +99,9 @@ export default class DeploymentCreate extends EnvironmentCommand {
         },
         next: {
           commands: [
-            this.suggest(
-              [
-                "deployment create",
-                Cmd.option("--release", flags.release),
-                ...(flags.message === undefined ? [] : [Cmd.option("--message", flags.message)]),
-              ].join(" "),
-            ),
+            this.suggest("deployment:create", {
+              flags: { release: flags.release, message: flags.message },
+            }),
           ],
         },
       });
@@ -141,7 +139,7 @@ export default class DeploymentCreate extends EnvironmentCommand {
                 )}.`,
               ],
       },
-      next: { commands: [this.suggest("deployment list")] },
+      next: { commands: [this.suggest("deployment:list")] },
     });
   }
 }

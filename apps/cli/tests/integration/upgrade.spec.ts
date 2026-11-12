@@ -1,8 +1,9 @@
+import { newestCliCommand } from "@/lib/public-cli";
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "@tests/helpers/platform";
 import { aSetUpApp, type ScaffoldedApp } from "@tests/helpers/project";
-import { cliVersion, expectedPublicCliCommand } from "@tests/helpers/run-cli";
+import { cliVersion } from "@tests/helpers/run-cli";
 import { asTerminal, offTerminal } from "@tests/helpers/terminal";
 
 const platform = usePlatformMock();
@@ -267,7 +268,7 @@ describe("upgrade", () => {
             refresh: "planned",
             install_command: `npm --prefix ${app.path} install --save-exact @zitadel/sdk-next@${NEWEST}`,
             next_actions: [STILL_THIS_CLI],
-            next_commands: [expectedPublicCliCommand(`upgrade --cwd ${app.path}`)],
+            next_commands: [newestCliCommand(`upgrade --cwd ${app.path}`, CLI_VERSION)],
           },
           warnings: [],
         });
@@ -427,7 +428,7 @@ describe("upgrade", () => {
           code: "E_NETWORK",
           message: "Could not look up the latest Zitadel release",
           hint: "Check the connection to the npm registry, then rerun.",
-          next_commands: [expectedPublicCliCommand(`upgrade --cwd ${app.path}`)],
+          next_commands: [newestCliCommand(`upgrade --cwd ${app.path}`, CLI_VERSION)],
         });
       });
 
@@ -447,7 +448,7 @@ describe("upgrade", () => {
           hint: `npm install --save-exact @zitadel/sdk-next@${NEWEST} failed with exit 1. Nothing else changed; fix that and rerun.`,
           next_commands: [
             `npm --prefix ${app.path} install --save-exact @zitadel/sdk-next@${NEWEST}`,
-            expectedPublicCliCommand(`upgrade --cwd ${app.path}`),
+            newestCliCommand(`upgrade --cwd ${app.path}`, CLI_VERSION),
           ],
         });
       });

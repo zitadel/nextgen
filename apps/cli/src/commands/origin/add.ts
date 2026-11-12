@@ -10,6 +10,7 @@ import {
 } from "@/lib/oclif";
 import { dryRunResult } from "@/lib/oclif/crud/shared";
 import { escapeControlCharacters } from "@/lib/terminal-text";
+import { relatedFlags } from "@/lib/oclif/flags";
 
 /** The two kinds an origin pattern can be, as the `--kind` flag accepts them. */
 const ORIGIN_KINDS = ["primary", "preview"] as const;
@@ -39,13 +40,15 @@ export default class OriginAdd extends EnvironmentCommand {
       description: "The origin pattern to add.",
     }),
   };
-  static override flags = {
-    kind: Flags.option({
-      description: "What the pattern is for.",
-      options: ORIGIN_KINDS,
-      required: true,
-    })(),
-  };
+  static override flags = relatedFlags(
+    {
+      kind: Flags.option({
+        description: "What the pattern is for.",
+        options: ORIGIN_KINDS,
+      })(),
+    },
+    { kind: { required: true } },
+  );
 
   protected async execute({ args, flags }: Admitted<typeof OriginAdd>): Promise<JsonEnvelope> {
     // A dry run makes no request, so it answers before the connection — the
@@ -80,7 +83,7 @@ export default class OriginAdd extends EnvironmentCommand {
         title,
         sections: [],
       },
-      next: { commands: [this.suggest("origin list")] },
+      next: { commands: [this.suggest("origin:list")] },
     });
   }
 }

@@ -20,8 +20,15 @@ const hook: Hook<"finally"> = async ({ config }) => {
   }
   try {
     const { updateNotice } = await import("@/lib/update-notice");
+    const { declaredOf, renderSuggestion, suggestion } = await import("@/lib/suggestion");
     const notice = await updateNotice({
       cliVersion: config.version,
+      upgrade: renderSuggestion(
+        suggestion("upgrade"),
+        declaredOf("upgrade", config.findCommand("upgrade")),
+        {},
+        config.version,
+      ),
       cwd: process.cwd(),
       env: process.env,
       columns: process.stdout.columns,

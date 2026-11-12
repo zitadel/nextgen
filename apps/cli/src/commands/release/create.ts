@@ -1,7 +1,6 @@
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
-import { Cmd } from "@/lib/cmd";
 import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { type Refused, reads } from "@/lib/oclif/flags";
 import { MESSAGE_MAX_LENGTH, messageTooLong, Publisher } from "@/lib/publish";
@@ -65,9 +64,7 @@ export default class ReleaseCreate extends EnvironmentCommand {
       compare: false,
       json: this.isJson,
       color: this.isColored,
-      suggest: (args) => {
-        return this.suggest(args);
-      },
+      suggest: this.suggester,
     });
     for (const warning of prepared.warnings) {
       reportWarning(warning);
@@ -91,14 +88,7 @@ export default class ReleaseCreate extends EnvironmentCommand {
           sections: [],
         },
         next: {
-          commands: [
-            this.suggest(
-              [
-                "release create",
-                ...(flags.message === undefined ? [] : [Cmd.option("--message", flags.message)]),
-              ].join(" "),
-            ),
-          ],
+          commands: [this.suggest("release:create", { flags: { message: flags.message } })],
         },
       });
     }
@@ -122,7 +112,7 @@ export default class ReleaseCreate extends EnvironmentCommand {
         title,
         sections: [],
       },
-      next: { commands: [this.suggest(`deployment create --release ${Cmd.quote(release.id)}`)] },
+      next: { commands: [this.suggest("deployment:create", { flags: { release: release.id } })] },
     });
   }
 }

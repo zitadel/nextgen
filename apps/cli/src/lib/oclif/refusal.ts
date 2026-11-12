@@ -1,5 +1,5 @@
 import { ZitadelError, type ZitadelErrorCode } from "@/lib/errors";
-import type { SuggestedCommand } from "@/lib/suggestion";
+import { isSuggestion, type Suggested, type Suggestion } from "@/lib/suggestion";
 
 /**
  * How a command refuses, written once as text. Every placeholder is written
@@ -10,7 +10,12 @@ export type Refusal = Readonly<{
   code?: ZitadelErrorCode;
   message: string;
   hint?: string;
-  next?: readonly string[];
+  /**
+   * What to run next: a {@link Suggestion} checked against the command it
+   * names, or a whole `{name}` placeholder the values fill with one or a list
+   * of them. The run that reports the refusal renders each with its own scope.
+   */
+  next?: readonly (Suggestion | `{${string}}`)[];
   details?: unknown;
 }>;
 
@@ -27,7 +32,10 @@ export type Placeholders = Readonly<Record<string, unknown>>;
  * is empty.
  */
 export function unmetBy(refusal: Refusal, values: Placeholders): string[] {
-  const unfilled = [refusal.message, refusal.hint ?? "", ...(refusal.next ?? [])]
+  const placeholders = (refusal.next ?? []).filter((entry) => {
+    return typeof entry === "string";
+  });
+  const unfilled = [refusal.message, refusal.hint ?? "", ...placeholders]
     .flatMap((template) => {
       return [...template.matchAll(PLACEHOLDER)];
     })
@@ -99,37 +107,32 @@ function fill(details: unknown, values: Placeholders): unknown {
  * check that found two steps — remove an origin, then add it back — writes one
  * entry and hands over both, and one that found a single step is unchanged.
  */
-function commandsOf(entry: string, values: Placeholders): string[] {
+function commandsOf(entry: Suggestion | `{${string}}`, values: Placeholders): Suggested[] {
+  if (typeof entry !== "string") {
+    return [entry];
+  }
   const whole = WHOLE_PLACEHOLDER.exec(entry);
   const value = whole?.[1] === undefined ? undefined : values[whole[1]];
-  if (Array.isArray(value)) {
-    return value.map(String);
-  }
-  return [interpolate(entry, values)];
+  const given: unknown[] = Array.isArray(value) ? value : value === undefined ? [] : [value];
+
+  return given.filter((one): one is Suggested => {
+    return (
+      typeof one === "string" ||
+      (typeof one === "object" && one !== null && isSuggestion(one as Suggested))
+    );
+  });
 }
 
 /**
  * The error a {@link Refusal} describes, `E_VALIDATION` unless it names a code.
- * `suggest` turns each of its `next` commands into the suggestion the run's own
- * builders make, so a refusal names a command and never spells one out; a
- * refusal raised where no run exists, such as while a flag parses, has none.
+ * Its `next` commands stay suggestions for the run that reports it to render,
+ * so a refusal raised while a flag parses, before any run has settled, names
+ * the same follow-ups as one raised by the command.
  */
-export function refusalError(
-  refusal: Refusal,
-  values: Placeholders,
-  suggest?: (command: string) => SuggestedCommand,
-): ZitadelError {
-  // A refusal raised where no run exists, such as while a flag parses, has
-  // nothing to build a suggestion with. It goes without its follow-ups rather
-  // than throwing, which would cost the refusal the code that says why.
-  const suggested =
-    suggest === undefined
-      ? undefined
-      : refusal.next?.flatMap((command) => {
-          return commandsOf(command, values).map((one) => {
-            return suggest(one);
-          });
-        });
+export function refusalError(refusal: Refusal, values: Placeholders): ZitadelError {
+  const suggested = refusal.next?.flatMap((entry) => {
+    return commandsOf(entry, values);
+  });
   return new ZitadelError(refusal.code ?? "E_VALIDATION", interpolate(refusal.message, values), {
     hint: refusal.hint === undefined ? undefined : interpolate(refusal.hint, values),
     nextCommands: suggested,

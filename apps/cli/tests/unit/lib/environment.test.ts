@@ -1,4 +1,5 @@
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { suggestion } from "@/lib/suggestion";
 import { join } from "node:path";
 
 import { describe, expect, vi } from "vitest";
@@ -436,10 +437,14 @@ describe("requireValue", () => {
     const production = await resolve(dir, { envName: "production" });
 
     expect(() => requireValue(development, "ZITADEL_URL")).toThrow(
-      expect.objectContaining({ nextCommands: [`zitadel setup --cwd ${dir}`] }),
+      expect.objectContaining({ nextCommands: [suggestion("setup", { flags: { cwd: dir } })] }),
     );
     expect(() => requireValue(production, "ZITADEL_URL")).toThrow(
-      expect.objectContaining({ nextCommands: [`zitadel env add production --cwd ${dir}`] }),
+      expect.objectContaining({
+        nextCommands: [
+          suggestion("env:add", { args: { name: "production" }, flags: { cwd: dir } }),
+        ],
+      }),
     );
   });
 
@@ -494,7 +499,9 @@ describe("requireValue", () => {
     const environment = await resolve(dir, { envName: "staging" });
 
     expect(() => requireValue(environment, "ZITADEL_PROJECT_ID")).toThrow(
-      expect.objectContaining({ nextCommands: [`zitadel env add staging --cwd ${dir}`] }),
+      expect.objectContaining({
+        nextCommands: [suggestion("env:add", { args: { name: "staging" }, flags: { cwd: dir } })],
+      }),
     );
   });
 

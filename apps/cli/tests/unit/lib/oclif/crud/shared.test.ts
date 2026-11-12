@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { unscopedCommand } from "@/lib/suggestion";
+import { aSuggest } from "@tests/helpers/suggest";
 import { article, capitalize, dryRunResult, idArg, parseOrThrow } from "@/lib/oclif/crud/shared";
 
-const REAL = unscopedCommand("users delete user_1");
+/** A dry run's real command, as a run renders it. */
+const REAL = aSuggest()("users:delete", { args: { id: "user_1" } });
 
 describe("parseOrThrow", () => {
   const schema = z.object({ name: z.string() }).strict();

@@ -145,7 +145,9 @@ describe("variable resolve", () => {
           message: "Nothing is deployed to the project.",
           hint: "Deploy first, then resolve its variables.",
           next_commands: [
-            expectedPublicCliCommand(app.againAsRun("deploy -m '<what changed>' --env staging")),
+            expectedPublicCliCommand(
+              app.againAsRun("deploy --message '<what changed>' --env staging"),
+            ),
           ],
         });
       });
@@ -356,7 +358,9 @@ describe("variable resolve", () => {
           code: "E_NOT_FOUND",
           message: "Nothing is deployed to https://c.example.com.",
           hint: "Deploy to it first, then resolve its variables.",
-          next_commands: [expectedPublicCliCommand(app.againAsRun("deploy -m '<what changed>'"))],
+          next_commands: [
+            expectedPublicCliCommand(app.againAsRun("deploy --message '<what changed>'")),
+          ],
         });
       });
 

@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, vi } from "vitest";
 
 import { developmentIssuer } from "@/commands/auth-method/sso/enable/index";
 import { ZitadelError } from "@/lib/errors";
-import { unscopedCommand } from "@/lib/suggestion";
+import { suggestion } from "@/lib/suggestion";
 import { it } from "@tests/helpers/fixtures";
 import { makeProject, setUpProject } from "@tests/helpers/local-project";
 import { rejectionOf } from "@tests/helpers/thrown-value";
@@ -33,9 +33,7 @@ describe("developmentIssuer", () => {
     const cwd = await makeProject(dir);
 
     const error = await rejectionOf(() => {
-      return developmentIssuer(cwd, {}, process.env, (next) => {
-        return unscopedCommand(next);
-      });
+      return developmentIssuer(cwd, {}, process.env);
     });
 
     expect(error).toBeInstanceOf(ZitadelError);
@@ -43,7 +41,7 @@ describe("developmentIssuer", () => {
       code: "E_VALIDATION",
       message: "This project has no development issuer",
       hint: "Set the project up first, or set ZITADEL_ISSUER to the origin your app serves from.",
-      nextCommands: [unscopedCommand("setup")],
+      nextCommands: [suggestion("setup")],
     });
   });
 });

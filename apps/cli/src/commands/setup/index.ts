@@ -55,15 +55,12 @@ import {
   claimState,
   claimWindowDeadline,
 } from "@/lib/claim-state";
-import { Cmd } from "@/lib/cmd";
 import { deployInitialRelease, type InitialDeployment } from "@/lib/environment";
 import { errorMessage, isCancellation, isErrno, toZitadelError, ZitadelError } from "@/lib/errors";
 import {
   type CustomFlagValues,
   callbackUriFor,
   customExample,
-  customFlagText,
-  flagText,
   loopbackIssuerWarning,
   type PublishState,
   publishClientId,
@@ -75,7 +72,6 @@ import {
   type SecretOutcome,
   type SecretPublisher,
   selectionFromFlags,
-  ssoEnableArgs,
   storeClientSecret,
 } from "@/lib/idp";
 import { brandingGuidanceAction, exploreAllCommands } from "@/lib/journey-guidance";
@@ -91,13 +87,12 @@ import {
   nonBlankString,
 } from "@/lib/oclif";
 import { Destructive } from "@/lib/oclif/destructive";
-import { environmentSelectorSuffix, projectEnvFile } from "@/lib/oclif/environment-flags";
+import { projectEnvFile } from "@/lib/oclif/environment-flags";
 import { filled, type Refused, reads, whole } from "@/lib/oclif/flags";
 import { asStepsShown } from "@/lib/oclif/next-steps";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { painted } from "@/lib/oclif/rendering";
 import { serverKind } from "@/lib/oclif/server-kind";
-import { Suggestible } from "@/lib/oclif/suggestible";
 import type { GlobalOptions } from "@/lib/oclif/types";
 import {
   createOrca,
@@ -129,12 +124,13 @@ import { writeScaffoldManifest } from "@/lib/scaffold-manifest";
 import { hostUnlessDefault, type ResolvedServer, resolveServer } from "@/lib/server";
 import { id as styleId, path as stylePath, url as styleUrl } from "@/lib/style";
 import {
-  DEPLOY_ARGS,
-  type EnvironmentSelector,
   inShell,
-  projectCommand,
+  type Scope,
+  type Suggest,
   type SuggestedCommand,
-  unscopedCommand,
+  type SuggestFlags,
+  suggestion,
+  WHAT_CHANGED,
 } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import type { Questions, Step, Summary } from "@/lib/ui";
@@ -173,6 +169,7 @@ import {
   SETUP_PROMPTS,
   type SetupAnswers,
   type SsoDraft,
+  ssoEnableFlags,
 } from "./prompts";
 import {
   detectProjectFacts,
@@ -187,41 +184,22 @@ import {
 } from "./summary";
 
 /**
- * {@link recoverySelector} plus `--server local`, for the recovery after a
- * local-server failure (see `ssoRecovery`).
- */
-export function localRecoverySelector(cwd: string | undefined): EnvironmentSelector {
-  return environmentSelectorSuffix({
-    envFile: projectEnvFile(cwd, ".env.development.local"),
-    server: "local",
-    cwd,
-  });
-}
-
-/**
  * The parts of a setup invocation that a retry suggestion must reproduce.
  * Suggested retries are followed verbatim (especially by agents), so dropping
  * a flag here silently changes what the retry scaffolds.
  */
 export type SetupRetryOptions = {
-  /**
-   * The directory setup was pointed at, as typed. Every suggested rerun
-   * carries it as `--cwd`, quoted for a shell, so it configures that project
-   * from wherever it is run.
-   */
-  cwd?: string;
   framework?: string;
   preset?: SetupPreset;
   useCase?: SetupUseCase;
   renderer?: string;
   devPort?: number;
-  nonInteractive?: boolean;
   /**
    * The `--sso` flags as typed, when they could not be resolved to a provider
    * yet: a custom connection described in part, which the wizard completes.
    * Dropping them would send the developer back without what they typed.
    */
-  ssoTyped?: string;
+  ssoTyped?: SsoFlags;
   /**
    * The social provider and its client id. The secret is deliberately absent:
    * a retry asks for it again, or takes it on stdin, because putting a
@@ -245,32 +223,45 @@ export type SetupRetryOptions = {
 };
 
 /**
- * Reconstructs the flag list of the current invocation for retry guidance,
- * ending in `--server local`. Flags whose resolved value equals the default
- * are omitted — the retry reproduces the same outcome without them.
+ * The `--sso-*` flags that describe a custom connection, as `setup` takes them.
+ * Only the ones that were given are there.
  */
-export function setupRetryFlags(opts: SetupRetryOptions): string {
-  const parts: string[] = [];
-  if (opts.framework) {
-    parts.push(Cmd.option("--framework", opts.framework));
-  }
-  if (opts.preset && opts.preset !== DEFAULT_SETUP_PRESET) {
-    parts.push(Cmd.option("--preset", opts.preset));
-  }
-  if (opts.useCase && opts.useCase !== DEFAULT_SETUP_USE_CASE) {
-    parts.push(Cmd.option("--use-case", opts.useCase));
-  }
-  if (opts.renderer && opts.renderer !== "react") {
-    parts.push(Cmd.option("--renderer", opts.renderer));
-  }
-  if (opts.devPort !== undefined) {
-    parts.push(`--dev-port ${opts.devPort}`);
-  }
-  // Even the recommended one, unlike the defaults above: without the flag, a
-  // policy file `--force` keeps keeps its own minimum.
-  if (opts.passwordMinLength !== undefined) {
-    parts.push(`--password-min-length ${opts.passwordMinLength ?? 0}`);
-  }
+type SsoSettingFlags = Readonly<{
+  ssoSlug?: string;
+  ssoDisplayName?: string;
+  ssoIssuer?: string;
+  ssoScopes?: string;
+}>;
+
+/** `--sso` and the settings that go with it, as typed. */
+type SsoFlags = SsoSettingFlags & Readonly<{ sso: string }>;
+
+/**
+ * The `--sso-*` flags for the settings that were given.
+ *
+ * @param values - The custom connection's settings, each perhaps missing.
+ * @returns The flags, in the order the command line takes them.
+ */
+function ssoSettingFlags(values: CustomFlagValues): SsoSettingFlags {
+  return {
+    ...(values.slug === undefined ? {} : { ssoSlug: values.slug }),
+    ...(values.displayName === undefined ? {} : { ssoDisplayName: values.displayName }),
+    ...(values.issuer === undefined ? {} : { ssoIssuer: values.issuer }),
+    ...(values.scopes === undefined ? {} : { ssoScopes: values.scopes }),
+  };
+}
+
+/**
+ * The flags of the current invocation for retry guidance, ending in
+ * `--server local` unless the run named a server. Flags whose resolved value
+ * equals the default are omitted — the retry reproduces the same outcome
+ * without them. The directory is not among them: the run puts its own `--cwd`
+ * on every command it suggests.
+ *
+ * @param opts - What the invocation was given and resolved.
+ * @returns The flags of the `setup` that repeats it, in command-line order.
+ */
+export function setupRetryFlags(opts: SetupRetryOptions): SuggestFlags<"setup"> {
   // Only the first: `--sso` takes one provider, and a scripted rerun can pipe
   // only one secret. A retry naming several would not be runnable, which is
   // the whole point of this line. The rest are not silently dropped -- the
@@ -278,33 +269,40 @@ export function setupRetryFlags(opts: SetupRetryOptions): string {
   // `--sso` makes the rerun skip the multi-select, so a provider left out here
   // could not be reselected.
   const [firstSso] = opts.sso ?? [];
-  if (firstSso === undefined && opts.ssoTyped !== undefined) {
-    parts.push(opts.ssoTyped);
-  }
-  if (firstSso) {
-    // Provider only. `--sso-client-id` would interpolate a value the wizard
-    // accepted on emptiness alone into a command run verbatim, and nothing
-    // here escapes it for a shell. The rerun asks for the id.
-    parts.push(Cmd.option("--sso", selectionName(firstSso)));
-    // A custom connection is nothing without its description, and none of it is
-    // a credential, so unlike the client id it travels in the command.
-    if (firstSso.kind === "custom") {
-      parts.push(customFlagText(firstSso.connection, SETUP_FLAG_NAMES));
-    }
-  }
-  // `--non-interactive` is dropped when a provider is being configured: that
-  // combination reads the client secret from stdin, and a command handed over
-  // as text has no stdin to read. Offering it would advertise a retry that
-  // fails the moment it is run. Interactively the rerun asks for the secret,
-  // which is the one way a plain command can obtain it -- putting it in the
-  // command text is never an option.
-  if (opts.nonInteractive && firstSso === undefined && opts.ssoTyped === undefined) {
-    parts.push("--non-interactive");
-  }
-  if (opts.server !== null) {
-    parts.push(`--server ${opts.server === undefined ? "local" : Cmd.quote(opts.server)}`);
-  }
-  return `${parts.join(" ")}${cwdArg(opts)}`;
+  // Provider only. `--sso-client-id` would interpolate a value the wizard
+  // accepted on emptiness alone into a command run verbatim. The rerun asks
+  // for the id. A custom connection is nothing without its description, and
+  // none of it is a credential, so unlike the client id it travels in the
+  // command.
+  const sso: SsoFlags | undefined =
+    firstSso === undefined
+      ? opts.ssoTyped
+      : {
+          sso: selectionName(firstSso),
+          ...(firstSso.kind === "custom"
+            ? ssoSettingFlags({
+                slug: firstSso.connection.slug,
+                displayName: firstSso.connection.displayName,
+                issuer: firstSso.connection.issuer,
+                scopes: firstSso.connection.scopes.join(" "),
+              })
+            : {}),
+        };
+
+  return {
+    ...(opts.framework ? { framework: opts.framework } : {}),
+    ...(opts.preset && opts.preset !== DEFAULT_SETUP_PRESET ? { preset: opts.preset } : {}),
+    ...(opts.useCase && opts.useCase !== DEFAULT_SETUP_USE_CASE ? { useCase: opts.useCase } : {}),
+    ...(opts.renderer && opts.renderer !== "react" ? { renderer: opts.renderer } : {}),
+    ...(opts.devPort === undefined ? {} : { devPort: opts.devPort }),
+    // Even the recommended one, unlike the defaults above: without the flag, a
+    // policy file `--force` keeps keeps its own minimum.
+    ...(opts.passwordMinLength === undefined
+      ? {}
+      : { passwordMinLength: opts.passwordMinLength ?? 0 }),
+    ...sso,
+    ...(opts.server === null ? {} : { server: opts.server ?? "local" }),
+  };
 }
 
 /** Whether `--sso` names a provider this CLI offers. */
@@ -314,17 +312,15 @@ const isKnownSsoName = (name: string): boolean => {
 
 /**
  * Retry options straight from parsed flags, for failures before the wizard
- * resolves answers. `--non-interactive` is echoed only when explicitly passed
- * — TTY/JSON-inferred non-interactivity re-infers itself on the retry.
+ * resolves answers. How the run answered (`--non-interactive`) is not carried:
+ * a suggested command never says it, and it re-infers itself on the retry.
  */
 export function retryOptionsFromFlags(flags: {
-  cwd?: string;
   framework?: string;
   preset?: string;
   useCase?: string;
   renderer?: string;
   devPort?: number;
-  nonInteractive?: boolean;
   passwordMinLength?: PasswordMinLength;
   sso?: string;
   ssoClientId?: string;
@@ -353,23 +349,17 @@ export function retryOptionsFromFlags(flags: {
   }
   // What was typed for a provider this run knows, kept when it cannot become a
   // selection yet, so a retry reproduces it.
-  const typed =
+  const typed: SsoFlags | undefined =
     selection === undefined && flags.sso !== undefined && isKnownSsoName(flags.sso)
-      ? [Cmd.option("--sso", flags.sso), flagText(customSettingsOf(flags), SETUP_FLAG_NAMES)]
-          .filter((part) => {
-            return part !== "";
-          })
-          .join(" ")
+      ? { sso: flags.sso, ...ssoSettingFlags(customSettingsOf(flags)) }
       : undefined;
   return {
     ssoTyped: typed,
     framework: flags.framework,
     preset: flags.preset as SetupPreset | undefined,
     useCase: flags.useCase as SetupUseCase | undefined,
-    cwd: flags.cwd,
     renderer: flags.renderer,
     devPort: flags.devPort,
-    nonInteractive: Boolean(flags.nonInteractive),
     passwordMinLength: flags.passwordMinLength,
     // The provider survives on its own. A suggested retry carries `--sso`
     // without `--sso-client-id` -- the id is never put in command text -- so
@@ -382,27 +372,23 @@ export function retryOptionsFromFlags(flags: {
 }
 
 /**
- * The providers a setup retry cannot carry, and how to restore them.
+ * How to finish what a rerun will not. Setup configures one provider, so a run
+ * that chose several needs the rest enabled afterwards: this is the hint
+ * saying so and an `auth-method sso enable` for each one left.
  *
  * `--sso` names one provider and makes the rerun skip the multi-select, so
  * every other provider chosen would be lost unless it is restored explicitly.
  * Both recovery paths need this -- the one before the wizard and the one for a
- * failed project creation -- and the second was missed when this was written
- * inline, which is exactly the kind of thing one copy prevents.
- */
-/** `--cwd` for a suggested command, when setup was pointed at a directory. */
-export function cwdArg(retry: SetupRetryOptions): string {
-  return retry.cwd === undefined ? "" : ` ${Cmd.option("--cwd", retry.cwd)}`;
-}
-
-/**
- * How to finish what a rerun will not. Setup configures one provider, so a run
- * that chose several needs the rest enabled afterwards: this is the hint
- * saying so and an `auth-method sso enable` for each one left.
+ * failed project creation.
+ *
+ * @param retry - What the run was given and resolved.
+ * @param suggest - Renders a suggestion for the run that reports it, which
+ *   pins the project setup creates (`--env-file`) as every recovery does.
+ * @returns The hint, and the commands that enable the providers left.
  */
 export function ssoRecovery(
   retry: SetupRetryOptions,
-  cliVersion: string,
+  suggest: Suggest,
 ): { hint: string; commands: SuggestedCommand[] } {
   const chosen = retry.sso ?? [];
   const remaining = chosen.slice(1);
@@ -416,30 +402,23 @@ export function ssoRecovery(
     hint:
       `The rerun configures ${chosen[0] ? providerOf(chosen[0]).slug : ""} only; add the rest with the auth-method sso enable ` +
       "commands below, which ask for each client id. ",
-    // The client id is not interpolated into the command. These strings are
-    // run verbatim, especially by agents, and nothing escapes them for a
-    // shell: a value the wizard accepted -- it only refuses an empty one --
-    // could split into two arguments or carry a metacharacter that changes
-    // what the command does. `auth-method sso enable` asks for the id, exactly as it asks
-    // for the secret, which was never put in command text for the same
-    // reason.
-    // localRecoverySelector carries `--server local`, as the setup retry
-    // pins it. An unpinned `auth-method sso enable`
-    // takes its server from `ZITADEL_URL`, so with that variable set to
-    // another server it would publish the client id and secret there --
-    // leaving the local provider unconfigured and the credentials somewhere
-    // nobody asked for. Both callers of this are local-server failures, so
-    // `local` is the server meant in every case.
+    // The client id is not given. These commands are run verbatim, especially by
+    // agents: `auth-method sso enable` asks for the id, exactly as it asks for
+    // the secret, which is never put in command text for the same reason.
     //
-    // `--env-file .env.development.local` pins the project and credential too:
-    // `auth-method sso enable` is an EnvironmentCommand that resolves those from the
-    // environment, where the process environment outranks the `.env` files, so
-    // in a shell holding production values `--server local` alone would send
-    // the production token to the local server. `--env-file` outranks the
-    // process environment (unlike `--env`), so it is the one that forces the
-    // generated development credential the local project actually expects.
+    // `--server local` is given too, as the setup retry pins it. An unpinned
+    // `auth-method sso enable` takes its server from `ZITADEL_URL`, so with that
+    // variable set to another server it would publish the client id and secret
+    // there -- leaving the local provider unconfigured and the credentials
+    // somewhere nobody asked for. Both callers of this are local-server
+    // failures, so `local` is the server meant in every case. The run's scope
+    // pins the project and credential (`--env-file .env.development.local`, which
+    // outranks the process environment, unlike `--env`), so `--server local`
+    // alone cannot send a production token to the local server.
     commands: remaining.map((selection) => {
-      return projectCommand(ssoEnableArgs(selection), localRecoverySelector(retry.cwd), cliVersion);
+      return suggest("auth-method:sso:enable", {
+        flags: { ...ssoEnableFlags(selection), server: "local" },
+      });
     }),
   };
 }
@@ -471,7 +450,7 @@ const NO_LOCAL_SERVER_REFUSAL: Refusal = {
   hint:
     "{reason}Start local Zitadel first, then rerun setup. {scripting}{recovery}" +
     "After setup succeeds, follow its next_commands to start the app and verify registration, logout, and login in the browser.",
-  next: ["start", "{setup}"],
+  next: [suggestion("start"), "{setup}"],
 };
 
 /** How a `--cwd` that is a file, or lies under one, is refused. */
@@ -545,9 +524,6 @@ export type SetupPreflight = Readonly<{
   configured: boolean;
 }>;
 
-/** How the preflight turns a command it names into one the reader can run. */
-type Suggest = (command: string) => SuggestedCommand;
-
 /** The flags setup's preflight reads. */
 type PreflightFlags = Readonly<{
   git?: boolean;
@@ -579,27 +555,20 @@ async function resolveSetupServer(
       throw error;
     }
     const retry = retryOptionsOf(flags);
-    const recovery = ssoRecovery(retry, meta.cliVersion);
-    throw refusalError(
-      NO_LOCAL_SERVER_REFUSAL,
-      {
-        reason: normalized.hint ? `${normalized.hint} ` : "",
-        scripting:
-          retry.sso && retry.sso.length > 0
-            ? "The rerun asks for the client id and secret, because a command carries neither. " +
-              "To script it instead, add --sso-client-id and --non-interactive, and pipe the secret in. "
-            : "",
-        recovery:
-          recovery.commands.length > 0
-            ? `${recovery.hint}${recovery.commands.join(" ")} `
-            : recovery.hint,
-        setup: `setup ${setupRetryFlags({
-          ...retry,
-          cwd: undefined,
-        })}`,
-      },
-      suggest,
-    );
+    const recovery = ssoRecovery(retry, suggest);
+    throw refusalError(NO_LOCAL_SERVER_REFUSAL, {
+      reason: normalized.hint ? `${normalized.hint} ` : "",
+      scripting:
+        retry.sso && retry.sso.length > 0
+          ? "The rerun asks for the client id and secret, because a command carries neither. " +
+            "To script it instead, add --sso-client-id and --non-interactive, and pipe the secret in. "
+          : "",
+      recovery:
+        recovery.commands.length > 0
+          ? `${recovery.hint}${recovery.commands.join(" ")} `
+          : recovery.hint,
+      setup: suggestion("setup", { flags: setupRetryFlags(retry) }),
+    });
   }
 }
 
@@ -651,7 +620,6 @@ function refuseWorktree(state: WorktreeState): void {
 async function refuseOtherReleasesServer(
   flags: PreflightFlags,
   meta: GlobalOptions,
-  suggest: Suggest,
 ): Promise<void> {
   const nearest = await readNearestRuntimeMetadata(meta.cwd).catch(() => {
     return undefined;
@@ -669,30 +637,20 @@ async function refuseOtherReleasesServer(
   ) {
     return;
   }
-  const start = nearest.dir === meta.cwd ? "start" : `start ${Cmd.option("--cwd", nearest.dir)}`;
-  throw refusalError(
-    SERVER_VERSION_REFUSAL,
-    {
-      running: runtime.server_version,
-      expected,
-      serverUrl: runtime.server_url,
-      start,
-      where:
-        nearest.dir === meta.cwd
-          ? ""
-          : `Run start in ${nearest.dir}, where the server was started. `,
-      setup: `setup ${setupRetryFlags({
-        ...retryOptionsOf(flags),
-        cwd: undefined,
-      })}`,
-    },
-    (command) => {
-      // The start command names the server's own directory, so the typed --cwd is not added.
-      return command === start && nearest.dir !== meta.cwd
-        ? unscopedCommand(command, meta.cliVersion)
-        : suggest(command);
-    },
-  );
+  // The start command names the server's own directory, so the typed --cwd is not added.
+  const start =
+    nearest.dir === meta.cwd
+      ? suggestion("start")
+      : suggestion("start", { flags: { cwd: nearest.dir } });
+  throw refusalError(SERVER_VERSION_REFUSAL, {
+    running: runtime.server_version,
+    expected,
+    serverUrl: runtime.server_url,
+    start,
+    where:
+      nearest.dir === meta.cwd ? "" : `Run start in ${nearest.dir}, where the server was started. `,
+    setup: suggestion("setup", { flags: setupRetryFlags(retryOptionsOf(flags)) }),
+  });
 }
 
 /**
@@ -732,7 +690,7 @@ export async function setupPreflight(
   if (flags.git !== false) {
     refuseWorktree(await inspectWorktree(meta.cwd));
   }
-  await refuseOtherReleasesServer(flags, resolved, suggest);
+  await refuseOtherReleasesServer(flags, resolved);
   return {
     server,
     configured,
@@ -777,7 +735,7 @@ export type SetupFlagsToCheck = Readonly<{
 const DESIGN_REMOVED_REFUSAL: Refusal = {
   message: "setup no longer applies a login template, so --design was removed",
   hint: `Rerun setup without --design. ${PAGE_LAYOUT_HINT} To own the widget's structure after setup, eject one of: ${BRANDING_DESIGNS.join(", ")}.`,
-  next: ["branding eject"],
+  next: [suggestion("branding:eject")],
 };
 
 const CLIENT_ID_NEEDS_SSO_REFUSAL: Refusal = {
@@ -828,13 +786,9 @@ function whereToRegister(flags: SetupFlagsToCheck, provider: string): string {
  * says nobody can be asked; a person at a terminal is asked for what is
  * missing instead.
  */
-export function refuseUnusableFlags(
-  flags: SetupFlagsToCheck,
-  scripted: boolean,
-  suggest: (command: string) => SuggestedCommand,
-): void {
+export function refuseUnusableFlags(flags: SetupFlagsToCheck, scripted: boolean): void {
   if (flags.design !== undefined) {
-    throw refusalError(DESIGN_REMOVED_REFUSAL, {}, suggest);
+    throw refusalError(DESIGN_REMOVED_REFUSAL, {});
   }
   if (flags.ssoClientId !== undefined && flags.sso === undefined) {
     throw refusalError(CLIENT_ID_NEEDS_SSO_REFUSAL, {});
@@ -1009,23 +963,15 @@ const SET_UP_TITLE = "Set up Zitadel in this app";
 const WOULD_SET_UP_TITLE = "Would set up Zitadel in this app (dry run)";
 
 /**
- * The selector appended to setup's credential-recovery commands. `variable set`
- * is an `EnvironmentCommand` that resolves the project and server from the
- * environment, where the process environment outranks the `.env` files — so a
- * bare retry in a shell holding production values would publish to the wrong
- * project. Pinning `--env-file .env.development.local` (the file setup wrote)
- * forces the local project the recovery is for, because `--env-file` outranks
- * the process environment (unlike `--env`); same reasoning as the SSO recovery.
+ * The env file setup writes for the CLI's own commands. Every command setup
+ * suggests that resolves an environment is pinned to it: `variable set` and the
+ * like resolve the project and server from the environment, where the process
+ * environment outranks the `.env` files, so a bare retry in a shell holding
+ * production values would publish to the wrong project. `--env-file` outranks
+ * the process environment (unlike `--env`), so it forces the project setup
+ * created.
  */
-function recoverySelector(cwd: string | undefined): EnvironmentSelector {
-  // `--cwd` too, as typed, and the file under it: `--env-file` is read from
-  // the shell's directory, so a recovery run from where setup was launched
-  // reads the file setup wrote.
-  return environmentSelectorSuffix({
-    envFile: projectEnvFile(cwd, ".env.development.local"),
-    cwd,
-  });
-}
+const RECOVERY_ENV_FILE = ".env.development.local";
 
 /** `zitadel setup` — create a project and scaffold local auth.
  *
@@ -1082,7 +1028,7 @@ export function readPort(value: string): Parsed<number> {
  * An interactive setup ends with a note about the Zitadel agent skills, shown
  * once per machine; set `NO_SKILLS_PROMPT=1` to hide it.
  */
-export default class Setup extends Suggestible(Destructive(BaseCommand)) {
+export default class Setup extends Destructive(BaseCommand) {
   static override description =
     "Create a Zitadel project and scaffold local auth. An interactive setup ends with a note about the Zitadel agent skills, shown once per machine; set NO_SKILLS_PROMPT=1 to hide it.";
   static override group = CommandGroups.gettingStarted;
@@ -1207,13 +1153,36 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
     resolveServer: false,
   };
 
+  /**
+   * The server a recovery names instead of the env file, for a project setup
+   * moved to another port that has no env file to pin.
+   */
+  private recoveryServer: string | undefined;
+
+  /**
+   * What every command setup suggests is pinned to: the env file setup wrote,
+   * so a follow-up reaches the project setup created and not one the shell's
+   * environment names, and `--cwd` as typed, so it works from wherever it is
+   * run (`--env-file` is read from the shell's directory, so the file is named
+   * under `--cwd`). A command that resolves no environment takes only the
+   * directory.
+   *
+   * @returns The scope.
+   */
+  protected override scope(): Scope {
+    const { cwd } = super.scope();
+
+    return {
+      ...(cwd === undefined ? {} : { cwd }),
+      ...(this.recoveryServer === undefined
+        ? { envFile: projectEnvFile(cwd, RECOVERY_ENV_FILE) }
+        : { server: this.recoveryServer }),
+    };
+  }
+
   protected async execute({ flags }: Admitted<typeof Setup>): Promise<JsonEnvelope> {
-    refuseUnusableFlags(flags, this.nonInteractive, (next) => {
-      return this.suggest(next);
-    });
-    const preflight = await setupPreflight(flags, this.meta, (next) => {
-      return this.suggest(next);
-    });
+    refuseUnusableFlags(flags, this.nonInteractive);
+    const preflight = await setupPreflight(flags, this.meta, this.suggester);
     this.meta = {
       ...this.meta,
       source: preflight.server.value,
@@ -1222,7 +1191,7 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
       // An app already set up has nothing left to scaffold, but an explicit
       // --dev-port is how it moves to another port.
       if (flags.devPort !== undefined) {
-        return this.moveToDevPort(this.cwd, flags.cwd, flags.devPort, this.dryRun);
+        return this.moveToDevPort(this.cwd, flags.devPort, this.dryRun);
       }
 
       const skippedHost = hostUnlessDefault(preflight.server.value);
@@ -1267,7 +1236,7 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
       this.nonInteractive,
       this.dryRun,
       wizardQuestions,
-      this.cliVersion,
+      this.suggester,
     );
 
     const orca = createOrca();
@@ -1311,7 +1280,6 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
           await resolveScaffoldFramework(flags.framework, this.nonInteractive, orca, {
             retry: retryOptionsOf(flags),
             serverFlag: this.meta.serverFlag,
-            cliVersion: this.cliVersion,
             ask: wizardQuestions,
           }),
         );
@@ -1373,9 +1341,7 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
         id: app.framework,
         displayName: orca.displayName(app.framework),
       },
-      suggest: (args: string) => {
-        return projectCommand(args, recoverySelector(flags.cwd), this.cliVersion);
-      },
+      suggest: this.suggester,
       cwd: this.cwd,
       frameworkChosen: scaffoldedFramework || flags.framework !== undefined,
       serverFlag: this.meta.serverFlag,
@@ -1399,9 +1365,7 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
         portInUseWarning(
           answers.devPort,
           await LocalServer.nextFreePort(answers.devPort),
-          (args) => {
-            return this.suggest(args);
-          },
+          this.suggester,
         ),
       );
     }
@@ -1549,7 +1513,7 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
         : await createProjectWithLocalHint(
             unauthClient,
             answers.server,
-            this.cliVersion,
+            this.suggester,
             projectName,
             issuer,
             retry,
@@ -1613,7 +1577,7 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
               filesWritten: [],
               passwordMinLength: signInOf(answers).password_min_length,
             }
-          : await this.writeConfiguration(answers, project, recoverySelector(flags.cwd));
+          : await this.writeConfiguration(answers, project);
       } catch (error) {
         // Setup is not atomic: the patcher already wrote `zitadel.json` (the
         // marker the already-initialized guard skips on) and `.zitadel/secret`.
@@ -1628,15 +1592,21 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
         await removeSetupMarkers(this.cwd);
         await restoreCredentialEnvFiles(this.cwd, envFilesBefore);
         const cause = toZitadelError(error);
-        const rerun = `setup ${setupRetryFlags({
+        const rerun = setupRetryFlags({
           ...retry,
-          cwd: undefined,
           server: this.meta.serverFlag ?? null,
-        })}`;
+        });
         throw new ZitadelError(cause.code, `Default configuration setup failed: ${cause.message}`, {
-          hint: this.configurationFailureHint(cause, newApp !== undefined, rerun),
+          hint: this.configurationFailureHint(
+            cause,
+            newApp !== undefined,
+            this.suggest("setup", { flags: rerun }),
+          ),
           nextCommands:
-            cause.nextCommands ?? (newApp === undefined ? [this.suggest(`${rerun} --force`)] : []),
+            cause.nextCommands ??
+            (newApp === undefined
+              ? [this.suggest("setup", { flags: { ...rerun, force: true } })]
+              : []),
           details: cause.details,
         });
       }
@@ -1737,10 +1707,10 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
               `${answer.endpoints.issuer}, not the provider`,
           );
         }
-        reportClientIdOutcome(idVariable, clientId, this.cliVersion, recoverySelector(flags.cwd));
+        reportClientIdOutcome(idVariable, clientId, this.suggester);
         // The wizard refuses an empty secret, so a deferred publish here only
         // ever means there was no project to publish to.
-        reportSecretOutcome(secret, this.cliVersion, false, recoverySelector(flags.cwd));
+        reportSecretOutcome(secret, false, this.suggester);
       }
     }
 
@@ -1770,7 +1740,6 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
     }
 
     const installOutcome = await installDependenciesForSetup({
-      cliVersion: this.cliVersion,
       cwd: this.cwd,
       ...(flags.cwd === undefined ? {} : { cwdFlag: flags.cwd }),
       depsAdded: result.depsAdded,
@@ -1778,7 +1747,7 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
       env: this.env,
       issuer,
       json: this.isJson,
-      selector: recoverySelector(flags.cwd),
+      suggest: this.suggester,
       scaffoldedFramework,
       skipInstall: Boolean(flags.skipInstall),
       task: (label, work, done) => {
@@ -1804,11 +1773,10 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
       server: answers.server,
       project,
       dryRun: this.dryRun,
-      selector: recoverySelector(flags.cwd),
     });
     // A failed deploy leaves the project with no release, so the deploy that
     // fixes it leads both surfaces.
-    const deployCommand = projectCommand(DEPLOY_ARGS, recoverySelector(flags.cwd), this.cliVersion);
+    const deployCommand = this.suggest("deploy", { flags: { message: WHAT_CHANGED } });
     const deployStep =
       deployment === undefined && !this.dryRun
         ? {
@@ -1925,9 +1893,9 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
         (isLocal && (this.dryRun || hostsPlatform)));
     const claimNudge = nudgeClaim
       ? {
-          actions: [claimAction(this.cliVersion, deadline, recoverySelector(flags.cwd))],
-          boxActions: [claimBoxAction(this.cliVersion, deadline, recoverySelector(flags.cwd))],
-          commands: [claimCommand(this.cliVersion, recoverySelector(flags.cwd))],
+          actions: [claimAction(this.suggester, deadline)],
+          boxActions: [claimBoxAction(this.suggester, deadline)],
+          commands: [claimCommand(this.suggester)],
         }
       : {
           actions: [],
@@ -1959,11 +1927,7 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
         };
     // A run that skipped social sign-in says how to add it later, the way
     // `consoleStep` says how to open the console.
-    const ssoCommand = projectCommand(
-      "auth-method sso enable --provider google",
-      recoverySelector(flags.cwd),
-      this.cliVersion,
-    );
+    const ssoCommand = this.suggest("auth-method:sso:enable", { flags: { provider: "google" } });
     const ssoStep =
       answers.sso.length === 0
         ? {
@@ -1981,6 +1945,9 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
             boxActions: [],
             commands: [] as SuggestedCommand[],
           };
+    // This run again without `--dry-run`, with every other flag as typed, which
+    // is what a preview's one follow-up is.
+    const realRun = this.dryRun ? await this.realRun() : undefined;
     // The structured report is human-only. Under `--json` we let the
     // envelope returned from `this.emit(...)` be the sole stdout
     // payload (oclif requires single-doc JSON).
@@ -2013,7 +1980,7 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
         ...consoleStep.boxActions,
         ...ssoStep.boxActions,
         ...claimNudge.boxActions,
-        ...(this.dryRun ? [{ text: "Set it up for real:", command: this.setupForReal() }] : []),
+        ...(realRun === undefined ? [] : [{ text: "Set it up for real:", command: realRun }]),
       ];
       const connectionLines = planned.connections.flatMap((entry) => {
         const connection = entry.connection;
@@ -2211,7 +2178,7 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
         actions: [
           ...deployStep.actions,
           ...installOutcome.nextActions,
-          brandingGuidanceAction(this.cliVersion),
+          brandingGuidanceAction(this.suggester),
           ...consoleStep.actions,
           ...ssoStep.actions,
           ...claimNudge.actions,
@@ -2237,38 +2204,19 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
                 },
               ];
             }),
-            this.cliVersion,
-            recoverySelector(flags.cwd),
+            this.suggester,
           ),
           ...deployStep.commands,
           ...installOutcome.nextCommands,
           ...consoleStep.commands,
           ...ssoStep.commands,
-          ...(this.dryRun ? [this.setupForReal()] : []),
+          ...(realRun === undefined ? [] : [realRun]),
           ...claimNudge.commands,
         ],
       },
       // The box holds the next steps, so the base command does not repeat them.
       nextShown: this.isJson ? undefined : asStepsShown(),
     });
-  }
-
-  /**
-   * This run again without `--dry-run`, with every other flag as typed, which
-   * is what a preview's one follow-up is. A server URL's credentials are left
-   * out, as a suggested command is pasted somewhere they should not be.
-   */
-  private setupForReal(): SuggestedCommand {
-    return this.retryCommand([
-      "setup",
-      ...this.argv
-        .filter((word) => {
-          return word !== "--dry-run";
-        })
-        .map((word) => {
-          return word.replace(/(\w+:\/\/)[^/?#\s]*@/g, "$1");
-        }),
-    ]);
   }
 
   /**
@@ -2289,7 +2237,7 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
   private configurationFailureHint(
     cause: ZitadelError,
     removedNewApp: boolean,
-    rerun: string,
+    rerun: SuggestedCommand,
   ): string {
     if (removedNewApp) {
       const removed =
@@ -2305,7 +2253,7 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
     }
     return (
       "The project was created but its default configuration (schema, login flow, " +
-      `password and sign-up policies) was not all written. Rerun ${this.suggest(rerun)} to start over; ` +
+      `password and sign-up policies) was not all written. Rerun ${rerun} to start over; ` +
       "--force overwrites the schema and flow files setup scaffolds and keeps an " +
       "existing password or sign-up policy file. It does not cover a connection under .zitadel/idps/ -- those are " +
       "yours, so setup never replaces or removes one; delete it to scaffold a fresh " +
@@ -2367,7 +2315,6 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
    * @param answers - What to scaffold.
    * @param project - The project just created, whose server is asked whether
    *   it takes a sign-up policy.
-   * @param selector - Pins the deploy the sign-up policy warning suggests.
    * @returns The absolute paths written, and the minimum password length the
    *   policy holds.
    * @throws {@link ZitadelError} With `E_CONFLICT` when a file setup will not
@@ -2377,14 +2324,13 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
   private async writeConfiguration(
     answers: SetupAnswers,
     project: CreatedProject,
-    selector: EnvironmentSelector,
   ): Promise<ScaffoldedConfiguration> {
     const signupPolicy = await this.serverTakesSignupPolicy(answers.server, project);
     const scaffold = await scaffoldOf(this.cwd, this.force, answers, signupPolicy);
     if (!signupPolicy) {
       reportWarning(
         scaffold.signupPolicy === undefined
-          ? `The server does not take a sign-up policy yet, so setup wrote none. Upgrade the server, then add ${SignupPolicy.PATH} and run ${projectCommand(DEPLOY_ARGS, selector, this.cliVersion)}.`
+          ? `The server does not take a sign-up policy yet, so setup wrote none. Upgrade the server, then add ${SignupPolicy.PATH} and run ${this.suggest("deploy", { flags: { message: WHAT_CHANGED } })}.`
           : `The server does not take a sign-up policy yet, so every deploy fails while ${SignupPolicy.PATH} is there. Upgrade the server, or move the file out of ${CONFIG_DIRECTORIES.policies}/ until you do.`,
       );
     }
@@ -2494,7 +2440,6 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
     server: string;
     project: CreatedProject;
     dryRun: boolean;
-    selector: EnvironmentSelector;
   }): Promise<InitialDeployment | undefined> {
     if (opts.dryRun) {
       this.ui
@@ -2520,9 +2465,7 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
         narrate: (notices) => {
           this.narrate(notices);
         },
-        suggest: (args) => {
-          return projectCommand(args, opts.selector, this.cliVersion);
-        },
+        suggest: this.suggester,
       });
       deploying.done(
         `Deployed ${escapeControlCharacters(abbreviate(deployment.contentHash))} to ${deployment.origins.length} ${new Intl.PluralRules("en").select(deployment.origins.length) === "one" ? "origin" : "origins"}`,
@@ -2534,7 +2477,7 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
       }
       deploying.done("Left .zitadel/ undeployed");
       reportWarning(
-        `The project was set up but its first deploy failed: ${toZitadelError(error).message}. Run ${projectCommand(DEPLOY_ARGS, opts.selector, this.cliVersion)} to publish .zitadel/.`,
+        `The project was set up but its first deploy failed: ${toZitadelError(error).message}. Run ${this.suggest("deploy", { flags: { message: WHAT_CHANGED } })} to publish .zitadel/.`,
       );
       return undefined;
     }
@@ -2546,7 +2489,6 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
    */
   private async moveToDevPort(
     cwd: string,
-    typedCwd: string | undefined,
     devPort: number,
     dryRun: boolean,
   ): Promise<JsonEnvelope> {
@@ -2592,34 +2534,31 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
     // Pinned to the project just moved, as the other recoveries are: its env
     // file, or the server the move used for a project setup gave none, never
     // what the shell has exported.
-    const selector = (await access(join(cwd, ".env.development.local")).then(
+    const hasEnvFile = await access(join(cwd, RECOVERY_ENV_FILE)).then(
       () => {
         return true;
       },
       () => {
         return false;
       },
-    ))
-      ? recoverySelector(typedCwd)
-      : environmentSelectorSuffix({
-          server,
-          cwd: typedCwd,
-        });
+    );
+    if (!hasEnvFile) {
+      this.recoveryServer = server;
+    }
     // Not setup again: the app is on the new port by now, so a rerun moves
     // nothing and never reaches the old origin.
     const cleanup =
       move.refused && move.staleOrigin !== undefined
-        ? projectCommand(
-            `origin rm ${Cmd.quote(move.staleOrigin)} --force`,
-            selector,
-            this.cliVersion,
-          )
+        ? this.suggest("origin:rm", {
+            args: { pattern: move.staleOrigin },
+            flags: { force: true },
+          })
         : undefined;
     // The new origin serves nothing until a deployment names it.
     const deploy =
       move.undeployed === undefined
         ? undefined
-        : projectCommand(DEPLOY_ARGS, selector, this.cliVersion);
+        : this.suggest("deploy", { flags: { message: WHAT_CHANGED } });
     if (deploy !== undefined) {
       reportWarning(
         `${move.issuer} serves nothing until the next deploy: ${move.undeployed}. Run ${deploy}.`,
@@ -2665,7 +2604,7 @@ export default class Setup extends Suggestible(Destructive(BaseCommand)) {
         ...(deploy === undefined && cleanup === undefined && !dryRun
           ? {}
           : {
-              commands: [deploy, cleanup, dryRun ? this.setupForReal() : undefined].filter(
+              commands: [deploy, cleanup, dryRun ? await this.realRun() : undefined].filter(
                 (command) => {
                   return command !== undefined;
                 },
@@ -2706,7 +2645,7 @@ async function resolveScaffoldFramework(
   framework: string | undefined,
   nonInteractive: boolean,
   orca: Orca,
-  guidance: { retry: SetupRetryOptions; serverFlag?: string; cliVersion: string; ask: Questions },
+  guidance: { retry: SetupRetryOptions; serverFlag?: string; ask: Questions },
 ): Promise<string> {
   if (framework) {
     return framework;
@@ -2728,13 +2667,12 @@ async function resolveScaffoldFramework(
       nextCommands:
         guidance.serverFlag === "local" && suggested
           ? [
-              unscopedCommand(
-                `setup ${setupRetryFlags({
+              suggestion("setup", {
+                flags: setupRetryFlags({
                   ...guidance.retry,
                   framework: suggested,
-                })}`,
-                guidance.cliVersion,
-              ),
+                }),
+              }),
             ]
           : [],
       details: { frameworks: choices },
@@ -2794,6 +2732,13 @@ async function removeSetupMarkers(cwd: string): Promise<void> {
  * The name of the README setup writes into each configuration directory.
  */
 const README = "README.md";
+
+/**
+ * The client id a suggested `setup` leaves for the reader to fill in. It is a
+ * placeholder for a client id, so it stands as the type the flag parses to
+ * though it is not one a provider issued.
+ */
+const ID_TO_FILL_IN = "<id>" as ClientId;
 
 /**
  * What setup's default configuration left behind.
@@ -2931,7 +2876,7 @@ function connectionRefusal(path: string, selection: ProviderSelection): ZitadelE
       "A connection file is yours to keep, so setup never replaces or removes one. " +
       "Remove it and run setup again to scaffold a fresh one, or keep it and enable the " +
       "provider afterwards to reuse it.",
-    nextCommands: [unscopedCommand(ssoEnableArgs(selection))],
+    nextCommands: [suggestion("auth-method:sso:enable", { flags: ssoEnableFlags(selection) })],
     details: { file: path },
   });
 }
@@ -3047,7 +2992,7 @@ export async function ssoFromFlags(
   nonInteractive: boolean,
   dryRun: boolean,
   ask: Questions,
-  cliVersion: string,
+  suggest: Suggest,
 ): Promise<SsoDraft | undefined> {
   const customValues = customSettingsOf(flags);
   if (flags.sso === undefined) {
@@ -3098,13 +3043,10 @@ export async function ssoFromFlags(
     stdin: true,
     // A concrete rerun for an agent, never carrying the value: the secret is
     // piped from the caller's own environment.
-    retry: inShell(
-      unscopedCommand(
-        `setup ${Cmd.option("--sso", flags.sso)} --sso-client-id '<id>' ...`,
-        cliVersion,
-      ),
-      { before: `printf '%s' "$CLIENT_SECRET" | ` },
-    ),
+    retry: inShell(suggest("setup", { flags: { sso: flags.sso, ssoClientId: ID_TO_FILL_IN } }), {
+      before: `printf '%s' "$CLIENT_SECRET" | `,
+      after: " ...",
+    }),
   });
   return {
     selection,
@@ -3153,7 +3095,7 @@ function ssoCredentialPublisher(
 async function createProjectWithLocalHint(
   client: ReturnType<typeof createZitadelClient>,
   server: string,
-  cliVersion: string,
+  suggest: Suggest,
   projectName: string,
   issuer: string,
   retry: SetupRetryOptions,
@@ -3176,18 +3118,14 @@ async function createProjectWithLocalHint(
     });
   } catch (error) {
     const normalized = toZitadelError(error);
-    const retryFlags = setupRetryFlags(retry);
-    const sso = ssoRecovery(retry, cliVersion);
+    const retryCommand = suggest("setup", { flags: setupRetryFlags(retry) });
+    const sso = ssoRecovery(retry, suggest);
     throw new ZitadelError(normalized.code, normalized.message, {
       hint:
         `${normalized.hint ? `${normalized.hint} ` : ""}` +
         "If you meant to use a local Zitadel server, start it first " +
-        `and retry setup with ${retryFlags}. ${sso.hint}`.trimEnd(),
-      nextCommands: [
-        unscopedCommand(`start${cwdArg(retry)}`, cliVersion),
-        unscopedCommand(`setup ${retryFlags}`, cliVersion),
-        ...sso.commands,
-      ],
+        `and retry setup with the commands below. ${sso.hint}`.trimEnd(),
+      nextCommands: [suggest("start"), retryCommand, ...sso.commands],
       details: {
         server,
         original: normalized.details,
@@ -3249,14 +3187,10 @@ function describeWrittenFile(relPath: string, dryRun: boolean): string | null {
  * that moves the app to `free`. With no free port among the next ones it names
  * only the flag: a placeholder in a suggested command is a shell redirection.
  */
-export function portInUseWarning(
-  port: number,
-  free: number | undefined,
-  suggest: (args: string) => SuggestedCommand,
-): string {
+export function portInUseWarning(port: number, free: number | undefined, suggest: Suggest): string {
   return free === undefined
     ? `Port ${port} and the ports after it are already in use. If that is not this app's dev server, run setup with --dev-port and a free port.`
-    : `Port ${port} is already in use. If that is not this app's dev server, run setup with a free port: ${suggest(`setup --dev-port ${free}`)}`;
+    : `Port ${port} is already in use. If that is not this app's dev server, run setup with a free port: ${suggest("setup", { flags: { devPort: free } })}`;
 }
 
 /**

@@ -80,7 +80,7 @@ export default class EnvList extends Tabulatable(EnvironmentCommand) {
 
     return this.emit(
       items.length === 0
-        ? { ...listed, next: { commands: [this.suggest("env add '<name>'")] } }
+        ? { ...listed, next: { commands: [this.suggest("env:add", { args: { name: "<name>" } })] } }
         : listed,
     );
   }

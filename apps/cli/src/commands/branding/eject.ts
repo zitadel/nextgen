@@ -19,10 +19,9 @@ import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "@/
 import { filled, reads } from "@/lib/oclif/flags";
 import { Promptable } from "@/lib/oclif/promptable";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
-import { Suggestible } from "@/lib/oclif/suggestible";
 import { hasZitadelConfig } from "@/lib/project";
 import { normalizePublicCliProse } from "@/lib/public-cli";
-import { DEPLOY_ARGS } from "@/lib/suggestion";
+import { suggestion, WHAT_CHANGED } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import {
   Branding,
@@ -42,7 +41,7 @@ const DESIGN_CATALOG = BRANDING_DESIGNS.join(", ");
 const NOT_A_PROJECT_REFUSAL: Refusal = {
   message: "This directory is not a Zitadel project",
   hint: "Run setup first; branding files live under .zitadel/.",
-  next: ["setup"],
+  next: [suggestion("setup")],
 };
 
 /**
@@ -53,7 +52,7 @@ const NOT_A_PROJECT_REFUSAL: Refusal = {
 const RETIRED_DESIGN_REFUSAL: Refusal = {
   message: "The {design} design was retired: it was page layout, not widget structure",
   hint: `${PAGE_LAYOUT_HINT} To own the widget's structure, eject one of: ${DESIGN_CATALOG}.`,
-  next: ["branding eject --design centered"],
+  next: [suggestion("branding:eject", { flags: { design: "centered" } })],
 };
 
 /**
@@ -112,7 +111,7 @@ function isRetiredDesign(value: string): boolean {
  * override ladder (docs/design/branding/override-ladder.md); unrelated to
  * `zitadel eject`, which removes the Zitadel integration.
  */
-export default class BrandingEject extends Suggestible(Promptable(BaseCommand)) {
+export default class BrandingEject extends Promptable(BaseCommand) {
   static override description =
     "Take ownership of the login template: scaffold .zitadel/branding/ from a shipped design.";
   static override group = CommandGroups.configuration;
@@ -138,14 +137,10 @@ export default class BrandingEject extends Suggestible(Promptable(BaseCommand)) 
 
   protected async execute({ flags }: Admitted<typeof BrandingEject>): Promise<JsonEnvelope> {
     if (flags.design !== undefined && !isBrandingDesign(flags.design)) {
-      throw refusalError(RETIRED_DESIGN_REFUSAL, { design: flags.design }, (next) => {
-        return this.suggest(next);
-      });
+      throw refusalError(RETIRED_DESIGN_REFUSAL, { design: flags.design });
     }
     if (!(await hasZitadelConfig(this.cwd))) {
-      throw refusalError(NOT_A_PROJECT_REFUSAL, {}, (next) => {
-        return this.suggest(next);
-      });
+      throw refusalError(NOT_A_PROJECT_REFUSAL, {});
     }
     // The checks above refused one that is not a design, so a value that got
     // here is either a design or absent, and absent is asked for.
@@ -204,7 +199,7 @@ export default class BrandingEject extends Suggestible(Promptable(BaseCommand)) 
       if (error instanceof FileExistsError) {
         throw new ZitadelError("E_CONFLICT", error.message, {
           hint: "Rerun with --force to replace it, or edit the existing file directly.",
-          nextCommands: [this.suggest(`branding eject --design ${design} --force`)],
+          nextCommands: [await this.again("branding:eject", { with: { design, force: true } })],
           details: error.details,
         });
       }
@@ -254,9 +249,7 @@ export default class BrandingEject extends Suggestible(Promptable(BaseCommand)) 
           ],
         },
         next: {
-          commands: [
-            this.suggest(`branding eject --design ${design}${this.force ? " --force" : ""}`),
-          ],
+          commands: [await this.again("branding:eject", { without: ["dryRun"], with: { design } })],
         },
       });
     }
@@ -285,7 +278,10 @@ export default class BrandingEject extends Suggestible(Promptable(BaseCommand)) 
           `Edit ${DEFAULT_BRANDING_TEMPLATE_PATH} — the login UI is yours now.`,
           "Validate the template and see the diff with a dry run, then publish it.",
         ],
-        commands: [this.suggest("deploy --dry-run"), this.suggest(DEPLOY_ARGS)],
+        commands: [
+          this.suggest("deploy", { flags: { dryRun: true } }),
+          this.suggest("deploy", { flags: { message: WHAT_CHANGED } }),
+        ],
       },
     });
   }

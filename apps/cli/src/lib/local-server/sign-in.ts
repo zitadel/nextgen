@@ -4,7 +4,7 @@ import { createZitadelClient, AuthAttemptService } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
 import type { LocalAdmin } from "./admin-credential";
 import { PLATFORM_PROJECT_ID, readPlatformRuntime } from "./runtime";
-import { unscopedCommand } from "@/lib/suggestion";
+import { suggestion } from "@/lib/suggestion";
 import { userAgent } from "@/lib/user-agent";
 
 /**
@@ -121,7 +121,7 @@ async function signIn(
         // `zitadel start` adopts a healthy running server untouched, so it
         // cannot fix this on its own: the server has to stop first.
         hint: "Stop it, then start it again so it boots with the platform project and the local admin.",
-        nextCommands: [unscopedCommand("stop"), unscopedCommand("start")],
+        nextCommands: [suggestion("stop"), suggestion("start")],
         details: { server_url: serverUrl },
       },
     );
@@ -176,6 +176,6 @@ async function signIn(
 function adminNotFound(): ZitadelError {
   return new ZitadelError("E_AUTH", "The local server could not find the local admin", {
     hint: "Check `zitadel logs` first: a server that failed the lookup reports it the same way. If the logs show no error, the local data directory predates the local admin — `zitadel reset --force` deletes the local data so `zitadel start` can import it again.",
-    nextCommands: [unscopedCommand("logs")],
+    nextCommands: [suggestion("logs")],
   });
 }

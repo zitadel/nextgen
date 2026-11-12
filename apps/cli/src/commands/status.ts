@@ -8,7 +8,6 @@ import {
   claimState,
   claimWindowClosedAction,
 } from "@/lib/claim-state";
-import { Cmd } from "@/lib/cmd";
 import { isCancellation } from "@/lib/errors";
 import {
   customizeAndPublishActions,
@@ -22,7 +21,6 @@ import {
 } from "@/lib/local-server/runtime";
 import { LocalServer } from "@/lib/local-server/server";
 import {
-  type Admitted,
   CommandGroups,
   type Connection,
   EnvironmentCommand,
@@ -38,13 +36,7 @@ import {
   readZitadelConfig,
   readZitadelSecret,
 } from "@/lib/project";
-import {
-  DEPLOY_ARGS,
-  type EnvironmentSelector,
-  projectCommand,
-  type SuggestedCommand,
-  unscopedCommand,
-} from "@/lib/suggestion";
+import { type Suggest, type SuggestedCommand, WHAT_CHANGED } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 
 /**
@@ -75,10 +67,9 @@ export default class Status extends EnvironmentCommand {
     });
   }
 
-  protected async execute({ flags }: Admitted<typeof Status>): Promise<JsonEnvelope> {
+  protected async execute(): Promise<JsonEnvelope> {
     const server = await LocalServer.at(this.cwd, {
       cliVersion: this.cliVersion,
-      selector: this.cwdSelector(),
     }).status();
     const serverLifecycle = server.lifecycle;
 
@@ -163,17 +154,8 @@ export default class Status extends EnvironmentCommand {
         overview: exploreAllCommands(this.cliVersion),
       },
       next: {
-        actions: nextActionsFor(project, users, this.cliVersion, this.environmentSelector()),
-        commands: nextCommandsFor(
-          serverLifecycle,
-          project,
-          users,
-          this.cliVersion,
-          this.environmentSelector(),
-          // `--cwd` as typed, for the follow-ups the selector does not carry: the
-          // runtime and the project files they act on live in that directory.
-          typeof flags.cwd === "string" ? ` ${Cmd.option("--cwd", flags.cwd)}` : "",
-        ),
+        actions: nextActionsFor(project, users, this.suggester),
+        commands: nextCommandsFor(serverLifecycle, project, users, this.suggester),
       },
     });
   }
@@ -333,11 +315,10 @@ async function detectUserPresence(connect: () => Promise<Connection>): Promise<U
 function nextActionsFor(
   project: ProjectStatus,
   users: UserPresence,
-  cliVersion: string,
-  // Appended to the `claim` the prose nudge quotes: the action text is a
-  // pasteable command, so it must carry the same environment selector the
-  // machine `next_commands` do, or a reader copying it retargets the project.
-  selector: EnvironmentSelector,
+  // Renders the `claim` the prose nudge quotes: the action text is a
+  // pasteable command, so it must carry the same scope the machine
+  // `next_commands` do, or a reader copying it retargets the project.
+  suggest: Suggest,
 ): string[] {
   if (project.lifecycle === "not-configured") {
     return project.environment === undefined && project.env_file === undefined
@@ -361,18 +342,17 @@ function nextActionsFor(
       ? project.claim.claimable
         ? [
             claimAction(
-              cliVersion,
+              suggest,
               project.claim.deadline === undefined ? undefined : new Date(project.claim.deadline),
-              selector,
             ),
           ]
-        : [claimWindowClosedAction(cliVersion, selector)]
+        : [claimWindowClosedAction(suggest)]
       : [];
   if (users === "none") {
     return [verifyLoginAction(project.issuer), ...claim];
   }
   if (users === "some") {
-    return [...customizeAndPublishActions(cliVersion, selector), ...claim];
+    return [...customizeAndPublishActions(suggest), ...claim];
   }
   return claim;
 }
@@ -381,39 +361,35 @@ function nextCommandsFor(
   serverLifecycle: string,
   project: ProjectStatus,
   users: UserPresence,
-  cliVersion: string,
-  // The `--env`/`--env-file`/`--server` suffix this run was invoked with (empty
-  // for the default environment). Carried into every project-scoped follow-up so
-  // an agent running them stays on the environment `status` reported, rather than
-  // silently falling back to the default development project.
-  selector: EnvironmentSelector,
-  cwdSuffix: string,
+  // Renders each follow-up with the `--env`/`--env-file`/`--server` and
+  // `--cwd` this run was invoked with, so an agent running them stays on the
+  // environment `status` reported, rather than silently falling back to the
+  // default development project.
+  suggest: Suggest,
 ): SuggestedCommand[] {
   const commands: SuggestedCommand[] = [];
   if (serverLifecycle !== "running") {
-    commands.push(unscopedCommand(`start${cwdSuffix}`, cliVersion));
+    commands.push(suggest("start"));
   }
   if (project.lifecycle === "not-configured" && project.environment !== undefined) {
-    commands.push(
-      unscopedCommand(`env add ${Cmd.quote(project.environment)}${cwdSuffix}`, cliVersion),
-    );
+    commands.push(suggest("env:add", { args: { name: project.environment } }));
   } else if (project.lifecycle === "not-configured") {
     if (project.env_file === undefined) {
-      commands.push(unscopedCommand(`setup --server local${cwdSuffix}`, cliVersion));
+      commands.push(suggest("setup", { flags: { server: "local" } }));
     }
   } else if (project.lifecycle === "orphaned-config") {
     commands.push(
-      unscopedCommand(`setup --force${cwdSuffix}`, cliVersion),
-      projectCommand("doctor --fix", selector, cliVersion),
+      suggest("setup", { flags: { force: true } }),
+      suggest("doctor", { flags: { fix: true } }),
     );
   } else {
-    commands.push(projectCommand("doctor", selector, cliVersion));
+    commands.push(suggest("doctor"));
     // Suggested even when the local record says the window has closed: the
     // record can be stale (claimed from another machine reads detached), and
     // `claim` is the safe reconciliation — the server checks the grant
     // before the window, so an attached project answers with a clean skip.
     if (project.claim?.kind === "detached") {
-      commands.push(claimCommand(cliVersion, selector));
+      commands.push(claimCommand(suggest));
     }
     if (users === "none") {
       // Staged like next_actions: before the first login is proven in a
@@ -421,9 +397,9 @@ function nextCommandsFor(
       // and the verify mission lives in next_actions. A full `deploy` joins
       // once users exist ("some") or when the probe can't tell ("unknown"
       // keeps the lifecycle-only behavior rather than withholding on no signal).
-      commands.push(projectCommand("deploy --dry-run", selector, cliVersion));
+      commands.push(suggest("deploy", { flags: { dryRun: true } }));
     } else {
-      commands.push(projectCommand(DEPLOY_ARGS, selector, cliVersion));
+      commands.push(suggest("deploy", { flags: { message: WHAT_CHANGED } }));
     }
   }
   return commands;

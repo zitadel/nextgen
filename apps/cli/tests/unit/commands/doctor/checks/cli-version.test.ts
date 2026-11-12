@@ -3,6 +3,7 @@ import { describe, expect } from "vitest";
 
 import { checkCliVersion } from "@/commands/doctor/checks/cli-version";
 import { it } from "@tests/helpers/fixtures";
+import { aSuggest } from "@tests/helpers/suggest";
 
 /**
  * Where the CLI asks npm for its newest release.
@@ -31,7 +32,11 @@ describe("checkCliVersion", () => {
     it("warns with the upgrade command", async ({ server, dir }) => {
       server.use(latestIs("2.0.0"));
 
-      const outcome = await checkCliVersion({ cliVersion: CURRENT, env: { XDG_CONFIG_HOME: dir } });
+      const outcome = await checkCliVersion({
+        cliVersion: CURRENT,
+        env: { XDG_CONFIG_HOME: dir },
+        suggest: aSuggest({}, CURRENT),
+      });
 
       expect(outcome).toMatchObject({
         name: "cli-version",
@@ -50,7 +55,7 @@ describe("checkCliVersion", () => {
       const outcome = await checkCliVersion({
         cliVersion: CURRENT,
         env: { XDG_CONFIG_HOME: dir },
-        typedCwd: "apps/web",
+        suggest: aSuggest({ cwd: "apps/web" }, CURRENT),
       });
 
       expect(outcome.details).toMatchObject({
@@ -62,7 +67,11 @@ describe("checkCliVersion", () => {
   it("passes on the latest release", async ({ server, dir }) => {
     server.use(latestIs(CURRENT));
 
-    const outcome = await checkCliVersion({ cliVersion: CURRENT, env: { XDG_CONFIG_HOME: dir } });
+    const outcome = await checkCliVersion({
+      cliVersion: CURRENT,
+      env: { XDG_CONFIG_HOME: dir },
+      suggest: aSuggest({}, CURRENT),
+    });
 
     expect(outcome).toMatchObject({ status: "pass" });
   });
@@ -74,7 +83,11 @@ describe("checkCliVersion", () => {
       }),
     );
 
-    const outcome = await checkCliVersion({ cliVersion: CURRENT, env: { XDG_CONFIG_HOME: dir } });
+    const outcome = await checkCliVersion({
+      cliVersion: CURRENT,
+      env: { XDG_CONFIG_HOME: dir },
+      suggest: aSuggest({}, CURRENT),
+    });
 
     expect(outcome).toMatchObject({
       status: "pass",
@@ -86,6 +99,7 @@ describe("checkCliVersion", () => {
     const outcome = await checkCliVersion({
       cliVersion: CURRENT,
       env: { XDG_CONFIG_HOME: dir, ZITADEL_UPDATE_CHECK: "0" },
+      suggest: aSuggest({}, CURRENT),
     });
 
     expect(outcome).toMatchObject({

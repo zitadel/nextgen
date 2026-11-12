@@ -51,7 +51,7 @@ describe("deployment list", () => {
 
     const { stderr } = await firstPagePiped(cwd);
 
-    expect(stderr).toContain("deployment list --limit 1 --page-token");
+    expect(stderr).toContain("deployment list --limit 1 --plain --page-token");
   });
 
   it("follows a cursor back as the server wrote it with --all", async () => {

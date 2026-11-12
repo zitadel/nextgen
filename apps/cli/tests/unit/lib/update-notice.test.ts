@@ -7,6 +7,7 @@ import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { updateNotice } from "@/lib/update-notice";
+import { aSuggest } from "@tests/helpers/suggest";
 
 const REGISTRY = "https://registry.npmjs.org/-/package/@zitadel%2fcli/dist-tags";
 
@@ -16,6 +17,7 @@ let dir: string;
 function notice(cliVersion: string, env: NodeJS.ProcessEnv = {}) {
   return updateNotice({
     cliVersion,
+    upgrade: aSuggest({}, cliVersion)("upgrade"),
     cwd: dir,
     env: { XDG_CONFIG_HOME: dir, ...env },
     columns: 80,

@@ -4,10 +4,10 @@ import { z } from "zod";
 import { ReleaseService } from "@/lib/backend";
 import { RevokeReleaseParams } from "@/lib/backend/schemas";
 import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
-import { Cmd } from "@/lib/cmd";
 import { Destructive } from "@/lib/oclif/destructive";
 import { mutatedData } from "@/lib/oclif/envelope";
 import { type Refused, taken } from "@/lib/oclif/flags";
+import { suggestion } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 
 /**
@@ -19,7 +19,7 @@ const RELEASE_ID: Refused<string> = {
   refusal: {
     message: "Invalid {input}: {problem}",
     hint: "List the releases to find one.",
-    next: ["release list"],
+    next: [suggestion("release:list")],
     details: {
       argument: "{input}",
     },
@@ -81,7 +81,12 @@ export default class ReleaseRevoke extends Destructive(EnvironmentCommand) {
               sections: [],
             },
             next: {
-              commands: [this.suggest(`release revoke ${Cmd.quote(args.releaseId)} --force`)],
+              commands: [
+                this.suggest("release:revoke", {
+                  args: { releaseId: args.releaseId },
+                  flags: { force: true },
+                }),
+              ],
             },
           };
         },

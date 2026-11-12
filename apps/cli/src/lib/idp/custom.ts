@@ -106,7 +106,7 @@ export const SETUP_FLAG_NAMES: CustomFlagNames = flagNamesOf(SETUP_FLAG_KEYS);
  * and reads `displayName`.
  *
  * @remarks
- * The rule is `src/lib/oclif/names.ts`, repeated here because this library
+ * The rule is `src/lib/names.ts`, repeated here because this library
  * knows nothing of the command layer.
  */
 type AsRead<Key extends string> = Key extends `${infer Head}-${infer Tail}`

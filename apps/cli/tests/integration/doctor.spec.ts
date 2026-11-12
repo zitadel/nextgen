@@ -927,7 +927,7 @@ describe("doctor", () => {
             CHECK.processes,
           ],
           next_actions: [
-            `When a sign-in or a request fails, the server's log says why: run ${expectedPublicCliCommand("logs --follow")} in another terminal to watch it.`,
+            `When a sign-in or a request fails, the server's log says why: run ${expectedPublicCliCommand(`logs --follow --cwd ${app.path}`)} in another terminal to watch it.`,
           ],
         },
         warnings: [],

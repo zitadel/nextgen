@@ -3,11 +3,9 @@ import { join } from "node:path";
 import { execa } from "execa";
 import semver from "semver";
 
-import { Cmd } from "@/lib/cmd";
 import { errorMessage, ZitadelError } from "@/lib/errors";
 import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
 import { painted } from "@/lib/oclif/rendering";
-import { Suggestible } from "@/lib/oclif/suggestible";
 import {
   addExactCommandFor,
   detectPackageManager,
@@ -20,7 +18,14 @@ import { newestCliCommand } from "@/lib/public-cli";
 import { type BreakingChange, breakingChanges, RELEASE_NOTES_URL } from "@/lib/release-notes";
 import { SHARED_SKILLS_DIR } from "@/lib/skills/add";
 import { arrow, command, dim, mark, strong, url } from "@/lib/style";
-import { type SuggestedCommand, shellCommand, unscopedCommand } from "@/lib/suggestion";
+import {
+  declaredOf,
+  renderSuggestion,
+  type SuggestedCommand,
+  type SuggestRest,
+  shellCommand,
+  suggestion,
+} from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { isNewerVersion, latestCliVersion } from "@/lib/update-check";
 import { exactZitadelPins, floatingZitadelSpecs } from "@/lib/zitadel-pins";
@@ -42,7 +47,7 @@ type PackageUpgrade = { name: string; from: string; to: string };
  * choice the user made, as `doctor`'s `dependency-version` check also holds, so
  * it is reported and left alone.
  */
-export default class Upgrade extends Suggestible(BaseCommand) {
+export default class Upgrade extends BaseCommand {
   static override description =
     "Upgrade this project to the latest Zitadel release.\n\nRe-pins the project's exactly-pinned @zitadel/* packages with its own package manager, then runs the new release's doctor --fix to refresh generated files. Run it as npx @zitadel/cli@latest upgrade so the newest release does the upgrading.";
   static override group = CommandGroups.diagnostics;
@@ -127,19 +132,12 @@ export default class Upgrade extends Suggestible(BaseCommand) {
         : await refreshProject(target, this.cwd, this.env, flags.telemetry === false, this.signal);
     }
 
-    // At the new version, and from the shell's directory like every suggestion.
-    const atTarget = (args: string): SuggestedCommand => {
-      return unscopedCommand(
-        flags.cwd === undefined ? args : `${args} ${Cmd.option("--cwd", flags.cwd)}`,
-        target,
-      );
-    };
     const commands: SuggestedCommand[] = [
       ...(this.dryRun && !upToDate ? [this.suggest("upgrade")] : []),
-      ...(refresh === "failed" ? [atTarget("doctor --fix")] : []),
-      ...(refresh === "issues" ? [atTarget("doctor")] : []),
+      ...(refresh === "failed" ? [this.atTarget(target, "doctor", { flags: { fix: true } })] : []),
+      ...(refresh === "issues" ? [this.atTarget(target, "doctor")] : []),
       ...(install !== undefined && !this.dryRun && existsSync(join(this.cwd, SHARED_SKILLS_DIR))
-        ? [atTarget("skills add")]
+        ? [this.atTarget(target, "skills:add")]
         : []),
     ];
     const actions = [
@@ -211,7 +209,31 @@ export default class Upgrade extends Suggestible(BaseCommand) {
     });
   }
 
-  private async install(install: PackageCommand, suggestion: SuggestedCommand): Promise<void> {
+  /**
+   * A command to run at the new version, from the shell's directory like every
+   * suggestion: the CLI's own `--cwd` goes back on, and the command is written
+   * for `target` rather than for the release that is running.
+   *
+   * @param target - The release the command runs as.
+   * @param id - The command, as oclif names it.
+   * @param rest - Its arguments and flags, by the names code reads them.
+   * @returns The command.
+   * @throws {Error} When `id` is no command this CLI loaded.
+   */
+  private atTarget<const Id extends string>(
+    target: string,
+    id: Id,
+    ...rest: SuggestRest<Id>
+  ): SuggestedCommand {
+    return renderSuggestion(
+      suggestion(id, ...rest),
+      declaredOf(id, this.config.findCommand(id)),
+      this.scope(),
+      target,
+    );
+  }
+
+  private async install(install: PackageCommand, installCommand: SuggestedCommand): Promise<void> {
     try {
       await runPackageCommand(install, {
         cwd: this.cwd,
@@ -221,7 +243,7 @@ export default class Upgrade extends Suggestible(BaseCommand) {
     } catch (error) {
       throw new ZitadelError("E_VALIDATION", "Could not install the new packages", {
         hint: `${errorMessage(error)}. Nothing else changed; fix that and rerun.`,
-        nextCommands: [suggestion, this.suggest("upgrade")],
+        nextCommands: [installCommand, this.suggest("upgrade")],
       });
     }
   }

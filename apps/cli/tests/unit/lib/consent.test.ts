@@ -11,7 +11,10 @@ import { confirm, isCancel } from "@clack/prompts";
 import { createZitadelClient } from "@/lib/backend";
 import { Consent, type Gate, isRefusal } from "@/lib/consent";
 import { ZitadelError } from "@/lib/errors";
-import { unscopedCommand } from "@/lib/suggestion";
+import { aSuggest } from "@tests/helpers/suggest";
+
+/** Renders the commands these questions suggest, as a run does. */
+const suggest = aSuggest();
 
 const signal = new AbortController().signal;
 
@@ -19,7 +22,7 @@ const GATE: Gate = {
   verb: "remove",
   name: "remove API_URL from the project",
   message: "Remove API_URL from the project?",
-  retry: unscopedCommand("variable rm API_URL --force"),
+  retry: suggest("variable:rm", { args: { name: "API_URL" }, flags: { force: true } }),
 };
 /** A client as every command gets one; nothing here sends a request. */
 const aClient = () => createZitadelClient({ signal, baseUrl: "http://localhost:8080" });
@@ -78,7 +81,7 @@ describe("Consent", () => {
       expect(await refusalOf(scripted)).toMatchObject({
         code: "E_CONFIRMATION_REQUIRED",
         message: "Cannot remove API_URL from the project without --force in non-interactive mode",
-        nextCommands: ["zitadel variable rm API_URL --force"],
+        nextCommands: ["npx @zitadel/cli@0.1.0 variable rm API_URL --force"],
       });
     });
 

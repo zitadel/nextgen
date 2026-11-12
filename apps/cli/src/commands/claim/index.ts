@@ -6,16 +6,15 @@ import { ClaimService } from "@/lib/backend";
 import { getClaimStatusQueryChallengeIdRegExp } from "@/lib/backend/schemas";
 import { openInBrowser } from "@/lib/browser";
 import { CLAIM_WINDOW_DAYS, isAttached } from "@/lib/claim-state";
-import { Cmd } from "@/lib/cmd";
 import { requireValue } from "@/lib/environment";
 import { ZitadelError } from "@/lib/errors";
 import { log } from "@/lib/log";
 import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
-import { reads, type Refused, whole } from "@/lib/oclif/flags";
+import { reads, type Refused, relatedFlags, whole } from "@/lib/oclif/flags";
 import { hasZitadelSecret, readZitadelSecret, writeZitadelSecret } from "@/lib/project";
 import { normalizePublicCliCommand } from "@/lib/public-cli";
 import { isLoopbackUrl } from "@/lib/server";
-import { type SuggestedCommand, unscopedCommand } from "@/lib/suggestion";
+import { type SuggestedCommand, suggestion } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { section } from "@/lib/ui";
 import { reportWarning } from "@/lib/warnings";
@@ -101,7 +100,7 @@ const CHALLENGE_ID: Refused<string> = {
   refusal: {
     message:
       "--challenge-id takes the challenge_id that the --no-wait run returned, which starts with ch_",
-    next: ["claim --no-wait"],
+    next: [suggestion("claim", { flags: { noWait: true } })],
   },
 };
 
@@ -137,44 +136,39 @@ export default class Claim extends EnvironmentCommand {
     "<%= config.bin %> <%= command.id %> --no-wait",
     "<%= config.bin %> <%= command.id %> --challenge-id ch_01J0Z9KX7Y0Q2Y7JX5M9K2YF3C",
   ];
-  static override flags = {
-    "no-open": Flags.boolean({
-      description: "Print the link instead of opening a browser.",
-    }),
-    timeout: Flags.custom<number>({
-      parse: reads(TIMEOUT),
-    })({
-      min: TIMEOUT_MIN,
-      description:
-        "Seconds to wait for the browser step. Defaults to the link's own expiry (10 minutes).",
-    }),
-    "no-wait": Flags.boolean({
-      description:
-        "Print the link and exit, without opening a browser or waiting for the browser step. The result names the command that waits for it.",
-      exclusive: ["challenge-id", "timeout"],
-    }),
-    "challenge-id": Flags.custom<string>({
-      parse: reads(CHALLENGE_ID),
-    })({
-      description: "Wait for the link a --no-wait run printed, instead of creating a new one.",
-    }),
-  };
+  static override flags = relatedFlags(
+    {
+      "no-open": Flags.boolean({
+        description: "Print the link instead of opening a browser.",
+      }),
+      timeout: Flags.custom<number>({
+        parse: reads(TIMEOUT),
+      })({
+        min: TIMEOUT_MIN,
+        description:
+          "Seconds to wait for the browser step. Defaults to the link's own expiry (10 minutes).",
+      }),
+      "no-wait": Flags.boolean({
+        description:
+          "Print the link and exit, without opening a browser or waiting for the browser step. The result names the command that waits for it.",
+      }),
+      "challenge-id": Flags.custom<string>({
+        parse: reads(CHALLENGE_ID),
+      })({
+        description: "Wait for the link a --no-wait run printed, instead of creating a new one.",
+      }),
+    },
+    { "no-wait": { exclusive: ["challenge-id", "timeout"] } },
+  );
 
   protected async execute({ flags }: Admitted<typeof Claim>): Promise<JsonEnvelope> {
     // Where a fresh link comes from when this one dies: a run that is part of
     // the two-step flow suggests the step that hands the link back, so
     // following the suggestion never blocks with the link out of sight.
-    const startOver = this.suggest(
+    const startOver =
       flags.noWait || flags.challengeId !== undefined
-        ? "claim --no-wait"
-        : [
-            "claim",
-            ...(flags.noOpen ? ["--no-open"] : []),
-            ...(flags.timeout === undefined
-              ? []
-              : [Cmd.option("--timeout", String(flags.timeout))]),
-          ].join(" "),
-    );
+        ? this.suggest("claim", { flags: { noWait: true } })
+        : this.suggest("claim", { flags: { noOpen: flags.noOpen, timeout: flags.timeout } });
 
     // The project to claim is the one the resolved environment points at — the
     // same project (and credential) `connect()` authenticates — so a
@@ -248,7 +242,7 @@ export default class Claim extends EnvironmentCommand {
           commands: [
             flags.challengeId === undefined
               ? startOver
-              : this.suggest(`claim --challenge-id ${Cmd.quote(flags.challengeId)}`),
+              : this.suggest("claim", { flags: { challengeId: flags.challengeId } }),
           ],
         },
       });
@@ -273,7 +267,7 @@ export default class Claim extends EnvironmentCommand {
         }
         case "window-expired": {
           this.recordTelemetry({ claim_outcome: "window_expired" });
-          throw claimWindowExpiredError(this.cliVersion);
+          throw claimWindowExpiredError();
         }
         case "started": {
           break;
@@ -423,7 +417,7 @@ export default class Claim extends EnvironmentCommand {
               claim_outcome: "window_expired",
               poll_count: attempt,
             });
-            throw new AbortError(claimWindowExpiredError(this.cliVersion));
+            throw new AbortError(claimWindowExpiredError());
           }
           case "expired": {
             this.recordTelemetry({
@@ -487,7 +481,7 @@ export default class Claim extends EnvironmentCommand {
     challenge: { claim_url: string; challenge_id: string; expires_at: string },
   ): JsonEnvelope {
     this.recordTelemetry({ claim_outcome: "link_issued" });
-    const wait = this.suggest(`claim --challenge-id ${Cmd.quote(challenge.challenge_id)}`);
+    const wait = this.suggest("claim", { flags: { challengeId: challenge.challenge_id } });
 
     const title = "Open the link in a browser to make your project permanent";
 
@@ -558,12 +552,12 @@ function expiredError(message: string, claimAgain: SuggestedCommand): ZitadelErr
  * cannot fix a closed window, so suggesting `claim` again would send the
  * user in a circle.
  */
-function claimWindowExpiredError(cliVersion: string): ZitadelError {
+function claimWindowExpiredError(): ZitadelError {
   return new ZitadelError(
     "E_VALIDATION",
     `This project was not claimed within ${CLAIM_WINDOW_DAYS} days of creation, so it can no longer be claimed.`,
     {
-      hint: `The project still works for now, but it stays temporary and its data may be lost. To get a claimable project, run ${unscopedCommand("setup", cliVersion)} in a fresh directory (here it would just skip as already initialized) and claim the new one within the window.`,
+      hint: `The project still works for now, but it stays temporary and its data may be lost. To get a claimable project, run \`zitadel setup\` in a fresh directory (here it would just skip as already initialized) and claim the new one within the window.`,
     },
   );
 }

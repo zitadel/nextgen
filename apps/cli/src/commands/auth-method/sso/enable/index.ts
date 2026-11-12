@@ -22,7 +22,7 @@ import {
 } from "@zitadel/config/idp";
 import { z } from "zod";
 
-import { AuthMethodCommand, type SchemaTarget } from "@/commands/auth-method/command";
+import { AuthMethodCommand, type Follow, type SchemaTarget } from "@/commands/auth-method/command";
 import {
   isCancelled,
   Origins,
@@ -54,8 +54,7 @@ import { type Admitted, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
 import { environmentFlags } from "@/lib/oclif/environment-flags";
 import { filled, reads, type Refused } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
-import { optionArgs } from "@/lib/public-cli";
-import { portableSuggestions, type SuggestedCommand } from "@/lib/suggestion";
+import { suggestion } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { reportWarning } from "@/lib/warnings";
 import {
@@ -144,7 +143,7 @@ const PROVIDER_IS_NAMED_REFUSAL: Refusal = {
 const NO_ISSUER_REFUSAL: Refusal = {
   message: "This project has no development issuer",
   hint: "Set the project up first, or set ZITADEL_ISSUER to the origin your app serves from.",
-  next: ["setup"],
+  next: [suggestion("setup")],
 };
 
 /**
@@ -153,7 +152,6 @@ const NO_ISSUER_REFUSAL: Refusal = {
  * @param cwd - The project root.
  * @param flags - The flags that pick the environment.
  * @param env - The process environment.
- * @param suggest - Turns the refusal's `next` command into the run's own suggestion.
  * @returns The issuer.
  * @throws {@link ZitadelError} When the Project has none, so it has not been set up.
  */
@@ -161,7 +159,6 @@ export async function developmentIssuer(
   cwd: string,
   flags: EnvironmentFlags,
   env: NodeJS.ProcessEnv = process.env,
-  suggest?: (command: string) => SuggestedCommand,
 ): Promise<string> {
   const environment = await resolveEnvironment({
     cwd,
@@ -172,7 +169,7 @@ export async function developmentIssuer(
   });
   const issuer = environment.values.ZITADEL_ISSUER?.value;
   if (issuer === undefined) {
-    throw refusalError(NO_ISSUER_REFUSAL, {}, suggest);
+    throw refusalError(NO_ISSUER_REFUSAL, {});
   }
   return issuer;
 }
@@ -402,9 +399,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     const choice = ProviderChoice.fromFlags(flags, {
       interactive: !this.nonInteractive && !this.dryRun,
     });
-    const issuer = await developmentIssuer(this.cwd, flags, this.env, (next) => {
-      return this.suggest(next);
-    });
+    const issuer = await developmentIssuer(this.cwd, flags, this.env);
     const target = await this.loadSchemaTarget(flags);
     // Refused before anything is asked: a provider no flow offers is no
     // sign-in button however well everything else goes.
@@ -449,23 +444,17 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     this.introduce(summary, target.schema, provider);
     if (this.dryRun) {
       // What the developer typed, so the real run is one command away.
-      const real = [
-        "auth-method",
-        "sso",
-        "enable",
-        ...optionArgs("--provider", flags.provider),
-        ...target.schemaArgs,
-        ...[
-          ["--slug", flags.slug],
-          ["--display-name", flags.displayName],
-          ["--issuer", flags.issuer],
-          ["--scopes", flags.scopes],
-          ["--client-id", flags.clientId],
-        ].flatMap(([option, value]) => {
-          return value === undefined ? [] : optionArgs(String(option), String(value));
-        }),
-        ...this.environmentSelectorArgs(),
-      ];
+      const real = this.follow("auth-method:sso:enable", {
+        flags: {
+          provider: flags.provider,
+          ...(target.schemaGiven === undefined ? {} : { schema: target.schemaGiven }),
+          ...(flags.slug === undefined ? {} : { slug: flags.slug }),
+          ...(flags.displayName === undefined ? {} : { displayName: flags.displayName }),
+          ...(flags.issuer === undefined ? {} : { issuer: flags.issuer }),
+          ...(flags.scopes === undefined ? {} : { scopes: flags.scopes }),
+          ...(flags.clientId === undefined ? {} : { clientId: flags.clientId }),
+        },
+      });
 
       return this.previewResult(summary, preview, delivery.names, flags.clientId, real);
     }
@@ -537,8 +526,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     return new CredentialDelivery({
       connection: preview.document,
       reused: !preview.created,
-      selector: this.environmentSelector(),
-      cliVersion: this.cliVersion,
+      suggest: this.suggester,
     });
   }
 
@@ -562,8 +550,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       secretVariable: names.clientSecret,
       ask: this.ask,
       developmentBuild: isDevelopmentBuild() && !this.nonInteractive,
-      selector: this.environmentSelector(),
-      cliVersion: this.cliVersion,
+      suggest: this.suggester,
     });
   }
 
@@ -669,7 +656,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
    * @param change - The change worked out before anything was asked.
    * @param names - The variables the credentials would go to.
    * @param givenClientId - The client id `--client-id` gave, if any.
-   * @param real - The arguments of the real run, as the developer typed them.
+   * @param real - The real run, as the developer typed it.
    * @returns The dry run's result.
    */
   private previewResult(
@@ -677,7 +664,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     change: DocumentChange<Connection>,
     names: CredentialNames,
     givenClientId: ClientId | undefined,
-    real: readonly string[],
+    real: Follow,
   ): JsonEnvelope {
     this.report(change);
     if (!this.isJson) {
@@ -713,7 +700,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         title,
         would_store: toStore,
         dry_run: true,
-        next_args: [real],
+        next_args: [real.args],
       },
       summary: {
         title,
@@ -722,7 +709,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
           return escapeControlCharacters(line);
         }),
       },
-      next: { commands: portableSuggestions([real], this.cliVersion) },
+      next: { commands: [real.command] },
     });
   }
 
@@ -844,11 +831,15 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
   private result(input: ResultInput): JsonEnvelope {
     const summary = input.summary;
     const name = summary.displayName;
-    const scopeArgs = this.environmentSelectorArgs();
-    const recovery = input.delivery.recoveryArgs(input.published, scopeArgs);
+    const recovery = input.delivery.unpublishedOf(input.published).map((missing) => {
+      return this.follow("variable:set", {
+        args: { name: missing.name },
+        flags: missing.secret ? { secret: true } : {},
+      });
+    });
     const unpublished = !summary.reused || input.written.length > 0;
     const stored = input.delivery.areStored(input.published);
-    const followUps = this.followUps(unpublished, scopeArgs, recovery);
+    const followUps = this.followUps(unpublished, recovery);
     const payload = this.payload({
       summary,
       change: input.change,

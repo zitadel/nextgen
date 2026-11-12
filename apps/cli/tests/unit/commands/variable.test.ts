@@ -13,6 +13,7 @@ import { usePlatformServer } from "@tests/helpers/platform-project";
 import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
 import { asTerminal as asPerson } from "@tests/helpers/terminal";
 import { type Answer, answering } from "@tests/helpers/keyboard";
+import { runCommand } from "@tests/helpers/run-command";
 
 const { server } = usePlatformServer();
 
@@ -1002,7 +1003,14 @@ describe("variable rm asked on a terminal", () => {
   const removingOn = async (serverUrl: string, cwd: string, ...answers: Answer[]) => {
     const talk = answering(...answers);
     const result = await asPerson(() =>
-      VariableRm.run(["SUPPORT_EMAIL", "--cwd", cwd, "--server", serverUrl, ...extraFlags]),
+      runCommand(VariableRm, "variable:rm", [
+        "SUPPORT_EMAIL",
+        "--cwd",
+        cwd,
+        "--server",
+        serverUrl,
+        ...extraFlags,
+      ]),
     );
     return { result, shown: talk.shown(), talk };
   };
@@ -1063,7 +1071,14 @@ describe("variable rm asked on a terminal", () => {
     const talk = answering();
 
     await asPerson(() =>
-      VariableRm.run(["SUPPORT_EMAIL", "--cwd", cwd, "--server", DEFAULT_SERVER, "--force"]),
+      runCommand(VariableRm, "variable:rm", [
+        "SUPPORT_EMAIL",
+        "--cwd",
+        cwd,
+        "--server",
+        DEFAULT_SERVER,
+        "--force",
+      ]),
     );
 
     expect(talk.asked()).toEqual([]);
@@ -1076,7 +1091,14 @@ describe("variable rm asked on a terminal", () => {
     const answered = await removing(cwd, true);
     const forced = answering();
     await asPerson(() =>
-      VariableRm.run(["SUPPORT_EMAIL", "--cwd", cwd, "--server", DEFAULT_SERVER, "--force"]),
+      runCommand(VariableRm, "variable:rm", [
+        "SUPPORT_EMAIL",
+        "--cwd",
+        cwd,
+        "--server",
+        DEFAULT_SERVER,
+        "--force",
+      ]),
     );
 
     expect(lastLine(answered.talk.plain())).toBe(lastLine(forced.plain()));
@@ -1111,7 +1133,13 @@ describe("variable set asked on a terminal", () => {
     const talk = answering("support@acme.example");
 
     await asPerson(() =>
-      VariableSet.run(["SUPPORT_EMAIL", "--cwd", cwd, "--server", DEFAULT_SERVER]),
+      runCommand(VariableSet, "variable:set", [
+        "SUPPORT_EMAIL",
+        "--cwd",
+        cwd,
+        "--server",
+        DEFAULT_SERVER,
+      ]),
     );
 
     expect(talk.asked()).toEqual(["What should the value of SUPPORT_EMAIL be?"]);

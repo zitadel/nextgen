@@ -29,9 +29,9 @@ import {
   type CustomFlagValues,
   callbackUriFor,
   loopbackIssuerWarning,
-  ssoEnableArgs,
 } from "@/lib/idp";
 import { issuerFromPort } from "@/lib/orca";
+import type { SuggestFlags } from "@/lib/suggestion";
 import type { Questions } from "@/lib/ui";
 import { reportWarning } from "@/lib/warnings";
 
@@ -183,7 +183,7 @@ export class SocialSignInPrompt implements SetupPrompt {
         ctx.say(
           [
             `Skipped ${entry.displayName}. Once its OAuth application exists, add it with:`,
-            ctx.suggest(ssoEnableArgs(selection)),
+            ctx.suggest("auth-method:sso:enable", { flags: ssoEnableFlags(selection) }),
           ].join("\n"),
         );
         continue;
@@ -306,4 +306,28 @@ function clientIdOrSkip(value: string): Parsed<ClientId | undefined> {
         value: undefined,
       }
     : parseClientId(value);
+}
+
+/**
+ * The flags `auth-method sso enable` takes to add `selection` to a project: the
+ * provider, and for a custom connection the settings that describe it.
+ *
+ * @param selection - The provider.
+ * @returns The flags, in the order the command line takes them.
+ */
+export function ssoEnableFlags(
+  selection: ProviderSelection,
+): SuggestFlags<"auth-method:sso:enable"> {
+  if (selection.kind !== "custom") {
+    return { provider: selectionName(selection) };
+  }
+  const { slug, displayName, issuer, scopes } = selection.connection;
+
+  return {
+    provider: selectionName(selection),
+    slug,
+    displayName,
+    issuer,
+    scopes: scopes.join(" "),
+  };
 }

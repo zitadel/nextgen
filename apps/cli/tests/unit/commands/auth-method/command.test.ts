@@ -10,7 +10,7 @@ import AuthMethodPasskeyDisable from "@/commands/auth-method/passkey/disable";
 import AuthMethodSsoDisable from "@/commands/auth-method/sso/disable";
 import { Consent } from "@/lib/consent";
 import { ZitadelError } from "@/lib/errors";
-import { unscopedCommand } from "@/lib/suggestion";
+import { suggestion } from "@/lib/suggestion";
 import { BrokenFilesError, type Change, DiskStore, Schemas, UserSchema } from "@/lib/zitadel";
 import { answering, type Person } from "@tests/helpers/keyboard";
 import { recordLog } from "@tests/helpers/log";
@@ -134,7 +134,16 @@ class ChangeWriter extends AuthMethodPasskeyDisable {
    * @returns The change with its consent, or `undefined` when the person said no.
    */
   confirming(target: SchemaTarget, make: () => Change): Promise<unknown> {
-    return this.confirmIfNoSignInLeft(target, [], make);
+    return this.confirmIfNoSignInLeft(
+      target,
+      {
+        real: this.follow("auth-method:passkey:disable", { flags: { force: true } }),
+        dryRun: this.follow("auth-method:passkey:disable", {
+          flags: { force: true, dryRun: true },
+        }),
+      },
+      make,
+    );
   }
 }
 
@@ -154,20 +163,13 @@ function aNewSchema(read: SchemaTarget): Change {
  * Reads the schema target of the Project in `cwd`, as a run with these flags would.
  *
  * @param cwd - The Project.
- * @param flags - The `--schema` the run named, and whether it was given `--cwd`.
+ * @param flags - The `--schema` the run named.
  * @returns The target.
  */
-function target(
-  cwd: string,
-  flags: { schema?: string; cwdGiven?: boolean } = {},
-): Promise<SchemaTarget> {
+function target(cwd: string, flags: { schema?: string } = {}): Promise<SchemaTarget> {
   return readSchemaTarget({
     cwd,
     schema: flags.schema,
-    cwdGiven: flags.cwdGiven ?? false,
-    suggest: (next) => {
-      return unscopedCommand(next);
-    },
   });
 }
 
@@ -500,10 +502,10 @@ describe("AuthMethodCommand", () => {
               "disable",
               "--schema",
               "default-human-user",
-              "--cwd",
-              cwd,
               "--force",
               "--dry-run",
+              "--cwd",
+              cwd,
             ],
             expect.anything(),
           ],
@@ -541,9 +543,9 @@ describe("AuthMethodCommand", () => {
               "disable",
               "--schema",
               "default-human-user",
+              "--force",
               "--cwd",
               cwd,
-              "--force",
             ],
             expect.anything(),
           ],
@@ -589,7 +591,7 @@ describe("AuthMethodCommand", () => {
         data: {
           next_args: [
             ["deploy", "--dry-run"],
-            ["deploy", "-m", "<what changed>"],
+            ["deploy", "--message", "<what changed>"],
           ],
         },
       });
@@ -722,20 +724,23 @@ describe("AuthMethodCommand.write", () => {
 
 describe("readSchemaTarget", () => {
   describe("with one schema", () => {
-    it("finds it, with no --cwd for the follow-ups", async ({ dir }) => {
+    it("finds it, pinning no --schema for the follow-ups", async ({ dir }) => {
       const cwd = await setUpProject(dir);
 
       const read = await target(cwd);
 
-      expect(read).toMatchObject({ schema: { name: "default-human-user" }, cwdArgs: [] });
+      expect(read).toMatchObject({
+        schema: { name: "default-human-user" },
+        schemaGiven: undefined,
+      });
     });
 
-    it("carries --cwd into the follow-ups when the run had one", async ({ dir }) => {
+    it("carries --schema into the follow-ups when the run had one", async ({ dir }) => {
       const cwd = await setUpProject(dir);
 
-      const read = await target(cwd, { cwdGiven: true });
+      const read = await target(cwd, { schema: "default-human-user" });
 
-      expect(read).toMatchObject({ cwdArgs: ["--cwd", cwd] });
+      expect(read).toMatchObject({ schemaGiven: "default-human-user" });
     });
   });
 
@@ -887,7 +892,7 @@ describe("readSchemaTarget", () => {
         return target(cwd);
       });
 
-      expect(error).toMatchObject({ nextCommands: [unscopedCommand("setup")] });
+      expect(error).toMatchObject({ nextCommands: [suggestion("setup")] });
     });
   });
 

@@ -31,10 +31,9 @@ import {
 import { ZitadelError } from "@/lib/errors";
 import { asker } from "@/lib/input";
 import { LocalServer } from "@/lib/local-server/server";
-import { environmentSelectorSuffix } from "@/lib/oclif/environment-flags";
-import { projectCommand } from "@/lib/suggestion";
 import { takeReportedWarnings } from "@/lib/warnings";
 import { acmeSelection, clientId, clientSecret, googleSelection } from "@tests/helpers/idp-values";
+import { aSuggest } from "@tests/helpers/suggest";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
 /**
@@ -146,13 +145,7 @@ const CONTEXT: PromptContext = {
   },
   framework: FRAMEWORK,
   cwd: APP_DIR,
-  suggest: (args) => {
-    return projectCommand(
-      args,
-      environmentSelectorSuffix({ envFile: ".env.development.local" }),
-      "1.2.3",
-    );
-  },
+  suggest: aSuggest({ envFile: ".env.development.local" }, "1.2.3"),
 };
 
 /**

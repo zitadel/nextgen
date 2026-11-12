@@ -1,8 +1,7 @@
 import wrapAnsi from "wrap-ansi";
 
-import { Cmd } from "@/lib/cmd";
 import { type NextSteps, renderNextSteps } from "@/lib/oclif/next-steps";
-import { publicCliCommand } from "@/lib/public-cli";
+import type { Suggest } from "@/lib/suggestion";
 import { arrow, command, dim, mark, statusColor, strong } from "@/lib/style";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 
@@ -104,8 +103,8 @@ const ROW_MARK: Record<RowStatus, string> = {
 export type DoctorReportInput = {
   checks: readonly CheckOutcome[];
   cliVersion: string;
-  /** `--cwd` as typed, which a suggested command carries. */
-  typedCwd?: string;
+  /** Renders the commands the report suggests, with the run's own scope. */
+  suggest: Suggest;
   /** Whether this directory has a `zitadel.json`; without one no project check ran. */
   projectConfigured: boolean;
   /** The project's hosted server, when it uses no local one and no local check ran. */
@@ -218,10 +217,7 @@ function skipReason(
   if (category === "project" && !input.projectConfigured) {
     return {
       reason: "no zitadel.json in this directory",
-      command: publicCliCommand(
-        input.typedCwd === undefined ? "setup" : `setup ${Cmd.option("--cwd", input.typedCwd)}`,
-        input.cliVersion,
-      ),
+      command: input.suggest("setup"),
     };
   }
   return undefined;

@@ -1,6 +1,6 @@
 import { DeploymentService, SchemaService, UserService, VariableService } from "@/lib/backend";
 import type { StepContext } from "@/lib/publish/pipeline";
-import { shellCommand } from "@/lib/suggestion";
+import { aSuggest } from "@tests/helpers/suggest";
 import { type ConfigStore, type ConfigurationBundle, ZitadelConfig } from "@/lib/zitadel";
 import { MemoryStore } from "@tests/helpers/storage/backend/memory";
 import { type ClientStubs, fakeClient } from "@tests/helpers/fake-client";
@@ -55,9 +55,7 @@ export function aStepContext(overrides: StepContextOverrides = {}): StepContext 
     config,
     store,
     bundle: fields.bundle ?? bundleOf(fields.config, store),
-    suggest: (args) => {
-      return shellCommand(`${args} ${ENVIRONMENT_SELECTOR}`);
-    },
+    suggest: aSuggest({ env: "staging" }),
     ...fields,
   };
 }
