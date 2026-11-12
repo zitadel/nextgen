@@ -17,7 +17,7 @@ const INVITATION_ID: Refused<string> = {
   refusal: {
     message: "Invalid {input}: {problem}",
     hint: "Find one with `zitadel invitation list --status pending`.",
-    next: ["invitation list --status pending"],
+    next: [{ id: "invitation:list", flags: { status: "pending" } }],
     details: {
       argument: "{input}",
     },
@@ -31,14 +31,14 @@ const INVITATION_ID: Refused<string> = {
 const NO_ID_REFUSAL: Refusal = {
   message: "Name the invitation to cancel",
   hint: "Pass its id; find one with `zitadel invitation list --status pending`.",
-  next: ["invitation list --status pending"],
+  next: [{ id: "invitation:list", flags: { status: "pending" } }],
 };
 
 /** How a bare cancel is refused when the project has no invitation left to cancel. */
 const NOTHING_PENDING_REFUSAL: Refusal = {
   message: "The project has no pending invitations",
   hint: "Only a pending invitation can be cancelled.",
-  next: ["invitation list"],
+  next: [{ id: "invitation:list" }],
 };
 
 /**
@@ -70,9 +70,7 @@ export default class InvitationCancel extends Destructive(EnvironmentCommand) {
 
   protected async execute({ args }: Admitted<typeof InvitationCancel>): Promise<JsonEnvelope> {
     if (args.invitationId === undefined && (this.dryRun || this.nonInteractive)) {
-      throw refusalError(NO_ID_REFUSAL, {}, (command) => {
-        return this.suggest(command);
-      });
+      throw refusalError(NO_ID_REFUSAL, {});
     }
     const invitationId = args.invitationId ?? (await this.pickPending());
 
@@ -120,14 +118,12 @@ export default class InvitationCancel extends Destructive(EnvironmentCommand) {
     const invitationService = new InvitationService(client, projectId);
     const pending = await invitationService.pending();
     if (pending.length === 0) {
-      throw refusalError(NOTHING_PENDING_REFUSAL, {}, (command) => {
-        return this.suggest(command);
-      });
+      throw refusalError(NOTHING_PENDING_REFUSAL, {});
     }
     return this.ask.select({
       name: "invitation id",
       message: "Which invitation would you like to cancel?",
-      retry: this.suggest("invitation list --status pending"),
+      retry: this.suggest({ id: "invitation:list", flags: { status: "pending" } }),
       options: pending.map((invitation) => ({
         value: invitation.id,
         label: invitation.id,

@@ -18,7 +18,7 @@ const INVITATION_ID: Refused<string> = {
   refusal: {
     message: "Invalid {input}: {problem}",
     hint: "Find one with `zitadel invitation list`.",
-    next: ["invitation list"],
+    next: [{ id: "invitation:list" }],
     details: {
       argument: "{input}",
     },

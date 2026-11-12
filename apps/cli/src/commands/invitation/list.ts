@@ -16,6 +16,7 @@ import {
 } from "@/lib/oclif";
 import { reads, type Refused, whole } from "@/lib/oclif/flags";
 import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
+import { relatedFlags } from "@/lib/suggestion/relations";
 
 /** The columns `list` renders, in order. */
 const COLUMNS = ["id", "name", "role", "status", "expires_at"] as const;
@@ -62,32 +63,34 @@ export default class InvitationList extends Tabulatable(EnvironmentCommand) {
     "<%= config.bin %> invitation list --status pending",
     "<%= config.bin %> invitation list --all --json",
   ];
-  static override flags = {
-    status: Flags.custom<InvitationStatus>({})({
-      options: [...STATUSES],
-      description: "Only invitations with this status.",
-    }),
-    type: Flags.custom<InvitationType>({})({
-      options: [...TYPES],
-      description: "Only invitations of this type.",
-    }),
-    limit: Flags.custom<number>({
-      parse: reads(LIMIT),
-    })({
-      min: LIMIT_MIN,
-      max: LIMIT_MAX,
-      description: "Page size (server default 20, max 100).",
-    }),
-    "page-token": nonBlankString({
-      description: "Continue from a previous page's next_page_token.",
-    }),
-    all: Flags.boolean({
-      char: "a",
-      description: "Fetch every page instead of one.",
-      exclusive: ["page-token"],
-    }),
-    plain: plainFlag,
-  };
+  static override flags = relatedFlags(
+    {
+      status: Flags.custom<InvitationStatus>({})({
+        options: [...STATUSES],
+        description: "Only invitations with this status.",
+      }),
+      type: Flags.custom<InvitationType>({})({
+        options: [...TYPES],
+        description: "Only invitations of this type.",
+      }),
+      limit: Flags.custom<number>({
+        parse: reads(LIMIT),
+      })({
+        min: LIMIT_MIN,
+        max: LIMIT_MAX,
+        description: "Page size (server default 20, max 100).",
+      }),
+      "page-token": nonBlankString({
+        description: "Continue from a previous page's next_page_token.",
+      }),
+      all: Flags.boolean({
+        char: "a",
+        description: "Fetch every page instead of one.",
+      }),
+      plain: plainFlag,
+    },
+    { all: { exclusive: ["page-token"] } },
+  );
 
   protected async execute({ flags }: Admitted<typeof InvitationList>): Promise<JsonEnvelope> {
     const { client, projectId } = await this.connect();
@@ -120,12 +123,6 @@ export default class InvitationList extends Tabulatable(EnvironmentCommand) {
     const footer: string[] = [];
     const page = {
       token: listed.next,
-      command: "invitation list",
-      flags: [
-        ...(flags.status === undefined ? [] : [`--status ${flags.status}`]),
-        ...(flags.type === undefined ? [] : [`--type ${flags.type}`]),
-        ...(flags.limit === undefined ? [] : [`--limit ${flags.limit}`]),
-      ],
     };
     const extra = {};
 

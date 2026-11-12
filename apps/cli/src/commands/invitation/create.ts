@@ -55,7 +55,7 @@ const REPLACES: Refused<string> = {
   refusal: {
     message: "Invalid {input}: {problem}",
     hint: "Find one with `zitadel invitation list`.",
-    next: ["invitation list"],
+    next: [{ id: "invitation:list" }],
   },
 };
 
@@ -63,7 +63,7 @@ const REPLACES: Refused<string> = {
 const REPLACES_ACCEPTED_REFUSAL: Refusal = {
   message: "{id} was already accepted, so there is nothing to replace",
   hint: "Create a new invitation instead.",
-  next: ["invitation create"],
+  next: [{ id: "invitation:create" }],
 };
 
 /**
@@ -157,7 +157,7 @@ export default class InvitationCreate extends Promptable(EnvironmentCommand) {
         ],
       },
       next: {
-        commands: [this.suggest("invitation list --status pending")],
+        commands: [this.suggest({ id: "invitation:list", flags: { status: "pending" } })],
       },
     });
   }
@@ -191,9 +191,7 @@ export default class InvitationCreate extends Promptable(EnvironmentCommand) {
   ): Promise<Invitation> {
     const invitation = await invitationService.get(invitationId);
     if (invitation.status === "accepted") {
-      throw refusalError(REPLACES_ACCEPTED_REFUSAL, { id: invitation.id }, (command) => {
-        return this.suggest(command);
-      });
+      throw refusalError(REPLACES_ACCEPTED_REFUSAL, { id: invitation.id });
     }
     return invitation;
   }
@@ -204,7 +202,7 @@ export default class InvitationCreate extends Promptable(EnvironmentCommand) {
       name: "relation",
       message: "Which role should whoever accepts receive on the project?",
       flag: "--relation",
-      retry: this.suggest("invitation create --relation viewer"),
+      retry: this.suggest({ id: "invitation:create", flags: { relation: "viewer" } }),
       initialValue: "viewer",
       options: RELATIONS.map((relation) => ({
         value: relation,
