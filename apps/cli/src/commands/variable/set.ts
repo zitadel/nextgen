@@ -17,22 +17,22 @@ import { reportWarning } from "@/lib/warnings";
 import { variableNameArg } from "./name";
 
 /** How a secret asked to be stored as another type is refused. */
-const SECRET_AS_STRING_REFUSAL: Refusal = {
+const SECRET_AS_STRING_REFUSAL = {
   message: "A secret is stored as a string.",
   hint: "Drop --as, or drop --secret for a non-credential number or boolean.",
-};
+} as const satisfies Refusal;
 
 /** How a secret given on the command line, where it would reach shell history, is refused. */
-const SECRET_VALUE_REFUSAL: Refusal = {
+const SECRET_VALUE_REFUSAL = {
   message: "A secret value is not given on the command line.",
   hint: "Drop the value and pipe it in, or let the prompt ask for it.",
-};
+} as const satisfies Refusal;
 
 /** How a value that does not parse as the type `--as` names is refused. */
-const VALUE_TYPE_REFUSAL: Refusal = {
+const VALUE_TYPE_REFUSAL = {
   message: '"{value}" is not a valid {as} value.',
   hint: "A boolean variable is exactly true or false, and a number is a JSON number such as 5, -1.5 or 1e3. Pass --as string to keep it as text.",
-};
+} as const satisfies Refusal;
 
 /**
  * `zitadel variable set NAME [VALUE]` — enter or replace one variable on the

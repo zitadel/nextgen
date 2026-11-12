@@ -45,7 +45,7 @@ const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"] as const;
  * would refuse `-X delete`, so the value is upper-cased before the set decides
  * it. It refuses a method the CLI does not send.
  */
-const METHOD: Refused<string> = {
+const METHOD = {
   schema: z
     .string()
     .transform((method) => {
@@ -55,27 +55,27 @@ const METHOD: Refused<string> = {
   refusal: {
     message: `-X {value} is not one of ${HTTP_METHODS.join(", ")}`,
   },
-};
+} as const satisfies Refused<string>;
 
-const UNCALLABLE_REFUSAL: Refusal = {
+const UNCALLABLE_REFUSAL = {
   message: "{reason}",
   hint: "Call it from the app it belongs to, through the SDK; the api ls command marks what the CLI can call.",
   next: [{ id: "api:ls" }],
-};
+} as const satisfies Refusal;
 
-const NOTHING_TO_PAGE_REFUSAL: Refusal = {
+const NOTHING_TO_PAGE_REFUSAL = {
   message: "{operation} does not page, so --paginate has nothing to follow",
   hint: "Leave out --paginate.",
-};
+} as const satisfies Refusal;
 
-const FORCE_REQUIRED_REFUSAL: Refusal = {
+const FORCE_REQUIRED_REFUSAL = {
   code: "E_CONFIRMATION_REQUIRED",
   message: "Cannot call {operation} without --force in non-interactive mode",
   hint:
     "Ask a person first: {question} Once they agree, run the same command again, " +
     "with its --field values or the pipe into --input, and add --force.",
   details: { question: "{question}" },
-};
+} as const satisfies Refusal;
 
 /**
  * The operation an operation id or a path names, or the refusal that says how to

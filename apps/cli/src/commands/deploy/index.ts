@@ -39,7 +39,7 @@ import { reportWarning } from "@/lib/warnings";
  * reject later. `messageTooLong` counts code points, as the server does, so
  * the length is its call and not the schema's. The message is trimmed.
  */
-const MESSAGE: Refused<string> = {
+const MESSAGE = {
   schema: z
     .string()
     .trim()
@@ -54,7 +54,7 @@ const MESSAGE: Refused<string> = {
       argument: "--message",
     },
   },
-};
+} as const satisfies Refused<string>;
 
 /**
  * What a deploy with no primary origin to land on tells the developer, naming
@@ -119,17 +119,17 @@ export function missingPrimaryOrigin(input: {
  */
 const LOCKOUT_ACTION = "deploy a release that leaves existing users unable to sign in";
 
-const NEEDS_MESSAGE_REFUSAL: Refusal = {
+const NEEDS_MESSAGE_REFUSAL = {
   message: "A deploy needs a message in non-interactive mode",
   hint: "Pass -m/--message with a short summary of what this release changes, or deploy from a clean git commit.",
-};
+} as const satisfies Refusal;
 
 /** How a project with nowhere to land a deploy is refused. */
-const NO_PRIMARY_ORIGIN_REFUSAL: Refusal = {
+const NO_PRIMARY_ORIGIN_REFUSAL = {
   message: "The project has no primary origin to deploy to",
   hint: "{hint}",
   next: ["{next}"],
-};
+} as const satisfies Refusal;
 
 /**
  * The commit that keeps what was deployed in git, aimed at the directory that

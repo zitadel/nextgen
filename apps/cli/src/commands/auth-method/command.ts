@@ -118,7 +118,7 @@ export type SchemaTargetInput = {
 /**
  * What a schema pointing at an external URL is refused for.
  */
-const EXTERNAL_SCHEMA_REFUSAL: Refusal = {
+const EXTERNAL_SCHEMA_REFUSAL = {
   message: "{file} points at an external schema",
   hint:
     "Its sign-in methods live in the schema at its url, which the server fetches. " +
@@ -127,22 +127,22 @@ const EXTERNAL_SCHEMA_REFUSAL: Refusal = {
     file: "{file}",
     url: "{url}",
   },
-};
+} as const satisfies Refusal;
 
 /**
  * What a Project with no user schema at all is refused for.
  */
-const NO_SCHEMA_REFUSAL: Refusal = {
+const NO_SCHEMA_REFUSAL = {
   code: "E_NOT_FOUND",
   message: "This project has no user schema under .zitadel/schemas",
   hint: "Set the project up first.",
   next: [{ id: "setup" }],
-};
+} as const satisfies Refusal;
 
 /**
  * What a `--schema` that names no schema is refused for.
  */
-const UNKNOWN_SCHEMA_REFUSAL: Refusal = {
+const UNKNOWN_SCHEMA_REFUSAL = {
   code: "E_NOT_FOUND",
   message: "This project has no user schema named {requested}",
   hint: "Known schemas: {labels}",
@@ -151,24 +151,24 @@ const UNKNOWN_SCHEMA_REFUSAL: Refusal = {
     known: "{known}",
     schemas: "{schemas}",
   },
-};
+} as const satisfies Refusal;
 
 /**
  * What a run that names no schema, where there are several, is refused for.
  */
-const UNNAMED_SCHEMA_REFUSAL: Refusal = {
+const UNNAMED_SCHEMA_REFUSAL = {
   message: "This project has more than one user schema",
   hint: "Name the one to change with --schema. Known schemas: {labels}",
   details: {
     known: "{known}",
     schemas: "{schemas}",
   },
-};
+} as const satisfies Refusal;
 
 /**
  * What a `--schema` that more than one schema answers to is refused for.
  */
-const AMBIGUOUS_SCHEMA_REFUSAL: Refusal = {
+const AMBIGUOUS_SCHEMA_REFUSAL = {
   message: "More than one user schema is named {requested}: {labels}",
   hint: "Name the one to change by its file: {flags}",
   details: {
@@ -176,7 +176,7 @@ const AMBIGUOUS_SCHEMA_REFUSAL: Refusal = {
     candidates: "{candidates}",
     schemas: "{schemas}",
   },
-};
+} as const satisfies Refusal;
 
 /**
  * The schema the run is about, chosen by `--schema` or as the Project's only
@@ -790,30 +790,34 @@ function chosenSchema(schemas: Schemas, requested: string | undefined): UserSche
   try {
     return schemas.resolve(requested);
   } catch (error) {
-    if (error instanceof SchemaNotFoundError && error.known.length === 0) {
-      throw refusalError(NO_SCHEMA_REFUSAL, {});
-    }
+    // `resolve` misses a name only when one was given: with none, it either
+    // has no schema at all or finds several.
     if (error instanceof SchemaNotFoundError) {
+      const { requested } = error;
+      if (error.known.length === 0 || requested === undefined) {
+        throw refusalError(NO_SCHEMA_REFUSAL, {});
+      }
       throw refusalError(UNKNOWN_SCHEMA_REFUSAL, {
-        requested: error.requested,
+        requested,
         labels: error.known.map(labelOf).join(", "),
         known: namesOf(error.known),
         schemas: detailsOf(error.known),
       });
     }
-    if (error instanceof AmbiguousSchemaError && error.requested === undefined) {
-      throw refusalError(UNNAMED_SCHEMA_REFUSAL, {
-        labels: error.candidates.map(labelOf).join(", "),
-        known: namesOf(error.candidates),
-        schemas: detailsOf(error.candidates),
-      });
-    }
     if (error instanceof AmbiguousSchemaError) {
+      const { requested } = error;
+      if (requested === undefined) {
+        throw refusalError(UNNAMED_SCHEMA_REFUSAL, {
+          labels: error.candidates.map(labelOf).join(", "),
+          known: namesOf(error.candidates),
+          schemas: detailsOf(error.candidates),
+        });
+      }
       const flags = error.candidates.map((schema) => {
         return optionArgs("--schema", schemas.nameUniquely(schema)).join(" ");
       });
       throw refusalError(AMBIGUOUS_SCHEMA_REFUSAL, {
-        requested: error.requested,
+        requested,
         labels: error.candidates.map(labelOf).join(", "),
         flags: flags.join(" or "),
         candidates: namesOf(error.candidates),

@@ -34,6 +34,66 @@ export type Placeholders = Readonly<Record<string, unknown>>;
  */
 export type NextPlaceholders = Readonly<Record<string, Suggested | readonly Suggested[]>>;
 
+/** The name of each `{name}` in `Text`, as {@link interpolate} reads one. */
+type NamesIn<Text extends string> = Text extends `${string}{${infer Name}}${infer Rest}`
+  ?
+      | (Name extends `${string}${" " | '"' | "'" | ":" | "{" | "$"}${string}` ? never : Name)
+      | NamesIn<Rest>
+  : never;
+
+/** The placeholder names anywhere in `Value`: a string, or each string a list or object holds. */
+type NamesInValue<Value> = Value extends string
+  ? NamesIn<Value>
+  : Value extends readonly (infer Each)[]
+    ? NamesInValue<Each>
+    : Value extends object
+      ? { [Key in keyof Value]: NamesInValue<Value[Key]> }[keyof Value]
+      : never;
+
+/** Whether `R`'s wording is known only as `string`, as a refusal held in a variable of type {@link Refusal} is. */
+type Wide<R> = R extends { readonly message: infer Message }
+  ? string extends Message
+    ? true
+    : R extends { readonly hint: infer Hint }
+      ? string extends Hint
+        ? true
+        : false
+      : false
+  : true;
+
+/** The names `R`'s message, hint and details ask `values` for. */
+export type ValueNames<R> =
+  Wide<R> extends true
+    ? never
+    :
+        | NamesInValue<R extends { readonly message: infer Message } ? Message : never>
+        | NamesInValue<R extends { readonly hint: infer Hint } ? Hint : never>
+        | NamesInValue<R extends { readonly details: infer Details } ? Details : never>;
+
+/** The names `R`'s whole-placeholder `next` entries ask the `next` values for. */
+export type NextNames<R> =
+  Wide<R> extends true
+    ? never
+    : R extends { readonly next: readonly (infer Entry)[] }
+      ? Entry extends `{${infer Name}}`
+        ? Name
+        : never
+      : never;
+
+/**
+ * What a refusal's `values` must hold: every name its wording asks for, with a
+ * value. A refusal whose wording is only known as `string` takes any values,
+ * and only a test can tell what it asks for.
+ */
+export type ValuesFor<R> = Placeholders & {
+  readonly [Name in ValueNames<R>]: NonNullable<unknown> | null;
+};
+
+/** What a refusal's `next` values must hold: a follow-up for each whole placeholder it names. */
+export type NextFor<R> = NextPlaceholders & {
+  readonly [Name in NextNames<R>]: Suggested | readonly Suggested[];
+};
+
 /**
  * The names a refusal's wording would leave unfilled, given the values it
  * would be raised with.
@@ -153,11 +213,12 @@ function isSuggestedList(value: Suggested | readonly Suggested[]): value is read
  * so a refusal raised while a flag parses, before any run has settled, names
  * the same follow-ups as one raised by the command.
  */
-export function refusalError(
-  refusal: Refusal,
-  values: Placeholders,
-  next: NextPlaceholders = {},
+export function refusalError<const R extends Refusal>(
+  refusal: R,
+  values: ValuesFor<R>,
+  ...given: [NextNames<R>] extends [never] ? [next?: NextPlaceholders] : [next: NextFor<R>]
 ): ZitadelError {
+  const next: NextPlaceholders = given[0] ?? {};
   const suggested = refusal.next?.flatMap((entry) => {
     return commandsOf(entry, next);
   });

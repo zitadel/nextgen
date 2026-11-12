@@ -102,7 +102,7 @@ const MAX_PORT = 65_535;
  * A TCP port, refusing what is not a whole number from 1 to 65535, which is no
  * port a server can listen on.
  */
-const PORT: Refused<number> = {
+const PORT = {
   schema: whole.pipe(z.number().min(MIN_PORT).max(MAX_PORT)),
   refusal: {
     message: "{value} is not a TCP port",
@@ -112,7 +112,7 @@ const PORT: Refused<number> = {
     min: MIN_PORT,
     max: MAX_PORT,
   },
-};
+} as const satisfies Refused<number>;
 
 /** What doctor is about, worked out once however many times it is asked for. */
 /**

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { interpolate, refusalError, unmetBy } from "@/lib/oclif/refusal";
+import { interpolate, type Refusal, refusalError, unmetBy } from "@/lib/oclif/refusal";
 
 describe("interpolate", () => {
   it("fills each placeholder from the values", () => {
@@ -81,12 +81,14 @@ describe("refusalError", () => {
   });
 
   it("fills a next placeholder only from the next values, never from a string among the others", () => {
+    // @ts-expect-error a whole `next` placeholder is filled from the typed `next` values alone
     const error = refusalError({ message: "No server", next: ["{next}"] }, { next: "deploy -m x" });
 
     expect(error.nextCommands).toEqual([]);
   });
 
   it("names nothing for a placeholder no value fills", () => {
+    // @ts-expect-error the `next` values the placeholder asks for are left out
     const error = refusalError({ message: "No server", next: ["{next}"] }, {});
 
     expect(error.nextCommands).toEqual([]);
@@ -97,6 +99,38 @@ describe("refusalError", () => {
 
     expect(error.hint).toBeUndefined();
     expect(error.nextCommands).toBeUndefined();
+  });
+});
+
+describe("refusalError's values", () => {
+  const ASKS = {
+    message: "No schema named {requested}",
+    hint: "Known: {labels}",
+    details: { known: "{known}" },
+  } as const;
+
+  it("does not compile without a value its message, hint or details asks for", () => {
+    // @ts-expect-error the hint asks for {labels}
+    refusalError(ASKS, { requested: "x", known: [] });
+    // @ts-expect-error the details ask for {known}
+    refusalError(ASKS, { requested: "x", labels: "a" });
+
+    expect(refusalError(ASKS, { requested: "x", labels: "a", known: [] }).hint).toBe("Known: a");
+  });
+
+  it("does not compile without the follow-up a whole next placeholder asks for", () => {
+    // @ts-expect-error the `next` values must give {fix}
+    refusalError({ message: "No", next: ["{fix}"] }, {});
+
+    expect(
+      refusalError({ message: "No", next: ["{fix}"] }, {}, { fix: { id: "start" } }).nextCommands,
+    ).toEqual([{ id: "start" }]);
+  });
+
+  it("takes any values for a refusal whose wording is only known as text", () => {
+    const wide: Refusal = { message: "No {thing}" };
+
+    expect(refusalError(wide, {}).message).toBe("No {thing}");
   });
 });
 

@@ -124,9 +124,10 @@ function unfilled(text: string): string[] {
 
 /**
  * A refusal's wording reaches the person, so a placeholder nothing fills shows
- * them `{min}` where a number belonged. `interpolate` leaves it rather than
- * throwing, because a refusal is worth more than the defect in its own
- * wording, which makes this the only thing that catches one.
+ * them `{min}` where a number belonged. The compiler refuses one for a refusal
+ * declared `as const satisfies Refusal` (or `Refused`), whose wording it can
+ * read; this covers the few it cannot, declared with a type annotation because
+ * a `next` suggestion in a flag's own refusal would make its type circular.
  */
 describe("what a flag or argument is refused for", () => {
   it("asks only for what something fills", async () => {

@@ -444,50 +444,50 @@ export function customSettingsOf(flags: {
 }
 
 /** How `--server local` with nothing running is refused. */
-const NO_LOCAL_SERVER_REFUSAL: Refusal = {
+const NO_LOCAL_SERVER_REFUSAL = {
   code: "E_LOCAL_SERVER_NOT_RUNNING",
   message: "Local Zitadel server is not running",
   hint:
     "{reason}Start local Zitadel first, then rerun setup. {scripting}{recovery}" +
     "After setup succeeds, follow its next_commands to start the app and verify registration, logout, and login in the browser.",
   next: [{ id: "start" }, "{setup}"],
-};
+} as const satisfies Refusal;
 
 /** How a `--cwd` that is a file, or lies under one, is refused. */
-const NOT_A_DIRECTORY_REFUSAL: Refusal = {
+const NOT_A_DIRECTORY_REFUSAL = {
   message: "{cwd} is not a directory",
   hint: "Point --cwd at the app's directory, or at one that does not exist yet for setup to create.",
-};
+} as const satisfies Refusal;
 
 /** How a directory holding a project secret with no configuration is refused. */
-const SECRET_WITHOUT_CONFIG_REFUSAL: Refusal = {
+const SECRET_WITHOUT_CONFIG_REFUSAL = {
   code: "E_CONFLICT",
   message: ".zitadel/secret exists without zitadel.json",
   hint: "Move the secret aside or restore zitadel.json before running setup.",
-};
+} as const satisfies Refusal;
 
 /** How a repository git cannot answer about is refused. */
-const WORKTREE_UNKNOWN_REFUSAL: Refusal = {
+const WORKTREE_UNKNOWN_REFUSAL = {
   code: "E_CONFLICT",
   message: "Could not tell whether the git working tree is clean: {reason}",
   hint:
     "Setup commits the files it writes, and will not do that without knowing the tree " +
     "started clean. Fix what git is reporting, then run setup again, or pass --no-git to " +
     "set up without touching version control.",
-};
+} as const satisfies Refusal;
 
 /** How a repository where a commit would land in the wrong place is refused. */
-const WORKTREE_BLOCKED_REFUSAL: Refusal = {
+const WORKTREE_BLOCKED_REFUSAL = {
   code: "E_CONFLICT",
   message: "Setup cannot commit here: {blocked}",
   hint:
     "Setup commits the project so the first release records a commit. Finish or abort what " +
     "is under way, or check out a branch, then run setup again, or pass --no-git to set up " +
     "without touching version control.",
-};
+} as const satisfies Refusal;
 
 /** How a repository holding work the CLI did not write is refused. */
-const WORKTREE_DIRTY_REFUSAL: Refusal = {
+const WORKTREE_DIRTY_REFUSAL = {
   code: "E_CONFLICT",
   message: "The git working tree has {parts}",
   hint:
@@ -500,10 +500,10 @@ const WORKTREE_DIRTY_REFUSAL: Refusal = {
     modified: "{modified}",
     untracked: "{untracked}",
   },
-};
+} as const satisfies Refusal;
 
 /** How a local server another CLI release started is refused. */
-const SERVER_VERSION_REFUSAL: Refusal = {
+const SERVER_VERSION_REFUSAL = {
   code: "E_CONFLICT",
   message: "The local Zitadel server runs {running}, but this CLI ships {expected}",
   hint:
@@ -516,7 +516,7 @@ const SERVER_VERSION_REFUSAL: Refusal = {
     server_version: "{running}",
     cli_server_version: "{expected}",
   },
-};
+} as const satisfies Refusal;
 
 /** What setup needs to know about the run before it detects or writes anything. */
 export type SetupPreflight = Readonly<{
@@ -737,42 +737,42 @@ export type SetupFlagsToCheck = Readonly<{
   ssoScopes?: string;
 }>;
 
-const DESIGN_REMOVED_REFUSAL: Refusal = {
+const DESIGN_REMOVED_REFUSAL = {
   message: "setup no longer applies a login template, so --design was removed",
   hint: `Rerun setup without --design. ${PAGE_LAYOUT_HINT} To own the widget's structure after setup, eject one of: ${BRANDING_DESIGNS.join(", ")}.`,
   next: [{ id: "branding:eject" }],
-};
+} as const satisfies Refusal;
 
-const CLIENT_ID_NEEDS_SSO_REFUSAL: Refusal = {
+const CLIENT_ID_NEEDS_SSO_REFUSAL = {
   message: "--sso-client-id needs --sso",
   hint: "Name the provider with --sso, e.g. --sso google.",
-};
+} as const satisfies Refusal;
 
-const SETTING_NEEDS_SSO_REFUSAL: Refusal = {
+const SETTING_NEEDS_SSO_REFUSAL = {
   message: `{flag} needs --sso ${CUSTOM_PROVIDER}`,
   hint: `Name the provider with --sso ${CUSTOM_PROVIDER}.`,
-};
+} as const satisfies Refusal;
 
-const SETTINGS_NEED_CUSTOM_REFUSAL: Refusal = {
+const SETTINGS_NEED_CUSTOM_REFUSAL = {
   message: "{names} only applies to a custom connection",
   hint: `Add --sso ${CUSTOM_PROVIDER}, or remove {them}.`,
   details: {
     flags: "{flags}",
   },
-};
+} as const satisfies Refusal;
 
-const CUSTOM_CONNECTION_INCOMPLETE_REFUSAL: Refusal = {
+const CUSTOM_CONNECTION_INCOMPLETE_REFUSAL = {
   message: "A custom connection needs {list}",
   hint: `Describe the connection, e.g. ${customExample(SETUP_FLAG_NAMES)}`,
   details: {
     missing: "{missing}",
   },
-};
+} as const satisfies Refusal;
 
-const SSO_NEEDS_CLIENT_ID_REFUSAL: Refusal = {
+const SSO_NEEDS_CLIENT_ID_REFUSAL = {
   message: "--sso {sso} needs --sso-client-id",
   hint: "Register {registration} and pass its client id.",
-};
+} as const satisfies Refusal;
 
 /** Where an application for `provider` is registered, for the hint to name. */
 function whereToRegister(flags: SetupFlagsToCheck, provider: string): string {
@@ -856,10 +856,10 @@ export function refuseUnusableFlags(flags: SetupFlagsToCheck, scripted: boolean)
  * is to pass one or leave the flag out, which is not what to do about a value
  * the provider would reject, so the two are worded apart.
  */
-const EMPTY_SETTING: Refusal = {
+const EMPTY_SETTING = {
   message: "the value is empty",
   hint: "Pass a value for {input}, or omit it entirely.",
-};
+} as const satisfies Refusal;
 
 /**
  * A trimmed value one of the platform's own parsers accepts, kept as it was
@@ -998,7 +998,7 @@ const MAX_PORT = 65_535;
  * A TCP port, refusing what is not a whole number from 1 to 65535, which is no
  * port a server can listen on.
  */
-const PORT: Refused<number> = {
+const PORT = {
   schema: whole.pipe(z.number().min(MIN_PORT).max(MAX_PORT)),
   refusal: {
     message: "{value} is not a TCP port",
@@ -1008,7 +1008,7 @@ const PORT: Refused<number> = {
     min: MIN_PORT,
     max: MAX_PORT,
   },
-};
+} as const satisfies Refused<number>;
 
 /**
  * The port a value names, for the dev-port prompt, so a port typed at the

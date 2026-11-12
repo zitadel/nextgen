@@ -35,10 +35,10 @@ const DEPLOYMENT_ID: Refused<string> = {
 };
 
 /** What naming both a deployment and an origin is refused for: the deployment already says which. */
-const DEPLOYMENT_AND_ORIGIN_REFUSAL: Refusal = {
+const DEPLOYMENT_AND_ORIGIN_REFUSAL = {
   message: "Name a deployment or an origin, not both.",
   hint: "A deployment id already says which deployment to read; `--origin` only picks the live one.",
-};
+} as const satisfies Refusal;
 
 /** The columns `resolve` renders, in order. */
 const COLUMNS = ["name", "value"] as const;

@@ -35,10 +35,10 @@ import { type Fact, section } from "@/lib/ui";
  * How an image beside the binary runtime is refused: an image is a container's,
  * and the npm binary runtime has none to run.
  */
-const IMAGE_NEEDS_DOCKER_REFUSAL: Refusal = {
+const IMAGE_NEEDS_DOCKER_REFUSAL = {
   message: "--image requires --runtime docker",
   hint: "Pass --runtime docker with --image <tag>, or omit --image for the npm binary runtime.",
-};
+} as const satisfies Refusal;
 
 const MIN_PORT = 1;
 const MAX_PORT = 65_535;
@@ -47,7 +47,7 @@ const MAX_PORT = 65_535;
  * A TCP port, refusing what is not a whole number from 1 to 65535, which is no
  * port a server can listen on.
  */
-const PORT: Refused<number> = {
+const PORT = {
   schema: whole.pipe(z.number().min(MIN_PORT).max(MAX_PORT)),
   refusal: {
     message: "{value} is not a TCP port",
@@ -57,7 +57,7 @@ const PORT: Refused<number> = {
     min: MIN_PORT,
     max: MAX_PORT,
   },
-};
+} as const satisfies Refused<number>;
 
 /**
  * `zitadel start` — start a local Zitadel server.

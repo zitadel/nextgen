@@ -1,7 +1,7 @@
 import { Args, Flags } from "@oclif/core";
 import { type ZodType, z } from "zod";
 
-import type { Placeholders } from "./refusal";
+import type { Placeholders, ValueNames } from "./refusal";
 import { type Refusal, refusalError } from "./refusal";
 
 /**
@@ -17,12 +17,37 @@ export type Refused<T> = Readonly<{
   values?: Placeholders;
 }>;
 
+/** What {@link read} fills in every flag's and argument's refusal. */
+type Parsed = "value" | "input" | "problem";
+
+/**
+ * `Declared`, unless its refusal asks for a name neither the parser nor its
+ * own `values` fills: then it must also carry that value, so leaving it out
+ * does not compile. A refusal whose wording is only known as `string` is
+ * checked by a test instead.
+ */
+type Filled<Declared> = Declared extends { readonly refusal: infer R }
+  ? [
+      Exclude<
+        ValueNames<R>,
+        Parsed | (Declared extends { readonly values: infer Values } ? keyof Values : never)
+      >,
+    ] extends [never]
+    ? Declared
+    : Declared & {
+        readonly values: {
+          readonly [Name in Exclude<ValueNames<R>, Parsed>]: NonNullable<unknown>;
+        };
+      }
+  : Declared;
+
 function read<T>(refused: Refused<T>, value: string, input: string): T {
   const parsed = refused.schema.safeParse(value);
   if (parsed.success) {
     return parsed.data;
   }
-  throw refusalError(refused.refusal, {
+  const refusal: Refusal = refused.refusal;
+  throw refusalError(refusal, {
     ...refused.values,
     value,
     input,
@@ -42,14 +67,18 @@ function read<T>(refused: Refused<T>, value: string, input: string): T {
  * oclif's own refusal lands, so a missing value and an unusable one fail the
  * same way, and the value the command is handed is already the parsed type.
  */
-export function reads<T>(refused: Refused<T>) {
+export function reads<T, const Declared extends Refused<T> = Refused<T>>(
+  refused: Filled<Declared> & Refused<T>,
+) {
   return async (value: string, _command: unknown, definition: { name: string }): Promise<T> => {
     return read(refused, value, `--${definition.name}`);
   };
 }
 
 /** The `parse` an argument gives `Args.custom`, named as it is. See {@link reads}. */
-export function taken<T>(refused: Refused<T>) {
+export function taken<T, const Declared extends Refused<T> = Refused<T>>(
+  refused: Filled<Declared> & Refused<T>,
+) {
   return async (value: string, _command: unknown, definition: { name: string }): Promise<T> => {
     return read(refused, value, definition.name);
   };

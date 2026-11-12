@@ -171,6 +171,22 @@ describe("a flag built with reads", () => {
   });
 });
 
+describe("a refusal a flag or argument is built with", () => {
+  const LIMITED = {
+    schema: z.string(),
+    refusal: { message: "{input} takes at most {max} characters" },
+  } as const;
+
+  it("does not compile without a value only its declaration can fill", () => {
+    // @ts-expect-error nothing fills {max}
+    reads(LIMITED);
+    // @ts-expect-error nothing fills {max}
+    taken(LIMITED);
+
+    expect(reads({ ...LIMITED, values: { max: 3 } })).toBeTypeOf("function");
+  });
+});
+
 describe("an argument built with taken", () => {
   const nameArg = Args.custom<string>({
     parse: taken({
