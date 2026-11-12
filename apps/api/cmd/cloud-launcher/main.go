@@ -21,10 +21,10 @@
 //   - The pause. A function is paused between requests, which the launcher
 //     tells a deployment's server as server.lifecycle: request_only; what
 //     the server then does differently is the server's (ADR 089). Its
-//     hourly audit event purge cannot run on a timer here: a Vercel Cron Job
-//     (repo-root vercel.json) calls the server's retention trigger instead,
-//     with CRON_SECRET as its bearer token, which becomes
-//     events.retention.trigger_secret in <data_dir>/nextgen.yaml.
+//     periodic work, the hourly audit event purge among it, cannot run on a
+//     timer here: a Vercel Cron Job (repo-root vercel.json) calls the
+//     server's wake-up endpoint instead, with CRON_SECRET as its bearer
+//     token, which becomes server.wake_up.secret in <data_dir>/nextgen.yaml.
 //   - The deployment's shape. The listen address follows PORT, the data dir
 //     is the function's writable /tmp and the console is a service of its
 //     own (repo-root vercel.json). The platform project is bootstrapped,
@@ -66,7 +66,6 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/zitadel/nextgen/cmd/server"
-	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/background"
 	"github.com/zitadel/nextgen/internal/bootstrap/users"
 	"github.com/zitadel/nextgen/internal/crypto"
@@ -363,9 +362,9 @@ type serving struct {
 	// adminID is the user id admin names, the deployment's platform operator
 	// unless NEXTGEN_PLATFORM_OPERATORS says otherwise (ADR 075).
 	adminID string
-	// cronSecret is what the cron job that runs the audit event purge sends
-	// as its bearer token. Empty in a local run, which keeps the server's own
-	// purge loop.
+	// cronSecret is what the cron job that wakes the server for its periodic
+	// work sends as its bearer token. Empty in a local run, which keeps the
+	// server's own timers.
 	cronSecret string
 }
 
@@ -444,13 +443,14 @@ func parseServing(env string) (*serving, error) {
 	}
 
 	// Without it a deployment would never purge: the cron job is the only
-	// caller of the purge, and the server refuses a call without the secret.
+	// thing that wakes the server for its periodic work, and the server
+	// refuses a call without the secret.
 	s.cronSecret = os.Getenv("CRON_SECRET")
 	if s.cronSecret == "" && deployed(env) {
-		return nil, fmt.Errorf("CRON_SECRET must be set for a %s deployment: the cron job that purges expired audit events authenticates with it", env)
+		return nil, fmt.Errorf("CRON_SECRET must be set for a %s deployment: the cron job that wakes the server to purge expired audit events authenticates with it", env)
 	}
 	if s.cronSecret != "" {
-		if err := audit.CheckTriggerSecret(s.cronSecret); err != nil {
+		if err := background.CheckWakeUpSecret(s.cronSecret); err != nil {
 			return nil, fmt.Errorf("CRON_SECRET %w", err)
 		}
 	}
@@ -537,8 +537,8 @@ func prepareServer(extra []string) ([]string, error) {
 	// one fact is all the launcher says: the server holds its background
 	// work to it and takes server.idle_timeout and
 	// events.request.flush_wait from it, unless a NEXTGEN_* variable sets
-	// those (ADR 089). A local run keeps running, and purges on its own
-	// timer without a CRON_SECRET.
+	// those (ADR 089). A local run keeps running, on its own timers without
+	// a CRON_SECRET.
 	if deployed(env) {
 		pinned["NEXTGEN_SERVER_LIFECYCLE"] = string(background.RequestOnly)
 	}
@@ -706,7 +706,7 @@ func decodePEM(name, b64 string) (string, error) {
 // stay in it: the master keys as YAML block scalars under their ids, and the
 // cron job's secret. The current key encrypts; a previous key, during a
 // rotation, only decrypts until the server has re-wrapped everything it
-// wrapped. With the secret, the server leaves the purge to the cron job.
+// wrapped. The secret opens the server's wake-up endpoint to the cron job.
 func renderConfig(s *serving) ([]byte, error) {
 	key := func(pem string, encrypts bool) map[string]any {
 		return map[string]any{"private_key": pem, "use_for_encryption": encrypts}
@@ -715,11 +715,9 @@ func renderConfig(s *serving) ([]byte, error) {
 	if s.previousID != "" {
 		keys[s.previousID] = key(s.previousPEM, false)
 	}
-	config := map[string]any{
-		"server": map[string]any{"generate_master_key": false, "master_keys": keys},
-	}
+	server := map[string]any{"generate_master_key": false, "master_keys": keys}
 	if s.cronSecret != "" {
-		config["events"] = map[string]any{"retention": map[string]any{"trigger_secret": s.cronSecret}}
+		server["wake_up"] = map[string]any{"secret": s.cronSecret}
 	}
-	return yaml.Marshal(config)
+	return yaml.Marshal(map[string]any{"server": server})
 }

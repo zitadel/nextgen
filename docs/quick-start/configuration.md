@@ -20,6 +20,7 @@ Example file: [`docs/operations/nextgen.example.yaml`](../operations/nextgen.exa
 | `server.request_id_header` | `NEXTGEN_SERVER_REQUEST_ID_HEADER` | — (unset)                                                      | A header a proxy in front of the server sets to its own ID for each request, such as Vercel's `x-vercel-id`. The server then uses that ID in its logs, `X-Request-Id`, audit events and error pages. Set it only behind a proxy that overwrites the header, or a client chooses its own ID. |
 | `server.idle_timeout`    | `NEXTGEN_SERVER_IDLE_TIMEOUT`    | `60s`; `0` where `server.lifecycle` is `request_only` | How long the server keeps a connection open while it waits for the next request. Behind a proxy that reuses its connections, set it above the proxy's own idle timeout, or to `0` to never close one: a `POST` the proxy sends as the server closes the connection ends as the proxy's 502. |
 | `server.lifecycle`       | `NEXTGEN_SERVER_LIFECYCLE`       | `always_on`                                                         | How the platform keeps the process running: `always_on`, `scale_to_zero` or `request_only`; see [Where the server runs](#where-the-server-runs) |
+| `server.wake_up.secret`  | `NEXTGEN_SERVER_WAKE_UP_SECRET`  | (empty)                                                             | Opens the endpoint a scheduler calls to run the server's periodic work; see [Waking the server](#waking-the-server) |
 
 ### Where the server runs
 
@@ -37,8 +38,8 @@ requests. Say which it is with `server.lifecycle`
 | --- | --- | --- |
 | Docker, Docker Compose, a VM, Kubernetes | `always_on` (the default) | Nothing |
 | Cloud Run with CPU always allocated and a minimum of one instance | `always_on` | Nothing |
-| Knative; Cloud Run with CPU always allocated and no minimum instance | `scale_to_zero` | Nothing. To purge audit events while no request comes: `events.retention.trigger_secret` and a scheduler |
-| Vercel function; Cloud Run by default (CPU only during requests) | `request_only` | `events.retention.trigger_secret` and a scheduler, or `events.retention.enabled: false` |
+| Knative; Cloud Run with CPU always allocated and no minimum instance | `scale_to_zero` | Nothing. To purge and export audit events while no request comes: [`server.wake_up.secret` and a scheduler](#waking-the-server) |
+| Vercel function; Cloud Run by default (CPU only during requests) | `request_only` | [`server.wake_up.secret` and a scheduler](#waking-the-server), or `events.retention.enabled: false` |
 
 The setting turns nothing on by itself. The server holds everything it does
 outside a request to it, and refuses to start with a setting that could not
@@ -48,13 +49,46 @@ work there:
 | --- | --- | --- |
 | `server.idle_timeout` | `60s`, as always on | Defaults to `0`: the platform's proxy reuses its connections across a pause |
 | `events.request.flush_wait` | `0s`, as always on: the event is written after the response, and before an instance stops | Defaults to `2s`: a request waits for its [audit event](#request-audit-events); `0` fails the start |
-| [Audit event retention](#audit-event-retention) | Purges as an instance starts and hourly while one is up | Runs only from its trigger: the start fails without `events.retention.trigger_secret`, unless retention is off |
-| `events.export.enabled` | Ships while an instance is up | Fails the start: it ships on a timer |
-| `service_ping.enabled` | Fails the start: it pings at each start | Fails the start |
+| [Audit event retention](#audit-event-retention) | Purges as an instance starts and hourly while one is up | Purges only when the server is [woken](#waking-the-server): the start fails without `server.wake_up.secret`, unless retention is off |
+| `events.export.enabled` | Ships while an instance is up | Ships only when the server is woken, what is pending since the last call: the start fails without `server.wake_up.secret` |
+| `service_ping.enabled` | Fails the start: it pings at each start | Fails the start, with or without `server.wake_up.secret` |
 | Master key rotation | The server re-wraps beside its requests | The server re-wraps before it takes its first request |
 
 A value you set for `server.idle_timeout` or `events.request.flush_wait`
 outranks its default.
+
+### Waking the server
+
+A server that is paused between requests keeps no timer, and one whose last
+instance is stopped keeps none while it has no instance. A scheduler outside
+the server does the timer's job: one call runs all the server's periodic work
+once, which is the [audit event purge](#audit-event-retention) and the audit
+event export, each if it is on.
+
+Set `server.wake_up.secret` to at least 16 printable ASCII characters
+(`openssl rand -hex 32`), and have the scheduler send it as a bearer token in
+a `GET` or `POST` to `/cron/wake-up`, once an hour or as often as events
+should be exported:
+
+```sh
+curl -fsS -H "Authorization: Bearer $WAKE_UP_SECRET" https://zitadel.example.com/cron/wake-up
+# {"tasks":[{"name":"event_retention","ok":true}]}
+```
+
+- Without `server.wake_up.secret` the server has no such endpoint. A
+  `request_only` server with retention or the export on does not start
+  without it.
+- A call without the secret gets `401`. A call whose work failed gets `500`
+  and names the task with `"ok":false`; the server's log says why.
+- The work of one call shares 4½ minutes, so give the call that long. What
+  does not fit is cancelled: a purge then deletes nothing, and the export
+  ships the rest with the next call.
+- A missed call leaves its work to the next. Two calls at once are safe.
+- An `always_on` server keeps its timers and runs the same work once more per
+  call.
+
+The hosted cloud calls it from a Vercel Cron Job
+([runbook](../runbooks/cloud.md#operating)).
 
 ## Platform
 
@@ -167,29 +201,11 @@ answer. Requests in flight together still share a write.
 | `events.retention.enabled`        | `NEXTGEN_EVENTS_RETENTION_ENABLED`        | `true`           | Delete audit events once they are older than the window        |
 | `events.retention.window`         | `NEXTGEN_EVENTS_RETENTION_WINDOW`         | `720h` (30 days) | How long an event is kept after it was stored                  |
 | `events.retention.interval`       | `NEXTGEN_EVENTS_RETENTION_INTERVAL`       | `1h`             | How often the server purges; the first purge runs as it starts |
-| `events.retention.trigger_secret` | `NEXTGEN_EVENTS_RETENTION_TRIGGER_SECRET` | (empty)          | Leaves the schedule to a scheduler outside the server (below)  |
 
 The server purges on its own timer. A server the platform
-[pauses between requests](#where-the-server-runs)
-can't keep a timer, and does not start without `trigger_secret`. Set it to at
-least 16 printable ASCII characters (`openssl rand -hex 32`), and the server
-stops its timer and purges once per `GET` or `POST` to
-`/cron/events-retention` that carries the secret as a bearer token:
-
-```sh
-curl -fsS -H "Authorization: Bearer $TRIGGER_SECRET" https://zitadel.example.com/cron/events-retention
-# {"deleted":42}
-```
-
-- A request without the secret gets `401`, and a purge that fails `500`; the
-  server's log says why.
-- A purge that takes longer than 4½ minutes is cancelled and deletes nothing,
-  so give the call that long.
-- A missed call leaves its events to the next. Two calls at once are safe: the
-  second deletes what the first left, or nothing.
-
-The hosted cloud calls it from a Vercel Cron Job
-([runbook](../runbooks/cloud.md#operating)).
+[pauses between requests](#where-the-server-runs) can't keep a timer: it
+purges once per call that [wakes it](#waking-the-server), and does not start
+without `server.wake_up.secret` while retention is on.
 
 ## Logging
 

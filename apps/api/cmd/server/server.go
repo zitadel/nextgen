@@ -446,7 +446,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	// Everything the server does outside a request starts through this
 	// group, which holds each task to what it does in the server's lifecycle
 	// (ADR 089).
-	tasks := background.NewGroup(cfg.Server.Lifecycle)
+	tasks := background.NewGroup(cfg.Server.Lifecycle, cfg.Server.WakeUp)
 	defer tasks.Close()
 
 	exportAdapter := service.EventExportAdapter{Pool: serviceDBPool}
@@ -512,7 +512,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		api.NewIDPCallbackHandler(ssoCallback),
 		standaloneRuntimeResolver(projectService, tokenService, keyService, cfg.Platform.ResolvedProjectID()),
 		requestEventBuf,
-		retentionJob.Trigger())
+		tasks.WakeUp())
 	if err != nil {
 		return fmt.Errorf("failed to build http mux: %w", err)
 	}
@@ -734,6 +734,8 @@ func readConfig(configPath string, overrides ...configOverride) (Config, error) 
 	// lifecycleDefaults sets what follows from it, server.idle_timeout among
 	// them.
 	v.SetDefault("server.lifecycle", string(background.AlwaysOn))
+	// Empty: no wake-up endpoint, the periodic work runs on its timers only.
+	v.SetDefault("server.wake_up.secret", "")
 	// Generation on by default: a first local start has to work with no
 	// configuration at all. Production turns it off, per ADR 029.
 	v.SetDefault("server.generate_master_key", true)
@@ -821,8 +823,6 @@ func readConfig(configPath string, overrides ...configOverride) (Config, error) 
 	v.SetDefault("events.retention.window", 30*24*time.Hour)
 	v.SetDefault("events.retention.interval", time.Hour)
 	v.SetDefault("events.retention.enabled", true)
-	// Empty: the server purges on its own timer, not when a scheduler calls.
-	v.SetDefault("events.retention.trigger_secret", "")
 	v.SetDefault("events.export.enabled", false)
 	v.SetDefault("events.export.interval", 5*time.Second)
 	v.SetDefault("service_ping.enabled", false)
@@ -1019,7 +1019,7 @@ func idleTimeout(configured time.Duration) time.Duration {
 	return configured
 }
 
-func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiServers api.Servers, idpCallbackHandler http.Handler, runtime runtimeResolver, requestEvents *audit.RequestBuffer, retentionTrigger http.Handler) (http.Handler, error) {
+func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiServers api.Servers, idpCallbackHandler http.Handler, runtime runtimeResolver, requestEvents *audit.RequestBuffer, wakeUp http.Handler) (http.Handler, error) {
 	mux := http.NewServeMux()
 
 	if cfg.ConsoleEnabled {
@@ -1073,8 +1073,8 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiS
 	mux.Handle(api.IDPCallbackPattern, callback)
 	mux.Handle(api.IDPCallbackUpstreamPattern, callback)
 	// Request ID, access log and panic recovery — shared by mounts that sit
-	// outside the API's auth/CSRF chain (retention trigger, CSP reports, the
-	// embedded OpenAPI document).
+	// outside the API's auth/CSRF chain (the wake-up endpoint, CSP reports,
+	// the embedded OpenAPI document).
 	observe := func(h http.Handler) http.Handler {
 		return middleware.Chain(h,
 			func(next http.Handler) http.Handler {
@@ -1084,12 +1084,12 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiS
 			api.WithRecover,
 		)
 	}
-	// The event retention trigger, when a scheduler outside the process runs
-	// the purge (events.retention.trigger_secret, ADR 049): the operator's,
-	// not the API's, so it takes the request ID and the request line but none
-	// of the middleware a client's request passes.
-	if retentionTrigger != nil {
-		mux.Handle(audit.RetentionTriggerPath, observe(retentionTrigger))
+	// The wake-up endpoint, when a scheduler outside the process runs the
+	// server's periodic work (server.wake_up.secret, ADR 089): the
+	// operator's, not the API's, so it takes the request ID and the request
+	// line but none of the middleware a client's request passes.
+	if wakeUp != nil {
+		mux.Handle(background.WakeUpPath, observe(wakeUp))
 	}
 	// Where browsers post the violations of the console's and the error
 	// page's policies, and on the hosted cloud those of every service's

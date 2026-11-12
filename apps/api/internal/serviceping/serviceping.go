@@ -163,12 +163,13 @@ func New(cfg Config, facts Facts) *Pinger {
 }
 
 // pingsPerStart is why the ping is off where instances come and go.
-const pingsPerStart = "it pings at each start, which would count starts and not deployments, and it has no trigger; turn it off with service_ping.enabled"
+const pingsPerStart = "it pings at each start, which would count starts and not deployments, and nothing stores when a deployment last pinged for a wake-up to go by; turn it off with service_ping.enabled"
 
 // Task is the pinger as background work. It pings as it starts and then on a
-// timer, and has no trigger. Where the platform starts and stops instances
-// that would count starts, not deployments, so the server refuses to start
-// there with the ping on.
+// timer. Where the platform starts and stops instances that would count
+// starts, not deployments, so the server refuses to start there with the ping
+// on. It is no periodic task of the wake-up endpoint either: a call cannot
+// tell whether the deployment has pinged in this interval.
 func (p *Pinger) Task() background.Task {
 	return background.Task{
 		Name:        "service ping",

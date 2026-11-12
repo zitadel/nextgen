@@ -59,6 +59,8 @@ where the platform pauses the process or stops its last instance
 
 - Start it as a `background.Task` through the group in `cmd/server`, with an
   answer for each `server.lifecycle`; never with a bare `go`.
+- Give periodic work a `Task.Once`: the wake-up endpoint runs it, so it needs
+  no endpoint or secret of its own.
 - `server:lint` (`backgroundlint`) reports a `go` statement elsewhere.
 - Add `//background:allow <reason>` only to name the goroutine's task, or to
   say why it is not background work.

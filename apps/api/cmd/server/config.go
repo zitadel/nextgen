@@ -140,7 +140,7 @@ func (c Config) Validate() error {
 		c.Platform.Validate,
 		c.HTTPClient.Validate,
 		c.Schema.Validate,
-		c.Events.Retention.Validate,
+		c.Events.Export.Validate,
 	} {
 		if err := validate(); err != nil {
 			return err
@@ -221,10 +221,18 @@ type ServerConfig struct {
 	// the settings a pause changes take their defaults from it: IdleTimeout
 	// and events.request.flush_wait (ADR 089).
 	Lifecycle background.Lifecycle `mapstructure:"lifecycle"`
+	// WakeUp opens the endpoint a scheduler outside the process calls to run
+	// the server's periodic work: all of it where Lifecycle is request_only,
+	// and what an idle deployment would otherwise leave until its next
+	// request where it is scale_to_zero (ADR 089).
+	WakeUp background.WakeUpConfig `mapstructure:"wake_up"`
 }
 
 func (c ServerConfig) Validate() error {
 	if err := c.Lifecycle.Validate(); err != nil {
+		return err
+	}
+	if err := c.WakeUp.Validate(); err != nil {
 		return err
 	}
 	// Checked here rather than at startup, so `migrate` refuses an entry the
