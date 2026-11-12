@@ -266,6 +266,68 @@ func TestApplicationService_Get(t *testing.T) {
 	assert.ErrorIs(t, err, domain.ErrApplicationNotFound())
 }
 
+func TestApplicationService_Client(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name     string
+		row      *domain.ApplicationClient
+		rowErr   error
+		document []byte
+		wantErr  error
+	}{
+		{
+			name:     "supplied_client_id",
+			row:      &domain.ApplicationClient{ApplicationID: "app_1", Slug: "web", ClientID: "shop-web"},
+			document: shopDocument(shopWebFixed),
+		},
+		{
+			// The document holds no client_id when the server generated it, so
+			// the client is found through its row.
+			name:     "generated_client_id",
+			row:      &domain.ApplicationClient{ApplicationID: "app_1", Slug: "web", ClientID: "client_1"},
+			document: shopDocument(shopWeb),
+		},
+		{
+			name:    "unknown_client",
+			rowErr:  database.NewNoRowFoundError(nil),
+			wantErr: domain.ErrApplicationNotFound(),
+		},
+		{
+			name:    "storage_unavailable",
+			rowErr:  database.NewUnavailableError(nil),
+			wantErr: domain.ErrUnavailable(),
+		},
+		{
+			name:     "slug_missing_from_document",
+			row:      &domain.ApplicationClient{ApplicationID: "app_1", Slug: "admin", ClientID: "shop-admin"},
+			document: shopDocument(shopWebFixed),
+			wantErr:  domain.ErrInternal(nil),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			f := newApplicationFixture(t)
+			f.pool.EXPECT().GetApplicationClientByClientID(gomock.Any(), appProjectID, "requested").Return(tt.row, tt.rowErr)
+			if tt.row != nil {
+				stored := storedShop()
+				stored.Document = tt.document
+				f.pool.EXPECT().GetApplication(gomock.Any(), gomock.Any()).Return(stored, nil)
+			}
+
+			got, err := f.svc.Client(t.Context(), appProjectID, "dep_1", "requested")
+			if tt.wantErr != nil {
+				assert.ErrorIs(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, "web", got.Slug)
+			assert.Equal(t, []string{"https://shop.example.com/callback"}, got.RedirectURIs)
+			assert.Equal(t, []string{"authorization_code"}, got.GrantTypes)
+		})
+	}
+}
+
 // applicationFixture splits reads from writes like idpConnectionFixture: the
 // service reads through the pool and writes through the transaction, so an
 // expectation on the wrong mock fails the test, and an event recorded on tx

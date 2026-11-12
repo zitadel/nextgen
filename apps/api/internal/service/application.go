@@ -28,6 +28,9 @@ type ApplicationClientSecret struct {
 type ApplicationService interface {
 	CreateOrRevise(ctx context.Context, projectID string, document []byte) (*CreateApplicationOutput, error)
 	Get(ctx context.Context, projectID, id string) (*domain.Application, error)
+	// Client returns the newest document of the client holding clientID. An
+	// unknown client is [domain.ErrApplicationNotFound].
+	Client(ctx context.Context, projectID, deploymentID, clientID string) (domain.ApplicationClientDocument, error)
 }
 
 type applicationService struct {
@@ -67,6 +70,38 @@ func (s *applicationService) Get(ctx context.Context, projectID, id string) (_ *
 	defer end(&err)
 
 	return s.get(ctx, projectID, domain.ApplicationFieldID, id)
+}
+
+// Client implements [ApplicationService]. deploymentID is unused: a
+// registered client is data, not part of a release (ADR 081 §10).
+func (s *applicationService) Client(ctx context.Context, projectID, _, clientID string) (_ domain.ApplicationClientDocument, err error) {
+	ctx, end := startSpan(ctx, "ApplicationService.Client")
+	defer end(&err)
+
+	row, err := s.v2Pool.Statements().GetApplicationClientByClientID(ctx, projectID, clientID)
+	if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+		return domain.ApplicationClientDocument{}, domain.ErrApplicationNotFound()
+	}
+	if _, ok := errors.AsType[*database.UnavailableError](err); ok {
+		return domain.ApplicationClientDocument{}, domain.ErrUnavailable().WithParent(err)
+	}
+	if err != nil {
+		return domain.ApplicationClientDocument{}, domain.ErrInternal(err).WithMessage("failed to get application client")
+	}
+	application, err := s.get(ctx, projectID, domain.ApplicationFieldID, row.ApplicationID)
+	if err != nil {
+		return domain.ApplicationClientDocument{}, err
+	}
+	doc, err := domain.ParseApplicationDocument(application.Document)
+	if err != nil {
+		return domain.ApplicationClientDocument{}, domain.ErrInternal(err).WithMessage("failed to parse application document")
+	}
+	// A revision cannot remove a client, so its slug is always in the newest one.
+	i := slices.IndexFunc(doc.Clients, func(client domain.ApplicationClientDocument) bool { return client.Slug == row.Slug })
+	if i < 0 {
+		return domain.ApplicationClientDocument{}, domain.ErrInternal(nil).WithMessage("application client missing from its document")
+	}
+	return doc.Clients[i], nil
 }
 
 // validate checks document against the application.json schema, then against
