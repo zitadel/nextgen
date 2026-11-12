@@ -1672,10 +1672,14 @@ describe("users screen", () => {
   it("reads only the rows for a new term, keeping the older revisions filter", async () => {
     serveLineage();
     const bodies = recordQueries(() => HttpResponse.json({ users: [] }));
+    // What a search must not read again is the filter's own chrome: the
+    // options, the revisions and the newest revision, all reads of the schema
+    // list. A schema read by its id is a row's columns, and with no rows here
+    // it is an earlier test's replaced search finishing late (`serveLineage`).
     const schemaReads: string[] = [];
     const countSchemaReads = ({ request }: { request: Request }) => {
       const url = new URL(request.url);
-      if (url.pathname.startsWith("/api/v1/schemas")) schemaReads.push(url.pathname + url.search);
+      if (url.pathname === "/api/v1/schemas") schemaReads.push(url.pathname + url.search);
     };
     await renderUsers(`${scopedPath("/users")}&schema=business&revision=older`);
     await screen.findByText("No users match this filter.");
