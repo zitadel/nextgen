@@ -11,7 +11,6 @@ import {
 } from "@/lib/oclif/failure";
 import { type SuggestedCommand, unscopedCommand } from "@/lib/suggestion";
 import { Ui } from "@/lib/ui";
-import { closest } from "@/lib/zitadel/utils/spelling";
 
 /** The exit code a shell reports for a command it cannot find, which scripts already branch on. */
 export const UNKNOWN_COMMAND_EXIT_CODE = 127;
@@ -234,19 +233,22 @@ export class UnknownCommand {
   }
 
   /**
+   * The one candidate the word is a single edit from, or differs from only in
+   * case, however short the word: `ad` is one edit from `add`. Two such
+   * candidates are a guess between them, so neither is offered.
+   *
    * @param word - The word typed.
    * @param candidates - The words it may have meant.
-   * @returns The candidate a single edit from it, or the one it differs from
-   *   only in case, if there is one.
+   * @returns The candidate it meant, if exactly one is that close.
    */
   private oneEditFrom(word: string, candidates: readonly string[]): string | undefined {
-    const guess = closest(word, candidates);
-    if (guess === undefined) {
-      return undefined;
-    }
-    return guess.toLowerCase() === word.toLowerCase() || distance(word, guess) <= 1
-      ? guess
-      : undefined;
+    const close = [...new Set(candidates)].filter((candidate) => {
+      return (
+        candidate !== word &&
+        (candidate.toLowerCase() === word.toLowerCase() || distance(word, candidate) <= 1)
+      );
+    });
+    return close.length === 1 ? close[0] : undefined;
   }
 
   /**

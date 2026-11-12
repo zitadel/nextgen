@@ -12,6 +12,7 @@ const KNOWN: ReadonlyArray<readonly string[]> = [
   ["variable", "list"],
   ["env"],
   ["env", "list"],
+  ["env", "add"],
   ["doctor"],
   ["deploy"],
 ];
@@ -71,6 +72,7 @@ describe("UnknownCommand", () => {
     it.each([
       ["frobnicate", 127],
       ["teams:delete", 127],
+      ["env:ad", 127],
       ["doctor:extra", 3],
       ["variable:list:extra", 3],
     ])("%s exits %s: a shell's code only for a name that is no command", (id, code) => {
@@ -104,6 +106,7 @@ describe("UnknownCommand", () => {
       ["deplo", ["zitadel deploy --help"]],
       ["usrs:list", ["zitadel users --help"]],
       ["DEPLOY", ["zitadel deploy --help"]],
+      ["env:ad", ["zitadel env add --help", "zitadel env --help"]],
     ])("%s suggests the help of the one it meant", (id, next) => {
       const { error } = new UnknownCommand(id, KNOWN);
 
