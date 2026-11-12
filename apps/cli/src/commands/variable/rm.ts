@@ -1,12 +1,13 @@
 import { Flags } from "@oclif/core";
 
 import { VariableRemoval, VariableService } from "@/lib/backend";
-import { variableNameArg } from "./name";
 import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { dryRunResult } from "@/lib/oclif/crud/shared";
 import { Destructive } from "@/lib/oclif/destructive";
 import { deletedData } from "@/lib/oclif/envelope";
-import { prose } from "@/lib/oclif/rendering";
+import { escapeControlCharacters } from "@/lib/terminal-text";
+
+import { variableNameArg } from "./name";
 
 /**
  * `zitadel variable rm NAME` — remove one variable from the project.
@@ -17,6 +18,7 @@ import { prose } from "@/lib/oclif/rendering";
 export default class VariableRm extends Destructive(EnvironmentCommand) {
   static override description = "Remove one variable from the project.";
   static override group = CommandGroups.configuration;
+
   static override examples = [
     "<%= config.bin %> variable rm GOOGLE_CLIENT_ID",
     "<%= config.bin %> variable rm API_URL --preview",
@@ -51,14 +53,19 @@ export default class VariableRm extends Destructive(EnvironmentCommand) {
     return this.emit(
       await this.confirmed({
         verb: "remove",
-        name: `remove ${args.name} from the project`,
-        message: `Remove ${args.name} from the project?`,
-        preview: () => {
+        name: `remove ${removal.preview ? "the preview value of " : ""}${args.name} from the project`,
+        message: async () => {
+          const { projectId, server } = await this.connect();
+          const what = removal.preview ? "the preview value of " : "";
+          return `Remove ${what}${args.name} from project ${projectId} on ${server.replace(/^https?:\/\//, "")}?`;
+        },
+        preview: async () => {
           const result = dryRunResult({
             verb: "remove",
             topic: "variable",
             id: args.name,
             clause: `from the project${suffix}`,
+            next: await this.realRun(),
           });
           return {
             ...result,
@@ -82,7 +89,10 @@ export default class VariableRm extends Destructive(EnvironmentCommand) {
               }),
               kinds: removal.kinds,
             },
-            pretty: prose(`Removed ${args.name} from the project${suffix}`),
+            summary: {
+              title: `Removed ${escapeControlCharacters(args.name)} from the project${suffix}`,
+              sections: [],
+            },
           };
         },
       }),

@@ -41,7 +41,9 @@ export class StagingArea {
     try {
       return await work(new StagingArea(git, join(scratch, "index")));
     } finally {
-      await rm(scratch, { recursive: true, force: true }).catch(() => undefined);
+      await rm(scratch, { recursive: true, force: true }).catch(() => {
+        return undefined;
+      });
     }
   }
 
@@ -120,7 +122,9 @@ export class StagingArea {
     );
     const excluded = listed
       .paths()
-      .filter((path) => except(Buffer.from(path, "latin1").toString("utf8")))
+      .filter((path) => {
+        return except(Buffer.from(path, "latin1").toString("utf8"));
+      })
       .map(Git.excludedLiteral);
     const list = join(dirname(this.index), "paths");
     await writeFile(list, Buffer.from([".", ...excluded].join("\0"), "latin1"));
@@ -144,7 +148,11 @@ export class StagingArea {
    * the names it matches, so a name that is not valid UTF-8 still matches.
    */
   async markAsAdded(paths: readonly string[], globs: readonly string[] = []): Promise<void> {
-    const present = paths.filter((path) => this.git.exists(path)).map(Git.literal);
+    const present = paths
+      .filter((path) => {
+        return this.git.exists(path);
+      })
+      .map(Git.literal);
     const matching: string[] = [];
     for (const glob of globs) {
       const untracked = await this.git.run([

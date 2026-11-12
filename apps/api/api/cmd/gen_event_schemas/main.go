@@ -157,7 +157,7 @@ var webhookByEventType = map[string]webhookDoc{
 	"session.established": {description: "A session was established, by a sign-in or by exchanging a session."},
 	"session.deleted":     {description: "A session was revoked."},
 
-	"flow.signup_challenge.issued":   {description: "A password signup proof-of-work challenge was issued."},
+	"flow.signup_challenge.issued":   {description: "A sign-up proof-of-work challenge was issued."},
 	"flow.signup_challenge.consumed": {description: "A signup proof was spent before attempting user creation."},
 	"auth.attempt.created": {description: "An authentication attempt started. See " +
 		"[Sessions and auth attempts](/docs/concepts/sessions-auth-attempts)."},

@@ -1,7 +1,9 @@
 import { webcrypto } from "node:crypto";
 import {
   applyBranding,
+  applyPasskey,
   clearBranding,
+  clearPasskey,
   PASSWORD_FIELD,
   setupMockHandlers,
   type CapturedRequest,
@@ -2178,6 +2180,269 @@ describe("<zitadel-login> against the typed Flow API", () => {
         element.shadowRoot?.querySelector('zl-field[type="password"]') === null ? true : null,
       );
       expect(signupSubmits().some((r) => r.body.gate_proofs?.signup_pow)).toBe(false);
+    });
+
+    /**
+     * WebAuthn that never settles: `<zl-passkey>` starts its ceremony and the
+     * test answers it with `zl-passkey-result`, as a successful one would.
+     */
+    function holdWebAuthn() {
+      const credentials = Object.getOwnPropertyDescriptor(navigator, "credentials");
+      const publicKeyCredential = Object.getOwnPropertyDescriptor(window, "PublicKeyCredential");
+      const create = vi.fn(() => Promise.race<PublicKeyCredential>([]));
+      Object.defineProperty(window, "PublicKeyCredential", {
+        configurable: true,
+        value: class PublicKeyCredentialStub {},
+      });
+      Object.defineProperty(navigator, "credentials", {
+        configurable: true,
+        value: { create: create as unknown as CredentialsContainer["create"], get: vi.fn() },
+      });
+      return {
+        create,
+        restore() {
+          if (credentials) Object.defineProperty(navigator, "credentials", credentials);
+          else Reflect.deleteProperty(navigator, "credentials");
+          if (publicKeyCredential)
+            Object.defineProperty(window, "PublicKeyCredential", publicKeyCredential);
+          else Reflect.deleteProperty(window, "PublicKeyCredential");
+        },
+      };
+    }
+
+    /**
+     * identifier → register, then ask for the passkey sign-up's ceremony and
+     * wait until it has started. A check that fails takes `<zl-passkey>` off
+     * the step again, so the ceremony's start is read from WebAuthn itself.
+     */
+    async function startPasskeySignup(
+      element: ZitadelLogin,
+      webauthn: { create: { mock: { calls: unknown[] } } },
+    ): Promise<void> {
+      submit(element, "register");
+      await waitFor(() =>
+        element.shadowRoot?.querySelector('zl-button[action="passkey_register"]'),
+      );
+      type(element, "email", "passkey@acme.com");
+      const started = webauthn.create.mock.calls.length;
+      submit(element, "passkey_register");
+      await waitFor(() => (webauthn.create.mock.calls.length > started ? true : null));
+    }
+
+    function answerCeremony(element: ZitadelLogin): void {
+      element.shadowRoot?.dispatchEvent(
+        new CustomEvent("zl-passkey-result", {
+          bubbles: true,
+          composed: true,
+          detail: {
+            challenge_id: "ch_mock_passkey_register",
+            method: "passkey_register",
+            proof: {
+              id: "cred_passkey_signup",
+              rawId: "Y3JlZF9wYXNza2V5X3NpZ251cA",
+              type: "public-key",
+              response: { attestationObject: "AAAA", clientDataJSON: "BBBB" },
+            },
+          },
+        }),
+      );
+    }
+
+    /** Step GETs the mock answered so far. */
+    const stepGets = () => mock.getCaptured().filter((req) => req.kind === "getFlowStep").length;
+
+    /** Whether the check a passkey sign-up solves during its ceremony is done. */
+    const proofReady = (element: ZitadelLogin) =>
+      (element as unknown as { signupCeremony?: string }).signupCeremony !== undefined;
+
+    it("solves a passkey sign-up's check while its ceremony runs and sends it with the attestation", async () => {
+      applyPasskey(true);
+      const webauthn = holdWebAuthn();
+      try {
+        const element = await mount(host);
+        await startPasskeySignup(element, webauthn);
+        // Asking for the ceremony creates nobody, so it carries no proof.
+        const asked = signupSubmits().find((r) => r.body.action === "passkey_register");
+        expect(asked?.body.gate_proofs).toBeUndefined();
+        // The check is done while the ceremony runs, before any passkey exists.
+        await waitFor(() => (proofReady(element) ? true : null));
+        const gets = stepGets();
+        const completed = new Promise((resolve) =>
+          element.addEventListener("zitadel-flow-complete", resolve, { once: true }),
+        );
+
+        answerCeremony(element);
+
+        const attestation = await waitFor(() =>
+          signupSubmits().find((r) => r.body.challenge_response),
+        );
+        expect(attestation.body).toMatchObject({
+          action: "passkey_register",
+          challenge_response: { method: "passkey_register" },
+          gate_proofs: { signup_pow: expect.any(String) },
+        });
+        await completed;
+        // Nothing stands between the ceremony and the attestation that can fail.
+        expect(stepGets()).toBe(gets);
+        expect(webauthn.create).toHaveBeenCalledTimes(1);
+      } finally {
+        webauthn.restore();
+        clearPasskey();
+      }
+    });
+
+    it("stops a passkey sign-up's ceremony when its check fails, before a passkey is stored", async () => {
+      applyPasskey(true);
+      const webauthn = holdWebAuthn();
+      const derive = vi.spyOn(globalThis.crypto.subtle, "deriveBits");
+      derive.mockRejectedValueOnce(new Error("Temporary signup check failure"));
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      try {
+        const element = await mount(host);
+        await startPasskeySignup(element, webauthn);
+
+        await waitFor(() =>
+          element.shadowRoot?.textContent?.includes(en["error.signup_check_failed"]!) ? true : null,
+        );
+        // The ceremony left the step, which aborts the browser's prompt.
+        expect(internals(element).response.step.challenge).toBeUndefined();
+        expect(element.shadowRoot?.querySelector("zl-passkey")).toBeNull();
+        const [options] = webauthn.create.mock.calls[0] as unknown as [CredentialCreationOptions];
+        expect(options.signal?.aborted).toBe(true);
+        expect(signupSubmits().some((r) => r.body.challenge_response)).toBe(false);
+
+        // Picking the passkey again resumes the server's ceremony and solves afresh.
+        submit(element, "passkey_register");
+        await waitFor(() => (webauthn.create.mock.calls.length === 2 ? true : null));
+        await waitFor(() => (proofReady(element) ? true : null));
+      } finally {
+        warn.mockRestore();
+        derive.mockRestore();
+        webauthn.restore();
+        clearPasskey();
+      }
+    });
+
+    it("stops a passkey sign-up's ceremony when the server will issue no check", async () => {
+      applyPasskey(true);
+      const webauthn = holdWebAuthn();
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      try {
+        const element = await mount(host);
+        server.use(
+          http.get(
+            "*/flow/:id",
+            () =>
+              HttpResponse.json(
+                { code: "flow.rate_limited", message: "signup request limit reached" },
+                { status: 429 },
+              ),
+            { once: true },
+          ),
+        );
+        await startPasskeySignup(element, webauthn);
+
+        await waitFor(() =>
+          element.shadowRoot?.textContent?.includes(en["error.signup_rate_limited"] ?? "")
+            ? true
+            : null,
+        );
+        expect(element.shadowRoot?.querySelector("zl-passkey")).toBeNull();
+        const [options] = webauthn.create.mock.calls[0] as unknown as [CredentialCreationOptions];
+        expect(options.signal?.aborted).toBe(true);
+        expect(signupSubmits().some((r) => r.body.challenge_response)).toBe(false);
+      } finally {
+        warn.mockRestore();
+        webauthn.restore();
+        clearPasskey();
+      }
+    });
+
+    it("takes a response whose step carries no gates, as a host's own render may resume one", async () => {
+      const element = await mount(host);
+      const { response } = internals(element);
+      const { gates: _none, ...step } = response.step;
+
+      await expect(
+        internals(element).applyResponse({ ...response, step } as CreateFlow201),
+      ).resolves.toBeUndefined();
+    });
+
+    it("waits for a check still running when the passkey ceremony ends", async () => {
+      applyPasskey(true);
+      const webauthn = holdWebAuthn();
+      let release!: () => void;
+      const held = new Promise<void>((resolve) => (release = resolve));
+      const subtle = globalThis.crypto.subtle;
+      const deriveBits = subtle.deriveBits.bind(subtle);
+      const derive = vi
+        .spyOn(subtle, "deriveBits")
+        .mockImplementationOnce(async (...args: Parameters<SubtleCrypto["deriveBits"]>) => {
+          await held;
+          return deriveBits(...args);
+        });
+      try {
+        const element = await mount(host);
+        await startPasskeySignup(element, webauthn);
+        const gets = stepGets();
+
+        answerCeremony(element);
+        await waitFor(() => (element.getAttribute("aria-busy") === "true" ? true : null));
+        expect(signupSubmits().some((r) => r.body.challenge_response)).toBe(false);
+
+        release();
+        const attestation = await waitFor(() =>
+          signupSubmits().find((r) => r.body.challenge_response),
+        );
+        expect(attestation.body.gate_proofs).toEqual({ signup_pow: expect.any(String) });
+        expect(stepGets()).toBe(gets);
+      } finally {
+        release();
+        derive.mockRestore();
+        webauthn.restore();
+        clearPasskey();
+      }
+    });
+
+    it("keeps the passkey sign-up step without restarting its ceremony when the server refuses the proof", async () => {
+      applyPasskey(true);
+      const webauthn = holdWebAuthn();
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      try {
+        const element = await mount(host);
+        await startPasskeySignup(element, webauthn);
+        await waitFor(() => (proofReady(element) ? true : null));
+        server.use(
+          http.post(
+            "*/flow/:id/submit",
+            () =>
+              HttpResponse.json(
+                { code: "flow.rate_limited", message: "signup request limit reached" },
+                { status: 429 },
+              ),
+            { once: true },
+          ),
+        );
+
+        answerCeremony(element);
+
+        await waitFor(() =>
+          element.shadowRoot?.textContent?.includes(en["error.signup_rate_limited"] ?? "")
+            ? true
+            : null,
+        );
+        expect(internals(element).response.step.challenge).toBeUndefined();
+        expect(element.shadowRoot?.querySelector("zl-passkey")).toBeNull();
+        expect(webauthn.create).toHaveBeenCalledTimes(1);
+
+        // Picking the passkey again resumes the server's pending ceremony.
+        submit(element, "passkey_register");
+        await waitFor(() => (webauthn.create.mock.calls.length === 2 ? true : null));
+      } finally {
+        warn.mockRestore();
+        webauthn.restore();
+        clearPasskey();
+      }
     });
 
     it("renders no generic control for the kind: back action, only the account's change link", async () => {

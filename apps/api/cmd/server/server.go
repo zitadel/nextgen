@@ -1,10 +1,12 @@
 package server
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"net/http"
 	"net/url"
 	"os"
@@ -17,6 +19,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/KimMachineGun/automemlimit/memlimit"
 	"github.com/go-viper/mapstructure/v2"
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/ianlancetaylor/jsonschema"
@@ -174,6 +177,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	sfs.Add(telemetry.Shutdown)
 
 	setUpLogging(cfg.Instrumentation.Log, telemetry.LoggerProvider())
+	setMemoryLimit()
 
 	pool, err := startDatabase(ctx, cfg, applyMigrations)
 	if err != nil {
@@ -191,7 +195,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		return fmt.Errorf("failed to create Crypter: %w", err)
 	}
 
-	hasherFactory, err := cfg.PasswordHasher.NewHasherFactory()
+	hasherFactory, err := cfg.PasswordHasher.NewHasherFactory(metrics.WithMeterProvider(telemetry.MeterProvider()))
 	if err != nil {
 		return fmt.Errorf("failed to build password hasher: %w", err)
 	}
@@ -384,7 +388,6 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 
 	// ── Flow engine ──────────────────
 	fields := domain.NewSchemaFieldResolver()
-	flowAuth := service.NewFlowAuthAttemptAdapter(authAttemptSvc, schemaStore)
 	// The sign-up guard asks the project's user.create policy which challenge
 	// to issue; without one, it issues its built-in proof of work.
 	userCreatePolicy, err := service.NewUserCreatePolicy(policyEngine, policyService)
@@ -392,6 +395,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		return err
 	}
 	signupProtection := service.NewSignupProtection(serviceDBPool, keyService, userCreatePolicy)
+	flowAuth := service.NewFlowAuthAttemptAdapter(authAttemptSvc, schemaStore, signupProtection)
 	createUserHandler := service.NewFlowCreateUserHandler(
 		projectHashers,
 		passwordPolicy,
@@ -497,7 +501,9 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		// The same platform project the handler resolves: sessions homed there
 		// can reach the platform operator path (ADR 075).
 		api.NewSecurityHandler(tokenService).WithPlatformProject(cfg.Platform.ResolvedProjectID()),
-		apiServerOptions(telemetry.TracerProvider(), telemetry.MeterProvider(), consoleLink(cfg.Server.ConsolePath))...)
+		apiServerOptions(telemetry.TracerProvider(), telemetry.MeterProvider(), consoleLink(cfg.Server.ConsolePath),
+			// A refused hash waited max_wait for a slot; the next try waits as long.
+			cmp.Or(cfg.PasswordHasher.Concurrency.MaxWait, crypto.DefaultHashMaxWait))...)
 	if err != nil {
 		return fmt.Errorf("failed to build api servers: %w", err)
 	}
@@ -749,7 +755,15 @@ func readConfig(configPath string, overrides ...configOverride) (Config, error) 
 			MinSha512Rounds: 5_000, MaxSha512Rounds: 1_000_000,
 		},
 	})
-	v.SetDefault("schema.lru_cache_size", 1000) // todo: temp, review
+	// How much hashing runs at once in this process: one hash per CPU it
+	// may use, inside a memory budget sized from the container's memory
+	// limit. A hash that finds no slot within max_wait is refused with a 429
+	// rather than queued without end, so a burst degrades into retries
+	// instead of into an OOM kill or a stalled server.
+	v.SetDefault("password_hasher.concurrency.max_operations", 0) // 0: one per CPU the process may use, following runtime.GOMAXPROCS
+	v.SetDefault("password_hasher.concurrency.memory_budget", 0)  // bytes shared by every running hash; 0: half the Go memory limit (set from the container's limit) when there is one, else 512 MiB
+	v.SetDefault("password_hasher.concurrency.max_wait", 0)       // how long a hash waits for a slot before the 429; 0: 1s
+	v.SetDefault("schema.lru_cache_size", 1000)                   // todo: temp, review
 	v.SetDefault("keys.crypter_lru_cache_size", 1000)
 	v.SetDefault("keys.signing_key_lru_cache_size", 1000)
 	// An identifier namespace, not an address: it is stamped into documents
@@ -927,8 +941,9 @@ func mustBindEnv(v *viper.Viper, key string) {
 // apiServerOptions are the options of the ogen API servers that buildHTTPMux
 // mounts, to which api.NewServers adds each mount's own; shared with the
 // test of that chain. home is the way on that the error page of a path
-// nothing answers offers a person (ADR 076).
-func apiServerOptions(tracerProvider trace.TracerProvider, meterProvider metric.MeterProvider, home *errorpage.Link) []oasapi.ServerOption {
+// nothing answers offers a person (ADR 076); retryAfter is the Retry-After
+// of a user.password_hashing_busy 429.
+func apiServerOptions(tracerProvider trace.TracerProvider, meterProvider metric.MeterProvider, home *errorpage.Link, retryAfter time.Duration) []oasapi.ServerOption {
 	return []oasapi.ServerOption{
 		oasapi.WithMiddleware(
 			middleware.AddOperationIdToContext(),
@@ -936,7 +951,7 @@ func apiServerOptions(tracerProvider trace.TracerProvider, meterProvider metric.
 		),
 		oasapi.WithMeterProvider(meterProvider),
 		oasapi.WithTracerProvider(api.NewOgenTracerProvider(tracerProvider)),
-		oasapi.WithErrorHandler(api.OgenErrorHandler),
+		oasapi.WithErrorHandler(api.OgenErrorHandler(retryAfter)),
 		oasapi.WithNotFound(api.OgenNotFound(home)),
 		oasapi.WithMethodNotAllowed(api.OgenMethodNotAllowed),
 	}
@@ -1152,6 +1167,28 @@ func buildMasterKey(keyConfigs map[string]*MasterKeyConfig) (*domain.MasterKeys,
 	}
 
 	return masterKeys, nil
+}
+
+// setMemoryLimit sets the Go memory limit from the cgroup memory limit the
+// process runs under, when there is one: the garbage collector then keeps the
+// heap inside the container, and the password hashing budget is derived from
+// it (crypto.HashConcurrencyConfig). An operator's GOMEMLIMIT is kept, and
+// AUTOMEMLIMIT tunes the ratio or turns this off, as the library documents.
+// It runs after the logger is set up and before anything that reads the
+// limit, so the outcome is one line of the server's own: the library would
+// otherwise report every start without cgroups as an error.
+func setMemoryLimit() {
+	limit, err := memlimit.Set()
+	switch {
+	case errors.Is(err, memlimit.ErrCgroupsNotSupported), errors.Is(err, memlimit.ErrNoCgroup):
+		slog.Debug("no cgroup memory limit to derive the Go memory limit from", slogctx.Err(err))
+	case err != nil:
+		slog.Warn("the Go memory limit could not be set from the cgroup memory limit", slogctx.Err(err))
+	case limit < math.MaxInt64:
+		slog.Info("Go memory limit set", slog.Int64("limit_bytes", limit))
+	default:
+		slog.Debug("the process runs without a memory limit")
+	}
 }
 
 // ----------------------------- INSTRUMENTATION --------------------------------------

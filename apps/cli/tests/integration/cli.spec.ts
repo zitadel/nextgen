@@ -4,8 +4,13 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "@tests/helpers/platform";
-import { anApp } from "@tests/helpers/project";
-import { expectedPublicCliCommand, parseJson, runCliForTest } from "@tests/helpers/run-cli";
+import { anApp, MOCK_SERVER_URL } from "@tests/helpers/project";
+import {
+  cliVersion,
+  expectedPublicCliCommand,
+  parseJson,
+  runCliForTest,
+} from "@tests/helpers/run-cli";
 
 const platform = usePlatformMock();
 
@@ -50,6 +55,35 @@ async function suggestedCommandIds(): Promise<Set<string>> {
   return commands;
 }
 
+/**
+ * What a project's environment lacks when a deploy runs before setup, as the
+ * envelope says it.
+ */
+const CONSULTED = [
+  "--server",
+  "process environment",
+  ".env.development.local",
+  ".env.local",
+  ".env.development",
+  ".env",
+  ".zitadel/secret",
+];
+
+/**
+ * How the refusal tells the developer to give the project an id.
+ */
+const NOT_SET_UP_HINT = `Consulted, in order: ${CONSULTED.join(", ")}. Set ZITADEL_PROJECT_ID in .env.development.local or the process environment, or run ${expectedPublicCliCommand("env add development")}.`;
+
+/**
+ * What the envelope says of a directory with no local server started in it.
+ */
+const NO_LOCAL_SERVER = {
+  lifecycle: "missing",
+  runtime: { configured: false },
+  docker: { available: true, container_exists: false, container_running: false },
+  health: { healthy: false },
+};
+
 describe("the cli", () => {
   describe("against an invalid server", () => {
     describe("that is not a zitadel api", () => {
@@ -59,7 +93,21 @@ describe("the cli", () => {
 
         const result = await app.deploy();
 
-        expect(result).toFailWith("E_VALIDATION");
+        expect(app.envelopeOf(result)).toEqual({
+          status: "error",
+          cli_version: cliVersion.version,
+          command: "deploy",
+          source: MOCK_SERVER_URL,
+          code: "E_VALIDATION",
+          message: "ZITADEL_PROJECT_ID is not set for the development environment",
+          hint: NOT_SET_UP_HINT,
+          next_commands: [expectedPublicCliCommand(`setup --cwd ${app.path}`)],
+          details: {
+            environment: "development",
+            variable: "ZITADEL_PROJECT_ID",
+            consulted: CONSULTED,
+          },
+        });
       });
     });
 
@@ -70,7 +118,21 @@ describe("the cli", () => {
 
         const result = await app.deploy();
 
-        expect(result).toFailWith("E_VALIDATION");
+        expect(app.envelopeOf(result)).toEqual({
+          status: "error",
+          cli_version: cliVersion.version,
+          command: "deploy",
+          source: MOCK_SERVER_URL,
+          code: "E_VALIDATION",
+          message: "ZITADEL_PROJECT_ID is not set for the development environment",
+          hint: NOT_SET_UP_HINT,
+          next_commands: [expectedPublicCliCommand(`setup --cwd ${app.path}`)],
+          details: {
+            environment: "development",
+            variable: "ZITADEL_PROJECT_ID",
+            consulted: CONSULTED,
+          },
+        });
       });
     });
 
@@ -81,7 +143,21 @@ describe("the cli", () => {
 
         const result = await app.deploy();
 
-        expect(result).toFailWith("E_VALIDATION");
+        expect(app.envelopeOf(result)).toEqual({
+          status: "error",
+          cli_version: cliVersion.version,
+          command: "deploy",
+          source: MOCK_SERVER_URL,
+          code: "E_VALIDATION",
+          message: "ZITADEL_PROJECT_ID is not set for the development environment",
+          hint: NOT_SET_UP_HINT,
+          next_commands: [expectedPublicCliCommand(`setup --cwd ${app.path}`)],
+          details: {
+            environment: "development",
+            variable: "ZITADEL_PROJECT_ID",
+            consulted: CONSULTED,
+          },
+        });
       });
     });
   });
@@ -89,6 +165,28 @@ describe("the cli", () => {
   describe("against a valid server", () => {
     describe("--json", () => {
       it("names the failure when run before setup", async () => {
+        const app = await anApp();
+
+        const result = await app.deploy();
+
+        expect(app.envelopeOf(result)).toEqual({
+          status: "error",
+          cli_version: cliVersion.version,
+          command: "deploy",
+          source: MOCK_SERVER_URL,
+          code: "E_VALIDATION",
+          message: "ZITADEL_PROJECT_ID is not set for the development environment",
+          hint: NOT_SET_UP_HINT,
+          next_commands: [expectedPublicCliCommand(`setup --cwd ${app.path}`)],
+          details: {
+            environment: "development",
+            variable: "ZITADEL_PROJECT_ID",
+            consulted: CONSULTED,
+          },
+        });
+      });
+
+      it("exits as a validation failure does", async () => {
         const app = await anApp();
 
         const result = await app.deploy();
@@ -101,7 +199,7 @@ describe("the cli", () => {
 
         const result = await app.deploy();
 
-        expect(result).toSuggest(expectedPublicCliCommand("setup"));
+        expect(result).toSuggestExactly(`setup --cwd ${app.path}`);
       });
 
       it("has no server of its own when nothing names one", async () => {
@@ -109,7 +207,28 @@ describe("the cli", () => {
 
         const result = await app.runWithoutServer(["status", "--json"]);
 
-        expect(app.envelopeOf(result).source).toBe("");
+        expect(app.envelopeOf(result)).toEqual({
+          cli_version: cliVersion.version,
+          command: "status",
+          source: "",
+          status: "ok",
+          data: {
+            title: "Checked the status of the project",
+            server: NO_LOCAL_SERVER,
+            project: {
+              lifecycle: "not-configured",
+              message: "zitadel.json has not been created yet.",
+            },
+            next_actions: [
+              "From your app directory, run setup; the CLI will detect the framework or ask in an empty directory.",
+            ],
+            next_commands: [
+              expectedPublicCliCommand(`start --cwd ${app.path}`),
+              expectedPublicCliCommand(`setup --server local --cwd ${app.path}`),
+            ],
+          },
+          warnings: [],
+        });
       });
 
       it("takes the server from ZITADEL_URL in the project's env file", async () => {
@@ -121,7 +240,28 @@ describe("the cli", () => {
 
         const result = await app.runWithoutServer(["status", "--json"]);
 
-        expect(app.envelopeOf(result).source).toBe("https://self.example");
+        expect(app.envelopeOf(result)).toEqual({
+          cli_version: cliVersion.version,
+          command: "status",
+          source: "https://self.example",
+          status: "ok",
+          data: {
+            title: "Checked the status of the project",
+            server: NO_LOCAL_SERVER,
+            project: {
+              lifecycle: "not-configured",
+              message: "zitadel.json has not been created yet.",
+            },
+            next_actions: [
+              "From your app directory, run setup; the CLI will detect the framework or ask in an empty directory.",
+            ],
+            next_commands: [
+              expectedPublicCliCommand(`start --cwd ${app.path}`),
+              expectedPublicCliCommand(`setup --server local --cwd ${app.path}`),
+            ],
+          },
+          warnings: [],
+        });
       });
 
       it("ignores the server named in zitadel.json", async () => {
@@ -134,7 +274,28 @@ describe("the cli", () => {
 
         const result = await app.runWithoutServer(["status", "--json"]);
 
-        expect(app.envelopeOf(result).source).toBe("");
+        expect(app.envelopeOf(result)).toEqual({
+          cli_version: cliVersion.version,
+          command: "status",
+          source: "",
+          status: "ok",
+          data: {
+            title: "Checked the status of the project",
+            server: NO_LOCAL_SERVER,
+            project: {
+              lifecycle: "orphaned-config",
+              project_id: "existing",
+              message: "zitadel.json exists but .zitadel/secret is missing.",
+            },
+            next_actions: [],
+            next_commands: [
+              expectedPublicCliCommand(`start --cwd ${app.path}`),
+              expectedPublicCliCommand(`setup --force --cwd ${app.path}`),
+              expectedPublicCliCommand(`doctor --fix --cwd ${app.path}`),
+            ],
+          },
+          warnings: [],
+        });
       });
 
       it("only ever suggests commands a user can run", async () => {
@@ -159,12 +320,55 @@ describe("the cli", () => {
 
     describe("global flags", () => {
       it("accepts -v as the short form of --verbose", async () => {
-        const result = await runCliForTest(["resources", "-v", "--json"]);
+        const app = await anApp();
 
-        expect(result).toSucceed();
+        const result = await app.runWithoutServer(["status", "-v", "--json"]);
+
+        expect(app.envelopeOf(result)).toEqual({
+          cli_version: cliVersion.version,
+          command: "status",
+          source: "",
+          status: "ok",
+          data: {
+            title: "Checked the status of the project",
+            server: NO_LOCAL_SERVER,
+            project: {
+              lifecycle: "not-configured",
+              message: "zitadel.json has not been created yet.",
+            },
+            next_actions: [
+              "From your app directory, run setup; the CLI will detect the framework or ask in an empty directory.",
+            ],
+            next_commands: [
+              expectedPublicCliCommand(`start --cwd ${app.path}`),
+              expectedPublicCliCommand(`setup --server local --cwd ${app.path}`),
+            ],
+          },
+          warnings: [],
+        });
       });
 
       it("rejects an unrecognised short flag", async () => {
+        const result = await runCliForTest(["resources", "-Z", "--json"]);
+
+        expect(parseJson(result.stdout)).toEqual({
+          status: "error",
+          cli_version: cliVersion.version,
+          command: "resources",
+          source: "",
+          code: "E_VALIDATION",
+          message: "Nonexistent flag: -Z",
+          next_commands: [expectedPublicCliCommand("resources --help")],
+          details: {
+            original: {
+              name: "Error",
+              message: "Nonexistent flag: -Z\nSee more help with --help",
+            },
+          },
+        });
+      });
+
+      it("exits as a validation failure does for an unrecognised short flag", async () => {
         const result = await runCliForTest(["resources", "-Z", "--json"]);
 
         expect(result).toFailWith("E_VALIDATION");
@@ -178,7 +382,7 @@ describe("the cli", () => {
 
       /**
        * Colour itself is not asserted here, and an assertion about it would
-       * mislead: picocolors and consola decide colour when they load, from the
+       * mislead: picocolors decides colour when it loads, from the
        * real process streams, so a run in this harness emits no escape byte
        * whatever the flags say — a check for their absence would hold against
        * any implementation, broken ones included. What a run decides is pinned
@@ -186,9 +390,32 @@ describe("the cli", () => {
        * decides for itself is enforced by `biome-plugins/no-own-colour.grit`.
        */
       it("accepts --no-color", async () => {
-        const result = await runCliForTest(["resources", "--no-color", "--json"]);
+        const app = await anApp();
 
-        expect(result).toSucceed();
+        const result = await app.runWithoutServer(["status", "--no-color", "--json"]);
+
+        expect(app.envelopeOf(result)).toEqual({
+          cli_version: cliVersion.version,
+          command: "status",
+          source: "",
+          status: "ok",
+          data: {
+            title: "Checked the status of the project",
+            server: NO_LOCAL_SERVER,
+            project: {
+              lifecycle: "not-configured",
+              message: "zitadel.json has not been created yet.",
+            },
+            next_actions: [
+              "From your app directory, run setup; the CLI will detect the framework or ask in an empty directory.",
+            ],
+            next_commands: [
+              expectedPublicCliCommand(`start --cwd ${app.path}`),
+              expectedPublicCliCommand(`setup --server local --cwd ${app.path}`),
+            ],
+          },
+          warnings: [],
+        });
       });
     });
 
@@ -203,6 +430,12 @@ describe("the cli", () => {
         const result = await runCliForTest(["bogus", "--json"]);
 
         expect(result.stdout.trim()).toBe("");
+      });
+
+      it("says on stderr which command does not exist", async () => {
+        const result = await runCliForTest(["bogus", "--json"]);
+
+        expect(result.stderr).toContain("bogus is not a zitadel command.");
       });
     });
   });

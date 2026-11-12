@@ -1,10 +1,10 @@
-import { box } from "consola/utils";
-
 import { exactZitadelPins } from "@/lib/zitadel-pins";
-import { BOX_STYLE, wrapForBox } from "./box";
-import { command } from "./style";
+
+import { wrapForBox } from "./box";
+import { command, notice } from "./style";
+import type { SuggestedCommand } from "./suggestion";
 import { escapeControlCharacters } from "./terminal-text";
-import { upgradeCommand } from "./suggestion";
+import { drawBox } from "./ui/layout";
 import { isNewerVersion, latestCliVersion, updateCheckDisabled } from "./update-check";
 
 /**
@@ -12,9 +12,17 @@ import { isNewerVersion, latestCliVersion, updateCheckDisabled } from "./update-
  * release, or `undefined` when nothing is. It compares the project's pins as
  * well as the CLI: under `npx @zitadel/cli@latest` the CLI is the newest by
  * definition, and what has gone stale is the app.
+ *
+ * @param input.cliVersion - The release of the CLI that is running.
+ * @param input.upgrade - The `upgrade` command the box quotes, rendered by the caller.
+ * @param input.cwd - The directory whose pins are compared.
+ * @param input.env - The process environment.
+ * @param input.columns - The terminal width to wrap to, if any.
+ * @returns The box, or `undefined` when nothing is behind.
  */
 export async function updateNotice(input: {
   cliVersion: string;
+  upgrade: SuggestedCommand;
   cwd: string;
   env: NodeJS.ProcessEnv;
   columns?: number;
@@ -27,7 +35,10 @@ export async function updateNotice(input: {
   if (latest === undefined) {
     return undefined;
   }
-  const pins = (await exactZitadelPins(cwd).catch(() => undefined)) ?? [];
+  const pins =
+    (await exactZitadelPins(cwd).catch(() => {
+      return undefined;
+    })) ?? [];
   // A version on either side of the arrow is semver by the time it is here, so
   // there is nothing in one to spell out. A package name is only known to start
   // with `@zitadel/`, and this box is written straight to stderr rather than
@@ -36,7 +47,9 @@ export async function updateNotice(input: {
   const behind = [
     ...(isNewerVersion(latest, cliVersion) ? [`CLI ${cliVersion} → ${latest}`] : []),
     ...pins
-      .filter(([, version]) => isNewerVersion(latest, version))
+      .filter(([, version]) => {
+        return isNewerVersion(latest, version);
+      })
       .map(([name, version]) => {
         return `${escapeControlCharacters(name)} ${version} → ${latest}`;
       }),
@@ -44,8 +57,9 @@ export async function updateNotice(input: {
   if (behind.length === 0) {
     return undefined;
   }
-  return box(wrapForBox([...behind, "", command(upgradeCommand(cliVersion))].join("\n"), columns), {
-    title: "Update available",
-    style: BOX_STYLE.info,
-  });
+  return drawBox(
+    wrapForBox([...behind, "", command(input.upgrade)].join("\n"), columns),
+    "Update available",
+    notice,
+  );
 }

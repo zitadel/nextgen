@@ -47,6 +47,7 @@ import {
   passkeyUpsellStep,
   passwordStep,
   recoverStep,
+  registerPasskeyStep,
   registerPasswordStep,
   registerStep,
   registerSsoStep,
@@ -421,7 +422,9 @@ export function setupMockHandlers(
     const step = snapshot.value as FlowStepName | "idle";
     switch (step) {
       case "register":
-        return withBranding(registerStep(input));
+        return withBranding(
+          snapshot.context.passkeyRegistration ? registerPasskeyStep(input) : registerStep(input),
+        );
       case "register-password":
         return withBranding(registerPasswordStep(input));
       case "recover":
@@ -511,9 +514,16 @@ export function setupMockHandlers(
         iss,
       };
 
+      // A sign-up spends the proof where the user is created: the password
+      // submit, or the attestation of a passkey registration.
+      const signingUp =
+        (before === "register-password" && body.action === "submit") ||
+        (before === "register" &&
+          body.action === "passkey_register" &&
+          Boolean(body.challenge_response) &&
+          snapshot.context.passkeyRegistration);
       if (
-        before === "register-password" &&
-        body.action === "submit" &&
+        signingUp &&
         !validSignupProof(body.gate_proofs?.signup_pow, snapshot.context.sessionToken)
       ) {
         return HttpResponse.json(
@@ -613,12 +623,13 @@ export function setupMockHandlers(
         fields: submitted,
         sso_provider_id: body.sso_provider_id ?? null,
         outcome,
+        attested: Boolean(body.challenge_response),
       });
       const after = actor.getSnapshot();
       const createdEmail = after.context.capturedFields.email;
       if (
         routesByAccount &&
-        (before === "register-password" || before === "register-sso") &&
+        (before === "register" || before === "register-password" || before === "register-sso") &&
         after.value === "done" &&
         createdEmail
       ) {

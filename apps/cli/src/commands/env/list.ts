@@ -14,6 +14,7 @@ const COLUMNS = ["name", "source", "server", "project_id", "resolved"] as const;
 export default class EnvList extends Tabulatable(EnvironmentCommand) {
   static override description = "List the environments bound in this directory's .env files.";
   static override group = CommandGroups.configuration;
+
   static override examples = ["<%= config.bin %> env list", "<%= config.bin %> env list --plain"];
   static override flags = {
     plain: plainFlag,
@@ -24,12 +25,14 @@ export default class EnvList extends Tabulatable(EnvironmentCommand) {
 
     const bound = await readBoundEnvironments(this.cwd);
     const items = [
-      ...bound.map((entry) => ({
-        name: entry.name,
-        source: entry.file,
-        server: entry.values.ZITADEL_URL ?? "",
-        project_id: entry.values.ZITADEL_PROJECT_ID ?? "",
-      })),
+      ...bound.map((entry) => {
+        return {
+          name: entry.name,
+          source: entry.file,
+          server: entry.values.ZITADEL_URL ?? "",
+          project_id: entry.values.ZITADEL_PROJECT_ID ?? "",
+        };
+      }),
       ...(this.env.ZITADEL_PROJECT_ID
         ? [
             {
@@ -40,17 +43,21 @@ export default class EnvList extends Tabulatable(EnvironmentCommand) {
             },
           ]
         : []),
-    ].map((entry) => ({
-      ...entry,
-      resolved: entry.source === values.ZITADEL_PROJECT_ID?.source,
-    }));
+    ].map((entry) => {
+      return {
+        ...entry,
+        resolved: entry.source === values.ZITADEL_PROJECT_ID?.source,
+      };
+    });
 
-    const rows = items.map((entry) => ({
-      ...entry,
-      resolved: entry.resolved ? "yes" : "",
-    }));
+    const rows = items.map((entry) => {
+      return {
+        ...entry,
+        resolved: entry.resolved ? "yes" : "",
+      };
+    });
     const columns = COLUMNS;
-    const empty = "No environments are bound here. Run `zitadel env add <name>` to bind one.";
+    const empty = "No environments found";
     const footer = [`Resolved now: ${name.value} (from ${name.source})`];
     const page = null;
     const extra = {
@@ -60,7 +67,7 @@ export default class EnvList extends Tabulatable(EnvironmentCommand) {
       },
     };
 
-    return this.emitList(flags, {
+    const listed = await this.listResult(flags, {
       columns,
       rows,
       items,
@@ -70,5 +77,14 @@ export default class EnvList extends Tabulatable(EnvironmentCommand) {
       page,
       extra,
     });
+
+    return this.emit(
+      items.length === 0
+        ? {
+            ...listed,
+            next: { commands: [this.suggest({ id: "env:add", args: { name: "<name>" } })] },
+          }
+        : listed,
+    );
   }
 }

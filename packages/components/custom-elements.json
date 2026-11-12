@@ -7572,7 +7572,7 @@
               }
             }
           ],
-          "description": "Solve the `signup_pow` gate of a password sign-up step, as `<zitadel-login>`\ndoes, for a client of your own: GET the step, pass `step.gates.signup_pow.challenge`,\nand submit the result as `gate_proofs.signup_pow`. Needs `crypto.subtle`,\nwhich browsers offer only on `https://` and `localhost` pages."
+          "description": "Solve the `signup_pow` gate of a sign-up step, as `<zitadel-login>` does, for\na client of your own: GET the step, pass `step.gates.signup_pow.challenge`,\nand submit the result as `gate_proofs.signup_pow`, with the password or with\nthe attestation of a passkey registration that creates the user. Needs\n`crypto.subtle`, which browsers offer only on `https://` and `localhost`\npages."
         }
       ],
       "exports": [
@@ -9024,6 +9024,49 @@
             },
             {
               "kind": "field",
+              "name": "signupPrepare",
+              "type": {
+                "text": "{ ceremony: string; controller: AbortController; done: Promise<void> } | undefined"
+              },
+              "privacy": "private",
+              "description": "The check a passkey sign-up solves while its ceremony runs, by the ceremony's id."
+            },
+            {
+              "kind": "field",
+              "name": "signupCeremony",
+              "type": {
+                "text": "string | undefined"
+              },
+              "privacy": "private",
+              "description": "The ceremony whose attestation signupProof is for."
+            },
+            {
+              "kind": "method",
+              "name": "prepareSignupProof",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "parameters": [
+                {
+                  "name": "flowId",
+                  "type": {
+                    "text": "string"
+                  }
+                },
+                {
+                  "name": "step",
+                  "type": {
+                    "text": "CreateFlow201[\"step\"]"
+                  }
+                }
+              ],
+              "description": "Solve a passkey sign-up's check while its ceremony runs, so the proof is\nready before the authenticator stores a passkey. The step announces the\ngate; its challenge comes with a step GET, as for a password sign-up. A\ncheck that fails first takes the ceremony off the step, which stops it:\nnobody is left holding a passkey for an account that was never made. The\nbrowser's prompt is not held back for any of it."
+            },
+            {
+              "kind": "field",
               "name": "submitted",
               "type": {
                 "text": "Promise<void>"
@@ -9084,9 +9127,24 @@
                   "type": {
                     "text": "string | undefined"
                   }
+                },
+                {
+                  "name": "ceremony",
+                  "default": "false"
                 }
               ],
-              "description": "Keep the sign-up form and its values for a retry after its check failed\nor the server refused the proof, with a message from the locale catalog.\nA refused proof is dropped and the step refreshed, so a step rendered\nwithout the gate, by a server from before it, carries it on the retry."
+              "description": "Keep the sign-up form and its values for a retry after its check failed\nor the server refused the proof, with a message from the locale catalog.\nA refused proof is dropped and the step refreshed, so a step rendered\nwithout the gate, by a server from before it, carries it on the retry.\nAfter a passkey sign-up's attestation the step comes back without its\nceremony, for the reason holdCeremony gives."
+            },
+            {
+              "kind": "method",
+              "name": "holdCeremony",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "void"
+                }
+              },
+              "description": "Drop the ceremony from the step a stopped or refused attestation left:\nrendered again, it would mount a fresh `<zl-passkey>` that starts the\nceremony unasked. Picking the passkey again resumes the server's pending\nceremony."
             },
             {
               "kind": "method",

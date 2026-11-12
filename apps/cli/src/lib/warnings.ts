@@ -1,4 +1,4 @@
-import { consola } from "consola";
+import { log } from "@/lib/log";
 
 import { escapeControlCharacters } from "./terminal-text";
 
@@ -12,7 +12,7 @@ const reported: string[] = [];
 
 /**
  * Report a warning. This is the only way the CLI warns: never call
- * `consola.warn` directly (see `apps/cli/AGENTS.md`).
+ * `log.warn` directly (see `apps/cli/AGENTS.md`).
  *
  * A terminal shows the warning at once, which matters when it comes before a
  * long wait. `--json` silences that output, so the warning is also kept for
@@ -27,7 +27,7 @@ const reported: string[] = [];
  * @param message - What to warn about.
  */
 export function reportWarning(message: string): void {
-  consola.warn(escapeControlCharacters(message));
+  log.warn(escapeControlCharacters(message));
   reported.push(message);
 }
 

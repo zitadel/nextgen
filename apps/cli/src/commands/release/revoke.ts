@@ -1,13 +1,14 @@
 import { Args, Flags } from "@oclif/core";
 import { z } from "zod";
 
-import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
-import { mutatedData } from "@/lib/oclif/envelope";
 import { ReleaseService } from "@/lib/backend";
 import { RevokeReleaseParams } from "@/lib/backend/schemas";
-import { type Refused, taken } from "@/lib/oclif/flags";
+import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { Destructive } from "@/lib/oclif/destructive";
-import { prose } from "@/lib/oclif/rendering";
+import { mutatedData } from "@/lib/oclif/envelope";
+import { type Refused, taken } from "@/lib/oclif/flags";
+
+import { escapeControlCharacters } from "@/lib/terminal-text";
 
 /**
  * The release `release revoke` revokes. The schema is the API spec's own, so a value that is not one is
@@ -17,8 +18,8 @@ const RELEASE_ID: Refused<string> = {
   schema: z.string().trim().pipe(RevokeReleaseParams.shape.release_id),
   refusal: {
     message: "Invalid {input}: {problem}",
-    hint: "Find one with `zitadel release list`.",
-    next: ["release list"],
+    hint: "List the releases to find one.",
+    next: [{ id: "release:list" }],
     details: {
       argument: "{input}",
     },
@@ -35,12 +36,15 @@ const RELEASE_ID: Refused<string> = {
 export default class ReleaseRevoke extends Destructive(EnvironmentCommand) {
   static override description = "Revoke a release so its content is never served again.";
   static override group = CommandGroups.configuration;
+
   static override examples = [
     "<%= config.bin %> release revoke rel_01KX3RG8A7F0N9WD3P2E4YM5C1",
     "<%= config.bin %> release revoke rel_01KX3RG8A7F0N9WD3P2E4YM5C1 --force",
   ];
   static override args = {
-    release_id: Args.custom<string>({ parse: taken(RELEASE_ID) })({
+    release_id: Args.custom<string>({
+      parse: taken(RELEASE_ID),
+    })({
       required: true,
       description: "The release to revoke.",
     }),
@@ -58,12 +62,33 @@ export default class ReleaseRevoke extends Destructive(EnvironmentCommand) {
       await this.confirmed({
         verb: "revoke",
         name: `revoke ${args.releaseId}`,
-        message: `Revoke ${args.releaseId}? Its content can never be served again.`,
+        message: async () => {
+          const { projectId, server } = await this.connect();
+          return `Revoke ${args.releaseId} in project ${projectId} on ${server.replace(/^https?:\/\//, "")} so its content can never be served again?`;
+        },
         preview: () => {
+          const title = `Would revoke ${escapeControlCharacters(args.releaseId)} (dry run)`;
+
           return {
             status: "ok",
-            data: { dry_run: true, release_id: args.releaseId },
-            pretty: prose(`Would revoke ${args.releaseId}. Nothing was revoked (dry run).`),
+            data: {
+              dry_run: true,
+              title,
+              release_id: args.releaseId,
+            },
+            summary: {
+              title,
+              sections: [],
+            },
+            next: {
+              commands: [
+                this.suggest({
+                  id: "release:revoke",
+                  args: { releaseId: args.releaseId },
+                  flags: { force: true },
+                }),
+              ],
+            },
           };
         },
         prepare: () => {
@@ -72,13 +97,19 @@ export default class ReleaseRevoke extends Destructive(EnvironmentCommand) {
         apply: async (consent, { client, projectId }) => {
           const releaseService = new ReleaseService(consent.unlock(client), projectId);
           const release = await releaseService.revoke(args.releaseId);
+          const title = `Revoked ${escapeControlCharacters(release.id)}`;
+
           return {
             status: "ok",
             data: {
+              title,
               ...mutatedData({ release_id: release.id }, "revoked"),
               revoked_at: release.revoked_at,
             },
-            pretty: prose(`Revoked ${release.id}`),
+            summary: {
+              title,
+              sections: [],
+            },
           };
         },
       }),

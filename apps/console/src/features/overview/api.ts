@@ -1,7 +1,7 @@
 import { api } from "@/api/zitadel";
 import { type Deployment, livePrimaryDeployment } from "@/features/deployments/deployment";
 import { listRecentEvents } from "@/features/events/api";
-import type { LogEvent } from "@/features/events/model";
+import type { ProjectEvent } from "@/features/events/model";
 import { describeError } from "@/lib/api-error";
 
 /**
@@ -14,7 +14,7 @@ import { describeError } from "@/lib/api-error";
  * person who may not read deployments or events still has the rest to see.
  */
 
-/** How many events the activity card lists before it hands over to Logs. */
+/** How many events the activity card lists before it hands over to Events. */
 const RECENT_EVENTS = 5;
 
 /** A card's read: what it shows, or why it shows nothing. */
@@ -27,7 +27,7 @@ interface ProjectOverview {
   /** The deployment the primary origins serve, `undefined` while none does. */
   live: CardRead<Deployment | undefined>;
   /** The newest audit events, newest first. */
-  activity: CardRead<LogEvent[]>;
+  activity: CardRead<ProjectEvent[]>;
 }
 
 export async function loadProjectOverview(projectId: string): Promise<ProjectOverview> {

@@ -9,8 +9,8 @@ import { SolidStartScaffolder } from "./solid-start";
 import { SvelteScaffolder } from "./svelte";
 import { SvelteKitScaffolder } from "./sveltekit";
 import { TanStackStartScaffolder } from "./tanstack-start";
-import { VueScaffolder } from "./vue";
 import type { Scaffolder } from "./types";
+import { VueScaffolder } from "./vue";
 
 /**
  * Active scaffolders, in priority order. The framework picker derives its

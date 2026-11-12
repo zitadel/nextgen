@@ -8,7 +8,8 @@ description: |
   and the supplied salt. Match the first 16 derived bytes to key_prefix.
   Submit gate_proofs.signup_pow as a JSON string containing protocol,
   challenge_id and derived_key (the full 32 bytes in lowercase hex).
-  The proof is spent before password hashing, even if user creation fails.
+  The proof is spent before the user is created (for a password, before it
+  is hashed), even if user creation fails.
 properties:
   protocol:
     type: string

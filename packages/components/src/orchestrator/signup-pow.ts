@@ -11,10 +11,12 @@ export function stopIfAborted(signal: AbortSignal | undefined): void {
 }
 
 /**
- * Solve the `signup_pow` gate of a password sign-up step, as `<zitadel-login>`
- * does, for a client of your own: GET the step, pass `step.gates.signup_pow.challenge`,
- * and submit the result as `gate_proofs.signup_pow`. Needs `crypto.subtle`,
- * which browsers offer only on `https://` and `localhost` pages.
+ * Solve the `signup_pow` gate of a sign-up step, as `<zitadel-login>` does, for
+ * a client of your own: GET the step, pass `step.gates.signup_pow.challenge`,
+ * and submit the result as `gate_proofs.signup_pow`, with the password or with
+ * the attestation of a passkey registration that creates the user. Needs
+ * `crypto.subtle`, which browsers offer only on `https://` and `localhost`
+ * pages.
  */
 export async function solveSignupPow(challenge: Challenge, signal?: AbortSignal): Promise<string> {
   // Web Crypto runs PBKDF2 asynchronously. No worker bundle, WASM, provider

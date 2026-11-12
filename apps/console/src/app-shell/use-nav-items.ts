@@ -4,6 +4,9 @@ import { useMatch, useRouter, useSearch } from "@tanstack/react-router";
 import { withoutTrailingSlash } from "@/lib/base-path";
 import type { NavMeta, NavView } from "@/nav";
 
+/** Route prefix of the selected project's Settings, whose pages have a list of their own (D40). */
+export const PROJECT_SETTINGS_PATH = "/project";
+
 export interface NavItem {
   /** Route path. */
   to: string;
@@ -14,7 +17,7 @@ export interface NavItem {
  * Builds one sidebar's list from `staticData.nav` on the route tree (Console
  * ADR 0001).
  *
- * `view` selects which list. The shell renders three from one route tree, so
+ * `view` selects which list. The shell renders several from one route tree, so
  * an entry belongs to exactly one of them. The list is one level, sorted by
  * `nav.order` so the sidebar matches the design regardless of route
  * registration order.
