@@ -1,7 +1,9 @@
 // The cloud's `server` service (repo-root vercel.json): a Node.js function in
-// front of the Go server, so the server's spans reach Vercel Tracing. Only a
-// Node.js function gets Vercel's request context, whose reportSpans adds spans
-// to the request's trace; a Go function has no way to send them.
+// front of the Go server, so the server's spans reach Vercel Tracing and its
+// metrics Vercel's custom metrics. Only a Node.js function gets the hooks for
+// both: the request context, whose reportSpans adds spans to the request's
+// trace, and the runtime's sendMetric, which `metric()` of @vercel/functions
+// calls. A Go function has no way to send either.
 //
 // On an instance's first request the wrapper starts the launcher
 // (apps/api/cmd/cloud-launcher, built into ../dist/nextgen-launcher and
@@ -12,11 +14,17 @@
 //   the client asked for (x-forwarded-host), as the Go preset's proxy sets it.
 // - replaces the client's trace context: traceparent comes from Vercel's root
 //   span for the request, so the server, which trusts traceparent here
-//   (CLOUD_TRACE_COLLECTOR), only ever continues a trace Vercel started.
+//   (CLOUD_OTLP_COLLECTOR), only ever continues a trace Vercel started.
 //   tracestate and baggage are dropped.
-// - receives the server's spans as OTLP/HTTP protobuf on a loopback collector,
-//   sorts them by request (spans.mjs), and hands each request's spans to
-//   reportSpans once the response is done, in waitUntil.
+// - receives the server's spans and metrics as OTLP/HTTP protobuf on a
+//   loopback collector. Spans are sorted by request (spans.mjs) and each
+//   request's spans handed to reportSpans once the response is done, in
+//   waitUntil. Metrics are queued as Vercel data points (metrics.mjs), and
+//   every request, once its response is done, sends what is queued: Vercel
+//   ties a data point to the invocation reporting it and takes
+//   metricsPerRequest of them from one. So a data point is reported by
+//   whichever request ends next, and those of an instance's last request
+//   wait for the instance to serve again.
 //
 // Logs pass straight through: the launcher writes to this process's stdout
 // and stderr, as it does under the Go preset. If the launcher exits, so does
@@ -28,11 +36,16 @@ import net from "node:net";
 import { fileURLToPath } from "node:url";
 import { gunzipSync } from "node:zlib";
 
-import { decodeTraceRequest } from "./otlp.mjs";
+import { MetricQueue } from "./metrics.mjs";
+import { decodeMetricsRequest, decodeTraceRequest } from "./otlp.mjs";
 import { SpanRouter } from "./spans.mjs";
 
 const launcherPath = fileURLToPath(new URL("../dist/nextgen-launcher", import.meta.url));
 const requestContext = Symbol.for("@vercel/request-context");
+// What `metric()` of @vercel/functions calls; the package is that one line.
+const runtimeIpc = Symbol.for("@vercel/rusty-runtime-ipc");
+// Vercel records up to 100 data points per invocation.
+const metricsPerRequest = 100;
 // How long a finished response waits for its server span. The launcher sets
 // the server's batch timeout to 100ms.
 const spanWaitMs = 1000;
@@ -50,6 +63,7 @@ const hopByHop = new Set([
 const clientTraceContext = new Set(["traceparent", "tracestate", "baggage"]);
 
 const router = new SpanRouter();
+const metrics = new MetricQueue();
 let started;
 
 function listen(server) {
@@ -66,8 +80,15 @@ async function freePort() {
   return port;
 }
 
+// The OTLP/HTTP paths the server exports to, and what takes each export.
+const collectors = {
+  "/v1/traces": (body) => router.ingest(decodeTraceRequest(body)),
+  "/v1/metrics": (body) => metrics.ingest(decodeMetricsRequest(body)),
+};
+
 function collectorHandler(req, res) {
-  if (req.method !== "POST" || req.url !== "/v1/traces") {
+  const collect = req.method === "POST" ? collectors[req.url] : undefined;
+  if (!collect) {
     res.writeHead(404).end();
     return;
   }
@@ -87,11 +108,11 @@ function collectorHandler(req, res) {
       if (req.headers["content-encoding"] === "gzip") {
         body = gunzipSync(body);
       }
-      router.ingest(decodeTraceRequest(body));
-      // An empty ExportTraceServiceResponse: everything was accepted.
+      collect(body);
+      // An empty Export*ServiceResponse: everything was accepted.
       res.writeHead(200, { "content-type": "application/x-protobuf" }).end();
     } catch (error) {
-      console.error("server wrapper: dropping a span export:", error);
+      console.error(`server wrapper: dropping an export to ${req.url}:`, error);
       res.writeHead(400).end();
     }
   });
@@ -127,7 +148,7 @@ function start() {
       env: {
         ...process.env,
         PORT: String(port),
-        CLOUD_TRACE_COLLECTOR: `127.0.0.1:${collectorPort}`,
+        CLOUD_OTLP_COLLECTOR: `127.0.0.1:${collectorPort}`,
       },
       stdio: "inherit",
     });
@@ -222,16 +243,28 @@ export default async function handler(req, res) {
   });
   req.pipe(upstream);
 
-  if (entry) {
+  if (typeof context?.waitUntil === "function") {
     context.waitUntil(
       new Promise((resolve) => res.once("close", resolve))
-        .then(() => router.close(entry, spanWaitMs))
+        .then(() => (entry ? router.close(entry, spanWaitMs) : null))
         .then((spans) => {
           if (spans) {
             telemetry.reportSpans(spans);
           }
+          sendMetrics();
         })
-        .catch((error) => console.error("server wrapper: reporting spans failed:", error)),
+        .catch((error) => console.error("server wrapper: reporting telemetry failed:", error)),
     );
+  }
+}
+
+// Called in a request's waitUntil, so Vercel counts the data points to it.
+function sendMetrics() {
+  const sendMetric = globalThis[runtimeIpc]?.sendMetric;
+  if (typeof sendMetric !== "function") {
+    return;
+  }
+  for (const point of metrics.take(metricsPerRequest)) {
+    sendMetric.call(globalThis[runtimeIpc], point.name, point.value, point.attributes);
   }
 }

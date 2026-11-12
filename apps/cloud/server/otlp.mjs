@@ -1,14 +1,19 @@
-// Decodes an OTLP/HTTP protobuf trace export (ExportTraceServiceRequest, as
-// the Go SDK's otlptracehttp exporter sends it) into the OTLP JSON object
-// Vercel's reportSpans takes, the shape @vercel/otel hands it: hex trace and
-// span IDs, nanosecond timestamps as decimal strings, enums as numbers. An
-// integer attribute (intValue) is a JSON number, not the string the OTLP JSON
-// spec allows: Vercel's runtime rejects the whole export otherwise ("expected
-// i64"), so a value beyond 2^53 loses precision. Only the trace messages are
-// read; unknown fields are skipped, as protobuf requires.
+// Decodes the OTLP/HTTP protobuf exports the Go SDK sends the wrapper, with no
+// dependency. Unknown fields are skipped, as protobuf requires.
 //
-// Field numbers: opentelemetry-proto, opentelemetry/proto/trace/v1/trace.proto
-// and opentelemetry/proto/common/v1/common.proto.
+// - decodeTraceRequest: an ExportTraceServiceRequest (otlptracehttp), into the
+//   OTLP JSON object Vercel's reportSpans takes, the shape @vercel/otel hands
+//   it: hex trace and span IDs, nanosecond timestamps as decimal strings,
+//   enums as numbers. An integer attribute (intValue) is a JSON number, not
+//   the string the OTLP JSON spec allows: Vercel's runtime rejects the whole
+//   export otherwise ("expected i64"), so a value beyond 2^53 loses precision.
+// - decodeMetricsRequest: an ExportMetricsServiceRequest (otlpmetrichttp),
+//   into the same JSON naming, with numbers as numbers. Only what metrics.mjs
+//   reads is decoded: gauges, sums and explicit-bucket histograms.
+//
+// Field numbers: opentelemetry-proto, opentelemetry/proto/trace/v1/trace.proto,
+// opentelemetry/proto/metrics/v1/metrics.proto and
+// opentelemetry/proto/common/v1/common.proto.
 
 const VARINT = 0;
 const I64 = 1;
@@ -301,6 +306,114 @@ export function decodeTraceRequest(bytes) {
     { resourceSpans: [] },
     {
       1: [LEN, (r, req) => req.resourceSpans.push(resourceSpans(r.chunk()))],
+    },
+  );
+}
+
+// A packed repeated fixed64 or double field: eight bytes per element.
+function packed64(bytes, read) {
+  const reader = new Reader(bytes);
+  const list = [];
+  while (!reader.done()) {
+    list.push(read(reader));
+  }
+  return list;
+}
+
+function numberDataPoint(bytes) {
+  return readMessage(
+    bytes,
+    { attributes: [], timeUnixNano: "0" },
+    {
+      3: [I64, (r, p) => (p.timeUnixNano = r.fixed64().toString())],
+      4: [I64, (r, p) => (p.value = r.double())],
+      6: [I64, (r, p) => (p.value = Number(BigInt.asIntN(64, r.fixed64())))],
+      7: [LEN, attributes],
+    },
+  );
+}
+
+function histogramDataPoint(bytes) {
+  return readMessage(
+    bytes,
+    { attributes: [], timeUnixNano: "0", count: 0, bucketCounts: [], explicitBounds: [] },
+    {
+      3: [I64, (r, p) => (p.timeUnixNano = r.fixed64().toString())],
+      4: [I64, (r, p) => (p.count = Number(r.fixed64()))],
+      5: [I64, (r, p) => (p.sum = r.double())],
+      6: [LEN, (r, p) => (p.bucketCounts = packed64(r.chunk(), (b) => Number(b.fixed64())))],
+      7: [LEN, (r, p) => (p.explicitBounds = packed64(r.chunk(), (b) => b.double()))],
+      9: [LEN, attributes],
+      11: [I64, (r, p) => (p.min = r.double())],
+      12: [I64, (r, p) => (p.max = r.double())],
+    },
+  );
+}
+
+// Gauge, Sum and Histogram: data points in field 1, then the temporality
+// (1 delta, 2 cumulative) and, for a sum, whether it only grows.
+function points(bytes, dataPoint) {
+  return readMessage(
+    bytes,
+    { dataPoints: [] },
+    {
+      1: [LEN, (r, m) => m.dataPoints.push(dataPoint(r.chunk()))],
+      2: [VARINT, (r, m) => (m.aggregationTemporality = count(r))],
+      3: [VARINT, (r, m) => (m.isMonotonic = r.varint() !== 0n)],
+    },
+  );
+}
+
+function metric(bytes) {
+  return readMessage(
+    bytes,
+    { name: "" },
+    {
+      1: [LEN, (r, m) => (m.name = text(r))],
+      3: [LEN, (r, m) => (m.unit = text(r))],
+      5: [LEN, (r, m) => (m.gauge = points(r.chunk(), numberDataPoint))],
+      7: [LEN, (r, m) => (m.sum = points(r.chunk(), numberDataPoint))],
+      9: [LEN, (r, m) => (m.histogram = points(r.chunk(), histogramDataPoint))],
+      // Named, not decoded: metrics.mjs counts what it cannot report.
+      10: [LEN, (r, m) => (r.chunk(), (m.exponentialHistogram = {}))],
+      11: [LEN, (r, m) => (r.chunk(), (m.summary = {}))],
+    },
+  );
+}
+
+function scopeMetrics(bytes) {
+  return readMessage(
+    bytes,
+    { scope: { name: "", attributes: [], droppedAttributesCount: 0 }, metrics: [] },
+    {
+      1: [LEN, (r, sm) => (sm.scope = scope(r.chunk()))],
+      2: [LEN, (r, sm) => sm.metrics.push(metric(r.chunk()))],
+    },
+  );
+}
+
+function resourceMetrics(bytes) {
+  return readMessage(
+    bytes,
+    { resource: { attributes: [], droppedAttributesCount: 0 }, scopeMetrics: [] },
+    {
+      1: [LEN, (r, rm) => (rm.resource = resource(r.chunk()))],
+      2: [LEN, (r, rm) => rm.scopeMetrics.push(scopeMetrics(r.chunk()))],
+    },
+  );
+}
+
+/**
+ * Decodes an ExportMetricsServiceRequest.
+ * @param {Uint8Array} bytes the request body, uncompressed
+ * @returns {{ resourceMetrics: object[] }} the request as OTLP JSON
+ */
+export function decodeMetricsRequest(bytes) {
+  return readMessage(
+    bytes,
+    { resourceMetrics: [] },
+    {
+      1: [LEN, (r, req) => req.resourceMetrics.push(resourceMetrics(r.chunk()))],
     },
   );
 }

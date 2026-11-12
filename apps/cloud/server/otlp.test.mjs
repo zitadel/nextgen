@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { decodeTraceRequest } from "./otlp.mjs";
+import { decodeMetricsRequest, decodeTraceRequest } from "./otlp.mjs";
 
 // A minimal protobuf writer, enough to build the messages the Go SDK sends.
 const varint = (value) => {
@@ -149,4 +149,129 @@ test("rejects a truncated export", () => {
     () => decodeTraceRequest(new Uint8Array(request.slice(0, request.length - 3))),
     /truncated/,
   );
+});
+
+const packedFixed64 = (field, values) => {
+  const b = Buffer.alloc(8 * values.length);
+  values.forEach((value, i) => b.writeBigUInt64LE(BigInt(value), 8 * i));
+  return bytes(field, [...b]);
+};
+const packedDouble = (field, values) => {
+  const b = Buffer.alloc(8 * values.length);
+  values.forEach((value, i) => b.writeDoubleLE(value, 8 * i));
+  return bytes(field, [...b]);
+};
+const sfixed64 = (field, value) => {
+  const b = Buffer.alloc(8);
+  b.writeBigInt64LE(BigInt(value));
+  return [...tag(field, 1), ...b];
+};
+
+test("decodes a metrics export", () => {
+  const counter = [
+    ...str(1, "zitadel.audit.events.written"),
+    ...str(3, "{event}"),
+    ...bytes(7, [
+      ...bytes(1, [
+        ...fixed64(3, "1794009925290366659"),
+        ...sfixed64(6, 3),
+        ...bytes(7, kv("type", str(1, "session.created"))),
+      ]),
+      ...uint(2, 1),
+      ...uint(3, 1),
+    ]),
+  ];
+  const level = [
+    ...str(1, "db.client.connection.count"),
+    ...bytes(7, [...bytes(1, [...sfixed64(6, -2)]), ...uint(2, 2)]),
+  ];
+  const gauge = [...str(1, "cache.entries"), ...bytes(5, bytes(1, double(4, 12.5)))];
+  const histogram = [
+    ...str(1, "db.client.operation.duration"),
+    ...str(3, "s"),
+    ...bytes(9, [
+      ...bytes(1, [
+        ...fixed64(3, "1794009925290366659"),
+        ...fixed64(4, 3),
+        ...double(5, 0.035),
+        ...packedFixed64(6, [1, 2, 0]),
+        ...packedDouble(7, [0.01, 0.1]),
+        ...bytes(9, kv("db.query.summary", str(1, "SELECT users"))),
+        ...double(11, 0.005),
+        ...double(12, 0.02),
+        // An exemplar, which nothing reads: skipped.
+        ...bytes(8, double(3, 0.02)),
+      ]),
+      ...uint(2, 1),
+    ]),
+  ];
+  const exponential = [...str(1, "exp"), ...bytes(10, uint(2, 1))];
+  const request = bytes(1, [
+    ...bytes(1, bytes(1, kv("service.name", str(1, "zitadel")))),
+    ...bytes(2, [
+      ...bytes(1, str(1, "github.com/zitadel/nextgen")),
+      ...bytes(2, counter),
+      ...bytes(2, level),
+      ...bytes(2, gauge),
+      ...bytes(2, histogram),
+      ...bytes(2, exponential),
+    ]),
+  ]);
+
+  const decoded = decodeMetricsRequest(new Uint8Array(request));
+
+  const [rm] = decoded.resourceMetrics;
+  assert.deepEqual(rm.resource.attributes, [
+    { key: "service.name", value: { stringValue: "zitadel" } },
+  ]);
+  const [sm] = rm.scopeMetrics;
+  assert.equal(sm.scope.name, "github.com/zitadel/nextgen");
+  assert.deepEqual(sm.metrics, [
+    {
+      name: "zitadel.audit.events.written",
+      unit: "{event}",
+      sum: {
+        dataPoints: [
+          {
+            attributes: [{ key: "type", value: { stringValue: "session.created" } }],
+            timeUnixNano: "1794009925290366659",
+            value: 3,
+          },
+        ],
+        aggregationTemporality: 1,
+        isMonotonic: true,
+      },
+    },
+    {
+      name: "db.client.connection.count",
+      sum: {
+        dataPoints: [{ attributes: [], timeUnixNano: "0", value: -2 }],
+        aggregationTemporality: 2,
+      },
+    },
+    {
+      name: "cache.entries",
+      gauge: { dataPoints: [{ attributes: [], timeUnixNano: "0", value: 12.5 }] },
+    },
+    {
+      name: "db.client.operation.duration",
+      unit: "s",
+      histogram: {
+        dataPoints: [
+          {
+            attributes: [{ key: "db.query.summary", value: { stringValue: "SELECT users" } }],
+            timeUnixNano: "1794009925290366659",
+            count: 3,
+            sum: 0.035,
+            bucketCounts: [1, 2, 0],
+            explicitBounds: [0.01, 0.1],
+            min: 0.005,
+            max: 0.02,
+          },
+        ],
+        aggregationTemporality: 1,
+      },
+    },
+    { name: "exp", exponentialHistogram: {} },
+  ]);
 });
