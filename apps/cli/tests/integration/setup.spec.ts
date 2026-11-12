@@ -10,31 +10,17 @@ import {
   type CliResult,
   type Credentials,
   type CustomConnection,
+  DEFAULT_SIGNUP_POLICY,
+  MOCK_SERVER_URL,
   PASSWORD_POLICY,
   type ScaffoldedApp,
   SETUP_ORIGIN,
 } from "@tests/helpers/project";
+import { cliVersion, expectedPublicCliCommand, pressCtrlC } from "@tests/helpers/run-cli";
 
 const platform = usePlatformMock();
 
 useLocalServers();
-
-/**
- * The part of setup's envelope that says what it committed.
- */
-type SetupGitData = {
-  git: { initialized: boolean; commit: string | null };
-};
-
-/**
- * The part of setup's envelope that says what to do next.
- */
-type NextActionsData = { next_actions: string[] };
-
-/**
- * The part of setup's envelope that says which files it wrote.
- */
-type FilesWrittenData = { files_written: string[] };
 
 /**
  * A full commit sha.
@@ -110,10 +96,290 @@ const ACME_FLAGS_WITH_A_BAD_SLUG = ACME_FLAGS_WITH_CLIENT_ID.map((flag) => {
 });
 
 /**
+ * The headline of a setup.
+ */
+const SET_UP_TITLE = "Set up Zitadel in this app";
+
+/**
+ * The headline of a setup previewed.
+ */
+const WOULD_SET_UP_TITLE = "Would set up Zitadel in this app (dry run)";
+
+/**
+ * The project setup created, as it names it.
+ */
+const PROJECT = { project_id: expect.stringMatching(/^proj-/), issuer: "http://localhost:3000" };
+
+/**
+ * The install a run that did not install reports.
+ */
+const INSTALL_SKIPPED = {
+  status: "skipped",
+  package_manager: "npm",
+  command: "npm install",
+  reason: "skip-install",
+};
+
+/**
+ * The commit a run that made one reports.
+ */
+const COMMITTED = { initialized: true, commit: expect.stringMatching(SHA) };
+
+/**
+ * How people sign in after a default setup.
+ */
+const SIGN_IN = {
+  starts_with: "password",
+  methods: ["password", "passkey"],
+  fields: [{ name: "email", required: true }],
+  password_min_length: 15,
+  providers: [],
+};
+
+/**
+ * What the first deploy reports, which only its ids vary.
+ */
+const DEPLOYMENT = {
+  release_id: expect.stringMatching(/^rel_/),
+  content_hash: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
+  deployment_id: expect.stringMatching(/^dep_/),
+  origins: ["http://localhost:3000"],
+};
+
+/**
+ * The step that tells the developer how to check sign-in works.
+ */
+const VERIFY_STEP =
+  "Verify auth in the browser: register a user, sign out, sign in again with the same user, and confirm /profile shows Signed in.";
+
+/**
+ * The step that points at the folders the developer edits.
+ */
+const CUSTOMIZE_STEP =
+  "Customize what you ask for and how people sign in: edit .zitadel/schemas/ to change the information you collect, and .zitadel/flows/ to change the sign-up/sign-in experience. Each folder has a README with examples.";
+
+/**
+ * The step that says where the login's look is changed.
+ */
+/**
+ * The step on changing the login's look, which names `branding eject` in the
+ * directory setup ran in.
+ *
+ * @param app - The app setup ran in.
+ * @returns The step.
+ */
+function brandingStep(app: { readonly path: string }): string {
+  return `Change how the login looks: it is a component in your app, so theme it with --zl-* custom properties in your own stylesheet and build any page layout around it in your code. To change the widget's structure, ${expectedPublicCliCommand(`branding eject --cwd ${app.path}`)} scaffolds an editable template in .zitadel/branding/.`;
+}
+
+/**
+ * Every file setup writes into an app, in the order it reports them.
+ */
+const FILES_WRITTEN = [
+  ".gitignore",
+  ".zitadel/secret",
+  "zitadel.json",
+  ".env.example",
+  ".env.local",
+  ".env.development.local",
+  ".zitadel/state.json",
+  "AGENTS.md",
+  "README.md",
+  "app/login/page.tsx",
+  "app/register/page.tsx",
+  "app/profile/page.tsx",
+  "proxy.ts",
+  "custom-elements.d.ts",
+  "package.json",
+  ".zitadel/meta/flow-definition.json",
+  ".zitadel/meta/user-schema.json",
+  ".zitadel/meta/user-property.json",
+  ".zitadel/meta/property-name.json",
+  ".zitadel/meta/auth-methods.json",
+  ".zitadel/meta/auth-method.json",
+  ".zitadel/meta/sso-auth-method.json",
+  ".zitadel/meta/idp-connection.json",
+  ".zitadel/meta/branding.json",
+  ".zitadel/meta/policy.json",
+  ".zitadel/meta/policy-test.json",
+  ".zitadel/meta/project.json",
+  ".zitadel/schemas/default-human-user.json",
+  ".zitadel/flows/default-login.json",
+  ".zitadel/policies/auth.factor.password.set.json",
+  ".zitadel/policies/user.create.json",
+  ".zitadel/schemas/README.md",
+  ".zitadel/flows/README.md",
+  ".zitadel/policies/README.md",
+];
+
+/**
+ * The same, less the sign-up policy a server that predates it cannot take.
+ */
+const FILES_WRITTEN_WITHOUT_SIGNUP_POLICY = FILES_WRITTEN.filter((file) => {
+  return file !== ".zitadel/policies/user.create.json";
+});
+
+/**
+ * The files a dry run says it would write: the configuration is left to the real run.
+ */
+const FILES_WOULD_WRITE = [
+  ".gitignore",
+  ".zitadel/secret",
+  "zitadel.json",
+  ".env.example",
+  ".env.local",
+  ".env.development.local",
+  ".zitadel/state.json",
+  "AGENTS.md",
+  "README.md",
+  "app/login/page.tsx",
+  "app/register/page.tsx",
+  "app/profile/page.tsx",
+  "proxy.ts",
+  "custom-elements.d.ts",
+  "package.json",
+  ".zitadel/meta/flow-definition.json",
+  ".zitadel/meta/user-schema.json",
+  ".zitadel/meta/user-property.json",
+  ".zitadel/meta/property-name.json",
+  ".zitadel/meta/auth-methods.json",
+  ".zitadel/meta/auth-method.json",
+  ".zitadel/meta/sso-auth-method.json",
+  ".zitadel/meta/idp-connection.json",
+  ".zitadel/meta/branding.json",
+  ".zitadel/meta/policy.json",
+  ".zitadel/meta/policy-test.json",
+  ".zitadel/meta/project.json",
+];
+
+/**
+ * The scaffolded files, one row each, as the envelope types them.
+ */
+const FILES = [
+  { path: ".zitadel", kind: "dir", action: "create" },
+  { path: ".zitadel/flows", kind: "dir", action: "create" },
+  { path: ".zitadel/schemas", kind: "dir", action: "create" },
+  { path: ".gitignore", kind: "file", action: "update" },
+  { path: ".zitadel/secret", kind: "file", action: "create" },
+  { path: "zitadel.json", kind: "file", action: "create" },
+  { path: ".env.example", kind: "file", action: "create" },
+  { path: ".env.local", kind: "file", action: "create" },
+  { path: ".env.development.local", kind: "file", action: "create" },
+  { path: ".zitadel/state.json", kind: "file", action: "create" },
+  { path: "AGENTS.md", kind: "file", action: "create" },
+  { path: "README.md", kind: "file", action: "create" },
+  { path: "app/login/page.tsx", kind: "file", action: "create" },
+  { path: "app/register/page.tsx", kind: "file", action: "create" },
+  { path: "app/profile/page.tsx", kind: "file", action: "create" },
+  { path: "proxy.ts", kind: "file", action: "create" },
+  { path: "custom-elements.d.ts", kind: "file", action: "create" },
+  { path: "package.json", kind: "file", action: "update" },
+  { path: ".zitadel/meta", kind: "dir", action: "create" },
+  { path: ".zitadel/meta/flow-definition.json", kind: "file", action: "create" },
+  { path: ".zitadel/meta/user-schema.json", kind: "file", action: "create" },
+  { path: ".zitadel/meta/user-property.json", kind: "file", action: "create" },
+  { path: ".zitadel/meta/property-name.json", kind: "file", action: "create" },
+  { path: ".zitadel/meta/auth-methods.json", kind: "file", action: "create" },
+  { path: ".zitadel/meta/auth-method.json", kind: "file", action: "create" },
+  { path: ".zitadel/meta/sso-auth-method.json", kind: "file", action: "create" },
+  { path: ".zitadel/meta/idp-connection.json", kind: "file", action: "create" },
+  { path: ".zitadel/meta/branding.json", kind: "file", action: "create" },
+  { path: ".zitadel/meta/policy.json", kind: "file", action: "create" },
+  { path: ".zitadel/meta/policy-test.json", kind: "file", action: "create" },
+  { path: ".zitadel/meta/project.json", kind: "file", action: "create" },
+];
+
+/**
+ * Every file setup writes into an app it creates.
+ */
+const NEW_APP_FILES_WRITTEN = [
+  ".gitignore",
+  ".zitadel/secret",
+  "zitadel.json",
+  ".env.example",
+  ".env.local",
+  ".env.development.local",
+  ".zitadel/state.json",
+  "AGENTS.md",
+  "README.md",
+  "app/page.tsx",
+  "app/login/page.tsx",
+  "app/register/page.tsx",
+  "app/profile/page.tsx",
+  "app/login/layout.tsx",
+  "app/register/layout.tsx",
+  "app/profile/layout.tsx",
+  "proxy.ts",
+  "custom-elements.d.ts",
+  "package.json",
+  ".zitadel/meta/flow-definition.json",
+  ".zitadel/meta/user-schema.json",
+  ".zitadel/meta/user-property.json",
+  ".zitadel/meta/property-name.json",
+  ".zitadel/meta/auth-methods.json",
+  ".zitadel/meta/auth-method.json",
+  ".zitadel/meta/sso-auth-method.json",
+  ".zitadel/meta/idp-connection.json",
+  ".zitadel/meta/branding.json",
+  ".zitadel/meta/policy.json",
+  ".zitadel/meta/policy-test.json",
+  ".zitadel/meta/project.json",
+  ".zitadel/schemas/default-human-user.json",
+  ".zitadel/flows/default-login.json",
+  ".zitadel/policies/auth.factor.password.set.json",
+  ".zitadel/policies/user.create.json",
+  ".zitadel/schemas/README.md",
+  ".zitadel/flows/README.md",
+  ".zitadel/policies/README.md",
+];
+
+/**
+ * The scaffolded files of an app setup creates, one row each.
+ */
+const NEW_APP_FILES = [
+  { path: ".zitadel", kind: "dir", action: "create" },
+  { path: ".zitadel/flows", kind: "dir", action: "create" },
+  { path: ".zitadel/schemas", kind: "dir", action: "create" },
+  { path: ".gitignore", kind: "file", action: "update" },
+  { path: ".zitadel/secret", kind: "file", action: "create" },
+  { path: "zitadel.json", kind: "file", action: "create" },
+  { path: ".env.example", kind: "file", action: "create" },
+  { path: ".env.local", kind: "file", action: "create" },
+  { path: ".env.development.local", kind: "file", action: "create" },
+  { path: ".zitadel/state.json", kind: "file", action: "create" },
+  { path: "AGENTS.md", kind: "file", action: "create" },
+  { path: "README.md", kind: "file", action: "create" },
+  { path: "app/page.tsx", kind: "file", action: "update" },
+  { path: "app/login/page.tsx", kind: "file", action: "create" },
+  { path: "app/register/page.tsx", kind: "file", action: "create" },
+  { path: "app/profile/page.tsx", kind: "file", action: "create" },
+  { path: "app/login/layout.tsx", kind: "file", action: "create" },
+  { path: "app/register/layout.tsx", kind: "file", action: "create" },
+  { path: "app/profile/layout.tsx", kind: "file", action: "create" },
+  { path: "proxy.ts", kind: "file", action: "create" },
+  { path: "custom-elements.d.ts", kind: "file", action: "create" },
+  { path: "package.json", kind: "file", action: "update" },
+  { path: ".zitadel/meta", kind: "dir", action: "create" },
+  { path: ".zitadel/meta/flow-definition.json", kind: "file", action: "create" },
+  { path: ".zitadel/meta/user-schema.json", kind: "file", action: "create" },
+  { path: ".zitadel/meta/user-property.json", kind: "file", action: "create" },
+  { path: ".zitadel/meta/property-name.json", kind: "file", action: "create" },
+  { path: ".zitadel/meta/auth-methods.json", kind: "file", action: "create" },
+  { path: ".zitadel/meta/auth-method.json", kind: "file", action: "create" },
+  { path: ".zitadel/meta/sso-auth-method.json", kind: "file", action: "create" },
+  { path: ".zitadel/meta/idp-connection.json", kind: "file", action: "create" },
+  { path: ".zitadel/meta/branding.json", kind: "file", action: "create" },
+  { path: ".zitadel/meta/policy.json", kind: "file", action: "create" },
+  { path: ".zitadel/meta/policy-test.json", kind: "file", action: "create" },
+  { path: ".zitadel/meta/project.json", kind: "file", action: "create" },
+];
+
+/**
  * A provider setup can enable, with how to ask for it and what it publishes.
  */
 type Provider = {
   readonly name: string;
+  readonly selection: string;
   readonly slug: string;
   readonly variables: string;
   readonly credentials: Credentials;
@@ -126,6 +392,7 @@ type Provider = {
 const PROVIDERS: readonly Provider[] = [
   {
     name: "a social provider",
+    selection: "google",
     slug: "google",
     variables: "GOOGLE",
     credentials: SOCIAL_CREDENTIALS,
@@ -135,6 +402,7 @@ const PROVIDERS: readonly Provider[] = [
   },
   {
     name: "a custom OpenID Connect provider",
+    selection: "custom",
     slug: ACME.slug,
     variables: "ACME_SSO",
     credentials: ACME_CREDENTIALS,
@@ -143,18 +411,6 @@ const PROVIDERS: readonly Provider[] = [
     },
   },
 ];
-
-/**
- * The entries a list holds more than once.
- *
- * @param list - The list.
- * @returns Each repeated entry, once per repeat.
- */
-function duplicatesIn(list: readonly string[]): string[] {
-  return list.filter((entry, at) => {
-    return list.indexOf(entry) !== at;
-  });
-}
 
 describe("setup", () => {
   describe("against an invalid server", () => {
@@ -165,7 +421,29 @@ describe("setup", () => {
 
         const result = await app.setup();
 
-        expect(result).toFailWith("E_NOT_FOUND");
+        expect(app.envelopeOf(result)).toEqual({
+          status: "error",
+          cli_version: cliVersion.version,
+          command: "setup",
+          source: MOCK_SERVER_URL,
+          code: "E_NOT_FOUND",
+          message: `POST ${MOCK_SERVER_URL}/api/v1/projects returned 404 — ${MOCK_SERVER_URL}/api/v1/projects has no such endpoint; is this a Zitadel platform API?`,
+          hint: `If you meant to use a local Zitadel server, start it first and retry setup with the commands below.`,
+          next_commands: [
+            expectedPublicCliCommand(`start --cwd ${app.path}`),
+            expectedPublicCliCommand(
+              `setup --framework next --dev-port 3000 --server local --cwd ${app.path}`,
+            ),
+          ],
+          details: {
+            server: MOCK_SERVER_URL,
+            original: {
+              status: 404,
+              url: `${MOCK_SERVER_URL}/api/v1/projects`,
+              body: { raw: "<html>not here</html>" },
+            },
+          },
+        });
       });
 
       it("does not claim to be configured", async () => {
@@ -185,7 +463,29 @@ describe("setup", () => {
 
         const result = await app.setup();
 
-        expect(result).toFailWith("E_NETWORK");
+        expect(app.envelopeOf(result)).toEqual({
+          status: "error",
+          cli_version: cliVersion.version,
+          command: "setup",
+          source: MOCK_SERVER_URL,
+          code: "E_NETWORK",
+          message: "down",
+          hint: `If you meant to use a local Zitadel server, start it first and retry setup with the commands below.`,
+          next_commands: [
+            expectedPublicCliCommand(`start --cwd ${app.path}`),
+            expectedPublicCliCommand(
+              `setup --framework next --dev-port 3000 --server local --cwd ${app.path}`,
+            ),
+          ],
+          details: {
+            server: MOCK_SERVER_URL,
+            original: {
+              status: 503,
+              url: `${MOCK_SERVER_URL}/api/v1/projects`,
+              body: { code: "unavailable", message: "down" },
+            },
+          },
+        });
       });
 
       it("still names a custom connection flag that is wrong", async () => {
@@ -194,7 +494,17 @@ describe("setup", () => {
 
         const result = await app.setupSsoWith(ACME_FLAGS_WITH_A_BAD_SLUG, ACME_CREDENTIALS.secret);
 
-        expect(result).toFailWith("E_VALIDATION");
+        expect(app.envelopeOf(result)).toEqual({
+          status: "error",
+          cli_version: cliVersion.version,
+          command: "setup",
+          source: "",
+          code: "E_VALIDATION",
+          message:
+            '--sso-slug: Use lowercase letters, digits, "-" and "_", starting with a letter or digit, at most 64 characters.',
+          hint: "Fix --sso-slug and run the command again.",
+          details: { flag: "--sso-slug" },
+        });
       });
 
       it("leaves the directory start ran in as it was", async () => {
@@ -216,7 +526,25 @@ describe("setup", () => {
 
         const result = await app.setup();
 
-        expect(result).toFailWith("E_NETWORK");
+        expect(app.envelopeOf(result)).toEqual({
+          status: "error",
+          cli_version: cliVersion.version,
+          command: "setup",
+          source: MOCK_SERVER_URL,
+          code: "E_NETWORK",
+          message: `POST ${MOCK_SERVER_URL}/api/v1/projects got no response`,
+          hint: `Check your connection and the server URL (ZITADEL_URL or --server). If you meant to use a local Zitadel server, start it first and retry setup with the commands below.`,
+          next_commands: [
+            expectedPublicCliCommand(`start --cwd ${app.path}`),
+            expectedPublicCliCommand(
+              `setup --framework next --dev-port 3000 --server local --cwd ${app.path}`,
+            ),
+          ],
+          details: {
+            server: MOCK_SERVER_URL,
+            original: { url: `${MOCK_SERVER_URL}/api/v1/projects`, reason: "unreachable" },
+          },
+        });
       });
     });
   });
@@ -232,12 +560,50 @@ describe("setup", () => {
     });
 
     describe("--json", () => {
-      it("succeeds", async () => {
+      it("reports what it wrote, deployed and suggests next", async () => {
         const app = await anApp();
 
         const result = await app.setup();
 
-        expect(result).toSucceed();
+        expect(app.envelopeOf(result)).toEqual({
+          cli_version: cliVersion.version,
+          command: "setup",
+          source: MOCK_SERVER_URL,
+          status: "ok",
+          data: {
+            title: SET_UP_TITLE,
+            project: PROJECT,
+            framework: "next",
+            server: MOCK_SERVER_URL,
+            files_written: FILES_WRITTEN,
+            files: FILES,
+            files_skipped: [],
+            install: INSTALL_SKIPPED,
+            git: COMMITTED,
+            sign_in: SIGN_IN,
+            sso: [],
+            deployment: DEPLOYMENT,
+            next_actions: [
+              `Install dependencies: npm --prefix ${app.path} install`,
+              `Start your project: npm --prefix ${app.path} run dev (then open http://localhost:3000/register)`,
+              VERIFY_STEP,
+              CUSTOMIZE_STEP,
+              `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
+              brandingStep(app),
+              `Add social sign-in whenever you are ready: ${expectedPublicCliCommand(app.asSetupSuggests("auth-method sso enable --provider google"))}`,
+            ],
+            next_commands: [
+              `npm --prefix ${app.path} install`,
+              `npm --prefix ${app.path} run dev`,
+              expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run")),
+              expectedPublicCliCommand(app.asSetupSuggests("status")),
+              expectedPublicCliCommand(
+                app.asSetupSuggests("auth-method sso enable --provider google"),
+              ),
+            ],
+          },
+          warnings: [],
+        });
       });
 
       it("scaffolds the login, register and profile pages", async () => {
@@ -295,50 +661,16 @@ describe("setup", () => {
         expect(data.diff?.files).toEqual([]);
       });
 
-      it.each([
-        "deploy -m '<what changed>'",
-        "serves only what is deployed",
-        "auth-method sso enable --provider google",
-      ])("says %s in its next actions", async (said) => {
+      it.each([SCHEMA_FILE, FLOW_FILE])("writes %s", async (file) => {
         const app = await anApp();
+        const before = await app.snapshot();
 
-        const result = await app.setup();
+        await app.setup();
 
-        expect(app.envelopeOf<NextActionsData>(result).data.next_actions.join("\n")).toContain(
-          said,
-        );
-      });
-
-      it.each([SCHEMA_FILE, FLOW_FILE])("reports writing %s", async (file) => {
-        const app = await anApp();
-
-        const result = await app.setup();
-
-        expect(app.envelopeOf<FilesWrittenData>(result).data.files_written).toContain(file);
-      });
-
-      it("reports each written file once", async () => {
-        const app = await anApp();
-
-        const result = await app.setup();
-
-        expect(duplicatesIn(app.envelopeOf<FilesWrittenData>(result).data.files_written)).toEqual(
-          [],
-        );
+        expect((await before.changes()).added).toContain(file);
       });
 
       describe("with git", () => {
-        it("reports the commit it made", async () => {
-          const app = await anApp();
-
-          const result = await app.setup();
-
-          expect(app.envelopeOf<SetupGitData>(result).data.git).toMatchObject({
-            initialized: true,
-            commit: expect.stringMatching(SHA),
-          });
-        });
-
         it("keeps the project secret it wrote out of the commit it makes", async () => {
           const app = await anApp();
 
@@ -366,25 +698,52 @@ describe("setup", () => {
           expect(await app.trackedFiles()).toContain(SCHEMA_FILE);
         });
 
-        it("reports the repository it created when it could not commit", async () => {
+        it("reports the repository it created when it could not commit, warning once", async () => {
           const app = await anApp();
 
           const result = await app.setupWithGitThatCannotCommit();
 
-          expect(app.envelopeOf<SetupGitData>(result).data.git).toEqual({
-            initialized: true,
-            commit: null,
+          expect(app.envelopeOf(result)).toEqual({
+            cli_version: cliVersion.version,
+            command: "setup",
+            source: MOCK_SERVER_URL,
+            status: "ok",
+            data: {
+              title: SET_UP_TITLE,
+              project: PROJECT,
+              framework: "next",
+              server: MOCK_SERVER_URL,
+              files_written: FILES_WRITTEN,
+              files: FILES,
+              files_skipped: [],
+              install: INSTALL_SKIPPED,
+              git: { initialized: true, commit: null },
+              sign_in: SIGN_IN,
+              sso: [],
+              deployment: DEPLOYMENT,
+              next_actions: [
+                `Install dependencies: npm --prefix ${app.path} install`,
+                `Start your project: npm --prefix ${app.path} run dev (then open http://localhost:3000/register)`,
+                VERIFY_STEP,
+                CUSTOMIZE_STEP,
+                `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
+                brandingStep(app),
+                `Add social sign-in whenever you are ready: ${expectedPublicCliCommand(app.asSetupSuggests("auth-method sso enable --provider google"))}`,
+              ],
+              next_commands: [
+                `npm --prefix ${app.path} install`,
+                `npm --prefix ${app.path} run dev`,
+                expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run")),
+                expectedPublicCliCommand(app.asSetupSuggests("status")),
+                expectedPublicCliCommand(
+                  app.asSetupSuggests("auth-method sso enable --provider google"),
+                ),
+              ],
+            },
+            warnings: [
+              "Could not commit the scaffolded project (fatal: cannot commit); the first release records no commit, so the next deploy cannot show a diff. Setup created a new, empty git repository here.",
+            ],
           });
-        });
-
-        it("warns that it could not commit and left a new repository", async () => {
-          const app = await anApp();
-
-          const result = await app.setupWithGitThatCannotCommit();
-
-          expect(app.envelopeOf(result).warnings?.join("\n")).toContain(
-            "Setup created a new, empty git repository here.",
-          );
         });
       });
 
@@ -404,9 +763,44 @@ describe("setup", () => {
 
           const result = await app.setup();
 
-          expect(app.envelopeOf<SetupGitData>(result).data.git).toMatchObject({
-            initialized: false,
-            commit: expect.stringMatching(SHA),
+          expect(app.envelopeOf(result)).toEqual({
+            cli_version: cliVersion.version,
+            command: "setup",
+            source: MOCK_SERVER_URL,
+            status: "ok",
+            data: {
+              title: SET_UP_TITLE,
+              project: PROJECT,
+              framework: "next",
+              server: MOCK_SERVER_URL,
+              files_written: FILES_WRITTEN,
+              files: FILES,
+              files_skipped: [],
+              install: INSTALL_SKIPPED,
+              git: { initialized: false, commit: expect.stringMatching(SHA) },
+              sign_in: SIGN_IN,
+              sso: [],
+              deployment: DEPLOYMENT,
+              next_actions: [
+                `Install dependencies: npm --prefix ${app.path} install`,
+                `Start your project: npm --prefix ${app.path} run dev (then open http://localhost:3000/register)`,
+                VERIFY_STEP,
+                CUSTOMIZE_STEP,
+                `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
+                brandingStep(app),
+                `Add social sign-in whenever you are ready: ${expectedPublicCliCommand(app.asSetupSuggests("auth-method sso enable --provider google"))}`,
+              ],
+              next_commands: [
+                `npm --prefix ${app.path} install`,
+                `npm --prefix ${app.path} run dev`,
+                expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run")),
+                expectedPublicCliCommand(app.asSetupSuggests("status")),
+                expectedPublicCliCommand(
+                  app.asSetupSuggests("auth-method sso enable --provider google"),
+                ),
+              ],
+            },
+            warnings: [],
           });
         });
 
@@ -417,29 +811,37 @@ describe("setup", () => {
 
           const result = await app.setup();
 
-          expect(result).toFailWith("E_CONFLICT");
+          expect(app.envelopeOf(result)).toEqual({
+            status: "error",
+            cli_version: cliVersion.version,
+            command: "setup",
+            source: "",
+            code: "E_CONFLICT",
+            message:
+              "Setup cannot commit here: HEAD is detached, so the commit would be on no branch",
+            hint: "Setup commits the project so the first release records a commit. Finish or abort what is under way, or check out a branch, then run setup again, or pass --no-git to set up without touching version control.",
+          });
         });
       });
 
       describe("in a repository with uncommitted work", () => {
-        it("refuses", async () => {
+        it("refuses, naming the untracked file", async () => {
           const app = await anApp();
           await app.underVersionControl();
           await app.withUncommittedWork();
 
           const result = await app.setup();
 
-          expect(result).toFailWith("E_CONFLICT");
-        });
-
-        it("names the untracked file it refused over", async () => {
-          const app = await anApp();
-          await app.underVersionControl();
-          await app.withUncommittedWork();
-
-          const result = await app.setup();
-
-          expect(result).toExplain("untracked file");
+          expect(app.envelopeOf(result)).toEqual({
+            status: "error",
+            cli_version: cliVersion.version,
+            command: "setup",
+            source: "",
+            code: "E_CONFLICT",
+            message: "The git working tree has 1 untracked file",
+            hint: "Setup commits the project directory so the first release records a commit, and it will not do that while there is work it did not write, which would be committed under setup's name. See them with git status, commit or stash them, then run setup again. If you have just scaffolded the app yourself, committing it first is the expected step. To set up without touching version control at all, pass --no-git.",
+            details: { modified: [], untracked: ["notes.md"] },
+          });
         });
 
         it("writes nothing into the project", async () => {
@@ -460,7 +862,45 @@ describe("setup", () => {
 
           const result = await app.setup(["--no-git"]);
 
-          expect(result).toSucceed();
+          expect(app.envelopeOf(result)).toEqual({
+            cli_version: cliVersion.version,
+            command: "setup",
+            source: MOCK_SERVER_URL,
+            status: "ok",
+            data: {
+              title: SET_UP_TITLE,
+              project: PROJECT,
+              framework: "next",
+              server: MOCK_SERVER_URL,
+              files_written: FILES_WRITTEN,
+              files: FILES,
+              files_skipped: [],
+              install: INSTALL_SKIPPED,
+              git: { initialized: false, commit: null },
+              sign_in: SIGN_IN,
+              sso: [],
+              deployment: DEPLOYMENT,
+              next_actions: [
+                `Install dependencies: npm --prefix ${app.path} install`,
+                `Start your project: npm --prefix ${app.path} run dev (then open http://localhost:3000/register)`,
+                VERIFY_STEP,
+                CUSTOMIZE_STEP,
+                `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
+                brandingStep(app),
+                `Add social sign-in whenever you are ready: ${expectedPublicCliCommand(app.asSetupSuggests("auth-method sso enable --provider google"))}`,
+              ],
+              next_commands: [
+                `npm --prefix ${app.path} install`,
+                `npm --prefix ${app.path} run dev`,
+                expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run")),
+                expectedPublicCliCommand(app.asSetupSuggests("status")),
+                expectedPublicCliCommand(
+                  app.asSetupSuggests("auth-method sso enable --provider google"),
+                ),
+              ],
+            },
+            warnings: [],
+          });
         });
       });
 
@@ -469,9 +909,44 @@ describe("setup", () => {
 
         const result = await app.setup(["--no-git"]);
 
-        expect(app.envelopeOf<SetupGitData>(result).data.git).toEqual({
-          initialized: false,
-          commit: null,
+        expect(app.envelopeOf(result)).toEqual({
+          cli_version: cliVersion.version,
+          command: "setup",
+          source: MOCK_SERVER_URL,
+          status: "ok",
+          data: {
+            title: SET_UP_TITLE,
+            project: PROJECT,
+            framework: "next",
+            server: MOCK_SERVER_URL,
+            files_written: FILES_WRITTEN,
+            files: FILES,
+            files_skipped: [],
+            install: INSTALL_SKIPPED,
+            git: { initialized: false, commit: null },
+            sign_in: SIGN_IN,
+            sso: [],
+            deployment: DEPLOYMENT,
+            next_actions: [
+              `Install dependencies: npm --prefix ${app.path} install`,
+              `Start your project: npm --prefix ${app.path} run dev (then open http://localhost:3000/register)`,
+              VERIFY_STEP,
+              CUSTOMIZE_STEP,
+              `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
+              brandingStep(app),
+              `Add social sign-in whenever you are ready: ${expectedPublicCliCommand(app.asSetupSuggests("auth-method sso enable --provider google"))}`,
+            ],
+            next_commands: [
+              `npm --prefix ${app.path} install`,
+              `npm --prefix ${app.path} run dev`,
+              expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run")),
+              expectedPublicCliCommand(app.asSetupSuggests("status")),
+              expectedPublicCliCommand(
+                app.asSetupSuggests("auth-method sso enable --provider google"),
+              ),
+            ],
+          },
+          warnings: [],
         });
       });
 
@@ -483,6 +958,7 @@ describe("setup", () => {
 
           expect(await app.publishedPolicies()).toEqual([
             expect.objectContaining({ operation: PASSWORD_POLICY, config: { min_length: 15 } }),
+            expect.objectContaining(DEFAULT_SIGNUP_POLICY),
           ]);
         });
 
@@ -493,7 +969,54 @@ describe("setup", () => {
 
           expect(await app.publishedPolicies()).toEqual([
             expect.objectContaining({ operation: PASSWORD_POLICY, config: { min_length: 12 } }),
+            expect.objectContaining(DEFAULT_SIGNUP_POLICY),
           ]);
+        });
+
+        it("reports a given minimum length as the one signing in will ask for", async () => {
+          const app = await anApp();
+
+          const result = await app.setup(["--password-min-length", "12"]);
+
+          expect(app.envelopeOf(result)).toEqual({
+            cli_version: cliVersion.version,
+            command: "setup",
+            source: MOCK_SERVER_URL,
+            status: "ok",
+            data: {
+              title: SET_UP_TITLE,
+              project: PROJECT,
+              framework: "next",
+              server: MOCK_SERVER_URL,
+              files_written: FILES_WRITTEN,
+              files: FILES,
+              files_skipped: [],
+              install: INSTALL_SKIPPED,
+              git: COMMITTED,
+              sign_in: { ...SIGN_IN, password_min_length: 12 },
+              sso: [],
+              deployment: DEPLOYMENT,
+              next_actions: [
+                `Install dependencies: npm --prefix ${app.path} install`,
+                `Start your project: npm --prefix ${app.path} run dev (then open http://localhost:3000/register)`,
+                VERIFY_STEP,
+                CUSTOMIZE_STEP,
+                `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
+                brandingStep(app),
+                `Add social sign-in whenever you are ready: ${expectedPublicCliCommand(app.asSetupSuggests("auth-method sso enable --provider google"))}`,
+              ],
+              next_commands: [
+                `npm --prefix ${app.path} install`,
+                `npm --prefix ${app.path} run dev`,
+                expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run")),
+                expectedPublicCliCommand(app.asSetupSuggests("status")),
+                expectedPublicCliCommand(
+                  app.asSetupSuggests("auth-method sso enable --provider google"),
+                ),
+              ],
+            },
+            warnings: [],
+          });
         });
 
         it("reads a minimum length of 0 as none", async () => {
@@ -503,6 +1026,7 @@ describe("setup", () => {
 
           expect(await app.publishedPolicies()).toEqual([
             expect.objectContaining({ operation: PASSWORD_POLICY, config: {} }),
+            expect.objectContaining(DEFAULT_SIGNUP_POLICY),
           ]);
         });
 
@@ -511,7 +1035,16 @@ describe("setup", () => {
 
           const result = await app.setup(["--password-min-length", "65"]);
 
-          expect(result).toFailWith("E_VALIDATION");
+          expect(app.envelopeOf(result)).toEqual({
+            status: "error",
+            cli_version: cliVersion.version,
+            command: "setup",
+            source: "",
+            code: "E_VALIDATION",
+            message: "Must be a whole number from 1 to 64, or 0 for none",
+            hint: "Pass a whole number for --password-min-length, or 0 for none.",
+            details: { argument: "--password-min-length" },
+          });
         });
       });
 
@@ -522,7 +1055,45 @@ describe("setup", () => {
 
           const result = await app.setupNewApp();
 
-          expect(result).toSucceed();
+          expect(app.envelopeOf(result)).toEqual({
+            cli_version: cliVersion.version,
+            command: "setup",
+            source: MOCK_SERVER_URL,
+            status: "ok",
+            data: {
+              title: SET_UP_TITLE,
+              project: PROJECT,
+              framework: "next",
+              server: MOCK_SERVER_URL,
+              files_written: NEW_APP_FILES_WRITTEN,
+              files: NEW_APP_FILES.slice(1),
+              files_skipped: [".zitadel"],
+              install: INSTALL_SKIPPED,
+              git: COMMITTED,
+              sign_in: SIGN_IN,
+              sso: [],
+              deployment: DEPLOYMENT,
+              next_actions: [
+                `Install dependencies: npm --prefix ${app.path} install`,
+                `Start your project: npm --prefix ${app.path} run dev (then open http://localhost:3000/register)`,
+                VERIFY_STEP,
+                CUSTOMIZE_STEP,
+                `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
+                brandingStep(app),
+                `Add social sign-in whenever you are ready: ${expectedPublicCliCommand(app.asSetupSuggests("auth-method sso enable --provider google"))}`,
+              ],
+              next_commands: [
+                `npm --prefix ${app.path} install`,
+                `npm --prefix ${app.path} run dev`,
+                expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run")),
+                expectedPublicCliCommand(app.asSetupSuggests("status")),
+                expectedPublicCliCommand(
+                  app.asSetupSuggests("auth-method sso enable --provider google"),
+                ),
+              ],
+            },
+            warnings: [],
+          });
         });
 
         it("creates a new app in a directory whose name is not a valid package name", async () => {
@@ -530,7 +1101,45 @@ describe("setup", () => {
 
           const result = await app.setupNewApp();
 
-          expect(result).toSucceed();
+          expect(app.envelopeOf(result)).toEqual({
+            cli_version: cliVersion.version,
+            command: "setup",
+            source: MOCK_SERVER_URL,
+            status: "ok",
+            data: {
+              title: SET_UP_TITLE,
+              project: PROJECT,
+              framework: "next",
+              server: MOCK_SERVER_URL,
+              files_written: NEW_APP_FILES_WRITTEN,
+              files: NEW_APP_FILES,
+              files_skipped: [],
+              install: INSTALL_SKIPPED,
+              git: COMMITTED,
+              sign_in: SIGN_IN,
+              sso: [],
+              deployment: DEPLOYMENT,
+              next_actions: [
+                `Install dependencies: npm --prefix ${app.path} install`,
+                `Start your project: npm --prefix ${app.path} run dev (then open http://localhost:3000/register)`,
+                VERIFY_STEP,
+                CUSTOMIZE_STEP,
+                `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
+                brandingStep(app),
+                `Add social sign-in whenever you are ready: ${expectedPublicCliCommand(app.asSetupSuggests("auth-method sso enable --provider google"))}`,
+              ],
+              next_commands: [
+                `npm --prefix ${app.path} install`,
+                `npm --prefix ${app.path} run dev`,
+                expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run")),
+                expectedPublicCliCommand(app.asSetupSuggests("status")),
+                expectedPublicCliCommand(
+                  app.asSetupSuggests("auth-method sso enable --provider google"),
+                ),
+              ],
+            },
+            warnings: [],
+          });
         });
 
         it("creates a new app in a directory that does not exist yet", async () => {
@@ -538,15 +1147,95 @@ describe("setup", () => {
 
           const result = await app.setupNewApp();
 
-          expect(result).toSucceed();
+          expect(app.envelopeOf(result)).toEqual({
+            cli_version: cliVersion.version,
+            command: "setup",
+            source: MOCK_SERVER_URL,
+            status: "ok",
+            data: {
+              title: SET_UP_TITLE,
+              project: PROJECT,
+              framework: "next",
+              server: MOCK_SERVER_URL,
+              files_written: NEW_APP_FILES_WRITTEN,
+              files: NEW_APP_FILES,
+              files_skipped: [],
+              install: INSTALL_SKIPPED,
+              git: COMMITTED,
+              sign_in: SIGN_IN,
+              sso: [],
+              deployment: DEPLOYMENT,
+              next_actions: [
+                `Install dependencies: npm --prefix ${app.path} install`,
+                `Start your project: npm --prefix ${app.path} run dev (then open http://localhost:3000/register)`,
+                VERIFY_STEP,
+                CUSTOMIZE_STEP,
+                `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
+                brandingStep(app),
+                `Add social sign-in whenever you are ready: ${expectedPublicCliCommand(app.asSetupSuggests("auth-method sso enable --provider google"))}`,
+              ],
+              next_commands: [
+                `npm --prefix ${app.path} install`,
+                `npm --prefix ${app.path} run dev`,
+                expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run")),
+                expectedPublicCliCommand(app.asSetupSuggests("status")),
+                expectedPublicCliCommand(
+                  app.asSetupSuggests("auth-method sso enable --provider google"),
+                ),
+              ],
+            },
+            warnings: [],
+          });
         });
 
-        it("previews a new app on a dry run", async () => {
+        it("previews a new app on a dry run, with the real command to run next", async () => {
           const app = await aNewAppDirectory();
 
           const result = await app.setupNewApp(["--dry-run"]);
 
-          expect(result).toSucceed();
+          expect(app.envelopeOf(result)).toEqual({
+            cli_version: cliVersion.version,
+            command: "setup",
+            source: MOCK_SERVER_URL,
+            status: "ok",
+            data: {
+              title: WOULD_SET_UP_TITLE,
+              dry_run: true,
+              project: { project_id: "dry-run-0000", issuer: "http://localhost:3000" },
+              framework: "next",
+              server: MOCK_SERVER_URL,
+              files_written: [],
+              files: [],
+              files_skipped: [],
+              install: { status: "would-run", package_manager: "npm", command: "npm install" },
+              git: { initialized: false, commit: null },
+              sign_in: SIGN_IN,
+              sso: [],
+              deployment: null,
+              next_actions: [
+                `Install dependencies: npm --prefix ${app.path} install`,
+                `Start your project: npm --prefix ${app.path} run dev (then open http://localhost:3000/register)`,
+                VERIFY_STEP,
+                CUSTOMIZE_STEP,
+                `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
+                brandingStep(app),
+                `Add social sign-in whenever you are ready: ${expectedPublicCliCommand(app.asSetupSuggests("auth-method sso enable --provider google"))}`,
+              ],
+              next_commands: [
+                `npm --prefix ${app.path} install`,
+                `npm --prefix ${app.path} run dev`,
+                expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run")),
+                expectedPublicCliCommand(app.asSetupSuggests("status")),
+                expectedPublicCliCommand(
+                  app.asSetupSuggests("auth-method sso enable --provider google"),
+                ),
+                expectedPublicCliCommand(
+                  `setup --skip-install --framework next --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+                ),
+              ],
+            },
+            warnings: [],
+          });
         });
 
         it("creates no app on a dry run", async () => {
@@ -566,13 +1255,207 @@ describe("setup", () => {
 
           const rerun = await app.setupNewApp();
 
-          expect(app.envelopeOf<FilesWrittenData>(rerun).data.files_written).toContain(
-            "app/page.tsx",
-          );
+          expect(app.envelopeOf(rerun)).toEqual({
+            cli_version: cliVersion.version,
+            command: "setup",
+            source: MOCK_SERVER_URL,
+            status: "ok",
+            data: {
+              title: SET_UP_TITLE,
+              project: PROJECT,
+              framework: "next",
+              server: MOCK_SERVER_URL,
+              files_written: NEW_APP_FILES_WRITTEN,
+              files: NEW_APP_FILES,
+              files_skipped: [],
+              install: INSTALL_SKIPPED,
+              git: COMMITTED,
+              sign_in: SIGN_IN,
+              sso: [],
+              deployment: DEPLOYMENT,
+              next_actions: [
+                `Install dependencies: npm --prefix ${app.path} install`,
+                `Start your project: npm --prefix ${app.path} run dev (then open http://localhost:3000/register)`,
+                VERIFY_STEP,
+                CUSTOMIZE_STEP,
+                `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
+                brandingStep(app),
+                `Add social sign-in whenever you are ready: ${expectedPublicCliCommand(app.asSetupSuggests("auth-method sso enable --provider google"))}`,
+              ],
+              next_commands: [
+                `npm --prefix ${app.path} install`,
+                `npm --prefix ${app.path} run dev`,
+                expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run")),
+                expectedPublicCliCommand(app.asSetupSuggests("status")),
+                expectedPublicCliCommand(
+                  app.asSetupSuggests("auth-method sso enable --provider google"),
+                ),
+              ],
+            },
+            warnings: [],
+          });
+        });
+      });
+
+      describe("on a dry run", () => {
+        it("previews what it would write, with the real command to run next", async () => {
+          const app = await anApp();
+
+          const result = await app.setup(["--dry-run"]);
+
+          expect(app.envelopeOf(result)).toEqual({
+            cli_version: cliVersion.version,
+            command: "setup",
+            source: MOCK_SERVER_URL,
+            status: "ok",
+            data: {
+              title: WOULD_SET_UP_TITLE,
+              dry_run: true,
+              project: { project_id: "dry-run-0000", issuer: "http://localhost:3000" },
+              framework: "next",
+              server: MOCK_SERVER_URL,
+              files_written: FILES_WOULD_WRITE,
+              files: FILES,
+              files_skipped: [],
+              install: { status: "would-run", package_manager: "npm", command: "npm install" },
+              git: { initialized: false, commit: null },
+              sign_in: SIGN_IN,
+              sso: [],
+              deployment: null,
+              next_actions: [
+                `Install dependencies: npm --prefix ${app.path} install`,
+                `Start your project: npm --prefix ${app.path} run dev (then open http://localhost:3000/register)`,
+                VERIFY_STEP,
+                CUSTOMIZE_STEP,
+                `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
+                brandingStep(app),
+                `Add social sign-in whenever you are ready: ${expectedPublicCliCommand(app.asSetupSuggests("auth-method sso enable --provider google"))}`,
+              ],
+              next_commands: [
+                `npm --prefix ${app.path} install`,
+                `npm --prefix ${app.path} run dev`,
+                expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run")),
+                expectedPublicCliCommand(app.asSetupSuggests("status")),
+                expectedPublicCliCommand(
+                  app.asSetupSuggests("auth-method sso enable --provider google"),
+                ),
+                expectedPublicCliCommand(
+                  `setup --skip-install --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+                ),
+              ],
+            },
+            warnings: [],
+          });
+        });
+
+        it("writes nothing and creates nothing", async () => {
+          const app = await anApp();
+          const before = await app.snapshot();
+
+          await app.setup(["--dry-run"]);
+
+          expect(await before.changes()).toMatchObject(NO_CHANGES);
+        });
+
+        it("reports an app that is already set up as one it would leave alone", async () => {
+          const app = await aCommittedApp();
+
+          const result = await app.setup(["--dry-run"]);
+
+          expect(app.envelopeOf(result)).toEqual({
+            cli_version: cliVersion.version,
+            command: "setup",
+            source: MOCK_SERVER_URL,
+            status: "ok",
+            data: { title: "Zitadel is already set up in this app (dry run)", dry_run: true },
+            warnings: [],
+          });
+        });
+
+        it("reports moving the app to another port, with the real command to run next", async () => {
+          const app = await aCommittedApp();
+
+          const result = await app.setup(["--dev-port", "3001", "--force", "--dry-run"]);
+
+          expect(app.envelopeOf(result)).toEqual({
+            cli_version: cliVersion.version,
+            command: "setup",
+            source: MOCK_SERVER_URL,
+            status: "ok",
+            data: {
+              title: "Would move the app to http://localhost:3001 (dry run)",
+              dry_run: true,
+              moved: true,
+              previous_issuer: "http://localhost:3000",
+              issuer: "http://localhost:3001",
+              dev_port: 3001,
+              files_written: [".env.local", "zitadel.json", "AGENTS.md", "README.md"],
+              deployment_id: null,
+              next_actions: [],
+              next_commands: [
+                expectedPublicCliCommand(
+                  `setup --skip-install --dev-port 3001 --force --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+                ),
+              ],
+            },
+            warnings: [],
+          });
+        });
+
+        it("leaves the origin where it was when it would move the app", async () => {
+          const app = await aCommittedApp();
+
+          await app.setup(["--dev-port", "3001", "--force", "--dry-run"]);
+
+          expect(await app.projectOrigins()).toEqual([SETUP_ORIGIN]);
         });
       });
 
       describe("with the install", () => {
+        it("reports the install it ran", async () => {
+          const app = await anApp();
+
+          const result = await app.setup([], { install: true });
+
+          expect(app.envelopeOf(result)).toEqual({
+            cli_version: cliVersion.version,
+            command: "setup",
+            source: MOCK_SERVER_URL,
+            status: "ok",
+            data: {
+              title: SET_UP_TITLE,
+              project: PROJECT,
+              framework: "next",
+              server: MOCK_SERVER_URL,
+              files_written: FILES_WRITTEN,
+              files: FILES,
+              files_skipped: [],
+              install: { status: "completed", package_manager: "npm", command: "npm install" },
+              git: COMMITTED,
+              sign_in: SIGN_IN,
+              sso: [],
+              deployment: DEPLOYMENT,
+              next_actions: [
+                `Start your project: npm --prefix ${app.path} run dev (then open http://localhost:3000/register)`,
+                VERIFY_STEP,
+                CUSTOMIZE_STEP,
+                `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
+                brandingStep(app),
+                `Add social sign-in whenever you are ready: ${expectedPublicCliCommand(app.asSetupSuggests("auth-method sso enable --provider google"))}`,
+              ],
+              next_commands: [
+                `npm --prefix ${app.path} run dev`,
+                expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run")),
+                expectedPublicCliCommand(app.asSetupSuggests("status")),
+                expectedPublicCliCommand(
+                  app.asSetupSuggests("auth-method sso enable --provider google"),
+                ),
+              ],
+            },
+            warnings: [],
+          });
+        });
+
         it("installs the dependencies it added", async () => {
           const app = await anApp();
 
@@ -607,20 +1490,21 @@ describe("setup", () => {
       });
 
       describe("in an app below the supported framework version", () => {
-        it("refuses", async () => {
+        it("refuses, saying the version is below the supported floor", async () => {
           const app = await anApp({ nextVersion: "^14.2.0" });
 
           const result = await app.setup();
 
-          expect(result).toFailWith("E_UNSUPPORTED_PROJECT_SHAPE");
-        });
-
-        it("says the version is below the supported floor", async () => {
-          const app = await anApp({ nextVersion: "^14.2.0" });
-
-          const result = await app.setup();
-
-          expect(result).toExplain("below the supported floor");
+          expect(app.envelopeOf(result)).toEqual({
+            status: "error",
+            cli_version: cliVersion.version,
+            command: "setup",
+            source: MOCK_SERVER_URL,
+            code: "E_UNSUPPORTED_PROJECT_SHAPE",
+            message:
+              'Next.js "^14.2.0" is below the supported floor — the CLI integrates Next.js 15.2.3 and newer',
+            hint: "Upgrade the app to Next.js 15.2.3 or later and rerun. Earlier releases let a request skip middleware (CVE-2025-29927).",
+          });
         });
 
         it("writes nothing to the app", async () => {
@@ -639,7 +1523,14 @@ describe("setup", () => {
 
           const rerun = await app.setup();
 
-          expect(rerun).toBeSkipped();
+          expect(app.envelopeOf(rerun)).toEqual({
+            cli_version: cliVersion.version,
+            command: "setup",
+            source: MOCK_SERVER_URL,
+            status: "skipped",
+            reason: "already-initialized",
+            data: { title: "Zitadel is already set up in this app" },
+          });
         });
 
         it("skips after the developer edited the schema", async () => {
@@ -650,7 +1541,14 @@ describe("setup", () => {
 
           const rerun = await app.setup();
 
-          expect(rerun).toBeSkipped();
+          expect(app.envelopeOf(rerun)).toEqual({
+            cli_version: cliVersion.version,
+            command: "setup",
+            source: MOCK_SERVER_URL,
+            status: "skipped",
+            reason: "already-initialized",
+            data: { title: "Zitadel is already set up in this app" },
+          });
         });
 
         it("leaves the developer's edits in place", async () => {
@@ -678,31 +1576,60 @@ describe("setup", () => {
           ]);
         });
 
+        it("reports the move it made under --force", async () => {
+          const app = await aCommittedApp();
+
+          const result = await app.setup(["--dev-port", "3001", "--force"]);
+
+          expect(app.envelopeOf(result)).toEqual({
+            cli_version: cliVersion.version,
+            command: "setup",
+            source: MOCK_SERVER_URL,
+            status: "ok",
+            data: {
+              title: "Moved the app to http://localhost:3001",
+              moved: true,
+              previous_issuer: "http://localhost:3000",
+              issuer: "http://localhost:3001",
+              dev_port: 3001,
+              files_written: [".env.local", "zitadel.json", "AGENTS.md", "README.md"],
+              deployment_id: expect.stringMatching(/^dep_/),
+              next_actions: ["Restart the dev server and open http://localhost:3001/login."],
+            },
+            warnings: [],
+          });
+        });
+
         describe("with --dev-port, without --force, when no one can be asked", () => {
-          it("still succeeds", async () => {
+          it("still succeeds, leaving the previous origin to remove with --force", async () => {
             const app = await aCommittedApp();
 
             const result = await app.setup(["--dev-port", "3001"]);
 
-            expect(result).toSucceed();
-          });
-
-          it("says to pass --force", async () => {
-            const app = await aCommittedApp();
-
-            const result = await app.setup(["--dev-port", "3001"]);
-
-            expect(result).toSay("origin rm http://localhost:3000 --force");
-          });
-
-          it("suggests removing the previous origin with --force", async () => {
-            const app = await aCommittedApp();
-
-            const result = await app.setup(["--dev-port", "3001"]);
-
-            expect(result).toSuggestExactly(
-              app.asSetupSuggests("origin rm http://localhost:3000 --force"),
-            );
+            expect(app.envelopeOf(result)).toEqual({
+              cli_version: cliVersion.version,
+              command: "setup",
+              source: MOCK_SERVER_URL,
+              status: "ok",
+              data: {
+                title: "Moved the app to http://localhost:3001",
+                moved: true,
+                previous_issuer: "http://localhost:3000",
+                issuer: "http://localhost:3001",
+                dev_port: 3001,
+                files_written: [".env.local", "zitadel.json", "AGENTS.md", "README.md"],
+                deployment_id: expect.stringMatching(/^dep_/),
+                next_actions: ["Restart the dev server and open http://localhost:3001/login."],
+                next_commands: [
+                  expectedPublicCliCommand(
+                    app.asSetupSuggests("origin rm http://localhost:3000 --force"),
+                  ),
+                ],
+              },
+              warnings: [
+                `http://localhost:3000 is still among the project's origins; it admits a port nothing serves any more. Remove it with ${expectedPublicCliCommand(app.asSetupSuggests("origin rm http://localhost:3000 --force"))}.`,
+              ],
+            });
           });
 
           it("removes nothing", async () => {
@@ -716,13 +1643,55 @@ describe("setup", () => {
       });
 
       describe("when its first deploy is refused", () => {
-        it("succeeds", async () => {
+        it("succeeds, naming the deploy to run instead", async () => {
           const app = await anApp();
           platform.rejectsASchema();
 
           const result = await app.setup();
 
-          expect(result).toSucceed();
+          expect(app.envelopeOf(result)).toEqual({
+            cli_version: cliVersion.version,
+            command: "setup",
+            source: MOCK_SERVER_URL,
+            status: "ok",
+            data: {
+              title: SET_UP_TITLE,
+              project: PROJECT,
+              framework: "next",
+              server: MOCK_SERVER_URL,
+              files_written: FILES_WRITTEN,
+              files: FILES,
+              files_skipped: [],
+              install: INSTALL_SKIPPED,
+              git: COMMITTED,
+              sign_in: SIGN_IN,
+              sso: [],
+              deployment: null,
+              next_actions: [
+                `Deploy .zitadel/ so the project serves its release: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))}`,
+                `Install dependencies: npm --prefix ${app.path} install`,
+                `Start your project: npm --prefix ${app.path} run dev (then open http://localhost:3000/register)`,
+                VERIFY_STEP,
+                CUSTOMIZE_STEP,
+                `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
+                brandingStep(app),
+                `Add social sign-in whenever you are ready: ${expectedPublicCliCommand(app.asSetupSuggests("auth-method sso enable --provider google"))}`,
+              ],
+              next_commands: [
+                expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'")),
+                `npm --prefix ${app.path} install`,
+                `npm --prefix ${app.path} run dev`,
+                expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run")),
+                expectedPublicCliCommand(app.asSetupSuggests("status")),
+                expectedPublicCliCommand(
+                  app.asSetupSuggests("auth-method sso enable --provider google"),
+                ),
+              ],
+            },
+            warnings: [
+              `The project was set up but its first deploy failed: release: invalid. Run ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))} to publish .zitadel/.`,
+            ],
+          });
         });
 
         it("deploys nothing", async () => {
@@ -742,6 +1711,93 @@ describe("setup", () => {
 
           platform.recovers();
           expect(await app.deploy()).toSucceed();
+        });
+      });
+
+      describe("against a server that does not take a sign-up policy yet", () => {
+        it("writes none, and deploys the rest, warning once", async () => {
+          const app = await anApp();
+          platform.predatesTheSignupPolicy();
+
+          const result = await app.setup();
+
+          expect(app.envelopeOf(result)).toEqual({
+            cli_version: cliVersion.version,
+            command: "setup",
+            source: MOCK_SERVER_URL,
+            status: "ok",
+            data: {
+              title: SET_UP_TITLE,
+              project: PROJECT,
+              framework: "next",
+              server: MOCK_SERVER_URL,
+              files_written: FILES_WRITTEN_WITHOUT_SIGNUP_POLICY,
+              files: FILES,
+              files_skipped: [],
+              install: INSTALL_SKIPPED,
+              git: COMMITTED,
+              sign_in: SIGN_IN,
+              sso: [],
+              deployment: DEPLOYMENT,
+              next_actions: [
+                `Install dependencies: npm --prefix ${app.path} install`,
+                `Start your project: npm --prefix ${app.path} run dev (then open http://localhost:3000/register)`,
+                VERIFY_STEP,
+                CUSTOMIZE_STEP,
+                `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
+                brandingStep(app),
+                `Add social sign-in whenever you are ready: ${expectedPublicCliCommand(app.asSetupSuggests("auth-method sso enable --provider google"))}`,
+              ],
+              next_commands: [
+                `npm --prefix ${app.path} install`,
+                `npm --prefix ${app.path} run dev`,
+                expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run")),
+                expectedPublicCliCommand(app.asSetupSuggests("status")),
+                expectedPublicCliCommand(
+                  app.asSetupSuggests("auth-method sso enable --provider google"),
+                ),
+              ],
+            },
+            warnings: [
+              `The server does not take a sign-up policy yet, so setup wrote none. Upgrade the server, then add .zitadel/policies/user.create.json and run ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))}.`,
+            ],
+          });
+        });
+
+        it("publishes the password policy alone", async () => {
+          const app = await anApp();
+          platform.predatesTheSignupPolicy();
+
+          await app.setup();
+
+          expect(await app.publishedPolicies()).toEqual([
+            expect.objectContaining({ operation: PASSWORD_POLICY }),
+          ]);
+        });
+
+        it("writes no sign-up policy file", async () => {
+          const app = await anApp();
+          platform.predatesTheSignupPolicy();
+
+          await app.setup();
+
+          expect((await app.snapshot()).paths()).not.toContain(
+            app.policyFile(DEFAULT_SIGNUP_POLICY.operation),
+          );
+        });
+
+        it("leaves a sign-up policy --force keeps, which no deploy gets past", async () => {
+          const app = await anApp();
+          await app.writeSignupPolicy({});
+          platform.predatesTheSignupPolicy();
+
+          const result = await app.setup(["--force"]);
+
+          expect(result).toSucceed();
+          expect((await app.snapshot()).paths()).toContain(
+            app.policyFile(DEFAULT_SIGNUP_POLICY.operation),
+          );
+          expect(await app.liveDeploymentCount()).toBe(0);
         });
       });
 
@@ -773,12 +1829,72 @@ describe("setup", () => {
       });
 
       describe.each(PROVIDERS)("with $name", (provider) => {
-        it("succeeds", async () => {
+        it("reports the connection it registered", async () => {
           const app = await anApp();
 
           const result = await provider.setUp(app);
 
-          expect(result).toSucceed();
+          expect(app.envelopeOf(result)).toEqual({
+            cli_version: cliVersion.version,
+            command: "setup",
+            source: MOCK_SERVER_URL,
+            status: "ok",
+            data: {
+              title: SET_UP_TITLE,
+              project: PROJECT,
+              framework: "next",
+              server: MOCK_SERVER_URL,
+              files_written: [
+                ...FILES_WRITTEN.slice(0, 29),
+                `.zitadel/idps/${provider.slug}.json`,
+                ...FILES_WRITTEN.slice(29),
+              ],
+              files: FILES,
+              files_skipped: [],
+              install: INSTALL_SKIPPED,
+              git: COMMITTED,
+              sign_in: {
+                ...SIGN_IN,
+                methods: ["password", "passkey", "sso"],
+                providers: [provider.slug],
+              },
+              sso: [
+                {
+                  provider: provider.selection,
+                  slug: provider.slug,
+                  client_id: provider.credentials.clientId,
+                  connection: `.zitadel/idps/${provider.slug}.json`,
+                  claim_mapping: { email: "email" },
+                  verified_claims: { email: "email_verified" },
+                  scopes: ["openid", "profile", "email"],
+                  unmapped: [],
+                  used_by: ["default-human-user"],
+                  callback_uri: `http://localhost:3000/__nextgen/idp/${provider.slug}/callback`,
+                  client_id_variable: {
+                    variable: `${provider.variables}_CLIENT_ID`,
+                    published: "stored",
+                  },
+                  secret: { variable: `${provider.variables}_CLIENT_SECRET`, published: "stored" },
+                },
+              ],
+              deployment: DEPLOYMENT,
+              next_actions: [
+                `Install dependencies: npm --prefix ${app.path} install`,
+                `Start your project: npm --prefix ${app.path} run dev (then open http://localhost:3000/register)`,
+                VERIFY_STEP,
+                CUSTOMIZE_STEP,
+                `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
+                brandingStep(app),
+              ],
+              next_commands: [
+                `npm --prefix ${app.path} install`,
+                `npm --prefix ${app.path} run dev`,
+                expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run")),
+                expectedPublicCliCommand(app.asSetupSuggests("status")),
+              ],
+            },
+            warnings: [],
+          });
         });
 
         it("registers the connection under its slug", async () => {
@@ -791,55 +1907,6 @@ describe("setup", () => {
               return idp.slug;
             }),
           ).toEqual([provider.slug]);
-        });
-
-        it("reports the claim mapping the connection was written with", async () => {
-          const app = await anApp();
-
-          const result = await provider.setUp(app);
-
-          const { data } = app.envelopeOf<{ sso: { claim_mapping: Record<string, string> }[] }>(
-            result,
-          );
-          expect(data.sso[0]?.claim_mapping).toEqual({ email: "email" });
-        });
-
-        it("reports what makes the email verified apart from the mapping", async () => {
-          const app = await anApp();
-
-          const result = await provider.setUp(app);
-
-          const { data } = app.envelopeOf<{ sso: { verified_claims: Record<string, string> }[] }>(
-            result,
-          );
-          expect(data.sso[0]?.verified_claims).toEqual({ email: "email_verified" });
-        });
-
-        it("reports the scopes the connection asks for", async () => {
-          const app = await anApp();
-
-          const result = await provider.setUp(app);
-
-          const { data } = app.envelopeOf<{ sso: { scopes: string[] }[] }>(result);
-          expect(data.sso[0]?.scopes).toEqual(["openid", "profile", "email"]);
-        });
-
-        it("reports the attributes no claim fills", async () => {
-          const app = await anApp();
-
-          const result = await provider.setUp(app);
-
-          const { data } = app.envelopeOf<{ sso: { unmapped: unknown[] }[] }>(result);
-          expect(data.sso[0]?.unmapped).toEqual([]);
-        });
-
-        it("reports the schemas that sign in through the connection", async () => {
-          const app = await anApp();
-
-          const result = await provider.setUp(app);
-
-          const { data } = app.envelopeOf<{ sso: { used_by: string[] }[] }>(result);
-          expect(data.sso[0]?.used_by).toEqual(["default-human-user"]);
         });
 
         it("publishes the client id as a readable project variable", async () => {
@@ -904,6 +1971,14 @@ describe("setup", () => {
           await provider.setUp(app);
 
           expect(await app.filesContaining(provider.credentials.secret)).toEqual([]);
+        });
+
+        it("keeps the secret out of everything it prints", async () => {
+          const app = await anApp();
+
+          const result = await provider.setUp(app);
+
+          expect(result).not.toSay(provider.credentials.secret);
         });
 
         it("keeps the client id out of every file in the project", async () => {
@@ -983,47 +2058,39 @@ describe("setup", () => {
       });
 
       describe("with a custom provider but not both credentials", () => {
-        it("will not set up the provider without a client secret", async () => {
+        it("will not set up the provider without a client secret, naming how to pipe it in", async () => {
           const app = await anApp();
 
           const result = await app.setupSsoWith(ACME_FLAGS_WITH_CLIENT_ID, "");
 
-          expect(result).toFailWith("E_VALIDATION");
+          expect(app.envelopeOf(result)).toEqual({
+            status: "error",
+            cli_version: cliVersion.version,
+            command: "setup",
+            source: MOCK_SERVER_URL,
+            code: "E_VALIDATION",
+            message: "No client secret supplied",
+            hint: `Pipe it in on stdin. It is never a flag: that would put it in shell history, a process listing and CI logs. For example: printf '%s' "$CLIENT_SECRET" | ${expectedPublicCliCommand(`setup --sso custom --sso-client-id '<id>' --cwd ${app.path} ...`)}`,
+            next_commands: [
+              `printf '%s' "$CLIENT_SECRET" | ${expectedPublicCliCommand(`setup --sso custom --sso-client-id '<id>' --cwd ${app.path} ...`)}`,
+            ],
+          });
         });
-
-        it("names the secret as what is missing", async () => {
-          const app = await anApp();
-
-          const result = await app.setupSsoWith(ACME_FLAGS_WITH_CLIENT_ID, "");
-
-          expect(result).toExplain("No client secret supplied");
-        });
-
-        it("hints at piping the secret in", async () => {
-          const app = await anApp();
-
-          const result = await app.setupSsoWith(ACME_FLAGS_WITH_CLIENT_ID, "");
-
-          expect(result).toHintAt("Pipe it in on stdin.");
-        });
-
-        it.each([`printf '%s' "$CLIENT_SECRET" | `, "setup --sso custom --sso-client-id <id>"])(
-          "suggests piping the secret in, without carrying one: %s",
-          async (suggested) => {
-            const app = await anApp();
-
-            const result = await app.setupSsoWith(ACME_FLAGS_WITH_CLIENT_ID, "");
-
-            expect(result).toSuggest(suggested);
-          },
-        );
 
         it("will not set up the provider without a client id", async () => {
           const app = await anApp();
 
           const result = await app.setupSsoWith(ACME_FLAGS, ACME_CREDENTIALS.secret);
 
-          expect(result).toExplain("--sso-client-id");
+          expect(app.envelopeOf(result)).toEqual({
+            status: "error",
+            cli_version: cliVersion.version,
+            command: "setup",
+            source: "",
+            code: "E_VALIDATION",
+            message: "--sso custom needs --sso-client-id",
+            hint: "Register a client at https://sso.acme.example and pass its client id.",
+          });
         });
 
         it.each([
@@ -1038,9 +2105,186 @@ describe("setup", () => {
           expect(await before.changes()).toMatchObject(NO_CHANGES);
         });
       });
+
+      describe("when the server mints a project id holding an escape sequence", () => {
+        it("carries the id as it was minted, escape sequence and all", async () => {
+          const app = await anApp();
+          platform.mintsAHostileProjectId();
+
+          const result = await app.setup();
+
+          expect(app.envelopeOf(result)).toEqual({
+            cli_version: cliVersion.version,
+            command: "setup",
+            source: MOCK_SERVER_URL,
+            status: "ok",
+            data: {
+              title: SET_UP_TITLE,
+              project: { project_id: "proj-\u001b[2Jwiped", issuer: "http://localhost:3000" },
+              framework: "next",
+              server: MOCK_SERVER_URL,
+              files_written: FILES_WRITTEN,
+              files: FILES,
+              files_skipped: [],
+              install: INSTALL_SKIPPED,
+              git: COMMITTED,
+              sign_in: SIGN_IN,
+              sso: [],
+              deployment: null,
+              next_actions: [
+                `Deploy .zitadel/ so the project serves its release: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))}`,
+                `Install dependencies: npm --prefix ${app.path} install`,
+                `Start your project: npm --prefix ${app.path} run dev (then open http://localhost:3000/register)`,
+                VERIFY_STEP,
+                CUSTOMIZE_STEP,
+                `See your changes before they go live: ${expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run"))} to preview, then ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))} to publish. The project serves only what is deployed, so an edit takes effect once you deploy it.`,
+                brandingStep(app),
+                `Add social sign-in whenever you are ready: ${expectedPublicCliCommand(app.asSetupSuggests("auth-method sso enable --provider google"))}`,
+              ],
+              next_commands: [
+                expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'")),
+                `npm --prefix ${app.path} install`,
+                `npm --prefix ${app.path} run dev`,
+                expectedPublicCliCommand(app.asSetupSuggests("deploy --dry-run")),
+                expectedPublicCliCommand(app.asSetupSuggests("status")),
+                expectedPublicCliCommand(
+                  app.asSetupSuggests("auth-method sso enable --provider google"),
+                ),
+              ],
+            },
+            warnings: [
+              `The project was set up but its first deploy failed: request does not conform to spec. Run ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))} to publish .zitadel/.`,
+            ],
+          });
+        });
+      });
+
+      describe("when the server does not answer", () => {
+        it("stops on Ctrl-C, in one envelope", async () => {
+          const app = await anApp();
+          const waiting = platform.hangs();
+
+          const result = app.setup();
+          await waiting;
+          pressCtrlC();
+
+          expect(app.envelopeOf(await result)).toEqual({
+            status: "error",
+            cli_version: cliVersion.version,
+            command: "setup",
+            source: MOCK_SERVER_URL,
+            code: "E_CANCELLED",
+            message: "Cancelled",
+            hint: "The command was cancelled with Ctrl-C.",
+          });
+        });
+
+        it("exits 130 on Ctrl-C", async () => {
+          const app = await anApp();
+          const waiting = platform.hangs();
+
+          const result = app.setup();
+          await waiting;
+          pressCtrlC();
+
+          expect(await result).toExitWith(130);
+        });
+
+        it("does not claim to be configured after Ctrl-C", async () => {
+          const app = await anApp();
+          const waiting = platform.hangs();
+
+          const result = app.setup();
+          await waiting;
+          pressCtrlC();
+          await result;
+
+          expect(await app.hasBeenConfigured()).toBe(false);
+        });
+      });
     });
 
     describe("rendered for a terminal", () => {
+      it("closes its narration on the headline the envelope carries", async () => {
+        const app = await anApp();
+
+        const result = await app.setupRendered();
+
+        expect(result).toSayOnce(SET_UP_TITLE);
+      });
+
+      it("closes a dry run's narration on the headline the envelope carries", async () => {
+        const app = await anApp();
+
+        const result = await app.setupRendered(["--dry-run"]);
+
+        expect(result).toSayOnce(WOULD_SET_UP_TITLE);
+      });
+
+      it("names the app's address when piped", async () => {
+        const app = await anApp();
+
+        const result = await app.setupRendered();
+
+        expect(result).toPrint("App will run   http://localhost:3000");
+      });
+
+      it("names the server it ran against when piped", async () => {
+        const app = await anApp();
+
+        const result = await app.setupRendered();
+
+        expect(result).toPrint(`Server         ${MOCK_SERVER_URL}`);
+      });
+
+      it("names the real command after a dry run", async () => {
+        const app = await anApp();
+
+        const result = await app.setupRendered(["--dry-run"]);
+
+        expect(result).toSayOnce(
+          expectedPublicCliCommand(
+            `setup --skip-install --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+          ),
+        );
+      });
+
+      it("says to deploy once, when the first deploy was refused", async () => {
+        const app = await anApp();
+        platform.rejectsASchema();
+
+        const result = await app.setupRendered();
+
+        expect(result).toSayOnce(
+          `The project was set up but its first deploy failed: release: invalid. Run ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))} to publish .zitadel/.`,
+        );
+      });
+
+      it("says the next steps' commands once", async () => {
+        const app = await anApp();
+
+        const result = await app.setupRendered();
+
+        expect(result).toSayOnce(expectedPublicCliCommand(app.asSetupSuggests("status")));
+      });
+
+      it("spells out an escape sequence in the project id", async () => {
+        const app = await anApp();
+        platform.mintsAHostileProjectId();
+
+        const result = await app.setupRendered();
+
+        expect(result).toPrint("Project id     proj-\\x1b[2Jwiped");
+      });
+
+      it("keeps the client secret out of everything it prints", async () => {
+        const app = await anApp();
+
+        const result = await app.setupWithCustomSsoRendered(ACME, ACME_CREDENTIALS);
+
+        expect(result).not.toSay(ACME_CREDENTIALS.secret);
+      });
+
       it("names the provider in the connection's box", async () => {
         const app = await anApp();
 

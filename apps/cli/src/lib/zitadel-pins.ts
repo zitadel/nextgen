@@ -20,7 +20,9 @@ type ZitadelSpec = [name: string, specifier: string];
  * @throws A `SyntaxError` when the `package.json` is not valid JSON.
  */
 export async function exactZitadelPins(cwd: string): Promise<ZitadelSpec[] | undefined> {
-  return (await zitadelSpecs(cwd))?.filter(([, version]) => semver.valid(version) !== null);
+  return (await zitadelSpecs(cwd))?.filter(([, version]) => {
+    return semver.valid(version) !== null;
+  });
 }
 
 /**
@@ -32,7 +34,9 @@ export async function exactZitadelPins(cwd: string): Promise<ZitadelSpec[] | und
  * @throws A `SyntaxError` when the `package.json` is not valid JSON.
  */
 export async function floatingZitadelSpecs(cwd: string): Promise<ZitadelSpec[] | undefined> {
-  return (await zitadelSpecs(cwd))?.filter(([, version]) => semver.valid(version) === null);
+  return (await zitadelSpecs(cwd))?.filter(([, version]) => {
+    return semver.valid(version) === null;
+  });
 }
 
 /**
@@ -48,7 +52,11 @@ async function zitadelSpecs(cwd: string): Promise<ZitadelSpec[] | undefined> {
   return (
     pkg &&
     Object.entries({ ...pkg.dependencies, ...pkg.devDependencies })
-      .filter(([name]) => name.startsWith("@zitadel/"))
-      .map(([name, version]): ZitadelSpec => [name, (version ?? "").trim()])
+      .filter(([name]) => {
+        return name.startsWith("@zitadel/");
+      })
+      .map(([name, version]): ZitadelSpec => {
+        return [name, (version ?? "").trim()];
+      })
   );
 }

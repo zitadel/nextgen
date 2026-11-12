@@ -123,6 +123,10 @@ type Session struct {
 	// The factors must be verified using [AuthAttempt]s before being added to the session, and the VerifiedAt field must be set to the time of verification.
 	// The factors are stored in the database.
 	Factors []AuthFactor
+
+	// FlowID is the login flow whose handoff an exchange consumed. Set only on
+	// the session ExchangeSession returns, for its events; it is not stored.
+	FlowID string
 }
 
 func NewSession(projectID string, agent *UserAgent) (*Session, error) {

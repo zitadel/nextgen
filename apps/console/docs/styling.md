@@ -108,7 +108,7 @@ Canonical examples:
 | --- | --- |
 | Nav chrome | `Sidebar` (`collapsible="icon"`; mobile = persistent icon rail) |
 | Org/project picker | `Popover` + `Badge` |
-| Users filters | `Select` (schema, then revision), in `ResourceTitle`'s `filter` slot; the revision menu is `RevisionItems` (`src/features/schemas/components/revision-select.tsx`), shared with the schema detail's picker |
+| List filters | `ResourceFilter` (`src/components/resource-filter.tsx`), by the "List filters" recipe below |
 | Users table | `Table`, `Avatar`, `Badge`, `DropdownMenu`, `Button`; `HoverCard` (identity), `Popover` (attributes) |
 | Panel around a screen's content | `Card` |
 | Attribute chip / CLI command in prose | `InlineCode` |
@@ -120,6 +120,23 @@ Canonical examples:
 | Row actions menu | `RowMenu` (`src/components/resource-list.tsx`) |
 | Screen outside the app shell (sign-in, claim, server unavailable) | `StandaloneScreen` + `StandaloneMessage` (`src/components/standalone-screen.tsx`) |
 | Centred state in place of a screen's content (the project picker) | `Empty` (`src/components/ui/empty.tsx`) |
+
+### Status tones
+
+A status pill's dot (`StatusBadge`, `StatusDot` in `src/components/status-badge.tsx`)
+is coloured by what the status means, never per status. Add a new status to
+`STATUS_TONE` there, under the tone whose meaning it has; an unlisted one reads
+neutral.
+
+| Tone | Token | Meaning | Statuses |
+| --- | --- | --- | --- |
+| `positive` | `success` | in force and working | `active`, `live` |
+| `caution` | `warning` | held for now; someone can lift it | `suspended` |
+| `critical` | `destructive` | on its way out, not coming back by itself | `pending_purge` |
+| `neutral` | `muted-foreground` | off, or not yet on | `deactivated`, `inactive`, `draft` |
+
+A hard stop that is not one state among several (a revoked release) is the
+tinted `destructive` `Badge` with no dot, not a tone.
 
 Shared text styles (`PAGE_TITLE`, `SECTION_HEADING`, `SUBSECTION_HEADING`,
 `OVERLINE`, `EYEBROW`, the panel table cells) live in
@@ -169,9 +186,11 @@ compose it rather than restating the numbers per screen.
 Every list screen is a table on this shell, User schemas and Login flows
 included (D17; the earlier card of rows broke on narrow widths). A screen
 composes `Page`, `ResourceTitle` (with the Add button as its `action`,
-beside the title at every width, D19, and any list filter as its `filter`,
+beside the title at every width, D19, labelled with what it adds as the sheet
+it opens is titled: `Add user`, `New project`, never a bare `Add`, the list's search as its `filter`,
 beside the action on one 36px row and on its own row under the title on a
-phone; `filterBelow` keeps it on that row at every width, as Logs' search is),
+phone, where `filterBelow` keeps it at every width, as Events' search is, and
+the list's `ResourceFilter` as its `below` row, by "List filters" below),
 then `ResourceHeaderRow` +
 `ResourceHeadCell`, `ResourceRow`, `ResourceEmptyRow` and `LoadMore`. A
 fractional grid takes `RESOURCE_TABLE_FIXED`, which scrolls the table inside
@@ -185,7 +204,7 @@ its card below 576px rather than squeezing the cells.
 | Table top | 20px under the title row at `lg`, 16px below |
 | Table head | 56px tall, 24px leading / 16px trailing inset |
 | Table cell | 56px tall, 24px inset, 8px block padding |
-| Row density | `RESOURCE_DENSITY` on the table's card sets the height for every head and body cell: `comfortable` (56px, the default) or `compact` (40px, 4px block padding, `RowMenu size="icon-xs"`; Logs). Never restate a height per cell |
+| Row density | `RESOURCE_DENSITY` on the table's card sets the height for every head and body cell: `comfortable` (56px, the default) or `compact` (40px, 4px block padding, `RowMenu size="icon-xs"`; Events). Never restate a height per cell |
 | Head label | display face, 12/16, 0.72px tracking, `foreground` |
 | Row icon | 16px, stroke 1.5, `muted-foreground`, 10px to its label |
 
@@ -212,6 +231,34 @@ glance; and the design's Lucide glyphs are drawn at **stroke 1.5**, where
 `lucide-react` defaults to 2 — a glyph at the default weight reads heavier than
 the design even though its box measures correctly.
 
+### List filters
+
+A list is narrowed through `ResourceFilter` (`src/components/resource-filter.tsx`):
+**Add filter** lists the resource's properties, then the chosen property's
+values by its type, and each set filter is a chip. The Users list
+(`src/routes/_authed/users/index.tsx`) is the shipped example. To add it to a
+list:
+
+1. Describe the properties as `FilterDefinition`s (`src/lib/resource-filter.ts`)
+   in `src/features/<resource>/filters.tsx`. A fixed set of values is
+   `type: "options"`, a moment `type: "date"`; a status takes `statusOptions`
+   (`status-badge.tsx`). A property that depends on another names it in the
+   other's `clears` and says why it is `unavailable` until then.
+2. Keep each value in the URL under its definition's `key`: accept only what
+   the filter could have set in the route's `validateSearch`
+   (`parseDateFilter` for a date), and leave the keys in `loaderDeps`.
+3. Turn the values into the query's criteria in the feature, as `userFilter`
+   (`src/features/users/list.ts`) does. The server narrows; nothing filters or
+   counts the rows already loaded. A date's start is `dateFilterStart`.
+4. Render it in `ResourceTitle`'s `below` row, merging each `onChange` patch
+   into the search. The search field stays in `filter`.
+5. In the empty state, tell "no match" from "none yet" with `isFiltered`, and
+   clear with `clearedFilters`.
+
+A new kind of value (a number, free text) is a new `type` in
+`FilterDefinition` and its values list in the component, not a control beside
+it.
+
 ## Resource detail layout — one shell for every detail screen
 
 Detail screens come in three compositions, and each has one shell:
@@ -219,7 +266,9 @@ Detail screens come in three compositions, and each has one shell:
 - **Resource detail** (Users, Teams, Project settings): a title row over body
   cards. Compose `Page` + `DetailHeader` from
   `src/components/detail-page.tsx`, then put the body under `DETAIL_BODY`. A
-  body card with a titled section is a `DetailSection`; a single name field with
+  body card with a titled section is a `DetailSection`, with an optional
+  `description` (a muted sentence about the whole section, between the title
+  and the rule); a single name field with
   its Save button is a `RenameCard` (`src/components/rename-card.tsx`). A body
   card the design titles by name rather than a section title (Users: the profile,
   under its schema's name) leads with `PanelTitle as="h2"`; the header owns the

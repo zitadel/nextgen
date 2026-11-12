@@ -7,6 +7,7 @@ import type { ZitadelConfig } from "@/lib/zitadel/config";
 import type { ReadableFile } from "@/lib/zitadel/resources/document";
 import { PasswordPolicy } from "@/lib/zitadel/resources/policies/password";
 import { Policy } from "@/lib/zitadel/resources/policies/policy";
+import { SignupPolicy } from "@/lib/zitadel/resources/policies/signup";
 import { PolicyTest } from "@/lib/zitadel/resources/policies/suite";
 import type { PolicySelection } from "@/lib/zitadel/resources/policies/types";
 import { CONFIG_DIRECTORIES } from "@/lib/zitadel/types";
@@ -41,15 +42,21 @@ export class Policies extends Collection<Policy> {
 
   /**
    * Read a policy file into the class that knows its operation: a
-   * {@link PasswordPolicy} for the password operation, a plain {@link Policy}
-   * for any other.
+   * {@link PasswordPolicy} for the password operation, a {@link SignupPolicy}
+   * for the one that creates a user, a plain {@link Policy} for any other.
    *
    * @param file - The file.
    * @returns The policy, marked as read, or the broken file it is.
    */
   static read(file: ReadableFile): Policy | BrokenFile {
-    if (!("unparsed" in file) && file.body.operation === PasswordPolicy.OPERATION) {
+    if ("unparsed" in file) {
+      return Policy.read(file);
+    }
+    if (file.body.operation === PasswordPolicy.OPERATION) {
       return PasswordPolicy.read(file);
+    }
+    if (file.body.operation === SignupPolicy.OPERATION) {
+      return SignupPolicy.read(file);
     }
     return Policy.read(file);
   }
@@ -63,6 +70,20 @@ export class Policies extends Collection<Policy> {
   get password(): PasswordPolicy | undefined {
     const policy = this.get(PasswordPolicy.PATH);
     if (policy instanceof PasswordPolicy) {
+      return policy;
+    }
+    return undefined;
+  }
+
+  /**
+   * The sign-up policy, which `setup` writes and keeps.
+   *
+   * @returns The policy for the operation that creates a user at its file, or
+   *   `undefined` when there is none.
+   */
+  get signup(): SignupPolicy | undefined {
+    const policy = this.get(SignupPolicy.PATH);
+    if (policy instanceof SignupPolicy) {
       return policy;
     }
     return undefined;

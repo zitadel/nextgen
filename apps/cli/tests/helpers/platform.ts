@@ -73,6 +73,13 @@ export interface PlatformMock {
   rejectsAFlow(): void;
 
   /**
+   * Answers as a server from before the sign-up policy: an evaluation of one,
+   * and a release build that carries one, are refused as malformed
+   * (`req.invalid`), because the server does not know the operation.
+   */
+  predatesTheSignupPolicy(): void;
+
+  /**
    * Refuses every release build as a server does a bundle whose connection
    * changes a field fixed for the life of the connection: `rel.invalid`, with
    * the field named in the resource's own `details`.
@@ -158,6 +165,15 @@ export interface PlatformMock {
    * @returns The pattern it will answer with.
    */
   admitsAHostileOriginPattern(): string;
+
+  /**
+   * Answers a release build with a content hash holding a terminal escape
+   * sequence, before the colon that names its algorithm, which is the part a
+   * shortened hash keeps whole.
+   *
+   * @returns The hash it will answer with.
+   */
+  buildsAReleaseWithAHostileHash(): string;
 
   /**
    * Answers a release revoke with an id holding a terminal escape sequence.
@@ -335,6 +351,32 @@ export function usePlatformMock(): PlatformMock {
       ]);
     },
 
+    predatesTheSignupPolicy() {
+      const unknownOperation = () =>
+        HttpResponse.json(
+          { code: "req.invalid", message: "the request is invalid" },
+          { status: 400 },
+        );
+      const isSignupPolicy = (policy: unknown) =>
+        typeof policy === "object" &&
+        policy !== null &&
+        "operation" in policy &&
+        policy.operation === "user.create";
+      // A handler that answers nothing leaves the request to the platform's own.
+      server.use(
+        http.post("*/policies/evaluate", async ({ request }) => {
+          return isSignupPolicy(await request.clone().json()) ? unknownOperation() : undefined;
+        }),
+        http.post("*/releases/build", async ({ request }) => {
+          const body = z
+            .object({ bundle: z.object({ policies: z.array(z.unknown()).optional() }) })
+            .safeParse(await request.clone().json());
+          const carriesOne = body.success && (body.data.bundle.policies ?? []).some(isSignupPolicy);
+          return carriesOne ? unknownOperation() : undefined;
+        }),
+      );
+    },
+
     rejectsAFlow() {
       refuseReleases([
         {
@@ -447,6 +489,22 @@ export function usePlatformMock(): PlatformMock {
         }),
       );
       return origin;
+    },
+
+    buildsAReleaseWithAHostileHash() {
+      const hash = `sha256\u001b[2Jwiped:${"a".repeat(64)}`;
+      server.use(
+        http.post("*/releases/build", () => {
+          return HttpResponse.json({
+            id: "rel_1",
+            project_id: "proj_1",
+            content_hash: hash,
+            created_at: "2026-01-01T00:00:00Z",
+            revoked_at: null,
+          });
+        }),
+      );
+      return hash;
     },
 
     revokesAHostileReleaseId() {

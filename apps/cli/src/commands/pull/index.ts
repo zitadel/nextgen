@@ -2,11 +2,16 @@ import { Args } from "@oclif/core";
 import { z } from "zod";
 
 import type { ReleasePointer, ReleasePointerKind } from "@/lib/backend";
-import { PublishedConfiguration } from "@/lib/publish";
+import { GetDeploymentByIdParams, GetReleaseByIdParams } from "@/lib/backend/schemas";
 import { ZitadelError } from "@/lib/errors";
 import { mapBounded } from "@/lib/map-bounded";
 import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
-import { DEPLOY_ARGS } from "@/lib/suggestion";
+import { type Refused, taken } from "@/lib/oclif/flags";
+import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { PublishedConfiguration } from "@/lib/publish";
+import { WHAT_CHANGED } from "@/lib/suggestion";
+import { escapeControlCharacters } from "@/lib/terminal-text";
+import { reportWarning } from "@/lib/warnings";
 import {
   type Change,
   DiskStore,
@@ -16,10 +21,6 @@ import {
   type Schemas,
   ZitadelConfig,
 } from "@/lib/zitadel";
-import { type Refused, taken } from "@/lib/oclif/flags";
-import { type Refusal, refusalError } from "@/lib/oclif/refusal";
-import { reportWarning } from "@/lib/warnings";
-import { prose } from "@/lib/oclif/rendering";
 
 /**
  * A release id, as the platform mints it.
@@ -53,7 +54,7 @@ const LATEST_TARGET: PullTarget = {
  * @returns Whether it is a release id.
  */
 function isReleaseId(target: string): target is ReleaseId {
-  return target.startsWith("rel_");
+  return GetReleaseByIdParams.shape.release_id.safeParse(target).success;
 }
 
 /**
@@ -63,7 +64,7 @@ function isReleaseId(target: string): target is ReleaseId {
  * @returns Whether it is a deployment id.
  */
 function isDeploymentId(target: string): target is DeploymentId {
-  return target.startsWith("dep_");
+  return GetDeploymentByIdParams.shape.deployment_id.safeParse(target).success;
 }
 
 /**
@@ -76,12 +77,21 @@ const TARGET: Refused<PullTarget> = {
       return LATEST_TARGET;
     }
     if (isReleaseId(target)) {
-      return { kind: "release", id: target };
+      return {
+        kind: "release",
+        id: target,
+      };
     }
     if (isDeploymentId(target)) {
-      return { kind: "deployment", id: target };
+      return {
+        kind: "deployment",
+        id: target,
+      };
     }
-    ctx.addIssue({ code: "custom", message: "not a pull target" });
+    ctx.addIssue({
+      code: "custom",
+      message: "not a pull target",
+    });
     return z.NEVER;
   }),
   refusal: {
@@ -113,7 +123,7 @@ type PullableKind = Extract<ReleasePointerKind, "schema" | "flow_definition">;
  * the revision a release pins, which places the revision by its handle.
  *
  * @remarks
- * Only `schema` and `flow_definition` qualify (issue #541): their
+ * Only `schema` and `flow_definition` qualify: their
  * `revision_id` is the id their read endpoint takes. A release also pins
  * `branding` and `idp`, but those pin a revision id the per-kind read
  * endpoints do not accept yet, so a release that carries them is pulled for
@@ -195,6 +205,7 @@ export default class Pull extends EnvironmentCommand {
     "Rebuild your .zitadel/ files from a release.\n\nWrites .zitadel/ from the revisions a released snapshot pins.";
   static override group = CommandGroups.configuration;
   static override groupOrder = 2;
+
   static override examples = [
     "<%= config.bin %> pull",
     "<%= config.bin %> pull rel_01KX3RG8A7F0N9WD3P2E4YM5C1",
@@ -216,18 +227,18 @@ export default class Pull extends EnvironmentCommand {
   /**
    * Write each revision the target's release pins into `.zitadel/`.
    *
-   * @param input - The target.
+   * @param input.args - The target.
    * @returns The release, what was written, and what was skipped.
    * @throws {@link ZitadelError} With `E_NOT_FOUND` when `latest` is asked for
    *   and nothing is deployed.
    */
-  protected async execute(input: Admitted<typeof Pull>): Promise<JsonEnvelope> {
+  protected async execute({ args }: Admitted<typeof Pull>): Promise<JsonEnvelope> {
     const { client, projectId } = await this.connect();
     const store = new DiskStore(this.cwd);
     const config = await ZitadelConfig.loadKinds(store, ["schemas", "flows"]);
 
     const configuration = new PublishedConfiguration(client, projectId);
-    const releaseId = await this.resolveReleaseId(configuration, input.args.target);
+    const releaseId = await this.resolveReleaseId(configuration, args.target);
     const release = await configuration.fetchRelease(releaseId);
 
     // Fetched together, but kept in the order the release pins them, so the
@@ -237,9 +248,15 @@ export default class Pull extends EnvironmentCommand {
       FETCH_CONCURRENCY,
       async (pointer): Promise<Attempt> => {
         try {
-          return { kind: "done", outcome: await this.fetchOne(configuration, config, pointer) };
+          return {
+            kind: "done",
+            outcome: await this.fetchOne(configuration, config, pointer),
+          };
         } catch (error) {
-          return { kind: "failed", error };
+          return {
+            kind: "failed",
+            error,
+          };
         }
       },
     );
@@ -277,27 +294,40 @@ export default class Pull extends EnvironmentCommand {
       reportSkipped(resource);
     }
 
-    const summary = pulled
-      .map((entry) => {
-        return entry.path;
-      })
-      .join("\n");
-    const files = pulled.length === 1 ? "file" : "files";
-    const headline = this.dryRun
-      ? `Would write ${pulled.length} ${files} from ${release.id} (dry run).`
-      : `Pulled ${pulled.length} ${files} from ${release.id}.`;
-    const next = this.dryRun ? [] : [this.suggest(DEPLOY_ARGS)];
+    const files = `${pulled.length} ${new Intl.PluralRules("en").select(pulled.length) === "one" ? "file" : "files"}`;
+
+    const title = escapeControlCharacters(
+      this.dryRun
+        ? `Would write ${files} from ${release.id} (dry run)`
+        : `Pulled ${files} from ${release.id}`,
+    );
 
     return this.emit({
       status: "ok",
       data: {
+        title,
         release_id: release.id,
         pulled,
         skipped,
         ...(this.dryRun ? { dry_run: true } : {}),
       },
-      next: { commands: next },
-      pretty: prose(`${headline}\n${summary}`),
+      summary: {
+        title,
+        sections: [],
+        lines: fileList(
+          pulled.map((entry) => {
+            return entry.path;
+          }),
+          this.dryRun,
+        ),
+      },
+      next: {
+        commands: this.dryRun
+          ? [await this.again("pull", { without: ["dryRun"] })]
+          : args.target.kind !== "latest"
+            ? []
+            : [this.suggest({ id: "deploy", flags: { message: WHAT_CHANGED } })],
+      },
     });
   }
 
@@ -351,13 +381,22 @@ export default class Pull extends EnvironmentCommand {
     config: ZitadelConfig,
     pointer: ReleasePointer,
   ): Promise<PullOutcome> {
-    const resource: PinnedResource = { kind: pointer.kind, handle: pointer.handle };
+    const resource: PinnedResource = {
+      kind: pointer.kind,
+      handle: pointer.handle,
+    };
     if (!isPullable(pointer.kind)) {
-      return { kind: "skipped", resource };
+      return {
+        kind: "skipped",
+        resource,
+      };
     }
     const body = await configuration.fetchRevision(pointer.kind, pointer.revision_id);
     if (!isJsonValue(body) || !isJsonObject(body)) {
-      return { kind: "skipped", resource };
+      return {
+        kind: "skipped",
+        resource,
+      };
     }
     const collection = PULLABLE[pointer.kind](config);
     const change = collection.placeRevision(pointer.handle, body);
@@ -397,8 +436,8 @@ export default class Pull extends EnvironmentCommand {
       case "latest": {
         const releaseId = await configuration.fetchLiveReleaseId();
         if (releaseId === undefined) {
-          throw new ZitadelError("E_NOT_FOUND", "Nothing is deployed to a primary origin yet.", {
-            hint: `Deploy first with \`zitadel ${DEPLOY_ARGS}${this.environmentSelector()}\`, then pull.`,
+          throw new ZitadelError("E_NOT_FOUND", "Nothing is deployed to a primary origin yet", {
+            hint: `Deploy first with ${this.suggest({ id: "deploy", flags: { message: WHAT_CHANGED } })}, then pull.`,
           });
         }
         return releaseId;
@@ -408,13 +447,26 @@ export default class Pull extends EnvironmentCommand {
 }
 
 /**
- * Warn that a release pins a resource `pull` cannot rebuild on disk yet.
- *
- * @remarks
- * A reported warning rides the envelope (BaseCommand merges them), so a
- * `--json` caller sees it too.
- *
- * @param resource - The resource.
+ * The paths under the line that says what they are, for the lines under the
+ * closing sentence. Listed bare in the summary box they are file names with
+ * nothing naming them, so a reader has to guess whether they were written,
+ * skipped or found. Empty for a pull that wrote nothing, which has no list.
+ */
+export function fileList(paths: readonly string[], dryRun: boolean): string[] {
+  return paths.length === 0
+    ? []
+    : [
+        dryRun ? "Files it would write:" : "Files written:",
+        ...paths.map((p) => {
+          return escapeControlCharacters(`  ${p}`);
+        }),
+      ];
+}
+
+/**
+ * Warn that a release pins a resource `pull` cannot rebuild on disk yet. A
+ * reported warning rides the envelope (BaseCommand merges them), so a `--json`
+ * caller sees it too.
  */
 function reportSkipped(resource: PinnedResource): void {
   reportWarning(

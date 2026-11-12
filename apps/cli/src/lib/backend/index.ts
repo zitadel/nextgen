@@ -29,25 +29,25 @@ export {
   type UnavailableReason,
 } from "./errors";
 export {
-  AuthAttemptService,
   type AttemptFactor,
   type AttemptProof,
   type AttemptProofResult,
+  AuthAttemptService,
 } from "./services/auth-attempt";
-export { BrandingService, type BrandingRevision, type BrandingSummary } from "./services/branding";
+export { type BrandingRevision, BrandingService, type BrandingSummary } from "./services/branding";
 export {
-  ClaimService,
   type ClaimChallenge,
   type ClaimProgress,
+  ClaimService,
   type ClaimStart,
   type CompletedClaim,
 } from "./services/claim";
 export {
   Deployment,
-  DeploymentService,
   type DeploymentInput,
   type DeploymentPageQuery,
   type DeploymentQuery,
+  DeploymentService,
   type DeployToPrimaryRequest,
   type DeployToPrimaryResult,
   type ExtendPrimaryResult,
@@ -57,66 +57,66 @@ export {
   type RollbackTarget,
 } from "./services/deployment";
 export {
-  FlowService,
   type CreatedFlow,
   type FlowInput,
   type FlowPage,
-  type FlowSummary,
   type FlowQuery,
   type FlowRecord,
+  FlowService,
+  type FlowSummary,
 } from "./services/flow";
 export { IdpService, type IdpSummary } from "./services/idp";
 export {
-  Operation,
-  OperationService,
   type ApiOperation,
   type ApiRequest,
   type ApiResponse,
+  Operation,
   type OperationQuery,
+  OperationService,
   type Target,
 } from "./services/operation";
 export {
   Origin,
-  Origins,
-  OriginService,
   type OriginKind,
   type OriginRemoval,
+  OriginService,
+  Origins,
 } from "./services/origin";
 export {
-  PolicyService,
   type Policy,
   type PolicyDecision,
   type PolicyEvaluation,
+  type PolicyInput,
   type PolicyPage,
   type PolicyQuery,
   type PolicyRecord,
-  type PolicyInput,
   type PolicyRevision,
+  PolicyService,
   type PublishedPolicy,
 } from "./services/policy";
-export { PreviewService, type LivePreview, type PreviewPageQuery } from "./services/preview";
+export { type LivePreview, type PreviewPageQuery, PreviewService } from "./services/preview";
 export {
-  ProjectService,
   type CreatedProject,
   type Project,
   type ProjectInput,
+  ProjectService,
 } from "./services/project";
 export {
-  ReleaseService,
   type Release,
   type ReleaseInput,
   type ReleasePointer,
   type ReleasePointerKind,
   type ReleaseRecord,
+  ReleaseService,
 } from "./services/release";
 export {
-  SchemaService,
   type CreatedSchema,
   type SchemaInput,
   type SchemaPage,
-  type SchemaSummary,
   type SchemaQuery,
   type SchemaRecord,
+  SchemaService,
+  type SchemaSummary,
 } from "./services/schema";
 export {
   type Credential,
@@ -126,14 +126,14 @@ export {
   UserService,
 } from "./services/user";
 export {
-  Variable,
-  VariableRemoval,
-  VariableService,
-  VariableWrite,
   type Held,
   type Scalar,
+  Variable,
   type VariableKind,
+  VariableRemoval,
+  VariableService,
   type VariableState,
   type VariableValue,
+  VariableWrite,
   type VariableWritten,
 } from "./services/variable";

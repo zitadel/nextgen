@@ -58,17 +58,28 @@ export const RESOURCE_TABLE_FIXED = "min-w-[36rem] table-fixed text-xs";
 /** A screen's title: the 24/24 display face, shared with the detail shell. */
 export const RESOURCE_TITLE = PAGE_TITLE;
 
+/** Controls on a row of the title's own: 8px apart, wrapping among themselves. */
+const TITLE_ROW_CONTROLS = "flex min-w-0 basis-full flex-wrap items-center gap-2";
+
+/**
+ * A row under the title at every width (`filterBelow`, `below`): out of the
+ * header's 8px inset, flush with the table under it.
+ */
+const TITLE_ROW_BELOW = `${TITLE_ROW_CONTROLS} lg:-mx-2 lg:basis-[calc(100%+1rem)]`;
+
 /**
  * The title row of a list screen: the heading with, where the screen has one,
  * its primary action beside it at every width (D19), and any filter beside
  * that. 36px tall (`PAGE_TITLE_ROW`), except where the row is too narrow for a
- * filter, which then takes a row of its own under the title.
+ * filter, which then takes a row of its own under the title, and where the
+ * screen gives it a row `below`.
  */
 export function ResourceTitle({
   children,
   action,
   filter,
   filterBelow = false,
+  below,
 }: {
   children: ReactNode;
   action?: ReactNode;
@@ -83,15 +94,23 @@ export function ResourceTitle({
   filter?: ReactNode;
   /**
    * Keeps the filter on its own row under the title at every width, for one
-   * that wants the row's whole width (Logs' search, which fills with chips).
+   * that wants the row's whole width (Events' search, which fills with chips).
    */
   filterBelow?: boolean;
+  /**
+   * A row of its own under the title row at every width, flush with the table
+   * and filling from the left: a list's `ResourceFilter`, whose chips need the
+   * width the title row cannot promise.
+   */
+  below?: ReactNode;
 }) {
+  const belowRow = below && <div className={cn(TITLE_ROW_BELOW, "order-4")}>{below}</div>;
   if (!filter) {
     return (
       <div className={cn(RESOURCE_HEADER, PAGE_TITLE_ROW, "flex-wrap gap-x-2 gap-y-4")}>
         <h1 className={RESOURCE_TITLE}>{children}</h1>
         <div className="order-2 ml-auto sm:order-3 sm:ml-0">{action}</div>
+        {belowRow}
       </div>
     );
   }
@@ -106,11 +125,10 @@ export function ResourceTitle({
       <h1 className={RESOURCE_TITLE}>{children}</h1>
       <div
         className={cn(
-          "order-3 flex min-w-0 basis-full flex-wrap items-center gap-2",
+          "order-3",
           filterBelow
-            ? // Out of the header's 8px inset, flush with the table under it.
-              "lg:-mx-2 lg:basis-[calc(100%+1rem)]"
-            : "@3xl/title-row:order-2 @3xl/title-row:grow @3xl/title-row:basis-0 @3xl/title-row:justify-end",
+            ? TITLE_ROW_BELOW
+            : `${TITLE_ROW_CONTROLS} @3xl/title-row:order-2 @3xl/title-row:grow @3xl/title-row:basis-0 @3xl/title-row:justify-end`,
         )}
       >
         {filter}
@@ -123,6 +141,7 @@ export function ResourceTitle({
       >
         {action}
       </div>
+      {belowRow}
     </div>
   );
 }
@@ -177,7 +196,7 @@ export const RESOURCE_STICKY_BODY =
  * `comfortable`, the default, is the design's 56px with 8px block padding: a
  * row with a second line under its name, or a mark beside it. `compact` is
  * 40px with 4px: one line a row, where the list is read by the screenful
- * (Logs). A compact row's menu takes `RowMenu`'s `icon-xs`, the 24px button
+ * (Events). A compact row's menu takes `RowMenu`'s `icon-xs`, the 24px button
  * a narrow menu column sizes itself for.
  */
 export const RESOURCE_DENSITY = {

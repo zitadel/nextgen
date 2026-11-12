@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { HttpResponse, http } from "msw";
 import { describe, expect, it, vi } from "vitest";
 
-import Pull from "@/commands/pull";
+import Pull, { fileList } from "@/commands/pull";
 import { ZitadelError } from "@/lib/errors";
 import { parseArg } from "@tests/helpers/inputs";
 import {
@@ -16,6 +16,27 @@ import {
 } from "@tests/helpers/platform-project";
 import { runCliForTest } from "@tests/helpers/run-cli";
 import { rejectionOf } from "@tests/helpers/thrown-value";
+import { runCommand } from "@tests/helpers/run-cli";
+
+describe("fileList", () => {
+  it("says what the paths under it are", () => {
+    expect(fileList([".zitadel/schemas/human-user.json"], false)).toEqual([
+      "Files written:",
+      "  .zitadel/schemas/human-user.json",
+    ]);
+  });
+
+  it("says a dry run would write them, rather than that it did", () => {
+    expect(fileList([".zitadel/schemas/human-user.json"], true)).toEqual([
+      "Files it would write:",
+      "  .zitadel/schemas/human-user.json",
+    ]);
+  });
+
+  it("lists nothing, and leads nothing, when no file was written", () => {
+    expect(fileList([], false)).toEqual([]);
+  });
+});
 
 /**
  * The release the live primary deployment serves, found only past the first
@@ -92,7 +113,7 @@ describe("pull", () => {
       await mkdir(join(project.cwd, ".zitadel/branding/unreadable.json"), { recursive: true });
       server.use(liveAcrossTwoPages(LIVE_PRIMARY), answersTheLiveRelease());
 
-      const envelope = await Pull.run([
+      const envelope = await runCommand(Pull, "pull", [
         "latest",
         "--cwd",
         project.cwd,
@@ -211,7 +232,14 @@ describe("pull of a release pinning two handles that resolve to one file", () =>
         return undefined;
       });
       await rejectionOf(() => {
-        return Pull.run([RELEASE_ID, "--cwd", project.cwd, "--server", PLATFORM_URL, "--json"]);
+        return runCommand(Pull, "pull", [
+          RELEASE_ID,
+          "--cwd",
+          project.cwd,
+          "--server",
+          PLATFORM_URL,
+          "--json",
+        ]);
       });
       const said = printed.mock.calls.flat().join("\n");
       printed.mockRestore();
@@ -228,14 +256,14 @@ describe("pull of a release pinning two handles that resolve to one file", () =>
 
 describe("pull's --json envelope", () => {
   it.each([
-    [[], ["release_id", "pulled", "skipped", "next_commands"]],
-    [["--dry-run"], ["release_id", "pulled", "skipped", "dry_run", "next_commands"]],
+    [[], ["title", "release_id", "pulled", "skipped", "next_commands"]],
+    [["--dry-run"], ["title", "release_id", "pulled", "skipped", "dry_run", "next_commands"]],
   ])("holds exactly the keys of a run with flags %j", async (flags, keys) => {
     const project = await aProjectWithTwoDeploys("zitadel-pull-");
     dirs.push(project.cwd);
     server.use(liveAcrossTwoPages(LIVE_PRIMARY), answersTheLiveRelease());
 
-    const envelope = await Pull.run([
+    const envelope = await runCommand(Pull, "pull", [
       "latest",
       "--cwd",
       project.cwd,
@@ -295,7 +323,14 @@ describe("pull of a release whose revisions cannot be fetched", () => {
       return undefined;
     });
     await rejectionOf(() => {
-      return Pull.run([RELEASE_ID, "--cwd", project.cwd, "--server", PLATFORM_URL, "--json"]);
+      return runCommand(Pull, "pull", [
+        RELEASE_ID,
+        "--cwd",
+        project.cwd,
+        "--server",
+        PLATFORM_URL,
+        "--json",
+      ]);
     });
     const said = printed.mock.calls.flat().join("\n");
     printed.mockRestore();

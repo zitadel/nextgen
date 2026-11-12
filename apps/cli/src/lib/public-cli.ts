@@ -35,33 +35,9 @@ export function sdkVersionForCli(cliVersion: string): string {
 }
 
 /**
- * Whether a value can sit in a suggested command unquoted on every shell the
- * CLI runs under (POSIX shells, PowerShell and cmd.exe). Quoting differs
- * between them, so a value that needs quoting is not put in a suggested
- * command at all; callers hand it over as an argument list instead.
- */
-export function isPortableShellWord(value: string): boolean {
-  // `/` is included so a POSIX-style --cwd path can be suggested as written.
-  return /^[A-Za-z0-9_./-]+$/.test(value);
-}
-
-/**
- * Suggested commands as strings, built from argument lists. Every argument
- * must be a portable shell word, or none of the commands is returned: a
- * caller then hands over the argument lists alone, which no shell interprets.
- */
-export function portableCommands(argLists: readonly string[][], cliVersion: string): string[] {
-  if (!argLists.every((args) => args.every(isPortableShellWord))) {
-    return [];
-  }
-  return argLists.map((args) => publicCliCommand(args.join(" "), cliVersion));
-}
-
-/**
  * An option and its value as arguments for a suggested command. A value that
  * starts with `-` would be read as the next flag, so it is joined with `=`
- * instead. That token is not a portable shell word, so it also keeps the
- * string form out of {@link portableCommands}.
+ * instead.
  *
  * @param option - The option, with its dashes, e.g. `--schema`.
  * @param value - The value it takes, as the user or a file name gave it.
@@ -99,7 +75,31 @@ export function normalizePublicCliCommands<T extends string>(
   cliVersion: string,
 ): T[] | undefined {
   // Only the `zitadel` prefix changes, so a suggestion stays a suggestion.
-  return commands?.map((command) => normalizePublicCliCommand(command, cliVersion) as T);
+  return commands?.map((command) => {
+    return normalizePublicCliCommand(command, cliVersion) as T;
+  });
+}
+
+/**
+ * Text as a terminal shows it: a command quoted in backticks is written out
+ * as the one that runs on the reader's machine, and every other backtick span
+ * loses its backticks, because a terminal prints them rather than rendering
+ * them as code.
+ *
+ * Library code writes its hints in the readable form, with the command in
+ * backticks. This is the single place that form becomes what a person sees,
+ * so no hint has to know the version of the CLI or how it is run.
+ *
+ * @param text - A message or hint as its author wrote it.
+ * @param cliVersion - The running CLI's version, which the public command pins.
+ * @returns The text without backticks and with each `zitadel …` command spelled out.
+ */
+export function spellOutCommands(text: string, cliVersion: string): string {
+  return text.replace(/`([^`\n]+)`/g, (_match, span: string) => {
+    return span.replace(/(^|\|\s*)zitadel(?= |$)/g, (_found, lead: string) => {
+      return `${lead}${publicCliCommand("", cliVersion)}`;
+    });
+  });
 }
 
 /**
@@ -119,17 +119,18 @@ export function normalizePublicCliProse(content: string, cliVersion: string): st
   const prefix = publicCliCommand("", cliVersion);
   return rewriteCliCodeSpans(content, cliVersion).replace(
     /^(\s*)zitadel (.*)$/gm,
-    (_match, indent: string, rest: string) => `${indent}${prefix} ${rest}`,
+    (_match, indent: string, rest: string) => {
+      return `${indent}${prefix} ${rest}`;
+    },
   );
 }
 
 /** The inline-code-span half of {@link normalizePublicCliProse}. */
 function rewriteCliCodeSpans(content: string, cliVersion: string): string {
   const prefix = publicCliCommand("", cliVersion);
-  return content.replace(
-    /`zitadel( [^`\n]*)?`/g,
-    (_match, args: string | undefined) => `\`${prefix}${args ?? ""}\``,
-  );
+  return content.replace(/`zitadel( [^`\n]*)?`/g, (_match, args: string | undefined) => {
+    return `\`${prefix}${args ?? ""}\``;
+  });
 }
 
 /**
@@ -144,7 +145,7 @@ function rewriteCliCodeSpans(content: string, cliVersion: string): string {
  * project's install. Their `description` strings surface as editor tooltips
  * on the scaffolded `.zitadel/**` files, where the bare command does not
  * exist on the user's PATH, so the copy is normalized on the way out instead
- * of the shared source being edited (same fix PR #872 made for the READMEs).
+ * of the shared source being edited.
  *
  * Unlike {@link normalizePublicCliProse} this rewrites inline code spans
  * only: a JSON `description` is prose, so a value that merely begins with
@@ -155,11 +156,15 @@ export function normalizePublicCliJson<T>(value: T, cliVersion: string): T {
     return rewriteCliCodeSpans(value, cliVersion) as T;
   }
   if (Array.isArray(value)) {
-    return value.map((item) => normalizePublicCliJson(item, cliVersion)) as T;
+    return value.map((item) => {
+      return normalizePublicCliJson(item, cliVersion);
+    }) as T;
   }
   if (typeof value === "object" && value !== null) {
     return Object.fromEntries(
-      Object.entries(value).map(([key, item]) => [key, normalizePublicCliJson(item, cliVersion)]),
+      Object.entries(value).map(([key, item]) => {
+        return [key, normalizePublicCliJson(item, cliVersion)];
+      }),
     ) as T;
   }
   return value;
@@ -179,11 +184,15 @@ export function maskPublicCliVersion<T>(value: T): T {
     return value.replace(PUBLIC_CLI_VERSION, `${CLI_PACKAGE_NAME}@*`) as T;
   }
   if (Array.isArray(value)) {
-    return value.map((item) => maskPublicCliVersion(item)) as T;
+    return value.map((item) => {
+      return maskPublicCliVersion(item);
+    }) as T;
   }
   if (typeof value === "object" && value !== null) {
     return Object.fromEntries(
-      Object.entries(value).map(([key, item]) => [key, maskPublicCliVersion(item)]),
+      Object.entries(value).map(([key, item]) => {
+        return [key, maskPublicCliVersion(item)];
+      }),
     ) as T;
   }
   return value;

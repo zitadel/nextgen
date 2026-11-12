@@ -27,6 +27,7 @@ type ManagedIDGenerator interface {
 
 type AllStatements interface {
 	ManagedIDGenerator
+	SignupProtectionStatements
 	ProjectStatements
 	OriginStatements
 	FlowDefinitionStatements
@@ -52,13 +53,29 @@ type AllStatements interface {
 	VariableStatements
 	VariableSetStatements
 	ClaimStatements
+	InvitationStatements
 	ResourceScopeStatements
+	SearchEntryStatements
 	AuthzAssignmentStatements
 	AuthzMembershipEdgeStatements
 	AuthzCatalogStatements
 	AuthzResolverStatements
 	EventStatements
 	Statements
+}
+
+// SignupProtectionStatements are infrastructure state for the signup gate.
+// Get methods return nil, nil when absent. Rate writes and issuance run while
+// holding LockSignupLimits' row lock in a transaction; consumption is an atomic compare/delete.
+type SignupProtectionStatements interface {
+	GetSignupChallenge(context.Context, string, string) (*domain.SignupChallengeRecord, error)
+	CreateSignupChallenge(context.Context, *domain.SignupChallengeRecord) error
+	ConsumeSignupChallenge(context.Context, string, string, string, int64) (bool, error)
+	// DeleteExpiredSignupProtection deletes at most limit expired rows of each table.
+	DeleteExpiredSignupProtection(ctx context.Context, projectID string, now int64, limit int) error
+	LockSignupLimits(context.Context, string, string) (*domain.SignupLimits, error)
+	InsertSignupLimits(context.Context, *domain.SignupLimits) error
+	UpdateSignupLimits(context.Context, *domain.SignupLimits) error
 }
 
 // TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
@@ -571,6 +588,14 @@ const DefaultUserTeamsLimit = 10
 
 type UserStatements interface {
 	Statements
+	// SearchUserIndex reads, in one statement, one range of the user search
+	// index per range of ranges: the users of that project whose value of that
+	// property starts with prefix, by text then user, each to limit rows, from
+	// the index alone. The result is ranges with Hits and Full set. It is for
+	// projects whose list gate allows the caller every user, decided before
+	// the read: it needs a one-shot skip or an unrestricted context, and
+	// refuses one that carries a list filter.
+	SearchUserIndex(ctx context.Context, ranges []domain.UserSearchRange, prefix string, limit int) ([]domain.UserSearchRange, error)
 	CreateUser(ctx context.Context, user *domain.CreateUser) error
 	// PatchUser reconciles the stored user to the given post-merge state:
 	// header (schema_url, updated_at), and attribute rows with their unique
@@ -728,6 +753,38 @@ type VariableSetStatements interface {
 	GetDeploymentVariables(ctx context.Context, projectID, deploymentID string) (*domain.VariableSet, error)
 }
 
+// InvitationStatements persists invitations (ADR 086). A pending invitation
+// past its expires_at reads as expired, so the guarded writes take now.
+type InvitationStatements interface {
+	Statements
+	// CreateInvitation inserts entity as pending and stamps its id and
+	// created_at. A token hash already stored returns a [database.UniqueError].
+	CreateInvitation(ctx context.Context, entity *domain.Invitation) error
+	GetInvitationByID(ctx context.Context, projectID, id string) (*domain.Invitation, error)
+	// GetInvitationByTokenHash finds an invitation in any project by the hash
+	// of its link's token.
+	GetInvitationByTokenHash(ctx context.Context, tokenHash string) (*domain.Invitation, error)
+	// ListInvitations lists invitations; invitation.ListOptions builds the
+	// project, status and type filters.
+	ListInvitations(ctx context.Context, filter *database.ListOptions[domain.InvitationField]) (*database.ListResult[*domain.Invitation], error)
+	// ChangeInvitationStatus moves a pending, unexpired invitation to
+	// accepted, recording acceptedBy and now, or to rejected with a nil
+	// acceptedBy, and nulls its metadata. Any other invitation returns a
+	// [database.NoRowFoundError].
+	ChangeInvitationStatus(ctx context.Context, projectID, id string, status domain.InvitationStatus, acceptedBy *string, now time.Time) (*domain.Invitation, error)
+	// ClearInvitationMetadata nulls the metadata of an invitation that is no
+	// longer pending at now, as replace does. A pending, unexpired or absent
+	// invitation returns a [database.NoRowFoundError].
+	ClearInvitationMetadata(ctx context.Context, projectID, id string, now time.Time) error
+	// DeletePendingInvitation removes a pending, unexpired invitation. Any
+	// other invitation returns a [database.NoRowFoundError].
+	DeletePendingInvitation(ctx context.Context, projectID, id string, now time.Time) error
+	// CountPendingInvitations counts the project's pending, unexpired
+	// invitations. The cap holds only when the count and the create run in
+	// one transaction under LockProject.
+	CountPendingInvitations(ctx context.Context, projectID string, now time.Time) (int64, error)
+}
+
 type ClaimStatements interface {
 	Statements
 	// CreateChallenge inserts a pending claim challenge; entity.ID is the
@@ -766,6 +823,31 @@ type ClaimStatements interface {
 //   - DeleteResourceScope: explicit cleanup where FK cascade does not apply (user /
 //     schema / flow_definition / session delete today; branding relies on project
 //     cascade; project delete cascades RSI via project_id FK).
+//
+// SearchEntryStatements reads what search finds teams, user schemas, flow
+// definitions and identity provider connections by (ADR 087 §5): their
+// [domain.SearchEntry] rows. The statements that write those resources write
+// their entries in the same transaction, so nothing else writes them.
+type SearchEntryStatements interface {
+	Statements
+	// SearchEntries returns the entries of kind in projectID with a text that
+	// starts with prefix, a text as [domain.SearchText] folds it, by matched
+	// text, then by key. An entry found by several of its texts appears once
+	// per text. It reads exactly one range of the index to at most limit rows,
+	// whatever the caller may see: the authz list filter on ctx (which it
+	// refuses a context without, like a list) drops rows from those it read,
+	// never reads further. full says the range held limit rows, so more may
+	// match than were read.
+	SearchEntries(ctx context.Context, kind domain.ResourceKind, projectID, prefix string, limit int) (matches []domain.SearchEntryMatch, full bool, err error)
+	// SearchEntriesInProjects reads, in one statement, the range SearchEntries
+	// reads for every pair of projectIDs and kinds, each to limit rows; the
+	// results follow projectIDs, then kinds. It is for projects whose list gate
+	// allows the caller every row, decided before the read: it needs a
+	// one-shot skip or an unrestricted context, and refuses one that carries a
+	// list filter, which it could not apply to one project alone.
+	SearchEntriesInProjects(ctx context.Context, projectIDs []string, kinds []domain.ResourceKind, prefix string, limit int) ([]domain.SearchEntryRange, error)
+}
+
 type ResourceScopeStatements interface {
 	Statements
 	UpsertResourceScope(ctx context.Context, scope *domain.ResourceScope) error
@@ -921,6 +1003,9 @@ type AuthzResolverStatements interface {
 	ActiveSystemCatalogID(ctx context.Context) (string, error)
 	HasAuthzProjectFoothold(ctx context.Context, projectID, homeProjectID string, principalType domain.AuthzPrincipalType, principalID string) (bool, error)
 	CheckAuthz(ctx context.Context, params domain.AuthzCheckParams) (allowed bool, foothold bool, err error)
+	// CheckAuthzProjects is CheckAuthz for each of projectIDs in one round
+	// trip, params.ProjectID ignored; the results follow projectIDs' order.
+	CheckAuthzProjects(ctx context.Context, params domain.AuthzCheckParams, projectIDs []string) ([]domain.AuthzCheckResult, error)
 	CheckPlatformOperator(ctx context.Context, params domain.AuthzPlatformCheckParams) (bool, error)
 	ListAuthzObjectIDs(ctx context.Context, params domain.AuthzListObjectsParams) ([]string, error)
 }

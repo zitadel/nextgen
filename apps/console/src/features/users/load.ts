@@ -38,7 +38,11 @@ export async function loadUsers(search: UsersSearch & { project?: string }) {
     ? await fetchLatestSchemaId(projectId, older).catch(() => undefined)
     : undefined;
   if (older && !latestId) {
-    throw redirect({ to: "/users", search: (prev) => ({ ...prev, revision: undefined }) });
+    throw redirect({
+      from: "/users/",
+      to: "/users",
+      search: (prev) => ({ ...prev, revision: undefined }),
+    });
   }
   const filter = userFilter(search, latestId);
   const [page, options, revisions] = await Promise.all([

@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"errors"
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
@@ -14,7 +15,11 @@ const (
 	createJSONSchemaStmt = `INSERT INTO json_schemas (project_id, url, object_type, kind, payload, created_at)
 VALUES (?, ?, ?, ?, ?, ?) RETURNING project_id, url, object_type, kind, created_at, payload`
 
-	deleteByIDJSONSchemaStmt = `DELETE FROM json_schemas WHERE project_id = ? AND url = ?`
+	deleteByIDJSONSchemaStmt = `DELETE FROM json_schemas WHERE project_id = ? AND url = ? RETURNING project_id, url, object_type, kind, created_at, payload`
+
+	// newestJSONSchemaByObjectTypeStmt is one descent of the object type
+	// revision index.
+	newestJSONSchemaByObjectTypeStmt = jsonSchemaQuery + ` WHERE project_id = ? AND object_type = ? ORDER BY created_at DESC LIMIT 1`
 
 	jsonSchemaQuery = `SELECT project_id, url, object_type, kind, created_at, payload FROM json_schemas`
 
@@ -72,23 +77,55 @@ func (js jsonSchemaStatements) CreateJSONSchema(ctx context.Context, schema *dom
 		}
 		*schema = *scanned
 		rsi := newResourceScopeStatements(tx)
-		return rsi.UpsertResourceScope(ctx, domain.NewResourceScope(domain.ResourceKindSchema, schema.ProjectID, schema.URL))
+		if err := rsi.UpsertResourceScope(ctx, domain.NewResourceScope(domain.ResourceKindSchema, schema.ProjectID, schema.URL)); err != nil {
+			return err
+		}
+		// The new revision is the newest of its object type, so search answers
+		// with it.
+		if entry, ok := domain.SchemaSearchEntry(schema); ok {
+			return writeSearchEntry(ctx, tx, entry)
+		}
+		return nil
 	})
 }
 
 // DeleteJSONSchemaByID implements [service.JSONSchemaStatements].
 func (js jsonSchemaStatements) DeleteJSONSchemaByID(ctx context.Context, projectID, schemaID string) error {
 	return withTransaction(ctx, js.client, func(ctx context.Context, tx queryExecutor) error {
-		n, err := execAffected(ctx, tx, deleteByIDJSONSchemaStmt, projectID, schemaID)
+		deleted, err := scanJSONSchemaRow(tx.QueryRow(ctx, deleteByIDJSONSchemaStmt, projectID, schemaID))
 		if err != nil {
-			return err
-		}
-		if n == 0 {
-			return nil
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil
+			}
+			return wrapError(err)
 		}
 		rsi := newResourceScopeStatements(tx)
-		return rsi.DeleteResourceScope(ctx, domain.ResourceKindSchema, projectID, schemaID)
+		if err := rsi.DeleteResourceScope(ctx, domain.ResourceKindSchema, projectID, schemaID); err != nil {
+			return err
+		}
+		return js.replaceSearchEntry(ctx, tx, deleted)
 	})
+}
+
+// replaceSearchEntry points the search entry of a deleted schema's object type
+// at the newest revision left, or removes it when none is.
+func (js jsonSchemaStatements) replaceSearchEntry(ctx context.Context, tx queryExecutor, deleted *domain.JSONSchema) error {
+	entry, ok := domain.SchemaSearchEntry(deleted)
+	if !ok {
+		return nil
+	}
+	if deleted.ObjectType != nil {
+		newest, err := scanJSONSchemaRow(tx.QueryRow(ctx, newestJSONSchemaByObjectTypeStmt, deleted.ProjectID, *deleted.ObjectType))
+		switch {
+		case err == nil:
+			if next, ok := domain.SchemaSearchEntry(newest); ok {
+				return writeSearchEntry(ctx, tx, next)
+			}
+		case !errors.Is(err, sql.ErrNoRows):
+			return wrapError(err)
+		}
+	}
+	return deleteSearchEntry(ctx, tx, entry.ProjectID, entry.Kind, entry.Key)
 }
 
 // GetJSONSchemaByID implements [service.JSONSchemaStatements].

@@ -88,6 +88,11 @@ var allowedAttributes = map[attribute.Key]bool{
 	"cache.hit":      true,
 	"key.kind":       true,
 
+	// The hashing limiter's, on password.Hash and password.Verify: the bytes
+	// a hash reserved and the seconds it waited for them.
+	"password_hashing.weight":        true,
+	"password_hashing.wait_duration": true,
+
 	"oas.operation":             true,
 	"http.request.method":       true,
 	"http.route":                true,
