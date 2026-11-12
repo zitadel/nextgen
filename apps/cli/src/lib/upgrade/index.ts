@@ -11,3 +11,4 @@ export { type PackageUpgrade, UpgradePlan } from "./upgrade-plan";
 export { UpgradeReport } from "./upgrade-report";
 export { UpgradeTarget } from "./upgrade-target";
 export { ZITADEL } from "./zitadel";
+export { Upgrader, type UpgradeResult } from "./upgrader";

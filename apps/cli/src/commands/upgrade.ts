@@ -2,25 +2,14 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 
 import { Cmd } from "@/lib/cmd";
-import { ZitadelError } from "@/lib/errors";
 import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
 import { painted } from "@/lib/oclif/rendering";
 import { Suggestible } from "@/lib/oclif/suggestible";
-import { hasZitadelConfig } from "@/lib/project";
 import { newestCliCommand } from "@/lib/public-cli";
 import { SHARED_SKILLS_DIR } from "@/lib/skills/add";
 import { strong } from "@/lib/style";
-import { type SuggestedCommand, shellCommand, unscopedCommand } from "@/lib/suggestion";
-import {
-  BreakingChangesBanner,
-  ProjectInstaller,
-  type Refresh,
-  ReleaseChannel,
-  ScopedDependencies,
-  UpgradePlan,
-  UpgradeReport,
-  ZITADEL,
-} from "@/lib/upgrade";
+import { type SuggestedCommand, unscopedCommand } from "@/lib/suggestion";
+import { BreakingChangesBanner, Upgrader, ZITADEL } from "@/lib/upgrade";
 
 /**
  * `zitadel upgrade` — move this project to the latest release.
@@ -49,37 +38,24 @@ export default class Upgrade extends Suggestible(BaseCommand) {
   };
 
   protected async execute({ flags }: Admitted<typeof Upgrade>): Promise<JsonEnvelope> {
-    const latest = await new ReleaseChannel(ZITADEL, this.cliVersion, this.env).latestFresh();
-    if (latest === undefined) {
-      throw new ZitadelError("E_NETWORK", "Could not look up the latest Zitadel release", {
-        hint: "Check the connection to the npm registry, then rerun.",
-        nextCommands: [this.suggest("upgrade")],
-      });
-    }
-    const plan = await UpgradePlan.create({
+    const upgrader = new Upgrader(ZITADEL, {
       cliVersion: this.cliVersion,
-      latest,
-      dependencies: await ScopedDependencies.read(this.cwd, ZITADEL.scope),
-    });
-
-    // Before anything changes, so the person reads it while they can still stop.
-    if (!plan.upToDate) {
-      this.log(new BreakingChangesBanner(plan.breaking).render());
-    }
-    const installer = new ProjectInstaller(ZITADEL, {
       cwd: this.cwd,
       typedCwd: flags.cwd,
       env: this.env,
       json: this.isJson,
       noTelemetry: flags.telemetry === false,
+      dryRun: this.dryRun,
       signal: this.signal,
+      retry: this.suggest("upgrade"),
     });
-    const install = await installer.plan(plan);
-    const installCommand = install === undefined ? undefined : shellCommand(install.display);
-    if (install !== undefined && installCommand !== undefined && !this.dryRun) {
-      await installer.install(install, [installCommand, this.suggest("upgrade")]);
+    const plan = await upgrader.plan();
+
+    // Before anything changes, so the person reads it while they can still stop.
+    if (!plan.upToDate) {
+      this.log(new BreakingChangesBanner(plan.breaking).render());
     }
-    const refresh = await this.refresh(installer, install === undefined ? undefined : plan.target);
+    const { refresh, installed, report } = await upgrader.apply(plan);
 
     // At the new version, and from the shell's directory like every suggestion.
     const atTarget = (args: string): SuggestedCommand => {
@@ -92,7 +68,7 @@ export default class Upgrade extends Suggestible(BaseCommand) {
       ...(this.dryRun && !plan.upToDate ? [this.suggest("upgrade")] : []),
       ...(refresh === "failed" ? [atTarget("doctor --fix")] : []),
       ...(refresh === "issues" ? [atTarget("doctor")] : []),
-      ...(install !== undefined && !this.dryRun && existsSync(join(this.cwd, SHARED_SKILLS_DIR))
+      ...(installed && existsSync(join(this.cwd, SHARED_SKILLS_DIR))
         ? [atTarget("skills add")]
         : []),
     ];
@@ -102,7 +78,6 @@ export default class Upgrade extends Suggestible(BaseCommand) {
         ]
       : [];
 
-    const report = new UpgradeReport(plan, { refresh, dryRun: this.dryRun, installCommand });
     const rows = report.rows();
     return this.emit({
       status: "ok",
@@ -118,19 +93,5 @@ export default class Upgrade extends Suggestible(BaseCommand) {
         ...(commands.length > 0 ? { commands } : {}),
       },
     });
-  }
-
-  /**
-   * Has the new release regenerate the project's files, or says it would.
-   *
-   * @param installer - What applies the plan.
-   * @param target - The release to run, or `undefined` when no package moved.
-   * @returns How it ended; `skipped` when nothing moved or the project has no Zitadel config.
-   */
-  private async refresh(installer: ProjectInstaller, target: string | undefined): Promise<Refresh> {
-    if (target === undefined || !(await hasZitadelConfig(this.cwd))) {
-      return "skipped";
-    }
-    return this.dryRun ? "planned" : installer.refresh(target);
   }
 }
