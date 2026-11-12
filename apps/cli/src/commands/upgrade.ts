@@ -65,7 +65,7 @@ export default class Upgrade extends BaseCommand {
     if (latest === undefined) {
       throw new ZitadelError("E_NETWORK", "Could not look up the latest Zitadel release", {
         hint: "Check the connection to the npm registry, then rerun.",
-        nextCommands: [this.suggest({ id: "upgrade" })],
+        nextCommands: [await this.again("upgrade", {})],
       });
     }
     // A CLI ahead of the dist-tag (a prerelease) is what its own files target,
@@ -129,7 +129,7 @@ export default class Upgrade extends BaseCommand {
     // for the release that is running.
     const atTarget = this.suggestWith(this.scope(), target);
     const commands: SuggestedCommand[] = [
-      ...(this.dryRun && !upToDate ? [this.suggest({ id: "upgrade" })] : []),
+      ...(this.dryRun && !upToDate ? [await this.realRun()] : []),
       ...(refresh === "failed" ? [atTarget({ id: "doctor", flags: { fix: true } })] : []),
       ...(refresh === "issues" ? [atTarget({ id: "doctor" })] : []),
       ...(install !== undefined && !this.dryRun && existsSync(join(this.cwd, SHARED_SKILLS_DIR))
@@ -215,7 +215,7 @@ export default class Upgrade extends BaseCommand {
     } catch (error) {
       throw new ZitadelError("E_VALIDATION", "Could not install the new packages", {
         hint: `${errorMessage(error)}. Nothing else changed; fix that and rerun.`,
-        nextCommands: [installCommand, this.suggest({ id: "upgrade" })],
+        nextCommands: [installCommand, await this.again("upgrade", {})],
       });
     }
   }

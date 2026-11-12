@@ -75,7 +75,7 @@ export default class Stop extends BaseCommand {
           title,
           sections: [section(undefined, ...facts)],
         },
-        next: { commands: [this.suggest({ id: "stop" })] },
+        next: { commands: [await this.realRun()] },
       });
     }
 

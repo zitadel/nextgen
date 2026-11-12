@@ -382,7 +382,7 @@ export default class Eject extends Destructive(BaseCommand) {
           await ejectProject(this.cwd, "plan"),
           dir,
           setItUp,
-          this.suggest({ id: "eject", flags: { force: true } }),
+          await this.again("eject", { without: ["dryRun"], with: { force: true } }),
         );
       },
       apply: async (consent) => {
@@ -394,7 +394,7 @@ export default class Eject extends Destructive(BaseCommand) {
       result.status === "skipped" && result.reason === "eject-cancelled"
         ? {
             ...result,
-            next: { commands: [this.suggest({ id: "eject" })] },
+            next: { commands: [await this.realRun()] },
             summary: {
               title: CANCELLED,
               sections: [],
@@ -402,7 +402,7 @@ export default class Eject extends Destructive(BaseCommand) {
               next: [
                 {
                   text: "Remove it whenever you like:",
-                  command: this.suggest({ id: "eject" }),
+                  command: await this.realRun(),
                 },
               ],
             },

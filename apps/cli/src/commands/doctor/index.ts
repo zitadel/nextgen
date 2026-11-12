@@ -334,7 +334,15 @@ export default class Doctor extends Destructive(BaseCommand) {
             server: projectServer,
           })
         : undefined;
-    const warningAdvice = advisoryForWarnings(warnings, this.suggest, claimSuggest);
+    const again: DoctorAgain = {
+      rerun: await this.realRun(),
+      repair: await this.again("doctor", { without: ["dryRun"], with: { fix: true } }),
+      forcedRepair: await this.again("doctor", {
+        without: ["dryRun"],
+        with: { fix: true, force: true },
+      }),
+    };
+    const warningAdvice = advisoryForWarnings(warnings, this.suggest, claimSuggest, again);
     this.ui.ranAgainst(projectId, projectServer ?? this.meta.source);
     // A server that is running is one a sign-in or a request can fail
     // against, and its log is where the reason is.
@@ -424,6 +432,7 @@ export default class Doctor extends Destructive(BaseCommand) {
         (next) => {
           return [...this.argsOf(this.suggest(next))];
         },
+        again,
         parentRuntimeDir,
       );
       // A check that failed with a typed CLI error advertises its own
@@ -529,6 +538,16 @@ export default class Doctor extends Destructive(BaseCommand) {
 }
 
 /**
+ * This doctor run again, as it was typed (its `--port`, `--image` and
+ * `--runtime` kept): as it is, with `--fix`, and with `--fix --force`.
+ */
+export type DoctorAgain = Readonly<{
+  rerun: SuggestedCommand;
+  repair: SuggestedCommand;
+  forcedRepair: SuggestedCommand;
+}>;
+
+/**
  * What to do about the checks that failed: the hint doctor prints and the
  * commands it suggests. The checks are weighed in the order a reader would fix
  * them — the machine before the project — so one run advises on the first
@@ -539,6 +558,7 @@ export default class Doctor extends Destructive(BaseCommand) {
  * @param port - The port the run checked.
  * @param suggest - Renders a suggestion with the run's own scope.
  * @param suggestWords - {@link suggest} as the words after the CLI.
+ * @param again - This doctor run again, as it was typed.
  * @param runtimeDir - The folder whose server was checked, when it is a parent of the run's.
  * @returns The hint, the commands, and the same recovery as argument lists where one applies.
  */
@@ -548,6 +568,7 @@ export function failureAdvice(
   port: number,
   suggest: Suggest,
   suggestWords: SuggestWords,
+  again: DoctorAgain,
   runtimeDir?: string,
 ): { hint: string; nextCommands: SuggestedCommand[]; suggestedArgs?: string[][] } {
   const failedNames = new Set(
@@ -559,36 +580,36 @@ export function failureAdvice(
   if (failedNames.has("server-binary")) {
     return {
       hint: "The Zitadel server npm package is not available. Reinstall the CLI package, then retry.",
-      nextCommands: [suggest({ id: "doctor" })],
+      nextCommands: [again.rerun],
     };
   }
 
   if (failedNames.has("docker-cli")) {
-    const advice = dockerRuntimeGuidance("doctor", suggest({ id: "doctor" }));
+    const advice = dockerRuntimeGuidance("doctor", again.rerun);
     return {
       hint: advice.hint,
-      nextCommands: [advice.check, suggest(advice.retry)],
+      nextCommands: [advice.check, again.rerun],
     };
   }
 
   if (failedNames.has("image")) {
     return {
       hint: "The local Zitadel image is not available. Check Docker registry access, build it locally, or pass --image / ZITADEL_LOCAL_IMAGE.",
-      nextCommands: [shellCommand(`docker pull ${Cmd.quote(image)}`), suggest({ id: "doctor" })],
+      nextCommands: [shellCommand(`docker pull ${Cmd.quote(image)}`), again.rerun],
     };
   }
 
   if (failedNames.has("state-dir")) {
     return {
-      hint: `The local Zitadel state directory is not writable. Fix directory permissions, then rerun ${suggest({ id: "doctor" })}.`,
-      nextCommands: [suggest({ id: "doctor" })],
+      hint: `The local Zitadel state directory is not writable. Fix directory permissions, then rerun ${again.rerun}.`,
+      nextCommands: [again.rerun],
     };
   }
 
   if (failedNames.has("port")) {
     const fallbackPort = port === DEFAULT_LOCAL_SERVER_PORT ? port + 1 : DEFAULT_LOCAL_SERVER_PORT;
     const stopCommand = suggest({ id: "stop", flags: { all: true } });
-    const retryCommand = suggest({ id: "doctor" });
+    const retryCommand = again.rerun;
     const alternatePortCommand = suggest({ id: "doctor", flags: { port: fallbackPort } });
     return {
       hint:
@@ -645,14 +666,14 @@ export function failureAdvice(
   if (typed?.hint !== undefined) {
     return {
       hint: typed.hint,
-      nextCommands: [suggest({ id: "doctor" })],
+      nextCommands: [again.rerun],
     };
   }
 
   if (failedNames.has("environment")) {
     return {
-      hint: `The resolved environment could not connect. Check the server, project and credential it resolves with ${suggest({ id: "env" })}, then rerun ${suggest({ id: "doctor" })}.`,
-      nextCommands: [suggest({ id: "env" }), suggest({ id: "doctor" })],
+      hint: `The resolved environment could not connect. Check the server, project and credential it resolves with ${suggest({ id: "env" })}, then rerun ${again.rerun}.`,
+      nextCommands: [suggest({ id: "env" }), again.rerun],
     };
   }
 
@@ -660,7 +681,7 @@ export function failureAdvice(
     return !LOCAL_RUNTIME_CHECK_NAMES.has(check.name);
   });
   if (hasProjectFailure) {
-    const fix = suggest({ id: "doctor", flags: { fix: true } });
+    const fix = again.repair;
 
     return {
       hint: `Run ${fix} to re-apply missing managed files.`,
@@ -669,8 +690,8 @@ export function failureAdvice(
   }
 
   return {
-    hint: `Fix the reported checks, then rerun ${suggest({ id: "doctor" })}.`,
-    nextCommands: [suggest({ id: "doctor" })],
+    hint: `Fix the reported checks, then rerun ${again.rerun}.`,
+    nextCommands: [again.rerun],
   };
 }
 
@@ -688,12 +709,14 @@ export type WarningFix = { check: string; action: string; command: SuggestedComm
  * @param suggest - Renders a suggestion with the run's own scope.
  * @param local - Renders a suggestion for the local project, which is the one
  *   the claim check reads, or nothing when nothing a command can carry reaches it.
+ * @param again - This doctor run again, as it was typed.
  * @returns The advice, or nothing when no warning has any.
  */
 export function advisoryForWarnings(
   warnings: CheckOutcome[],
   suggest: Suggest,
   local: Suggest | undefined,
+  again: DoctorAgain,
 ): { nextActions: string[]; nextCommands: SuggestedCommand[]; fixes: WarningFix[] } | undefined {
   const nextActions: string[] = [];
   const nextCommands: SuggestedCommand[] = [];
@@ -712,9 +735,9 @@ export function advisoryForWarnings(
       return check.name === "docker-cli";
     })
   ) {
-    const advice = dockerRuntimeGuidance("doctor", suggest({ id: "doctor" }));
+    const advice = dockerRuntimeGuidance("doctor", again.rerun);
     nextActions.push(...advice.nextActions);
-    nextCommands.push(advice.check, suggest(advice.retry));
+    nextCommands.push(advice.check, again.rerun);
   }
 
   const claimWarning = warnings.find((check) => {
@@ -790,7 +813,7 @@ export function advisoryForWarnings(
     fix(
       "issuer-origin",
       "Make the app's issuer a primary origin; a deploy lands only on primary origins, and setup 0.1.0 registered it as a preview one.",
-      suggest({ id: "doctor", flags: { fix: true, force: true } }),
+      again.forcedRepair,
     );
   }
 
@@ -804,7 +827,7 @@ export function advisoryForWarnings(
     fix(
       "meta-schemas",
       "Write this CLI version's editor schemas into .zitadel/meta/; editors and agents read the dialect from there.",
-      suggest({ id: "doctor", flags: { fix: true } }),
+      again.repair,
     );
   }
 

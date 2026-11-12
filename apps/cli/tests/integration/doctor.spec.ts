@@ -461,10 +461,10 @@ describe("doctor", () => {
           source: expect.stringMatching(/^http:\/\/localhost:\d+$/),
           code: "E_VALIDATION",
           message: "Zitadel doctor found issues",
-          hint: `The resolved environment could not connect. Check the server, project and credential it resolves with ${expectedPublicCliCommand(`env ${selector}`)}, then rerun ${expectedPublicCliCommand(`doctor ${selector}`)}.`,
+          hint: `The resolved environment could not connect. Check the server, project and credential it resolves with ${expectedPublicCliCommand(`env ${selector}`)}, then rerun ${expectedPublicCliCommand(`doctor --port ${app.doctoredPortOf(result)} ${selector}`)}.`,
           next_commands: [
             expectedPublicCliCommand(`env ${selector}`),
-            expectedPublicCliCommand(`doctor ${selector}`),
+            expectedPublicCliCommand(`doctor --port ${app.doctoredPortOf(result)} ${selector}`),
           ],
           details: {
             title: "Zitadel doctor found issues",
@@ -500,7 +500,9 @@ describe("doctor", () => {
           message: "Zitadel doctor found issues",
           hint: "Upgrade the app to Next.js 15.2.3 or later and rerun. Earlier releases let a request skip middleware (CVE-2025-29927).",
           next_commands: [
-            expectedPublicCliCommand(`doctor --server ${MOCK_SERVER_URL} --cwd ${app.path}`),
+            expectedPublicCliCommand(
+              `doctor --port ${app.doctoredPortOf(result)} --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+            ),
           ],
           details: {
             title: "Zitadel doctor found issues",
@@ -545,7 +547,9 @@ describe("doctor", () => {
           message: "Zitadel doctor found issues",
           hint: "Upgrade the app to Next.js 15.2.3 or later and rerun. Earlier releases let a request skip middleware (CVE-2025-29927).",
           next_commands: [
-            expectedPublicCliCommand(`doctor --server ${MOCK_SERVER_URL} --cwd ${app.path}`),
+            expectedPublicCliCommand(
+              `doctor --port ${app.doctoredPortOf(result)} --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+            ),
           ],
           details: {
             title: "Zitadel doctor found issues",
@@ -646,7 +650,7 @@ describe("doctor", () => {
             ],
             next_commands: [
               expectedPublicCliCommand(
-                `doctor --fix --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+                `doctor --fix --port ${app.doctoredPortOf(result)} --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
               ),
             ],
           },
@@ -714,7 +718,7 @@ describe("doctor", () => {
               ],
               next_commands: [
                 expectedPublicCliCommand(
-                  `doctor --fix --force --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+                  `doctor --fix --force --port ${app.doctoredPortOf(result)} --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
                 ),
               ],
             },

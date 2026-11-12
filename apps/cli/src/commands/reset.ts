@@ -74,7 +74,7 @@ export default class Reset extends Destructive(BaseCommand) {
           `Kept: ${join(this.cwd, LOCAL_ADMIN_FILE)}, the local admin sign-in, and everything else in your project.`,
           `Run ${this.suggest({ id: "start" })} afterwards to set up a fresh server.`,
         ].join("\n"),
-        preview: () => {
+        preview: async () => {
           const title = "Would reset the local Zitadel server runtime (dry run)";
           return {
             status: "ok",
@@ -90,7 +90,9 @@ export default class Reset extends Destructive(BaseCommand) {
               title,
               sections: [facts],
             },
-            next: { commands: [this.suggest({ id: "reset", flags: { force: true } })] },
+            next: {
+              commands: [await this.again("reset", { without: ["dryRun"], with: { force: true } })],
+            },
           };
         },
         apply: async (consent) => {

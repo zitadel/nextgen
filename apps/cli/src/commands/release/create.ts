@@ -88,7 +88,7 @@ export default class ReleaseCreate extends EnvironmentCommand {
           sections: [],
         },
         next: {
-          commands: [this.suggest({ id: "release:create", flags: { message: flags.message } })],
+          commands: [await this.realRun()],
         },
       });
     }

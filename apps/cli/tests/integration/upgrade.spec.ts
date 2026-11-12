@@ -272,7 +272,7 @@ describe("upgrade", () => {
             refresh: "planned",
             install_command: `npm --prefix ${app.path} install --save-exact @zitadel/sdk-next@${NEWEST}`,
             next_actions: [STILL_THIS_CLI],
-            next_commands: [newestCliCommand(`upgrade --cwd ${app.path}`, CLI_VERSION)],
+            next_commands: [newestCliCommand(app.againAsRun("upgrade"), CLI_VERSION)],
           },
           warnings: [],
         });
@@ -432,7 +432,7 @@ describe("upgrade", () => {
           code: "E_NETWORK",
           message: "Could not look up the latest Zitadel release",
           hint: "Check the connection to the npm registry, then rerun.",
-          next_commands: [newestCliCommand(`upgrade --cwd ${app.path}`, CLI_VERSION)],
+          next_commands: [newestCliCommand(app.againAsRun("upgrade"), CLI_VERSION)],
         });
       });
 
@@ -452,7 +452,7 @@ describe("upgrade", () => {
           hint: `npm install --save-exact @zitadel/sdk-next@${NEWEST} failed with exit 1. Nothing else changed; fix that and rerun.`,
           next_commands: [
             `npm --prefix ${app.path} install --save-exact @zitadel/sdk-next@${NEWEST}`,
-            newestCliCommand(`upgrade --cwd ${app.path}`, CLI_VERSION),
+            newestCliCommand(app.againAsRun("upgrade"), CLI_VERSION),
           ],
         });
       });

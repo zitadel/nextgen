@@ -11,7 +11,8 @@ import type { LocalServers } from "@/lib/local-server/processes";
 import { projectMetaSchemas } from "@/lib/meta-schemas";
 import { publicCliCommand } from "@/lib/public-cli";
 import { MANAGED_MARKER } from "@/lib/paths";
-import { advisoryForWarnings } from "@/commands/doctor/index";
+import { advisoryForWarnings, type DoctorAgain } from "@/commands/doctor/index";
+import type { Suggest } from "@/lib/suggestion";
 import { nextPort } from "@tests/helpers/ports";
 import { aSuggest, aSuggestWords } from "@tests/helpers/suggestions";
 import {
@@ -1027,6 +1028,20 @@ describe("doctor's managed runtime process check", () => {
   });
 });
 
+/**
+ * Doctor run again in the scope `suggest` carries, as `execute` hands it over.
+ *
+ * @param suggest - The suggester of the run's scope.
+ * @returns The run as it is, with `--fix`, and with `--fix --force`.
+ */
+function againIn(suggest: Suggest): DoctorAgain {
+  return {
+    rerun: suggest({ id: "doctor" }),
+    repair: suggest({ id: "doctor", flags: { fix: true } }),
+    forcedRepair: suggest({ id: "doctor", flags: { fix: true, force: true } }),
+  };
+}
+
 describe("advisoryForWarnings", () => {
   const claimWarning = {
     name: "claim",
@@ -1040,6 +1055,7 @@ describe("advisoryForWarnings", () => {
       [claimWarning],
       aSuggest({}, cliVersion.version),
       aSuggest({ server: "https://a.example" }, cliVersion.version),
+      againIn(aSuggest({}, cliVersion.version)),
     );
 
     expect(advice?.nextCommands).toEqual([
@@ -1052,6 +1068,7 @@ describe("advisoryForWarnings", () => {
       [claimWarning],
       aSuggest({}, cliVersion.version),
       aSuggest({}, cliVersion.version),
+      againIn(aSuggest({}, cliVersion.version)),
     );
 
     expect(advice?.nextCommands).toEqual([expectedPublicCliCommand("claim")]);
@@ -1069,6 +1086,7 @@ describe("advisoryForWarnings", () => {
       [metaWarning],
       aSuggest({ cwd: "apps/web" }, cliVersion.version),
       undefined,
+      againIn(aSuggest({ cwd: "apps/web" }, cliVersion.version)),
     );
 
     expect(advice?.nextCommands).toEqual([expectedPublicCliCommand("doctor --fix --cwd apps/web")]);
@@ -1086,7 +1104,12 @@ describe("advisoryForWarnings", () => {
       },
     };
 
-    const advice = advisoryForWarnings([metaWarning], aSuggest({}, cliVersion.version), undefined);
+    const advice = advisoryForWarnings(
+      [metaWarning],
+      aSuggest({}, cliVersion.version),
+      undefined,
+      againIn(aSuggest({}, cliVersion.version)),
+    );
 
     expect(advice).toBeUndefined();
   });
@@ -1103,7 +1126,12 @@ describe("advisoryForWarnings", () => {
       },
     };
 
-    const advice = advisoryForWarnings([metaWarning], aSuggest({}, cliVersion.version), undefined);
+    const advice = advisoryForWarnings(
+      [metaWarning],
+      aSuggest({}, cliVersion.version),
+      undefined,
+      againIn(aSuggest({}, cliVersion.version)),
+    );
 
     expect(advice).toBeUndefined();
   });
@@ -1120,6 +1148,7 @@ describe("advisoryForWarnings", () => {
       [issuerWarning],
       aSuggest({ cwd: "apps/web" }, cliVersion.version),
       undefined,
+      againIn(aSuggest({ cwd: "apps/web" }, cliVersion.version)),
     );
 
     expect(advice?.nextCommands).toEqual([
@@ -1140,7 +1169,15 @@ describe("failureAdvice for a runtime found in a parent directory", () => {
   ])(
     "quotes %s in the commands and hands it over as it is in the arguments",
     (_name, dir, quoted) => {
-      const advice = failureAdvice(failed, "image", 8080, SUGGEST, SUGGEST_WORDS, dir);
+      const advice = failureAdvice(
+        failed,
+        "image",
+        8080,
+        SUGGEST,
+        SUGGEST_WORDS,
+        againIn(SUGGEST),
+        dir,
+      );
 
       expect(advice.nextCommands).toEqual([
         publicCliCommand(`start --cwd ${quoted}`, "1.0.0"),
@@ -1156,7 +1193,15 @@ describe("failureAdvice for a runtime found in a parent directory", () => {
   );
 
   it("writes the commands out for a path that needs no quoting", () => {
-    const advice = failureAdvice(failed, "image", 8080, SUGGEST, SUGGEST_WORDS, "/home/dev/app");
+    const advice = failureAdvice(
+      failed,
+      "image",
+      8080,
+      SUGGEST,
+      SUGGEST_WORDS,
+      againIn(SUGGEST),
+      "/home/dev/app",
+    );
 
     expect(advice.nextCommands).toEqual([
       publicCliCommand("start --cwd /home/dev/app", "1.0.0"),
@@ -1166,7 +1211,15 @@ describe("failureAdvice for a runtime found in a parent directory", () => {
   });
 
   it("says the server is the parent's and that a reset deletes the parent's data", () => {
-    const advice = failureAdvice(failed, "image", 8080, SUGGEST, SUGGEST_WORDS, "/home/dev/app");
+    const advice = failureAdvice(
+      failed,
+      "image",
+      8080,
+      SUGGEST,
+      SUGGEST_WORDS,
+      againIn(SUGGEST),
+      "/home/dev/app",
+    );
 
     expect(advice.hint).toContain("This folder has no Zitadel server of its own");
     expect(advice.hint).toContain("the parent folder, /home/dev/app");
@@ -1181,6 +1234,7 @@ describe("failureAdvice for a runtime found in a parent directory", () => {
       8080,
       aSuggest({ cwd: "/home/dev/app/child" }, "1.0.0"),
       aSuggestWords({ cwd: "/home/dev/app/child" }),
+      againIn(aSuggest({ cwd: "/home/dev/app/child" }, "1.0.0")),
       "/home/dev/app",
     );
 
@@ -1188,13 +1242,21 @@ describe("failureAdvice for a runtime found in a parent directory", () => {
   });
 
   it("keeps the hint to one line", () => {
-    const advice = failureAdvice(failed, "image", 8080, SUGGEST, SUGGEST_WORDS, "/home/dev/app");
+    const advice = failureAdvice(
+      failed,
+      "image",
+      8080,
+      SUGGEST,
+      SUGGEST_WORDS,
+      againIn(SUGGEST),
+      "/home/dev/app",
+    );
 
     expect(advice.hint).not.toContain("\n");
   });
 
   it("keeps the plain advice for a runtime in the working directory", () => {
-    const advice = failureAdvice(failed, "image", 8080, SUGGEST, SUGGEST_WORDS);
+    const advice = failureAdvice(failed, "image", 8080, SUGGEST, SUGGEST_WORDS, againIn(SUGGEST));
 
     expect(advice.hint).not.toContain("parent folder");
     expect(advice.nextCommands).toEqual([

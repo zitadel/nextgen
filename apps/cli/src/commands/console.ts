@@ -79,7 +79,7 @@ export default class Console extends BaseCommand {
           title,
           sections: [section(undefined, ["Signed in as", escapeControlCharacters(admin.email)])],
         },
-        next: { commands: [this.suggest({ id: "console" })] },
+        next: { commands: [await this.realRun()] },
       });
     }
 
@@ -107,7 +107,7 @@ export default class Console extends BaseCommand {
       },
       next: {
         actions: [
-          `The link signs you in once. Run ${this.suggest({ id: "console" })} again for a fresh one.`,
+          `The link signs you in once. Run ${await this.again("console", {})} again for a fresh one.`,
         ],
       },
     });
