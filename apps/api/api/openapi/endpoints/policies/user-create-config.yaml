@@ -5,15 +5,16 @@ description: |
   The settings of a `user.create` policy, checked before a sign-up creates a
   user. Every setting is optional; a setting left out switches its rule off,
   and `{}` switches every rule off. Zitadel's own sign-up protection, a proof
-  of work on every password sign-up and limits per sign-up flow, applies
-  either way: a policy chooses among challenges and never switches it off.
-  Sign-ups with a passkey or through a sign-in provider are not challenged.
+  of work on every sign-up with a password or a passkey and limits per
+  sign-up flow, applies either way: a policy chooses among challenges and
+  never switches it off. Sign-ups through a sign-in provider are not
+  challenged: each needs an account at the provider.
 properties:
   challenge:
     type: string
     enum:
       - zitadel_pow
     description: |
-      The challenge a password sign-up must solve before the user is
-      created. `zitadel_pow` is Zitadel's built-in proof of work, which every
-      password sign-up solves when no policy names a challenge.
+      The challenge a sign-up with a password or a passkey must solve before
+      the user is created. `zitadel_pow` is Zitadel's built-in proof of work,
+      which every such sign-up solves when no policy names a challenge.

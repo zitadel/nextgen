@@ -217,7 +217,9 @@ const V2_EXCHANGE_ONLY_BEARER = exchangeOnlyBearer(
 
 /** The exchange-only bearer hook `text` carries, of either version, or `undefined`. */
 function bearerIn(text: string): string | undefined {
-  return [EXCHANGE_ONLY_BEARER, V2_EXCHANGE_ONLY_BEARER].find((bearer) => text.includes(bearer));
+  return [EXCHANGE_ONLY_BEARER, V2_EXCHANGE_ONLY_BEARER].find((bearer) => {
+    return text.includes(bearer);
+  });
 }
 
 /** The session-cookie hooks' functions, after the bearer hook (ADR 073, ADR 083). */
@@ -402,11 +404,11 @@ export function proxyConfApiPrefixEdit(): (source: string | undefined) => string
     if (source === undefined) {
       return proxyConfTemplate();
     }
-    return withLfLineEnds(source, (text) =>
-      text.includes(MANAGED_MARKER) && text.includes(V2_EXCHANGE_ONLY_BEARER)
+    return withLfLineEnds(source, (text) => {
+      return text.includes(MANAGED_MARKER) && text.includes(V2_EXCHANGE_ONLY_BEARER)
         ? text.replace(V2_EXCHANGE_ONLY_BEARER, EXCHANGE_ONLY_BEARER)
-        : text,
-    );
+        : text;
+    });
   };
 }
 

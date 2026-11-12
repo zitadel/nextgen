@@ -11,9 +11,10 @@ import type { LocalServers } from "@/lib/local-server/processes";
 import { projectMetaSchemas } from "@/lib/meta-schemas";
 import { publicCliCommand } from "@/lib/public-cli";
 import { MANAGED_MARKER } from "@/lib/paths";
-import { advisoryForWarnings } from "@/commands/doctor/index";
-import { environmentSelectorSuffix } from "@/lib/oclif/environment-flags";
+import { advisoryForWarnings, type DoctorAgain } from "@/commands/doctor/index";
+import type { Suggest } from "@/lib/suggestion";
 import { nextPort } from "@tests/helpers/ports";
+import { aSuggest, aSuggestWords } from "@tests/helpers/suggestions";
 import {
   aMachineRunning,
   cliVersion,
@@ -21,6 +22,8 @@ import {
   parseJson,
   runCliForTest,
 } from "@tests/helpers/run-cli";
+import { asTerminal } from "@tests/helpers/terminal";
+import { stripAnsi } from "@tests/helpers/run-cli";
 
 type Check = { name: string; status: "pass" | "warn" | "fail"; message: string; path?: string };
 
@@ -385,6 +388,43 @@ describe("doctor command", () => {
     );
   });
 
+  it("says each next step once when its output is read by a pipe", async () => {
+    const cwd = await makeHealthyProject();
+    await writeDetachedSecret(cwd, "2026-01-01T00:00:00.000Z");
+    const fake = await fakeDocker();
+
+    const res = await runCliForTest(["doctor", "--cwd", cwd, "--port", String(nextPort())], {
+      PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
+      DOCKER_LOG: fake.logPath,
+    });
+
+    const claim = expectedPublicCliCommand(`claim --server https://api.zitadel.cloud --cwd ${cwd}`);
+    expect(stripAnsi(res.stdout).split(claim)).toHaveLength(2);
+    expect(stripAnsi(res.stdout)).not.toContain("Next:");
+  });
+
+  it("says a next step that no row shows once, in what a pipe reads", async () => {
+    const cwd = await makeHealthyProject();
+    const fake = await fakeDocker();
+
+    const res = await runCliForTest(
+      ["doctor", "--cwd", cwd, "--port", String(nextPort())],
+      {
+        PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
+        DOCKER_LOG: fake.logPath,
+      },
+      undefined,
+      aMachineRunning({
+        pid: 999_991,
+        ppid: 1,
+        command: "/usr/local/bin/node /tmp/app/node_modules/@zitadel/server/bin/zitadel-server.js",
+      }),
+    );
+
+    const stop = expectedPublicCliCommand("stop --all");
+    expect(stripAnsi(res.stdout).split(stop)).toHaveLength(2);
+  });
+
   // Claiming needs a human in a browser, so --fix has nothing safe to do. The
   // warning has to survive it rather than being silently "repaired".
   it("leaves the claim warning (and the secret) alone under --fix", async () => {
@@ -667,9 +707,7 @@ console.log(["p4242", "cnode", "n127.0.0.1:" + process.env.LSOF_FIXTURE_PORT].jo
       const res = await doctorWithoutPort(app);
 
       const data = (parseJson(res.stdout) as { data: { next_actions?: string[] } }).data;
-      expect(data.next_actions).toContainEqual(
-        expect.stringContaining(expectedPublicCliCommand("logs --follow")),
-      );
+      expect(data.next_actions).toContainEqual(expect.stringContaining(" logs --follow"));
     });
   });
 
@@ -827,6 +865,51 @@ console.log(["p4242", "cnode", "n127.0.0.1:" + process.env.LSOF_FIXTURE_PORT].jo
     const dependency = json.data.checks.find((check) => check.name === "dependency");
     expect(dependency?.status).toBe("pass");
   });
+
+  // It never opens a connection, so nothing else records where it ran; the
+  // project comes from `.zitadel/secret` and the server from `zitadel.json`.
+  it("names the project it checked, not only the server", async () => {
+    const cwd = await makeHealthyProject();
+    const fake = await fakeDocker();
+
+    const res = await asTerminal(() =>
+      runCliForTest(["doctor", "--cwd", cwd, "--port", String(nextPort())], {
+        PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
+        DOCKER_LOG: fake.logPath,
+      }),
+    );
+
+    expect(stripAnsi(res.stdout)).toContain(
+      "All checks passed · project proj-001 on api.zitadel.cloud",
+    );
+    expect(stripAnsi(res.stdout)).not.toContain("Using project proj-001");
+  });
+
+  it("titles its --json answer with the title a terminal shows", async () => {
+    const cwd = await makeHealthyProject();
+
+    const res = await doctor(cwd);
+
+    expect(parseJson(res.stdout)).toMatchObject({
+      data: {
+        title: "All checks passed",
+      },
+    });
+  });
+
+  it("says its verdict on a terminal once, in its title", async () => {
+    const cwd = await makeHealthyProject();
+    const fake = await fakeDocker();
+
+    const res = await asTerminal(() =>
+      runCliForTest(["doctor", "--cwd", cwd, "--port", String(nextPort())], {
+        PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
+        DOCKER_LOG: fake.logPath,
+      }),
+    );
+
+    expect(stripAnsi(res.stdout)).not.toContain("Zitadel doctor passed");
+  });
 });
 
 async function fakeDocker(): Promise<{ binDir: string; logPath: string }> {
@@ -945,6 +1028,20 @@ describe("doctor's managed runtime process check", () => {
   });
 });
 
+/**
+ * Doctor run again in the scope `suggest` carries, as `execute` hands it over.
+ *
+ * @param suggest - The suggester of the run's scope.
+ * @returns The run as it is, with `--fix`, and with `--fix --force`.
+ */
+function againIn(suggest: Suggest): DoctorAgain {
+  return {
+    rerun: suggest({ id: "doctor" }),
+    repair: suggest({ id: "doctor", flags: { fix: true } }),
+    forcedRepair: suggest({ id: "doctor", flags: { fix: true, force: true } }),
+  };
+}
+
 describe("advisoryForWarnings", () => {
   const claimWarning = {
     name: "claim",
@@ -956,9 +1053,9 @@ describe("advisoryForWarnings", () => {
   it("suggests claiming the local project on the server doctor checked", () => {
     const advice = advisoryForWarnings(
       [claimWarning],
-      cliVersion.version,
-      environmentSelectorSuffix({ server: "https://a.example" }),
-      environmentSelectorSuffix({}),
+      aSuggest({}, cliVersion.version),
+      aSuggest({ server: "https://a.example" }, cliVersion.version),
+      againIn(aSuggest({}, cliVersion.version)),
     );
 
     expect(advice?.nextCommands).toEqual([
@@ -969,9 +1066,9 @@ describe("advisoryForWarnings", () => {
   it("adds no selector to the claim when doctor named no server or directory", () => {
     const advice = advisoryForWarnings(
       [claimWarning],
-      cliVersion.version,
-      environmentSelectorSuffix({}),
-      environmentSelectorSuffix({}),
+      aSuggest({}, cliVersion.version),
+      aSuggest({}, cliVersion.version),
+      againIn(aSuggest({}, cliVersion.version)),
     );
 
     expect(advice?.nextCommands).toEqual([expectedPublicCliCommand("claim")]);
@@ -987,9 +1084,9 @@ describe("advisoryForWarnings", () => {
 
     const advice = advisoryForWarnings(
       [metaWarning],
-      cliVersion.version,
+      aSuggest({ cwd: "apps/web" }, cliVersion.version),
       undefined,
-      environmentSelectorSuffix({ cwd: "apps/web" }),
+      againIn(aSuggest({ cwd: "apps/web" }, cliVersion.version)),
     );
 
     expect(advice?.nextCommands).toEqual([expectedPublicCliCommand("doctor --fix --cwd apps/web")]);
@@ -1009,9 +1106,9 @@ describe("advisoryForWarnings", () => {
 
     const advice = advisoryForWarnings(
       [metaWarning],
-      cliVersion.version,
+      aSuggest({}, cliVersion.version),
       undefined,
-      environmentSelectorSuffix({}),
+      againIn(aSuggest({}, cliVersion.version)),
     );
 
     expect(advice).toBeUndefined();
@@ -1031,9 +1128,9 @@ describe("advisoryForWarnings", () => {
 
     const advice = advisoryForWarnings(
       [metaWarning],
-      cliVersion.version,
+      aSuggest({}, cliVersion.version),
       undefined,
-      environmentSelectorSuffix({}),
+      againIn(aSuggest({}, cliVersion.version)),
     );
 
     expect(advice).toBeUndefined();
@@ -1049,9 +1146,9 @@ describe("advisoryForWarnings", () => {
 
     const advice = advisoryForWarnings(
       [issuerWarning],
-      cliVersion.version,
+      aSuggest({ cwd: "apps/web" }, cliVersion.version),
       undefined,
-      environmentSelectorSuffix({ cwd: "apps/web" }),
+      againIn(aSuggest({ cwd: "apps/web" }, cliVersion.version)),
     );
 
     expect(advice?.nextCommands).toEqual([
@@ -1061,40 +1158,48 @@ describe("advisoryForWarnings", () => {
 });
 
 describe("failureAdvice for a runtime found in a parent directory", () => {
+  const SUGGEST = aSuggest({}, "1.0.0");
+  const SUGGEST_WORDS = aSuggestWords();
   const failed = [{ name: "runtime", status: "fail" as const, message: "not healthy" }];
 
   it.each([
-    ["a Windows path with a space", "C:\\work\\my app"],
-    ["a Windows path with an apostrophe", "C:\\work\\it's"],
-    ["a POSIX path with a space", "/home/dev/my app"],
-  ])("hands over %s as arguments, not as commands", (_name, dir) => {
-    const advice = failureAdvice(
-      failed,
-      "image",
-      8080,
-      "1.0.0",
-      environmentSelectorSuffix({}),
-      dir,
-    );
+    ["a Windows path with a space", "C:\\work\\my app", "'C:\\work\\my app'"],
+    ["a Windows path with an apostrophe", "C:\\work\\it's", "'C:\\work\\it'\\''s'"],
+    ["a POSIX path with a space", "/home/dev/my app", "'/home/dev/my app'"],
+  ])(
+    "quotes %s in the commands and hands it over as it is in the arguments",
+    (_name, dir, quoted) => {
+      const advice = failureAdvice(
+        failed,
+        "image",
+        8080,
+        SUGGEST,
+        SUGGEST_WORDS,
+        againIn(SUGGEST),
+        dir,
+      );
 
-    expect(advice.nextCommands).toEqual([publicCliCommand("start", "1.0.0")]);
-    expect(advice.suggestedArgs).toEqual([
-      ["start", "--cwd", dir],
-      ["start"],
-      ["reset", "--force", "--cwd", dir],
-    ]);
-    expect(advice.hint).toContain("details.suggested_args");
-    expect(advice.hint).toContain(dir);
-    expect(advice.hint).toContain("--json");
-  });
+      expect(advice.nextCommands).toEqual([
+        publicCliCommand(`start --cwd ${quoted}`, "1.0.0"),
+        publicCliCommand("start", "1.0.0"),
+        publicCliCommand(`reset --force --cwd ${quoted}`, "1.0.0"),
+      ]);
+      expect(advice.suggestedArgs).toEqual([
+        ["start", "--cwd", dir],
+        ["start"],
+        ["reset", "--force", "--cwd", dir],
+      ]);
+    },
+  );
 
   it("writes the commands out for a path that needs no quoting", () => {
     const advice = failureAdvice(
       failed,
       "image",
       8080,
-      "1.0.0",
-      environmentSelectorSuffix({}),
+      SUGGEST,
+      SUGGEST_WORDS,
+      againIn(SUGGEST),
       "/home/dev/app",
     );
 
@@ -1110,8 +1215,9 @@ describe("failureAdvice for a runtime found in a parent directory", () => {
       failed,
       "image",
       8080,
-      "1.0.0",
-      environmentSelectorSuffix({}),
+      SUGGEST,
+      SUGGEST_WORDS,
+      againIn(SUGGEST),
       "/home/dev/app",
     );
 
@@ -1126,10 +1232,10 @@ describe("failureAdvice for a runtime found in a parent directory", () => {
       failed,
       "image",
       8080,
-      "1.0.0",
-      environmentSelectorSuffix({}),
+      aSuggest({ cwd: "/home/dev/app/child" }, "1.0.0"),
+      aSuggestWords({ cwd: "/home/dev/app/child" }),
+      againIn(aSuggest({ cwd: "/home/dev/app/child" }, "1.0.0")),
       "/home/dev/app",
-      "/home/dev/app/child",
     );
 
     expect(advice.suggestedArgs?.[1]).toEqual(["start", "--cwd", "/home/dev/app/child"]);
@@ -1140,8 +1246,9 @@ describe("failureAdvice for a runtime found in a parent directory", () => {
       failed,
       "image",
       8080,
-      "1.0.0",
-      environmentSelectorSuffix({}),
+      SUGGEST,
+      SUGGEST_WORDS,
+      againIn(SUGGEST),
       "/home/dev/app",
     );
 
@@ -1149,7 +1256,7 @@ describe("failureAdvice for a runtime found in a parent directory", () => {
   });
 
   it("keeps the plain advice for a runtime in the working directory", () => {
-    const advice = failureAdvice(failed, "image", 8080, "1.0.0", environmentSelectorSuffix({}));
+    const advice = failureAdvice(failed, "image", 8080, SUGGEST, SUGGEST_WORDS, againIn(SUGGEST));
 
     expect(advice.hint).not.toContain("parent folder");
     expect(advice.nextCommands).toEqual([

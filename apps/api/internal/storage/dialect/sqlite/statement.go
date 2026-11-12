@@ -44,6 +44,7 @@ type statements struct {
 	claimStatements
 	invitationStatements
 	resourceScopeStatements
+	searchEntryStatements
 	authzAssignmentStatements
 	authzMembershipEdgeStatements
 	authzCatalogStatements
@@ -90,6 +91,7 @@ func newStatements(client queryExecutor) statements {
 		claimStatements:               newClaimStatements(client),
 		invitationStatements:          newInvitationStatements(client),
 		resourceScopeStatements:       newResourceScopeStatements(client),
+		searchEntryStatements:         newSearchEntryStatements(client),
 		authzAssignmentStatements:     newAuthzAssignmentStatements(client),
 		authzMembershipEdgeStatements: newAuthzMembershipEdgeStatements(client),
 		authzCatalogStatements:        newAuthzCatalogStatements(client),

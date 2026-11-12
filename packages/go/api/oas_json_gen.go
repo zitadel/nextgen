@@ -50411,6 +50411,22 @@ func (s FinishUserPasskeyRegistrationErrorResponse) encodeFields(e *jx.Encoder) 
 				}
 			}
 		}
+	case UserPasswordHashingBusyFinishUserPasskeyRegistrationErrorResponse:
+		e.FieldStart("code")
+		e.Str("user.password_hashing_busy")
+		{
+			s := s.UserPasswordHashingBusy
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case UserPasswordPolicyViolationFinishUserPasskeyRegistrationErrorResponse:
 		e.FieldStart("code")
 		e.Str("user.password_policy_violation")
@@ -50533,6 +50549,9 @@ func (s *FinishUserPasskeyRegistrationErrorResponse) Decode(d *jx.Decoder) error
 				case "user.password_empty":
 					s.Type = UserPasswordEmptyFinishUserPasskeyRegistrationErrorResponse
 					found = true
+				case "user.password_hashing_busy":
+					s.Type = UserPasswordHashingBusyFinishUserPasskeyRegistrationErrorResponse
+					found = true
 				case "user.password_policy_violation":
 					s.Type = UserPasswordPolicyViolationFinishUserPasskeyRegistrationErrorResponse
 					found = true
@@ -50618,6 +50637,10 @@ func (s *FinishUserPasskeyRegistrationErrorResponse) Decode(d *jx.Decoder) error
 		}
 	case UserPasswordEmptyFinishUserPasskeyRegistrationErrorResponse:
 		if err := s.UserPasswordEmpty.Decode(d); err != nil {
+			return err
+		}
+	case UserPasswordHashingBusyFinishUserPasskeyRegistrationErrorResponse:
+		if err := s.UserPasswordHashingBusy.Decode(d); err != nil {
 			return err
 		}
 	case UserPasswordPolicyViolationFinishUserPasskeyRegistrationErrorResponse:
@@ -64701,6 +64724,22 @@ func (s GetFlowStepErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case UserPasswordHashingBusyGetFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("user.password_hashing_busy")
+		{
+			s := s.UserPasswordHashingBusy
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case UserPasswordPolicyViolationGetFlowStepErrorResponse:
 		e.FieldStart("code")
 		e.Str("user.password_policy_violation")
@@ -64876,6 +64915,9 @@ func (s *GetFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 				case "user.password_empty":
 					s.Type = UserPasswordEmptyGetFlowStepErrorResponse
 					found = true
+				case "user.password_hashing_busy":
+					s.Type = UserPasswordHashingBusyGetFlowStepErrorResponse
+					found = true
 				case "user.password_policy_violation":
 					s.Type = UserPasswordPolicyViolationGetFlowStepErrorResponse
 					found = true
@@ -65050,6 +65092,10 @@ func (s *GetFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case UserPasswordEmptyGetFlowStepErrorResponse:
 		if err := s.UserPasswordEmpty.Decode(d); err != nil {
+			return err
+		}
+	case UserPasswordHashingBusyGetFlowStepErrorResponse:
+		if err := s.UserPasswordHashingBusy.Decode(d); err != nil {
 			return err
 		}
 	case UserPasswordPolicyViolationGetFlowStepErrorResponse:
@@ -108060,6 +108106,40 @@ func (s *OptSessTokenCreationFailedDetails) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes SessTokenInvalidDetails as json.
+func (o OptSessTokenInvalidDetails) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes SessTokenInvalidDetails from json.
+func (o *OptSessTokenInvalidDetails) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptSessTokenInvalidDetails to nil")
+	}
+	o.Set = true
+	o.Value = make(SessTokenInvalidDetails)
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptSessTokenInvalidDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptSessTokenInvalidDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes SessionDeletedEventDelegationType as json.
 func (o OptSessionDeletedEventDelegationType) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -109297,6 +109377,40 @@ func (s OptUserPasswordEmptyDetails) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *OptUserPasswordEmptyDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes UserPasswordHashingBusyDetails as json.
+func (o OptUserPasswordHashingBusyDetails) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes UserPasswordHashingBusyDetails from json.
+func (o *OptUserPasswordHashingBusyDetails) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptUserPasswordHashingBusyDetails to nil")
+	}
+	o.Set = true
+	o.Value = make(UserPasswordHashingBusyDetails)
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptUserPasswordHashingBusyDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptUserPasswordHashingBusyDetails) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -144015,107 +144129,11 @@ func (s SearchErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case FlowdefNotFoundSearchErrorResponse:
-		e.FieldStart("code")
-		e.Str("flowdef.not_found")
-		{
-			s := s.FlowdefNotFound
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case FlowdefPermissionDeniedSearchErrorResponse:
-		e.FieldStart("code")
-		e.Str("flowdef.permission_denied")
-		{
-			s := s.FlowdefPermissionDenied
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case IdpNotFoundSearchErrorResponse:
-		e.FieldStart("code")
-		e.Str("idp.not_found")
-		{
-			s := s.IdpNotFound
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case IdpPermissionDeniedSearchErrorResponse:
-		e.FieldStart("code")
-		e.Str("idp.permission_denied")
-		{
-			s := s.IdpPermissionDenied
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
 	case InternalSearchErrorResponse:
 		e.FieldStart("code")
 		e.Str("internal")
 		{
 			s := s.Internal
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case SchNotFoundSearchErrorResponse:
-		e.FieldStart("code")
-		e.Str("sch.not_found")
-		{
-			s := s.SchNotFound
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case SchPermissionDeniedSearchErrorResponse:
-		e.FieldStart("code")
-		e.Str("sch.permission_denied")
-		{
-			s := s.SchPermissionDenied
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -144207,11 +144225,11 @@ func (s SearchErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case TeamTeamNotFoundSearchErrorResponse:
+	case SessProjectMismatchSearchErrorResponse:
 		e.FieldStart("code")
-		e.Str("team.team_not_found")
+		e.Str("sess.project_mismatch")
 		{
-			s := s.TeamTeamNotFound
+			s := s.SessProjectMismatch
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -144223,11 +144241,11 @@ func (s SearchErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case TeamPermissionDeniedSearchErrorResponse:
+	case SessTokenInvalidSearchErrorResponse:
 		e.FieldStart("code")
-		e.Str("team.permission_denied")
+		e.Str("sess.token_invalid")
 		{
-			s := s.TeamPermissionDenied
+			s := s.SessTokenInvalid
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -144260,38 +144278,6 @@ func (s SearchErrorResponse) encodeFields(e *jx.Encoder) {
 		e.Str("unavailable")
 		{
 			s := s.Unavailable
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case UserNotFoundSearchErrorResponse:
-		e.FieldStart("code")
-		e.Str("user.not_found")
-		{
-			s := s.UserNotFound
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case UserPermissionDeniedSearchErrorResponse:
-		e.FieldStart("code")
-		e.Str("user.permission_denied")
-		{
-			s := s.UserPermissionDenied
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -144338,26 +144324,8 @@ func (s *SearchErrorResponse) Decode(d *jx.Decoder) error {
 				case "flowdef.invalid":
 					s.Type = FlowdefInvalidSearchErrorResponse
 					found = true
-				case "flowdef.not_found":
-					s.Type = FlowdefNotFoundSearchErrorResponse
-					found = true
-				case "flowdef.permission_denied":
-					s.Type = FlowdefPermissionDeniedSearchErrorResponse
-					found = true
-				case "idp.not_found":
-					s.Type = IdpNotFoundSearchErrorResponse
-					found = true
-				case "idp.permission_denied":
-					s.Type = IdpPermissionDeniedSearchErrorResponse
-					found = true
 				case "internal":
 					s.Type = InternalSearchErrorResponse
-					found = true
-				case "sch.not_found":
-					s.Type = SchNotFoundSearchErrorResponse
-					found = true
-				case "sch.permission_denied":
-					s.Type = SchPermissionDeniedSearchErrorResponse
 					found = true
 				case "flowdef.missing_project_id":
 					s.Type = FlowdefMissingProjectIDSearchErrorResponse
@@ -144374,23 +144342,17 @@ func (s *SearchErrorResponse) Decode(d *jx.Decoder) error {
 				case "req.invalid":
 					s.Type = ReqInvalidSearchErrorResponse
 					found = true
-				case "team.team_not_found":
-					s.Type = TeamTeamNotFoundSearchErrorResponse
+				case "sess.project_mismatch":
+					s.Type = SessProjectMismatchSearchErrorResponse
 					found = true
-				case "team.permission_denied":
-					s.Type = TeamPermissionDeniedSearchErrorResponse
+				case "sess.token_invalid":
+					s.Type = SessTokenInvalidSearchErrorResponse
 					found = true
 				case "team.project_not_found":
 					s.Type = TeamProjectNotFoundSearchErrorResponse
 					found = true
 				case "unavailable":
 					s.Type = UnavailableSearchErrorResponse
-					found = true
-				case "user.not_found":
-					s.Type = UserNotFoundSearchErrorResponse
-					found = true
-				case "user.permission_denied":
-					s.Type = UserPermissionDeniedSearchErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -144418,32 +144380,8 @@ func (s *SearchErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.FlowdefInvalid.Decode(d); err != nil {
 			return err
 		}
-	case FlowdefNotFoundSearchErrorResponse:
-		if err := s.FlowdefNotFound.Decode(d); err != nil {
-			return err
-		}
-	case FlowdefPermissionDeniedSearchErrorResponse:
-		if err := s.FlowdefPermissionDenied.Decode(d); err != nil {
-			return err
-		}
-	case IdpNotFoundSearchErrorResponse:
-		if err := s.IdpNotFound.Decode(d); err != nil {
-			return err
-		}
-	case IdpPermissionDeniedSearchErrorResponse:
-		if err := s.IdpPermissionDenied.Decode(d); err != nil {
-			return err
-		}
 	case InternalSearchErrorResponse:
 		if err := s.Internal.Decode(d); err != nil {
-			return err
-		}
-	case SchNotFoundSearchErrorResponse:
-		if err := s.SchNotFound.Decode(d); err != nil {
-			return err
-		}
-	case SchPermissionDeniedSearchErrorResponse:
-		if err := s.SchPermissionDenied.Decode(d); err != nil {
 			return err
 		}
 	case FlowdefMissingProjectIDSearchErrorResponse:
@@ -144466,12 +144404,12 @@ func (s *SearchErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.ReqInvalid.Decode(d); err != nil {
 			return err
 		}
-	case TeamTeamNotFoundSearchErrorResponse:
-		if err := s.TeamTeamNotFound.Decode(d); err != nil {
+	case SessProjectMismatchSearchErrorResponse:
+		if err := s.SessProjectMismatch.Decode(d); err != nil {
 			return err
 		}
-	case TeamPermissionDeniedSearchErrorResponse:
-		if err := s.TeamPermissionDenied.Decode(d); err != nil {
+	case SessTokenInvalidSearchErrorResponse:
+		if err := s.SessTokenInvalid.Decode(d); err != nil {
 			return err
 		}
 	case TeamProjectNotFoundSearchErrorResponse:
@@ -144480,14 +144418,6 @@ func (s *SearchErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case UnavailableSearchErrorResponse:
 		if err := s.Unavailable.Decode(d); err != nil {
-			return err
-		}
-	case UserNotFoundSearchErrorResponse:
-		if err := s.UserNotFound.Decode(d); err != nil {
-			return err
-		}
-	case UserPermissionDeniedSearchErrorResponse:
-		if err := s.UserPermissionDenied.Decode(d); err != nil {
 			return err
 		}
 	default:
@@ -144751,11 +144681,16 @@ func (s *SearchResponse) encodeFields(e *jx.Encoder) {
 		}
 		e.ArrEnd()
 	}
+	{
+		e.FieldStart("more_projects")
+		e.Bool(s.MoreProjects)
+	}
 }
 
-var jsonFieldsNameOfSearchResponse = [2]string{
+var jsonFieldsNameOfSearchResponse = [3]string{
 	0: "results",
 	1: "incomplete_types",
+	2: "more_projects",
 }
 
 // Decode decodes SearchResponse from json.
@@ -144803,6 +144738,18 @@ func (s *SearchResponse) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"incomplete_types\"")
 			}
+		case "more_projects":
+			requiredBitSet[0] |= 1 << 2
+			if err := func() error {
+				v, err := d.Bool()
+				s.MoreProjects = bool(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"more_projects\"")
+			}
 		default:
 			return d.Skip()
 		}
@@ -144813,7 +144760,7 @@ func (s *SearchResponse) Decode(d *jx.Decoder) error {
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [1]uint8{
-		0b00000011,
+		0b00000111,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -146622,6 +146569,194 @@ func (s SessTokenCreationFailedDetails) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *SessTokenCreationFailedDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *SessTokenInvalid) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *SessTokenInvalid) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("code")
+		e.Str("sess.token_invalid")
+	}
+	{
+		e.FieldStart("message")
+		e.Str(s.Message)
+	}
+	{
+		if s.Details.Set {
+			e.FieldStart("details")
+			s.Details.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfSessTokenInvalid = [3]string{
+	0: "code",
+	1: "message",
+	2: "details",
+}
+
+// Decode decodes SessTokenInvalid from json.
+func (s *SessTokenInvalid) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode SessTokenInvalid to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "code":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.Code = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"code\"")
+			}
+		case "message":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := d.Str()
+				s.Message = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"message\"")
+			}
+		case "details":
+			if err := func() error {
+				s.Details.Reset()
+				if err := s.Details.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"details\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode SessTokenInvalid")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfSessTokenInvalid) {
+					name = jsonFieldsNameOfSessTokenInvalid[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *SessTokenInvalid) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *SessTokenInvalid) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s SessTokenInvalidDetails) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields implements json.Marshaler.
+func (s SessTokenInvalidDetails) encodeFields(e *jx.Encoder) {
+	for k, elem := range s {
+		e.FieldStart(k)
+
+		if len(elem) != 0 {
+			e.Raw(elem)
+		}
+	}
+}
+
+// Decode decodes SessTokenInvalidDetails from json.
+func (s *SessTokenInvalidDetails) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode SessTokenInvalidDetails to nil")
+	}
+	m := s.init()
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		var elem jx.Raw
+		if err := func() error {
+			v, err := d.RawAppend(nil)
+			elem = jx.Raw(v)
+			if err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrapf(err, "decode field %q", k)
+		}
+		m[string(k)] = elem
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode SessTokenInvalidDetails")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s SessTokenInvalidDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *SessTokenInvalidDetails) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -149057,6 +149192,22 @@ func (s SetUserPasswordErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case UserPasswordHashingBusySetUserPasswordErrorResponse:
+		e.FieldStart("code")
+		e.Str("user.password_hashing_busy")
+		{
+			s := s.UserPasswordHashingBusy
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case UserPasswordPolicyViolationSetUserPasswordErrorResponse:
 		e.FieldStart("code")
 		e.Str("user.password_policy_violation")
@@ -149182,6 +149333,9 @@ func (s *SetUserPasswordErrorResponse) Decode(d *jx.Decoder) error {
 				case "user.password_empty":
 					s.Type = UserPasswordEmptySetUserPasswordErrorResponse
 					found = true
+				case "user.password_hashing_busy":
+					s.Type = UserPasswordHashingBusySetUserPasswordErrorResponse
+					found = true
 				case "user.password_policy_violation":
 					s.Type = UserPasswordPolicyViolationSetUserPasswordErrorResponse
 					found = true
@@ -149271,6 +149425,10 @@ func (s *SetUserPasswordErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case UserPasswordEmptySetUserPasswordErrorResponse:
 		if err := s.UserPasswordEmpty.Decode(d); err != nil {
+			return err
+		}
+	case UserPasswordHashingBusySetUserPasswordErrorResponse:
+		if err := s.UserPasswordHashingBusy.Decode(d); err != nil {
 			return err
 		}
 	case UserPasswordPolicyViolationSetUserPasswordErrorResponse:
@@ -150467,6 +150625,22 @@ func (s SubmitFlowStepErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case UserPasswordHashingBusySubmitFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("user.password_hashing_busy")
+		{
+			s := s.UserPasswordHashingBusy
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case UserPasswordPolicyViolationSubmitFlowStepErrorResponse:
 		e.FieldStart("code")
 		e.Str("user.password_policy_violation")
@@ -150650,6 +150824,9 @@ func (s *SubmitFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 					found = true
 				case "user.password_empty":
 					s.Type = UserPasswordEmptySubmitFlowStepErrorResponse
+					found = true
+				case "user.password_hashing_busy":
+					s.Type = UserPasswordHashingBusySubmitFlowStepErrorResponse
 					found = true
 				case "user.password_policy_violation":
 					s.Type = UserPasswordPolicyViolationSubmitFlowStepErrorResponse
@@ -150837,6 +151014,10 @@ func (s *SubmitFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case UserPasswordEmptySubmitFlowStepErrorResponse:
 		if err := s.UserPasswordEmpty.Decode(d); err != nil {
+			return err
+		}
+	case UserPasswordHashingBusySubmitFlowStepErrorResponse:
+		if err := s.UserPasswordHashingBusy.Decode(d); err != nil {
 			return err
 		}
 	case UserPasswordPolicyViolationSubmitFlowStepErrorResponse:
@@ -154661,6 +154842,97 @@ func (s TknInvalidTknidDetails) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *TknInvalidTknidDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes TooManyRequests as json.
+func (s TooManyRequests) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+func (s TooManyRequests) encodeFields(e *jx.Encoder) {
+	switch s.Type {
+	case UserPasswordHashingBusyTooManyRequests:
+		e.FieldStart("code")
+		e.Str("user.password_hashing_busy")
+		{
+			s := s.UserPasswordHashingBusy
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	}
+}
+
+// Decode decodes TooManyRequests from json.
+func (s *TooManyRequests) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode TooManyRequests to nil")
+	}
+	// Sum type discriminator.
+	if typ := d.Next(); typ != jx.Object {
+		return errors.Errorf("unexpected json type %q", typ)
+	}
+
+	var found bool
+	if err := d.Capture(func(d *jx.Decoder) error {
+		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
+			if found {
+				return d.Skip()
+			}
+			switch string(key) {
+			case "code":
+				typ, err := d.Str()
+				if err != nil {
+					return err
+				}
+				switch typ {
+				case "user.password_hashing_busy":
+					s.Type = UserPasswordHashingBusyTooManyRequests
+					found = true
+				default:
+					return errors.Errorf("unknown type %s", typ)
+				}
+				return nil
+			}
+			return d.Skip()
+		})
+	}); err != nil {
+		return errors.Wrap(err, "capture")
+	}
+	if !found {
+		return errors.New("unable to detect sum type variant")
+	}
+	switch s.Type {
+	case UserPasswordHashingBusyTooManyRequests:
+		if err := s.UserPasswordHashingBusy.Decode(d); err != nil {
+			return err
+		}
+	default:
+		return errors.Errorf("inferred invalid type: %s", s.Type)
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s TooManyRequests) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *TooManyRequests) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -161087,6 +161359,194 @@ func (s *UserPasswordEmptyDetails) UnmarshalJSON(data []byte) error {
 }
 
 // Encode implements json.Marshaler.
+func (s *UserPasswordHashingBusy) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *UserPasswordHashingBusy) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("code")
+		e.Str("user.password_hashing_busy")
+	}
+	{
+		e.FieldStart("message")
+		e.Str(s.Message)
+	}
+	{
+		if s.Details.Set {
+			e.FieldStart("details")
+			s.Details.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfUserPasswordHashingBusy = [3]string{
+	0: "code",
+	1: "message",
+	2: "details",
+}
+
+// Decode decodes UserPasswordHashingBusy from json.
+func (s *UserPasswordHashingBusy) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode UserPasswordHashingBusy to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "code":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.Code = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"code\"")
+			}
+		case "message":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := d.Str()
+				s.Message = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"message\"")
+			}
+		case "details":
+			if err := func() error {
+				s.Details.Reset()
+				if err := s.Details.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"details\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode UserPasswordHashingBusy")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfUserPasswordHashingBusy) {
+					name = jsonFieldsNameOfUserPasswordHashingBusy[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *UserPasswordHashingBusy) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *UserPasswordHashingBusy) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s UserPasswordHashingBusyDetails) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields implements json.Marshaler.
+func (s UserPasswordHashingBusyDetails) encodeFields(e *jx.Encoder) {
+	for k, elem := range s {
+		e.FieldStart(k)
+
+		if len(elem) != 0 {
+			e.Raw(elem)
+		}
+	}
+}
+
+// Decode decodes UserPasswordHashingBusyDetails from json.
+func (s *UserPasswordHashingBusyDetails) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode UserPasswordHashingBusyDetails to nil")
+	}
+	m := s.init()
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		var elem jx.Raw
+		if err := func() error {
+			v, err := d.RawAppend(nil)
+			elem = jx.Raw(v)
+			if err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrapf(err, "decode field %q", k)
+		}
+		m[string(k)] = elem
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode UserPasswordHashingBusyDetails")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s UserPasswordHashingBusyDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *UserPasswordHashingBusyDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
 func (s *UserPasswordPolicyViolation) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
@@ -166835,6 +167295,22 @@ func (s VerifyChallengeProofErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case UserPasswordHashingBusyVerifyChallengeProofErrorResponse:
+		e.FieldStart("code")
+		e.Str("user.password_hashing_busy")
+		{
+			s := s.UserPasswordHashingBusy
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case UserPasswordPolicyViolationVerifyChallengeProofErrorResponse:
 		e.FieldStart("code")
 		e.Str("user.password_policy_violation")
@@ -166944,6 +167420,9 @@ func (s *VerifyChallengeProofErrorResponse) Decode(d *jx.Decoder) error {
 				case "user.password_empty":
 					s.Type = UserPasswordEmptyVerifyChallengeProofErrorResponse
 					found = true
+				case "user.password_hashing_busy":
+					s.Type = UserPasswordHashingBusyVerifyChallengeProofErrorResponse
+					found = true
 				case "user.password_policy_violation":
 					s.Type = UserPasswordPolicyViolationVerifyChallengeProofErrorResponse
 					found = true
@@ -167030,6 +167509,10 @@ func (s *VerifyChallengeProofErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case UserPasswordEmptyVerifyChallengeProofErrorResponse:
 		if err := s.UserPasswordEmpty.Decode(d); err != nil {
+			return err
+		}
+	case UserPasswordHashingBusyVerifyChallengeProofErrorResponse:
+		if err := s.UserPasswordHashingBusy.Decode(d); err != nil {
 			return err
 		}
 	case UserPasswordPolicyViolationVerifyChallengeProofErrorResponse:

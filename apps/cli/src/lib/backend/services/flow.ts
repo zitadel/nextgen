@@ -5,11 +5,10 @@ import type {
   ListFlowDefinitions200,
   ListFlowDefinitionsParams,
 } from "@zitadel/api/generated/model";
-
 import { Paging } from "@zitadel/api/runtime/paging";
 
-import { pagedFunctions, type ZitadelClient } from "@/lib/backend/client";
 import { ApiService, type Page, type PageOptions } from "@/lib/backend/api-service";
+import { pagedFunctions, type ZitadelClient } from "@/lib/backend/client";
 import { NotFoundError } from "@/lib/backend/errors";
 
 /** What narrows and pages a list of flow definitions. */

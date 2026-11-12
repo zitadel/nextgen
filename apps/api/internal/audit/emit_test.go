@@ -60,6 +60,28 @@ func TestEmit_BuildsAndInserts(t *testing.T) {
 	require.Equal(t, "user_1", *cap.last.EntityID)
 }
 
+// A request that names no flow (the handoff exchange) still writes into the
+// flow its caller names; an empty override leaves the request's own.
+func TestEmit_FlowIDOverridesTheRequests(t *testing.T) {
+	t.Parallel()
+	requestFlow := "flow_request"
+	ctx := audit.WithActorContext(t.Context(), audit.ActorContext{ProjectID: "proj_1", FlowID: &requestFlow})
+	emit := func(flowID string) *domain.Event {
+		cap := &insertEventCapture{}
+		require.NoError(t, audit.Emit(ctx, cap, audit.EmitSpec{
+			Type:      domain.EventTypeSessionEstablished,
+			Category:  domain.EventCategorySession,
+			ProjectID: "proj_1",
+			FlowID:    &flowID,
+			Payload:   domain.SessionEstablishedPayload{},
+		}))
+		return cap.last
+	}
+	require.NotNil(t, emit("flow_attempt").FlowID)
+	require.Equal(t, "flow_attempt", *emit("flow_attempt").FlowID)
+	require.Equal(t, "flow_request", *emit("").FlowID)
+}
+
 func TestEmit_CopiesRequestIDFromMiddleware(t *testing.T) {
 	t.Parallel()
 	cap := &insertEventCapture{}

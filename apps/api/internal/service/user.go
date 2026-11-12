@@ -1,6 +1,7 @@
 package service
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -149,6 +150,15 @@ type SearchUsersInput struct {
 
 // SearchUsersOutput holds the users found, the best match first: a user whose
 // value is the whole query comes before the users it only starts.
+// SearchUsersInProjectsInput asks for the users of several projects whose
+// identifier or a part of whose display name a text starts (ADR 087 §6).
+type SearchUsersInProjectsInput struct {
+	ProjectIDs []string
+	Query      string
+	// Limit is the most users returned, from all the projects together.
+	Limit int
+}
+
 type SearchUsersOutput struct {
 	Items []*domain.User
 	// More reports that further users match.
@@ -171,6 +181,12 @@ type UserService interface {
 	// their display name, from the search index (ADR 058). Like ListUsers it
 	// is a management list: the caller's list filter narrows it.
 	SearchUsers(ctx context.Context, input SearchUsersInput) (*SearchUsersOutput, error)
+	// SearchUsersInProjects is SearchUsers across projects whose list gate
+	// allows the caller every user, decided before the call (ctx carries the
+	// one-shot skip). Its reads do not grow with the projects: one of their
+	// user schemas, one of the search index across all of them, and one list of
+	// the users it answers with. Each user carries their best MatchedText.
+	SearchUsersInProjects(ctx context.Context, input SearchUsersInProjectsInput) (*SearchUsersOutput, error)
 	ListPasskeys(ctx context.Context, input ListPasskeysInput) (passkeys []*domain.UserPasskey, nextPage string, err error)
 	ListIdentityLinks(ctx context.Context, input ListIdentityLinksInput) (links []*domain.IDPIdentityLink, nextPage string, err error)
 	ListUserTeams(ctx context.Context, input ListUserTeamsInput) (*ListUserTeamsOutput, error)
@@ -453,6 +469,214 @@ func (s *userService) SearchUsers(ctx context.Context, input SearchUsersInput) (
 		return nil, err
 	}
 	return out, nil
+}
+
+func (s *userService) SearchUsersInProjects(ctx context.Context, input SearchUsersInProjectsInput) (_ *SearchUsersOutput, err error) {
+	ctx, end := startSpan(ctx, "UserService.SearchUsersInProjects")
+	defer end(&err)
+
+	term, ok := domain.SearchText(input.Query)
+	if !ok || len(input.ProjectIDs) == 0 {
+		return &SearchUsersOutput{}, nil
+	}
+	limit := normalizeLimit(input.Limit)
+	stmts := s.v2Pool.Statements()
+	designations, attributeKeys, err := searchDesignations(WithAuthzListUnrestricted(ctx), stmts, input.ProjectIDs)
+	if err != nil {
+		return nil, mapListError(err, "failed to list schemas from database")
+	}
+	var ranges []domain.UserSearchRange
+	perUser := 1
+	for _, projectID := range input.ProjectIDs {
+		d := designations[projectID]
+		if d == nil {
+			continue
+		}
+		perUser = max(perUser, d.perUser)
+		for _, key := range d.searchKeys {
+			ranges = append(ranges, domain.UserSearchRange{ProjectID: projectID, Key: key})
+		}
+	}
+	// As in SearchUsers: a user is a row per property they match on, so this
+	// many rows a range hold limit+1 different users whenever that many match.
+	read, err := stmts.SearchUserIndex(ctx, ranges, term, (limit+1)*perUser)
+	if err != nil {
+		return nil, mapListError(err, "failed to search users in database")
+	}
+
+	type candidate struct{ projectID, userID, text string }
+	better := func(a, b string) bool {
+		if (a == term) != (b == term) {
+			return a == term
+		}
+		return a < b
+	}
+	byUser := make(map[[2]string]*candidate)
+	more := false
+	for _, r := range read {
+		more = more || r.Full
+		for _, hit := range r.Hits {
+			key := [2]string{r.ProjectID, hit.UserID}
+			if c, ok := byUser[key]; !ok || better(hit.MatchedText, c.text) {
+				byUser[key] = &candidate{projectID: r.ProjectID, userID: hit.UserID, text: hit.MatchedText}
+			}
+		}
+	}
+	candidates := make([]*candidate, 0, len(byUser))
+	for _, c := range byUser {
+		candidates = append(candidates, c)
+	}
+	slices.SortFunc(candidates, func(a, b *candidate) int {
+		switch {
+		case better(a.text, b.text):
+			return -1
+		case better(b.text, a.text):
+			return 1
+		}
+		return cmp.Or(cmp.Compare(a.projectID, b.projectID), cmp.Compare(a.userID, b.userID))
+	})
+	if len(candidates) > limit {
+		candidates, more = candidates[:limit], true
+	}
+	if len(candidates) == 0 {
+		return &SearchUsersOutput{More: more}, nil
+	}
+
+	// The users answered with, from every project in one list, with the
+	// attributes their names are made of. These are rows the read above
+	// already chose, not a list of the project, so no gate applies.
+	idsByProject := make(map[string][]database.Filter[domain.UserField])
+	var projects []string
+	for _, c := range candidates {
+		if _, ok := idsByProject[c.projectID]; !ok {
+			projects = append(projects, c.projectID)
+		}
+		idsByProject[c.projectID] = append(idsByProject[c.projectID], database.Equal(database.Col(domain.UserFieldID), c.userID))
+	}
+	perProject := make([]database.Filter[domain.UserField], 0, len(projects))
+	for _, projectID := range projects {
+		perProject = append(perProject, database.And(
+			database.Equal(database.Col(domain.UserFieldProjectID), projectID),
+			database.Or(idsByProject[projectID]...),
+		))
+	}
+	listed, err := stmts.ListUsers(WithAuthzListUnrestricted(ctx), &database.ListOptions[domain.UserField]{
+		Filter: database.Or(perProject...),
+		Pagination: database.Page[domain.UserField]{
+			Limit: uint32(len(candidates)),
+			OrderBy: database.OrderBy[domain.UserField]{
+				Columns:   []database.Column[domain.UserField]{database.Col(domain.UserFieldID)},
+				Direction: database.OrderAsc,
+			},
+		},
+	}, UserQueryOptions{AttributeKeys: attributeKeys})
+	if err != nil {
+		return nil, mapListError(err, "failed to read users from database")
+	}
+	users := make(map[[2]string]*domain.User, len(listed.Items))
+	for _, user := range listed.Items {
+		users[[2]string{user.ProjectID, user.ID}] = user
+	}
+	out := &SearchUsersOutput{More: more, Items: make([]*domain.User, 0, len(candidates))}
+	for _, c := range candidates {
+		user, ok := users[[2]string{c.projectID, c.userID}]
+		if !ok {
+			// Gone between the two reads.
+			continue
+		}
+		user.MatchedText = c.text
+		ref := domain.ResolveUserRef(user, designations[c.projectID].documents[user.SchemaURL])
+		user.Ref = &ref
+		out.Items = append(out.Items, user)
+	}
+	return out, nil
+}
+
+// projectDesignations is what one project's user schemas designate, for a
+// search across projects.
+type projectDesignations struct {
+	// documents are the project's user schema revisions by URL.
+	documents map[string][]byte
+	// searchKeys are the properties any revision designates as identifier or
+	// display part; perUser the most of them one revision designates.
+	searchKeys []domain.AttributeKey
+	perUser    int
+}
+
+// searchDesignations reads the user schemas of projectIDs in one paged list
+// and returns each project's designations, and the attribute keys a user's
+// name is made of in any of them.
+func searchDesignations(ctx context.Context, stmts AllStatements, projectIDs []string) (map[string]*projectDesignations, []string, error) {
+	projectFilters := make([]database.Filter[domain.JSONSchemaField], 0, len(projectIDs))
+	for _, projectID := range projectIDs {
+		projectFilters = append(projectFilters, database.Equal(database.Col(domain.JSONSchemaFieldProjectID), projectID))
+	}
+	list := func(cursor []byte) (*database.ListResult[*domain.JSONSchema], error) {
+		return stmts.ListJSONSchemas(ctx, &database.ListOptions[domain.JSONSchemaField]{
+			Filter: database.And(
+				database.Or(projectFilters...),
+				database.Equal(database.Col(domain.JSONSchemaFieldKind), domain.JSONSchemaKindUserSchema.String()),
+			),
+			Pagination: database.Page[domain.JSONSchemaField]{
+				Limit:  refSchemaPageSize,
+				Cursor: cursor,
+				OrderBy: database.OrderBy[domain.JSONSchemaField]{
+					Columns: []database.Column[domain.JSONSchemaField]{
+						database.Col(domain.JSONSchemaFieldProjectID),
+						database.Col(domain.JSONSchemaFieldURL),
+					},
+					Direction: database.OrderAsc,
+				},
+			},
+		}, JSONSchemaQueryOptions{})
+	}
+	first, err := list(nil)
+	if err != nil {
+		return nil, nil, err
+	}
+	byProject := make(map[string]*projectDesignations, len(projectIDs))
+	var attributeKeys []string
+	for schema, err := range first.Iterate(list) {
+		if err != nil {
+			return nil, nil, err
+		}
+		d := byProject[schema.ProjectID]
+		if d == nil {
+			d = &projectDesignations{documents: map[string][]byte{}}
+			byProject[schema.ProjectID] = d
+		}
+		d.documents[schema.URL] = schema.Schema
+		var designated []domain.AttributeKey
+		if identifier := domain.DesignatedIdentifier(schema.Schema); identifier != "" {
+			designated = append(designated, domain.AttributeKey(identifier))
+		}
+		for _, part := range domain.DesignatedDisplay(schema.Schema) {
+			if part != "" {
+				designated = append(designated, domain.AttributeKey(part))
+			}
+		}
+		slices.Sort(designated)
+		designated = slices.Compact(designated)
+		d.perUser = max(d.perUser, len(designated))
+		for _, key := range designated {
+			if !slices.Contains(d.searchKeys, key) {
+				d.searchKeys = append(d.searchKeys, key)
+			}
+		}
+		for _, key := range domain.DesignatedAttributeKeys(schema.Schema) {
+			if !slices.Contains(attributeKeys, key) {
+				attributeKeys = append(attributeKeys, key)
+			}
+		}
+	}
+	for _, d := range byProject {
+		slices.Sort(d.searchKeys)
+	}
+	if len(attributeKeys) == 0 {
+		// As in designatingSchemas: empty AttributeKeys hydrates everything.
+		attributeKeys = []string{""}
+	}
+	return byProject, attributeKeys, nil
 }
 
 // splitUserFilters separates the predicates that compile to a filter on the
@@ -1239,8 +1463,8 @@ func (o *SetPasswordUserAction) Prepare(ctx context.Context) (err error) {
 	if err != nil {
 		return err
 	}
-	_, end := startSpan(ctx, "password.Hash")
-	o.hash, err = domain.HashPassword(o.Password, hasher)
+	hashCtx, end := startSpan(ctx, "password.Hash")
+	o.hash, err = domain.HashPassword(hashCtx, o.Password, hasher)
 	end(&err)
 	return err
 }

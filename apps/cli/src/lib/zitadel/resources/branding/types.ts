@@ -49,7 +49,7 @@ export type BrandingDesignInfo = {
  * the `branding eject` design picker.
  *
  * @remarks
- * Setup no longer offers designs (#1039).
+ * Setup does not offer designs.
  */
 export const BRANDING_DESIGN_INFO: Readonly<Record<BrandingDesign, BrandingDesignInfo>> = {
   centered: {
@@ -63,10 +63,10 @@ export const BRANDING_DESIGN_INFO: Readonly<Record<BrandingDesign, BrandingDesig
 };
 
 /**
- * Designs the eject catalog used to ship (#1039).
+ * Designs the eject catalog does not ship.
  *
  * @remarks
- * They were page layout around the default card, not widget structure, so they
+ * They are page layout around the default card, not widget structure, so they
  * are refused by name with a pointer to where page layout lives now: scripts
  * and agents that learned `--design split` get an actionable error instead of
  * oclif's generic "expected one of".

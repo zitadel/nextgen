@@ -191,6 +191,10 @@ const (
 	// PasswordError is a hash that could not be verified at all, such as one
 	// in an algorithm the server no longer carries.
 	PasswordError PasswordResult = "error"
+	// PasswordBusy is a verification that never ran: the server was hashing
+	// as much as it allows and no slot freed up within the wait. It says
+	// nothing about the password.
+	PasswordBusy PasswordResult = "busy"
 )
 
 // AuthCheck is the kind of proof that was verified.
@@ -216,6 +220,10 @@ const (
 	// verifying or persisting: the errors that give the response a 5xx. A
 	// storage failure that was wrapped as a rejection still counts here.
 	AuthError AuthResult = "error"
+	// AuthBusy is a proof the server did not check: its password hashing was
+	// at its limit, so the client was told to retry. Neither the client's
+	// doing nor a fault, and never a failed attempt.
+	AuthBusy AuthResult = "busy"
 )
 
 // KeyKind is the kind of key being resolved, with the values the
@@ -337,7 +345,7 @@ func Catalogue() []Instrument {
 			Description: "Duration of verifying a password against its stored hash. `updated` is a match on a hash outdated for the project's method, so the verify also computed (or attempted) a new hash: two hashes for one sign-in; it occurs for the `login` purpose only.",
 			Attributes: []Attribute{
 				{Key: PurposeKey, Description: "Why the password was verified: `login` verifies a sign-in proof; `history` compares a new password against a remembered one on a password change, where `mismatch` is the normal outcome.", Values: values(PasswordLogin, PasswordHistory)},
-				{Key: ResultKey, Description: "Outcome.", Values: values(PasswordMatch, PasswordUpdated, PasswordMismatch, PasswordError)},
+				{Key: ResultKey, Description: "Outcome.", Values: values(PasswordMatch, PasswordUpdated, PasswordMismatch, PasswordError, PasswordBusy)},
 			},
 		},
 		{
@@ -345,7 +353,7 @@ func Catalogue() []Instrument {
 			Description: "Authentication proofs verified through auth attempts, by kind of proof and outcome. SSO sign-ins are not counted.",
 			Attributes: []Attribute{
 				{Key: CheckKey, Description: "Kind of proof.", Values: values(CheckUser, CheckPassword, CheckPasskey, CheckPasskeyRegistration)},
-				{Key: ResultKey, Description: "Outcome: `rejected` is refused by the client's doing, `error` is a failure of the server.", Values: values(AuthSuccess, AuthRejected, AuthError)},
+				{Key: ResultKey, Description: "Outcome: `rejected` is refused by the client's doing, `error` is a failure of the server, `busy` is a proof not checked because password hashing was at its limit.", Values: values(AuthSuccess, AuthRejected, AuthError, AuthBusy)},
 			},
 		},
 		{
@@ -401,6 +409,26 @@ func Catalogue() []Instrument {
 			Name: CacheEntries, Kind: KindGauge,
 			Description: "Entries currently held in a cache.",
 			Attributes:  []Attribute{cacheName},
+		},
+		{
+			Name: PasswordHashingInFlight, Kind: KindGauge,
+			Description: "Password hashes currently running.",
+		},
+		{
+			Name: PasswordHashingWaiting, Kind: KindGauge,
+			Description: "Password hashes waiting for a slot.",
+		},
+		{
+			Name: PasswordHashingMemoryReserved, Kind: KindGauge, Unit: "By",
+			Description: "Memory the running password hashes are budgeted to use.",
+		},
+		{
+			Name: PasswordHashingRejected, Kind: KindCounter,
+			Description: "Password hashes refused because no slot freed up within the configured wait.",
+		},
+		{
+			Name: PasswordHashingWaitDuration, Kind: KindHistogram, Unit: "s",
+			Description: "Time a password hash waited for a slot, whether it got one or not; 0 when one was free.",
 		},
 	}
 }

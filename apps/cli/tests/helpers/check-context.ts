@@ -2,6 +2,8 @@ import type { CheckContext } from "@/commands/doctor/checks";
 import { Consent } from "@/lib/consent";
 import { createOrca } from "@/lib/orca";
 
+import { aSuggest } from "./suggestions";
+
 /**
  * The CLI version a doctor check runs as unless a test says otherwise.
  */
@@ -35,7 +37,7 @@ export async function declined(): Promise<undefined> {
  * @param gate - What the repair asked consent for.
  * @returns Never; it always rejects.
  */
-export async function unasked(gate: Parameters<CheckContext["consent"]>[0]): Promise<never> {
+async function unasked(gate: Parameters<CheckContext["consent"]>[0]): Promise<never> {
   throw new Error(`unexpected request to ${gate.name}`);
 }
 
@@ -52,6 +54,7 @@ export function aCheckContext(cwd: string, overrides: Partial<CheckContext> = {}
     cwd,
     orca: createOrca(),
     cliVersion: CHECK_CLI_VERSION,
+    suggest: aSuggest({}, CHECK_CLI_VERSION),
     dryRun: false,
     signal: new AbortController().signal,
     consent: unasked,

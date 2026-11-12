@@ -32,8 +32,8 @@ there, not a new color at the call site.
 - Never rely on color alone. Output must read the same with `--no-color`, so a
   status always has its mark or a word such as `Warning:`.
 - Adding color must not change piped output: scripts read those words.
-- `consola`'s narration keeps its own `✔` for a step in progress; `✓` reports a
-  result.
+- Narration is `log` (`src/lib/log.ts`): a wizard draws each level with its
+  mark, and every other command says it as a plain line.
 - Color follows stdout's terminal. Write to stderr through `BaseCommand`, which
   takes the codes back out when only stderr is redirected.
 - Use `statusColor` for a mark in another shape, like `doctor`'s `[✓]`.
@@ -58,10 +58,10 @@ there, not a new color at the call site.
 ## Boxes
 
 - Box only a moment that ends a run or needs attention, never a routine result.
-- Draw one with `consola`'s box, its content through `wrapForBox`
-  ([`src/lib/box.ts`](../src/lib/box.ts)), so the frame fits the terminal.
-- Use `BOX_STYLE.success` when a run succeeded and `BOX_STYLE.info` for what to
-  read or do.
+- Draw one with `drawBox` ([`src/lib/ui/layout.ts`](../src/lib/ui/layout.ts)),
+  its content through `wrapForBox` ([`src/lib/box.ts`](../src/lib/box.ts)), so
+  the frame fits the terminal.
+- Green is for a run that succeeded, cyan (`notice`) for what to read or do.
 - Put nothing in a box that must be copied whole, such as a long URL: print it
   on its own line below the frame.
 

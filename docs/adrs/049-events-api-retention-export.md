@@ -521,7 +521,7 @@ ascending list apply it.
 history before an accountable owner exists
 ([ADR 046](046-claim-lifecycle-v2.md)). The platform project is never
 claimed: it is the deployment's own, with its operators from the start. Its
-events were stored but shown to no one, so the console's Logs for it stayed
+events were stored but shown to no one, so the console's Events screen for it stayed
 empty.
 
 **Decision.** The platform project's events are visible as a claimed

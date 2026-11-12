@@ -5,10 +5,6 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, vi } from "vitest";
 
-vi.mock("@clack/prompts", async () => (await import("@tests/helpers/clack")).clackDouble());
-
-import { cancel, confirm, isCancel } from "@clack/prompts";
-
 import { LOCAL_ADMIN_FILE } from "@/lib/local-server/admin-credential";
 import {
   CONTAINER_DATA_DIR,
@@ -27,8 +23,10 @@ import {
   parseJson,
   runCliForTest,
 } from "@tests/helpers/run-cli";
+import { cliPackageRoot } from "@tests/helpers/oclif-build";
 import { it } from "@tests/helpers/fixtures";
-import { asTerminal } from "@tests/helpers/terminal";
+import { type Answer, answering } from "@tests/helpers/keyboard";
+import { asOneLine, asTerminal } from "@tests/helpers/terminal";
 
 const tempDirs: string[] = [];
 const servers: Server[] = [];
@@ -164,7 +162,9 @@ describe("local runtime commands", () => {
     expect(envelope.data.next_actions.join("\n")).toContain("managed local runtime");
     expect(envelope.data.next_actions.join("\n")).toContain("--server <url>");
     expect(envelope.data.next_commands).toContain("docker version");
-    expect(envelope.data.next_commands).toContain(expectedPublicCliCommand("doctor"));
+    expect(envelope.data.next_commands).toContain(
+      expectedPublicCliCommand(`doctor --runtime docker --port ${port} --cwd ${cwd}`),
+    );
     expect(envelope.data.checks.find((check) => check.name === "docker-cli")).toMatchObject({
       status: "warn",
     });
@@ -251,8 +251,10 @@ describe("local runtime commands", () => {
     };
     expect(envelope.status).toBe("error");
     expect(envelope.hint).toContain("Existing local runtime metadata");
-    expect(envelope.next_commands).toContain(expectedPublicCliCommand("start"));
-    expect(envelope.next_commands).toContain(expectedPublicCliCommand("reset --force"));
+    expect(envelope.next_commands).toContain(expectedPublicCliCommand(`start --cwd ${cwd}`));
+    expect(envelope.next_commands).toContain(
+      expectedPublicCliCommand(`reset --force --cwd ${cwd}`),
+    );
     expect(envelope.details.checks.find((check) => check.name === "runtime")).toMatchObject({
       status: "fail",
     });
@@ -313,7 +315,9 @@ describe("local runtime commands", () => {
       warnings: string[];
     };
     expect(envelope.warnings.join("\n")).toContain("managed-runtime-processes");
-    expect(envelope.data.next_commands).toContain(expectedPublicCliCommand("stop --all"));
+    expect(envelope.data.next_commands).toContain(
+      expectedPublicCliCommand(`stop --all --cwd ${cwd}`),
+    );
     expect(
       envelope.data.checks.find((check) => check.name === "managed-runtime-processes"),
     ).toMatchObject({
@@ -348,7 +352,9 @@ describe("local runtime commands", () => {
     expect(envelope.hint).toContain("managed local runtime");
     expect(envelope.hint).toContain("--server <url>");
     expect(envelope.next_commands).toContain("docker version");
-    expect(envelope.next_commands).toContain(expectedPublicCliCommand("start"));
+    expect(envelope.next_commands).toContain(
+      expectedPublicCliCommand(`start --runtime docker --port ${port} --cwd ${cwd}`),
+    );
     expect(envelope.details.message).toContain("remote or cloud setup can continue");
 
     const dockerCalls = await readDockerCalls(fake.logPath);
@@ -418,7 +424,7 @@ describe("local runtime commands", () => {
     expect(again.exitCode).toBe(0);
     expect(parseJson(again.stdout)).toMatchObject({
       data: {
-        title: "Local Zitadel server is already running.",
+        title: "Local Zitadel server is already running",
         runtime: { env: envelope.data.runtime.env },
       },
     });
@@ -450,7 +456,7 @@ describe("local runtime commands", () => {
 
     expect(result.exitCode).toBe(0);
     expect(parseJson(result.stdout)).toMatchObject({
-      data: { title: "Local Zitadel server is already running.", runtime: { env: recorded } },
+      data: { title: "Local Zitadel server is already running", runtime: { env: recorded } },
     });
     expect((await readRuntimeMetadata(cwd))?.env).toEqual(recorded);
     const dockerCalls = await readDockerCalls(fake.logPath);
@@ -531,9 +537,7 @@ describe("local runtime commands", () => {
     expect(envelope.data.next_commands).toEqual([
       expectedPublicCliCommand(`setup --server local --cwd ${cwd}`),
     ]);
-    expect(envelope.data.next_actions).toContainEqual(
-      expect.stringContaining(expectedPublicCliCommand("logs --follow")),
-    );
+    expect(envelope.data.next_actions).toContainEqual(expect.stringContaining(" logs --follow"));
 
     const runtime = await readRuntimeMetadata(cwd);
     expect(runtime).toMatchObject({
@@ -567,7 +571,7 @@ describe("local runtime commands", () => {
     });
 
     expect(result.exitCode).toBe(0);
-    expect(result.stdout).toContain("Local Zitadel server is ready.");
+    expect(result.stdout).toContain("Local Zitadel server is ready");
     expect(result.stdout).toContain(
       "  Create an app with authentication. Run setup in this directory",
     );
@@ -605,7 +609,7 @@ describe("local runtime commands", () => {
     expect(envelope.code).toBe("E_PORT_IN_USE");
     expect(envelope.details.port).toBe(port);
     expect(envelope.details.listeners.length).toBeGreaterThan(0);
-    expect(envelope.next_commands).toContain(expectedPublicCliCommand("stop --all"));
+    expect(envelope.next_commands).toContain(expectedPublicCliCommand(`stop --all --cwd ${cwd}`));
   });
 
   // The platform project and the local admin travel together: a harness that
@@ -927,6 +931,34 @@ describe("local runtime commands", () => {
     ]);
   });
 
+  it("stop --all --dry-run stops nothing and lists what it would stop", async () => {
+    const cwd = await tempProject("zitadel-stop-all-dry-run-");
+    const servers = aMachineRunning({
+      pid: process.pid,
+      ppid: 1,
+      command: "/usr/local/bin/node /tmp/app/node_modules/@zitadel/server/bin/zitadel-server.js",
+    });
+
+    const result = await runCliForTest(
+      ["stop", "--cwd", cwd, "--json", "--all", "--dry-run"],
+      {},
+      undefined,
+      servers,
+    );
+
+    expect(result.exitCode).toBe(0);
+    const envelope = parseJson(result.stdout) as {
+      data: { dry_run: boolean; title: string; sweep: { count: number; results?: unknown } };
+      status: string;
+    };
+    expect(envelope.status).toBe("ok");
+    expect(envelope.data.dry_run).toBe(true);
+    expect(envelope.data.title).toMatch(/ \(dry run\)$/);
+    expect(envelope.data.sweep.count).toBe(1);
+    expect(envelope.data.sweep.results).toBeUndefined();
+    expect(() => process.kill(process.pid, 0)).not.toThrow();
+  });
+
   it("reset --force deletes local runtime data without suggesting a restart", async () => {
     const cwd = await tempProject("zitadel-reset-");
     const fake = await fakeDocker();
@@ -952,23 +984,25 @@ describe("local runtime commands", () => {
   });
 
   describe("reset asked on a terminal", () => {
-    // The built CLI bundles its own prompts, so a prompt can only be answered
-    // by running the command from source, where `input` is the one module asked.
-    const resetting = async (answer: unknown, cancelled: boolean) => {
+    // The built CLI bundles its own prompts, so it can only be answered by
+    // running the command from source.
+    const resetting = async (answers: Answer[]) => {
       const cwd = await tempProject("zitadel-reset-asked-");
       const paths = localRuntimePaths(cwd);
       await mkdir(paths.dataDir, { recursive: true });
       await writeFile(join(cwd, LOCAL_ADMIN_FILE), "{}");
       await writeRuntimeMetadata(cwd, runtimeFor(cwd, "http://localhost:8080"));
-      vi.mocked(isCancel).mockReturnValue(cancelled);
-      vi.mocked(confirm).mockResolvedValueOnce(answer as never);
-      const outcome = await asTerminal(() => Reset.run(["--cwd", cwd])).then(
-        (envelope) => ({ envelope: JSON.parse(JSON.stringify(envelope)) as unknown }),
-        (error: unknown) => ({ error }),
+      const talk = answering(...answers);
+      const outcome = await asTerminal(() =>
+        Reset.run(["--cwd", cwd], cliPackageRoot).then(
+          (envelope) => ({ envelope: JSON.parse(JSON.stringify(envelope)) as unknown }),
+          (error: unknown) => ({ error }),
+        ),
       );
       return {
         cwd,
         outcome,
+        asked: talk.asked(),
         kept: await stat(paths.dataDir).then(
           () => true,
           () => false,
@@ -978,13 +1012,10 @@ describe("local runtime commands", () => {
 
     afterEach(() => {
       vi.unstubAllEnvs();
-      vi.mocked(confirm).mockReset();
-      vi.mocked(isCancel).mockReset();
-      vi.mocked(isCancel).mockReturnValue(false);
     });
 
     it("is skipped, deleting nothing, when the answer is no", async () => {
-      const { outcome, kept } = await resetting(false, false);
+      const { outcome, kept } = await resetting([false]);
 
       expect(outcome).toMatchObject({
         envelope: { status: "skipped", reason: "reset-cancelled" },
@@ -996,7 +1027,7 @@ describe("local runtime commands", () => {
       const fake = await fakeDocker();
       vi.stubEnv("PATH", `${fake.binDir}:${process.env.PATH ?? ""}`);
       vi.stubEnv("DOCKER_LOG", fake.logPath);
-      const { outcome, kept, cwd } = await resetting(true, false);
+      const { outcome, kept, cwd } = await resetting([true]);
 
       expect(outcome).toMatchObject({ envelope: { status: "ok" } });
       expect(kept).toBe(false);
@@ -1005,20 +1036,19 @@ describe("local runtime commands", () => {
     });
 
     it("names the directory and data it deletes, that it cannot be undone, and the admin file it keeps", async () => {
-      const { cwd } = await resetting(false, false);
+      const { cwd, asked } = await resetting([false]);
 
-      const message = vi.mocked(confirm).mock.calls[0]?.[0].message;
+      const message = asOneLine(asked.join("\n"));
       expect(message).toContain(localRuntimePaths(cwd).dataDir);
       expect(message).toContain(join(cwd, LOCAL_ADMIN_FILE));
       expect(message).toContain("every organization, user, application and setting");
       expect(message).toContain("cannot be undone");
     });
 
-    it("fails, deleting nothing, on Ctrl-C", async () => {
-      const { outcome, kept } = await resetting(Symbol("cancel"), true);
+    it("fails, deleting nothing, when the person walks away", async () => {
+      const { outcome, kept } = await resetting([]);
 
       expect(outcome).toHaveProperty("error");
-      expect(cancel).toHaveBeenCalledWith("Cancelled.");
       expect(kept).toBe(true);
     });
   });
