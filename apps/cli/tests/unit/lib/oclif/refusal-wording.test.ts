@@ -65,6 +65,24 @@ function literalAt(source: string, opened: number): string {
  * it in the same file counts too — a name no throw of it ever passes reaches
  * the person as braces.
  */
+/**
+ * The values a throw hands over, opening at `opened`: the wording's values and,
+ * after them, the values its whole-placeholder `next` entries are filled from.
+ *
+ * @param source - The module's source.
+ * @param opened - Where the first values literal opens.
+ * @returns Both literals, one after the other.
+ */
+function valuesAt(source: string, opened: number): string {
+  const values = literalAt(source, opened);
+  const after = source.slice(opened + values.length);
+  const next = /^\s*,\s*\{/.exec(after);
+
+  return next === null
+    ? values
+    : `${values}\n${literalAt(source, opened + values.length + next[0].length - 1)}`;
+}
+
 async function declared(): Promise<Declared[]> {
   const found: Declared[] = [];
   for (const file of await sources()) {
@@ -77,7 +95,7 @@ async function declared(): Promise<Declared[]> {
       const opened = match.index + match[0].length - 1;
       const thrown = [...source.matchAll(THROWN)]
         .filter((throwing) => (throwing[1] ?? "").includes(match[1] as string))
-        .map((throwing) => literalAt(source, throwing.index + throwing[0].length - 1));
+        .map((throwing) => valuesAt(source, throwing.index + throwing[0].length - 1));
       // A refusal nothing throws is dead, which another test would catch; it
       // is weighed on its wording alone.
       found.push({ file, text: [literalAt(source, opened), ...thrown].join("\n") });

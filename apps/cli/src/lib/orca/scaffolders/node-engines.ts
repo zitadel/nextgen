@@ -66,15 +66,18 @@ export function nodeSupport(
   const listed = range
     .replace(/[\^~<>=]/g, "")
     .split("||")
-    .map((part) => part.trim().split(".", 3).map(Number));
-  const supported = listed.some(
-    ([lMajor, lMinor = 0, lPatch = 0]) =>
-      lMajor === major && (minor > lMinor || (minor === lMinor && patch >= lPatch)),
-  );
+    .map((part) => {
+      return part.trim().split(".", 3).map(Number);
+    });
+  const supported = listed.some(([lMajor, lMinor = 0, lPatch = 0]) => {
+    return lMajor === major && (minor > lMinor || (minor === lMinor && patch >= lPatch));
+  });
   if (supported) {
     return "supported";
   }
-  const majors = listed.map(([lMajor = 0]) => lMajor);
+  const majors = listed.map(([lMajor = 0]) => {
+    return lMajor;
+  });
   const between = major > Math.min(...majors) && major < Math.max(...majors);
   return major % 2 === 1 && between ? "warned" : "refused";
 }

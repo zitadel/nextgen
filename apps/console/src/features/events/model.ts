@@ -3,12 +3,12 @@ import type { ListEvents200DataItem, ListEventsParams } from "@zitadel/api/gener
 /**
  * One event, as `GET /events` and `GET /events/{id}` return it: an
  * append-only record of something that happened in a project, a sign-in
- * step, a change to a record or an API request. The API calls them events;
- * the sidebar calls their screen Logs.
+ * step, a change to a record or an API request. The API, the CLI and
+ * the console's Events screen all call them events.
  */
-export type LogEvent = ListEvents200DataItem;
+export type ProjectEvent = ListEvents200DataItem;
 
-/** What Logs' audit view, and Overview's card of it, say of a project with none. */
+/** What Events' audit view, and Overview's card of it, say of a project with none. */
 export const NO_AUDIT_EVENTS = "This project has no audit events.";
 
 /**
@@ -23,7 +23,7 @@ export type EventSubject =
   | { kind: "request"; method: string; route: string; status: number }
   | { kind: "record"; type: string; id?: string };
 
-export function eventSubject(event: LogEvent): EventSubject | undefined {
+export function eventSubject(event: ProjectEvent): EventSubject | undefined {
   if (event.event_type === "request.api") {
     const { method, route_template: route, status } = event.payload;
     return { kind: "request", method, route, status };
@@ -46,7 +46,7 @@ interface EventField {
  * not carry has no row, since the server stores an unset one as empty or
  * `null` and neither says anything.
  */
-export function eventFields(event: LogEvent): EventField[] {
+export function eventFields(event: ProjectEvent): EventField[] {
   const fields: (Omit<EventField, "value"> & { value: string | null | undefined })[] = [
     { label: "Category", value: event.category },
     { label: "Actor", value: event.actor_id, id: true },
@@ -75,18 +75,18 @@ export function eventFields(event: LogEvent): EventField[] {
  * some; `requests` is them alone; `all` reads both together, as following one
  * request through its changes needs.
  */
-export const LOG_VIEWS = ["audit", "requests", "all"] as const;
-export type LogView = (typeof LOG_VIEWS)[number];
+export const EVENT_VIEWS = ["audit", "requests", "all"] as const;
+export type EventView = (typeof EVENT_VIEWS)[number];
 
-/** What the views call themselves in the Logs list of the sidebar. */
-export const VIEW_LABEL: Record<LogView, string> = {
+/** What the views call themselves in the Events list of the sidebar. */
+export const VIEW_LABEL: Record<EventView, string> = {
   audit: "Audit events",
   requests: "API requests",
   all: "All",
 };
 
 /** What each view holds, under its name in the view picker. */
-export const VIEW_DESCRIPTION: Record<LogView, string> = {
+export const VIEW_DESCRIPTION: Record<EventView, string> = {
   audit: "Sign-ins and changes to the project",
   requests: "One per call to the API",
   all: "Both, in the order they happened",
@@ -105,9 +105,9 @@ const AUDIT_VIEW_CATEGORIES = [...AUDIT_CATEGORIES, "signal"] as const;
 
 /**
  * How far back the list reads, counted back from when it loads: Vercel's
- * Logs offers the same steps. Unset, it reads everything the server still
+ * Events offers the same steps. Unset, it reads everything the server still
  * retains. A range with both ends set is `from` and `to` instead
- * ({@link LogsSearch}).
+ * ({@link EventsSearch}).
  */
 export const TIME_RANGES = ["30m", "1h", "12h", "24h", "3d", "7d", "14d"] as const;
 export type TimeRange = (typeof TIME_RANGES)[number];
@@ -151,7 +151,7 @@ export const AROUND_MINUTES = 5;
  * under no other filter: what else happened then. The bounds are on
  * `created_at`, the time the server filters by.
  */
-export function around(event: Pick<LogEvent, "created_at">): LogsSearch {
+export function around(event: Pick<ProjectEvent, "created_at">): EventsSearch {
   const at = new Date(event.created_at).getTime();
   return {
     view: "all",
@@ -221,12 +221,12 @@ export const EVENT_TYPES = [
   "webhook.disabled",
   "webhook.secret_rotated",
   "webhook.updated",
-] as const satisfies readonly LogEvent["event_type"][];
+] as const satisfies readonly ProjectEvent["event_type"][];
 
 // Fails to compile while the API knows a type the list above lacks.
-const EVERY_EVENT_TYPE: [Exclude<LogEvent["event_type"], (typeof EVENT_TYPES)[number]>] extends [
-  never,
-]
+const EVERY_EVENT_TYPE: [
+  Exclude<ProjectEvent["event_type"], (typeof EVENT_TYPES)[number]>,
+] extends [never]
   ? true
   : never = true;
 void EVERY_EVENT_TYPE;
@@ -264,19 +264,19 @@ export const FAILURE_TYPES: readonly string[] = EVENT_TYPES.filter((type) =>
 );
 
 /** Whether an event records a failure: a failure type, or a request the server answered with 5xx. */
-export function isFailure(event: LogEvent): boolean {
+export function isFailure(event: ProjectEvent): boolean {
   if (FAILURE_TYPES.includes(event.event_type)) return true;
   return event.event_type === "request.api" && event.payload.status >= 500;
 }
 
 /**
  * The filters that narrow by one value the event carries: typed or pasted
- * into the Logs list of the sidebar or the search above the table, or set
+ * into the Events list of the sidebar or the search above the table, or set
  * from an event (a row's menu, the event's panel). `name` is what the value
  * is called in a sentence: "Only this actor", "Clear the actor filter".
  *
  * The type is chosen from {@link EVENT_TYPES} rather than typed, and the list
- * takes several at once (`LogsSearch.type`); the others hold one value each.
+ * takes several at once (`EventsSearch.type`); the others hold one value each.
  * Any of them combine: what no index holds is matched under the server's scan
  * budget (root ADR 048), and the list says when a page stopped short.
  */
@@ -302,7 +302,7 @@ const FILTER_BY_KEY = Object.fromEntries(VALUE_FILTERS.map((filter) => [filter.k
 };
 
 /** The value of an event each filter matches. */
-const EVENT_VALUE: Record<ValueFilterKey, (event: LogEvent) => string | null | undefined> = {
+const EVENT_VALUE: Record<ValueFilterKey, (event: ProjectEvent) => string | null | undefined> = {
   type: (event) => event.event_type,
   actor: (event) => event.actor_id,
   resource: (event) => event.entity_id,
@@ -317,7 +317,7 @@ const EVENT_VALUE: Record<ValueFilterKey, (event: LogEvent) => string | null | u
 };
 
 /** The filters an event can set, each with the value it carries; none for a value it lacks. */
-export function eventFilterValues(event: LogEvent): { filter: ValueFilter; value: string }[] {
+export function eventFilterValues(event: ProjectEvent): { filter: ValueFilter; value: string }[] {
   return VALUE_FILTERS.flatMap((filter) => {
     const value = EVENT_VALUE[filter.key](event);
     return value ? [{ filter, value }] : [];
@@ -332,8 +332,8 @@ export function eventFilterValues(event: LogEvent): { filter: ValueFilter; value
  * range with fixed ends, `from` and `to` (RFC 3339, either may be open);
  * never both.
  */
-export type LogsSearch = {
-  view: LogView;
+export type EventsSearch = {
+  view: EventView;
   category?: AuditCategory;
   since?: TimeRange;
   from?: string;
@@ -354,7 +354,7 @@ export type StatusClass = (typeof STATUS_CLASSES)[number];
 export const FAILED_STATUS: readonly StatusClass[] = ["4xx", "5xx"];
 
 /** Whether the list is narrowed by what only an API request carries: its operation or its status. */
-function byRequest(search: LogsSearch): boolean {
+function byRequest(search: EventsSearch): boolean {
   return Boolean(search.operation || search.status?.length);
 }
 
@@ -376,7 +376,7 @@ function byRequest(search: LogsSearch): boolean {
  * Everything else combines: the ids with each other, with types, with any
  * view and with a category.
  */
-export function servedSearch(search: LogsSearch): LogsSearch {
+export function servedSearch(search: EventsSearch): EventsSearch {
   const time = search.from || search.to ? { ...search, since: undefined } : search;
   if (byRequest(time)) return { ...time, view: "requests", category: undefined, type: undefined };
   if (time.type?.length) return { ...time, view: "all", category: undefined };
@@ -420,7 +420,7 @@ function statusClasses(value: unknown): StatusClass[] | undefined {
  * unknown view is the default one, a range whose start is not before its end
  * is no range, and what does not combine gives way ({@link servedSearch}).
  */
-export function parseLogsSearch(search: Record<string, unknown>): LogsSearch {
+export function parseEventsSearch(search: Record<string, unknown>): EventsSearch {
   let from = moment(search.from);
   let to = moment(search.to);
   if (from && to && from >= to) {
@@ -429,8 +429,8 @@ export function parseLogsSearch(search: Record<string, unknown>): LogsSearch {
   }
   // Every key, even unset: the router lays this over the raw search, so a key
   // left out would keep the URL's value.
-  const parsed: LogsSearch = {
-    view: LOG_VIEWS.find((known) => known === search.view) ?? "audit",
+  const parsed: EventsSearch = {
+    view: EVENT_VIEWS.find((known) => known === search.view) ?? "audit",
     category: AUDIT_CATEGORIES.find((known) => known === search.category),
     since: TIME_RANGES.find((known) => known === search.since),
     from,
@@ -447,12 +447,12 @@ export function parseLogsSearch(search: Record<string, unknown>): LogsSearch {
 }
 
 /** Whether the list reads a range with fixed ends rather than one counted back from now. */
-export function hasCustomRange(search: LogsSearch): boolean {
+export function hasCustomRange(search: EventsSearch): boolean {
   return Boolean(search.from || search.to);
 }
 
 /** How many filters narrow the view beyond the view itself; the time is one, however set. */
-export function filterCount(search: LogsSearch): number {
+export function filterCount(search: EventsSearch): number {
   return (
     Number(Boolean(search.category)) +
     Number(Boolean(search.since) || hasCustomRange(search)) +
@@ -462,12 +462,12 @@ export function filterCount(search: LogsSearch): number {
 }
 
 /** Whether anything narrows the view beyond the view itself. */
-export function isNarrowed(search: LogsSearch): boolean {
+export function isNarrowed(search: EventsSearch): boolean {
   return filterCount(search) > 0;
 }
 
 /** Whether the list is narrowed to exactly this value already, so setting it would narrow no further. */
-export function isNarrowedTo(search: LogsSearch, key: ValueFilterKey, value: string): boolean {
+export function isNarrowedTo(search: EventsSearch, key: ValueFilterKey, value: string): boolean {
   if (key === "type") return search.type?.length === 1 && search.type[0] === value;
   return search[key] === value;
 }
@@ -478,7 +478,7 @@ export function isNarrowedTo(search: LogsSearch, key: ValueFilterKey, value: str
  * it loaded ({@link rangeStart}); a range with fixed ends brings its own.
  */
 export function eventsQuery(
-  search: LogsSearch,
+  search: EventsSearch,
   createdAfter?: string,
 ): Pick<
   ListEventsParams,
@@ -528,7 +528,7 @@ export function eventsQuery(
 }
 
 /** The list in another view. Only the All view holds types, and only the requests' an operation or a status. */
-export function withView(current: LogsSearch, view: LogView): LogsSearch {
+export function withView(current: EventsSearch, view: EventView): EventsSearch {
   return servedSearch({
     ...current,
     view,
@@ -539,21 +539,24 @@ export function withView(current: LogsSearch, view: LogView): LogsSearch {
 }
 
 /** The list narrowed to one category, or to none. A category takes no type beside it. */
-export function withCategory(current: LogsSearch, category: AuditCategory | undefined): LogsSearch {
+export function withCategory(
+  current: EventsSearch,
+  category: AuditCategory | undefined,
+): EventsSearch {
   return servedSearch({ ...current, category, type: category ? undefined : current.type });
 }
 
 /** The list over another time range counted back from now, or over everything retained. */
-export function withTimeRange(current: LogsSearch, since: TimeRange | undefined): LogsSearch {
+export function withTimeRange(current: EventsSearch, since: TimeRange | undefined): EventsSearch {
   return { ...current, since, from: undefined, to: undefined };
 }
 
 /** The list between two fixed moments; either may be open. */
 export function withCustomRange(
-  current: LogsSearch,
+  current: EventsSearch,
   from: string | undefined,
   to: string | undefined,
-): LogsSearch {
+): EventsSearch {
   return servedSearch({ ...current, since: undefined, from: moment(from), to: moment(to) });
 }
 
@@ -562,7 +565,7 @@ export function withCustomRange(
  * with no category beside them ({@link servedSearch}); clearing them keeps the
  * view they left the list in.
  */
-export function withTypes(current: LogsSearch, types: readonly string[]): LogsSearch {
+export function withTypes(current: EventsSearch, types: readonly string[]): EventsSearch {
   if (types.length === 0) return { ...current, type: undefined };
   return servedSearch({
     ...current,
@@ -576,7 +579,7 @@ export function withTypes(current: LogsSearch, types: readonly string[]): LogsSe
  * The API requests narrowed to these status classes, or to none. Clearing
  * them keeps the requests view the list is in.
  */
-export function withStatus(current: LogsSearch, classes: readonly StatusClass[]): LogsSearch {
+export function withStatus(current: EventsSearch, classes: readonly StatusClass[]): EventsSearch {
   if (classes.length === 0) return { ...current, status: undefined };
   return servedSearch({
     ...current,
@@ -599,10 +602,10 @@ export function withStatus(current: LogsSearch, classes: readonly StatusClass[])
  *   types chosen before ({@link withTypes}).
  */
 export function narrowedBy(
-  current: LogsSearch,
+  current: EventsSearch,
   key: ValueFilterKey,
   value: string | undefined,
-): LogsSearch {
+): EventsSearch {
   if (key === "type") return withTypes(current, value ? [value] : []);
   if (!value) return { ...current, [key]: undefined };
   if (key === "request" || key === "session" || key === "flow") {
@@ -616,7 +619,7 @@ export function narrowedBy(
  * The list of everything that shares one value with an event, in every view
  * and under no other filter: where the event's panel leads on to.
  */
-export function sharing(key: ValueFilterKey, value: string): LogsSearch {
+export function sharing(key: ValueFilterKey, value: string): EventsSearch {
   if (key === "type") return { view: "all", type: [value] };
   if (key === "operation") return { view: "requests", operation: value };
   return { view: "all", [key]: value };
@@ -626,7 +629,7 @@ export function sharing(key: ValueFilterKey, value: string): LogsSearch {
  * The filters set by a pasted value, in the order the search draws them as
  * chips: every one but the type, which the sidebar chooses.
  */
-export function chipFilters(search: LogsSearch): { filter: ValueFilter; value: string }[] {
+export function chipFilters(search: EventsSearch): { filter: ValueFilter; value: string }[] {
   return VALUE_FILTERS.flatMap((filter) => {
     if (filter.key === "type") return [];
     const value = search[filter.key];
@@ -693,21 +696,21 @@ export function searchMeanings(term: string): SearchMeaning[] {
 
 /** One loaded event as a row of the exported CSV, in {@link CSV_COLUMNS}' order. */
 const CSV_COLUMNS = [
-  ["id", (event: LogEvent) => event.id],
-  ["occurred_at", (event: LogEvent) => event.occurred_at],
-  ["created_at", (event: LogEvent) => event.created_at],
-  ["event_type", (event: LogEvent) => event.event_type],
-  ["category", (event: LogEvent) => event.category],
-  ["actor_id", (event: LogEvent) => event.actor_id],
-  ["actor_type", (event: LogEvent) => event.actor_type],
-  ["entity_type", (event: LogEvent) => event.entity_type],
-  ["entity_id", (event: LogEvent) => event.entity_id],
-  ["client_id", (event: LogEvent) => event.client_id],
-  ["request_id", (event: LogEvent) => event.request_id],
-  ["session_id", (event: LogEvent) => event.session_id],
-  ["flow_id", (event: LogEvent) => event.flow_id],
-  ["fingerprint", (event: LogEvent) => event.fingerprint],
-  ["payload", (event: LogEvent) => JSON.stringify(event.payload)],
+  ["id", (event: ProjectEvent) => event.id],
+  ["occurred_at", (event: ProjectEvent) => event.occurred_at],
+  ["created_at", (event: ProjectEvent) => event.created_at],
+  ["event_type", (event: ProjectEvent) => event.event_type],
+  ["category", (event: ProjectEvent) => event.category],
+  ["actor_id", (event: ProjectEvent) => event.actor_id],
+  ["actor_type", (event: ProjectEvent) => event.actor_type],
+  ["entity_type", (event: ProjectEvent) => event.entity_type],
+  ["entity_id", (event: ProjectEvent) => event.entity_id],
+  ["client_id", (event: ProjectEvent) => event.client_id],
+  ["request_id", (event: ProjectEvent) => event.request_id],
+  ["session_id", (event: ProjectEvent) => event.session_id],
+  ["flow_id", (event: ProjectEvent) => event.flow_id],
+  ["fingerprint", (event: ProjectEvent) => event.fingerprint],
+  ["payload", (event: ProjectEvent) => JSON.stringify(event.payload)],
 ] as const;
 
 /** A CSV field, quoted when it holds a comma, a quote or a line break. */
@@ -719,10 +722,10 @@ function csvField(value: string | null | undefined): string {
 /**
  * The loaded events as CSV, one row each under a header: the envelope's
  * values, and the payload as JSON in one field. Only what the list loaded:
- * the API has no export, so a longer log is paged first, or read through the
+ * the API has no export, so a longer list is paged first, or read through the
  * CLI.
  */
-export function eventsCsv(events: readonly LogEvent[]): string {
+export function eventsCsv(events: readonly ProjectEvent[]): string {
   const header = CSV_COLUMNS.map(([name]) => name).join(",");
   const rows = events.map((event) =>
     CSV_COLUMNS.map(([, read]) => csvField(read(event))).join(","),

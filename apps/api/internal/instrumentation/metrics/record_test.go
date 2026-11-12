@@ -46,6 +46,14 @@ func TestCatalogue_MatchesWhatIsRecorded(t *testing.T) {
 	require.NoError(t, err)
 	cache.RecordLookup(true)
 	cache.RecordAdd(true)
+	hashing, err := metrics.NewPasswordHashing(metrics.PasswordHashingState{
+		InFlight:       func() int64 { return 1 },
+		Waiting:        func() int64 { return 0 },
+		MemoryReserved: func() int64 { return 64 << 20 },
+	}, metrics.WithMeterProvider(otel.GetMeterProvider()))
+	require.NoError(t, err)
+	hashing.RecordWait(time.Millisecond)
+	hashing.RecordRejected()
 
 	got := metricstest.Instruments(reader.Collect(t))
 	catalogued := map[string]bool{}
@@ -117,7 +125,7 @@ func TestRecord_GrowsOnlyTheGivenValue(t *testing.T) {
 
 	login := metrics.PurposeKey.String(string(metrics.PasswordLogin))
 	passwords := metricstest.GrewOnly(t, reader, metrics.PasswordVerificationDuration, []attribute.KeyValue{login},
-		metrics.ResultKey, metrics.PasswordMatch, metrics.PasswordUpdated, metrics.PasswordMismatch, metrics.PasswordError)
+		metrics.ResultKey, metrics.PasswordMatch, metrics.PasswordUpdated, metrics.PasswordMismatch, metrics.PasswordError, metrics.PasswordBusy)
 	metrics.RecordPasswordVerification(t.Context(), metrics.PasswordHistory, metrics.PasswordMismatch, time.Millisecond)
 	passwords("")
 	metrics.RecordPasswordVerification(t.Context(), metrics.PasswordLogin, metrics.PasswordUpdated, time.Millisecond)

@@ -22,6 +22,7 @@ export function listData<T, K extends string = "next_page_token">(
   count: number;
 } & Record<K, string | null> {
   const cursorKey: string = opts.cursorKey ?? "next_page_token";
+
   return {
     items,
     count: items.length,

@@ -35,7 +35,7 @@ import { describeEventTypes, type WebhookDraft, type WebhookRefusal } from "../m
  * **Events are all of them or a selection.** `All events` is the API's `*`:
  * every type the server writes, the ones a later version adds included, but
  * not `request.api`, one event per API call, which a receiver that calls the
- * API would feed itself with. A selection is chosen from the types Logs
+ * API would feed itself with. A selection is chosen from the types Events
  * filters by, under the same captions (`EVENT_TYPE_GROUPS`), and may name
  * `request.api`. A type the webhook holds that this list no longer offers
  * stays chosen: the server keeps it, and it matches nothing.
@@ -175,8 +175,8 @@ export function WebhookFields({
 }
 
 /**
- * The selection: Logs' type list, several at once. The trigger says how many
- * are chosen, as Logs' filter does, and the list ticks them. Several are
+ * The selection: Events' type list, several at once. The trigger says how many
+ * are chosen, as Events' filter does, and the list ticks them. Several are
  * named under it too, so what a webhook gets is read without opening the
  * list, a type the list no longer offers included.
  */

@@ -726,9 +726,6 @@ importers:
       ajv:
         specifier: 'catalog:'
         version: 8.20.0
-      consola:
-        specifier: ^3.4.2
-        version: 3.4.2
       escape-string-regexp:
         specifier: 'catalog:'
         version: 5.0.0

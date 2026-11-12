@@ -12,8 +12,8 @@ describe("the variable name argument", () => {
     await expect(parseArg(variableNameArg({}), "  FOO  ")).resolves.toBe("FOO");
   });
 
-  it.each(["GOOGLE-CLIENT", "a.b", "has space"])(
-    "refuses %j as invalid, quoting it",
+  it.each(["GOOGLE-CLIENT", "a.b", "has space", "A\u001b[2J"])(
+    "refuses %j as invalid, quoting it as typed",
     async (name) => {
       await expect(parseArg(variableNameArg({}), name)).rejects.toMatchObject({
         code: "E_VALIDATION",

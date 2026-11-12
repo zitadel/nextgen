@@ -1,7 +1,7 @@
-import { type Admitted, BaseCommand, type JsonEnvelope } from "@/lib/oclif";
-import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
+import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
 import { describeRegistry } from "@/lib/oclif/crud";
-import { CommandGroups } from "@/lib/oclif/groups";
+import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
+
 import { RESOURCES } from "./resources";
 
 /** The columns `resources` renders, in order. */
@@ -21,6 +21,7 @@ export default class ResourcesList extends Tabulatable(BaseCommand) {
   static override description =
     "List the resources this CLI manages.\n\nShows what can be done to each.";
   static override group = CommandGroups.diagnostics;
+
   static override examples = [
     "<%= config.bin %> resources",
     "<%= config.bin %> resources --json",
@@ -41,7 +42,7 @@ export default class ResourcesList extends Tabulatable(BaseCommand) {
       return {
         topic: String(resource.topic),
         verbs: (resource.verbs as string[]).join(", "),
-        // Every list shares one filter grammar now, so the column is simply the
+        // Every list shares one filter grammar, so the column is simply the
         // fields `--filter` accepts. What each field accepts beyond that — its
         // operations, its closed values — is in `--json` and in `--help`, which
         // is where a reader goes once they know the field exists.
@@ -54,8 +55,8 @@ export default class ResourcesList extends Tabulatable(BaseCommand) {
     });
 
     const columns = COLUMNS;
-    const empty = "No resources.";
-    const footer = [`Run \`${this.config.bin} <resource> <verb> --help\` for a command's flags.`];
+    const empty = "No resources found";
+    const footer = ["Add --help to any command for its flags."];
     const page = null;
     const extra = {};
 

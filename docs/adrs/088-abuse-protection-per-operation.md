@@ -155,10 +155,10 @@ An illustration; names and fields settle in the implementing PR:
 ### 5. A free default policy
 
 Every project has the same protection before it configures any: the guards.
-For `user.create` that is #2626's built-in proof of work on every password
-sign-up from the public plane, and its per-flow limits. Every pricing plan
-includes it. Sign-up with a passkey or through a sign-in provider is not
-challenged yet.
+For `user.create` that is #2626's built-in proof of work on every sign-up
+with a password or a passkey from the public plane, and its per-flow limits.
+Every pricing plan includes it. Sign-up through a sign-in provider is not
+challenged: each one needs an account at the provider.
 
 - Zitadel ships the guards' values as a default policy, as it ships the
   password policy's (`packages/config/defaults/default-password-policy.json`).

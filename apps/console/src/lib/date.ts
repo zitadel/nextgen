@@ -36,7 +36,7 @@ function fraction(value: string): Intl.DateTimeFormatOptions {
  * where the events of one request fall within the same second. A moment the
  * server stamped to the whole second shows no milliseconds. The same fallback.
  */
-export function formatLogTime(value: string): string {
+export function formatEventTime(value: string): string {
   return format(value, {
     ...DATE,
     hour: "2-digit",
@@ -46,7 +46,7 @@ export function formatLogTime(value: string): string {
   });
 }
 
-/** `2026-04-28T15:32:07.123Z` → `15:32:07.123`: {@link formatLogTime} without the date. */
+/** `2026-04-28T15:32:07.123Z` → `15:32:07.123`: {@link formatEventTime} without the date. */
 export function formatClockTime(value: string): string {
   return format(value, {
     hour: "2-digit",

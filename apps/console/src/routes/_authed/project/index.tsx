@@ -1,60 +1,11 @@
-import { createFileRoute, useRouter } from "@tanstack/react-router";
-import { Boxes, Settings } from "lucide-react";
-import { useState } from "react";
-
-import { api } from "@/api/zitadel";
-import { MetaRule, MetaValue } from "@/components/detail-meta";
-import { DETAIL_BODY, DetailHeader } from "@/components/detail-page";
-import { Page } from "@/components/layout";
-import {
-  AddAdminButton,
-  ProjectAdmins,
-} from "@/features/project-settings/components/project-admins";
-import { ProjectOrigins } from "@/features/project-settings/components/project-origins";
-import {
-  type PasswordPolicyRead,
-  ProjectPolicies,
-} from "@/features/project-settings/components/project-policies";
-import { ProjectVariables } from "@/features/project-settings/components/project-variables";
-import { readDeployedPasswordPolicy } from "@/features/project-settings/api";
-import { RenameCard } from "@/components/rename-card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { describeError } from "@/lib/api-error";
-import { formatDate } from "@/lib/date";
-import { projectScopeDeps, requireProjectScope } from "@/features/projects/project-scope";
+import { createFileRoute, redirect } from "@tanstack/react-router";
+import { Settings } from "lucide-react";
 
 /**
- * The selected project's own page: its detail, origins, variables and admins.
+ * The project's Settings row: the last of the project's list, and the way into
+ * its own list (D40), as the root Settings row is above every project (D29).
  *
- * It is the project's settings, as Vercel's project Settings is, beside its
- * Overview (`/`, D35), and it is scoped like the rest: the page follows the
- * selection, and Projects is where projects are compared and picked.
- * `/projects/$projectId` redirects here with that project
- * selected, so a link to one project's page still lands on it, and the
- * projects list's row menu opens it as `View project`.
- *
- * The header card carries `PROJECT ID` and `CREATED`. The design draws a third
- * cell, `ISSUER` — the project's issuer origin — but nothing carries it:
- * `project-response` is `id`, `name`, `origins`, `created_at` and
- * `updated_at`, and `issuer` appears nowhere in the spec, the console or the
- * domain layer. The cell is left out rather than shown empty, and returns as one
- * more `MetaValue` when the field lands.
- *
- * Two tabs, as the team's page, and the team page's rhythm: 24px under the
- * tab row on both tabs, `Details` as the name card's title, and secondary
- * for the small actions. The Overview frame draws 16px, `Project Detail` and
- * an outline Add origin; the shipped pages win over one frame, and #2319
- * carries the three divergences for the frames.
- *
- * General (Vercel's name for it; Overview is the project's landing, D35)
- * holds the project's name, its origins, its variables and secrets and its
- * policies; Admins holds who has access and how (#1238, #1462), with
- * the Add button on the tab row. All of it is project-level data, so it lives
- * here rather than under account settings, and the id every request carries is
- * this route's. The origins ride on the project; the admins, the grants and
- * the variables are loaded with it, since the four reads are the same viewer
- * check on the same project and succeed or fail as one. The password policy
- * is read beside them but fails on its own: its card only shows it.
+ * It has no page of its own: it forwards to the list's first page, General.
  */
 export const Route = createFileRoute("/_authed/project/")({
   // Last: the list above it is the project's contents, this is the project.
@@ -62,107 +13,7 @@ export const Route = createFileRoute("/_authed/project/")({
     scope: "project",
     nav: { label: "Settings", order: 11, icon: Settings },
   },
-  loaderDeps: projectScopeDeps,
-  loader: async ({ deps }) => {
-    const projectId = requireProjectScope(deps.project);
-    const [project, admins, grants, variables, policies] = await Promise.all([
-      api.getProject(projectId),
-      // One page each: a project's admins are a handful. Add paging with the
-      // first project that needs it. The people and how they hold access come
-      // from the admins list (#1462); the grants add the rows it leaves out.
-      // Their principal refs carry the names, so nothing is expanded.
-      api.listProjectAdmins(projectId, { limit: 100 }),
-      api.queryGrants({ limit: 100 }, { project_id: projectId }),
-      // No kind: every name with its value per kind, which is what the table
-      // shows side by side.
-      api.getVariables({ project_id: projectId }),
-      // The password policy the primary origins enforce, which is the one
-      // their release pins rather than the newest published revision.
-      // Read-only, so a failed read costs the card its row, not the page its
-      // editable sections.
-      readDeployedPasswordPolicy(projectId).then(
-        (read): PasswordPolicyRead => read ?? { deployed: false },
-        (cause): PasswordPolicyRead => ({
-          error: describeError(cause, "The password policy could not be read."),
-        }),
-      ),
-    ]);
-    return {
-      project,
-      admins: admins.admins,
-      grants: grants.grants,
-      variables,
-      passwordPolicy: policies,
-    };
+  beforeLoad: ({ search }) => {
+    throw redirect({ to: "/project/general", search, replace: true });
   },
-  component: ProjectDetail,
 });
-
-type Tab = "general" | "admins";
-
-function ProjectDetail() {
-  const { project, admins, grants, variables, passwordPolicy } = Route.useLoaderData();
-  const { session } = Route.useRouteContext();
-  const router = useRouter();
-  const [tab, setTab] = useState<Tab>("general");
-  const reload = () => void router.invalidate();
-
-  return (
-    <Page>
-      <DetailHeader
-        icon={Boxes}
-        title={project.name}
-        meta={
-          <>
-            <MetaValue label="Project ID" value={project.id} copyable />
-            <MetaRule />
-            <MetaValue label="Created" value={formatDate(project.created_at)} />
-          </>
-        }
-      />
-
-      <Tabs
-        value={tab}
-        onValueChange={(value) => setTab(value as Tab)}
-        className={`${DETAIL_BODY} gap-6`}
-      >
-        {/* The active tab's action sits on the tab row, as the design draws it. */}
-        <div className="flex items-center justify-between gap-6">
-          <TabsList aria-label="Project detail sections">
-            <TabsTrigger value="general">General</TabsTrigger>
-            <TabsTrigger value="admins">Admins</TabsTrigger>
-          </TabsList>
-          {tab === "admins" && <AddAdminButton projectId={project.id} onAdded={reload} />}
-        </div>
-
-        {/* The page owns the 16px between its cards. */}
-        <TabsContent value="general" className="flex flex-col gap-4">
-          <RenameCard
-            id="project-name"
-            layout="inline"
-            label="Project name"
-            value={project.name}
-            onSave={async (name) => {
-              await api.patchProject(project.id, { name });
-              await router.invalidate();
-            }}
-            errorFallback="Could not save the project."
-          />
-          <ProjectOrigins projectId={project.id} origins={project.origins} onChanged={reload} />
-          <ProjectVariables variables={variables} />
-          <ProjectPolicies password={passwordPolicy} />
-        </TabsContent>
-
-        <TabsContent value="admins">
-          <ProjectAdmins
-            projectId={project.id}
-            admins={admins}
-            grants={grants}
-            viewerUserId={session.user_id ?? undefined}
-            onChanged={reload}
-          />
-        </TabsContent>
-      </Tabs>
-    </Page>
-  );
-}

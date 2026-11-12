@@ -235,7 +235,7 @@ describe("webhooks screen", () => {
     );
   });
 
-  it("adds a webhook for the event types chosen from Logs' list", async () => {
+  it("adds a webhook for the event types chosen from Events' list", async () => {
     server.use(listWebhooks());
     const bodies = recordCreates(created);
     await renderWebhooks();
@@ -247,7 +247,7 @@ describe("webhooks screen", () => {
 
     await userEvent.click(screen.getByRole("combobox", { name: "Event types" }));
     const list = within(await screen.findByRole("listbox", { name: "Event types" }));
-    // Under the captions Logs' type filter draws.
+    // Under the captions Events' type filter draws.
     expect(list.getByText("webhook")).toBeInTheDocument();
     await userEvent.click(list.getByRole("option", { name: "user.created" }));
     await userEvent.click(list.getByRole("option", { name: "request.api" }));
