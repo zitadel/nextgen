@@ -2,18 +2,11 @@ package audit
 
 import (
 	"context"
-	"crypto/sha256"
-	"crypto/subtle"
-	"fmt"
 	"log/slog"
-	"net/http"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/zitadel/nextgen/internal/background"
-	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/instrumentation/errlog"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 )
 
@@ -28,43 +21,6 @@ type RetentionConfig struct {
 	Retention time.Duration `mapstructure:"window"`
 	Interval  time.Duration `mapstructure:"interval"`
 	Enabled   bool          `mapstructure:"enabled"`
-	// TriggerSecret hands the schedule to something outside the process.
-	// Set, the server runs no loop of its own and purges once per request to
-	// RetentionTriggerPath that carries it as a bearer token: a server that
-	// runs only while it serves a request, such as a Vercel function, cannot
-	// keep a loop going.
-	TriggerSecret string `mapstructure:"trigger_secret"`
-}
-
-// RetentionTriggerPath is where a scheduler starts one purge when the
-// config names a trigger secret. It is the deployment operator's, outside
-// the API: no client calls it.
-const RetentionTriggerPath = "/cron/events-retention"
-
-// minTriggerSecretLength is the length Vercel recommends for CRON_SECRET.
-const minTriggerSecretLength = 16
-
-// Validate refuses a trigger secret that is short enough to guess or that a
-// request header cannot carry as it is.
-func (c RetentionConfig) Validate() error {
-	if c.TriggerSecret == "" {
-		return nil
-	}
-	if err := CheckTriggerSecret(c.TriggerSecret); err != nil {
-		return fmt.Errorf("events.retention.trigger_secret %w", err)
-	}
-	return nil
-}
-
-// CheckTriggerSecret is Validate's rule for a secret on its own, for a
-// caller that reads the secret from somewhere else. The error reads after
-// the setting's name.
-func CheckTriggerSecret(secret string) error {
-	invisible := func(r rune) bool { return r < '!' || r > '~' }
-	if len(secret) < minTriggerSecretLength || strings.IndexFunc(secret, invisible) >= 0 {
-		return fmt.Errorf("must be at least %d printable ASCII characters, without spaces", minTriggerSecretLength)
-	}
-	return nil
 }
 
 func DefaultRetentionConfig() RetentionConfig {
@@ -88,14 +44,8 @@ func applyRetentionDefaults(cfg RetentionConfig) RetentionConfig {
 
 const retentionCloseTimeout = 5 * time.Second
 
-// retentionTriggerTimeout bounds a purge that a request starts. It stays
-// under the five minutes a Vercel function runs by default, so the
-// scheduler learns how the run ended.
-const retentionTriggerTimeout = 4*time.Minute + 30*time.Second
-
 // RetentionJob deletes events older than the retention window: on its own
-// timer, or once per request to its trigger when the config names a
-// trigger secret.
+// timer, and once per call to the server's wake-up endpoint.
 type RetentionJob struct {
 	cfg       RetentionConfig
 	purge     EventPurger
@@ -120,23 +70,23 @@ func NewRetentionJob(purge EventPurger, cfg RetentionConfig) *RetentionJob {
 
 // Task is the purge as background work. Where instances come and go it purges
 // as each one starts and on its timer while one is up. A process paused
-// between requests runs no timer, so there it runs from its trigger and the
-// start fails without a trigger secret.
+// between requests runs no timer, so there it purges only when the server is
+// woken.
 func (j *RetentionJob) Task() background.Task {
 	return background.Task{
 		Name:        "event retention",
 		Disabled:    !j.cfg.Enabled,
 		Start:       func(context.Context) error { j.Start(); return nil },
 		Stop:        j.Close,
+		Once:        j.Once,
 		ScaleToZero: background.WhileUp(),
-		RequestOnly: background.OnTrigger(j.Trigger(),
-			"set events.retention.trigger_secret and have a scheduler call "+RetentionTriggerPath+", or turn the purge off with events.retention.enabled"),
+		RequestOnly: background.OnWakeUp("turn the purge off with events.retention.enabled"),
 	}
 }
 
-// Start starts the loop, unless retention is off or a trigger runs it.
+// Start starts the loop, unless retention is off.
 func (j *RetentionJob) Start() {
-	if !j.cfg.Enabled || j.cfg.TriggerSecret != "" {
+	if !j.cfg.Enabled {
 		close(j.done)
 		return
 	}
@@ -196,57 +146,21 @@ func (j *RetentionJob) deleteExpired(ctx context.Context) (int64, error) {
 	return j.purge.DeleteEventsOlderThan(ctx, time.Now().UTC().Add(-j.cfg.Retention))
 }
 
-// Trigger is the handler that purges once per GET or POST that carries the
-// trigger secret as a bearer token, and answers how many events it deleted.
-// It is nil unless retention is on and the config names a trigger secret.
-func (j *RetentionJob) Trigger() http.Handler {
-	if !j.cfg.Enabled || j.cfg.TriggerSecret == "" {
-		return nil
+// Once runs one purge for a caller that waits for it, such as a call to the
+// wake-up endpoint, and logs how many events it deleted. ctx gives the purge
+// its deadline.
+func (j *RetentionJob) Once(ctx context.Context) error {
+	ctx, span := startJobSpan(ctx, "audit.PurgeExpiredEvents")
+	defer span.End()
+
+	n, err := j.deleteExpired(ctx)
+	if err != nil {
+		failJobSpan(ctx, err)
+		return err
 	}
-	// Hashes, so the comparison takes as long whatever the length of the
-	// token a request sends.
-	secret := sha256.Sum256([]byte(j.cfg.TriggerSecret))
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet && r.Method != http.MethodPost {
-			w.Header().Set("Allow", "GET, POST")
-			errlog.Log(r.Context(), domain.ErrRequestMethodNotAllowed())
-			http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
-			return
-		}
-		scheme, token, _ := strings.Cut(r.Header.Get("Authorization"), " ")
-		sent := sha256.Sum256([]byte(token))
-		if !strings.EqualFold(scheme, "Bearer") || subtle.ConstantTimeCompare(sent[:], secret[:]) != 1 {
-			w.Header().Set("WWW-Authenticate", "Bearer")
-			errlog.Log(r.Context(), domain.ErrAuthUnauthorized(nil))
-			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
-			return
-		}
-
-		// A run may outlast the server's write timeout, which every other
-		// request keeps: past it, the scheduler would never hear how the run
-		// ended.
-		_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(retentionTriggerTimeout + 10*time.Second))
-
-		ctx, cancel := context.WithTimeout(r.Context(), retentionTriggerTimeout)
-		defer cancel()
-		ctx, span := startJobSpan(ctx, "audit.PurgeExpiredEvents")
-		defer span.End()
-
-		n, err := j.deleteExpired(ctx)
-		if err != nil {
-			failJobSpan(ctx, err)
-			// The request's context, not the purge's: a purge that ran out of
-			// time is an Error, a client that left a Warn.
-			errlog.LogFault(r.Context(), err)
-			http.Error(w, "event retention: purge failed", http.StatusInternalServerError)
-			return
-		}
-		// Logged when nothing was deleted too: every run leaves a line.
-		zlog.Info(ctx, "event retention: purged events", slog.Int64("deleted", n))
-		w.Header().Set("Content-Type", "application/json")
-		w.Header().Set("Cache-Control", "no-store")
-		_, _ = fmt.Fprintf(w, "{\"deleted\":%d}\n", n)
-	})
+	// Logged when nothing was deleted too: every run leaves a line.
+	zlog.Info(ctx, "event retention: purged events", slog.Int64("deleted", n))
+	return nil
 }
 
 func (j *RetentionJob) Close() {

@@ -27,7 +27,7 @@ One Vercel deployment, seven [services](https://vercel.com/docs/services):
 
 | Service | Built by | Serves |
 |---|---|---|
-| `server` | Go preset, rooted at the Go module `apps/api`; the build command enters the repo root and installs, because Vercel's Go builder runs no `installCommand`, and then runs `node_modules/.bin/turbo run deploy --filter=@zitadel/cloud`. turbo goes by its path because, unlike the JS builders, the Go builder puts no `node_modules/.bin` on `PATH`. `@zitadel/cloud`'s `build` compiles `apps/api/cmd/cloud-launcher` without the console (`-tags noconsole`), then `migrate` migrates and `deploy` hands the binary to the preset, none of them cached | `/api/*`, the API; its own root paths, `/console/runtime.json`, `/livez`, `/readyz`, `/csp-report`, `/cron/events-retention` and the IdP callbacks (`/idp/{slug}/callback`, `/__nextgen/idp/{slug}/callback`); and until 1.0.0 the root paths of the API's resources (`/users`, `/flow`, … in one rule). Nothing else |
+| `server` | Go preset, rooted at the Go module `apps/api`; the build command enters the repo root and installs, because Vercel's Go builder runs no `installCommand`, and then runs `node_modules/.bin/turbo run deploy --filter=@zitadel/cloud`. turbo goes by its path because, unlike the JS builders, the Go builder puts no `node_modules/.bin` on `PATH`. `@zitadel/cloud`'s `build` compiles `apps/api/cmd/cloud-launcher` without the console (`-tags noconsole`), then `migrate` migrates and `deploy` hands the binary to the preset, none of them cached | `/api/*`, the API; its own root paths, `/console/runtime.json`, `/livez`, `/readyz`, `/csp-report`, `/cron/wake-up` and the IdP callbacks (`/idp/{slug}/callback`, `/__nextgen/idp/{slug}/callback`); and until 1.0.0 the root paths of the API's resources (`/users`, `/flow`, … in one rule). Nothing else |
 | `console` | Vite; `turbo run build` with `CONSOLE_BASE_PATH=/console/` and `CONSOLE_ADDON=../cloud-console`, which compiles in the cloud's add-on ([`apps/cloud-console`](../../apps/cloud-console/AGENTS.md)): it reports Vercel Web Analytics and Speed Insights, adds the unlisted sign-up page `/console/signup`, and adds Billing and Support to Settings, which until their systems are live say the cloud is free during the preview and point to GitHub issues, starts onboarding on each signed-in page and on the CLI's claim page, and reports `signup_completed` when the sign-in widget makes an account; in previews it also adds Email and sends the sign-in widget's calls through BotID's check in `cloud-functions`; the service serves the build where it lands, `apps/api/internal/staticui/console/dist` | `/console/*` (bare `/console` redirects to the slash form; `/ui/console` and `/ui/console/*` redirect here with a 307) |
 | `docs` | Next.js; `turbo run build --filter=@zitadel/docs`, after `@zitadel/components`, `@zitadel/api-mock` and the `@zitadel/api` client the mock calls, which the live examples render, and the docs' typecheck. The build's cache key holds the deployment's ID, which Skew Protection bakes into it, so it never comes from the cache; never moon, which cannot archive the symlinks Vercel's Next.js adapter writes | `/docs` and `/docs/*`: pages, assets (`/docs/_next/`), search, `llms.txt`, each page's `.md` and the MCP server |
 | `website` | Next.js; `turbo run build --filter=@zitadel/website`, after the atoms of `@zitadel/components` its showcase renders; keyed by the deployment's ID, as the docs' | `/`, the front page, `/changelog` (`/changelog/` redirects there) with its entries' pages and its feed under it, `/changelog/*`, and their assets at `/_next/*`; the host's `/llms.txt`; the host's favicons at `/favicon.ico` and `/favicons/*`, which the console, the login UI and the docs link; and every path no other service claims, which its 404 answers ([ADR 076](../adrs/076-error-pages-and-unmatched-routes.md)) |
@@ -100,9 +100,10 @@ server does differently is its own
 ([ADR 089](../adrs/089-server-lifecycle.md),
 [configuration](../quick-start/configuration.md#where-the-server-runs)).
 A setting that needs background work the server cannot do there, such as
-`NEXTGEN_SERVICE_PING_ENABLED` or `NEXTGEN_EVENTS_EXPORT_ENABLED`, fails the
-function's start, not its build: set it on a preview first. A local run
-(`pnpm run cloud`) keeps running and stays `always_on`.
+`NEXTGEN_SERVICE_PING_ENABLED`, fails the function's start, not its build:
+set it on a preview first. Its periodic work runs when the cron job
+[wakes it](#operating). A local run (`pnpm run cloud`) keeps running and
+stays `always_on`.
 
 In production, Vercel's URL is `VERCEL_PROJECT_PRODUCTION_URL`, which Vercel
 sets to the project's shortest production domain. The public base is where
@@ -285,8 +286,8 @@ Environment variables (add secrets with
 | `MASTER_KEY_ID` | Preview | preview's `master-key.id`, `cloud-preview-<year>-<month>` |
 | `MASTER_KEY_PREVIOUS_PEM_B64` | Production or Preview; sensitive; only during a rotation | the key being rotated out, which `setup-secrets.sh --force` sets |
 | `MASTER_KEY_PREVIOUS_ID` | Production or Preview; only during a rotation | its id |
-| `CRON_SECRET` | Production; sensitive | `openssl rand -hex 32`, kept in 1Password: the token the [event retention](#operating) cron job sends the server; the build fails without it |
-| `CRON_SECRET` | Preview; sensitive | another one: a preview's build fails without it too, although no cron job runs there; it starts a run on a preview by hand |
+| `CRON_SECRET` | Production; sensitive | `openssl rand -hex 32`, kept in 1Password: the token the cron job that [wakes the server](#operating) sends it; the build fails without it |
+| `CRON_SECRET` | Preview; sensitive | another one: a preview's build fails without it too, although no cron job runs there; it wakes a preview's server by hand |
 | `CONSOLE_SPEED_INSIGHTS_SAMPLE_RATE` | Production, Preview | `0.01`: the share of console page loads that send Speed Insights, `0` to `1`; unset sends every one |
 | `DOCS_SPEED_INSIGHTS_SAMPLE_RATE` | Production, Preview | `0.01`: the same for the docs |
 | `WEBSITE_SPEED_INSIGHTS_SAMPLE_RATE` | Production, Preview | `0.01`: the same for the website |
@@ -744,23 +745,25 @@ project and imports the root admin.
     `max_connections`, and handler time alone does not say whether
     connection waits or the shared vCPU stretched it.
 - **Event retention:** a function is paused between requests, so
-  the server's own hourly purge is off here. A Vercel Cron Job (`crons` in
-  `vercel.json`) calls `/cron/events-retention` on the production deployment
-  at 17 minutes past every hour, with `CRON_SECRET` as its bearer token, and
-  the server deletes the audit events older than 30 days
-  ([ADR 049](../adrs/049-events-api-retention-export.md#amendment-2026-10-27-who-starts-the-purge-and-as-which-role)).
-  - Each run logs one line, `event retention: purged events` with the number
-    it deleted or `event retention: purge failed` with the cause; a failed
-    run answers 500. Settings → Cron Jobs lists the job: View Logs shows its
-    runs, and Run starts one now.
-  - Previews get no cron job. Start a run on one by hand with the preview's
+  the server's own timers are off here. A Vercel Cron Job (`crons` in
+  `vercel.json`) calls the server's wake-up endpoint, `/cron/wake-up`, on the
+  production deployment at 17 minutes past every hour, with `CRON_SECRET` as
+  its bearer token. Each call runs the server's periodic work once
+  ([configuration](../quick-start/configuration.md#waking-the-server)): here
+  that is the purge of the audit events older than 30 days.
+  - Each call logs `wake-up: ran the periodic tasks`, and the purge
+    `event retention: purged events` with the number it deleted. A call whose
+    purge failed answers 500 with `"ok":false` for `event_retention` and logs
+    the cause as an error. Settings → Cron Jobs lists the job: View Logs
+    shows its runs, and Run starts one now.
+  - Previews get no cron job. Wake one by hand with the preview's
     `CRON_SECRET` from 1Password and the bypass secret
     ([Checking a deployment by hand](#checking-a-deployment-by-hand)):
 
     ```sh
     curl -fsS -H "Authorization: Bearer $CRON_SECRET" \
       -H "x-vercel-protection-bypass: $VERCEL_AUTOMATION_BYPASS_SECRET" \
-      https://cloud-….vercel.app/cron/events-retention
+      https://cloud-….vercel.app/cron/wake-up
     ```
 
   - A run that takes longer than 4½ minutes is cancelled and deletes

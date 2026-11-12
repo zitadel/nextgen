@@ -245,7 +245,7 @@
       }
     },
     {
-      "source": "/cron/events-retention",
+      "source": "/cron/wake-up",
       "destination": {
         "service": "server"
       }
@@ -277,7 +277,7 @@
   ],
   "crons": [
     {
-      "path": "/cron/events-retention",
+      "path": "/cron/wake-up",
       "schedule": "17 * * * *"
     }
   ],

@@ -21,7 +21,7 @@ import (
 
 	"github.com/zitadel/nextgen/api/client"
 	"github.com/zitadel/nextgen/internal/api"
-	"github.com/zitadel/nextgen/internal/audit"
+	"github.com/zitadel/nextgen/internal/background"
 	"github.com/zitadel/nextgen/internal/securityheaders"
 )
 
@@ -266,10 +266,10 @@ func TestPrepareServerServesProductionFromThePooledURL(t *testing.T) {
 	}, served.Query())
 }
 
-// A function runs only while it serves a request, so the server's own purge
-// loop cannot run here: the cron job in vercel.json calls the server's
-// trigger with CRON_SECRET, which the server takes from the config file.
-func TestPrepareServerLeavesThePurgeToTheCronJob(t *testing.T) {
+// A function runs only while it serves a request, so the server's own timers
+// cannot run here: the cron job in vercel.json calls the server's wake-up
+// endpoint with CRON_SECRET, which the server takes from the config file.
+func TestPrepareServerLeavesThePeriodicWorkToTheCronJob(t *testing.T) {
 	dataDir := t.TempDir()
 	setLauncherEnv(t, dataDir)
 	t.Setenv("VERCEL_ENV", "production")
@@ -284,14 +284,16 @@ func TestPrepareServerLeavesThePurgeToTheCronJob(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join(dataDir, "nextgen.yaml"))
 	require.NoError(t, err)
 	var config struct {
-		Events struct {
-			Retention struct {
-				TriggerSecret string `yaml:"trigger_secret"`
-			} `yaml:"retention"`
-		} `yaml:"events"`
+		Server struct {
+			WakeUp struct {
+				Secret string `yaml:"secret"`
+			} `yaml:"wake_up"`
+		} `yaml:"server"`
+		Events map[string]any `yaml:"events"`
 	}
 	require.NoError(t, yaml.Unmarshal(raw, &config))
-	assert.Equal(t, secret, config.Events.Retention.TriggerSecret)
+	assert.Equal(t, secret, config.Server.WakeUp.Secret)
+	assert.Empty(t, config.Events, "the secret is the server's, not the purge's")
 	assert.Empty(t, os.Getenv("CRON_SECRET"), "the secret leaves the environment once it is on disk")
 }
 
@@ -577,11 +579,12 @@ func TestVercelJSONKeepsTheServerInFrankfurt(t *testing.T) {
 	assert.Equal(t, []string{"fra1"}, function.Regions, "the region of the PlanetScale databases")
 }
 
-// The cron job is the only caller of the audit event purge in the cloud, so
-// its path is the server's trigger, and nothing routes it anywhere but the
-// server: a redirect would end the run, which a cron job does not follow, and
-// another service would answer 404.
-func TestVercelJSONSchedulesTheEventRetentionPurge(t *testing.T) {
+// The cron job is the only thing that runs the server's periodic work in the
+// cloud, the audit event purge among it, so its path is the server's wake-up
+// endpoint, and nothing routes it anywhere but the server: a redirect would
+// end the call, which a cron job does not follow, and another service would
+// answer 404.
+func TestVercelJSONWakesTheServerEveryHour(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "vercel.json"))
 	require.NoError(t, err)
 	var config struct {
@@ -601,11 +604,11 @@ func TestVercelJSONSchedulesTheEventRetentionPurge(t *testing.T) {
 	require.NoError(t, json.Unmarshal(raw, &config))
 
 	require.Len(t, config.Crons, 1)
-	assert.Equal(t, audit.RetentionTriggerPath, config.Crons[0].Path)
+	assert.Equal(t, background.WakeUpPath, config.Crons[0].Path)
 	assert.Equal(t, "17 * * * *", config.Crons[0].Schedule, "hourly, as a self-hosted server purges")
 
 	for _, redirect := range config.Redirects {
-		assert.False(t, routeMatches(redirect.Source, audit.RetentionTriggerPath), "redirected by %s", redirect.Source)
+		assert.False(t, routeMatches(redirect.Source, background.WakeUpPath), "redirected by %s", redirect.Source)
 	}
 	var service string
 	for _, rewrite := range config.Rewrites {
@@ -614,14 +617,14 @@ func TestVercelJSONSchedulesTheEventRetentionPurge(t *testing.T) {
 		if forGoImportHost(rewrite.Has) {
 			continue
 		}
-		if routeMatches(rewrite.Source, audit.RetentionTriggerPath) {
+		if routeMatches(rewrite.Source, background.WakeUpPath) {
 			var destination struct{ Service string }
 			require.NoError(t, json.Unmarshal(rewrite.Destination, &destination))
 			service = destination.Service
 			break
 		}
 	}
-	assert.Equal(t, "server", service, "the first rewrite that matches the trigger's path")
+	assert.Equal(t, "server", service, "the first rewrite that matches the endpoint's path")
 }
 
 // The cloud gives the server its own paths and nothing else: the API under
@@ -665,7 +668,7 @@ func TestVercelJSONSendsTheServerOnlyItsOwnPaths(t *testing.T) {
 		"/livez",
 		"/readyz",
 		securityheaders.ReportPath,
-		audit.RetentionTriggerPath,
+		background.WakeUpPath,
 		api.IDPCallbackUpstreamPath("github"),
 		api.IDPCallbackPath("github"),
 	}

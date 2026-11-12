@@ -96,20 +96,18 @@ func TestRetentionJob_runIsTraced(t *testing.T) {
 // A run that a request starts is a job root like the loop's, sampled by the
 // job rule, even when the request carries a caller's trace context
 // (instrumentation.trace.trust_remote_spans).
-func TestRetentionJob_triggeredRunIsTraced(t *testing.T) {
+func TestRetentionJob_wokenRunIsTraced(t *testing.T) {
 	spanExporter.Reset()
 	p := &tracedPurger{}
-	trigger := NewRetentionJob(p, RetentionConfig{Retention: time.Hour, Enabled: true, TriggerSecret: testTriggerSecret}).Trigger()
 	caller := trace.NewSpanContext(trace.SpanContextConfig{
 		TraceID:    trace.TraceID{1},
 		SpanID:     trace.SpanID{1},
 		TraceFlags: trace.FlagsSampled,
 		Remote:     true,
 	})
-	r := httptest.NewRequestWithContext(trace.ContextWithRemoteSpanContext(t.Context(), caller), http.MethodGet, RetentionTriggerPath, nil)
-	r.Header.Set("Authorization", "Bearer "+testTriggerSecret)
 
-	trigger.ServeHTTP(httptest.NewRecorder(), r)
+	require.NoError(t, NewRetentionJob(p, RetentionConfig{Retention: time.Hour, Enabled: true}).
+		Once(trace.ContextWithRemoteSpanContext(t.Context(), caller)))
 
 	span := jobSpan(t, "audit.PurgeExpiredEvents")
 	assert.Equal(t, span.SpanContext, p.seen, "the purge runs under the job span")

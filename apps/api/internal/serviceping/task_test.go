@@ -9,9 +9,10 @@ import (
 	"github.com/zitadel/nextgen/internal/background"
 )
 
-// The ping goes out as the server starts and has no trigger. Where the
-// platform starts and stops instances that would count starts, so the server
-// refuses to start there with the ping on, and sends nothing.
+// The ping goes out as the server starts. Where the platform starts and stops
+// instances that would count starts, so the server refuses to start there
+// with the ping on, and sends nothing. A wake-up secret changes nothing: a
+// call could not tell whether the deployment has pinged in this interval.
 func TestTaskWhereInstancesComeAndGo(t *testing.T) {
 	intake := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 		t.Error("the pinger sent a request")
@@ -20,7 +21,7 @@ func TestTaskWhereInstancesComeAndGo(t *testing.T) {
 
 	for _, lifecycle := range []background.Lifecycle{background.ScaleToZero, background.RequestOnly} {
 		t.Run(string(lifecycle), func(t *testing.T) {
-			g := background.NewGroup(lifecycle)
+			g := background.NewGroup(lifecycle, background.WakeUpConfig{Secret: "0123456789abcdef-wake-up"})
 			defer g.Close()
 			err := g.Start(t.Context(), New(Config{Enabled: true, VercelEndpoint: intake.URL}, Facts{}).Task())
 			if err == nil || !strings.Contains(err.Error(), "service ping cannot run where server.lifecycle is "+string(lifecycle)) || !strings.Contains(err.Error(), "service_ping.enabled") {
@@ -41,7 +42,7 @@ func TestTaskPingsAlwaysOn(t *testing.T) {
 	}))
 	defer intake.Close()
 
-	g := background.NewGroup(background.AlwaysOn)
+	g := background.NewGroup(background.AlwaysOn, background.WakeUpConfig{})
 	if err := g.Start(t.Context(), New(Config{Enabled: true, VercelEndpoint: intake.URL}, Facts{}).Task()); err != nil {
 		t.Fatal(err)
 	}

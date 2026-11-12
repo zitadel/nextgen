@@ -7,6 +7,9 @@
 // while an instance is up. Every task therefore says what it does in each,
 // and one that does not say fails the start wherever the server runs
 // (ADR 089).
+//
+// What a timer would do there, a scheduler outside the process does: it calls
+// the wake-up endpoint, and each call runs every periodic task once.
 package background
 
 import (
@@ -14,7 +17,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"strings"
 )
 
@@ -62,6 +64,11 @@ type Task struct {
 	Start func(ctx context.Context) error
 	// Stop stops what was started and waits for it. It may be nil.
 	Stop func()
+	// Once runs one round of a periodic task: one purge, one shipment. A call
+	// to the wake-up endpoint runs it, in every lifecycle, and it must not
+	// overlap a round the task's own timer started in the same process. It
+	// is nil for a task that is not periodic.
+	Once func(ctx context.Context) error
 	// ScaleToZero is what the task does where the platform stops the last
 	// instance, and RequestOnly what it does in a process paused between
 	// requests. Both are required: Group.Start refuses a task without them
@@ -77,16 +84,15 @@ const (
 	unanswered answerKind = iota
 	whileUp
 	inRequest
-	onTrigger
+	onWakeUp
 	unsupported
 )
 
 // Answer is what a task does in one lifecycle. Its zero value is no answer.
 type Answer struct {
-	kind    answerKind
-	start   func(ctx context.Context) error
-	trigger http.Handler
-	hint    string
+	kind  answerKind
+	start func(ctx context.Context) error
+	hint  string
 }
 
 // WhileUp answers that Task.Start does the job where instances come and go:
@@ -104,12 +110,13 @@ func InRequest(start func(ctx context.Context) error) Answer {
 	return Answer{kind: inRequest, start: start}
 }
 
-// OnTrigger answers that the work runs once per call to an endpoint, which a
-// scheduler outside the process calls. trigger is that endpoint's handler,
-// nil when the configuration does not give it what it needs; needs then says
-// what to set. The caller mounts the handler; Task.Start does not run.
-func OnTrigger(trigger http.Handler, needs string) Answer {
-	return Answer{kind: onTrigger, trigger: trigger, hint: needs}
+// OnWakeUp answers that the task runs only when a scheduler outside the
+// process calls the wake-up endpoint: Task.Once per call, and Task.Start not
+// at all. The start fails while server.wake_up.secret is unset, because the
+// task would then never run; off says how to turn the task off instead. It
+// is an answer only for a task that has a Task.Once.
+func OnWakeUp(off string) Answer {
+	return Answer{kind: onWakeUp, hint: off}
 }
 
 // Unsupported answers that the task cannot run in that lifecycle: the start
@@ -121,16 +128,26 @@ func Unsupported(instead string) Answer {
 // Group starts the server's background tasks and stops them together.
 type Group struct {
 	lifecycle Lifecycle
+	wakeUp    WakeUpConfig
 	stops     []func()
+	// periodic are the rounds a call to the wake-up endpoint runs, in the
+	// order their tasks started.
+	periodic []round
 }
 
-// NewGroup returns the group of a process whose server.lifecycle is
-// lifecycle.
-func NewGroup(lifecycle Lifecycle) *Group {
+// round is one periodic task's Task.Once under its name.
+type round struct {
+	name string
+	once func(ctx context.Context) error
+}
+
+// NewGroup returns the group of a process whose server.lifecycle is lifecycle
+// and whose server.wake_up is wakeUp.
+func NewGroup(lifecycle Lifecycle, wakeUp WakeUpConfig) *Group {
 	if lifecycle == "" {
 		lifecycle = AlwaysOn
 	}
-	return &Group{lifecycle: lifecycle}
+	return &Group{lifecycle: lifecycle, wakeUp: wakeUp}
 }
 
 // Start starts task the way the lifecycle allows. An error names the task and
@@ -156,11 +173,11 @@ func (g *Group) Start(ctx context.Context, task Task) error {
 		return g.lifecycle.Validate()
 	}
 	switch answer.kind {
-	case onTrigger:
-		if answer.trigger == nil {
-			return fmt.Errorf("%s cannot run on a timer where server.lifecycle is %s: %s", task.Name, g.lifecycle, answer.hint)
+	case onWakeUp:
+		if g.wakeUp.Secret == "" {
+			return fmt.Errorf("%s cannot run on a timer where server.lifecycle is %s: set server.wake_up.secret and have a scheduler call %s, or %s", task.Name, g.lifecycle, WakeUpPath, answer.hint)
 		}
-		slog.Debug("background task runs when its trigger is called", slog.String("task", task.Name))
+		slog.Debug("background task runs when the server is woken", slog.String("task", task.Name))
 	case unsupported:
 		return fmt.Errorf("%s cannot run where server.lifecycle is %s: %s", task.Name, g.lifecycle, answer.hint)
 	case inRequest:
@@ -178,6 +195,9 @@ func (g *Group) Start(ctx context.Context, task Task) error {
 		}
 		g.started(task)
 	}
+	if task.Once != nil {
+		g.periodic = append(g.periodic, round{name: task.Name, once: task.Once})
+	}
 	return nil
 }
 
@@ -194,6 +214,7 @@ func (t Task) answered() error {
 		answer := declared.answer
 		missing := answer.kind == unanswered ||
 			(answer.kind == inRequest && answer.start == nil) ||
+			(answer.kind == onWakeUp && t.Once == nil) ||
 			(answer.kind == whileUp && declared.lifecycle == RequestOnly)
 		if missing {
 			return fmt.Errorf("background task %q does not say what it does where server.lifecycle is %s: set %s (ADR 089)", t.Name, declared.lifecycle, declared.field)

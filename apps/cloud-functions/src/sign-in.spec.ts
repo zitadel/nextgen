@@ -103,7 +103,7 @@ describe("the sign-in widget's calls", () => {
     "/cloud/zitadel",
     "/cloud/zitadel/flow",
     "/cloud/zitadel/docs",
-    "/cloud/zitadel/cron/events-retention",
+    "/cloud/zitadel/cron/wake-up",
     "/cloud/zitadel/cloud/api/account/ensure",
     "/cloud/zitadel/cloud/zitadel/api/v1/flow",
     "/cloud/zitadel/api/v1",

@@ -10,6 +10,8 @@
 > instead of on the server's own timer, and it runs as the server's role, not
 > a dedicated one. See
 > [the amendment](#amendment-2026-10-27-who-starts-the-purge-and-as-which-role).
+> The request is the server's wake-up call since
+> [ADR 089](089-server-lifecycle.md) §5.
 >
 > **Amendment (2026-10-30):** §3's shipper and §1's ascending pages list only
 > settled events, so no cursor skips an event whose transaction commits late.
@@ -433,24 +435,23 @@ start, outside the request that started the instance, and its hourly runs
 happen only while an instance is up. On the hosted cloud those runs failed
 while connecting to the database.
 
-**Trigger.** `events.retention.trigger_secret` hands the schedule to a
-scheduler outside the process.
+**Trigger.** A scheduler outside the process can run the purge: each call
+that wakes the server runs one (`server.wake_up.secret` and `/cron/wake-up`,
+[ADR 089](089-server-lifecycle.md) §5). The purge first had a secret and a
+path of its own, `events.retention.trigger_secret` and
+`/cron/events-retention`, which that endpoint replaced.
 
-- Unset, the default, a server purges on its own timer as before. A server
-  that says it is paused between requests (`server.lifecycle: request_only`,
-  [ADR 089](089-server-lifecycle.md)) does not start without it.
-- Set, the server keeps no timer. Each `GET` or `POST` to
-  `/cron/events-retention` that carries the secret as a bearer token runs one
-  purge; any other request to the path gets 401.
+- A server purges on its own timer as before, unless it says it is paused
+  between requests (`server.lifecycle: request_only`). Such a server purges
+  only when woken, and does not start without the wake-up secret.
 - A run is the same purge: it deletes what is older than the window. A missed
   run leaves its events to the next, and a second run at the same time
   deletes what the first left, or nothing; within one process, runs wait for
   each other.
-- The path is the operator's, not the API's: it is not in the OpenAPI
-  document and takes no API credential.
-- The hosted cloud calls it hourly from a Vercel Cron Job in `vercel.json`,
-  which sends the project's `CRON_SECRET` as the bearer token; the launcher
-  makes it the trigger secret ([runbook](../runbooks/cloud.md#operating)).
+- The hosted cloud wakes its server hourly from a Vercel Cron Job in
+  `vercel.json`, which sends the project's `CRON_SECRET` as the bearer token;
+  the launcher makes it the wake-up secret
+  ([runbook](../runbooks/cloud.md#operating)).
 
 [ADR 065](065-background-jobs.md) proposes moving the purge onto an in-process
 job loop with no HTTP surface. On such a platform that loop needs a trigger

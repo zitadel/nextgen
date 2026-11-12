@@ -15,7 +15,7 @@ import (
 
 	"github.com/zitadel/nextgen/internal/api"
 	oasapi "github.com/zitadel/nextgen/internal/api/generated"
-	"github.com/zitadel/nextgen/internal/audit"
+	"github.com/zitadel/nextgen/internal/background"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/securityheaders"
 	"github.com/zitadel/nextgen/internal/service"
@@ -239,31 +239,31 @@ func TestBuildHTTPMuxServesRuntimeDocumentWithTheConsoleOff(t *testing.T) {
 	assert.Equal(t, "root", get(t, mux, "/ui/console/").Header().Get("X-Test-Handler"))
 }
 
-// The event retention trigger is a mount only when a scheduler outside the
-// process runs the purge; otherwise its path is the API's like any other. It
-// takes the request ID the proxy sent, so the scheduler's log and the
-// server's lines name the same run.
-func TestBuildHTTPMuxMountsTheRetentionTriggerOnlyWhenGiven(t *testing.T) {
+// The wake-up endpoint is a mount only when the server has one
+// (server.wake_up.secret); otherwise its path is the API's like any other.
+// It takes the request ID the proxy sent, so the scheduler's log and the
+// server's lines name the same call.
+func TestBuildHTTPMuxMountsTheWakeUpEndpointOnlyWhenGiven(t *testing.T) {
 	cfg := ServerConfig{RequestIDHeader: "x-vercel-id"}
-	trigger := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("X-Test-Handler", "retention-trigger")
+	wakeUp := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("X-Test-Handler", "wake-up")
 	})
 	mux, err := buildHTTPMux(cfg, idgen.NewULID(), doubleServers(t, echo), idpCallbackEcho(),
 		staticResolver(consoleRuntime{Mode: ConsoleModeStandalone}, nil),
-		nil, trigger)
+		nil, wakeUp)
 	require.NoError(t, err)
 
-	r := httptest.NewRequest(http.MethodGet, audit.RetentionTriggerPath, nil)
+	r := httptest.NewRequest(http.MethodGet, background.WakeUpPath, nil)
 	r.Header.Set("x-vercel-id", "fra1::2vxlh-1792820352212-3ce3eb4ad630")
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, r)
-	assert.Equal(t, "retention-trigger", rec.Header().Get("X-Test-Handler"))
+	assert.Equal(t, "wake-up", rec.Header().Get("X-Test-Handler"))
 	assert.Equal(t, "2vxlh-1792820352212-3ce3eb4ad630", rec.Header().Get("X-Request-Id"))
-	// A longer path is not the trigger and stays with the API's root alias.
-	assert.Equal(t, "root", get(t, mux, audit.RetentionTriggerPath+"/x").Header().Get("X-Test-Handler"))
+	// A longer path is not the endpoint and stays with the API's root alias.
+	assert.Equal(t, "root", get(t, mux, background.WakeUpPath+"/x").Header().Get("X-Test-Handler"))
 
-	assert.Equal(t, "root", get(t, newTestMux(t, cfg), audit.RetentionTriggerPath).Header().Get("X-Test-Handler"),
-		"without a trigger the path falls through to the API's root alias")
+	assert.Equal(t, "root", get(t, newTestMux(t, cfg), background.WakeUpPath).Header().Get("X-Test-Handler"),
+		"without the endpoint the path falls through to the API's root alias")
 }
 
 // checkSessionCSRF refuses every cookie-authenticated request that did not pass

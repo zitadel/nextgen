@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"log"
 	"log/slog"
+	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -163,32 +166,50 @@ func TestLoadConfigSessionDefaults(t *testing.T) {
 }
 
 // TestLoadConfigEventRetention pins the purge a server runs with no retention
-// settings, its own hourly loop, and the trigger secret that hands the
-// schedule to something outside the process: the key the cloud's launcher
-// renders, or the environment, which outranks it.
+// settings: its own hourly loop.
 func TestLoadConfigEventRetention(t *testing.T) {
-	t.Setenv("NEXTGEN_SERVER_DATA_DIR", t.TempDir())
-	t.Setenv("NEXTGEN_EVENTS_RETENTION_TRIGGER_SECRET", "")
-	configPath := filepath.Join(t.TempDir(), "nextgen.yaml")
-	require.NoError(t, os.WriteFile(configPath, nil, 0o600))
+	_, configPath := tempServerConfig(t)
 
 	cfg, err := loadConfig(configPath)
 	require.NoError(t, err)
 	assert.Equal(t, audit.RetentionConfig{Retention: 720 * time.Hour, Interval: time.Hour, Enabled: true}, cfg.Events.Retention)
+}
 
-	require.NoError(t, os.WriteFile(configPath, []byte("events:\n  retention:\n    trigger_secret: '0123456789abcdef-file'\n"), 0o600))
+// TestLoadConfigWakeUp pins that a server has no wake-up endpoint unless a
+// secret opens it: the key the cloud's launcher renders, or the environment,
+// which outranks it.
+func TestLoadConfigWakeUp(t *testing.T) {
+	_, configPath := tempServerConfig(t)
+	t.Setenv("NEXTGEN_SERVER_WAKE_UP_SECRET", "")
+
+	cfg, err := loadConfig(configPath)
+	require.NoError(t, err)
+	assert.Empty(t, cfg.Server.WakeUp.Secret)
+
+	require.NoError(t, os.WriteFile(configPath, []byte("server:\n  wake_up:\n    secret: '0123456789abcdef-file'\n"), 0o600))
 	cfg, err = loadConfig(configPath)
 	require.NoError(t, err)
-	assert.Equal(t, "0123456789abcdef-file", cfg.Events.Retention.TriggerSecret)
+	assert.Equal(t, "0123456789abcdef-file", cfg.Server.WakeUp.Secret)
 
-	t.Setenv("NEXTGEN_EVENTS_RETENTION_TRIGGER_SECRET", "0123456789abcdef-env")
+	t.Setenv("NEXTGEN_SERVER_WAKE_UP_SECRET", "0123456789abcdef-env")
 	cfg, err = loadConfig(configPath)
 	require.NoError(t, err)
-	assert.Equal(t, "0123456789abcdef-env", cfg.Events.Retention.TriggerSecret)
+	assert.Equal(t, "0123456789abcdef-env", cfg.Server.WakeUp.Secret)
 
-	t.Setenv("NEXTGEN_EVENTS_RETENTION_TRIGGER_SECRET", "too short")
+	t.Setenv("NEXTGEN_SERVER_WAKE_UP_SECRET", "too short")
 	_, err = loadConfig(configPath)
-	assert.ErrorContains(t, err, "events.retention.trigger_secret must be at least 16 printable ASCII characters")
+	assert.ErrorContains(t, err, "server.wake_up.secret must be at least 16 printable ASCII characters")
+}
+
+// A sink the shipper cannot deliver to fails the load, in every lifecycle:
+// paused between requests the shipper never starts, so its start could not.
+func TestLoadConfigRefusesAnUnsupportedEventSink(t *testing.T) {
+	_, configPath := tempServerConfig(t)
+	require.NoError(t, os.WriteFile(configPath, []byte("events:\n  export:\n    sinks:\n      - type: webhkok\n        url: https://example.invalid/hook\n"), 0o600))
+
+	_, err := loadConfig(configPath)
+
+	assert.ErrorContains(t, err, `events.export.sinks: unsupported event sink type "webhkok"`)
 }
 
 // The two settings the cloud's launcher makes for a server that runs only
@@ -284,20 +305,20 @@ func TestLoadConfigLifecycle(t *testing.T) {
 }
 
 // A server whose lifecycle leaves a background task with no way to run does
-// not start: paused between requests, the purge needs its trigger's secret
-// and the request events a wait; the export has no trigger; and the ping
-// would count the starts of a platform that starts and stops instances. The
-// error names the task and the setting.
+// not start: paused between requests, the purge and the export need the
+// wake-up endpoint and the request events a wait; and the ping would count
+// the starts of a platform that starts and stops instances. The error names
+// the task and the setting.
 func TestRunRefusesAStartThatWouldSkipATask(t *testing.T) {
 	for name, tc := range map[string]struct {
 		lifecycle background.Lifecycle
 		set       func(*Config)
 		want      []string
 	}{
-		"request only, no trigger secret": {
+		"request only, no wake-up endpoint": {
 			lifecycle: background.RequestOnly,
 			set:       func(*Config) {},
-			want:      []string{"event retention cannot run on a timer where server.lifecycle is request_only", "events.retention.trigger_secret"},
+			want:      []string{"event retention cannot run on a timer where server.lifecycle is request_only", "server.wake_up.secret", "/cron/wake-up", "events.retention.enabled"},
 		},
 		"request only, no wait for the request event": {
 			lifecycle: background.RequestOnly,
@@ -310,12 +331,12 @@ func TestRunRefusesAStartThatWouldSkipATask(t *testing.T) {
 				cfg.Events.Retention.Enabled = false
 				cfg.Events.Export.Enabled = true
 			},
-			want: []string{"event export cannot run where server.lifecycle is request_only", "events.export.enabled"},
+			want: []string{"event export cannot run on a timer where server.lifecycle is request_only", "server.wake_up.secret", "events.export.enabled"},
 		},
-		"request only, service ping on": {
+		"request only, service ping on, though a scheduler wakes the server": {
 			lifecycle: background.RequestOnly,
 			set: func(cfg *Config) {
-				cfg.Events.Retention.Enabled = false
+				cfg.Server.WakeUp.Secret = "0123456789abcdef-wake-up"
 				cfg.ServicePing.Enabled = true
 			},
 			want: []string{"service ping cannot run where server.lifecycle is request_only", "service_ping.enabled"},
@@ -346,6 +367,75 @@ func TestRunRefusesAStartThatWouldSkipATask(t *testing.T) {
 	}
 }
 
+// A server that is paused between requests starts with no timer of its own,
+// and one call from a scheduler runs its periodic work: the purge, against
+// the database, done when the call is answered. Without the secret the call
+// is refused.
+func TestRunWakesAPausedServerForItsPeriodicWork(t *testing.T) {
+	const secret = "0123456789abcdef-wake-up"
+	_, configPath := tempServerConfig(t)
+	t.Setenv("NEXTGEN_SERVER_LIFECYCLE", string(background.RequestOnly))
+	t.Setenv("NEXTGEN_SERVER_WAKE_UP_SECRET", secret)
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	address := listener.Addr().String()
+	require.NoError(t, listener.Close())
+	t.Setenv("NEXTGEN_SERVER_ADDRESS", address)
+	cfg, err := loadConfig(configPath)
+	require.NoError(t, err)
+
+	ctx, stop := context.WithTimeout(t.Context(), time.Minute)
+	defer stop()
+	stopped := make(chan error, 1)
+	go func() { stopped <- run(ctx, cfg, nil, true) }()
+
+	// call answers status 0 for a request that got no response.
+	call := func(path, authorization string) (int, string) {
+		r, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://"+address+path, nil)
+		if err != nil {
+			return 0, err.Error()
+		}
+		if authorization != "" {
+			r.Header.Set("Authorization", authorization)
+		}
+		res, err := http.DefaultClient.Do(r)
+		if err != nil {
+			return 0, err.Error()
+		}
+		defer res.Body.Close()
+		body, err := io.ReadAll(res.Body)
+		if err != nil {
+			return 0, err.Error()
+		}
+		return res.StatusCode, string(body)
+	}
+	var early struct {
+		stopped bool
+		err     error
+	}
+	require.Eventually(t, func() bool {
+		select {
+		case early.err = <-stopped:
+			early.stopped = true
+			return true
+		default:
+		}
+		status, _ := call("/livez", "")
+		return status == http.StatusOK
+	}, 30*time.Second, 50*time.Millisecond, "the server never listened")
+	require.False(t, early.stopped, "the server stopped before it listened: %v", early.err)
+
+	status, _ := call(background.WakeUpPath, "")
+	assert.Equal(t, http.StatusUnauthorized, status)
+
+	status, body := call(background.WakeUpPath, "Bearer "+secret)
+	require.Equal(t, http.StatusOK, status, body)
+	assert.JSONEq(t, `{"tasks":[{"name":"event_retention","ok":true}]}`, body)
+
+	stop()
+	require.NoError(t, <-stopped)
+}
+
 type rewrapRecorder struct {
 	calls   chan struct{}
 	release chan struct{}
@@ -368,13 +458,13 @@ func TestMasterKeyRewrapTask(t *testing.T) {
 		task := masterKeyRewrapTask(nil, &domain.MasterKeys{EncryptionKey: domain.MasterKey{ID: "current"}})
 		assert.True(t, task.Disabled)
 		for _, lifecycle := range background.Lifecycles {
-			require.NoError(t, background.NewGroup(lifecycle).Start(t.Context(), task))
+			require.NoError(t, background.NewGroup(lifecycle, background.WakeUpConfig{}).Start(t.Context(), task))
 		}
 	})
 	for _, lifecycle := range []background.Lifecycle{background.AlwaysOn, background.ScaleToZero} {
 		t.Run(string(lifecycle)+" re-wraps beside its requests", func(t *testing.T) {
 			keys := &rewrapRecorder{calls: make(chan struct{}), release: make(chan struct{})}
-			require.NoError(t, background.NewGroup(lifecycle).Start(t.Context(), masterKeyRewrapTask(keys, rotating)))
+			require.NoError(t, background.NewGroup(lifecycle, background.WakeUpConfig{}).Start(t.Context(), masterKeyRewrapTask(keys, rotating)))
 			<-keys.calls
 			close(keys.release)
 		})
@@ -383,7 +473,7 @@ func TestMasterKeyRewrapTask(t *testing.T) {
 		keys := &rewrapRecorder{calls: make(chan struct{}, 1), release: make(chan struct{})}
 		started := make(chan error, 1)
 		go func() {
-			started <- background.NewGroup(background.RequestOnly).Start(t.Context(), masterKeyRewrapTask(keys, rotating))
+			started <- background.NewGroup(background.RequestOnly, background.WakeUpConfig{}).Start(t.Context(), masterKeyRewrapTask(keys, rotating))
 		}()
 		<-keys.calls
 		select {

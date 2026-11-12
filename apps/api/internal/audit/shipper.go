@@ -6,8 +6,11 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math/rand/v2"
 	"net/http"
 	"os"
+	"slices"
+	"sync"
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -40,6 +43,24 @@ type ExportConfig struct {
 	Sinks    []SinkConfig  `mapstructure:"sinks"`
 }
 
+// Validate refuses a sink of a type the shipper cannot deliver to.
+func (c ExportConfig) Validate() error {
+	for _, sink := range c.Sinks {
+		if err := checkSinkType(sink.Type); err != nil {
+			return fmt.Errorf("events.export.sinks: %w", err)
+		}
+	}
+	return nil
+}
+
+func checkSinkType(sinkType domain.EventSinkType) error {
+	switch sinkType {
+	case "", domain.EventSinkTypeStdout, domain.EventSinkTypeWebhook:
+		return nil
+	}
+	return fmt.Errorf("unsupported event sink type %q", sinkType)
+}
+
 func DefaultExportConfig() ExportConfig {
 	return ExportConfig{
 		Enabled:  false,
@@ -66,14 +87,23 @@ const (
 	shipPageSize       = 100
 )
 
-// Shipper delivers events to deployment-configured sinks (ADR 049).
+// Shipper delivers events to deployment-configured sinks (ADR 049): on its
+// own timer, and once per call to the server's wake-up endpoint.
 type Shipper struct {
 	cfg    ExportConfig
 	src    EventExportSource
 	client *http.Client
-	sinks  []*domain.EventSink
-	stop   chan struct{}
-	done   chan struct{}
+	// sinks are the configured sinks once ensureSinks has registered them.
+	sinksMu    sync.Mutex
+	sinksReady bool
+	sinks      []*domain.EventSink
+	// shipping holds a token while a round runs, so the rounds of one
+	// process run one after the other and deliver no event twice.
+	shipping chan struct{}
+	// firstProject picks where a woken round starts in a list of n projects.
+	firstProject func(n int) int
+	stop         chan struct{}
+	done         chan struct{}
 }
 
 func NewShipper(src EventExportSource, cfg ExportConfig) *Shipper {
@@ -85,25 +115,27 @@ func NewShipper(src EventExportSource, cfg ExportConfig) *Shipper {
 		src: src,
 		// Operator-configured URL, not user-injectable: stdlib client by design (ADR 061).
 		//egress:allow operator-configured export sink, not user-injectable (ADR 061)
-		client: &http.Client{Timeout: 10 * time.Second},
-		stop:   make(chan struct{}),
-		done:   make(chan struct{}),
+		client:       &http.Client{Timeout: 10 * time.Second},
+		shipping:     make(chan struct{}, 1),
+		firstProject: rand.IntN,
+		stop:         make(chan struct{}),
+		done:         make(chan struct{}),
 	}
 }
 
 // Task is the shipper as background work. Where instances come and go it
-// ships while one is up, from the cursor the last one stored. It ships on a
-// timer and has no trigger, so a process paused between requests refuses to
-// start with export on.
+// ships while one is up, from the cursor the last one stored. A process
+// paused between requests runs no timer, so there it ships only when the
+// server is woken: what is pending since the last call, in one round.
 func (s *Shipper) Task() background.Task {
 	return background.Task{
 		Name:        "event export",
 		Disabled:    !s.cfg.Enabled,
 		Start:       s.Start,
 		Stop:        s.Close,
+		Once:        s.Once,
 		ScaleToZero: background.WhileUp(),
-		RequestOnly: background.Unsupported(
-			"it ships on a timer and has no trigger; turn it off with events.export.enabled"),
+		RequestOnly: background.OnWakeUp("turn the export off with events.export.enabled"),
 	}
 }
 
@@ -112,15 +144,34 @@ func (s *Shipper) Start(ctx context.Context) error {
 		close(s.done)
 		return nil
 	}
+	if err := s.ensureSinks(ctx); err != nil {
+		close(s.done)
+		return err
+	}
+	if len(s.sinks) == 0 {
+		close(s.done)
+		return nil
+	}
+	go s.loop() //background:allow the task "event export"
+	return nil
+}
+
+// ensureSinks registers the configured sinks, once per process: as the
+// shipper starts where its loop runs, and in the first round where only a
+// wake-up runs it, so that a start there costs no statement.
+func (s *Shipper) ensureSinks(ctx context.Context) error {
+	s.sinksMu.Lock()
+	defer s.sinksMu.Unlock()
+	if s.sinksReady {
+		return nil
+	}
+	var sinks []*domain.EventSink
 	for _, sc := range s.cfg.Sinks {
 		if sc.Type == "" {
 			continue
 		}
-		switch sc.Type {
-		case domain.EventSinkTypeStdout, domain.EventSinkTypeWebhook:
-		default:
-			close(s.done)
-			return fmt.Errorf("unsupported event sink type %q", sc.Type)
+		if err := checkSinkType(sc.Type); err != nil {
+			return err
 		}
 		if !sinkEnabled(sc) {
 			continue
@@ -132,16 +183,12 @@ func (s *Shipper) Start(ctx context.Context) error {
 			Enabled: true,
 		}
 		if err := s.src.EnsureSink(ctx, sink); err != nil {
-			close(s.done)
 			return err
 		}
-		s.sinks = append(s.sinks, sink)
+		sinks = append(sinks, sink)
 	}
-	if len(s.sinks) == 0 {
-		close(s.done)
-		return nil
-	}
-	go s.loop() //background:allow the task "event export"
+	s.sinks = sinks
+	s.sinksReady = true
 	return nil
 }
 
@@ -159,25 +206,72 @@ func (s *Shipper) loop() {
 	}
 }
 
+// shipOnce is the loop's round. Its failures are logged where they happen.
 func (s *Shipper) shipOnce() {
-	projects, err := s.listProjects()
+	_ = s.ship(context.Background(), nil)
+}
+
+// Once ships one round for a caller that waits for it, such as a call to the
+// wake-up endpoint. ctx bounds the round: what it leaves, the next round
+// ships. It starts at a project picked at random, so that a round a deadline
+// cuts short does not leave the same projects waiting every time.
+func (s *Shipper) Once(ctx context.Context) error {
+	if err := s.ensureSinks(ctx); err != nil {
+		return err
+	}
+	return s.ship(ctx, s.firstProject)
+}
+
+// ship ships every project to every sink, each pair from its own cursor, and
+// waits for a round this process is already running. first, when set, picks
+// the project the round starts with. The error counts the pairs that failed
+// and carries the first failure.
+func (s *Shipper) ship(ctx context.Context, first func(n int) int) error {
+	select {
+	case s.shipping <- struct{}{}:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+	defer func() { <-s.shipping }()
+
+	projects, err := s.listProjects(ctx)
 	if err != nil {
 		slog.Error("event shipper: list projects failed",
 			slog.String("error", err.Error()),
 		)
-		return
+		return err
 	}
+	if first != nil && len(projects) > 1 {
+		from := first(len(projects))
+		projects = slices.Concat(projects[from:], projects[:from])
+	}
+	var (
+		failed  int
+		failure error
+	)
 	for _, sink := range s.sinks {
 		for _, projectID := range projects {
-			s.shipProject(sink, projectID)
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			if err := s.shipProject(ctx, sink, projectID); err != nil {
+				failed++
+				if failure == nil {
+					failure = err
+				}
+			}
 		}
 	}
+	if failure != nil {
+		return fmt.Errorf("%d of %d shipments failed, the first: %w", failed, len(s.sinks)*len(projects), failure)
+	}
+	return nil
 }
 
 // listProjects lists the projects to ship under a job span of its own, ended
 // before any project is shipped.
-func (s *Shipper) listProjects() ([]string, error) {
-	ctx, span := startJobSpan(context.Background(), "audit.ListProjects")
+func (s *Shipper) listProjects(ctx context.Context) ([]string, error) {
+	ctx, span := startJobSpan(ctx, "audit.ListProjects")
 	defer span.End()
 	ctx, cancel := context.WithTimeout(ctx, shipListTimeout)
 	defer cancel()
@@ -189,9 +283,10 @@ func (s *Shipper) listProjects() ([]string, error) {
 }
 
 // shipProject ships one project to one sink under its own job span, so a
-// trace covers one pair rather than a whole tick.
-func (s *Shipper) shipProject(sink *domain.EventSink, projectID string) {
-	ctx, span := startJobSpan(context.Background(), "audit.ShipEvents",
+// trace covers one pair rather than a whole round. It logs what failed and
+// returns it.
+func (s *Shipper) shipProject(ctx context.Context, sink *domain.EventSink, projectID string) error {
+	ctx, span := startJobSpan(ctx, "audit.ShipEvents",
 		attribute.String("zitadel.event_sink.id", sink.ID),
 		attribute.String("zitadel.project.id", projectID),
 	)
@@ -207,7 +302,7 @@ func (s *Shipper) shipProject(sink *domain.EventSink, projectID string) {
 			slog.String("project_id", projectID),
 			slog.String("error", err.Error()),
 		)
-		return
+		return err
 	}
 	if cursor == nil {
 		cursor = &domain.EventSinkCursor{
@@ -219,7 +314,7 @@ func (s *Shipper) shipProject(sink *domain.EventSink, projectID string) {
 	for {
 		if err := ctx.Err(); err != nil {
 			failJobSpan(ctx, err)
-			return
+			return err
 		}
 		batch, err := s.src.ListEventsAfterCursor(ctx, projectID, cursor.LastCreatedAt, cursor.LastEventID, shipPageSize)
 		if err != nil {
@@ -229,10 +324,10 @@ func (s *Shipper) shipProject(sink *domain.EventSink, projectID string) {
 				slog.String("project_id", projectID),
 				slog.String("error", err.Error()),
 			)
-			return
+			return err
 		}
 		if len(batch) == 0 {
-			return
+			return nil
 		}
 		var last *domain.Event
 		for _, ev := range batch {
@@ -244,25 +339,27 @@ func (s *Shipper) shipProject(sink *domain.EventSink, projectID string) {
 					slog.String("event_id", ev.ID),
 					slog.String("error", err.Error()),
 				)
-				s.upsertCursor(ctx, sink.ID, projectID, cursor, last)
-				return
+				_ = s.upsertCursor(ctx, sink.ID, projectID, cursor, last)
+				return err
 			}
 			cursor.LastCreatedAt = ev.CreatedAt
 			cursor.LastEventID = ev.ID
 			last = ev
 		}
-		if !s.upsertCursor(ctx, sink.ID, projectID, cursor, last) {
-			return
+		if err := s.upsertCursor(ctx, sink.ID, projectID, cursor, last); err != nil {
+			return err
 		}
 		if len(batch) < shipPageSize {
-			return
+			return nil
 		}
 	}
 }
 
-func (s *Shipper) upsertCursor(ctx context.Context, sinkID, projectID string, cursor *domain.EventSinkCursor, last *domain.Event) bool {
+// upsertCursor stores the cursor when the page delivered an event. It logs a
+// failure to store it and returns it.
+func (s *Shipper) upsertCursor(ctx context.Context, sinkID, projectID string, cursor *domain.EventSinkCursor, last *domain.Event) error {
 	if last == nil {
-		return true
+		return nil
 	}
 	if err := s.src.UpsertEventSinkCursor(ctx, cursor); err != nil {
 		failJobSpan(ctx, err)
@@ -272,9 +369,9 @@ func (s *Shipper) upsertCursor(ctx context.Context, sinkID, projectID string, cu
 			slog.String("event_id", last.ID),
 			slog.String("error", err.Error()),
 		)
-		return false
+		return err
 	}
-	return true
+	return nil
 }
 
 func (s *Shipper) deliver(ctx context.Context, sink *domain.EventSink, ev *domain.Event) error {

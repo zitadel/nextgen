@@ -342,3 +342,99 @@ func TestShipper_StartSkipsDisabledSinks(t *testing.T) {
 	t.Cleanup(s.Close)
 	assert.Empty(t, s.sinks)
 }
+
+func TestExportConfig_Validate(t *testing.T) {
+	assert.NoError(t, ExportConfig{}.Validate())
+	assert.NoError(t, ExportConfig{Sinks: []SinkConfig{{Type: domain.EventSinkTypeStdout}, {Type: domain.EventSinkTypeWebhook, URL: "https://example.invalid/hook"}, {}}}.Validate())
+	err := ExportConfig{Sinks: []SinkConfig{{Type: "webhkok", URL: "https://example.invalid/hook"}}}.Validate()
+	assert.EqualError(t, err, `events.export.sinks: unsupported event sink type "webhkok"`)
+}
+
+// visitRecordingSource records the order the projects' cursors are read in,
+// and can end a context at the first read.
+type visitRecordingSource struct {
+	*fakeExportSource
+	visited []string
+	atFirst func()
+}
+
+func (s *visitRecordingSource) GetEventSinkCursor(ctx context.Context, sinkID, projectID string) (*domain.EventSinkCursor, error) {
+	s.visited = append(s.visited, projectID)
+	if len(s.visited) == 1 && s.atFirst != nil {
+		s.atFirst()
+	}
+	return s.fakeExportSource.GetEventSinkCursor(ctx, sinkID, projectID)
+}
+
+func stdoutShipper(src EventExportSource) *Shipper {
+	return NewShipper(src, ExportConfig{Enabled: true, Interval: time.Hour, Sinks: []SinkConfig{{Type: domain.EventSinkTypeStdout}}})
+}
+
+// A round that a wake-up runs has a deadline. It starts at a project picked
+// per round, so the projects a short round leaves are not the same every
+// time.
+func TestShipper_OnceStartsAtThePickedProject(t *testing.T) {
+	src := &visitRecordingSource{fakeExportSource: newFakeExportSource([]string{"proj_a", "proj_b", "proj_c"}, nil)}
+	s := stdoutShipper(src)
+	s.firstProject = func(n int) int {
+		assert.Equal(t, 3, n)
+		return 2
+	}
+
+	require.NoError(t, s.Once(t.Context()))
+	assert.Equal(t, []string{"proj_c", "proj_a", "proj_b"}, src.visited)
+
+	src.visited = nil
+	s.shipOnce()
+	assert.Equal(t, []string{"proj_a", "proj_b", "proj_c"}, src.visited, "the loop has no deadline and keeps the list's order")
+}
+
+// A round ends with its context and says so: what it left, the next ships.
+func TestShipper_OnceEndsWithItsContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	src := &visitRecordingSource{fakeExportSource: newFakeExportSource([]string{"proj_a", "proj_b", "proj_c"}, nil), atFirst: cancel}
+	s := stdoutShipper(src)
+	s.firstProject = func(int) int { return 0 }
+
+	err := s.Once(ctx)
+
+	require.ErrorIs(t, err, context.Canceled)
+	assert.Equal(t, []string{"proj_a"}, src.visited)
+}
+
+// The caller of a round hears that shipments failed, and how many; the loop
+// only logs them.
+func TestShipper_OnceReportsFailedShipments(t *testing.T) {
+	t0 := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	event := func(project string) []*domain.Event {
+		return []*domain.Event{{ProjectID: project, ID: "evt_1", CreatedAt: t0, EventType: domain.EventTypeUserCreated, Category: domain.EventCategoryEntity}}
+	}
+	src := newFakeExportSource([]string{"proj_a", "proj_b", "proj_c"}, map[string][]*domain.Event{"proj_a": event("proj_a"), "proj_c": event("proj_c")})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.Copy(io.Discard, r.Body)
+		w.WriteHeader(http.StatusBadGateway)
+	}))
+	t.Cleanup(srv.Close)
+	s := NewShipper(src, ExportConfig{Enabled: true, Interval: time.Hour, Sinks: []SinkConfig{{Type: domain.EventSinkTypeWebhook, URL: srv.URL}}})
+	s.client = srv.Client()
+
+	err := s.Once(t.Context())
+
+	require.EqualError(t, err, "2 of 3 shipments failed, the first: Bad Gateway")
+	assert.Empty(t, src.upserts)
+}
+
+// A round waits for the one this process is running, so the loop's round and
+// a wake-up's never deliver the same events twice.
+func TestShipper_RoundsOfOneProcessRunOneAfterTheOther(t *testing.T) {
+	src := &visitRecordingSource{fakeExportSource: newFakeExportSource([]string{"proj_a"}, nil)}
+	s := stdoutShipper(src)
+	s.shipping <- struct{}{} // a round is running
+
+	ctx, cancel := context.WithTimeout(t.Context(), 20*time.Millisecond)
+	defer cancel()
+	err := s.Once(ctx)
+
+	assert.ErrorIs(t, err, context.DeadlineExceeded, "the second waited for the first until its own deadline")
+	assert.Empty(t, src.visited, "and never read a cursor")
+}
