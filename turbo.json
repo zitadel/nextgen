@@ -451,8 +451,8 @@
       "cache": false,
       "inputs": ["scripts/doctor.mjs", "scripts/server-build.mjs", "scripts/dev-process.mjs"]
     },
-    // `workspace:cli` is not a turbo task: it is interactive, which turbo only
-    // supports inside its terminal UI. Run `pnpm run cli -- ...` directly.
+    // The root `cli` script is not a turbo task: it is interactive, which turbo
+    // only supports inside its terminal UI. Run `pnpm run cli -- ...` directly.
     // Under `turbo watch server` a Go or console edit restarts the server
     // (`interruptible`): its edges reach both.
     "//#server": {

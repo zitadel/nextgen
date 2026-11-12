@@ -5,6 +5,10 @@
 > [turborepo-migration.md](turborepo-migration.md) (the switch). The rules
 > that came out of it live in turborepo.md; this note keeps the evidence, the
 > reasoning and the measurements.
+>
+> **Outcome:** moon was removed in #2881
+> ([ADR 089](../../adrs/089-turborepo-task-runner.md)); the moon comparisons
+> here are history.
 
 ## Short answer
 
