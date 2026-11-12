@@ -392,6 +392,11 @@ project's Vercel Firewall, each counting per address in a fixed window of
   on `main` deploys as production. A preview per queue branch would build
   every service again and leave one more database behind for every
   queued pull request.
+- **Dependabot pull requests get no preview.** `git.deploymentEnabled`
+  turns off deployments of `dependabot/**`. Vercel credits a bot's
+  deployment to a team member, who gets its failure emails, and the pull
+  request's CI builds the same code. To check a dependency bump on a
+  preview, push it to a branch of your own.
 - **Migrations must be expand/contract.** The previous deployment serves on
   the new schema until the new one is live, and Instant Rollback promotes
   an older deployment without touching the schema.
