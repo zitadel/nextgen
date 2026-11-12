@@ -94,7 +94,7 @@ export function ResourceTitle({
   filter?: ReactNode;
   /**
    * Keeps the filter on its own row under the title at every width, for one
-   * that wants the row's whole width (Logs' search, which fills with chips).
+   * that wants the row's whole width (Events' search, which fills with chips).
    */
   filterBelow?: boolean;
   /**
@@ -196,7 +196,7 @@ export const RESOURCE_STICKY_BODY =
  * `comfortable`, the default, is the design's 56px with 8px block padding: a
  * row with a second line under its name, or a mark beside it. `compact` is
  * 40px with 4px: one line a row, where the list is read by the screenful
- * (Logs). A compact row's menu takes `RowMenu`'s `icon-xs`, the 24px button
+ * (Events). A compact row's menu takes `RowMenu`'s `icon-xs`, the 24px button
  * a narrow menu column sizes itself for.
  */
 export const RESOURCE_DENSITY = {
@@ -299,8 +299,10 @@ export function ResourceHeadCell({
 }
 
 /**
- * The empty header cell over the row menus. `narrow` for a column that is the
- * menu's button and no wider, with {@link RESOURCE_MENU_CELL_NARROW} beneath.
+ * The header cell over the row menus: blank on screen, "Actions" to a screen
+ * reader, so the menu cells have a column header like every other cell.
+ * `narrow` for a column that is the menu's button and no wider, with
+ * {@link RESOURCE_MENU_CELL_NARROW} beneath.
  */
 export function ResourceMenuHead({
   className,
@@ -317,7 +319,9 @@ export function ResourceMenuHead({
         narrow ? "w-[calc(var(--resource-menu,2.25rem)+1rem)] px-2" : "px-6",
         className,
       )}
-    />
+    >
+      <span className="sr-only">Actions</span>
+    </TableHead>
   );
 }
 

@@ -7,7 +7,7 @@
  * Vercel exposes bare hosts, so a scheme is prepended; Netlify exposes the full
  * deployment URL, which is used as-is. Cloudflare Pages is not detected: it
  * sets `CF_PAGES_URL` on production deployments too, and nothing in its build
- * environment marks a preview, so its URLs are passed with `--origin` (#1692).
+ * environment marks a preview, so its URLs are passed with `--origin`.
  *
  * Only a build's preview / per-deploy URLs belong here: a platform's
  * production or canonical-site variable (e.g. `VERCEL_PROJECT_PRODUCTION_URL`,
@@ -21,15 +21,23 @@ const PREVIEW_PLATFORMS: ReadonlyArray<{
 }> = [
   {
     variables: ["VERCEL_BRANCH_URL", "VERCEL_URL"],
-    urls: (env) =>
-      [env.VERCEL_BRANCH_URL, env.VERCEL_URL]
-        .filter((host): host is string => Boolean(host))
-        .map((host) => `https://${host}`),
+    urls: (env) => {
+      return [env.VERCEL_BRANCH_URL, env.VERCEL_URL]
+        .filter((host): host is string => {
+          return Boolean(host);
+        })
+        .map((host) => {
+          return `https://${host}`;
+        });
+    },
   },
   {
     variables: ["DEPLOY_PRIME_URL", "DEPLOY_URL"],
-    urls: (env) =>
-      [env.DEPLOY_PRIME_URL, env.DEPLOY_URL].filter((url): url is string => Boolean(url)),
+    urls: (env) => {
+      return [env.DEPLOY_PRIME_URL, env.DEPLOY_URL].filter((url): url is string => {
+        return Boolean(url);
+      });
+    },
   },
 ];
 

@@ -2,6 +2,7 @@ import { stat } from "node:fs/promises";
 import { join } from "node:path";
 
 import { ZitadelError } from "@/lib/errors";
+
 import { dependencyVersionMajor, hasDependency, readPackageJson } from "./package-json";
 import { detectDevPort, issuerFromPort } from "./port";
 import type { Detector, FrameworkFacts } from "./types";
@@ -28,7 +29,9 @@ export class NextDetector implements Detector {
    * an empty directory to scaffold.
    */
   async detect(cwd: string): Promise<FrameworkFacts | null> {
-    const pkg = await readPackageJson(cwd).catch(() => undefined);
+    const pkg = await readPackageJson(cwd).catch(() => {
+      return undefined;
+    });
     if (!pkg || !hasDependency(pkg, "next")) {
       return null;
     }

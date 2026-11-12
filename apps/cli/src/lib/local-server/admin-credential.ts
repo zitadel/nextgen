@@ -17,7 +17,7 @@ import {
   readRuntimeMetadata,
   sameLocalServer,
 } from "./runtime";
-import { shellCommand, unscopedCommand } from "@/lib/suggestion";
+import { shellCommand } from "@/lib/suggestion";
 
 /**
  * The local admin's two files under `.zitadel/local/` (gitignored):
@@ -62,7 +62,9 @@ export async function findLocalAdminFor(
 ): Promise<LocalAdmin | undefined> {
   for (const dir of ancestors(cwd, homedir())) {
     if ((await findLocalAdminDir(dir)) !== dir) continue;
-    const runtime = await readRuntimeMetadata(dir).catch(() => undefined);
+    const runtime = await readRuntimeMetadata(dir).catch(() => {
+      return undefined;
+    });
     if (runtime && sameLocalServer(runtime.server_url, serverUrl)) {
       return readLocalAdmin(dir);
     }
@@ -115,8 +117,8 @@ function malformedAdminFile(cause?: unknown): ZitadelError {
     hint: `Delete ${LOCAL_ADMIN_FILE} and run \`zitadel reset --force\`, then \`zitadel start\`. Both are needed: reset keeps ${LOCAL_ADMIN_FILE}, and deleting it alone leaves the server holding the old password.`,
     nextCommands: [
       shellCommand(`rm ${LOCAL_ADMIN_FILE}`),
-      unscopedCommand("reset --force"),
-      unscopedCommand("start"),
+      { id: "reset", flags: { force: true } },
+      { id: "start" },
     ],
     ...(cause ? { details: { cause: errorMessage(cause) } } : {}),
   });

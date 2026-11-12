@@ -1,7 +1,7 @@
 import type { GetClaimStatus200, InitClaim201 } from "@zitadel/api/generated/model";
 
-import type { ZitadelClient } from "@/lib/backend/client";
 import { ApiService } from "@/lib/backend/api-service";
+import type { ZitadelClient } from "@/lib/backend/client";
 import { BackendError } from "@/lib/backend/errors";
 
 /** A claim link, as the server mints it. */

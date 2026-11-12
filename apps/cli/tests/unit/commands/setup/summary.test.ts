@@ -5,7 +5,7 @@ import {
   formatFrameworkLine,
   relativeDisplayPath,
   signInOf,
-  signInSummary,
+  summarySections,
 } from "@/commands/setup/summary";
 import type { ScaffoldedProvider } from "@/lib/zitadel";
 import { it } from "@tests/helpers/fixtures";
@@ -28,12 +28,6 @@ const REACT_WITHOUT_VERSION = /^React · /;
  * Google, chosen from the catalog.
  */
 const GOOGLE: ScaffoldedProvider = { selection: { kind: "catalog", id: "google" } };
-
-/**
- * The sign-in setup configures for the password-first preset and the minimal
- * use case, with no provider.
- */
-const PASSWORD_FIRST = signInOf({ preset: "password-first", useCase: "minimal", sso: [] });
 
 /**
  * The version ranges that name no version the summary could show.
@@ -198,61 +192,57 @@ describe("signInOf", () => {
   });
 });
 
-describe("signInSummary", () => {
-  it("says what password-first enables and what registration asks for", () => {
-    const signIn = signInOf({
-      preset: "password-first",
-      useCase: "consumer",
-      sso: [],
-      passwordMinLength: null,
-    });
+describe("summarySections", () => {
+  it("keeps the styling of a secondary value as styling, not as text", () => {
+    const [section] = summarySections([
+      {
+        title: "Detected",
+        rows: [
+          {
+            label: "Package",
+            value: "@zitadel/sdk-next",
+            secondary: "\u001b[36mpackage.json\u001b[39m",
+          },
+        ],
+      },
+    ]);
 
-    const summary = signInSummary(signIn, []);
-
-    expect(summary).toBe(
-      [
-        "Users see email and password first; passkeys are enabled but not shown at sign-in.",
-        "Password and passkey are enabled in the user schema.",
-        "Registration requires email; givenName and familyName are optional.",
-        "Passwords have no minimum length.",
-        "No external providers will be added.",
-      ].join("\n"),
-    );
+    const [, value] = section?.facts[0] ?? [];
+    expect(value).toContain("\u001b[36mpackage.json\u001b[39m");
+    expect(value).not.toContain("\\x1b");
   });
 
-  it("says passkey-first shows a passkey first, with email and password as the alternative", () => {
-    const signIn = signInOf({ preset: "passkey-first", useCase: "minimal", sso: [] });
+  // Setup's report is the one a reader compares with every other command's,
+  // so it is stated in the same shape: a heading in the box's own case, no
+  // mark on a row, and no second column that only lines up by luck.
+  it("states the facts the way every other box states them", () => {
+    const sections = summarySections([
+      {
+        title: "Customize",
+        rows: [
+          { label: "User schema", value: ".zitadel/schemas/", secondary: "see its README.md" },
+          { label: "Login flow", value: ".zitadel/flows/", secondary: "see its README.md" },
+        ],
+      },
+    ]);
 
-    const summary = signInSummary(signIn, []);
-
-    expect(summary).toContain(
-      "Users see a passkey first, with email and password as the alternative.",
-    );
+    expect(sections).toEqual([
+      {
+        heading: "Customize",
+        facts: [
+          ["User schema", ".zitadel/schemas/ (see its README.md)"],
+          ["Login flow", ".zitadel/flows/ (see its README.md)"],
+        ],
+      },
+    ]);
   });
 
-  it("leaves out the optional clause when every field is required", () => {
-    const summary = signInSummary(PASSWORD_FIRST, []);
-
-    expect(summary).toContain("Registration requires email.");
-  });
-
-  it("says the minimum password length", () => {
-    const summary = signInSummary(PASSWORD_FIRST, []);
-
-    expect(summary).toContain("Passwords need at least 15 characters.");
-  });
-
-  describe("with providers selected", () => {
-    it("names them", () => {
-      const summary = signInSummary(PASSWORD_FIRST, ["Google", "Acme SSO"]);
-
-      expect(summary).toContain("External providers: Google, Acme SSO.");
-    });
-
-    it("does not say no providers will be added", () => {
-      const summary = signInSummary(PASSWORD_FIRST, ["Google", "Acme SSO"]);
-
-      expect(summary).not.toContain("No external providers");
-    });
+  it("leaves out a group nothing was written into", () => {
+    expect(
+      summarySections([
+        { title: "Detected", rows: [{ label: "Framework", value: "Next.js" }] },
+        { title: "Installed", rows: [] },
+      ]).map((group) => group.heading),
+    ).toEqual(["Detected"]);
   });
 });

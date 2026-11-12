@@ -1,15 +1,14 @@
 import { basename } from "node:path";
 
+import { loadPatchContext } from "@/commands/doctor/patch-context";
 import {
+  createZitadelClient,
   DeploymentService,
   OriginService,
-  createZitadelClient,
   type ZitadelClient,
 } from "@/lib/backend";
-
 import { type Consent, type Gate, isRefusal } from "@/lib/consent";
 import { errorMessage, isCancellation, toZitadelError, ZitadelError } from "@/lib/errors";
-import { DiskStore, ZitadelConfig } from "@/lib/zitadel";
 import { issuerFromPort, type Orca } from "@/lib/orca";
 import { portFromIssuer } from "@/lib/orca/detectors/port";
 import { replaceOrigin } from "@/lib/orca/patchers/rule/dev-port-move";
@@ -17,8 +16,8 @@ import type { PatchResult } from "@/lib/orca/patchers/types";
 import { readZitadelSecret, writeZitadelSecret } from "@/lib/project";
 import { readScaffoldManifest } from "@/lib/scaffold-manifest";
 import { updateScaffold } from "@/lib/sync/state";
-import { loadPatchContext } from "@/commands/doctor/patch-context";
 import { userAgent } from "@/lib/user-agent";
+import { DiskStore, ZitadelConfig } from "@/lib/zitadel";
 
 /** What {@link moveDevPort} changed. */
 export type DevPortMove = Readonly<{
@@ -64,6 +63,8 @@ export async function moveDevPort(opts: {
   signal: AbortSignal;
   /** Asks to remove the previous origin; the command's own confirmation. */
   consent: (gate: Gate) => Promise<Consent | undefined>;
+  /** Told once the files have moved, before the consent is asked. */
+  filesMoved?: (moved: Pick<DevPortMove, "previousIssuer" | "issuer" | "result">) => void;
 }): Promise<DevPortMove> {
   const { cwd, devPort, source, orca, cliVersion, dryRun, signal } = opts;
   const context = await loadPatchContext(cwd, orca, cliVersion);
@@ -97,19 +98,28 @@ export async function moveDevPort(opts: {
   const ctx = {
     ...context,
     issuer,
-    framework: { ...context.framework, devPort, url: issuer },
+    framework: {
+      ...context.framework,
+      devPort,
+      url: issuer,
+    },
   };
   const patcher = orca.patcherFor(ctx.framework.id);
-  const result = await patcher.moveDevPort(ctx, previousIssuer, { cwd, dryRun, force: false });
+  const result = await patcher.moveDevPort(ctx, previousIssuer, {
+    cwd,
+    dryRun,
+    force: false,
+  });
 
   if (!dryRun) {
     // The app's own origin is primary, so the move rewrites that list. An
     // older secret that still carries the issuer as a preview pattern is
     // rewritten too, so the stale URL is not left behind either way.
-    const rewrite = (patterns: string[]): string[] =>
-      replaceOrigin(patterns, previousIssuer, issuer).filter(
-        (pattern) => typeof pattern === "string",
-      );
+    const rewrite = (patterns: string[]): string[] => {
+      return replaceOrigin(patterns, previousIssuer, issuer).filter((pattern) => {
+        return typeof pattern === "string";
+      });
+    };
     await writeZitadelSecret(cwd, {
       ...secret,
       primary_origins: rewrite(secret.primary_origins),
@@ -117,11 +127,19 @@ export async function moveDevPort(opts: {
     });
     const manifest = await readScaffoldManifest(cwd);
     if (manifest !== undefined) {
-      await updateScaffold(cwd, { ...manifest, dev_port: devPort });
+      await updateScaffold(cwd, {
+        ...manifest,
+        dev_port: devPort,
+      });
     }
   }
   const served =
     dryRun || !moving ? {} : await serveNewOrigin(client, secret.project_id, issuer, devPort);
+  opts.filesMoved?.({
+    previousIssuer,
+    issuer,
+    result,
+  });
   const replacing = !dryRun && moving && portFromIssuer(previousIssuer) !== undefined;
   // A refusal for want of --force leaves the origin behind and says so;
   // anything else the request for consent throws (Ctrl-C, a bug) stops
@@ -131,7 +149,7 @@ export async function moveDevPort(opts: {
         .consent({
           verb: "replace",
           name: `remove ${previousIssuer} from the project's origins`,
-          message: `Remove ${previousIssuer}, the app's previous origin, from the project? ${issuer} replaces it.`,
+          message: `Remove ${previousIssuer}, the app's previous origin, from project ${secret.project_id} on ${source.replace(/^https?:\/\//, "")}, now that ${issuer} replaces it?`,
         })
         .catch((error: unknown) => {
           if (isRefusal(error)) {
@@ -153,7 +171,11 @@ export async function moveDevPort(opts: {
           () => {
             return undefined;
           },
-          () => {
+          (error: unknown) => {
+            if (isCancellation(error)) {
+              throw error;
+            }
+
             return previousIssuer;
           },
         );
@@ -184,16 +206,21 @@ async function serveNewOrigin(
   try {
     const extended = await deployments.extendPrimary(issuer, `Moved the dev port to ${devPort}`);
     switch (extended.outcome) {
-      case "deployed":
+      case "deployed": {
         return { deploymentId: extended.deployment.id };
-      case "unchanged":
+      }
+      case "unchanged": {
         return {};
-      case "none":
+      }
+      case "none": {
         return { undeployed: "nothing is deployed to the project yet" };
-      case "raced":
+      }
+      case "raced": {
         return { undeployed: "another deploy landed while the app moved" };
-      case "revoked":
+      }
+      case "revoked": {
         return { undeployed: "the release the previous port ran is revoked" };
+      }
     }
   } catch (error) {
     if (isCancellation(error)) {
@@ -219,14 +246,20 @@ async function connectionSlugs(cwd: string): Promise<readonly string[]> {
   const config = await ZitadelConfig.loadKinds(new DiskStore(cwd), ["connections"]);
   const named = [
     ...config.connections.all.map((connection) => {
-      return { path: connection.path, name: connection.slug };
+      return {
+        path: connection.path,
+        name: connection.slug,
+      };
     }),
     ...config.broken
       .filter((file) => {
         return file.kind === "connection";
       })
       .map((file) => {
-        return { path: file.path, name: basename(file.path, ".json") };
+        return {
+          path: file.path,
+          name: basename(file.path, ".json"),
+        };
       }),
   ];
   return named

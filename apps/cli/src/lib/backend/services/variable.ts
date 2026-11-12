@@ -1,6 +1,7 @@
 import type { GetVariable200, GetVariables200 } from "@zitadel/api/generated/model";
-import { isCancelled, type ZitadelClient } from "@/lib/backend/client";
+
 import { ApiService } from "@/lib/backend/api-service";
+import { isCancelled, type ZitadelClient } from "@/lib/backend/client";
 import { ForbiddenError, NotFoundError } from "@/lib/backend/errors";
 
 /** The kinds of value a name can hold: what primary deploys freeze, and what preview deploys freeze. */
@@ -276,7 +277,7 @@ export class Variable {
   /**
    * Every name on the project with the primary value it holds and the preview
    * value beside it. A name is listed when either kind holds a value, so a
-   * preview-only name does not disappear (#1617).
+   * preview-only name does not disappear.
    *
    * @param body - What a read without a kind answered.
    * @returns The variables, sorted by name.
@@ -365,7 +366,7 @@ export class VariableService extends ApiService {
   /**
    * Every name on the project, with its primary value and the preview value
    * beside it. A name that holds only a preview value is listed too, so it does
-   * not disappear from the project's own set (#1617).
+   * not disappear from the project's own set.
    *
    * @returns The variables, sorted by name.
    */

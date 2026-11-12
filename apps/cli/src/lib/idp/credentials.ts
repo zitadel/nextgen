@@ -5,9 +5,10 @@ import type {
   ClientSecretVariable,
   ConnectionEndpoints,
 } from "@zitadel/config/idp";
-import { consola } from "consola";
 
-import { type EnvironmentSelector, projectCommand, type SuggestedCommand } from "@/lib/suggestion";
+import { log } from "@/lib/log";
+import type { Suggest, SuggestedCommand } from "@/lib/suggestion";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 import { reportWarning } from "@/lib/warnings";
 
 /**
@@ -100,10 +101,17 @@ export type ClientIdToPublish = {
  */
 export async function storeClientSecret(secret: SecretToStore): Promise<SecretOutcome> {
   if (secret.value === undefined) {
-    return { name: secret.name, published: "deferred" };
+    return {
+      name: secret.name,
+      published: "deferred",
+    };
   }
   const published = await publishSecret(secret.publish, secret.name, secret.value, true);
-  return { name: secret.name, published };
+
+  return {
+    name: secret.name,
+    published,
+  };
 }
 
 /**
@@ -146,31 +154,12 @@ async function publishSecret(
   }
   try {
     await publish(name, value, { secret });
+
     return "stored";
   } catch (error) {
-    consola.debug(`Publishing ${name} to the project failed`, error);
+    log.debug(`Publishing ${name} to the project failed`, error);
     return "failed";
   }
-}
-
-/**
- * The `variable set` arguments that publish one credential to the project.
- *
- * @remarks
- * Without `--preview` the write takes the platform's default: a client id,
- * which is not secret, is stored for both kinds, and a client secret for the
- * primary kind only. The engine resolves a connection's `${{ NAME }}` from the
- * project's own variables.
- *
- * @param name - The variable.
- * @param secret - Whether it is a secret one.
- * @returns The arguments.
- */
-function republishArgsFor(name: CredentialVariable, secret: boolean): readonly string[] {
-  if (secret) {
-    return ["variable", "set", name, "--secret"];
-  }
-  return ["variable", "set", name];
 }
 
 /**
@@ -178,24 +167,30 @@ function republishArgsFor(name: CredentialVariable, secret: boolean): readonly s
  * connection looks for it.
  *
  * @remarks
+ * Without `--preview` the write takes the platform's default: a client id,
+ * which is not secret, is stored for both kinds, and a client secret for the
+ * primary kind only. The engine resolves a connection's `${{ NAME }}` from the
+ * project's own variables.
+ *
  * Shared so the warning printed to a terminal and the `next_commands` a JSON
  * run reports cannot drift apart — a JSON run prints no warnings at all, so
  * that list is the only place the recovery step appears.
  *
  * @param name - The variable.
  * @param secret - Whether it is a secret one.
- * @param cliVersion - The running CLI's version, for the public spelling.
- * @param selector - The run's `--env`/`--env-file`/`--server`, so the retry
- *   targets the same project.
+ * @param suggest - Renders the command for the run, scope included.
  * @returns The command.
  */
 export function republishCommand(
   name: CredentialVariable,
   secret: boolean,
-  cliVersion: string,
-  selector: EnvironmentSelector,
+  suggest: Suggest,
 ): SuggestedCommand {
-  return projectCommand(republishArgsFor(name, secret).join(" "), selector, cliVersion);
+  if (secret) {
+    return suggest({ id: "variable:set", args: { name }, flags: { secret: true } });
+  }
+
+  return suggest({ id: "variable:set", args: { name } });
 }
 
 /**
@@ -215,23 +210,18 @@ export type CredentialRecovery = {
 };
 
 /**
- * The arguments that finish the job for every credential the project did not
- * receive — empty in the ordinary case, where both were stored.
+ * The credentials the project did not receive — empty in the ordinary case,
+ * where both were stored.
  *
  * @remarks
- * Argument lists rather than command strings, for a caller that also reports
- * them as `next_args`; {@link republishCommands} is built from this, so the
- * two forms list the same commands.
+ * Typed, not rendered, for a caller that reports each as a command and as
+ * `next_args`: it builds both from the same `variable set` input, which is
+ * what {@link republishCommands} does for the commands.
  *
  * @param credentials - Each credential of the run and what became of it.
- * @param extraArgs - Appended to every command, such as the `--cwd` the run
- *   was given, so the recovery reaches the same Project.
- * @returns One argument list per credential the project lacks.
+ * @returns One entry per credential the project lacks.
  */
-export function republishArgs(
-  credentials: readonly CredentialRecovery[],
-  extraArgs: readonly string[] = [],
-): readonly (readonly string[])[] {
+export function unpublished(credentials: readonly CredentialRecovery[]): readonly Unpublished[] {
   return credentials.flatMap((credential) => {
     const name = credential.name;
     if (name === undefined) {
@@ -240,30 +230,44 @@ export function republishArgs(
     if (credential.published === undefined || credential.published === "stored") {
       return [];
     }
-    return [[...republishArgsFor(name, credential.secret), ...extraArgs]];
+
+    return [{ name, secret: credential.secret }];
   });
 }
 
 /**
- * {@link republishArgs} as commands to run.
+ * A credential the project lacks, which `variable set` puts there.
+ */
+export type Unpublished = {
+  /**
+   * The variable.
+   */
+  readonly name: CredentialVariable;
+
+  /**
+   * Whether it is a secret one.
+   */
+  readonly secret: boolean;
+};
+
+/**
+ * {@link unpublished} as commands to run.
  *
  * @remarks
- * Built for a run that prints nothing: with `--json` consola is disabled, so
+ * Built for a run that prints nothing: with `--json` narration is disabled, so
  * the warnings above never appear and this list is the only place the recovery
  * step is stated.
  *
  * @param credentials - Each credential of the run and what became of it.
- * @param cliVersion - The running CLI's version, for the public spelling.
- * @param selector - The run's environment selector.
+ * @param suggest - Renders each command for the run, scope included.
  * @returns One command per credential the project lacks.
  */
 export function republishCommands(
   credentials: readonly CredentialRecovery[],
-  cliVersion: string,
-  selector: EnvironmentSelector,
+  suggest: Suggest,
 ): readonly SuggestedCommand[] {
-  return republishArgs(credentials).map((args) => {
-    return projectCommand(args.join(" "), selector, cliVersion);
+  return unpublished(credentials).map((missing) => {
+    return republishCommand(missing.name, missing.secret, suggest);
   });
 }
 
@@ -291,7 +295,7 @@ function reportPublished(
 ): void {
   switch (state) {
     case "stored": {
-      consola.success(`Published ${name} to the project`);
+      log.done(`Published ${escapeControlCharacters(name)} to the project`);
       return;
     }
     case "deferred": {
@@ -313,17 +317,15 @@ function reportPublished(
  * Tell the developer what became of the secret.
  *
  * @param outcome - Where the secret ended up.
- * @param cliVersion - The running CLI's version, for the public spelling.
  * @param noValue - Whether a deferral means no value was given.
- * @param selector - The run's environment selector.
+ * @param suggest - Renders the command that publishes it, for the run.
  */
 export function reportSecretOutcome(
   outcome: SecretOutcome,
-  cliVersion: string,
   noValue: boolean,
-  selector: EnvironmentSelector,
+  suggest: Suggest,
 ): void {
-  const republish = republishCommand(outcome.name, true, cliVersion, selector);
+  const republish = republishCommand(outcome.name, true, suggest);
   reportPublished(outcome.name, outcome.published, republish, noValue);
 }
 
@@ -336,16 +338,14 @@ export function reportSecretOutcome(
  *
  * @param name - The variable.
  * @param state - What became of it.
- * @param cliVersion - The running CLI's version, for the public spelling.
- * @param selector - The run's environment selector.
+ * @param suggest - Renders the command that publishes it, for the run.
  */
 export function reportClientIdOutcome(
   name: ClientIdVariable,
   state: PublishState,
-  cliVersion: string,
-  selector: EnvironmentSelector,
+  suggest: Suggest,
 ): void {
-  const republish = republishCommand(name, false, cliVersion, selector);
+  const republish = republishCommand(name, false, suggest);
   reportPublished(name, state, republish, false);
 }
 

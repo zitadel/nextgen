@@ -1,11 +1,13 @@
 import { Flags } from "@oclif/core";
 
-import { type EscapeOptions, escapeControlCharacters } from "@/lib/terminal-text";
-import { isObject } from "@/lib/json";
 import { Cmd } from "@/lib/cmd";
+import { isObject } from "@/lib/json";
+import { type EscapeOptions, escapeControlCharacters } from "@/lib/terminal-text";
+import type { Summary } from "@/lib/ui";
+
 import type { BaseCommand } from "./base";
 import { listData } from "./envelope";
-import { painted, rows } from "./rendering";
+import { painted, type Rendering, rows } from "./rendering";
 import type { CommandResult, JsonEnvelope } from "./types";
 
 /** A class that can be extended, abstract or not, whatever arguments it takes. */
@@ -33,12 +35,11 @@ export type ListFlags = { readonly plain: boolean | undefined };
 
 /**
  * The next page of a paged list. A page token only works with the flags that
- * issued it, so `flags` repeats them: `emitList` appends the token and `--json`.
+ * issued it, so `emitList` suggests the run again as typed with the token in
+ * place of any it was given, and `--json` when the run was JSON.
  */
 export type ListPage = {
   token: string | null;
-  command: string;
-  flags: readonly string[];
   /** The envelope property the cursor is reported under, when the platform spells it differently. */
   cursorKey?: string;
 };
@@ -98,10 +99,11 @@ const ONE_LINE: EscapeOptions = { keepLayout: false };
  * escaped for all of them and none can drive the terminal.
  */
 const readCell = (column: string, item: unknown, options?: EscapeOptions): string => {
-  const value = column
-    .split(".")
-    .reduce<unknown>((current, key) => (isObject(current) ? current[key] : undefined), item);
+  const value = column.split(".").reduce<unknown>((current, key) => {
+    return isObject(current) ? current[key] : undefined;
+  }, item);
   const text = value == null ? "" : typeof value === "string" ? value : JSON.stringify(value);
+
   return escapeControlCharacters(text, options);
 };
 
@@ -116,7 +118,9 @@ const tabulateRows = (columns: readonly string[], items: readonly unknown[]): st
   return items
     .map((item) => {
       return columns
-        .map((column) => readCell(column, item).replaceAll("\t", "\\t").replaceAll("\n", "\\n"))
+        .map((column) => {
+          return readCell(column, item).replaceAll("\t", "\\t").replaceAll("\n", "\\n");
+        })
         .join("\t");
     })
     .join("\n");
@@ -164,10 +168,19 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
       }
       const { makeTable } = await import("@oclif/table");
       const table = makeTable({
-        data: items.map((item) =>
-          Object.fromEntries(columns.map((column) => [column, readCell(column, item, ONE_LINE)])),
-        ),
-        columns: columns.map((key) => ({ key, name: key.split(".").at(-1) ?? key })),
+        data: items.map((item) => {
+          return Object.fromEntries(
+            columns.map((column) => {
+              return [column, readCell(column, item, ONE_LINE)];
+            }),
+          );
+        }),
+        columns: columns.map((key) => {
+          return {
+            key,
+            name: key.split(".").at(-1) ?? key,
+          };
+        }),
         borderStyle: "headers-only-with-underline",
         maxWidth: "none",
         // The library styles a header bold blue from its own reading of the
@@ -179,6 +192,7 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
           ? { bold: true, color: "blue" }
           : { bold: false, color: undefined },
       });
+
       return table.replace(/\n+$/, "");
     }
 
@@ -198,39 +212,77 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
       // screen to draw a table on.
       const plain = flags.plain === true || !this.isOnScreen;
       // The cursor is opaque text from the server: `Cmd.option` quotes it so
-      // whitespace or shell metacharacters cannot run from a copied command,
-      // and it is spelled out so what drives a terminal cannot either. The
-      // data keeps the cursor as it came, so paging with it still works.
+      // whitespace, shell metacharacters and control characters cannot run from
+      // a copied command, and spelling it out first would change what it reads
+      // back as. The data keeps the cursor as it came, so paging with it works.
       const token = view.page?.token || null;
-      const shown = token === null ? null : escapeControlCharacters(token);
       const more =
-        shown === null ? [] : [`More available: ${Cmd.option("--page-token", shown)} (or --all)`];
-      // A paged list asks for its follow-up command whether or not there is a
-      // next page, so a command that cannot suggest one fails on its first run
-      // and not on the first result that spans two pages.
-      const followUp =
-        view.page === null
+        token === null ? [] : [`More available: ${Cmd.option("--page-token", token)} (or --all)`];
+      // The raw cursor: this command reaches the envelope, where a script
+      // reads it to page, and `renderNextSteps` spells it out for the copy a
+      // person sees. The rest is the run again as typed, so the token goes
+      // with the flags that issued it.
+      const nextCommand =
+        token === null
           ? undefined
-          : this.suggestFollowUp(
-              [
-                view.page.command,
-                ...view.page.flags,
-                // The raw cursor: this command reaches the envelope, where a
-                // script reads it to page, and `renderNextSteps` spells it out
-                // for the copy a person sees.
-                Cmd.option("--page-token", token ?? ""),
-                "--json",
-              ].join(" "),
-            );
-      const nextCommand = token === null ? undefined : followUp;
+          : await this.rerun({
+              without: ["pageToken", "all"],
+              after: { pageToken: token, ...(this.jsonEnabled() ? { json: true } : {}) },
+            });
+      // What a script's rows leave out, said beside them on stderr: the empty
+      // line and the footer would break `cut`, `awk` and `wc -l` on stdout, but
+      // a deployment id or an origin list is not the script's to lose.
+      const aside = [
+        ...(view.rows.length === 0
+          ? [escapeControlCharacters(view.empty)]
+          : view.footer.map((line) => {
+              return escapeControlCharacters(line);
+            })),
+        ...more,
+      ];
+      let rendered: { pretty?: Rendering } = {};
+      if (plain) {
+        rendered = { pretty: rows(await this.renderList(plain, view)) };
+      } else if (this.jsonEnabled()) {
+        rendered = { pretty: painted(await this.renderList(plain, view)) };
+      }
       return {
         status: "ok",
         data: view.items === undefined ? view.data : this.canonicalData(view, token),
+        ...rendered,
+        ...(plain && !this.jsonEnabled() && aside.length > 0 ? { footer: aside.join("\n") } : {}),
+        summary: await this.listSummary(view, more, !plain && !this.jsonEnabled()),
         ...(nextCommand === undefined ? {} : { next: { commands: [nextCommand] } }),
-        // Plain records are what a script reads, so they keep stdout to
-        // themselves; the aligned table is painted. Either way every fragment
-        // the rendering is composed of was spelled out where it was read.
-        pretty: (plain ? rows : painted)(await this.renderList(plain, view, more)),
+      };
+    }
+
+    /**
+     * How a person at a terminal sees the end of a list: the count is the
+     * headline, the table is what it produced, and the footer lines sit beside
+     * it. A list that found nothing says so, in the one sentence every list uses.
+     */
+    private async listSummary(
+      view: ListView,
+      more: readonly string[],
+      drawn: boolean,
+    ): Promise<Summary> {
+      if (view.rows.length === 0) {
+        return {
+          title: escapeControlCharacters(view.empty),
+          sections: [],
+          ...(more.length === 0 ? {} : { extras: [...more] }),
+        };
+      }
+      return {
+        title: `Found ${view.rows.length} ${new Intl.PluralRules("en").select(view.rows.length) === "one" ? view.singular : (view.plural ?? `${view.singular}s`)}`,
+        sections: [],
+        ...(drawn ? { lines: (await this.tabulate(view.columns, view.rows)).split("\n") } : {}),
+        extras: [
+          ...view.footer.map((line) => {
+            return escapeControlCharacters(line);
+          }),
+          ...more,
+        ],
       };
     }
 
@@ -243,48 +295,29 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
         nextPageToken: token,
         cursorKey: view.page?.cursorKey,
       });
-      const replaced = Object.keys(view.extra).filter((key) => key in canonical);
+      const replaced = Object.keys(view.extra).filter((key) => {
+        return key in canonical;
+      });
       if (replaced.length > 0) {
         throw new Error(`a list's extra fields may not replace ${replaced.join(", ")}`);
       }
-      return { ...canonical, ...view.extra };
+      return {
+        ...canonical,
+        ...view.extra,
+      };
     }
 
     /**
-     * The terminal rendering of a list: a pipe (or `--plain`) gets tab-separated
-     * rows with no header and nothing when empty, so `cut`, `awk` and `wc -l`
-     * work; a terminal gets the aligned table, a blank line, a
-     * `${n} ${singular|plural}` count and the footer lines. Nothing under
-     * `--json`.
+     * What a script reads of a list: tab-separated rows with no header and
+     * nothing when empty, so `cut`, `awk` and `wc -l` work. Nothing under
+     * `--json`. A terminal is not drawn from this but from the summary.
      */
-    private async renderList(
-      plain: boolean,
-      view: ListView,
-      more: readonly string[],
-    ): Promise<string> {
-      if (this.jsonEnabled()) {
+    private async renderList(plain: boolean, view: ListView): Promise<string> {
+      if (this.jsonEnabled() || !plain) {
         return "";
       }
-      if (plain) {
-        return tabulateRows(view.columns, view.rows);
-      }
-      // A view's words carry what the server answered as readily as a cell
-      // does — an id in the empty line, the origins a footer names — so they
-      // are spelled out here, where the cells and the cursor already are.
-      if (view.rows.length === 0) {
-        // A page can be empty while more remain: the events list matches some
-        // filters over a bounded number of events per request.
-        return [escapeControlCharacters(view.empty), ...more].join("\n");
-      }
-      const plural = view.plural ?? `${view.singular}s`;
-      const count = `${view.rows.length} ${view.rows.length === 1 ? view.singular : plural}`;
-      return [
-        await this.tabulate(view.columns, view.rows),
-        "",
-        count,
-        ...view.footer.map((line) => escapeControlCharacters(line)),
-        ...more,
-      ].join("\n");
+
+      return tabulateRows(view.columns, view.rows);
     }
 
     /**
@@ -302,15 +335,28 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
       // Width is measured over the fields that survive, so an omitted one cannot
       // pad every other label out of alignment.
       const rows = fields
-        .map((field) => [field.split(".").at(-1) ?? field, readCell(field, item)] as const)
-        .filter(([, value]) => value !== "");
-      const width = Math.max(0, ...rows.map(([label]) => label.length));
-      const body = rows.map(([label, value]) => `${label.padEnd(width)}  ${value}`);
+        .map((field) => {
+          return [field.split(".").at(-1) ?? field, readCell(field, item)] as const;
+        })
+        .filter(([, value]) => {
+          return value !== "";
+        });
+      const width = Math.max(
+        0,
+        ...rows.map(([label]) => {
+          return label.length;
+        }),
+      );
+      const body = rows.map(([label, value]) => {
+        return `${label.padEnd(width)}  ${value}`;
+      });
       // The heading is a field of the record, so it is the server's text as
       // much as any cell is, and `readCell` spells out only the cells.
       const headed = heading === undefined ? [] : [escapeControlCharacters(heading), ""];
+
       return [...headed, ...body].join("\n");
     }
   }
+
   return TabulatableCommand;
 }

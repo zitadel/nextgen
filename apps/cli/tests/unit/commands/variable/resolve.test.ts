@@ -267,7 +267,7 @@ describe("variable resolve", () => {
     });
 
     expect(exitCode).toBe(0);
-    expect(stdout).toContain("dep_old froze no variables.");
+    expect(stdout).toContain("dep_old froze no variables · project");
   });
 
   it("says a deployment the project does not have is not found", async () => {
@@ -321,7 +321,7 @@ describe("deployment_id", () => {
     ).rejects.toMatchObject({
       code: "E_VALIDATION",
       message: expect.stringContaining("must be a deployment ID"),
-      hint: "Find one with `zitadel deployment list`, or omit it to read the live deployment.",
+      hint: "List the deployments to find one, or omit it to read the live deployment.",
     });
   });
 });

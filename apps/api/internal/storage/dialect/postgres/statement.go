@@ -23,6 +23,7 @@ type statements struct {
 	jsonSchemaStatements
 	releaseStatements
 	idpConnectionStatements
+	applicationStatements
 	policyStatements
 	idpIdentityLinkStatements
 	deploymentStatements
@@ -43,6 +44,7 @@ type statements struct {
 	claimStatements
 	invitationStatements
 	resourceScopeStatements
+	searchEntryStatements
 	authzAssignmentStatements
 	authzMembershipEdgeStatements
 	authzCatalogStatements
@@ -68,6 +70,7 @@ func newStatements(client queryExecutor) statements {
 		jsonSchemaStatements:          newJSONSchemaStatements(client),
 		releaseStatements:             newReleaseStatements(client),
 		idpConnectionStatements:       newIDPConnectionStatements(client),
+		applicationStatements:         newApplicationStatements(client),
 		policyStatements:              newPolicyStatements(client),
 		idpIdentityLinkStatements:     newIDPIdentityLinkStatements(client),
 		deploymentStatements:          newDeploymentStatements(client),
@@ -88,6 +91,7 @@ func newStatements(client queryExecutor) statements {
 		claimStatements:               newClaimStatements(client),
 		invitationStatements:          newInvitationStatements(client),
 		resourceScopeStatements:       newResourceScopeStatements(client),
+		searchEntryStatements:         newSearchEntryStatements(client),
 		authzAssignmentStatements:     newAuthzAssignmentStatements(client),
 		authzMembershipEdgeStatements: newAuthzMembershipEdgeStatements(client),
 		authzCatalogStatements:        newAuthzCatalogStatements(client),

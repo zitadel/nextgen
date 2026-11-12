@@ -993,6 +993,8 @@ var remappedErrors = []string{
 	// Attributes failing the user schema answer req.invalid, the way request
 	// validation answers a malformed body.
 	"domain.ErrUserAttributesInvalid",
+	// A finished invitation answers inv.not_found, so its state stays hidden.
+	"domain.ErrInvitationNotPending",
 }
 
 // operationExcludedErrors drops internal sentinels from the generated default

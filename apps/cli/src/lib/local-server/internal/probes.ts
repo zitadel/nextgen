@@ -81,15 +81,21 @@ export interface Network {
 const realNetwork: Network = {
   answers(port) {
     const hosts = ["127.0.0.1", "::1"];
-    return Promise.all(hosts.map((host) => connects(host, port))).then((results) =>
-      results.some(Boolean),
-    );
+    return Promise.all(
+      hosts.map((host) => {
+        return connects(host, port);
+      }),
+    ).then((results) => {
+      return results.some(Boolean);
+    });
   },
   canBind(port) {
     return new Promise((resolve) => {
       const probe = createServer();
       probe.once("error", () => resolve(false));
-      probe.listen({ port, exclusive: true }, () => probe.close(() => resolve(true)));
+      probe.listen({ port, exclusive: true }, () => {
+        return probe.close(() => resolve(true));
+      });
     });
   },
 };

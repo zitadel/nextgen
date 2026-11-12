@@ -218,7 +218,7 @@ describe("users screen", () => {
       "Status",
       "Member of",
       "ID",
-      "",
+      "Actions",
     ]);
     expect(table.getByText("familyName: Patel · givenName: Maya")).toBeInTheDocument();
   });
@@ -266,7 +266,7 @@ describe("users screen", () => {
       "Status",
       "Member of",
       "ID",
-      "",
+      "Actions",
     ]);
     // The ID is the column that is cut to fit; the tooltip keeps it whole.
     expect(table.getByTitle("user_1")).toHaveTextContent("user_1");
@@ -1672,9 +1672,10 @@ describe("users screen", () => {
   it("reads only the rows for a new term, keeping the older revisions filter", async () => {
     serveLineage();
     const bodies = recordQueries(() => HttpResponse.json({ users: [] }));
-    // The load's schema reads are lists. A read of one schema by id comes only
-    // from the columns of rows this test never has: an earlier test's search
-    // still reading, which MSW reports to every listener.
+    // What a search must not read again is the filter's own chrome: the
+    // options, the revisions and the newest revision, all reads of the schema
+    // list. A schema read by its id is a row's columns, and with no rows here
+    // it is an earlier test's replaced search finishing late (`serveLineage`).
     const schemaReads: string[] = [];
     const countSchemaReads = ({ request }: { request: Request }) => {
       const url = new URL(request.url);
