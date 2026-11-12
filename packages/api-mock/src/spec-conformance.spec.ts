@@ -2916,4 +2916,147 @@ describe("api-mock releases and deployments", () => {
     expect(ok.status).toBe(200);
     expect(((await ok.json()) as { revoked_at: string }).revoked_at).not.toBeNull();
   });
+
+  describe("revoking a release a primary origin and a preview serve", () => {
+    const PREVIEW_URL = "https://acme-git-sso-acmeinc.vercel.app";
+
+    /** A project serving one release on its primary origin and on a preview URL. */
+    async function aReleaseServedTwice(name: string) {
+      const project = await newProject(name);
+      await addPrimary(project.id, project.secret, "https://app.acme.com");
+      await addPreview(project.id, project.secret, "https://*-acmeinc.vercel.app");
+      const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+        id: string;
+      };
+      const primary = (await (
+        await createDeployment(project.id, project.secret, {
+          release_id: release.id,
+          targets: "primary",
+        })
+      ).json()) as { id: string };
+      const preview = (await (
+        await createDeployment(project.id, project.secret, {
+          release_id: release.id,
+          targets: [PREVIEW_URL],
+          ttl: "PT168H",
+        })
+      ).json()) as { id: string };
+      return { project, release, primary, preview };
+    }
+
+    const revoke = (project: { id: string; secret: string }, releaseId: string) =>
+      fetch(`${BASE}/releases/${releaseId}/revoke?project_id=${project.id}`, {
+        method: "POST",
+        headers: { authorization: `Bearer ${project.secret}` },
+      });
+
+    const removePreview = (project: { id: string; secret: string }) =>
+      fetch(`${BASE}/projects/${project.id}/previews/remove`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+        body: JSON.stringify({ origin: PREVIEW_URL }),
+      });
+
+    test("names each origin with its kind and the deployment that pins the release there", async () => {
+      const { project, release, primary, preview } = await aReleaseServedTwice("revoke-both");
+
+      const refused = await revoke(project, release.id);
+
+      expect(refused.status).toBe(409);
+      expect(await refused.json()).toEqual({
+        code: "rel.in_use",
+        message: "release: still served by an origin",
+        details: {
+          origins: [
+            { origin: PREVIEW_URL, deployment_id: preview.id, kind: "preview" },
+            { origin: "https://app.acme.com", deployment_id: primary.id, kind: "primary" },
+          ],
+        },
+      });
+    });
+
+    test("still names the primary origin once the preview is removed", async () => {
+      const { project, release, primary } = await aReleaseServedTwice("revoke-preview-removed");
+      await removePreview(project);
+
+      const refused = await revoke(project, release.id);
+
+      expect(refused.status).toBe(409);
+      expect(((await refused.json()) as { details: unknown }).details).toEqual({
+        origins: [{ origin: "https://app.acme.com", deployment_id: primary.id, kind: "primary" }],
+      });
+    });
+
+    test("still names the preview once another release is live on the primary origin", async () => {
+      const { project, release, preview } = await aReleaseServedTwice("revoke-primary-replaced");
+      const next = (await (await createRelease(project.id, project.secret, rel2)).json()) as {
+        id: string;
+      };
+      await createDeployment(project.id, project.secret, {
+        release_id: next.id,
+        targets: "primary",
+      });
+
+      const refused = await revoke(project, release.id);
+
+      expect(refused.status).toBe(409);
+      expect(((await refused.json()) as { details: unknown }).details).toEqual({
+        origins: [{ origin: PREVIEW_URL, deployment_id: preview.id, kind: "preview" }],
+      });
+    });
+
+    test("allows the revoke once the preview is removed and another release is live", async () => {
+      const { project, release } = await aReleaseServedTwice("revoke-freed");
+      await removePreview(project);
+      const next = (await (await createRelease(project.id, project.secret, rel2)).json()) as {
+        id: string;
+      };
+      await createDeployment(project.id, project.secret, {
+        release_id: next.id,
+        targets: "primary",
+      });
+
+      const revoked = await revoke(project, release.id);
+
+      expect(revoked.status).toBe(200);
+    });
+
+    test("is not held by a preview that has expired", async () => {
+      const { project, release } = await aReleaseServedTwice("revoke-preview-expired");
+      const next = (await (await createRelease(project.id, project.secret, rel2)).json()) as {
+        id: string;
+      };
+      await createDeployment(project.id, project.secret, {
+        release_id: next.id,
+        targets: "primary",
+      });
+      vi.useFakeTimers({ toFake: ["Date"] });
+      try {
+        vi.setSystemTime(Date.now() + 8 * 24 * 3_600_000);
+
+        const revoked = await revoke(project, release.id);
+
+        expect(revoked.status).toBe(200);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    test("lists the same origins as the live deployments view", async () => {
+      const { project, release } = await aReleaseServedTwice("revoke-matches-live");
+
+      const refused = (await (await revoke(project, release.id)).json()) as {
+        details: { origins: { origin: string }[] };
+      };
+      const live = (await (
+        await fetch(`${BASE}/deployments?project_id=${project.id}&live=true`)
+      ).json()) as { deployments: { targets: { origin: string }[] }[] };
+
+      expect(refused.details.origins.map((served) => served.origin).sort()).toEqual(
+        live.deployments
+          .flatMap((deployment) => deployment.targets.map((target) => target.origin))
+          .sort(),
+      );
+    });
+  });
 });

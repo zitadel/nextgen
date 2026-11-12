@@ -111,6 +111,59 @@ export async function aProjectWithTwoDeploys(
   };
 }
 
+/** A preview pattern and a URL it admits, for a project that serves a release on a preview. */
+export const PREVIEW_PATTERN = "https://*-acme.vercel.app";
+export const PREVIEW_URL = "https://x-acme.vercel.app";
+
+/** The primary origin {@link aReleaseServedOn} registers. */
+export const PRIMARY_ORIGIN = "https://app.acme.com";
+
+/**
+ * A project on the mock with one release live on a primary origin, on a
+ * preview URL, or on both, its directory, and the deployments that serve it.
+ *
+ * @param prefix - The project's name, and the prefix of its directory.
+ * @param served - Where the release is live.
+ * @returns The directory, the release, and the deployment serving it on each
+ * origin kind it was put live on. The caller removes the directory.
+ */
+export async function aReleaseServedOn(
+  prefix: string,
+  served: { primary: boolean; preview: boolean },
+): Promise<{ cwd: string; releaseId: string; primary?: string; preview?: string }> {
+  const { id, project_secret: secret } = CreatedProject.parse(
+    await callPlatform("/projects", "", { name: prefix }),
+  );
+  await callPlatform(`/projects/${id}/origins`, secret, {
+    pattern: PRIMARY_ORIGIN,
+    kind: "primary",
+  });
+  await callPlatform(`/projects/${id}/origins`, secret, {
+    pattern: PREVIEW_PATTERN,
+    kind: "preview",
+  });
+  const release = Created.parse(
+    await callPlatform(`/releases?project_id=${id}`, secret, {
+      pointers: [{ kind: "schema", revision_id: "sch_a" }],
+    }),
+  );
+  const deploy = async (body: object): Promise<string> => {
+    return Created.parse(
+      await callPlatform(`/deployments?project_id=${id}`, secret, {
+        release_id: release.id,
+        ...body,
+      }),
+    ).id;
+  };
+
+  return {
+    cwd: await aProjectDirectory(prefix, { id, secret }),
+    releaseId: release.id,
+    ...(served.primary ? { primary: await deploy({ targets: "primary" }) } : {}),
+    ...(served.preview ? { preview: await deploy({ targets: [PREVIEW_URL], ttl: "PT168H" }) } : {}),
+  };
+}
+
 /**
  * Answers the live deployment list in two pages: a live preview first, and
  * `primary` only behind the cursor, so a read of the first page alone misses it.

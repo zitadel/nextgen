@@ -63,10 +63,18 @@ describe("ReleaseService.revoke", () => {
   });
 
   describe("when an origin still serves the release", () => {
+    /** A primary origin that serves the release, as the server names it. */
     const PRIMARY = { origin: "https://app.acme.com", deployment_id: "dep_1", kind: "primary" };
+
+    /** A preview that serves the release, as the server names it. */
     const PREVIEW = { origin: "https://x.vercel.app", deployment_id: "dep_2", kind: "preview" };
 
-    /** A service whose server refuses the revoke with the answer `body`. */
+    /**
+     * A service whose server refuses the revoke.
+     *
+     * @param body - The answer the server refuses with.
+     * @returns A service bound to a project, whose revoke is refused with `body`.
+     */
     function refusedWith(body: unknown): ReleaseService {
       const revokeRelease = async () => {
         throw new ConflictError("release: still served by an origin", {
@@ -99,11 +107,12 @@ describe("ReleaseService.revoke", () => {
         details: { origins: [PRIMARY] },
       });
 
-      await expect(releaseService.revoke("rel_1")).rejects.toBeInstanceOf(ConflictError);
-      await expect(releaseService.revoke("rel_1")).rejects.toMatchObject({
-        status: 409,
-        serverCode: "rel.in_use",
+      const refusal = await releaseService.revoke("rel_1").catch((cause: unknown) => {
+        return cause;
       });
+
+      expect(refusal).toBeInstanceOf(ConflictError);
+      expect(refusal).toMatchObject({ status: 409, serverCode: "rel.in_use" });
     });
 
     it.each([

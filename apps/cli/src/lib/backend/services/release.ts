@@ -7,24 +7,44 @@ import type {
   GetReleaseById200PointersItemKind,
   RevokeRelease409DetailsOriginsItem,
 } from "@zitadel/api/generated/model";
+import { RevokeRelease409DetailsOriginsItemKind } from "@zitadel/api/generated/model";
 import { z } from "zod";
 
 import { ApiService } from "@/lib/backend/api-service";
 import type { ZitadelClient } from "@/lib/backend/client";
 import { ConflictError } from "@/lib/backend/errors";
 
-/** One origin that serves a release, the deployment that pins it there, and whether it is a primary origin or a preview. */
+/**
+ * One origin that serves a release.
+ *
+ * @remarks
+ * Names the deployment that pins the release there, and whether the origin is
+ * a primary origin or a preview, which is freed differently: a primary origin
+ * by putting another release live on it, a preview by removing it.
+ */
 export type ServingOrigin = Readonly<RevokeRelease409DetailsOriginsItem>;
 
 /**
- * The refusal to revoke a release an origin still serves, carrying every such
- * origin. Raised only when the server's answer names them, so a caller that
- * catches it always has at least one.
+ * The refusal to revoke a release an origin still serves.
+ *
+ * @remarks
+ * Raised only when the server's answer names the origins, so a caller that
+ * catches it always has at least one. It is a {@link ConflictError} that
+ * carries the server's answer as it came, so a caller that does not know it
+ * handles it as the plain conflict it also is.
  */
 export class ReleaseInUseError extends ConflictError {
+  /** The error's name, which a caller that cannot import the class matches on. */
   override readonly name: string = "ReleaseInUseError";
+
+  /** Every origin that serves the release, in the order the server named them. */
   readonly origins: readonly ServingOrigin[];
 
+  /**
+   * @param message - The server's message.
+   * @param origins - Every origin that serves the release.
+   * @param options - What the server's answer carried: status, URL, body and request id.
+   */
   constructor(
     message: string,
     origins: readonly ServingOrigin[],
@@ -35,7 +55,15 @@ export class ReleaseInUseError extends ConflictError {
   }
 }
 
-/** The origins a `rel.in_use` answer names, as the API documents them. */
+/**
+ * The origins a `rel.in_use` answer names, as the API documents them.
+ *
+ * @remarks
+ * The generated client types the 409 body but, as every error body, does not
+ * validate it, so the answer is checked here before it is trusted. The kinds
+ * are the generated ones, so a kind the API adds is not left out by this schema
+ * alone.
+ */
 const InUseBody = z.object({
   details: z.object({
     origins: z
@@ -43,7 +71,7 @@ const InUseBody = z.object({
         z.object({
           origin: z.string(),
           deployment_id: z.string(),
-          kind: z.enum(["primary", "preview"]),
+          kind: z.enum(RevokeRelease409DetailsOriginsItemKind),
         }),
       )
       .min(1),

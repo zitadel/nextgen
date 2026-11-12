@@ -1,11 +1,11 @@
 import { Args, Flags } from "@oclif/core";
 import { z } from "zod";
 
-import { ReleaseInUseError, ReleaseService, type ServingOrigin } from "@/lib/backend";
+import { ReleaseInUseError, ReleaseService } from "@/lib/backend";
 import { RevokeReleaseParams } from "@/lib/backend/schemas";
 import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
-import { toZitadelError, ZitadelError } from "@/lib/errors";
-import type { Suggestion } from "@/lib/suggestion";
+import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { type Suggestion, WHAT_CHANGED } from "@/lib/suggestion";
 import { Destructive } from "@/lib/oclif/destructive";
 import { mutatedData } from "@/lib/oclif/envelope";
 import { type Refused, taken } from "@/lib/oclif/flags";
@@ -26,6 +26,18 @@ const RELEASE_ID: Refused<string> = {
       argument: "{input}",
     },
   },
+};
+
+/**
+ * How a release an origin still serves is refused: the origins that serve it,
+ * and what frees them. The server names the origins; the steps are the CLI's.
+ */
+const RELEASE_IN_USE_REFUSAL: Refusal = {
+  code: "E_CONFLICT",
+  message: "release: still served by an origin",
+  hint: "Served by {served}. Revoke it again after you {steps}.",
+  next: ["{next}"],
+  details: "{details}",
 };
 
 /**
@@ -102,34 +114,41 @@ export default class ReleaseRevoke extends Destructive(EnvironmentCommand) {
             if (!(error instanceof ReleaseInUseError)) {
               throw error;
             }
-            const base = toZitadelError(error);
-            const previews = error.origins.filter((served: ServingOrigin) => {
-              return served.kind === "preview";
+            const previews = error.origins.filter((origin) => {
+              return origin.kind === "preview";
             });
-            const hasPrimary = previews.length < error.origins.length;
-            const served = new Intl.ListFormat("en", { type: "conjunction" }).format(
-              error.origins.map((origin: ServingOrigin) => {
-                return `${origin.origin} (${origin.kind}, ${origin.deployment_id})`;
+            const primaries = error.origins.filter((origin) => {
+              return origin.kind === "primary";
+            });
+            const steps = [
+              ...(primaries.length > 0 ? ["put another release live on each primary origin"] : []),
+              ...(previews.length > 0 ? ["remove each preview"] : []),
+            ];
+            const next: Suggestion[] = [
+              ...(primaries.length > 0
+                ? [
+                    { id: "deploy", flags: { message: WHAT_CHANGED } } satisfies Suggestion,
+                    { id: "deployment:rollback" } satisfies Suggestion,
+                  ]
+                : []),
+              ...previews.map((preview) => {
+                return { id: "preview:rm", args: { url: preview.origin } } satisfies Suggestion;
               }),
-            );
-            const steps: string[] = [];
-            const nextCommands: Suggestion[] = [];
-            if (hasPrimary) {
-              steps.push("put another release live on each primary origin");
-              nextCommands.push({ id: "deploy" }, { id: "deployment:rollback" });
-            }
-            if (previews.length > 0) {
-              steps.push("remove each preview");
-            }
-            for (const preview of previews) {
-              nextCommands.push({ id: "preview:rm", args: { url: preview.origin } });
-            }
+            ];
 
-            throw new ZitadelError(base.code, base.message, {
-              hint: `Served by ${served}. Revoke it again after you ${steps.join(" and ")}.`,
-              nextCommands,
-              details: base.details,
-            });
+            throw refusalError(
+              RELEASE_IN_USE_REFUSAL,
+              {
+                served: new Intl.ListFormat("en", { type: "conjunction" }).format(
+                  error.origins.map((origin) => {
+                    return `${origin.origin} (${origin.kind}, ${origin.deployment_id})`;
+                  }),
+                ),
+                steps: steps.join(" and "),
+                details: { status: error.status, url: error.url, body: error.body },
+              },
+              { next },
+            );
           });
           const title = `Revoked ${escapeControlCharacters(release.id)}`;
 
