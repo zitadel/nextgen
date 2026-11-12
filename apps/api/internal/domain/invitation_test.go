@@ -10,6 +10,7 @@ import (
 )
 
 func TestInvitation_StatusAt(t *testing.T) {
+	t.Parallel()
 	expiresAt := time.Date(2026, 11, 7, 10, 0, 0, 0, time.UTC)
 	tests := []struct {
 		name   string
@@ -24,6 +25,7 @@ func TestInvitation_StatusAt(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			invitation := &domain.Invitation{Status: tt.stored, ExpiresAt: expiresAt}
 			assert.Equal(t, tt.want, invitation.StatusAt(tt.now))
 		})

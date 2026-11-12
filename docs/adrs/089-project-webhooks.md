@@ -66,6 +66,7 @@ there. A webhook belongs to one project, so it needs no cursor table, and
   "last_delivered_at": "2026-11-11T10:00:12Z",
   "last_error_at": null,
   "last_error_status": null,             // the HTTP status; null with no response
+  "last_error_reason": null,             // why there was no response (§10)
   "previous_secret_expires_at": null,
   "created_at": "2026-11-11T10:00:00Z",
   // Only in the responses to create and rotate_secret:
@@ -79,7 +80,8 @@ there. A webhook belongs to one project, so it needs no cursor table, and
   No `sink_` id is in the spec yet, so nothing public changes. Error codes are
   `webhook.*`, as an application's are `application.*` beside its `app`
   prefix.
-- **`url`** is `https`, at most 2048 characters, with no userinfo.
+- **`url`** is `https`, at most 2048 characters, with no userinfo. A
+  self-hosted server's operator may also allow `http` (§10).
 - **`event_types`** holds event types as `GET /events` names them, each
   once, or the single entry `*`. It is never empty.
   - `*` is every type the server writes, those added later included, except
@@ -200,6 +202,7 @@ What changes for a project's webhook:
 - **Egress.** The URL is the customer's, so every request goes through the
   hardened client of [ADR 061](061-egress-policy-user-injectable-urls.md). A
   redirect is a failure, not followed. Each request has a 10 second deadline.
+  §10 has what an operator may open beside it.
 - **One sender.** A server takes a time-limited lease on a webhook before it
   ships it, so replicas do not each deliver every event.
 - **Isolation.** Webhooks ship concurrently, each within its own time budget,
@@ -262,6 +265,43 @@ disable it and rotate its secret.
 `create` and `rotate-secret` print the secret once; with `--json` it is
 `data.secret`. No flag takes a secret.
 
+### 10. A self-hosted server
+
+Delivery needs nothing but the server and its database: no queue, no
+function and no scheduler (§4). What a self-hosted server changes is which
+endpoints a webhook may name. The defaults are the hosted cloud's, `https`
+and public addresses only, and an in-cluster receiver or a developer's
+machine is neither.
+
+- **Two settings, both off.** They are the operator's and apply to webhooks
+  only:
+  - `events.webhooks.allow_list` re-allows addresses and host names the deny
+    list of ADR 061 blocks, in the form `httpclient.allow_list` takes.
+    Deliveries are allowed what either list allows.
+  - `events.webhooks.allow_http` lets a webhook's `url` be `http`. The
+    contract's pattern takes both schemes, and a server without the setting
+    refuses `http` with `webhook.invalid`.
+- **The local runtime** (`zitadel start`) sets both for loopback, so
+  `http://localhost:3000/hooks` works with no tunnel.
+- **Refused when written.** Create and update answer `webhook.invalid` for a
+  `url` whose host is an address or a name the server would not deliver to.
+  A name that only resolves to such an address is found at delivery.
+- **Why a delivery got no response.** `last_error_reason` is set with
+  `last_error_at` when `last_error_status` is null, and null otherwise:
+  `blocked_address`, `dns`, `connect`, `tls`, `timeout` or `redirect`. It is
+  a closed list, never the client's error text, which holds the URL.
+- **Delivery switched off.** With `events.webhooks.enabled: false` create,
+  update and `rotate_secret` answer `webhook.delivery_disabled`. Reads and
+  delete keep working, and the console says that the server sends nothing.
+- **No proxy.** The egress client connects directly (ADR 061 decision 4), so
+  a server that reaches the internet only through a proxy delivers to no
+  webhook outside its network.
+- **Certificates** are checked against the operating system's trust store.
+  An operator adds a private authority there; the server has no setting.
+- **Limits are constants.** Ten webhooks per project, the 10 second
+  deadline and the 3 days before a webhook is disabled are the same on every
+  server.
+
 ## Open questions
 
 - **The hosted cloud's queue.** Vercel Queues is in beta, nothing has run
@@ -273,9 +313,10 @@ disable it and rotate its secret.
   still uses, so its deliveries fail until it has the newest one. An
   `Idempotency-Key` would let the caller repeat the request and get the same
   secret, and needs an idempotency store the server does not have.
-- **Loopback in development.** The egress policy refuses loopback URLs, so a
-  webhook to `localhost` needs the allow-list exception whose development
-  gating is open on #928.
+- **`http` to a public address.** `allow_http` permits `http` to every
+  address the server may reach, the public ones included, where the event is
+  readable on the way. Limiting `http` to what `events.webhooks.allow_list`
+  names would close that and make one setting depend on the other.
 
 ## Consequences
 
@@ -314,6 +355,13 @@ disable it and rotate its secret.
 - **The whole resource in `data`**, as Stripe's `data.object` is. It would
   send what the audit rules keep out of events, and cost a read per
   delivery.
+- **`httpclient.allow_list` for a self-hosted server's private endpoints.**
+  It also opens schema and identity-provider fetches to the same addresses,
+  for every project on the server, and it does nothing about `http`.
+- **A proxy for deliveries.** The dial-time address check would see the
+  proxy, not the endpoint the proxy reaches (ADR 061 decision 4).
+- **The client's error text as the reason.** It holds the URL, whose path or
+  query may be a token.
 - **Webhooks as release configuration.** The URL differs per environment, and
   a rollback would redirect events.
 
@@ -327,3 +375,6 @@ disable it and rotate its secret.
 - On implementation: the spec, the CLI's
   [`SKILL.md`](../../apps/cli/skills/zitadel-cli/SKILL.md), and a docs page on
   verifying a signature.
+- [`configuration.md`](../quick-start/configuration.md) for §10's two
+  settings and the missing proxy, and the signature guide, which should say
+  "`https` and public addresses" of the hosted cloud only.

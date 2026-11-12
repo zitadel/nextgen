@@ -16,9 +16,9 @@ description: |
 
   1. Take every resource in the release as the `bundle` of
      `POST /releases/build` carries it, with `kind` set to `schema`,
-     `flow_definition`, `branding` or `idp`, and `handle` set to the
+     `flow_definition`, `branding`, `idp` or `oauth`, and `handle` set to the
      schema's `objectType`, the flow definition's `name`, `default` for
-     branding, or the identity provider's `slug`.
+     branding and oauth, or the identity provider's `slug`.
      A `schema-url` entry's content is the entry as written, and its handle
      is the `objectType` of the document the URL serves.
   2. Build the JSON document
