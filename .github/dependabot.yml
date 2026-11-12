@@ -1,0 +1,21 @@
+version: 2
+updates:
+  # The framework CLIs `zitadel setup` runs, each at an exact version, so an
+  # upstream release reaches customers and the fresh-app journeys only through
+  # this pull request (apps/cli/src/lib/orca/scaffolders/framework-clis.ts).
+  # One grouped pull request a week, which the fresh-app journeys test. It
+  # changes what setup scaffolds, so add a changeset before it merges.
+  # Security updates for the rest of the repository need no entry.
+  - package-ecosystem: npm
+    directory: /apps/cli/src/lib/orca/scaffolders/framework-clis
+    schedule:
+      interval: weekly
+    # A broken release (create-vite 9.3.2) is usually replaced within days.
+    cooldown:
+      default-days: 3
+    groups:
+      framework-clis:
+        patterns: ["*"]
+    commit-message:
+      prefix: fix
+      include: scope

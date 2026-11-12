@@ -6,6 +6,9 @@
 > **Next step:** the full migration was prototyped and planned in
 > [turborepo-migration.md](turborepo-migration.md) (task mapping, feature
 > replacements, script ports, CI, remote cache, rollout, effort, decisions).
+> **Outcome:** Turborepo replaced moon
+> ([ADR 089](../../adrs/089-turborepo-task-runner.md)); this document is
+> history.
 
 ## Short answer
 

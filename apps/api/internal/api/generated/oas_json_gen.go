@@ -53695,10 +53695,6 @@ func (s *FlowDefinition) encodeFields(e *jx.Encoder) {
 		e.Str(s.Name)
 	}
 	{
-		e.FieldStart("status")
-		s.Status.Encode(e)
-	}
-	{
 		e.FieldStart("user_schema")
 		e.Str(s.UserSchema)
 	}
@@ -53722,14 +53718,13 @@ func (s *FlowDefinition) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfFlowDefinition = [7]string{
+var jsonFieldsNameOfFlowDefinition = [6]string{
 	0: "$schema",
 	1: "name",
-	2: "status",
-	3: "user_schema",
-	4: "purposes",
-	5: "audience",
-	6: "steps",
+	2: "user_schema",
+	3: "purposes",
+	4: "audience",
+	5: "steps",
 }
 
 // Decode decodes FlowDefinition from json.
@@ -53763,18 +53758,8 @@ func (s *FlowDefinition) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"name\"")
 			}
-		case "status":
-			requiredBitSet[0] |= 1 << 2
-			if err := func() error {
-				if err := s.Status.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"status\"")
-			}
 		case "user_schema":
-			requiredBitSet[0] |= 1 << 3
+			requiredBitSet[0] |= 1 << 2
 			if err := func() error {
 				v, err := d.Str()
 				s.UserSchema = string(v)
@@ -53786,7 +53771,7 @@ func (s *FlowDefinition) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"user_schema\"")
 			}
 		case "purposes":
-			requiredBitSet[0] |= 1 << 4
+			requiredBitSet[0] |= 1 << 3
 			if err := func() error {
 				if err := s.Purposes.Decode(d); err != nil {
 					return err
@@ -53806,7 +53791,7 @@ func (s *FlowDefinition) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"audience\"")
 			}
 		case "steps":
-			requiredBitSet[0] |= 1 << 6
+			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
 				s.Steps = make([]FlowDefinitionStep, 0)
 				if err := d.Arr(func(d *jx.Decoder) error {
@@ -53833,7 +53818,7 @@ func (s *FlowDefinition) Decode(d *jx.Decoder) error {
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [1]uint8{
-		0b01011110,
+		0b00101110,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -54244,46 +54229,6 @@ func (s *FlowDefinitionResponse) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *FlowDefinitionResponse) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes FlowDefinitionStatus as json.
-func (s FlowDefinitionStatus) Encode(e *jx.Encoder) {
-	e.Str(string(s))
-}
-
-// Decode decodes FlowDefinitionStatus from json.
-func (s *FlowDefinitionStatus) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode FlowDefinitionStatus to nil")
-	}
-	v, err := d.StrBytes()
-	if err != nil {
-		return err
-	}
-	// Try to use constant string.
-	switch FlowDefinitionStatus(v) {
-	case FlowDefinitionStatusActive:
-		*s = FlowDefinitionStatusActive
-	case FlowDefinitionStatusDraft:
-		*s = FlowDefinitionStatusDraft
-	default:
-		*s = FlowDefinitionStatus(v)
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s FlowDefinitionStatus) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *FlowDefinitionStatus) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -61547,12 +61492,6 @@ func (s *FlowdefPayload) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
-		if s.Status.Set {
-			e.FieldStart("status")
-			s.Status.Encode(e)
-		}
-	}
-	{
 		if s.UserSchema.Set {
 			e.FieldStart("user_schema")
 			s.UserSchema.Encode(e)
@@ -61572,12 +61511,11 @@ func (s *FlowdefPayload) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfFlowdefPayload = [5]string{
+var jsonFieldsNameOfFlowdefPayload = [4]string{
 	0: "name",
-	1: "status",
-	2: "user_schema",
-	3: "purposes",
-	4: "audience",
+	1: "user_schema",
+	2: "purposes",
+	3: "audience",
 }
 
 // Decode decodes FlowdefPayload from json.
@@ -61597,16 +61535,6 @@ func (s *FlowdefPayload) Decode(d *jx.Decoder) error {
 				return nil
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"name\"")
-			}
-		case "status":
-			if err := func() error {
-				s.Status.Reset()
-				if err := s.Status.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"status\"")
 			}
 		case "user_schema":
 			if err := func() error {

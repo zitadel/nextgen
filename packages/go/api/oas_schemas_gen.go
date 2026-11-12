@@ -17236,8 +17236,6 @@ func (s *CreateFlowDefinitionErrorResponseStatusCode) SetResponse(val CreateFlow
 func (*CreateFlowDefinitionErrorResponseStatusCode) createFlowDefinitionRes() {}
 
 // The request body for creating a flow definition.
-// The flow definition is created in an `active` state by default.
-// The status can also be set with the `status` attribute in the flow definition payload.
 // Ref: #
 type CreateFlowDefinitionRequest struct {
 	ProjectID      ProjectID      `json:"project_id"`
@@ -31372,8 +31370,7 @@ type FlowDefinition struct {
 	// supported: the `name` is part of the public contract another
 	// definition may reference. It acts as the human display label as well;
 	// there is no separate slug.
-	Name   string               `json:"name"`
-	Status FlowDefinitionStatus `json:"status"`
+	Name string `json:"name"`
 	// The user schema this flow operates on, named by its `objectType`. The
 	// flow runs against the revision of that schema its release pins, so
 	// publishing a schema revision needs no change to the flow. A schema ID
@@ -31414,11 +31411,6 @@ func (s *FlowDefinition) GetName() string {
 	return s.Name
 }
 
-// GetStatus returns the value of Status.
-func (s *FlowDefinition) GetStatus() FlowDefinitionStatus {
-	return s.Status
-}
-
 // GetUserSchema returns the value of UserSchema.
 func (s *FlowDefinition) GetUserSchema() string {
 	return s.UserSchema
@@ -31447,11 +31439,6 @@ func (s *FlowDefinition) SetSchema(val OptString) {
 // SetName sets the value of Name.
 func (s *FlowDefinition) SetName(val string) {
 	s.Name = val
-}
-
-// SetStatus sets the value of Status.
-func (s *FlowDefinition) SetStatus(val FlowDefinitionStatus) {
-	s.Status = val
 }
 
 // SetUserSchema sets the value of UserSchema.
@@ -31649,53 +31636,6 @@ func (s *FlowDefinitionResponse) SetUpdatedAt(val time.Time) {
 
 func (*FlowDefinitionResponse) createFlowDefinitionRes() {}
 func (*FlowDefinitionResponse) getFlowDefinitionRes()    {}
-
-// The lifecycle state of this flow definition.
-// active: The flow definition is ready to be used. The server can select it for new flows.
-// draft: The server will not select it for new flows, and existing flows must handle it gracefully
-// if they reference this definition.
-// A revision's status is fixed at creation. Publish a new revision to change it.
-// Ref: #
-type FlowDefinitionStatus string
-
-const (
-	FlowDefinitionStatusActive FlowDefinitionStatus = "active"
-	FlowDefinitionStatusDraft  FlowDefinitionStatus = "draft"
-)
-
-// AllValues returns all FlowDefinitionStatus values.
-func (FlowDefinitionStatus) AllValues() []FlowDefinitionStatus {
-	return []FlowDefinitionStatus{
-		FlowDefinitionStatusActive,
-		FlowDefinitionStatusDraft,
-	}
-}
-
-// MarshalText implements encoding.TextMarshaler.
-func (s FlowDefinitionStatus) MarshalText() ([]byte, error) {
-	switch s {
-	case FlowDefinitionStatusActive:
-		return []byte(s), nil
-	case FlowDefinitionStatusDraft:
-		return []byte(s), nil
-	default:
-		return nil, errors.Errorf("invalid value: %q", s)
-	}
-}
-
-// UnmarshalText implements encoding.TextUnmarshaler.
-func (s *FlowDefinitionStatus) UnmarshalText(data []byte) error {
-	switch FlowDefinitionStatus(data) {
-	case FlowDefinitionStatusActive:
-		*s = FlowDefinitionStatusActive
-		return nil
-	case FlowDefinitionStatusDraft:
-		*s = FlowDefinitionStatusDraft
-		return nil
-	default:
-		return errors.Errorf("invalid value: %q", data)
-	}
-}
 
 // A step in a flow definition: one screen of the flow, as an administrator
 // writes it. This is configuration, not the runtime payload sent to the
@@ -35744,7 +35684,6 @@ func (s *FlowdefNotFoundDetails) init() FlowdefNotFoundDetails {
 // Ref: #
 type FlowdefPayload struct {
 	Name       OptString                 `json:"name"`
-	Status     OptString                 `json:"status"`
 	UserSchema OptString                 `json:"user_schema"`
 	Purposes   OptFlowdefPayloadPurposes `json:"purposes"`
 	Audience   OptFlowdefPayloadAudience `json:"audience"`
@@ -35753,11 +35692,6 @@ type FlowdefPayload struct {
 // GetName returns the value of Name.
 func (s *FlowdefPayload) GetName() OptString {
 	return s.Name
-}
-
-// GetStatus returns the value of Status.
-func (s *FlowdefPayload) GetStatus() OptString {
-	return s.Status
 }
 
 // GetUserSchema returns the value of UserSchema.
@@ -35778,11 +35712,6 @@ func (s *FlowdefPayload) GetAudience() OptFlowdefPayloadAudience {
 // SetName sets the value of Name.
 func (s *FlowdefPayload) SetName(val OptString) {
 	s.Name = val
-}
-
-// SetStatus sets the value of Status.
-func (s *FlowdefPayload) SetStatus(val OptString) {
-	s.Status = val
 }
 
 // SetUserSchema sets the value of UserSchema.

@@ -26,7 +26,6 @@ func sampleFlowDefinition(projectID, id string) *domain.FlowDefinition {
 		ID:            id,
 		Name:          "Default Login",
 		SchemaVersion: "1.0.0",
-		Status:        domain.FlowDefinitionStatusDraft,
 		UserSchema:    "https://example.com/schemas/human-user.json",
 		Purposes: map[domain.FlowDefinitionPurpose]string{
 			domain.FlowDefinitionPurposeLogin: "identifier",
@@ -65,7 +64,6 @@ func TestFlowDefinitionStatements_CreateAndGet(t *testing.T) {
 	assert.Equal(t, def.ID, got.ID)
 	assert.Equal(t, def.Name, got.Name)
 	assert.Equal(t, def.SchemaVersion, got.SchemaVersion)
-	assert.Equal(t, def.Status, got.Status)
 	assert.Equal(t, def.UserSchema, got.UserSchema)
 	assert.Equal(t, def.Purposes, got.Purposes)
 	assert.Equal(t, def.Audience.AppIDs, got.Audience.AppIDs)
@@ -128,33 +126,6 @@ func TestFlowDefinitionStatements_ListByPurpose(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, listed.Items, 1)
 	assert.Equal(t, login.ID, listed.Items[0].ID)
-}
-
-func TestFlowDefinitionStatements_ListByStatus(t *testing.T) {
-	projectID := uniqueProjectID(t)
-	t.Cleanup(func() { _, _ = testPool.DeleteProjectByID(context.Background(), projectID) })
-	require.NoError(t, testPool.CreateProject(t.Context(), newTestProject(projectID)))
-
-	draft := sampleFlowDefinition(projectID, uniqueFlowDefinitionID(t)+"-draft")
-	active := sampleFlowDefinition(projectID, uniqueFlowDefinitionID(t)+"-active")
-	active.Name = "Active Login"
-	active.Status = domain.FlowDefinitionStatusActive
-	t.Cleanup(func() {
-		_ = testPool.DeleteFlowDefinitionByID(context.Background(), projectID, draft.ID)
-		_ = testPool.DeleteFlowDefinitionByID(context.Background(), projectID, active.ID)
-	})
-	require.NoError(t, testPool.CreateFlowDefinition(t.Context(), draft))
-	require.NoError(t, testPool.CreateFlowDefinition(t.Context(), active))
-
-	listed, err := testPool.ListFlowDefinitions(service.WithAuthzListUnrestricted(t.Context()), &database.ListOptions[domain.FlowDefinitionField]{
-		Filter: database.And(
-			database.Equal(database.Col(domain.FlowDefinitionFieldProjectID), projectID),
-			database.Equal(database.Col(domain.FlowDefinitionFieldStatus), domain.FlowDefinitionStatusActive.String()),
-		),
-	}, service.FlowDefinitionQueryOptions{})
-	require.NoError(t, err)
-	require.Len(t, listed.Items, 1)
-	assert.Equal(t, active.ID, listed.Items[0].ID)
 }
 
 func TestFlowDefinitionStatements_DeleteProjectCascades(t *testing.T) {

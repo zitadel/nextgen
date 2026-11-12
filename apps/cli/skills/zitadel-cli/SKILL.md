@@ -961,9 +961,9 @@ whose users are managed through the API, and ask the user first. That refusal's
 could be enabled instead. A non-interactive dry run refuses it the same way, and its
 `--force` re-run keeps `--dry-run`; with `--force` it previews the change and
 warns that no way to sign in would be left. A method that is enabled but not
-offered by any active flow is reported in `warnings` (and in `data.not_offered`
+offered by any flow is reported in `warnings` (and in `data.not_offered`
 for password and passkey); for those two the warning says what to add, and
-names the active login flow files to add it to. Every command reports `data.changed`, the
+names the login flow files to add it to. Every command reports `data.changed`, the
 project-relative files it wrote (on a dry run, the files it would write), empty
 when nothing changed. Follow `data.next_commands` (`deploy --dry-run`, `deploy`, and
 `variable set` when a credential did not reach the project) to publish the
