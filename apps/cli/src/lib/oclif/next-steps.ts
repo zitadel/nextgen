@@ -14,6 +14,7 @@ import {
   type Suggested,
   type SuggestedCommand,
   suggestionWords,
+  withoutCredentials,
 } from "@/lib/suggestion";
 import { command, dim, strong } from "@/lib/style";
 import { escapeControlCharacters } from "@/lib/terminal-text";
@@ -120,12 +121,6 @@ export function renderNextSteps(next: NextSteps): string {
     }),
   ].join("\n");
 }
-
-/**
- * The `user:password@` of a URL, which a rebuilt command never prints:
- * everything in the authority up to its last `@`, since a password may hold one.
- */
-const CREDENTIALS = /(\w+:\/\/)[^/?#\s]*@/g;
 
 /**
  * Flags that say how a run answers, never what it does, so a rebuilt command
@@ -242,9 +237,7 @@ export class RunSuggestions {
     raw: readonly ParsedToken[],
     change: Rerun = {},
   ): SuggestedCommand {
-    const redact = (word: string) => {
-      return word.replace(CREDENTIALS, "$1");
-    };
+    const redact = withoutCredentials;
     const positional = (
       change.arguments ??
       raw.flatMap((token) => {

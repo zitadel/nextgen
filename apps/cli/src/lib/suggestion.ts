@@ -502,6 +502,24 @@ export type Scope = Readonly<{
  */
 const NEWEST: ReadonlySet<string> = new Set(["upgrade"]);
 
+/**
+ * The `user:password@` of a URL, which a suggested command never prints:
+ * everything in the authority up to its last `@`, since a password may hold one.
+ */
+const CREDENTIALS = /(\w+:\/\/)[^/?#\s]*@/g;
+
+/**
+ * `word` with the credentials of every URL in it taken out, so a suggestion
+ * that puts back a typed `--server https://user:secret@host` prints the host
+ * alone.
+ *
+ * @param word - A word of a command line.
+ * @returns It, without any URL's `user:password@`.
+ */
+export function withoutCredentials(word: string): string {
+  return word.replace(CREDENTIALS, "$1");
+}
+
 /** `envFile` as `env-file`: a name as code reads it, spelled as the command line takes it. */
 export function spelled(name: string): string {
   return name.replace(/[A-Z]/g, (letter) => {
@@ -656,7 +674,9 @@ export function suggestionWords(
   const scoped = carried(scope, target, given);
   for (const [name, value] of Object.entries(scoped)) {
     if (value !== undefined && target.flags.has(spelled(name))) {
-      options.push(...optionArgs(`--${spelled(name)}`, value));
+      // The scope is the run's as it was typed, so a server named with its
+      // credentials loses them here, on every suggestion that carries it.
+      options.push(...optionArgs(`--${spelled(name)}`, withoutCredentials(value)));
     }
   }
   // A positional argument is read by where it stands, so one given after one

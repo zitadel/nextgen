@@ -100,6 +100,30 @@ class SwitchProbe extends BaseCommand {
   }
 }
 
+/** Asks before it acts on an environment, as `variable rm` does, and offers itself with `--force`. */
+class ConsentProbe extends EnvironmentCommand {
+  public static override readonly id: string = "variable:rm";
+  static override meta = { resolveServer: false, environment: false };
+  static override flags = {
+    force: Flags.boolean({ description: "Remove it without asking." }),
+  };
+
+  protected async execute(): Promise<never> {
+    throw new Error("unused");
+  }
+
+  /**
+   * This run again with `--force`, as its confirmation refusal offers it.
+   *
+   * @returns The command.
+   */
+  async probe() {
+    const { flags } = await this.parse(ConsentProbe);
+    await this.toMeta(flags, { resolveServer: false, environment: false });
+    return this.rerun({ with: { force: true } });
+  }
+}
+
 const config = await Config.load(cliPackageRoot);
 
 describe("BaseCommand.suggest", () => {
@@ -167,7 +191,29 @@ describe("BaseCommand.suggest", () => {
   });
 });
 
+describe("BaseCommand.suggest with a server named with its credentials", () => {
+  it("puts the server back without them", async ({ dir }) => {
+    const deploy = await new FilesOnlyProbe(
+      ["--cwd", dir, "--server", "https://user:secret@a.example"],
+      config,
+    ).probe();
+
+    expect(deploy).toMatch(new RegExp(`deploy --dry-run --server https://a.example --cwd ${dir}$`));
+  });
+});
+
 describe("BaseCommand.rerun", () => {
+  it("puts an environment-scoped run's server back without its credentials", async ({ dir }) => {
+    const retry = await new ConsentProbe(
+      ["--cwd", dir, "--server", "https://user:p@ss@a.example"],
+      config,
+    ).probe();
+
+    expect(retry).toMatch(
+      new RegExp(`variable rm --force --server https://a.example --cwd ${dir}$`),
+    );
+  });
+
   it("keeps a switch named for what it turns off", async () => {
     const real = await new SwitchProbe(["--no-open", "--dry-run"], config).probe();
 
