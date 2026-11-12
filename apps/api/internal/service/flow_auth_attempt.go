@@ -216,6 +216,7 @@ func (a *FlowAuthAttemptAdapter) IssuePasskeyRegistrationChallenge(ctx context.C
 		ChallengeID: ch.GetID(),
 		UserID:      registrationCh.UserID,
 		Options:     options,
+		Provisional: registrationCh.Provisional,
 	}, nil
 }
 
