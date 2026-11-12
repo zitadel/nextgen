@@ -77,6 +77,12 @@ tags:
       Branding sets how the login looks: its layout, asset URLs and Liquid
       template. Each publish creates an immutable revision. The login renders
       the revision the deployed release pins.
+  - name: OAuth Settings
+    description: |
+      OAuth settings say whether a project's OAuth authorization server
+      answers. A release publishes them as an immutable revision, and this
+      operation reads one back. There is no operation that publishes them on
+      their own.
   - name: Identity Providers
     description: |
       Identity providers are the external login providers a project offers.
@@ -306,6 +312,8 @@ paths:
     $ref: endpoints/branding/methods.yaml
   /branding/{id}:
     $ref: endpoints/branding/by_id/methods.yaml
+  /oauth_settings/{oauth_settings_id}:
+    $ref: endpoints/oauth_settings/by_id/methods.yaml
   /idps:
     $ref: endpoints/idps/methods.yaml
   /idps/query:
