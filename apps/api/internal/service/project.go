@@ -592,6 +592,11 @@ type ListAuthorizedProjectsRequest struct {
 	Order     string
 	Limit     int
 	PageToken string
+	// ExcludeProjectID leaves one project out of the listing: the reserved
+	// platform project when the caller asked for `exclude_platform` (D42).
+	// Applied with the authorization and the name search, so paging stays
+	// whole. Empty excludes nothing.
+	ExcludeProjectID string
 }
 
 func (s *projectService) ListAuthorized(ctx context.Context, req ListAuthorizedProjectsRequest) (_ *ListProjectsResponse, err error) {
@@ -641,8 +646,19 @@ func (s *projectService) listForSessionUser(ctx context.Context, req ListAuthori
 			Cursor:  []byte(req.PageToken),
 		},
 	}
+	var filters []database.Filter[domain.ProjectField]
 	if req.NameContains != "" {
-		opts.Filter = database.StringContainsFold(database.Col(domain.ProjectFieldName), req.NameContains)
+		filters = append(filters, database.StringContainsFold(database.Col(domain.ProjectFieldName), req.NameContains))
+	}
+	if req.ExcludeProjectID != "" {
+		filters = append(filters, database.Not(database.Equal(database.Col(domain.ProjectFieldID), req.ExcludeProjectID)))
+	}
+	switch len(filters) {
+	case 0:
+	case 1:
+		opts.Filter = filters[0]
+	default:
+		opts.Filter = database.And(filters...)
 	}
 	result, err := list(opts)
 	if err != nil {

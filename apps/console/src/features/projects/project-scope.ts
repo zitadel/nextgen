@@ -3,6 +3,7 @@ import { ApiError } from "@zitadel/api/runtime/fetch";
 
 import { api } from "@/api/zitadel";
 import { useAsync } from "@/hooks/use-async";
+import { getPlatformProjectId } from "@/runtime/runtime";
 
 import { toProjectRef } from "./model";
 import { listMyProjectsCached, useMyProjects } from "./my-projects";
@@ -92,6 +93,19 @@ export function validateProjectScopeSearch(search: Record<string, unknown>): Pro
 }
 
 /**
+ * Whether `?project=` names the reserved platform project, the console's root
+ * (D42). It is never offered as a project to choose; its screens are the
+ * root's, which the root's sidebar opens by selecting it. The `_authed` guard
+ * lets that selection stand only for someone who may act on the project
+ * (`readPlatformAccess`), and drops it for anyone else.
+ */
+export function selectsPlatformProject(search: Record<string, unknown>): boolean {
+  const platform = getPlatformProjectId();
+  const project = search[PROJECT_SCOPE_PARAM];
+  return !!platform && typeof project === "string" && project.trim() === platform;
+}
+
+/**
  * The project to select when a screen is opened without one, or `undefined`
  * when the person has to choose.
  *
@@ -144,6 +158,16 @@ export function useSelectProjectTarget(): (project: string) => {
 /** The selected project id, or `undefined` when none is selected. */
 export function useProjectScope(): string | undefined {
   return useSearch({ strict: false, select: (search) => search.project });
+}
+
+/**
+ * Whether the selected project is the reserved platform project: the screen
+ * is one of the root's (D42), drawn for that project like any project's, and
+ * the chrome around it is the root's (its sidebar, its pill).
+ */
+export function usePlatformSelected(): boolean {
+  const platform = getPlatformProjectId();
+  return useProjectScope() === platform && platform !== undefined;
 }
 
 /**

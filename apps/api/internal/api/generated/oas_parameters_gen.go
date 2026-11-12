@@ -9853,6 +9853,10 @@ type ListMyProjectsParams struct {
 	// continues the list it came from, and under another order it is
 	// refused with `400`.
 	Order OptSortDirection `json:",omitempty,omitzero"`
+	// Leaves out the deployment's reserved platform project, the one the
+	// console signs in to. Defaults to `false`. Send the same value with
+	// every `page_token` the list returns.
+	ExcludePlatform OptBool `json:",omitempty,omitzero"`
 	// The project the caller signs its users in to. The cookie's session is used
 	// only when it belongs to this project; a session of any other project answers
 	// `403` with `sess.project_mismatch`.
@@ -9901,6 +9905,15 @@ func unpackListMyProjectsParams(packed middleware.Parameters) (params ListMyProj
 		}
 		if v, ok := packed[key]; ok {
 			params.Order = v.(OptSortDirection)
+		}
+	}
+	{
+		key := middleware.ParameterKey{
+			Name: "exclude_platform",
+			In:   "query",
+		}
+		if v, ok := packed[key]; ok {
+			params.ExcludePlatform = v.(OptBool)
 		}
 	}
 	{
@@ -10126,6 +10139,47 @@ func decodeListMyProjectsParams(args [0]string, argsEscaped bool, r *http.Reques
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
 			Name: "order",
+			In:   "query",
+			Err:  err,
+		}
+	}
+	// Decode query: exclude_platform.
+	if err := func() error {
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "exclude_platform",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotExcludePlatformVal bool
+				if err := func() error {
+					val, err := d.DecodeValue()
+					if err != nil {
+						return err
+					}
+
+					c, err := conv.ToBool(val)
+					if err != nil {
+						return err
+					}
+
+					paramsDotExcludePlatformVal = c
+					return nil
+				}(); err != nil {
+					return err
+				}
+				params.ExcludePlatform.SetTo(paramsDotExcludePlatformVal)
+				return nil
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		return params, &ogenerrors.DecodeParamError{
+			Name: "exclude_platform",
 			In:   "query",
 			Err:  err,
 		}

@@ -46,16 +46,21 @@ each route's `staticData.nav` ([`src/nav.ts`](src/nav.ts)).
 - **Authentication** (`/authentication`).
 - **Events** (`/events`, `/events/$eventId`): the project's events.
 - **Project settings** (`/project`).
-- **Profile** (`/settings/profile`), your profile, under Settings in the
-  account sidebar.
+- **Projects** (`/projects`), the root's home, and beside it the platform
+  project's screens for someone who can act on it (D42): the project screens
+  above, with that project selected.
+- **Settings** (`/settings`): the platform project's General and Admins for
+  someone who can act on it, then what the hosted cloud adds (Billing,
+  Support, Email).
 
 The sidebar is one level, in the order and with the icons of the design's
 "01 / Nav Level 1".
 
 **Not in the sidebar:**
 
-- `/` redirects to Users, `/settings` to the profile, and `/projects/$projectId` to
-  `/project` with that project selected.
+- `/` redirects to Users, `/settings` to its list's first page, and
+  `/projects/$projectId` to `/project` with that project selected.
+- `/account` is your profile, opened from the account menu.
 - `/system` shows server health.
 - `/login` and `/claim` render outside the app shell.
 

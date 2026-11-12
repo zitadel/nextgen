@@ -58,12 +58,12 @@ async function renderAt(path: string) {
   render(<RouterProvider router={router} />);
 }
 
-describe("settings profile", () => {
+describe("profile", () => {
   beforeEach(() => server.use(schema(DEFAULT_SCHEMA)));
 
   it("shows the signed-in person's email, disabled", async () => {
     server.use(http.get(ME_URL, () => HttpResponse.json(me())));
-    await renderAt("/settings/profile");
+    await renderAt("/account");
 
     expect(await screen.findByRole("heading", { name: "Profile" })).toBeInTheDocument();
     const email = screen.getByLabelText("Email");
@@ -76,7 +76,7 @@ describe("settings profile", () => {
     // offered — the `givenName` it does not declare included — and the one
     // field shown cannot change, so the screen has no Save.
     server.use(http.get(ME_URL, () => HttpResponse.json(me())));
-    await renderAt("/settings/profile");
+    await renderAt("/account");
     await screen.findByRole("heading", { name: "Profile" });
 
     expect(screen.getAllByRole("textbox")).toHaveLength(1);
@@ -96,23 +96,24 @@ describe("settings profile", () => {
         ),
       ),
     );
-    await renderAt("/settings/profile");
+    await renderAt("/account");
 
     const email = await screen.findByLabelText("Email");
     expect(email).toHaveValue("");
     expect(email).toHaveAttribute("placeholder", "No email address");
   });
 
-  it("marks Profile in the Settings list, under the heading that leads back", async () => {
+  it("is the account's, apart from the root Settings (D42)", async () => {
     server.use(http.get(ME_URL, () => HttpResponse.json(me())));
-    await renderAt("/settings/profile");
+    await renderAt("/account");
     await screen.findByRole("heading", { name: "Profile" });
 
-    const nav = screen.getByRole("navigation", { name: "Settings" });
-    const links = within(nav).getAllByRole("link");
-    expect(links.map((link) => link.textContent)).toEqual(["Settings", "Profile"]);
-    expect(links[1]).toHaveAttribute("aria-current", "page");
-    expect(links[0]).not.toHaveAttribute("aria-current");
+    // Drawn with the account list, no row marked: the account menu opens it,
+    // as Vercel's account settings open from the avatar.
+    const nav = screen.getByRole("navigation", { name: "Account" });
+    expect(within(nav).queryByRole("link", { name: "Profile" })).not.toBeInTheDocument();
+    expect(within(nav).queryByRole("link", { current: "page" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("navigation", { name: "Settings" })).not.toBeInTheDocument();
   });
 
   it("offers the name the schema designates for display, and saves it", async () => {
@@ -127,7 +128,7 @@ describe("settings profile", () => {
         );
       }),
     );
-    await renderAt("/settings/profile");
+    await renderAt("/account");
 
     const name = await screen.findByLabelText("Name");
     expect(name).toHaveValue("");
@@ -151,7 +152,7 @@ describe("settings profile", () => {
         return HttpResponse.json(me({ attributes: { email: "maya@example.com" } }));
       }),
     );
-    await renderAt("/settings/profile");
+    await renderAt("/account");
 
     const name = await screen.findByLabelText("Name");
     expect(name).toHaveValue("Maya");
@@ -177,7 +178,7 @@ describe("settings profile, generated from the schema", () => {
         HttpResponse.json(me({ attributes: { username: "maya", companyName: "Acme", age: 30 } })),
       ),
     );
-    await renderAt("/settings/profile");
+    await renderAt("/account");
 
     expect(await screen.findByLabelText("Username")).toBeDisabled();
     expect(screen.getByLabelText("Company")).toHaveValue("Acme");
@@ -202,7 +203,7 @@ describe("settings profile, generated from the schema", () => {
         return HttpResponse.json(me({ attributes: { username: "maya", age: 30 } }));
       }),
     );
-    await renderAt("/settings/profile");
+    await renderAt("/account");
 
     const age = await screen.findByLabelText("Age");
     await userEvent.type(age, "-");
@@ -220,7 +221,7 @@ describe("settings profile, generated from the schema", () => {
         HttpResponse.json(me({ identifier: "maya@example.com", identifier_property: "email" })),
       ),
     );
-    await renderAt("/settings/profile");
+    await renderAt("/account");
 
     expect(await screen.findByLabelText("Identifier")).toHaveValue("maya@example.com");
     expect(screen.getAllByRole("textbox")).toHaveLength(1);
@@ -229,7 +230,7 @@ describe("settings profile, generated from the schema", () => {
 
   it("generates the avatar from the identifier, as the footer and the login do", async () => {
     server.use(http.get(ME_URL, () => HttpResponse.json(me({ identifier: "Maya@Example.com" }))));
-    await renderAt("/settings/profile");
+    await renderAt("/account");
 
     await screen.findByLabelText("Email");
     const avatars = document.querySelectorAll<HTMLElement>(".zl-avatar");
@@ -260,7 +261,7 @@ describe("settings profile, generated from the schema", () => {
         ),
       ),
     );
-    await renderAt("/settings/profile");
+    await renderAt("/account");
 
     expect(await screen.findByLabelText("Username")).toBeDisabled();
     expect(screen.getByLabelText("Active")).toBeDisabled();
@@ -290,7 +291,7 @@ describe("settings profile, generated from the schema", () => {
         return HttpResponse.json(me({ attributes: { username: "maya", seats: 42 } }));
       }),
     );
-    await renderAt("/settings/profile");
+    await renderAt("/account");
 
     const seats = await screen.findByLabelText("Seats");
     expect(seats).toBeEnabled();
@@ -316,7 +317,7 @@ describe("settings profile, generated from the schema", () => {
         return HttpResponse.json(me({ attributes: { email: "maya@example.com", terms: false } }));
       }),
     );
-    await renderAt("/settings/profile");
+    await renderAt("/account");
 
     const terms = await screen.findByLabelText("Terms");
     expect(terms).toBeDisabled();
@@ -344,7 +345,7 @@ describe("settings profile, generated from the schema", () => {
         }),
       ),
     );
-    await renderAt("/settings/profile");
+    await renderAt("/account");
 
     expect(await screen.findByText("MacBook")).toBeInTheDocument();
     expect(screen.getByText(/^Set /)).toBeInTheDocument();
@@ -355,7 +356,7 @@ describe("settings profile, generated from the schema", () => {
 
   it("says so when the person has no sign-in methods beyond their identifier", async () => {
     server.use(http.get(ME_URL, () => HttpResponse.json(me())));
-    await renderAt("/settings/profile");
+    await renderAt("/account");
 
     expect(await screen.findByText("Not set")).toBeInTheDocument();
 
@@ -368,7 +369,7 @@ describe("settings profile, generated from the schema", () => {
       http.get(ME_URL, () => HttpResponse.json(me())),
       http.get(PASSKEYS_URL, () => HttpResponse.json({ code: "internal" }, { status: 500 })),
     );
-    await renderAt("/settings/profile");
+    await renderAt("/account");
 
     expect(await screen.findByRole("heading", { name: "Profile" })).toBeInTheDocument();
     expect(screen.getByText("Could not be loaded")).toBeInTheDocument();

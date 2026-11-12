@@ -817,6 +817,10 @@ type ListMyProjectsParams struct {
 	// continues the list it came from, and under another order it is
 	// refused with `400`.
 	Order OptSortDirection `json:",omitempty,omitzero"`
+	// Leaves out the deployment's reserved platform project, the one the
+	// console signs in to. Defaults to `false`. Send the same value with
+	// every `page_token` the list returns.
+	ExcludePlatform OptBool `json:",omitempty,omitzero"`
 	// The project the caller signs its users in to. The cookie's session is used
 	// only when it belongs to this project; a session of any other project answers
 	// `403` with `sess.project_mismatch`.

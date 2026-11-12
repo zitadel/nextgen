@@ -51,6 +51,16 @@ through any wrapping.
   `internal/errorpage`, never HTML of its own; an API path answers the
   envelope even to a browser ([ADR 076](../docs/adrs/076-error-pages-and-unmatched-routes.md)).
 
+## The platform project's configuration
+
+- A resource a project deploys or registers (what a release ships, a
+  deployment serves, an origin admits, an application) sets `configuration`
+  on its `resourceAccess`: on the reserved platform project its writes ask
+  for the admin role
+  ([Console ADR 0004 §1](../../console/docs/adrs/0004-console-deployment-modes.md#1-every-bootstrapped-deployment-has-one-reserved-platform-project)).
+- `TestEveryGatedResourceIsClassedForThePlatformProject` fails until a new
+  resource is classed as configuration or as the platform project's own.
+
 ## Format before push
 
 Run `turbo run format --filter=@zitadel/server` before pushing Go changes. It

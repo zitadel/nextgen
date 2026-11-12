@@ -24,10 +24,11 @@ import { ZitadelLogo } from "./logo";
 import { SearchDialog, SearchTrigger, useSearchShortcut } from "./search";
 import {
   PROJECT_SETTINGS_PATH,
-  accountListItems,
+  useAccountListItems,
   useNavItems,
-  useRequestedNavItem,
+  useSettingsListItems,
 } from "./use-nav-items";
+import { usePlatformSelected } from "@/features/projects/project-scope";
 import { cn } from "@/lib/utils";
 import type { NavView } from "@/nav";
 import { SETTINGS_PATH, type ShellUser, UserMenuItem } from "./user-menu";
@@ -92,16 +93,24 @@ export function AppShell({
 /** The console's home: Projects, the list of every project. */
 const HOME_ROUTE = "/_authed/projects/";
 
+/** The person's profile, which the account menu opens (D42). */
+const ACCOUNT_ROUTE = "/_authed/account/";
+
 /** Events, whose list replaces the project's on the screen and under an event's drawer. */
 const EVENTS_PATH = "/events";
 
 /**
- * Which of the sidebar's lists is showing, and the **route** decides:
- * Projects is above every project, so it lists the account's screens;
- * `/settings` with anything beneath it lists Settings' pages (D29); `/project`
+ * Which of the sidebar's lists is showing, and the **URL** decides: the route,
+ * and whether the project it is drawn for is the reserved platform project,
+ * whose screens are the root's (D42).
+ *
+ * Projects is above every project, so it lists the root's screens, and so do
+ * the person's profile (`/account`) and any screen of the platform project;
+ * `/settings` with anything beneath it lists Settings' pages (D29), and so do
+ * the platform project's own Settings pages, which are the root's; `/project`
  * with anything beneath it lists the selected project's Settings pages (D40);
  * `/events` with anything beneath it lists Events' views and filters (D30);
- * everything else lists the selected project's. Deriving it from the route
+ * everything else lists the selected project's. Deriving it from the URL
  * rather than from component state is what lets a settings or events URL
  * survive a refresh, and it keeps the shell consistent with ADR 0001's
  * route-driven nav.
@@ -109,10 +118,16 @@ const EVENTS_PATH = "/events";
 function useShellView(): NavView {
   const matchRoute = useMatchRoute();
   const atHome = !!useMatch({ from: HOME_ROUTE, shouldThrow: false });
+  // The person's profile is above every project too (D42), with no row of its own.
+  const atAccount = !!useMatch({ from: ACCOUNT_ROUTE, shouldThrow: false });
+  // So is every screen drawn for the platform project: it is the root's.
+  const atPlatform = usePlatformSelected();
   if (matchRoute({ to: SETTINGS_PATH, fuzzy: true })) return "settings";
-  if (matchRoute({ to: PROJECT_SETTINGS_PATH, fuzzy: true })) return "project-settings";
+  if (matchRoute({ to: PROJECT_SETTINGS_PATH, fuzzy: true })) {
+    return atPlatform ? "settings" : "project-settings";
+  }
   if (matchRoute({ to: EVENTS_PATH, fuzzy: true })) return "events";
-  return atHome ? "account" : "portal";
+  return atHome || atAccount || atPlatform ? "account" : "portal";
 }
 
 /**
@@ -210,21 +225,23 @@ const NAV_LABEL: Record<NavView, string> = {
 
 /**
  * The sidebar's nav: one flat list of the view's routes (`staticData.nav`,
- * Console ADR 0001). Portal is the project's screens. Account is what sits
- * above every project: Projects, the home, then the project's screens, then
- * what an add-on lists, then Settings (D34). A project's screen chosen from it
- * opens in the selected project (D36); with none selected it asks for one
- * (D31), marking its row while it asks (D22).
- * Settings is that row's own list, under a heading that leads back:
- * the person's profile, alone while accounts are not surfaced (Console ADR
- * 0005 §3), then what an add-on lists. A row stays marked on the screens
+ * Console ADR 0001). Portal is the project's screens. Account is the root's
+ * list, what sits above every project: Projects, the home, then the reserved
+ * platform project's screens for someone who may act on it, then Settings
+ * (D42, `useAccountListItems`). Those screens are a project's own, drawn for
+ * the platform project, which their rows select; a customer's project is
+ * reached by choosing it.
+ * Settings is that row's own list, under a heading that leads back: the
+ * platform project's Settings pages, then what an add-on lists
+ * (`useSettingsListItems`). A row stays marked on the screens
  * beneath it, so a resource's detail keeps its list marked. The project's
  * Settings row opens a list the same way, under a heading that leads back to
  * the project: its General and Admins pages (D40).
  *
  * Events is one screen's own list, under a heading that leads back to the
- * project's: a picker of the list's views, not routes, and its filters in a
- * group of their own (D30). The events feature draws both.
+ * project's, or to the root's for the platform project's Events (D42): a
+ * picker of the list's views, not routes, and its filters in a group of
+ * their own (D30). The events feature draws both.
  *
  * Rows are Vercel's: 36px with a 1px gap, the glyph 12px in and the label 10px
  * after it. They keep that height in the rail, so collapsing moves nothing
@@ -232,12 +249,14 @@ const NAV_LABEL: Record<NavView, string> = {
  */
 function NavList({ view }: { view: NavView }) {
   const own = useNavItems(view);
-  const project = useNavItems("portal");
-  const items = view === "account" ? accountListItems(own, project) : own;
-  // On Projects' way to a screen (`?next=`), that screen's row is the marked one.
-  const requested = useRequestedNavItem(project);
+  const account = useAccountListItems();
+  const settings = useSettingsListItems();
+  const items = view === "account" ? account : view === "settings" ? settings : own;
   const matchRoute = useMatchRoute();
   const entrance = useListEntrance(view);
+  // Whether the screen is drawn for the platform project (D42): its rows are
+  // the marked ones then, and Events' list leads back to the root's.
+  const atPlatform = usePlatformSelected();
 
   return (
     // Keyed by the list, so a new one mounts and plays its entrance once.
@@ -248,16 +267,26 @@ function NavList({ view }: { view: NavView }) {
           {view === "settings" && <ListHeading name="Settings" to="/projects" back="Projects" />}
           {view === "project-settings" && <ListHeading name="Settings" to="/" back="the project" />}
           {/* `/` is where a project lands, whichever screen that is. */}
-          {view === "events" && <ListHeading name="Events" to="/" back="the project" />}
+          {view === "events" &&
+            (atPlatform ? (
+              <ListHeading name="Events" to="/projects" back="Projects" />
+            ) : (
+              <ListHeading name="Events" to="/" back="the project" />
+            ))}
           {view === "events" && <EventViewPicker />}
-          {items.map(({ to, nav: { icon: Icon, label: name } }) => (
+          {items.map(({ to, project, nav: { icon: Icon, label: name } }) => (
             <SidebarMenuItem key={to}>
               <SidebarMenuButton
                 asChild
-                isActive={requested ? requested.to === to : !!matchRoute({ to, fuzzy: to !== "/" })}
+                // A row of the platform project's is marked only while the
+                // screen is drawn for it: Projects' own rows read the selection.
+                isActive={!!matchRoute({ to, fuzzy: to !== "/" }) && (!project || atPlatform)}
                 tooltip={name}
               >
-                <Link to={to} title={name}>
+                {/* A row of the root's that is the platform project's screen
+                    selects that project (D42); every other row keeps the
+                    selection, which `_authed` retains. */}
+                <Link to={to} search={project ? { project } : undefined} title={name}>
                   <Icon aria-hidden />
                   {/* Cut short itself: with the arrow after it, it is no
                       longer the button's last child, which is what the
@@ -381,12 +410,19 @@ function ListHeading({
  * so the bar carries none of them.
  */
 function ContextBar({ view, userId }: { view: NavView; userId?: string }) {
+  // A screen drawn for the platform project is the root's (D42): the pill
+  // says the root there, never a project named Platform.
+  const root = usePlatformSelected();
   return (
     <div className={TOP_BAR}>
       {/* The signed-in person, whose recent projects the switcher keeps. */}
       {/* Above every project, with none selected, the pill says so, and its
           list leads into one. */}
-      <ContextSwitcher userId={userId} allProjects={view === "account" || view === "settings"} />
+      <ContextSwitcher
+        userId={userId}
+        allProjects={view === "account" || view === "settings"}
+        root={root}
+      />
     </div>
   );
 }

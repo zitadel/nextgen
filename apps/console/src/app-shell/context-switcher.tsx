@@ -95,10 +95,17 @@ interface SwitcherOption {
 export function ContextSwitcher({
   userId,
   allProjects = false,
+  root = false,
 }: {
   userId?: string;
   /** The screen is above every project: with none selected, the pill says so. */
   allProjects?: boolean;
+  /**
+   * The screen is the root's own: it is drawn for the reserved platform
+   * project, which is the selection then (D42). The pill says the root, never
+   * a project named for the platform, and its list marks and remembers none.
+   */
+  root?: boolean;
 }) {
   // The pill shows the selected project (`?project=`, `src/features/projects/project-scope.ts`),
   // never `getConsoleProjectId()`: that is the project the console signs into —
@@ -109,13 +116,14 @@ export function ContextSwitcher({
   // project selected anywhere — the switcher, Projects, search, a link — is the
   // one they opened last.
   const current = useSelectedProject();
-  useRememberRecentProject(userId, current);
+  // The platform project is the root, never one of the person's projects.
+  useRememberRecentProject(userId, root ? undefined : current);
   const selected = useProjectScope();
   const teamId = useParams({ strict: false, select: (params) => params.teamId });
 
   return (
     <nav aria-label="Context" className="flex min-w-0 items-center gap-2">
-      <ProjectSwitcher userId={userId} current={current} allProjects={allProjects} />
+      <ProjectSwitcher userId={userId} current={current} allProjects={allProjects} root={root} />
       {/* The team switcher joins the bar once a team is open — the team is the
           context then, and following another team from the list switches it.
           Teams are not a standing selection the way projects are: no screen
@@ -141,11 +149,13 @@ function ProjectSwitcher({
   userId,
   current,
   allProjects,
+  root,
 }: {
   userId: string | undefined;
   /** The selected project, named once it is read. */
   current: SelectedProject | undefined;
   allProjects: boolean;
+  root: boolean;
 }) {
   // The first page says whether there are more projects than it shows, and so
   // whether the list can open on all of them.
@@ -177,7 +187,8 @@ function ProjectSwitcher({
     groups = [{ options: byName(matches).map(toOption) }];
     emptyLabel = found?.term.toLowerCase() === term ? NO_MATCHES : SEARCHING;
   } else if (mine) {
-    const named = current?.name === undefined ? undefined : { ...current, name: current.name };
+    const named =
+      root || current?.name === undefined ? undefined : { ...current, name: current.name };
     const { recent, rest } = openingList(mine, named, recents);
     groups = [
       { heading: "Recent", options: recent.map(toOption) },
@@ -187,15 +198,17 @@ function ProjectSwitcher({
   }
 
   const label = current && (current.name ?? current.id);
-  // A selection outlives the way up to Projects and Settings (D36).
-  const unselected = allProjects && !selected;
+  // A selection outlives the way up to Projects and Settings (D36). While it
+  // is the platform project the pill names the root (D42).
+  const shown = root ? undefined : selected;
+  const unselected = root || (allProjects && !selected);
 
   return (
     <Combobox open={open} onOpenChange={changeOpen}>
       <ComboboxAnchor asChild>
         <button type="button" aria-label="Switch project" className={TRIGGER}>
-          {selected ? (
-            <ProjectMark projectId={selected} className="size-4" />
+          {shown ? (
+            <ProjectMark projectId={shown} className="size-4" />
           ) : (
             <Boxes size={16} className="shrink-0 text-foreground" aria-hidden />
           )}
@@ -215,7 +228,7 @@ function ProjectSwitcher({
       </ComboboxAnchor>
       <ComboboxContent
         groups={groups}
-        selected={selected ? [selected] : []}
+        selected={shown ? [shown] : []}
         searchPlaceholder={FIND_PROJECT}
         emptyLabel={emptyLabel}
         search={{ query, onQueryChange: setQuery }}
