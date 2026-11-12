@@ -216,6 +216,7 @@ var userBoundSessionOperations = map[api.OperationName]bool{
 	api.GetFlowDefinitionOperation:     true,
 	api.ListBrandingOperation:          true,
 	api.GetBrandingByIdOperation:       true,
+	api.GetOAuthSettingsByIdOperation:  true,
 	api.QueryIdpsOperation:             true,
 	api.GetIdpByIdOperation:            true,
 	api.GetIdpRevisionByIdOperation:    true,
