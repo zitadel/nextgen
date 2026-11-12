@@ -772,10 +772,9 @@ type InvitationStatements interface {
 	// acceptedBy, and nulls its metadata. Any other invitation returns a
 	// [database.NoRowFoundError].
 	ChangeInvitationStatus(ctx context.Context, projectID, id string, status domain.InvitationStatus, acceptedBy *string, now time.Time) (*domain.Invitation, error)
-	// ClearInvitationMetadata nulls the metadata of an invitation that is no
-	// longer pending at now, as replace does. A pending, unexpired or absent
-	// invitation returns a [database.NoRowFoundError].
-	ClearInvitationMetadata(ctx context.Context, projectID, id string, now time.Time) error
+	// DeleteUnacceptedInvitation removes an invitation that was not accepted,
+	// as replace does. An accepted or absent one returns a [database.NoRowFoundError].
+	DeleteUnacceptedInvitation(ctx context.Context, projectID, id string) error
 	// DeletePendingInvitation removes a pending, unexpired invitation. Any
 	// other invitation returns a [database.NoRowFoundError].
 	DeletePendingInvitation(ctx context.Context, projectID, id string, now time.Time) error

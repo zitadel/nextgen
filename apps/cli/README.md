@@ -747,9 +747,10 @@ Claim this project to make it permanent. Opens a browser to create an account or
 
 ```
 USAGE
-  $ zitadel claim [-c <value>] [-s <value>] [-n] [--dry-run] [-v]
-    [--debug] [--color] [--telemetry] [-e <value>] [--env-file <value>]
-    [--no-open] [--no-wait | --challenge-id <value> | --timeout <value>]
+  $ zitadel claim [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
+    <value>] [--no-open] [--no-wait | --challenge-id <value> | --timeout
+    <value>]
 
 FLAGS
   -c, --cwd=<value>           Project directory to operate on.
@@ -779,6 +780,9 @@ FLAGS
                               --no-telemetry.
       --timeout=<value>       Seconds to wait for the browser step. Defaults to
                               the link's own expiry (10 minutes).
+
+GLOBAL FLAGS
+  --json  Format output as json.
 
 DESCRIPTION
   Claim this project to make it permanent. Opens a browser to create an account
@@ -924,9 +928,9 @@ Deploy an existing release to the project's origins.
 
 ```
 USAGE
-  $ zitadel deployment create --release <value> [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
-    <value>] [-m <value>]
+  $ zitadel deployment create --release <value> [--json] [-c <value>] [-s
+    <value>] [-n] [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e
+    <value>] [--env-file <value>] [-m <value>]
 
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
@@ -949,6 +953,9 @@ FLAGS
       --release=<value>   (required) The release id to deploy.
       --[no-]telemetry    Send anonymous usage analytics. Disable with
                           --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
 
 DESCRIPTION
   Deploy an existing release to the project's origins.
@@ -2357,9 +2364,9 @@ Add an origin pattern to the project.
 
 ```
 USAGE
-  $ zitadel origin add PATTERN --kind primary|preview [-c <value>] [-s
-    <value>] [-n] [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e
-    <value>] [--env-file <value>]
+  $ zitadel origin add PATTERN --kind primary|preview [--json] [-c
+    <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
+    [--telemetry] [-e <value>] [--env-file <value>]
 
 ARGUMENTS
   PATTERN  The origin pattern to add.
@@ -2385,6 +2392,9 @@ FLAGS
                           <options: primary|preview>
       --[no-]telemetry    Send anonymous usage analytics. Disable with
                           --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
 
 DESCRIPTION
   Add an origin pattern to the project.
@@ -2595,9 +2605,9 @@ Run the test cases in .zitadel/policies/ against the policies.
 
 ```
 USAGE
-  $ zitadel policies test [OPERATION] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
-    <value>] [--release <value>]
+  $ zitadel policies test [OPERATION] [--json] [-c <value>] [-s <value>]
+    [-n] [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>]
+    [--env-file <value>] [--release <value>]
 
 ARGUMENTS
   [OPERATION]  Test only this operation's policy, such as
@@ -2624,6 +2634,9 @@ FLAGS
                           the files in .zitadel/policies/.
       --[no-]telemetry    Send anonymous usage analytics. Disable with
                           --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
 
 DESCRIPTION
   Run the test cases in .zitadel/policies/ against the policies.
@@ -2655,9 +2668,9 @@ Deploy a release from .zitadel/ to a pull-request build's preview URLs.
 
 ```
 USAGE
-  $ zitadel preview [-c <value>] [-s <value>] [-n] [--dry-run] [-v]
-    [--debug] [--color] [--telemetry] [-e <value>] [--env-file <value>]
-    [--origin <value>...] [--ttl <value>] [-m <value>] [--strict]
+  $ zitadel preview [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
+    <value>] [--origin <value>...] [--ttl <value>] [-m <value>] [--strict]
 
 FLAGS
   -c, --cwd=<value>        Project directory to operate on.
@@ -2688,6 +2701,9 @@ FLAGS
       --ttl=<value>        How long the preview stays live, such as 7d, 12h or
                            90m. Between 60s and 365d. Defaults to the project's
                            own lifetime.
+
+GLOBAL FLAGS
+  --json  Format output as json.
 
 DESCRIPTION
   Deploy a release from .zitadel/ to a pull-request build's preview URLs.
@@ -2991,7 +3007,7 @@ Rebuild your .zitadel/ files from a release.
 
 ```
 USAGE
-  $ zitadel pull [TARGET] [-c <value>] [-s <value>] [-n]
+  $ zitadel pull [TARGET] [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
     <value>]
 
@@ -3019,6 +3035,9 @@ FLAGS
       --[no-]telemetry    Send anonymous usage analytics. Disable with
                           --no-telemetry.
 
+GLOBAL FLAGS
+  --json  Format output as json.
+
 DESCRIPTION
   Rebuild your .zitadel/ files from a release.
 
@@ -3038,9 +3057,9 @@ Build a release from .zitadel/ without deploying it.
 
 ```
 USAGE
-  $ zitadel release create [-c <value>] [-s <value>] [-n] [--dry-run] [-v]
-    [--debug] [--color] [--telemetry] [-e <value>] [--env-file <value>] [-m
-    <value>]
+  $ zitadel release create [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
+    <value>] [-m <value>]
 
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
@@ -3062,6 +3081,9 @@ FLAGS
                           with --env.
       --[no-]telemetry    Send anonymous usage analytics. Disable with
                           --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
 
 DESCRIPTION
   Build a release from .zitadel/ without deploying it.
@@ -3795,8 +3817,9 @@ Summarize the local Zitadel server and project state.
 
 ```
 USAGE
-  $ zitadel status [-c <value>] [-s <value>] [-n] [--dry-run] [-v]
-    [--debug] [--color] [--telemetry] [-e <value>] [--env-file <value>]
+  $ zitadel status [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
+    <value>]
 
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
@@ -3817,6 +3840,9 @@ FLAGS
                           with --env.
       --[no-]telemetry    Send anonymous usage analytics. Disable with
                           --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
 
 DESCRIPTION
   Summarize the local Zitadel server and project state.

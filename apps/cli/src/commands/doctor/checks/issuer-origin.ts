@@ -14,7 +14,6 @@ import {
   writeZitadelSecret,
   type ZitadelSecret,
 } from "@/lib/project";
-import { projectCommand } from "@/lib/suggestion";
 import { userAgent } from "@/lib/user-agent";
 import { reportWarning } from "@/lib/warnings";
 
@@ -67,7 +66,7 @@ export class IssuerOriginCheck implements SanityCheck {
       message:
         `The project has no primary origin to deploy to: it holds ${finding.pattern} as a ` +
         "preview origin, as setup 0.1.0 registered it. Run " +
-        `${projectCommand("doctor --fix", ctx.selector, ctx.cliVersion)} to make it primary.`,
+        `${ctx.suggest({ id: "doctor", flags: { fix: true } })} to make it primary.`,
       details: {
         pattern: finding.pattern,
         server: finding.server,

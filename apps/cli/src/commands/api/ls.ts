@@ -8,7 +8,6 @@ import {
   type JsonEnvelope,
   nonBlankString,
 } from "@/lib/oclif";
-import { Suggestible } from "@/lib/oclif/suggestible";
 import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
 
 /** The columns `ls` renders, in order. */
@@ -37,7 +36,7 @@ function entryOf(operation: Operation) {
  * offline. `--json` carries each one's parameters, body and paging, which is
  * what an agent needs to build the call.
  */
-export default class ApiLs extends Tabulatable(Suggestible(BaseCommand)) {
+export default class ApiLs extends Tabulatable(BaseCommand) {
   static override description =
     "List the operations of the Zitadel API that the api command calls.";
   static override group = CommandGroups.diagnostics;
@@ -96,7 +95,11 @@ export default class ApiLs extends Tabulatable(Suggestible(BaseCommand)) {
     return this.emit({
       ...listed,
       next: {
-        commands: [this.suggest(items.length === 0 ? "api ls" : "api '<operation-id>'")],
+        commands: [
+          items.length === 0
+            ? this.suggest({ id: "api:ls" })
+            : this.suggest({ id: "api", args: { operation: "<operation-id>" } }),
+        ],
       },
     });
   }

@@ -2,7 +2,6 @@ import { Flags } from "@oclif/core";
 import { z } from "zod";
 
 import { startedServer } from "@/commands/local-server/started";
-import { Cmd } from "@/lib/cmd";
 import { serverLogAction } from "@/lib/journey-guidance";
 import { ensureLocalAdmin } from "@/lib/local-server/admin-credential";
 import { EMPTY_SUMMARY, loadProjectEnv } from "@/lib/local-server/env-vars";
@@ -29,8 +28,7 @@ import {
 import { type Refused, reads, whole } from "@/lib/oclif/flags";
 import type { NextSteps } from "@/lib/oclif/next-steps";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
-import { Suggestible } from "@/lib/oclif/suggestible";
-import type { SuggestedCommand } from "@/lib/suggestion";
+import type { Suggest, SuggestedCommand } from "@/lib/suggestion";
 import { type Fact, section } from "@/lib/ui";
 
 /**
@@ -64,7 +62,7 @@ const PORT: Refused<number> = {
 /**
  * `zitadel start` — start a local Zitadel server.
  */
-export default class Start extends Suggestible(BaseCommand) {
+export default class Start extends BaseCommand {
   static override description = "Start a local Zitadel server.";
   static override group = CommandGroups.gettingStarted;
   static override groupOrder = 2;
@@ -147,16 +145,7 @@ export default class Start extends Suggestible(BaseCommand) {
           ],
         },
         next: {
-          commands: [
-            this.suggest(
-              [
-                "start",
-                ...(flags.port === undefined ? [] : [Cmd.option("--port", String(flags.port))]),
-                ...(flags.runtime === undefined ? [] : [Cmd.option("--runtime", flags.runtime)]),
-                ...(flags.image === undefined ? [] : [Cmd.option("--image", flags.image)]),
-              ].join(" "),
-            ),
-          ],
+          commands: [await this.realRun()],
         },
       });
     }
@@ -184,7 +173,6 @@ export default class Start extends Suggestible(BaseCommand) {
 
     const { runtime, alreadyRunning } = await LocalServer.at(this.cwd, {
       cliVersion: this.cliVersion,
-      selector: this.cwdSelector(),
     }).start(
       runtimeBackend === "docker"
         ? {
@@ -198,7 +186,7 @@ export default class Start extends Suggestible(BaseCommand) {
             env,
             userFile: local?.userFile,
           },
-      { port: flags.port },
+      { port: flags.port, retry: await this.again("start", {}) },
     );
     // The envelope's `source` named the port guessed before one was chosen; an
     // agent that follows it would target a different server than the one started.
@@ -229,7 +217,7 @@ export default class Start extends Suggestible(BaseCommand) {
           ),
         ],
       },
-      next: readyNext(this.cliVersion, this.suggest("setup --server local")),
+      next: readyNext(this.suggest),
     });
   }
 
@@ -291,16 +279,13 @@ function readyData(metadata: RuntimeMetadata, alreadyRunning: boolean) {
   };
 }
 
-function readyNext(
-  cliVersion: string,
-  setupCommand: SuggestedCommand,
-): NextSteps<SuggestedCommand> {
+function readyNext(suggest: Suggest): NextSteps<SuggestedCommand> {
   return {
     actions: [
       "Create an app with authentication. Run setup in this directory or a subdirectory.",
       "Setup asks for a framework and sign-in method, creates or updates your app, and installs its dependencies.",
-      serverLogAction(cliVersion),
+      serverLogAction(suggest),
     ],
-    commands: [setupCommand],
+    commands: [suggest({ id: "setup", flags: { server: "local" } })],
   };
 }

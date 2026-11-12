@@ -2,7 +2,6 @@ import { Flags } from "@oclif/core";
 import { z } from "zod";
 
 import { Paging } from "@/lib/backend/transport";
-import { Cmd } from "@/lib/cmd";
 import { chosenColumns, readColumns } from "@/lib/oclif/crud/columns";
 import { type FieldPaths, fieldPaths } from "@/lib/oclif/crud/paths";
 import {
@@ -281,8 +280,6 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>, List
     const footer: string[] = [];
     const page = {
       token: next,
-      command: `${topic} list`,
-      flags: repeatedFlags(flags),
       cursorKey: wire.nextPageToken,
     };
     const extra = {};
@@ -303,22 +300,6 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>, List
     );
   }
 }
-
-/**
- * The flags a follow-up page has to carry: a cursor is only valid with the
- * sorting and filters that produced it, and the page size and the columns are
- * part of what the caller asked for. Values are re-emitted exactly as they were typed.
- */
-const repeatedFlags = (flags: ListFlags): readonly string[] => {
-  const limit = flags.limit === undefined ? [] : [`--limit ${flags.limit}`];
-  const sort = flags.sort ? [Cmd.option("--sort", flags.sort.raw)] : [];
-  const filters = (flags.filter ?? []).map((filter) => {
-    return Cmd.option("--filter", filter.raw);
-  });
-  const fields = flags.fields === undefined ? [] : [Cmd.option("--fields", flags.fields.join(","))];
-
-  return [...limit, ...fields, ...sort, ...filters];
-};
 
 /**
  * Parsed filters as the flat query parameters a GET list expects. A field

@@ -4,16 +4,21 @@ import { installDependenciesForSetup, type SetupInstallInput } from "@/commands/
 import type { BoxAction } from "@/lib/box";
 import { ZitadelError } from "@/lib/errors";
 import { installLogSink } from "@/lib/log";
-import { environmentSelectorSuffix } from "@/lib/oclif/environment-flags";
 import type { runPackageCommand } from "@/lib/package-manager";
 import { it } from "@tests/helpers/fixtures";
 import { writeJson } from "@tests/helpers/local-project";
+import { aSuggest } from "@tests/helpers/suggestions";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
 /**
  * The selector the follow-up commands carry, pinning the project setup created.
  */
 const SELECTOR = " --env-file .env.development.local";
+
+/**
+ * Renders the follow-ups as setup's run does, pinned to the project setup created.
+ */
+const SUGGEST = aSuggest({ envFile: ".env.development.local" }, "1.2.3");
 
 /**
  * The command that previews a deploy of the project setup created.
@@ -102,14 +107,13 @@ function recordingTask(steps: string[]): SetupInstallInput["task"] {
  */
 function anInstallInput(overrides: Partial<SetupInstallInput> = {}): SetupInstallInput {
   return {
-    cliVersion: "1.2.3",
     cwd: "",
     depsAdded: ["@zitadel/sdk-next"],
     dryRun: false,
     env: {},
     issuer: "http://localhost:3000",
     json: true,
-    selector: environmentSelectorSuffix({ envFile: ".env.development.local" }),
+    suggest: SUGGEST,
     scaffoldedFramework: false,
     skipInstall: false,
     task: recordingTask([]),
@@ -207,7 +211,7 @@ describe("installDependenciesForSetup", () => {
       "sign in again",
       ".zitadel/schemas/",
       ".zitadel/flows/",
-      `See your changes before they go live: ${PLAN_COMMAND} to preview, then npx @zitadel/cli@1.2.3 deploy -m '<what changed>'${SELECTOR} to publish.`,
+      `See your changes before they go live: ${PLAN_COMMAND} to preview, then npx @zitadel/cli@1.2.3 deploy --message '<what changed>'${SELECTOR} to publish.`,
     ])("says %s in the next actions", async (said, { dir }) => {
       await aProject(dir);
 

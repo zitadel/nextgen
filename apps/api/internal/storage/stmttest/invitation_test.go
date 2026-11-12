@@ -261,27 +261,32 @@ func TestInvitationStatements_ChangeStatus(t *testing.T) {
 	})
 }
 
-func TestInvitationStatements_ClearMetadata(t *testing.T) {
+func TestInvitationStatements_DeleteUnaccepted(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID := ensureProject(t, d.stmts)
 		now := invitationNow()
 
-		// Replacing an expired invitation moves its metadata to the new one.
-		expired := createInvitation(t, d.stmts, projectID, now.Add(-time.Hour))
-		require.NoError(t, d.stmts.ClearInvitationMetadata(t.Context(), projectID, expired.ID, now))
-		got, err := d.stmts.GetInvitationByID(t.Context(), projectID, expired.ID)
-		require.NoError(t, err)
-		assert.Nil(t, got.EncryptedMetadata)
-
-		// A live invitation keeps the metadata its accepter's journey shows.
 		pending := createInvitation(t, d.stmts, projectID, now.Add(time.Hour))
-		err = d.stmts.ClearInvitationMetadata(t.Context(), projectID, pending.ID, now)
-		assert.ErrorIs(t, err, new(database.NoRowFoundError))
-		got, err = d.stmts.GetInvitationByID(t.Context(), projectID, pending.ID)
+		expired := createInvitation(t, d.stmts, projectID, now.Add(-time.Hour))
+		rejected := createInvitation(t, d.stmts, projectID, now.Add(time.Hour))
+		_, err := d.stmts.ChangeInvitationStatus(t.Context(), projectID, rejected.ID, domain.InvitationStatusRejected, nil, now)
 		require.NoError(t, err)
-		assert.Equal(t, "ciphertext", *got.EncryptedMetadata)
+		for _, id := range []string{pending.ID, expired.ID, rejected.ID} {
+			require.NoError(t, d.stmts.DeleteUnacceptedInvitation(t.Context(), projectID, id))
+			_, err := d.stmts.GetInvitationByID(t.Context(), projectID, id)
+			assert.ErrorIs(t, err, new(database.NoRowFoundError))
+		}
 
-		err = d.stmts.ClearInvitationMetadata(t.Context(), projectID, "inv_does_not_exist", now)
+		// An accepted invitation keeps its row.
+		accepted := createInvitation(t, d.stmts, projectID, now.Add(time.Hour))
+		_, err = d.stmts.ChangeInvitationStatus(t.Context(), projectID, accepted.ID, domain.InvitationStatusAccepted, new("user_1"), now)
+		require.NoError(t, err)
+		err = d.stmts.DeleteUnacceptedInvitation(t.Context(), projectID, accepted.ID)
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
+		_, err = d.stmts.GetInvitationByID(t.Context(), projectID, accepted.ID)
+		assert.NoError(t, err)
+
+		err = d.stmts.DeleteUnacceptedInvitation(t.Context(), projectID, "inv_does_not_exist")
 		assert.ErrorIs(t, err, new(database.NoRowFoundError))
 	})
 }

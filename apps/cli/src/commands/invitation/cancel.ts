@@ -17,7 +17,7 @@ const INVITATION_ID: Refused<string> = {
   refusal: {
     message: "Invalid {input}: {problem}",
     hint: "Find one with `zitadel invitation list --status pending`.",
-    next: ["invitation list --status pending"],
+    next: [{ id: "invitation:list", flags: { status: "pending" } }],
     details: {
       argument: "{input}",
     },
@@ -34,21 +34,21 @@ const INVITATION_CANCELLED = "invitation_cancelled";
 const NO_ID_REFUSAL: Refusal = {
   message: "Name the invitation to cancel",
   hint: "Pass its id; find one with `zitadel invitation list --status pending`.",
-  next: ["invitation list --status pending"],
+  next: [{ id: "invitation:list", flags: { status: "pending" } }],
 };
 
 /** How a cancel of an invitation that has already finished is refused. */
 const NOT_PENDING_REFUSAL: Refusal = {
   message: "{id} is {status}, so there is nothing to cancel",
   hint: "Only a pending invitation can be cancelled.",
-  next: ["invitation list --status pending"],
+  next: [{ id: "invitation:list", flags: { status: "pending" } }],
 };
 
 /** How a bare cancel is refused when the project has no invitation left to cancel. */
 const NOTHING_PENDING_REFUSAL: Refusal = {
   message: "The project has no pending invitations",
   hint: "Only a pending invitation can be cancelled.",
-  next: ["invitation list"],
+  next: [{ id: "invitation:list" }],
 };
 
 /**
@@ -80,9 +80,7 @@ export default class InvitationCancel extends Destructive(EnvironmentCommand) {
 
   protected async execute({ args }: Admitted<typeof InvitationCancel>): Promise<JsonEnvelope> {
     if (args.invitationId === undefined && (this.dryRun || this.nonInteractive)) {
-      throw refusalError(NO_ID_REFUSAL, {}, (command) => {
-        return this.suggest(command);
-      });
+      throw refusalError(NO_ID_REFUSAL, {});
     }
     const target = args.invitationId ?? (await this.pickPending());
     const invitationId = typeof target === "string" ? target : target.id;
@@ -146,14 +144,12 @@ export default class InvitationCancel extends Destructive(EnvironmentCommand) {
     const { client, projectId } = await this.connect();
     const pending = await new InvitationService(client, projectId).pending();
     if (pending.length === 0) {
-      throw refusalError(NOTHING_PENDING_REFUSAL, {}, (command) => {
-        return this.suggest(command);
-      });
+      throw refusalError(NOTHING_PENDING_REFUSAL, {});
     }
     return this.ask.select({
       name: "invitation id",
       message: "Which invitation would you like to cancel?",
-      retry: this.suggest("invitation list --status pending"),
+      retry: this.suggest({ id: "invitation:list", flags: { status: "pending" } }),
       options: pending.map((invitation) => ({
         value: invitation,
         label: invitation.id,
@@ -173,16 +169,10 @@ export default class InvitationCancel extends Destructive(EnvironmentCommand) {
   ): Promise<Invitation> {
     const invitation = await invitationService.get(invitationId);
     if (invitation.status !== "pending") {
-      throw refusalError(
-        NOT_PENDING_REFUSAL,
-        {
-          id: invitation.id,
-          status: invitation.status,
-        },
-        (command) => {
-          return this.suggest(command);
-        },
-      );
+      throw refusalError(NOT_PENDING_REFUSAL, {
+        id: invitation.id,
+        status: invitation.status,
+      });
     }
     return invitation;
   }

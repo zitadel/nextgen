@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { Origins } from "@/lib/backend";
+
 import Deploy, { missingPrimaryOrigin } from "@/commands/deploy/index";
 import { parseFlag } from "@tests/helpers/inputs";
 
@@ -20,7 +21,7 @@ describe("missingPrimaryOrigin", () => {
   it("suggests doctor --fix for setup's project holding its issuer as a preview origin", () => {
     const outcome = outcomeFor({ origins: PREVIEW_ISSUER });
 
-    expect(outcome.next).toEqual(["doctor --fix"]);
+    expect(outcome.next).toEqual([{ id: "doctor", flags: { fix: true } }]);
     expect(outcome.hint).not.toContain("doctor --fix");
   });
 
@@ -34,8 +35,8 @@ describe("missingPrimaryOrigin", () => {
     const outcome = outcomeFor({ origins: PREVIEW_ISSUER, setupProject: false });
 
     expect(outcome.next).toEqual([
-      `origin rm ${ISSUER} --force`,
-      `origin add ${ISSUER} --kind primary`,
+      { id: "origin:rm", args: { pattern: ISSUER }, flags: { force: true } },
+      { id: "origin:add", args: { pattern: ISSUER }, flags: { kind: "primary" } },
     ]);
     expect(outcome.hint).not.toContain("origin add");
   });
@@ -45,12 +46,14 @@ describe("missingPrimaryOrigin", () => {
       origins: Origins.wrap([{ pattern: "https://*-acme.vercel.app", kind: "preview" }]),
     });
 
-    expect(outcome.next).toEqual([`origin add ${ISSUER} --kind primary`]);
+    expect(outcome.next).toEqual([
+      { id: "origin:add", args: { pattern: ISSUER }, flags: { kind: "primary" } },
+    ]);
   });
 
   it("adds the issuer as its origin, without a trailing slash", () => {
     expect(outcomeFor({ issuer: `${ISSUER}/` }).next).toEqual([
-      `origin add ${ISSUER} --kind primary`,
+      { id: "origin:add", args: { pattern: ISSUER }, flags: { kind: "primary" } },
     ]);
   });
 
@@ -59,7 +62,7 @@ describe("missingPrimaryOrigin", () => {
   });
 
   it("suggests origin list when no issuer resolves", () => {
-    expect(outcomeFor({ issuer: undefined }).next).toEqual(["origin list"]);
+    expect(outcomeFor({ issuer: undefined }).next).toEqual([{ id: "origin:list" }]);
   });
 });
 

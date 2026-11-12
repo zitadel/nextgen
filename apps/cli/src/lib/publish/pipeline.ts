@@ -1,5 +1,5 @@
 import type { DeploymentService, SchemaService, UserService, VariableService } from "@/lib/backend";
-import type { SuggestedCommand } from "@/lib/suggestion";
+import type { Suggest } from "@/lib/suggestion";
 import type { ConfigStore, ConfigurationBundle, ZitadelConfig } from "@/lib/zitadel";
 
 /**
@@ -80,7 +80,7 @@ export type StepContext = {
    * A command against the project this run addresses, carrying its
    * environment selector, for a step's error to suggest its own fix.
    */
-  readonly suggest: (args: string) => SuggestedCommand;
+  readonly suggest: Suggest;
 
   /**
    * What the earlier steps of this publish learned, merged in the order they

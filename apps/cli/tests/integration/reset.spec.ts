@@ -245,7 +245,7 @@ describe("reset", () => {
               container_name: expect.stringMatching(/^zitadel-server-[0-9a-f]{12}$/),
               data_deleted: false,
             },
-            next_commands: [expectedPublicCliCommand(`reset --force --cwd ${app.path}`)],
+            next_commands: [expectedPublicCliCommand(app.againAsRun("reset --force"))],
           },
           warnings: [],
         });
@@ -271,7 +271,7 @@ describe("reset", () => {
               log_path: `${app.path}/.zitadel/local/server.log`,
               data_deleted: false,
             },
-            next_commands: [expectedPublicCliCommand(`reset --force --cwd ${app.path}`)],
+            next_commands: [expectedPublicCliCommand(app.againAsRun("reset --force"))],
           },
           warnings: [],
         });
@@ -319,7 +319,7 @@ describe("reset", () => {
 
         const result = await shown(() => app.run(["reset", "--dry-run"]));
 
-        expect(result).toSayOnce(expectedPublicCliCommand(`reset --force --cwd ${app.path}`));
+        expect(result).toSayOnce(expectedPublicCliCommand(app.againAsRun("reset --force")));
       });
     });
 

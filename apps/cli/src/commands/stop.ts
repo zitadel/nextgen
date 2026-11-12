@@ -8,13 +8,12 @@ import {
 } from "@/lib/local-server/runtime";
 import { LocalServer } from "@/lib/local-server/server";
 import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
-import { Suggestible } from "@/lib/oclif/suggestible";
 import { type Fact, section } from "@/lib/ui";
 
 /**
  * `zitadel stop` — stop the local Zitadel server.
  */
-export default class Stop extends Suggestible(BaseCommand) {
+export default class Stop extends BaseCommand {
   static override description = "Stop the local Zitadel server.";
   static override group = CommandGroups.localDevelopment;
   static override groupOrder = 3;
@@ -76,13 +75,12 @@ export default class Stop extends Suggestible(BaseCommand) {
           title,
           sections: [section(undefined, ...facts)],
         },
-        next: { commands: [this.suggest("stop")] },
+        next: { commands: [await this.realRun()] },
       });
     }
 
     const { stopped, outcome } = await LocalServer.at(this.cwd, {
       cliVersion: this.cliVersion,
-      selector: this.cwdSelector(),
     }).stop();
 
     const title = stopped ? "Local Zitadel server stopped" : "Local Zitadel server was not running";
@@ -199,7 +197,7 @@ export default class Stop extends Suggestible(BaseCommand) {
         title,
         sections: [section(undefined, ...found)],
       },
-      next: { commands: [this.suggest("stop --all")] },
+      next: { commands: [this.suggest({ id: "stop", flags: { all: true } })] },
       ...(discovery.supported
         ? {}
         : { warnings: ["managed-runtime-processes: discovery unavailable"] }),

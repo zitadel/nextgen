@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "@tests/helpers/platform";
-import { aSetUpApp, type ScaffoldedApp } from "@tests/helpers/project";
+import { aSetUpApp, type ScaffoldedApp, MOCK_SERVER_URL } from "@tests/helpers/project";
 import { cliVersion, expectedPublicCliCommand } from "@tests/helpers/run-cli";
 
 const platform = usePlatformMock();
@@ -96,12 +96,24 @@ describe("auth-method passkey enable", () => {
             notices: [{ severity: "warning", message: NOT_OFFERED_WARNING }],
             title: "Enabled passkey for default-human-user",
             next_args: [
-              ["deploy", "--dry-run", "--cwd", app.path],
-              ["deploy", "-m", "<what changed>", "--cwd", app.path],
+              ["deploy", "--dry-run", "--server", MOCK_SERVER_URL, "--cwd", app.path],
+              [
+                "deploy",
+                "--message",
+                "<what changed>",
+                "--server",
+                MOCK_SERVER_URL,
+                "--cwd",
+                app.path,
+              ],
             ],
             next_commands: [
-              expectedPublicCliCommand(`deploy --dry-run --cwd ${app.path}`),
-              expectedPublicCliCommand(`deploy -m '<what changed>' --cwd ${app.path}`),
+              expectedPublicCliCommand(
+                `deploy --dry-run --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+              ),
+              expectedPublicCliCommand(
+                `deploy --message '<what changed>' --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+              ),
             ],
           },
           warnings: [NOT_OFFERED_WARNING],
@@ -168,9 +180,21 @@ describe("auth-method passkey enable", () => {
               notices: [{ severity: "warning", message: NOT_OFFERED_WARNING }],
               title: "Would enable passkey for default-human-user (dry run)",
               dry_run: true,
-              next_args: [["auth-method", "passkey", "enable", "--cwd", app.path]],
+              next_args: [
+                [
+                  "auth-method",
+                  "passkey",
+                  "enable",
+                  "--server",
+                  MOCK_SERVER_URL,
+                  "--cwd",
+                  app.path,
+                ],
+              ],
               next_commands: [
-                expectedPublicCliCommand(`auth-method passkey enable --cwd ${app.path}`),
+                expectedPublicCliCommand(
+                  `auth-method passkey enable --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+                ),
               ],
             },
             warnings: [NOT_OFFERED_WARNING],
@@ -207,11 +231,21 @@ describe("auth-method passkey enable", () => {
               title: "Would enable passkey for default-human-user (dry run)",
               dry_run: true,
               next_args: [
-                ["auth-method", "passkey", "enable", "--schema", SCHEMA, "--cwd", app.path],
+                [
+                  "auth-method",
+                  "passkey",
+                  "enable",
+                  "--schema",
+                  SCHEMA,
+                  "--server",
+                  MOCK_SERVER_URL,
+                  "--cwd",
+                  app.path,
+                ],
               ],
               next_commands: [
                 expectedPublicCliCommand(
-                  `auth-method passkey enable --schema ${SCHEMA} --cwd ${app.path}`,
+                  `auth-method passkey enable --schema ${SCHEMA} --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
                 ),
               ],
             },
@@ -239,9 +273,21 @@ describe("auth-method passkey enable", () => {
               notices: [{ severity: "warning", message: NOT_OFFERED_WARNING }],
               title: "Nothing to enable for default-human-user (dry run)",
               dry_run: true,
-              next_args: [["auth-method", "passkey", "enable", "--cwd", app.path]],
+              next_args: [
+                [
+                  "auth-method",
+                  "passkey",
+                  "enable",
+                  "--server",
+                  MOCK_SERVER_URL,
+                  "--cwd",
+                  app.path,
+                ],
+              ],
               next_commands: [
-                expectedPublicCliCommand(`auth-method passkey enable --cwd ${app.path}`),
+                expectedPublicCliCommand(
+                  `auth-method passkey enable --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+                ),
               ],
             },
             warnings: [NOT_OFFERED_WARNING],
@@ -337,7 +383,7 @@ describe("auth-method passkey enable", () => {
 
         const result = await app.enableMethodRendered("passkey");
 
-        expect(result).toPrint(`deploy --dry-run --cwd ${app.path}`);
+        expect(result).toPrint(`deploy --dry-run --server ${MOCK_SERVER_URL} --cwd ${app.path}`);
       });
 
       it("warns once when no login flow offers passkey yet", async () => {

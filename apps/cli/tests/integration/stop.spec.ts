@@ -243,7 +243,7 @@ describe("stop", () => {
               data_preserved: true,
               data_dir: `${app.path}/.zitadel/local/nextgen-data`,
             },
-            next_commands: [expectedPublicCliCommand(`stop --cwd ${app.path}`)],
+            next_commands: [expectedPublicCliCommand(app.againAsRun("stop"))],
           },
           warnings: [],
         });
@@ -276,7 +276,7 @@ describe("stop", () => {
               container_name: expect.stringMatching(/^zitadel-server-[0-9a-f]{12}$/),
               data_preserved: true,
             },
-            next_commands: [expectedPublicCliCommand(`stop --cwd ${app.path}`)],
+            next_commands: [expectedPublicCliCommand(app.againAsRun("stop"))],
           },
           warnings: [],
         });
@@ -388,7 +388,7 @@ describe("stop", () => {
 
         const result = await shown(() => app.run(["stop", "--dry-run"]));
 
-        expect(result).toSayOnce(expectedPublicCliCommand(`stop --cwd ${app.path}`));
+        expect(result).toSayOnce(expectedPublicCliCommand(app.againAsRun("stop")));
       });
 
       it("prints the sweep it planned, once", async () => {

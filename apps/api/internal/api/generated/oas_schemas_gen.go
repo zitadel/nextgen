@@ -11088,6 +11088,7 @@ type CancelInvitationErrorResponse struct {
 	Type                CancelInvitationErrorResponseType // switch on this field
 	AuthCsrfInvalid     AuthCsrfInvalid
 	AuthUnauthorized    AuthUnauthorized
+	EvtInvalid          EvtInvalid
 	Internal            Internal
 	InvNotFound         InvNotFound
 	InvPermissionDenied InvPermissionDenied
@@ -11103,6 +11104,7 @@ type CancelInvitationErrorResponseType string
 const (
 	AuthCsrfInvalidCancelInvitationErrorResponse     CancelInvitationErrorResponseType = "auth.csrf_invalid"
 	AuthUnauthorizedCancelInvitationErrorResponse    CancelInvitationErrorResponseType = "auth.unauthorized"
+	EvtInvalidCancelInvitationErrorResponse          CancelInvitationErrorResponseType = "evt.invalid"
 	InternalCancelInvitationErrorResponse            CancelInvitationErrorResponseType = "internal"
 	InvNotFoundCancelInvitationErrorResponse         CancelInvitationErrorResponseType = "inv.not_found"
 	InvPermissionDeniedCancelInvitationErrorResponse CancelInvitationErrorResponseType = "inv.permission_denied"
@@ -11119,6 +11121,11 @@ func (s CancelInvitationErrorResponse) IsAuthCsrfInvalid() bool {
 // IsAuthUnauthorized reports whether CancelInvitationErrorResponse is AuthUnauthorized.
 func (s CancelInvitationErrorResponse) IsAuthUnauthorized() bool {
 	return s.Type == AuthUnauthorizedCancelInvitationErrorResponse
+}
+
+// IsEvtInvalid reports whether CancelInvitationErrorResponse is EvtInvalid.
+func (s CancelInvitationErrorResponse) IsEvtInvalid() bool {
+	return s.Type == EvtInvalidCancelInvitationErrorResponse
 }
 
 // IsInternal reports whether CancelInvitationErrorResponse is Internal.
@@ -11190,6 +11197,27 @@ func (s CancelInvitationErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized
 func NewAuthUnauthorizedCancelInvitationErrorResponse(v AuthUnauthorized) CancelInvitationErrorResponse {
 	var s CancelInvitationErrorResponse
 	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetEvtInvalid sets CancelInvitationErrorResponse to EvtInvalid.
+func (s *CancelInvitationErrorResponse) SetEvtInvalid(v EvtInvalid) {
+	s.Type = EvtInvalidCancelInvitationErrorResponse
+	s.EvtInvalid = v
+}
+
+// GetEvtInvalid returns EvtInvalid and true boolean if CancelInvitationErrorResponse is EvtInvalid.
+func (s CancelInvitationErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
+	if !s.IsEvtInvalid() {
+		return v, false
+	}
+	return s.EvtInvalid, true
+}
+
+// NewEvtInvalidCancelInvitationErrorResponse returns new CancelInvitationErrorResponse from EvtInvalid.
+func NewEvtInvalidCancelInvitationErrorResponse(v EvtInvalid) CancelInvitationErrorResponse {
+	var s CancelInvitationErrorResponse
+	s.SetEvtInvalid(v)
 	return s
 }
 
@@ -17704,7 +17732,12 @@ type CreateInvitationErrorResponse struct {
 	Type                CreateInvitationErrorResponseType // switch on this field
 	AuthCsrfInvalid     AuthCsrfInvalid
 	AuthUnauthorized    AuthUnauthorized
+	EncKeyDecryptFailed EncKeyDecryptFailed
+	EncKeyEncryptFailed EncKeyEncryptFailed
+	EncKeyNotFound      EncKeyNotFound
+	EvtInvalid          EvtInvalid
 	Internal            Internal
+	TknInvalid          TknInvalid
 	InvInvalid          InvInvalid
 	InvNotFound         InvNotFound
 	InvPendingLimit     InvPendingLimit
@@ -17713,6 +17746,7 @@ type CreateInvitationErrorResponse struct {
 	InvProjectUnclaimed InvProjectUnclaimed
 	NotImplemented      NotImplemented
 	ReqInvalid          ReqInvalid
+	EncKeyUnknownAlg    EncKeyUnknownAlg
 	Unavailable         Unavailable
 }
 
@@ -17723,7 +17757,12 @@ type CreateInvitationErrorResponseType string
 const (
 	AuthCsrfInvalidCreateInvitationErrorResponse     CreateInvitationErrorResponseType = "auth.csrf_invalid"
 	AuthUnauthorizedCreateInvitationErrorResponse    CreateInvitationErrorResponseType = "auth.unauthorized"
+	EncKeyDecryptFailedCreateInvitationErrorResponse CreateInvitationErrorResponseType = "enc_key.decrypt_failed"
+	EncKeyEncryptFailedCreateInvitationErrorResponse CreateInvitationErrorResponseType = "enc_key.encrypt_failed"
+	EncKeyNotFoundCreateInvitationErrorResponse      CreateInvitationErrorResponseType = "enc_key.not_found"
+	EvtInvalidCreateInvitationErrorResponse          CreateInvitationErrorResponseType = "evt.invalid"
 	InternalCreateInvitationErrorResponse            CreateInvitationErrorResponseType = "internal"
+	TknInvalidCreateInvitationErrorResponse          CreateInvitationErrorResponseType = "tkn.invalid"
 	InvInvalidCreateInvitationErrorResponse          CreateInvitationErrorResponseType = "inv.invalid"
 	InvNotFoundCreateInvitationErrorResponse         CreateInvitationErrorResponseType = "inv.not_found"
 	InvPendingLimitCreateInvitationErrorResponse     CreateInvitationErrorResponseType = "inv.pending_limit"
@@ -17732,6 +17771,7 @@ const (
 	InvProjectUnclaimedCreateInvitationErrorResponse CreateInvitationErrorResponseType = "inv.project_unclaimed"
 	NotImplementedCreateInvitationErrorResponse      CreateInvitationErrorResponseType = "not_implemented"
 	ReqInvalidCreateInvitationErrorResponse          CreateInvitationErrorResponseType = "req.invalid"
+	EncKeyUnknownAlgCreateInvitationErrorResponse    CreateInvitationErrorResponseType = "enc_key.unknown_alg"
 	UnavailableCreateInvitationErrorResponse         CreateInvitationErrorResponseType = "unavailable"
 )
 
@@ -17745,9 +17785,34 @@ func (s CreateInvitationErrorResponse) IsAuthUnauthorized() bool {
 	return s.Type == AuthUnauthorizedCreateInvitationErrorResponse
 }
 
+// IsEncKeyDecryptFailed reports whether CreateInvitationErrorResponse is EncKeyDecryptFailed.
+func (s CreateInvitationErrorResponse) IsEncKeyDecryptFailed() bool {
+	return s.Type == EncKeyDecryptFailedCreateInvitationErrorResponse
+}
+
+// IsEncKeyEncryptFailed reports whether CreateInvitationErrorResponse is EncKeyEncryptFailed.
+func (s CreateInvitationErrorResponse) IsEncKeyEncryptFailed() bool {
+	return s.Type == EncKeyEncryptFailedCreateInvitationErrorResponse
+}
+
+// IsEncKeyNotFound reports whether CreateInvitationErrorResponse is EncKeyNotFound.
+func (s CreateInvitationErrorResponse) IsEncKeyNotFound() bool {
+	return s.Type == EncKeyNotFoundCreateInvitationErrorResponse
+}
+
+// IsEvtInvalid reports whether CreateInvitationErrorResponse is EvtInvalid.
+func (s CreateInvitationErrorResponse) IsEvtInvalid() bool {
+	return s.Type == EvtInvalidCreateInvitationErrorResponse
+}
+
 // IsInternal reports whether CreateInvitationErrorResponse is Internal.
 func (s CreateInvitationErrorResponse) IsInternal() bool {
 	return s.Type == InternalCreateInvitationErrorResponse
+}
+
+// IsTknInvalid reports whether CreateInvitationErrorResponse is TknInvalid.
+func (s CreateInvitationErrorResponse) IsTknInvalid() bool {
+	return s.Type == TknInvalidCreateInvitationErrorResponse
 }
 
 // IsInvInvalid reports whether CreateInvitationErrorResponse is InvInvalid.
@@ -17788,6 +17853,11 @@ func (s CreateInvitationErrorResponse) IsNotImplemented() bool {
 // IsReqInvalid reports whether CreateInvitationErrorResponse is ReqInvalid.
 func (s CreateInvitationErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidCreateInvitationErrorResponse
+}
+
+// IsEncKeyUnknownAlg reports whether CreateInvitationErrorResponse is EncKeyUnknownAlg.
+func (s CreateInvitationErrorResponse) IsEncKeyUnknownAlg() bool {
+	return s.Type == EncKeyUnknownAlgCreateInvitationErrorResponse
 }
 
 // IsUnavailable reports whether CreateInvitationErrorResponse is Unavailable.
@@ -17837,6 +17907,90 @@ func NewAuthUnauthorizedCreateInvitationErrorResponse(v AuthUnauthorized) Create
 	return s
 }
 
+// SetEncKeyDecryptFailed sets CreateInvitationErrorResponse to EncKeyDecryptFailed.
+func (s *CreateInvitationErrorResponse) SetEncKeyDecryptFailed(v EncKeyDecryptFailed) {
+	s.Type = EncKeyDecryptFailedCreateInvitationErrorResponse
+	s.EncKeyDecryptFailed = v
+}
+
+// GetEncKeyDecryptFailed returns EncKeyDecryptFailed and true boolean if CreateInvitationErrorResponse is EncKeyDecryptFailed.
+func (s CreateInvitationErrorResponse) GetEncKeyDecryptFailed() (v EncKeyDecryptFailed, ok bool) {
+	if !s.IsEncKeyDecryptFailed() {
+		return v, false
+	}
+	return s.EncKeyDecryptFailed, true
+}
+
+// NewEncKeyDecryptFailedCreateInvitationErrorResponse returns new CreateInvitationErrorResponse from EncKeyDecryptFailed.
+func NewEncKeyDecryptFailedCreateInvitationErrorResponse(v EncKeyDecryptFailed) CreateInvitationErrorResponse {
+	var s CreateInvitationErrorResponse
+	s.SetEncKeyDecryptFailed(v)
+	return s
+}
+
+// SetEncKeyEncryptFailed sets CreateInvitationErrorResponse to EncKeyEncryptFailed.
+func (s *CreateInvitationErrorResponse) SetEncKeyEncryptFailed(v EncKeyEncryptFailed) {
+	s.Type = EncKeyEncryptFailedCreateInvitationErrorResponse
+	s.EncKeyEncryptFailed = v
+}
+
+// GetEncKeyEncryptFailed returns EncKeyEncryptFailed and true boolean if CreateInvitationErrorResponse is EncKeyEncryptFailed.
+func (s CreateInvitationErrorResponse) GetEncKeyEncryptFailed() (v EncKeyEncryptFailed, ok bool) {
+	if !s.IsEncKeyEncryptFailed() {
+		return v, false
+	}
+	return s.EncKeyEncryptFailed, true
+}
+
+// NewEncKeyEncryptFailedCreateInvitationErrorResponse returns new CreateInvitationErrorResponse from EncKeyEncryptFailed.
+func NewEncKeyEncryptFailedCreateInvitationErrorResponse(v EncKeyEncryptFailed) CreateInvitationErrorResponse {
+	var s CreateInvitationErrorResponse
+	s.SetEncKeyEncryptFailed(v)
+	return s
+}
+
+// SetEncKeyNotFound sets CreateInvitationErrorResponse to EncKeyNotFound.
+func (s *CreateInvitationErrorResponse) SetEncKeyNotFound(v EncKeyNotFound) {
+	s.Type = EncKeyNotFoundCreateInvitationErrorResponse
+	s.EncKeyNotFound = v
+}
+
+// GetEncKeyNotFound returns EncKeyNotFound and true boolean if CreateInvitationErrorResponse is EncKeyNotFound.
+func (s CreateInvitationErrorResponse) GetEncKeyNotFound() (v EncKeyNotFound, ok bool) {
+	if !s.IsEncKeyNotFound() {
+		return v, false
+	}
+	return s.EncKeyNotFound, true
+}
+
+// NewEncKeyNotFoundCreateInvitationErrorResponse returns new CreateInvitationErrorResponse from EncKeyNotFound.
+func NewEncKeyNotFoundCreateInvitationErrorResponse(v EncKeyNotFound) CreateInvitationErrorResponse {
+	var s CreateInvitationErrorResponse
+	s.SetEncKeyNotFound(v)
+	return s
+}
+
+// SetEvtInvalid sets CreateInvitationErrorResponse to EvtInvalid.
+func (s *CreateInvitationErrorResponse) SetEvtInvalid(v EvtInvalid) {
+	s.Type = EvtInvalidCreateInvitationErrorResponse
+	s.EvtInvalid = v
+}
+
+// GetEvtInvalid returns EvtInvalid and true boolean if CreateInvitationErrorResponse is EvtInvalid.
+func (s CreateInvitationErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
+	if !s.IsEvtInvalid() {
+		return v, false
+	}
+	return s.EvtInvalid, true
+}
+
+// NewEvtInvalidCreateInvitationErrorResponse returns new CreateInvitationErrorResponse from EvtInvalid.
+func NewEvtInvalidCreateInvitationErrorResponse(v EvtInvalid) CreateInvitationErrorResponse {
+	var s CreateInvitationErrorResponse
+	s.SetEvtInvalid(v)
+	return s
+}
+
 // SetInternal sets CreateInvitationErrorResponse to Internal.
 func (s *CreateInvitationErrorResponse) SetInternal(v Internal) {
 	s.Type = InternalCreateInvitationErrorResponse
@@ -17855,6 +18009,27 @@ func (s CreateInvitationErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalCreateInvitationErrorResponse(v Internal) CreateInvitationErrorResponse {
 	var s CreateInvitationErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetTknInvalid sets CreateInvitationErrorResponse to TknInvalid.
+func (s *CreateInvitationErrorResponse) SetTknInvalid(v TknInvalid) {
+	s.Type = TknInvalidCreateInvitationErrorResponse
+	s.TknInvalid = v
+}
+
+// GetTknInvalid returns TknInvalid and true boolean if CreateInvitationErrorResponse is TknInvalid.
+func (s CreateInvitationErrorResponse) GetTknInvalid() (v TknInvalid, ok bool) {
+	if !s.IsTknInvalid() {
+		return v, false
+	}
+	return s.TknInvalid, true
+}
+
+// NewTknInvalidCreateInvitationErrorResponse returns new CreateInvitationErrorResponse from TknInvalid.
+func NewTknInvalidCreateInvitationErrorResponse(v TknInvalid) CreateInvitationErrorResponse {
+	var s CreateInvitationErrorResponse
+	s.SetTknInvalid(v)
 	return s
 }
 
@@ -18026,6 +18201,27 @@ func NewReqInvalidCreateInvitationErrorResponse(v ReqInvalid) CreateInvitationEr
 	return s
 }
 
+// SetEncKeyUnknownAlg sets CreateInvitationErrorResponse to EncKeyUnknownAlg.
+func (s *CreateInvitationErrorResponse) SetEncKeyUnknownAlg(v EncKeyUnknownAlg) {
+	s.Type = EncKeyUnknownAlgCreateInvitationErrorResponse
+	s.EncKeyUnknownAlg = v
+}
+
+// GetEncKeyUnknownAlg returns EncKeyUnknownAlg and true boolean if CreateInvitationErrorResponse is EncKeyUnknownAlg.
+func (s CreateInvitationErrorResponse) GetEncKeyUnknownAlg() (v EncKeyUnknownAlg, ok bool) {
+	if !s.IsEncKeyUnknownAlg() {
+		return v, false
+	}
+	return s.EncKeyUnknownAlg, true
+}
+
+// NewEncKeyUnknownAlgCreateInvitationErrorResponse returns new CreateInvitationErrorResponse from EncKeyUnknownAlg.
+func NewEncKeyUnknownAlgCreateInvitationErrorResponse(v EncKeyUnknownAlg) CreateInvitationErrorResponse {
+	var s CreateInvitationErrorResponse
+	s.SetEncKeyUnknownAlg(v)
+	return s
+}
+
 // SetUnavailable sets CreateInvitationErrorResponse to Unavailable.
 func (s *CreateInvitationErrorResponse) SetUnavailable(v Unavailable) {
 	s.Type = UnavailableCreateInvitationErrorResponse
@@ -18089,9 +18285,11 @@ type CreateInvitationProjectMemberRequest struct {
 	// Optional label for who the link is for. Displayed only; never matched.
 	Metadata OptInvitationMetadata `json:"metadata"`
 	// When set, this create replaces that invitation: the new invitation keeps
-	// the original's `journey_id`, and a pending original is deleted in the
-	// same transaction. Use the `id` that `createInvitation`
-	// (`POST /invitations`) or `listInvitations` (`GET /invitations`) returns.
+	// the original's `journey_id` and, without `metadata` of its own, the
+	// original's metadata. The original is deleted in the same transaction. An
+	// accepted invitation cannot be replaced. Use the `id` that
+	// `createInvitation` (`POST /invitations`) or `listInvitations`
+	// (`GET /invitations`) returns.
 	ReplacesInvitationID OptInvitationID                          `json:"replaces_invitation_id"`
 	Type                 CreateInvitationProjectMemberRequestType `json:"type"`
 	ProjectMember        InvitationProjectMemberPayload           `json:"project_member"`
@@ -18177,7 +18375,7 @@ type CreateInvitationProjectMemberResponse struct {
 	ID        InvitationID `json:"id"`
 	ProjectID ProjectID    `json:"project_id"`
 	// Who the administrator said the link is for. Null after accept or decline.
-	// Cancel and replace of a pending invitation delete the row.
+	// Cancel and replace delete the row.
 	Metadata OptNilInvitationMetadata `json:"metadata"`
 	Status   InvitationStatus         `json:"status"`
 	// The user who created the invitation. Null when a project secret created
@@ -18199,7 +18397,7 @@ type CreateInvitationProjectMemberResponse struct {
 	ProjectMember InvitationProjectMemberPayload            `json:"project_member"`
 	// The browser URL to share. It carries the redeem token in the fragment.
 	// Only this create or replace response returns it.
-	Link url.URL `json:"link"`
+	Link string `json:"link"`
 }
 
 // GetID returns the value of ID.
@@ -18268,7 +18466,7 @@ func (s *CreateInvitationProjectMemberResponse) GetProjectMember() InvitationPro
 }
 
 // GetLink returns the value of Link.
-func (s *CreateInvitationProjectMemberResponse) GetLink() url.URL {
+func (s *CreateInvitationProjectMemberResponse) GetLink() string {
 	return s.Link
 }
 
@@ -18338,7 +18536,7 @@ func (s *CreateInvitationProjectMemberResponse) SetProjectMember(val InvitationP
 }
 
 // SetLink sets the value of Link.
-func (s *CreateInvitationProjectMemberResponse) SetLink(val url.URL) {
+func (s *CreateInvitationProjectMemberResponse) SetLink(val string) {
 	s.Link = val
 }
 
@@ -18581,9 +18779,11 @@ type CreateInvitationTeamMemberRequest struct {
 	// Optional label for who the link is for. Displayed only; never matched.
 	Metadata OptInvitationMetadata `json:"metadata"`
 	// When set, this create replaces that invitation: the new invitation keeps
-	// the original's `journey_id`, and a pending original is deleted in the
-	// same transaction. Use the `id` that `createInvitation`
-	// (`POST /invitations`) or `listInvitations` (`GET /invitations`) returns.
+	// the original's `journey_id` and, without `metadata` of its own, the
+	// original's metadata. The original is deleted in the same transaction. An
+	// accepted invitation cannot be replaced. Use the `id` that
+	// `createInvitation` (`POST /invitations`) or `listInvitations`
+	// (`GET /invitations`) returns.
 	ReplacesInvitationID OptInvitationID                       `json:"replaces_invitation_id"`
 	Type                 CreateInvitationTeamMemberRequestType `json:"type"`
 	TeamMember           InvitationTeamMemberPayload           `json:"team_member"`
@@ -18669,7 +18869,7 @@ type CreateInvitationTeamMemberResponse struct {
 	ID        InvitationID `json:"id"`
 	ProjectID ProjectID    `json:"project_id"`
 	// Who the administrator said the link is for. Null after accept or decline.
-	// Cancel and replace of a pending invitation delete the row.
+	// Cancel and replace delete the row.
 	Metadata OptNilInvitationMetadata `json:"metadata"`
 	Status   InvitationStatus         `json:"status"`
 	// The user who created the invitation. Null when a project secret created
@@ -18691,7 +18891,7 @@ type CreateInvitationTeamMemberResponse struct {
 	TeamMember InvitationTeamMemberPayload            `json:"team_member"`
 	// The browser URL to share. It carries the redeem token in the fragment.
 	// Only this create or replace response returns it.
-	Link url.URL `json:"link"`
+	Link string `json:"link"`
 }
 
 // GetID returns the value of ID.
@@ -18760,7 +18960,7 @@ func (s *CreateInvitationTeamMemberResponse) GetTeamMember() InvitationTeamMembe
 }
 
 // GetLink returns the value of Link.
-func (s *CreateInvitationTeamMemberResponse) GetLink() url.URL {
+func (s *CreateInvitationTeamMemberResponse) GetLink() string {
 	return s.Link
 }
 
@@ -18830,7 +19030,7 @@ func (s *CreateInvitationTeamMemberResponse) SetTeamMember(val InvitationTeamMem
 }
 
 // SetLink sets the value of Link.
-func (s *CreateInvitationTeamMemberResponse) SetLink(val url.URL) {
+func (s *CreateInvitationTeamMemberResponse) SetLink(val string) {
 	s.Link = val
 }
 
@@ -50018,8 +50218,8 @@ func (s *InvitationLookupTeamMemberResponseType) UnmarshalText(data []byte) erro
 
 // What the administrator entered at creation, so other administrators know who
 // the link is for. It is only displayed, never matched. Null once the
-// invitation is accepted or declined. Cancel and replace of a pending
-// invitation delete the row, so the metadata goes with it.
+// invitation is accepted or declined. Cancel deletes the row with it; replace
+// moves it to the new invitation unless that sends its own.
 // Ref: #
 type InvitationMetadata struct {
 	// A display name for who the invitation is intended for.
@@ -50042,7 +50242,7 @@ type InvitationProjectMember struct {
 	ID        InvitationID `json:"id"`
 	ProjectID ProjectID    `json:"project_id"`
 	// Who the administrator said the link is for. Null after accept or decline.
-	// Cancel and replace of a pending invitation delete the row.
+	// Cancel and replace delete the row.
 	Metadata OptNilInvitationMetadata `json:"metadata"`
 	Status   InvitationStatus         `json:"status"`
 	// The user who created the invitation. Null when a project secret created
@@ -50826,8 +51026,8 @@ func (s *InvitationRejectedPayload) SetUserID(val string) {
 }
 
 // Lifecycle status of the invitation. `expired` is derived on read from
-// `expires_at`; `accepted` and `rejected` are final. Cancel and replace of a
-// pending invitation delete the row rather than leaving a cancelled status.
+// `expires_at`; `accepted` and `rejected` are final. Cancel and replace delete
+// the row rather than leaving a cancelled status.
 // Ref: #
 type InvitationStatus string
 
@@ -50890,7 +51090,7 @@ type InvitationTeamMember struct {
 	ID        InvitationID `json:"id"`
 	ProjectID ProjectID    `json:"project_id"`
 	// Who the administrator said the link is for. Null after accept or decline.
-	// Cancel and replace of a pending invitation delete the row.
+	// Cancel and replace delete the row.
 	Metadata OptNilInvitationMetadata `json:"metadata"`
 	Status   InvitationStatus         `json:"status"`
 	// The user who created the invitation. Null when a project secret created

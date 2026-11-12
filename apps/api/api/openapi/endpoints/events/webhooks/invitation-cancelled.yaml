@@ -3,10 +3,8 @@ post:
   operationId: invitationCancelled
   summary: invitation.cancelled
   description: |
-    A pending invitation was cancelled by an administrator, or by a
-    replacement.
-
-    Not sent yet: the contract is published ahead of the code that sends it.
+    A pending invitation was cancelled by an administrator, or an unaccepted
+    one was deleted by its replacement.
 
     The body is the event as `GET /events` returns it.
   tags:

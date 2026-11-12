@@ -1,5 +1,4 @@
 import type { Credential, QueriedUser, UserQuery } from "@/lib/backend";
-import { Cmd } from "@/lib/cmd";
 import { isCancellation } from "@/lib/errors";
 import { isObject } from "@/lib/json";
 import { mapBounded } from "@/lib/map-bounded";
@@ -490,9 +489,11 @@ async function lookupWarnings(
       const missingCount = count(missing.length, read.truncated);
       const userCount = count(read.users.length, read.truncated);
       const users = plural(read.users.length, "user");
-      const fix = ctx.suggest(
-        `users update '<user_id>' --schema '<revision_id>' --set ${Cmd.quote(`attributes.${identifier}=<value>`)}`,
-      );
+      const fix = ctx.suggest({
+        id: "users:update",
+        args: { id: "<user_id>" },
+        flags: { schema: "<revision_id>", set: `attributes.${identifier}=<value>` },
+      });
       return {
         warnings: [
           `${missingCount} of ${userCount} existing ${users} of ${quote(objectType)} ${new Intl.PluralRules("en").select(missing.length) === "one" ? "has" : "have"} no ${quote(identifier)}, the field the login flow looks users up by, so those who sign in with a password and type it are offered registration instead of being signed in. Move each user to the schema revision that defines it and set it in one update: ${fix}`,

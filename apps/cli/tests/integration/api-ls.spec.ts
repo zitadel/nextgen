@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "@tests/helpers/platform";
-import { aSetUpApp } from "@tests/helpers/project";
+import { aSetUpApp, MOCK_SERVER_URL } from "@tests/helpers/project";
 import { expectedPublicCliCommand } from "@tests/helpers/run-cli";
 
 const platform = usePlatformMock();
@@ -39,7 +39,11 @@ describe("api ls", () => {
               },
             ],
             count: 1,
-            next_commands: [expectedPublicCliCommand(`api '<operation-id>' --cwd ${app.path}`)],
+            next_commands: [
+              expectedPublicCliCommand(
+                `api '<operation-id>' --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+              ),
+            ],
           },
           warnings: [],
         });
@@ -77,7 +81,11 @@ describe("api ls", () => {
               },
             ],
             count: 1,
-            next_commands: [expectedPublicCliCommand(`api '<operation-id>' --cwd ${app.path}`)],
+            next_commands: [
+              expectedPublicCliCommand(
+                `api '<operation-id>' --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+              ),
+            ],
           },
           warnings: [],
         });
@@ -136,7 +144,11 @@ describe("api ls", () => {
               },
             ],
             count: 2,
-            next_commands: [expectedPublicCliCommand(`api '<operation-id>' --cwd ${app.path}`)],
+            next_commands: [
+              expectedPublicCliCommand(
+                `api '<operation-id>' --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+              ),
+            ],
           },
           warnings: [],
         });
@@ -170,7 +182,11 @@ describe("api ls", () => {
               },
             ],
             count: 1,
-            next_commands: [expectedPublicCliCommand(`api '<operation-id>' --cwd ${app.path}`)],
+            next_commands: [
+              expectedPublicCliCommand(
+                `api '<operation-id>' --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+              ),
+            ],
           },
           warnings: [],
         });
@@ -235,7 +251,9 @@ describe("api ls", () => {
         const result = await app.apiOperationsRendered("--tag", "System");
 
         expect(result).toSayOnce(
-          expectedPublicCliCommand(`api '<operation-id>' --cwd ${app.path}`),
+          expectedPublicCliCommand(
+            `api '<operation-id>' --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+          ),
         );
         expect(result.stdout).not.toContain("<operation-id>");
       });

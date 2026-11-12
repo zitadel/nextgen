@@ -12,11 +12,7 @@ vi.mock("@oclif/table", async (importOriginal) => {
 import { makeTable } from "@oclif/table";
 
 import { asTerminal, offTerminal } from "@tests/helpers/terminal";
-import {
-  aTableDrawnByARun,
-  aTabulatingCommand,
-  anUnscopedTabulatingCommand,
-} from "@tests/helpers/tabulate";
+import { aTableDrawnByARun, aTabulatingCommand } from "@tests/helpers/tabulate";
 
 const draw = (argv: string[] = []) => aTabulatingCommand(argv);
 
@@ -309,10 +305,7 @@ describe("a list for a script", () => {
   });
 
   it("names the next page beside the rows", async () => {
-    const result = await draw().drawList(
-      { plain: true },
-      { ...view, page: { token: "p2", command: "thing list", flags: [] } },
-    );
+    const result = await draw().drawList({ plain: true }, { ...view, page: { token: "p2" } });
 
     expect(result).toMatchObject({ footer: "More available: --page-token p2 (or --all)" });
   });
@@ -434,7 +427,7 @@ describe("emitList", () => {
   it("reports the cursor under the property the platform spells it as", async () => {
     const result = await draw().drawList(
       { plain: true },
-      { ...view, page: { token: "p2", command: "thing list", flags: [], cursorKey: "nextCursor" } },
+      { ...view, page: { token: "p2", cursorKey: "nextCursor" } },
     );
 
     expect(result).toMatchObject({ data: { items: [{ id: "a" }], count: 1, nextCursor: "p2" } });
@@ -451,24 +444,6 @@ describe("emitList", () => {
     await expect(replacing).rejects.toThrow("may not replace count");
   });
 
-  it("refuses a paged list from a command that cannot suggest a follow-up, even on its last page", async () => {
-    const list = anUnscopedTabulatingCommand().drawList(
-      { plain: true },
-      { ...view, page: { token: null, command: "thing list", flags: [] } },
-    );
-
-    await expect(list).rejects.toThrow("override suggestFollowUp");
-  });
-
-  it("refuses to suggest a follow-up from a command that has none to suggest", async () => {
-    const list = anUnscopedTabulatingCommand().drawList(
-      { plain: true },
-      { ...view, page: { token: "p2", command: "thing list", flags: [] } },
-    );
-
-    await expect(list).rejects.toThrow("override suggestFollowUp");
-  });
-
   it("gives a pipe tab-separated rows, and sends the next steps beside them", async () => {
     const result = await draw().drawList({ plain: true }, view);
 
@@ -482,9 +457,9 @@ describe("emitList", () => {
   });
 
   it("reports the next page's cursor, its command and a footer that names it", async () => {
-    const result = await draw().drawList(
+    const result = await draw(["--limit", "1"]).drawList(
       { plain: false },
-      { ...view, page: { token: "p2", command: "thing list", flags: ["--limit 1"] } },
+      { ...view, page: { token: "p2" } },
     );
 
     expect(result).toMatchObject({
@@ -493,10 +468,21 @@ describe("emitList", () => {
     });
   });
 
+  it("asks for the next page with its token in place of the one the run was given", async () => {
+    const result = await draw(["--page-token", "p1", "--all"]).drawList(
+      { plain: false },
+      { ...view, page: { token: "p2" } },
+    );
+
+    expect(result).toMatchObject({
+      next: { commands: [expect.stringMatching(/thing list --page-token p2$/)] },
+    });
+  });
+
   it("asks for the next page as JSON when the run was JSON", async () => {
     const result = await draw(["--json"]).drawList(
       { plain: false },
-      { ...view, page: { token: "p2", command: "thing list", flags: [] } },
+      { ...view, page: { token: "p2" } },
     );
 
     expect(result).toMatchObject({
@@ -506,10 +492,7 @@ describe("emitList", () => {
 
   it("names the next page in the footer of a person's list", async () => {
     const result = await asTerminal(() =>
-      draw().drawList(
-        { plain: false },
-        { ...view, page: { token: "p2", command: "thing list", flags: [] } },
-      ),
+      draw().drawList({ plain: false }, { ...view, page: { token: "p2" } }),
     );
 
     expect(result).toMatchObject({
@@ -526,7 +509,7 @@ describe("emitList", () => {
           rows: [],
           items: [],
           empty: "No things on this page",
-          page: { token: "p2", command: "thing list", flags: [] },
+          page: { token: "p2" },
         },
       ),
     );
@@ -542,10 +525,7 @@ describe("emitList", () => {
 
   it("quotes a cursor holding a control character so a shell reads it back as it is", async () => {
     const result = await asTerminal(() =>
-      draw().drawList(
-        { plain: false },
-        { ...view, page: { token: "a\u001bb", command: "thing list", flags: [] } },
-      ),
+      draw().drawList({ plain: false }, { ...view, page: { token: "a\u001bb" } }),
     );
 
     expect(result).toMatchObject({
@@ -555,10 +535,7 @@ describe("emitList", () => {
 
   it("joins a cursor that starts with a dash to its option, so it stays one option", async () => {
     const result = await asTerminal(() =>
-      draw().drawList(
-        { plain: false },
-        { ...view, page: { token: "-p2", command: "thing list", flags: [] } },
-      ),
+      draw().drawList({ plain: false }, { ...view, page: { token: "-p2" } }),
     );
 
     expect(result).toMatchObject({

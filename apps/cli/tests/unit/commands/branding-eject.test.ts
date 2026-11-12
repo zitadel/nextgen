@@ -288,7 +288,7 @@ describe("branding eject asked on a terminal", () => {
     const talk = answering(...answers);
     return {
       talk,
-      done: asTerminal(() => BrandingEject.run(["--cwd", cwd])),
+      done: asTerminal(() => BrandingEject.run(["--cwd", cwd], cliPackageRoot)),
     };
   };
 

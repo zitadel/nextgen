@@ -3,7 +3,7 @@ import { stripVTControlCharacters } from "node:util";
 
 import { Command, Flags, type Interfaces, ux } from "@oclif/core";
 
-import { byName, type ByName } from "./names";
+import { byName, type ByName } from "@/lib/names";
 import { nonBlankString, serverFlag } from "./flags";
 import { Interruptible } from "./interruptible";
 import { log } from "@/lib/log";
@@ -16,11 +16,16 @@ import { normalizePublicCliCommands, publicCliCommand, spellOutCommands } from "
 import { hostUnlessDefault, resolveServer, SERVER_VARIABLE } from "@/lib/server";
 import { statusColor } from "@/lib/style";
 import {
-  asEnvironmentSelector,
-  type EnvironmentSelector,
-  inShell,
+  type Again,
+  declaredOf,
+  type LooseNext,
+  helpOf,
+  commandOf,
+  isSuggestion,
+  type Scope,
+  type Suggest,
+  type Suggested,
   type SuggestedCommand,
-  unscopedCommand,
 } from "@/lib/suggestion";
 import { type Properties, Telemetry, type TelemetryDeps } from "@/lib/telemetry";
 import { DO_NOT_TRACK, ZITADEL_TELEMETRY } from "@/lib/telemetry/consent";
@@ -43,6 +48,8 @@ import {
 } from "./command-telemetry";
 import type { CommandGroup } from "./groups";
 import { escapeControlCharacters, escapeJsonControlCharacters } from "@/lib/terminal-text";
+import type { RELATIONS } from "@/lib/suggestion/relations";
+import { type Rerun, RunSuggestions, typedScopeOf } from "@/lib/suggestion/run";
 import { type NextSteps, nextStepsData, renderNextSteps, stepsOf } from "./next-steps";
 import { painted } from "./rendering";
 import type {
@@ -54,24 +61,11 @@ import type {
   JsonEnvelope,
   SkippedEnvelope,
 } from "./types";
-import { Cmd } from "@/lib/cmd";
 
 /**
  * The colour variables, which `bin/run.js` sets from `--color`/`--no-color`
  * and the colour libraries read. The libraries agree that off wins.
  */
-/** The spellings of the option that names the project directory. */
-const CWD_OPTIONS: readonly string[] = ["--cwd", "-c"];
-
-/** Flags that say how a run answers, not what it does, so a rebuilt command leaves them out. */
-export const ANSWERING: ReadonlySet<string> = new Set(["force", "json", "non-interactive"]);
-
-/**
- * The `user:password@` of a URL, which a rebuilt command never prints:
- * everything in the authority up to its last `@`, since a password may hold one.
- */
-const CREDENTIALS = /(\w+:\/\/)[^/?#\s]*@/g;
-
 const NO_COLOR: FlagVariable = {
   name: "NO_COLOR",
   flag: "color",
@@ -111,7 +105,7 @@ export type MetaOptions = {
  * as code reads it (`flags.clientId` for `--client-id`); see `./names`.
  */
 export type Admitted<C extends typeof BaseCommand> = Readonly<{
-  flags: ByName<Interfaces.InferredFlags<C["flags"] & C["baseFlags"]>>;
+  flags: ByName<Interfaces.InferredFlags<Omit<C["flags"], typeof RELATIONS> & C["baseFlags"]>>;
   args: ByName<Interfaces.InferredArgs<C["args"]>>;
   argv: readonly string[];
 }>;
@@ -303,8 +297,24 @@ export abstract class BaseCommand extends Interruptible(Command) {
 
   private reading: ReturnType<BaseCommand["parse"]> | undefined;
 
-  /** `--cwd` as typed, carried into the unscoped follow-ups this run suggests. */
-  private typedCwd: string | undefined;
+  /**
+   * How the command line chose the project, as typed: `--cwd`, `--env` or
+   * `--env-file`, and `--server`, carried into the commands this run suggests.
+   */
+  private typedScope: Scope = {};
+
+  /** The commands this run suggests next; see {@link suggest}. */
+  private readonly suggestions = new RunSuggestions({
+    findCommand: (id) => {
+      return this.config.findCommand(id);
+    },
+    cliVersion: () => {
+      return this.cliVersion;
+    },
+    scope: () => {
+      return this.scope();
+    },
+  });
 
   /** Whether the flags were read and the run's context settled, as opposed to a failure before it. */
   private settled = false;
@@ -418,102 +428,108 @@ export abstract class BaseCommand extends Interruptible(Command) {
   }
 
   /**
-   * This run again with `words`, as a destructive command's `--force` retry
-   * suggests it: `words` are its arguments as typed, and the directory goes on as
-   * {@link cwdSelector} puts it. A project command keeps its environment
-   * selector instead (`EnvironmentCommand`).
+   * What this run puts back on every command it suggests: how its command line
+   * chose the project (`--cwd`, `--env` or `--env-file`, `--server`), as typed.
+   * Only what was typed is carried: a name that came from `ZITADEL_ENV` or a
+   * platform signal needs none, because the next run in the same environment
+   * inherits it. The renderer gives the environment half only to a target
+   * that takes it.
+   *
+   * @returns The scope, holding only what the command line named.
    */
-  protected retryCommand(words: readonly string[]): SuggestedCommand {
-    const line = Cmd.of(words).without(CWD_OPTIONS);
-    return unscopedCommand(`${line}${this.cwdSelector()}`, this.cliVersion);
+  protected scope(): Scope {
+    return this.typedScope;
   }
 
   /**
-   * This run as a command to type, rebuilt from the command line as oclif
-   * parsed it rather than as typed: its arguments (or `arguments` in their
-   * place), then `add`, then each flag but the ones in `leave`, with a URL's
-   * credentials left out and the selector put back on by {@link retryCommand}.
-   * Arguments that read as flags go last, after a `--`.
+   * A command this run suggests next, checked against the command it names
+   * and rendered with this run's {@link scope} ({@link RunSuggestions}). It is
+   * a property, so it can be handed to a helper as it is.
    *
-   * @param options.add - Words the command gains, such as `--force`.
-   * @param options.leave - Flags that only say how this run answered.
-   * @param options.arguments - The arguments to name, where they are not the ones typed.
+   * @param next - The target and its arguments and flags, by the names code reads them.
+   * @returns The command, in the public `npx @zitadel/cli@<version>` form.
+   * @throws {Error} When the target is no command this CLI loaded.
    */
-  protected async typedRun(options: {
-    add: readonly string[];
-    leave: ReadonlySet<string>;
-    arguments?: readonly string[];
-  }): Promise<SuggestedCommand> {
+  protected readonly suggest: Suggest = (next: Suggested | LooseNext) => {
+    return this.suggestions.aimedAt(this.scope())(next as Suggested);
+  };
+
+  /**
+   * {@link suggest} aimed at a scope of its own rather than this run's, such as
+   * the environment a command just created, or run as another release.
+   *
+   * @param scope - What every suggestion is aimed at, in place of this run's.
+   * @param cliVersion - The release the suggestions run as.
+   * @returns The renderer.
+   */
+  protected suggestWith(scope: Scope, cliVersion: string = this.cliVersion): Suggest {
+    return this.suggestions.aimedAt(scope, cliVersion);
+  }
+
+  /**
+   * A command this run rendered, as the words after the CLI (`next_args`).
+   *
+   * @param command - A command {@link suggest}, {@link again} or {@link rerun} rendered.
+   * @returns Its words.
+   * @throws {Error} When this run did not render `command`.
+   */
+  protected argsOf(command: SuggestedCommand): readonly string[] {
+    return this.suggestions.argsOf(command);
+  }
+
+  /**
+   * This run again, `without` some of its flags and `with` others, as a dry
+   * run's real command or a refusal's `--force` retry suggests it. `id` must be
+   * the command that is running, so what changes is checked against it.
+   *
+   * @param id - The running command, as oclif names it.
+   * @param change - The flags to drop and to add, by the names code reads them.
+   * @returns The command.
+   * @throws {Error} When `id` is not the running command.
+   */
+  protected readonly again: Again = async (id, change) => {
+    // A class run on its own, outside the command table, has no id oclif
+    // knows to compare: the one named stands in for it.
+    if (this.id !== undefined && this.config.findCommand(this.id) !== undefined && id !== this.id) {
+      throw new Error(`${this.id} cannot suggest itself as ${id}`);
+    }
+
+    return this.rerun({ without: change.without, with: change.with }, id);
+  };
+
+  /**
+   * {@link again} for code that does not know which command it runs in, such
+   * as a mixin: the changes are checked when the command is rendered, not when
+   * it is compiled ({@link RunSuggestions.rerun}).
+   *
+   * @param change - What the rerun changes, by the names code reads them.
+   * @param id - The running command, where the class has no id of its own.
+   * @returns The command.
+   */
+  protected async rerun(change: Rerun = {}, id: string = this.id ?? ""): Promise<SuggestedCommand> {
     const { raw } = await this.parseOnce();
-    const definitions: Record<string, { type: string } | undefined> = {
-      ...this.ctor.baseFlags,
-      ...this.ctor.flags,
-    };
-    const redact = (word: string) => {
-      return word.replace(CREDENTIALS, "$1");
-    };
-    const positional = (
-      options.arguments ??
-      raw.flatMap((token) => {
-        return token.type === "arg" ? [token.input] : [];
-      })
-    ).map(redact);
-    const flags = raw.flatMap((token) => {
-      if (token.type !== "flag" || options.leave.has(token.flag)) {
-        return [];
-      }
-      // A boolean's input is the flag as typed (`--no-color`, `-v`). A value
-      // that starts with `-` stays one word with its flag, or it reads as one.
-      const value = redact(token.input);
-      if (definitions[token.flag]?.type === "boolean") {
-        return [token.input];
-      }
-
-      return value.startsWith("-") ? [`--${token.flag}=${value}`] : [`--${token.flag}`, value];
+    // Read off the running class itself rather than looked up by id: this run
+    // is the command, whatever table it was loaded from.
+    const target = declaredOf(id, {
+      flags: {
+        ...this.command.baseFlags,
+        ...this.command.flags,
+        ...(this.command.enableJsonFlag ? { json: { type: "boolean" as const } } : {}),
+      },
+      args: this.command.args ?? {},
     });
-    const delimited = positional.some((word) => {
-      return word.startsWith("-");
-    });
-    const command = this.retryCommand([
-      ...(this.id ?? "").split(":").filter((word) => {
-        return word !== "";
-      }),
-      ...(delimited ? [] : positional),
-      ...options.add,
-      ...flags,
-    ]);
 
-    return delimited ? inShell(command, { after: ` -- ${Cmd.of(positional)}` }) : command;
+    return this.suggestions.rerun(id, target, raw, change);
   }
 
   /**
    * The command a dry run offers next: this run again with `--dry-run` taken
    * off, every typed flag kept but the ones that only say how it answered.
+   *
+   * @returns The command.
    */
   protected async realRun(): Promise<SuggestedCommand> {
-    return this.typedRun({ add: [], leave: new Set(["json", "non-interactive", "dry-run"]) });
-  }
-
-  /**
-   * The suggestion for a follow-up the framework builds on a command's behalf,
-   * such as a list's next page. A command that talks to a project overrides it
-   * to keep the run's environment selector, so the framework never has to
-   * choose between the scoped and the unscoped form. A command that leaves it
-   * alone has no follow-up to suggest, and being asked to is a bug.
-   */
-  protected suggestFollowUp(_args: string): SuggestedCommand {
-    throw new Error(`${this.id ?? "this command"} suggests no follow-up: override suggestFollowUp`);
-  }
-
-  /**
-   * The directory this run addressed, as the flag that puts it back. A
-   * follow-up run from the shell's directory would act on whatever project is
-   * there.
-   */
-  protected cwdSelector(): EnvironmentSelector {
-    return asEnvironmentSelector(
-      this.typedCwd === undefined ? "" : ` ${Cmd.option("--cwd", this.typedCwd)}`,
-    );
+    return this.rerun({ without: ["dryRun"] });
   }
 
   /**
@@ -566,7 +582,12 @@ export abstract class BaseCommand extends Interruptible(Command) {
   ): Promise<GlobalOptions> {
     const flags = byName(given);
     const cwd = resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined);
-    this.typedCwd = typeof flags.cwd === "string" ? flags.cwd : undefined;
+    this.typedScope = typedScopeOf({
+      cwd: flags.cwd,
+      env: flags.env,
+      envFile: flags.envFile,
+      server: flags.server,
+    });
     const serverFlag = typeof flags.server === "string" ? flags.server : undefined;
     const source = await this.serverOf(cwd, serverFlag, options);
     const json = this.jsonEnabled();
@@ -621,7 +642,6 @@ export abstract class BaseCommand extends Interruptible(Command) {
         ? await eligibleForSkills({
             env: process.env,
             interactive: !this.meta.nonInteractive,
-            cliVersion: this.config.version,
           })
         : false;
     this.settled = true;
@@ -654,7 +674,12 @@ export abstract class BaseCommand extends Interruptible(Command) {
   private async metaFromArgv(meta: GlobalOptions): Promise<GlobalOptions> {
     const typed = argvValue(this.argv, "--cwd", "-c");
     const serverFlag = argvValue(this.argv, "--server");
-    this.typedCwd = typed;
+    this.typedScope = typedScopeOf({
+      cwd: typed,
+      env: argvValue(this.argv, "--env", "-e"),
+      envFile: argvValue(this.argv, "--env-file"),
+      server: serverFlag,
+    });
     const cwd = resolveCwd(typed);
     try {
       const source = await this.serverOf(cwd, serverFlag, this.command.meta);
@@ -662,29 +687,6 @@ export abstract class BaseCommand extends Interruptible(Command) {
     } catch {
       return { ...meta, cwd, serverFlag };
     }
-  }
-
-  /**
-   * A failure's follow-ups written bare (`zitadel start`), aimed at the
-   * directory the run was given: raised below the command, where the run's
-   * `--cwd` is not known, they would otherwise act on whatever project the
-   * shell is in. One that already names its directory is left alone.
-   */
-  private scopedFailure(error: ZitadelError): ZitadelError {
-    const selector = this.cwdSelector();
-    if (selector === "" || error.nextCommands === undefined) {
-      return error;
-    }
-
-    return new ZitadelError(error.code, error.message, {
-      hint: error.hint,
-      nextCommands: error.nextCommands.map((command) => {
-        return command.startsWith("zitadel ") && !/\s(--cwd|-c)[\s=]/.test(command)
-          ? (`${command}${selector}` as SuggestedCommand)
-          : command;
-      }),
-      details: error.details,
-    });
   }
 
   /**
@@ -926,7 +928,9 @@ export abstract class BaseCommand extends Interruptible(Command) {
           },
         ];
     const skills =
-      this.skillsOffered && changed ? [claimSkills(process.env, this.config.version)] : [];
+      this.skillsOffered && changed
+        ? [claimSkills(process.env, this.suggest({ id: "skills:add" }))]
+        : [];
     return {
       ...summary,
       next: [
@@ -996,9 +1000,15 @@ export abstract class BaseCommand extends Interruptible(Command) {
     const reason: unknown = this.signal.reason;
     const cancelled =
       this.signal.aborted && reason instanceof ZitadelError && reason.code === "E_CANCELLED";
+    // A command line oclif refused may name no command, and then the CLI's
+    // own help is the one to read.
+    const help =
+      this.config.findCommand(meta.command) === undefined
+        ? commandOf(["--help"], meta.cliVersion)
+        : this.suggest(helpOf(meta.command));
     const zitadelError = presentedFailure(
-      this.scopedFailure(cancelled ? reason : toZitadelError(error)),
-      meta,
+      this.suggestions.renderedFailure(cancelled ? reason : toZitadelError(error)),
+      help,
     );
     this.meta = meta;
     this.openTelemetry(process.argv.includes("--no-telemetry") ? false : undefined);
@@ -1216,6 +1226,23 @@ function toEnvelope(result: CommandResult, meta: GlobalOptions): JsonEnvelope {
   };
 }
 
+/**
+ * A failure's follow-ups, each rendered by `renderedFailure` before the failure
+ * is reported.
+ *
+ * @param error - The failure, as the command's failure handler left it.
+ * @returns Its follow-ups.
+ * @throws {Error} When one was left for a run to render, which is a defect in the handler.
+ */
+function renderedCommands(error: ZitadelError): SuggestedCommand[] {
+  return (error.nextCommands ?? []).map((next) => {
+    if (isSuggestion(next)) {
+      throw new Error(`${next.id} was reported without being rendered`);
+    }
+    return next;
+  });
+}
+
 /** Builds the failure envelope from a {@link ZitadelError} and the invocation metadata. */
 function toErrorEnvelope(error: ZitadelError, meta: GlobalOptions): ErrorEnvelope {
   return {
@@ -1226,7 +1253,7 @@ function toErrorEnvelope(error: ZitadelError, meta: GlobalOptions): ErrorEnvelop
     code: error.code,
     message: error.message,
     hint: error.hint === undefined ? undefined : spellOutCommands(error.hint, meta.cliVersion),
-    next_commands: normalizePublicCliCommands(error.nextCommands, meta.cliVersion),
+    next_commands: error.nextCommands === undefined ? undefined : renderedCommands(error),
     details: error.details,
   };
 }
@@ -1272,7 +1299,7 @@ function failureSummary(error: ZitadelError, meta: GlobalOptions): Summary {
   // success's rendering does, and are spelled out here for the same reason.
   // The envelope keeps them as they came, so a reader parses the real text.
   // Only the label is coloured, so there is nothing for the spelling to undo.
-  const commands = normalizePublicCliCommands(error.nextCommands, meta.cliVersion) ?? [];
+  const commands = renderedCommands(error);
   return {
     title: `Error: ${escapeControlCharacters(spellOutCommands(error.message, meta.cliVersion))} (${error.code})`,
     sections: [],
@@ -1298,19 +1325,20 @@ function failureSummary(error: ZitadelError, meta: GlobalOptions): Summary {
  * A failure as every rendering of it states it. oclif refuses a command line
  * in its own words, so the sentence is its first line and the step is the
  * command's help, in the envelope and on the terminal alike.
+ *
+ * @param error - The failure.
+ * @param help - The help of the command the run named.
+ * @returns The failure as it is reported.
  */
-function presentedFailure(error: ZitadelError, meta: GlobalOptions): ZitadelError {
+function presentedFailure(error: ZitadelError, help: SuggestedCommand): ZitadelError {
   const { sentence, misuse } = failureText(error.message);
   if (!misuse) {
     return error;
   }
-  const command = meta.command.replaceAll(":", " ").trim();
 
   return new ZitadelError(error.code, sentence, {
     hint: error.hint,
-    nextCommands: error.nextCommands?.length
-      ? error.nextCommands
-      : [unscopedCommand(command === "" ? "--help" : `${command} --help`, meta.cliVersion)],
+    nextCommands: error.nextCommands?.length ? error.nextCommands : [help],
     details: error.details,
   });
 }

@@ -10,7 +10,7 @@ import {
   type UnavailableReason,
 } from "./backend";
 import { isObject } from "./json";
-import type { SuggestedCommand } from "./suggestion";
+import type { Suggested } from "./suggestion";
 import {
   ConflictError as ConfigConflictError,
   ConfigError,
@@ -95,8 +95,12 @@ export function confirmationHint(question: string): string {
  */
 export type ZitadelErrorOptions = {
   hint?: string;
-  /** Built by the `lib/suggestion` builders, so a project command keeps its selector. */
-  nextCommands?: readonly SuggestedCommand[];
+  /**
+   * What to run next. A {@link Suggested} rendered already, or a `Suggestion`
+   * the command's failure handler renders with the run's scope, so one raised
+   * below a command still aims at the run's project.
+   */
+  nextCommands?: readonly Suggested[];
   details?: unknown;
 };
 
@@ -109,7 +113,7 @@ export type ZitadelErrorOptions = {
 export class ZitadelError extends Error {
   readonly code: ZitadelErrorCode;
   readonly hint?: string;
-  readonly nextCommands?: readonly SuggestedCommand[];
+  readonly nextCommands?: readonly Suggested[];
   readonly details?: unknown;
 
   /**

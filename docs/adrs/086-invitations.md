@@ -403,7 +403,22 @@ change. #2458 specifies the events; this ADR adjusts them slightly.
 - v4 migration docs: v4 project members map to grants; v4 invite codes don't
   carry over.
 
-## Amendment (2026-11-10): `invitation_cancelled`
+## Amendment (2026-11-11): replace deletes any unaccepted original
+
+This replaces the replace rule in §4, and the matching sentences in §4's
+erasure rule and §10's state changes (#2852).
+
+- Replace deletes the original in the same transaction whether it is pending,
+  expired or rejected. The list shows one invitation per journey, and the
+  events keep the history (`invitation.cancelled` with reason `replaced`).
+- An accepted invitation can't be replaced; replace answers the same `404` as
+  for an unknown id.
+- Metadata still moves to the new invitation when the replace sends none of
+  its own. A rejected original has none left to move.
+- Cancel is unchanged: it deletes only a pending invitation, and an expired
+  one keeps its row until the cleanup job exists.
+
+## Amendment (2026-11-12): `invitation_cancelled`
 
 §9 sends no event when a pending invitation is cancelled. Cancel deletes the
 row, so a cancelled journey ends at `invitation_created` and counts against

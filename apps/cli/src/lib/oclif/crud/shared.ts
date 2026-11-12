@@ -3,10 +3,10 @@ import { z } from "zod";
 
 import { ZitadelError } from "@/lib/errors";
 import { nonBlankArg, taken } from "@/lib/oclif/flags";
-import { named } from "@/lib/oclif/names";
+import { named } from "@/lib/names";
 import { prose } from "@/lib/oclif/rendering";
 import type { CommandResult } from "@/lib/oclif/types";
-import type { SuggestedCommand } from "@/lib/suggestion";
+import { resourceSuggestion, type SuggestedCommand } from "@/lib/suggestion";
 import { escapeControlCharacters, escapeJsonControlCharacters } from "@/lib/terminal-text";
 
 import { type CredentialContext, redactCredentials } from "./secrets";
@@ -36,7 +36,7 @@ export const idArg = <Ctx>(resource: ResourceDescriptor<Ctx>, topic?: string) =>
             refusal: {
               message: "Invalid {input}: {problem}",
               hint: lists ? "List them to find one." : "Pass the id exactly as it was listed.",
-              next: lists ? [`${topic} list`] : undefined,
+              next: lists ? [resourceSuggestion(topic, "list")] : undefined,
               details: {
                 argument: "{input}",
               },

@@ -5,9 +5,8 @@ import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
 import { isErrno, ZitadelError, errorMessage } from "@/lib/errors";
-import { Cmd } from "@/lib/cmd";
 import { isTrainVersion } from "@/lib/public-cli";
-import { unscopedCommand } from "@/lib/suggestion";
+
 import { readIfExists } from "@/lib/fs";
 import { parseJsonObject } from "@/lib/json";
 import { ancestors } from "@/lib/paths";
@@ -412,7 +411,7 @@ export function localServerNotRunning(serverUrl?: string): ZitadelError {
     hint: serverUrl
       ? `No healthy local server responded at ${serverUrl}.`
       : "No local server has been started in this directory or a parent. Run `zitadel start`, or name a server another directory started with --server <url>.",
-    nextCommands: [unscopedCommand("start")],
+    nextCommands: [{ id: "start" }],
     details: { server_url: serverUrl },
   });
 }
@@ -576,7 +575,7 @@ function explicitUrlPort(value: string): number | undefined {
 function malformedRuntime(input: Record<string, unknown>): ZitadelError {
   return new ZitadelError("E_VALIDATION", `${LOCAL_RUNTIME_FILE} is malformed`, {
     hint: "Run `zitadel reset --force`, then `zitadel start`.",
-    nextCommands: [unscopedCommand("reset --force"), unscopedCommand("start")],
+    nextCommands: [{ id: "reset", flags: { force: true } }, { id: "start" }],
     details: input,
   });
 }
@@ -592,19 +591,12 @@ export function retargetMalformedRuntime(error: unknown, dir: string): unknown {
   }
   const resetArgs = ["reset", "--force", "--cwd", dir];
   const startArgs = ["start", "--cwd", dir];
-  const reset = resetArgs
-    .map((word) => {
-      return Cmd.quote(word);
-    })
-    .join(" ");
-  const start = startArgs
-    .map((word) => {
-      return Cmd.quote(word);
-    })
-    .join(" ");
   return new ZitadelError(error.code, error.message, {
     hint: "Reset the local runtime, then start it again, each with the --cwd of the directory that holds it.",
-    nextCommands: [unscopedCommand(reset), unscopedCommand(start)],
+    nextCommands: [
+      { id: "reset", flags: { force: true, cwd: dir } },
+      { id: "start", flags: { cwd: dir } },
+    ],
     details: {
       ...(error.details as Record<string, unknown>),
       suggested_args: [resetArgs, startArgs],
