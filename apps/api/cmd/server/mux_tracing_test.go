@@ -61,7 +61,7 @@ func TestBuildHTTPMuxTracesTheAuditEventUnderTheServerSpan(t *testing.T) {
 			tokens.EXPECT().IntrospectToken(gomock.Any(), "secret").
 				Return(&domain.Token{Type: domain.TokenTypeProjectToken, ProjectID: "proj_1"}, nil)
 			apiServers, err := api.NewServers(oasapi.UnimplementedHandler{}, api.NewSecurityHandler(tokens),
-				apiServerOptions(muxTracerProvider, noop.NewMeterProvider(), nil)...)
+				apiServerOptions(muxTracerProvider, noop.NewMeterProvider(), nil, 0)...)
 			require.NoError(t, err)
 			events := audit.NewRequestBuffer(audit.BatchInserter(func(context.Context, []*domain.Event) error { return nil }), audit.RequestBufferConfig{})
 			t.Cleanup(events.Close)

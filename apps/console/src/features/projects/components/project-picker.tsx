@@ -3,6 +3,7 @@ import { Plus } from "lucide-react";
 
 import { ProjectMark } from "@/components/project-mark";
 import { LoadMore } from "@/components/resource-list";
+import { SearchField } from "@/components/search-field";
 import { Button } from "@/components/ui/button";
 import {
   Empty,
@@ -18,7 +19,6 @@ import type { NavIcon } from "@/nav";
 import { type ProjectRead, primaryHost } from "../model";
 import { useSelectProjectTarget } from "../project-scope";
 import { NewProjectSheet } from "./new-project-sheet";
-import { ProjectSearch } from "./project-search";
 
 /**
  * The step before a screen that needs a project while none is selected (D31):
@@ -76,7 +76,7 @@ export function ProjectPicker({
       </EmptyHeader>
 
       <EmptyContent className="items-stretch gap-3 text-left text-wrap">
-        <ProjectSearch query={query} onSearch={onSearch} />
+        <SearchField label="Search projects" query={query} onSearch={onSearch} className="w-full" />
 
         {projects.length === 0 ? (
           <p className="text-muted-foreground py-6 text-center">No projects match “{searched}”.</p>

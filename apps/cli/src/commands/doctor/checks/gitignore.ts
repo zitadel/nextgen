@@ -23,9 +23,13 @@ export class GitignoreCheck extends AbstractSanityCheck {
 
   override async fix(ctx: CheckContext): Promise<void> {
     const path = join(ctx.cwd, ".gitignore");
-    const existing = await readFile(path, "utf8").catch(() => "");
+    const existing = await readFile(path, "utf8").catch(() => {
+      return "";
+    });
     const lines = existing.split(/\r?\n/g);
-    const missing = REQUIRED_ENTRIES.filter((entry) => !lines.includes(entry));
+    const missing = REQUIRED_ENTRIES.filter((entry) => {
+      return !lines.includes(entry);
+    });
     if (missing.length === 0 || ctx.dryRun) {
       return;
     }

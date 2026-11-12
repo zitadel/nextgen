@@ -11,6 +11,7 @@ import (
 // FlowCreateUserWithPasswordHandler implements the `create_user` on_success:
 // persist a new user from validated identifier + password fields.
 type FlowCreateUserWithPasswordHandler struct {
+	protection  SignupProtection
 	hashers     ProjectHasherResolver
 	passwords   PasswordGate
 	userService UserService
@@ -24,8 +25,10 @@ func NewFlowCreateUserHandler(
 	userService UserService,
 	schemaStore domain.JSONSchemaStore,
 	db StatementPool,
+	protection SignupProtection,
 ) *FlowCreateUserWithPasswordHandler {
 	return &FlowCreateUserWithPasswordHandler{
+		protection:  protection,
 		userService: userService,
 		schemaStore: schemaStore,
 		hashers:     hashers,
@@ -37,11 +40,33 @@ func NewFlowCreateUserHandler(
 var _ domain.FlowOnSuccessHandler = (*FlowCreateUserWithPasswordHandler)(nil)
 
 func (h *FlowCreateUserWithPasswordHandler) Handle(ctx context.Context, in domain.FlowOnSuccessInput) (domain.FlowOnSuccessResult, error) {
+	if in.State == nil || in.ProjectID == "" || in.State.ProjectID != in.ProjectID {
+		return domain.FlowOnSuccessResult{}, domain.ErrFlowIntegrity()
+	}
 	password := in.State.CollectedData.AuthMethods.Password
 	if password == "" {
 		return domain.FlowOnSuccessResult{}, fmt.Errorf("%w: create_user has no password in collected data", domain.ErrFlowIntegrity())
 	}
 
+	// Signup has no password history. Check its cheap policy before spending
+	// the proof; SetUserPasswordAction still checks again before hashing.
+	if _, err := h.passwords.CheckPassword(ctx, SetPasswordInput{ProjectID: in.ProjectID, Password: password}); err != nil {
+		if derr, ok := errors.AsType[domain.Error](err); ok && errors.Is(err, domain.ErrUserPasswordPolicyViolation(nil)) {
+			if details, ok := derr.Details.(domain.PasswordPolicyViolations); ok {
+				return domain.FlowOnSuccessResult{StepError: domain.FlowStepFailed(domain.PasswordPolicyStepError(details.Violations), err)}, nil
+			}
+		}
+		return domain.FlowOnSuccessResult{}, err
+	}
+
+	// Spend once, before password hashing or any user mutation. A failed
+	// signup still costs the proof; the next GET issues a new challenge.
+	if h.protection == nil {
+		return domain.FlowOnSuccessResult{}, domain.ErrFlowIntegrity()
+	}
+	if err := h.protection.Consume(ctx, in.State, in.GateProofs[domain.SignupGate]); err != nil {
+		return domain.FlowOnSuccessResult{}, err
+	}
 	userID, err := h.db.Statements().NewManagedID(string(domain.PrefixUser))
 	if err != nil {
 		return domain.FlowOnSuccessResult{}, fmt.Errorf("create_user: mint user id: %w", err)

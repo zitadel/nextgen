@@ -153,6 +153,69 @@ func (r *Resolver) CheckPath(ctx context.Context, stmts service.AuthzResolverSta
 	return o.decision, o.path, nil
 }
 
+// CheckProjects is CheckPath for each of projectIDs, req.ProjectID ignored,
+// in one statement for the grants and at most one for the platform operator
+// path, which does not depend on the project. Decisions and paths follow
+// projectIDs' order. It answers the questions CheckPath answers without a
+// target resource; a check naming one (ResourceID) goes through CheckPath.
+func (r *Resolver) CheckProjects(ctx context.Context, stmts service.AuthzResolverStatements, req Request, projectIDs []string) ([]Decision, []Path, error) {
+	decisions := make([]Decision, len(projectIDs))
+	paths := make([]Path, len(projectIDs))
+	if len(projectIDs) == 0 {
+		return decisions, paths, nil
+	}
+	if req.ResourceID != "" || req.PrincipalType == domain.AuthzPrincipalTypeSKTeam {
+		for i, projectID := range projectIDs {
+			one := req
+			one.ProjectID = projectID
+			d, p, err := r.CheckPath(ctx, stmts, one)
+			if err != nil {
+				return nil, nil, err
+			}
+			decisions[i], paths[i] = d, p
+		}
+		return decisions, paths, nil
+	}
+	req.ProjectID = projectIDs[0]
+	if err := validateCheckRequest(req); err != nil {
+		return nil, nil, err
+	}
+	catalogID, err := r.ActiveCatalogID(ctx, stmts)
+	if err != nil {
+		return nil, nil, err
+	}
+	params := checkParams(catalogID, req)
+	results, err := stmts.CheckAuthzProjects(ctx, params, projectIDs)
+	if err != nil {
+		return nil, nil, err
+	}
+	operatorAsked, operator := false, false
+	for i, result := range results {
+		decisions[i] = DecisionNotFound
+		switch {
+		case result.Allowed:
+			decisions[i], paths[i] = DecisionAllow, PathGrant
+			continue
+		case params.PlatformOperatorEligible():
+			if !operatorAsked {
+				operatorAsked = true
+				operator, err = stmts.CheckPlatformOperator(ctx, params.PlatformCheckParams())
+				if err != nil {
+					return nil, nil, err
+				}
+			}
+			if operator {
+				decisions[i], paths[i] = DecisionAllow, PathPlatformOperator
+				continue
+			}
+		}
+		if result.Foothold {
+			decisions[i] = DecisionForbidden
+		}
+	}
+	return decisions, paths, nil
+}
+
 // PlatformOperator reports whether req's principal holds ObjectType.Relation on
 // every object through the platform operator relation (ADR 075 §3), without a
 // target project: listMyProjects asks it for project.viewer to decide whether

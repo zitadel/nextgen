@@ -1,20 +1,23 @@
 import { Args } from "@oclif/core";
 import { z } from "zod";
 
-import { nonBlankArg, taken } from "@/lib/oclif/flags";
-import { named } from "@/lib/oclif/names";
-
 import { ZitadelError } from "@/lib/errors";
+import { nonBlankArg, taken } from "@/lib/oclif/flags";
+import { named } from "@/lib/names";
+import { prose } from "@/lib/oclif/rendering";
 import type { CommandResult } from "@/lib/oclif/types";
+import { resourceSuggestion, type SuggestedCommand } from "@/lib/suggestion";
+import { escapeControlCharacters, escapeJsonControlCharacters } from "@/lib/terminal-text";
+
 import { type CredentialContext, redactCredentials } from "./secrets";
 import type { Json, ResourceDescriptor, Schema } from "./types";
-import { prose } from "@/lib/oclif/rendering";
-import { escapeJsonControlCharacters } from "@/lib/terminal-text";
 
 /** Helpers shared by more than one verb builder. */
 
 /** The name of a resource's positional argument. */
-export const idName = <Ctx>(resource: ResourceDescriptor<Ctx>): string => resource.idArg ?? "id";
+export const idName = <Ctx>(resource: ResourceDescriptor<Ctx>): string => {
+  return resource.idArg ?? "id";
+};
 
 /**
  * The single positional argument the id-taking verbs share. Given the
@@ -32,22 +35,22 @@ export const idArg = <Ctx>(resource: ResourceDescriptor<Ctx>, topic?: string) =>
             schema: z.string().trim().pipe(resource.idSchema),
             refusal: {
               message: "Invalid {input}: {problem}",
-              hint: lists
-                ? `Find one with \`zitadel ${topic} list\`.`
-                : "Pass the id exactly as it was listed.",
-              next: lists ? [`${topic} list`] : undefined,
+              hint: lists ? "List them to find one." : "Pass the id exactly as it was listed.",
+              next: lists ? [resourceSuggestion(topic, "list")] : undefined,
               details: {
                 argument: "{input}",
               },
             },
           }),
         });
+
   return { [name]: take({ required: true, description }) };
 };
 
 /** The value the caller passed for that argument, read as a command reads it. */
-export const idValue = <Ctx>(resource: ResourceDescriptor<Ctx>, args: Json): string =>
-  String(args[named(idName(resource))]);
+export const idValue = <Ctx>(resource: ResourceDescriptor<Ctx>, args: Json): string => {
+  return String(args[named(idName(resource))]);
+};
 
 /**
  * Words spelled with a vowel but said with a "yoo" sound, so they take "a":
@@ -61,10 +64,13 @@ const YOO_SOUND = /^(?:user|unique|unit|usage)/i;
  * connection". A vowel letter takes "an", except a word in {@link YOO_SOUND}.
  * A silent "h" ("an hour") is not handled; no resource noun starts with one.
  */
-export const article = (phrase: string): string =>
-  /^[aeiou]/i.test(phrase) && !YOO_SOUND.test(phrase) ? "an" : "a";
+export const article = (phrase: string): string => {
+  return /^[aeiou]/i.test(phrase) && !YOO_SOUND.test(phrase) ? "an" : "a";
+};
 
-export const capitalize = (word: string): string => word.charAt(0).toUpperCase() + word.slice(1);
+export const capitalize = (word: string): string => {
+  return word.charAt(0).toUpperCase() + word.slice(1);
+};
 
 /**
  * Validate with a generated schema, translating a failure into the CLI's
@@ -85,6 +91,7 @@ export const parseOrThrow = <B>(
       details: { issues: parsed.error.issues },
     });
   }
+
   return parsed.data;
 };
 
@@ -96,6 +103,8 @@ export const parseOrThrow = <B>(
 export type DryRun = Readonly<{
   verb: string;
   topic: string;
+  /** What the subject line calls the resource, as the prompt does; the topic when absent. */
+  noun?: string;
   id?: string;
   /** What the subject line ends with: "from the project", "on the project (secret)". */
   clause?: string;
@@ -103,16 +112,20 @@ export type DryRun = Readonly<{
   /** What the server answered when asked to check the write; absent when it was not asked. */
   checked?: Json;
   context?: CredentialContext;
+  /** The real command: this run again without `--dry-run`, which the command builds (`realRun`). */
+  next: SuggestedCommand;
 }>;
 
 export const dryRunResult = ({
   verb,
   topic,
+  noun,
   id,
   clause,
   body,
   checked,
   context,
+  next,
 }: DryRun): CommandResult => {
   // A body that came from a file may legitimately hold a credential; a preview
   // of it must not put that value on screen or into a CI log. Only the
@@ -121,7 +134,7 @@ export const dryRunResult = ({
   // send later comes from (ADR 071 §8).
   const shown = body === undefined ? undefined : (redactCredentials(body, context) as Json);
   const result = checked === undefined ? undefined : (redactCredentials(checked, context) as Json);
-  const subject = [topic, id, clause].filter(Boolean).join(" ");
+  const subject = [noun ?? topic, id, clause].filter(Boolean).join(" ");
   // The document keeps the spelling JSON spells a control character with, as
   // the cells of a table are spelled where they are read: the line around it
   // is prose, but the block itself is a document a reader copies, and the
@@ -131,16 +144,28 @@ export const dryRunResult = ({
   const printed =
     shown === undefined ? "" : `\n${escapeJsonControlCharacters(JSON.stringify(shown, null, 2))}`;
   const verdict = result === undefined ? "" : "\nThe server would accept this. Nothing changed.";
+
+  const title = `Would ${verb} ${escapeControlCharacters(subject, { keepLayout: false })} (dry run)`;
+
   return {
     status: "ok",
     data: {
       dry_run: true,
+      title,
       verb,
       topic,
       id,
       body: shown,
       ...(result === undefined ? {} : { result }),
     },
-    pretty: prose(`Dry run: would ${verb} ${subject}${printed}${verdict}`),
+    pretty: prose(`Would ${verb} ${subject} (dry run)${printed}${verdict}`),
+    next: { commands: [next] },
+    summary: {
+      title,
+      sections: [],
+      lines: [...printed.split("\n"), ...verdict.split("\n")].filter((line) => {
+        return line !== "";
+      }),
+    },
   };
 };

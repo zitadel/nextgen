@@ -43,7 +43,7 @@ func TestProjectHasherResolver(t *testing.T) {
 
 		hasher, err := hashers.HasherForProject(t.Context(), "proj_1")
 		require.NoError(t, err)
-		encoded, err := hasher.Hash("Passw0rd!")
+		encoded, err := hasher.Hash(t.Context(), "Passw0rd!")
 		require.NoError(t, err)
 		assert.True(t, strings.HasPrefix(encoded, bcrypt.Prefix), "got %q", encoded)
 	})
@@ -62,7 +62,7 @@ func TestProjectHasherResolver(t *testing.T) {
 
 		hasher, err := hashers.HasherForProject(t.Context(), "proj_1")
 		require.NoError(t, err)
-		encoded, err := hasher.Hash("Passw0rd!")
+		encoded, err := hasher.Hash(t.Context(), "Passw0rd!")
 		require.NoError(t, err)
 		assert.True(t, strings.HasPrefix(encoded, argon2.Prefix), "got %q", encoded)
 	})
@@ -86,7 +86,7 @@ func TestProjectHasherResolver(t *testing.T) {
 
 		hasher, err := hashers.HasherForProject(t.Context(), "proj_1")
 		require.NoError(t, err)
-		encoded, err := hasher.Hash("Passw0rd!")
+		encoded, err := hasher.Hash(t.Context(), "Passw0rd!")
 		require.NoError(t, err)
 		assert.True(t, strings.HasPrefix(encoded, argon2.Prefix), "got %q", encoded)
 	})
@@ -103,7 +103,7 @@ func TestProjectHasherResolver(t *testing.T) {
 
 		hasher, err := hashers.HasherForProject(t.Context(), "proj_gone")
 		require.NoError(t, err)
-		encoded, err := hasher.Hash("Passw0rd!")
+		encoded, err := hasher.Hash(t.Context(), "Passw0rd!")
 		require.NoError(t, err)
 		assert.True(t, strings.HasPrefix(encoded, bcrypt.Prefix), "got %q", encoded)
 	})

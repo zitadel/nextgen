@@ -49,3 +49,12 @@ func projectIsClaimed(ctx context.Context, stmts claimStateStatements, projectID
 	claim, err := loadProjectClaim(ctx, stmts, projectID)
 	return claim == projectClaimed, err
 }
+
+// projectIsClaimedOrExempt is projectIsClaimed, except that the platform
+// project, and every project on a server without one, are exempt.
+func projectIsClaimedOrExempt(ctx context.Context, stmts claimStateStatements, platformProjectID, projectID string) (bool, error) {
+	if platformProjectID == "" || projectID == platformProjectID {
+		return true, nil
+	}
+	return projectIsClaimed(ctx, stmts, projectID)
+}

@@ -1,3 +1,5 @@
+import { execFileSync } from "node:child_process";
+
 import { describe, expect, it } from "vitest";
 
 import { Cmd } from "@/lib/cmd";
@@ -13,6 +15,64 @@ describe("Cmd.quote", () => {
 
   it("escapes an embedded single quote", () => {
     expect(Cmd.quote("it's")).toBe(`'it'\\''s'`);
+  });
+
+  it("quotes a word that starts with `=`, which a shell would expand", () => {
+    expect(Cmd.quote("=cmd")).toBe("'=cmd'");
+  });
+
+  it.each([
+    { name: "a tab", value: "my\tdir", quoted: "$'my\\tdir'" },
+    { name: "a newline", value: "a\nb", quoted: "$'a\\nb'" },
+    { name: "a carriage return", value: "a\rb", quoted: "$'a\\rb'" },
+    { name: "ESC before a hex digit", value: "a\u001bb", quoted: "$'a\\x1bb'" },
+    { name: "DEL", value: "a\u007fb", quoted: "$'a\\x7fb'" },
+    { name: "a C1 control", value: "a\u009bb", quoted: "$'a\\xc2\\x9bb'" },
+    { name: "a bidi override", value: "a‮b", quoted: "$'a\\xe2\\x80\\xaeb'" },
+    { name: "a tag character", value: "a\u{e0041}b", quoted: "$'a\\xf3\\xa0\\x81\\x81b'" },
+    { name: "a single quote beside a tab", value: "it's\t", quoted: "$'it\\'s\\t'" },
+    { name: "a backslash beside a tab", value: "a\\b\t", quoted: "$'a\\\\b\\t'" },
+  ])("writes a value holding $name in ANSI-C quotes", ({ value, quoted }) => {
+    expect(Cmd.quote(value)).toBe(quoted);
+  });
+
+  it.each(
+    ["bash", "zsh"]
+      .filter((shell) => {
+        try {
+          execFileSync(shell, ["-c", "true"]);
+          return true;
+        } catch {
+          return false;
+        }
+      })
+      .flatMap((shell) => {
+        return [
+          [shell, "my\tdir"],
+          [shell, "a\nb"],
+          [shell, "a\rb"],
+          [shell, "a\u001bb"],
+          [shell, "a\u007fb"],
+          [shell, "a\u009bb"],
+          [shell, "a‮b"],
+          [shell, "a\u{e0041}b"],
+          [shell, "it's\t"],
+          [shell, "a\\b\t"],
+          [shell, "$(whoami)\n"],
+          [shell, "my dir"],
+          [shell, "it's"],
+        ];
+      }),
+  )("is read back by %s as the value it quoted (%j)", (shell, value) => {
+    const read = execFileSync(shell, ["-c", `printf '%s' ${Cmd.quote(value)}`], {
+      encoding: "utf8",
+    });
+
+    expect(read).toBe(value);
+  });
+
+  it("leaves a plain safe word unchanged", () => {
+    expect(Cmd.quote("my-app_1.0")).toBe("my-app_1.0");
   });
 });
 

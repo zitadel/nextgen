@@ -96,7 +96,10 @@ func (s idpConnectionStatements) CreateIDPConnection(ctx context.Context, entity
 		// CreatedAt == UpdatedAt.
 		entity.CreatedAt, entity.UpdatedAt = createdAt, createdAt
 		rsi := newResourceScopeStatements(tx)
-		return rsi.UpsertResourceScope(ctx, domain.NewResourceScope(domain.ResourceKindIDPConnection, entity.ProjectID, entity.ID))
+		if err := rsi.UpsertResourceScope(ctx, domain.NewResourceScope(domain.ResourceKindIDPConnection, entity.ProjectID, entity.ID)); err != nil {
+			return err
+		}
+		return writeSearchEntry(ctx, tx, domain.IDPConnectionSearchEntry(entity))
 	})
 }
 
@@ -112,19 +115,24 @@ func (s idpConnectionStatements) ReviseIDPConnection(ctx context.Context, entity
 	if err != nil {
 		return wrapError(err)
 	}
-	// One insert, so no transaction. The connection row is not read here, so
-	// CreatedAt stays as the caller had it.
+	// The connection row is not read here, so CreatedAt stays as the caller
+	// had it.
 	revision := buildStatement(createIDPConnectionRevisionStmt,
 		entity.ProjectID,
 		revisionID,
 		entity.ID,
 		document,
 	).statement()
-	if err := s.db.Write(ctx, revision, scanReturnedTimestamp(&entity.UpdatedAt)); err != nil {
-		return idpconnection.ReviseNotFound(err)
-	}
-	entity.RevisionID = revisionID
-	return nil
+	return withTransaction(ctx, s.db, func(ctx context.Context, tx queryExecutor) error {
+		var updatedAt time.Time
+		if err := tx.Write(ctx, revision, scanReturnedTimestamp(&updatedAt)); err != nil {
+			return idpconnection.ReviseNotFound(err)
+		}
+		entity.UpdatedAt = updatedAt
+		entity.RevisionID = revisionID
+		// The revision's display name is what search shows from now on.
+		return writeSearchEntry(ctx, tx, domain.IDPConnectionSearchEntry(entity))
+	})
 }
 
 // scanReturnedTimestamp reads the created_at a write returned into dst,

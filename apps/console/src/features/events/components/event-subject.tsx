@@ -1,14 +1,14 @@
 import { IdText } from "@/components/id-text";
 import { cn } from "@/lib/utils";
 
-import { eventSubject, type LogEvent } from "@/features/events/model";
+import { eventSubject, type ProjectEvent } from "@/features/events/model";
 
 /**
  * What the event was about: an API request as its method, operation and
- * status, any other event as the record it touched. Logs' rows and the
+ * status, any other event as the record it touched. Events' rows and the
  * Overview's recent activity draw it alike.
  */
-export function EventSubject({ event }: { event: LogEvent }) {
+export function EventSubject({ event }: { event: ProjectEvent }) {
   const subject = eventSubject(event);
   if (!subject) return <span className="text-muted-foreground">—</span>;
 

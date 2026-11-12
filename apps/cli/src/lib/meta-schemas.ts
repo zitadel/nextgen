@@ -15,16 +15,15 @@
 import { lstat, mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { isDeepStrictEqual } from "node:util";
-
+import { META_SCHEMA_DIR, metaSchemaFiles } from "@zitadel/config/meta-schemas";
 import semver from "semver";
 
-import { META_SCHEMA_DIR, metaSchemaFiles } from "@zitadel/config/meta-schemas";
-
 import { exactZitadelPins } from "@/lib/zitadel-pins";
+
 import { isErrno } from "./errors";
 import { pathExists, readIfExists } from "./fs";
-import { mapBounded } from "./map-bounded";
 import { parseJsonOrUndefined } from "./json";
+import { mapBounded } from "./map-bounded";
 import { maskPublicCliVersion, normalizePublicCliJson } from "./public-cli";
 
 /**
