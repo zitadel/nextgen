@@ -33,6 +33,7 @@ func (a *FlowAuthAttemptAdapter) Start(ctx context.Context, in domain.FlowCreate
 		ProjectID:      in.ProjectID,
 		SessionID:      in.SessionID,
 		RequiredChecks: in.RequiredChecks,
+		FlowID:         in.FlowID,
 	})
 	if err != nil {
 		return "", err

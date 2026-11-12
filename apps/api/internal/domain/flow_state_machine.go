@@ -148,6 +148,9 @@ type FlowStateMachine interface {
 // FlowStartInput carries everything the state machine needs to
 // bootstrap a new flow.
 type FlowStartInput struct {
+	// ID is the flow handle the caller minted. The attempt the flow creates
+	// records it, so the handoff exchange's events join the flow's.
+	ID            string
 	Definition    *FlowDefinition
 	Purpose       FlowDefinitionPurpose
 	Session       FlowSessionRef
@@ -409,6 +412,7 @@ func (r *FlowStateMachineRuntime) Start(ctx context.Context, in FlowStartInput) 
 	}
 
 	state := &FlowState{
+		ID:            in.ID,
 		ProjectID:     in.Definition.ProjectID,
 		UserSchemaURL: in.UserSchemaURL,
 		FlowProgress: FlowProgress{
@@ -434,7 +438,7 @@ func (r *FlowStateMachineRuntime) Start(ctx context.Context, in FlowStartInput) 
 	if r.authAttempts == nil {
 		return FlowStepResult{}, fmt.Errorf("%w: auth-attempt service not wired", ErrFlowIntegrity())
 	}
-	attemptInput := FlowCreateAttemptInput{ProjectID: state.ProjectID}
+	attemptInput := FlowCreateAttemptInput{ProjectID: state.ProjectID, FlowID: state.ID}
 	if state.SessionID != "" {
 		sid := state.SessionID
 		attemptInput.SessionID = &sid
@@ -1454,7 +1458,7 @@ func (r *FlowStateMachineRuntime) dropResolvedUser(pc *processCtx, reason string
 	if !hadResolvedUser {
 		return nil
 	}
-	attemptInput := FlowCreateAttemptInput{ProjectID: pc.state.ProjectID}
+	attemptInput := FlowCreateAttemptInput{ProjectID: pc.state.ProjectID, FlowID: pc.state.ID}
 	if pc.state.SessionID != "" {
 		sid := pc.state.SessionID
 		attemptInput.SessionID = &sid
