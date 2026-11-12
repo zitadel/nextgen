@@ -222,6 +222,32 @@ func TestApplicationService_CreateOrRevise(t *testing.T) {
 		assert.ErrorIs(t, err, domain.ErrApplicationNotFound())
 	})
 
+	// Spanner reports a spent retry budget as UnavailableError; the caller can
+	// retry, so it must not become an internal error.
+	unavailable := database.NewUnavailableError(errors.New("retry budget spent"))
+	for name, expect := range map[string]func(f applicationFixture){
+		"a read the database cannot serve is unavailable": func(f applicationFixture) {
+			f.pool.EXPECT().GetApplication(gomock.Any(), gomock.Any()).Return(nil, unavailable)
+		},
+		"a create the database cannot serve is unavailable": func(f applicationFixture) {
+			f.pool.EXPECT().GetApplication(gomock.Any(), gomock.Any()).Return(nil, database.NewNoRowFoundError(nil))
+			f.tx.EXPECT().CreateApplication(gomock.Any(), gomock.Any(), gomock.Any()).Return(unavailable)
+		},
+		"a revision the database cannot serve is unavailable": func(f applicationFixture) {
+			f.pool.EXPECT().GetApplication(gomock.Any(), gomock.Any()).Return(storedShop(), nil)
+			f.tx.EXPECT().LockApplication(gomock.Any(), appProjectID, "app_1").Return(unavailable)
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			f := newApplicationFixture(t)
+			expect(f)
+
+			_, err := f.svc.CreateOrRevise(t.Context(), appProjectID, shopDocument(shopWeb))
+			assert.ErrorIs(t, err, domain.ErrUnavailable())
+		})
+	}
+
 	t.Run("a document the schema refuses stores nothing", func(t *testing.T) {
 		t.Parallel()
 		f := newApplicationFixture(t)

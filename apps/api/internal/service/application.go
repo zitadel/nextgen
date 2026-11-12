@@ -110,6 +110,9 @@ func (s *applicationService) create(ctx context.Context, projectID string, next 
 	if _, ok := errors.AsType[*database.ForeignKeyError](err); ok {
 		return nil, domain.ErrApplicationNotFound().WithParent(err)
 	}
+	if _, ok := errors.AsType[*database.UnavailableError](err); ok {
+		return nil, domain.ErrUnavailable().WithParent(err)
+	}
 	if _, ok := errors.AsType[*database.UniqueError](err); !ok {
 		return nil, domain.ErrInternal(err).WithMessage("failed to create application")
 	}
@@ -189,6 +192,9 @@ func (s *applicationService) revise(ctx context.Context, existing *domain.Applic
 	if de, ok := errors.AsType[domain.Error](err); ok {
 		return nil, de
 	}
+	if _, ok := errors.AsType[*database.UnavailableError](err); ok {
+		return nil, domain.ErrUnavailable().WithParent(err)
+	}
 	return nil, domain.ErrInternal(err).WithMessage("failed to revise application")
 }
 
@@ -228,13 +234,17 @@ func storeClientSecrets(ctx context.Context, stmts AllStatements, clients []*dom
 	return nil
 }
 
-// clientIDTaken returns client_id_taken when another client of the project
-// holds the client_id of one of clients, and nil when none does.
+// clientIDTaken runs after a unique error, to tell whether the client_id index
+// was the one hit: it returns client_id_taken when another client of the
+// project holds the client_id of one of clients, and nil when none does.
 func (s *applicationService) clientIDTaken(ctx context.Context, clients []*domain.ApplicationClient) error {
 	for _, client := range clients {
 		_, err := s.v2Pool.Statements().GetApplicationClientByClientID(ctx, client.ProjectID, client.ClientID)
 		if err == nil {
 			return domain.ErrApplicationClientIDTaken().WithDetails(map[string]string{"client_id": client.ClientID})
+		}
+		if _, ok := errors.AsType[*database.UnavailableError](err); ok {
+			return domain.ErrUnavailable().WithParent(err)
 		}
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); !ok {
 			return domain.ErrInternal(err).WithMessage("failed to look up application client")
@@ -261,6 +271,9 @@ func (s *applicationService) get(ctx context.Context, projectID string, field do
 	}
 	if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 		return nil, domain.ErrApplicationNotFound()
+	}
+	if _, ok := errors.AsType[*database.UnavailableError](err); ok {
+		return nil, domain.ErrUnavailable().WithParent(err)
 	}
 	return nil, domain.ErrInternal(err).WithMessage("failed to get application")
 }
