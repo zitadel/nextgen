@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
 
-import { criticalPath, renderSummary } from "./turbo-run-summary.mjs";
+import { criticalPath, renderSummary, seconds } from "./turbo-run-summary.mjs";
 
 function task(taskId, start, end, { deps = [], hit = false, source = "LOCAL", exitCode = 0 } = {}) {
   return {
@@ -53,4 +53,12 @@ test("names failed tasks", () => {
     tasks: [...summary.tasks, task("c#test", 0, 1_000, { exitCode: 1 })],
   };
   assert.match(renderSummary(failing), /\*\*Failed:\*\* `c#test`/);
+});
+
+test("formats durations without rolling a unit over", () => {
+  assert.equal(seconds(999.6), "1.0s");
+  assert.equal(seconds(59_960), "1m 00s");
+  assert.equal(seconds(119_600), "2m 00s");
+  assert.equal(seconds(61_000), "1m 01s");
+  assert.equal(seconds(Number.NaN), "–");
 });

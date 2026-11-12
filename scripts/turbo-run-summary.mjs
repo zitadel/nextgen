@@ -13,12 +13,14 @@ import { pathToFileURL } from "node:url";
 
 const SLOWEST = 15;
 
-function seconds(ms) {
-  if (ms < 1000) return `${Math.round(ms)}ms`;
-  const s = ms / 1000;
-  if (s < 60) return `${s.toFixed(1)}s`;
-  const m = Math.floor(s / 60);
-  return `${m}m ${String(Math.round(s % 60)).padStart(2, "0")}s`;
+// Each branch's bound is where its rounding would reach the next unit, so
+// 59.96s reads `1m 00s`, not `60.0s`. A missing timing reads `–`.
+export function seconds(ms) {
+  if (!Number.isFinite(ms)) return "–";
+  if (ms < 999.5) return `${Math.round(ms)}ms`;
+  if (ms < 59_950) return `${(ms / 1000).toFixed(1)}s`;
+  const total = Math.round(ms / 1000);
+  return `${Math.floor(total / 60)}m ${String(total % 60).padStart(2, "0")}s`;
 }
 
 function duration(task) {
