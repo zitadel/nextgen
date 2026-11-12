@@ -350,6 +350,10 @@ webhooks:
     $ref: endpoints/events/webhooks/flow-signup_challenge-issued.yaml
   flow.signup_challenge.consumed:
     $ref: endpoints/events/webhooks/flow-signup_challenge-consumed.yaml
+  application.created:
+    $ref: endpoints/events/webhooks/application-created.yaml
+  application.updated:
+    $ref: endpoints/events/webhooks/application-updated.yaml
   auth.attempt.created:
     $ref: endpoints/events/webhooks/auth-attempt-created.yaml
   auth.attempt.handed_off:

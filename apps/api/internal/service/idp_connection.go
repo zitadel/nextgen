@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -210,23 +209,9 @@ var errIDPSlugTaken = errors.New("identity provider connection slug taken")
 // rules repeat the schema's, which already passed, so any other refusal is
 // reported as req.invalid.
 func (s *idpConnectionService) validate(document []byte) (string, error) {
-	uri, err := s.schemas.LatestSchemaURI(domain.SchemaKindIDPConnection)
+	doc, err := validateBuiltinSchema(s.schemas, domain.SchemaKindIDPConnection, document)
 	if err != nil {
-		return "", domain.ErrInternal(err).WithMessage("identity provider connection schema not registered")
-	}
-	schema, err := s.schemas.GetBuiltinSchema(uri)
-	if err != nil {
-		return "", domain.ErrInternal(err).WithMessage("identity provider connection schema not compiled")
-	}
-	var doc map[string]any
-	if err := json.Unmarshal(document, &doc); err != nil {
-		return "", domain.ErrRequestInvalid().WithParent(err)
-	}
-	if err := schema.Validate(doc); err != nil {
-		// The validator's messages quote the rejected value, and a secret
-		// pasted where its variable reference belongs is one: the log gets
-		// the failures' locations only.
-		return "", domain.ErrRequestInvalid().WithDetails(domain.FlattenValidationErrors(err)).WithParent(domain.SchemaValidationCause(err))
+		return "", err
 	}
 	if _, err := idp.ParseConnection("", document); err != nil {
 		if de, ok := errors.AsType[domain.Error](err); ok && de.Code == domain.ErrIDPEndpointsPartial(nil).Code {

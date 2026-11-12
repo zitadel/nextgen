@@ -110,13 +110,35 @@ type ApplicationClientSecret struct {
 // has no index there.
 // todo (@grvijayan) : denying removal of a client is temporary until the deletion semantics are defined.
 func ErrApplicationFieldImmutable(details any) Error {
-	return newError("application.field_immutable", "application: a revision may not change a client's client_id or remove a client", details, nil)
+	return newError(PrefixApplication.ErrorCodePrefix("field_immutable"), "application: a revision may not change a client's client_id or remove a client", details, nil)
 }
 
 // ErrApplicationInvalid rejects a document that passes the schema but breaks
 // a rule of the authorization server. details maps each location to why.
 func ErrApplicationInvalid(details any, parent error) Error {
-	return newError("application.invalid", "application: invalid", details, parent)
+	return newError(PrefixApplication.ErrorCodePrefix("invalid"), "application: invalid", details, parent)
+}
+
+func ErrApplicationNotFound() Error {
+	return newError(PrefixApplication.ErrorCodePrefix("not_found"), "application: not found", nil, nil)
+}
+
+// ErrApplicationClientIDTaken rejects a new client whose client_id another
+// client of the project holds.
+func ErrApplicationClientIDTaken() Error {
+	return newError(PrefixApplication.ErrorCodePrefix("client_id_taken"), "application: another client of the project holds this client_id", nil, nil)
+}
+
+// ErrApplicationPermissionDenied rejects a caller whose project role does not
+// allow the operation, such as a viewer revising an application.
+func ErrApplicationPermissionDenied() Error {
+	return newError(PrefixApplication.ErrorCodePrefix("permission_denied"), "application: the caller's project role does not allow this operation", nil, nil)
+}
+
+// ErrApplicationRevisionConflict reports a revision created at the same
+// instant as another revision of the same application, so neither is newest.
+func ErrApplicationRevisionConflict() Error {
+	return newError(PrefixApplication.ErrorCodePrefix("revision_conflict"), "application: another revision of the same application was created at the same instant", nil, nil)
 }
 
 func ParseApplicationDocument(document []byte) (ApplicationDocument, error) {
