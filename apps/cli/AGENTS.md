@@ -23,7 +23,7 @@
 - Claim: [ADR 046](../../docs/adrs/046-claim-lifecycle-v2.md).
 - The fresh-app journey: [`e2e/journey/AGENTS.md`](../../e2e/journey/AGENTS.md).
 - Never write a suggested command (`next.commands`, `nextCommands`, a `retry`) as a
-  string: `this.suggest("variable:get", { args: { name } })` (`src/lib/suggestion/`).
+  string: `this.suggest({ id: "variable:get", args: { name } })` (`src/lib/suggestion/`).
 - The compiler checks the id and input against the target's `args` and `flags`;
   what is suggestible derives from `src/index.ts`, so add no mapping.
 - Declare `required`, `exclusive` and `dependsOn` through `relatedFlags`
@@ -32,10 +32,10 @@
   them; set one only to aim elsewhere (a new app, a new environment).
 - Suggest the running command again with `this.again(id, { without, with })`,
   which keeps everything the run was given.
-- Without a run at hand (a library error, a `Refusal`'s `next`), use
-  `suggestion(id, input)`; the failure handler renders it with the run's scope.
-- A helper that renders now takes a `Suggest` (`this.suggester`); a resource id
-  known only at run time is `resourceSuggestion(topic, verb, input)`.
+- Without a run at hand (a library error, a `Refusal`'s `next`), write the same
+  `{ id, … }` object; the failure handler renders it with the run's scope.
+- A helper that renders now takes a `Suggest` (`this.suggest`, or `suggestWith(scope)`
+  aimed elsewhere); a runtime-only resource id is `resourceSuggestion(topic, verb)`.
 - `shellCommand` is for anything that is not the CLI; `inShell` wraps a pipe or
   redirection around a suggestion.
 - Pass a result's next steps as `next` (`src/lib/oclif/next-steps.ts`), never
@@ -108,7 +108,8 @@
   command.
 - Write every refusal once, as a `Refusal` template with `{name}` placeholders
   (`src/lib/oclif/refusal.ts`), never a `ZitadelError` built by hand; its `next`
-  entries are `suggestion(...)` values.
+  entries are `{ id, … }` objects, and a `{name}` one is filled from `refusalError`'s
+  third argument, never from its values.
   - A `next` entry that is only a placeholder takes its value as it is, so a
     check that found two steps hands over both.
 - Declare a flag or argument by its CLI spelling and read it as code reads it
