@@ -1,5 +1,7 @@
 import { RECOMMENDED_PASSWORD_MIN_LENGTH } from "@zitadel/config/schemas";
+
 import type { PasswordMinLength } from "@/lib/zitadel";
+
 import type { PromptContext, SetupAnswers, SetupPrompt } from "./types";
 
 /**
@@ -29,16 +31,25 @@ export class PasswordPolicyPrompt implements SetupPrompt {
         label: `${RECOMMENDED_PASSWORD_MIN_LENGTH} characters — recommended`,
         hint: "NIST minimum for password-only sign-in",
       },
-      { value: 8, label: "8 characters", hint: "NIST minimum with a second factor" },
-      { value: null, label: "No minimum" },
+      {
+        value: 8,
+        label: "8 characters",
+        hint: "NIST minimum with a second factor",
+      },
+      {
+        value: null,
+        label: "No minimum",
+      },
     ];
-    const passwordMinLength = await ctx.input({
-      kind: "select",
+    const passwordMinLength = await ctx.ask.select({
       name: "minimum password length",
       message: "Which minimum length should passwords have? You can change it later.",
       initialValue: RECOMMENDED_PASSWORD_MIN_LENGTH,
       options,
     });
-    return { ...answers, passwordMinLength };
+    return {
+      ...answers,
+      passwordMinLength,
+    };
   }
 }

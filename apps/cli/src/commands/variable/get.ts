@@ -1,11 +1,13 @@
 import { Flags } from "@oclif/core";
 
 import { VariableService } from "@/lib/backend";
-import { variableNameArg } from "./name";
 import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
+import { json } from "@/lib/oclif/rendering";
 import { Tabulatable } from "@/lib/oclif/tabulatable";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 import { variableCell } from "@/lib/variables";
-import { json, painted } from "@/lib/oclif/rendering";
+
+import { variableNameArg } from "./name";
 
 /**
  * `zitadel variable get NAME` — read one variable by name from the project.
@@ -18,6 +20,7 @@ import { json, painted } from "@/lib/oclif/rendering";
 export default class VariableGet extends Tabulatable(EnvironmentCommand) {
   static override description = "Get one variable from the project.";
   static override group = CommandGroups.configuration;
+
   static override examples = [
     "<%= config.bin %> variable get GOOGLE_CLIENT_ID",
     "<%= config.bin %> variable get API_URL --preview",
@@ -44,23 +47,31 @@ export default class VariableGet extends Tabulatable(EnvironmentCommand) {
       is_secret: variable.secret,
     });
 
+    const title = `Read ${escapeControlCharacters(args.name)}`;
     if (!this.isOnScreen) {
       return this.emit({
         status: "ok",
         data: variable,
         pretty: json(variable),
+        summary: {
+          title,
+          sections: [],
+        },
       });
     }
+
     const cell = variableCell(variable);
 
     return this.emit({
       status: "ok",
       data: variable,
-      pretty: painted(
-        this.tabulateDetail(args.name, ["value"], {
+      summary: {
+        title,
+        sections: [],
+        lines: this.tabulateDetail(undefined, ["value"], {
           value: cell.value === "" ? '""' : cell.value,
-        }),
-      ),
+        }).split("\n"),
+      },
     });
   }
 }

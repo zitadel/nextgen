@@ -1,8 +1,7 @@
 import { ENVIRONMENT_KEYS, type EnvironmentKey } from "@/lib/environment";
-import { escapeControlCharacters } from "@/lib/terminal-text";
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { Tabulatable } from "@/lib/oclif/tabulatable";
-import { painted } from "@/lib/oclif/rendering";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 
 /** The values that grant access, never printed — only named and masked. */
 const SECRET_KEYS: ReadonlySet<EnvironmentKey> = new Set([
@@ -26,6 +25,7 @@ export default class Env extends Tabulatable(EnvironmentCommand) {
   static override description =
     "Show which server and project resolve, and where each value came from.";
   static override group = CommandGroups.configuration;
+
   static override examples = [
     "<%= config.bin %> env",
     "<%= config.bin %> env --env production",
@@ -41,37 +41,48 @@ export default class Env extends Tabulatable(EnvironmentCommand) {
         return [];
       }
       const shown = SECRET_KEYS.has(key) ? REDACTED : entry.value;
-      return [{ variable: key, value: shown, source: entry.source }];
+      return [
+        {
+          variable: key,
+          value: shown,
+          source: entry.source,
+        },
+      ];
     });
-    const lookups = consulted.map(({ source, present, supplied }) => ({
-      source,
-      present,
-      supplied: supplied.join(", "),
-    }));
+    const lookups = consulted.map(({ source, present, supplied }) => {
+      return {
+        source,
+        present,
+        supplied: supplied.join(", "),
+      };
+    });
+
+    this.ui.ranAgainst(values.ZITADEL_PROJECT_ID?.value, values.ZITADEL_URL?.value);
+
+    const variables = await this.tabulate(["variable", "value", "source"], resolved);
+    const sources = await this.tabulate(["source", "present", "supplied"], lookups);
 
     return this.emit({
       status: "ok",
       data: {
-        environment: { name: name.value, source: name.source },
+        environment: {
+          name: name.value,
+          source: name.source,
+        },
         values: resolved,
-        consulted: consulted.map(({ source, present, supplied }) => ({
-          source,
-          present,
-          supplied: [...supplied],
-        })),
+        consulted: consulted.map(({ source, present, supplied }) => {
+          return {
+            source,
+            present,
+            supplied: [...supplied],
+          };
+        }),
       },
-      // Painted, because the two tables below are the CLI's own; the heading
-      // names a value read from a file, so it is spelled out here.
-      pretty: painted(
-        [
-          escapeControlCharacters(`Environment  ${name.value} (from ${name.source})`),
-          "",
-          await this.tabulate(["variable", "value", "source"], resolved),
-          "",
-          "Consulted, in order:",
-          await this.tabulate(["source", "present", "supplied"], lookups),
-        ].join("\n"),
-      ),
+      summary: {
+        title: escapeControlCharacters(`Using the ${name.value} environment (from ${name.source})`),
+        sections: [],
+        lines: [...variables.split("\n"), "", "Consulted, in order:", ...sources.split("\n")],
+      },
     });
   }
 }

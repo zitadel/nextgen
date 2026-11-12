@@ -40,7 +40,7 @@ func passwordVerifications(t *testing.T, purpose metrics.PasswordPurpose) func(w
 	t.Helper()
 	return metricstest.GrewOnly(t, service.MetricsReader, metrics.PasswordVerificationDuration,
 		[]attribute.KeyValue{metrics.PurposeKey.String(string(purpose))}, metrics.ResultKey,
-		metrics.PasswordMatch, metrics.PasswordUpdated, metrics.PasswordMismatch, metrics.PasswordError)
+		metrics.PasswordMatch, metrics.PasswordUpdated, metrics.PasswordMismatch, metrics.PasswordError, metrics.PasswordBusy)
 }
 
 func TestTokenService_IntrospectToken_metrics(t *testing.T) {
@@ -148,6 +148,9 @@ func TestAuthAttemptService_VerifyProof_password_metrics(t *testing.T) {
 		{"mismatch", nil, "", fmt.Errorf("%w: x", crypto.ErrHashMismatch), metrics.AuthRejected, metrics.PasswordMismatch},
 		{"hash unreadable", nil, "", crypto.ErrInvalidHash, metrics.AuthRejected, metrics.PasswordError},
 		{"no password set", database.NewNoRowFoundError(nil), "", nil, metrics.AuthRejected, ""},
+		// The check never ran, so it is neither a rejection nor an error, and
+		// no failed check is recorded against the user.
+		{"hashing busy", nil, "", crypto.ErrHashingBusy, metrics.AuthBusy, metrics.PasswordBusy},
 		// The storage failure is wrapped as a rejected proof; the metric
 		// reads the cause and still counts it as an error.
 		{"password store unavailable", database.NewUnavailableError(errors.New("down")), "", nil, metrics.AuthError, ""},
@@ -164,18 +167,21 @@ func TestAuthAttemptService_VerifyProof_password_metrics(t *testing.T) {
 			} else {
 				stmts.EXPECT().GetUserPassword(gomock.Any(), gomock.Any()).Return(password, nil)
 				hashers.EXPECT().HasherForProject(gomock.Any(), gomock.Any()).Return(projectHasher, nil)
-				projectHasher.EXPECT().VerifyAndRehash("encoded", "pw").Return(tc.updated, tc.verifyErr)
+				projectHasher.EXPECT().VerifyAndRehash(gomock.Any(), "encoded", "pw").Return(tc.updated, tc.verifyErr)
 			}
 			if tc.updated != "" {
 				stmts.EXPECT().UpdateUserPasswordHash(gomock.Any(), password, tc.updated).Return(nil)
 			}
-			if tc.wantOutcome == metrics.AuthSuccess {
+			switch tc.wantOutcome {
+			case metrics.AuthSuccess:
 				stmts.EXPECT().AuthAttemptChallengeSucceeded(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
-			} else {
+			case metrics.AuthBusy:
+				// Neither succeeded nor failed is recorded.
+			default:
 				stmts.EXPECT().AuthAttemptChallengeFailed(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 			}
 			outcomes := metricstest.GrewOnly(t, service.MetricsReader, metrics.AuthAttemptOutcomes, check,
-				metrics.ResultKey, metrics.AuthSuccess, metrics.AuthRejected, metrics.AuthError)
+				metrics.ResultKey, metrics.AuthSuccess, metrics.AuthRejected, metrics.AuthError, metrics.AuthBusy)
 			passwords := passwordVerifications(t, metrics.PasswordLogin)
 
 			svc := newAuthAttemptSvcWithHashers(ctrl, stmts, nil, nil, hashers, nil)
@@ -207,6 +213,7 @@ func TestPasswordPolicy_History_metrics(t *testing.T) {
 		{"matches the current password", "match", metrics.PasswordMatch},
 		{"differs from the current password", "other", metrics.PasswordMismatch},
 		{"current password unreadable", "unreadable", metrics.PasswordError},
+		{"hashing busy", "busy", metrics.PasswordBusy},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			f := newHistoryFixture(t, 1)
@@ -253,7 +260,7 @@ func TestAuthAttemptService_VerifyProof_user_metrics(t *testing.T) {
 			users.EXPECT().GetByAttributes(gomock.Any(), "proj", gomock.Any(), gomock.Any()).Return(nil, tc.lookupErr)
 			stmts.EXPECT().AuthAttemptChallengeFailed(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 			outcomes := metricstest.GrewOnly(t, service.MetricsReader, metrics.AuthAttemptOutcomes, check,
-				metrics.ResultKey, metrics.AuthSuccess, metrics.AuthRejected, metrics.AuthError)
+				metrics.ResultKey, metrics.AuthSuccess, metrics.AuthRejected, metrics.AuthError, metrics.AuthBusy)
 
 			svc := newAuthAttemptSvc(ctrl, stmts, nil, users)
 			_, err := svc.VerifyProof(t.Context(), service.VerifyProofInput{

@@ -12,6 +12,7 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/zitadel/nextgen/internal/audit"
+	"github.com/zitadel/nextgen/internal/crypto/pow"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
@@ -637,6 +638,7 @@ func TestFlowService_Start_StampsFlowIDBeforeStateMachine(t *testing.T) {
 	require.NotEmpty(t, slot.FlowID, "flow_id was not stamped before stateMachine.Start (auth.attempt.created would miss it)")
 	require.NotNil(t, res.State)
 	assert.Equal(t, res.State.ID, *slot.FlowID, "stamped flow_id")
+	assert.Equal(t, res.State.ID, sm.gotStartInput.ID, "the attempt the state machine creates records this flow")
 	require.NotEmpty(t, slot.SessionID, "session_id was not stamped before stateMachine.Start")
 	assert.Equal(t, *slot.SessionID, sm.gotStartInput.Session.ID, "stamped session_id")
 }
@@ -955,6 +957,67 @@ func TestFlowService_Start_ResolvesBuiltinSchemaUnderAnotherBase(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, stored.URL, sm.gotStartInput.UserSchemaURL)
+}
+
+// countingSignupProtection counts the challenges a render asks the guard for.
+type countingSignupProtection struct {
+	stubSignupProtection
+	issued int
+}
+
+func (c *countingSignupProtection) Challenge(context.Context, *domain.FlowState) (*pow.PublicChallenge, error) {
+	c.issued++
+	return &pow.PublicChallenge{ChallengeID: "ch_pow"}, nil
+}
+
+// A passkey registration that creates its user is a sign-up: the step that
+// carries its ceremony announces the gate, and a render prepares the puzzle.
+// The stored challenge decides, as at verification.
+func TestFlowService_GetStep_GatesAPasskeyRegistrationThatCreatesItsUser(t *testing.T) {
+	provisional, _ := registrationChallengeAttempt(t, "user_minted01", true, time.Now())
+	enrollment, _ := registrationChallengeAttempt(t, "user_1", false, time.Now())
+	for _, tc := range []struct {
+		name    string
+		attempt *domain.AuthAttempt
+		readErr error
+		method  string
+		gated   bool
+	}{
+		{name: "provisional registration", attempt: provisional, method: domain.FlowChallengeMethodPasskeyRegister, gated: true},
+		{name: "enrollment of a pinned user", attempt: enrollment, method: domain.FlowChallengeMethodPasskeyRegister},
+		{name: "superseded ceremony", attempt: &domain.AuthAttempt{ProjectID: "proj", ID: "att-1"}, method: domain.FlowChallengeMethodPasskeyRegister},
+		{name: "attempt gone", readErr: domain.ErrAuthAttemptNotFound(), method: domain.FlowChallengeMethodPasskeyRegister},
+		{name: "passkey sign-in", method: domain.FlowChallengeMethodPasskey},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			def := newDef("register", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeRegister)
+			def.Steps = []domain.FlowDefinitionStep{{Name: "start", Actions: []domain.FlowStepAction{{Name: "passkey_register", Kind: domain.FlowActionKindPasskeyRegister}}}}
+			state := &domain.FlowState{ID: "flow-1", ProjectID: def.ProjectID, FlowProgress: domain.FlowProgress{DefinitionID: def.ID}, AuthAttemptID: "att-1"}
+			step := &domain.FlowStep{Name: "start", Challenge: &domain.FlowStepChallenge{Method: tc.method, ChallengeID: "ch-reg-1"}}
+			sm := &fakeStateMachine{renderResult: domain.FlowStepResult{State: state, Step: step}}
+
+			ctrl := gomock.NewController(t)
+			pool := servicemocks.NewMockPool(ctrl)
+			stmts := servicemocks.NewMockAllStatements(ctrl)
+			stmts.EXPECT().GetFlowDefinitionByID(gomock.Any(), def.ProjectID, def.ID).Return(def, nil)
+			if tc.method == domain.FlowChallengeMethodPasskeyRegister {
+				stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), def.ProjectID, "att-1").Return(tc.attempt, tc.readErr)
+			}
+			pool.EXPECT().Statements().Return(stmts).AnyTimes()
+			protection := &countingSignupProtection{}
+
+			res, err := service.NewFlowService(service.NewPool(pool), sm, domain.BuiltinSchemaBases{}, protection).
+				GetStep(t.Context(), service.GetFlowStepRequest{State: state})
+			require.NoError(t, err)
+			assert.Equal(t, tc.gated, res.Step.SignupRequired)
+			if tc.gated {
+				assert.Equal(t, 1, protection.issued)
+				require.NotNil(t, res.Step.SignupChallenge)
+			} else {
+				assert.Zero(t, protection.issued)
+			}
+		})
+	}
 }
 
 func TestFlowService_SignupIssuanceCannotDiscardTransition(t *testing.T) {

@@ -1,9 +1,10 @@
 import { createZitadelClient, IdpService } from "@/lib/backend";
 import { isCancellation } from "@/lib/errors";
-import { DEPLOYED_DEPENDENT_RULE } from "@/lib/publish/steps/validate";
 import { readProjectServer, readZitadelConfig, readZitadelSecret } from "@/lib/project";
+import { DEPLOYED_DEPENDENT_RULE } from "@/lib/publish/steps/validate";
 import { userAgent } from "@/lib/user-agent";
 import { CONFIG_DIRECTORIES, DiskStore, type Issue, ZitadelConfig } from "@/lib/zitadel";
+
 import { AbstractSanityCheck, type CheckContext, type CheckOutcome } from "./types";
 
 /**
@@ -70,8 +71,8 @@ export class SchemaCheck extends AbstractSanityCheck {
           status: "warn",
           message:
             `No schema files found in ${CONFIG_DIRECTORIES.schemas} — this project predates editable ` +
-            "schema config or setup was interrupted. New projects scaffold editable " +
-            "defaults via `zitadel setup`.",
+            "schema configuration or setup was interrupted. New projects scaffold editable " +
+            `defaults via ${ctx.suggest({ id: "setup" })}.`,
           path: this.path,
         };
       }
@@ -97,7 +98,12 @@ export class SchemaCheck extends AbstractSanityCheck {
           path: pathOf(warnings),
         };
       }
-      return { name: this.name, status: "pass", message: this.summary, path: this.path };
+      return {
+        name: this.name,
+        status: "pass",
+        message: this.summary,
+        path: this.path,
+      };
     } finally {
       this.inspections.delete(ctx);
     }
@@ -131,7 +137,11 @@ export class SchemaCheck extends AbstractSanityCheck {
   private async inspect(ctx: CheckContext): Promise<Inspection> {
     const store = new DiskStore(ctx.cwd);
     const config = await ZitadelConfig.loadUnchecked(store);
-    return { store, config, issues: config.validate({ store }) };
+    return {
+      store,
+      config,
+      issues: config.validate({ store }),
+    };
   }
 
   /**

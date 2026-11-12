@@ -171,10 +171,15 @@ How a guard answers:
 - **Fail closed on secrets, open on quotas.** A guard in front of a secret (a
   factor, a claim) fails its operation when its events cannot be read; a
   quota lets the request through and logs.
-- **Bound the hash.** Each instance caps concurrent password-hash
-  verifications and answers past the cap with `503` and `Retry-After`.
+- **Bound the hash.** Each instance caps concurrent password hashes and
+  verifications and answers past the cap with `429`, the code
+  `user.password_hashing_busy` and `Retry-After`
+  ([ADR 029](029-cryptography-secrets-and-key-lifecycle.md#passwords-and-secrets)).
   argon2id is memory-hard, and an unauthenticated caller decides how many run
-  at once.
+  at once. The code is not `req.rate_limited`: it says the instance is busy,
+  not that the caller sent too much, and it never counts as a failed attempt.
+  The five operations that hash declare that `429` with a body that
+  `req.rate_limited` can join.
 
 What a guard does not count:
 

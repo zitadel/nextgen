@@ -315,7 +315,12 @@ describe("DockerLauncher", () => {
       const calls = dockerAnswering({ stderr: "level=INFO msg=a\nlevel=WARN msg=b\n" });
       const sink = aSink();
 
-      await DockerLauncher.followLogs("zitadel-server-test", 50, sink);
+      await DockerLauncher.followLogs(
+        "zitadel-server-test",
+        50,
+        sink,
+        new AbortController().signal,
+      );
 
       expect(calls).toEqual([["logs", "--tail", "50", "--follow", "zitadel-server-test"]]);
       expect(sink.existingText).toEqual([]);
@@ -329,7 +334,12 @@ describe("DockerLauncher", () => {
       );
       const sink = aSink();
 
-      await DockerLauncher.followLogs("zitadel-server-test", "all", sink);
+      await DockerLauncher.followLogs(
+        "zitadel-server-test",
+        "all",
+        sink,
+        new AbortController().signal,
+      );
 
       expect(sink.existingText).toEqual(["level=INFO msg=a\n"]);
       expect(sink.appendedText.join("")).toBe(

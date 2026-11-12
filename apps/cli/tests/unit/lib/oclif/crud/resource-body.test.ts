@@ -1,5 +1,6 @@
 import { CreateTeamBody } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import { describeBody } from "@/lib/oclif/crud";
 import { documentSchemaOf } from "@/lib/oclif/crud/fields";
@@ -47,6 +48,39 @@ describe("resourceBody", () => {
       },
     });
   });
+
+  it.each([
+    [
+      "one",
+      z.object({ name: z.string() }),
+      "teams create is missing required field: --name",
+      "Pass --name, or include it in --data / --file.",
+    ],
+    [
+      "several",
+      z.object({ name: z.string(), slug: z.string() }),
+      "teams create is missing required fields: --name, --slug",
+      "Pass --name and --slug, or include them in --data / --file.",
+    ],
+  ])(
+    "words a refusal for %s missing field in the singular or plural",
+    async (_count, schema, message, hint) => {
+      await expect(
+        resourceBody(
+          {
+            topic: "teams",
+            verb: "create",
+            root: undefined,
+            schema,
+            document: documentSchemaOf(schema, undefined),
+            fields: describeBody(schema),
+            references: undefined,
+          },
+          { data: "{}" },
+        ),
+      ).rejects.toMatchObject({ message, hint: expect.stringContaining(hint) });
+    },
+  );
 
   it("refuses a body that does not fit the API schema", async () => {
     await expect(resolve({ data: '{"name":42}' })).rejects.toMatchObject({

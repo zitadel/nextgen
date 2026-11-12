@@ -277,7 +277,7 @@ describe("NextPatcher's request boundary", () => {
       new NextPatcher().patch(ctxFor("next", "app", 16), { cwd, dryRun: false, force: true }),
     ).rejects.toMatchObject({
       code: "E_CONFLICT",
-      message: "Next.js 16 won't start with both middleware.ts and the proxy.ts setup writes",
+      message: "Next.js 16 will not start with both middleware.ts and the proxy.ts setup writes",
       details: { path: "middleware.ts", writes: "proxy.ts" },
     });
     expect(existsSync(join(cwd, "proxy.ts"))).toBe(false);
