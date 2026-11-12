@@ -651,6 +651,7 @@ describe("what gives way, on every way into a list", () => {
       "request_id",
       "session_id",
       "status_class",
+      "user_id",
     ]);
   }
 
@@ -794,8 +795,14 @@ describe("searchMeanings", () => {
     ]);
   });
 
+  it("leaves a user's ID to the person: the account or the actor", () => {
+    // What happened to the account holds the changes to the user too, so the
+    // resource is not a third reading.
+    expect(meanings("user_1")).toEqual(["user user_1", "actor user_1"]);
+    expect(meanings("user:team_1")).toEqual(["user team_1"]);
+  });
+
   it("leaves any other ID to the person: an actor or a resource", () => {
-    expect(meanings("user_1")).toEqual(["actor user_1", "resource user_1"]);
     expect(meanings("team_1")).toEqual(["actor team_1", "resource team_1"]);
     // An email address is not an ID of an event, but it is one whole value.
     expect(meanings("User.Name@example.com")).toEqual([
@@ -843,15 +850,16 @@ describe("eventsCsv", () => {
         actor_id: "user_1",
         entity_type: "user",
         entity_id: "user_2",
+        user_id: "user_2",
         payload: { note: 'a "quoted", value' },
       }),
     ]);
     const [header, row, end] = csv.split("\r\n");
     expect(header).toBe(
-      "id,occurred_at,created_at,event_type,category,actor_id,actor_type,entity_type,entity_id,client_id,request_id,session_id,flow_id,fingerprint,payload",
+      "id,occurred_at,created_at,event_type,category,actor_id,actor_type,entity_type,entity_id,user_id,client_id,request_id,session_id,flow_id,fingerprint,payload",
     );
     expect(row).toBe(
-      'evt_1,2026-11-10T08:15:43Z,2026-11-10T08:15:43Z,user.deleted,entity,user_1,,user,user_2,,,,,,"{""note"":""a \\""quoted\\"", value""}"',
+      'evt_1,2026-11-10T08:15:43Z,2026-11-10T08:15:43Z,user.deleted,entity,user_1,,user,user_2,user_2,,,,,,"{""note"":""a \\""quoted\\"", value""}"',
     );
     expect(end).toBe("");
   });

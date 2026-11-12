@@ -1,7 +1,7 @@
 # Events a person can read
 
-> **Status:** draft proposal, 2026-11-11. Nothing below is built unless a
-> section says "Today". Decisions carry the markers of
+> **Status:** draft proposal, 2026-11-11. Decision 3 is built; nothing else
+> below is, unless a section says "Today". Decisions carry the markers of
 > [README.md](README.md#status-markers). Once settled they become an amendment
 > of [ADR 048](../../adrs/048-wide-events-internal-audit-primitive.md), entries
 > in [events-catalog.md](events-catalog.md) and, for the console, entries in
@@ -36,7 +36,7 @@ What the six rows cannot say:
 | Question | What a reader gets | Cause |
 |----------|--------------------|-------|
 | What happened | Six step names. Rows 2 and 3 look alike. | The rows are the server's steps. A check's type (`User`, `Password`) is in its payload. |
-| Whose account | Nothing on rows 1 to 4, nor on a rejected password. | A user is named in `entity_id` (`user.*`), in `payload.user_id` (an established session, factors, identity links, memberships, invitations), in `payload.principal_id` (grants), in `actor_id`, or nowhere (checks, `session.deleted`, `auth.token.revoked`). No filter reads a payload. |
+| Whose account | `user_id` on rows 2 to 6, and on a rejected password, since [decision 3](#3-one-column-for-the-user-an-event-concerns). No list row shows it. | Before, a user was named in `entity_id`, in a payload, in `actor_id`, or nowhere, and no filter reads a payload. |
 | Who did it | A dash before the exchange. `service` with no ID for an API key. | A request without a credential has no actor. A key has an actor type and no `actor_id`, and `token_id` has no filter. |
 | From where | Nothing. | Address, user agent and origin are stored only on `request.api`, which is dropped under load, and no list row, panel field or CSV column shows them. The exchange is the app server's request, so its address is the wrong one. |
 | When | The same second on every row. | The store keeps microseconds; `GET /events` returns whole seconds. |
@@ -134,37 +134,29 @@ it at handoff, as it stores `flow_id`.
 
 ### 3. One column for the user an event concerns
 
-**LOCKED (2026-11-11): built next.** The details below are RECOMMENDED unless
-marked OPEN.
-
-`events` gains `user_id`: the user whose account the event is about, whoever
-acted. It is an ID like `actor_id`, and it adds no personal data.
+**BUILT (2026-11-11).** `events` has `user_id`: the user whose account the
+event is about, whoever acted. It is an ID like `actor_id`, and it adds no
+personal data.
 
 - **Filter:** `GET /events?user_id=…`, read from an index shaped as the
   actor's and the resource's are: project, user, category, time, ID, leaving
-  out the rows that name no user. All three dialects get it.
+  out the rows that name no user. All three dialects have it;
+  [ADR 048](../../adrs/048-wide-events-internal-audit-primitive.md#amendment-2026-11-11-the-user-an-event-concerns)
+  has the measurement.
 - **Two questions, two filters.** `actor_id` answers what a principal did.
   `user_id` answers what happened to an account: its sign-ins, the attempts
   against it, its credential changes, and what an administrator did to it.
-- **Who sets it:** the emitter, through one field of the emit call.
-
-| Events | `user_id` is |
-|--------|--------------|
-| `user.*` | the user |
-| `session.*` | the session's user |
-| `auth.token.*` | the token's user, when it has one |
-| `auth.check.*`, `auth.attempt.handed_off` | the user the attempt resolved, once it has |
-| `auth.factor.*`, `idp.identity_link.created` | the user in the payload today |
-| `authz.granted`, `authz.revoked` | the principal, when it is a user |
-| `invitation.accepted`, `invitation.rejected`, team memberships | the user in the payload today |
-
-- **Enforced by a test**, as the catalog's producers are: an event type in the
-  table that leaves `user_id` empty fails it.
-- **OPEN:** whether `payload.user_id` stays beside the column or retires
-  through the catalog's Contracted section.
-- **OPEN:** the name. `user_id` matches the payload field and the glossary.
-  `subject` reads as OIDC's `sub`.
+- **Who sets it:** the emitter, through `EmitSpec.UserID`. The
+  [catalog](events-catalog.md#the-user-an-event-concerns) lists the types
+  that do, and a test holds every emitter to that list.
+- **The name** is `user_id`: it matches the payload field and the glossary,
+  and `subject` reads as OIDC's `sub`.
+- **`payload.user_id` stays** on the events that have it. Retiring it changes
+  their contract and gives a reader nothing yet.
 - Stored events are not backfilled.
+- An accepted or a declined invitation and a team membership set it once
+  they have an emitter. A created or a cancelled invitation names no user:
+  its link is for whoever redeems it.
 
 ### 4. The actor is the authenticated caller
 
@@ -181,10 +173,9 @@ Two positions:
   reads well in a list with an Actor column, and without `user_id` it is the
   only indexed place the user appears.
 
-**RECOMMENDED: the caller, always, once decision 3 has landed**, and the three
-existing exceptions go with it. With `user_id` the second position has nothing
-left to add, and three emitters deciding for themselves have already drifted
-apart.
+**RECOMMENDED: the caller, always**, and the three existing exceptions go
+with it. With `user_id` the second position has nothing left to add, and
+three emitters deciding for themselves have already drifted apart.
 
 With it:
 
@@ -194,8 +185,8 @@ With it:
   resources ([credentials.md](credentials.md)). The actor index then answers
   what a key did, with no index on `token_id`.
 
-**LOCKED (2026-11-11): until decision 3 lands, both events keep the actor
-they have**, the caller on `session.established` and the user on
+**LOCKED (2026-11-11): until this is built, both events keep the actor they
+have**, the caller on `session.established` and the user on
 `auth.token.issued`. Naming the user on both was weighed and dropped: it
 would have changed the session event's actor twice.
 
@@ -265,13 +256,12 @@ column in every index's sort key.
 
 ## Order of work
 
-1. **The user column and the actor rule** (decisions 3 and 4): one change to
-   the contract.
+1. **The actor rule** (decision 4), now that events name their user.
 2. **Complete sign-in outcomes** (decisions 2 and 5), with the session types
    and the missing revoke.
 3. **Outcomes apart from steps, and the time on the wire** (decisions 1 and 6).
 4. **The console** (decision 7).
 
-The branch that carries this note already ships two things every step keeps:
-`token_id` is the credential a request presented, and an SSO callback's events
-carry their flow.
+Built so far, and kept by every step: `token_id` is the credential a request
+presented, an SSO callback's events carry their flow, and events name the
+user they concern (decision 3).
