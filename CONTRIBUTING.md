@@ -286,6 +286,10 @@ and edges decide it:
 the frameworks in `ciExcludedFrameworkIds`
 ([`frameworks.mjs`](e2e/journey/scripts/frameworks.mjs)).
 
+Each run's summary page shows the turbo run's totals, critical path and
+slowest tasks ([`turbo-run-summary.mjs`](scripts/turbo-run-summary.mjs));
+the raw `--summarize` JSON is the run's `turbo-run-summary` artifact.
+
 The Spanner suite (`turbo run test:spanner --filter=@zitadel/server`) is not
 part of `full-pr`. It runs in the separate `spanner` workflow against Spanner
 Omni, weekly on `main` and on demand, and is not a required check. To run it

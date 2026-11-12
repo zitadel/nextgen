@@ -168,12 +168,28 @@ jobs:
       # CPU-bound, and turbo's default of 10 leaves this runner's cores idle.
       # The script itself keeps the default, since a task per core overloads
       # a laptop and its tests time out; pnpm appends the flag to its
-      # `turbo run`.
+      # `turbo run`. `--summarize` writes the run's per-task timings and
+      # cache results to .turbo/runs for the two steps after this one.
       - name: Run the ci script
-        run: corepack pnpm run ci --concurrency=100%
+        run: corepack pnpm run ci --concurrency=100% --summarize
         env:
           # Each journey's work dir, with its diagnostics, under this one.
           JOURNEY_WORK_DIR: ${{ runner.temp }}/ci-journey
+
+      # The run's totals, critical path and slowest tasks on the run's
+      # summary page. A run that stops before turbo starts has no file.
+      - name: Summarize the turbo run
+        if: ${{ !cancelled() && hashFiles('.turbo/runs/*.json') != '' }}
+        run: node scripts/turbo-run-summary.mjs >> "$GITHUB_STEP_SUMMARY"
+
+      # The raw summary, for comparing runs over time.
+      - name: Upload the turbo run summary
+        if: ${{ !cancelled() && hashFiles('.turbo/runs/*.json') != '' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: turbo-run-summary
+          path: .turbo/runs/*.json
+          retention-days: 30
 
       # Every lane's results and the journeys' diagnostics. The handshake is
       # left out: it carries the project secret and sits beside them in
