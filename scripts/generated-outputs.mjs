@@ -1,8 +1,7 @@
 /**
- * The code-generation outputs of `server:generate`, as one list.
- *
- * These globs mirror the `outputs` of the `server:generate` Moon task — keep
- * the two in sync. They are deliberately file-precise rather than
+ * The committed code-generation outputs of `@zitadel/server#generate`, as one
+ * list: what generation deletes before it regenerates, and what
+ * check-generate compares. They are deliberately file-precise rather than
  * directory-wide: `apps/api/internal/domain` holds hand-written code alongside its
  * generated `*_enumer.go`, so a directory-level pattern here would be a
  * destructive mistake waiting to happen.
@@ -68,9 +67,8 @@ export function hasGeneratedMarker(absPath) {
 }
 
 /**
- * Matches a glob the way git's `:(glob)` pathspecs do, which is what
- * check-go-generate compares the worktree with — `**` spans directories, `*`
- * stays inside one segment, and a leading dot is not special.
+ * Matches a glob the way git's `:(glob)` pathspecs do — `**` spans
+ * directories, `*` stays inside one segment, and a leading dot is not special.
  *
  * That last part is why this is not `fs.globSync`: Node's glob silently skips
  * dot-directories, and `api/openapi/endpoints/.well-known/` holds real
@@ -88,40 +86,40 @@ function globToRegExp(pattern) {
   return new RegExp(`^${source}$`);
 }
 
-/** Every file under a repo-relative directory, itself repo-relative. */
-function filesUnder(dir) {
-  const absolute = join(ROOT, dir);
+/** Every file under a directory relative to `root`, itself root-relative. */
+function filesUnder(dir, root) {
+  const absolute = join(root, dir);
   // The ogen output is gone on a pruned tree, and internal/** always exists.
   if (!existsSync(absolute)) {
     return [];
   }
   return readdirSync(absolute, { recursive: true, withFileTypes: true })
     .filter((entry) => entry.isFile())
-    .map((entry) => relative(ROOT, join(entry.parentPath, entry.name)));
+    .map((entry) => relative(root, join(entry.parentPath, entry.name)));
 }
 
 /**
- * Splits everything the globs match into files carrying the marker and files
- * that do not. Callers decide what to do with the strays; nothing here
- * deletes anything.
+ * Splits everything the globs match below `root` (a checkout of this
+ * repository) into files carrying the marker and files that do not. Callers
+ * decide what to do with the strays; nothing here deletes anything.
  */
-export function collectGeneratedFiles() {
+export function collectGeneratedFiles(root = ROOT) {
   const matched = GENERATED_GLOBS.flatMap((pattern) => {
     // Every glob is rooted at a literal directory before its first `**`, or at
     // the parent of a single-directory pattern, so the walk stays inside the
     // trees that hold generated output.
-    const root = pattern.includes("/**/")
+    const base = pattern.includes("/**/")
       ? pattern.slice(0, pattern.indexOf("/**/"))
       : dirname(pattern);
     const matches = globToRegExp(pattern);
-    return filesUnder(root).filter((rel) => matches.test(rel));
+    return filesUnder(base, root).filter((rel) => matches.test(rel));
   });
   const unique = [...new Set(matched)].sort();
 
   const generated = [];
   const unmarked = [];
   for (const rel of unique) {
-    (hasGeneratedMarker(join(ROOT, rel)) ? generated : unmarked).push(rel);
+    (hasGeneratedMarker(join(root, rel)) ? generated : unmarked).push(rel);
   }
   return { generated, unmarked };
 }

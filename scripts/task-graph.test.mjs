@@ -13,27 +13,26 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
-import { parse, stringify } from "yaml";
+
+import { PUBLIC_RELEASE_PACKAGES, SERVER_PLATFORM_PACKAGES } from "./release-manifest.mjs";
 
 const repo = fileURLToPath(new URL("..", import.meta.url));
 const turbo = join(repo, "node_modules/.bin/turbo");
-const moon = join(repo, "node_modules/.bin/moon");
-const gate = [
-  "lint",
-  "typecheck",
-  "build",
-  "test",
-  "check-typecheck",
-  "check-openapi-rules",
-  "check-adrs",
-  "check-moon-graph",
-  "check-go-work",
-];
+// The tasks CI runs: every `turbo run` list in the root `ci` script.
+const gate = JSON.parse(readFileSync(join(repo, "package.json"), "utf8"))
+  .scripts.ci.split("&&")
+  .flatMap(
+    (command) =>
+      command
+        .trim()
+        .match(/^turbo run (.+)$/)?.[1]
+        .split(/\s+/) ?? [],
+  )
+  .filter((word) => !word.startsWith("--"));
 let root;
 let baseline;
-let moonProjects;
 
-function run(command, args) {
+function run(command, args, extraEnv = {}) {
   return execFileSync(command, args, {
     cwd: root,
     encoding: "utf8",
@@ -63,27 +62,21 @@ function run(command, args) {
       TURBO_TELEMETRY_DISABLED: "1",
       TURBO_CACHE_DIR: join(root, ".turbo/cache"),
       TURBO_FORCE: "false",
-      MOON_FORCE: "false",
-      MOON_BASE: "HEAD",
+      ...extraEnv,
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
 }
 
-function dry() {
+function dry(extraEnv) {
   return new Map(
     JSON.parse(
-      run(turbo, ["run", ...gate, "snapshot", "journey-local", "--dry=json", "--cache=local:rw"]),
+      run(
+        turbo,
+        ["run", ...gate, "snapshot", "journey-local", "--dry=json", "--cache=local:rw"],
+        extraEnv,
+      ),
     ).tasks.map((task) => [task.taskId, task]),
-  );
-}
-
-function moonAffected() {
-  const { tasks } = JSON.parse(run(moon, ["query", "tasks", "--affected", "--downstream", "deep"]));
-  return new Set(
-    Object.entries(tasks).flatMap(([project, tasks]) =>
-      Object.keys(tasks).map((task) => `${project}:${task}`),
-    ),
   );
 }
 
@@ -104,13 +97,6 @@ function changed(file, content, check) {
   }
 }
 
-function reaches(edges, from, target, seen = new Set()) {
-  if (from === target) return true;
-  if (seen.has(from)) return false;
-  seen.add(from);
-  return (edges.get(from) ?? []).some((next) => reaches(edges, next, target, seen));
-}
-
 beforeAll(() => {
   root = mkdtempSync(join(tmpdir(), "nextgen-task-graph-"));
   // Use the working copy's real graph, with tiny source fixtures. No installs,
@@ -120,8 +106,7 @@ beforeAll(() => {
   );
   for (const file of files) {
     if (
-      !/(^|\/)(package\.json|turbo\.json|moon\.yml|go\.mod|go\.sum)$/.test(file) &&
-      !/^\.moon\/.*\.yml$/.test(file) &&
+      !/(^|\/)(package\.json|turbo\.json|go\.mod|go\.sum)$/.test(file) &&
       ![
         "pnpm-lock.yaml",
         "pnpm-workspace.yaml",
@@ -138,9 +123,6 @@ beforeAll(() => {
     mkdirSync(dirname(join(root, file)), { recursive: true });
     cpSync(join(repo, file), join(root, file));
   }
-  const workspace = parse(readFileSync(join(root, ".moon/workspace.yml"), "utf8"));
-  delete workspace.remote;
-  write(".moon/workspace.yml", stringify(workspace));
   for (const file of [
     "apps/api/internal/build/info.go",
     "apps/api/internal/build/info_test.go",
@@ -176,9 +158,6 @@ beforeAll(() => {
     "fixture",
   ]);
   baseline = dry();
-  moonProjects = new Map(
-    JSON.parse(run(moon, ["query", "projects"])).projects.map((project) => [project.id, project]),
-  );
 });
 
 afterAll(() => {
@@ -186,76 +165,108 @@ afterAll(() => {
 });
 
 describe.sequential("task graph cache and ordering contracts", () => {
-  test("both CI gates run the typecheck-coverage, OpenAPI-rule and go.work checks", () => {
-    const ci = parse(readFileSync(join(repo, ".github/workflows/ci-turbo.yml"), "utf8"));
-    const tasks = ci.jobs.checks.env.TASKS.split(" ");
-    const moonCI = readFileSync(join(repo, ".github/workflows/ci.yml"), "utf8");
+  test("CI runs the typecheck-coverage, OpenAPI-rule and go.work checks", () => {
+    // The baseline is what the root `ci` script runs: the root lint and test
+    // reach them.
     for (const task of ["check-typecheck", "check-openapi-rules", "check-go-work"]) {
-      expect(tasks).toContain(task);
-      expect(moonCI).toContain(`:${task}`);
-      expect(baseline.get(`//#${task}`).command).not.toBe("<NONEXISTENT>");
+      expect(baseline.has(`//#${task}`), task).toBe(true);
+      expect(baseline.get(`//#${task}`).command, task).not.toBe("<NONEXISTENT>");
     }
   });
 
-  test("native Go results and Git-stamped binaries cannot restore another host or revision", () => {
-    for (const [project, pkg] of [
-      ["server", "@zitadel/server"],
-      ["bench", "bench"],
-      ["oidc-mock", "oidc-mock"],
-    ]) {
-      for (const task of ["build", "test", "vet", "format"]) {
-        expect(baseline.get(`${pkg}#${task}`).resolvedTaskDefinition.cache).toBe(false);
-        expect(moonProjects.get(project).tasks[task].options.cache).toBe(false);
-      }
-    }
-    // Turbo gives every module in go.work Go tasks of its own (build, test,
-    // lint), which it would cache.
-    for (const task of baseline.values()) {
-      if (task.command.startsWith("go ")) {
-        expect(task.resolvedTaskDefinition.cache, task.taskId).toBe(false);
-      }
-    }
-    // Generation depends on neither: go.mod pins its toolchain.
-    const generation = ["generate", "check-generate", "check-generate-pruned"];
-    const { tasks } = JSON.parse(
-      run(turbo, ["run", ...generation, "--filter=@zitadel/server", "--dry=json"]),
+  // Turbo keys a Go module's tasks, and every task that depends on a module's
+  // `go-sources`, on `go version` and the effective `go env`. A GOENV file,
+  // which no task's `env` lists, stands in for another host's target.
+  test("cached Go results key on the target; stamped and stateful ones stay uncached", () => {
+    const uncached = new Set([
+      "@zitadel/server#build",
+      "@zitadel/server#test:postgres",
+      // The proof-of-work race run: a probe, never replayed.
+      "@zitadel/server#test:pow",
+      "//#check-go-work",
+    ]);
+    const goTasks = [...baseline.values()].filter(
+      (task) =>
+        /(^|&& )go /.test(task.command) ||
+        /check-go-work|go-(format-check|lint|generate)\.mjs/.test(task.command),
     );
-    for (const task of generation) {
-      const turboTask = tasks.find(({ taskId }) => taskId === `@zitadel/server#${task}`);
-      expect(turboTask.resolvedTaskDefinition.cache, task).toBe(true);
-      expect(moonProjects.get("server").tasks[task].options.cache, task).toBe(true);
+    expect(goTasks.length).toBeGreaterThan(15);
+    for (const task of goTasks) {
+      expect(task.resolvedTaskDefinition.cache, task.taskId).toBe(!uncached.has(task.taskId));
+    }
+    // The release binaries stamp the release version and the commit.
+    for (const { packageName } of SERVER_PLATFORM_PACKAGES) {
+      expect(baseline.get(`${packageName}#build-binary`).resolvedTaskDefinition.cache).toBe(false);
+    }
+    const goenvDir = mkdtempSync(join(tmpdir(), "nextgen-goenv-"));
+    try {
+      // A target other than the host's, whose default the key already holds.
+      writeFileSync(
+        join(goenvDir, "go.env"),
+        `GOARCH=${process.arch === "arm64" ? "amd64" : "arm64"}\n`,
+      );
+      const other = dry({ GOENV: join(goenvDir, "go.env") });
+      for (const task of goTasks.filter((task) => task.resolvedTaskDefinition.cache)) {
+        expect(other.get(task.taskId).hash, task.taskId).not.toBe(task.hash);
+      }
+    } finally {
+      rmSync(goenvDir, { recursive: true, force: true });
     }
   });
 
-  test("release writes wait for the Go readers in both runners", () => {
-    const edges = new Map([...baseline].map(([id, task]) => [id, task.dependencies]));
-    for (const id of edges.keys()) {
-      if (id.endsWith("#build-release")) {
-        expect(reaches(edges, id, "@zitadel/server#test"), id).toBe(true);
+  // Generated files are committed: no task writes them during a run, so no
+  // task waits for generation. `generate` rewrites them and is never cached;
+  // `check-generate` only compares, and caches by its inputs and the Go
+  // toolchain.
+  test("no task depends on generation that writes committed files", () => {
+    const { tasks } = JSON.parse(
+      run(turbo, [
+        "run",
+        "generate",
+        "check-generate",
+        "--filter=@zitadel/server",
+        "--filter=@zitadel/design-tokens",
+        "--dry=json",
+      ]),
+    );
+    for (const pkg of ["@zitadel/server", "@zitadel/design-tokens"]) {
+      const task = (name) => tasks.find(({ taskId }) => taskId === `${pkg}#${name}`);
+      expect(task("generate").resolvedTaskDefinition.cache, `${pkg}#generate`).toBe(false);
+      expect(task("check-generate").resolvedTaskDefinition.cache, `${pkg}#check-generate`).toBe(
+        true,
+      );
+    }
+    for (const task of baseline.values()) {
+      for (const dependency of task.dependencies) {
+        expect(dependency, task.taskId).not.toMatch(/^@zitadel\/(server|design-tokens)#generate$/);
       }
     }
+  });
+
+  // Turbo's release graph has no second build: pack, snapshot and publish
+  // depend on every public package's own build and on each server platform
+  // package's binary, and so wait for no test (tools/release/turbo.json).
+  test("turbo's release entry points pack the graph's builds and wait for no test", () => {
     for (const entry of ["pack", "snapshot", "publish"]) {
-      const graph = JSON.parse(run(moon, ["action-graph", `release:${entry}`, "--json"]));
-      const ids = new Map(
-        Object.entries(graph.data)
-          .filter(([, node]) => node.action === "run-task")
-          .map(([id, node]) => [Number(id), node.params.target]),
+      const { tasks } = JSON.parse(
+        run(turbo, ["run", entry, "--filter=@zitadel/release", "--dry=json"]),
       );
-      const waitsFor = new Map([...ids.values()].map((id) => [id, []]));
-      for (const [from, to] of graph.graph.edges) {
-        if (ids.has(from) && ids.has(to)) waitsFor.get(ids.get(from)).push(ids.get(to));
+      const ids = new Set(tasks.map(({ taskId }) => taskId));
+      // A package that ships dist/ is packed after its build; a server
+      // platform package after its binary.
+      for (const pkg of PUBLIC_RELEASE_PACKAGES) {
+        const platform = SERVER_PLATFORM_PACKAGES.some(
+          ({ packageName }) => packageName === pkg.name,
+        );
+        const { files = [] } = JSON.parse(
+          readFileSync(join(repo, pkg.dir, "package.json"), "utf8"),
+        );
+        const build = platform ? "build-binary" : files.includes("dist") ? "build" : undefined;
+        if (build)
+          expect(ids.has(`${pkg.name}#${build}`), `${entry}: ${pkg.name}#${build}`).toBe(true);
       }
-      // Every Go task on the server module resolves the console's embed.
-      const goReaders = [...waitsFor.keys()].filter((id) =>
-        /^server:(?!openapi$|format$)/.test(id),
-      );
-      expect(goReaders.length > 0, entry).toBe(entry === "snapshot");
-      for (const id of waitsFor.keys()) {
-        if (id.endsWith(":build-release")) {
-          for (const reader of goReaders) {
-            expect(reaches(waitsFor, id, reader), `${entry}: ${id} -> ${reader}`).toBe(true);
-          }
-        }
+      for (const id of ids) {
+        expect(id, entry).not.toMatch(/#(build-release|test|test[-:].+|vet|lint|typecheck)$/);
       }
     }
   });
@@ -276,18 +287,7 @@ describe.sequential("task graph cache and ordering contracts", () => {
       ]) {
         expect(next.get(id).hash, id).not.toBe(baseline.get(id).hash);
       }
-      const affected = moonAffected();
-      expect([...affected].filter((task) => task.endsWith(":build"))).toEqual([]);
-      expect(affected.has("console:test")).toBe(true);
-      expect(affected.has("components:typecheck")).toBe(true);
     });
-    for (const project of moonProjects.values()) {
-      const inputs = project.tasks.build?.inputFiles ?? {};
-      expect(
-        Object.keys(inputs).some((file) => file.startsWith("packages/vitest-config/")),
-        project.id,
-      ).toBe(false);
-    }
   });
 
   // The builds that compile the server module: the server binary, the
@@ -311,10 +311,6 @@ describe.sequential("task graph cache and ordering contracts", () => {
         expect(next.get("@zitadel/e2e#journey-local").hash).toBe(
           baseline.get("@zitadel/e2e#journey-local").hash,
         );
-        const affected = moonAffected();
-        expect(affected.has("server:build")).toBe(false);
-        expect(affected.has("bench:build")).toBe(false);
-        expect(affected.has("server:test")).toBe(true);
       });
     }
     // The client module's tests are its own: the server compiles only its
@@ -325,10 +321,6 @@ describe.sequential("task graph cache and ordering contracts", () => {
         expect(next.get(task).hash, task).toBe(baseline.get(task).hash);
       }
       expect(next.get("zitadel/v5#test").hash).not.toBe(baseline.get("zitadel/v5#test").hash);
-      const affected = moonAffected();
-      expect(affected.has("server:build")).toBe(false);
-      expect(affected.has("bench:build")).toBe(false);
-      expect(affected.has("go:test")).toBe(true);
     });
     changed("tools/oidc-mock/main.go", "package main\n// changed mock\n", () => {
       const next = dry();
@@ -336,10 +328,58 @@ describe.sequential("task graph cache and ordering contracts", () => {
         expect(next.get(task).hash, task).toBe(baseline.get(task).hash);
       }
       expect(next.get("oidc-mock#build").hash).not.toBe(baseline.get("oidc-mock#build").hash);
-      const affected = moonAffected();
-      expect(affected.has("server:build")).toBe(false);
-      expect(affected.has("bench:build")).toBe(false);
-      expect(affected.has("oidc-mock:build")).toBe(true);
+    });
+  });
+
+  // Each journey depends on the builds of what it installs, not one pack of
+  // every public package (e2e/turbo.json, frameworks.test.mjs).
+  test("an SDK change reaches only the journeys that install that SDK", () => {
+    changed("packages/sdk-svelte/src/lib/index.ts", "export {};\n", () => {
+      const next = dry();
+      const changedJourneys = [...next.values()]
+        .filter(({ taskId }) => /^@zitadel\/e2e#journey:/.test(taskId))
+        .filter(({ taskId, hash }) => hash !== baseline.get(taskId).hash)
+        .map(({ taskId }) => taskId);
+      expect(changedJourneys).toEqual(["@zitadel/e2e#journey:svelte"]);
+    });
+  });
+
+  // The cached e2e lanes and the kit's suite boot what a switch replaces
+  // (another server binary, a server setting, a lane's port), so their key
+  // holds the switches; the telemetry opt-outs change no result.
+  test("a cached lane's key holds the switches that change what it tests", () => {
+    const lanes = [...baseline.values()].filter(
+      ({ taskId, command, resolvedTaskDefinition }) =>
+        resolvedTaskDefinition.cache &&
+        // Their input-only bases run nothing.
+        command !== "<NONEXISTENT>" &&
+        /^@zitadel\/(e2e#(console|demo)-|testing#test:integration$)/.test(taskId),
+    );
+    expect(lanes.length).toBeGreaterThanOrEqual(8);
+    const switched = dry({ ZITADEL_SERVER_BINARY: "/elsewhere/nextgen" });
+    const optedOut = dry({ ZITADEL_TELEMETRY: "0", ZITADEL_TELEMETRY_ENV: "development" });
+    for (const { taskId, hash } of lanes) {
+      expect(switched.get(taskId).hash, taskId).not.toBe(hash);
+      expect(optedOut.get(taskId).hash, taskId).toBe(hash);
+    }
+  });
+
+  // Two suites read files outside their package that only their inputs can
+  // name: frameworks.test.mjs derives each journey's edges from the manifests
+  // of what it installs, and this file builds its fixture from every module's
+  // go.mod.
+  test("the graph's own tests rerun when a manifest or a go.mod they read changes", () => {
+    const manifest = "packages/sdk-svelte/package.json";
+    const described = {
+      ...JSON.parse(readFileSync(join(root, manifest), "utf8")),
+      description: "",
+    };
+    changed(manifest, JSON.stringify(described, null, 2), () => {
+      expect(dry().get("@zitadel/e2e#test").hash).not.toBe(baseline.get("@zitadel/e2e#test").hash);
+    });
+    const module = "tools/bench/go.mod";
+    changed(module, `${readFileSync(join(root, module), "utf8")}\n// changed\n`, () => {
+      expect(dry().get("//#test").hash).not.toBe(baseline.get("//#test").hash);
     });
   });
 
@@ -370,6 +410,12 @@ describe.sequential("task graph cache and ordering contracts", () => {
       "apps/cloud-functions/app/.well-known/workflow/v1/.gitignore": "*",
       "apps/cloud-functions/app/.well-known/workflow/v1/flow/route.js": "export {};\n",
       "apps/demo-next/next-env.d.ts": '/// <reference types="next" />\n',
+      // What the e2e lanes write beside their specs.
+      "e2e/console/test-results/smoke/.last-run.json": "{}\n",
+      "e2e/console/playwright-report/real/index.html": "<html></html>\n",
+      "e2e/demo-next/test-results/mock/.last-run.json": "{}\n",
+      "e2e/demo-next/playwright-report/real/index.html": "<html></html>\n",
+      "e2e/demo-nuxt/test-results/mock/.last-run.json": "{}\n",
     };
     try {
       for (const [file, content] of Object.entries(generated)) write(file, content);
@@ -384,35 +430,12 @@ describe.sequential("task graph cache and ordering contracts", () => {
   });
 
   for (const app of ["docs", "website"]) {
-    test(`${app} dotenv changes invalidate Turbo and Moon builds`, () => {
+    test(`${app} dotenv changes invalidate its build`, () => {
       changed(`apps/${app}/.env.local`, "SAMPLE_RATE=one\n", () => {
         const first = dry().get(`@zitadel/${app}#build`).hash;
         write(`apps/${app}/.env.local`, "SAMPLE_RATE=two\n");
         expect(dry().get(`@zitadel/${app}#build`).hash).not.toBe(first);
       });
-      // Execute the real Moon input configuration with a tiny stand-in for
-      // Next.js: it reads the ignored file and emits one build artifact.
-      const path = `apps/${app}/moon.yml`;
-      const config = parse(readFileSync(join(root, path), "utf8"));
-      Object.assign(config.tasks.build, {
-        command: "node ../../scripts/read-env.mjs",
-        deps: [],
-        outputs: [".next/probe.txt"],
-        options: { ...config.tasks.build.options, mergeArgs: "replace" },
-      });
-      write(
-        "scripts/read-env.mjs",
-        'import fs from "node:fs";fs.mkdirSync(".next",{recursive:true});fs.writeFileSync(".next/probe.txt",fs.readFileSync(".env.local"));',
-      );
-      changed(path, stringify(config), () => {
-        changed(`apps/${app}/.env.local`, "one", () => {
-          run(moon, ["run", `${app}:build`]);
-          write(`apps/${app}/.env.local`, "two");
-          run(moon, ["run", `${app}:build`]);
-          expect(readFileSync(join(root, `apps/${app}/.next/probe.txt`), "utf8")).toBe("two");
-        });
-      });
-      rmSync(join(root, "scripts/read-env.mjs"));
     });
   }
 });

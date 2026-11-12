@@ -160,7 +160,7 @@ a fiction. **Default to the real-data loop.**
 ### Real data (default)
 
 ```sh
-moon run console:dev-real
+turbo run dev:real --filter=@zitadel/console
 ```
 
 One command: boots an ephemeral real instance (binary runtime + SQLite by
@@ -185,8 +185,8 @@ the same way — through the grant, not a secret.
 ### Mock backend
 
 ```sh
-PORT=8080 moon run api-mock:start          # terminal 1
-moon run console:dev                       # terminal 2
+turbo run start --filter=@zitadel/api-mock   # terminal 1, on :8080
+turbo run dev --filter=@zitadel/console      # terminal 2
 ```
 
 Fast and offline, and the full sign-in loop works (the mock serves
@@ -195,14 +195,14 @@ Fast and offline, and the full sign-in loop works (the mock serves
 needs no real data: it has **no user store**, so list screens cannot be
 meaningful and nothing about authorization can be proven there. It serves its
 own `/console/runtime.json`, naming the mock's platform project as the one the
-console signs into (so the claim page can complete, as in `console:dev-claim`),
+console signs into (so the claim page can complete, as in `dev:claim`),
 and the loop needs no variables: the dev proxy's default backend is the mock's
 port.
 
 ### Embedded build
 
 ```sh
-moon run workspace:server
+pnpm run server
 ```
 
 Serves the built bundle under `/ui/console/` — no HMR. Use it only to verify the
@@ -220,8 +220,8 @@ embed base path.
 ## Commands
 
 ```sh
-moon run console:dev-real   # dev server + seeded real backend (preferred)
-moon run console:dev        # dev server only (bring your own backend)
-moon run console:test
-moon run console:typecheck
+turbo run dev:real --filter=@zitadel/console   # dev server + seeded real backend (preferred)
+turbo run dev --filter=@zitadel/console        # dev server only (bring your own backend)
+turbo run test --filter=@zitadel/console
+turbo run typecheck --filter=@zitadel/console
 ```

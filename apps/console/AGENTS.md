@@ -108,7 +108,7 @@ between files are the sign the component is missing.
 
 ## Code layout
 
-Layers import downward only; `console:lint` fails an upward import
+Layers import downward only; the console's `lint` fails an upward import
 ([ADR 0007](docs/adrs/0007-console-code-layout.md)): `routes/` → `app-shell/` →
 `features/` → `components/`, `hooks/`, `lib/`, `api/`, `auth/`, `runtime/`.
 
@@ -127,22 +127,22 @@ Layers import downward only; `console:lint` fails an upward import
 ## Local loop
 
 ```sh
-moon run console:dev-real   # real seeded instance + dev server (the default)
-moon run console:dev-claim  # the same for the claim page
-moon run console:dev        # dev server only, http://localhost:5174
-moon run console:typecheck console:test console:build
+turbo run dev:real --filter=@zitadel/console    # real seeded instance + dev server (the default)
+turbo run dev:claim --filter=@zitadel/console   # the same for the claim page
+turbo run dev --filter=@zitadel/console         # dev server only, http://localhost:5174
+turbo run typecheck test build --filter=@zitadel/console
 ```
 
 - Develop against real data: `@zitadel/api-mock` has no user store, so a list
   read from it is fiction. When each backend applies is in the Local
   development section of [`README.md`](README.md).
-- The claim page needs `dev-claim`: `claim/complete` accepts only a
-  platform-project session, so on `dev-real` every claim fails with "This
-  account can't claim the project". `dev-claim` pins the console to
+- The claim page needs `dev:claim`: `claim/complete` accepts only a
+  platform-project session, so on `dev:real` every claim fails with "This
+  account can't claim the project". `dev:claim` pins the console to
   `proj_platform`, so list screens read empty and you register on the claim
   page instead of using the seeded users.
 - Both tasks build the CLI they boot the server through. A direct
-  `pnpm run dev:real` does not: run `moon run cli:build` first, or the server
+  `pnpm run dev:real` does not: run `turbo run build --filter=@zitadel/cli` first, or the server
   starts unmigrated and dies with `no such table: projects`.
 - Run `pnpm install` after a rebase: a stale `node_modules` fails the built CLI
   on a missing transitive dependency.

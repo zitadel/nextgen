@@ -8,7 +8,7 @@ import type { NodeEngines } from "./node-engines";
  * developer upgrades it. Its route protection is `nextgenMiddleware`, which
  * runs in Next's Middleware / Proxy, and 16.2.x had several bypasses of that
  * layer: keep the pin on a release with no high or critical advisory, as
- * `cli:check-advisories` checks.
+ * `@zitadel/cli#check-advisories` checks.
  */
 const CREATE_NEXT_APP_VERSION = "16.4.2";
 

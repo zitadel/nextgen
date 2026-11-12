@@ -14,14 +14,15 @@ SolidStart, Qwik Router). `scripts/frameworks.mjs` is the authoritative list.
 ## Local runner
 
 ```sh
-moon run e2e:journey
+turbo run journey --filter=@zitadel/e2e
 ```
 
 The default mode runs the full framework matrix in parallel. It uses the
 `@zitadel/server` npm binary runtime and does not require Docker:
 
 1. Ensure the Playwright Chromium browsers are installed.
-2. Build and pack the public workspace packages with `moon run release:pack`.
+2. Build and pack the public workspace packages with
+   `turbo run pack --filter=@zitadel/release`.
 3. Verify tarballs are installable and do not contain `catalog:` or
    `workspace:` dependency specs.
 4. Start Verdaccio as a Node process with npmjs proxying enabled.
@@ -37,15 +38,18 @@ The default mode runs the full framework matrix in parallel. It uses the
 ### Options
 
 ```sh
-moon run e2e:journey -- --keep
-moon run e2e:journey -- --work-dir /tmp/zitadel-journey
-moon run e2e:journey -- --runtime docker --image nextgen:local
-moon run e2e:journey -- --framework next
-moon run e2e:journey -- --preexisting-app
-moon run e2e:journey -- --framework vue --remote
-moon run e2e:journey -- --concurrency 2
-moon run e2e:journey -- --tarballs-dir dist/release/<version>/npm
+turbo run journey --filter=@zitadel/e2e -- --keep
+turbo run journey --filter=@zitadel/e2e -- --work-dir /tmp/zitadel-journey
+turbo run journey --filter=@zitadel/e2e -- --runtime docker --image nextgen:local
+turbo run journey --filter=@zitadel/e2e -- --framework next
+turbo run journey --filter=@zitadel/e2e -- --preexisting-app
+turbo run journey --filter=@zitadel/e2e -- --framework vue --remote
+turbo run journey --filter=@zitadel/e2e -- --concurrency 2
+turbo run journey --filter=@zitadel/e2e -- --tarballs-dir dist/release/<version>/npm
 ```
+
+One CI journey alone, on the release's npm tarballs as CI runs it:
+`turbo run journey:vue --filter=@zitadel/e2e`.
 
 - `--framework <id>` runs one framework (any id in `frameworkIds` in
   `scripts/frameworks.mjs`, e.g. `next`, `sveltekit`, `qwik-router`) instead of
@@ -71,9 +75,9 @@ moon run e2e:journey -- --tarballs-dir dist/release/<version>/npm
 - `--image <docker-tag>` uses an existing local runtime image instead of
   building one and implies `--runtime docker`.
 - `--tarballs-dir <path>` uses prebuilt release npm tarballs instead of running
-  `moon run release:pack`.
+  `turbo run pack --filter=@zitadel/release`.
 - Each framework lane starts the mock OIDC provider from
-  `tools/oidc-mock/dist/oidc-mock` (`moon run oidc-mock:build`). Without it the
+  `tools/oidc-mock/dist/oidc-mock` (`turbo run build --filter=oidc-mock`). Without it the
   specs that sign in through it skip, and `--ci` refuses to start. A docker
   runtime starts no mock.
 - `--keep` keeps the temporary work directory after success.
@@ -86,16 +90,12 @@ Useful environment overrides:
 - `JOURNEY_ZITADEL_PORT` for single-framework runs only
 - `JOURNEY_EDGE_PORT` for single-framework `--remote` runs only
 - `JOURNEY_TARBALLS_DIR` to use prebuilt release npm tarballs
-- `JOURNEY_TARBALLS_REQUIRED=1` to refuse to pack without them. The
-  `e2e:journey-local` lane sets it: the e2e lanes beside it read the dist
-  folders a pack wipes and rebuilds.
 - `JOURNEY_OIDC_MOCK_PORT` for single-framework runs only
 - `JOURNEY_CI=1`, `JOURNEY_CONCURRENCY`, `JOURNEY_MATRIX`, `JOURNEY_RUNTIME`
   and `JOURNEY_WORK_DIR` for `--ci`, `--concurrency`, `--matrix`, `--runtime`
-  and `--work-dir`. Arguments on the command line win. CI's turbo job sets
-  these: turbo puts arguments after `--` into every task's cache key, so the
-  journey's dependencies would rebuild instead of coming from the cache. They
-  are also how ci.yml reaches `e2e:journey-local`, whose command moon fixes.
+  and `--work-dir`. Arguments on the command line win. CI sets these: turbo
+  puts arguments after `--` into every task's cache key, so the journey's
+  dependencies would rebuild instead of coming from the cache.
 - `JOURNEY_ENABLE_PASSKEY=0` as a local-only escape hatch while debugging
   passkey setup. CI must run passkey coverage — the `passkey-first` preset
   lane, which is the only shipped preset whose flow offers a passkey.
@@ -124,7 +124,7 @@ They stay registered and run by hand with `--framework`. It does not use public 
 the current workflow's package tarballs to Verdaccio and runs the same `npx`
 local setup flow against the generated app. The Docker fallback journey remains
 an opt-in local/manual check via
-`moon run e2e:journey -- --runtime docker --image <docker-tag>`. Private
+`turbo run journey --filter=@zitadel/e2e -- --runtime docker --image <docker-tag>`. Private
 support packages such as design tokens are bundled into the public packages
 that need them and must not be uploaded or published.
 

@@ -9,19 +9,14 @@ import { runCapture } from "../../../scripts/dev-process.mjs";
 import { packPublicPackages } from "../../../scripts/release-artifacts.mjs";
 // @boundaries-ignore root scripts/ belongs to the workspace root, which no package can depend on
 import { APP_RELEASE_PACKAGES, PUBLIC_PACKAGE_DIRS } from "../../../scripts/release-manifest.mjs";
-// @boundaries-ignore root scripts/ belongs to the workspace root, which no package can depend on
-import { runnerCommand } from "../../../scripts/task-runner.mjs";
 import { packageName, parsePort } from "./lib.mjs";
 
 export const packageDirs = [...PUBLIC_PACKAGE_DIRS];
 
 // Verdaccio serves a proxied packument from its storage until it is `maxage`
-// old, then asks npmjs again; the default is 2m. CI restores the storage of an
-// earlier run (JOURNEY_REGISTRY_STORAGE), so with the default every packument
-// is stale from the start, and the scaffolds' installs wait on thousands of
-// npmjs round trips that almost all come back 304 Not Modified. With an hour,
-// most CI runs restore packuments another run refreshed within the hour and
-// ask npmjs nothing; a fresh local store only skips repeat checks within a run.
+// old, then asks npmjs again; the default is 2m, which makes a long journey
+// run ask npmjs again for packuments it fetched minutes earlier. An hour skips
+// those repeat checks within a run.
 //
 // Longer is not better: npmjs releases reach the journey up to `maxage` late
 // (`nuxi@latest` and `@angular/cli@latest` resolve `latest` here), and `nuxi init` downloads its starter template from GitHub,
@@ -67,6 +62,20 @@ export async function prepareLocalRegistry(input) {
     await buildAppPackages(input.repoRoot, input.run, env, log);
     await packAppPackages(input.repoRoot, paths.tarballsDir, env, log, input.runCapture);
     await verifyTarballs(input.repoRoot, paths.tarballsDir, input.run, env, ["--app-packages"]);
+  } else if (input.packageDirs) {
+    // A CI journey's own set (journey-packages.mjs), packed from the builds
+    // its turbo task depends on.
+    await packPackageDirs(
+      input.repoRoot,
+      paths.tarballsDir,
+      input.packageDirs,
+      env,
+      log,
+      input.runCapture,
+    );
+    await verifyTarballs(input.repoRoot, paths.tarballsDir, input.run, env, [
+      `--packages=${input.packageDirs.join(",")}`,
+    ]);
   } else {
     await buildPackages(input.repoRoot, input.run, env, log, input.prebuiltTarballsDir);
     await packPackages(
@@ -114,8 +123,7 @@ export async function buildPackages(
   }
   const projectNames = await Promise.all(packageDirs.map((dir) => packageName(repoRoot, dir)));
   log(`building release npm tarballs for ${projectNames.join(", ")}`);
-  const pack = runnerCommand(["release:pack"], env);
-  await run(pack.command, pack.args, { cwd: repoRoot, env });
+  await run("turbo", ["run", "@zitadel/release#pack"], { cwd: repoRoot, env });
 }
 
 export async function packPackages(
@@ -139,16 +147,15 @@ export async function packPackages(
 }
 
 // The `app` package set: what a generated app installs, packed from the
-// packages' cached dev builds. `release:pack` rebuilds every public package
-// after cli:test and cross-compiles the server for every platform, none of
-// which a generated app installs.
+// packages' cached dev builds. `@zitadel/release#pack` builds every public
+// package and cross-compiles the server for every platform, none of which a
+// generated app installs.
 export async function buildAppPackages(repoRoot, run, env, log = () => undefined) {
   log(`building ${APP_RELEASE_PACKAGES.map((pkg) => pkg.name).join(", ")}`);
-  const build = runnerCommand(
-    APP_RELEASE_PACKAGES.map((pkg) => `${pkg.moonProject}:build`),
+  await run("turbo", ["run", ...APP_RELEASE_PACKAGES.map((pkg) => `${pkg.name}#build`)], {
+    cwd: repoRoot,
     env,
-  );
-  await run(build.command, build.args, { cwd: repoRoot, env });
+  });
 }
 
 // Each pack runs on pipes of its own (runReplayed in scripts/dev-process.mjs
@@ -160,10 +167,22 @@ export async function packAppPackages(
   log = () => undefined,
   runCaptureFn = runCapture,
 ) {
+  const dirs = APP_RELEASE_PACKAGES.map((pkg) => pkg.dir);
+  await packPackageDirs(repoRoot, tarballsDir, dirs, env, log, runCaptureFn);
+}
+
+export async function packPackageDirs(
+  repoRoot,
+  tarballsDir,
+  dirs,
+  env,
+  log = () => undefined,
+  runCaptureFn = runCapture,
+) {
   log(`packing npm tarballs into ${tarballsDir}`);
   await packPublicPackages({
     repoRoot,
-    dirs: APP_RELEASE_PACKAGES.map((pkg) => pkg.dir),
+    dirs,
     tarballsDir,
     run: (command, args, options) => runCaptureFn(command, args, { ...options, env }),
   });
@@ -337,6 +356,9 @@ uplinks:
   npmjs:
     url: https://registry.npmjs.org/
     maxage: ${UPLINK_MAXAGE}
+    timeout: 60s
+    max_fails: 10
+    fail_timeout: 10s
 packages:
   '@zitadel/*':
     access: $all

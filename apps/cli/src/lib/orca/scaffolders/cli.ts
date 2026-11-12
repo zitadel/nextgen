@@ -30,7 +30,7 @@ export abstract class AbstractCLIScaffolder implements Scaffolder {
    * release, and any package that release writes at a fixed version. A
    * framework CLI run `@latest`, and the ranges it writes, move to patched
    * releases by themselves; a pin stays on its version until someone bumps
-   * it, so `cli:check-advisories` checks each against the npm advisory
+   * it, so `@zitadel/cli#check-advisories` checks each against the npm advisory
    * database.
    */
   readonly pinnedPackages: ReadonlyArray<string> = [];
