@@ -186,7 +186,8 @@ login flows.
 
 The two in-repo consumers are `e2e/demo-next/playwright.real.config.mts`
 and `e2e/console/playwright.real.config.mts` — run them with
-`moon run e2e:demo-next-real` / `moon run e2e:console-real`.
+`turbo run demo-next-real --filter=@zitadel/e2e` /
+`turbo run console-real --filter=@zitadel/e2e`.
 
 ### Composable pieces
 
@@ -295,7 +296,7 @@ provisioning contract the boot path drives — never a server flag, and never
 direct database writes, which would bypass the provisioner and break seed
 ops for `connectZitadel` targets.
 
-The in-repo dev loop follows the same contract: `moon run console:dev-real`
+The in-repo dev loop follows the same contract: `turbo run dev:real --filter=@zitadel/console`
 boots, seeds, and uses `handle.projectSecret` itself to grant the dev user
 access, then signs the console in with that user's session cookie — the
 secret never reaches the dev proxy or the browser (#1300). `--seed-only`
@@ -307,7 +308,7 @@ or export.
 **One instance per suite, one fresh user per test.** Emails are unique per
 project, so per-test `seed.user()` calls are isolation enough for login-flow
 tests, and tests run fully parallel against the shared instance
-(demonstrated by `e2e:demo-next-real`, 2 workers).
+(demonstrated by the `demo-next-real` lane, 2 workers).
 
 Typical timings with the SQLite local default (dated estimates from a July 2026 dev build — orders of magnitude, not a benchmark; remeasure locally before relying on them):
 
@@ -318,7 +319,7 @@ Typical timings with the SQLite local default (dated estimates from a July 2026 
 | Stop | typically under a second |
 | Bootstrap (project + schema + flow) | ~100ms |
 | Seed one user (create + password) | ~50ms |
-| Full `e2e:demo-next-real` suite (boot + Next dev + 2 browser tests) | ~25s |
+| Full `demo-next-real` suite (boot + Next dev + 2 browser tests) | ~25s |
 
 **Instance-per-worker is not worth it for browser e2e**: the app dev server
 boots once with one project's env, and every extra worker would pay the full
@@ -337,11 +338,11 @@ mutate project-wide state; revisit with warm-dir reuse if that need appears.
 
 Customer installs get the published server binary through `@zitadel/server`'s
 platform packages; the in-repo workspace carries no such binary, so the repo's
-own suites run `moon run server:build` and point the kit at the result via
+own suites run `turbo run build --filter=@zitadel/server` and point the kit at the result via
 `ZITADEL_SERVER_BINARY` (the `withZitadel` option `zitadel.serverBinary` /
-`serverBinaryHint` exists for this). Most in-repo moon tasks set
+`serverBinaryHint` exists for this). Most in-repo e2e lanes set
 `NEXTGEN_SERVER_CONSOLE_ENABLED=false` because they drive the app-embedded
-login, not the server-hosted console; the exception is `e2e:console-embedded`,
+login, not the server-hosted console; the exception is `console-embedded`,
 which keeps the console on and omits `app` — the binary-served console is its
 subject. Customer installs need none of this.
 

@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, vi } from "vitest";
 
 import type { JsonObject } from "@/lib/zitadel";
 import {
+  aPasswordFlow,
   authMethodJson,
   authMethodText,
   LOGIN_FLOW_FILE,
@@ -1580,12 +1581,12 @@ describe("auth-method sso enable", () => {
     });
   });
 
-  describe("when no active flow offers a way to sign in", () => {
+  describe("when no flow offers a way to sign in", () => {
     it("warns that nobody can sign in", async ({ dir }) => {
       const cwd = await aProject(dir);
       await writeJson(cwd, LOGIN_FLOW_FILE, {
-        ...loginFlow("default-human-user"),
-        status: "draft",
+        ...aPasswordFlow("default-human-user"),
+        purposes: { register: "identifier" },
       });
 
       const result = await withStdin(SECRET, () => {
@@ -1594,7 +1595,7 @@ describe("auth-method sso enable", () => {
 
       expect(parseJson(result.stdout)).toMatchObject({
         warnings: expect.arrayContaining([
-          "No active login flow for default-human-user offers a method it enables, so nobody can sign in until one does.",
+          "No login flow for default-human-user offers a method it enables, so nobody can sign in until one does.",
         ]),
       });
     });

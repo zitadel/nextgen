@@ -20,7 +20,6 @@ import (
 func passkeySignupFlowDefinition(userSchema string) api.FlowDefinition {
 	return api.FlowDefinition{
 		Name:       "passkey-signup",
-		Status:     "active",
 		UserSchema: userSchema,
 		Purposes:   api.FlowDefinitionPurposes{"register": "register"},
 		Steps: []api.FlowDefinitionStep{

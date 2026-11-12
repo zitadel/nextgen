@@ -1,6 +1,6 @@
 import { type Plugin, loadEnv } from "vite";
 
-/** Where `moon run cloud-functions:dev` answers. */
+/** Where `turbo run dev --filter=@zitadel/cloud-functions` answers. */
 const defaultFunctionsUrl = "http://localhost:5180";
 
 /**

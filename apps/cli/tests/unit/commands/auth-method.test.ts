@@ -98,10 +98,10 @@ const PASSWORD_NOT_OFFERED =
   "and a transition under its name. See .zitadel/flows/README.md.";
 
 /**
- * The warning for a schema no active flow lets anyone sign in to.
+ * The warning for a schema no flow lets anyone sign in to.
  */
 const NOBODY_CAN_SIGN_IN =
-  "No active login flow for default-human-user offers a method it enables, " +
+  "No login flow for default-human-user offers a method it enables, " +
   "so nobody can sign in until one does.";
 
 /**
@@ -332,45 +332,7 @@ describe("auth-method password and passkey", () => {
       expect(parseJson(result.stdout)).toMatchObject({ data: { not_offered: ["passkey"] } });
     });
 
-    describe("with a draft flow that offers it", () => {
-      const draft = {
-        ...aPasswordFlow(),
-        name: "draft-login",
-        status: "draft",
-        purposes: { login: "passkey-first" },
-        steps: [
-          {
-            name: "passkey-first",
-            fields: [],
-            actions: [PASSKEY_ACTION],
-            transitions: { passkey: { target: "done" } },
-          },
-          DONE_STEP,
-        ],
-      };
-      const documents: ConfigDocuments = {
-        schemas: { "default-human-user.json": aSchema(BOTH) },
-        flows: { "default-human-user-login.json": aPasswordFlow(), "draft-login.json": draft },
-      };
-
-      it("does not count the draft flow as offering the method", async ({ dir }) => {
-        await writeProject(dir, documents);
-
-        const result = await runCliForTest(authMethodJson(dir, "passkey", "enable"));
-
-        expect(parseJson(result.stdout)).toMatchObject({ data: { not_offered: ["passkey"] } });
-      });
-
-      it("names only the active flow as the place to add it", async ({ dir }) => {
-        await writeProject(dir, documents);
-
-        const result = await runCliForTest(authMethodJson(dir, "passkey", "enable"));
-
-        expect(parseJson(result.stdout)).toMatchObject({ warnings: [PASSKEY_NOT_OFFERED] });
-      });
-    });
-
-    it("warns when no active flow offers any method the schema enables", async ({ dir }) => {
+    it("warns when no flow offers any method the schema enables", async ({ dir }) => {
       await writeProject(dir, aProject(BOTH, NO_METHOD_FLOW));
 
       const result = await runCliForTest(authMethodJson(dir, "password", "disable"));
@@ -396,15 +358,18 @@ describe("auth-method password and passkey", () => {
       expect(parseJson(result.stdout)).toMatchObject({ warnings: [PASSKEY_NOT_OFFERED] });
     });
 
-    it("points at the flows folder when no flow is active", async ({ dir }) => {
-      await writeProject(dir, aProject(PASSWORD_ONLY, { ...aPasswordFlow(), status: "draft" }));
+    it("points at the flows folder when no flow signs anyone in", async ({ dir }) => {
+      await writeProject(
+        dir,
+        aProject(PASSWORD_ONLY, { ...aPasswordFlow(), purposes: { register: "identifier" } }),
+      );
 
       const result = await runCliForTest(authMethodJson(dir, "passkey", "enable", "--dry-run"));
 
       expect(parseJson(result.stdout)).toMatchObject({
         warnings: [
           "No login flow for default-human-user offers passkey yet. " +
-            "In an active login flow for default-human-user in .zitadel/flows/, " +
+            "In a login flow for default-human-user in .zitadel/flows/, " +
             'add a "kind": "passkey" action to a step reached from purposes.login, ' +
             'plus a transition under the action\'s name. A "kind": "passkey_register" action does the same for sign-up. ' +
             "See .zitadel/flows/README.md.",

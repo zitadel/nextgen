@@ -110,15 +110,19 @@ jobs:
     if: ${{ github.event_name == 'workflow_dispatch' || needs.changesets.outputs.publish_should_run == 'true' }}
     runs-on: depot-ubuntu-24.04-16
     timeout-minutes: 90
+    env:
+      # A release builds everything itself: it neither restores nor saves
+      # task results, so nothing a pull request's run wrote can reach it.
+      TURBO_CACHE: "local:,remote:"
+      TURBO_TELEMETRY_DISABLED: "1"
     steps:
       - uses: actions/checkout@v6
         with:
           ref: ${{ github.event_name == 'push' && github.sha || 'main' }}
           fetch-depth: 0
 
-      # Keyed like ci.yml's setup-go step (see the comment there), so this job
-      # restores the Go cache ci.yml saves: both build through GOCACHEPROG on
-      # Depot and keep the same files in GOCACHE.
+      # Go builds through GOCACHEPROG (`depot gocache`) on Depot, which keeps
+      # Depot's files in GOCACHE.
       - uses: actions/setup-go@v6
         with:
           go-version-file: apps/api/go.mod
@@ -155,29 +159,21 @@ jobs:
       - name: Install dependencies
         run: corepack pnpm install --frozen-lockfile
 
-      # Bare `moon` below is the workspace's own pinned @moonrepo/cli, so CI
-      # runs the exact version the lockfile resolves — same as local dev.
-      - name: Put workspace binaries on PATH
-        run: echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
-
       - name: Configure Changesets git tag author
         if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && ! inputs.dry_run) }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
+      # The release graph (tools/release/turbo.json) builds every public
+      # package and the five server binaries, then publishes what it built.
+      # Its options come from the environment (release.mjs): arguments after
+      # `--` would re-key every task in the run.
       - name: Publish dry run
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
-        run: |
-          args=(release:publish -- --dry-run)
-          if [ -n "$RECOVER_VERSION" ]; then
-            args+=(--recover-version "$RECOVER_VERSION")
-          fi
-          # Release tasks are excluded from `moon ci`, but this workflow invokes
-          # them explicitly. Unset only CI so Moon keeps the task in the action
-          # pipeline while preserving the GitHub Actions/OIDC environment.
-          env -u CI moon run "${args[@]}"
+        run: corepack pnpm exec turbo run @zitadel/release#publish
         env:
+          RELEASE_DRY_RUN: "1"
           BASE_SHA: ${{ github.event.before || 'HEAD^' }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PNPM_CONFIG_PROVENANCE: "false"
@@ -185,15 +181,7 @@ jobs:
 
       - name: Publish release
         if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && ! inputs.dry_run) }}
-        run: |
-          args=(release:publish)
-          if [ -n "$RECOVER_VERSION" ]; then
-            args+=(-- --recover-version "$RECOVER_VERSION")
-          fi
-          # Release tasks are excluded from `moon ci`, but this workflow invokes
-          # them explicitly. Unset only CI so Moon keeps the task in the action
-          # pipeline while preserving the GitHub Actions/OIDC environment.
-          env -u CI moon run "${args[@]}"
+        run: corepack pnpm exec turbo run @zitadel/release#publish
         env:
           BASE_SHA: ${{ github.event.before || 'HEAD^' }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

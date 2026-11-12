@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/pressly/goose/v3"
@@ -15,13 +16,14 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/testdb"
 )
 
-// roundTripShards is how many databases the walk is split across when each
-// SpannerDSN call provisions its own, as on Spanner Omni in CI. There every
-// schema change takes seconds, and a migration needs three (Up, Down, Up
-// again), so a single walk outlasts the lane's per-package timeout. Each shard
-// first applies the migrations before its range, one schema change each, so
-// the last shard takes longest.
-const roundTripShards = 4
+// roundTripWalks is how many walks share the migrations when each SpannerDSN
+// call provisions its own database, as on Spanner Omni in CI. There a schema
+// change takes seconds, one that creates indexes minutes, and a migration
+// needs three (Up, Down, Up again), so a single walk outlasts the lane's
+// per-package timeout. A walk that is free takes the next migration, after
+// applying the ones it skipped ([migrationtest.RoundTripClaimed]), so the
+// walks finish together however the expensive migrations cluster.
+const roundTripWalks = 6
 
 // TestMigrationsRoundTrip proves every Down restores the schema its Up
 // started from, and that the Up applies again after it; see
@@ -39,16 +41,20 @@ func TestMigrationsRoundTrip(t *testing.T) {
 		migrationtest.RoundTrip(t, p, snap, known)
 		return
 	}
-	for shard := range roundTripShards {
-		t.Run(fmt.Sprintf("shard %d of %d", shard+1, roundTripShards), func(t *testing.T) {
-			t.Parallel()
-			p, snap := openRoundTrip(t)
-			sources := p.ListSources()
-			first := sources[shard*len(sources)/roundTripShards].Version
-			last := sources[(shard+1)*len(sources)/roundTripShards-1].Version
-			migrationtest.RoundTripRange(t, p, snap, known, first, last)
+	// Each walk runs from a goroutine of its own, not as a parallel subtest:
+	// -parallel (GOMAXPROCS, 4 on CI's runner) would hold the others back
+	// until the first ones had claimed every migration.
+	claims := new(migrationtest.Claims)
+	var walks sync.WaitGroup
+	for walk := range roundTripWalks {
+		walks.Go(func() {
+			t.Run(fmt.Sprintf("walk %d of %d", walk+1, roundTripWalks), func(t *testing.T) {
+				p, snap := openRoundTrip(t)
+				migrationtest.RoundTripClaimed(t, p, snap, known, claims.Next)
+			})
 		})
 	}
+	walks.Wait()
 }
 
 // openRoundTrip provisions a database and returns a provider over it and the

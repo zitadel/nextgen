@@ -243,7 +243,7 @@ Turbo-only drift from moon or from the port:
 | every Go server task | `internal/errorpage/*` and the design tokens' `tokens.css`, both `//go:embed`ed: moon's file group had them, the port did not, so an error-page edit restored a stale binary |
 | `//#test` | `packages/config/src/defaults.ts` |
 | 12 tasks whose command runs `scripts/task-guard.mjs` | the guard |
-| `server#test-postgres`, `server#test-sqlite` | `vercel.json`, `apps/cloud/build.sh` (the cloud launcher's tests, which `./...` includes) |
+| `server#test:postgres`, `server#test:sqlite` | `vercel.json`, `apps/cloud/build.sh` (the cloud launcher's tests, which `./...` includes) |
 | `//#build-local-image`, `server#clean-generated`, the release tasks | the scripts their scripts import |
 | `docs#typecheck` | 1,368 ignored generated files, which `api#generate` already covers |
 

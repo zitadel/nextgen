@@ -53,9 +53,9 @@ through any wrapping.
 
 ## Format before push
 
-Run `moon run server:format` before pushing Go changes. It only checks
-(`gofmt -l` on tracked `*.go`); on failure run `gofmt -w` on the listed paths
-and re-run it. `server:format` is part of `ci / full-pr`.
+Run `turbo run format --filter=@zitadel/server` before pushing Go changes. It
+only checks (`gofmt -l` on tracked `*.go`); on failure run `gofmt -w` on the
+listed paths and re-run it. `ci / full-pr` runs it under the server's `lint`.
 
 ## Redirect targets
 

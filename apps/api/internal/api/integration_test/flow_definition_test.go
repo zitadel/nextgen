@@ -29,7 +29,6 @@ func TestCreateFlowDefinitionUnauthenticated(t *testing.T) {
 		ProjectID: "proj_1234",
 		FlowDefinition: api.FlowDefinition{
 			Name:       "login-flow",
-			Status:     "active",
 			UserSchema: userSchemaURI,
 			Purposes:   map[string]string{"login": "step_1"},
 			Audience: api.OptFlowAudience{
@@ -96,8 +95,7 @@ func TestCreateFlowDefinition(t *testing.T) {
 						},
 						Set: true,
 					},
-					Steps:  validSteps(),
-					Status: api.FlowDefinitionStatusActive,
+					Steps: validSteps(),
 				},
 			},
 		},
@@ -151,7 +149,6 @@ func TestCreateFlowDefinition(t *testing.T) {
 				ProjectID: api.ProjectID(project.ID),
 				FlowDefinition: api.FlowDefinition{
 					Name:       "invalid-flow",
-					Status:     "active",
 					UserSchema: userSchemaURI,
 					Purposes:   map[string]string{"login": "collect_identifier"},
 					Audience: api.OptFlowAudience{
@@ -199,7 +196,6 @@ func TestCreateFlowDefinition(t *testing.T) {
 				FlowDefinition: api.FlowDefinition{
 					Name:       "invalid-flow",
 					UserSchema: userSchemaURI,
-					Status:     "active",
 					Purposes:   map[string]string{"login": "step_1"},
 					Audience: api.OptFlowAudience{
 						Value: api.FlowAudience{
@@ -246,7 +242,6 @@ func TestCreateFlowDefinition(t *testing.T) {
 				FlowDefinition: api.FlowDefinition{
 					Name:       "invalid-flow",
 					UserSchema: userSchemaURI,
-					Status:     "active",
 					Purposes:   map[string]string{"login": "step_1"},
 					Audience: api.OptFlowAudience{
 						Value: api.FlowAudience{
@@ -310,7 +305,6 @@ func newCreateFlowDefinitionRequest(projectID api.ProjectID, definition api.Flow
 func newFlowDefinitionFixture(name string, userSchemaURI string) api.FlowDefinition {
 	return api.FlowDefinition{
 		Name:       name,
-		Status:     "active",
 		UserSchema: userSchemaURI,
 		Purposes:   map[string]string{"login": "step_1"},
 		Audience: api.OptFlowAudience{
@@ -443,7 +437,6 @@ func TestGetFlowDefinition(t *testing.T) {
 		ProjectID: api.ProjectID(project.ID),
 		FlowDefinition: api.FlowDefinition{
 			Name:       "existing-flow",
-			Status:     "active",
 			UserSchema: userSchemaURI,
 			Purposes:   map[string]string{"login": "step_1"},
 			Audience: api.OptFlowAudience{
@@ -558,7 +551,6 @@ func TestListFlowDefinitionsPagination(t *testing.T) {
 			ProjectID: api.ProjectID(project.ID),
 			FlowDefinition: api.FlowDefinition{
 				Name:       fmt.Sprintf("paged-flow-%d", i),
-				Status:     "active",
 				UserSchema: userSchemaURI,
 				Purposes:   map[string]string{"login": "step_1"},
 				Steps:      validSteps(),
@@ -658,7 +650,6 @@ func TestListFlowDefinitionsRevisions(t *testing.T) {
 			ProjectID: api.ProjectID(project.ID),
 			FlowDefinition: api.FlowDefinition{
 				Name:       name,
-				Status:     "active",
 				UserSchema: userSchemaURI,
 				Purposes:   map[string]string{"login": "step_1"},
 				Steps:      validSteps(),
@@ -785,7 +776,6 @@ func TestListFlowDefinitions(t *testing.T) {
 		ProjectID: api.ProjectID(project1.ID),
 		FlowDefinition: api.FlowDefinition{
 			Name:       "flow-1",
-			Status:     "active",
 			UserSchema: userSchemaURI,
 			Purposes:   map[string]string{"login": "step_1"},
 			Audience: api.OptFlowAudience{
@@ -807,7 +797,6 @@ func TestListFlowDefinitions(t *testing.T) {
 		FlowDefinition: api.FlowDefinition{
 			Name:       "flow-2",
 			UserSchema: userSchemaURI,
-			Status:     "active",
 			Purposes:   map[string]string{"profiling": "step_1"},
 			Audience: api.OptFlowAudience{
 				Value: api.FlowAudience{
@@ -827,7 +816,6 @@ func TestListFlowDefinitions(t *testing.T) {
 		ProjectID: api.ProjectID(project1.ID),
 		FlowDefinition: api.FlowDefinition{
 			Name:       "flow-1",
-			Status:     "active",
 			UserSchema: userSchemaURI,
 			Purposes:   map[string]string{"login": "step_1"},
 			Steps:      validSteps(),
@@ -843,7 +831,6 @@ func TestListFlowDefinitions(t *testing.T) {
 		FlowDefinition: api.FlowDefinition{
 			Name:       "flow-3",
 			UserSchema: userSchemaURI,
-			Status:     "active",
 			Purposes:   map[string]string{"login": "step_1"},
 			Audience: api.OptFlowAudience{
 				Value: api.FlowAudience{
