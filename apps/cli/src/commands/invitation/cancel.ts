@@ -71,27 +71,34 @@ export default class InvitationCancel extends Destructive(EnvironmentCommand) {
   protected async execute({ args }: Admitted<typeof InvitationCancel>): Promise<JsonEnvelope> {
     const { client, projectId } = await this.connect();
     const invitationService = new InvitationService(client, projectId);
-    const invitation =
-      args.invitationId === undefined
-        ? await this.pickPending(invitationService)
-        : await this.readPending(invitationService, args.invitationId);
+    // A bare cancel picks from the pending list even on a dry run, as a bare
+    // rollback resolves its target; a named one is read only to be cancelled.
+    const target = args.invitationId ?? (await this.pickPending(invitationService));
+    const invitationId = typeof target === "string" ? target : target.id;
 
     return this.emit(
       await this.confirmed({
         verb: "cancel",
-        name: `cancel ${invitation.id}`,
-        message: `Cancel ${describe(invitation)} so its link stops working?`,
+        name: `cancel ${invitationId}`,
+        message: (invitation) => {
+          return `Cancel ${describe(invitation)} so its link stops working?`;
+        },
         // A bare cancel picked its invitation, which a retry must name.
-        arguments: [invitation.id],
+        arguments: [invitationId],
         preview: async () => {
           return dryRunResult({
             verb: "cancel",
             topic: "invitation",
-            id: invitation.id,
+            id: invitationId,
             next: await this.realRun(),
           });
         },
-        apply: async (consent) => {
+        prepare: () => {
+          return typeof target === "string"
+            ? this.readPending(invitationService, target)
+            : Promise.resolve(target);
+        },
+        apply: async (consent, invitation) => {
           const unlocked = new InvitationService(consent.unlock(client), projectId);
           await unlocked.cancel(invitation.id);
           this.trackEvent(INVITATION_CANCELLED, {
@@ -137,7 +144,8 @@ export default class InvitationCancel extends Destructive(EnvironmentCommand) {
 
   /**
    * The invitation the command line named, read before anyone is asked, so
-   * the question can name it and one that is no longer pending is refused.
+   * the question can name it and one that is no longer pending is refused:
+   * the server answers that cancel with the same 404 as a miss.
    */
   private async readPending(
     invitationService: InvitationService,

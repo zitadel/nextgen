@@ -74,7 +74,7 @@ Some commands add what they did, as counts and fixed values:
 | `branding eject` | The design it ejected. |
 | `api` | The operation it called, and whether it followed pagination. |
 
-`invitation_created` and `invitation_cancelled` carry the role the invitation grants, such as `project_editor`, and its journey ID: a random ID the invitation and its replacements share, so the time to accept can be measured. It never carry the name you gave, the invitation ID or the link. Their Vercel copies keep only the eight properties above.
+`invitation_created` and `invitation_cancelled` carry the role the invitation grants, such as `project_editor`, and its journey ID: a random ID the invitation and its replacements share, so the time to accept can be measured. They never carry the name you gave, the invitation ID or the link. Their Vercel copies keep only the eight properties above.
 
 Mixpanel is told not to locate you by your IP address (`ip: 0`); the country comes from your timezone instead.
 
