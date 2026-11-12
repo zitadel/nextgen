@@ -17,11 +17,11 @@ import {
   isFailure,
   isNarrowed,
   isNarrowedTo,
-  LOG_VIEWS,
-  type LogEvent,
-  type LogsSearch,
+  EVENT_VIEWS,
+  type ProjectEvent,
+  type EventsSearch,
   narrowedBy,
-  parseLogsSearch,
+  parseEventsSearch,
   rangeStart,
   searchMeanings,
   servedSearch,
@@ -37,7 +37,7 @@ import {
 } from "./model";
 
 /** An event's envelope, with the type and payload a test names. */
-function event(overrides: Record<string, unknown>): LogEvent {
+function event(overrides: Record<string, unknown>): ProjectEvent {
   return {
     id: "evt_1",
     project_id: "proj_test",
@@ -48,7 +48,7 @@ function event(overrides: Record<string, unknown>): LogEvent {
     client_id: "",
     payload: {},
     ...overrides,
-  } as LogEvent;
+  } as ProjectEvent;
 }
 
 describe("eventSubject", () => {
@@ -125,9 +125,9 @@ describe("eventFields", () => {
 /** Every category but the requests', which the audit view asks for. */
 const AUDIT = ["auth", "session", "admin", "entity", "signal"];
 
-describe("parseLogsSearch", () => {
+describe("parseEventsSearch", () => {
   it("opens on the audit events with nothing narrowing them", () => {
-    expect(parseLogsSearch({})).toEqual({
+    expect(parseEventsSearch({})).toEqual({
       view: "audit",
       category: undefined,
       since: undefined,
@@ -148,7 +148,7 @@ describe("parseLogsSearch", () => {
   });
 
   it("keeps what the list can send and drops the rest", () => {
-    const parsed = parseLogsSearch({
+    const parsed = parseEventsSearch({
       view: "all",
       category: "admin",
       since: "7d",
@@ -181,15 +181,15 @@ describe("parseLogsSearch", () => {
   });
 
   it("has no category among the requests, nor one the API does not narrow audit events by", () => {
-    expect(parseLogsSearch({ view: "requests", category: "auth" }).category).toBeUndefined();
-    expect(parseLogsSearch({ category: "request" }).category).toBeUndefined();
-    expect(parseLogsSearch({ view: "nope" }).view).toBe("audit");
-    expect(parseLogsSearch({ since: "30d" }).since).toBeUndefined();
+    expect(parseEventsSearch({ view: "requests", category: "auth" }).category).toBeUndefined();
+    expect(parseEventsSearch({ category: "request" }).category).toBeUndefined();
+    expect(parseEventsSearch({ view: "nope" }).view).toBe("audit");
+    expect(parseEventsSearch({ since: "30d" }).since).toBeUndefined();
   });
 
   it("reads a type in the All view with no category, whatever the URL puts beside it", () => {
     expect(
-      parseLogsSearch({
+      parseEventsSearch({
         view: "audit",
         category: "auth",
         type: "user.deleted",
@@ -210,7 +210,7 @@ describe("parseLogsSearch", () => {
 
   it("keeps every value filter a URL carries, together", () => {
     expect(
-      parseLogsSearch({
+      parseEventsSearch({
         category: "auth",
         since: "7d",
         actor: "user_1",
@@ -243,33 +243,33 @@ describe("parseLogsSearch", () => {
   });
 
   it("reads one type or several, once each, and drops what is not a type", () => {
-    expect(parseLogsSearch({ type: "user.created" }).type).toEqual(["user.created"]);
+    expect(parseEventsSearch({ type: "user.created" }).type).toEqual(["user.created"]);
     expect(
-      parseLogsSearch({ type: ["user.created", " auth.check.failed ", "user.created"] }).type,
+      parseEventsSearch({ type: ["user.created", " auth.check.failed ", "user.created"] }).type,
     ).toEqual(["user.created", "auth.check.failed"]);
     // A type the console does not know yet is kept: the server may write it.
-    expect(parseLogsSearch({ type: ["thing.happened"] }).type).toEqual(["thing.happened"]);
-    expect(parseLogsSearch({ type: ["", "nodot", 7] }).type).toBeUndefined();
+    expect(parseEventsSearch({ type: ["thing.happened"] }).type).toEqual(["thing.happened"]);
+    expect(parseEventsSearch({ type: ["", "nodot", 7] }).type).toBeUndefined();
   });
 
   it("reads a range with fixed ends in place of one counted back from now", () => {
     expect(
-      parseLogsSearch({ since: "1h", from: "2026-11-10T08:00:00Z", to: "2026-11-10T09:00:00Z" }),
+      parseEventsSearch({ since: "1h", from: "2026-11-10T08:00:00Z", to: "2026-11-10T09:00:00Z" }),
     ).toMatchObject({
       since: undefined,
       from: "2026-11-10T08:00:00.000Z",
       to: "2026-11-10T09:00:00.000Z",
     });
     // Either end may be open.
-    expect(parseLogsSearch({ to: "2026-11-10T09:00:00Z" })).toMatchObject({
+    expect(parseEventsSearch({ to: "2026-11-10T09:00:00Z" })).toMatchObject({
       from: undefined,
       to: "2026-11-10T09:00:00.000Z",
     });
     // A start not before its end, or one that is no moment, is no range.
     expect(
-      parseLogsSearch({ since: "1h", from: "2026-11-10T09:00:00Z", to: "2026-11-10T08:00:00Z" }),
+      parseEventsSearch({ since: "1h", from: "2026-11-10T09:00:00Z", to: "2026-11-10T08:00:00Z" }),
     ).toMatchObject({ since: "1h", from: undefined, to: undefined });
-    expect(parseLogsSearch({ from: "yesterday" }).from).toBeUndefined();
+    expect(parseEventsSearch({ from: "yesterday" }).from).toBeUndefined();
   });
 });
 
@@ -291,7 +291,7 @@ describe("servedSearch", () => {
   });
 
   it("keeps every other value filter and the range beside a type", () => {
-    const search: LogsSearch = {
+    const search: EventsSearch = {
       view: "all",
       type: ["user.created"],
       actor: "user_1",
@@ -309,7 +309,7 @@ describe("servedSearch", () => {
   });
 
   it("leaves every other combination as it is", () => {
-    const search: LogsSearch = {
+    const search: EventsSearch = {
       view: "audit",
       category: "entity",
       actor: "user_1",
@@ -325,24 +325,24 @@ describe("servedSearch", () => {
 
 describe("eventsQuery", () => {
   it("asks for every category but the requests' on the audit view", () => {
-    expect(eventsQuery(parseLogsSearch({})).category).toEqual(AUDIT);
+    expect(eventsQuery(parseEventsSearch({})).category).toEqual(AUDIT);
   });
 
   it("asks for the requests alone, or for no category at all", () => {
-    expect(eventsQuery(parseLogsSearch({ view: "requests" })).category).toEqual(["request"]);
-    expect(eventsQuery(parseLogsSearch({ view: "all" })).category).toBeUndefined();
+    expect(eventsQuery(parseEventsSearch({ view: "requests" })).category).toEqual(["request"]);
+    expect(eventsQuery(parseEventsSearch({ view: "all" })).category).toBeUndefined();
   });
 
   it("narrows either view to the one category chosen", () => {
-    expect(eventsQuery(parseLogsSearch({ category: "auth" })).category).toEqual(["auth"]);
-    expect(eventsQuery(parseLogsSearch({ view: "all", category: "auth" })).category).toEqual([
+    expect(eventsQuery(parseEventsSearch({ category: "auth" })).category).toEqual(["auth"]);
+    expect(eventsQuery(parseEventsSearch({ view: "all", category: "auth" })).category).toEqual([
       "auth",
     ]);
   });
 
   it("names each value filter as the API's parameter, and no other", () => {
     const query = eventsQuery(
-      parseLogsSearch({
+      parseEventsSearch({
         view: "all",
         actor: "user_1",
         resource: "user_2",
@@ -377,10 +377,10 @@ describe("eventsQuery", () => {
   });
 
   it("asks for one type or several, with no category beside them", () => {
-    const query = eventsQuery(parseLogsSearch({ type: "user.created" }));
+    const query = eventsQuery(parseEventsSearch({ type: "user.created" }));
     expect(query.event_type).toEqual(["user.created"]);
     expect(query.category).toBeUndefined();
-    expect(eventsQuery(parseLogsSearch({ type: [...FAILURE_TYPES] })).event_type).toEqual([
+    expect(eventsQuery(parseEventsSearch({ type: [...FAILURE_TYPES] })).event_type).toEqual([
       ...FAILURE_TYPES,
     ]);
   });
@@ -400,22 +400,22 @@ describe("eventsQuery", () => {
 
   it("sends the start of the time range it is given", () => {
     const start = "2026-11-09T08:00:00.000Z";
-    expect(eventsQuery(parseLogsSearch({ since: "24h" }), start).created_after).toBe(start);
+    expect(eventsQuery(parseEventsSearch({ since: "24h" }), start).created_after).toBe(start);
     // The range's start is the list's to compute, once: none given, none sent.
-    expect(eventsQuery(parseLogsSearch({ since: "24h" })).created_after).toBeUndefined();
+    expect(eventsQuery(parseEventsSearch({ since: "24h" })).created_after).toBeUndefined();
   });
 });
 
 describe("the list in another view, category or range", () => {
   it("keeps the filters across the views, but a type only in All", () => {
-    const current = parseLogsSearch({ view: "all", actor: "user_1", since: "7d" });
+    const current = parseEventsSearch({ view: "all", actor: "user_1", since: "7d" });
     expect(withView(current, "audit")).toMatchObject({
       view: "audit",
       actor: "user_1",
       since: "7d",
     });
 
-    const typed = parseLogsSearch({ type: "user.created", session: "sess_1" });
+    const typed = parseEventsSearch({ type: "user.created", session: "sess_1" });
     expect(withView(typed, "all").type).toEqual(["user.created"]);
     for (const view of ["audit", "requests"] as const) {
       expect(withView(typed, view)).toMatchObject({ view, type: undefined, session: "sess_1" });
@@ -423,13 +423,13 @@ describe("the list in another view, category or range", () => {
   });
 
   it("drops the category on the way into the requests", () => {
-    const current = parseLogsSearch({ category: "auth" });
+    const current = parseEventsSearch({ category: "auth" });
     expect(withView(current, "requests")).toMatchObject({ view: "requests", category: undefined });
     expect(withView(current, "all")).toMatchObject({ view: "all", category: "auth" });
   });
 
   it("gives up the type for a category, and keeps it when the category is cleared", () => {
-    const typed = parseLogsSearch({ type: "user.created" });
+    const typed = parseEventsSearch({ type: "user.created" });
     expect(withCategory(typed, "entity")).toMatchObject({
       view: "all",
       category: "entity",
@@ -439,7 +439,7 @@ describe("the list in another view, category or range", () => {
   });
 
   it("keeps an actor beside a category", () => {
-    const current = parseLogsSearch({ actor: "user_1" });
+    const current = parseEventsSearch({ actor: "user_1" });
     expect(withCategory(current, "admin")).toMatchObject({
       view: "audit",
       category: "admin",
@@ -448,13 +448,13 @@ describe("the list in another view, category or range", () => {
   });
 
   it("changes the time range and nothing else", () => {
-    const current = parseLogsSearch({ type: "user.created", request: "req_1" });
+    const current = parseEventsSearch({ type: "user.created", request: "req_1" });
     expect(withTimeRange(current, "1h")).toEqual({ ...current, since: "1h" });
     expect(withTimeRange({ ...current, since: "1h" }, undefined)).toEqual(current);
   });
 
   it("swaps a range counted back from now and one with fixed ends for each other", () => {
-    const current = parseLogsSearch({ since: "1h", actor: "user_1" });
+    const current = parseEventsSearch({ since: "1h", actor: "user_1" });
     const fixed = withCustomRange(current, "2026-11-10T08:00:00Z", undefined);
     expect(fixed).toMatchObject({
       since: undefined,
@@ -480,7 +480,7 @@ describe("the list in another view, category or range", () => {
   });
 
   it("narrows to several types, and back to any", () => {
-    const current = parseLogsSearch({ category: "auth", actor: "user_1" });
+    const current = parseEventsSearch({ category: "auth", actor: "user_1" });
     const typed = withTypes(current, ["user.created", "user.created", "user.deleted"]);
     expect(typed).toMatchObject({
       view: "all",
@@ -517,7 +517,7 @@ describe("narrowing by one value", () => {
   });
 
   it("follows a request, a session or a login flow through every view", () => {
-    const current = parseLogsSearch({ category: "entity" });
+    const current = parseEventsSearch({ category: "entity" });
     for (const key of ["request", "session", "flow"] as const) {
       expect(narrowedBy(current, key, "id_1")).toMatchObject({
         view: "all",
@@ -528,7 +528,7 @@ describe("narrowing by one value", () => {
   });
 
   it("narrows the view it is on by an actor, a resource, its type, an application or a device", () => {
-    const current = parseLogsSearch({ category: "entity", since: "24h" });
+    const current = parseEventsSearch({ category: "entity", since: "24h" });
     for (const key of ["actor", "resource", "resource_type", "client", "device"] as const) {
       expect(narrowedBy(current, key, "user_1")).toMatchObject({
         view: "audit",
@@ -540,7 +540,7 @@ describe("narrowing by one value", () => {
   });
 
   it("reads a type in the All view with no category, beside what else is set", () => {
-    const current = parseLogsSearch({ category: "auth", actor: "user_1", resource: "user_2" });
+    const current = parseEventsSearch({ category: "auth", actor: "user_1", resource: "user_2" });
     expect(narrowedBy(current, "type", "user.created")).toMatchObject({
       view: "all",
       category: undefined,
@@ -551,7 +551,7 @@ describe("narrowing by one value", () => {
   });
 
   it("keeps a type beside an actor", () => {
-    const current = parseLogsSearch({ type: "user.created" });
+    const current = parseEventsSearch({ type: "user.created" });
     expect(narrowedBy(current, "actor", "user_1")).toMatchObject({
       view: "all",
       type: ["user.created"],
@@ -560,7 +560,7 @@ describe("narrowing by one value", () => {
   });
 
   it("knows the value the list is narrowed to already", () => {
-    const current = parseLogsSearch({ type: "user.created", actor: "user_1" });
+    const current = parseEventsSearch({ type: "user.created", actor: "user_1" });
     expect(isNarrowedTo(current, "type", "user.created")).toBe(true);
     expect(isNarrowedTo(current, "actor", "user_1")).toBe(true);
     expect(isNarrowedTo(current, "actor", "user_2")).toBe(false);
@@ -584,7 +584,7 @@ describe("narrowing by one value", () => {
     for (const set of keys) {
       for (const next of keys) {
         if (next === set) continue;
-        const current = parseLogsSearch({ view: "all", [set]: "value_1" });
+        const current = parseEventsSearch({ view: "all", [set]: "value_1" });
         expect(narrowedBy(current, next, "value_2")).toMatchObject({
           [set]: "value_1",
           [next]: "value_2",
@@ -594,7 +594,7 @@ describe("narrowing by one value", () => {
   });
 
   it("clears one filter and leaves the others", () => {
-    const current = parseLogsSearch({ category: "auth", actor: "user_1", session: "sess_1" });
+    const current = parseEventsSearch({ category: "auth", actor: "user_1", session: "sess_1" });
     for (const empty of [undefined, ""]) {
       expect(narrowedBy(current, "actor", empty)).toEqual({ ...current, actor: undefined });
     }
@@ -606,16 +606,16 @@ describe("narrowing by one value", () => {
   });
 
   it("knows a narrowed list from a whole view, and by how much", () => {
-    expect(isNarrowed(parseLogsSearch({ view: "requests" }))).toBe(false);
-    expect(filterCount(parseLogsSearch({ view: "all" }))).toBe(0);
-    expect(isNarrowed(parseLogsSearch({ category: "auth" }))).toBe(true);
-    expect(isNarrowed(parseLogsSearch({ since: "1h" }))).toBe(true);
+    expect(isNarrowed(parseEventsSearch({ view: "requests" }))).toBe(false);
+    expect(filterCount(parseEventsSearch({ view: "all" }))).toBe(0);
+    expect(isNarrowed(parseEventsSearch({ category: "auth" }))).toBe(true);
+    expect(isNarrowed(parseEventsSearch({ since: "1h" }))).toBe(true);
     expect(
-      filterCount(parseLogsSearch({ from: "2026-11-10T08:00:00Z", to: "2026-11-10T09:00:00Z" })),
+      filterCount(parseEventsSearch({ from: "2026-11-10T08:00:00Z", to: "2026-11-10T09:00:00Z" })),
     ).toBe(1);
-    expect(filterCount(parseLogsSearch({ type: ["user.created", "user.deleted"] }))).toBe(1);
+    expect(filterCount(parseEventsSearch({ type: ["user.created", "user.deleted"] }))).toBe(1);
     expect(
-      filterCount(parseLogsSearch({ category: "auth", since: "1h", actor: "user_1", flow: "f" })),
+      filterCount(parseEventsSearch({ category: "auth", since: "1h", actor: "user_1", flow: "f" })),
     ).toBe(4);
   });
 });
@@ -625,7 +625,7 @@ describe("what gives way, on every way into a list", () => {
    * The two rules, and nothing else given up: the server bounds every read,
    * so any other combination is sent as it is.
    */
-  function expectServed(search: LogsSearch) {
+  function expectServed(search: EventsSearch) {
     const query = eventsQuery(search);
     // A type names its own category: no category beside types.
     if (query.event_type) {
@@ -664,7 +664,7 @@ describe("what gives way, on every way into a list", () => {
    */
   const COMBINED = ["type", "request", "actor", "resource_type", "device"] as const;
   const urls: Record<string, unknown>[] = [];
-  for (const view of [...LOG_VIEWS, undefined]) {
+  for (const view of [...EVENT_VIEWS, undefined]) {
     for (const category of [...AUDIT_CATEGORIES, undefined]) {
       for (const range of [{}, { since: "1h" }, { from: "2026-11-10T08:00:00Z" }]) {
         for (let bits = 0; bits < 2 ** COMBINED.length; bits++) {
@@ -680,12 +680,12 @@ describe("what gives way, on every way into a list", () => {
   }
 
   it("holds in every URL", () => {
-    for (const url of urls) expectServed(parseLogsSearch(url));
+    for (const url of urls) expectServed(parseEventsSearch(url));
   });
 
   it("drops no value filter a URL carries", () => {
     for (const url of urls) {
-      const parsed = parseLogsSearch(url);
+      const parsed = parseEventsSearch(url);
       for (const { key } of VALUE_FILTERS) {
         const expected = key === "type" && url.type ? [url.type] : url[key];
         expect(parsed[key], JSON.stringify(url)).toEqual(expected);
@@ -699,15 +699,15 @@ describe("what gives way, on every way into a list", () => {
     // search is checked once. Checked on every click, the sweep outlasted the
     // test timeout on a loaded CI runner.
     const checked = new Set<string>();
-    const expectServedOnce = (search: LogsSearch) => {
+    const expectServedOnce = (search: EventsSearch) => {
       const key = JSON.stringify(search);
       if (checked.has(key)) return;
       checked.add(key);
       expectServed(search);
     };
     for (const url of urls) {
-      const current = parseLogsSearch(url);
-      for (const view of LOG_VIEWS) expectServedOnce(withView(current, view));
+      const current = parseEventsSearch(url);
+      for (const view of EVENT_VIEWS) expectServedOnce(withView(current, view));
       for (const category of [...AUDIT_CATEGORIES, undefined]) {
         expectServedOnce(withCategory(current, category));
       }
@@ -859,7 +859,7 @@ describe("eventsCsv", () => {
 
 describe("the API requests by operation and status", () => {
   it("reads them in the requests view, with no category or type beside them", () => {
-    const parsed = parseLogsSearch({
+    const parsed = parseEventsSearch({
       view: "audit",
       category: "auth",
       type: "user.created",
@@ -886,7 +886,7 @@ describe("the API requests by operation and status", () => {
   });
 
   it("are dropped for a view that is not the requests', or for a type", () => {
-    const current = parseLogsSearch({ operation: "createUser", status: "5xx" });
+    const current = parseEventsSearch({ operation: "createUser", status: "5xx" });
     for (const view of ["audit", "all"] as const) {
       expect(withView(current, view)).toMatchObject({
         view,
@@ -907,7 +907,7 @@ describe("the API requests by operation and status", () => {
   });
 
   it("narrows to status classes in their order, or the failed requests, and back to any", () => {
-    const current = parseLogsSearch({ view: "requests", since: "1h" });
+    const current = parseEventsSearch({ view: "requests", since: "1h" });
     const failed = withStatus(current, [...FAILED_STATUS].reverse());
     expect(failed).toMatchObject({ view: "requests", status: ["4xx", "5xx"], since: "1h" });
     expect(eventsQuery(failed).status_class).toEqual(["4xx", "5xx"]);
@@ -932,10 +932,12 @@ describe("the API requests by operation and status", () => {
       "operation",
       "createUser",
     ]);
-    expect(narrowedBy(parseLogsSearch({ view: "all" }), "operation", "createUser")).toMatchObject({
-      view: "requests",
-      operation: "createUser",
-    });
+    expect(narrowedBy(parseEventsSearch({ view: "all" }), "operation", "createUser")).toMatchObject(
+      {
+        view: "requests",
+        operation: "createUser",
+      },
+    );
     expect(sharing("operation", "createUser")).toEqual({
       view: "requests",
       operation: "createUser",
@@ -945,7 +947,7 @@ describe("the API requests by operation and status", () => {
 
 describe("chipFilters", () => {
   it("lists the pasted filters in the filters' order, by their search names, and never the type", () => {
-    const search = parseLogsSearch({
+    const search = parseEventsSearch({
       view: "all",
       type: "user.created",
       device: "fp_1",

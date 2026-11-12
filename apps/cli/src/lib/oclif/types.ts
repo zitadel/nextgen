@@ -1,6 +1,7 @@
 import type { ZitadelClient } from "@/lib/backend";
 import type { Environment } from "@/lib/environment";
 import type { SuggestedCommand } from "@/lib/suggestion";
+import type { Summary } from "@/lib/ui";
 import type { BaseCommand } from "./base";
 import type { NextSteps, StepsShown } from "./next-steps";
 import type { Rendering } from "./rendering";
@@ -141,8 +142,19 @@ export type CommandResult =
       readonly nextShown?: StepsShown;
       /** Set when {@link pretty} already says every warning, so none is printed again below it. */
       readonly warningsShown?: boolean;
+      /**
+       * Set when {@link data} is what a server answered, passed through as it
+       * came: the envelope adds no headline to it.
+       */
+      readonly verbatim?: true;
       /** Printed in human mode after everything else, and never part of the envelope. */
       readonly footer?: string;
+      /**
+       * How a person at a terminal sees the ending: the headline that closes the
+       * chain, then these facts and next steps. Replaces `pretty` there. Without
+       * it the ending is split out of `pretty`.
+       */
+      readonly summary: Summary;
     }
   | {
       readonly status: "skipped";
@@ -152,6 +164,13 @@ export type CommandResult =
       readonly next?: Pick<NextSteps<SuggestedCommand>, "commands">;
       /** As on a success: a rendering that says which kind it is. */
       readonly pretty?: Rendering;
+      /**
+       * How a person at a terminal sees the skip, the same shape a success
+       * ends on. Without it the ending is split out of `Skipped: <reason>`,
+       * which states the machine's token for what happened and says nothing
+       * about what the skip left in place or how to go on from it.
+       */
+      readonly summary: Summary;
     };
 
 /** The platform connection a project command opens. */
@@ -164,7 +183,6 @@ export type Connection = Readonly<{
 
 /** How a project command opens its {@link Connection}. */
 export type ConnectOptions = Readonly<{
-  quiet?: boolean;
   prompt?: boolean;
   /**
    * How long one request on this connection may take, for a caller that must

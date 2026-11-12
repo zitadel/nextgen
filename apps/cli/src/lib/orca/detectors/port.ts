@@ -93,11 +93,15 @@ export function withDevPort(script: string, port: number): string {
   // every re-run of setup.
   const flagPattern = /(-p\s+|--port[=\s]+)\d+/;
   if (flagPattern.test(script)) {
-    return script.replace(flagPattern, (_match, prefix: string) => `${prefix}${String(port)}`);
+    return script.replace(flagPattern, (_match, prefix: string) => {
+      return `${prefix}${String(port)}`;
+    });
   }
   const envPattern = /((?:^|\s)PORT=)\d+/;
   if (envPattern.test(script)) {
-    return script.replace(envPattern, (_match, prefix: string) => `${prefix}${String(port)}`);
+    return script.replace(envPattern, (_match, prefix: string) => {
+      return `${prefix}${String(port)}`;
+    });
   }
   return `${script.trimEnd()} --port ${String(port)}`;
 }

@@ -85,6 +85,7 @@ describe("BaseCommand envelope", () => {
     const cmd = makeCommand();
 
     const envelope = await cmd.finish({
+      summary: { title: "Done", sections: [] },
       status: "ok",
       data: {
         deployment: Deployment.of(RECORD as never),
@@ -104,6 +105,7 @@ describe("BaseCommand envelope", () => {
     const cmd = makeCommand();
 
     const envelope = await cmd.finish({
+      summary: { title: "Done", sections: [] },
       status: "ok",
       data: {
         items: [Deployment.of(RECORD as never)],
@@ -120,6 +122,7 @@ describe("BaseCommand envelope", () => {
     const cmd = makeCommand();
 
     const envelope = await cmd.finish({
+      summary: { title: "Done", sections: [] },
       status: "ok",
       data: {
         deployment: Deployment.of({
@@ -143,6 +146,7 @@ describe("BaseCommand rendering", () => {
     const cmd = makeCommand();
 
     await cmd.finish({
+      summary: { title: "Done", sections: [] },
       status: "ok",
       data: {},
       pretty: prose("Deployed \u001b[2Jwiped"),
@@ -152,37 +156,11 @@ describe("BaseCommand rendering", () => {
     expect(cmd.logged.join("\n")).not.toContain("\u001b[2J");
   });
 
-  // The generic rendering carries the colour the CLI puts on the next steps
-  // and the warnings, so it spells out what the data says itself rather than
-  // being spelled out whole. These hold that boundary where it is.
-  it("spells out the title the data carries, which a command took from the server", async () => {
-    const cmd = makeCommand();
-
-    await cmd.finish({
-      status: "ok",
-      data: { title: "Bound dev to proj\u001b[2Jwiped." },
-    });
-
-    expect(cmd.logged.join("\n")).toContain("Bound dev to proj\\x1b[2Jwiped.");
-    expect(cmd.logged.join("\n")).not.toContain("\u001b[2J");
-  });
-
-  it("spells out a section the data carries, which the server answered", async () => {
-    const cmd = makeCommand();
-
-    await cmd.finish({
-      status: "ok",
-      data: { project: { project_id: "proj_1", issuer: "https://a.example\u001b[2Jwiped" } },
-    });
-
-    expect(cmd.logged.join("\n")).toContain("https://a.example\\x1b[2Jwiped");
-    expect(cmd.logged.join("\n")).not.toContain("\u001b[2J");
-  });
-
   it("spells out a warning beside the generic rendering, which names what was read", async () => {
     const cmd = makeCommand();
 
     await cmd.finish({
+      summary: { title: "Done", sections: [] },
       status: "ok",
       data: {},
       warnings: ["schema \u001b[2Jwiped has no identifier"],
@@ -196,24 +174,13 @@ describe("BaseCommand rendering", () => {
     const cmd = makeCommand();
 
     await cmd.finish({
+      summary: { title: "Done", sections: [] },
       status: "ok",
       data: {},
       pretty: painted("\u001b[32mok\u001b[39m"),
     });
 
     expect(cmd.logged.join("\n")).toContain("\u001b[32mok\u001b[39m");
-  });
-
-  it("spells out the reason a skip gives, which is a server value as often as not", async () => {
-    const cmd = makeCommand();
-
-    await cmd.finish({
-      status: "skipped",
-      reason: "\u001b[2Jwiped",
-    });
-
-    expect(cmd.logged.join("\n")).toContain("\\x1b[2Jwiped");
-    expect(cmd.logged.join("\n")).not.toContain("\u001b[2J");
   });
 });
 
@@ -249,5 +216,84 @@ describe("BaseCommand.logJson", () => {
 
     expect(written).toHaveLength(2);
     expect(written[0]).toBe(written[1]);
+  });
+});
+
+describe("BaseCommand envelope headline", () => {
+  it("gives a success the headline the terminal draws as data.title", async () => {
+    const envelope = await makeCommand().finish({
+      summary: { title: "Set variable FOO", sections: [] },
+      status: "ok",
+      data: { name: "FOO" },
+    });
+
+    expect(envelope).toMatchObject({ data: { title: "Set variable FOO", name: "FOO" } });
+  });
+
+  it("gives a skip the headline it draws, with no data of its own", async () => {
+    const envelope = await makeCommand().finish({
+      summary: { title: "Nothing was removed", sections: [] },
+      status: "skipped",
+      reason: "not-live",
+    });
+
+    expect(envelope).toMatchObject({ data: { title: "Nothing was removed" } });
+  });
+
+  it("keeps the data a skip had beside its headline", async () => {
+    const envelope = await makeCommand().finish({
+      summary: { title: "Nothing was removed", sections: [] },
+      status: "skipped",
+      reason: "not-live",
+      data: { url: "https://a.test" },
+    });
+
+    expect(envelope).toMatchObject({
+      data: { title: "Nothing was removed", url: "https://a.test" },
+    });
+  });
+
+  it("keeps the record an entity stands for beside the headline", async () => {
+    const envelope = await makeCommand().finish({
+      summary: { title: "Deployment dep_1", sections: [] },
+      status: "ok",
+      data: Deployment.of(RECORD as never),
+    });
+
+    expect(JSON.parse(JSON.stringify(envelope))).toMatchObject({
+      data: { title: "Deployment dep_1", ...RECORD },
+    });
+  });
+
+  it("keeps a title the data already has", async () => {
+    const envelope = await makeCommand().finish({
+      summary: { title: "Got it", sections: [] },
+      status: "ok",
+      data: { title: "Mr" },
+    });
+
+    expect(envelope).toMatchObject({ data: { title: "Mr" } });
+  });
+
+  it("leaves data that is not an object as it is", async () => {
+    const envelope = await makeCommand().finish({
+      summary: { title: "Got it", sections: [] },
+      status: "ok",
+      data: ["a"],
+    });
+
+    expect(envelope).toMatchObject({ data: ["a"] });
+  });
+
+  it("adds no headline to what a server answered, passed through as it came", async () => {
+    const envelope = await makeCommand().finish({
+      summary: { title: "Done", sections: [] },
+      status: "ok",
+      data: { id: "1" },
+      verbatim: true,
+    });
+
+    expect(envelope).toMatchObject({ data: { id: "1" } });
+    expect(envelope).not.toMatchObject({ data: { title: "Done" } });
   });
 });

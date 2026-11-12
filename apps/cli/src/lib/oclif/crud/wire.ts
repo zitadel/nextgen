@@ -17,15 +17,19 @@ export const DEFAULT_WIRE: WireConventions = {
   limit: "limit",
   pageToken: "page_token",
   nextPageToken: "next_page_token",
-  query: ({ paging, filters, sorting }: QueryParts): Json => ({
-    ...paging,
-    ...(sorting && { sorting }),
-    ...(filters.length > 0 && { filter: filters }),
-  }),
+  query: ({ paging, filters, sorting }: QueryParts): Json => {
+    return {
+      ...paging,
+      ...(sorting && { sorting }),
+      ...(filters.length > 0 && { filter: filters }),
+    };
+  },
 };
 
 /** The caller's overrides over {@link DEFAULT_WIRE}. */
-export const wireOf = (overrides: Partial<WireConventions> | undefined): WireConventions => ({
-  ...DEFAULT_WIRE,
-  ...overrides,
-});
+export const wireOf = (overrides: Partial<WireConventions> | undefined): WireConventions => {
+  return {
+    ...DEFAULT_WIRE,
+    ...overrides,
+  };
+};

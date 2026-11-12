@@ -319,6 +319,9 @@ func TestHandleSessionCookie(t *testing.T) {
 			api.GetPolicyOperation,
 			api.ListPolicyRevisionsOperation,
 			api.GetPolicyRevisionOperation,
+			// Declared ahead of its handler, so it is listed before the
+			// handler could ever run without a principal.
+			api.GetOAuthSettingsByIdOperation,
 		} {
 			t.Run(string(op), func(t *testing.T) {
 				t.Parallel()

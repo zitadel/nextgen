@@ -26,6 +26,8 @@ properties:
       - `branding` — always `default`. A project has one branding, so there is
         nothing to distinguish. It is revisioned like everything else, and
         `revision_id` is what varies between releases.
+      - `oauth` — always `default`, likewise: a project has one set of OAuth
+        settings, and `revision_id` is what varies between releases.
       - `idp` — the connection's `slug`, so `google` and `github` are
         separate resources a release pins separately
       - `policy` — the policy's `operation`, so a project's password policy

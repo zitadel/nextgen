@@ -1,10 +1,12 @@
 package server
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"net/http"
 	"net/url"
 	"os"
@@ -17,6 +19,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/KimMachineGun/automemlimit/memlimit"
 	"github.com/go-viper/mapstructure/v2"
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/ianlancetaylor/jsonschema"
@@ -47,7 +50,9 @@ import (
 	"github.com/zitadel/nextgen/internal/instrumentation/metrics"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/instrumentation/zotel"
+	"github.com/zitadel/nextgen/internal/oauth"
 	"github.com/zitadel/nextgen/internal/policy"
+	"github.com/zitadel/nextgen/internal/secrets"
 	"github.com/zitadel/nextgen/internal/securityheaders"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/serviceping"
@@ -174,6 +179,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	sfs.Add(telemetry.Shutdown)
 
 	setUpLogging(cfg.Instrumentation.Log, telemetry.LoggerProvider())
+	setMemoryLimit()
 
 	pool, err := startDatabase(ctx, cfg, applyMigrations)
 	if err != nil {
@@ -191,7 +197,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		return fmt.Errorf("failed to create Crypter: %w", err)
 	}
 
-	hasherFactory, err := cfg.PasswordHasher.NewHasherFactory()
+	hasherFactory, err := cfg.PasswordHasher.NewHasherFactory(metrics.WithMeterProvider(telemetry.MeterProvider()))
 	if err != nil {
 		return fmt.Errorf("failed to build password hasher: %w", err)
 	}
@@ -310,9 +316,11 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	}
 	claimService := service.NewClaimService(serviceDBPool, consoleBase, cfg.Platform.ResolvedProjectID())
 	grantService := service.NewGrantService(serviceDBPool, userRefs, cfg.Platform.ResolvedProjectID())
+	invitationService := service.NewInvitationService(serviceDBPool, keyService, consoleBase, cfg.Platform.ResolvedProjectID())
 	brandingService := service.NewBrandingService(serviceDBPool)
 	variableService := service.NewVariableService(serviceDBPool, keyService)
 	idpConnectionService := service.NewIDPConnectionService(serviceDBPool, schemaValidator)
+	applicationService := service.NewApplicationService(serviceDBPool, schemaValidator, secrets.NewRandomSecretGenerator())
 	deploymentService := service.NewDeploymentService(serviceDBPool, variableService)
 	eventService := service.NewEventService(serviceDBPool, cfg.Platform.ResolvedProjectID())
 	// Operation policies (ADR 066). Every template is compiled and checked
@@ -483,6 +491,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 			releaseService,
 			deploymentService,
 			idpConnectionService,
+			applicationService,
 			eventService,
 			tokenService,
 			keyService,
@@ -493,20 +502,47 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 			// Resolved, not the raw pin: in bootstrap mode project_id is empty
 			// and an empty handler pin rejects every claim/complete session.
 			cfg.Platform.ResolvedProjectID(),
-		).WithPersonalTeamEnsurer(personalTeams).WithBuiltinSchemaBases(builtinBases).WithRuntimeResolver(runtimeResolver).WithPolicyService(policyService).WithReadinessCheck(pool),
+		).WithPersonalTeamEnsurer(personalTeams).WithBuiltinSchemaBases(builtinBases).WithRuntimeResolver(runtimeResolver).WithPolicyService(policyService).WithInvitationService(invitationService).WithReadinessCheck(pool),
 		// The same platform project the handler resolves: sessions homed there
 		// can reach the platform operator path (ADR 075).
 		api.NewSecurityHandler(tokenService).WithPlatformProject(cfg.Platform.ResolvedProjectID()),
-		apiServerOptions(telemetry.TracerProvider(), telemetry.MeterProvider(), consoleLink(cfg.Server.ConsolePath))...)
+		apiServerOptions(telemetry.TracerProvider(), telemetry.MeterProvider(), consoleLink(cfg.Server.ConsolePath),
+			// A refused hash waited max_wait for a slot; the next try waits as long.
+			cmp.Or(cfg.PasswordHasher.Concurrency.MaxWait, crypto.DefaultHashMaxWait))...)
 	if err != nil {
 		return fmt.Errorf("failed to build api servers: %w", err)
+	}
+
+	// The OAuth authorization server (ADR 081), behind oauth.enabled. Until
+	// a project can enable OAuth, no origin is admitted as an issuer and no
+	// project has it enabled, so every issuer answers 404.
+	var oauthHandlers *oauth.Handlers
+	if cfg.OAuth.Enabled {
+		publicBase, err := url.Parse(cfg.Server.PublicBase)
+		if err != nil {
+			return fmt.Errorf("failed to parse server public base: %w", err)
+		}
+		// Endpoint URLs and the platform issuer keep the public base's path,
+		// but spell its origin as a browser does, without a default port.
+		origin, err := publicOrigin(cfg.Server.PublicBase)
+		if err != nil {
+			return err
+		}
+		publicBase.Scheme, publicBase.Host, _ = strings.Cut(origin, "://")
+		oauthHandlers = oauth.New(oauth.Config{
+			PublicBase:      publicBase,
+			PlatformEnabled: cfg.Platform.ResolvedProjectID() == domain.PlatformProjectID,
+			Admission:       oauth.DenyAll{},
+			Settings:        oauth.NotEnabled{},
+		})
 	}
 
 	mux, err := buildHTTPMux(cfg.Server, idgen.NewULID(), apiServers,
 		api.NewIDPCallbackHandler(ssoCallback),
 		standaloneRuntimeResolver(projectService, tokenService, keyService, cfg.Platform.ResolvedProjectID()),
 		requestEventBuf,
-		retentionJob.Trigger())
+		retentionJob.Trigger(),
+		oauthHandlers)
 	if err != nil {
 		return fmt.Errorf("failed to build http mux: %w", err)
 	}
@@ -749,7 +785,15 @@ func readConfig(configPath string, overrides ...configOverride) (Config, error) 
 			MinSha512Rounds: 5_000, MaxSha512Rounds: 1_000_000,
 		},
 	})
-	v.SetDefault("schema.lru_cache_size", 1000) // todo: temp, review
+	// How much hashing runs at once in this process: one hash per CPU it
+	// may use, inside a memory budget sized from the container's memory
+	// limit. A hash that finds no slot within max_wait is refused with a 429
+	// rather than queued without end, so a burst degrades into retries
+	// instead of into an OOM kill or a stalled server.
+	v.SetDefault("password_hasher.concurrency.max_operations", 0) // 0: one per CPU the process may use, following runtime.GOMAXPROCS
+	v.SetDefault("password_hasher.concurrency.memory_budget", 0)  // bytes shared by every running hash; 0: half the Go memory limit (set from the container's limit) when there is one, else 512 MiB
+	v.SetDefault("password_hasher.concurrency.max_wait", 0)       // how long a hash waits for a slot before the 429; 0: 1s
+	v.SetDefault("schema.lru_cache_size", 1000)                   // todo: temp, review
 	v.SetDefault("keys.crypter_lru_cache_size", 1000)
 	v.SetDefault("keys.signing_key_lru_cache_size", 1000)
 	// An identifier namespace, not an address: it is stamped into documents
@@ -785,6 +829,8 @@ func readConfig(configPath string, overrides ...configOverride) (Config, error) 
 	v.SetDefault("platform.operators", []string{})
 	// Zero: a request does not wait for its event to be written.
 	v.SetDefault("events.request.flush_wait", time.Duration(0))
+	// Off: the OAuth authorization server is not mounted (ADR 081).
+	v.SetDefault("oauth.enabled", false)
 	v.SetDefault("events.retention.window", 30*24*time.Hour)
 	v.SetDefault("events.retention.interval", time.Hour)
 	v.SetDefault("events.retention.enabled", true)
@@ -927,8 +973,9 @@ func mustBindEnv(v *viper.Viper, key string) {
 // apiServerOptions are the options of the ogen API servers that buildHTTPMux
 // mounts, to which api.NewServers adds each mount's own; shared with the
 // test of that chain. home is the way on that the error page of a path
-// nothing answers offers a person (ADR 076).
-func apiServerOptions(tracerProvider trace.TracerProvider, meterProvider metric.MeterProvider, home *errorpage.Link) []oasapi.ServerOption {
+// nothing answers offers a person (ADR 076); retryAfter is the Retry-After
+// of a user.password_hashing_busy 429.
+func apiServerOptions(tracerProvider trace.TracerProvider, meterProvider metric.MeterProvider, home *errorpage.Link, retryAfter time.Duration) []oasapi.ServerOption {
 	return []oasapi.ServerOption{
 		oasapi.WithMiddleware(
 			middleware.AddOperationIdToContext(),
@@ -936,7 +983,7 @@ func apiServerOptions(tracerProvider trace.TracerProvider, meterProvider metric.
 		),
 		oasapi.WithMeterProvider(meterProvider),
 		oasapi.WithTracerProvider(api.NewOgenTracerProvider(tracerProvider)),
-		oasapi.WithErrorHandler(api.OgenErrorHandler),
+		oasapi.WithErrorHandler(api.OgenErrorHandler(retryAfter)),
 		oasapi.WithNotFound(api.OgenNotFound(home)),
 		oasapi.WithMethodNotAllowed(api.OgenMethodNotAllowed),
 	}
@@ -964,7 +1011,16 @@ func idleTimeout(configured time.Duration) time.Duration {
 	return configured
 }
 
-func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiServers api.Servers, idpCallbackHandler http.Handler, runtime runtimeResolver, requestEvents *audit.RequestBuffer, retentionTrigger http.Handler) (http.Handler, error) {
+func buildHTTPMux(
+	cfg ServerConfig,
+	reqIdGen middleware.RequestIDGenerator,
+	apiServers api.Servers,
+	idpCallbackHandler http.Handler,
+	runtime runtimeResolver,
+	requestEvents *audit.RequestBuffer,
+	retentionTrigger http.Handler,
+	oauthHandlers *oauth.Handlers,
+) (http.Handler, error) {
 	mux := http.NewServeMux()
 
 	if cfg.ConsoleEnabled {
@@ -1041,6 +1097,14 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiS
 	// pages. Outside the API's chain: a browser posts it without the CSRF
 	// token or a session, and nobody's audit trail needs it.
 	mux.Handle(securityheaders.ReportPath, observe(securityheaders.Report()))
+	// The OAuth authorization server, with oauth.enabled: the well-known
+	// metadata paths and the endpoints under oauth.Prefix, each mounted
+	// explicitly so the API's root catch-all does not swallow them. Outside
+	// the API's chain: an OAuth client's requests carry neither the CSRF
+	// token nor a session cookie, and the handlers start their own spans.
+	if oauthHandlers != nil {
+		oauthHandlers.Mount(mux, observe)
+	}
 	// The API under /api/v1 (including the embedded OpenAPI document), the
 	// probes at the root, and the root alias for every other path until
 	// 1.0.0 (ADR 077).
@@ -1152,6 +1216,28 @@ func buildMasterKey(keyConfigs map[string]*MasterKeyConfig) (*domain.MasterKeys,
 	}
 
 	return masterKeys, nil
+}
+
+// setMemoryLimit sets the Go memory limit from the cgroup memory limit the
+// process runs under, when there is one: the garbage collector then keeps the
+// heap inside the container, and the password hashing budget is derived from
+// it (crypto.HashConcurrencyConfig). An operator's GOMEMLIMIT is kept, and
+// AUTOMEMLIMIT tunes the ratio or turns this off, as the library documents.
+// It runs after the logger is set up and before anything that reads the
+// limit, so the outcome is one line of the server's own: the library would
+// otherwise report every start without cgroups as an error.
+func setMemoryLimit() {
+	limit, err := memlimit.Set()
+	switch {
+	case errors.Is(err, memlimit.ErrCgroupsNotSupported), errors.Is(err, memlimit.ErrNoCgroup):
+		slog.Debug("no cgroup memory limit to derive the Go memory limit from", slogctx.Err(err))
+	case err != nil:
+		slog.Warn("the Go memory limit could not be set from the cgroup memory limit", slogctx.Err(err))
+	case limit < math.MaxInt64:
+		slog.Info("Go memory limit set", slog.Int64("limit_bytes", limit))
+	default:
+		slog.Debug("the process runs without a memory limit")
+	}
 }
 
 // ----------------------------- INSTRUMENTATION --------------------------------------

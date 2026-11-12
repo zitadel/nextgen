@@ -145,9 +145,10 @@ Shared text styles (`PAGE_TITLE`, `SECTION_HEADING`, `SUBSECTION_HEADING`,
 - `SECTION_HEADING`, 16/20 (Figma `zitadel/section-heading`): every primary card
   and section title, the project page's Project Detail, Origins and Variables
   and Secrets cards included. `DetailSection` renders it as an `h2`; so do
-  Field definitions, Steps, Release content and the settings sections.
+  Field definitions, a login flow's User schema, Release content and the
+  settings sections.
 - `SUBSECTION_HEADING`, 14/20 (`zitadel/subsection-heading`): a subordinate heading
-  inside a card body, such as Sign-in methods on a schema.
+  inside a card body, such as an identity provider's Used by.
 - The overline is for meta labels, table heads and drill-down breadcrumbs,
   never a section title.
 
@@ -161,21 +162,17 @@ A mutation's pending and error state comes from `useSubmit`
 ## Page wrapper — one top for every screen
 
 Every console screen renders inside `Page` (`src/components/layout.tsx`): lists,
-resource details, configuration panels, settings and System. It owns the page
+details, settings and System. It owns the page
 gutter and, above all, the distance under the top bar, so no screen measures its
 own. Do not add a per-screen wrapper with its own padding.
 
 | Region | Value |
 | --- | --- |
 | Page top | 20px at `lg`, 16px below |
-| Page gutter | 16px; 24px from `sm` with `inset="panel"` |
+| Page gutter | 16px |
 | Page bottom | 32px |
 | Title row | 36px, title centred — `PAGE_TITLE_ROW` in `typography.ts`, used by lists, details, settings and System |
 | Fill | `fill`: at `lg`, exactly the height under the 56px top bar, as a column; the part that should take the rest uses `flex-1 min-h-0` (Branding's preview). Never a `100vh` offset |
-
-`inset="panel"` is for the configuration-panel screens (Login flows, Identity
-providers, Releases), whose single card the design insets by 24px on the
-sides. It changes the sides only, never the top.
 
 ## Resource list layout — one shell for every list screen
 
@@ -189,7 +186,7 @@ composes `Page`, `ResourceTitle` (with the Add button as its `action`,
 beside the title at every width, D19, labelled with what it adds as the sheet
 it opens is titled: `Add user`, `New project`, never a bare `Add`, the list's search as its `filter`,
 beside the action on one 36px row and on its own row under the title on a
-phone, where `filterBelow` keeps it at every width, as Logs' search is, and
+phone, where `filterBelow` keeps it at every width, as Events' search is, and
 the list's `ResourceFilter` as its `below` row, by "List filters" below),
 then `ResourceHeaderRow` +
 `ResourceHeadCell`, `ResourceRow`, `ResourceEmptyRow` and `LoadMore`. A
@@ -204,7 +201,7 @@ its card below 576px rather than squeezing the cells.
 | Table top | 20px under the title row at `lg`, 16px below |
 | Table head | 56px tall, 24px leading / 16px trailing inset |
 | Table cell | 56px tall, 24px inset, 8px block padding |
-| Row density | `RESOURCE_DENSITY` on the table's card sets the height for every head and body cell: `comfortable` (56px, the default) or `compact` (40px, 4px block padding, `RowMenu size="icon-xs"`; Logs). Never restate a height per cell |
+| Row density | `RESOURCE_DENSITY` on the table's card sets the height for every head and body cell: `comfortable` (56px, the default) or `compact` (40px, 4px block padding, `RowMenu size="icon-xs"`; Events). Never restate a height per cell |
 | Head label | display face, 12/16, 0.72px tracking, `foreground` |
 | Row icon | 16px, stroke 1.5, `muted-foreground`, 10px to its label |
 
@@ -261,38 +258,41 @@ it.
 
 ## Resource detail layout — one shell for every detail screen
 
-Detail screens come in three compositions, and each has one shell:
+Resources (Users, Teams, Project settings) and configuration (Login flows,
+Identity providers, Releases) draw the same detail screen: a header over body
+cards of labelled rows. Compose `Page` + `DetailHeader` from
+`src/components/detail-page.tsx`, then the body under `DETAIL_BODY`, its tab
+row and cards 16px apart (`DETAIL_STACK`).
 
-- **Resource detail** (Users, Teams, Project settings): a title row over body
-  cards. Compose `Page` + `DetailHeader` from
-  `src/components/detail-page.tsx`, then put the body under `DETAIL_BODY`. A
-  body card with a titled section is a `DetailSection`, with an optional
-  `description` (a muted sentence about the whole section, between the title
-  and the rule); a single name field with
-  its Save button is a `RenameCard` (`src/components/rename-card.tsx`). A body
-  card the design titles by name rather than a section title (Users: the profile,
-  under its schema's name) leads with `PanelTitle as="h2"`; the header owns the
-  `h1`.
-- **Resource detail, identity-line header** (User schemas): the resource
-  detail body under `DetailTitle` (`src/components/detail-page.tsx`) instead of
+- A body card with a titled section is a `DetailSection`: the title, with an
+  optional `aside` on the label rail (a login flow's or a user's schema and
+  its `RevisionLink`) and `action` at the row's end, an optional
+  `description` (a muted sentence about the whole section) under them, a
+  rule, then the content. A single name field with its Save button is a
+  `RenameCard` (`src/components/rename-card.tsx`).
+- A labelled value is a `DetailRow`, its value in `DETAIL_VALUE`, and a card's
+  rows sit in `DetailRows`. Do not lay out a label and value by hand: every
+  card puts its values on the same 218px rail, and a label beside a form
+  control takes `FIELD_LABEL_RAIL` (or `FIELD_GROUP_LABEL_RAIL` in a
+  responsive `FieldGroup`) so the control starts there too.
+- User schemas head the same body with `DetailTitle` instead of
   `DetailHeader`: the title over one 12/16 line with the id, its copy button
   and the created date, no icon tile and no header card. The line stacks under
-  `sm`. Each tab is a `DetailSection`.
-- **Configuration panel** (Login flows, Identity providers, Releases): the whole
-  screen is one `DetailPanel` headed by a `PanelTitle` (both in
-  `src/components/detail-page.tsx`), inside `<Page inset="panel">`
-  (`src/components/layout.tsx`).
-- **Settings** (Profile): a bare title over one card of labelled rows, in a
-  centred column `--zl-container-settings` wide. Compose `Page` +
-  `SettingsColumn` (`src/components/layout.tsx`), a `DETAIL_TITLE` heading with
-  no header gutter, then `SettingsCard` (`src/components/settings-card.tsx`)
-  holding `Field` rows: 24px inset, 20px block, 16px between rows. No icon tile
-  and no header card: a settings screen is not a resource with an id.
+  `sm`.
 
-Resource detail and the configuration panel share the icon tile (`ICON_PLATE`)
-and the header card (`MetaCard`, holding `MetaValue`s split by `MetaRule`): the
-resource id, copyable, and the created date. The identity-line header carries
-the same two values in one line instead.
+Settings (Profile) is a different composition: a bare title over one card of
+labelled rows, in a centred column `--zl-container-settings` wide. Compose
+`Page` + `SettingsColumn` (`src/components/layout.tsx`), a `DETAIL_TITLE`
+heading with no header gutter, then `SettingsCard`
+(`src/components/settings-card.tsx`) holding `Field` rows: 24px inset, 20px
+block, 16px between rows. No icon tile and no header card: a settings screen is
+not a resource with an id.
+
+`DetailHeader` carries the icon tile (`ICON_PLATE`) and the header card
+(`MetaCard`, holding `MetaValue`s split by `MetaRule`): the resource id,
+copyable, and the created date, and an optional `action` (a release's menu)
+after the card. The identity-line header carries the same two values in one
+line instead.
 
 | Region        | Value                                                 |
 | ------------- | ----------------------------------------------------- |
@@ -300,7 +300,9 @@ the same two values in one line instead.
 | Header gutter | 24px — the page gutter plus 8px                        |
 | Title lockup  | 36px icon tile, 12px to a 24/24 display-face title     |
 | Header card   | 20px inset, 14px block, values centred on the rule     |
-| Body          | 24px under the header row                              |
+| Body          | 24px under the header row; 16px between its parts      |
+| Body card     | 24px inset, 20px block, 16px from title to rule to content; the 1px stroke is drawn inside the edge (`Card`'s inset outline), as the design draws it |
+| Labelled row  | 218px label rail from `sm`, stacked below; 20px line, 4px block; 16px either side of a zero-height rule between rows |
 
 The title's icon is the glyph the resource's sidebar entry carries, at stroke
 1.5. Tabs are the body's first element when a resource has more than one

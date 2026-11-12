@@ -126,10 +126,12 @@ func TestFlowAuthAttemptAdapter_Start_ReturnsAttemptID(t *testing.T) {
 
 	id, err := adapter.Start(context.Background(), domain.FlowCreateAttemptInput{
 		ProjectID: "proj-1",
+		FlowID:    "flow-1",
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "att-1", id)
 	assert.Equal(t, "proj-1", fake.createIn.ProjectID)
+	assert.Equal(t, "flow-1", fake.createIn.FlowID)
 }
 
 func TestFlowAuthAttemptAdapter_SubmitIdentifier_HappyPath(t *testing.T) {

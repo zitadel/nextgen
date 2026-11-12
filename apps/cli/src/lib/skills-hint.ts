@@ -1,22 +1,92 @@
+import type { SuggestedCommand } from "@/lib/suggestion";
 import { existsSync, mkdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-
-import consola from "consola";
 import * as rosie from "rosie-skills";
 
+import { log } from "@/lib/log";
+
+import type { BoxAction } from "./box";
 import { command } from "./style";
-import { publicCliCommand } from "./public-cli";
 import { telemetryConfigDir } from "./telemetry/identity";
 
 export type SkillsHintInput = {
   env: NodeJS.ProcessEnv;
   /** False for `--json`, `--non-interactive`, or a non-TTY stream. */
   interactive: boolean;
-  /** The running CLI's, whose skills the named command adds. */
-  cliVersion: string;
 };
 
+/** What the hint is shown with: the `skills add` it names, rendered for the run that shows it. */
+export type SkillsHintShown = SkillsHintInput & Readonly<{ skillsAdd: SuggestedCommand }>;
+
 const SHOWN_FILE = "skills-hint.json";
+
+/** Where the once-per-machine marker lives, or nowhere when the machine has no config directory. */
+function shownFile(env: NodeJS.ProcessEnv): string | undefined {
+  const configDir = telemetryConfigDir(env);
+  return configDir === undefined ? undefined : join(configDir, SHOWN_FILE);
+}
+
+/**
+ * The marker's path when this machine is still to be offered the skills:
+ * someone is watching, nothing opts out, an agent is installed, and the offer
+ * has not been made before. Reads the filesystem. Both ways of offering the
+ * skills decide through this, so the conditions cannot drift apart.
+ */
+async function pendingOffer({ env, interactive }: SkillsHintInput): Promise<string | undefined> {
+  if (!interactive || isCI(env) || isOptedOut(env)) {
+    return undefined;
+  }
+  const shownPath = shownFile(env);
+  if (shownPath === undefined || existsSync(shownPath)) {
+    return undefined;
+  }
+  return (await rosie.agents()).some((agent) => {
+    return agent.detected && agent.installPath !== null;
+  })
+    ? shownPath
+    : undefined;
+}
+
+/**
+ * Whether this machine should be offered the skills, resolved while the
+ * command runs. {@link claimSkills} is what spends the offer, at the moment the
+ * summary is built.
+ */
+export async function eligibleForSkills(input: SkillsHintInput): Promise<boolean> {
+  try {
+    return (await pendingOffer(input)) !== undefined;
+  } catch {
+    // Nothing here may fail the command the person actually ran.
+    return false;
+  }
+}
+
+/**
+ * Spends the once-per-machine offer and returns the step to put in the
+ * summary, or `undefined` if another run took it first. Written exclusively,
+ * so of two concurrent first runs only one shows it.
+ */
+export function claimSkills(
+  env: NodeJS.ProcessEnv,
+  skillsAdd: SuggestedCommand,
+): BoxAction | undefined {
+  try {
+    const shownPath = shownFile(env);
+    if (shownPath === undefined) {
+      return undefined;
+    }
+    mkdirSync(dirname(shownPath), { recursive: true });
+    writeFileSync(shownPath, `${JSON.stringify({ date: new Date().toISOString() })}\n`, {
+      flag: "wx",
+    });
+    return {
+      text: "Using an AI coding agent? Add the Zitadel skills to your project so it can work with the CLI:",
+      command: skillsAdd,
+    };
+  } catch {
+    return undefined;
+  }
+}
 
 /**
  * Tell a developer who has AI coding agents installed how to give them the
@@ -34,29 +104,10 @@ const SHOWN_FILE = "skills-hint.json";
  * fail the command the user actually ran, and losing the race to create the marker
  * (`EEXIST`) just means another run is showing the note.
  */
-export async function showSkillsHint({
-  env,
-  interactive,
-  cliVersion,
-}: SkillsHintInput): Promise<void> {
+export async function showSkillsHint(input: SkillsHintShown): Promise<void> {
   try {
-    if (!interactive || isCI(env) || isOptedOut(env)) {
-      return;
-    }
-    const configDir = telemetryConfigDir(env);
-    if (configDir === undefined) {
-      return;
-    }
-    const shownPath = join(configDir, SHOWN_FILE);
-    if (existsSync(shownPath)) {
-      return;
-    }
-    // Detected agents only decide whether the note is relevant; it does not
-    // name them.
-    const detected = (await rosie.agents()).some(
-      (agent) => agent.detected && agent.installPath !== null,
-    );
-    if (!detected) {
+    const shownPath = await pendingOffer(input);
+    if (shownPath === undefined) {
       return;
     }
     // Created exclusively and before printing: of two concurrent first runs only
@@ -67,13 +118,13 @@ export async function showSkillsHint({
     });
 
     try {
-      consola.log(
+      log.plain(
         [
           "",
           "Using an AI coding agent?",
-          "Add the Zitadel skills to your project to help your agent work with Zitadel’s CLI and authentication integrations:",
+          "Add the Zitadel skills to your project to help your agent work with Zitadel's CLI and authentication integrations:",
           "",
-          `  ${command(publicCliCommand("skills add", cliVersion))}`,
+          `  ${command(input.skillsAdd)}`,
           "",
           "Optional. You can continue without installing skills.",
         ].join("\n"),

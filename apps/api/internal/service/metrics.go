@@ -28,9 +28,14 @@ func credentialResult(err error) metrics.CredentialResult {
 }
 
 // passwordResult maps a verification's outcome to its PasswordResult: updated
-// is the new hash a match on an outdated hash computed, or empty.
+// is the new hash a match on an outdated hash computed, or empty. A busy
+// refusal comes first: the verification never ran, so it is neither an error
+// of the hash nor anything about the password. The history check sees the
+// crypto error as is, a sign-in the domain error wrapping it.
 func passwordResult(updated string, err error) metrics.PasswordResult {
 	switch {
+	case errors.Is(err, crypto.ErrHashingBusy), errors.Is(err, domain.ErrUserPasswordHashingBusy()):
+		return metrics.PasswordBusy
 	case updated != "" || errors.Is(err, crypto.ErrRehashFailed):
 		return metrics.PasswordUpdated
 	case err == nil:
@@ -52,10 +57,16 @@ var authChecks = map[domain.AuthCheckType]metrics.AuthCheck{
 }
 
 // authResult classifies the outcome of verifying a proof: it worked, it was
-// checked and refused, or it could not be completed.
+// checked and refused, it was not checked because password hashing was at
+// its limit, or it could not be completed. Busy comes first: the service
+// answers it as its own error, and errors.Is would also find it under a
+// rejection that wrapped it.
 func authResult(err error) metrics.AuthResult {
 	if err == nil {
 		return metrics.AuthSuccess
+	}
+	if errors.Is(err, domain.ErrUserPasswordHashingBusy()) {
+		return metrics.AuthBusy
 	}
 	if errors.Is(err, domain.ErrAuthAttemptProofRejected(nil)) {
 		rejected, _ := errors.AsType[domain.Error](err)

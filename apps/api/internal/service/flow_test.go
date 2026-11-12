@@ -638,6 +638,7 @@ func TestFlowService_Start_StampsFlowIDBeforeStateMachine(t *testing.T) {
 	require.NotEmpty(t, slot.FlowID, "flow_id was not stamped before stateMachine.Start (auth.attempt.created would miss it)")
 	require.NotNil(t, res.State)
 	assert.Equal(t, res.State.ID, *slot.FlowID, "stamped flow_id")
+	assert.Equal(t, res.State.ID, sm.gotStartInput.ID, "the attempt the state machine creates records this flow")
 	require.NotEmpty(t, slot.SessionID, "session_id was not stamped before stateMachine.Start")
 	assert.Equal(t, *slot.SessionID, sm.gotStartInput.Session.ID, "stamped session_id")
 }

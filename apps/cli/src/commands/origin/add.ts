@@ -1,5 +1,6 @@
 import { Flags } from "@oclif/core";
 
+import { OriginService } from "@/lib/backend";
 import {
   type Admitted,
   CommandGroups,
@@ -7,9 +8,9 @@ import {
   type JsonEnvelope,
   nonBlankArg,
 } from "@/lib/oclif";
-import { OriginService } from "@/lib/backend";
 import { dryRunResult } from "@/lib/oclif/crud/shared";
-import { prose } from "@/lib/oclif/rendering";
+import { escapeControlCharacters } from "@/lib/terminal-text";
+import { relatedFlags } from "@/lib/suggestion/relations";
 
 /** The two kinds an origin pattern can be, as the `--kind` flag accepts them. */
 const ORIGIN_KINDS = ["primary", "preview"] as const;
@@ -28,6 +29,7 @@ const ORIGIN_KINDS = ["primary", "preview"] as const;
 export default class OriginAdd extends EnvironmentCommand {
   static override description = "Add an origin pattern to the project.";
   static override group = CommandGroups.configuration;
+
   static override examples = [
     "<%= config.bin %> origin add https://app.acme.com --kind primary",
     "<%= config.bin %> origin add 'https://*-acme.vercel.app' --kind preview",
@@ -38,13 +40,15 @@ export default class OriginAdd extends EnvironmentCommand {
       description: "The origin pattern to add.",
     }),
   };
-  static override flags = {
-    kind: Flags.option({
-      description: "What the pattern is for.",
-      options: ORIGIN_KINDS,
-      required: true,
-    })(),
-  };
+  static override flags = relatedFlags(
+    {
+      kind: Flags.option({
+        description: "What the pattern is for.",
+        options: ORIGIN_KINDS,
+      })(),
+    },
+    { kind: { required: true } },
+  );
 
   protected async execute({ args, flags }: Admitted<typeof OriginAdd>): Promise<JsonEnvelope> {
     // A dry run makes no request, so it answers before the connection — the
@@ -57,25 +61,29 @@ export default class OriginAdd extends EnvironmentCommand {
           topic: "origin",
           id: args.pattern,
           body: { kind: flags.kind },
+          next: await this.realRun(),
         }),
       );
     }
 
     const { client, projectId } = await this.connect();
-
     const originService = new OriginService(client, projectId);
     const added = await originService.add(args.pattern, flags.kind);
+
+    const title = `Added ${escapeControlCharacters(added.pattern)} (${escapeControlCharacters(added.kind)})`;
 
     return this.emit({
       status: "ok",
       data: {
+        title,
         pattern: added.pattern,
         kind: added.kind,
       },
-      next: {
-        commands: [this.suggest("origin list")],
+      summary: {
+        title,
+        sections: [],
       },
-      pretty: prose(`Added ${added.pattern} (${added.kind})`),
+      next: { commands: [this.suggest({ id: "origin:list" })] },
     });
   }
 }

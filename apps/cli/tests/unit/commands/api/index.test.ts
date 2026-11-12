@@ -85,7 +85,7 @@ describe("--force on a call that cannot be asked about", () => {
 
   it("is required for a destructive call with a body nobody can be asked about", () => {
     expect(() => {
-      refuseUnforced(withBody, forcing({ nonInteractive: true }));
+      refuseUnforced(withBody, forcing({ nonInteractive: true }), "Call deleteUser?");
     }).toThrow(
       expect.objectContaining({
         code: "E_CONFIRMATION_REQUIRED",
@@ -94,21 +94,29 @@ describe("--force on a call that cannot be asked about", () => {
     );
   });
 
+  it("repeats the question a person would be asked, which is the question it asks", () => {
+    const question = "Call deleteUser in project proj_1 on localhost:8080? Delete a user.";
+
+    expect(() => {
+      refuseUnforced(withBody, forcing({ nonInteractive: true }), question);
+    }).toThrow(expect.objectContaining({ details: { question } }));
+  });
+
   it("is satisfied once it is given", () => {
     expect(() => {
-      refuseUnforced(withBody, forcing({ nonInteractive: true, force: true }));
+      refuseUnforced(withBody, forcing({ nonInteractive: true, force: true }), "Call deleteUser?");
     }).not.toThrow();
   });
 
   it("is not required on a terminal, where the person is asked instead", () => {
     expect(() => {
-      refuseUnforced(withBody, forcing({}));
+      refuseUnforced(withBody, forcing({}), "Call deleteUser?");
     }).not.toThrow();
   });
 
   it("is not required by a dry run, which calls nothing", () => {
     expect(() => {
-      refuseUnforced(withBody, forcing({ nonInteractive: true, dryRun: true }));
+      refuseUnforced(withBody, forcing({ nonInteractive: true, dryRun: true }), "Call deleteUser?");
     }).not.toThrow();
   });
 
@@ -117,6 +125,7 @@ describe("--force on a call that cannot be asked about", () => {
       refuseUnforced(
         request({ destructive: false, body: { name: "a" } }),
         forcing({ nonInteractive: true }),
+        "Call deleteUser?",
       );
     }).not.toThrow();
   });
@@ -126,6 +135,7 @@ describe("--force on a call that cannot be asked about", () => {
       refuseUnforced(
         request({ destructive: true, body: undefined }),
         forcing({ nonInteractive: true }),
+        "Call deleteUser?",
       );
     }).not.toThrow();
   });
