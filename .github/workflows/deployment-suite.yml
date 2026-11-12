@@ -34,10 +34,18 @@ jobs:
     name: ${{ inputs.suite }} (${{ inputs.environment }})
     runs-on: ubuntu-24.04
     timeout-minutes: ${{ inputs.timeout }}
+    permissions:
+      contents: read
+      # The remote-cache step trades this for a Turborepo token.
+      id-token: write
     outputs:
       result: ${{ steps.passed.outputs.result }}
     env:
       SUITE: ${{ inputs.suite }}
+      # Read what ci.yml stored, never write: a suite's builds are the ones
+      # ci.yml and Vercel's build already ran for this commit or main.
+      TURBO_CACHE: "local:rw,remote:r"
+      TURBO_TELEMETRY_DISABLED: "1"
       CLOUD_URL: ${{ inputs.url }}
       # Production can test a deployed commit from before the CLOUD_URL rename.
       DOCS_BASE_URL: ${{ inputs.url }}
@@ -138,6 +146,21 @@ jobs:
       - name: Put workspace binaries on PATH
         if: steps.suite.outputs.present == 'true'
         run: echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
+
+      # Vercel's remote cache over OIDC, as in ci.yml: without it the CLI's
+      # suite rebuilds every package it packs. A failed exchange runs on the
+      # local cache only (the step prints Vercel's answer).
+      - name: Set up Turborepo remote cache
+        id: remote-cache
+        if: steps.suite.outputs.present == 'true'
+        continue-on-error: true
+        uses: vercel/setup-turborepo-remote-cache-action@v1.1.0
+        with:
+          team: ${{ vars.TURBO_TEAM }}
+
+      - name: Use the local cache only without a token
+        if: steps.suite.outputs.present == 'true' && steps.remote-cache.outcome != 'success'
+        run: echo "TURBO_CACHE=local:rw" >> "$GITHUB_ENV"
 
       # No actions/cache for the browsers: it refuses deployment_status, the
       # event deployment-checks.yml runs on ("not tied to a branch or tag
