@@ -10,6 +10,8 @@ const KNOWN: ReadonlyArray<readonly string[]> = [
   ["teams", "list"],
   ["users", "list"],
   ["variable", "list"],
+  ["env"],
+  ["env", "list"],
   ["doctor"],
   ["deploy"],
 ];
@@ -53,6 +55,7 @@ describe("unknownCommand", () => {
   describe("with a command that exists and an argument it does not take", () => {
     it.each([
       ["doctor:extra", ["doctor"]],
+      ["env:extra", ["env"]],
       ["variable:list:extra", ["variable", "list"]],
     ])("%s names the command, not the argument", (id, command) => {
       const { error, typed } = unknownCommand(id, KNOWN);
@@ -74,14 +77,14 @@ describe("unknownCommand", () => {
 
   describe("with a misspelled command", () => {
     it.each([
-      ["variable:lst", "zitadel variable list", "zitadel variable --help"],
-      ["teams:lst:extra", "zitadel teams list", "zitadel teams --help"],
-      ["deplo", "zitadel deploy", undefined],
-      ["usrs:list", "zitadel users --help", undefined],
-    ])("%s suggests the one it meant", (id, meant, help) => {
+      ["variable:lst", ["zitadel variable list --help", "zitadel variable --help"]],
+      ["teams:lst:extra", ["zitadel teams list --help", "zitadel teams --help"]],
+      ["deplo", ["zitadel deploy --help"]],
+      ["usrs:list", ["zitadel users --help"]],
+    ])("%s suggests the help of the one it meant", (id, next) => {
       const { error } = unknownCommand(id, KNOWN);
 
-      expect(error.nextCommands).toEqual(help === undefined ? [meant] : [meant, help]);
+      expect(error.nextCommands).toEqual(next);
     });
   });
 });

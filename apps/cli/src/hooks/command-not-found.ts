@@ -24,9 +24,9 @@ export type UnknownCommand = Readonly<{
  * a topic, and the one word after it that is not a command there. Whatever
  * follows may be an argument, which a refusal never repeats.
  *
- * The follow-ups are the one word the last of those is a single edit from, as the
- * command or topic that would run it, and the help of the topic the first words
- * name. A command that merely resembles another is never one of them, so a
+ * The follow-ups are the help of the one word the last of those is a single edit from
+ * (never the command itself, which would run without the flags typed), and the help of the
+ * topic the first words name. A command that merely resembles another is never one of them, so a
  * destructive command is not offered for a different one's name.
  *
  * @param id - What oclif made of the words typed, joined by `:`.
@@ -88,8 +88,7 @@ export function unknownCommand(
   const next: SuggestedCommand[] = [];
   if (meant !== undefined) {
     const meantWords = [...parent, meant];
-    const asTopic = isTopic(meantWords);
-    next.push(unscopedCommand(`${meantWords.join(" ")}${asTopic ? " --help" : ""}`));
+    next.push(unscopedCommand(`${meantWords.join(" ")} --help`));
   }
   if (topicDepth > 0) {
     next.push(unscopedCommand(`${parent.join(" ")} --help`));
