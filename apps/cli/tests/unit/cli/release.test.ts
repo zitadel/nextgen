@@ -6,7 +6,7 @@ import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { updateCheckDisabled, zitadelChannel } from "@/lib/zitadel-packages";
+import { updateCheckDisabled, zitadelChannel } from "@/cli/release";
 
 const REGISTRY = "https://registry.npmjs.org/-/package/@zitadel%2fcli/dist-tags";
 

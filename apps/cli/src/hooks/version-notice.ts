@@ -19,7 +19,7 @@ const hook: Hook<"finally"> = async ({ config }) => {
     return;
   }
   try {
-    const { updateNotice } = await import("@/lib/update-notice");
+    const { updateNotice } = await import("@/cli/notice");
     const { suggesterFor } = await import("@/lib/suggestion");
     const notice = await updateNotice({
       cliVersion: config.version,

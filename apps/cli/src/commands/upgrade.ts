@@ -20,12 +20,7 @@ import {
   type UpgradeResult,
   Upgrader,
 } from "@/lib/upgrade";
-import {
-  UPDATE_CHECK_VARIABLE,
-  ZITADEL_CLI,
-  ZITADEL_SCOPE,
-  zitadelChannel,
-} from "@/lib/zitadel-packages";
+import { UPDATE_CHECK_VARIABLE, ZITADEL_CLI, ZITADEL_SCOPE, zitadelChannel } from "@/cli/release";
 
 /**
  * How long the new release's `doctor --fix` may run before it counts as failed.

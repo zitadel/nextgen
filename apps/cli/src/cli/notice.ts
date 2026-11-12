@@ -1,11 +1,11 @@
 import { Dependencies } from "@/lib/upgrade/dependencies";
 
-import { wrapForBox } from "./box";
-import { command, notice } from "./style";
-import type { SuggestedCommand } from "./suggestion";
-import { escapeControlCharacters } from "./terminal-text";
-import { drawBox } from "./ui/layout";
-import { updateCheckDisabled, ZITADEL_SCOPE, zitadelChannel } from "./zitadel-packages";
+import { wrapForBox } from "@/lib/box";
+import { command, notice } from "@/lib/style";
+import type { SuggestedCommand } from "@/lib/suggestion";
+import { escapeControlCharacters } from "@/lib/terminal-text";
+import { drawBox } from "@/lib/ui/layout";
+import { updateCheckDisabled, ZITADEL_SCOPE, zitadelChannel } from "./release";
 
 /**
  * The box `zitadel --version` ends with when something is behind the latest

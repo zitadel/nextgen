@@ -130,7 +130,7 @@
 - A domain lib under `src/lib` stays plain functions and parsers, and never
   imports `lib/oclif`. The exception is `src/lib/upgrade` (classes, one word per
   file): it is generic, knows nothing of Zitadel, the CLI or `doctor`, and takes
-  what it needs as options. `lib/zitadel-packages.ts` supplies Zitadel's, and
+  what it needs as options. `src/cli/release.ts` supplies Zitadel's, and
   the `upgrade` command does the CLI's part, `doctor --fix` included.
 - Say what a command is doing with `log` (`src/lib/log.ts`) from a command or a
   library alike, never a logger or stream of your own: the running command's

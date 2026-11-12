@@ -1,10 +1,10 @@
 import { join } from "node:path";
 
-import { npmDistTagForCliVersion } from "./public-cli";
-import { isCI } from "./skills-hint";
-import { telemetryConfigDir } from "./telemetry/identity";
-import { Cache } from "./upgrade/cache";
-import { ReleaseChannel } from "./upgrade/channel";
+import { npmDistTagForCliVersion } from "@/lib/public-cli";
+import { isCI } from "@/lib/skills-hint";
+import { telemetryConfigDir } from "@/lib/telemetry/identity";
+import { Cache } from "@/lib/upgrade/cache";
+import { ReleaseChannel } from "@/lib/upgrade/channel";
 
 /**
  * The prefix of the Zitadel packages that move together as one release.

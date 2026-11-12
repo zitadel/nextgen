@@ -1,5 +1,5 @@
 import type { Suggest } from "@/lib/suggestion";
-import { updateCheckDisabled, zitadelChannel } from "@/lib/zitadel-packages";
+import { updateCheckDisabled, zitadelChannel } from "@/cli/release";
 
 import type { CheckOutcome } from "./types";
 

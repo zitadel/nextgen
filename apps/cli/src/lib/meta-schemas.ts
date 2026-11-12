@@ -19,7 +19,7 @@ import { META_SCHEMA_DIR, metaSchemaFiles } from "@zitadel/config/meta-schemas";
 import semver from "semver";
 
 import { Dependencies } from "@/lib/upgrade/dependencies";
-import { ZITADEL_SCOPE } from "@/lib/zitadel-packages";
+import { ZITADEL_SCOPE } from "@/cli/release";
 
 import { isErrno } from "./errors";
 import { pathExists, readIfExists } from "./fs";
