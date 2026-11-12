@@ -1,375 +1,163 @@
-import { type Hook, ux } from "@oclif/core";
+import type { Hook } from "@oclif/core";
 import { distance } from "fastest-levenshtein";
 
 import { ZitadelError } from "@/lib/errors";
-import {
-  envelopeText,
-  Failure,
-  type FailureOutput,
-  JsonFailureOutput,
-  TerminalFailureOutput,
-} from "@/lib/oclif/failure";
+import { type Admitted, BaseCommand } from "@/lib/oclif/base";
+import type { JsonEnvelope } from "@/lib/oclif/types";
 import { type SuggestedCommand, unscopedCommand } from "@/lib/suggestion";
-import { Ui } from "@/lib/ui";
+import type { Telemetry, TelemetryDeps } from "@/lib/telemetry";
 
 /** The exit code a shell reports for a command it cannot find, which scripts already branch on. */
 export const UNKNOWN_COMMAND_EXIT_CODE = 127;
 
 /**
- * The words typed that name no command, and the refusal for them.
+ * What runs when the words typed name no command: a command like every other,
+ * so it parses `--json`, prints its failure and exits as every command does,
+ * and only the refusal is its own. It is never registered, so it is never
+ * listed, completed or suggested.
  *
- * It names the command as far as it was wrong: the longest run of words that is
- * a topic, and the one word after it that is not a command there. Whatever
- * follows may be an argument, which a refusal never repeats.
- *
- * The follow-ups are the help of the one word the last of those is a single
- * edit from (never the command itself, which would run without the flags
- * typed), and the help of the topic the first words name. A command that merely
- * resembles another is never one of them, so a destructive command is not
- * offered for a different one's name.
+ * It names the command as far as it was wrong: the longest run of words that
+ * is a topic, and the one word after it that is not a command there. Whatever
+ * follows may be an argument, which a refusal never repeats. It suggests the
+ * help of the one visible command a word is a single edit from, never the
+ * command itself, which would run without the flags typed, so a typo can never
+ * turn into a different, possibly destructive, command.
  */
-export class UnknownCommand {
-  /** The words typed that name no command, without the arguments after them. */
-  readonly typed: readonly string[];
-  /** The refusal. */
-  readonly error: ZitadelError;
-  /** Whether the words name a command that exists, followed by a word it does not take. */
-  private readonly exists: boolean;
+export class NotFound extends BaseCommand {
+  static override readonly id = "not-found";
+  static override hidden = true;
+  // Whatever was typed is its arguments.
+  static override strict = false;
+  static override meta = { resolveServer: false };
 
-  /** The commands a refusal may suggest: the visible ones and their aliases. */
-  private readonly commands: ReadonlyArray<readonly string[]>;
-  /** Every command that exists, hidden ones included, for telling a command from a typo. */
-  private readonly known: ReadonlyArray<readonly string[]>;
+  /** Whether the words name no command, which exits as a shell does, rather than a command given a word it does not take. */
+  private nameless = true;
 
   /**
-   * @param id - What oclif made of the words typed, joined by `:`.
-   * @param commands - Every command a person may run, as the words that name it
-   *   (`["variable", "list"]`): visible ones and their aliases.
-   * @param hidden - The hidden commands, which exist but are never suggested.
-   */
-  constructor(
-    id: string,
-    commands: ReadonlyArray<readonly string[]>,
-    hidden: ReadonlyArray<readonly string[]> = [],
-  ) {
-    this.commands = commands;
-    this.known = [...commands, ...hidden];
-    const words = id.split(":").filter((word) => {
-      return word !== "";
-    });
-    const refused =
-      this.nothingUsable(words) ?? this.unwantedArgument(words) ?? this.misspelled(words);
-    this.typed = refused.typed;
-    this.error = refused.error;
-    this.exists = refused.exists;
-  }
-
-  /**
-   * The code the run exits with: a shell's 127 for a name that is no command,
-   * and the refusal's own code for a command that exists and was given a word
-   * it does not take, as that command refuses an argument it does not take.
+   * Refuses what was typed.
    *
-   * @returns The exit code.
+   * @param input - The words typed, as arguments.
+   * @returns Never; it always refuses.
+   * @throws {ZitadelError} The refusal, as `E_VALIDATION`.
    */
-  get exitCode(): number {
-    return this.exists ? this.error.exitCode : UNKNOWN_COMMAND_EXIT_CODE;
-  }
-
-  /**
-   * The command as every envelope names it: oclif's id, or `(default)` when no
-   * word named one.
-   *
-   * @returns The id.
-   */
-  get command(): string {
-    return this.typed.length === 0 ? "(default)" : this.typed.join(":");
-  }
-
-  /**
-   * The refusal for what was typed, among the commands the CLI declares. Only
-   * a command that is not hidden, or one of its aliases, is ever suggested.
-   *
-   * @param id - What oclif made of the words typed, joined by `:`.
-   * @param commands - The commands the CLI declares, as oclif lists them.
-   * @returns The refusal.
-   */
-  static among(
-    id: string,
-    commands: ReadonlyArray<Readonly<{ id: string; hidden?: boolean; aliases: readonly string[] }>>,
-  ): UnknownCommand {
+  protected async execute(input: Admitted<typeof BaseCommand>): Promise<JsonEnvelope> {
+    const words = input.argv.flatMap((word) => word.split(":")).filter((word) => word !== "");
     const named = (hidden: boolean): string[][] => {
-      return commands
-        .filter((command) => {
-          return (command.hidden === true) === hidden;
-        })
-        .flatMap((command) => {
-          return [command.id, ...command.aliases];
-        })
-        .map((commandId) => {
-          return commandId.split(":");
-        });
+      return this.config.commands
+        .filter((command) => Boolean(command.hidden) === hidden)
+        .flatMap((command) => [command.id, ...command.aliases])
+        .map((name) => name.split(":"));
     };
-    return new UnknownCommand(id, named(false), named(true));
-  }
+    const visible = named(false);
+    const known = [...visible, ...named(true)];
+    // The next word of every visible command under `parent`.
+    const under = (parent: readonly string[]): string[] => {
+      return visible
+        .filter((c) => c.length > parent.length && parent.every((w, i) => c[i] === w))
+        .map((c) => c[parent.length] as string);
+    };
+    // The one candidate a word is a single edit, or a change of case, from.
+    const near = (word: string, candidates: readonly string[]): string | undefined => {
+      const close = [...new Set(candidates)].filter((candidate) => {
+        return (
+          candidate !== word &&
+          (candidate.toLowerCase() === word.toLowerCase() || distance(word, candidate) <= 1)
+        );
+      });
+      return close.length === 1 ? close[0] : undefined;
+    };
 
-  /**
-   * Nothing that could name a command was typed, such as only a flag.
-   *
-   * @param words - The words typed.
-   * @returns The refusal, or `undefined` when a word was typed.
-   */
-  private nothingUsable(words: readonly string[]): Refused | undefined {
-    if (words[0] !== undefined && !words[0].startsWith("-")) {
-      return undefined;
-    }
-    return {
-      typed: [],
-      exists: false,
-      error: new ZitadelError("E_VALIDATION", "That is not a zitadel command.", {
+    if (words[0] === undefined) {
+      throw new ZitadelError("E_VALIDATION", "That is not a zitadel command.", {
         nextCommands: [unscopedCommand("--help")],
-      }),
-    };
-  }
-
-  /**
-   * A real command followed by an argument it does not take. A command that is
-   * also a topic is not refused this way when the next word is a typo of one of
-   * its subcommands.
-   *
-   * @param words - The words typed.
-   * @returns The refusal, or `undefined` when no command begins the words.
-   */
-  private unwantedArgument(words: readonly string[]): Refused | undefined {
-    for (let length = words.length - 1; length > 0; length -= 1) {
-      const command = words.slice(0, length);
-      if (!this.isCommand(command)) {
-        continue;
-      }
-      if (this.oneEditFrom(words[length] as string, this.childrenOf(command)) !== undefined) {
-        return undefined;
-      }
-      return {
-        typed: command,
-        exists: true,
-        error: new ZitadelError(
-          "E_VALIDATION",
-          `${command.join(" ")} does not take the argument typed after it.`,
-          { nextCommands: [unscopedCommand(`${command.join(" ")} --help`)] },
-        ),
-      };
+      });
     }
-    return undefined;
-  }
 
-  /**
-   * A word that is not a command where it was typed, with the help of the one
-   * it is a single edit from and of the topic it was typed in.
-   *
-   * @param words - The words typed.
-   * @returns The refusal.
-   */
-  private misspelled(words: readonly string[]): Refused {
+    // A real command followed by a word it does not take, unless that word is
+    // a typo of one of its subcommands: the command's own refusal.
+    for (let length = words.length - 1; length > 0; length -= 1) {
+      const prefix = words.slice(0, length);
+      const exists = known.some((c) => c.length === length && prefix.every((w, i) => c[i] === w));
+      if (exists && near(words[length] as string, under(prefix)) === undefined) {
+        this.nameless = false;
+        this.id = prefix.join(":");
+        throw new ZitadelError(
+          "E_VALIDATION",
+          `${prefix.join(" ")} does not take the argument typed after it.`,
+          { nextCommands: [unscopedCommand(`${prefix.join(" ")} --help`)] },
+        );
+      }
+    }
+
+    // A word that is no command where it was typed: the longest run of visible
+    // topics, then that word.
     let depth = 0;
-    while (depth < words.length - 1 && this.isTopic(words.slice(0, depth + 1), this.commands)) {
+    while (depth < words.length - 1 && under(words.slice(0, depth + 1)).length > 0) {
       depth += 1;
     }
     const typed = words.slice(0, depth + 1);
     const parent = typed.slice(0, -1);
-    const meant = this.oneEditFrom(typed[depth] as string, this.childrenOf(parent));
+    const meant = near(typed[depth] as string, under(parent));
     const next: SuggestedCommand[] = [];
     if (meant !== undefined) {
       next.push(unscopedCommand(`${[...parent, meant].join(" ")} --help`));
     }
-    if (depth > 0) {
+    if (parent.length > 0) {
       next.push(unscopedCommand(`${parent.join(" ")} --help`));
     } else if (next.length === 0) {
       next.push(unscopedCommand("--help"));
     }
-    return {
-      typed,
-      exists: false,
-      error: new ZitadelError("E_VALIDATION", `${typed.join(" ")} is not a zitadel command.`, {
-        nextCommands: next,
-      }),
-    };
-  }
-
-  /**
-   * @param name - The words that may name a command.
-   * @returns Whether they name one exactly.
-   */
-  private isCommand(name: readonly string[]): boolean {
-    return this.known.some((command) => {
-      return command.length === name.length && this.begins(name, command);
+    this.id = typed.join(":");
+    throw new ZitadelError("E_VALIDATION", `${typed.join(" ")} is not a zitadel command.`, {
+      nextCommands: next,
     });
   }
 
   /**
-   * A topic is a name that only begins a command: oclif lists a command as a topic too.
+   * Exits as a shell does for a command it cannot find, or with the refusal's
+   * own code when the command exists and was given a word it does not take.
    *
-   * @param name - The words that may name a topic.
-   * @param among - The commands to look in: the visible ones for a topic a
-   *   refusal may name, so a topic only hidden commands are in is never offered.
-   * @returns Whether some longer command begins with them.
+   * @param code - The refusal's exit code.
+   * @returns Never.
    */
-  private isTopic(name: readonly string[], among: ReadonlyArray<readonly string[]>): boolean {
-    return among.some((command) => {
-      return command.length > name.length && this.begins(name, command);
-    });
+  public override exit(code = 0): never {
+    return super.exit(this.nameless && code !== 0 ? UNKNOWN_COMMAND_EXIT_CODE : code);
   }
 
   /**
-   * @param parent - The words of a topic, or none for the top level.
-   * @returns The next word of every command under it.
-   */
-  private childrenOf(parent: readonly string[]): string[] {
-    return this.commands
-      .filter((command) => {
-        return command.length > parent.length && this.begins(parent, command);
-      })
-      .map((command) => {
-        return command[parent.length] as string;
-      });
-  }
-
-  /**
-   * The one candidate the word is a single edit from, or differs from only in
-   * case, however short the word: `ad` is one edit from `add`. Two such
-   * candidates are a guess between them, so neither is offered.
+   * Sends nothing: the words typed are free text, which analytics never carry.
    *
-   * @param word - The word typed.
-   * @param candidates - The words it may have meant.
-   * @returns The candidate it meant, if exactly one is that close.
+   * @param deps - What telemetry is built from.
+   * @returns Telemetry that is off.
    */
-  private oneEditFrom(word: string, candidates: readonly string[]): string | undefined {
-    const close = [...new Set(candidates)].filter((candidate) => {
-      return (
-        candidate !== word &&
-        (candidate.toLowerCase() === word.toLowerCase() || distance(word, candidate) <= 1)
-      );
-    });
-    return close.length === 1 ? close[0] : undefined;
-  }
-
-  /**
-   * @param prefix - The words that may begin a command.
-   * @param command - The command's words.
-   * @returns Whether the command begins with them.
-   */
-  private begins(prefix: readonly string[], command: readonly string[]): boolean {
-    return prefix.every((word, index) => {
-      return command[index] === word;
-    });
-  }
-}
-
-/** What a refusal names, and the refusal. */
-type Refused = Readonly<{ typed: readonly string[]; exists: boolean; error: ZitadelError }>;
-
-/**
- * What was typed on the command line, read as oclif reads it for a command,
- * since no command was found to read it.
- */
-export class Invocation {
-  private readonly argv: readonly string[];
-  private readonly contentType: string | undefined;
-
-  /**
-   * @param argv - The arguments typed after the program.
-   * @param contentType - The CLI's `CONTENT_TYPE` environment variable, if set.
-   */
-  constructor(argv: readonly string[], contentType: string | undefined) {
-    this.argv = argv;
-    this.contentType = contentType;
-  }
-
-  /**
-   * What was typed, as the words themselves.
-   *
-   * oclif joins the leading words into the id with `:` and hands over the rest,
-   * but drops a flag after a word that has a colon of its own, and the id cannot
-   * be split back into words without inventing flags (`frobnicate:--json`). The
-   * process's own arguments are the words when they spell this id, as they do
-   * when the CLI is the program run; a run started inside another process (a
-   * test runner) gets oclif's words, and never that process's own flags.
-   *
-   * @param id - What oclif made of the leading words, joined by `:`.
-   * @param argv - The words oclif handed over after them.
-   * @param processArgv - The process's arguments after the program.
-   * @param contentType - The CLI's `CONTENT_TYPE` environment variable, if set.
-   * @returns The invocation.
-   */
-  static typed(
-    id: string,
-    argv: readonly string[],
-    processArgv: readonly string[],
-    contentType: string | undefined,
-  ): Invocation {
-    const leading: string[] = [];
-    for (const word of processArgv) {
-      leading.push(word);
-      if (leading.join(":") === id) {
-        return new Invocation(processArgv, contentType);
-      }
-    }
-    return new Invocation(argv, contentType);
-  }
-
-  /**
-   * Whether the run asked for JSON: a `--json` before any `--`, or the content type.
-   *
-   * @returns Whether the failure is written as an envelope.
-   */
-  get wantsJson(): boolean {
-    if (this.contentType?.toLowerCase() === "json") {
-      return true;
-    }
-    const json = this.argv.indexOf("--json");
-    const passThrough = this.argv.indexOf("--");
-    return json !== -1 && (passThrough === -1 || json < passThrough);
+  protected override createTelemetry(deps: TelemetryDeps): Telemetry {
+    return super.createTelemetry({ ...deps, flag: false });
   }
 }
 
 /**
- * Refuses a command that does not exist the way every other failure is
- * refused: one error envelope on stdout under `--json`, the error block on
- * stderr otherwise, and the exit code a shell gives a command it cannot find,
- * or the refusal's own code when the command exists and the word after it is
- * one it does not take.
+ * Hands a name that is no command to {@link NotFound}. It never offers to run
+ * another command, as oclif's own prompt did, taking the closest name for the
+ * one typed and dropping its flags: `teams delete x --dry-run` became an offer
+ * to run `grants delete`.
  *
- * It never offers to run another command. oclif's own prompt does, and takes
- * the closest name for the one typed, dropping its flags: `teams delete x
- * --dry-run` became an offer to run `grants delete`.
+ * It hands over only the words that name the command and `--json` when it was
+ * asked for, since the flags typed belong to a command that does not exist and
+ * would be refused as unknown. oclif joins the leading words into `id` and
+ * drops a flag after a word with a colon of its own, so the process's own
+ * arguments are read when they spell this id, as they do when the CLI is the
+ * program run; a run started inside another process (a test runner) gets
+ * oclif's words.
  */
-const hook: Hook<"command_not_found"> = async function ({ id, argv, config }) {
-  const unknown = UnknownCommand.among(id, config.commands);
-  const failure = new Failure(unknown.error, {
-    cliVersion: config.version,
-    command: unknown.command,
-    source: "",
-  });
-  const invocation = Invocation.typed(
-    id,
-    argv ?? [],
-    process.argv.slice(2),
-    config.scopedEnvVar("CONTENT_TYPE"),
-  );
-  const output: FailureOutput = invocation.wantsJson
-    ? new JsonFailureOutput((envelope) => {
-        ux.stdout(envelopeText(envelope, config.theme?.json));
-      })
-    : new TerminalFailureOutput(
-        (summary) => {
-          // Nothing has been drawn yet, so the summary is written out as a run off a terminal writes it.
-          const ui = new Ui({ interactive: false, force: false }, "plain");
-          return ui.written(summary).replace(/\n+$/, "");
-        },
-        (text) => {
-          ux.stderr(text);
-        },
-      );
-  output.write(failure);
-  return this.exit(unknown.exitCode);
+const hook: Hook<"command_not_found"> = async ({ id, argv, config }) => {
+  const own = process.argv.slice(2);
+  const spelled = own.some((_, index) => own.slice(0, index + 1).join(":") === id);
+  const typed = spelled ? own : [...id.split(":"), ...(argv ?? [])];
+  const end = typed.indexOf("--") === -1 ? typed.length : typed.indexOf("--");
+  const json = typed.slice(0, end).includes("--json");
+  const first = typed.findIndex((word) => word.startsWith("-"));
+  const words = first === -1 ? typed : typed.slice(0, first);
+  await NotFound.run([...words, ...(json ? ["--json"] : [])], config);
 };
 
 export default hook;

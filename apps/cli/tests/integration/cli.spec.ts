@@ -467,6 +467,81 @@ describe("the cli", () => {
           });
         });
 
+        it.each([
+          [
+            "a short typo of a subcommand",
+            ["env", "ad"],
+            "env:ad",
+            "env ad is not a zitadel command.",
+            ["env add --help", "env --help"],
+            127,
+          ],
+          [
+            "a typo only in case",
+            ["DEPLOY"],
+            "DEPLOY",
+            "DEPLOY is not a zitadel command.",
+            ["deploy --help"],
+            127,
+          ],
+          [
+            "a typo of an alias",
+            ["ejct"],
+            "ejct",
+            "ejct is not a zitadel command.",
+            ["eject --help"],
+            127,
+          ],
+          [
+            "flags the command it meant takes",
+            ["variable", "lst", "--env", "staging"],
+            "variable:lst",
+            "variable lst is not a zitadel command.",
+            ["variable list --help", "variable --help"],
+            127,
+          ],
+          [
+            "a word a real command does not take",
+            ["deploy", "extra"],
+            "deploy",
+            "deploy does not take the argument typed after it.",
+            ["deploy --help"],
+            3,
+          ],
+          [
+            "a typo of a hidden subcommand",
+            ["autocomplete:crete"],
+            "autocomplete",
+            "autocomplete does not take the argument typed after it.",
+            ["autocomplete --help"],
+            3,
+          ],
+        ])(
+          "answers %s with one envelope and its exit code",
+          async (_, argv, command, message, next, exitCode) => {
+            const result = await runCliForTest([...argv, "--json"]);
+
+            expect({ exitCode: result.exitCode, envelope: parseJson(result.stdout) }).toEqual({
+              exitCode,
+              envelope: {
+                status: "error",
+                cli_version: cliVersion.version,
+                command,
+                source: "",
+                code: "E_VALIDATION",
+                message,
+                next_commands: next.map((step) => expectedPublicCliCommand(step)),
+              },
+            });
+          },
+        );
+
+        it("prints no envelope for a --json after the pass-through", async () => {
+          const result = await runCliForTest(["frobnicate", "--", "--json"]);
+
+          expect(result.stdout).toBe("");
+        });
+
         it("exits 127, as a shell does for a command it cannot find", async () => {
           const result = await runCliForTest(["teams", "delete", "x", "--json"]);
 

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { stripVTControlCharacters } from "node:util";
 
 import { Command, Flags, type Interfaces, ux } from "@oclif/core";
 
@@ -11,7 +12,7 @@ import { failureText, toZitadelError, ZitadelError } from "@/lib/errors";
 import { isObject } from "@/lib/json";
 import { type LocalServers, PsLocalServers } from "@/lib/local-server/processes";
 import { resolveCwd } from "@/lib/paths";
-import { normalizePublicCliCommands, publicCliCommand } from "@/lib/public-cli";
+import { normalizePublicCliCommands, publicCliCommand, spellOutCommands } from "@/lib/public-cli";
 import { hostUnlessDefault, resolveServer, SERVER_VARIABLE } from "@/lib/server";
 import { statusColor } from "@/lib/style";
 import {
@@ -26,7 +27,7 @@ import { DO_NOT_TRACK, ZITADEL_TELEMETRY } from "@/lib/telemetry/consent";
 import { processUserAgent, useUserAgent } from "@/lib/user-agent";
 import { claimSkills, eligibleForSkills } from "@/lib/skills-hint";
 import type { Presentation, Summary } from "@/lib/ui";
-import { textOf } from "@/lib/ui/summary";
+import { NEXT_LABEL, textOf } from "@/lib/ui/summary";
 import { Ui } from "@/lib/ui";
 import { stripColumnMarks } from "@/lib/ui/layout";
 import { DrawnSpinner } from "@/lib/ui/spinner";
@@ -41,25 +42,19 @@ import {
   vercelEventKeys,
 } from "./command-telemetry";
 import type { CommandGroup } from "./groups";
-import { escapeControlCharacters } from "@/lib/terminal-text";
+import { escapeControlCharacters, escapeJsonControlCharacters } from "@/lib/terminal-text";
 import { type NextSteps, nextStepsData, renderNextSteps, stepsOf } from "./next-steps";
 import { painted } from "./rendering";
 import type {
   CommandResult,
+  ErrorEnvelope,
   EnvelopeMeta,
   FlagVariable,
   GlobalOptions,
   JsonEnvelope,
+  SkippedEnvelope,
 } from "./types";
 import { Cmd } from "@/lib/cmd";
-import {
-  asideText,
-  envelopeText,
-  Failure,
-  JsonFailureOutput,
-  TerminalFailureOutput,
-  withWarnings,
-} from "./failure";
 
 /**
  * The colour variables, which `bin/run.js` sets from `--color`/`--no-color`
@@ -951,7 +946,14 @@ export abstract class BaseCommand extends Interruptible(Command) {
    * @param json - The envelope to write.
    */
   protected override logJson(json: unknown): void {
-    ux.stdout(envelopeText(json, this.config.theme?.json));
+    ux.stdout(
+      escapeJsonControlCharacters(
+        ux.colorizeJson(json, {
+          pretty: true,
+          theme: this.config.theme?.json,
+        }),
+      ),
+    );
   }
 
   /**
@@ -959,7 +961,9 @@ export abstract class BaseCommand extends Interruptible(Command) {
    * redirected, as in `2> error.log`, the codes are taken back out.
    */
   private logAside(text: string): void {
-    this.logToStderr(asideText(text));
+    this.logToStderr(
+      process.stderr.isTTY || process.env[FORCE_COLOR.name] ? text : stripVTControlCharacters(text),
+    );
   }
 
   /**
@@ -995,11 +999,8 @@ export abstract class BaseCommand extends Interruptible(Command) {
         }),
       );
     }
-    const failure = new Failure(zitadelError, meta, takeReportedWarnings());
     if (this.jsonEnabled()) {
-      new JsonFailureOutput((envelope) => {
-        this.logJson(envelope);
-      }).write(failure);
+      this.logJson(withWarnings(toErrorEnvelope(zitadelError, meta), takeReportedWarnings()));
     } else if (zitadelError.code === "E_CANCELLED") {
       this.ui.stop(zitadelError);
     } else {
@@ -1014,14 +1015,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
           failed: true,
         });
       }
-      new TerminalFailureOutput(
-        (summary) => {
-          return this.ui.written(summary).replace(/\n+$/, "");
-        },
-        (text) => {
-          this.logToStderr(text);
-        },
-      ).write(failure);
+      this.logAside(this.ui.written(failureSummary(zitadelError, meta)).replace(/\n+$/, ""));
     }
     return this.exit(zitadelError.exitCode);
   }
@@ -1168,6 +1162,17 @@ function withReportedWarnings(result: CommandResult, reported: readonly string[]
   return { ...result, warnings: [...reported, ...(result.warnings ?? [])] };
 }
 
+/**
+ * Add reported warnings to a skipped or error envelope. Those envelopes carry
+ * `warnings` only when there are some, so their shape is otherwise unchanged.
+ */
+function withWarnings<T extends SkippedEnvelope | ErrorEnvelope>(
+  envelope: T,
+  warnings: readonly string[],
+): T {
+  return warnings.length === 0 ? envelope : { ...envelope, warnings: [...warnings] };
+}
+
 /** Wraps a {@link CommandResult} with the invocation metadata into the final envelope. */
 function toEnvelope(result: CommandResult, meta: GlobalOptions): JsonEnvelope {
   const base: EnvelopeMeta = {
@@ -1193,6 +1198,21 @@ function toEnvelope(result: CommandResult, meta: GlobalOptions): JsonEnvelope {
     reason: result.reason,
     data: withHeadline(result.data ?? {}, result.summary.title),
     next_commands: result.next?.commands ? [...result.next.commands] : undefined,
+  };
+}
+
+/** Builds the failure envelope from a {@link ZitadelError} and the invocation metadata. */
+function toErrorEnvelope(error: ZitadelError, meta: GlobalOptions): ErrorEnvelope {
+  return {
+    status: "error",
+    cli_version: meta.cliVersion,
+    command: meta.command,
+    source: meta.source,
+    code: error.code,
+    message: error.message,
+    hint: error.hint === undefined ? undefined : spellOutCommands(error.hint, meta.cliVersion),
+    next_commands: normalizePublicCliCommands(error.nextCommands, meta.cliVersion),
+    details: error.details,
   };
 }
 
@@ -1222,6 +1242,41 @@ function renderPretty(result: CommandResult, next: string, withWarnings: boolean
 /** The warnings a result still has to show: those its own output did not. */
 function warningsOf(result: CommandResult): readonly string[] {
   return result.status === "ok" && !result.warningsShown ? (result.warnings ?? []) : [];
+}
+
+/**
+ * A failure as the one ending every failure is shown as: the coded sentence, an
+ * optional hint, and any commands to run next. It is the only place a failure
+ * becomes words for a person, so there is one grammar however the failure
+ * arose — the CLI's own refusal, the platform's, a socket that never answered,
+ * or oclif refusing the command line.
+ */
+function failureSummary(error: ZitadelError, meta: GlobalOptions): Summary {
+  // A failure names what it failed on — an origin, an id, a value — so the
+  // message and the hint carry what the server answered as readily as a
+  // success's rendering does, and are spelled out here for the same reason.
+  // The envelope keeps them as they came, so a reader parses the real text.
+  // Only the label is coloured, so there is nothing for the spelling to undo.
+  const commands = normalizePublicCliCommands(error.nextCommands, meta.cliVersion) ?? [];
+  return {
+    title: `Error: ${escapeControlCharacters(spellOutCommands(error.message, meta.cliVersion))} (${error.code})`,
+    sections: [],
+    lines: error.hint
+      ? [escapeControlCharacters(spellOutCommands(error.hint, meta.cliVersion))]
+      : [],
+    ...(commands.length === 0
+      ? {}
+      : {
+          next: [
+            {
+              text: NEXT_LABEL,
+              command: commands.join("\n"),
+            },
+          ],
+          boxed: true,
+        }),
+    failed: true,
+  };
 }
 
 /**
