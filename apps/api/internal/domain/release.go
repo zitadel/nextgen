@@ -71,10 +71,12 @@ func ErrReleaseRevisionUnpinnable(details any) Error {
 	return newError(PrefixRelease.ErrorCodePrefix("revision_unpinnable"), "release: pinned revision declares no handle", details, nil)
 }
 
-// ReleaseInUseOrigin is one origin whose newest deployment pins the release.
+// ReleaseInUseOrigin is one origin whose newest deployment pins the release,
+// and whether that deployment serves it as a primary origin or a preview.
 type ReleaseInUseOrigin struct {
-	Origin       string `json:"origin"`
-	DeploymentID string `json:"deployment_id"`
+	Origin       string               `json:"origin"`
+	DeploymentID string               `json:"deployment_id"`
+	Kind         DeploymentOriginKind `json:"kind"`
 }
 
 // ReleaseInUseDetails names every origin that still serves the release.

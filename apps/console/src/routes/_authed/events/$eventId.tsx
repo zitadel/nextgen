@@ -1,101 +1,68 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { Logs } from "lucide-react";
-import { Fragment } from "react";
-import { MetaRule, MetaValue } from "@/components/detail-meta";
-import { DETAIL_BODY, DetailHeader, DetailRow, DetailSection } from "@/components/detail-page";
-import { DocumentViewer } from "@/components/document-viewer";
-import { Page } from "@/components/layout";
-import { Button } from "@/components/ui/button";
-import { CopyButton } from "@/components/ui/copy-button";
-import { Separator } from "@/components/ui/separator";
-import { getProjectEvent } from "@/features/events/api";
-import { eventFields, eventFilterValues, sharing } from "@/features/events/model";
+import { createFileRoute } from "@tanstack/react-router";
+import { getProjectEvent, listFlowEvents, listRequestEvents } from "@/features/events/api";
+import {
+  EventPanel,
+  EventPanelMessage,
+  EventPanelPending,
+} from "@/features/events/components/event-panel";
 import { projectScopeDeps, requireProjectScope } from "@/features/projects/project-scope";
-import { formatTimestamp } from "@/lib/date";
+import { ApiError } from "@zitadel/api/runtime/fetch";
+import { describeError } from "@/lib/api-error";
 
 /**
- * One event, opened from Logs. The sidebar keeps Logs' list and marks no
- * view: a view or a filter chosen there opens the list.
+ * One event, in the drawer over Events' list (`EventSheet`, drawn by the list's
+ * route): a row opens it, the overview's recent activity links to it, and a
+ * link to it opens the list beside it under the filters it carries.
  *
- * The header names the event's type, its id and when it happened. Details
- * lists the values its envelope carries: who caused it, through which
- * application, on which record, and the ids that tie it to the other events
- * of the same request, session or login flow. Related events leads on to
- * those: Logs narrowed to everything that shares one of its values (its
- * type, actor, resource, request, session or login flow), in every view,
- * since a request's own event is not an audit event. Document is the
- * event as the API returns it, which is also what a webhook receives, so it
- * copies whole.
+ * Beside the event the drawer lists the events it belongs with, oldest first:
+ * - An event of a login flow gets the whole flow, one range of the flow index:
+ *   every call of the sign-in, its checks, and the session and token it ended
+ *   in. Its request's events are among them.
+ * - Any other event gets its request's, one range of the request index: what
+ *   an API call changed, or which call a change came from.
  *
  * An event is read-only: nothing here edits or removes it.
  */
 export const Route = createFileRoute("/_authed/events/$eventId")({
   staticData: { scope: "project", resource: "event" },
   loaderDeps: projectScopeDeps,
-  loader: ({ params, deps }) => getProjectEvent(requireProjectScope(deps.project), params.eventId),
-  component: EventDetail,
+  loader: async ({ params, deps }) => {
+    const projectId = requireProjectScope(deps.project);
+    const event = await getProjectEvent(projectId, params.eventId);
+    if (event.flow_id) {
+      return { event, flow: await listFlowEvents(projectId, event.flow_id) };
+    }
+    const request = event.request_id
+      ? await listRequestEvents(projectId, event.request_id)
+      : undefined;
+    return { event, request };
+  },
+  pendingComponent: EventPanelPending,
+  errorComponent: EventError,
+  component: EventScreen,
 });
 
-function EventDetail() {
-  const event = Route.useLoaderData();
-  const fields = eventFields(event);
-  const related = eventFilterValues(event);
+function EventScreen() {
+  const { event, request, flow } = Route.useLoaderData();
+  return <EventPanel event={event} request={request} flow={flow} />;
+}
 
+/**
+ * The drawer when its event cannot be read: gone (retention deletes events by
+ * age, so a kept link can outlive one), never this project's, or the server
+ * failed. Its close leads back to the list.
+ */
+function EventError({ error }: { error: unknown }) {
+  if (error instanceof ApiError && error.status === 404) {
+    return (
+      <EventPanelMessage title="Event not found">
+        This project holds no event with this ID.
+      </EventPanelMessage>
+    );
+  }
   return (
-    <Page>
-      <DetailHeader
-        icon={Logs}
-        title={event.event_type}
-        meta={
-          <>
-            <MetaValue label="Event ID" value={event.id} copyable />
-            <MetaRule />
-            <MetaValue label="Occurred" value={formatTimestamp(event.occurred_at)} />
-          </>
-        }
-      />
-
-      <div className={`${DETAIL_BODY} flex flex-col gap-6`}>
-        <DetailSection title="Details">
-          <div className="flex flex-col gap-3">
-            {fields.map((field, index) => (
-              <Fragment key={field.label}>
-                {index > 0 && <Separator />}
-                <DetailRow label={field.label} align="center">
-                  <span className="flex min-w-0 items-center gap-1.5">
-                    {/* `break-all`: an id has no break point, and must wrap on
-                        a phone rather than widen the card. */}
-                    <span className="text-foreground min-w-0 text-sm leading-5 break-all">
-                      {field.value}
-                    </span>
-                    {field.id && (
-                      <CopyButton value={field.value} label={`Copy ${field.label}`} size="inline" />
-                    )}
-                  </span>
-                </DetailRow>
-              </Fragment>
-            ))}
-          </div>
-        </DetailSection>
-
-        <DetailSection title="Related events">
-          <ul className="flex flex-wrap gap-2">
-            {related.map(({ filter, value }) => (
-              <li key={filter.key}>
-                <Button asChild variant="outline" size="sm">
-                  <Link to="/events" search={sharing(filter.key, value)}>
-                    Same {filter.name}
-                  </Link>
-                </Button>
-              </li>
-            ))}
-          </ul>
-        </DetailSection>
-
-        <DetailSection title="Document">
-          <DocumentViewer document={event} noun="event" cliHint={false} />
-        </DetailSection>
-      </div>
-    </Page>
+    <EventPanelMessage title="Event">
+      {describeError(error, "Could not load this event.")}
+    </EventPanelMessage>
   );
 }

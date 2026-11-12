@@ -15,8 +15,8 @@ type ListFunc func(context.Context, *database.ListOptions[domain.EventField]) (*
 
 // ListEach serves one keyset page of the events whose field is any of values:
 // it reads the page of each value on its own and merges them in the page's
-// order. It is how a list over several categories, or several event types,
-// stays on an index.
+// order. It is how a list over several categories, event types, status
+// classes or operations stays on an index.
 //
 // The events of one value are a range of an index that ends in
 // (created_at, id), already in order, so each read stops at the page size. A

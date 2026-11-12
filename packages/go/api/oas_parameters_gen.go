@@ -641,12 +641,25 @@ type ListEventsParams struct {
 	RequestID OptString `json:",omitempty,omitzero"`
 	// Only events with this device fingerprint ID.
 	Fingerprint OptString `json:",omitempty,omitzero"`
-	// Only events that affected this type of resource.
+	// Only events that affected this type of resource, such as `user`.
 	EntityType OptString `json:",omitempty,omitzero"`
 	// Only events that affected the resource with this ID.
 	EntityID OptString `json:",omitempty,omitzero"`
 	// Only events emitted under this team, as stored on the event.
 	TeamID OptString `json:",omitempty,omitzero"`
+	// Only `request.api` events of this API operation, the
+	// `payload.operation_id` they record, such as `createUser`. Repeat the
+	// parameter to match any of up to 10 operations. Requests recorded by a
+	// server version before this filter existed are not matched; they leave
+	// the list as retention removes them.
+	OperationID []string `json:",omitempty"`
+	// Only `request.api` events whose response status, the `payload.status`
+	// they record, is in this class: `4xx` is 400 to 499. Repeat the
+	// parameter to match any of several classes: `4xx` and `5xx` are the
+	// failed requests. Requests recorded by a server version before this
+	// filter existed are not matched; they leave the list as retention
+	// removes them.
+	StatusClass []ListEventsStatusClassItem `json:",omitempty"`
 	// Inclusive lower bound on `created_at` (RFC 3339).
 	CreatedAfter OptDateTime `json:",omitempty,omitzero"`
 	// Exclusive upper bound on `created_at` (RFC 3339).
@@ -1131,8 +1144,9 @@ type RollbackDeploymentParams struct {
 
 // SearchParams is parameters of search operation.
 type SearchParams struct {
-	// The project the request addresses, by the `id` that `createProject` (`POST /projects`)
-	// returns. Omit it to address the credential's own project.
+	// The project to search, by the `id` that `createProject` (`POST /projects`)
+	// returns. Omit it to search the credential's own project with a project
+	// secret, or the projects the person can act on with a session.
 	ProjectID OptProjectID `json:",omitempty,omitzero"`
 }
 

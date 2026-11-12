@@ -273,7 +273,9 @@ export class Lifecycle<R extends ServerRecord> {
   /** Whether a server that is alive answers, asking up to {@link HEALTH_ATTEMPTS} times. */
   private async answers(serverUrl: string): Promise<boolean> {
     const clock = this.options.clock ?? realClock;
-    for (const attempt of Array.from({ length: HEALTH_ATTEMPTS }, (_, index) => index + 1)) {
+    for (const attempt of Array.from({ length: HEALTH_ATTEMPTS }, (_, index) => {
+      return index + 1;
+    })) {
       if (await this.deps.health.isHealthy(serverUrl)) {
         return true;
       }
@@ -351,7 +353,9 @@ export class Lifecycle<R extends ServerRecord> {
       } finally {
         // A claim that cannot be removed is a file whose owner is gone, which
         // the next start takes over; it must not hide how this start ended.
-        await claim.release().catch(() => undefined);
+        await claim.release().catch(() => {
+          return undefined;
+        });
       }
     }
   }
@@ -472,7 +476,9 @@ export class Lifecycle<R extends ServerRecord> {
     record: R,
   ): Promise<ServerStartError<R>> {
     // The log goes first: cleaning up may remove it with the server.
-    const logTail = await this.deps.launcher.logTail?.(record, 40).catch(() => undefined);
+    const logTail = await this.deps.launcher.logTail?.(record, 40).catch(() => {
+      return undefined;
+    });
     return new ServerStartError(
       reason,
       record,
@@ -511,7 +517,9 @@ export async function claimFreePort(
     return { port: requested, release };
   }
   const first = preferred ?? firstPort;
-  for (const port of Array.from({ length: PORT_SEARCH_RANGE }, (_, index) => first + index)) {
+  for (const port of Array.from({ length: PORT_SEARCH_RANGE }, (_, index) => {
+    return first + index;
+  })) {
     if (!(await ports.isFree(port))) {
       continue;
     }

@@ -9,6 +9,7 @@ require (
 	cloud.google.com/go/spanner v1.91.0
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric v0.53.0
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace v1.33.0
+	github.com/KimMachineGun/automemlimit v1.0.1
 	github.com/descope/virtualwebauthn v1.0.5
 	github.com/go-faker/faker/v4 v4.7.0
 	github.com/go-faster/errors v0.7.1
@@ -35,7 +36,7 @@ require (
 	github.com/veqryn/slog-context v0.9.0
 	github.com/veqryn/slog-context/otel v0.9.0
 	github.com/zitadel/oidc/v3 v3.52.0
-	github.com/zitadel/passwap v0.12.1
+	github.com/zitadel/passwap v0.13.0
 	github.com/zitadel/sloggcp v0.6.0
 	go.opentelemetry.io/contrib/bridges/otelslog v0.20.0
 	go.opentelemetry.io/contrib/exporters/autoexport v0.70.0
@@ -69,6 +70,8 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 	modernc.org/sqlite v1.55.0
 )
+
+require github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58 // indirect
 
 require (
 	github.com/fsnotify/fsnotify v1.9.0 // indirect

@@ -1,14 +1,14 @@
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
+import { startedServer } from "@/commands/local-server/started";
 import { DEFAULT_LOCAL_SERVER_URL, readNearestRuntimeMetadata } from "@/lib/local-server/runtime";
 import { LocalServer } from "@/lib/local-server/server";
-import { startedServer } from "@/commands/local-server/started";
 import { LOG_LEVELS, type LogLine, logText, renderLogLine } from "@/lib/local-server/server-log";
 import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "@/lib/oclif";
-import { type Refused, reads, whole } from "@/lib/oclif/flags";
+import { reads, type Refused, whole } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
-import { painted } from "@/lib/oclif/rendering";
+import { painted, prose } from "@/lib/oclif/rendering";
 
 /** How many lines `--tail` shows when it is not given. */
 const DEFAULT_TAIL = 200;
@@ -40,13 +40,20 @@ const FOLLOW_IS_NOT_JSON_REFUSAL: Refusal = {
 /** How a directory where `zitadel start` never ran is refused. */
 const NOT_STARTED_REFUSAL: Refusal = {
   message: "Local Zitadel runtime has not been started",
-  hint: "Run `zitadel start` first.",
-  next: ["start"],
+  hint: "Start the local server first.",
+  next: [{ id: "start" }],
 };
 
+/**
+ * `zitadel logs` — show local Zitadel server logs.
+ *
+ * On a terminal, warnings are yellow and errors red. Run it in the directory
+ * the start command ran in, or one inside it: the server is found from the
+ * nearest .zitadel/local/ on the way up.
+ */
 export default class Logs extends BaseCommand {
   static override description =
-    "Show local Zitadel server logs.\n\nOn a terminal, warnings are yellow and errors red. Run it in the directory `zitadel start` ran in, or one inside it: the server is found from the nearest `.zitadel/local/` on the way up.";
+    "Show local Zitadel server logs.\n\nOn a terminal, warnings are yellow and errors red. Run it in the directory the start command ran in, or one inside it: the server is found from the nearest .zitadel/local/ on the way up.";
   static override group = CommandGroups.localDevelopment;
   static override groupOrder = 2;
 
@@ -54,7 +61,6 @@ export default class Logs extends BaseCommand {
     "<%= config.bin %> <%= command.id %> --follow",
     "<%= config.bin %> <%= command.id %> --level warn",
   ];
-
   static override flags = {
     follow: Flags.boolean({ description: "Keep printing lines as the server writes them." }),
     level: Flags.option({
@@ -89,9 +95,7 @@ export default class Logs extends BaseCommand {
     // in the nearest parent, as `doctor` and `console` find it.
     const started = await this.started.of(this.cwd);
     if (started === undefined) {
-      throw refusalError(NOT_STARTED_REFUSAL, {}, (next) => {
-        return this.suggestUnscoped(next);
-      });
+      throw refusalError(NOT_STARTED_REFUSAL, {});
     }
     const server = LocalServer.at(started.dir, {
       cliVersion: this.cliVersion,
@@ -105,20 +109,35 @@ export default class Logs extends BaseCommand {
             process.stdout.write(`${render(lines, this.isColored)}\n`);
           }
         },
+        signal: this.signal,
       });
+
+      const title = "Stopped following local Zitadel logs";
 
       return this.emit({
         status: "ok",
-        data: { title: "Stopped following local Zitadel logs." },
+        data: { title },
+        ...(this.isOnScreen ? {} : { pretty: prose("") }),
+        summary: {
+          title,
+          sections: [],
+        },
       });
     }
 
-    const { runtime, lines } = await server.logs({ tail: flags.tail, level: flags.level });
+    const { runtime, lines } = await server.logs({
+      tail: flags.tail,
+      level: flags.level,
+    });
+    const shown = lines.map((line) => {
+      return renderLogLine(line, this.isColored);
+    });
+    const title = "Local Zitadel server logs";
 
     return this.emit({
       status: "ok",
       data: {
-        title: "Local Zitadel server logs.",
+        title,
         runtime:
           runtime.backend === "binary"
             ? {
@@ -132,11 +151,20 @@ export default class Logs extends BaseCommand {
               },
         logs: logText(lines),
       },
-      pretty: painted(render(lines, this.isColored)),
+      pretty: painted(shown.join("\n")),
+      summary: {
+        title,
+        sections: [],
+        lines: shown,
+      },
     });
   }
 }
 
 function render(lines: readonly LogLine[], color: boolean): string {
-  return lines.map((line) => renderLogLine(line, color)).join("\n");
+  return lines
+    .map((line) => {
+      return renderLogLine(line, color);
+    })
+    .join("\n");
 }

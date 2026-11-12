@@ -32,6 +32,7 @@ type Handler struct {
 	keyService            service.KeyService
 	claimService          service.ClaimService
 	grantService          *service.GrantService
+	invitationService     *service.InvitationService
 	variableService       service.VariableService
 	runtime               *service.RuntimeResolver
 	pool                  *service.DB

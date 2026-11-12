@@ -1,0 +1,16 @@
+title: InvitationAcceptedPayload
+description: |
+  Payload for `invitation.accepted`. The invitation ID is the event's
+  `entity_id`, and `user_id` is the user who redeemed the link. Discriminate
+  on `type`; the object named after it says what the invitation granted. Grant
+  events the acceptance writes, such as `authz.granted`, carry this event's
+  `request_id`. There are none when the user already holds an identical
+  active grant.
+oneOf:
+  - $ref: invitation-accepted-project-member-payload.yaml
+  - $ref: invitation-accepted-team-member-payload.yaml
+discriminator:
+  propertyName: type
+  mapping:
+    project_member: invitation-accepted-project-member-payload.yaml
+    team_member: invitation-accepted-team-member-payload.yaml

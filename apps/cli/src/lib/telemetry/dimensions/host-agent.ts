@@ -6,13 +6,32 @@ class HostAgent implements Property<NodeJS.ProcessEnv, string> {
   private static readonly agents: ReadonlyArray<
     readonly [(env: NodeJS.ProcessEnv) => boolean, string]
   > = [
-    [(env) => Boolean(env.CLAUDECODE || env.CLAUDE_CODE_ENTRYPOINT), "claude_code"],
-    [(env) => Boolean(env.CURSOR_TRACE_ID || env.CURSOR_AGENT), "cursor"],
-    [(env) => env.TERM_PROGRAM === "vscode", "vscode"],
+    [
+      (env) => {
+        return Boolean(env.CLAUDECODE || env.CLAUDE_CODE_ENTRYPOINT);
+      },
+      "claude_code",
+    ],
+    [
+      (env) => {
+        return Boolean(env.CURSOR_TRACE_ID || env.CURSOR_AGENT);
+      },
+      "cursor",
+    ],
+    [
+      (env) => {
+        return env.TERM_PROGRAM === "vscode";
+      },
+      "vscode",
+    ],
   ];
 
   public value(env: NodeJS.ProcessEnv): string {
-    return HostAgent.agents.find(([matches]) => matches(env))?.[1] ?? "unknown";
+    return (
+      HostAgent.agents.find(([matches]) => {
+        return matches(env);
+      })?.[1] ?? "unknown"
+    );
   }
 }
 

@@ -27,9 +27,12 @@ test("shows the signed-in person's email, read-only", async ({ page, zitadel, se
 
   const nav = page.getByRole("navigation", { name: "Settings" });
   await expect(nav.getByRole("link", { name: "Profile" })).toHaveAttribute("aria-current", "page");
-  // Above every project: the pill names none, and the list's heading leads
-  // back up to the account's list, which Projects heads.
-  await expect(page.getByRole("button", { name: "Switch project" })).toHaveText("All projects");
+  // Above every project the person's one project stays selected, so the pill
+  // still names it (D36). The list's heading leads back up to the account's
+  // list, which Projects heads.
+  await expect(page.getByRole("button", { name: "Switch project" })).not.toHaveText(
+    /All projects|Select a project|No projects/,
+  );
   await nav.getByRole("link", { name: "Settings: back to Projects" }).click();
   const account = page.getByRole("navigation", { name: "Account" });
   await expect(account.getByRole("link", { name: "Projects" })).toHaveAttribute(

@@ -33,7 +33,7 @@ import Pull from "./commands/pull";
 import ReleaseCreate from "./commands/release/create";
 import ReleaseRevoke from "./commands/release/revoke";
 import Reset from "./commands/reset";
-import { RESOURCE_COMMANDS } from "./commands/resources";
+import { RESOURCE_COMMANDS, type ResourceTable } from "./commands/resources";
 import ResourcesList from "./commands/resources-list";
 import Setup from "./commands/setup/index";
 import SkillsAdd from "./commands/skills/add";
@@ -48,15 +48,14 @@ import VariableRm from "./commands/variable/rm";
 import VariableSet from "./commands/variable/set";
 
 /**
- * The explicit oclif command table (`oclif.commands.strategy: "explicit"` in
- * `package.json`). Keys are command ids with `:` as the topic separator;
- * oclif renders them with the configured space separator (`users list`).
- *
- * Hand-written workflow commands are listed first; the resource commands
- * (`users`, `teams`, `sessions`, …) come from the registry in
- * `commands/resources.ts`, so a new backend resource is one registry entry.
+ * The hand-written commands of the explicit oclif command table
+ * (`oclif.commands.strategy: "explicit"` in `package.json`). Keys are command
+ * ids with `:` as the topic separator; oclif renders them with the configured
+ * space separator (`users list`). The resource commands (`users`, `teams`,
+ * `sessions`, …) come from the registry in `commands/resources.ts`, so a new
+ * backend resource is one registry entry.
  */
-export const COMMANDS: Record<string, typeof Command> = {
+export const WORKFLOW_COMMANDS = {
   api: Api,
   claim: Claim,
   console: Console,
@@ -102,5 +101,28 @@ export const COMMANDS: Record<string, typeof Command> = {
   "variable:list": VariableList,
   "variable:rm": VariableRm,
   "variable:resolve": VariableResolve,
+} as const satisfies Record<string, typeof Command>;
+
+/**
+ * Every command the CLI runs: the hand-written ones, then the generated
+ * resource commands.
+ */
+export const COMMANDS: Record<string, typeof Command> = {
+  ...WORKFLOW_COMMANDS,
   ...RESOURCE_COMMANDS,
 };
+
+declare module "@/lib/suggestion" {
+  /**
+   * Every command a run can suggest, read from the command table itself, so a
+   * command is suggestible the moment it is in the table and there is nothing
+   * else to keep in step with it.
+   */
+  interface NextTable extends CommandTable {}
+}
+
+/**
+ * The hand-written commands, then the generated resource commands a
+ * hand-written one does not stand in for (`release create`).
+ */
+type CommandTable = typeof WORKFLOW_COMMANDS & Omit<ResourceTable, keyof typeof WORKFLOW_COMMANDS>;

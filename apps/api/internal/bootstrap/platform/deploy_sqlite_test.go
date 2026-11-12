@@ -71,7 +71,7 @@ func TestEnsureDeployedSQLiteServesTheServersBundle(t *testing.T) {
 	}
 	assert.Equal(t, 1, kinds[domain.ReleasePointerKindSchema], "the platform user schema")
 	assert.Positive(t, kinds[domain.ReleasePointerKindFlowDefinition], "the default login flows")
-	assert.Equal(t, 1, kinds[domain.ReleasePointerKindPolicy], "the recommended password policy")
+	assert.Equal(t, 2, kinds[domain.ReleasePointerKindPolicy], "the recommended password policy and the default sign-up policy")
 
 	// The project starts empty: everything it serves came with the release.
 	flows, err := pool.Statements().ListFlowDefinitions(

@@ -57,6 +57,7 @@ export class PublishedConfiguration {
    */
   async fetchLiveReleaseId(): Promise<string | undefined> {
     const deployment = await this.deployments.newestPrimary();
+
     return deployment?.release_id;
   }
 
@@ -68,6 +69,7 @@ export class PublishedConfiguration {
    */
   async fetchReleaseIdOfDeployment(deploymentId: string): Promise<string> {
     const deployment = await this.deployments.get(deploymentId);
+
     return deployment.release_id;
   }
 
@@ -96,10 +98,12 @@ export class PublishedConfiguration {
     switch (kind) {
       case "schema": {
         const response = await this.schemas.get(revisionId);
+
         return response.schema;
       }
       case "flow_definition": {
         const response = await this.flows.get(revisionId);
+
         return response.flow_definition;
       }
       // A kind the server pins but `.zitadel/` has no file for yet.

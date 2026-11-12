@@ -20,6 +20,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/branding"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/idpconnection"
+	"github.com/zitadel/nextgen/internal/storage/invitation"
 	"github.com/zitadel/nextgen/internal/storage/oauthsettings"
 	"github.com/zitadel/nextgen/internal/storage/policystore"
 	"github.com/zitadel/nextgen/internal/storage/release"
@@ -83,6 +84,7 @@ func TestCursorBattle_DrainAllListIncarnations(t *testing.T) {
 		t.Run("brandings", func(t *testing.T) { battleBrandings(t, d) })
 		t.Run("oauth_settings", func(t *testing.T) { battleOAuthSettings(t, d) })
 		t.Run("releases", func(t *testing.T) { battleReleases(t, d) })
+		t.Run("invitations", func(t *testing.T) { battleInvitations(t, d) })
 		t.Run("deployments", func(t *testing.T) { battleDeployments(t, d) })
 		t.Run("deployments_origin", func(t *testing.T) { battleDeploymentsOfOrigin(t, d) })
 		t.Run("deployments_live", func(t *testing.T) { battleLiveDeployments(t, d) })
@@ -883,6 +885,42 @@ func battleReleases(t *testing.T, d dialect) {
 			opts.Pagination.Cursor = cursor
 			return d.stmts.ListReleases(unfilteredListCtx(t), opts)
 		}, func(r *domain.Release) string { return r.ID })
+		assertDrainMatch(t, want, got)
+	})
+}
+
+func battleInvitations(t *testing.T, d dialect) {
+	t.Helper()
+	projectID := ensureProject(t, d.stmts)
+	now := invitationNow()
+	created := make([]*domain.Invitation, 0, 5)
+	for range 5 {
+		created = append(created, createInvitation(t, d.stmts, projectID, now.Add(time.Hour)))
+	}
+	// Sort by the index's key: created_at can tie, and id is then unrelated to
+	// insertion order.
+	slices.SortFunc(created, func(a, b *domain.Invitation) int {
+		return cmp.Or(
+			a.CreatedAt.Compare(b.CreatedAt),
+			cmp.Compare(a.ID, b.ID),
+		)
+	})
+	want := invitationIDs(created)
+	filter := database.Equal(database.Col(domain.InvitationFieldProjectID), projectID)
+	orderAsc := invitation.NewestFirst()
+	orderAsc.Direction = database.OrderAsc
+	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.InvitationField]) (*database.ListResult[*domain.Invitation], error) {
+		return d.stmts.ListInvitations(t.Context(), &database.ListOptions[domain.InvitationField]{
+			Filter: filter, Pagination: page,
+		})
+	}, func(i *domain.Invitation) string { return i.ID }, 2)
+
+	t.Run("newest_first_helper", func(t *testing.T) {
+		got := pageAll(t, len(want), nil, func(cursor []byte) (*database.ListResult[*domain.Invitation], error) {
+			opts := invitation.ListOptions(projectID, new(domain.InvitationStatusPending), nil, now, 2)
+			opts.Pagination.Cursor = cursor
+			return d.stmts.ListInvitations(t.Context(), opts)
+		}, func(i *domain.Invitation) string { return i.ID })
 		assertDrainMatch(t, want, got)
 	})
 }

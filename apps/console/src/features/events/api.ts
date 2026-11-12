@@ -1,11 +1,11 @@
 import { api } from "@/api/zitadel";
 import { LIST_PAGE_SIZE } from "@/lib/paging";
 
-import { eventsQuery, type LogEvent, type LogsSearch } from "./model";
+import { eventsQuery, type ProjectEvent, type EventsSearch } from "./model";
 
 /** One page of a project's events, newest first. */
-export interface EventPage {
-  items: LogEvent[];
+interface EventPage {
+  items: ProjectEvent[];
   nextPageToken?: string;
 }
 
@@ -24,7 +24,7 @@ export interface EventPage {
  */
 export async function listProjectEvents(
   projectId: string,
-  search: LogsSearch,
+  search: EventsSearch,
   page: { createdAfter?: string; pageToken?: string } = {},
 ): Promise<EventPage> {
   const answer = await api.listEvents({
@@ -36,17 +36,89 @@ export async function listProjectEvents(
   return { items: answer.data, nextPageToken: answer.next_page_token ?? undefined };
 }
 
+/**
+ * The events recorded after a moment under the list's filters, oldest first:
+ * what Live adds on top of the list. `createdAfter` is inclusive, so the
+ * newest event the list holds comes back too, and the caller drops what it
+ * has. A token continues the same read; a page without one has read up to
+ * now.
+ */
+export async function listNewerEvents(
+  projectId: string,
+  search: EventsSearch,
+  page: { createdAfter: string; pageToken?: string },
+): Promise<EventPage> {
+  const query = eventsQuery(search);
+  const answer = await api.listEvents({
+    project_id: projectId,
+    ...query,
+    // The later of the two starts: the list's own range may begin after the
+    // newest event it holds, when it holds none.
+    created_after:
+      query.created_after && query.created_after > page.createdAfter
+        ? query.created_after
+        : page.createdAfter,
+    order: "asc",
+    limit: LIST_PAGE_SIZE,
+    page_token: page.pageToken,
+  });
+  return { items: answer.data, nextPageToken: answer.next_page_token ?? undefined };
+}
+
+/** How many events of one request or login flow the panel lists. */
+const TIMELINE_EVENTS_LIMIT = 50;
+
+/** The events an event belongs with, oldest first; `more` says there are others. */
+export interface EventTimeline {
+  items: ProjectEvent[];
+  more: boolean;
+}
+
+/**
+ * One request's events in the order they happened, at most
+ * {@link TIMELINE_EVENTS_LIMIT}: the API call and the changes and sign-ins it
+ * made. One range of the request index; `more` says the request holds others.
+ */
+export async function listRequestEvents(
+  projectId: string,
+  requestId: string,
+): Promise<EventTimeline> {
+  const answer = await api.listEvents({
+    project_id: projectId,
+    request_id: requestId,
+    order: "asc",
+    limit: TIMELINE_EVENTS_LIMIT,
+  });
+  return { items: answer.data, more: Boolean(answer.next_page_token) };
+}
+
+/**
+ * One login flow's events in the order they happened, at most
+ * {@link TIMELINE_EVENTS_LIMIT}: every API call of the sign-in or sign-up, the
+ * checks they made, and the session and token it ended in. One range of the
+ * flow index; `more` says the flow holds others.
+ */
+export async function listFlowEvents(projectId: string, flowId: string): Promise<EventTimeline> {
+  const answer = await api.listEvents({
+    project_id: projectId,
+    flow_id: flowId,
+    order: "asc",
+    limit: TIMELINE_EVENTS_LIMIT,
+  });
+  return { items: answer.data, more: Boolean(answer.next_page_token) };
+}
+
 /** One event of the project. An id the project does not hold is a 404. */
-export function getProjectEvent(projectId: string, eventId: string): Promise<LogEvent> {
+export function getProjectEvent(projectId: string, eventId: string): Promise<ProjectEvent> {
   return api.getEvent(eventId, { project_id: projectId });
 }
 
 /**
  * The project's newest audit events, at most `limit`: the sign-ins and changes,
- * as Logs' default view lists them. The audit view is one range of an index,
+ * as Events' default view lists them. The audit view is one range of an index,
  * so the page fills up to `limit` whenever the project has that many.
  */
-export async function listRecentEvents(projectId: string, limit: number): Promise<LogEvent[]> {
+export async function listRecentEvents(projectId: string, limit: number): Promise<ProjectEvent[]> {
   const answer = await api.listEvents({
     project_id: projectId,
     ...eventsQuery({ view: "audit" }),

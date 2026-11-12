@@ -3,10 +3,11 @@ import { describe, expect, vi } from "vitest";
 import { installDependenciesForSetup, type SetupInstallInput } from "@/commands/setup/install";
 import type { BoxAction } from "@/lib/box";
 import { ZitadelError } from "@/lib/errors";
-import { environmentSelectorSuffix } from "@/lib/oclif/environment-flags";
+import { installLogSink } from "@/lib/log";
 import type { runPackageCommand } from "@/lib/package-manager";
 import { it } from "@tests/helpers/fixtures";
 import { writeJson } from "@tests/helpers/local-project";
+import { aSuggest } from "@tests/helpers/suggestions";
 import { rejectionOf } from "@tests/helpers/thrown-value";
 
 /**
@@ -15,9 +16,19 @@ import { rejectionOf } from "@tests/helpers/thrown-value";
 const SELECTOR = " --env-file .env.development.local";
 
 /**
+ * Renders the follow-ups as setup's run does, pinned to the project setup created.
+ */
+const SUGGEST = aSuggest({ envFile: ".env.development.local" }, "1.2.3");
+
+/**
  * The command that previews a deploy of the project setup created.
  */
 const PLAN_COMMAND = `npx @zitadel/cli@1.2.3 deploy --dry-run${SELECTOR}`;
+
+/**
+ * The command the box points at for the next steps once login works.
+ */
+const STATUS_COMMAND = `npx @zitadel/cli@1.2.3 status${SELECTOR}`;
 
 /**
  * The directory `--cwd` names, as typed.
@@ -26,11 +37,16 @@ const CWD_FLAG = "shop";
 
 /**
  * The ways setup leaves the install to the reader: the flag, the input that
- * sets it, and the reason the outcome gives.
+ * sets it, and what the outcome reports: skipped with its reason, or, for a
+ * dry run, the install it would run.
  */
 const SKIPS = [
-  ["--skip-install", { skipInstall: true }, "skip-install"],
-  ["--dry-run", { dryRun: true }, "dry-run"],
+  ["--skip-install", { skipInstall: true }, { status: "skipped", reason: "skip-install" }],
+  [
+    "--dry-run",
+    { dryRun: true },
+    { status: "would-run", package_manager: "npm", command: "npm install" },
+  ],
 ] as const;
 
 /**
@@ -67,6 +83,22 @@ function aFailingRunner() {
 }
 
 /**
+ * A stand-in for the command's `this.ui.task`: it runs the work and remembers
+ * the label it was given and the line the step settled on.
+ *
+ * @param steps - Where the labels are kept, in the order they were said.
+ * @returns The task.
+ */
+function recordingTask(steps: string[]): SetupInstallInput["task"] {
+  return async (label, work, done) => {
+    steps.push(label);
+    const result = await work();
+    steps.push(done?.(result) ?? label);
+    return result;
+  };
+}
+
+/**
  * Setup's install input for CLI 1.2.3, having added the Next.js SDK to the
  * project in `cwd`, as a `--json` run reads it.
  *
@@ -75,16 +107,16 @@ function aFailingRunner() {
  */
 function anInstallInput(overrides: Partial<SetupInstallInput> = {}): SetupInstallInput {
   return {
-    cliVersion: "1.2.3",
     cwd: "",
     depsAdded: ["@zitadel/sdk-next"],
     dryRun: false,
     env: {},
     issuer: "http://localhost:3000",
     json: true,
-    selector: environmentSelectorSuffix({ envFile: ".env.development.local" }),
+    suggest: SUGGEST,
     scaffoldedFramework: false,
     skipInstall: false,
+    task: recordingTask([]),
     ...overrides,
   };
 }
@@ -105,6 +137,33 @@ function textOf(actions: BoxAction[]): string {
 
 describe("installDependenciesForSetup", () => {
   describe("when setup added a dependency", () => {
+    it("reports the install as a step of the command's own chain", async ({ dir }) => {
+      await aProject(dir);
+      const steps: string[] = [];
+
+      await installDependenciesForSetup(
+        anInstallInput({ cwd: dir, run: aRunner(), task: recordingTask(steps) }),
+      );
+
+      expect(steps).toEqual(["Installing dependencies with npm install", "Installed dependencies"]);
+    });
+
+    it("reports no step when there is nothing to install", async ({ dir }) => {
+      await aProject(dir);
+      const steps: string[] = [];
+
+      await installDependenciesForSetup(
+        anInstallInput({
+          cwd: dir,
+          run: aRunner(),
+          skipInstall: true,
+          task: recordingTask(steps),
+        }),
+      );
+
+      expect(steps).toEqual([]);
+    });
+
     it("runs the install once", async ({ dir }) => {
       await aProject(dir);
       const run = aRunner();
@@ -149,10 +208,10 @@ describe("installDependenciesForSetup", () => {
     it.for([
       "Start your project: npm run dev (then open http://localhost:3000/register)",
       "register a user",
-      "log in again",
+      "sign in again",
       ".zitadel/schemas/",
       ".zitadel/flows/",
-      `See your changes before they go live: ${PLAN_COMMAND} to preview, then npx @zitadel/cli@1.2.3 deploy -m '<what changed>'${SELECTOR} to publish.`,
+      `See your changes before they go live: ${PLAN_COMMAND} to preview, then npx @zitadel/cli@1.2.3 deploy --message '<what changed>'${SELECTOR} to publish.`,
     ])("says %s in the next actions", async (said, { dir }) => {
       await aProject(dir);
 
@@ -182,7 +241,7 @@ describe("installDependenciesForSetup", () => {
         anInstallInput({ cwd: dir, run: aRunner() }),
       );
 
-      expect(result.nextCommands).toEqual(["npm run dev", PLAN_COMMAND]);
+      expect(result.nextCommands).toEqual(["npm run dev", PLAN_COMMAND, STATUS_COMMAND]);
     });
   });
 
@@ -194,11 +253,15 @@ describe("installDependenciesForSetup", () => {
         anInstallInput({ cwd: dir, run: aRunner() }),
       );
 
-      expect(result.boxActions.at(-1)).toEqual({
-        text:
-          "Once login works, this shows your next steps (customizing is covered in " +
-          "your README's Zitadel section):",
+      // One sentence per fact: the step that introduces a command says when to
+      // run it, and where customizing is written up is a sentence of its own
+      // rather than a parenthesis inside that one.
+      expect(result.boxActions.at(-2)).toEqual({
+        text: "Once login works, this shows your next steps:",
         command: `npx @zitadel/cli@1.2.3 status${SELECTOR}`,
+      });
+      expect(result.boxActions.at(-1)).toEqual({
+        text: "Customizing the login is covered in your README's Zitadel section.",
       });
     });
 
@@ -262,7 +325,7 @@ describe("installDependenciesForSetup", () => {
         anInstallInput({ cwd: dir, depsAdded: [], scaffoldedFramework: true, run: aRunner() }),
       );
 
-      expect(result.nextCommands).toEqual(["pnpm dev", PLAN_COMMAND]);
+      expect(result.nextCommands).toEqual(["pnpm dev", PLAN_COMMAND, STATUS_COMMAND]);
     });
   });
 
@@ -276,15 +339,18 @@ describe("installDependenciesForSetup", () => {
       expect(run).not.toHaveBeenCalled();
     });
 
-    it.for(SKIPS)("reports the install skipped with %s", async ([, skip, reason], { dir }) => {
-      await aProject(dir);
+    it.for(SKIPS)(
+      "reports the install it left to the reader with %s",
+      async ([, skip, reported], { dir }) => {
+        await aProject(dir);
 
-      const result = await installDependenciesForSetup(
-        anInstallInput({ cwd: dir, run: aRunner(), ...skip }),
-      );
+        const result = await installDependenciesForSetup(
+          anInstallInput({ cwd: dir, run: aRunner(), ...skip }),
+        );
 
-      expect(result.install).toMatchObject({ status: "skipped", reason });
-    });
+        expect(result.install).toMatchObject(reported);
+      },
+    );
 
     it.for(SKIPS)("suggests installing first with %s", async ([, skip], { dir }) => {
       await aProject(dir);
@@ -293,7 +359,12 @@ describe("installDependenciesForSetup", () => {
         anInstallInput({ cwd: dir, run: aRunner(), ...skip }),
       );
 
-      expect(result.nextCommands).toEqual(["npm install", "npm run dev", PLAN_COMMAND]);
+      expect(result.nextCommands).toEqual([
+        "npm install",
+        "npm run dev",
+        PLAN_COMMAND,
+        STATUS_COMMAND,
+      ]);
     });
 
     it("keeps the install step first in the box", async ({ dir }) => {
@@ -303,8 +374,10 @@ describe("installDependenciesForSetup", () => {
         anInstallInput({ cwd: dir, run: aRunner(), skipInstall: true }),
       );
 
+      // A sentence, not a second label: it says why the step is there at all,
+      // which `Next:` — the one label — cannot.
       expect(result.boxActions[0]).toEqual({
-        text: "Install dependencies:",
+        text: "Setup did not install the new dependencies, so install them first:",
         command: "npm install",
       });
     });
@@ -371,7 +444,31 @@ describe("installDependenciesForSetup", () => {
         anInstallInput({ cwd: dir, depsAdded: [], run: aRunner() }),
       );
 
-      expect(result.nextCommands).toEqual(["npm run dev", PLAN_COMMAND]);
+      expect(result.nextCommands).toEqual(["npm run dev", PLAN_COMMAND, STATUS_COMMAND]);
+    });
+  });
+
+  describe("when the install writes to the terminal itself", () => {
+    // A spinner redrawing over the package manager's own output mixes the two,
+    // and its raw mode keeps Ctrl-C from reaching the child.
+    it("says a plain line first and runs no step around it", async ({ dir }) => {
+      await aProject(dir);
+      const steps: string[] = [];
+      const said: string[] = [];
+      const restore = installLogSink((level, text) => {
+        said.push(`${level} ${text}`);
+      });
+
+      await installDependenciesForSetup(
+        anInstallInput({ cwd: dir, json: false, run: aRunner(), task: recordingTask(steps) }),
+      );
+      restore();
+
+      expect(steps).toEqual([]);
+      expect(said).toEqual([
+        "start Installing dependencies with npm install",
+        "done Installed dependencies",
+      ]);
     });
   });
 

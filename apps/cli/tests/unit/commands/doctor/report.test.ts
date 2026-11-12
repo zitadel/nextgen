@@ -11,6 +11,7 @@ import {
   renderDoctorReport,
   withCategories,
 } from "@/commands/doctor/report";
+import { aSuggest } from "@tests/helpers/suggestions";
 
 /**
  * The cause several credential checks share when the secret is gone.
@@ -51,6 +52,7 @@ function report(checks: CheckOutcome[], input: Partial<DoctorReportInput> = {}):
   return renderDoctorReport({
     checks,
     cliVersion: "1.0.0",
+    suggest: aSuggest({}, "1.0.0"),
     projectConfigured: true,
     runtime: "binary",
     port: 8080,
@@ -145,8 +147,12 @@ describe("renderDoctorReport", () => {
   describe("when a category's checks all passed", () => {
     const text = report([pass("config"), pass("schema")]);
 
-    it.each(["[✓] Project", "2 checks passed", "✓ Zitadel doctor passed."])("says %s", (said) => {
+    it.each(["[✓] Project", "2 checks passed"])("says %s", (said) => {
       expect(text).toContain(said);
+    });
+
+    it("leaves the verdict to the title above it", () => {
+      expect(text).not.toContain("Zitadel doctor passed");
     });
 
     it("collapses the category", () => {
@@ -164,12 +170,12 @@ describe("renderDoctorReport", () => {
       { name: "schema", status: "warn", message: "No schema files" },
     ]);
 
-    it.each([
-      "[!] Project",
-      "    ! No schema files",
-      "! Zitadel doctor passed with warnings in 1 category.",
-    ])("says %s", (said) => {
+    it.each(["[!] Project", "    ! No schema files"])("says %s", (said) => {
       expect(text).toContain(said);
+    });
+
+    it("leaves the verdict to the title above it", () => {
+      expect(text).not.toContain("Zitadel doctor passed");
     });
 
     it("leaves out the checks that passed", () => {
@@ -298,7 +304,10 @@ describe("renderDoctorReport", () => {
     });
 
     it("carries --cwd in the setup it offers", () => {
-      const typed = report([pass("port")], { projectConfigured: false, typedCwd: "apps/web" });
+      const typed = report([pass("port")], {
+        projectConfigured: false,
+        suggest: aSuggest({ cwd: "apps/web" }, "1.0.0"),
+      });
 
       expect(typed).toContain("→ npx @zitadel/cli@1.0.0 setup --cwd apps/web");
     });

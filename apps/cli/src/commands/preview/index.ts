@@ -1,25 +1,25 @@
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
+import { ForbiddenError, OriginService, type ZitadelClient } from "@/lib/backend";
 import {
   type Admitted,
   CommandGroups,
-  CREDENTIALS,
   type CommandResult,
+  CREDENTIALS,
   type JsonEnvelope,
   PREVIEW_CREDENTIAL,
   PreviewCommand,
 } from "@/lib/oclif";
-import { ForbiddenError, OriginService, type ZitadelClient } from "@/lib/backend";
-import { deployMessage, MESSAGE_MAX_LENGTH, messageTooLong, Publisher } from "@/lib/publish";
-
 import { filled, reads, type Refused } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
+import { prose } from "@/lib/oclif/rendering";
 import { detectPreviewUrls } from "@/lib/preview";
+import { deployMessage, MESSAGE_MAX_LENGTH, messageTooLong, Publisher } from "@/lib/publish";
 import { runsInCi } from "@/lib/telemetry/dimensions/ci-provider";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 import { parseTtl, type Ttl } from "@/lib/ttl";
 import { reportWarning } from "@/lib/warnings";
-import { prose } from "@/lib/oclif/rendering";
 
 const CREDENTIAL_REQUIRED_REFUSAL: Refusal = {
   message: "{credential} is not set",
@@ -33,7 +33,7 @@ const NO_URLS_REFUSAL: Refusal = {
 
 const PRIMARY_ORIGIN_REFUSAL: Refusal = {
   message: "{origins} is a primary origin",
-  hint: "Pass the preview URLs with --origin; production is deployed by `zitadel deploy`, after merge.",
+  hint: "Pass the preview URLs with --origin; production is deployed after merge.",
 };
 
 /** The shortest and longest a preview may live, as the server fixes them. */
@@ -56,7 +56,7 @@ const ORIGIN: Refused<string> = {
     }, "A preview cannot target the primary origins"),
   refusal: {
     message: "{problem}",
-    hint: "Pass the preview URLs with --origin; production is deployed by `zitadel deploy`, after merge.",
+    hint: "Pass the preview URLs with --origin; production is deployed after merge.",
   },
 };
 
@@ -118,7 +118,7 @@ export type PreviewVerdict =
  * must not take writes. In a CI build `development` is only a platform the
  * resolver cannot read, so it is skipped rather than taken for a preview. A
  * fork pull-request build cannot read the preview credential, so a missing one
- * skips the preview and the build carries on (#1312); `--strict` refuses
+ * skips the preview and the build carries on; `--strict` refuses
  * instead, for a trusted build that expects it.
  */
 export function previewVerdict(input: {
@@ -205,7 +205,7 @@ export async function refusePrimaryOrigins(
  * It authenticates with the narrower preview credential and never falls back
  * to the project secret. A fork pull-request build has no `ZITADEL_PREVIEW_TOKEN`
  * — the secret is not shared with forks — so a missing one warns and exits
- * cleanly rather than failing the build (#1312); `--strict` turns that warning
+ * cleanly rather than failing the build; `--strict` turns that warning
  * into a failure for a trusted build that expects the token. Outside a preview
  * or development environment there is nothing to preview — even with an explicit
  * `--origin` — so it says so and exits cleanly without writing. The last line it
@@ -217,6 +217,7 @@ export default class Preview extends PreviewCommand {
     "Deploy a release from .zitadel/ to a pull-request build's preview URLs.";
   static override group = CommandGroups.configuration;
   static override groupOrder = 2;
+
   static override examples = [
     "<%= config.bin %> preview",
     "<%= config.bin %> preview --origin https://acme-git-sso-acmeinc.vercel.app",
@@ -270,35 +271,54 @@ export default class Preview extends PreviewCommand {
       compare: false,
       json: this.isJson,
       color: this.isColored,
-      suggest: (args) => {
-        return this.suggest(args);
-      },
+      suggest: this.suggest,
     });
     for (const warning of prepared.warnings) {
       reportWarning(warning);
     }
-    for (const notice of prepared.notices) {
-      process.stdout.write(notice);
-    }
+    this.narrate(prepared.notices);
 
     // A dry run validates and resolves the targets but writes nothing — no
     // release, no deployment, no preview registration — so a pull-request build
     // can check its `.zitadel/` without publishing, as `deploy --dry-run` does.
     if (this.dryRun) {
+      const title = `Validated the preview for ${urls.length} ${new Intl.PluralRules("en").select(urls.length) === "one" ? "URL" : "URLs"} and deployed nothing (dry run)`;
+
       return this.emit({
         status: "ok",
         data: {
+          title,
           dry_run: true,
           targets: urls,
         },
         pretty: prose(
           [
-            `Validated the preview for ${urls.length} URL${urls.length === 1 ? "" : "s"}. Nothing was deployed (dry run).`,
+            title,
             ...urls.map((url) => {
               return `  - ${url}`;
             }),
           ].join("\n"),
         ),
+        summary: {
+          title,
+          sections: [],
+          lines: urls.map((url) => {
+            return `  - ${escapeControlCharacters(url)}`;
+          }),
+        },
+        next: {
+          commands: [
+            this.suggest({
+              id: "preview",
+              flags: {
+                origin: [...urls],
+                ttl: flags.ttl?.canonical,
+                message: flags.message,
+                strict: flags.strict,
+              },
+            }),
+          ],
+        },
       });
     }
 
@@ -325,9 +345,14 @@ export default class Preview extends PreviewCommand {
       };
     });
 
+    const previewUrls = `${previews.length} ${new Intl.PluralRules("en").select(previews.length) === "one" ? "URL" : "URLs"}`;
+
+    const title = `Previewed ${escapeControlCharacters(release.content_hash)} on ${previewUrls}`;
+
     return this.emit({
       status: "ok",
       data: {
+        title,
         release_id: release.id,
         content_hash: release.content_hash,
         deployment_id: deployment.id,
@@ -336,7 +361,7 @@ export default class Preview extends PreviewCommand {
       },
       pretty: prose(
         [
-          `Previewed ${release.content_hash} on ${previews.length} URL${previews.length === 1 ? "" : "s"}`,
+          `Previewed ${release.content_hash} on ${previewUrls}`,
           ...previews.map((preview) => {
             return preview.expires_at === null
               ? `  - ${preview.url}`
@@ -345,6 +370,18 @@ export default class Preview extends PreviewCommand {
           `NEXT_PUBLIC_ZITADEL_RELEASE=${release.content_hash}`,
         ].join("\n"),
       ),
+      summary: {
+        title,
+        sections: [],
+        lines: [
+          ...previews.map((preview) => {
+            return preview.expires_at === null
+              ? `  - ${escapeControlCharacters(preview.url)}`
+              : `  - ${escapeControlCharacters(preview.url)} (until ${escapeControlCharacters(preview.expires_at)})`;
+          }),
+          `NEXT_PUBLIC_ZITADEL_RELEASE=${escapeControlCharacters(release.content_hash)}`,
+        ],
+      },
     });
   }
 
@@ -364,38 +401,50 @@ export default class Preview extends PreviewCommand {
       strict,
     });
     switch (verdict) {
-      case "preview":
+      case "preview": {
         return undefined;
-      case "credential-required":
+      }
+      case "credential-required": {
         throw refusalError(CREDENTIAL_REQUIRED_REFUSAL, {
           credential,
         });
-      case "production-build":
+      }
+      case "production-build": {
         return {
           status: "skipped",
           reason: "nothing-to-preview",
-          pretty: prose(
-            "nothing to preview — production is deployed by `zitadel deploy`, after merge",
-          ),
+          summary: {
+            title: "nothing to preview — production is deployed after merge",
+            sections: [],
+          },
         };
-      case "unnamed-ci-build":
+      }
+      case "unnamed-ci-build": {
         reportWarning(
           "This CI build names no environment, so the preview is skipped. Set ZITADEL_ENV=preview in the pull-request build that should deploy one.",
         );
         return {
           status: "skipped",
           reason: "nothing-to-preview",
-          pretty: prose("nothing to preview — set ZITADEL_ENV=preview in the pull-request build"),
+          summary: {
+            title: "nothing to preview — set ZITADEL_ENV=preview in the pull-request build",
+            sections: [],
+          },
         };
-      case "no-credential":
+      }
+      case "no-credential": {
         reportWarning(
           `No preview credential (${credential}) is set, so the preview is skipped; a fork pull-request build cannot read it. Pass --strict to fail instead.`,
         );
         return {
           status: "skipped",
           reason: "no-preview-credential",
-          pretty: prose(`no preview credential (${credential}) — preview skipped`),
+          summary: {
+            title: `no preview credential (${escapeControlCharacters(credential)}) — preview skipped`,
+            sections: [],
+          },
         };
+      }
     }
   }
 }

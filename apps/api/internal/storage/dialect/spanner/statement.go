@@ -5,6 +5,7 @@ import (
 )
 
 type statements struct {
+	signupProtectionStatements
 	projectStatements
 	originStatements
 	flowDefinitionStatements
@@ -31,7 +32,9 @@ type statements struct {
 	variableStatements
 	variableSetStatements
 	claimStatements
+	invitationStatements
 	resourceScopeStatements
+	searchEntryStatements
 	authzAssignmentStatements
 	authzMembershipEdgeStatements
 	authzCatalogStatements
@@ -49,6 +52,7 @@ func (s statements) IsStatements() {}
 func newStatements(db queryExecutor) statements {
 	db = traced(db)
 	return statements{
+		signupProtectionStatements:    newSignupProtectionStatements(db),
 		projectStatements:             newProjectStatements(db),
 		originStatements:              newOriginStatements(db),
 		flowDefinitionStatements:      newFlowDefinitionStatements(db),
@@ -75,7 +79,9 @@ func newStatements(db queryExecutor) statements {
 		variableStatements:            newVariableStatements(db),
 		variableSetStatements:         newVariableSetStatements(db),
 		claimStatements:               newClaimStatements(db),
+		invitationStatements:          newInvitationStatements(db),
 		resourceScopeStatements:       newResourceScopeStatements(db),
+		searchEntryStatements:         newSearchEntryStatements(db),
 		authzAssignmentStatements:     newAuthzAssignmentStatements(db),
 		authzMembershipEdgeStatements: newAuthzMembershipEdgeStatements(db),
 		authzCatalogStatements:        newAuthzCatalogStatements(db),

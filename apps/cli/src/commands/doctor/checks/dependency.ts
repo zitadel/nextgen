@@ -1,4 +1,5 @@
 import { readPackageJson } from "@/lib/npm";
+
 import { ManagedFilesCheck, resolveArtifacts } from "./managed-files";
 import { AbstractSanityCheck, type CheckContext } from "./types";
 
@@ -24,12 +25,18 @@ export class DependencyCheck extends AbstractSanityCheck {
     ]);
     const required = (await resolveArtifacts(ctx))?.dependencies;
     if (required === undefined || required.length === 0) {
-      if (![...names].some((name) => name.startsWith("@zitadel"))) {
+      if (
+        ![...names].some((name) => {
+          return name.startsWith("@zitadel");
+        })
+      ) {
         throw new Error("no @zitadel* dependency found in package.json");
       }
       return;
     }
-    const missing = required.filter((name) => !names.has(name));
+    const missing = required.filter((name) => {
+      return !names.has(name);
+    });
     if (missing.length > 0) {
       throw new Error(`package.json does not declare ${missing.join(", ")}, which the app imports`);
     }

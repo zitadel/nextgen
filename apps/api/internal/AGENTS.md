@@ -13,7 +13,9 @@ predicate's cost grows with the rows in its tables.
   `authz_membership_edges`) cascade from `projects`.
 - Clean up anything written outside the test's project (the platform
   project, the catalog tables) with the test's own `t.Cleanup` and
-  `context.Background()`.
+  `context.Background()`, except the platform project's revisions.
+- Never delete a revision (schema, flow definition, IDP connection, policy,
+  branding) from the platform project: a test that deploys it pins them all.
 - A project created over HTTP goes through the cached handler's unwrapped
   service; remove it with `Harness.CleanupProject`.
 

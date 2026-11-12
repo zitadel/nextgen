@@ -487,8 +487,8 @@ func TestReleaseServiceRevoke(t *testing.T) {
 		// The live view narrows each deployment to the origins it still serves.
 		statements.EXPECT().ListLiveDeployments(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return(&database.ListResult[*domain.Deployment]{Items: []*domain.Deployment{
-				{ProjectID: "proj_1", ID: "dep_3", ReleaseID: "rel_1", Targets: []domain.DeploymentTarget{{Origin: "https://www.acme.com"}}},
-				{ProjectID: "proj_1", ID: "dep_2", ReleaseID: "rel_1", Targets: []domain.DeploymentTarget{{Origin: "https://pr-1-acmeinc.vercel.app"}}},
+				{ProjectID: "proj_1", ID: "dep_3", ReleaseID: "rel_1", OriginKind: domain.DeploymentOriginKindPrimary, Targets: []domain.DeploymentTarget{{Origin: "https://www.acme.com"}}},
+				{ProjectID: "proj_1", ID: "dep_2", ReleaseID: "rel_1", OriginKind: domain.DeploymentOriginKindPreview, Targets: []domain.DeploymentTarget{{Origin: "https://pr-1-acmeinc.vercel.app"}}},
 			}}, nil)
 
 		_, err := svc.Revoke(t.Context(), "proj_1", "rel_1")
@@ -497,8 +497,8 @@ func TestReleaseServiceRevoke(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, domain.ErrReleaseInUse(domain.ReleaseInUseDetails{}).Code, de.Code)
 		assert.Equal(t, domain.ReleaseInUseDetails{Origins: []domain.ReleaseInUseOrigin{
-			{Origin: "https://pr-1-acmeinc.vercel.app", DeploymentID: "dep_2"},
-			{Origin: "https://www.acme.com", DeploymentID: "dep_3"},
+			{Origin: "https://pr-1-acmeinc.vercel.app", DeploymentID: "dep_2", Kind: domain.DeploymentOriginKindPreview},
+			{Origin: "https://www.acme.com", DeploymentID: "dep_3", Kind: domain.DeploymentOriginKindPrimary},
 		}}, de.Details)
 	})
 
