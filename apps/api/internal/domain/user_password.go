@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"context"
 	"errors"
 	"time"
 	"unicode/utf8"
@@ -60,7 +61,7 @@ func NormalizePassword(password string) string {
 	return norm.NFC.String(password)
 }
 
-func HashPassword(password string, hasher crypto.Hasher) (string, error) {
+func HashPassword(ctx context.Context, password string, hasher crypto.Hasher) (string, error) {
 	normalized := NormalizePassword(password)
 	if normalized == "" {
 		return "", ErrUserPasswordEmpty()
@@ -70,7 +71,7 @@ func HashPassword(password string, hasher crypto.Hasher) (string, error) {
 	if utf8.RuneCountInString(normalized) > MaxPasswordLength {
 		return "", ErrUserPasswordTooLong().WithMessage("The password is too long. It can be at most 64 characters.")
 	}
-	hash, err := hasher.Hash(normalized)
+	hash, err := hasher.Hash(ctx, normalized)
 	if errors.Is(err, crypto.ErrPasswordTooLong) {
 		// bcrypt takes 72 bytes, fewer than 64 code points can need.
 		return "", ErrUserPasswordTooLong().
@@ -100,12 +101,12 @@ type UserPassword struct {
 // new hash could be written; the caller lets the sign-in through. Any answer
 // about the password, a mismatch or a hash that cannot be read, is
 // [ErrUserPasswordInvalid]. A check that never ran, because the server is
-// hashing as much as it allows, is reported as what it is: a caller that
-// counted it as a wrong password would lock the user out for the server's
-// load.
-func (u *UserPassword) Verify(password string, verifier crypto.RehashingVerifier) (updated string, err error) {
+// hashing as much as it allows or the caller gave up waiting, is reported as
+// what it is: a caller that counted it as a wrong password would lock the
+// user out for the server's load.
+func (u *UserPassword) Verify(ctx context.Context, password string, verifier crypto.RehashingVerifier) (updated string, err error) {
 	normalized := NormalizePassword(password)
-	updated, err = verifier.VerifyAndRehash(u.EncodedHash, normalized)
+	updated, err = verifier.VerifyAndRehash(ctx, u.EncodedHash, normalized)
 	switch {
 	case err == nil:
 		return updated, nil
@@ -113,6 +114,8 @@ func (u *UserPassword) Verify(password string, verifier crypto.RehashingVerifier
 		return "", err
 	case errors.Is(err, crypto.ErrHashingBusy):
 		return "", ErrUserPasswordHashingBusy().WithParent(err)
+	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
+		return "", err
 	default:
 		// Keep the cause: it tells a wrong password from a hash that could not be read.
 		return "", ErrUserPasswordInvalid().WithParent(err)

@@ -1,6 +1,7 @@
 package service_test
 
 import (
+	"context"
 	"errors"
 	"testing"
 	"time"
@@ -33,7 +34,7 @@ func TestAuthAttemptService_VerifyProof_PasswordBusyIsNotAFailure(t *testing.T) 
 		},
 	}, nil)
 	stmts.EXPECT().GetUserPassword(gomock.Any(), gomock.Any()).Return(&domain.UserPassword{EncodedHash: "encoded"}, nil)
-	hasher.EXPECT().VerifyAndRehash("encoded", "secret").Return("", crypto.ErrHashingBusy)
+	hasher.EXPECT().VerifyAndRehash(gomock.Any(), "encoded", "secret").Return("", crypto.ErrHashingBusy)
 	// No AuthAttemptChallengeFailed: recording one here fails the test.
 
 	svc := newAuthAttemptSvcWithHashers(ctrl, stmts, nil, nil, service.FixedProjectHasherResolver{Hasher: hasher}, nil)
@@ -53,7 +54,7 @@ func TestPasswordPolicy_HistoryBusyPassesThrough(t *testing.T) {
 	f := newHistoryFixture(t, 2)
 	f.stmts.EXPECT().GetUserPassword(gomock.Any(), gomock.Any()).Return(&domain.UserPassword{ID: "upw_current", EncodedHash: "current"}, nil)
 	f.stmts.EXPECT().GetUserPasswordHistory(gomock.Any(), "p", "u").Return(nil, nil)
-	f.verifier.EXPECT().VerifyHash("current", gomock.Any()).Return(crypto.ErrHashingBusy)
+	f.verifier.EXPECT().VerifyHash(gomock.Any(), "current", gomock.Any()).Return(crypto.ErrHashingBusy)
 
 	_, err := f.gate.CheckPassword(t.Context(), service.SetPasswordInput{ProjectID: "p", UserID: "u", Password: "candidate", SelfService: true})
 	derr, ok := errors.AsType[domain.Error](err)
@@ -66,7 +67,9 @@ func TestPasswordPolicy_HistoryBusyPassesThrough(t *testing.T) {
 func TestSetPasswordAction_Prepare_busy(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	hasher := cryptomock.NewMockPasswordHasher(ctrl)
-	hasher.EXPECT().Hash("s3cret").Return("", crypto.ErrHashingBusy)
+	hasher.EXPECT().Hash(gomock.Any(), "s3cret").DoAndReturn(func(context.Context, string) (string, error) {
+		return "", crypto.ErrHashingBusy
+	})
 
 	action := service.NewSetUserPasswordAction(service.SetPasswordInput{
 		ProjectID: "proj_1",
