@@ -148,6 +148,9 @@ type FlowStateMachine interface {
 // FlowStartInput carries everything the state machine needs to
 // bootstrap a new flow.
 type FlowStartInput struct {
+	// ID is the flow handle the caller minted. The attempt the flow creates
+	// records it, so the handoff exchange's events join the flow's.
+	ID            string
 	Definition    *FlowDefinition
 	Purpose       FlowDefinitionPurpose
 	Session       FlowSessionRef
@@ -158,8 +161,11 @@ type FlowStartInput struct {
 
 // FlowSubmitInput carries a single client submission.
 //
-// GateProofs carries the built-in signup proof to create_user. Other gate
-// names, or proofs on steps without that mutation, remain unsupported.
+// GateProofs carries the built-in signup proof to the submissions that can
+// create a user: create_user, and a passkey registration's attestation. Any
+// other submission to a step carrying that registration may bring it too and
+// leaves it unspent, since the step announces the gate. Other gate names, or
+// proofs on any other step, remain unsupported.
 type FlowSubmitInput struct {
 	Action     string
 	Fields     map[string]any
@@ -406,6 +412,7 @@ func (r *FlowStateMachineRuntime) Start(ctx context.Context, in FlowStartInput) 
 	}
 
 	state := &FlowState{
+		ID:            in.ID,
 		ProjectID:     in.Definition.ProjectID,
 		UserSchemaURL: in.UserSchemaURL,
 		FlowProgress: FlowProgress{
@@ -431,7 +438,7 @@ func (r *FlowStateMachineRuntime) Start(ctx context.Context, in FlowStartInput) 
 	if r.authAttempts == nil {
 		return FlowStepResult{}, fmt.Errorf("%w: auth-attempt service not wired", ErrFlowIntegrity())
 	}
-	attemptInput := FlowCreateAttemptInput{ProjectID: state.ProjectID}
+	attemptInput := FlowCreateAttemptInput{ProjectID: state.ProjectID, FlowID: state.ID}
 	if state.SessionID != "" {
 		sid := state.SessionID
 		attemptInput.SessionID = &sid
@@ -1101,7 +1108,7 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, def *FlowDefiniti
 	}
 
 	for name := range in.GateProofs {
-		if name != SignupGate || currentStep.OnSuccess == nil || *currentStep.OnSuccess != FlowOnSuccessCreateUser {
+		if name != SignupGate || !acceptsSignupProof(currentStep, state, in) {
 			return FlowStepResult{}, fmt.Errorf("%w: gate proofs", ErrFlowUnsupported())
 		}
 	}
@@ -1451,7 +1458,7 @@ func (r *FlowStateMachineRuntime) dropResolvedUser(pc *processCtx, reason string
 	if !hadResolvedUser {
 		return nil
 	}
-	attemptInput := FlowCreateAttemptInput{ProjectID: pc.state.ProjectID}
+	attemptInput := FlowCreateAttemptInput{ProjectID: pc.state.ProjectID, FlowID: pc.state.ID}
 	if pc.state.SessionID != "" {
 		sid := pc.state.SessionID
 		attemptInput.SessionID = &sid
@@ -2030,7 +2037,8 @@ func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowRe
 			// The verify transaction persists the credential, the user row
 			// (when the ceremony is provisional), and the attempt factors
 			// atomically — the attempt service decides provisional-or-not
-			// from the stored challenge.
+			// from the stored challenge, and a provisional one spends the
+			// sign-up proof first.
 			err := r.authAttempts.SubmitPasskeyRegistration(ctx, FlowSubmitPasskeyRegistrationInput{
 				ProjectID:      state.ProjectID,
 				AttemptID:      state.AuthAttemptID,
@@ -2039,6 +2047,8 @@ func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowRe
 				Attestation:    in.ChallengeResponse.Proof,
 				UserSchemaURL:  state.UserSchemaURL,
 				UserAttributes: state.CollectedData.UserData,
+				State:          state,
+				GateProofs:     in.GateProofs,
 			})
 			if errors.Is(err, ErrAuthAttemptProofRejected(nil)) {
 				state.ClearPendingChallenge()
@@ -2672,6 +2682,27 @@ func collectsStepFields(kind FlowActionKind, in FlowSubmitInput) bool {
 		return true
 	}
 	return kind == FlowActionKindPasskeyRegister && in.ChallengeResponse == nil
+}
+
+// acceptsSignupProof reports whether a submission to step may carry the
+// sign-up proof: one to a step that creates its user on success, or one to a
+// step carrying a passkey registration, which creates its user when the
+// attempt has none yet. Only the attestation spends the proof there, but the
+// step announces the gate for as long as the ceremony is pending, so a client
+// solves it for whatever it submits next: the password path it falls back to
+// after a cancelled prompt must not be refused for bringing it.
+func acceptsSignupProof(step *FlowDefinitionStep, state *FlowState, in FlowSubmitInput) bool {
+	if step.OnSuccess != nil && *step.OnSuccess == FlowOnSuccessCreateUser {
+		return true
+	}
+	if !stepHasActionKind(step, FlowActionKindPasskeyRegister) {
+		return false
+	}
+	pending := state.PendingChallenge != nil && state.PendingChallenge.Method == FlowChallengeMethodPasskeyRegister
+	// Without a pending registration only its attestation may bring the
+	// proof: an assertion of a sign-in the step also offers creates nobody.
+	attests := in.ChallengeResponse != nil && in.ChallengeResponse.Method == FlowChallengeMethodPasskeyRegister
+	return pending || attests
 }
 
 // stepHasActionKind reports whether the step declares any action of the

@@ -82,4 +82,18 @@ describe("console", () => {
     const json = parseJson(res.stdout) as { data: { signed_in_as: string } };
     expect(json.data.signed_in_as).toBe(admin.email);
   });
+
+  it("names the sign-in link it would mint on a dry run", async () => {
+    const parent = await mkdtemp(join(tmpdir(), "zitadel-console-"));
+    tempDirs.push(parent);
+    await ensureLocalAdmin(parent);
+
+    const res = await runCliForTest(["console", "--cwd", parent, "--json", "--dry-run"]);
+
+    const json = parseJson(res.stdout) as { data: { dry_run: boolean; title: string } };
+    expect(json.data).toMatchObject({
+      dry_run: true,
+      title: "Would mint a console sign-in link (dry run)",
+    });
+  });
 });

@@ -3,7 +3,7 @@ post:
   operationId: flowSignupChallengeIssued
   summary: flow.signup_challenge.issued
   description: |
-    A password signup proof-of-work challenge was issued.
+    A sign-up proof-of-work challenge was issued.
 
     The body is the event as `GET /events` returns it.
   tags:

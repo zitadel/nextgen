@@ -40,7 +40,7 @@ const ROOT: RootMount = {
  * Next.js — whose middleware runs the proxy server-side — a SPA has no server,
  * so the dev proxy provides the same-origin `/__nextgen` path locally. In
  * production that path comes from a platform rewrite or minimal worker
- * (ADR 036); CLI scaffolding for it is tracked in issue #560.
+ * (ADR 036).
  */
 export class QwikPatcher extends AbstractRulePatcher implements ViteSupport {
   canPatch(framework: string): boolean {

@@ -1,17 +1,24 @@
 package crypto
 
+import "context"
+
+// Hasher hashes a password. The context bounds the wait for a hashing slot, see
+// [HashConcurrencyConfig]; the hash itself does not stop when it ends.
 type Hasher interface {
-	Hash(string) (string, error)
+	Hash(ctx context.Context, password string) (string, error)
 }
 
+// HashVerifier checks a password against an encoded hash. The context bounds
+// the wait for a hashing slot, as for [Hasher].
 type HashVerifier interface {
-	VerifyHash(encoded string, target string) error
+	VerifyHash(ctx context.Context, encoded string, target string) error
 }
 
 // RehashingVerifier verifies a password and returns a new hash when the stored
-// one is outdated. See [PasswapHasher.VerifyAndRehash].
+// one is outdated. See [PasswapHasher.VerifyAndRehash]. The context bounds the
+// wait for a hashing slot, as for [Hasher].
 type RehashingVerifier interface {
-	VerifyAndRehash(encoded string, target string) (updated string, err error)
+	VerifyAndRehash(ctx context.Context, encoded string, target string) (updated string, err error)
 }
 
 // PasswordHasher writes new hashes and moves outdated ones to its own method.

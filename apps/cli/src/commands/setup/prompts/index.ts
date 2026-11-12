@@ -18,16 +18,16 @@ import { SocialSignInPrompt } from "./social-sign-in";
 import type { SetupPrompt } from "./types";
 import { UseCasePrompt } from "./use-case";
 
-export type { PromptContext, SetupAnswers, SetupPrompt, SsoAnswer, SsoDraft } from "./types";
-export { completeSso } from "./types";
 export { DevPortPrompt } from "./dev-port";
 export { FrameworkConfirmPrompt } from "./framework-confirm";
 export { PasswordPolicyPrompt } from "./password-policy";
+export { PickFrameworkPrompt } from "./pick-framework";
 export { ServerPrompt } from "./server";
 export { SignInPresetPrompt } from "./sign-in-preset";
 export { askCustomSettings, SocialSignInPrompt } from "./social-sign-in";
+export type { PromptContext, SetupAnswers, SetupPrompt, SsoAnswer, SsoDraft } from "./types";
+export { completeSso } from "./types";
 export { UseCasePrompt } from "./use-case";
-export { PickFrameworkPrompt } from "./pick-framework";
 
 /** Every question the main setup wizard asks, in ask order. */
 export const SETUP_PROMPTS: ReadonlyArray<SetupPrompt> = [

@@ -5,7 +5,12 @@ import { clearSessionCaches } from "@/lib/session-cache";
 import type { SearchHit } from "./model";
 import { RECENT_HIT_LIMIT, recentHits, rememberHit } from "./recents";
 
-const hit = (id: string, type: SearchHit["type"] = "user"): SearchHit => ({ type, id, title: id });
+const hit = (id: string, type: SearchHit["type"] = "user"): SearchHit => ({
+  type,
+  id,
+  projectId: "proj_1",
+  title: id,
+});
 
 describe("recent hits", () => {
   it("lists a project's hits most recent first, each once", () => {

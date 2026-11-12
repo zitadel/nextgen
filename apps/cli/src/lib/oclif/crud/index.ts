@@ -23,6 +23,12 @@ import type {
  * destructive-action guards, and the JSON / table envelopes.
  */
 
+export type { Assignment } from "./assign";
+export { readAssignment, readAssignments } from "./assign";
+export { chosenColumns } from "./columns";
+export { describeRegistry } from "./describe";
+export { jsonValue, mergeDocuments, setAt, typedValue, valueAt } from "./document";
+export type { BodyField, DescribeOptions, FieldKind } from "./fields";
 export {
   bodyFieldFlags,
   bodyFromFlags,
@@ -31,27 +37,21 @@ export {
   fieldExample,
   flagsAloneMayBeIncomplete,
 } from "./fields";
-export type { BodyField, DescribeOptions, FieldKind } from "./fields";
-export { readAssignment, readAssignments } from "./assign";
-export type { Assignment } from "./assign";
-export { jsonValue, mergeDocuments, setAt, typedValue, valueAt } from "./document";
-export { findCredential, isSecretKey, redactCredentials } from "./secrets";
-export type { Credential, CredentialContext, References } from "./secrets";
-export { describeRegistry } from "./describe";
-export { DEFAULT_WIRE, wireOf } from "./wire";
-export { parseFilter, parseSort } from "./query";
-export { chosenColumns } from "./columns";
-export { allows, fieldPaths, observedPaths, suggestable } from "./paths";
-export type { FieldPaths } from "./paths";
-export { bindOperation, definitionOf, ResourceCommand } from "./ops/command";
 export type {
   OperationClass,
   OperationDefinition,
   OperationInput,
   OperationStatics,
 } from "./ops/command";
-export { CreateOperation, DeleteOperation, GetOperation, ListOperation, UpdateOperation };
+export { bindOperation, definitionOf, ResourceCommand } from "./ops/command";
+export type { FieldPaths } from "./paths";
+export { allows, fieldPaths, observedPaths, suggestable } from "./paths";
+export { parseFilter, parseSort } from "./query";
+export type { Credential, CredentialContext, References } from "./secrets";
+export { findCredential, isSecretKey, redactCredentials } from "./secrets";
 export type * from "./types";
+export { DEFAULT_WIRE, wireOf } from "./wire";
+export { CreateOperation, DeleteOperation, GetOperation, ListOperation, UpdateOperation };
 
 /**
  * Builds the command classes for every registry entry, keyed by oclif command
@@ -62,17 +62,18 @@ export type * from "./types";
 export const buildResourceCommands = <Ctx>(
   registry: ResourceRegistry<Ctx>,
   options: ResourceCommandOptions<Ctx>,
-): Readonly<Record<ResourceCommandId, typeof Command>> =>
-  Object.fromEntries(
+): Readonly<Record<ResourceCommandId, typeof Command>> => {
+  return Object.fromEntries(
     Object.entries(registry).flatMap(([topic, resource]) => {
       const bind = <Spec>(
         verb: Verb,
         operation: OperationClass<Ctx, Spec>,
         spec: Spec | undefined,
-      ): readonly (readonly [ResourceCommandId, typeof Command])[] =>
-        spec === undefined
+      ): readonly (readonly [ResourceCommandId, typeof Command])[] => {
+        return spec === undefined
           ? []
           : [[`${topic}:${verb}`, bindOperation(operation, { topic, resource, spec, options })]];
+      };
       return [
         ...bind("list", ListOperation, resource.list),
         ...bind("get", GetOperation, resource.get),
@@ -82,6 +83,7 @@ export const buildResourceCommands = <Ctx>(
       ];
     }),
   );
+};
 
 /** Re-exported for registries that want to describe a resource in isolation. */
 export type { ResourceDescriptor };

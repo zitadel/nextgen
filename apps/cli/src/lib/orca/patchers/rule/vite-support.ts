@@ -104,8 +104,9 @@ function isLegacyManagedProxy(source: string): boolean {
       'loadEnv("development", process.cwd(), "ZITADEL_").ZITADEL_PROJECT_SECRET',
       'throw new Error("ZITADEL_PROJECT_SECRET is not set; add it to .env.local (zitadel setup writes it).")',
       "const bearer = `Bearer ${secret}`;",
-    ].every((fingerprint) => source.includes(fingerprint)) &&
-    LEGACY_PROXY_REQUEST_LISTENER.test(source)
+    ].every((fingerprint) => {
+      return source.includes(fingerprint);
+    }) && LEGACY_PROXY_REQUEST_LISTENER.test(source)
   );
 }
 
@@ -129,11 +130,9 @@ function forwardAppOrigin(source: string): string {
   if (!hasProxyCredentialPolicyMarker(source) || /\bxfwd\s*:/.test(source)) {
     return source;
   }
-  return source.replace(
-    HOST_KEEPING_ENTRY,
-    (_entry, head: string, indent: string, eol: string) =>
-      `${head}${indent}changeOrigin: true,${eol}${indent}xfwd: true,${eol}`,
-  );
+  return source.replace(HOST_KEEPING_ENTRY, (_entry, head: string, indent: string, eol: string) => {
+    return `${head}${indent}changeOrigin: true,${eol}${indent}xfwd: true,${eol}`;
+  });
 }
 
 /** The imports that the injected proxy entry depends on. */
@@ -169,9 +168,9 @@ export function viteProxyEdit(
     // the proxy entry (target, rewrite, TLS options, comments) remain intact.
     const migrated =
       source !== undefined && isLegacyManagedProxy(source)
-        ? source.replace(LEGACY_PROXY_REQUEST_LISTENER, (_listener, indent: string) =>
-            exchangeOnlyProxyRequestListener(indent),
-          )
+        ? source.replace(LEGACY_PROXY_REQUEST_LISTENER, (_listener, indent: string) => {
+            return exchangeOnlyProxyRequestListener(indent);
+          })
         : source;
     const workingSource = migrated === undefined ? undefined : forwardAppOrigin(migrated);
 
@@ -231,11 +230,12 @@ interface AstNode {
 
 /** The property `name` of an object literal node, if it has one. */
 function propertyOf(node: AstNode | undefined, name: string): AstNode | undefined {
-  return node?.properties?.find(
-    (property) =>
+  return node?.properties?.find((property) => {
+    return (
       (property.type === "ObjectProperty" || property.type === "ObjectMethod") &&
-      (property.key?.name === name || property.key?.value === name),
-  );
+      (property.key?.name === name || property.key?.value === name)
+    );
+  });
 }
 
 /**
@@ -297,7 +297,9 @@ function cliEntryOf(config: unknown, source: string): CliEntry | undefined {
   const statements = (body as AstNode).body as ReadonlyArray<AstNode>;
   for (const node of statements) {
     const printed = fingerprint(source.slice(node.start, node.end));
-    const known = HOOK_FINGERPRINTS.find((hook) => hook.fingerprint === printed);
+    const known = HOOK_FINGERPRINTS.find((hook) => {
+      return hook.fingerprint === printed;
+    });
     if (known) {
       return { entry, statements, hook: { node, version: known.version } };
     }
@@ -331,7 +333,10 @@ const V1_HOOK_STATEMENTS = 4;
 function withCurrentHooks(text: string): string | undefined {
   const marker = text.indexOf(`/* ${SESSION_COOKIE_MARKER_V1} */`);
   const statements = marker === -1 ? undefined : cliEntry(text)?.statements;
-  const first = statements?.findIndex((statement) => statement.start > marker) ?? -1;
+  const first =
+    statements?.findIndex((statement) => {
+      return statement.start > marker;
+    }) ?? -1;
   const last = statements?.[first + V1_HOOK_STATEMENTS - 1];
   if (first === -1 || !last) {
     return undefined;

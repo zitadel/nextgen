@@ -616,7 +616,7 @@ describe("projects screen", () => {
 // Opened on the way to a screen that needs a project (`?next=`), the page is
 // the choice of one and nothing else (D31).
 describe("project picker", () => {
-  const TO_LOGS = `/projects?next=${encodeURIComponent("/events")}`;
+  const TO_EVENTS = `/projects?next=${encodeURIComponent("/events")}`;
 
   it("lists the projects to choose from, without the list screen's columns and menus", async () => {
     server.use(
@@ -635,9 +635,9 @@ describe("project picker", () => {
         }),
       ),
     );
-    await renderProjects(TO_LOGS);
+    await renderProjects(TO_EVENTS);
 
-    expect(await screen.findByRole("heading", { name: "Continue to Logs" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Continue to Events" })).toBeInTheDocument();
     const list = within(screen.getByRole("list", { name: "Projects" }));
     const [first, second] = list.getAllByRole("listitem") as [HTMLElement, HTMLElement];
     // Each project goes on to the screen that was asked for.
@@ -668,13 +668,13 @@ describe("project picker", () => {
       ),
       http.get("http://localhost/api/v1/events", () => HttpResponse.json({ data: [] })),
     );
-    const router = await renderProjects(TO_LOGS);
+    const router = await renderProjects(TO_EVENTS);
 
     await userEvent.click(await screen.findByRole("link", { name: "Delta" }));
 
     await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/events"));
     expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_2" });
-    expect(await screen.findByRole("heading", { name: "Logs" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Events" })).toBeInTheDocument();
   });
 
   it("searches every project on the server and stays on the way to the screen", async () => {
@@ -693,7 +693,7 @@ describe("project picker", () => {
         return HttpResponse.json({ projects: [listed("proj_9", "Zephyr")] });
       }),
     );
-    const router = await renderProjects(TO_LOGS);
+    const router = await renderProjects(TO_EVENTS);
 
     await userEvent.type(await screen.findByRole("searchbox", { name: "Search projects" }), "zep");
 
@@ -708,7 +708,7 @@ describe("project picker", () => {
     await waitFor(() =>
       expect(router.state.resolvedLocation?.search).toMatchObject({ q: "zep", next: "/events" }),
     );
-    expect(screen.getByRole("heading", { name: "Continue to Logs" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Continue to Events" })).toBeInTheDocument();
     expect(screen.getByRole("searchbox", { name: "Search projects" })).toHaveValue("zep");
   });
 
@@ -722,10 +722,10 @@ describe("project picker", () => {
         ),
       ),
     );
-    await renderProjects(`${TO_LOGS}&q=zzz`);
+    await renderProjects(`${TO_EVENTS}&q=zzz`);
 
     expect(await screen.findByText("No projects match “zzz”.")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Continue to Logs" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Continue to Events" })).toBeInTheDocument();
     expect(screen.getByRole("searchbox", { name: "Search projects" })).toHaveValue("zzz");
   });
 
@@ -739,7 +739,7 @@ describe("project picker", () => {
         ),
       ),
     );
-    await renderProjects(TO_LOGS);
+    await renderProjects(TO_EVENTS);
 
     await userEvent.click(await screen.findByRole("button", { name: "Load more" }));
 
@@ -753,7 +753,7 @@ describe("project picker", () => {
     server.use(
       http.get(PROJECTS_URL, () => HttpResponse.json({ projects: [listed("proj_1", "River")] })),
     );
-    await renderProjects(TO_LOGS);
+    await renderProjects(TO_EVENTS);
 
     await userEvent.click(await screen.findByRole("button", { name: "New project" }));
 
@@ -763,11 +763,11 @@ describe("project picker", () => {
 
   it("is the way to a first project while there are none to choose from", async () => {
     server.use(http.get(PROJECTS_URL, () => HttpResponse.json({ projects: [] })));
-    await renderProjects(TO_LOGS);
+    await renderProjects(TO_EVENTS);
 
     // Still named for the screen, but there is nothing to choose: the page is
     // the command that makes a first project.
-    expect(await screen.findByRole("heading", { name: "Continue to Logs" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Continue to Events" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Create your first project" })).toBeInTheDocument();
     expect(screen.queryByText("Choose a project to continue.")).not.toBeInTheDocument();
     expect(screen.queryByRole("list", { name: "Projects" })).not.toBeInTheDocument();

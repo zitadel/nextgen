@@ -3,15 +3,15 @@ import {
   DEFAULT_SCOPES,
   type DisplayName,
   type Issuer,
+  type ProviderSelection,
   parseConnectionSlug,
   parseDisplayName,
   parseIssuer,
   parseScopes,
-  type ProviderSelection,
   RESERVED_SLUGS,
 } from "@zitadel/config/idp";
 
-import type { Asker } from "@/lib/input";
+import type { Questions } from "@/lib/ui";
 import type { Connection, ConnectionSetting, UserSchema, ZitadelConfig } from "@/lib/zitadel";
 
 import {
@@ -166,6 +166,7 @@ export class ProviderChoice {
     }
     const example = customExample(ENABLE_FLAG_NAMES);
     const selection = selectionFromFlags(provider, values, ENABLE_FLAG_NAMES, example);
+
     return new ProviderChoice(selection, values);
   }
 
@@ -174,18 +175,19 @@ export class ProviderChoice {
    *
    * @param target - The configuration and schema a custom connection is
    *   checked against.
-   * @param ask - How a question is asked: the running command's `input`.
+   * @param ask - How a question is asked: the running command's `this.ask`.
    * @returns The provider, checked.
    * @throws {@link ZitadelError} When a setting is refused.
    * @throws {@link ConfigError} When the slug names a connection that cannot
    *   be reused, or a flow would reject the provider.
    */
-  async resolve(target: ProviderTarget, ask: Asker): Promise<ProviderSelection> {
+  async resolve(target: ProviderTarget, ask: Questions): Promise<ProviderSelection> {
     if (this.selection !== undefined) {
       return this.selection;
     }
     const settings = await this.askCustomSettings(target, ask);
     const example = customExample(ENABLE_FLAG_NAMES);
+
     return selectionFromFlags(CUSTOM_PROVIDER, settings, ENABLE_FLAG_NAMES, example);
   }
 
@@ -204,6 +206,7 @@ export class ProviderChoice {
     if (this.values.scopes !== undefined) {
       return ["display name", "scopes"];
     }
+
     return ["display name"];
   }
 
@@ -226,7 +229,10 @@ export class ProviderChoice {
    */
   readStoredSettings(existing: Connection | undefined): StoredSettings {
     if (existing === undefined) {
-      return { displayName: undefined, issuer: undefined };
+      return {
+        displayName: undefined,
+        issuer: undefined,
+      };
     }
     existing.refuseNonOidc();
     const displayName = ProviderChoice.unlessGiven(this.values.displayName, () => {
@@ -235,7 +241,11 @@ export class ProviderChoice {
     const issuer = ProviderChoice.unlessGiven(this.values.issuer, () => {
       return existing.readUsableIssuer();
     });
-    return { displayName, issuer };
+
+    return {
+      displayName,
+      issuer,
+    };
   }
 
   /**
@@ -258,11 +268,10 @@ export class ProviderChoice {
    */
   private async askCustomSettings(
     target: ProviderTarget,
-    ask: Asker,
+    ask: Questions,
   ): Promise<Required<CustomFlagValues>> {
     const given = this.values;
-    const slug = await ask({
-      kind: "text",
+    const slug = await ask.text({
       name: "connection name",
       message:
         "What would you like to call this connection? It is used in your configuration, for example acme-sso.",
@@ -278,30 +287,33 @@ export class ProviderChoice {
     // An existing connection is described by its file, so nothing it already
     // holds is asked again; reuse never applies scopes, so they are not asked.
     const stored = this.readStoredSettings(existing);
-    const displayName = await ask({
-      kind: "text",
+    const displayName = await ask.text({
       name: "display name",
       message: "What name should the sign-in button show? For example Acme SSO.",
       parse: parseDisplayName,
       given: given.displayName ?? stored.displayName,
     });
-    const issuer = await ask({
-      kind: "text",
+    const issuer = await ask.text({
       name: "issuer",
       message: "What is the issuer URL of the provider?",
       parse: parseIssuer,
       given: given.issuer ?? stored.issuer,
     });
     const defaultScopes = DEFAULT_SCOPES.join(" ");
-    const scopes = await ask({
-      kind: "text",
+    const scopes = await ask.text({
       name: "scopes",
       message: "Which scopes should we request? Separate them with spaces.",
       parse: parseScopes,
       given: given.scopes ?? ProviderChoice.keptScopes(existing, defaultScopes),
       initialValue: defaultScopes,
     });
-    return { slug, displayName, issuer, scopes: scopes.join(" ") };
+
+    return {
+      slug,
+      displayName,
+      issuer,
+      scopes: scopes.join(" "),
+    };
   }
 
   /**
@@ -317,6 +329,7 @@ export class ProviderChoice {
     if (!parsed.ok) {
       return undefined;
     }
+
     return parsed.value;
   }
 
@@ -336,6 +349,7 @@ export class ProviderChoice {
     if (existing === undefined) {
       return undefined;
     }
+
     return defaultScopes;
   }
 
@@ -351,6 +365,7 @@ export class ProviderChoice {
     if (given !== undefined) {
       return undefined;
     }
+
     return read();
   }
 }
