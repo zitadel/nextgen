@@ -54,8 +54,8 @@ through any wrapping.
 ## The platform project's configuration
 
 - A resource a project deploys (what a release ships, a deployment serves or
-  an origin admits) sets `configuration` on its `resourceAccess`: the reserved
-  platform project refuses its writes
+  an origin admits) sets `configuration` on its `resourceAccess`: on the
+  reserved platform project its writes ask for the admin role
   ([Console ADR 0004 §1](../../console/docs/adrs/0004-console-deployment-modes.md#1-every-bootstrapped-deployment-has-one-reserved-platform-project)).
 - `TestEveryGatedResourceIsClassedForThePlatformProject` fails until a new
   resource is classed as configuration or as the platform project's own.

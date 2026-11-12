@@ -274,30 +274,27 @@ func TestPlatformProjectReadGatesTheRoot(t *testing.T) {
 	}
 }
 
-// TestPinnedPlatformProjectKeepsItsConfiguration pins the other side of
-// Console ADR 0004 §1: the server refuses configuration writes on the
-// reserved platform project only, the row bootstrap provisions. The harness's
-// platform project is an ordinary project the deployment pins, as a
-// self-hoster's only project is, so its administrator still adds and removes
-// an origin from the Console.
-func TestPinnedPlatformProjectKeepsItsConfiguration(t *testing.T) {
+// TestPinnedPlatformProjectKeepsItsRelations pins the other side of Console
+// ADR 0004 §1: writing configuration asks for the admin role on the reserved
+// platform project only, the row bootstrap provisions. The harness's platform
+// project is an ordinary project the deployment pins, as a self-hoster's only
+// project is, so an editor of it still adds an origin from the Console.
+func TestPinnedPlatformProjectKeepsItsRelations(t *testing.T) {
 	t.Parallel()
 
 	platform := harness.EnsurePlatformProject(t)
 	require.NotEqual(t, domain.PlatformProjectID, platform.ID, "the harness pins an ordinary project")
 	path := "/projects/" + platform.ID + "/origins"
 
-	adminID := platformUser(t)
-	admin := harness.SeedProjectAdmin(t, platform.ID, adminID)
-	t.Cleanup(func() {
-		_ = harness.EnsureServiceDB(t).Statements().RevokeAuthzAssignment(context.Background(), platform.ID, admin.ID)
-	})
-	cookie := platformSessionCookie(t, adminID)
+	editorID := platformUser(t)
+	editor := harness.SeedProjectEditor(t, platform.ID, editorID)
 	pattern := fmt.Sprintf("https://pinned-%d.example.com", time.Now().UnixNano())
+	t.Cleanup(func() {
+		_ = harness.EnsureProjectService(t).RemoveOrigin(context.Background(), platform.ID, pattern)
+		_ = harness.EnsureServiceDB(t).Statements().RevokeAuthzAssignment(context.Background(), platform.ID, editor.ID)
+	})
 
-	status, body := consoleCall(t, cookie, http.MethodPost, path, fmt.Sprintf(`{"pattern":%q,"kind":"preview"}`, pattern))
-	require.Less(t, status, http.StatusBadRequest, body)
-
-	status, body = consoleCall(t, cookie, http.MethodPost, path+"/remove", fmt.Sprintf(`{"pattern":%q}`, pattern))
+	status, body := consoleCall(t, platformSessionCookie(t, editorID), http.MethodPost, path,
+		fmt.Sprintf(`{"pattern":%q,"kind":"preview"}`, pattern))
 	assert.Less(t, status, http.StatusBadRequest, body)
 }

@@ -52,7 +52,7 @@
 > the reserved platform project is the Console's root level, not a project to
 > select. The runtime document names it (§3), and its surfaces render at the
 > root from effective permissions on it (§5). It holds who may use the
-> platform and no configuration of its own, which the server enforces (§1).
+> platform, and writing its configuration asks for its admin role (§1).
 
 ## Context
 
@@ -110,30 +110,30 @@ The reserved project is a **control project**, not a super-project:
   054; and
 - it is never the project a customer's application signs its users into.
 
-> **Amendment (2026-11-11, D41):** the last point is the server's to hold,
-> not a convention. The reserved project manages who may use the platform,
-> so it has a project's resources (users, teams, grants, invitations,
-> sessions, events) and no configuration of its own. What signs someone in to
-> it (its user schema, its login flows, its policies and its one primary
-> origin) is what the server ships and deploys at every start
+> **Amendment (2026-11-11, D41):** the last point is for the people who own
+> the platform to keep, and the server holds them to it. The reserved project
+> manages who may use the platform. It is a project like any other in what
+> it has (users, teams, grants, and the configuration that signs them in),
+> and the server deploys its defaults at every start
 > (`internal/bootstrap/platform`).
 >
-> The API refuses every write of configuration on it with the resource's
-> `permission_denied`: origins, releases, deployments and their rollback,
-> variables, schemas, flow definitions, policies, branding and identity
-> provider connections. The refusal comes after the caller's own access
-> check and holds whatever they are granted there, a platform operator
-> included. Reads are unchanged, and so is every write that says who may use
-> the platform.
+> Writing its configuration asks for its admin role. On the reserved project
+> the API asks `admin` of every configuration write that asks `editor` on
+> another project: origins, releases, deployments and their rollback,
+> previews, variables, schemas, flow definitions, policies, branding and
+> identity provider connections. A platform operator holds it (root ADR 075).
+> Someone granted less is answered the resource's `permission_denied`. Reads,
+> and every write that says who may use the platform, ask what they ask on
+> any project.
 >
 > The reason is the principal home: every user of the reserved project can be
 > granted any project (root ADR 053 §2), gets a team at sign-up (root ADR 046
-> §4) and can claim. One admitted origin would let an application sign its end
-> users in there and make each of them such an account.
+> §4) and can claim. One admitted origin lets an application sign its end
+> users in there and makes each of them such an account.
 >
 > "Reserved" is the row bootstrap provisions (§2). A project the deployment
 > merely pins, and the first-created fallback, are ordinary projects and keep
-> their configuration.
+> the relations every project asks.
 
 Standalone remains the default product posture, not a different authorization
 model. Its bootstrap may create one initial customer project and one owner
@@ -381,16 +381,17 @@ export const Route = createFileRoute("/_authed/billing/")({
 The sidebar and a route guard hide unavailable routes, but UI gating is never
 authorization. Each API operation performs its own target-scoped check.
 
-> **Amendment (2026-11-11, D41):** the reserved platform project's
-> surfaces (its users and its events) are root surfaces,
-> rows of the root's sidebar beside Projects, and the same rule governs them,
-> with the reserved project as the target. They are listed when the signed-in person
-> can act on that project, which the Console learns by reading it
-> (`GET /projects/{platform_project_id}`) until effective permissions are
-> exposed. Each page's own reads then decide what it shows. Being signed in
-> to the reserved project, or homed in it, lists none of them: §1's control
-> project grants nothing by itself, and root ADR 075's operators reach these
-> surfaces through `operator from platform`, as they reach every project.
+> **Amendment (2026-11-11, D41):** the reserved platform project's screens
+> are root surfaces: a project's own screens, rows of the root's sidebar
+> beside Projects, and the same rule governs them, with the reserved project
+> as the target. They are listed, and the project may be the Console's
+> selection, when the signed-in person can act on that project, which the
+> Console learns by reading it (`GET /projects/{platform_project_id}`) until
+> effective permissions are exposed. Each screen's own reads then decide what
+> it shows, and the server what it may write (§1). Being signed in to the
+> reserved project, or homed in it, lists none of them: §1's control project
+> grants nothing by itself, and root ADR 075's operators reach these surfaces
+> through `operator from platform`, as they reach every project.
 
 ### 6. Standalone and platform differ in defaults, not primitives
 

@@ -23,7 +23,7 @@ This means:
 
 Same resources, different project context. The SDK talks to `/users`, `/teams`, `/team_memberships` at both scales — the scope comes from the `project_id` resolved by the resource-scope index (see [`url-architecture.md`](url-architecture.md)).
 
-The platform project has these resources and no configuration of its own. What signs its users in is what the server ships and deploys at every start, and the API refuses to write it ([Console ADR 0004 §1](../../../apps/console/docs/adrs/0004-console-deployment-modes.md#1-every-bootstrapped-deployment-has-one-reserved-platform-project)).
+The platform project holds who may use the platform, never an application's end users, so writing its configuration asks for its admin role ([Console ADR 0004 §1](../../../apps/console/docs/adrs/0004-console-deployment-modes.md#1-every-bootstrapped-deployment-has-one-reserved-platform-project)).
 
 ## Self-hosted exposes the same API shape as cloud
 

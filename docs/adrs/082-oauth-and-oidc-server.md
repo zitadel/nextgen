@@ -25,10 +25,11 @@
 >
 > **Amendment (2026-11-11) — [D41](../design/decisions.md),
 > [Console ADR 0004 §1](../../apps/console/docs/adrs/0004-console-deployment-modes.md#1-every-bootstrapped-deployment-has-one-reserved-platform-project):**
-> the reserved platform project never holds a customer's app. Its apps are
-> Zitadel's own (the Console, the CLI, MCP clients acting on Zitadel), which
-> the server declares. When applications are built, declaring or registering
-> one on it through the API is refused as its other configuration is.
+> an app on the reserved platform project signs people in to the platform
+> itself (the Console, the CLI, MCP clients acting on Zitadel), never a
+> customer's end users. When applications are built, declaring or registering
+> one there asks for the project's admin role, as its other configuration
+> does.
 
 ## TL;DR
 

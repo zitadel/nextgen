@@ -463,10 +463,10 @@ posture can attach to it.
 
 > **Amendment (2026-11-11) —
 > [Console ADR 0004 §1](../../apps/console/docs/adrs/0004-console-deployment-modes.md#1-every-bootstrapped-deployment-has-one-reserved-platform-project):**
-> the identity home is closed to end users by the server. No role on the
-> reserved platform project, an operator's included, writes its
-> configuration through the API: an admitted origin would make an
-> application's end users principals of this ADR.
+> writing the reserved platform project's configuration asks for its admin
+> role, which an operator holds. An admitted origin would make an
+> application's end users principals of this ADR, so that is for the people
+> who own the platform to decide, not for an editor.
 
 ## Testing obligations
 

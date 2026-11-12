@@ -66,7 +66,8 @@ type resourceAccess struct {
 	denied    func() domain.Error
 	// configuration marks what a release ships, a deployment serves or an
 	// origin admits: the configuration a project deploys. On the reserved
-	// platform project it is the server's alone (refusePlatformConfiguration).
+	// platform project only its admins write it
+	// (requirePlatformConfigurationAdmin).
 	configuration bool
 }
 
@@ -381,29 +382,36 @@ func (h *Handler) requireProjectAccess(ctx context.Context, projectID string, re
 	if err := requireProjectAccess(ctx, h.pool.Statements(), projectID, res, op); err != nil {
 		return err
 	}
-	return h.refusePlatformConfiguration(projectID, res, op)
+	return h.requirePlatformConfigurationAdmin(ctx, projectID, res, op)
 }
 
-// refusePlatformConfiguration refuses a write to the configuration of the
-// reserved platform project (Console ADR 0004 §1). That project holds who may
-// use the platform, never an application's end users, so what signs someone
-// in to it is the server's own: the server deploys it at every start
-// (bootstrap/platform), calling the services, not this gate. No caller may
-// write it, whatever they hold there.
+// requirePlatformConfigurationAdmin holds a write to the configuration of the
+// reserved platform project to that project's admins (Console ADR 0004 §1).
+// The project holds who may use the platform, never an application's end
+// users: each of its users can be granted any project and can claim, so what
+// signs someone in to it (an origin, a deployment, a schema, later an app) is
+// for the people who own the platform to change. A platform operator is one
+// of them (root ADR 075); an editor of the platform project is not.
 //
-// It answers as a missing permission does, and only after the caller's own
-// access was checked, so it tells nobody more than their grants already do.
-// A project the deployment merely pins is not reserved
-// (domain.ReservedPlatformProjectID) and keeps its configuration.
-func (h *Handler) refusePlatformConfiguration(projectID string, res resourceAccess, op accessOp) error {
-	if !res.configuration || op == opRead {
+// It asks the admin relation only after the operation's own check allowed
+// the caller, so the answers to anyone else are unchanged, and an editor's
+// refusal reads as a missing permission. A project the deployment merely pins
+// is not reserved (domain.ReservedPlatformProjectID) and keeps the relations
+// every project asks. The server's own start-up deploy (bootstrap/platform)
+// calls the services, not this gate.
+func (h *Handler) requirePlatformConfigurationAdmin(ctx context.Context, projectID string, res resourceAccess, op accessOp) error {
+	// A read asks nothing more, and a removal already asked for admin.
+	if !res.configuration || op != opWrite {
 		return nil
 	}
 	if reserved := domain.ReservedPlatformProjectID(h.platformProjectID); reserved == "" || projectID != reserved {
 		return nil
 	}
-	denied := res.denied()
-	return denied.WithMessage(denied.Message + ": the server sets the platform project's configuration")
+	err := requireProjectAccess(ctx, h.pool.Statements(), projectID, res, opDelete)
+	if denied := res.denied(); errors.Is(err, denied) {
+		return denied.WithMessage(denied.Message + ": the platform project's configuration is written with its admin role")
+	}
+	return err
 }
 
 func requireProjectAccess(ctx context.Context, stmts service.AuthzResolverStatements, projectID string, res resourceAccess, op accessOp) error {
