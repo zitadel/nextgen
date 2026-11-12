@@ -2,6 +2,7 @@ import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { UserCog } from "lucide-react";
 
 import { api } from "@/api/zitadel";
+import { DETAIL_STACK } from "@/components/detail-page";
 import { SECTION_HEADING } from "@/components/typography";
 import {
   AddAdminButton,
@@ -48,7 +49,7 @@ function ProjectAdminsPage() {
   const reload = () => void router.invalidate();
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className={DETAIL_STACK}>
       <div className="flex items-center justify-between gap-6">
         <h2 className={SECTION_HEADING}>Admins</h2>
         <AddAdminButton projectId={projectId} onAdded={reload} />
