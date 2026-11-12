@@ -95,7 +95,7 @@ no command answers to.
 - A `PATCH` is not marked, though a merge-patch `null` removes what it names:
   updates are not guarded yet, and need a follow-up of their own.
 - The CLI's client only exposes a destructive operation behind a confirmation
-  ([consent](../../apps/cli/src/lib/consent.ts)).
+  ([consent](../../../cli/src/lib/consent.ts)).
 
 ## Descriptions — the first sentence stands alone
 

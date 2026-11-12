@@ -268,9 +268,9 @@ dependencies and runs the root `ci` script (`pnpm run ci`, in
     (`@zitadel/server#test:pow`). Each journey packs the npm tarballs
     it installs from the builds it depends on, so an SDK change runs only
     the journeys that install that SDK; `@zitadel/release#pack` packs and
-    checks the full release set. The console and demo lanes and the kit's
-    suite are cached, so a push that leaves their inputs alone restores
-    them; the journeys and the Postgres lane run whenever they are affected.
+    checks the full release set. The console and demo lanes, the kit's
+    suite and the journeys are cached, so a push that leaves their inputs
+    alone restores them; the Postgres lane runs whenever it is affected.
     The deployment lanes run [per deployment](#cloud-deployment-checks).
 
 The run selects with `--affected`, measured from the pull request's
@@ -278,7 +278,9 @@ base or, in the merge queue, from the commit the group is built on: turbo runs
 the tasks whose inputs the diff touches and every task that depends on them,
 so a docs-only PR runs almost nothing and a frontend-only PR skips the Go
 suites. A change to the `ci` script or to ci.yml reruns everything (both are
-global inputs), and so do a dispatch and the nightly run on `main`. How inputs
+global inputs), and so do a dispatch and the nightly run on `main`; the
+nightly also skips the cache, so a scaffolder release that breaks a journey
+shows there first. How inputs
 and edges decide it:
 [turborepo.md](docs/design/build/turborepo.md#commands). The CI journeys skip
 the frameworks in `ciExcludedFrameworkIds`
