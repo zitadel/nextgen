@@ -59,6 +59,17 @@ export function unknownCommand(
         (known) => known.length === length && command.every((word, index) => known[index] === word),
       )
     ) {
+      // A command that is also a topic: a word one edit from its subcommand is a typo, not an argument.
+      const subcommands = commands
+        .filter((known) => {
+          return known.length > length && command.every((word, index) => known[index] === word);
+        })
+        .map((known) => known[length] as string);
+      const next = words[length] as string;
+      const guess = closest(next, subcommands);
+      if (guess !== undefined && distance(next, guess) <= 1) {
+        continue;
+      }
       return {
         typed: command,
         error: new ZitadelError(

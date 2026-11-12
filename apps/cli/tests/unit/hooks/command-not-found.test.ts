@@ -79,6 +79,7 @@ describe("unknownCommand", () => {
     it.each([
       ["variable:lst", ["zitadel variable list --help", "zitadel variable --help"]],
       ["teams:lst:extra", ["zitadel teams list --help", "zitadel teams --help"]],
+      ["env:lst", ["zitadel env list --help", "zitadel env --help"]],
       ["deplo", ["zitadel deploy --help"]],
       ["usrs:list", ["zitadel users --help"]],
     ])("%s suggests the help of the one it meant", (id, next) => {

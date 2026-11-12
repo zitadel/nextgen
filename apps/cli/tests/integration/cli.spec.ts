@@ -225,7 +225,7 @@ describe("the cli", () => {
             code: "E_VALIDATION",
             message: "variable lst is not a zitadel command.",
             next_commands: [
-              expectedPublicCliCommand("variable list"),
+              expectedPublicCliCommand("variable list --help"),
               expectedPublicCliCommand("variable --help"),
             ],
           });
