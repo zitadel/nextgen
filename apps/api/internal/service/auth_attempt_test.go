@@ -553,7 +553,8 @@ func TestAuthAttemptService_IssueSSOState(t *testing.T) {
 	})
 }
 
-// The ceremony's outcome is audited with its result, under the SSO check.
+// The ceremony's outcome is audited with its result, under the SSO check and
+// in the attempt's login flow: the provider's redirect carries no flow cookie.
 func TestAuthAttemptService_SetSSOCallbackResult(t *testing.T) {
 	sessionID := "sess-1"
 	check := &domain.SSOCallbackCheck{ID: "chk-1", StateHash: "state-hash", AuthAttemptID: "att-1"}
@@ -590,7 +591,7 @@ func TestAuthAttemptService_SetSSOCallbackResult(t *testing.T) {
 			stmts.EXPECT().SetSSOCallbackResult(gomock.Any(), "proj", "state-hash", tt.result).Return(tt.writeErr)
 			var gotEvent *domain.Event
 			if tt.writeErr == nil {
-				stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), "proj", "att-1").Return(&domain.AuthAttempt{ProjectID: "proj", ID: "att-1", SessionID: &sessionID}, nil)
+				stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), "proj", "att-1").Return(&domain.AuthAttempt{ProjectID: "proj", ID: "att-1", SessionID: &sessionID, FlowID: "flow_1"}, nil)
 				stmts.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, ev *domain.Event) error {
 					gotEvent = ev
 					return nil
@@ -606,14 +607,22 @@ func TestAuthAttemptService_SetSSOCallbackResult(t *testing.T) {
 			statementer.EXPECT().Statements().Return(stmts).AnyTimes()
 			svc := service.NewAuthAttemptService(service.NewPool(pool), nil, nil, nil, nil)
 
-			err := svc.SetSSOCallbackResult(t.Context(), "proj", check, tt.result, tt.eventType)
+			ctx := audit.WithActorSlot(t.Context())
+			err := svc.SetSSOCallbackResult(ctx, "proj", check, tt.result, tt.eventType)
 
+			slot, ok := audit.ActorSlotFromContext(ctx)
+			require.True(t, ok)
 			if tt.wantErr != nil {
 				require.ErrorIs(t, err, tt.wantErr)
+				assert.Nil(t, slot.FlowID, "a refused callback joins no flow")
 				return
 			}
 			require.NoError(t, err)
 			require.NotNil(t, gotEvent)
+			require.NotNil(t, gotEvent.FlowID, "the event joins the attempt's flow")
+			assert.Equal(t, "flow_1", *gotEvent.FlowID)
+			require.NotNil(t, slot.FlowID, "the callback's request event joins it too")
+			assert.Equal(t, "flow_1", *slot.FlowID)
 			assert.Equal(t, tt.eventType, gotEvent.EventType)
 			assert.Equal(t, "proj", gotEvent.ProjectID)
 			require.NotNil(t, gotEvent.EntityID)

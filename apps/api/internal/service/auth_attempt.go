@@ -504,15 +504,17 @@ func (s *authAttemptService) SetSSOCallbackResult(ctx context.Context, projectID
 	ctx, end := startSpan(ctx, "AuthAttemptService.SetSSOCallbackResult")
 	defer end(&err)
 
-	return s.stmts.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+	var flowID string
+	err = s.stmts.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		if err := tx.Statements().SetSSOCallbackResult(ctx, projectID, check.StateHash, result); err != nil {
 			return err
 		}
-		// The session the event carries lives on the attempt.
+		// The session and the login flow the event carries live on the attempt.
 		attempt, err := tx.Statements().GetAuthAttemptByID(ctx, projectID, check.AuthAttemptID)
 		if err != nil {
 			return err
 		}
+		flowID = attempt.FlowID
 		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
 			Type:       eventType,
 			Category:   domain.EventCategoryAuth,
@@ -520,6 +522,7 @@ func (s *authAttemptService) SetSSOCallbackResult(ctx context.Context, projectID
 			EntityType: "check",
 			EntityID:   check.ID,
 			SessionID:  attempt.SessionID,
+			FlowID:     &attempt.FlowID,
 			Payload: domain.AuthCheckPayload{
 				CheckID:       check.ID,
 				CheckType:     check.Type().String(),
@@ -527,6 +530,13 @@ func (s *authAttemptService) SetSSOCallbackResult(ctx context.Context, projectID
 			},
 		})
 	})
+	if err != nil {
+		return err
+	}
+	// The provider's redirect reaches the callback without the flow's cookie,
+	// so its request event joins the flow only through the attempt.
+	audit.BindFlow(ctx, flowID)
+	return nil
 }
 
 // VerifyProof verifies the submitted proof against the challenge identified by ChallengeID.
