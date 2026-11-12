@@ -113,6 +113,7 @@ export default class Logs extends Suggestible(BaseCommand) {
             process.stdout.write(`${render(lines, this.isColored)}\n`);
           }
         },
+        signal: this.signal,
       });
 
       const title = "Stopped following local Zitadel logs";

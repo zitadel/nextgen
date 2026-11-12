@@ -243,6 +243,7 @@ describe("LocalServer", () => {
         tail: 1,
         level: "warn",
         print: (lines) => printed.push(...lines.map((line) => line.text)),
+        signal: new AbortController().signal,
       });
 
       expect(printed).toEqual([
@@ -251,6 +252,20 @@ describe("LocalServer", () => {
         "level=ERROR msg=unfinished",
       ]);
     });
+
+    it("prints the end of the log and stops when the run was interrupted before it began", async () => {
+      const cwd = await directoryWithAGoneServer();
+      await writeFile(join(cwd, "server.log"), "level=INFO msg=first\nlevel=INFO msg=last\n");
+      const printed: string[] = [];
+
+      await at(cwd).followLogs({
+        tail: 5,
+        print: (lines) => printed.push(...lines.map((line) => line.text)),
+        signal: AbortSignal.abort(),
+      });
+
+      expect(printed).toEqual(["level=INFO msg=first", "level=INFO msg=last"]);
+    }, 5_000);
   });
 
   describe("a free port in place of a taken one", () => {

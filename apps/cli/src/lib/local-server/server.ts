@@ -501,6 +501,8 @@ export class LocalServer {
     tail: number;
     level?: LogLevel;
     print: (lines: readonly LogLine[]) => void;
+    /** The run's Ctrl-C: once it aborts, following stops, even before it began. */
+    signal: AbortSignal;
   }): Promise<RuntimeMetadata> {
     const runtime = await this.recordedRuntime();
     const reader = new LogLineReader();
@@ -509,12 +511,13 @@ export class LocalServer {
       appended: (text) => options.print(atLeast(reader.read(text), options.level)),
     };
     if (runtime.backend === "binary") {
-      await BinaryLauncher.followLogs(runtime.log_path, sink);
+      await BinaryLauncher.followLogs(runtime.log_path, sink, { signal: options.signal });
     } else {
       await DockerLauncher.followLogs(
         runtime.container_name,
         options.level ? "all" : options.tail,
         sink,
+        options.signal,
       );
     }
     options.print(atLeast(reader.end(), options.level));

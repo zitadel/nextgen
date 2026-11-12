@@ -316,11 +316,18 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
    * --follow` then replays the log before it streams, so the replay is skipped,
    * stream by stream, by the lines read the first time; only whole lines are
    * handed over then, so a line still being written is not handed over twice.
+   *
+   * @param containerName - The container whose log is followed.
+   * @param tail - How many of the last lines Docker picks, or `"all"`.
+   * @param sink - Where the log is handed.
+   * @param interrupted - The run's Ctrl-C; following stops once it aborts, even
+   *   if it aborted before following began.
    */
   static async followLogs(
     containerName: string,
     tail: number | "all",
     sink: LogSink,
+    interrupted: AbortSignal,
   ): Promise<void> {
     const replayed = { stdout: 0, stderr: 0 };
     if (tail === "all") {
@@ -331,7 +338,7 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
       replayed.stdout = stdout.split("\n").length - 1;
       replayed.stderr = stderr.split("\n").length - 1;
     }
-    const stop = stopSignal();
+    const stop = stopSignal(interrupted);
     try {
       await streamDocker(
         ["logs", "--tail", String(tail), "--follow", containerName],

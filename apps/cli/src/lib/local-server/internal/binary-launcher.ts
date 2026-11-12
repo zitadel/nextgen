@@ -344,17 +344,17 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
 
   /**
    * Hands `sink` the log file as it is, then each part appended to it, until
-   * `signal` aborts, by default when the CLI is interrupted. The file is
+   * the run's `signal` aborts or the CLI is asked to stop. The file is
    * polled by size: it is appended to by another process, and there is no
    * event to wait on that works on every platform.
    */
   static async followLogs(
     logPath: string,
     sink: LogSink,
-    options: { clock?: Clock; signal?: AbortSignal } = {},
+    options: { clock?: Clock; signal: AbortSignal },
   ): Promise<void> {
     const clock = options.clock ?? realClock;
-    const stop = options.signal ? { signal: options.signal, dispose: () => {} } : stopSignal();
+    const stop = stopSignal(options.signal);
     try {
       const log = new AppendedLog(logPath);
       sink.existing(await log.next());
