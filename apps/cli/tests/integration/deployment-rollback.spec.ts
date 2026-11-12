@@ -417,7 +417,11 @@ describe("deployment rollback", () => {
           code: "E_VALIDATION",
           message: INVALID_DEPLOYMENT_ID,
           hint: "List the deployments to find one, or omit it to undo the last deploy.",
-          next_commands: [expectedPublicCliCommand(`deployment list --cwd ${app.path}`)],
+          next_commands: [
+            expectedPublicCliCommand(
+              `deployment list --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+            ),
+          ],
           details: { argument: "deployment_id" },
         });
       });
@@ -690,7 +694,11 @@ describe("deployment rollback", () => {
           code: "E_VALIDATION",
           message: INVALID_DEPLOYMENT_ID,
           hint: "List the deployments to find one, or omit it to undo the last deploy.",
-          next_commands: [expectedPublicCliCommand(`deployment list --cwd ${app.path}`)],
+          next_commands: [
+            expectedPublicCliCommand(
+              `deployment list --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+            ),
+          ],
           details: { argument: "deployment_id" },
         });
       });
@@ -709,7 +717,11 @@ describe("deployment rollback", () => {
           code: "E_VALIDATION",
           message: INVALID_DEPLOYMENT_ID,
           hint: "List the deployments to find one, or omit it to undo the last deploy.",
-          next_commands: [expectedPublicCliCommand(`deployment list --cwd ${app.path}`)],
+          next_commands: [
+            expectedPublicCliCommand(
+              `deployment list --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+            ),
+          ],
           details: { argument: "deployment_id" },
         });
       });

@@ -1,4 +1,3 @@
-import { Cmd } from "@/lib/cmd";
 import { Args, Flags } from "@oclif/core";
 import { z } from "zod";
 
@@ -34,12 +33,6 @@ import { Destructive } from "@/lib/oclif/destructive";
 import { reads, type Refused } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { json, prose, type Rendering } from "@/lib/oclif/rendering";
-import {
-  asEnvironmentSelector,
-  projectCommand,
-  type SuggestedCommand,
-  unscopedCommand,
-} from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import type { Summary } from "@/lib/ui";
 import { userAgent } from "@/lib/user-agent";
@@ -67,7 +60,7 @@ const METHOD: Refused<string> = {
 const UNCALLABLE_REFUSAL: Refusal = {
   message: "{reason}",
   hint: "Call it from the app it belongs to, through the SDK; the api ls command marks what the CLI can call.",
-  next: ["api ls"],
+  next: [{ id: "api:ls" }],
 };
 
 const NOTHING_TO_PAGE_REFUSAL: Refusal = {
@@ -95,7 +88,7 @@ function resolveTarget(ref: string, method?: string): Target {
     if (error instanceof InvalidError) {
       throw new ZitadelError("E_VALIDATION", error.message, {
         hint: error.hint,
-        nextCommands: [unscopedCommand("api ls --json")],
+        nextCommands: [{ id: "api:ls", flags: { json: true } }],
       });
     }
     throw error;
@@ -111,7 +104,6 @@ function resolveTarget(ref: string, method?: string): Target {
 export function readOperation(
   ref: string | undefined,
   method: string | undefined,
-  suggest?: (command: string) => SuggestedCommand,
 ): Target | undefined {
   if (ref === undefined) {
     return undefined;
@@ -119,13 +111,9 @@ export function readOperation(
   const target = resolveTarget(ref, method);
   const reason = target.operation.uncallable;
   if (reason !== undefined) {
-    throw refusalError(
-      UNCALLABLE_REFUSAL,
-      {
-        reason,
-      },
-      suggest,
-    );
+    throw refusalError(UNCALLABLE_REFUSAL, {
+      reason,
+    });
   }
   return target;
 }
@@ -322,13 +310,9 @@ export default class Api extends Destructive(EnvironmentCommand) {
       next: this.jsonEnabled()
         ? {
             commands: [
-              projectCommand(
-                "api ls",
-                asEnvironmentSelector(
-                  typeof flags.cwd === "string" ? ` ${Cmd.option("--cwd", flags.cwd)}` : "",
-                ),
-                this.config.version,
-              ),
+              this.suggestWith(typeof flags.cwd === "string" ? { cwd: flags.cwd } : {})({
+                id: "api:ls",
+              }),
             ],
           }
         : undefined,
@@ -336,9 +320,7 @@ export default class Api extends Destructive(EnvironmentCommand) {
   }
 
   protected async execute({ argv, args, flags }: Admitted<typeof Api>): Promise<JsonEnvelope> {
-    const named = readOperation(args.operation, flags.method, (next) => {
-      return this.suggest(next);
-    });
+    const named = readOperation(args.operation, flags.method);
     refuseUnpaged(named, flags.paginate);
 
     const target = named ?? resolveTarget(await this.chooseOperation(flags.paginate));
@@ -526,7 +508,7 @@ export default class Api extends Destructive(EnvironmentCommand) {
         (operation.auth !== "secret" || hasSecret)
       );
     });
-    const retry = this.suggest("api ls --json");
+    const retry = this.suggest({ id: "api:ls", flags: { json: true } });
     const tags = [
       ...new Set(
         callable.map((operation) => {
@@ -569,16 +551,16 @@ export default class Api extends Destructive(EnvironmentCommand) {
     { values, missing }: PathValues,
   ): Promise<Readonly<Record<string, string>>> {
     const filled: Record<string, string> = { ...values };
-    const spelled = missing
-      .map((each) => {
-        return Cmd.quote(`<${each}>`);
-      })
-      .join(" ");
+    const placeholders = missing.map((each) => {
+      return `<${each}>`;
+    });
     for (const name of missing) {
       filled[name] = await this.ask.text({
         name,
         message: `What is the value of ${name}?`,
-        retry: this.suggest(`api ${Cmd.quote(target.operation.id)} ${spelled}`),
+        // The path parameters follow the operation as arguments the command
+        // does not declare one by one, so the run is repeated as typed with them added.
+        retry: await this.rerun({ arguments: [target.operation.id, ...placeholders] }),
         parse: (value: string) => {
           const typed = value.trim();
           if (typed === "") {

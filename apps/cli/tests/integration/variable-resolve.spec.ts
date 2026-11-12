@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "@tests/helpers/platform";
-import { anUndeployedEnvironment, aSetUpApp } from "@tests/helpers/project";
+import { anUndeployedEnvironment, aSetUpApp, MOCK_SERVER_URL } from "@tests/helpers/project";
 import { cliVersion, expectedPublicCliCommand, pressCtrlC } from "@tests/helpers/run-cli";
 import { asTerminal, offTerminal, onTerminalReadingAFile } from "@tests/helpers/terminal";
 
@@ -145,7 +145,9 @@ describe("variable resolve", () => {
           message: "Nothing is deployed to the project.",
           hint: "Deploy first, then resolve its variables.",
           next_commands: [
-            expectedPublicCliCommand(app.againAsRun("deploy -m '<what changed>' --env staging")),
+            expectedPublicCliCommand(
+              app.againAsRun("deploy --message '<what changed>' --env staging"),
+            ),
           ],
         });
       });
@@ -356,7 +358,9 @@ describe("variable resolve", () => {
           code: "E_NOT_FOUND",
           message: "Nothing is deployed to https://c.example.com.",
           hint: "Deploy to it first, then resolve its variables.",
-          next_commands: [expectedPublicCliCommand(app.againAsRun("deploy -m '<what changed>'"))],
+          next_commands: [
+            expectedPublicCliCommand(app.againAsRun("deploy --message '<what changed>'")),
+          ],
         });
       });
 
@@ -513,7 +517,11 @@ describe("variable resolve", () => {
           message:
             "Invalid deployment_id: must be a deployment ID: dep_ followed by letters, digits, _ or -",
           hint: "List the deployments to find one, or omit it to read the live deployment.",
-          next_commands: [expectedPublicCliCommand(`deployment list --cwd ${app.path}`)],
+          next_commands: [
+            expectedPublicCliCommand(
+              `deployment list --server ${MOCK_SERVER_URL} --cwd ${app.path}`,
+            ),
+          ],
           details: { argument: "deployment_id" },
         });
       });

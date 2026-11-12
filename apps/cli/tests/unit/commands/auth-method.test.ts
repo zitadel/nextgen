@@ -206,7 +206,7 @@ describe("auth-method password and passkey", () => {
         data: {
           next_commands: [
             expectedPublicCliCommand(`deploy --dry-run --cwd ${dir}`),
-            expectedPublicCliCommand(`deploy -m '<what changed>' --cwd ${dir}`),
+            expectedPublicCliCommand(`deploy --message '<what changed>' --cwd ${dir}`),
           ],
         },
       });
@@ -234,11 +234,11 @@ describe("auth-method password and passkey", () => {
         data: {
           next_commands: [
             expect.stringMatching(/ deploy --dry-run --cwd '[^']+my project'$/),
-            expect.stringMatching(/ deploy -m '<what changed>' --cwd '[^']+my project'$/),
+            expect.stringMatching(/ deploy --message '<what changed>' --cwd '[^']+my project'$/),
           ],
           next_args: [
             ["deploy", "--dry-run", "--cwd", cwd],
-            ["deploy", "-m", "<what changed>", "--cwd", cwd],
+            ["deploy", "--message", "<what changed>", "--cwd", cwd],
           ],
         },
       });
@@ -692,7 +692,7 @@ describe("auth-method password and passkey", () => {
         expect(parseJson(result.stdout)).toMatchObject({
           next_commands: [
             expectedPublicCliCommand(
-              `auth-method passkey disable --schema default-human-user --cwd ${dir} --force`,
+              `auth-method passkey disable --schema default-human-user --force --cwd ${dir}`,
             ),
             expectedPublicCliCommand(
               `auth-method password enable --schema default-human-user --cwd ${dir}`,
@@ -710,7 +710,7 @@ describe("auth-method password and passkey", () => {
         expect(parseJson(result.stdout)).toMatchObject({
           next_commands: [
             expectedPublicCliCommand(
-              `auth-method passkey disable --schema default-human-user --cwd ${dir} --force`,
+              `auth-method passkey disable --schema default-human-user --force --cwd ${dir}`,
             ),
           ],
         });
@@ -726,7 +726,7 @@ describe("auth-method password and passkey", () => {
 
         expect(parseJson(result.stdout)).toMatchObject({
           next_commands: [
-            expectedPublicCliCommand(`auth-method passkey disable ${option} --cwd ${dir} --force`),
+            expectedPublicCliCommand(`auth-method passkey disable ${option} --force --cwd ${dir}`),
             expectedPublicCliCommand(`auth-method password enable ${option} --cwd ${dir}`),
           ],
         });
@@ -743,7 +743,7 @@ describe("auth-method password and passkey", () => {
         expect(parseJson(result.stdout)).toMatchObject({
           details: {
             suggested_args: [
-              ["auth-method", "passkey", "disable", "--schema", name, "--cwd", dir, "--force"],
+              ["auth-method", "passkey", "disable", "--schema", name, "--force", "--cwd", dir],
               ["auth-method", "password", "enable", "--schema", name, "--cwd", dir],
             ],
           },
@@ -757,7 +757,7 @@ describe("auth-method password and passkey", () => {
 
         expect(parseJson(result.stdout)).toHaveProperty(
           ["details", "suggested_args", 0],
-          ["auth-method", "passkey", "disable", "--schema=--force", "--cwd", dir, "--force"],
+          ["auth-method", "passkey", "disable", "--schema=--force", "--force", "--cwd", dir],
         );
       });
 
@@ -949,7 +949,7 @@ describe("auth-method password and passkey", () => {
         expect(parseJson(result.stdout)).toMatchObject({
           next_commands: [
             expectedPublicCliCommand(
-              `auth-method passkey disable --schema default-human-user --cwd ${dir} --force --dry-run`,
+              `auth-method passkey disable --schema default-human-user --force --dry-run --cwd ${dir}`,
             ),
             expectedPublicCliCommand(
               `auth-method password enable --schema default-human-user --cwd ${dir}`,

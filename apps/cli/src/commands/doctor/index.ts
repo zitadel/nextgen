@@ -40,12 +40,9 @@ import {
   nonBlankString,
 } from "@/lib/oclif";
 import { Destructive } from "@/lib/oclif/destructive";
-import {
-  environmentFlags,
-  environmentSelectorSuffix,
-  projectEnvFile,
-} from "@/lib/oclif/environment-flags";
-import { type Refused, reads, whole } from "@/lib/oclif/flags";
+import { environmentFlags, projectEnvFile } from "@/lib/oclif/environment-flags";
+import { reads, type Refused, whole } from "@/lib/oclif/flags";
+import { relatedFlags } from "@/lib/suggestion/relations";
 import {
   asStepsShown,
   type NextSteps,
@@ -64,13 +61,10 @@ import {
 } from "@/lib/project";
 import { isLoopbackUrl } from "@/lib/server";
 import {
-  asEnvironmentSelector,
-  type EnvironmentSelector,
-  portableSuggestions,
-  projectCommand,
+  type Suggest,
   type SuggestedCommand,
   shellCommand,
-  unscopedCommand,
+  type SuggestWords,
 } from "@/lib/suggestion";
 import { userAgent } from "@/lib/user-agent";
 import { reportWarning } from "@/lib/warnings";
@@ -147,29 +141,31 @@ export default class Doctor extends Destructive(BaseCommand) {
   static override group = CommandGroups.diagnostics;
   static override groupOrder = 1;
 
-  static override flags = {
-    fix: Flags.boolean({ description: "Repair missing files and stale managed wiring." }),
-    force: Flags.boolean({
-      char: "f",
-      description:
-        "With --fix, make repairs that replace an origin without the confirmation prompt. Required when non-interactive.",
-      dependsOn: ["fix"],
-    }),
-    image: nonBlankString({ description: "Container image to check." }),
-    port: Flags.custom<number>({
-      parse: reads(PORT),
-    })({
-      description: "Local HTTP port to check. Defaults to the port this directory's server uses.",
-    }),
-    runtime: Flags.option({
-      description: "Local runtime backend.",
-      options: RUNTIME_BACKENDS,
-    })(),
-    // Doctor's local-runtime checks are about the machine, but with `--env` /
-    // `--env-file` it also verifies the environment a command would connect to:
-    // the same flags every EnvironmentCommand takes, resolved the same way.
-    ...environmentFlags,
-  };
+  static override flags = relatedFlags(
+    {
+      fix: Flags.boolean({ description: "Repair missing files and stale managed wiring." }),
+      force: Flags.boolean({
+        char: "f",
+        description:
+          "With --fix, make repairs that replace an origin without the confirmation prompt. Required when non-interactive.",
+      }),
+      image: nonBlankString({ description: "Container image to check." }),
+      port: Flags.custom<number>({
+        parse: reads(PORT),
+      })({
+        description: "Local HTTP port to check. Defaults to the port this directory's server uses.",
+      }),
+      runtime: Flags.option({
+        description: "Local runtime backend.",
+        options: RUNTIME_BACKENDS,
+      })(),
+      // Doctor's local-runtime checks are about the machine, but with `--env` /
+      // `--env-file` it also verifies the environment a command would connect to:
+      // the same flags every EnvironmentCommand takes, resolved the same way.
+      ...environmentFlags,
+    },
+    { force: { dependsOn: ["fix"] } },
+  );
 
   static override meta = {
     resolveServer: false,
@@ -215,22 +211,16 @@ export default class Doctor extends Destructive(BaseCommand) {
             image,
             port,
             this.localServers(),
-            this.cliVersion,
+            this.suggest,
             parentRuntimeDir,
           )
         : [];
-    const selector = environmentSelectorSuffix({
-      cwd: flags.cwd,
-      envFile: flags.envFile,
-      envName: flags.env,
-      server: flags.server,
-    });
     const hasConfig = await hasZitadelConfig(this.cwd);
     const ctx: CheckContext = {
       cwd: this.cwd,
       orca: createOrca(),
       cliVersion: this.cliVersion,
-      selector,
+      suggest: this.suggest,
       dryRun: this.dryRun,
       signal: this.signal,
       consent: (gate) => {
@@ -286,7 +276,7 @@ export default class Doctor extends Destructive(BaseCommand) {
     const versionCheck = await checkCliVersion({
       cliVersion: this.cliVersion,
       env: this.env,
-      typedCwd: flags.cwd,
+      suggest: this.suggest,
     });
     const checks = [versionCheck, ...runtimeChecks, ...projectChecks, ...environmentChecks];
     const failed = checks.filter((check) => {
@@ -326,22 +316,34 @@ export default class Doctor extends Destructive(BaseCommand) {
           return false;
         },
       ));
-    const claimSelector = (await namesProject(
+    // A claim pinned to a file or a server cannot also carry what the run's
+    // own scope would put back on it, so a run that chose an environment of
+    // its own is told what to do instead of being sent to a claim that could
+    // resolve another project.
+    const claimSuggest = (await namesProject(
       join(this.cwd, ".env.development.local"),
       Promise.resolve(projectId),
     ))
-      ? environmentSelectorSuffix({
-          cwd: flags.cwd,
+      ? this.suggestWith({
+          ...this.scope(),
           envFile: projectEnvFile(flags.cwd, ".env.development.local"),
           server: projectServer,
         })
-      : bareResolves
-        ? environmentSelectorSuffix({
-            cwd: flags.cwd,
+      : bareResolves && flags.env === undefined && flags.envFile === undefined
+        ? this.suggestWith({
+            ...this.scope(),
             server: projectServer,
           })
         : undefined;
-    const warningAdvice = advisoryForWarnings(warnings, this.cliVersion, claimSelector, selector);
+    const again: DoctorAgain = {
+      rerun: await this.realRun(),
+      repair: await this.again("doctor", { without: ["dryRun"], with: { fix: true } }),
+      forcedRepair: await this.again("doctor", {
+        without: ["dryRun"],
+        with: { fix: true, force: true },
+      }),
+    };
+    const warningAdvice = advisoryForWarnings(warnings, this.suggest, claimSuggest, again);
     this.ui.ranAgainst(projectId, projectServer ?? this.meta.source);
     // A server that is running is one a sign-in or a request can fail
     // against, and its log is where the reason is.
@@ -352,7 +354,7 @@ export default class Doctor extends Destructive(BaseCommand) {
       })?.status === "pass";
     const nextActions = [
       ...(warningAdvice?.nextActions ?? []),
-      ...(serving ? [serverLogAction(this.cliVersion)] : []),
+      ...(serving ? [serverLogAction(this.suggest)] : []),
     ];
     this.recordTelemetry({
       runtime: runtimeBackend,
@@ -370,6 +372,7 @@ export default class Doctor extends Destructive(BaseCommand) {
     });
     // One text, the same in the envelope and on the terminal.
     const planned = flags.fix === true && this.dryRun;
+    const unplanned = planned ? await this.again("doctor", { without: ["dryRun"] }) : undefined;
     const verdict =
       failed.length > 0
         ? "Zitadel doctor found issues"
@@ -399,15 +402,7 @@ export default class Doctor extends Destructive(BaseCommand) {
         ? {
             commands: [
               ...(warningAdvice?.nextCommands ?? []),
-              ...(planned
-                ? [
-                    projectCommand(
-                      `doctor --fix${flags.force ? " --force" : ""}${flags.port === undefined ? "" : ` --port ${flags.port}`}`,
-                      selector,
-                      this.cliVersion,
-                    ),
-                  ]
-                : []),
+              ...(unplanned === undefined ? [] : [unplanned]),
             ],
           }
         : {}),
@@ -415,7 +410,7 @@ export default class Doctor extends Destructive(BaseCommand) {
     const reportInput = {
       checks,
       cliVersion: this.cliVersion,
-      typedCwd: flags.cwd,
+      suggest: this.suggest,
       projectConfigured: hasConfig,
       hostedServer,
       runtime: runtimeBackend,
@@ -434,10 +429,12 @@ export default class Doctor extends Destructive(BaseCommand) {
         failed,
         image,
         port,
-        this.cliVersion,
-        selector,
+        this.suggest,
+        (next) => {
+          return [...this.argsOf(this.suggest(next))];
+        },
+        again,
         parentRuntimeDir,
-        flags.cwd,
       );
       // A check that failed with a typed CLI error advertises its own
       // category (e.g. the framework floor's E_UNSUPPORTED_PROJECT_SHAPE) —
@@ -542,24 +539,38 @@ export default class Doctor extends Destructive(BaseCommand) {
 }
 
 /**
+ * This doctor run again, as it was typed (its `--port`, `--image` and
+ * `--runtime` kept): as it is, with `--fix`, and with `--fix --force`.
+ */
+export type DoctorAgain = Readonly<{
+  rerun: SuggestedCommand;
+  repair: SuggestedCommand;
+  forcedRepair: SuggestedCommand;
+}>;
+
+/**
  * What to do about the checks that failed: the hint doctor prints and the
  * commands it suggests. The checks are weighed in the order a reader would fix
  * them — the machine before the project — so one run advises on the first
  * failure that blocks the others rather than on all of them at once.
+ *
+ * @param failed - The checks that failed.
+ * @param image - The container image the run checked.
+ * @param port - The port the run checked.
+ * @param suggest - Renders a suggestion with the run's own scope.
+ * @param suggestWords - {@link suggest} as the words after the CLI.
+ * @param again - This doctor run again, as it was typed.
+ * @param runtimeDir - The folder whose server was checked, when it is a parent of the run's.
+ * @returns The hint, the commands, and the same recovery as argument lists where one applies.
  */
 export function failureAdvice(
   failed: CheckOutcome[],
   image: string,
   port: number,
-  cliVersion: string,
-  // The invocation's --env/--env-file/--server suffix. Appended only to the
-  // retries that resolve the environment (the env-connect failure and the
-  // project `--fix`); the local-runtime remedies — docker, port, image,
-  // state-dir — are machine checks the selector would only clutter.
-  selector: EnvironmentSelector,
+  suggest: Suggest,
+  suggestWords: SuggestWords,
+  again: DoctorAgain,
   runtimeDir?: string,
-  // doctor's own --cwd, carried by the `start` that gives that directory a server.
-  cwdFlag?: string,
 ): { hint: string; nextCommands: SuggestedCommand[]; suggestedArgs?: string[][] } {
   const failedNames = new Set(
     failed.map((check) => {
@@ -570,47 +581,37 @@ export function failureAdvice(
   if (failedNames.has("server-binary")) {
     return {
       hint: "The Zitadel server npm package is not available. Reinstall the CLI package, then retry.",
-      nextCommands: [unscopedCommand("doctor", cliVersion)],
+      nextCommands: [again.rerun],
     };
   }
 
   if (failedNames.has("docker-cli")) {
-    const advice = dockerRuntimeGuidance(
-      "doctor",
-      cliVersion,
-      asEnvironmentSelector(cwdFlag === undefined ? "" : ` ${Cmd.option("--cwd", cwdFlag)}`),
-    );
+    const advice = dockerRuntimeGuidance(again.rerun);
     return {
       hint: advice.hint,
-      nextCommands: advice.nextCommands,
+      nextCommands: [advice.check, again.rerun],
     };
   }
 
   if (failedNames.has("image")) {
     return {
       hint: "The local Zitadel image is not available. Check Docker registry access, build it locally, or pass --image / ZITADEL_LOCAL_IMAGE.",
-      nextCommands: [
-        shellCommand(`docker pull ${Cmd.quote(image)}`),
-        unscopedCommand("doctor", cliVersion),
-      ],
+      nextCommands: [shellCommand(`docker pull ${Cmd.quote(image)}`), again.rerun],
     };
   }
 
   if (failedNames.has("state-dir")) {
     return {
-      hint: `The local Zitadel state directory is not writable. Fix directory permissions, then rerun ${unscopedCommand("doctor", cliVersion)}.`,
-      nextCommands: [unscopedCommand("doctor", cliVersion)],
+      hint: `The local Zitadel state directory is not writable. Fix directory permissions, then rerun ${again.rerun}.`,
+      nextCommands: [again.rerun],
     };
   }
 
   if (failedNames.has("port")) {
     const fallbackPort = port === DEFAULT_LOCAL_SERVER_PORT ? port + 1 : DEFAULT_LOCAL_SERVER_PORT;
-    const stopCommand = unscopedCommand("stop --all", cliVersion);
-    const retryCommand = unscopedCommand("doctor", cliVersion);
-    const alternatePortCommand = unscopedCommand(
-      `doctor --port ${String(fallbackPort)}`,
-      cliVersion,
-    );
+    const stopCommand = suggest({ id: "stop", flags: { all: true } });
+    const retryCommand = again.rerun;
+    const alternatePortCommand = suggest({ id: "doctor", flags: { port: fallbackPort } });
     return {
       hint:
         `Port ${String(port)} is already in use. Stop the process using it, ` +
@@ -622,24 +623,38 @@ export function failureAdvice(
 
   if (failedNames.has("runtime")) {
     // `start` and `reset` act on their working directory, so a runtime found
-    // in a parent is named explicitly, its path quoted where it needs it, and
-    // the argument lists in `details.suggested_args` carry the same recovery. A
-    // `start` without the parent's `--cwd` gives the working directory a server
-    // of its own: `start` does not look in parents.
-    const here = cwdFlag === undefined ? [] : ["--cwd", cwdFlag];
-    const startHere = ["start", ...here];
-    const suggestedArgs =
+    // in a parent is named explicitly, and the argument lists in
+    // `details.suggested_args` carry the same recovery. A `start` without the
+    // parent's `--cwd` gives the working directory a server of its own:
+    // `start` does not look in parents.
+    const start = (cwd?: string) => {
+      return {
+        command: suggest({ id: "start", flags: { cwd } }),
+        words: suggestWords({ id: "start", flags: { cwd } }),
+      };
+    };
+    const reset = (cwd?: string) => {
+      return {
+        command: suggest({ id: "reset", flags: { force: true, cwd } }),
+        words: suggestWords({ id: "reset", flags: { force: true, cwd } }),
+      };
+    };
+    const recovery =
       runtimeDir === undefined
-        ? [startHere, ["reset", "--force", ...here]]
-        : [["start", "--cwd", runtimeDir], startHere, ["reset", "--force", "--cwd", runtimeDir]];
+        ? [start(), reset()]
+        : [start(runtimeDir), start(), reset(runtimeDir)];
     return {
       hint:
         runtimeDir === undefined
           ? "Existing local runtime metadata was found, but the local Zitadel server is not healthy. Start it again or reset stale local data."
           : `This folder has no Zitadel server of its own, so doctor checked the one in the parent folder, ${runtimeDir}, and found a problem with it. ` +
             `To keep using it, fix it or start it again. To give this folder its own server, run start here instead. Resetting deletes the local data in ${runtimeDir}, not in this folder.`,
-      nextCommands: portableSuggestions(suggestedArgs, cliVersion),
-      suggestedArgs,
+      nextCommands: recovery.map(({ command }) => {
+        return command;
+      }),
+      suggestedArgs: recovery.map(({ words }) => {
+        return words;
+      }),
     };
   }
 
@@ -652,17 +667,14 @@ export function failureAdvice(
   if (typed?.hint !== undefined) {
     return {
       hint: typed.hint,
-      nextCommands: [projectCommand("doctor", selector, cliVersion)],
+      nextCommands: [again.rerun],
     };
   }
 
   if (failedNames.has("environment")) {
     return {
-      hint: `The resolved environment could not connect. Check the server, project and credential it resolves with ${projectCommand("env", selector, cliVersion)}, then rerun ${projectCommand("doctor", selector, cliVersion)}.`,
-      nextCommands: [
-        projectCommand("env", selector, cliVersion),
-        projectCommand("doctor", selector, cliVersion),
-      ],
+      hint: `The resolved environment could not connect. Check the server, project and credential it resolves with ${suggest({ id: "env" })}, then rerun ${again.rerun}.`,
+      nextCommands: [suggest({ id: "env" }), again.rerun],
     };
   }
 
@@ -670,15 +682,17 @@ export function failureAdvice(
     return !LOCAL_RUNTIME_CHECK_NAMES.has(check.name);
   });
   if (hasProjectFailure) {
+    const fix = again.repair;
+
     return {
-      hint: `Run ${projectCommand("doctor --fix", selector, cliVersion)} to re-apply missing managed files.`,
-      nextCommands: [projectCommand("doctor --fix", selector, cliVersion)],
+      hint: `Run ${fix} to re-apply missing managed files.`,
+      nextCommands: [fix],
     };
   }
 
   return {
-    hint: `Fix the reported checks, then rerun ${projectCommand("doctor", selector, cliVersion)}.`,
-    nextCommands: [projectCommand("doctor", selector, cliVersion)],
+    hint: `Fix the reported checks, then rerun ${again.rerun}.`,
+    nextCommands: [again.rerun],
   };
 }
 
@@ -691,17 +705,19 @@ export type WarningFix = { check: string; action: string; command: SuggestedComm
  * primary issuer origin and the meta-schema refresh. A follow-up that is one
  * command for one check is also a `fix`, which the report shows under that
  * check's row instead of among the next steps.
+ *
+ * @param warnings - The checks that warned.
+ * @param suggest - Renders a suggestion with the run's own scope.
+ * @param local - Renders a suggestion for the local project, which is the one
+ *   the claim check reads, or nothing when nothing a command can carry reaches it.
+ * @param again - This doctor run again, as it was typed.
+ * @returns The advice, or nothing when no warning has any.
  */
 export function advisoryForWarnings(
   warnings: CheckOutcome[],
-  cliVersion: string,
-  /**
-   * The selector for the local project, which is the one the claim check
-   * reads, or nothing when no selector reaches it.
-   */
-  local: EnvironmentSelector | undefined,
-  /** This run's selection, which a suggested rerun of doctor carries. */
-  selector: EnvironmentSelector,
+  suggest: Suggest,
+  local: Suggest | undefined,
+  again: DoctorAgain,
 ): { nextActions: string[]; nextCommands: SuggestedCommand[]; fixes: WarningFix[] } | undefined {
   const nextActions: string[] = [];
   const nextCommands: SuggestedCommand[] = [];
@@ -720,9 +736,9 @@ export function advisoryForWarnings(
       return check.name === "docker-cli";
     })
   ) {
-    const advice = dockerRuntimeGuidance("doctor", cliVersion, selector);
+    const advice = dockerRuntimeGuidance(again.rerun);
     nextActions.push(...advice.nextActions);
-    nextCommands.push(...advice.nextCommands);
+    nextCommands.push(advice.check, again.rerun);
   }
 
   const claimWarning = warnings.find((check) => {
@@ -737,15 +753,15 @@ export function advisoryForWarnings(
     // authoritatively.
     if (local === undefined) {
       nextActions.push(
-        `Claim this project with ${unscopedCommand("claim", cliVersion)} once .env.development.local sets ZITADEL_PROJECT_ID and ZITADEL_PROJECT_SECRET to the project in .zitadel/secret; until then claim would resolve a different project.`,
+        `Claim this project with ${suggest({ id: "claim" })} once .env.development.local sets ZITADEL_PROJECT_ID and ZITADEL_PROJECT_SECRET to the project in .zitadel/secret; until then claim would resolve a different project.`,
       );
     } else {
       fix(
         "claim",
         claimWindowClosed(claimWarning)
-          ? claimWindowClosedAction(cliVersion, local)
-          : claimAction(cliVersion, undefined, local),
-        claimCommand(cliVersion, local),
+          ? claimWindowClosedAction(local)
+          : claimAction(local, undefined),
+        claimCommand(local),
       );
     }
   }
@@ -757,7 +773,7 @@ export function advisoryForWarnings(
     fix(
       "managed-runtime-processes",
       "Check the other local Zitadel servers before starting another; stop --all stops every one.",
-      unscopedCommand("stop --all", cliVersion),
+      suggest({ id: "stop", flags: { all: true } }),
     );
   }
 
@@ -798,7 +814,7 @@ export function advisoryForWarnings(
     fix(
       "issuer-origin",
       "Make the app's issuer a primary origin; a deploy lands only on primary origins, and setup 0.1.0 registered it as a preview one.",
-      projectCommand("doctor --fix --force", selector, cliVersion),
+      again.forcedRepair,
     );
   }
 
@@ -812,7 +828,7 @@ export function advisoryForWarnings(
     fix(
       "meta-schemas",
       "Write this CLI version's editor schemas into .zitadel/meta/; editors and agents read the dialect from there.",
-      projectCommand("doctor --fix", selector, cliVersion),
+      again.repair,
     );
   }
 
@@ -915,7 +931,7 @@ async function runLocalRuntimeChecks(
   image: string,
   port: number,
   servers: LocalServers,
-  cliVersion: string,
+  suggest: Suggest,
   inheritedFrom?: string,
 ): Promise<CheckOutcome[]> {
   const managedRuntimeCheck = await checkManagedRuntimeProcesses(runtime, servers);
@@ -971,7 +987,7 @@ async function runLocalRuntimeChecks(
                 ? `Image ${image} is available locally`
                 : `Image ${image} is available from the registry`;
             } catch (error) {
-              throw new Error(imageUnavailableMessage(image, error, cliVersion), { cause: error });
+              throw new Error(imageUnavailableMessage(image, error, suggest), { cause: error });
             }
           },
           "warn",
@@ -1228,10 +1244,10 @@ async function check(
   }
 }
 
-function imageUnavailableMessage(image: string, error: unknown, cliVersion: string): string {
+function imageUnavailableMessage(image: string, error: unknown, suggest: Suggest): string {
   const detail = errorMessage(error);
   const suffix = detail.trim() ? ` (${detail.trim()})` : "";
-  return `Image ${image} is not available to Docker${suffix}; ${unscopedCommand("start", cliVersion)} may need a pull or a different image.`;
+  return `Image ${image} is not available to Docker${suffix}; ${suggest({ id: "start" })} may need a pull or a different image.`;
 }
 
 /** The project `.zitadel/secret` records, or nothing when it cannot be read. */

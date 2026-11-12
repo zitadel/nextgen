@@ -1,6 +1,7 @@
 import { ForbiddenError, type VariableService } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
 import type { PipelineMode, StepContext } from "@/lib/publish/pipeline";
+import type { Suggest, SuggestedCommand } from "@/lib/suggestion";
 import type { Connection } from "@/lib/zitadel";
 
 /**
@@ -88,10 +89,17 @@ async function heldVariables(ctx: StepContext): Promise<ReadonlyMap<string, bool
  * @param mode - The publish the variable is for.
  * @returns The arguments.
  */
-function variableSetArgs(variable: string, secret: boolean, mode: PipelineMode): string {
-  const kindFlags = secret ? ["--secret"] : [];
-  const modeFlags = mode === "preview" ? ["--preview"] : [];
-  return ["variable", "set", variable, ...kindFlags, ...modeFlags].join(" ");
+function variableSet(
+  suggest: Suggest,
+  variable: string,
+  secret: boolean,
+  mode: PipelineMode,
+): SuggestedCommand {
+  return suggest({
+    id: "variable:set",
+    args: { name: variable },
+    flags: { secret, preview: mode === "preview" },
+  });
 }
 
 /**
@@ -146,7 +154,7 @@ function checkCredentialVariables(
     const field = use.field;
     const variable = use.variable;
     const wantsSecret = field === "client_secret";
-    const setCommand = ctx.suggest(variableSetArgs(variable, wantsSecret, ctx.mode));
+    const setCommand = variableSet(ctx.suggest, variable, wantsSecret, ctx.mode);
     const isSecret = held.get(variable);
     if (isSecret === undefined) {
       throw new ZitadelError(

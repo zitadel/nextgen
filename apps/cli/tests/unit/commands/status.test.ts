@@ -386,7 +386,7 @@ describe("status command", () => {
     );
     expect(json.data.next_commands).not.toContain(
       expectedPublicCliCommand(
-        `deploy -m '<what changed>' --server https://api.zitadel.cloud --cwd ${cwd}`,
+        `deploy --message '<what changed>' --server https://api.zitadel.cloud --cwd ${cwd}`,
       ),
     );
   });
@@ -406,12 +406,12 @@ describe("status command", () => {
     expect(actions).toContain(".zitadel/schemas/");
     expect(actions).toContain(
       `See your changes before they go live: ${expectedPublicCliCommand(`deploy --dry-run --server https://api.zitadel.cloud --cwd ${cwd}`)} to ` +
-        `preview, then ${expectedPublicCliCommand(`deploy -m '<what changed>' --server https://api.zitadel.cloud --cwd ${cwd}`)} to publish.`,
+        `preview, then ${expectedPublicCliCommand(`deploy --message '<what changed>' --server https://api.zitadel.cloud --cwd ${cwd}`)} to publish.`,
     );
     expect(actions).not.toContain("register a user");
     expect(json.data.next_commands).toContain(
       expectedPublicCliCommand(
-        `deploy -m '<what changed>' --server https://api.zitadel.cloud --cwd ${cwd}`,
+        `deploy --message '<what changed>' --server https://api.zitadel.cloud --cwd ${cwd}`,
       ),
     );
   });
@@ -435,7 +435,7 @@ describe("status command", () => {
     expect(actions).toContain("temporary and its data may be lost");
     expect(json.data.next_commands).toContain(
       expectedPublicCliCommand(
-        `deploy -m '<what changed>' --server https://api.zitadel.cloud --cwd ${cwd}`,
+        `deploy --message '<what changed>' --server https://api.zitadel.cloud --cwd ${cwd}`,
       ),
     );
   });

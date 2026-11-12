@@ -11,9 +11,10 @@ import type { LocalServers } from "@/lib/local-server/processes";
 import { projectMetaSchemas } from "@/lib/meta-schemas";
 import { publicCliCommand } from "@/lib/public-cli";
 import { MANAGED_MARKER } from "@/lib/paths";
-import { advisoryForWarnings } from "@/commands/doctor/index";
-import { environmentSelectorSuffix } from "@/lib/oclif/environment-flags";
+import { advisoryForWarnings, type DoctorAgain } from "@/commands/doctor/index";
+import type { Suggest } from "@/lib/suggestion";
 import { nextPort } from "@tests/helpers/ports";
+import { aSuggest, aSuggestWords } from "@tests/helpers/suggestions";
 import {
   aMachineRunning,
   cliVersion,
@@ -706,9 +707,7 @@ console.log(["p4242", "cnode", "n127.0.0.1:" + process.env.LSOF_FIXTURE_PORT].jo
       const res = await doctorWithoutPort(app);
 
       const data = (parseJson(res.stdout) as { data: { next_actions?: string[] } }).data;
-      expect(data.next_actions).toContainEqual(
-        expect.stringContaining(expectedPublicCliCommand("logs --follow")),
-      );
+      expect(data.next_actions).toContainEqual(expect.stringContaining(" logs --follow"));
     });
   });
 
@@ -1029,6 +1028,20 @@ describe("doctor's managed runtime process check", () => {
   });
 });
 
+/**
+ * Doctor run again in the scope `suggest` carries, as `execute` hands it over.
+ *
+ * @param suggest - The suggester of the run's scope.
+ * @returns The run as it is, with `--fix`, and with `--fix --force`.
+ */
+function againIn(suggest: Suggest): DoctorAgain {
+  return {
+    rerun: suggest({ id: "doctor" }),
+    repair: suggest({ id: "doctor", flags: { fix: true } }),
+    forcedRepair: suggest({ id: "doctor", flags: { fix: true, force: true } }),
+  };
+}
+
 describe("advisoryForWarnings", () => {
   const claimWarning = {
     name: "claim",
@@ -1040,9 +1053,9 @@ describe("advisoryForWarnings", () => {
   it("suggests claiming the local project on the server doctor checked", () => {
     const advice = advisoryForWarnings(
       [claimWarning],
-      cliVersion.version,
-      environmentSelectorSuffix({ server: "https://a.example" }),
-      environmentSelectorSuffix({}),
+      aSuggest({}, cliVersion.version),
+      aSuggest({ server: "https://a.example" }, cliVersion.version),
+      againIn(aSuggest({}, cliVersion.version)),
     );
 
     expect(advice?.nextCommands).toEqual([
@@ -1053,9 +1066,9 @@ describe("advisoryForWarnings", () => {
   it("adds no selector to the claim when doctor named no server or directory", () => {
     const advice = advisoryForWarnings(
       [claimWarning],
-      cliVersion.version,
-      environmentSelectorSuffix({}),
-      environmentSelectorSuffix({}),
+      aSuggest({}, cliVersion.version),
+      aSuggest({}, cliVersion.version),
+      againIn(aSuggest({}, cliVersion.version)),
     );
 
     expect(advice?.nextCommands).toEqual([expectedPublicCliCommand("claim")]);
@@ -1071,9 +1084,9 @@ describe("advisoryForWarnings", () => {
 
     const advice = advisoryForWarnings(
       [metaWarning],
-      cliVersion.version,
+      aSuggest({ cwd: "apps/web" }, cliVersion.version),
       undefined,
-      environmentSelectorSuffix({ cwd: "apps/web" }),
+      againIn(aSuggest({ cwd: "apps/web" }, cliVersion.version)),
     );
 
     expect(advice?.nextCommands).toEqual([expectedPublicCliCommand("doctor --fix --cwd apps/web")]);
@@ -1093,9 +1106,9 @@ describe("advisoryForWarnings", () => {
 
     const advice = advisoryForWarnings(
       [metaWarning],
-      cliVersion.version,
+      aSuggest({}, cliVersion.version),
       undefined,
-      environmentSelectorSuffix({}),
+      againIn(aSuggest({}, cliVersion.version)),
     );
 
     expect(advice).toBeUndefined();
@@ -1115,9 +1128,9 @@ describe("advisoryForWarnings", () => {
 
     const advice = advisoryForWarnings(
       [metaWarning],
-      cliVersion.version,
+      aSuggest({}, cliVersion.version),
       undefined,
-      environmentSelectorSuffix({}),
+      againIn(aSuggest({}, cliVersion.version)),
     );
 
     expect(advice).toBeUndefined();
@@ -1133,9 +1146,9 @@ describe("advisoryForWarnings", () => {
 
     const advice = advisoryForWarnings(
       [issuerWarning],
-      cliVersion.version,
+      aSuggest({ cwd: "apps/web" }, cliVersion.version),
       undefined,
-      environmentSelectorSuffix({ cwd: "apps/web" }),
+      againIn(aSuggest({ cwd: "apps/web" }, cliVersion.version)),
     );
 
     expect(advice?.nextCommands).toEqual([
@@ -1145,6 +1158,8 @@ describe("advisoryForWarnings", () => {
 });
 
 describe("failureAdvice for a runtime found in a parent directory", () => {
+  const SUGGEST = aSuggest({}, "1.0.0");
+  const SUGGEST_WORDS = aSuggestWords();
   const failed = [{ name: "runtime", status: "fail" as const, message: "not healthy" }];
 
   it.each([
@@ -1158,8 +1173,9 @@ describe("failureAdvice for a runtime found in a parent directory", () => {
         failed,
         "image",
         8080,
-        "1.0.0",
-        environmentSelectorSuffix({}),
+        SUGGEST,
+        SUGGEST_WORDS,
+        againIn(SUGGEST),
         dir,
       );
 
@@ -1181,8 +1197,9 @@ describe("failureAdvice for a runtime found in a parent directory", () => {
       failed,
       "image",
       8080,
-      "1.0.0",
-      environmentSelectorSuffix({}),
+      SUGGEST,
+      SUGGEST_WORDS,
+      againIn(SUGGEST),
       "/home/dev/app",
     );
 
@@ -1198,8 +1215,9 @@ describe("failureAdvice for a runtime found in a parent directory", () => {
       failed,
       "image",
       8080,
-      "1.0.0",
-      environmentSelectorSuffix({}),
+      SUGGEST,
+      SUGGEST_WORDS,
+      againIn(SUGGEST),
       "/home/dev/app",
     );
 
@@ -1214,10 +1232,10 @@ describe("failureAdvice for a runtime found in a parent directory", () => {
       failed,
       "image",
       8080,
-      "1.0.0",
-      environmentSelectorSuffix({}),
+      aSuggest({ cwd: "/home/dev/app/child" }, "1.0.0"),
+      aSuggestWords({ cwd: "/home/dev/app/child" }),
+      againIn(aSuggest({ cwd: "/home/dev/app/child" }, "1.0.0")),
       "/home/dev/app",
-      "/home/dev/app/child",
     );
 
     expect(advice.suggestedArgs?.[1]).toEqual(["start", "--cwd", "/home/dev/app/child"]);
@@ -1228,8 +1246,9 @@ describe("failureAdvice for a runtime found in a parent directory", () => {
       failed,
       "image",
       8080,
-      "1.0.0",
-      environmentSelectorSuffix({}),
+      SUGGEST,
+      SUGGEST_WORDS,
+      againIn(SUGGEST),
       "/home/dev/app",
     );
 
@@ -1237,7 +1256,7 @@ describe("failureAdvice for a runtime found in a parent directory", () => {
   });
 
   it("keeps the plain advice for a runtime in the working directory", () => {
-    const advice = failureAdvice(failed, "image", 8080, "1.0.0", environmentSelectorSuffix({}));
+    const advice = failureAdvice(failed, "image", 8080, SUGGEST, SUGGEST_WORDS, againIn(SUGGEST));
 
     expect(advice.hint).not.toContain("parent folder");
     expect(advice.nextCommands).toEqual([

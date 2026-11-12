@@ -1,7 +1,7 @@
 import { chmod, mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { Errors } from "@oclif/core";
+import { Config, Errors } from "@oclif/core";
 import { describe, expect } from "vitest";
 
 import AuthMethodSsoEnable from "@/commands/auth-method/sso/enable";
@@ -29,8 +29,14 @@ import {
 } from "@tests/helpers/local-project";
 import { usePlatformServer } from "@tests/helpers/platform-project";
 import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
+import { cliPackageRoot } from "@tests/helpers/oclif-build";
 import { asOneLine, asTerminal } from "@tests/helpers/terminal";
 import { rejectionOf } from "@tests/helpers/thrown-value";
+
+/**
+ * The CLI's configuration, which a run reads the commands it suggests from.
+ */
+const CONFIG = await Config.load(cliPackageRoot);
 
 /**
  * The custom connection the tests describe.
@@ -153,7 +159,7 @@ async function enterCustom(
   let failure: unknown;
   await asTerminal(async () => {
     failure = await rejectionOf(() => {
-      return AuthMethodSsoEnable.run(customArgs(cwd, ...flags));
+      return AuthMethodSsoEnable.run(customArgs(cwd, ...flags), CONFIG);
     });
   });
   return { failure, shown: talk.plain(), asked: talk.asked() };
@@ -1016,17 +1022,20 @@ describe("auth-method sso enable when the schema cannot be written", () => {
     try {
       failure = await withStdin(ACME.secret, () => {
         return rejectionOf(() => {
-          return AuthMethodSsoEnable.run([
-            ...customArgs(cwd),
-            "--slug",
-            ACME.slug,
-            "--display-name",
-            ACME.displayName,
-            "--issuer",
-            ACME.issuer,
-            "--client-id",
-            ACME.clientId,
-          ]);
+          return AuthMethodSsoEnable.run(
+            [
+              ...customArgs(cwd),
+              "--slug",
+              ACME.slug,
+              "--display-name",
+              ACME.displayName,
+              "--issuer",
+              ACME.issuer,
+              "--client-id",
+              ACME.clientId,
+            ],
+            CONFIG,
+          );
         });
       });
     } finally {

@@ -1,7 +1,7 @@
 import { Consent, type Gate } from "@/lib/consent";
 import { CANCELLED } from "@/lib/errors";
 
-import { ANSWERING, type BaseCommand } from "./base";
+import type { BaseCommand } from "./base";
 import { Promptable } from "./promptable";
 import type { CommandResult } from "./types";
 
@@ -103,35 +103,32 @@ export function Destructive<TBase extends CommandClass<BaseCommand>>(Base: TBase
      * Without a `retry` of the gate's own, the refusal suggests this
      * invocation again with `--force`, rebuilt from the command line as oclif
      * parsed it rather than as typed: its arguments (or the gate's
-     * `arguments` in their place), `--force`, then each flag but the ones that
-     * only say how to answer, with a URL's credentials left out and the
-     * selector put back on by {@link BaseCommand.retryCommand}. Arguments that
-     * read as flags go last, after a `--` ({@link BaseCommand.typedRun}).
+     * `arguments` in their place) and every flag but the ones that only say
+     * how to answer, with `--force` set, a URL's credentials left out and the
+     * run's scope put back on ({@link BaseCommand.rerun}).
      */
     protected async consent(gate: Gate): Promise<Consent | undefined> {
-      const retry = await this.typedRun({
-        add: ["--force"],
-        leave: ANSWERING,
-        arguments: gate.arguments,
-      });
+      // Rebuilt only when the gate names no retry of its own.
+      const retried =
+        "retry" in gate
+          ? gate
+          : {
+              ...gate,
+              retry: await this.rerun({
+                with: { force: true },
+                arguments: gate.arguments,
+              }),
+            };
       const session = {
         interactive: !this.nonInteractive,
         force: this.force,
         dryRun: this.dryRun,
       };
 
-      return Consent.request(
-        "retry" in gate
-          ? gate
-          : {
-              ...gate,
-              retry,
-            },
-        {
-          ...session,
-          confirmer: this.ui.confirmer(session),
-        },
-      );
+      return Consent.request(retried, {
+        ...session,
+        confirmer: this.ui.confirmer(session),
+      });
     }
   }
 

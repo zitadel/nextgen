@@ -10,6 +10,7 @@ import {
   PreviewCommand,
 } from "@/lib/oclif";
 import { reads, type Refused, whole } from "@/lib/oclif/flags";
+import { relatedFlags } from "@/lib/suggestion/relations";
 import { plainFlag, Tabulatable } from "@/lib/oclif/tabulatable";
 
 /** The columns `list` renders, in order. */
@@ -50,24 +51,26 @@ export default class PreviewList extends Tabulatable(PreviewCommand) {
     "<%= config.bin %> preview list --all",
     "<%= config.bin %> preview list --plain",
   ];
-  static override flags = {
-    limit: Flags.custom<number>({
-      parse: reads(LIMIT),
-    })({
-      min: LIMIT_MIN,
-      max: LIMIT_MAX,
-      description: "Page size (server default 20, max 100).",
-    }),
-    "page-token": nonBlankString({
-      description: "Continue from a previous page's next_page_token.",
-    }),
-    all: Flags.boolean({
-      char: "a",
-      description: "Fetch every page instead of one.",
-      exclusive: ["page-token"],
-    }),
-    plain: plainFlag,
-  };
+  static override flags = relatedFlags(
+    {
+      limit: Flags.custom<number>({
+        parse: reads(LIMIT),
+      })({
+        min: LIMIT_MIN,
+        max: LIMIT_MAX,
+        description: "Page size (server default 20, max 100).",
+      }),
+      "page-token": nonBlankString({
+        description: "Continue from a previous page's next_page_token.",
+      }),
+      all: Flags.boolean({
+        char: "a",
+        description: "Fetch every page instead of one.",
+      }),
+      plain: plainFlag,
+    },
+    { all: { exclusive: ["page-token"] } },
+  );
 
   protected async execute({ flags }: Admitted<typeof PreviewList>): Promise<JsonEnvelope> {
     const { client, projectId } = await this.connect();
@@ -95,8 +98,6 @@ export default class PreviewList extends Tabulatable(PreviewCommand) {
     const footer: string[] = [];
     const page = {
       token: listed.next,
-      command: "preview list",
-      flags: flags.limit === undefined ? [] : [`--limit ${flags.limit}`],
     };
     const extra = {};
 
