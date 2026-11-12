@@ -56,13 +56,19 @@ test("a cumulative counter is turned into its increase, also after a restart", (
   // Untaken, the increases are one data point.
   queue.ingest(exportOf(counter("events", 6, CUMULATIVE)));
   queue.ingest(exportOf(counter("events", 9, CUMULATIVE)));
-  assert.deepEqual(queue.take(100).map((point) => point.value), [7]);
+  assert.deepEqual(
+    queue.take(100).map((point) => point.value),
+    [7],
+  );
 });
 
 test("a level is sent when it changes and repeated after a while", () => {
   let now = 0;
   const queue = new MetricQueue({ levelRepeatMs: 1000, now: () => now });
-  const gauge = (value) => ({ name: "entries", gauge: { dataPoints: [{ attributes: [], value }] } });
+  const gauge = (value) => ({
+    name: "entries",
+    gauge: { dataPoints: [{ attributes: [], value }] },
+  });
   const levels = () => queue.take(100).map((point) => [point.name, point.value]);
 
   queue.ingest(exportOf(level("connections", 2), gauge(7)));
@@ -176,7 +182,11 @@ test("what has no replay is counted, not sent", () => {
   const queue = new MetricQueue();
   queue.ingest(
     exportOf(
-      histogram("cumulative", { count: 1, sum: 1, bucketCounts: [1], explicitBounds: [] }, CUMULATIVE),
+      histogram(
+        "cumulative",
+        { count: 1, sum: 1, bucketCounts: [1], explicitBounds: [] },
+        CUMULATIVE,
+      ),
       { name: "exponential", exponentialHistogram: {} },
       { name: "summary", summary: {} },
     ),

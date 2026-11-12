@@ -153,12 +153,16 @@ test("rejects a truncated export", () => {
 
 const packedFixed64 = (field, values) => {
   const b = Buffer.alloc(8 * values.length);
-  values.forEach((value, i) => b.writeBigUInt64LE(BigInt(value), 8 * i));
+  for (const [i, value] of values.entries()) {
+    b.writeBigUInt64LE(BigInt(value), 8 * i);
+  }
   return bytes(field, [...b]);
 };
 const packedDouble = (field, values) => {
   const b = Buffer.alloc(8 * values.length);
-  values.forEach((value, i) => b.writeDoubleLE(value, 8 * i));
+  for (const [i, value] of values.entries()) {
+    b.writeDoubleLE(value, 8 * i);
+  }
   return bytes(field, [...b]);
 };
 const sfixed64 = (field, value) => {

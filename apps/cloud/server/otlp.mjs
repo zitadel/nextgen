@@ -364,6 +364,12 @@ function points(bytes, dataPoint) {
   );
 }
 
+// Skips a message nothing reads and stands in for it.
+function unread(reader) {
+  reader.chunk();
+  return {};
+}
+
 function metric(bytes) {
   return readMessage(
     bytes,
@@ -375,8 +381,8 @@ function metric(bytes) {
       7: [LEN, (r, m) => (m.sum = points(r.chunk(), numberDataPoint))],
       9: [LEN, (r, m) => (m.histogram = points(r.chunk(), histogramDataPoint))],
       // Named, not decoded: metrics.mjs counts what it cannot report.
-      10: [LEN, (r, m) => (r.chunk(), (m.exponentialHistogram = {}))],
-      11: [LEN, (r, m) => (r.chunk(), (m.summary = {}))],
+      10: [LEN, (r, m) => (m.exponentialHistogram = unread(r))],
+      11: [LEN, (r, m) => (m.summary = unread(r))],
     },
   );
 }
