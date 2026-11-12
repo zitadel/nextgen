@@ -5,7 +5,7 @@ import {
   parseIssuer,
 } from "@zitadel/config/idp";
 
-import type { Asker } from "@/lib/input";
+import type { Questions } from "@/lib/ui";
 
 /**
  * What {@link askConnectionEndpoints} needs to know about the run.
@@ -22,9 +22,9 @@ export type EndpointsQuestion = {
   readonly developmentBuild: boolean;
 
   /**
-   * How the question is asked: the running command's `input`.
+   * How the question is asked: the running command's `this.ask`.
    */
-  readonly ask: Asker;
+  readonly ask: Questions;
 };
 
 /**
@@ -62,12 +62,12 @@ export async function askConnectionEndpoints(
   // URL` accepts `http://idp.internal:9100` and `file:///tmp/idp`, which would
   // be written to a connection that then fails on apply. Refusing at the prompt
   // puts the complaint where the value was typed.
-  const issuer = await question.ask({
-    kind: "text",
+  const issuer = await question.ask.text({
     name: "issuer",
     message: "What is the issuer URL of the provider?",
     parse: parseIssuer,
     initialValue: idpProvider(question.provider).issuer,
   });
+
   return { issuer };
 }

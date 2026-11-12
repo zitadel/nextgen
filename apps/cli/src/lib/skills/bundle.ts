@@ -1,6 +1,5 @@
 import { cp, glob, mkdir, readFile, rm } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
-
 import { parse } from "yaml";
 
 /**
@@ -48,7 +47,9 @@ export async function publicSkills(repoRoot: string): Promise<SkillSource[]> {
     }
     skills.set(name, { name, dir });
   }
-  return [...skills.values()].sort((a, b) => a.name.localeCompare(b.name));
+  return [...skills.values()].sort((a, b) => {
+    return a.name.localeCompare(b.name);
+  });
 }
 
 /**
@@ -62,7 +63,9 @@ export async function bundleSkills(repoRoot: string, outDir: string): Promise<st
   for (const skill of skills) {
     await cp(skill.dir, join(outDir, skill.name), { recursive: true });
   }
-  return skills.map((skill) => skill.name);
+  return skills.map((skill) => {
+    return skill.name;
+  });
 }
 
 type Frontmatter = { name?: unknown; metadata?: { internal?: unknown } };

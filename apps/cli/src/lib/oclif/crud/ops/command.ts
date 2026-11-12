@@ -1,12 +1,12 @@
 import type { Command, Interfaces } from "@oclif/core";
 
 import { ZitadelError } from "@/lib/errors";
-import { EnvironmentCommand } from "@/lib/oclif/environment-command";
 import type { Admitted, BaseCommand } from "@/lib/oclif/base";
-import type { CommandResult, JsonEnvelope } from "@/lib/oclif/types";
 import type { Json, ResourceCommandOptions, ResourceDescriptor } from "@/lib/oclif/crud/types";
 import { Destructive } from "@/lib/oclif/destructive";
+import { EnvironmentCommand } from "@/lib/oclif/environment-command";
 import { Tabulatable } from "@/lib/oclif/tabulatable";
+import type { CommandResult, JsonEnvelope } from "@/lib/oclif/types";
 
 /** Everything an operation needs to know about the resource it serves. */
 export type OperationDefinition<Ctx, Spec> = Readonly<{
@@ -77,7 +77,9 @@ export class ResourceCommand<
 
   /** Open the platform connection; deferred so `--dry-run` connects only to ask the server. */
   protected context(): Promise<Ctx> {
-    return this.definition.options.connect(() => this.connect());
+    return this.definition.options.connect(() => {
+      return this.connect();
+    });
   }
 
   /**
@@ -114,6 +116,7 @@ export const bindOperation = <Ctx, Spec>(
   // serialized request schema inside it) is implementation detail that would
   // dwarf the metadata an agent actually reads.
   definitions.set(bound, definition as OperationDefinition<unknown, unknown>);
+
   return bound;
 };
 
@@ -123,4 +126,6 @@ const definitions = new WeakMap<object, OperationDefinition<unknown, unknown>>()
 /** The definition {@link bindOperation} recorded for a command class, if any. */
 export const definitionOf = (
   command: typeof Command,
-): OperationDefinition<unknown, unknown> | undefined => definitions.get(command);
+): OperationDefinition<unknown, unknown> | undefined => {
+  return definitions.get(command);
+};

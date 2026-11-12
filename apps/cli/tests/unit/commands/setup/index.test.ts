@@ -1,5 +1,6 @@
+import { Config } from "@oclif/core";
 import { existsSync } from "node:fs";
-import { mkdir, readdir, readFile, rm } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import type { IncomingMessage } from "node:http";
 import { join } from "node:path";
 import { parseEnv } from "node:util";
@@ -16,7 +17,12 @@ vi.mock("@/commands/setup/prompts", async (importOriginal) => {
   return { ...(await importOriginal<object>()), askCustomSettings: vi.fn() };
 });
 
-import { confirm, intro, isCancel, multiselect, select } from "@clack/prompts";
+vi.mock("@/lib/scaffold-manifest", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/scaffold-manifest")>();
+  return { ...actual, writeScaffoldManifest: vi.fn(actual.writeScaffoldManifest) };
+});
+
+import { confirm, intro, isCancel, log, multiselect, outro, select } from "@clack/prompts";
 
 import Setup, {
   buildSummary,
@@ -34,7 +40,7 @@ import { askCustomSettings } from "@/commands/setup/prompts";
 import { createZitadelClient } from "@/lib/backend";
 import { ZitadelError } from "@/lib/errors";
 import { customExample, SETUP_FLAG_NAMES } from "@/lib/idp";
-import { type Asker, input } from "@/lib/input";
+import { asker } from "@/lib/input";
 import {
   localRuntimePaths,
   type RuntimeMetadata,
@@ -42,7 +48,7 @@ import {
 } from "@/lib/local-server/runtime";
 import { LocalServer } from "@/lib/local-server/server";
 import { readZitadelSecret } from "@/lib/project";
-import { type SuggestedCommand, unscopedCommand } from "@/lib/suggestion";
+import { writeScaffoldManifest } from "@/lib/scaffold-manifest";
 import { takeReportedWarnings } from "@/lib/warnings";
 import { aFakeAppGeneratorPath } from "@tests/helpers/app-generator";
 import { aUserSchema } from "@tests/helpers/config";
@@ -50,11 +56,22 @@ import { it, type Serve } from "@tests/helpers/fixtures";
 import { write } from "@tests/helpers/git-repo";
 import { parseFlag } from "@tests/helpers/inputs";
 import { usePlatformServer } from "@tests/helpers/platform-project";
-import { expectedPublicCliCommand, parseJson, runCliForTest } from "@tests/helpers/run-cli";
+import {
+  expectedPublicCliCommand,
+  parseJson,
+  pressCtrlC,
+  runCliForTest,
+  stripAnsi,
+} from "@tests/helpers/run-cli";
 import { aBinaryRecord, aDockerRecord } from "@tests/helpers/runtime-record";
+import { cliPackageRoot } from "@tests/helpers/oclif-build";
 import { aNextApp, suggestedCommands } from "@tests/helpers/setup";
+import { aSuggest } from "@tests/helpers/suggestions";
 import { asTerminal } from "@tests/helpers/terminal";
 import { rejectionOf, thrownBy } from "@tests/helpers/thrown-value";
+
+/** The CLI's commands, which a run reads to render what it suggests. */
+const config = await Config.load(cliPackageRoot);
 
 const { server } = usePlatformServer();
 
@@ -233,9 +250,7 @@ const CANCELLED = Symbol("cancelled");
  * @param question - The question.
  * @returns The answer.
  */
-const ask: Asker = (question) => {
-  return input(question, { interactive: true, force: false });
-};
+const ask = asker({ interactive: true, force: false });
 
 /**
  * A Vite React app.
@@ -337,6 +352,8 @@ type CapturingPlatform = {
   rejectsReleases(): void;
   /** Refuses a sign-up policy's evaluation as malformed, as a server from before the policy does. */
   predatesTheSignupPolicy(): void;
+  /** Leaves a sign-up policy's evaluation unanswered; resolves once it has been asked. */
+  hangsOnTheSignupPolicy(): Promise<void>;
 };
 
 /**
@@ -411,6 +428,7 @@ async function aCapturingPlatform(
   const projects: CreatedOnPlatform[] = [];
   const deployments: RequestedDeployment[] = [];
   const failing = { releases: false, signupPolicy: false };
+  let signupPolicyAsked: (() => void) | undefined;
   const url = await serve(async (req, res) => {
     const path = new URL(req.url ?? "/", "http://localhost").pathname;
     requests.push(`${req.method ?? "GET"} ${path}`);
@@ -429,6 +447,10 @@ async function aCapturingPlatform(
           created_at: "2026-06-01T00:00:00.000Z",
         }),
       );
+      return;
+    }
+    if (req.method === "POST" && path === "/api/v1/policies/evaluate" && signupPolicyAsked) {
+      signupPolicyAsked();
       return;
     }
     if (req.method === "POST" && path === "/api/v1/policies/evaluate" && failing.signupPolicy) {
@@ -480,6 +502,11 @@ async function aCapturingPlatform(
     },
     predatesTheSignupPolicy() {
       failing.signupPolicy = true;
+    },
+    hangsOnTheSignupPolicy() {
+      return new Promise<void>((asked) => {
+        signupPolicyAsked = asked;
+      });
     },
   };
 }
@@ -828,6 +855,39 @@ async function liveDeployments(cwd: string) {
   return client.listDeployments.all({ project_id: projectId, live: true });
 }
 
+/**
+ * Everything drawn in the chain, as one string.
+ *
+ * @returns The lines, one to a row.
+ */
+function drawnLines(): string {
+  return vi
+    .mocked(log.message)
+    .mock.calls.map(([text]) => {
+      return String(text);
+    })
+    .join("\n");
+}
+
+/**
+ * What a framed report says, a line at a time, with the frame taken off. The
+ * frame is coloured, so its glyphs leave escapes behind: strip those too or a
+ * border becomes a line of invisible characters rather than nothing.
+ *
+ * @param output - What the run printed.
+ * @returns The lines of the report, without the frame or blank lines.
+ */
+function framed(output: string): string[] {
+  return stripAnsi(output)
+    .split("\n")
+    .map((line) => {
+      return line.replaceAll(/[│╭╮╰╯─]/g, "").trim();
+    })
+    .filter((line) => {
+      return line !== "";
+    });
+}
+
 describe("setup", () => {
   describe("with zitadel.json already present", () => {
     it("reports itself skipped, as already initialized", async ({ dir }) => {
@@ -837,6 +897,17 @@ describe("setup", () => {
 
       expect(res).toBeSkipped();
       expect(parseJson(res.stdout)).toMatchObject({ reason: "already-initialized" });
+    });
+
+    it("answers a dry run ok, as a dry run that changes nothing", async ({ dir }) => {
+      await write(dir, { "zitadel.json": JSON.stringify({ project: "proj_x" }) });
+
+      const res = await runCliForTest(setupIn(dir, ...SCRIPTED, "--dry-run", "--json"));
+
+      expect(parseJson(res.stdout)).toMatchObject({
+        status: "ok",
+        data: { dry_run: true, title: "Zitadel is already set up in this app (dry run)" },
+      });
     });
   });
 
@@ -952,11 +1023,24 @@ describe("setup", () => {
         hint: expect.stringContaining("Run start to restart it"),
         next_commands: [
           expectedPublicCliCommand(`start --cwd ${dir}`),
-          expectedPublicCliCommand(
-            `setup --framework next --non-interactive --server local --cwd ${dir}`,
-          ),
+          expectedPublicCliCommand(`setup --framework next --server local --cwd ${dir}`),
         ],
         details: { server_url: serverUrl, server_version: "0.0.1" },
+      });
+    });
+
+    it("names its own directory once in the start it suggests from a subdirectory", async ({
+      dir,
+      serve,
+    }) => {
+      await writeRuntimeMetadata(dir, aRuntime(dir, await aHealthyServer(serve), "0.0.1"));
+      const cwd = join(dir, "my-app");
+      await mkdir(cwd);
+
+      const res = await runCliForTest(setupIn(cwd, "--framework", "next", ...LOCAL, ...SCRIPTED));
+
+      expect(parseJson(res.stdout)).toMatchObject({
+        next_commands: [expectedPublicCliCommand(`start --cwd ${dir}`), expect.any(String)],
       });
     });
 
@@ -994,9 +1078,7 @@ describe("setup", () => {
         hint: expect.stringContaining("Start local Zitadel first"),
         next_commands: [
           expectedPublicCliCommand(`start --cwd ${dir}`),
-          expectedPublicCliCommand(
-            `setup --framework next --non-interactive --server local --cwd ${dir}`,
-          ),
+          expectedPublicCliCommand(`setup --framework next --server local --cwd ${dir}`),
         ],
       });
     });
@@ -1156,13 +1238,11 @@ describe("setup", () => {
       expect(res).toFailWith("E_NOT_FOUND");
       expect(parseJson(res.stdout)).toMatchObject({
         message: expect.stringContaining("has no such endpoint"),
-        hint: expect.stringContaining(
-          "--framework next --dev-port 3000 --non-interactive --server local",
-        ),
+        hint: expect.stringContaining("retry setup with the commands below"),
         next_commands: [
           expectedPublicCliCommand(`start --cwd ${dir}`),
           expectedPublicCliCommand(
-            `setup --framework next --dev-port 3000 --non-interactive --server local --cwd ${dir}`,
+            `setup --framework next --dev-port 3000 --server local --cwd ${dir}`,
           ),
         ],
       });
@@ -1176,11 +1256,11 @@ describe("setup", () => {
       );
 
       expect(parseJson(res.stdout)).toMatchObject({
-        hint: expect.stringContaining("--preset passkey-first"),
+        hint: expect.stringContaining("retry setup with the commands below"),
         next_commands: [
           expectedPublicCliCommand(`start --cwd ${dir}`),
           expectedPublicCliCommand(
-            `setup --framework next --preset passkey-first --dev-port 3000 --non-interactive --server local --cwd ${dir}`,
+            `setup --framework next --preset passkey-first --dev-port 3000 --server local --cwd ${dir}`,
           ),
         ],
       });
@@ -1358,7 +1438,7 @@ describe("setup", () => {
     );
 
     it.for(FRAMEWORK_APPS)(
-      "skips the install of a $framework app as a dry run",
+      "reports the install of a $framework app as one it would run, never as skipped",
       async ({ framework, files }, { dir }) => {
         await write(dir, files);
 
@@ -1366,8 +1446,11 @@ describe("setup", () => {
           onTheCloud(dir, "--dry-run", "--skip-install", "--framework", framework),
         );
 
-        expect(parseJson(res.stdout)).toMatchObject({
-          data: { install: { status: "skipped", reason: "dry-run", command: "npm install" } },
+        const { data } = parseJson(res.stdout) as { data: { install: unknown } };
+        expect(data.install).toEqual({
+          status: "would-run",
+          package_manager: "npm",
+          command: "npm install",
         });
       },
     );
@@ -1458,6 +1541,81 @@ describe("setup", () => {
       ]);
 
       expect(res).toPrint(`Explore all commands:\n  ${expectedPublicCliCommand("")}`);
+    });
+
+    it("frames the report under its own headline when nobody is at a terminal", async ({ dir }) => {
+      await aNextApp(dir);
+
+      const res = await runCliForTest(
+        setupIn(dir, "--server", CLOUD, "--non-interactive", "--skip-install", ...DRY_RUN_NEXT),
+      );
+
+      expect(framed(res.stdout)).toContain("Summary");
+      expect(stripAnsi(res.stdout)).toMatch(/^Would set up Zitadel in this app \(dry run\)$/m);
+      expect(res.stdout).not.toContain("✓");
+      expect(res.stdout).not.toContain("DETECTED");
+    });
+
+    it("narrates no step as done that a dry run does not do", async ({ dir }) => {
+      await aNextApp(dir);
+
+      const res = await runCliForTest(
+        setupIn(dir, "--server", CLOUD, "--non-interactive", "--skip-install", ...DRY_RUN_NEXT),
+      );
+
+      expect(stripAnsi(res.stdout)).not.toMatch(/^✔\s+(Created project|Patched \d+ file)/m);
+    });
+
+    it("marks every step it starts as a dry run, but for the reads", async ({ dir }) => {
+      const cwd = await aNewAppDirectory(dir);
+
+      const res = await runCliForTest(
+        setupIn(cwd, "--server", CLOUD, "--non-interactive", "--skip-install", ...DRY_RUN_NEXT),
+        { PATH: await aFakeAppGeneratorPath() },
+      );
+
+      expect(
+        stripAnsi(res.stdout)
+          .split("\n")
+          .filter((line) => {
+            return line.startsWith("◐") && !line.includes("Detecting");
+          })
+          .filter((line) => {
+            return !line.endsWith("(dry run)");
+          }),
+      ).toEqual([]);
+    });
+
+    it("names no project it ran against, since a dry run creates none", async ({ dir }) => {
+      await aNextApp(dir);
+
+      const res = await runCliForTest(
+        setupIn(dir, "--server", CLOUD, "--non-interactive", "--skip-install", ...DRY_RUN_NEXT),
+      );
+
+      expect(res.stdout).not.toContain("Using project ");
+    });
+
+    it("ends the drawn report and the written title on one headline saying dry run", async ({
+      dir,
+    }) => {
+      await aNextApp(dir);
+      const args = setupIn(
+        dir,
+        "--server",
+        CLOUD,
+        "--non-interactive",
+        "--skip-install",
+        ...DRY_RUN_NEXT,
+      );
+
+      const plain = await runCliForTest(args);
+      const json = await runCliForTest([...args, "--json"]);
+
+      expect(parseJson(json.stdout)).toMatchObject({
+        data: { title: "Would set up Zitadel in this app (dry run)", dry_run: true },
+      });
+      expect(stripAnsi(plain.stdout)).toContain("Would set up Zitadel in this app (dry run)");
     });
 
     it.for([
@@ -1859,7 +2017,7 @@ describe("setup", () => {
         {
           saying: "what to do if zitadel start started the server",
           said: () => {
-            return "If `zitadel start` started this server";
+            return "started this server, run setup from the directory";
           },
         },
       ])("warns once, saying $saying", async ({ said }, { dir }) => {
@@ -1926,6 +2084,37 @@ describe("setup", () => {
     });
   });
 
+  describe("against a platform that deploys what setup wrote", () => {
+    it("says in the chain that it deployed what it wrote", async ({ dir }) => {
+      await aNextApp(dir);
+
+      const res = await runCliForTest(
+        setupIn(dir, "--server", CLOUD, ...SCRIPTED_NEXT, "--no-git", ...PINNED_DEV_PORT),
+      );
+
+      expect(stripAnsi(res.stdout)).toMatch(/Deployed sha256:[0-9a-f]{12} to 1 origin$/m);
+    });
+
+    it("records its first release as 'Initial deployment from setup'", async ({ dir }) => {
+      await aNextApp(dir);
+      const sent: string[] = [];
+      server.use(
+        http.post("*/releases/build", async ({ request }) => {
+          sent.push(await request.clone().text());
+        }),
+        http.post("*/deployments", async ({ request }) => {
+          sent.push(await request.clone().text());
+        }),
+      );
+
+      await runCliForTest(
+        setupIn(dir, "--server", CLOUD, ...SCRIPTED_NEXT, "--no-git", ...PINNED_DEV_PORT),
+      );
+
+      expect(sent.join("\n")).toContain("Initial deployment from setup");
+    });
+  });
+
   describe("against a server that does not take a sign-up policy yet", () => {
     it("warns that it wrote none, and how to add one once the server does", async ({
       dir,
@@ -1939,13 +2128,11 @@ describe("setup", () => {
         scriptedAgainst(dir, platform.url, "--no-git", ...PINNED_DEV_PORT),
       );
 
-      expect(parseJson(res.stdout)).toMatchObject({
-        warnings: [
-          expect.stringContaining(
-            "so setup wrote none. Upgrade the server, then add .zitadel/policies/user.create.json and run `zitadel deploy`",
-          ),
-        ],
-      });
+      const [warning] = (parseJson(res.stdout) as { warnings: string[] }).warnings;
+      expect(warning).toContain(
+        "so setup wrote none. Upgrade the server, then add .zitadel/policies/user.create.json and run ",
+      );
+      expect(warning).toContain(`--env-file ${dir}/.env.development.local`);
     });
 
     it("warns that a sign-up policy --force keeps fails every deploy", async ({ dir, serve }) => {
@@ -1966,14 +2153,47 @@ describe("setup", () => {
       expect(parseJson(res.stdout)).toMatchObject({
         warnings: [
           expect.stringContaining(
-            "every `zitadel deploy` fails while .zitadel/policies/user.create.json is there",
+            "every deploy fails while .zitadel/policies/user.create.json is there",
           ),
         ],
       });
     });
   });
 
+  describe("when Ctrl-C is pressed while it asks whether the server takes a sign-up policy", () => {
+    it("ends cancelled and leaves no zitadel.json behind", async ({ dir, serve }) => {
+      await aNextApp(dir);
+      const platform = await aCapturingPlatform(serve);
+      const asked = platform.hangsOnTheSignupPolicy();
+
+      const result = runCliForTest(
+        scriptedAgainst(dir, platform.url, "--no-git", ...PINNED_DEV_PORT),
+      );
+      await asked;
+      pressCtrlC();
+
+      expect(await result).toFailWith("E_CANCELLED");
+      expect(existsSync(join(dir, "zitadel.json"))).toBe(false);
+    });
+  });
+
   describe("when its first deploy fails", () => {
+    it("names the deploy in the box when its own deploy failed", async ({ dir }) => {
+      await aNextApp(dir);
+      server.use(
+        http.post("*/releases/build", () => {
+          return HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 });
+        }),
+      );
+
+      const res = await runCliForTest(
+        setupIn(dir, "--server", CLOUD, ...SCRIPTED_NEXT, "--no-git", ...PINNED_DEV_PORT),
+      );
+
+      expect(res).toPrint("Left .zitadel/ undeployed");
+      expect(framed(res.stdout).join("\n")).toContain("Deploy .zitadel/ so the project serves");
+    });
+
     it("still succeeds, reporting no deployment", async ({ dir, serve }) => {
       await aNextApp(dir);
       const platform = await aCapturingPlatform(serve);
@@ -2010,7 +2230,7 @@ describe("setup", () => {
         scriptedAgainst(dir, platform.url, "--no-git", ...PINNED_DEV_PORT),
       );
 
-      expect(suggestedCommands(res.stdout)[0]).toContain("deploy -m");
+      expect(suggestedCommands(res.stdout)[0]).toContain("deploy --message");
     });
 
     it("deploys nothing", async ({ dir, serve }) => {
@@ -2067,6 +2287,23 @@ describe("setup", () => {
       await runCliForTest(scriptedAgainst(dir, platform.url));
 
       expect(await readFile(join(dir, ".env.local"), "utf8")).toBe(own);
+    });
+
+    it("suggests rerunning with the flags it was given, and --force", async ({ dir, serve }) => {
+      await aNextApp(dir);
+      const platform = await aCapturingPlatform(serve, {
+        onCreateProject: () => {
+          return blockThePolicies(dir);
+        },
+      });
+
+      const res = await runCliForTest(
+        scriptedAgainst(dir, platform.url, "--dev-port", "3001", "--json"),
+      );
+
+      expect(suggestedCommands(res.stdout)).toEqual([
+        expect.stringMatching(/ setup --framework next --dev-port 3001 .*--force/),
+      ]);
     });
 
     describe("and is rerun with --force once it can be", () => {
@@ -2534,6 +2771,58 @@ describe("setup", () => {
       });
     });
 
+    describe("as a dry run", () => {
+      it("answers as a dry run that would move, and says nothing happened", async ({ dir }) => {
+        await aNextApp(dir, { scripts: { dev: "next dev" } });
+        await runCliForTest(onTheCloud(dir, "--non-interactive", "--skip-install"));
+
+        const res = await runCliForTest(onTheCloud(dir, ...MOVE_TO_3101, "--dry-run", "--json"));
+
+        expect(parseJson(res.stdout)).toMatchObject({
+          status: "ok",
+          data: {
+            title: "Would move the app to http://localhost:3101 (dry run)",
+            dry_run: true,
+            moved: true,
+          },
+        });
+      });
+
+      it("draws the previous issuer a file held without its control characters", async ({
+        dir,
+      }) => {
+        await aNextApp(dir, { scripts: { dev: "next dev" } });
+        await runCliForTest(onTheCloud(dir, "--non-interactive", "--skip-install"));
+        for (const file of [".env.local", ".env.development.local"]) {
+          const text = await readFile(join(dir, file), "utf8");
+          await writeFile(
+            join(dir, file),
+            text.replace(
+              /^ZITADEL_ISSUER=.*$/m,
+              'ZITADEL_ISSUER="http://localhost:3000\u001b]0;pwned\u0007"',
+            ),
+          );
+        }
+
+        const res = await runCliForTest(
+          onTheCloud(dir, ...MOVE_TO_3101, "--dry-run").filter((flag) => {
+            return flag !== "--json";
+          }),
+        );
+
+        expect(`${res.stdout}${res.stderr}`).not.toContain("\u001b]0;pwned");
+      });
+
+      it("does not tell the developer to restart the dev server", async ({ dir }) => {
+        await aNextApp(dir, { scripts: { dev: "next dev" } });
+        await runCliForTest(onTheCloud(dir, "--non-interactive", "--skip-install"));
+
+        const res = await runCliForTest(onTheCloud(dir, ...MOVE_TO_3101, "--dry-run", "--json"));
+
+        expect(res.stdout).not.toContain("Restart the dev server");
+      });
+    });
+
     it.for([
       {
         file: "the dev script",
@@ -2664,7 +2953,7 @@ describe("setup", () => {
         expect(parseJson(res.stdout)).toMatchObject({
           warnings: expect.arrayContaining([
             expect.stringMatching(
-              /^http:\/\/localhost:3101 serves nothing until the next deploy: nothing is deployed to the project yet\. Run `\S+ \S+ deploy .+`\.$/,
+              /^http:\/\/localhost:3101 serves nothing until the next deploy: nothing is deployed to the project yet\. Run \S+ \S+ deploy .+\.$/,
             ),
           ]),
         });
@@ -2677,7 +2966,9 @@ describe("setup", () => {
 
         const res = await runCliForTest(onTheCloud(dir, ...MOVE_TO_3101, "--force"));
 
-        expect(suggestedCommands(res.stdout)).toEqual([expect.stringContaining(" deploy -m ")]);
+        expect(suggestedCommands(res.stdout)).toEqual([
+          expect.stringContaining(" deploy --message "),
+        ]);
       });
     });
 
@@ -2705,7 +2996,7 @@ describe("setup", () => {
         expect(parseJson(res.stdout)).toMatchObject({
           warnings: expect.arrayContaining([
             expect.stringMatching(
-              /^http:\/\/localhost:3000 is still among the project's origins; it admits a port nothing serves any more\. Remove it with `\S+ \S+ origin rm http:\/\/localhost:3000 --force .+`\.$/,
+              /^http:\/\/localhost:3000 is still among the project's origins; it admits a port nothing serves any more\. Remove it with \S+ \S+ origin rm http:\/\/localhost:3000 --force .+\.$/,
             ),
           ]),
         });
@@ -2817,7 +3108,7 @@ describe("Setup.run", () => {
 
       await rejectionOf(() => {
         return asTerminal(() => {
-          return Setup.run(["--cwd", dir, "--server", CLOUD, "--force"]);
+          return Setup.run(["--cwd", dir, "--server", CLOUD, "--force"], config);
         });
       });
 
@@ -2836,7 +3127,7 @@ describe("Setup.run", () => {
 
       const error = await rejectionOf(() => {
         return asTerminal(() => {
-          return Setup.run(["--cwd", dir, "--server", CLOUD]);
+          return Setup.run(["--cwd", dir, "--server", CLOUD], config);
         });
       });
 
@@ -2849,11 +3140,54 @@ describe("Setup.run", () => {
 
       await rejectionOf(() => {
         return asTerminal(() => {
-          return Setup.run(["--cwd", dir, "--server", CLOUD]);
+          return Setup.run(["--cwd", dir, "--server", CLOUD], config);
         });
       });
 
       expect(existsSync(join(dir, "zitadel.json"))).toBe(false);
+    });
+  });
+
+  describe("with the detected framework accepted and every question answered", () => {
+    beforeEach(() => {
+      vi.mocked(log.message).mockClear();
+      vi.mocked(outro).mockClear();
+    });
+
+    /**
+     * Accepts the detected framework, then answers every question after it.
+     */
+    function answeringEveryQuestion(): void {
+      vi.mocked(confirm).mockResolvedValueOnce(true);
+      vi.mocked(select)
+        .mockResolvedValueOnce(DEFAULT_SETUP_USE_CASE)
+        .mockResolvedValueOnce(DEFAULT_SETUP_PRESET)
+        .mockResolvedValueOnce(15);
+      vi.mocked(multiselect).mockResolvedValueOnce([]);
+      vi.mocked(confirm).mockResolvedValueOnce(true);
+    }
+
+    it("closes the chain on what the run did, not on the box's own title", async ({ dir }) => {
+      await aNextApp(dir);
+      answeringEveryQuestion();
+
+      await asTerminal(() => {
+        return Setup.run(["--cwd", dir, "--server", CLOUD, "--skip-install"], config);
+      });
+
+      expect(outro).toHaveBeenCalledWith(expect.stringContaining("Set up Zitadel in this app"));
+    });
+
+    it("says in the chain that a step it could not finish gave up", async ({ dir }) => {
+      await aNextApp(dir);
+      answeringEveryQuestion();
+      vi.mocked(writeScaffoldManifest).mockRejectedValueOnce(new Error("disk full"));
+
+      await asTerminal(() => {
+        return Setup.run(["--cwd", dir, "--server", CLOUD, "--skip-install"], config);
+      });
+
+      expect(drawnLines()).toContain("Could not record what setup scaffolded");
     });
   });
 
@@ -2895,7 +3229,7 @@ describe("Setup.run", () => {
 
         const error = await rejectionOf(() => {
           return asTerminal(() => {
-            return Setup.run(["--cwd", cwd, "--server", CLOUD]);
+            return Setup.run(["--cwd", cwd, "--server", CLOUD], config);
           });
         });
 
@@ -2909,7 +3243,7 @@ describe("Setup.run", () => {
 
         await rejectionOf(() => {
           return asTerminal(() => {
-            return Setup.run(["--cwd", cwd, "--server", CLOUD]);
+            return Setup.run(["--cwd", cwd, "--server", CLOUD], config);
           });
         });
 
@@ -2926,11 +3260,32 @@ describe("Setup.run", () => {
 
         await rejectionOf(() => {
           return asTerminal(() => {
-            return Setup.run(["--cwd", cwd, "--server", CLOUD]);
+            return Setup.run(["--cwd", cwd, "--server", CLOUD], config);
           });
         });
 
         expect(await readdir(cwd)).toEqual([]);
+      });
+    });
+
+    describe("when the default configuration of the new app cannot be written", () => {
+      it("says in the chain that the new app is gone again", async ({ dir }) => {
+        const cwd = await aNewAppDirectory(dir);
+        answeringEveryQuestion();
+        vi.mocked(log.message).mockClear();
+        server.use(
+          http.post("*/projects", async () => {
+            await blockThePolicies(cwd);
+          }),
+        );
+
+        await rejectionOf(() => {
+          return asTerminal(() => {
+            return Setup.run(["--cwd", cwd, "--server", CLOUD, "--skip-install"], config);
+          });
+        });
+
+        expect(drawnLines()).toContain("Removed the new app");
       });
     });
 
@@ -2940,7 +3295,7 @@ describe("Setup.run", () => {
         answeringEveryQuestion();
 
         await asTerminal(() => {
-          return Setup.run(["--cwd", cwd, "--server", CLOUD, "--skip-install"]);
+          return Setup.run(["--cwd", cwd, "--server", CLOUD, "--skip-install"], config);
         });
 
         expect(await readdir(cwd)).toEqual(expect.arrayContaining(["app", "zitadel.json"]));
@@ -2951,7 +3306,7 @@ describe("Setup.run", () => {
         answeringEveryQuestion();
 
         await asTerminal(() => {
-          return Setup.run(["--cwd", cwd, "--server", CLOUD, "--skip-install"]);
+          return Setup.run(["--cwd", cwd, "--server", CLOUD, "--skip-install"], config);
         });
 
         expect(intro).toHaveBeenCalledTimes(1);
@@ -3197,16 +3552,6 @@ describe("Setup.flags", () => {
 });
 
 describe("refuseUnusableFlags", () => {
-  /**
-   * Builds a suggested command the way an unscoped CLI release names it.
-   *
-   * @param command - The command after the binary.
-   * @returns The full command.
-   */
-  const suggest = (command: string): SuggestedCommand => {
-    return unscopedCommand(command, "1.0.0");
-  };
-
   it.each<{ situation: string; flags: SetupFlagsToCheck; scripted: boolean; refusal: object }>([
     {
       situation: "--design whatever it names, pointing at branding eject",
@@ -3215,7 +3560,7 @@ describe("refuseUnusableFlags", () => {
       refusal: {
         code: "E_VALIDATION",
         message: "setup no longer applies a login template, so --design was removed",
-        nextCommands: [expect.stringContaining("branding eject")],
+        nextCommands: [{ id: "branding:eject" }],
       },
     },
     {
@@ -3302,7 +3647,7 @@ describe("refuseUnusableFlags", () => {
     },
   ])("refuses $situation", ({ flags, scripted, refusal }) => {
     const error = thrownBy(() => {
-      return refuseUnusableFlags(flags, scripted, suggest);
+      return refuseUnusableFlags(flags, scripted);
     });
 
     expect(error).toBeInstanceOf(ZitadelError);
@@ -3350,7 +3695,7 @@ describe("refuseUnusableFlags", () => {
     },
   ])("accepts $situation", ({ flags, scripted }) => {
     const error = thrownBy(() => {
-      return refuseUnusableFlags(flags, scripted, suggest);
+      return refuseUnusableFlags(flags, scripted);
     });
 
     expect(error).toBeUndefined();
@@ -3358,11 +3703,17 @@ describe("refuseUnusableFlags", () => {
 });
 
 describe("portInUseWarning", () => {
+  describe("when a later port is free", () => {
+    it("suggests setup on that port, from the run's directory", () => {
+      const warning = portInUseWarning(3000, 3001, aSuggest({ cwd: "app" }, "1.2.3"));
+
+      expect(warning).toContain("npx @zitadel/cli@1.2.3 setup --dev-port 3001 --cwd app");
+    });
+  });
+
   describe("when the ports after the taken one are taken too", () => {
     it("names only the flag, since a placeholder would run as a shell redirection", () => {
-      const warning = portInUseWarning(3000, undefined, (args) => {
-        return unscopedCommand(args, "1.2.3");
-      });
+      const warning = portInUseWarning(3000, undefined, aSuggest());
 
       expect(warning).toBe(
         "Port 3000 and the ports after it are already in use. If that is not this app's dev server, run setup with --dev-port and a free port.",
@@ -3416,14 +3767,19 @@ describe("localServerHostsPlatform", () => {
 describe("setupRetryFlags", () => {
   it.each([
     {
-      situation: "the custom settings typed, though they do not make a connection yet",
-      flags: { sso: "custom", ssoSlug: "acme-sso" },
-      carried: "--sso custom --sso-slug acme-sso",
+      situation: "a framework as typed, whatever it holds",
+      flags: { framework: "my app $(id)" },
+      carried: { framework: "my app $(id)" },
     },
     {
-      situation: "what was typed, quoted for a shell",
+      situation: "the custom settings typed, though they do not make a connection yet",
+      flags: { sso: "custom", ssoSlug: "acme-sso" },
+      carried: { sso: "custom", ssoSlug: "acme-sso" },
+    },
+    {
+      situation: "what was typed, as typed",
       flags: { sso: "custom", ssoSlug: "acme-sso", ssoDisplayName: "Acme's SSO" },
-      carried: "--sso-display-name 'Acme'\\''s SSO'",
+      carried: { ssoDisplayName: "Acme's SSO" },
     },
     {
       situation: "a whole connection as before",
@@ -3433,44 +3789,79 @@ describe("setupRetryFlags", () => {
         ssoDisplayName: "Acme",
         ssoIssuer: "https://sso.acme.example",
       },
-      carried: "--sso-issuer https://sso.acme.example",
+      carried: { ssoIssuer: "https://sso.acme.example" },
     },
     {
       situation: "the minimum password length",
       flags: { passwordMinLength: 12 },
-      carried: "--password-min-length 12",
+      carried: { passwordMinLength: 12 },
     },
     {
       situation: "an explicit no minimum as 0",
       flags: { passwordMinLength: null },
-      carried: "--password-min-length 0",
+      carried: { passwordMinLength: 0 },
     },
     {
       situation: "the recommended minimum, which a policy file --force keeps would not hold",
       flags: { passwordMinLength: 15 },
-      carried: "--password-min-length 15",
+      carried: { passwordMinLength: 15 },
     },
   ])("carries $situation", ({ flags, carried }) => {
     const retry = setupRetryFlags(retryOptionsFromFlags(flags));
 
-    expect(retry).toContain(carried);
+    expect(retry).toMatchObject(carried);
   });
 
   it.each([
     {
-      situation: "--non-interactive while a provider is being configured, typed in part or not",
+      situation: "the local server, when the run named none",
+      options: {},
+      flags: { server: "local" },
+    },
+    {
+      situation: "the server the run named",
+      options: { server: "https://zitadel.example" },
+      flags: { server: "https://zitadel.example" },
+    },
+    {
+      situation: "no server, when the run left it to the default",
+      options: { server: null },
+      flags: {},
+    },
+  ])("pins $situation", ({ options, flags }) => {
+    expect(setupRetryFlags(options)).toEqual(flags);
+  });
+
+  it("keeps the flags in command-line order, ending with the server", () => {
+    const retry = setupRetryFlags({ framework: "next", devPort: 3001, passwordMinLength: 12 });
+
+    const given = Object.entries(retry).flatMap(([name, value]) => {
+      return value === undefined ? [] : [name];
+    });
+
+    expect(given).toEqual(["framework", "devPort", "passwordMinLength", "server"]);
+  });
+
+  it.each([
+    {
+      situation: "--non-interactive, which is how a run answered and never what a retry does",
       flags: { sso: "custom", ssoSlug: "acme-sso", nonInteractive: true },
-      dropped: "--non-interactive",
+      dropped: "nonInteractive",
     },
     {
       situation: "a provider this CLI does not offer",
       flags: { sso: "nonesuch", ssoSlug: "acme-sso" },
-      dropped: "--sso",
+      dropped: "sso",
+    },
+    {
+      situation: "the directory, which the run that reports the retry puts back as --cwd",
+      flags: { framework: "next", cwd: "app" },
+      dropped: "cwd",
     },
   ])("drops $situation", ({ flags, dropped }) => {
     const retry = setupRetryFlags(retryOptionsFromFlags(flags));
 
-    expect(retry).not.toContain(dropped);
+    expect(retry).not.toHaveProperty(dropped);
   });
 });
 
@@ -3490,7 +3881,7 @@ describe("ssoFromFlags", () => {
         scopes: "openid",
       });
 
-      const draft = await ssoFromFlags(partial, false, false, ask, "0.0.0-test");
+      const draft = await ssoFromFlags(partial, false, false, ask, aSuggest());
 
       expect(draft?.selection).toMatchObject({
         kind: "custom",
@@ -3506,7 +3897,7 @@ describe("ssoFromFlags", () => {
         scopes: "openid",
       });
 
-      await ssoFromFlags(partial, false, false, ask, "0.0.0-test");
+      await ssoFromFlags(partial, false, false, ask, aSuggest());
 
       expect(askCustomSettings).toHaveBeenCalledWith(
         expect.objectContaining({ slug: "acme-sso" }),
@@ -3517,7 +3908,7 @@ describe("ssoFromFlags", () => {
     describe("when nobody is there to answer", () => {
       it("refuses with E_VALIDATION", async () => {
         const error = await rejectionOf(() => {
-          return ssoFromFlags(partial, true, false, ask, "0.0.0-test");
+          return ssoFromFlags(partial, true, false, ask, aSuggest());
         });
 
         expect(error).toBeInstanceOf(ZitadelError);
@@ -3526,7 +3917,7 @@ describe("ssoFromFlags", () => {
 
       it("does not ask", async () => {
         await rejectionOf(() => {
-          return ssoFromFlags(partial, true, false, ask, "0.0.0-test");
+          return ssoFromFlags(partial, true, false, ask, aSuggest());
         });
 
         expect(askCustomSettings).not.toHaveBeenCalled();

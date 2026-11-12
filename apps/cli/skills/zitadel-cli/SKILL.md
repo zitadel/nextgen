@@ -46,7 +46,7 @@ on the dist-tag so the newest release does the upgrading. It re-pins the
 exactly-pinned `@zitadel/*` packages with the project's own package manager and
 runs the new release's `doctor --fix`. It reports `data.packages`,
 `data.breaking_changes` (read them first: `--dry-run` changes nothing) and
-`data.refresh` (`done`, `issues`, `failed` or `skipped`). A range or dist-tag is
+`data.refresh` (`done`, `issues`, `failed`, `planned` on a dry run, or `skipped`). A range or dist-tag is
 listed in `data.left_alone` and stays as it is. `E_NETWORK` means the registry
 did not say what the latest release is. `doctor` warns (`cli-version`) when a
 newer CLI exists, asking the npm registry at most once a day and never on CI;
@@ -308,14 +308,30 @@ Each invocation prints one JSON object:
 
 - `status`: `ok` | `skipped` | `error`.
 - `cli_version`, `command`, `source`: always present.
-- On success: `data` with the command-specific payload.
+- On success: `data` with the command-specific payload, and the headline the
+  terminal draws as `data.title` (except `api`, whose `data` is the response
+  body as it came).
 - On a no-op: `reason` (e.g. `already-initialized`, `already-claimed`,
-  `nothing-to-eject`).
+  `nothing-to-eject`) and the headline it draws as `data.title`. `skipped` means
+  nothing was done because a person declined or there was nothing to do.
+- A dry run (`--dry-run`) answers `ok` with `data.dry_run: true` and a headline
+  ending in `(dry run)` as `data.title`, never `skipped`, and `next_commands` holds
+  the real command to run.
 - On failure: `code` (e.g. `E_VALIDATION`, `E_NETWORK`, `E_NOT_FOUND`,
   `E_CONFLICT`) and `message`, usually with a `hint`, and `details` when there
   is structured context.
 - `next_commands`: the suggested follow-ups, inside `data` on success and at
-  the top level on a no-op or failure. Prefer these over free-text hints.
+  the top level on a no-op or failure. Prefer these over free-text hints. Each
+  is runnable as written: it names flags by their long form (`--message`, not
+  `-m`) and repeats the `--cwd`, `--env`, `--env-file` and `--server` the run was
+  given (the environment ones only for a command that takes them), so following
+  it acts on the same project. A retry or a dry run's real command keeps every
+  flag the run was given except those that only say how it answers
+  (`--json`, `--non-interactive`, `--no-color`, `--verbose`, `--debug`,
+  `--no-telemetry`); add `--non-interactive --json` when you run one.
+- A command named in a `hint`, a `warning` or a `next_actions` line is written
+  the same way `next_commands` writes it — `npx @zitadel/cli@<version> …`,
+  unquoted — so prose and follow-up never name the same command two ways.
 - `warnings`: things that went wrong without stopping the command, such as a
   value that was not published. Always present on success (often empty), and
   present on a no-op or failure when there are any. Read them before you report
@@ -398,8 +414,8 @@ Each invocation prints one JSON object:
 - `variable set` stores the value on the project, but a sign-in keeps using the
   variables the last `deploy` froze, so the change applies after the next
   `deploy`. The envelope's `data.next_actions` says so and `data.next_commands`
-  holds `deploy -m '<what changed>'`. With `--preview` it points to
-  `preview --origin '<preview-url>' -m '<what changed>'` instead, since a primary
+  holds `deploy --message '<what changed>'`. With `--preview` it points to
+  `preview --origin '<preview-url>' --message '<what changed>'` instead, since a primary
   `deploy` leaves the preview value unapplied; a pull-request build that sets its
   own preview URL can drop `--origin`. In an environment other than
   `preview` or `development`, where `preview` skips, no command is suggested; nor in a
@@ -495,10 +511,17 @@ Common error codes point at their own fix in `next_commands`:
 
 In human mode the output follows the terminal (TTY table, or tab-separated lines
 when piped or `--plain`); `--json` is unaffected and remains the contract. A
-human run lists its next steps under `Next:` after its result (`setup` shows
-them in its summary box instead); where stdout is data a script reads (a piped
-or `--plain` list, a resource's created or updated JSON) they go to stderr, so
-stdout holds only that data.
+human run ends one of two ways. `setup`, which walks you through several
+stages, draws a chain and closes on a boxed summary: what happened, the
+commands to run next under `Next:`, `Explore all commands:` and where it
+ran. Every other command ends on its result, with any next steps under `Next:`
+and one dim footer line saying what it amounts to and where it ran; `status`
+also ends on `Explore all commands:`. Where stdout is data a script reads (a
+piped or `--plain` list, a resource's created or updated JSON) the next steps go
+to stderr under `Next:`, so stdout holds only that data; so do a piped list's footer
+and its empty-list line. A list's next-page command carries `--json` only when
+the run was `--json`. A failure is written to
+stderr, except inside a chain that is already drawn.
 
 Text the server returns cannot drive the reader's terminal, in `--json` as in
 human mode, but the two are spelled differently and only one is lossless.
@@ -522,8 +545,23 @@ pause. `E_NOT_FOUND` also covers what the server says is gone (410), such as a
 claim window that has closed, which retrying never recovers. Ctrl-C exits
 130: a command waiting on the server, or on an answer at a prompt, stops at
 once with `E_CANCELLED`, and any other command exits within a second, possibly
-without an envelope. In human mode a cancel prints no error block. An
-unknown command is handled by the CLI's help layer, not the envelope.
+without an envelope. In human mode a cancel prints no error block. A name the
+CLI cannot resolve to a command, an unknown command or an unknown subcommand,
+is an `E_VALIDATION` envelope like any other, but it exits 127, as a shell
+does for a command it cannot find. Its `next_commands` are the `--help` of the
+command it was one edit from and of the topic. It is never run as a different
+command. Its message names the first word that is no command where it was
+typed, as typed, and never a word after that one. A stray extra word after a
+real command is that command refusing an argument it does not take: an
+`E_VALIDATION` envelope that exits 3, like any other refusal. Asking for help
+on such a name is the one exception: the help layer answers, with nothing on stdout. With `--help`
+among the arguments, even with `--json`, and as `zitadel help <name>`, it is a
+plain `Command … not found` on stderr and exit 2. `zitadel help <name> --json`
+is the help layer refusing `--json`, which it does not take: `Nonexistent
+flag: --json` and a stack trace on stderr, and exit 1. Treat an empty stdout as
+either case, never as an envelope. Everything else answers with an envelope
+too, errors included — an unknown flag, a missing argument and a resource that
+is not found are all `status: "error"` objects on stdout.
 
 ## Clarify before you configure
 
@@ -622,7 +660,7 @@ npx @zitadel/cli@latest deploy -m "<why this release changes>" --non-interactive
 
 `setup` commits the project it scaffolds: `git init` first when the directory
 is not yet a repository, then one commit, `chore: scaffold the project with
-zitadel setup`. A release records the commit it was built from and `deploy`
+Zitadel setup`. A release records the commit it was built from and `deploy`
 diffs `.zitadel/` against it, so without this the first release carries no
 commit and the next deploy reports no diff.
 
@@ -732,9 +770,8 @@ directory or the nearest parent that has it (up to the home directory), so
 `mkdir my-app && cd my-app` after `start` works too. `doctor` checks that
 server and its port, but runs its project checks in the working directory, so run
 it from the app. When that server is unhealthy it suggests `start` and
-`reset --force` with `--cwd` set to the directory that holds it (when that path needs
-shell quoting the commands are left out, the hint names the directory, and
-`doctor --json` returns the argument lists in `details.suggested_args` to run as they are).
+`reset --force` with `--cwd` set to the directory that holds it (quoted where the path
+needs it; `doctor --json` also returns the argument lists in `details.suggested_args`).
 The hint says the server is the parent's and that `reset --force` deletes the data in that
 directory, and it adds a plain `start`, which gives the working directory a server of its own
 because `start` does not look in parents; a healthy parent server is reported in the `runtime`
@@ -887,8 +924,9 @@ The commands change only local files, apart from
 project. A provider added by `sso enable` is configured locally, not live: its
 `data.title` says so, `data.next_actions` says to deploy, and `data.next_commands`
 holds `deploy --dry-run` then `deploy`. Only run those once the provider's OAuth
-application exists. `data.title` claims the credentials are stored on the project
-only when they reached it. When they refuse, they write and publish nothing, on a dry run too.
+application exists. `data.client_id.published` and `data.secret.published` say whether the
+credentials reached the project; `data.title` says only that the provider is configured locally.
+When they refuse, they write and publish nothing, on a dry run too.
 They refuse to run while any file under `.zitadel/` does not parse, fails its
 contract or fails the per-file checks `deploy` makes (a literal `client_secret`,
 a branding template or `$file` that cannot be read or breaks the template

@@ -93,7 +93,9 @@ export async function writeManagedEnvFile(
   values: Record<string, string>,
 ): Promise<void> {
   const body = `${Object.entries(values)
-    .map(([key, value]) => envLine(key, value))
+    .map(([key, value]) => {
+      return envLine(key, value);
+    })
     .join("\n")}\n`;
   await writeFile(path, body, { mode: SECRET_MODE });
   await enforceSecretMode(path);

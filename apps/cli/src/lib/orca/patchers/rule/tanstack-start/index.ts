@@ -35,7 +35,9 @@ export class TanStackStartPatcher extends AbstractRulePatcher {
   }
 
   protected routeOps(ctx: PatchContext): FileOp[] {
-    const src = (rel: string) => join(ctx.framework.appDir, rel);
+    const src = (rel: string) => {
+      return join(ctx.framework.appDir, rel);
+    };
     return [
       // The auth boundary is written on every setup; a pre-existing start entry
       // at this exact path (e.g. another auth provider's src/start.ts) is a
@@ -71,7 +73,9 @@ export class TanStackStartPatcher extends AbstractRulePatcher {
   }
 
   protected routeFiles(view: PatchView): ReadonlyArray<string> {
-    const src = (rel: string) => join(view.framework.appDir, rel);
+    const src = (rel: string) => {
+      return join(view.framework.appDir, rel);
+    };
     return [
       src("start.ts"),
       src("routes/index.tsx"),

@@ -71,6 +71,7 @@ same TX (shared `request_id`).
 | **Policy** | `operation`, `revision_id`, `config` (the instance's settings) | — |
 | **Schema** | `kind`, `object_type` | Schema document body |
 | **IdP connection** | `slug`, `protocol`, `template`, `display_name`, `revision_id` | Connection document body, `client_secret` |
+| **Application** | `slug`, `name`, `client_ids[]` (the clients the write created), `revision_id` | Application document body, client secrets and their hashes |
 | **IdP identity link** | `connection_id`, `user_id` | Provider subject, claims, tokens |
 | **User** | `schema_id`; `attribute_keys[]`; `attributes` map **only** for `x-audit` fields | Non-`x-audit` values; passwords / factors |
 | **Token** | `scopes[]` | Token string / JWE |
@@ -184,6 +185,8 @@ tracked below.
 | ReleaseService revoke | `release.revoked` | `admin` | `release` | `content_hash` |
 | IDPConnectionService create (new slug) | `idp.created` | `admin` | `idp_connection` | `slug`, `protocol`, `template`, `display_name`, `revision_id` |
 | IDPConnectionService revise (existing slug) | `idp.updated` | `admin` | `idp_connection` | `revision_id`; delta: `display_name`, `template` (when changed) |
+| ApplicationService create (new slug) | `application.created` | `admin` | `application` | `slug`, `name`, `client_ids[]`, `revision_id` |
+| ApplicationService revise (existing slug) | `application.updated` | `admin` | `application` | `revision_id`; delta: `name` (when changed), `client_ids[]` (the clients the revision added) |
 | `CreateIDPIdentityLink` (SSO sign-in creates the user and links the provider account, same TX) | `idp.identity_link.created` | `entity` | `idp_identity_link` | `connection_id`, `user_id` (secondary; never the provider subject or claims) |
 | DeploymentService create (deploy and rollback alike; one event per deployment, whatever the number of targets) | `deployment.created` | `admin` | `deployment` | `release_id`, `targets`, `reason`, `message`, `rollback_to` |
 | VariableService set (one event per row written; entering and replacing are the same event, since the value is the only difference and it never appears; a value written for both kinds is two rows) | `variable.set` | `entity` | `variable` | `kind` (with `entity_id`, the row key), `secret` |
@@ -193,6 +196,8 @@ tracked below.
 | GrantService revoke (`RevokeAuthzAssignment`) | `authz.revoked` | `admin` | `authz_assignment` | `principal_type`, `principal_id`, `relation` |
 | `DeleteUserByID` revoking the user's assignments (`RevokeAuthzAssignmentsByPrincipal`; one event per assignment, on its own project) | `authz.revoked` | `admin` | `authz_assignment` | `principal_type`, `principal_id`, `relation` |
 | Startup reconcile of the platform operators configuration (`CreateAuthzAssignment` / `RevokeAuthzAssignment` on the platform operator relation, [ADR 075](../../adrs/075-platform-operators.md)); actor type `system` | `authz.granted`, `authz.revoked` | `admin` | `authz_assignment` | `principal_type`, `principal_id`, `relation` |
+| InvitationService create, and the new row of a replace | `invitation.created` | `admin` | `invitation` | `type` and its object (`project_member` with `relation`), `journey_id`, `replaces_invitation_id`, `expires_at`; never the metadata or the token |
+| InvitationService cancel of a pending invitation, and the original a replace deletes | `invitation.cancelled` | `admin` | `invitation` | `journey_id`, `reason` (`cancelled` or `replaced`), `replaced_by_invitation_id` |
 | Set password (`entity_id` / `factor_id` = password row id) | `auth.factor.password.set` | `auth` | `user_password` | `user_id`, `factor_id` |
 | Create passkey (`entity_id` / `factor_id` = credential id) | `auth.factor.passkey.enrolled` | `auth` | `user_passkey` | `user_id`, `factor_id` |
 
@@ -231,10 +236,8 @@ carries the invitation's metadata or its token.
 
 | `event_type` | Payload | Producer |
 |--------------|---------|----------|
-| `invitation.created` | `type` and its object, `journey_id`, `replaces_invitation_id`, `expires_at` | InvitationService create, and the new row of a replace ([#2852](https://github.com/zitadel/nextgen/issues/2852)) |
 | `invitation.accepted` | `type` and its object, `journey_id`, `user_id` (secondary) | InvitationService accept, sharing its `request_id` with the grant service's authz events when it writes any (none when the user already holds an identical active grant) ([#2853](https://github.com/zitadel/nextgen/issues/2853)) |
 | `invitation.rejected` | `journey_id`, `user_id` (secondary) | InvitationService decline ([#2853](https://github.com/zitadel/nextgen/issues/2853)) |
-| `invitation.cancelled` | `journey_id`, `reason` (`cancelled` or `replaced`), `replaced_by_invitation_id` | InvitationService cancel, and the old row of a replace ([#2852](https://github.com/zitadel/nextgen/issues/2852)) |
 
 ## Deferred
 

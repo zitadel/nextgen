@@ -23,7 +23,8 @@ npx @zitadel/cli@latest auth-method passkey enable
 ```
 
 ```text
-✔ Updated .zitadel/schemas/default-human-user.json
+Updated .zitadel/schemas/default-human-user.json
+
 Enabled passkey for default-human-user
 ```
 
@@ -47,11 +48,11 @@ You can enable first and edit the flow second, or the other way round. Deploy bo
 `disable` refuses while a flow still uses the method. It lists every step that does and what each is left with, and for a step left with nothing, what leads to it:
 
 ```text
-Error E_VALIDATION: Disabling password in .zitadel/schemas/default-human-user.json would break a login flow that still uses it:
+Error: Disabling password in .zitadel/schemas/default-human-user.json would break a login flow that still uses it:
   - .zitadel/flows/default-login.json: step "password" collects password
     Left with no field or sign-in method. Targeted by identifier.submit, register.user_already_exists.
   - .zitadel/flows/default-login.json: step "register-password" collects password
-    Left with no field or sign-in method. Targeted by register.submit.
+    Left with no field or sign-in method. Targeted by register.submit. (E_VALIDATION)
 Edit those steps first; login flows are not edited for you. From each step, remove its x-auth-methods#password field. Delete a step left with no field or sign-in method: retarget the transitions listed for it. `zitadel deploy --dry-run` checks the edited flow; then run the command again.
 ```
 
@@ -172,7 +173,7 @@ npx @zitadel/cli@latest auth-method password enable
 A password is checked against the user that the schema's `x-identifier` property finds. The command refuses a schema without one:
 
 ```text
-Error E_VALIDATION: .zitadel/schemas/default-human-user.json has no x-identifier for password
+Error: .zitadel/schemas/default-human-user.json has no x-identifier for password (E_VALIDATION)
 ```
 
 Set `"x-identifier": "email"`, or another property your users sign in with that has `"x-unique": "project"`, and run it again.
@@ -225,8 +226,8 @@ Remove every step that lists `x-auth-methods#password`. Retarget every transitio
 Compared with the preset, it drops the `identifier`, `password` and `register-password` steps. It drops the `email_fallback` action on `passkey-first` and the `submit` action on `register`, with their transitions. `user_already_exists` on `register` now goes to `passkey-first`, so an existing user who tries to sign up is sent to sign in. A transition left pointing at a removed step, or an action left without a transition, stops the command before it checks anything:
 
 ```text
-Error E_VALIDATION: A login flow has errors, so it cannot be checked against the changed schema:
-  - .zitadel/flows/default-login.json: step "register": action "submit" has no matching transition
+Error: A login flow has errors, so it cannot be checked against the changed schema:
+  - .zitadel/flows/default-login.json: step "register": action "submit" has no matching transition (E_VALIDATION)
 ```
 
 Fix each step it names and run the command again.
@@ -246,7 +247,7 @@ Users who signed up with only a password have nothing left to sign in with once 
 The commands keep at least one way to sign in on a schema: a password, a passkey, or a social sign-in provider. In a terminal, disabling the last one asks for confirmation. With `--non-interactive`, or in an agent, it is refused and prints the commands to run instead:
 
 ```text
-Error E_VALIDATION: .zitadel/schemas/default-human-user.json would have no way to sign in left
+Error: .zitadel/schemas/default-human-user.json would have no way to sign in left (E_VALIDATION)
 Enable another method first, such as `zitadel auth-method sso enable --provider <name>`. If the schema's users are only managed through the API, re-run with --force.
 Next:
   $ npx @zitadel/cli@latest auth-method passkey disable --schema default-human-user --force

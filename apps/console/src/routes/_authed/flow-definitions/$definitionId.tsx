@@ -1,14 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Link2, Workflow } from "lucide-react";
+import { Workflow } from "lucide-react";
 
 import { api } from "@/api/zitadel";
-import { MetaCard, MetaRule, MetaValue } from "@/components/detail-meta";
-import { DetailPanel, PanelTitle } from "@/components/detail-page";
+import { MetaRule, MetaValue } from "@/components/detail-meta";
+import { DETAIL_BODY, DetailHeader, DetailSection } from "@/components/detail-page";
 import { DocumentViewer } from "@/components/document-viewer";
 import { Page } from "@/components/layout";
-import { SECTION_HEADING, PANEL_BODY_CELL, PANEL_HEAD_CELL } from "@/components/typography";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
+import { PANEL_BODY_CELL, PANEL_HEAD_CELL } from "@/components/typography";
 import {
   Table,
   TableBody,
@@ -26,6 +24,7 @@ import {
   stepFieldNames,
 } from "@/features/flow-definitions/model";
 import { projectScopeDeps, requireProjectScope } from "@/features/projects/project-scope";
+import { RevisionLink } from "@/features/schemas/components/revision-link";
 import { schemaDisplayName } from "@/features/schemas/model";
 
 export const Route = createFileRoute("/_authed/flow-definitions/$definitionId")({
@@ -73,61 +72,68 @@ function FlowDefinitionDetail() {
   const steps = definition.steps ?? [];
 
   return (
-    <Page inset="panel">
-      <DetailPanel>
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          {/* Stacks below `sm` so a long schema name cannot squeeze the title. */}
-          <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-            <PanelTitle icon={Workflow} title={name} />
-            {schemaName && schemaId && (
-              <Link to="/schemas/$schemaId" params={{ schemaId }} className="w-fit shrink-0">
-                <Badge variant="outline" className="h-5 gap-1 hover:bg-accent">
-                  <Link2 className="size-3" aria-hidden />
-                  {schemaName}
-                </Badge>
-              </Link>
-            )}
-          </div>
-
-          {/* The design draws a third value, `EXPIRES AT`; nothing backs it. */}
-          <MetaCard bordered={false}>
+    <Page>
+      <DetailHeader
+        icon={Workflow}
+        title={name}
+        // The design draws a third value, `EXPIRES AT`; nothing backs it.
+        meta={
+          <>
             <MetaValue label="Flow ID" value={definitionId} copyable />
             <MetaRule />
             <MetaValue label="Created" value={formatDate(createdAt)} />
-          </MetaCard>
-        </div>
+          </>
+        }
+      />
 
-        <Separator />
-
-        {/* No inset: "Steps" lines up with the icon tile. (The schema detail
-            insets its equivalent to clear a tab strip; there are none here.) */}
-        <section className="flex flex-col gap-3">
-          <h2 className={SECTION_HEADING}>Steps</h2>
-          {/* `table-fixed`: equal thirds, not redistributed by content. */}
-          <Table className="table-fixed">
-            <TableHeader>
+      <DetailSection
+        title="User schema"
+        className={DETAIL_BODY}
+        aside={
+          schemaName && schemaId ? (
+            // The name opens the schema; the box beside it opens the revision
+            // the flow signs into, its newest.
+            <span className="flex min-w-0 flex-wrap items-center gap-3">
+              <Link
+                to="/schemas/$schemaId"
+                params={{ schemaId }}
+                className="text-sm leading-5 text-foreground underline-offset-2 hover:underline"
+              >
+                {schemaName}
+              </Link>
+              <RevisionLink schemaId={schemaId} name={schemaName} />
+            </span>
+          ) : (
+            definition.user_schema && (
+              <span className="text-sm leading-5 text-foreground">{definition.user_schema}</span>
+            )
+          )
+        }
+      >
+        {/* `table-fixed`: equal thirds, not redistributed by content. */}
+        <Table className="table-fixed" aria-label="Steps">
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead className={`${HEAD_CELL} pl-2`}>Step</TableHead>
+              <TableHead className={HEAD_CELL}>Field</TableHead>
+              <TableHead className={`${HEAD_CELL} pr-2`}>Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody className="[&_tr:last-child]:border-b">
+            {steps.length === 0 ? (
               <TableRow className="hover:bg-transparent">
-                <TableHead className={`${HEAD_CELL} pl-2`}>Step</TableHead>
-                <TableHead className={HEAD_CELL}>Field</TableHead>
-                <TableHead className={`${HEAD_CELL} pr-2`}>Actions</TableHead>
+                <TableCell colSpan={3} className="h-16 px-2 text-center text-muted-foreground">
+                  This flow defines no steps.
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody className="[&_tr:last-child]:border-b">
-              {steps.length === 0 ? (
-                <TableRow className="hover:bg-transparent">
-                  <TableCell colSpan={3} className="h-16 px-2 text-center text-muted-foreground">
-                    This flow defines no steps.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                steps.map((step) => <StepRow key={step.name} step={step} />)
-              )}
-            </TableBody>
-          </Table>
-        </section>
+            ) : (
+              steps.map((step) => <StepRow key={step.name} step={step} />)
+            )}
+          </TableBody>
+        </Table>
 
         <DocumentViewer document={definition} noun="definition" />
-      </DetailPanel>
+      </DetailSection>
     </Page>
   );
 }

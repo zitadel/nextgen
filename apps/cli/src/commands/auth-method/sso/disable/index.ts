@@ -2,12 +2,10 @@ import { Flags } from "@oclif/core";
 import { IDP_PROVIDERS } from "@zitadel/config/idp";
 
 import { AuthMethodCommand } from "@/commands/auth-method/command";
+import { CANCELLED } from "@/lib/errors";
 import { type Admitted, CommandGroups, type JsonEnvelope, nonBlankString } from "@/lib/oclif";
-import { environmentSelectorSuffix } from "@/lib/oclif/environment-flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
-import { prose } from "@/lib/oclif/rendering";
-import { optionArgs } from "@/lib/public-cli";
-import { projectCommand } from "@/lib/suggestion";
+import { escapeControlCharacters } from "@/lib/terminal-text";
 import type { UnusedConnection, UserSchema } from "@/lib/zitadel";
 
 /**
@@ -22,17 +20,7 @@ const NAME_PROVIDER_REFUSAL: Refusal = {
 };
 
 /**
- * The flags that name the project a removal's `variable rm` commands reach.
- */
-type SelectorFlags = {
-  readonly cwd?: string | undefined;
-  readonly env?: string | undefined;
-  readonly envFile?: string | undefined;
-  readonly server?: string | undefined;
-};
-
-/**
- * `auth-method sso disable` (ADR 070 §2): remove one provider from a schema
+ * `zitadel auth-method sso disable` — remove one provider from a schema
  * and from the login flows that run against it.
  *
  * The connection file and its published credentials are kept, so enabling the
@@ -44,6 +32,7 @@ type SelectorFlags = {
 export default class AuthMethodSsoDisable extends AuthMethodCommand {
   static override description = "Remove an identity provider from a user schema.";
   static override group = CommandGroups.authentication;
+
   static override examples = [
     "<%= config.bin %> auth-method sso disable --provider google",
     "<%= config.bin %> auth-method sso disable --provider google --schema customers",
@@ -63,31 +52,36 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
   /**
    * Remove the provider from the schema and its login flows.
    *
-   * @param input - The provider, the schema and the environment flags.
+   * @param input.flags - The provider, the schema and the environment flags.
    * @returns The result, with how to remove a connection nothing offers any more.
    * @throws {@link ZitadelError} When no provider is named, the schema cannot be
    *   chosen, or the change would leave no way to sign in and nobody agreed to it.
    */
-  protected async execute(input: Admitted<typeof AuthMethodSsoDisable>): Promise<JsonEnvelope> {
-    const flags = input.flags;
+  protected async execute({ flags }: Admitted<typeof AuthMethodSsoDisable>): Promise<JsonEnvelope> {
     const target = await this.loadSchemaTarget(flags);
     const config = target.config;
     const schema = target.schema;
     const provider = flags.provider ?? this.refuseUnnamedProvider(schema);
-    const retryArgs = [
-      "auth-method",
-      "sso",
-      "disable",
-      ...optionArgs("--provider", provider),
-      ...optionArgs("--schema", target.schemaFlag),
-    ];
-    const confirmed = await this.confirmIfNoSignInLeft(target, retryArgs, (options) => {
-      return config.connections.disable(schema, provider, options);
-    });
+    const confirmed = await this.confirmIfNoSignInLeft(
+      target,
+      (options) => {
+        return config.connections.disable(schema, provider, options);
+      },
+      { provider },
+    );
     if (confirmed === undefined) {
       return this.emit({
         status: "skipped",
         reason: "disable-cancelled",
+        summary: {
+          title: CANCELLED,
+          sections: [],
+          lines: [
+            escapeControlCharacters(
+              `${schema.path} is unchanged, so ${provider} is still offered to ${schema.name}.`,
+            ),
+          ],
+        },
       });
     }
     const change = confirmed.change;
@@ -111,30 +105,57 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
 
     if (this.dryRun) {
       this.report(change);
-      const preview = change.changed ? `Would remove ${provider} from ${where}` : unchanged;
+      const wouldTitle = escapeControlCharacters(
+        change.changed
+          ? `Would remove ${provider} from ${where} (dry run)`
+          : `${schema.name} does not offer ${provider}, so nothing would change (dry run)`,
+      );
+      // What the developer typed, so the real run is one command away.
+      const real = await this.realRun();
+
       return this.emit({
-        status: "skipped",
-        reason: "dry-run",
-        data,
-        pretty: prose(preview),
+        status: "ok",
+        data: {
+          ...data,
+          title: wouldTitle,
+          dry_run: true,
+          next_args: [this.argsOf(real)],
+        },
+        summary: {
+          title: wouldTitle,
+          sections: [],
+        },
+        next: { commands: [real] },
       });
     }
     await this.write(target, change, confirmed.consent);
     this.report(change);
-    const followUps = this.followUps(change.changed, target.cwdArgs);
+    const followUps = this.followUps(change.changed);
     const unused = change.changed ? change.after.connections.findUnused(provider) : undefined;
-    const actions = unused === undefined ? [] : this.removalActions(unused, flags);
-    const summary = change.changed ? `Removed ${provider} from ${where}` : unchanged;
-    const next =
-      actions.length > 0
-        ? { actions, commands: followUps.commands }
-        : { commands: followUps.commands };
+    const actions = unused === undefined ? [] : this.removalActions(unused);
+
+    const title = escapeControlCharacters(
+      change.changed ? `Removed ${provider} from ${where}` : unchanged,
+    );
 
     return this.emit({
       status: "ok",
-      data: { ...data, next_args: followUps.args },
-      next,
-      pretty: prose(summary),
+      data: {
+        ...data,
+        title,
+        next_args: followUps.args,
+      },
+      summary: {
+        title,
+        sections: [],
+      },
+      next:
+        actions.length > 0
+          ? {
+              actions,
+              commands: followUps.commands,
+            }
+          : { commands: followUps.commands },
     });
   }
 
@@ -163,30 +184,23 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
    * @remarks
    * In the other order the live release would offer a provider whose
    * credentials are gone, and the deploy would refuse a connection whose
-   * variables are missing. The `variable rm` commands carry the run's
-   * `--env`/`--env-file`/`--server`, so they reach the project this run named.
+   * variables are missing. The `variable rm` commands carry the run's own
+   * scope, so they reach the project this run named.
    *
    * @param unused - The connection, and the variables only it reads.
-   * @param flags - The run's `--cwd` and environment flags.
    * @returns The actions, the file's deletion first.
    */
-  private removalActions(unused: UnusedConnection, flags: SelectorFlags): readonly string[] {
+  private removalActions(unused: UnusedConnection): readonly string[] {
     const deletion = `To stop publishing the connection, delete ${unused.connection.path} before the deploy below.`;
     if (unused.variables.length === 0) {
       return [deletion];
     }
-    const selector = environmentSelectorSuffix({
-      cwd: flags.cwd,
-      envFile: flags.envFile,
-      envName: flags.env,
-      server: flags.server,
-    });
     const commands = unused.variables.map((name) => {
-      return `\`${projectCommand(`variable rm ${name}`, selector, this.cliVersion)}\``;
+      return this.suggest({ id: "variable:rm", args: { name } });
     });
     return [
       deletion,
-      `Once that deploy is live, remove its credentials: ${commands.join(" and ")}`,
+      `Once that deploy is live, remove its credentials: ${new Intl.ListFormat("en", { type: "conjunction" }).format(commands)}`,
     ];
   }
 }

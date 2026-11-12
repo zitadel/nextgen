@@ -1,29 +1,28 @@
 import { basename, join } from "node:path";
-
 import type { SetupPreset, SetupUseCase } from "@zitadel/config/defaults";
 import semver from "semver";
 
 import { pathExists } from "@/lib/fs";
+import { readPackageJson } from "@/lib/npm";
 import { detectors } from "@/lib/orca/detectors";
+import type { Detector } from "@/lib/orca/detectors/types";
+import { detectPackageManager, type PackageManager } from "@/lib/package-manager";
+import { dim } from "@/lib/style";
+import { type Fact, type Section as UiSection, section as uiSection } from "@/lib/ui";
 import {
+  type PasswordMinLength,
   type ScaffoldedProvider,
   TOGGLEABLE_METHODS,
   type ToggleableMethod,
   ZitadelConfig,
 } from "@/lib/zitadel";
-import type { Detector } from "@/lib/orca/detectors/types";
-import { readPackageJson } from "@/lib/npm";
-import { detectPackageManager, type PackageManager } from "@/lib/package-manager";
-import { arrow, dim, mark } from "@/lib/style";
-import type { PasswordMinLength } from "@/lib/zitadel";
 
 /**
- * Structured end-of-command summary, modelled on the report layout the
- * setup mock specifies: one line per fact, grouped under uppercase section
- * headers, with consistent `✓ label value` formatting. Each {@link Row}
- * carries the label, the primary value (already styled by the caller),
- * and an optional `secondary` shown after a dim `→` to mirror the
- * "package → file" lines in the mock.
+ * Structured end-of-command summary: one row per fact, grouped under a
+ * heading. Each {@link Row} carries the label, the primary value (already
+ * styled by the caller), and an optional `secondary` — where to look next for
+ * that row, said in the value rather than in a column of its own, because a
+ * second column only lines up when every value in the group is the same width.
  */
 export type Row = {
   label: string;
@@ -50,28 +49,33 @@ export function relativeDisplayPath(cwd: string, absolute: string): string {
 }
 
 /**
- * Renders the section list as a single multi-line string. Labels are
- * padded to a common width per section so the `✓ label  value` columns
- * line up, the title prints in dim gray, and `✓` is green. Values come
- * in pre-styled — use the palette in `lib/style` to keep the colours
- * consistent with the mock. That is also what spells a value out: this box is
- * written straight to the terminal rather than through `emit`, so a value put
- * in raw reaches the reader as it came.
+ * The section list as the facts every other command's box states: a heading,
+ * then `label   value` rows the shared layout aligns ({@link UiSection}).
+ *
+ * Drawing them through the one layout is what makes setup's ending comparable
+ * with every other command's at a glance.
  */
-export function renderSummary(sections: Section[]): string {
-  const lines: string[] = [];
-  for (const section of sections) {
-    if (section.rows.length === 0) continue;
-    if (lines.length > 0) lines.push("");
-    lines.push(dim(section.title.toUpperCase()));
-    const labelWidth = Math.max(...section.rows.map((r) => r.label.length)) + 3;
-    for (const row of section.rows) {
-      const labelCol = row.label.padEnd(labelWidth);
-      const secondary = row.secondary ? `   ${arrow} ${row.secondary}` : "";
-      lines.push(`${mark.pass} ${labelCol}${row.value}${secondary}`);
-    }
-  }
-  return lines.join("\n");
+export function summarySections(sections: Section[]): UiSection[] {
+  return sections
+    .filter((section) => {
+      return section.rows.length > 0;
+    })
+    .map((section) => {
+      return uiSection(
+        section.title,
+        ...section.rows.map((row): Fact => {
+          return [
+            row.label,
+            row.secondary === undefined
+              ? row.value
+              : // The secondary is already styled (a path, a url), and the palette spells out
+                // whatever it is given, so only the brackets are dimmed: dimming the whole
+                // would print the styling's own escape as the text `\\x1b[36m`.
+                `${row.value} ${dim("(")}${row.secondary}${dim(")")}`,
+          ];
+        }),
+      );
+    });
 }
 
 /**
@@ -100,7 +104,9 @@ export async function detectProjectFacts(cwd: string, frameworkId: string): Prom
   // A missing or unreadable package.json leaves the version undefined; the
   // renderer skips that segment, which is the same as the user not having
   // declared the framework dep yet.
-  const pj = await readPackageJson(cwd).catch(() => undefined);
+  const pj = await readPackageJson(cwd).catch(() => {
+    return undefined;
+  });
   const depPkg = depFromFramework(frameworkId);
   const range = pj?.dependencies?.[depPkg] ?? pj?.devDependencies?.[depPkg];
   const version = range ? stripRange(range) : undefined;
@@ -121,7 +127,9 @@ export function formatFrameworkLine(facts: ProjectFacts): string {
 }
 
 function detectorFor(framework: string): Detector | undefined {
-  return detectors.find((detector) => detector.framework === framework);
+  return detectors.find((detector) => {
+    return detector.framework === framework;
+  });
 }
 
 function depFromFramework(framework: string): string {
@@ -220,41 +228,12 @@ export function signInOf(answers: {
       ...(schema.isSsoEnabled ? ["sso"] : []),
     ],
     fields: schema.propertyNames.map((name) => {
-      return { name, required: required.includes(name) };
+      return {
+        name,
+        required: required.includes(name),
+      };
     }),
     password_min_length: policy.minLength ?? null,
     providers: [...schema.providers],
   };
-}
-
-/** The wizard's closing note: {@link SignIn} as sentences. */
-export function signInSummary(signIn: SignIn, providerNames: readonly string[]): string {
-  const required = signIn.fields.filter((field) => field.required).map((f) => f.name);
-  const optional = signIn.fields.filter((field) => !field.required).map((f) => f.name);
-  return [
-    signIn.starts_with === "passkey"
-      ? "Users see a passkey first, with email and password as the alternative."
-      : "Users see email and password first; passkeys are enabled but not shown at sign-in.",
-    `${capitalise(listOf(signIn.methods))} ${signIn.methods.length === 1 ? "is" : "are"} enabled in the user schema.`,
-    `Registration requires ${listOf(required)}` +
-      (optional.length === 0
-        ? "."
-        : `; ${listOf(optional)} ${optional.length === 1 ? "is" : "are"} optional.`),
-    signIn.password_min_length === null
-      ? "Passwords have no minimum length."
-      : `Passwords need at least ${signIn.password_min_length} characters.`,
-    providerNames.length === 0
-      ? "No external providers will be added."
-      : `External providers: ${providerNames.join(", ")}.`,
-  ].join("\n");
-}
-
-/** `["a"]` → "a", `["a", "b"]` → "a and b", `["a", "b", "c"]` → "a, b and c". */
-function listOf(items: readonly string[]): string {
-  if (items.length <= 1) return items.join("");
-  return `${items.slice(0, -1).join(", ")} and ${items.at(-1)}`;
-}
-
-function capitalise(text: string): string {
-  return text.length > 0 ? `${text[0]?.toUpperCase()}${text.slice(1)}` : text;
 }

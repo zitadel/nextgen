@@ -4,6 +4,22 @@ import { z } from "zod";
 
 import { EXIT_CODE_FOR, type ErrorCode } from "./errors";
 import { parseJson, stripAnsi } from "./run-cli";
+import { asOneLine } from "./terminal";
+
+/**
+ * Whether a run said `text`, wherever the layout happened to break it.
+ *
+ * An ending is laid out for a terminal 80 columns wide, so a sentence folds
+ * where its own length puts the fold and a step's command sits on a line
+ * under the sentence that introduces it. A spec asserts the words a command
+ * said; where they were broken is the layout's, and its unit tests'.
+ *
+ * Text that names a tab is matched exactly instead. A tab is not spacing in
+ * what a normal command prints — it is the separator `cut` and `awk` read the
+ * rows by — and flattening it would let a row that lost its tabs pass.
+ */
+const flows = (output: string, text: string): boolean =>
+  output.includes(text) || (!text.includes("\t") && asOneLine(output).includes(asOneLine(text)));
 
 /** Matchers that assert the CLI's behaviour in its own terms. */
 
@@ -255,6 +271,18 @@ expect.extend({
     };
   },
 
+  toExplainExactly(received: CliResult, text: string) {
+    const message = envelopeOf(received).message ?? "";
+    const pass = message === text;
+    return {
+      pass,
+      message: () =>
+        pass
+          ? `expected the message not to be exactly "${text}", but it was`
+          : `expected the message to be exactly "${text}", but it was: ${message || "(none)"}`,
+    };
+  },
+
   toHintAt(received: CliResult, text: string) {
     const hint = envelopeOf(received).hint ?? "";
     const pass = hint.includes(text);
@@ -299,13 +327,26 @@ expect.extend({
   },
 
   toPrint(received: CliResult, text: string) {
-    const pass = shown(received).includes(text);
+    const pass = flows(shown(received), text);
     return {
       pass,
       message: () =>
         pass
           ? `expected stdout not to contain "${text}", but it did`
           : `expected stdout to contain "${text}", but stdout was:\n\n${
+              shown(received).trim().slice(0, 600) || "(empty)"
+            }`,
+    };
+  },
+
+  toPrintExactly(received: CliResult, text: string) {
+    const pass = shown(received).includes(text);
+    return {
+      pass,
+      message: () =>
+        pass
+          ? `expected stdout not to contain exactly ${JSON.stringify(text)}, but it did`
+          : `expected stdout to contain exactly ${JSON.stringify(text)}, but stdout was:\n\n${
               shown(received).trim().slice(0, 600) || "(empty)"
             }`,
     };
@@ -374,9 +415,18 @@ expect.extend({
     };
   },
 
+  toSayOnce(received: CliResult, text: string) {
+    const count = asOneLine(said(received)).split(asOneLine(text)).length - 1;
+    return {
+      pass: count === 1,
+      message: () =>
+        `expected the output to say "${text}" exactly once, but it said it ${count} times:\n\n${said(received).trim().slice(0, 600)}`,
+    };
+  },
+
   toSay(received: CliResult, text: string) {
     const output = said(received);
-    const pass = output.includes(text);
+    const pass = flows(output, text);
     return {
       pass,
       message: () =>
@@ -414,6 +464,8 @@ declare module "vitest" {
     toCarryTheDeploymentRecord(): T;
     /** The envelope's `message` mentions this text. */
     toExplain(text: string): T;
+    /** The envelope's `message` is exactly this text: no full stop or other wording added. */
+    toExplainExactly(text: string): T;
     /** The envelope's `hint` mentions this text. */
     toHintAt(text: string): T;
     /** One of the suggested `next_commands` contains this text. */
@@ -425,6 +477,8 @@ declare module "vitest" {
     toSuggestExactly(command: string): T;
     /** stdout contains this text. Prefer it over `toSay` for rendered output. */
     toPrint(text: string): T;
+    /** stdout contains this text byte for byte, line breaks included, where `toPrint` lets them fold. */
+    toPrintExactly(text: string): T;
     /** One line of stdout holds these cells in this order, whatever the spacing between them. */
     toPrintRow(...cells: string[]): T;
     /** stdout is exactly these records, one per line, cells separated by tabs, with no header. */
@@ -433,6 +487,8 @@ declare module "vitest" {
     toPrintPlainRow(...cells: Cell[]): T;
     /** stdout carries rendered text, and is neither empty nor a JSON envelope. */
     toPrintNoJson(): T;
+    /** The output, stdout or stderr, contains this text, and only once. */
+    toSayOnce(text: string): T;
     /** The output, stdout or stderr, contains this text. */
     toSay(text: string): T;
   }

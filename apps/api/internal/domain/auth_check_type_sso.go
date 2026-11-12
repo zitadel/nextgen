@@ -324,7 +324,7 @@ func PKCEChallenge(verifier string) string {
 func randomSecret(size int) (string, error) {
 	b := make([]byte, size)
 	if _, err := rand.Read(b); err != nil {
-		return "", ErrInternal(err).WithMessage("failed to generate SSO state secret")
+		return "", ErrInternal(err).WithMessage("failed to generate random secret")
 	}
 	return base64.RawURLEncoding.EncodeToString(b), nil
 }

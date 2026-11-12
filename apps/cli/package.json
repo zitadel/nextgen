@@ -38,6 +38,7 @@
     },
     "helpClass": "./dist/lib/oclif/help",
     "hooks": {
+      "command_not_found": "./dist/hooks/command-not-found",
       "finally": "./dist/hooks/version-notice"
     },
     "additionalHelpFlags": [
@@ -46,7 +47,6 @@
     "topicSeparator": " ",
     "plugins": [
       "@oclif/plugin-help",
-      "@oclif/plugin-not-found",
       "@oclif/plugin-which",
       "@oclif/plugin-commands",
       "@oclif/plugin-autocomplete",
@@ -145,7 +145,6 @@
     "@oclif/plugin-autocomplete": "catalog:",
     "@oclif/plugin-commands": "catalog:",
     "@oclif/plugin-help": "catalog:",
-    "@oclif/plugin-not-found": "catalog:",
     "@oclif/plugin-search": "catalog:",
     "@oclif/plugin-version": "catalog:",
     "@oclif/plugin-which": "catalog:",
@@ -154,7 +153,6 @@
     "@zitadel/config": "workspace:*",
     "@zitadel/server": "workspace:*",
     "ajv": "catalog:",
-    "consola": "^3.4.2",
     "escape-string-regexp": "catalog:",
     "execa": "catalog:",
     "fastest-levenshtein": "catalog:",
