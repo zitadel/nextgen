@@ -232,9 +232,11 @@ function BrandingScreen() {
                     <DropdownMenuRadioItem key={id} value={id} disabled={id === unpublished}>
                       <entry.icon aria-hidden />
                       {entry.label}
-                      {/* What a visitor gets, and why a side is not offered. */}
+                      {/* What a visitor gets, and why a side is not offered. Muted
+                          text fails contrast on the highlighted row's accent, so
+                          the hint takes the row's colour there. */}
                       {(id === "revision" || id === unpublished) && (
-                        <span className="ml-auto pl-4 text-xs text-muted-foreground">
+                        <span className="ml-auto pl-4 text-xs text-muted-foreground in-data-highlighted:text-accent-foreground">
                           {id === "revision" ? revisionSide(revision) : "Not published"}
                         </span>
                       )}
