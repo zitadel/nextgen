@@ -277,3 +277,54 @@ func TestEventToAPI_RequestAPIMetadataKeepsUnknownKeys(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, `"abc"`, string(span))
 }
+
+// The API writes event times to the millisecond, truncated so a
+// `created_after` taken from an event still holds it, and the decode from the
+// storage wire takes any fraction.
+func TestEventToAPI_TimesToTheMillisecond(t *testing.T) {
+	t.Parallel()
+	payload, err := json.Marshal(domain.UserCreatedPayload{SchemaID: "sch_default"})
+	require.NoError(t, err)
+	for name, tc := range map[string]struct {
+		occurred, created time.Time
+		wantOccurred      string
+		wantCreated       string
+	}{
+		"fraction": {
+			occurred:     time.Date(2026, 11, 12, 23, 33, 50, 892_999_999, time.UTC),
+			created:      time.Date(2026, 11, 13, 0, 33, 50, 921_345_000, time.FixedZone("CET", 3600)),
+			wantOccurred: "2026-11-12T23:33:50.892Z",
+			wantCreated:  "2026-11-12T23:33:50.921Z",
+		},
+		"whole second": {
+			occurred:     time.Date(2026, 11, 12, 23, 33, 51, 0, time.UTC),
+			created:      time.Date(2026, 11, 12, 23, 33, 51, 400_000_000, time.UTC),
+			wantOccurred: "2026-11-12T23:33:51Z",
+			wantCreated:  "2026-11-12T23:33:51.4Z",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			got, err := eventToAPI(&domain.Event{
+				ID:         "evt_ms",
+				ProjectID:  "proj_1",
+				EventType:  domain.EventTypeUserCreated,
+				Category:   domain.EventCategoryEntity,
+				OccurredAt: tc.occurred,
+				CreatedAt:  tc.created,
+				ClientID:   "app_1",
+				Payload:    payload,
+			})
+			require.NoError(t, err)
+			raw, err := got.MarshalJSON()
+			require.NoError(t, err)
+			var wire struct {
+				OccurredAt string `json:"occurred_at"`
+				CreatedAt  string `json:"created_at"`
+			}
+			require.NoError(t, json.Unmarshal(raw, &wire))
+			assert.Equal(t, tc.wantOccurred, wire.OccurredAt)
+			assert.Equal(t, tc.wantCreated, wire.CreatedAt)
+		})
+	}
+}

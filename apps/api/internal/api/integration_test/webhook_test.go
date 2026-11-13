@@ -19,7 +19,7 @@ import (
 )
 
 // TestWebhooks covers the webhook operations over HTTP on a real database
-// (ADR 089): that each one answers its contract, that the secret is stored
+// (ADR 090): that each one answers its contract, that the secret is stored
 // under the project's key and shown only by create and rotate, and that every
 // write is recorded without it. What a body may hold is the service's test.
 func TestWebhooks(t *testing.T) {

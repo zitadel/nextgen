@@ -177,7 +177,7 @@ const (
 // WrittenEventTypes is every event type the server writes: the Path A and
 // Path B types of docs/design/api/events-catalog.md. A retired type is not in
 // it, since nothing writes it any more. A webhook's filter is checked against
-// it (ADR 089 §1). The catalog's producer test keeps it in step with the
+// it (ADR 090 §1). The catalog's producer test keeps it in step with the
 // catalog.
 func WrittenEventTypes() []EventType {
 	return []EventType{
@@ -226,6 +226,11 @@ type Event struct {
 
 	EntityType *string
 	EntityID   *string
+
+	// UserID is the user the event concerns, whoever acted: the user a
+	// session, a token, a sign-in check or a credential belongs to, and the
+	// user a change was made to. Nil on an event that concerns no user.
+	UserID *string
 
 	ClientID       string
 	TokenID        string
@@ -307,6 +312,7 @@ const (
 	EventFieldFlowID
 	EventFieldOperationStatus
 	EventFieldStatusClass
+	EventFieldUserID
 )
 
 func ErrEventNotFound() Error {

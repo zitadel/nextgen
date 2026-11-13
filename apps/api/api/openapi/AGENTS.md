@@ -9,10 +9,11 @@ bundling, the ogen `oneOf`-null workaround and pagination how-tos are in
 - Never hand-edit the ogen output, the server stubs in
   `apps/api/internal/api/generated/` and the public client in
   `packages/go/api/*_gen.go`, or orval's `packages/api/src/generated/`. Change
-  the spec, then run `moon run server:generate`; CI checks the committed output
-  with `server:check-generate`.
-- Lint the spec with `moon run server:openapi` (Redocly with the repo's
-  [`redocly.yaml`](../../../../redocly.yaml)).
+  the spec, then run `turbo run generate --filter=@zitadel/server`; CI checks
+  the committed output with `@zitadel/server#check-generate`.
+- Lint the spec with `turbo run lint --filter=@zitadel/server`: the server's
+  static checks include Redocly with the repo's
+  [`redocly.yaml`](../../../../redocly.yaml).
 
 ## Wire casing: snake_case
 
@@ -23,7 +24,7 @@ silently at runtime: an unknown property is dropped, not rejected.
   `rule/wire-parameter-no-camel-case` in `redocly.yaml` gate it, with
   documented carve-outs (JSON Schema keywords, `x-` extensions, RFC
   vocabularies, header and cookie names).
-- `moon run workspace:check-openapi-rules` runs fixture tests
+- `pnpm run check-openapi-rules` runs fixture tests
   (`scripts/openapi-casing-rules.test.mjs`) that fail when a rule silently
   stops matching. Keep the fixtures in step with the rules.
 
@@ -32,7 +33,7 @@ silently at runtime: an unknown property is dropped, not rejected.
 - Give every `pattern` in the OpenAPI spec an `x-zitadel-pattern-message` beside it: the sentence
   that follows the field's name when a value fails it (`must be a user ID:
   user_ followed by letters, digits, _ or -`). orval's zod output carries no
-  message of its own, so `moon run api:generate` adds this one
+  message of its own, so `turbo run generate --filter=@zitadel/api` adds this one
   (`packages/api/scripts/pattern-messages.ts`).
 - A message belongs to the pattern's text, so fields that share a regex share
   its wording. Generation fails when a pattern has no message, or when the same
@@ -94,7 +95,7 @@ no command answers to.
 - A `PATCH` is not marked, though a merge-patch `null` removes what it names:
   updates are not guarded yet, and need a follow-up of their own.
 - The CLI's client only exposes a destructive operation behind a confirmation
-  ([consent](../../apps/cli/src/lib/consent.ts)).
+  ([consent](../../../cli/src/lib/consent.ts)).
 
 ## Descriptions — the first sentence stands alone
 

@@ -26,6 +26,14 @@
 > [ADR 068](068-project-is-the-data-boundary.md),
 > [ADR 070](070-cli-auth-method-toggles.md),
 > [ADR 078](078-abuse-prevention-in-layers.md)
+>
+> **Amendment (2026-11-11) — [D42](../design/decisions.md),
+> [Console ADR 0004 §1](../../apps/console/docs/adrs/0004-console-deployment-modes.md#1-every-bootstrapped-deployment-has-one-reserved-platform-project):**
+> an application on the reserved platform project signs people in to the
+> platform itself (the Console, the CLI, MCP clients acting on Zitadel), never
+> a customer's end users. Declaring one there in a release, or registering one
+> through the API, asks for the project's admin role, as its other
+> configuration does.
 
 ## TL;DR
 

@@ -33,7 +33,6 @@ func sampleFlowDefinition(projectID, id, name string) *domain.FlowDefinition {
 		ID:            id,
 		Name:          name,
 		SchemaVersion: "1.0.0",
-		Status:        domain.FlowDefinitionStatusDraft,
 		UserSchema:    "https://example.com/schemas/human-user.json",
 		Purposes: map[domain.FlowDefinitionPurpose]string{
 			domain.FlowDefinitionPurposeLogin: "identifier",

@@ -1683,7 +1683,7 @@
       "get": {
         "operationId": "listMyProjects",
         "summary": "List the projects I can act on",
-        "description": "Lists the projects the signed-in user can act on: those they hold an active\ngrant on, either directly or through a team they are a member of. For a\nplatform operator, someone who runs the deployment, that is every project of\nthe deployment. Ordered by project ID unless `order` asks for creation\ntime, and paged with an opaque cursor.\n\nThis is not the same question as `queryProjects` (`POST /projects/query`), which answers with the one\nproject the calling credential is bound to. Here the session is the caller\nand the grants are the answer, so the list spans projects.\n\nWith `name_contains`, only the projects whose name contains that text are\nlisted. The search runs on the server together with the grants, so it\nreaches every project the user can act on, however many there are, and\npages like the full list.\n\nWith `project_id`, the projects are listed only when the session belongs to\nthat project. It names the project the session was signed in to, not one to\nlist.\n",
+        "description": "Lists the projects the signed-in user can act on: those they hold an active\ngrant on, either directly or through a team they are a member of. For a\nplatform operator, someone who runs the deployment, that is every project of\nthe deployment. Ordered by project ID unless `order` asks for creation\ntime, and paged with an opaque cursor.\n\nThis is not the same question as `queryProjects` (`POST /projects/query`), which answers with the one\nproject the calling credential is bound to. Here the session is the caller\nand the grants are the answer, so the list spans projects.\n\nWith `name_contains`, only the projects whose name contains that text are\nlisted. The search runs on the server together with the grants, so it\nreaches every project the user can act on, however many there are, and\npages like the full list.\n\nWith `project_id`, the projects are listed only when the session belongs to\nthat project. It names the project the session was signed in to, not one to\nlist.\n\nWith `exclude_platform`, the deployment's reserved platform project is left\nout: the project the console signs in to, which holds the console's\naccounts rather than an application's users. A deployment without one lists\nthe same projects either way.\n",
         "tags": [
           "Projects"
         ],
@@ -1718,6 +1718,16 @@
               "$ref": "#/components/schemas/sort-direction"
             },
             "example": "desc"
+          },
+          {
+            "name": "exclude_platform",
+            "in": "query",
+            "required": false,
+            "description": "Leaves out the deployment's reserved platform project, the one the\nconsole signs in to. Defaults to `false`. Send the same value with\nevery `page_token` the list returns.\n",
+            "schema": {
+              "type": "boolean"
+            },
+            "example": true
           },
           {
             "$ref": "#/components/parameters/session-project-id"
@@ -4481,7 +4491,6 @@
                     "schema_uri": "https://zitadel.com/schemas/v1/flow-definition.json",
                     "flow_definition": {
                       "name": "default-login",
-                      "status": "active",
                       "user_schema": "human-user",
                       "purposes": {
                         "login": "identifier",
@@ -4619,7 +4628,6 @@
                     "schema_uri": "https://zitadel.com/schemas/v1/flow-definition.json",
                     "flow_definition": {
                       "name": "password-login",
-                      "status": "active",
                       "user_schema": "human-user",
                       "purposes": {
                         "login": "identifier"
@@ -4676,7 +4684,6 @@
                     "schema_uri": "https://zitadel.com/schemas/v1/flow-definition.json",
                     "flow_definition": {
                       "name": "password-register",
-                      "status": "active",
                       "user_schema": "human-user",
                       "purposes": {
                         "register": "signup"
@@ -4717,7 +4724,6 @@
                     "schema_uri": "https://zitadel.com/schemas/v1/flow-definition.json",
                     "flow_definition": {
                       "name": "passkey-login",
-                      "status": "active",
                       "user_schema": "human-user",
                       "purposes": {
                         "login": "signin"
@@ -4756,7 +4762,6 @@
                     "schema_uri": "https://zitadel.com/schemas/v1/flow-definition.json",
                     "flow_definition": {
                       "name": "passkey-register",
-                      "status": "active",
                       "user_schema": "human-user",
                       "purposes": {
                         "register": "signup"
@@ -4795,7 +4800,6 @@
                     "schema_uri": "https://zitadel.com/schemas/v1/flow-definition.json",
                     "flow_definition": {
                       "name": "combined-password",
-                      "status": "active",
                       "user_schema": "human-user",
                       "purposes": {
                         "login": "identifier",
@@ -4912,7 +4916,6 @@
                     "schema_uri": "https://zitadel.com/schemas/v1/flow-definition.json",
                     "flow_definition": {
                       "name": "combined-password-passkey",
-                      "status": "active",
                       "user_schema": "human-user",
                       "purposes": {
                         "login": "identifier",
@@ -8045,7 +8048,6 @@
                       "flow_definitions": [
                         {
                           "name": "default-login",
-                          "status": "active",
                           "user_schema": "human-user",
                           "purposes": {
                             "login": "identify"
@@ -9557,7 +9559,7 @@
         "operationId": "listEvents",
         "x-zitadel-cli": "events list",
         "summary": "List events",
-        "description": "Lists a project's audit events, newest first. Pass `order=asc` for oldest\nfirst. Requires `events.read`.\n\nA project that is not claimed yet returns an empty list: its events are\nstored but stay invisible until the\n[claim](/docs/concepts/project-team-user#claim) succeeds. The deployment's\nplatform operators read them from the start.\n\nTeam-scoped credentials see only the events whose `team_id` matches the\ncredential's team. Team-scoped credentials are not issued today.\n\nEach item carries an `event_type` that says which type of event it is, and\nthe matching `payload`. To read one event, pass its `id` to `getEvent` (`GET /events/{id}`).\n\nFilters combine. These are answered from an index and fill their pages: no\nfilter, `category`, `event_type`, `status_class`, `operation_id` with or\nwithout `status_class`, `request_id`, `flow_id`, and `session_id`,\n`entity_id`, `actor_id` or `entity_type` with or without `category`, each\nwith or without the time bounds. Any other filter or combination is\nmatched event by event, over at most a few thousand events per request.\nSuch a page can hold fewer events than `limit`, or none, and still carry\n`next_page_token`: keep passing the token until a response has none.\n",
+        "description": "Lists a project's audit events, newest first. Pass `order=asc` for oldest\nfirst. Requires `events.read`.\n\nA project that is not claimed yet returns an empty list: its events are\nstored but stay invisible until the\n[claim](/docs/concepts/project-team-user#claim) succeeds. The deployment's\nplatform operators read them from the start.\n\nTeam-scoped credentials see only the events whose `team_id` matches the\ncredential's team. Team-scoped credentials are not issued today.\n\nEach item carries an `event_type` that says which type of event it is, and\nthe matching `payload`. To read one event, pass its `id` to `getEvent` (`GET /events/{id}`).\n\nFilters combine. These are answered from an index and fill their pages: no\nfilter, `category`, `event_type`, `status_class`, `operation_id` with or\nwithout `status_class`, `request_id`, `flow_id`, and `session_id`,\n`entity_id`, `user_id`, `actor_id` or `entity_type` with or without\n`category`, each with or without the time bounds. Any other filter or combination is\nmatched event by event, over at most a few thousand events per request.\nSuch a page can hold fewer events than `limit`, or none, and still carry\n`next_page_token`: keep passing the token until a response has none.\n",
         "tags": [
           "Events"
         ],
@@ -9613,6 +9615,14 @@
             "name": "actor_id",
             "in": "query",
             "description": "Only events triggered by this actor ID.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "user_id",
+            "in": "query",
+            "description": "Only events that concern this user ID, whoever triggered them: the\nuser's sign-ins, sessions and credentials, and the changes made to\nthe user. Events recorded by a server version before this filter\nexisted are not matched; they leave the list as retention removes\nthem.\n",
             "schema": {
               "type": "string"
             }
@@ -17445,14 +17455,6 @@
           }
         ]
       },
-      "flow-definition-status": {
-        "type": "string",
-        "enum": [
-          "active",
-          "draft"
-        ],
-        "description": "The lifecycle state of this flow definition.\n\nactive: The flow definition is ready to be used. The server can select it for new flows.\ndraft: The server will not select it for new flows, and existing flows must handle it gracefully if they reference this definition.\n\nA revision's status is fixed at creation. Publish a new revision to change it.\n"
-      },
       "flow-audience": {
         "type": "object",
         "additionalProperties": false,
@@ -17935,7 +17937,6 @@
         "type": "object",
         "required": [
           "name",
-          "status",
           "user_schema",
           "purposes",
           "steps"
@@ -17956,9 +17957,6 @@
               "combined-auth"
             ],
             "description": "Stable identifier for this flow, and the name a cross-flow `switch` or\n`pivot` transition will target once the server runs them. Every\nrevision of a flow shares its `name`; publishing a definition under an\nexisting `name` adds a revision to that flow. Renaming is not\nsupported: the `name` is part of the public contract another\ndefinition may reference. It acts as the human display label as well;\nthere is no separate slug.\n"
-          },
-          "status": {
-            "$ref": "#/components/schemas/flow-definition-status"
           },
           "user_schema": {
             "type": "string",
@@ -18130,7 +18128,7 @@
       },
       "create-flow-definition-request": {
         "type": "object",
-        "description": "The request body for creating a flow definition.\nThe flow definition is created in an `active` state by default.\nThe status can also be set with the `status` attribute in the flow definition payload.\n",
+        "description": "The request body for creating a flow definition.\n",
         "required": [
           "project_id",
           "flow_definition"
@@ -22049,12 +22047,14 @@
           "occurred_at": {
             "type": "string",
             "format": "date-time",
-            "description": "When the action happened, on the server's clock."
+            "x-ogen-time-format": "2006-01-02T15:04:05.999Z07:00",
+            "description": "When the action happened, on the server's clock, to the millisecond.\n"
           },
           "created_at": {
             "type": "string",
             "format": "date-time",
-            "description": "When the event was stored, on the server's clock."
+            "x-ogen-time-format": "2006-01-02T15:04:05.999Z07:00",
+            "description": "When the event was stored, on the server's clock, to the millisecond.\n"
           },
           "actor_id": {
             "description": "The ID of the actor that triggered the event.",
@@ -22097,6 +22097,17 @@
           },
           "entity_id": {
             "description": "The ID of the resource the event affected.",
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "user_id": {
+            "description": "The ID of the user the event concerns, whoever triggered it: the user a\nsession, a token, a sign-in check or a credential belongs to, or the\nuser a change was made to. Absent on an event that concerns no user.\n",
             "oneOf": [
               {
                 "type": "string"
@@ -22795,9 +22806,6 @@
         "description": "Payload for `flowdef.created`: the fields of the created flow definition\nrevision, without its steps. The retired `flowdef.updated` event carries the\nchanged fields in the same shape.\n",
         "properties": {
           "name": {
-            "type": "string"
-          },
-          "status": {
             "type": "string"
           },
           "user_schema": {
@@ -24695,8 +24703,8 @@
         "maxLength": 2048,
         "example": "https://api.acme.com/hooks/zitadel"
       },
-      "webhook-event-type": {
-        "title": "WebhookEventType",
+      "webhook-event-selector": {
+        "title": "WebhookEventSelector",
         "type": "string",
         "description": "An event type as `listEvents` (`GET /events`) filters by it, such as\n`user.created`, or `*` for every type.\n",
         "pattern": "^(\\*|[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+)$",
@@ -24710,7 +24718,7 @@
         "minItems": 1,
         "uniqueItems": true,
         "items": {
-          "$ref": "#/components/schemas/webhook-event-type"
+          "$ref": "#/components/schemas/webhook-event-selector"
         },
         "example": [
           "user.created",

@@ -20,7 +20,7 @@ description: |
 minItems: 1
 uniqueItems: true
 items:
-  $ref: webhook-event-type.yaml
+  $ref: webhook-event-selector.yaml
 example:
   - user.created
   - user.updated

@@ -4,12 +4,12 @@ A minimal Next.js application demonstrating [Nextgen Auth](../../packages/sdk-ne
 
 ## Running locally
 
-Use **Moon** from the repo root (`corepack pnpm install` first).
+Use **Turborepo** from the repo root (`corepack pnpm install` first).
 
 Build the SDK (and its transitive dependencies) once before the first run:
 
 ```bash
-moon run sdk-next:build
+turbo run build --filter=@zitadel/sdk-next
 ```
 
 ### 1. Configure environment
@@ -32,16 +32,19 @@ Or pass them inline when starting the dev server (step 2).
 Two terminals:
 
 ```bash
-# Terminal 1 — mock auth server on port 8080 (set PORT to override)
-moon run api-mock:start
+# Terminal 1 — mock auth server on port 8080
+turbo run start --filter=@zitadel/api-mock
 
 # Terminal 2 — Next.js on port 3002
-moon run demo-next:dev
+turbo run dev --filter=@zitadel/demo-next
 
-# …or with inline env overrides:
+# …or with inline env overrides, through pnpm (turbo hides unlisted variables):
 # ZITADEL_URL=https://my-instance.zitadel.cloud NEXT_PUBLIC_ZITADEL_PROJECT_ID=abc123 \
-#   moon run demo-next:dev
+#   corepack pnpm --filter @zitadel/demo-next dev
 ```
+
+The mock takes another port from `PORT` the same way:
+`PORT=8090 corepack pnpm --filter @zitadel/api-mock start`.
 
 Open [http://localhost:3002/login](http://localhost:3002/login). Any email/password combination is accepted by the mock server.
 
@@ -56,7 +59,7 @@ full flow engine.
 From the repo root:
 
 ```bash
-moon run workspace:cli -- start
+pnpm run cli -- start
 ```
 
 This builds the embedded console and login UIs, then starts the Go server on
@@ -96,7 +99,7 @@ server-side project-management calls and is not read by the demo app.
 #### 4. Start demo-next
 
 ```bash
-moon run demo-next:dev
+turbo run dev --filter=@zitadel/demo-next
 ```
 
 Open [http://localhost:3002/login](http://localhost:3002/login). Use the
@@ -110,14 +113,14 @@ the Lit atoms, the paired React components, and the `<zitadel-login>`
 orchestrator (MSW in the browser via `msw-storybook-addon`):
 
 ```bash
-moon run storybook:dev
+turbo run dev --filter=@zitadel/storybook
 # → http://localhost:6006
 ```
 
 After changing the widget elements in `packages/components`, rebuild before refreshing:
 
 ```bash
-moon run components:build
+turbo run build --filter=@zitadel/components
 ```
 
 The demo imports the package from `dist/`, not source.

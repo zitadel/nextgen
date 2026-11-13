@@ -28,8 +28,8 @@ boundary without pulling in unrelated orchestration.
 - **`forEachDialect`:** suite cases call `forEachDialect(t, fn)` so the body
   runs once per dialect as a subtest (`postgres`, `spanner`, `sqlite`); use
   normal `t.Run` for case names inside.
-- **CI:** still one tag per job (`server:test-postgres` /
-  `server:test-spanner` / `server:test-sqlite`). Locally, multiple tags may be
+- **CI:** still one tag per task (`@zitadel/server`'s `test:postgres` /
+  `test:spanner` / `test:sqlite`). Locally, multiple tags may be
   set in one process.
 - **Assertions:** domain fields, list/filter/cursor behavior, and typed
   integrity errors (`database.ForeignKeyError`, etc.). No live cross-dialect
