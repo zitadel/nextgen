@@ -272,20 +272,35 @@
     // and registry, so turbo runs them side by side. The root `ci` script
     // names each, so `--affected` runs only the affected ones; `journey-local`
     // runs them all. frameworks.test.mjs fails when a journey of the `--ci`
-    // set has no task here or in `ci`. Each packs the npm tarballs it installs
-    // (`--packed`, journey-packages.mjs) from the builds it depends on: the
-    // ones every journey installs (`journey-packages`, all five server
-    // binaries included) and its framework's SDK. So a change to one SDK
-    // selects only the journeys that install it; frameworks.test.mjs checks
-    // these edges against the packages' manifests. They are cached: the CLI
+    // set has no task here or in `ci`. Each installs the npm tarballs of the
+    // builds it depends on (`--packed`, journey-packages.mjs): the ones every
+    // journey installs, all five server binaries included, which
+    // `journey-packages` packs once for all of them, and its framework's SDK,
+    // which it packs itself. So a change to one SDK selects only the journeys
+    // that install it; frameworks.test.mjs checks these edges against the
+    // packages' manifests. They are cached: the CLI
     // build they depend on holds the framework CLI pins, and only the npm
     // ranges those releases write resolve at run time, as in a customer's
     // app; the nightly run (TURBO_FORCE, ci.yml) reruns them on that day's npm.
     // Their key holds the switches, as the cached lanes' does, and the
     // JOURNEY_* ones too (another runtime, image or tarball set), less
     // JOURNEY_WORK_DIR, which moves where a journey writes and is CI's own.
+    // Packs those shared tarballs into journey/test-output (journey-base
+    // leaves it out). Uncached like the binaries it packs, which stamp the
+    // commit; the tarballs are about 130 MB.
     "journey-packages": {
-      "inputs": ["package.json"],
+      "cache": false,
+      "inputs": [
+        "package.json",
+        "journey/scripts/pack-shared-packages.mjs",
+        "journey/scripts/journey-packages.mjs",
+        "journey/scripts/frameworks.mjs",
+        "$TURBO_ROOT$/scripts/release-artifacts.mjs",
+        "$TURBO_ROOT$/scripts/release-manifest.mjs",
+        "$TURBO_ROOT$/scripts/server-build.mjs",
+        "$TURBO_ROOT$/scripts/map-all.mjs",
+        "$TURBO_ROOT$/scripts/dev-process.mjs"
+      ],
       "dependsOn": ["@zitadel/api#build", "@zitadel/cli#build", "@zitadel/components#build", "@zitadel/config#build", "@zitadel/sdk-core#build", "@zitadel/server-darwin-arm64#build-binary", "@zitadel/server-darwin-x64#build-binary", "@zitadel/server-linux-arm64#build-binary", "@zitadel/server-linux-x64#build-binary", "@zitadel/server-win32-x64#build-binary"]
     },
     "journey-local": {

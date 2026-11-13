@@ -13,7 +13,7 @@ import {
   frameworkIds,
   frameworks,
 } from "./frameworks.mjs";
-import { journeyBuildTasks, journeyPackageDirs } from "./journey-packages.mjs";
+import { journeyBuildTasks, journeyPackageDirs, sharedPackageDirs } from "./journey-packages.mjs";
 
 test("the CI matrix skips the meta-frameworks whose scaffolders track upstream releases", () => {
   assert.deepEqual(ciExcludedFrameworkIds, [
@@ -142,6 +142,8 @@ test("every CI journey's task depends on the builds of exactly what it installs"
     return [...match[1].matchAll(/"([^"]+)"/g)].map(([, name]) => name);
   };
   const shared = edges("journey-packages");
+  // journey-packages packs exactly what it builds.
+  assert.deepEqual(shared, journeyBuildTasks(sharedPackageDirs(repoRoot)));
   const tasks = Object.entries(scripts).filter(([name]) => name.startsWith("journey:"));
   assert.equal(tasks.length, ciJourneyIds.length);
   for (const [task, script] of tasks) {

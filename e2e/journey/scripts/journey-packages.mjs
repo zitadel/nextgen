@@ -3,6 +3,7 @@ import { join } from "node:path";
 
 // @boundaries-ignore root scripts/ belongs to the workspace root, which no package can depend on
 import { PUBLIC_RELEASE_PACKAGES } from "../../../scripts/release-manifest.mjs";
+import { ciJourneyVariants, frameworkForId } from "./frameworks.mjs";
 
 const RUNTIME_DEPENDENCY_FIELDS = ["dependencies", "optionalDependencies", "peerDependencies"];
 
@@ -34,6 +35,26 @@ export function journeyPackageDirs(repoRoot, runs, read = readFileSync) {
     }
   }
   return [...dirs].sort();
+}
+
+/**
+ * What every CI journey installs: the CLI, the packages every SDK depends on,
+ * and theirs. The `journey-packages` task packs them once for all journeys
+ * (pack-shared-packages.mjs); its task depends on their builds.
+ */
+export function sharedPackageDirs(repoRoot, read = readFileSync) {
+  const sets = ciJourneyVariants().flatMap((variant) =>
+    variant.frameworkIds.map(
+      (id) =>
+        new Set(journeyPackageDirs(repoRoot, [{ variant, framework: frameworkForId(id) }], read)),
+    ),
+  );
+  return [...sets[0]].filter((dir) => sets.every((set) => set.has(dir))).sort();
+}
+
+/** Where the `journey-packages` task leaves the shared tarballs. */
+export function sharedPackagesDir(repoRoot) {
+  return join(repoRoot, "e2e", "journey", "test-output", "npm-packages");
 }
 
 /**

@@ -289,6 +289,61 @@ test("packs a CI journey's own set from the builds turbo ran, without a turbo ru
   );
 });
 
+test("copies the tarballs every journey shares and packs only the journey's own", async () => {
+  const repoRoot = await fixtureRepo();
+  await mkdir(join(repoRoot, "packages/sdk-svelte", "dist"), { recursive: true });
+  const workDir = await mkdtemp(join(tmpdir(), "zitadel-local-registry-"));
+  const sharedDir = await mkdtemp(join(tmpdir(), "zitadel-shared-tarballs-"));
+  tempDirs.push(workDir, sharedDir);
+  await writeFile(join(sharedDir, "zitadel-cli-0.1.0-alpha.5.tgz"), "cli");
+  const paths = localRegistryPaths(workDir);
+  const runCalls = [];
+  const packs = [];
+  const input = {
+    env: { PATH: "/bin" },
+    packageDirs: ["apps/cli", "packages/sdk-svelte"],
+    paths,
+    registryPort: 51_236,
+    registryUrl: "http://127.0.0.1:51236",
+    repoRoot,
+    run: async (command, args) => {
+      runCalls.push({ command, args });
+    },
+    runCapture: async (_command, args) => {
+      packs.push(args[2]);
+      return { stdout: "", stderr: "" };
+    },
+    shared: { dirs: ["apps/cli"], tarballsDir: sharedDir },
+    startLocalRegistry: async () => ({ exitCode: null, logFile: paths.registryLogPath }),
+    waitForHttp: async () => undefined,
+    workDir,
+  };
+
+  await prepareLocalRegistry(input);
+
+  assert.deepEqual(packs, ["packages/sdk-svelte"]);
+  assert.equal(
+    await readFile(join(paths.tarballsDir, "zitadel-cli-0.1.0-alpha.5.tgz"), "utf8"),
+    "cli",
+  );
+  assert.deepEqual(
+    runCalls.find((call) => call.args[0] === "e2e/journey/scripts/verify-tarballs.mjs").args,
+    [
+      "e2e/journey/scripts/verify-tarballs.mjs",
+      paths.tarballsDir,
+      "--packages=apps/cli,packages/sdk-svelte",
+    ],
+  );
+
+  await assert.rejects(
+    prepareLocalRegistry({
+      ...input,
+      shared: { ...input.shared, tarballsDir: join(sharedDir, "x") },
+    }),
+    /no zitadel-cli-0.1.0-alpha.5.tgz in .*; run turbo run journey-packages --filter=@zitadel\/e2e/,
+  );
+});
+
 test("keeps a reused store's proxied packages and trusts their metadata for an hour", async () => {
   const repoRoot = await fixtureRepo();
   const workDir = await mkdtemp(join(tmpdir(), "zitadel-local-registry-"));
