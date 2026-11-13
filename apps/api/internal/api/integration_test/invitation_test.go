@@ -488,7 +488,9 @@ func TestInvitationRedeem(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, api.InvitationStatusRejected, member.Status)
 		assert.True(t, member.AcceptedBy.IsNull())
-		assert.True(t, member.Metadata.IsNull())
+		assert.True(t, member.RejectedAt.Set)
+		// A decline keeps who the link was for, for the administrators.
+		assert.Equal(t, "Jane Doe", member.Metadata.Value.Name)
 
 		require.IsType(t, &api.AcceptInvitationNotFound{}, accept(t, colleague, token))
 		events := invitationEvents(t, owner, projectID, created.ID)
@@ -498,6 +500,48 @@ func TestInvitationRedeem(t *testing.T) {
 				assert.JSONEq(t, `{"journey_id":"`+created.JourneyID+`","user_id":"`+colleagueID+`"}`, string(event.Payload))
 			}
 		}
+
+		// listed returns this invitation as the owner lists it, if it is on the page.
+		listed := func(t *testing.T, params api.ListInvitationsParams) (api.InvitationProjectMember, bool) {
+			t.Helper()
+			params.ProjectID = projectID
+			params.Limit = api.NewOptLimit(100)
+			resp, err := owner.ListInvitations(t.Context(), params)
+			require.NoError(t, err)
+			page, ok := resp.(*api.ListInvitationsResponse)
+			require.True(t, ok, helpers.MustMarshal(t, resp))
+			for _, inv := range page.Invitations {
+				if item, ok := inv.GetInvitationProjectMember(); ok && item.ID == created.ID {
+					return item, true
+				}
+			}
+			return api.InvitationProjectMember{}, false
+		}
+		item, ok := listed(t, api.ListInvitationsParams{
+			Status: []api.InvitationStatus{api.InvitationStatusPending, api.InvitationStatusRejected},
+			Expand: []api.InvitationExpand{api.InvitationExpandInviter},
+		})
+		require.True(t, ok, "a rejected invitation matches pending or rejected")
+		assert.Equal(t, "Jane Doe", item.Metadata.Value.Name)
+		assert.Equal(t, member.RejectedAt.Value.Unix(), item.RejectedAt.Value.Unix())
+		inviter, ok := item.Inviter.Get()
+		require.True(t, ok, "expanded")
+		assert.Equal(t, api.UserID(ownerID), inviter.UserID)
+		assert.NotEmpty(t, inviter.Identifier.Value)
+
+		item, ok = listed(t, api.ListInvitationsParams{Status: []api.InvitationStatus{api.InvitationStatusRejected}})
+		require.True(t, ok)
+		assert.False(t, item.Inviter.Set, "inviter is omitted unless expanded")
+		_, ok = listed(t, api.ListInvitationsParams{Status: []api.InvitationStatus{api.InvitationStatusPending, api.InvitationStatusAccepted}})
+		assert.False(t, ok, "a rejected invitation matches neither pending nor accepted")
+
+		// The administrator removes the declined invitation, and its metadata with it.
+		cancelled, err := owner.CancelInvitation(t.Context(), api.CancelInvitationParams{ID: created.ID, ProjectID: projectID})
+		require.NoError(t, err)
+		require.IsType(t, &api.CancelInvitationNoContent{}, cancelled, helpers.MustMarshal(t, cancelled))
+		gone, err := owner.GetInvitation(t.Context(), api.GetInvitationParams{ID: created.ID, ProjectID: projectID})
+		require.NoError(t, err)
+		require.IsType(t, &api.GetInvitationNotFound{}, gone, helpers.MustMarshal(t, gone))
 	})
 
 	t.Run("refusals", func(t *testing.T) {

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -46,6 +47,9 @@ func NewInvitationService(db *DB, keys KeyService, grants *GrantService, refs Us
 type Invitation struct {
 	*domain.Invitation
 	Metadata *domain.InvitationMetadata
+	// Inviter names CreatedBy when the list expands it; nil otherwise and
+	// when a project secret created the invitation.
+	Inviter *domain.UserRef
 }
 
 // CreatedInvitation carries the link, which no later read returns.
@@ -65,10 +69,12 @@ type CreateInvitationInput struct {
 
 type ListInvitationsRequest struct {
 	ProjectID string
-	Status    *domain.InvitationStatus
-	Type      *domain.InvitationType
-	Limit     int
-	PageToken string
+	// Statuses matches any of them; empty matches all.
+	Statuses      []domain.InvitationStatus
+	Type          *domain.InvitationType
+	ExpandInviter bool
+	Limit         int
+	PageToken     string
 }
 
 type ListInvitationsResponse struct {
@@ -224,7 +230,7 @@ func (s *InvitationService) List(ctx context.Context, req ListInvitationsRequest
 	ctx, end := startSpan(ctx, "InvitationService.List")
 	defer end(&err)
 
-	opts := invitation.ListOptions(req.ProjectID, req.Status, req.Type, time.Now().UTC(), uint32(normalizeLimit(req.Limit)))
+	opts := invitation.ListOptions(req.ProjectID, req.Statuses, req.Type, time.Now().UTC(), uint32(normalizeLimit(req.Limit)))
 	if req.PageToken != "" {
 		opts.Pagination.Cursor = []byte(req.PageToken)
 	}
@@ -241,13 +247,18 @@ func (s *InvitationService) List(ctx context.Context, req ListInvitationsRequest
 		}
 		invitations = append(invitations, item)
 	}
+	if req.ExpandInviter {
+		if err := s.resolveInviters(ctx, invitations); err != nil {
+			return nil, err
+		}
+	}
 	return &ListInvitationsResponse{
 		Invitations:   invitations,
 		NextPageToken: string(result.NextCursor),
 	}, nil
 }
 
-// Cancel deletes a pending invitation.
+// Cancel deletes a pending or rejected invitation.
 func (s *InvitationService) Cancel(ctx context.Context, projectID, id string) (err error) {
 	ctx, end := startSpan(ctx, "InvitationService.Cancel")
 	defer end(&err)
@@ -259,7 +270,7 @@ func (s *InvitationService) Cancel(ctx context.Context, projectID, id string) (e
 		if err != nil {
 			return err
 		}
-		if err := stmts.DeletePendingInvitation(ctx, projectID, id, now); err != nil {
+		if err := stmts.DeleteCancellableInvitation(ctx, projectID, id, now); err != nil {
 			return notPendingOnMiss(err)
 		}
 		return emitInvitationCancelled(ctx, stmts, entity, domain.InvitationCancelReasonCancelled, "")
@@ -277,6 +288,47 @@ type InvitationLookup struct {
 	// Inviter names CreatedBy for a redeemer who cannot read platform users.
 	// Nil when a project secret created the invitation.
 	Inviter *domain.UserRef
+}
+
+// resolveInviters sets each invitation's Inviter from its CreatedBy.
+func (s *InvitationService) resolveInviters(ctx context.Context, invitations []*Invitation) error {
+	var ids []string
+	for _, item := range invitations {
+		if item.CreatedBy != nil && !slices.Contains(ids, *item.CreatedBy) {
+			ids = append(ids, *item.CreatedBy)
+		}
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	refs, err := s.inviterRefs(ctx, ids)
+	if err != nil {
+		return err
+	}
+	for _, item := range invitations {
+		if item.CreatedBy != nil {
+			item.Inviter = new(refs[*item.CreatedBy])
+		}
+	}
+	return nil
+}
+
+// inviterRefs resolves invitation creators, who are platform users. Every id
+// gets a ref: a missing user degrades to its id.
+func (s *InvitationService) inviterRefs(ctx context.Context, ids []string) (map[string]domain.UserRef, error) {
+	refs, err := s.refs.ResolveUserRefs(ctx, s.platformProjectID, ids)
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to resolve the inviter")
+	}
+	out := make(map[string]domain.UserRef, len(ids))
+	for _, id := range ids {
+		ref, ok := refs[id]
+		if !ok {
+			ref = domain.UserRef{UserID: id}
+		}
+		out[id] = ref
+	}
+	return out, nil
 }
 
 // InviterCheck reports whether userID still administers projectID, reading
@@ -299,15 +351,11 @@ func (s *InvitationService) Lookup(ctx context.Context, token string) (_ *Invita
 	}
 	found := &InvitationLookup{Invitation: entity, ProjectName: project.Name}
 	if entity.CreatedBy != nil {
-		// Creators are platform users; a missing one degrades to its id.
-		found.Inviter = &domain.UserRef{UserID: *entity.CreatedBy}
-		refs, err := s.refs.ResolveUserRefs(ctx, s.platformProjectID, []string{*entity.CreatedBy})
+		refs, err := s.inviterRefs(ctx, []string{*entity.CreatedBy})
 		if err != nil {
-			return nil, domain.ErrInternal(err).WithMessage("failed to resolve the inviter")
+			return nil, err
 		}
-		if ref, ok := refs[*entity.CreatedBy]; ok {
-			found.Inviter = &ref
-		}
+		found.Inviter = new(refs[*entity.CreatedBy])
 	}
 	return found, nil
 }
@@ -420,7 +468,8 @@ func (s *InvitationService) Reject(ctx context.Context, token, userID string) (_
 	if err != nil {
 		return nil, mapInvitationError(err, "failed to reject invitation")
 	}
-	return &Invitation{Invitation: rejected}, nil
+	// A decline keeps the metadata, so the response shows it as reads do.
+	return decryptInvitation(decrypterOfWritingKey(ctx, s.keys), rejected)
 }
 
 // pendingInvitationByToken finds the invitation a link's token redeems. An

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"time"
 
 	api "github.com/zitadel/nextgen/internal/api/generated"
@@ -55,6 +56,7 @@ func (h *Handler) CreateInvitation(ctx context.Context, req api.CreateInvitation
 		JourneyID:     inv.JourneyID,
 		AcceptedBy:    inv.AcceptedBy,
 		AcceptedAt:    inv.AcceptedAt,
+		RejectedAt:    inv.RejectedAt,
 		Type:          api.CreateInvitationProjectMemberResponseTypeProjectMember,
 		ProjectMember: inv.ProjectMember,
 		Link:          created.Link,
@@ -76,16 +78,13 @@ func (h *Handler) ListInvitations(ctx context.Context, params api.ListInvitation
 		Limit:     int(params.Limit.Or(0)),
 		PageToken: string(params.PageToken.Or("")),
 	}
-	// Several statuses and expand=inviter land with the list's backend.
-	if len(params.Status) > 1 || len(params.Expand) > 0 {
-		return nil, domain.ErrNotImplemented()
-	}
-	if len(params.Status) == 1 {
-		req.Status = new(domain.InvitationStatus(params.Status[0]))
+	for _, status := range params.Status {
+		req.Statuses = append(req.Statuses, domain.InvitationStatus(status))
 	}
 	if v, ok := params.Type.Get(); ok {
 		req.Type = new(domain.InvitationType(v))
 	}
+	req.ExpandInviter = slices.Contains(params.Expand, api.InvitationExpandInviter)
 	listed, err := h.invitationService.List(ctx, req)
 	if err != nil {
 		return nil, err
@@ -96,6 +95,14 @@ func (h *Handler) ListInvitations(ctx context.Context, params api.ListInvitation
 		mapped, err := invitationResponse(inv, now)
 		if err != nil {
 			return nil, err
+		}
+		if req.ExpandInviter {
+			// Present, and null for a project secret, only when expanded.
+			if inv.Inviter != nil {
+				mapped.InvitationProjectMember.Inviter.SetTo(userRefToAPI(*inv.Inviter))
+			} else {
+				mapped.InvitationProjectMember.Inviter.SetToNull()
+			}
 		}
 		resp.Invitations = append(resp.Invitations, *mapped)
 	}
@@ -172,7 +179,11 @@ func invitationProjectMemberResponse(inv *service.Invitation, now time.Time) api
 	} else {
 		resp.AcceptedAt.SetToNull()
 	}
-	resp.RejectedAt.SetToNull()
+	if inv.RejectedAt != nil {
+		resp.RejectedAt.SetTo(*inv.RejectedAt)
+	} else {
+		resp.RejectedAt.SetToNull()
+	}
 	return resp
 }
 

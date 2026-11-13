@@ -151,9 +151,9 @@ func TestInvitationStatements_List(t *testing.T) {
 		require.NoError(t, err)
 		createInvitation(t, d.stmts, otherProject, now.Add(time.Hour))
 
-		list := func(status *domain.InvitationStatus, typ *domain.InvitationType) []string {
+		list := func(statuses []domain.InvitationStatus, typ *domain.InvitationType) []string {
 			t.Helper()
-			result, err := d.stmts.ListInvitations(t.Context(), invitation.ListOptions(projectID, status, typ, now, 50))
+			result, err := d.stmts.ListInvitations(t.Context(), invitation.ListOptions(projectID, statuses, typ, now, 50))
 			require.NoError(t, err)
 			return invitationIDs(result.Items)
 		}
@@ -168,10 +168,17 @@ func TestInvitationStatements_List(t *testing.T) {
 		})
 
 		t.Run("by_status", func(t *testing.T) {
-			assert.Equal(t, []string{pending.ID}, list(new(domain.InvitationStatusPending), nil))
-			assert.Equal(t, []string{expired.ID}, list(new(domain.InvitationStatusExpired), nil))
-			assert.Equal(t, []string{accepted.ID}, list(new(domain.InvitationStatusAccepted), nil))
-			assert.Equal(t, []string{rejected.ID}, list(new(domain.InvitationStatusRejected), nil))
+			assert.Equal(t, []string{pending.ID}, list([]domain.InvitationStatus{domain.InvitationStatusPending}, nil))
+			assert.Equal(t, []string{expired.ID}, list([]domain.InvitationStatus{domain.InvitationStatusExpired}, nil))
+			assert.Equal(t, []string{accepted.ID}, list([]domain.InvitationStatus{domain.InvitationStatusAccepted}, nil))
+			assert.Equal(t, []string{rejected.ID}, list([]domain.InvitationStatus{domain.InvitationStatusRejected}, nil))
+		})
+
+		t.Run("by_any_of_several_statuses", func(t *testing.T) {
+			got := list([]domain.InvitationStatus{
+				domain.InvitationStatusPending, domain.InvitationStatusExpired, domain.InvitationStatusRejected,
+			}, nil)
+			assert.ElementsMatch(t, []string{pending.ID, expired.ID, rejected.ID}, got)
 		})
 
 		t.Run("by_type", func(t *testing.T) {
@@ -193,6 +200,7 @@ func TestInvitationStatements_ChangeStatus(t *testing.T) {
 			assert.Equal(t, domain.InvitationStatusAccepted, got.Status)
 			assert.Equal(t, "user_2", *got.AcceptedBy)
 			assert.Equal(t, now, *got.AcceptedAt)
+			assert.Nil(t, got.RejectedAt)
 			assert.Nil(t, got.EncryptedMetadata)
 
 			read, err := d.stmts.GetInvitationByID(t.Context(), projectID, entity.ID)
@@ -210,7 +218,13 @@ func TestInvitationStatements_ChangeStatus(t *testing.T) {
 			assert.Equal(t, domain.InvitationStatusRejected, got.Status)
 			assert.Nil(t, got.AcceptedBy)
 			assert.Nil(t, got.AcceptedAt)
-			assert.Nil(t, got.EncryptedMetadata)
+			assert.Equal(t, now, *got.RejectedAt)
+			// The administrators still see who a declined link was for.
+			assert.Equal(t, "ciphertext", *got.EncryptedMetadata)
+
+			read, err := d.stmts.GetInvitationByID(t.Context(), projectID, entity.ID)
+			require.NoError(t, err)
+			assert.Equal(t, got, read)
 		})
 
 		// All statuses but pending are final, so the second of two racing
@@ -291,26 +305,31 @@ func TestInvitationStatements_DeleteUnaccepted(t *testing.T) {
 	})
 }
 
-func TestInvitationStatements_DeletePending(t *testing.T) {
+func TestInvitationStatements_DeleteCancellable(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID := ensureProject(t, d.stmts)
 		now := invitationNow()
 
 		pending := createInvitation(t, d.stmts, projectID, now.Add(time.Hour))
-		require.NoError(t, d.stmts.DeletePendingInvitation(t.Context(), projectID, pending.ID, now))
-		_, err := d.stmts.GetInvitationByID(t.Context(), projectID, pending.ID)
-		assert.ErrorIs(t, err, new(database.NoRowFoundError))
-
-		// An expired or finished invitation keeps its row.
-		expired := createInvitation(t, d.stmts, projectID, now.Add(-time.Hour))
 		rejected := createInvitation(t, d.stmts, projectID, now.Add(time.Hour))
-		_, err = d.stmts.ChangeInvitationStatus(t.Context(), projectID, rejected.ID, domain.InvitationStatusRejected, nil, now)
+		_, err := d.stmts.ChangeInvitationStatus(t.Context(), projectID, rejected.ID, domain.InvitationStatusRejected, nil, now)
 		require.NoError(t, err)
-		for _, id := range []string{expired.ID, rejected.ID, pending.ID} {
-			err := d.stmts.DeletePendingInvitation(t.Context(), projectID, id, now)
+		for _, id := range []string{pending.ID, rejected.ID} {
+			require.NoError(t, d.stmts.DeleteCancellableInvitation(t.Context(), projectID, id, now))
+			_, err := d.stmts.GetInvitationByID(t.Context(), projectID, id)
 			assert.ErrorIs(t, err, new(database.NoRowFoundError))
 		}
-		for _, id := range []string{expired.ID, rejected.ID} {
+
+		// An expired or accepted invitation keeps its row.
+		expired := createInvitation(t, d.stmts, projectID, now.Add(-time.Hour))
+		accepted := createInvitation(t, d.stmts, projectID, now.Add(time.Hour))
+		_, err = d.stmts.ChangeInvitationStatus(t.Context(), projectID, accepted.ID, domain.InvitationStatusAccepted, new("user_1"), now)
+		require.NoError(t, err)
+		for _, id := range []string{expired.ID, accepted.ID, pending.ID} {
+			err := d.stmts.DeleteCancellableInvitation(t.Context(), projectID, id, now)
+			assert.ErrorIs(t, err, new(database.NoRowFoundError))
+		}
+		for _, id := range []string{expired.ID, accepted.ID} {
 			_, err := d.stmts.GetInvitationByID(t.Context(), projectID, id)
 			assert.NoError(t, err)
 		}

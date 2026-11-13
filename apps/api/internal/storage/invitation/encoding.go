@@ -25,6 +25,7 @@ type Row struct {
 	JourneyID         string
 	AcceptedBy        *string
 	AcceptedAt        *time.Time
+	RejectedAt        *time.Time
 	TokenHash         string
 }
 
@@ -43,17 +44,17 @@ func MarshalPayload(entity *domain.Invitation) ([]byte, error) {
 	}
 }
 
-// StatusChange returns the accepted_at a ChangeInvitationStatus writes. A
-// change it cannot write is a server fault: accepted needs the accepter,
-// rejected takes none.
-func StatusChange(status domain.InvitationStatus, acceptedBy *string, now time.Time) (*time.Time, error) {
+// StatusChange returns the accepted_at and rejected_at a
+// ChangeInvitationStatus writes. A change it cannot write is a server fault:
+// accepted needs the accepter, rejected takes none.
+func StatusChange(status domain.InvitationStatus, acceptedBy *string, now time.Time) (acceptedAt, rejectedAt *time.Time, err error) {
 	switch {
 	case status == domain.InvitationStatusAccepted && acceptedBy != nil && *acceptedBy != "":
-		return &now, nil
+		return &now, nil, nil
 	case status == domain.InvitationStatusRejected && acceptedBy == nil:
-		return nil, nil
+		return nil, &now, nil
 	default:
-		return nil, domain.ErrInternal(fmt.Errorf("cannot change an invitation's status to %q", status))
+		return nil, nil, domain.ErrInternal(fmt.Errorf("cannot change an invitation's status to %q", status))
 	}
 }
 
@@ -86,6 +87,9 @@ func ToDomain(row Row) (*domain.Invitation, error) {
 	}
 	if row.AcceptedAt != nil {
 		entity.AcceptedAt = new(row.AcceptedAt.UTC())
+	}
+	if row.RejectedAt != nil {
+		entity.RejectedAt = new(row.RejectedAt.UTC())
 	}
 	switch entity.Type {
 	case domain.InvitationTypeProjectMember:
