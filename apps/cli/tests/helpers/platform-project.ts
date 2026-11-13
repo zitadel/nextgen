@@ -165,6 +165,9 @@ type OriginKind = "primary" | "preview";
  *
  * @param prefix - The project's name, and the prefix of its directory.
  * @param served - Where the release is live.
+ * @param more - Further origins the release is live on: `primaries` are
+ * patterns of primary origins that a primary deployment serves, `previews` are
+ * URLs the preview deployment serves (each must match the preview pattern).
  * @returns The directory, the release, and `deploymentOn`, which names the
  * deployment serving the release on an origin kind and throws for a kind it
  * was not put live on. The caller removes the directory.
@@ -172,12 +175,21 @@ type OriginKind = "primary" | "preview";
 export async function aReleaseServedOn(
   prefix: string,
   served: { primary: boolean; preview: boolean },
+  more: { primaries?: readonly string[]; previews?: readonly string[] } = {},
 ): Promise<{ cwd: string; releaseId: string; deploymentOn(kind: OriginKind): string }> {
   const project = await aProjectWithPrimaryOrigin(prefix);
-  await callPlatform(`/projects/${project.id}/origins`, project.secret, {
-    pattern: PREVIEW_PATTERN,
-    kind: "preview",
-  });
+  await Promise.all([
+    ...(more.primaries ?? []).map((pattern) => {
+      return callPlatform(`/projects/${project.id}/origins`, project.secret, {
+        pattern,
+        kind: "primary",
+      });
+    }),
+    callPlatform(`/projects/${project.id}/origins`, project.secret, {
+      pattern: PREVIEW_PATTERN,
+      kind: "preview",
+    }),
+  ]);
   const releaseId = await createdRelease(project, "sch_a");
   const deployments: Partial<Record<OriginKind, string>> = {};
   if (served.primary) {
@@ -185,7 +197,7 @@ export async function aReleaseServedOn(
   }
   if (served.preview) {
     deployments.preview = await createdDeployment(project, releaseId, {
-      targets: [PREVIEW_URL],
+      targets: [PREVIEW_URL, ...(more.previews ?? [])],
       ttl: "PT168H",
     });
   }
