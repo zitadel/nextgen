@@ -5,18 +5,13 @@ description: Run end-to-end tests of your app against a real local Zitadel with 
 
 `@zitadel/testing` is the test kit for apps that use Zitadel. It boots a real Zitadel server from your test run, with SQLite and without Docker. It creates a project with the default login flow, then seeds users and sessions through the API. Its Playwright fixtures and helpers drive the real login in a browser.
 
-With it you can:
+This guide adds two tests to a Next.js app: one that signs a seeded user in, and one that starts signed in and tests a page behind the sign-in.
 
-- Sign a seeded user in through your app's own login page, with a password or a passkey.
-- Start a test already signed in, to test the pages behind the sign-in.
-- Call your app's backend as a signed-in user, without a browser.
-- Register a new user through the real sign-up flow.
-
-The kit is in preview: until 1.0.0, a minor version can change its API, and its release note marks that **Breaking:**. It runs on macOS and Linux only. The full API is in its [README](https://github.com/zitadel/nextgen/tree/main/packages/testing#readme).
+The kit is in preview: until 1.0.0, a minor version can change its API, and its release note marks that **Breaking:**. It runs on macOS and Linux only. Its full API is in its [README](https://github.com/zitadel/nextgen/tree/main/packages/testing#readme).
 
 ## Before you start
 
-- **An app from `zitadel setup`** ([Quickstart](/docs/get-started/quickstart)). The example below is a Next.js app; [Other frameworks](#other-frameworks) says what changes for the rest.
+- **A Next.js app from `zitadel setup`** ([Quickstart](/docs/get-started/quickstart)). Next.js is the only framework whose test setup an end-to-end run of this repository proves; see [Other frameworks](#other-frameworks).
 - **Node.js 24 or later**, as for the CLI.
 
 The kit does not use the project `setup` created or the runtime `zitadel start` runs. Each test run boots its own Zitadel server on a port you choose and creates a fresh project in it. When the run ends, the kit stops that server and deletes its data.
@@ -78,7 +73,7 @@ The `.mts` extension makes Node load the file as an ES module, which `import.met
 
 `seed.user()` creates a user with a unique email and a password, ready to sign in. `loginWithPassword()` fills the login component's identifier and password steps:
 
-```ts title="e2e/login.spec.ts"
+```ts title="e2e/sign-in.spec.ts"
 import { expect, loginWithPassword, test } from "@zitadel/testing/playwright";
 
 test("a seeded user signs in with their password", async ({ page, seed }) => {
@@ -87,98 +82,50 @@ test("a seeded user signs in with their password", async ({ page, seed }) => {
   await page.goto("/login");
   await loginWithPassword(page, user);
 
-  await expect(page).toHaveURL(/\/profile/);
+  await expect(page).toHaveURL(/\/profile(?:[/?#]|$)/, { timeout: 30_000 });
 });
 ```
 
-Run it:
-
-```sh
-npx playwright test
-```
-
-The first run takes longest: the test server creates its database, then your app's dev server compiles. Each test gets its own user, so tests run in parallel against the one test server.
-
-The helpers find the login component's controls by their automation hooks, not by their text, so they keep working when you change copy or locale. They never check your app's state: assert what your app shows after the sign-in yourself. `registerWithPassword()` and `registerWithPasskey()` drive the sign-up flow the same way, with an unused email from `seed.identity()`.
+The helpers find the login component's controls by their automation hooks, not by their text, so they keep working when you change copy or locale. They never check your app's state: assert what your app shows after the sign-in yourself.
 
 ## Start a test signed in
 
 Most tests of your app's pages should not test the sign-in again. The `authenticatedPage` fixture seeds a user, signs it in without a browser, and puts the session cookie into a page of its own:
 
-```ts title="e2e/profile.spec.ts"
+```ts title="e2e/signed-in.spec.ts"
 import { expect, test } from "@zitadel/testing/playwright";
 
-test("a signed-in user stays on the profile page", async ({ authenticatedPage }) => {
+test("a signed-in user sees the profile page", async ({ authenticatedPage }) => {
   const { page } = authenticatedPage;
 
   await page.goto("/profile");
 
-  await expect(page).toHaveURL(/\/profile/);
+  await expect(page).toHaveURL(/\/profile(?:[/?#]|$)/);
+  await expect(page.getByTestId("zitadel-session-logout")).toBeVisible({ timeout: 30_000 });
 });
 ```
 
-`setup` protects `/profile`, so a signed-out visitor is sent to `/login` instead. `authenticatedPage.user` is the seeded user, for assertions on what your page shows. The default `page` fixture stays signed out, for tests of the sign-in itself. `authenticatedPage` needs `use.baseURL`, which names the origin the cookie is for.
+`setup` protects `/profile`, so a signed-out visitor is sent to `/login` instead, and the test fails. `zitadel-session-logout` is the sign-out control of the session card on that page. The default `page` fixture stays signed out, for tests of the sign-in itself.
 
-## Call your backend as a signed-in user
+## Run the tests
 
-`seed.session()` seeds a user and returns its session token, without a browser. Send it as the session cookie your app reads. `sessionCookieName()` names that cookie for your project and origin:
-
-```ts title="e2e/api.spec.ts"
-import { expect, sessionCookieName, test } from "@zitadel/testing/playwright";
-
-test("the API answers a signed-in user", async ({ request, seed, zitadel, baseURL }) => {
-  const { sessionToken } = await seed.session();
-  const cookie = `${sessionCookieName(zitadel.handle.projectId, baseURL)}=${sessionToken}`;
-
-  const response = await request.get("/api/<your-route>", { headers: { cookie } });
-
-  expect(response.ok()).toBe(true);
-});
+```sh
+npx playwright test
 ```
 
-Replace `/api/<your-route>` with a route of your app that requires a sign-in.
+Both tests pass. The first run takes longest: the test server creates its database, then your app's dev server compiles. Each test gets its own user, so tests run in parallel against the one test server.
 
-## Test passkeys
+## More the kit can do
 
-The `passkey` fixture attaches a virtual authenticator to the page, so registering and signing in with a passkey complete without an operating-system dialog:
+The README documents each of these with an example:
 
-```ts title="e2e/passkey.spec.ts"
-import { expect, registerWithPasskey, test } from "@zitadel/testing/playwright";
-
-test("a new user registers a passkey", async ({ page, seed, passkey }) => {
-  const who = seed.identity();
-
-  await page.goto("/login");
-  await registerWithPasskey(page, { email: who.email });
-
-  await expect.poll(() => passkey.credentialCount()).toBe(1);
-});
-```
-
-`seed.identity()` returns an unused email and password and creates nothing, so the flow under test creates the user. `loginWithPasskey()` signs a user back in.
-
-- The virtual authenticator works in Chromium only.
-- It belongs to the page: register and sign in again on the same page. To sign out in between, clear the context's cookies instead of opening a new context.
-- Serve the app on `http://localhost` or HTTPS. An IP address such as `127.0.0.1` is not a valid origin for passkeys.
+- Register a new user through the real sign-up flow, and register or sign in with a passkey in Chromium: [Drive the login flow](https://github.com/zitadel/nextgen/tree/main/packages/testing#drive-the-login-flow) and [Test passkey flows](https://github.com/zitadel/nextgen/tree/main/packages/testing#test-passkey-flows).
+- Call session APIs without a browser, with the token `seed.session()` returns: [Start tests authenticated](https://github.com/zitadel/nextgen/tree/main/packages/testing#start-tests-authenticated).
+- Use another test runner, starting the test server with `startLocalZitadel()`: [API](https://github.com/zitadel/nextgen/tree/main/packages/testing#api).
 
 ## Other frameworks
 
-`nextAppEnv` maps the test server to the variables a Next.js app reads. For another framework, pass a template of your own: an object from each variable name your app reads to a field of the test server's handle. `setup` wrote those names to `.env.local`: `ZITADEL_URL`, `ZITADEL_PROJECT_ID`, `ZITADEL_PROJECT_SECRET`, and for most frameworks a public copy of the project ID, such as `VITE_ZITADEL_PROJECT_ID`:
-
-```ts
-import type { AppEnvTemplate } from "@zitadel/testing/playwright";
-
-const viteAppEnv: AppEnvTemplate = {
-  ZITADEL_URL: "baseUrl",
-  ZITADEL_PROJECT_ID: "projectId",
-  VITE_ZITADEL_PROJECT_ID: "projectId",
-  ZITADEL_PROJECT_SECRET: "projectSecret",
-};
-```
-
-Set `app.command` to your framework's dev server on the port of `appOrigin`, and `app.readyPath` to your sign-in page. A template that names a field the handle does not carry fails the run with that variable's name.
-
-To use the kit with a runner other than Playwright, start the test server yourself with `startLocalZitadel()` from `@zitadel/testing`. It returns the same seeding functions ([README](https://github.com/zitadel/nextgen/tree/main/packages/testing#api)).
+Only the Next.js setup above is proven by an end-to-end run. For another framework, the app must take the test server's URL, project ID and secret from the environment `withZitadel()` hands it. Not every app that `setup` scaffolds does: a Vite app's dev proxy names the server it was set up against. The README explains the env template: [Quick start](https://github.com/zitadel/nextgen/tree/main/packages/testing#quick-start-playwright).
 
 ## Limits
 
@@ -189,6 +136,6 @@ To use the kit with a runner other than Playwright, start the test server yourse
 
 ## When a run fails
 
-- **The test server does not boot.** Another process holds its `port`: choose another, or stop what holds it. `npx @zitadel/cli@latest stop --all` stops every runtime the CLI started, including ones a crashed run left behind.
+- **The test server does not boot.** Another process holds its `port`: choose another, or stop what holds it. `npx @zitadel/cli@latest stop --all` stops every runtime the CLI started, including ones a crashed run left behind. A failed boot keeps the test server's directory and prints its path.
 - **Playwright says the app's URL is already in use.** The kit always starts the app itself. Stop the dev server on `appOrigin`'s port, or move `appOrigin` to a free port.
-- **You need the server's log.** Set `zitadel: { keep: true }` in `withZitadel()`'s options to keep the test server's directory. Its log is `.zitadel/local/server.log` in it. A failed boot always keeps the directory and prints its path.
+- **You need the server's log of a run that booted.** Give the test server a directory of your own, which the kit keeps: add `zitadel: { dir: join(import.meta.dirname, ".zitadel-testing", "server") }` to `withZitadel()`'s options, with `join` from `node:path`. The log is `.zitadel/local/server.log` in that directory.
