@@ -6,8 +6,9 @@ const (
 	// PrefixAuthRequest prefixes a stored authorization request's id, the
 	// handle the login page receives as auth_request (ADR 081 §8).
 	PrefixAuthRequest ResourcePrefix = "authreq"
-	// AuthRequestTTL is how long a request and its binding cookie live. It
-	// matches AuthAttemptTTL, so a request outlives the flow it opens.
+	// AuthRequestTTL is how long a request and its binding cookie live: as
+	// long as a sign-in flow (AuthAttemptTTL), since a request is only needed
+	// while the sign-in it starts is running.
 	AuthRequestTTL = AuthAttemptTTL
 )
 
