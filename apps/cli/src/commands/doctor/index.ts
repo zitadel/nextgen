@@ -777,11 +777,9 @@ export function advisoryForWarnings(
     );
   }
 
-  const upgrade = remedyCommandOf(
-    warnings.find((check) => {
-      return check.name === "cli-version";
-    }),
-  );
+  const upgrade = warnings.find((check) => {
+    return check.name === "cli-version";
+  })?.remedy;
   if (upgrade !== undefined) {
     fix(
       "cli-version",
@@ -790,11 +788,9 @@ export function advisoryForWarnings(
     );
   }
 
-  const dependencyRemedy = remedyCommandOf(
-    warnings.find((check) => {
-      return check.name === "dependency-version";
-    }),
-  );
+  const dependencyRemedy = warnings.find((check) => {
+    return check.name === "dependency-version";
+  })?.remedy;
   // `upgrade` already moves the pins; aligning them with this older CLI as well
   // would send them backwards from where it leaves them.
   if (dependencyRemedy !== undefined && upgrade === undefined) {
@@ -1141,21 +1137,6 @@ function formatListeners(listeners: Awaited<ReturnType<typeof listenersForPort>>
         .join(" ");
     })
     .join(", ");
-}
-
-/**
- * The repair a warning carries, as its check rendered it (today: the CLI
- * version's `upgrade` and the dependency pins' package-manager-aware install),
- * so the structured advisory is the very command its prose quotes.
- *
- * @param check - The check, when it ran.
- * @returns Its repair, or nothing when it passed or carries none.
- */
-function remedyCommandOf(check: CheckOutcome | undefined): SuggestedCommand | undefined {
-  if (check?.status !== "warn") {
-    return undefined;
-  }
-  return check.remedy;
 }
 
 /**

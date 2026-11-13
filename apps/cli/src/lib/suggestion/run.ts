@@ -179,8 +179,8 @@ export class RunSuggestions {
    * @param raw - Its command line, as oclif parsed it.
    * @param change - What the rerun changes.
    * @returns The command.
-   * @throws {Error} When the change leaves out, or sets, a flag the command
-   *   does not declare.
+   * @throws {Error} When the change leaves out a flag the command does not
+   *   declare, or, from the renderer, sets one.
    */
   rerun(
     id: string,

@@ -90,6 +90,8 @@ export function categoryOf(checkName: string): CheckCategory {
 export function withCategories(
   checks: readonly CheckOutcome[],
 ): Array<Omit<CheckOutcome, "remedy"> & { category: CheckCategory }> {
+  // Each branch destructures the check it narrowed: a remedy comes only with
+  // details that are an object, which destructuring both at once would forget.
   return checks.map((check) => {
     const category = categoryOf(check.name);
     if (check.remedy === undefined) {
