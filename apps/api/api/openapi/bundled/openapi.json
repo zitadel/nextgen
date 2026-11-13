@@ -11574,7 +11574,7 @@
       "post": {
         "operationId": "invitationAccepted",
         "summary": "invitation.accepted",
-        "description": "An invitation was accepted. Grant events the acceptance writes carry\nthis event's `request_id`; there are none when the user already holds an\nidentical active grant.\n\nNot sent yet: the contract is published ahead of the code that sends it.\n\nThe body is the event as `GET /events` returns it.\n",
+        "description": "An invitation was accepted. Grant events the acceptance writes carry\nthis event's `request_id`; there are none when the user already holds an\nidentical active grant.\n\nThe body is the event as `GET /events` returns it.\n",
         "tags": [
           "Event Webhooks"
         ],
@@ -11661,7 +11661,7 @@
       "post": {
         "operationId": "invitationRejected",
         "summary": "invitation.rejected",
-        "description": "An invitation was declined.\n\nNot sent yet: the contract is published ahead of the code that sends it.\n\nThe body is the event as `GET /events` returns it.\n",
+        "description": "An invitation was declined.\n\nThe body is the event as `GET /events` returns it.\n",
         "tags": [
           "Event Webhooks"
         ],

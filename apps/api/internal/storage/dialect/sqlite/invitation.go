@@ -13,19 +13,21 @@ import (
 )
 
 const (
-	invitationColumns    = `project_id, id, type, payload, metadata, status, created_by, created_by_type, created_at, expires_at, journey_id, accepted_by, accepted_at, token_hash`
+	invitationColumns    = `project_id, id, type, payload, metadata, status, created_by, created_by_type, created_at, expires_at, journey_id, accepted_by, accepted_at, rejected_at, token_hash`
 	createInvitationStmt = `INSERT INTO invitations` +
 		` (project_id, id, type, payload, metadata, created_by, created_by_type, created_at, expires_at, journey_id, token_hash)` +
 		` VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	invitationQuery              = `SELECT ` + invitationColumns + ` FROM invitations`
 	getInvitationByTokenHashStmt = invitationQuery + ` WHERE token_hash = ?`
-	changeInvitationStatusStmt   = `UPDATE invitations SET status = ?, accepted_by = ?, accepted_at = ?, metadata = NULL` +
+	// Accept clears the metadata; a decline keeps it for the administrators.
+	changeInvitationStatusStmt = `UPDATE invitations SET status = ?, accepted_by = ?, accepted_at = ?, rejected_at = ?,` +
+		` metadata = CASE WHEN ? = 'accepted' THEN NULL ELSE metadata END` +
 		` WHERE project_id = ? AND id = ? AND status = 'pending' AND expires_at > ?` +
 		` RETURNING ` + invitationColumns
 	deleteUnacceptedInvitationStmt = `DELETE FROM invitations` +
 		` WHERE project_id = ? AND id = ? AND status <> 'accepted'`
-	deletePendingInvitationStmt = `DELETE FROM invitations` +
-		` WHERE project_id = ? AND id = ? AND status = 'pending' AND expires_at > ?`
+	deleteCancellableInvitationStmt = `DELETE FROM invitations` +
+		` WHERE project_id = ? AND id = ? AND (status = 'rejected' OR (status = 'pending' AND expires_at > ?))`
 	countPendingInvitationsStmt = `SELECT count(*) FROM invitations` +
 		` WHERE project_id = ? AND status = 'pending' AND expires_at > ?`
 )
@@ -112,12 +114,12 @@ func (s invitationStatements) ListInvitations(ctx context.Context, filter *datab
 
 // ChangeInvitationStatus implements [service.InvitationStatements].
 func (s invitationStatements) ChangeInvitationStatus(ctx context.Context, projectID, id string, status domain.InvitationStatus, acceptedBy *string, now time.Time) (*domain.Invitation, error) {
-	acceptedAt, err := invitation.StatusChange(status, acceptedBy, now)
+	acceptedAt, rejectedAt, err := invitation.StatusChange(status, acceptedBy, now)
 	if err != nil {
 		return nil, err
 	}
 	return s.queryOne(ctx, changeInvitationStatusStmt,
-		string(status), acceptedBy, nullUnixNano(acceptedAt), projectID, id, now.UnixNano(),
+		string(status), acceptedBy, nullUnixNano(acceptedAt), nullUnixNano(rejectedAt), string(status), projectID, id, now.UnixNano(),
 	)
 }
 
@@ -126,9 +128,9 @@ func (s invitationStatements) DeleteUnacceptedInvitation(ctx context.Context, pr
 	return s.execOne(ctx, deleteUnacceptedInvitationStmt, projectID, id)
 }
 
-// DeletePendingInvitation implements [service.InvitationStatements].
-func (s invitationStatements) DeletePendingInvitation(ctx context.Context, projectID, id string, now time.Time) error {
-	return s.execOne(ctx, deletePendingInvitationStmt, projectID, id, now.UnixNano())
+// DeleteCancellableInvitation implements [service.InvitationStatements].
+func (s invitationStatements) DeleteCancellableInvitation(ctx context.Context, projectID, id string, now time.Time) error {
+	return s.execOne(ctx, deleteCancellableInvitationStmt, projectID, id, now.UnixNano())
 }
 
 // CountPendingInvitations implements [service.InvitationStatements].
@@ -171,6 +173,7 @@ func scanInvitation(rows *sql.Rows) (*domain.Invitation, error) {
 		createdNano    int64
 		expiresNano    int64
 		acceptedAtNano sql.NullInt64
+		rejectedAtNano sql.NullInt64
 	)
 	if err := rows.Scan(
 		&scanned.ProjectID,
@@ -186,6 +189,7 @@ func scanInvitation(rows *sql.Rows) (*domain.Invitation, error) {
 		&scanned.JourneyID,
 		&scanned.AcceptedBy,
 		&acceptedAtNano,
+		&rejectedAtNano,
 		&scanned.TokenHash,
 	); err != nil {
 		return nil, err
@@ -195,6 +199,9 @@ func scanInvitation(rows *sql.Rows) (*domain.Invitation, error) {
 	scanned.ExpiresAt = timeFromUnixNano(expiresNano)
 	if acceptedAtNano.Valid {
 		scanned.AcceptedAt = new(timeFromUnixNano(acceptedAtNano.Int64))
+	}
+	if rejectedAtNano.Valid {
+		scanned.RejectedAt = new(timeFromUnixNano(rejectedAtNano.Int64))
 	}
 	return invitation.ToDomain(scanned)
 }

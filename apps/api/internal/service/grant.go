@@ -180,6 +180,61 @@ func (s *GrantService) writeGrant(ctx context.Context, stmts AllStatements, inpu
 	return asgn, nil
 }
 
+// EnsureUserGrant gives userID relation on the project inside the caller's
+// transaction, for invitation acceptance (ADR 086 §4). An identical active
+// grant is already done; an identical expired one is revoked and written anew.
+// It reads first because a unique violation would abort a Postgres transaction.
+func (s *GrantService) EnsureUserGrant(ctx context.Context, stmts AllStatements, projectID, userID, relation string, now time.Time) (err error) {
+	ctx, end := startSpan(ctx, "GrantService.EnsureUserGrant")
+	defer end(&err)
+
+	if _, ok := allowedGrantRelations[relation]; !ok {
+		return domain.ErrGrantInvalid().WithDetails("relation must be viewer, editor, or admin")
+	}
+	// The same active, platform-homed principal check as Create.
+	home, err := s.resolvePrincipalHome(ctx, stmts, domain.AuthzPrincipalTypeUser, userID)
+	if err != nil {
+		return err
+	}
+	if err := s.loadPrincipal(ctx, stmts, home, domain.AuthzPrincipalTypeUser, userID); err != nil {
+		return err
+	}
+	// Every assignment the user holds on the project, expired ones included.
+	held, err := stmts.ListAuthzAssignments(ctx, projectID, domain.AuthzPrincipalTypeUser, userID, false)
+	if err != nil {
+		return err
+	}
+	var expired []*domain.AuthzAssignment
+	for _, asgn := range held {
+		// Only a managed, direct grant of the same relation can collide;
+		// delegated rows sit outside the unique binding the write targets.
+		if !isManagedGrant(asgn) || asgn.DelegationID != nil || asgn.Relation != relation {
+			continue
+		}
+		// Still active: the user already has the relation.
+		if asgn.ExpiresAt == nil || now.Before(*asgn.ExpiresAt) {
+			return nil
+		}
+		expired = append(expired, asgn)
+	}
+	// Expired rows still hold the unique binding, so clear them first.
+	for _, asgn := range expired {
+		if err := stmts.RevokeAuthzAssignment(ctx, projectID, asgn.ID); err != nil {
+			return err
+		}
+		if err := emitManagedGrant(ctx, stmts, domain.EventTypeAuthzRevoked, asgn, domain.AuthzRevokedPayload{
+			PrincipalType: asgn.PrincipalType.String(),
+			PrincipalID:   asgn.PrincipalID,
+			Relation:      asgn.Relation,
+		}); err != nil {
+			return err
+		}
+	}
+	// No active grant left: write a permanent one and emit authz.granted.
+	_, err = s.writeGrant(ctx, stmts, CreateGrantInput{ProjectID: projectID, Relation: relation}, domain.AuthzPrincipalTypeUser, userID)
+	return err
+}
+
 func mapGrantWriteError(err error) error {
 	if _, ok := errors.AsType[*database.UniqueError](err); ok {
 		return domain.ErrGrantAlreadyExists().WithParent(err)

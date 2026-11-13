@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -21,17 +23,21 @@ const invitationMetadataMaxLen = 200
 
 // InvitationService manages a project's invitations (ADR 086).
 type InvitationService struct {
-	db   *DB
-	keys KeyService
+	db     *DB
+	keys   KeyService
+	grants *GrantService
+	refs   UserRefResolver
 	// consoleBaseURL never ends in a slash.
 	consoleBaseURL    string
 	platformProjectID string
 }
 
-func NewInvitationService(db *DB, keys KeyService, consoleBaseURL, platformProjectID string) *InvitationService {
+func NewInvitationService(db *DB, keys KeyService, grants *GrantService, refs UserRefResolver, consoleBaseURL, platformProjectID string) *InvitationService {
 	return &InvitationService{
 		db:                db,
 		keys:              keys,
+		grants:            grants,
+		refs:              refs,
 		consoleBaseURL:    consoleBaseURL,
 		platformProjectID: platformProjectID,
 	}
@@ -41,6 +47,9 @@ func NewInvitationService(db *DB, keys KeyService, consoleBaseURL, platformProje
 type Invitation struct {
 	*domain.Invitation
 	Metadata *domain.InvitationMetadata
+	// Inviter names CreatedBy when the list expands it; nil otherwise and
+	// when a project secret created the invitation.
+	Inviter *domain.UserRef
 }
 
 // CreatedInvitation carries the link, which no later read returns.
@@ -60,10 +69,12 @@ type CreateInvitationInput struct {
 
 type ListInvitationsRequest struct {
 	ProjectID string
-	Status    *domain.InvitationStatus
-	Type      *domain.InvitationType
-	Limit     int
-	PageToken string
+	// Statuses matches any of them; empty matches all.
+	Statuses      []domain.InvitationStatus
+	Type          *domain.InvitationType
+	ExpandInviter bool
+	Limit         int
+	PageToken     string
 }
 
 type ListInvitationsResponse struct {
@@ -219,7 +230,7 @@ func (s *InvitationService) List(ctx context.Context, req ListInvitationsRequest
 	ctx, end := startSpan(ctx, "InvitationService.List")
 	defer end(&err)
 
-	opts := invitation.ListOptions(req.ProjectID, req.Status, req.Type, time.Now().UTC(), uint32(normalizeLimit(req.Limit)))
+	opts := invitation.ListOptions(req.ProjectID, req.Statuses, req.Type, time.Now().UTC(), uint32(normalizeLimit(req.Limit)))
 	if req.PageToken != "" {
 		opts.Pagination.Cursor = []byte(req.PageToken)
 	}
@@ -236,13 +247,18 @@ func (s *InvitationService) List(ctx context.Context, req ListInvitationsRequest
 		}
 		invitations = append(invitations, item)
 	}
+	if req.ExpandInviter {
+		if err := s.resolveInviters(ctx, invitations); err != nil {
+			return nil, err
+		}
+	}
 	return &ListInvitationsResponse{
 		Invitations:   invitations,
 		NextPageToken: string(result.NextCursor),
 	}, nil
 }
 
-// Cancel deletes a pending invitation.
+// Cancel deletes a pending or rejected invitation.
 func (s *InvitationService) Cancel(ctx context.Context, projectID, id string) (err error) {
 	ctx, end := startSpan(ctx, "InvitationService.Cancel")
 	defer end(&err)
@@ -254,7 +270,7 @@ func (s *InvitationService) Cancel(ctx context.Context, projectID, id string) (e
 		if err != nil {
 			return err
 		}
-		if err := stmts.DeletePendingInvitation(ctx, projectID, id, now); err != nil {
+		if err := stmts.DeleteCancellableInvitation(ctx, projectID, id, now); err != nil {
 			return notPendingOnMiss(err)
 		}
 		return emitInvitationCancelled(ctx, stmts, entity, domain.InvitationCancelReasonCancelled, "")
@@ -263,6 +279,213 @@ func (s *InvitationService) Cancel(ctx context.Context, projectID, id string) (e
 		return mapInvitationError(err, "failed to cancel invitation")
 	}
 	return nil
+}
+
+// InvitationLookup is what the accept page shows of a pending invitation.
+type InvitationLookup struct {
+	*domain.Invitation
+	ProjectName string
+	// Inviter names CreatedBy for a redeemer who cannot read platform users.
+	// Nil when a project secret created the invitation.
+	Inviter *domain.UserRef
+}
+
+// resolveInviters sets each invitation's Inviter from its CreatedBy.
+func (s *InvitationService) resolveInviters(ctx context.Context, invitations []*Invitation) error {
+	var ids []string
+	for _, item := range invitations {
+		if item.CreatedBy != nil && !slices.Contains(ids, *item.CreatedBy) {
+			ids = append(ids, *item.CreatedBy)
+		}
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	refs, err := s.inviterRefs(ctx, ids)
+	if err != nil {
+		return err
+	}
+	for _, item := range invitations {
+		if item.CreatedBy != nil {
+			item.Inviter = new(refs[*item.CreatedBy])
+		}
+	}
+	return nil
+}
+
+// inviterRefs resolves invitation creators, who are platform users. Every id
+// gets a ref: a missing user degrades to its id.
+func (s *InvitationService) inviterRefs(ctx context.Context, ids []string) (map[string]domain.UserRef, error) {
+	refs, err := s.refs.ResolveUserRefs(ctx, s.platformProjectID, ids)
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to resolve the inviter")
+	}
+	out := make(map[string]domain.UserRef, len(ids))
+	for _, id := range ids {
+		ref, ok := refs[id]
+		if !ok {
+			ref = domain.UserRef{UserID: id}
+		}
+		out[id] = ref
+	}
+	return out, nil
+}
+
+// InviterCheck reports whether userID still administers projectID, reading
+// through stmts inside the accept's transaction.
+type InviterCheck func(ctx context.Context, stmts AllStatements, projectID, userID string) (bool, error)
+
+// Lookup finds a pending invitation by its link's token.
+func (s *InvitationService) Lookup(ctx context.Context, token string) (_ *InvitationLookup, err error) {
+	ctx, end := startSpan(ctx, "InvitationService.Lookup")
+	defer end(&err)
+
+	stmts := s.db.Statements()
+	entity, err := pendingInvitationByToken(ctx, stmts, token, time.Now().UTC())
+	if err != nil {
+		return nil, mapInvitationError(err, "failed to look up invitation")
+	}
+	project, err := stmts.GetProjectByID(ctx, entity.ProjectID)
+	if err != nil {
+		return nil, mapInvitationError(err, "failed to look up invitation")
+	}
+	found := &InvitationLookup{Invitation: entity, ProjectName: project.Name}
+	if entity.CreatedBy != nil {
+		refs, err := s.inviterRefs(ctx, []string{*entity.CreatedBy})
+		if err != nil {
+			return nil, err
+		}
+		found.Inviter = new(refs[*entity.CreatedBy])
+	}
+	return found, nil
+}
+
+// Accept redeems a pending invitation for userID: the type's adapter writes
+// the access, then the invitation is marked accepted (ADR 086 §4).
+func (s *InvitationService) Accept(ctx context.Context, token, userID string, inviterIsAdmin InviterCheck) (_ *Invitation, err error) {
+	ctx, end := startSpan(ctx, "InvitationService.Accept")
+	defer end(&err)
+
+	if s.platformProjectID == "" {
+		return nil, domain.ErrInvitationPlatformRequired()
+	}
+	var accepted *domain.Invitation
+	err = s.db.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		stmts := tx.Statements()
+		// Read per attempt, so a retried transaction rechecks expiry.
+		now := time.Now().UTC()
+		entity, err := pendingInvitationByToken(ctx, stmts, token, now)
+		if err != nil {
+			return err
+		}
+		if entity.CreatedBy != nil && *entity.CreatedBy == userID {
+			return domain.ErrInvitationSelfAccept()
+		}
+		claimed, err := projectIsClaimedOrExempt(ctx, stmts, s.platformProjectID, entity.ProjectID)
+		if err != nil {
+			return err
+		}
+		if !claimed {
+			return domain.ErrInvitationProjectUnclaimed()
+		}
+		// A project secret names no user, so only the project check applies.
+		if entity.CreatedBy != nil {
+			admin, err := inviterIsAdmin(ctx, stmts, entity.ProjectID, *entity.CreatedBy)
+			if err != nil {
+				return err
+			}
+			if !admin {
+				return domain.ErrInvitationInviterNotAdmin()
+			}
+		}
+		// The guarded status change goes first: it locks the row, so a racing
+		// accept misses here instead of colliding on the grant.
+		accepted, err = stmts.ChangeInvitationStatus(ctx, entity.ProjectID, entity.ID, domain.InvitationStatusAccepted, &userID, now)
+		if err != nil {
+			return notPendingOnMiss(err)
+		}
+		if err := s.grantInvited(ctx, stmts, entity, userID, now); err != nil {
+			return err
+		}
+		return emitInvitationAccepted(ctx, stmts, accepted, userID)
+	})
+	if err != nil {
+		// Only the token lookup's miss is a 404; any other miss is a fault.
+		if de, ok := errors.AsType[domain.Error](err); ok {
+			return nil, de
+		}
+		return nil, domain.ErrInternal(err).WithMessage("failed to accept invitation")
+	}
+	return &Invitation{Invitation: accepted}, nil
+}
+
+// grantInvited is the invitation type's adapter: it calls the service that
+// owns the target, and acceptance continues only on its success.
+func (s *InvitationService) grantInvited(ctx context.Context, stmts AllStatements, entity *domain.Invitation, userID string, now time.Time) error {
+	switch entity.Type {
+	case domain.InvitationTypeProjectMember:
+		if entity.ProjectMember == nil {
+			return domain.ErrInternal(fmt.Errorf("invitation %q has no project_member object", entity.ID))
+		}
+		err := s.grants.EnsureUserGrant(ctx, stmts, entity.ProjectID, userID, entity.ProjectMember.Relation, now)
+		// Create validated the relation, so a refusal here is a stored fault.
+		if errors.Is(err, domain.ErrGrantInvalid()) {
+			return domain.ErrInternal(err).WithMessage("invitation holds an invalid relation")
+		}
+		// The session's user is gone or no longer active.
+		if errors.Is(err, domain.ErrGrantPrincipalNotFound()) {
+			return domain.ErrAuthUnauthorized(err)
+		}
+		return err
+	default:
+		return domain.ErrNotImplemented()
+	}
+}
+
+// Reject declines a pending invitation for userID.
+func (s *InvitationService) Reject(ctx context.Context, token, userID string) (_ *Invitation, err error) {
+	ctx, end := startSpan(ctx, "InvitationService.Reject")
+	defer end(&err)
+
+	var rejected *domain.Invitation
+	err = s.db.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		stmts := tx.Statements()
+		now := time.Now().UTC()
+		entity, err := pendingInvitationByToken(ctx, stmts, token, now)
+		if err != nil {
+			return err
+		}
+		// An administrator cancels their own invitation instead.
+		if entity.CreatedBy != nil && *entity.CreatedBy == userID {
+			return domain.ErrInvitationSelfReject()
+		}
+		rejected, err = stmts.ChangeInvitationStatus(ctx, entity.ProjectID, entity.ID, domain.InvitationStatusRejected, nil, now)
+		if err != nil {
+			return notPendingOnMiss(err)
+		}
+		return emitInvitationRejected(ctx, stmts, rejected, userID)
+	})
+	if err != nil {
+		return nil, mapInvitationError(err, "failed to reject invitation")
+	}
+	// A decline keeps the metadata, so the response shows it as reads do.
+	return decryptInvitation(decrypterOfWritingKey(ctx, s.keys), rejected)
+}
+
+// pendingInvitationByToken finds the invitation a link's token redeems. An
+// unknown token and a finished invitation miss alike.
+func pendingInvitationByToken(ctx context.Context, stmts InvitationStatements, token string, now time.Time) (*domain.Invitation, error) {
+	entity, err := stmts.GetInvitationByTokenHash(ctx, domain.HashSecret(token))
+	if err != nil {
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+			return nil, domain.ErrInvitationNotFound()
+		}
+		return nil, err
+	}
+	if entity.StatusAt(now) != domain.InvitationStatusPending {
+		return nil, domain.ErrInvitationNotPending()
+	}
+	return entity, nil
 }
 
 func validateCreateInvitation(input *CreateInvitationInput) error {
@@ -355,6 +578,36 @@ func emitInvitationCreated(ctx context.Context, stmts EventStatements, entity *d
 		EntityType: "invitation",
 		EntityID:   entity.ID,
 		Payload:    payload,
+	})
+}
+
+func emitInvitationAccepted(ctx context.Context, stmts EventStatements, entity *domain.Invitation, userID string) error {
+	payload := domain.InvitationAcceptedPayload{
+		Type:      string(entity.Type),
+		JourneyID: entity.JourneyID,
+		UserID:    userID,
+	}
+	if entity.ProjectMember != nil {
+		payload.ProjectMember = &domain.InvitationProjectMemberPayload{Relation: entity.ProjectMember.Relation}
+	}
+	return audit.Emit(ctx, stmts, audit.EmitSpec{
+		Type:       domain.EventTypeInvitationAccepted,
+		Category:   domain.EventCategoryAdmin,
+		ProjectID:  entity.ProjectID,
+		EntityType: "invitation",
+		EntityID:   entity.ID,
+		Payload:    payload,
+	})
+}
+
+func emitInvitationRejected(ctx context.Context, stmts EventStatements, entity *domain.Invitation, userID string) error {
+	return audit.Emit(ctx, stmts, audit.EmitSpec{
+		Type:       domain.EventTypeInvitationRejected,
+		Category:   domain.EventCategoryAdmin,
+		ProjectID:  entity.ProjectID,
+		EntityType: "invitation",
+		EntityID:   entity.ID,
+		Payload:    domain.InvitationRejectedPayload{JourneyID: entity.JourneyID, UserID: userID},
 	})
 }
 

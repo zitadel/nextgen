@@ -1740,6 +1740,44 @@ func (c *MockAllStatementsDeleteAuthzMembershipEdgesForTeamDeactivateCall) DoAnd
 	return c
 }
 
+// DeleteCancellableInvitation mocks base method.
+func (m *MockAllStatements) DeleteCancellableInvitation(ctx context.Context, projectID, id string, now time.Time) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteCancellableInvitation", ctx, projectID, id, now)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteCancellableInvitation indicates an expected call of DeleteCancellableInvitation.
+func (mr *MockAllStatementsMockRecorder) DeleteCancellableInvitation(ctx, projectID, id, now any) *MockAllStatementsDeleteCancellableInvitationCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteCancellableInvitation", reflect.TypeOf((*MockAllStatements)(nil).DeleteCancellableInvitation), ctx, projectID, id, now)
+	return &MockAllStatementsDeleteCancellableInvitationCall{Call: call}
+}
+
+// MockAllStatementsDeleteCancellableInvitationCall wrap *gomock.Call
+type MockAllStatementsDeleteCancellableInvitationCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsDeleteCancellableInvitationCall) Return(arg0 error) *MockAllStatementsDeleteCancellableInvitationCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsDeleteCancellableInvitationCall) Do(f func(context.Context, string, string, time.Time) error) *MockAllStatementsDeleteCancellableInvitationCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsDeleteCancellableInvitationCall) DoAndReturn(f func(context.Context, string, string, time.Time) error) *MockAllStatementsDeleteCancellableInvitationCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // DeleteEventsOlderThan mocks base method.
 func (m *MockAllStatements) DeleteEventsOlderThan(ctx context.Context, createdBefore time.Time) (int64, error) {
 	m.ctrl.T.Helper()
@@ -2007,44 +2045,6 @@ func (c *MockAllStatementsDeleteOriginByPatternCall) Do(f func(context.Context, 
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAllStatementsDeleteOriginByPatternCall) DoAndReturn(f func(context.Context, string, string) (bool, *domain.Origin, error)) *MockAllStatementsDeleteOriginByPatternCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
-// DeletePendingInvitation mocks base method.
-func (m *MockAllStatements) DeletePendingInvitation(ctx context.Context, projectID, id string, now time.Time) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeletePendingInvitation", ctx, projectID, id, now)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// DeletePendingInvitation indicates an expected call of DeletePendingInvitation.
-func (mr *MockAllStatementsMockRecorder) DeletePendingInvitation(ctx, projectID, id, now any) *MockAllStatementsDeletePendingInvitationCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeletePendingInvitation", reflect.TypeOf((*MockAllStatements)(nil).DeletePendingInvitation), ctx, projectID, id, now)
-	return &MockAllStatementsDeletePendingInvitationCall{Call: call}
-}
-
-// MockAllStatementsDeletePendingInvitationCall wrap *gomock.Call
-type MockAllStatementsDeletePendingInvitationCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockAllStatementsDeletePendingInvitationCall) Return(arg0 error) *MockAllStatementsDeletePendingInvitationCall {
-	c.Call = c.Call.Return(arg0)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsDeletePendingInvitationCall) Do(f func(context.Context, string, string, time.Time) error) *MockAllStatementsDeletePendingInvitationCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsDeletePendingInvitationCall) DoAndReturn(f func(context.Context, string, string, time.Time) error) *MockAllStatementsDeletePendingInvitationCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

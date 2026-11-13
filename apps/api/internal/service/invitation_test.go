@@ -46,7 +46,12 @@ func newMockedInvitationService(t *testing.T, platformProjectID string) (*servic
 		},
 	).AnyTimes()
 	keys := servicemocks.NewMockKeyService(ctrl)
-	return service.NewInvitationService(service.NewPool(pool), keys, invitationConsole, platformProjectID), statements, keys, events
+	db := service.NewPool(pool)
+	grants := service.NewGrantService(db, nil, platformProjectID)
+	refs := &grantRefStub{byID: map[string]domain.UserRef{
+		"user_admin": {UserID: "user_admin", Identifier: "ada@example.com", IdentifierProperty: "email", Display: "Ada Lovelace"},
+	}}
+	return service.NewInvitationService(db, keys, grants, refs, invitationConsole, platformProjectID), statements, keys, events
 }
 
 // invitationEvent decodes one recorded event's payload into T.
@@ -391,7 +396,7 @@ func TestInvitationService_Cancel(t *testing.T) {
 			name: "deletes a pending invitation",
 			setup: func(s *servicemocks.MockAllStatements) {
 				s.EXPECT().GetInvitationByID(gomock.Any(), invitationProjectID, "inv_1").Return(&domain.Invitation{ProjectID: invitationProjectID, ID: "inv_1", JourneyID: "journey_1"}, nil)
-				s.EXPECT().DeletePendingInvitation(gomock.Any(), invitationProjectID, "inv_1", gomock.Any()).Return(nil)
+				s.EXPECT().DeleteCancellableInvitation(gomock.Any(), invitationProjectID, "inv_1", gomock.Any()).Return(nil)
 			},
 		},
 		{
@@ -405,7 +410,7 @@ func TestInvitationService_Cancel(t *testing.T) {
 			name: "finished or expired invitation",
 			setup: func(s *servicemocks.MockAllStatements) {
 				s.EXPECT().GetInvitationByID(gomock.Any(), invitationProjectID, "inv_1").Return(&domain.Invitation{ProjectID: invitationProjectID, ID: "inv_1", JourneyID: "journey_1"}, nil)
-				s.EXPECT().DeletePendingInvitation(gomock.Any(), invitationProjectID, "inv_1", gomock.Any()).Return(database.NewNoRowFoundError(nil))
+				s.EXPECT().DeleteCancellableInvitation(gomock.Any(), invitationProjectID, "inv_1", gomock.Any()).Return(database.NewNoRowFoundError(nil))
 			},
 			wantErr: domain.ErrInvitationNotPending(),
 		},
@@ -483,15 +488,379 @@ func TestInvitationService_List(t *testing.T) {
 			}, nil
 		})
 
-	status := domain.InvitationStatusPending
 	got, err := svc.List(t.Context(), service.ListInvitationsRequest{
 		ProjectID: invitationProjectID,
-		Status:    &status,
+		Statuses:  []domain.InvitationStatus{domain.InvitationStatusPending, domain.InvitationStatusRejected},
 		Limit:     5,
 		PageToken: "cursor_1",
 	})
 	require.NoError(t, err)
 	require.Len(t, got.Invitations, 2)
 	assert.Equal(t, "inv_2", got.Invitations[0].ID)
+	assert.Nil(t, got.Invitations[0].Inviter, "not expanded")
 	assert.Equal(t, "cursor_2", got.NextPageToken)
+}
+
+func TestInvitationService_ListExpandsInviter(t *testing.T) {
+	svc, s, _, _ := newMockedInvitationService(t, grantPlatformProjID)
+	s.EXPECT().ListInvitations(gomock.Any(), gomock.Any()).Return(&database.ListResult[*domain.Invitation]{
+		Items: []*domain.Invitation{
+			{ID: "inv_3", CreatedBy: new("user_admin")},
+			{ID: "inv_2", CreatedBy: new("user_gone")},
+			{ID: "inv_1"},
+		},
+	}, nil)
+
+	got, err := svc.List(t.Context(), service.ListInvitationsRequest{ProjectID: invitationProjectID, ExpandInviter: true})
+	require.NoError(t, err)
+	require.Len(t, got.Invitations, 3)
+	assert.Equal(t, "Ada Lovelace", got.Invitations[0].Inviter.Display)
+	// A creator who is gone degrades to their id.
+	assert.Equal(t, domain.UserRef{UserID: "user_gone"}, *got.Invitations[1].Inviter)
+	// A project secret names no inviter.
+	assert.Nil(t, got.Invitations[2].Inviter)
+}
+
+const invitationToken = "token_plain"
+
+func pendingInvitation(createdBy *string) *domain.Invitation {
+	return &domain.Invitation{
+		ProjectID:     invitationProjectID,
+		ID:            "inv_1",
+		Type:          domain.InvitationTypeProjectMember,
+		ProjectMember: &domain.InvitationProjectMember{Relation: "admin"},
+		Status:        domain.InvitationStatusPending,
+		CreatedBy:     createdBy,
+		ExpiresAt:     time.Now().Add(time.Hour),
+		JourneyID:     "journey_1",
+		TokenHash:     domain.HashSecret(invitationToken),
+	}
+}
+
+func expectInvitationByToken(s *servicemocks.MockAllStatements, entity *domain.Invitation) {
+	s.EXPECT().GetInvitationByTokenHash(gomock.Any(), domain.HashSecret(invitationToken)).Return(entity, nil)
+}
+
+// expectStatusChange expects the guarded write and returns its row as storage would.
+func expectStatusChange(s *servicemocks.MockAllStatements, entity *domain.Invitation, status domain.InvitationStatus, acceptedBy *string) {
+	s.EXPECT().ChangeInvitationStatus(gomock.Any(), invitationProjectID, entity.ID, status, acceptedBy, gomock.Any()).DoAndReturn(
+		func(_ context.Context, _, _ string, status domain.InvitationStatus, acceptedBy *string, now time.Time) (*domain.Invitation, error) {
+			changed := *entity
+			changed.Status = status
+			changed.EncryptedMetadata = nil
+			changed.AcceptedBy = acceptedBy
+			if acceptedBy != nil {
+				changed.AcceptedAt = &now
+			}
+			return &changed, nil
+		})
+}
+
+func inviterAdmin(admin bool) service.InviterCheck {
+	return func(context.Context, service.AllStatements, string, string) (bool, error) {
+		return admin, nil
+	}
+}
+
+func TestInvitationService_Lookup(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns a pending invitation with its project's name", func(t *testing.T) {
+		t.Parallel()
+		svc, s, _, _ := newMockedInvitationService(t, grantPlatformProjID)
+		expectInvitationByToken(s, pendingInvitation(new("user_admin")))
+		s.EXPECT().GetProjectByID(gomock.Any(), invitationProjectID).Return(&domain.Project{ID: invitationProjectID, Name: "Acme"}, nil)
+
+		got, err := svc.Lookup(t.Context(), invitationToken)
+		require.NoError(t, err)
+		assert.Equal(t, "Acme", got.ProjectName)
+		assert.Equal(t, "inv_1", got.ID)
+		require.NotNil(t, got.Inviter)
+		assert.Equal(t, "Ada Lovelace", got.Inviter.Display)
+	})
+
+	t.Run("an inviter that no longer resolves degrades to its id", func(t *testing.T) {
+		t.Parallel()
+		svc, s, _, _ := newMockedInvitationService(t, grantPlatformProjID)
+		expectInvitationByToken(s, pendingInvitation(new("user_gone")))
+		s.EXPECT().GetProjectByID(gomock.Any(), invitationProjectID).Return(&domain.Project{ID: invitationProjectID, Name: "Acme"}, nil)
+
+		got, err := svc.Lookup(t.Context(), invitationToken)
+		require.NoError(t, err)
+		assert.Equal(t, &domain.UserRef{UserID: "user_gone"}, got.Inviter)
+	})
+
+	t.Run("a project secret's invitation names no inviter", func(t *testing.T) {
+		t.Parallel()
+		svc, s, _, _ := newMockedInvitationService(t, grantPlatformProjID)
+		expectInvitationByToken(s, pendingInvitation(nil))
+		s.EXPECT().GetProjectByID(gomock.Any(), invitationProjectID).Return(&domain.Project{ID: invitationProjectID, Name: "Acme"}, nil)
+
+		got, err := svc.Lookup(t.Context(), invitationToken)
+		require.NoError(t, err)
+		assert.Nil(t, got.Inviter)
+	})
+
+	t.Run("an unknown token", func(t *testing.T) {
+		t.Parallel()
+		svc, s, _, _ := newMockedInvitationService(t, grantPlatformProjID)
+		s.EXPECT().GetInvitationByTokenHash(gomock.Any(), gomock.Any()).Return(nil, database.NewNoRowFoundError(nil))
+		_, err := svc.Lookup(t.Context(), invitationToken)
+		require.ErrorIs(t, err, domain.ErrInvitationNotFound())
+	})
+
+	t.Run("an expired invitation", func(t *testing.T) {
+		t.Parallel()
+		svc, s, _, _ := newMockedInvitationService(t, grantPlatformProjID)
+		expired := pendingInvitation(nil)
+		expired.ExpiresAt = time.Now().Add(-time.Minute)
+		expectInvitationByToken(s, expired)
+		_, err := svc.Lookup(t.Context(), invitationToken)
+		require.ErrorIs(t, err, domain.ErrInvitationNotPending())
+	})
+}
+
+func TestInvitationService_Accept(t *testing.T) {
+	t.Parallel()
+
+	const accepter = "user_colleague"
+	expired := time.Now().Add(-time.Hour)
+	managed := func(id, relation string, expiresAt *time.Time) *domain.AuthzAssignment {
+		asgn := &domain.AuthzAssignment{
+			ID:            id,
+			ProjectID:     invitationProjectID,
+			CatalogID:     domain.SystemCatalogID,
+			PrincipalType: domain.AuthzPrincipalTypeUser,
+			PrincipalID:   accepter,
+			ObjectType:    "project",
+			Relation:      relation,
+			ExpiresAt:     expiresAt,
+		}
+		asgn.ApplyScope(domain.NewProjectAssignmentScope())
+		return asgn
+	}
+
+	tests := []struct {
+		name string
+		held []*domain.AuthzAssignment
+		// revokes is the id of the expired grant the adapter replaces.
+		revokes    string
+		wantCreate bool
+		wantEvents []domain.EventType
+	}{
+		{
+			name:       "no grant yet: creates one",
+			wantCreate: true,
+			wantEvents: []domain.EventType{domain.EventTypeAuthzGranted, domain.EventTypeInvitationAccepted},
+		},
+		{
+			name:       "a different relation held: creates a second grant",
+			held:       []*domain.AuthzAssignment{managed("asgn_viewer", "viewer", nil)},
+			wantCreate: true,
+			wantEvents: []domain.EventType{domain.EventTypeAuthzGranted, domain.EventTypeInvitationAccepted},
+		},
+		{
+			name:       "an identical active grant: already done",
+			held:       []*domain.AuthzAssignment{managed("asgn_admin", "admin", nil)},
+			wantEvents: []domain.EventType{domain.EventTypeInvitationAccepted},
+		},
+		{
+			name:       "an identical expired grant: revoked and created again",
+			held:       []*domain.AuthzAssignment{managed("asgn_admin", "admin", &expired)},
+			revokes:    "asgn_admin",
+			wantCreate: true,
+			wantEvents: []domain.EventType{domain.EventTypeAuthzRevoked, domain.EventTypeAuthzGranted, domain.EventTypeInvitationAccepted},
+		},
+		{
+			name: "a delegated grant of the same relation: creates the direct one",
+			held: []*domain.AuthzAssignment{func() *domain.AuthzAssignment {
+				asgn := managed("asgn_delegated", "admin", nil)
+				asgn.DelegationID = new("dlg_1")
+				return asgn
+			}()},
+			wantCreate: true,
+			wantEvents: []domain.EventType{domain.EventTypeAuthzGranted, domain.EventTypeInvitationAccepted},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			svc, s, _, events := newMockedInvitationService(t, grantPlatformProjID)
+			entity := pendingInvitation(new("user_admin"))
+			expectInvitationByToken(s, entity)
+			expectClaimedProject(s, invitationProjectID)
+			expectActiveUserPrincipal(s, accepter)
+			s.EXPECT().ListAuthzAssignments(gomock.Any(), invitationProjectID, domain.AuthzPrincipalTypeUser, accepter, false).Return(tc.held, nil)
+			if tc.revokes != "" {
+				s.EXPECT().RevokeAuthzAssignment(gomock.Any(), invitationProjectID, tc.revokes).Return(nil)
+			}
+			if tc.wantCreate {
+				s.EXPECT().CreateAuthzAssignment(gomock.Any(), gomock.Any()).DoAndReturn(
+					func(_ context.Context, asgn *domain.AuthzAssignment) error {
+						assert.Equal(t, accepter, asgn.PrincipalID)
+						assert.Equal(t, domain.AuthzPrincipalTypeUser, asgn.PrincipalType)
+						assert.Equal(t, "admin", asgn.Relation)
+						assert.Nil(t, asgn.ExpiresAt)
+						asgn.ID = "asgn_new"
+						return nil
+					})
+			}
+			expectStatusChange(s, entity, domain.InvitationStatusAccepted, new(accepter))
+
+			got, err := svc.Accept(t.Context(), invitationToken, accepter, inviterAdmin(true))
+			require.NoError(t, err)
+			assert.Equal(t, domain.InvitationStatusAccepted, got.Status)
+			assert.Equal(t, new(accepter), got.AcceptedBy)
+			assert.Nil(t, got.Metadata)
+
+			types := make([]domain.EventType, 0, len(*events))
+			for _, event := range *events {
+				types = append(types, event.EventType)
+			}
+			require.Equal(t, tc.wantEvents, types)
+			accepted := invitationEvent[domain.InvitationAcceptedPayload](t, (*events)[len(*events)-1], domain.EventTypeInvitationAccepted, "inv_1")
+			assert.Equal(t, domain.InvitationAcceptedPayload{
+				Type:          "project_member",
+				ProjectMember: &domain.InvitationProjectMemberPayload{Relation: "admin"},
+				JourneyID:     "journey_1",
+				UserID:        accepter,
+			}, accepted)
+		})
+	}
+
+	refusals := []struct {
+		name      string
+		createdBy *string
+		setup     func(s *servicemocks.MockAllStatements, entity *domain.Invitation)
+		wantErr   error
+	}{
+		{
+			name:      "the inviter accepting their own invitation",
+			createdBy: new(accepter),
+			wantErr:   domain.ErrInvitationSelfAccept(),
+		},
+		{
+			name:      "an unclaimed project",
+			createdBy: new("user_admin"),
+			setup: func(s *servicemocks.MockAllStatements, _ *domain.Invitation) {
+				s.EXPECT().GetProjectByID(gomock.Any(), invitationProjectID).Return(&domain.Project{ID: invitationProjectID}, nil)
+				s.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), invitationProjectID).Return(nil, database.NewNoRowFoundError(nil))
+			},
+			wantErr: domain.ErrInvitationProjectUnclaimed(),
+		},
+		{
+			name:      "an inviter who no longer holds admin",
+			createdBy: new("user_admin"),
+			setup: func(s *servicemocks.MockAllStatements, _ *domain.Invitation) {
+				expectClaimedProject(s, invitationProjectID)
+			},
+			wantErr: domain.ErrInvitationInviterNotAdmin(),
+		},
+		{
+			name: "an accepting user no longer active",
+			setup: func(s *servicemocks.MockAllStatements, entity *domain.Invitation) {
+				expectClaimedProject(s, invitationProjectID)
+				expectStatusChange(s, entity, domain.InvitationStatusAccepted, new(accepter))
+				s.EXPECT().GetResourceScope(gomock.Any(), accepter).Return(&domain.ResourceScope{
+					ResourceID:   accepter,
+					ResourceKind: domain.ResourceKindUser,
+					ProjectID:    grantPlatformProjID,
+				}, nil)
+				s.EXPECT().GetUser(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, database.NewNoRowFoundError(nil))
+			},
+			wantErr: domain.ErrAuthUnauthorized(nil),
+		},
+		{
+			name: "a decline or accept that won the race",
+			setup: func(s *servicemocks.MockAllStatements, entity *domain.Invitation) {
+				// The loser misses on the status change and writes no grant.
+				expectClaimedProject(s, invitationProjectID)
+				s.EXPECT().ChangeInvitationStatus(gomock.Any(), invitationProjectID, entity.ID, domain.InvitationStatusAccepted, gomock.Any(), gomock.Any()).
+					Return(nil, database.NewNoRowFoundError(nil))
+			},
+			wantErr: domain.ErrInvitationNotPending(),
+		},
+	}
+	for _, tc := range refusals {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			svc, s, _, _ := newMockedInvitationService(t, grantPlatformProjID)
+			entity := pendingInvitation(tc.createdBy)
+			expectInvitationByToken(s, entity)
+			if tc.setup != nil {
+				tc.setup(s, entity)
+			}
+			_, err := svc.Accept(t.Context(), invitationToken, accepter, inviterAdmin(false))
+			require.ErrorIs(t, err, tc.wantErr)
+		})
+	}
+
+	t.Run("a server without a platform project", func(t *testing.T) {
+		t.Parallel()
+		svc, _, _, _ := newMockedInvitationService(t, "")
+		_, err := svc.Accept(t.Context(), invitationToken, accepter, inviterAdmin(true))
+		require.ErrorIs(t, err, domain.ErrInvitationPlatformRequired())
+	})
+
+	t.Run("an invitation a project secret created skips the inviter check", func(t *testing.T) {
+		t.Parallel()
+		svc, s, _, _ := newMockedInvitationService(t, grantPlatformProjID)
+		entity := pendingInvitation(nil)
+		expectInvitationByToken(s, entity)
+		expectClaimedProject(s, invitationProjectID)
+		expectActiveUserPrincipal(s, accepter)
+		s.EXPECT().ListAuthzAssignments(gomock.Any(), invitationProjectID, domain.AuthzPrincipalTypeUser, accepter, false).Return(nil, nil)
+		s.EXPECT().CreateAuthzAssignment(gomock.Any(), gomock.Any()).Return(nil)
+		expectStatusChange(s, entity, domain.InvitationStatusAccepted, new(accepter))
+
+		_, err := svc.Accept(t.Context(), invitationToken, accepter, func(context.Context, service.AllStatements, string, string) (bool, error) {
+			t.Error("the inviter check ran for an invitation without a creator")
+			return false, nil
+		})
+		require.NoError(t, err)
+	})
+}
+
+func TestInvitationService_Reject(t *testing.T) {
+	t.Parallel()
+
+	t.Run("declines a pending invitation", func(t *testing.T) {
+		t.Parallel()
+		svc, s, _, events := newMockedInvitationService(t, grantPlatformProjID)
+		entity := pendingInvitation(new("user_admin"))
+		entity.EncryptedMetadata = new("ciphertext")
+		expectInvitationByToken(s, entity)
+		expectStatusChange(s, entity, domain.InvitationStatusRejected, nil)
+
+		got, err := svc.Reject(t.Context(), invitationToken, "user_colleague")
+		require.NoError(t, err)
+		assert.Equal(t, domain.InvitationStatusRejected, got.Status)
+		assert.Nil(t, got.AcceptedBy)
+
+		require.Len(t, *events, 1)
+		rejected := invitationEvent[domain.InvitationRejectedPayload](t, (*events)[0], domain.EventTypeInvitationRejected, "inv_1")
+		assert.Equal(t, domain.InvitationRejectedPayload{JourneyID: "journey_1", UserID: "user_colleague"}, rejected)
+	})
+
+	t.Run("the inviter declining their own invitation", func(t *testing.T) {
+		t.Parallel()
+		svc, s, _, events := newMockedInvitationService(t, grantPlatformProjID)
+		expectInvitationByToken(s, pendingInvitation(new("user_admin")))
+
+		_, err := svc.Reject(t.Context(), invitationToken, "user_admin")
+		require.ErrorIs(t, err, domain.ErrInvitationSelfReject())
+		assert.Empty(t, *events)
+	})
+
+	t.Run("a finished invitation", func(t *testing.T) {
+		t.Parallel()
+		svc, s, _, events := newMockedInvitationService(t, grantPlatformProjID)
+		entity := pendingInvitation(nil)
+		entity.Status = domain.InvitationStatusAccepted
+		expectInvitationByToken(s, entity)
+
+		_, err := svc.Reject(t.Context(), invitationToken, "user_colleague")
+		require.ErrorIs(t, err, domain.ErrInvitationNotPending())
+		assert.Empty(t, *events)
+	})
 }
