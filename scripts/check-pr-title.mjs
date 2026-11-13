@@ -32,7 +32,6 @@ const NON_SHIPPING_TOP_LEVEL_DIRS = [
   ".changeset",
   ".devcontainer",
   ".github",
-  ".moon",
   ".run",
   "docs",
   "examples",
@@ -71,13 +70,13 @@ const NON_SHIPPING_ROOT_FILES = new Set([
   "LICENSE",
   "devbox.json",
   "devbox.lock",
-  "moon.yml",
   "package.json",
   "pnpm-lock.yaml",
   "pnpm-workspace.yaml",
   "redocly.yaml",
   "tsconfig.base.json",
   "tsconfig.json",
+  "turbo.json",
   "vitest.config.ts",
 ]);
 
@@ -161,7 +160,7 @@ export function isNonShippingFile(file) {
     return true;
   }
 
-  if (path.endsWith("/moon.yml")) {
+  if (path.endsWith("/turbo.json")) {
     return true;
   }
 

@@ -9,6 +9,7 @@ import { it } from "@tests/helpers/fixtures";
 
 import { parseJson, runCliForTest, stripAnsi } from "@tests/helpers/run-cli";
 import { asTerminal } from "@tests/helpers/terminal";
+import { PRIMARY_ORIGIN } from "@tests/helpers/records";
 
 const SERVER = "https://api.zitadel.example";
 
@@ -64,7 +65,7 @@ function list(cwd: string, extra: string[] = []) {
 describe("origin list", () => {
   it("returns the origins in the --json envelope", async () => {
     const cwd = await anAppDir();
-    origins.push({ pattern: "https://app.acme.com", kind: "primary" });
+    origins.push({ pattern: PRIMARY_ORIGIN, kind: "primary" });
 
     const result = await list(cwd, ["--json"]);
 
@@ -75,14 +76,14 @@ describe("origin list", () => {
 
   it("renders a pattern/kind table on a terminal", async () => {
     const cwd = await anAppDir();
-    origins.push({ pattern: "https://app.acme.com", kind: "primary" });
+    origins.push({ pattern: PRIMARY_ORIGIN, kind: "primary" });
 
     const result = await asTerminal(() => list(cwd));
 
     const text = stripAnsi(result.stdout);
     expect(text).toContain("pattern");
     expect(text).toContain("kind");
-    expect(text).toContain("https://app.acme.com");
+    expect(text).toContain(PRIMARY_ORIGIN);
     expect(text).toContain("1 origin");
   });
 
@@ -96,10 +97,10 @@ describe("origin list", () => {
 
   it("prints tab-separated rows with no header when piped", async () => {
     const cwd = await anAppDir();
-    origins.push({ pattern: "https://app.acme.com", kind: "primary" });
+    origins.push({ pattern: PRIMARY_ORIGIN, kind: "primary" });
 
     const result = await list(cwd, ["--plain"]);
 
-    expect(result.stdout.trim()).toBe("https://app.acme.com\tprimary");
+    expect(result.stdout.trim()).toBe(`${PRIMARY_ORIGIN}\tprimary`);
   });
 });

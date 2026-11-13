@@ -92,7 +92,6 @@ export function aSchema(methods: JsonValue, name: string = DEFAULT_SCHEMA): Json
 export function aPasswordFlow(schema: string = DEFAULT_SCHEMA) {
   return {
     name: `${schema}-login`,
-    status: "active",
     user_schema: schemaIdOf(schema),
     purposes: { login: "identifier" },
     steps: [IDENTIFIER_STEP, PASSWORD_STEP, DONE_STEP],

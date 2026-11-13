@@ -65,6 +65,11 @@ jobs:
     if: >-
       github.event.client_payload.environment == 'production' &&
       github.event.client_payload.project.name == 'cloud'
+    # deployment-suite.yml's remote-cache step trades the token for a
+    # Turborepo one.
+    permissions:
+      contents: read
+      id-token: write
     uses: ./.github/workflows/deployment-checks.yml
     with:
       # The deployment's own URL; the payload may leave out the scheme.

@@ -11,6 +11,7 @@ import { z } from "zod";
 import { DEFAULT_SERVER } from "@/lib/server";
 import type { JsonObject } from "@/lib/zitadel/types";
 import { toJsonObject } from "@/lib/zitadel/utils/json";
+import { PREVIEW_PATTERN, PREVIEW_URL, PRIMARY_ORIGIN } from "@tests/helpers/records";
 
 /** The platform the unit tests' msw server answers for. */
 export const PLATFORM_URL = DEFAULT_SERVER;
@@ -73,6 +74,67 @@ export async function aProjectDirectory(
 }
 
 /**
+ * A new project on the mock with {@link PRIMARY_ORIGIN} as its primary origin.
+ *
+ * @param name - The project's name.
+ * @returns The project's id and secret.
+ */
+async function aProjectWithPrimaryOrigin(name: string): Promise<{ id: string; secret: string }> {
+  const { id, project_secret: secret } = CreatedProject.parse(
+    await callPlatform("/projects", "", { name }),
+  );
+  await callPlatform(`/projects/${id}/origins`, secret, {
+    pattern: PRIMARY_ORIGIN,
+    kind: "primary",
+  });
+
+  return { id, secret };
+}
+
+/**
+ * Creates a release of the project on the mock that pins one schema revision.
+ *
+ * @param project - The project's id and secret.
+ * @param revision - The schema revision the release pins.
+ * @returns The release's id.
+ */
+async function createdRelease(
+  project: { id: string; secret: string },
+  revision: string,
+): Promise<string> {
+  const created = Created.parse(
+    await callPlatform(`/releases?project_id=${project.id}`, project.secret, {
+      pointers: [{ kind: "schema", revision_id: revision }],
+    }),
+  );
+
+  return created.id;
+}
+
+/**
+ * Creates a deployment of a release on the mock.
+ *
+ * @param project - The project's id and secret.
+ * @param releaseId - The release to make live.
+ * @param body - Where to make it live, as the API takes it: its targets and a preview's ttl.
+ * @returns The deployment's id.
+ */
+async function createdDeployment(
+  project: { id: string; secret: string },
+  releaseId: string,
+  body: object,
+): Promise<string> {
+  const created = Created.parse(
+    await callPlatform(`/deployments?project_id=${project.id}`, project.secret, {
+      release_id: releaseId,
+      ...body,
+    }),
+  );
+
+  return created.id;
+}
+
+/**
  * A project on the mock with two deploys to one primary origin, its
  * directory, and the second deployment's id. The caller removes the directory.
  *
@@ -82,32 +144,71 @@ export async function aProjectDirectory(
 export async function aProjectWithTwoDeploys(
   prefix: string,
 ): Promise<{ cwd: string; undone: string }> {
-  const { id, project_secret: secret } = CreatedProject.parse(
-    await callPlatform("/projects", "", { name: prefix }),
-  );
-  await callPlatform(`/projects/${id}/origins`, secret, {
-    pattern: "https://app.acme.com",
-    kind: "primary",
+  const project = await aProjectWithPrimaryOrigin(prefix);
+  await createdDeployment(project, await createdRelease(project, "sch_a"), { targets: "primary" });
+  const undone = await createdDeployment(project, await createdRelease(project, "sch_b"), {
+    targets: "primary",
   });
-  const deploy = async (revision: string): Promise<string> => {
-    const release = Created.parse(
-      await callPlatform(`/releases?project_id=${id}`, secret, {
-        pointers: [{ kind: "schema", revision_id: revision }],
-      }),
-    );
-    const deployment = Created.parse(
-      await callPlatform(`/deployments?project_id=${id}`, secret, {
-        release_id: release.id,
-        targets: "primary",
-      }),
-    );
-    return deployment.id;
-  };
-  await deploy("sch_a");
-  const undone = await deploy("sch_b");
+
+  return { cwd: await aProjectDirectory(prefix, project), undone };
+}
+
+/**
+ * The kinds of origin a release can be served on.
+ */
+type OriginKind = "primary" | "preview";
+
+/**
+ * A project on the mock with one release live on a primary origin, on a
+ * preview URL, or on both, its directory, and the deployments that serve it.
+ * The directory is made last, so a failure while arranging leaves none behind.
+ *
+ * @param prefix - The project's name, and the prefix of its directory.
+ * @param served - Where the release is live.
+ * @returns The directory, the release, and `deploymentOn`, which names the
+ * deployment serving the release on an origin kind and throws for a kind it
+ * was not put live on. The caller removes the directory.
+ */
+export async function aReleaseServedOn(
+  prefix: string,
+  served: { primary: boolean; preview: boolean },
+): Promise<{ cwd: string; releaseId: string; deploymentOn(kind: OriginKind): string }> {
+  const project = await aProjectWithPrimaryOrigin(prefix);
+  await callPlatform(`/projects/${project.id}/origins`, project.secret, {
+    pattern: PREVIEW_PATTERN,
+    kind: "preview",
+  });
+  const releaseId = await createdRelease(project, "sch_a");
+  const deployments: Partial<Record<OriginKind, string>> = {};
+  if (served.primary) {
+    deployments.primary = await createdDeployment(project, releaseId, { targets: "primary" });
+  }
+  if (served.preview) {
+    deployments.preview = await createdDeployment(project, releaseId, {
+      targets: [PREVIEW_URL],
+      ttl: "PT168H",
+    });
+  }
+  const cwd = await aProjectDirectory(prefix, project);
+
   return {
-    cwd: await aProjectDirectory(prefix, { id, secret }),
-    undone,
+    cwd,
+    releaseId,
+    /**
+     * The deployment serving the release on an origin kind.
+     *
+     * @param kind - The origin kind.
+     * @returns The deployment's ID.
+     * @throws Error when the release was not put live on that kind.
+     */
+    deploymentOn(kind: OriginKind): string {
+      const deployment = deployments[kind];
+      if (deployment === undefined) {
+        throw new Error(`The release is not served on a ${kind} origin`);
+      }
+
+      return deployment;
+    },
   };
 }
 
@@ -127,7 +228,7 @@ export function liveAcrossTwoPages(primary: { id: string; release_id: string }) 
             deployments: [
               {
                 ...primary,
-                targets: [{ origin: "https://app.acme.com", expires_at: null }],
+                targets: [{ origin: PRIMARY_ORIGIN, expires_at: null }],
                 metadata: { reason: "deploy" },
                 deployed_at: "2026-01-01T00:00:00.000Z",
               },

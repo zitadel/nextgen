@@ -108,11 +108,11 @@ describe("task-guard under turbo", () => {
     const lockBase = join(dir, "locks");
 
     await guard(
-      { mutex: "generated-sources", retries: 0, command: [process.execPath, "-e", "0"] },
+      { mutex: "example-lock", retries: 0, command: [process.execPath, "-e", "0"] },
       { env: { TURBO_HASH: "abc" }, lockBase, log: () => {} },
     );
 
-    await expect(readdir(lockDir("generated-sources", undefined, lockBase))).rejects.toThrow();
+    await expect(readdir(lockDir("example-lock", undefined, lockBase))).rejects.toThrow();
   });
 });
 

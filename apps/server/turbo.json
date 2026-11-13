@@ -4,29 +4,26 @@
   // The tasks of the server's Go module (apps/api, the package `nextgen`).
   // Input-only tasks split its production and test sources: `go-sources`
   // reaches the production sources of the module and of every module it
-  // requires through `nextgen#go-sources`, and lists what generation and
-  // the builds read outside the modules. Builds and generation do not consume
-  // _test.go or testdata; vet, lint, format and tests do.
-  // Native Go commands use Go's own compiler/test caches, not runner results:
-  // unset GOOS/GOARCH/CGO_ENABLED and the installed compiler are host defaults
-  // neither runner hashes. The local binary also stamps the current Git HEAD.
-  // Generation stays cached: go.mod pins its toolchain, and its output does
-  // not depend on the host or the commit.
+  // requires through `nextgen#go-sources`. Builds and generation do not
+  // consume _test.go or testdata; vet, lint, format and tests do.
+  // Through `go-sources`, every task here is keyed on the Go toolchain and
+  // target (`go version` and the effective `go env`), so the checks and the
+  // service-free tests are cached. `build` is not: the binary stamps the Git
+  // HEAD and branch. Nor are the database lanes or generation (below).
   "tasks": {
     "go-sources": {
       "dependsOn": ["nextgen#go-sources"],
-      "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
-      "inputs": [
-        "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/docs/design/api/events-catalog.md",
-        "$TURBO_ROOT$/scripts/check-go-generate.mjs",
-        "$TURBO_ROOT$/scripts/generate-meta-schemas.ts"
-      ]
+      "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"]
     },
+    // The drift tests also read the events catalog and the configuration
+    // guide's metrics table, and the proof-of-work tests its vectors.
     "go-tests": {
       "inputs": [
         "$TURBO_ROOT$/apps/api/**/*_test.go",
         "$TURBO_ROOT$/apps/api/**/testdata/**",
+        "$TURBO_ROOT$/docs/design/api/events-catalog.md",
+        "$TURBO_ROOT$/docs/quick-start/configuration.md",
+        "$TURBO_ROOT$/docs/design/flowengine/testdata/pow-v1-vectors.json",
         "!$TURBO_ROOT$/apps/api/**/node_modules/**",
         "!$TURBO_ROOT$/.claude/**",
         "!$TURBO_ROOT$/.codex/**",
@@ -55,101 +52,48 @@
       "inputs": ["$TURBO_ROOT$/scripts/lint-openapi.mjs", "$TURBO_ROOT$/redocly.yaml", "$TURBO_ROOT$/.redocly.lint-ignore.yaml"]
     },
     "format": {
-      "cache": false,
       "dependsOn": ["go-sources", "go-tests"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "inputs": ["$TURBO_ROOT$/scripts/go-format-check.mjs", "$TURBO_ROOT$/scripts/dev-process.mjs"]
     },
-    // Not `go generate ./...`: scripts/go-generate.mjs runs packages in
-    // parallel behind the one ordering constraint that matters. The script
-    // holds the `generated-sources` lock: generation rewrites files other
-    // packages read mid-graph (config's meta-schemas, api's error responses).
-    // Outputs are mirrored by GENERATED_GLOBS in scripts/generated-outputs.mjs.
+    // Generated files are committed: every task reads them as source, and no
+    // task depends on generation. scripts/go-generate.mjs runs every
+    // directive in a copy of the working tree: `generate`, the tool a person
+    // runs after changing what generation reads, then writes back only the
+    // files that differ (not cached: it writes committed files), and
+    // `check-generate`, in `lint`, fails when any differs. Neither writes a
+    // file another task reads while it runs.
     "generate": {
-      "dependsOn": ["go-sources"],
-      "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
-      "inputs": [
-        "$TURBO_ROOT$/scripts/go-generate.mjs",
-        "$TURBO_ROOT$/scripts/map-all.mjs",
-        "$TURBO_ROOT$/scripts/bundle-openapi.mjs",
-        "$TURBO_ROOT$/scripts/server-build.mjs",
-        "$TURBO_ROOT$/scripts/task-guard.mjs",
-        "$TURBO_ROOT$/scripts/dev-process.mjs",
-        "$TURBO_ROOT$/redocly.yaml"
-      ],
-      "outputs": [
-        "$TURBO_ROOT$/apps/api/internal/api/generated/**",
-        "$TURBO_ROOT$/apps/api/api/openapi/components/schemas/errors/**",
-        "$TURBO_ROOT$/apps/api/api/openapi/components/examples/errors/*.yaml",
-        "$TURBO_ROOT$/apps/api/api/openapi/endpoints/**/*-error-response.yaml",
-        "$TURBO_ROOT$/apps/api/api/openapi/endpoints/events/event.yaml",
-        "$TURBO_ROOT$/apps/api/api/openapi/endpoints/events/types/*.yaml",
-        "$TURBO_ROOT$/apps/api/api/openapi/endpoints/events/webhook-event.yaml",
-        "$TURBO_ROOT$/apps/api/api/openapi/endpoints/schemas/*.json",
-        "$TURBO_ROOT$/apps/api/api/openapi/bundled/openapi.json",
-        "$TURBO_ROOT$/apps/api/internal/**/*_enumer.go",
-        "$TURBO_ROOT$/apps/api/internal/**/*.mock.go",
-        "$TURBO_ROOT$/packages/go/api/*_gen.go"
-      ]
-    },
-    // Generators only write; removing everything and regenerating is how
-    // orphaned output gets pruned. Never cached: the point is to touch the
-    // filesystem.
-    "clean-generated": {
       "cache": false,
-      "inputs": [
-        "$TURBO_ROOT$/scripts/clean-generated.mjs",
-        "$TURBO_ROOT$/scripts/generated-outputs.mjs",
-        "$TURBO_ROOT$/scripts/dev-process.mjs",
-        "$TURBO_ROOT$/scripts/task-guard.mjs"
-      ]
+      "dependsOn": ["go-sources"],
+      "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"]
     },
     "check-generate": {
       "dependsOn": ["go-sources"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "inputs": [
         "$TURBO_ROOT$/scripts/go-generate.mjs",
+        "$TURBO_ROOT$/scripts/generated-outputs.mjs",
+        "$TURBO_ROOT$/scripts/generate-meta-schemas.ts",
         "$TURBO_ROOT$/scripts/map-all.mjs",
         "$TURBO_ROOT$/scripts/bundle-openapi.mjs",
         "$TURBO_ROOT$/scripts/server-build.mjs",
-        "$TURBO_ROOT$/scripts/task-guard.mjs",
         "$TURBO_ROOT$/scripts/dev-process.mjs",
-        "$TURBO_ROOT$/redocly.yaml",
-        "$TURBO_ROOT$/scripts/clean-generated.mjs",
-        "$TURBO_ROOT$/scripts/generated-outputs.mjs"
-      ]
-    },
-    // check-generate plus a prune. Deliberately not a dependency of vet/test:
-    // it deletes every generated file before regenerating, which is fine on a
-    // CI runner and rude on a machine someone is working in. CI runs it in
-    // place of the plain check.
-    "check-generate-pruned": {
-      "dependsOn": ["go-sources"],
-      "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
-      "inputs": [
-        "$TURBO_ROOT$/scripts/go-generate.mjs",
-        "$TURBO_ROOT$/scripts/map-all.mjs",
-        "$TURBO_ROOT$/scripts/bundle-openapi.mjs",
-        "$TURBO_ROOT$/scripts/server-build.mjs",
-        "$TURBO_ROOT$/scripts/task-guard.mjs",
-        "$TURBO_ROOT$/scripts/dev-process.mjs",
-        "$TURBO_ROOT$/redocly.yaml",
-        "$TURBO_ROOT$/scripts/clean-generated.mjs",
-        "$TURBO_ROOT$/scripts/generated-outputs.mjs"
+        "$TURBO_ROOT$/redocly.yaml"
       ]
     },
     // go vet compiles //go:embed all:dist, so the console build goes first (a
     // concurrent build can emptyOutDir the placeholder).
     "vet": {
-      "cache": false,
-      "dependsOn": ["go-sources", "go-tests", "check-generate", "@zitadel/console#build"],
+      "dependsOn": ["go-sources", "go-tests", "@zitadel/console#build"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"]
     },
     // The custom go/analysis checks and the Biome lint of the JavaScript
-    // launcher in bin/: scripts/go-lint.mjs, a copy of moon's inline script.
+    // launcher in bin/: scripts/go-lint.mjs. It also stands for the package's
+    // other static checks (vet, format, openapi, check-generate,
+    // check-pow-vectors), so `turbo run lint` runs them all.
     "lint": {
-      "cache": false,
-      "dependsOn": ["go-sources", "go-tests", "check-generate", "@zitadel/console#build"],
+      "dependsOn": ["go-sources", "go-tests", "check-generate", "check-pow-vectors", "@zitadel/console#build", "vet", "format", "openapi"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "inputs": [
         "$TURBO_ROOT$/scripts/go-lint.mjs",
@@ -159,6 +103,8 @@
         "$TURBO_ROOT$/biome-plugins/*.grit"
       ]
     },
+    // The proof-of-work vectors and the component's solver fixture match what
+    // their generator derives.
     "check-pow-vectors": {
       "inputs": [
         "$TURBO_ROOT$/docs/design/flowengine/testdata/generate-pow-v1-vectors.mjs",
@@ -166,7 +112,11 @@
         "$TURBO_ROOT$/packages/components/src/orchestrator/__fixtures__/signup-pow-vector.json"
       ]
     },
-    "test-pow": {
+    // The proof-of-work package needs no generated API, database or embedded
+    // UI, so a focused race and fuzz run keeps its feedback loop short. The
+    // root `ci` script names it, so CI runs it when these inputs change. A
+    // race run is a probe, so it is never replayed.
+    "test:pow": {
       "cache": false,
       "dependsOn": ["check-pow-vectors"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
@@ -177,37 +127,46 @@
         "$TURBO_ROOT$/apps/api/go.sum"
       ]
     },
-    // The test binary embeds the console's dist. Listed directly and not only
-    // through vet: turbo hashes every dependency's result, but the direct edge
-    // keeps the intent visible, as in moon.yml. Go's result cache stays off
-    // (-count=1 in the script): the drift tests read files outside the module.
-    "test": {
-      "cache": false,
-      "dependsOn": ["go-sources", "go-tests", "openapi", "format", "vet", "lint", "check-pow-vectors", "@zitadel/console#build"],
+    // The test binary embeds the console's dist. The checks (format, vet,
+    // lint, openapi, check-generate, check-pow-vectors) read nothing test
+    // writes and gate nothing: they run beside it. Go's result cache stays off
+    // (-count=1 in the script): the drift tests read files outside the module,
+    // which turbo's key holds (`go-tests`). A hit prints its hash, not the
+    // replayed -v log.
+    "test:unit": {
+      "outputLogs": "new-only",
+      "dependsOn": ["go-sources", "go-tests", "@zitadel/console#build"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"]
     },
     // The database lanes talk to a database whose state no hash sees, so
     // neither turbo's cache nor Go's (-count=1 in the scripts) may replay
     // them. They see the Docker and test-database variables. Their inputs
     // still matter: they decide when a change marks the lane affected, which
-    // selects it in CI (`--affected`), as the server inputs do in moon. They
-    // wait for check-generate, which rewrites internal/api/generated, a package they
-    // compile and type-load (api/internal/erroranalysis).
-    "test-postgres": {
+    // selects it in CI (`--affected`).
+    "test:postgres": {
       "cache": false,
-      "dependsOn": ["go-sources", "go-tests", "check-generate", "@zitadel/console#build"],
+      "dependsOn": ["go-sources", "go-tests", "@zitadel/console#build"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "passThroughEnv": ["ZITADEL_TEST_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
-    "test-spanner": {
+    // Its packages get 45 minutes each (the script's -timeout; spanner.yml's
+    // job allows 60): the migration round trip applies every migration's Up
+    // once per walk, about 20 minutes for 53 migrations on Omni, and grows
+    // with each one.
+    "test:spanner": {
       "cache": false,
-      "dependsOn": ["go-sources", "go-tests", "check-generate", "@zitadel/console#build"],
+      "dependsOn": ["go-sources", "go-tests", "@zitadel/console#build"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH", "ZITADEL_TEST_SPANNER_INSTANCE"],
       "passThroughEnv": ["ZITADEL_TEST_*", "DOCKER_*", "TESTCONTAINERS_*", "GOOGLE_*", "CLOUDSDK_*", "SPANNER_EMULATOR_HOST"]
     },
-    "test-sqlite": {
-      "cache": false,
-      "dependsOn": ["go-sources", "go-tests", "check-generate", "@zitadel/console#build"],
+    // The tests `turbo run test` runs: the unit tests and the SQLite lane,
+    // which needs no Docker, side by side. Postgres and Spanner stay apart.
+    "test": {
+      "dependsOn": ["test:unit", "test:sqlite"]
+    },
+    "test:sqlite": {
+      "outputLogs": "new-only",
+      "dependsOn": ["go-sources", "go-tests", "@zitadel/console#build"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "passThroughEnv": ["ZITADEL_TEST_*"]
     },
@@ -215,9 +174,14 @@
     // hashes. Its files are not inputs: turbo hashes a run's inputs before
     // the run starts, so the build would hash them without that run's console
     // build and miss the cache on the next run.
+    // The build's output, in the repository's dist/ beside the local
+    // servers' data, which it keeps.
+    "clean": {
+      "command": ["git", "clean", "-fdX", "--", "../../dist/server/nextgen", "../../dist/server/metadata.json"]
+    },
     "build": {
       "cache": false,
-      "dependsOn": ["go-sources", "check-generate", "@zitadel/console#build"],
+      "dependsOn": ["go-sources", "@zitadel/console#build"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "inputs": ["$TURBO_ROOT$/scripts/server-build.mjs", "$TURBO_ROOT$/scripts/dev-process.mjs"],
       "outputs": ["$TURBO_ROOT$/dist/server/nextgen", "$TURBO_ROOT$/dist/server/metadata.json"]

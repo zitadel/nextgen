@@ -257,12 +257,12 @@ describe("authentication guard", () => {
           );
         }),
       );
-      const router = await renderAt("/settings/profile");
+      const router = await renderAt("/account");
 
       expect(await screen.findByTestId("zitadel-login")).toBeInTheDocument();
       await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/login"));
       expect(router.state.resolvedLocation?.search).toMatchObject({
-        next: expect.stringMatching(/^\/settings\/profile/),
+        next: expect.stringMatching(/^\/account/),
       });
       expect(new URL(reads[0] ?? "").searchParams.get("project_id")).toBe("proj_test");
     } finally {
