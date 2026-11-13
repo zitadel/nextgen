@@ -121,6 +121,8 @@ func (s opServer) Authorize(ctx context.Context, r *op.ClientRequest[oidc.AuthRe
 	}
 	// The server does not serve the standard scopes yet, so they are ignored
 	// (ADR 082 §2). The library keeps them and drops every other scope.
+	// TODO(ADR 082 step 3): keep the scopes the server serves once OpenID
+	// Connect ships.
 	scopes := slices.DeleteFunc(req.Scopes, func(scope string) bool {
 		switch scope {
 		case oidc.ScopeOpenID, oidc.ScopeProfile, oidc.ScopeEmail, oidc.ScopeAddress, oidc.ScopePhone, oidc.ScopeOfflineAccess:
