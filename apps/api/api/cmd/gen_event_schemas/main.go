@@ -1,16 +1,11 @@
-// gen_event_schemas generates per-event-type OpenAPI schemas, the Event oneOf
-// union with discriminator mapping, and a webhook per event type from
-// domain.EventType constants.
-//
-// The webhooks describe what the event shipper POSTs to a webhook sink (ADR
-// 049): one event per request, its body the event as GET /events returns it.
-// The spec root lists them by hand, like its paths, and the generator fails
-// until that list names exactly the domain's event types.
+// gen_event_schemas generates, from domain.EventType constants, the
+// per-event-type OpenAPI schemas, the Event oneOf union with discriminator
+// mapping, and the WebhookEvent union: the body of the one webhook
+// (endpoints/events/event-webhook.yaml), with a member per event type.
 //
 // Paths are relative to this generator:
 //   - Domain: ../../../internal/domain/event.go
 //   - Output: ../../openapi/endpoints/events/
-//   - Spec root, checked: ../../openapi/openapi-spec.yaml
 package main
 
 import (
@@ -25,8 +20,6 @@ import (
 	"sort"
 	"strings"
 	"unicode"
-
-	"gopkg.in/yaml.v3"
 )
 
 // payloadByEventType maps every domain EventType string constant to a payload
@@ -108,9 +101,6 @@ var payloadByEventType = map[string]string{
 	"auth.factor.passkey.enrolled": "auth-factor-payload.yaml",
 }
 
-// webhookTag groups the webhooks; the spec root declares it.
-const webhookTag = "Event Webhooks"
-
 // eventStatus says whether anything emits an event type, as the Path A/B,
 // Retired, and Contracted sections of docs/design/api/events-catalog.md record.
 type eventStatus int
@@ -123,41 +113,44 @@ const (
 	statusContracted
 )
 
-// webhookDoc is what an event type's webhook page says beyond its schema.
+// webhookDoc is what the webhook's page says of an event type beyond its
+// schema: the description of the type's member of the WebhookEvent union.
 type webhookDoc struct {
 	// description says what happened, for someone receiving the event.
 	description string
 	status      eventStatus
 }
 
-// webhookByEventType documents the webhook of every domain EventType constant.
+// webhookByEventType documents every domain EventType constant for a webhook's
+// receiver.
 var webhookByEventType = map[string]webhookDoc{
 	"request.api": {description: "An API request in the project completed. One event per request; " +
-		"the health, liveness, and readiness probes send none. Only this event carries `metadata.client`, " +
-		"the requester's IP, user agent and origin; other events of the same request join to it through " +
-		"`request_id`."},
+		"the health, liveness, and readiness probes send none. The requester's IP, user agent and origin " +
+		"are in `metadata.client` of the event that `getEvent` (`GET /events/{id}`) returns, and its " +
+		"`request_id` joins the other events of the same request to it."},
 
 	"project.created": {description: "A project was created."},
-	"project.updated": {description: "A project was updated. The payload holds the fields that changed, " +
+	"project.updated": {description: "A project was updated. `data` holds the fields that changed, " +
 		"with their new values."},
 	"project.deleted": {description: "A project was deleted."},
 
-	"user.created": {description: "A user was created. The payload lists the attribute keys written, " +
+	"user.created": {description: "A user was created. `data` lists the attribute keys written, " +
 		"with values only for schema fields marked `x-audit`."},
 	"user.create.failed": {description: "A user could not be created because a unique attribute was already taken. " +
-		"The payload's `key_name` names the unique constraint that was hit."},
-	"user.updated": {description: "A user's attributes were updated. The payload lists the attribute keys " +
+		"`data.key_name` names the unique constraint that was hit."},
+	"user.updated": {description: "A user's attributes were updated. `data` lists the attribute keys " +
 		"written, with values only for schema fields marked `x-audit`."},
 	"user.deleted": {description: "A user was deleted."},
 
 	"team.created": {description: "A team was created."},
-	"team.updated": {description: "A team was updated. The payload holds the fields that changed, " +
+	"team.updated": {description: "A team was updated. `data` holds the fields that changed, " +
 		"with their new values."},
 	"team.deactivated": {description: "A team was deactivated."},
 
 	"auth.token.issued": {description: "A token was issued."},
 	"auth.token.revoked": {description: "A token was revoked. Deleting a session revokes its tokens too. " +
-		"Those events carry the session's `session_id` and no `entity_id`."},
+		"Those events have an `entity.id` of `null`; the session's ID is `session_id` of the event that " +
+		"`getEvent` (`GET /events/{id}`) returns."},
 
 	"session.established": {description: "A session was established, by a sign-in or by exchanging a session."},
 	"session.deleted":     {description: "A session was revoked."},
@@ -192,8 +185,8 @@ var webhookByEventType = map[string]webhookDoc{
 
 	"policy.created": {description: "A project published the first revision of its policy for an operation. " +
 		"A policy guards an operation, such as setting a password."},
-	"policy.updated": {description: "A project published a new revision of its policy for an operation. The " +
-		"payload holds the new revision and its settings."},
+	"policy.updated": {description: "A project published a new revision of its policy for an operation. " +
+		"`data` holds the new revision and its settings."},
 
 	"release.created": {description: "A release was created. A [release](/docs/concepts/repo-config) is an immutable " +
 		"build of the project's configuration, which a deployment makes live."},
@@ -204,7 +197,7 @@ var webhookByEventType = map[string]webhookDoc{
 		"revision, the name when it changed, and the clients the revision added."},
 
 	"idp.created": {description: "An identity provider (IdP) connection was created."},
-	"idp.updated": {description: "An IdP connection was revised. The payload holds the new " +
+	"idp.updated": {description: "An IdP connection was revised. `data` holds the new " +
 		"revision and the fields that changed."},
 
 	"idp.identity_link.created": {description: "A user was created by a sign-in through an identity provider (SSO) " +
@@ -213,9 +206,9 @@ var webhookByEventType = map[string]webhookDoc{
 	"deployment.created": {description: "A release was deployed, or a deployment rolled back. One event " +
 		"per deployment, however many targets it has. A deployment makes a release live on a set of origins."},
 
-	"origin.added": {description: "An origin was added to a project. The payload holds its `pattern` " +
+	"origin.added": {description: "An origin was added to a project. `data` holds its `pattern` " +
 		"and its `kind`, `primary` or `preview`."},
-	"origin.removed": {description: "An origin was removed from a project. The payload holds its `pattern` " +
+	"origin.removed": {description: "An origin was removed from a project. `data` holds its `pattern` " +
 		"and its `kind`, `primary` or `preview`."},
 
 	"variable.set": {description: "A variable was given a value, new or replacing one. One event per kind " +
@@ -228,8 +221,9 @@ var webhookByEventType = map[string]webhookDoc{
 	"authz.revoked": {description: "A role on a project was revoked."},
 
 	"invitation.created": {description: "An invitation was created, new or as the replacement of another."},
-	"invitation.accepted": {description: "An invitation was accepted. Grant events the acceptance writes " +
-		"carry this event's `request_id`; there are none when the user already holds an identical active grant.",
+	"invitation.accepted": {description: "An invitation was accepted. The grant events the acceptance writes " +
+		"share its `request_id`, which is on the event that `getEvent` (`GET /events/{id}`) returns; there are " +
+		"none when the user already holds an identical active grant.",
 		status: statusContracted},
 	"invitation.rejected": {description: "An invitation was declined.", status: statusContracted},
 	"invitation.cancelled": {description: "A pending invitation was cancelled by an administrator, " +
@@ -250,8 +244,6 @@ func main() {
 	outDir := filepath.Join(generatorDir, "../../openapi/endpoints/events")
 	typesDir := filepath.Join(outDir, "types")
 	payloadsDir := filepath.Join(outDir, "payloads")
-	webhooksDir := filepath.Join(outDir, "webhooks")
-	specPath := filepath.Join(generatorDir, "../../openapi/openapi-spec.yaml")
 
 	eventTypes, err := extractEventTypes(domainEventPath)
 	if err != nil {
@@ -264,10 +256,6 @@ func main() {
 	}
 	if err := validateWebhookDocs(eventTypes); err != nil {
 		fmt.Fprintf(os.Stderr, "webhook map: %v\n", err)
-		os.Exit(1)
-	}
-	if err := checkSpecWebhooks(specPath, eventTypes); err != nil {
-		fmt.Fprintf(os.Stderr, "spec webhooks: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -316,12 +304,13 @@ allOf:
 		os.Exit(1)
 	}
 
-	if err := writeWebhooks(webhooksDir, eventTypes); err != nil {
-		fmt.Fprintf(os.Stderr, "write webhooks: %v\n", err)
+	path := filepath.Join(outDir, webhookEventFile)
+	if err := os.WriteFile(path, []byte(webhookEventYAML(eventTypes)), 0o644); err != nil {
+		fmt.Fprintf(os.Stderr, "write %s: %v\n", path, err)
 		os.Exit(1)
 	}
 
-	fmt.Printf("✅ Generated %d event type schemas and webhooks in %s\n", len(eventTypes), outDir)
+	fmt.Printf("✅ Generated %d event type schemas and the webhook body in %s\n", len(eventTypes), outDir)
 }
 
 func validateMappings(eventTypes []string, payloadsDir string) error {
@@ -364,49 +353,6 @@ func validateWebhookDocs(eventTypes []string) error {
 	return nil
 }
 
-// checkSpecWebhooks reports where the webhooks the spec root lists differ from
-// the domain's event types. The root is written by hand, like its paths, so a
-// new event type needs its entry there as well as the file generated here.
-func checkSpecWebhooks(specPath string, eventTypes []string) error {
-	raw, err := os.ReadFile(specPath)
-	if err != nil {
-		return err
-	}
-	var spec struct {
-		Webhooks map[string]struct {
-			Ref string `yaml:"$ref"`
-		} `yaml:"webhooks"`
-	}
-	if err := yaml.Unmarshal(raw, &spec); err != nil {
-		return fmt.Errorf("parse %s: %w", specPath, err)
-	}
-
-	known := make(map[string]struct{}, len(eventTypes))
-	var problems []string
-	for _, et := range eventTypes {
-		known[et] = struct{}{}
-		want := webhookRef(et)
-		listed, ok := spec.Webhooks[et]
-		switch {
-		case !ok:
-			problems = append(problems, fmt.Sprintf("missing %s, with $ref: %s", et, want))
-		case listed.Ref != want:
-			problems = append(problems, fmt.Sprintf("%s has $ref: %s, want %s", et, listed.Ref, want))
-		}
-	}
-	for name := range spec.Webhooks {
-		if _, ok := known[name]; !ok {
-			problems = append(problems, fmt.Sprintf("%s is not a domain event type", name))
-		}
-	}
-	if len(problems) == 0 {
-		return nil
-	}
-	sort.Strings(problems)
-	return fmt.Errorf("%s does not list one webhook per event type:\n  %s",
-		specPath, strings.Join(problems, "\n  "))
-}
-
 func writeEventUnion(outDir string, eventTypes []string) error {
 	var buf bytes.Buffer
 	buf.WriteString(`# Code generated by gen_event_schemas; DO NOT EDIT.
@@ -429,93 +375,63 @@ oneOf:
 	return os.WriteFile(filepath.Join(outDir, "event.yaml"), buf.Bytes(), 0o644)
 }
 
-// writeWebhooks writes one webhook per event type: the request the shipper
-// sends a webhook sink to deliver an event of that type.
-func writeWebhooks(webhooksDir string, eventTypes []string) error {
-	if err := os.MkdirAll(webhooksDir, 0o755); err != nil {
-		return err
-	}
-	// Remove previously generated webhooks so renames/deletes stay clean.
-	if err := removeYAMLFiles(webhooksDir); err != nil {
-		return err
-	}
-	for _, et := range eventTypes {
-		path := filepath.Join(webhooksDir, webhookFileName(et))
-		if err := os.WriteFile(path, []byte(webhookYAML(et, webhookByEventType[et])), 0o644); err != nil {
-			return err
-		}
-	}
-	return nil
-}
+// webhookEventFile is the generated body of the webhook, beside the
+// hand-written webhook-event-base.yaml its members extend.
+const webhookEventFile = "webhook-event.yaml"
 
-func webhookYAML(et string, doc webhookDoc) string {
-	paragraphs := []string{doc.description}
-	switch doc.status {
-	case statusRetired:
-		paragraphs = append(paragraphs, "Retired: nothing sends this event any more. It stays in the API so "+
-			"stored events still decode.")
-	case statusContracted:
-		paragraphs = append(paragraphs, "Not sent yet: the contract is published ahead of the code that "+
-			"sends it.")
-	}
-	paragraphs = append(paragraphs, "The body is the event as `GET /events` returns it.")
-
+// webhookEventYAML is the WebhookEvent union: per event type, the envelope
+// with `type` fixed to it and `data` its payload. A member's title is what the
+// API reference lists in its selector, and its description what it shows once
+// the member is selected.
+func webhookEventYAML(eventTypes []string) string {
 	var buf bytes.Buffer
-	fmt.Fprintf(&buf, `# Code generated by gen_event_schemas; DO NOT EDIT.
-post:
-  operationId: %s
-  summary: %s
-  description: |
-`, webhookOperationID(et), et)
-	for i, paragraph := range paragraphs {
-		if i > 0 {
-			buf.WriteString("\n")
+	buf.WriteString(`# Code generated by gen_event_schemas; DO NOT EDIT.
+title: WebhookEvent
+description: |
+  An event as a project's webhook receives it. Read type to tell which
+  event type it is; each type carries its own data.
+oneOf:
+`)
+	for _, et := range eventTypes {
+		doc := webhookByEventType[et]
+		paragraphs := []string{doc.description}
+		switch doc.status {
+		case statusRetired:
+			paragraphs = append(paragraphs, "Retired: nothing sends this event any more. It stays in the API so "+
+				"stored events still decode.")
+		case statusContracted:
+			paragraphs = append(paragraphs, "Not sent yet: the contract is published ahead of the code that "+
+				"sends it.")
 		}
-		for _, line := range wrapText(paragraph, 72) {
-			fmt.Fprintf(&buf, "    %s\n", line)
+
+		fmt.Fprintf(&buf, "  - title: %s\n    description: |\n", et)
+		for i, paragraph := range paragraphs {
+			if i > 0 {
+				buf.WriteString("\n")
+			}
+			for _, line := range wrapText(paragraph, 70) {
+				fmt.Fprintf(&buf, "      %s\n", line)
+			}
 		}
+		if doc.status == statusRetired {
+			buf.WriteString("    deprecated: true\n")
+		}
+		fmt.Fprintf(&buf, `    allOf:
+      - $ref: webhook-event-base.yaml
+      - type: object
+        required:
+          - type
+          - data
+        properties:
+          type:
+            type: string
+            const: %s
+          data:
+            $ref: payloads/%s
+`, et, payloadByEventType[et])
 	}
-	fmt.Fprintf(&buf, "  tags:\n    - %s\n", webhookTag)
-	if doc.status == statusRetired {
-		buf.WriteString("  deprecated: true\n")
-	}
-	// The shipper sends no credentials and signs nothing.
-	fmt.Fprintf(&buf, `  security: []
-  requestBody:
-    required: true
-    content:
-      application/json:
-        schema:
-          $ref: ../types/%s.yaml
-  responses:
-    '2XX':
-      $ref: ../webhook-delivered.yaml
-    default:
-      $ref: ../webhook-not-delivered.yaml
-`, eventTypeSlug(et))
+	buf.WriteString("discriminator:\n  propertyName: type\n")
 	return buf.String()
-}
-
-// webhookRef is the $ref by which the spec root lists an event type's webhook.
-func webhookRef(et string) string {
-	return "endpoints/events/webhooks/" + webhookFileName(et)
-}
-
-func webhookFileName(et string) string {
-	return strings.ReplaceAll(et, ".", "-") + ".yaml"
-}
-
-// webhookOperationID writes the event type the way the API's operation ids
-// are written: auth.attempt.handed_off is authAttemptHandedOff.
-func webhookOperationID(et string) string {
-	var b strings.Builder
-	for i, part := range strings.FieldsFunc(et, func(r rune) bool { return r == '.' || r == '_' }) {
-		if i > 0 {
-			part = strings.ToUpper(part[:1]) + part[1:]
-		}
-		b.WriteString(part)
-	}
-	return b.String()
 }
 
 // wrapText breaks s at spaces into lines of at most width bytes, unless a

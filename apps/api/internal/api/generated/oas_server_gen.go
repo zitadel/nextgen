@@ -520,6 +520,38 @@ type Handler interface {
 	//
 	// POST /users
 	CreateUser(ctx context.Context, req *CreateUserRequest, params CreateUserParams) (CreateUserRes, error)
+	// CreateWebhook implements createWebhook operation.
+	//
+	// Creates a webhook for the project in `project_id` and returns it with its signing secret.
+	//
+	// The server then POSTs each of the project's events whose type is in `event_types` to `url`, one
+	// event per request, signed with the secret. Delivery starts with the events stored after this call: a
+	// new webhook gets no history. A project that is not claimed yet delivers nothing until the [claim]
+	// succeeds.
+	//
+	// The server refuses a body that breaks one of these rules:
+	//
+	//  - `url` is `https`, at most 2048 characters, and carries no user info.
+	//  - `event_types` holds at least one entry and no entry twice. Each entry is an event type the server
+	//    writes, or `*`, and `*` stands alone.
+	//  - A project holds at most 10 webhooks. One more answers `409` `webhook.limit_reached`: delete one
+	//    with `deleteWebhook` (`DELETE /webhooks/{id}`) first. Two webhooks may name the same `url`.
+	//
+	// The `secret` appears only in this response. Store it where the endpoint can read it, and verify each
+	// request with it.
+	//
+	// To recover from a lost response, send `Idempotency-Key` and repeat the request with the same key: it
+	// returns the first response, `secret` included, and creates nothing. Without the key, a repeated
+	// request creates a second webhook. Then find both with `listWebhooks` (`GET /webhooks`), delete one,
+	// and issue a secret for the other with `rotateWebhookSecret` (`POST /webhooks/{id}/rotate_secret`).
+	//
+	// Authenticate with a project secret (`oauth2`), or with the session cookie (`sessionCookie`) of a
+	// signed-in person who can change the project. Cookie requests follow that scheme's CSRF rules.
+	//
+	// [claim]: /docs/concepts/project-team-user#claim
+	//
+	// POST /webhooks
+	CreateWebhook(ctx context.Context, req *CreateWebhookRequest, params CreateWebhookParams) (CreateWebhookRes, error)
 	// DeleteGrant implements deleteGrant operation.
 	//
 	// Revokes a grant this API manages and emits `authz.revoked`.
@@ -573,6 +605,19 @@ type Handler interface {
 	//
 	// DELETE /variables/{variable_name}
 	DeleteVariable(ctx context.Context, params DeleteVariableParams) (DeleteVariableRes, error)
+	// DeleteWebhook implements deleteWebhook operation.
+	//
+	// Deletes a webhook. The server stops sending it events, including those it had not yet delivered, and
+	// its signing secret stops being valid.
+	//
+	// This cannot be undone. To stop delivery and keep the webhook, send `enabled: false` to
+	// `updateWebhook` (`PATCH /webhooks/{id}`) instead.
+	//
+	// Authenticate with a project secret (`oauth2`), or with the session cookie (`sessionCookie`) of a
+	// signed-in person who administers the project. Cookie requests follow that scheme's CSRF rules.
+	//
+	// DELETE /webhooks/{id}
+	DeleteWebhook(ctx context.Context, params DeleteWebhookParams) (DeleteWebhookRes, error)
 	// EvaluatePolicy implements evaluatePolicy operation.
 	//
 	// Evaluates a policy config against one request, without side effects, and answers the decision the
@@ -1031,6 +1076,18 @@ type Handler interface {
 	//
 	// GET /variables
 	GetVariables(ctx context.Context, params GetVariablesParams) (GetVariablesRes, error)
+	// GetWebhook implements getWebhook operation.
+	//
+	// Returns one webhook of the project in `project_id`, with the time of its last delivery and of its
+	// last failed attempt.
+	//
+	// The response never includes the signing secret.
+	//
+	// Authenticate with a project secret (`oauth2`), or with the session cookie (`sessionCookie`) of a
+	// signed-in person who can read the project.
+	//
+	// GET /webhooks/{id}
+	GetWebhook(ctx context.Context, params GetWebhookParams) (GetWebhookRes, error)
 	// InitClaim implements initClaim operation.
 	//
 	// Starts a claim, which attaches a project created before sign-in to a team, and returns the
@@ -1322,6 +1379,20 @@ type Handler interface {
 	//
 	// GET /users/{user_id}/teams
 	ListUserTeams(ctx context.Context, params ListUserTeamsParams) (ListUserTeamsRes, error)
+	// ListWebhooks implements listWebhooks operation.
+	//
+	// Lists the webhooks of the project in `project_id`, newest first by `created_at`, paginated with
+	// `limit` and `page_token`.
+	//
+	// Each webhook carries the time of its last delivery and of its last failed attempt. None carries its
+	// signing secret: only `createWebhook` (`POST /webhooks`) and `rotateWebhookSecret`
+	// (`POST /webhooks/{id}/rotate_secret`) return it.
+	//
+	// Authenticate with a project secret (`oauth2`), or with the session cookie (`sessionCookie`) of a
+	// signed-in person who can read the project.
+	//
+	// GET /webhooks
+	ListWebhooks(ctx context.Context, params ListWebhooksParams) (ListWebhooksRes, error)
 	// LookupInvitation implements lookupInvitation operation.
 	//
 	// Returns a lean view of the invitation for the signed-in accept page: project, role, inviter and
@@ -1595,6 +1666,26 @@ type Handler interface {
 	//
 	// POST /deployments/{deployment_id}/rollback
 	RollbackDeployment(ctx context.Context, req OptRollbackDeploymentRequest, params RollbackDeploymentParams) (RollbackDeploymentRes, error)
+	// RotateWebhookSecret implements rotateWebhookSecret operation.
+	//
+	// Issues a new signing secret for a webhook and returns the webhook with it.
+	//
+	// The `secret` appears only in this response. The previous secret stays valid for 24 hours, until
+	// `previous_secret_expires_at`: during that time every delivery carries two signatures, one per
+	// secret, so the endpoint can switch to the new secret without refusing a request. A second rotation
+	// within those 24 hours drops the older of the two secrets at once.
+	//
+	// To recover from a lost response, send `Idempotency-Key` and repeat the request with the same key: it
+	// returns the first response, `secret` included, and rotates nothing. Without the key, a repeated
+	// request rotates again: the secret of the lost response becomes the previous one, and the secret the
+	// endpoint still verifies with stops being valid at once. Give the endpoint the secret of the second
+	// response right away, since it refuses every delivery until it has it.
+	//
+	// Authenticate with a project secret (`oauth2`), or with the session cookie (`sessionCookie`) of a
+	// signed-in person who can change the project. Cookie requests follow that scheme's CSRF rules.
+	//
+	// POST /webhooks/{id}/rotate_secret
+	RotateWebhookSecret(ctx context.Context, params RotateWebhookSecretParams) (RotateWebhookSecretRes, error)
 	// Search implements search operation.
 	//
 	// Finds the resources of one project, or of the projects a person can act on, that match a text,
@@ -1758,6 +1849,26 @@ type Handler interface {
 	//
 	// PATCH /variables
 	UpdateVariables(ctx context.Context, req UpdateVariablesRequest, params UpdateVariablesParams) (UpdateVariablesRes, error)
+	// UpdateWebhook implements updateWebhook operation.
+	//
+	// Changes a webhook's `url`, `description`, `event_types` or `enabled`, and returns the updated
+	// webhook.
+	//
+	// Fields you leave out keep their value. The body names at least one field: an empty body is refused
+	// with `400`. `url` and `event_types` follow the rules `createWebhook` (`POST /webhooks`) states.
+	//
+	// A new `url` gets the events the old one had not yet acknowledged: the webhook keeps its place in the
+	// project's events. The signing secret stays the same.
+	//
+	// `enabled: false` stops delivery. `enabled: true` starts it again from now, also for a webhook the
+	// server disabled after 3 days of failures or a `410`: events stored while it was disabled are not
+	// sent.
+	//
+	// Authenticate with a project secret (`oauth2`), or with the session cookie (`sessionCookie`) of a
+	// signed-in person who can change the project. Cookie requests follow that scheme's CSRF rules.
+	//
+	// PATCH /webhooks/{id}
+	UpdateWebhook(ctx context.Context, req *UpdateWebhookRequest, params UpdateWebhookParams) (UpdateWebhookRes, error)
 	// VerifyChallengeProof implements verifyChallengeProof operation.
 	//
 	// Verifies a challenge by submitting its proof: the credential, code or assertion for the factor.

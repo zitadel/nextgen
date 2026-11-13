@@ -1,0 +1,65 @@
+---
+title: Webhooks
+description: Create and manage the URLs a project's events are sent to, and rotate a webhook's signing secret.
+---
+
+A webhook is a URL the server sends a project's
+[events](/docs/reference/api/events) to. It names the event types it
+receives, and every request to it is signed with a secret only the webhook's
+owner holds.
+
+These operations are not available yet: each answers `501` with the code
+`not_implemented`. The contract is published ahead of the server code.
+
+## What a webhook receives
+
+The server sends one `POST` per event, in the order the events were stored.
+The body is the same for every event type;
+[Event webhooks](/docs/reference/api/event-webhooks) describes it.
+
+- `event_types` lists the types the webhook receives. The single entry `*`
+  stands for every type except `request.api`. To receive that type, name it.
+- Any `2xx` status acknowledges the event. After any other answer the server
+  sends the event again, and holds back the webhook's later events until
+  then.
+- Delivery is at least once, so an event can arrive twice. Drop duplicates by
+  the `webhook-id` header.
+- A webhook is failing when its `last_error_at` is later than its
+  `last_delivered_at`. After 3 days of failures without a success, or a
+  `410` answer, the server sets `enabled` to `false` and stops sending.
+- A project holds at most 10 webhooks.
+
+## Verify the signature
+
+Each request carries three headers, following
+[Standard Webhooks](https://www.standardwebhooks.com/):
+
+| Header | Value |
+| --- | --- |
+| `webhook-id` | The event's `id`. It is the same on every retry. |
+| `webhook-timestamp` | When this attempt was sent, in seconds since the Unix epoch. |
+| `webhook-signature` | `v1,` followed by the signature in base64. |
+
+To verify a request:
+
+1. Read the body as raw bytes, before parsing it.
+2. Decode the secret: take the part after `whsec_` and decode it from base64.
+3. Compute the HMAC-SHA256 of `{webhook-id}.{webhook-timestamp}.{body}` with
+   the decoded secret as the key, and encode the result in base64.
+4. Compare it with the value after `v1,` in constant time. Refuse the
+   request when they differ.
+5. Refuse a request whose `webhook-timestamp` is more than five minutes from
+   your clock.
+
+A Standard Webhooks library for your language does these steps.
+
+The secret appears only in the responses that create a webhook and rotate
+its secret. For 24 hours after a rotation the header holds two signatures
+separated by a space, one per secret. Accept the request when either
+matches.
+
+Only a project's webhooks are signed. The sinks an operator sets in the
+server's configuration, under `events.export`, are
+[a different thing](/docs/reference/api/event-webhooks#the-operators-export-sink).
+
+<Operations />

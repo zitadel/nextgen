@@ -1,0 +1,93 @@
+title: Webhook
+type: object
+description: |
+  A webhook of a project: a URL the server POSTs the project's events to,
+  and the event types it gets. It never carries the signing secret, which
+  only `createWebhook` (`POST /webhooks`) and `rotateWebhookSecret`
+  (`POST /webhooks/{id}/rotate_secret`) return.
+
+  A webhook is failing when `last_error_at` is later than
+  `last_delivered_at`, or is set while `last_delivered_at` is `null`: its
+  last attempt failed. The server retries, and holds back the webhook's
+  later events until an attempt succeeds. When the endpoint has failed for
+  3 days without a success, or answers `410`, the server sets `enabled` to
+  `false` and stops sending.
+required:
+  - id
+  - project_id
+  - url
+  - description
+  - event_types
+  - enabled
+  - last_delivered_at
+  - last_error_status
+  - last_error_at
+  - previous_secret_expires_at
+  - created_at
+properties:
+  id:
+    $ref: ../../components/schemas/webhook-id.yaml
+  project_id:
+    $ref: ../../components/schemas/project-id.yaml
+  url:
+    $ref: webhook-url.yaml
+  description:
+    type: string
+    description: A note on what the webhook is for. Empty when none was given.
+    example: User sync
+  event_types:
+    $ref: webhook-event-types.yaml
+  enabled:
+    type: boolean
+    description: |
+      Whether the server sends events to the webhook. The server sets it to
+      `false` itself when the endpoint has failed for 3 days without a
+      success, or answers `410`. Set it back to `true` with `updateWebhook`
+      (`PATCH /webhooks/{id}`).
+    example: true
+  last_delivered_at:
+    description: |
+      When the endpoint last acknowledged an event. `null` until the first
+      delivery.
+    oneOf:
+      - type: string
+        format: date-time
+      - type: 'null'
+    example: '2026-11-11T10:00:12Z'
+  last_error_status:
+    description: |
+      The HTTP status the endpoint answered the last failed attempt with.
+      `null` when no attempt has failed, and also when the attempt at
+      `last_error_at` got no response: the connection failed, or the
+      endpoint did not answer within 10 seconds. It is never `0`.
+    oneOf:
+      - type: integer
+        format: int32
+        minimum: 100
+        maximum: 599
+      - type: 'null'
+    example: 503
+  last_error_at:
+    description: |
+      When a delivery attempt last failed. `null` when none has. A later
+      success does not clear it: compare it with `last_delivered_at`.
+    oneOf:
+      - type: string
+        format: date-time
+      - type: 'null'
+    example: '2026-11-10T08:15:00Z'
+  previous_secret_expires_at:
+    description: |
+      Until when deliveries are also signed with the secret that
+      `rotateWebhookSecret` replaced: 24 hours from the rotation. `null`
+      when no rotation is in progress.
+    oneOf:
+      - type: string
+        format: date-time
+      - type: 'null'
+    example: null
+  created_at:
+    type: string
+    format: date-time
+    description: When the webhook was created.
+    example: '2026-11-11T10:00:00Z'

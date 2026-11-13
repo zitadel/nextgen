@@ -541,6 +541,38 @@ type Invoker interface {
 	//
 	// POST /users
 	CreateUser(ctx context.Context, request *CreateUserRequest, params CreateUserParams) (CreateUserRes, error)
+	// CreateWebhook invokes createWebhook operation.
+	//
+	// Creates a webhook for the project in `project_id` and returns it with its signing secret.
+	//
+	// The server then POSTs each of the project's events whose type is in `event_types` to `url`, one
+	// event per request, signed with the secret. Delivery starts with the events stored after this call: a
+	// new webhook gets no history. A project that is not claimed yet delivers nothing until the [claim]
+	// succeeds.
+	//
+	// The server refuses a body that breaks one of these rules:
+	//
+	//  - `url` is `https`, at most 2048 characters, and carries no user info.
+	//  - `event_types` holds at least one entry and no entry twice. Each entry is an event type the server
+	//    writes, or `*`, and `*` stands alone.
+	//  - A project holds at most 10 webhooks. One more answers `409` `webhook.limit_reached`: delete one
+	//    with `deleteWebhook` (`DELETE /webhooks/{id}`) first. Two webhooks may name the same `url`.
+	//
+	// The `secret` appears only in this response. Store it where the endpoint can read it, and verify each
+	// request with it.
+	//
+	// To recover from a lost response, send `Idempotency-Key` and repeat the request with the same key: it
+	// returns the first response, `secret` included, and creates nothing. Without the key, a repeated
+	// request creates a second webhook. Then find both with `listWebhooks` (`GET /webhooks`), delete one,
+	// and issue a secret for the other with `rotateWebhookSecret` (`POST /webhooks/{id}/rotate_secret`).
+	//
+	// Authenticate with a project secret (`oauth2`), or with the session cookie (`sessionCookie`) of a
+	// signed-in person who can change the project. Cookie requests follow that scheme's CSRF rules.
+	//
+	// [claim]: /docs/concepts/project-team-user#claim
+	//
+	// POST /webhooks
+	CreateWebhook(ctx context.Context, request *CreateWebhookRequest, params CreateWebhookParams) (CreateWebhookRes, error)
 	// DeleteGrant invokes deleteGrant operation.
 	//
 	// Revokes a grant this API manages and emits `authz.revoked`.
@@ -594,6 +626,19 @@ type Invoker interface {
 	//
 	// DELETE /variables/{variable_name}
 	DeleteVariable(ctx context.Context, params DeleteVariableParams) (DeleteVariableRes, error)
+	// DeleteWebhook invokes deleteWebhook operation.
+	//
+	// Deletes a webhook. The server stops sending it events, including those it had not yet delivered, and
+	// its signing secret stops being valid.
+	//
+	// This cannot be undone. To stop delivery and keep the webhook, send `enabled: false` to
+	// `updateWebhook` (`PATCH /webhooks/{id}`) instead.
+	//
+	// Authenticate with a project secret (`oauth2`), or with the session cookie (`sessionCookie`) of a
+	// signed-in person who administers the project. Cookie requests follow that scheme's CSRF rules.
+	//
+	// DELETE /webhooks/{id}
+	DeleteWebhook(ctx context.Context, params DeleteWebhookParams) (DeleteWebhookRes, error)
 	// EvaluatePolicy invokes evaluatePolicy operation.
 	//
 	// Evaluates a policy config against one request, without side effects, and answers the decision the
@@ -1052,6 +1097,18 @@ type Invoker interface {
 	//
 	// GET /variables
 	GetVariables(ctx context.Context, params GetVariablesParams) (GetVariablesRes, error)
+	// GetWebhook invokes getWebhook operation.
+	//
+	// Returns one webhook of the project in `project_id`, with the time of its last delivery and of its
+	// last failed attempt.
+	//
+	// The response never includes the signing secret.
+	//
+	// Authenticate with a project secret (`oauth2`), or with the session cookie (`sessionCookie`) of a
+	// signed-in person who can read the project.
+	//
+	// GET /webhooks/{id}
+	GetWebhook(ctx context.Context, params GetWebhookParams) (GetWebhookRes, error)
 	// InitClaim invokes initClaim operation.
 	//
 	// Starts a claim, which attaches a project created before sign-in to a team, and returns the
@@ -1343,6 +1400,20 @@ type Invoker interface {
 	//
 	// GET /users/{user_id}/teams
 	ListUserTeams(ctx context.Context, params ListUserTeamsParams) (ListUserTeamsRes, error)
+	// ListWebhooks invokes listWebhooks operation.
+	//
+	// Lists the webhooks of the project in `project_id`, newest first by `created_at`, paginated with
+	// `limit` and `page_token`.
+	//
+	// Each webhook carries the time of its last delivery and of its last failed attempt. None carries its
+	// signing secret: only `createWebhook` (`POST /webhooks`) and `rotateWebhookSecret`
+	// (`POST /webhooks/{id}/rotate_secret`) return it.
+	//
+	// Authenticate with a project secret (`oauth2`), or with the session cookie (`sessionCookie`) of a
+	// signed-in person who can read the project.
+	//
+	// GET /webhooks
+	ListWebhooks(ctx context.Context, params ListWebhooksParams) (ListWebhooksRes, error)
 	// LookupInvitation invokes lookupInvitation operation.
 	//
 	// Returns a lean view of the invitation for the signed-in accept page: project, role, inviter and
@@ -1616,6 +1687,26 @@ type Invoker interface {
 	//
 	// POST /deployments/{deployment_id}/rollback
 	RollbackDeployment(ctx context.Context, request OptRollbackDeploymentRequest, params RollbackDeploymentParams) (RollbackDeploymentRes, error)
+	// RotateWebhookSecret invokes rotateWebhookSecret operation.
+	//
+	// Issues a new signing secret for a webhook and returns the webhook with it.
+	//
+	// The `secret` appears only in this response. The previous secret stays valid for 24 hours, until
+	// `previous_secret_expires_at`: during that time every delivery carries two signatures, one per
+	// secret, so the endpoint can switch to the new secret without refusing a request. A second rotation
+	// within those 24 hours drops the older of the two secrets at once.
+	//
+	// To recover from a lost response, send `Idempotency-Key` and repeat the request with the same key: it
+	// returns the first response, `secret` included, and rotates nothing. Without the key, a repeated
+	// request rotates again: the secret of the lost response becomes the previous one, and the secret the
+	// endpoint still verifies with stops being valid at once. Give the endpoint the secret of the second
+	// response right away, since it refuses every delivery until it has it.
+	//
+	// Authenticate with a project secret (`oauth2`), or with the session cookie (`sessionCookie`) of a
+	// signed-in person who can change the project. Cookie requests follow that scheme's CSRF rules.
+	//
+	// POST /webhooks/{id}/rotate_secret
+	RotateWebhookSecret(ctx context.Context, params RotateWebhookSecretParams) (RotateWebhookSecretRes, error)
 	// Search invokes search operation.
 	//
 	// Finds the resources of one project, or of the projects a person can act on, that match a text,
@@ -1779,6 +1870,26 @@ type Invoker interface {
 	//
 	// PATCH /variables
 	UpdateVariables(ctx context.Context, request UpdateVariablesRequest, params UpdateVariablesParams) (UpdateVariablesRes, error)
+	// UpdateWebhook invokes updateWebhook operation.
+	//
+	// Changes a webhook's `url`, `description`, `event_types` or `enabled`, and returns the updated
+	// webhook.
+	//
+	// Fields you leave out keep their value. The body names at least one field: an empty body is refused
+	// with `400`. `url` and `event_types` follow the rules `createWebhook` (`POST /webhooks`) states.
+	//
+	// A new `url` gets the events the old one had not yet acknowledged: the webhook keeps its place in the
+	// project's events. The signing secret stays the same.
+	//
+	// `enabled: false` stops delivery. `enabled: true` starts it again from now, also for a webhook the
+	// server disabled after 3 days of failures or a `410`: events stored while it was disabled are not
+	// sent.
+	//
+	// Authenticate with a project secret (`oauth2`), or with the session cookie (`sessionCookie`) of a
+	// signed-in person who can change the project. Cookie requests follow that scheme's CSRF rules.
+	//
+	// PATCH /webhooks/{id}
+	UpdateWebhook(ctx context.Context, request *UpdateWebhookRequest, params UpdateWebhookParams) (UpdateWebhookRes, error)
 	// VerifyChallengeProof invokes verifyChallengeProof operation.
 	//
 	// Verifies a challenge by submitting its proof: the credential, code or assertion for the factor.
@@ -5418,6 +5529,207 @@ func (c *Client) sendCreateUser(ctx context.Context, request *CreateUserRequest,
 	return result, nil
 }
 
+// CreateWebhook invokes createWebhook operation.
+//
+// Creates a webhook for the project in `project_id` and returns it with its signing secret.
+//
+// The server then POSTs each of the project's events whose type is in `event_types` to `url`, one
+// event per request, signed with the secret. Delivery starts with the events stored after this call: a
+// new webhook gets no history. A project that is not claimed yet delivers nothing until the [claim]
+// succeeds.
+//
+// The server refuses a body that breaks one of these rules:
+//
+//   - `url` is `https`, at most 2048 characters, and carries no user info.
+//   - `event_types` holds at least one entry and no entry twice. Each entry is an event type the server
+//     writes, or `*`, and `*` stands alone.
+//   - A project holds at most 10 webhooks. One more answers `409` `webhook.limit_reached`: delete one
+//     with `deleteWebhook` (`DELETE /webhooks/{id}`) first. Two webhooks may name the same `url`.
+//
+// The `secret` appears only in this response. Store it where the endpoint can read it, and verify each
+// request with it.
+//
+// To recover from a lost response, send `Idempotency-Key` and repeat the request with the same key: it
+// returns the first response, `secret` included, and creates nothing. Without the key, a repeated
+// request creates a second webhook. Then find both with `listWebhooks` (`GET /webhooks`), delete one,
+// and issue a secret for the other with `rotateWebhookSecret` (`POST /webhooks/{id}/rotate_secret`).
+//
+// Authenticate with a project secret (`oauth2`), or with the session cookie (`sessionCookie`) of a
+// signed-in person who can change the project. Cookie requests follow that scheme's CSRF rules.
+//
+// [claim]: /docs/concepts/project-team-user#claim
+//
+// POST /webhooks
+func (c *Client) CreateWebhook(ctx context.Context, request *CreateWebhookRequest, params CreateWebhookParams) (CreateWebhookRes, error) {
+	res, err := c.sendCreateWebhook(ctx, request, params)
+	return res, err
+}
+
+func (c *Client) sendCreateWebhook(ctx context.Context, request *CreateWebhookRequest, params CreateWebhookParams) (res CreateWebhookRes, err error) {
+	// Validate request before sending.
+	if err := func() error {
+		if err := request.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return res, errors.Wrap(err, "validate")
+	}
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("createWebhook"),
+		semconv.HTTPRequestMethodKey.String("POST"),
+		semconv.URLTemplateKey.String("/webhooks"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, CreateWebhookOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [1]string
+	pathParts[0] = "/webhooks"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "POST", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+	if err := encodeCreateWebhookRequest(request, r); err != nil {
+		return res, errors.Wrap(err, "encode request")
+	}
+
+	stage = "EncodeHeaderParams"
+	h := uri.NewHeaderEncoder(r.Header)
+	{
+		cfg := uri.HeaderParameterEncodingConfig{
+			Name:    "Idempotency-Key",
+			Explode: false,
+		}
+		if err := h.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.IdempotencyKey.Get(); ok {
+				return e.EncodeValue(conv.StringToString(val))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode header")
+		}
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, CreateWebhookOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+		{
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, CreateWebhookOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+				{0b00000010},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
+
+	stage = "DecodeResponse"
+	result, err := decodeCreateWebhookResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
 // DeleteGrant invokes deleteGrant operation.
 //
 // Revokes a grant this API manages and emits `authz.revoked`.
@@ -6056,6 +6368,180 @@ func (c *Client) sendDeleteVariable(ctx context.Context, params DeleteVariablePa
 
 	stage = "DecodeResponse"
 	result, err := decodeDeleteVariableResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// DeleteWebhook invokes deleteWebhook operation.
+//
+// Deletes a webhook. The server stops sending it events, including those it had not yet delivered, and
+// its signing secret stops being valid.
+//
+// This cannot be undone. To stop delivery and keep the webhook, send `enabled: false` to
+// `updateWebhook` (`PATCH /webhooks/{id}`) instead.
+//
+// Authenticate with a project secret (`oauth2`), or with the session cookie (`sessionCookie`) of a
+// signed-in person who administers the project. Cookie requests follow that scheme's CSRF rules.
+//
+// DELETE /webhooks/{id}
+func (c *Client) DeleteWebhook(ctx context.Context, params DeleteWebhookParams) (DeleteWebhookRes, error) {
+	res, err := c.sendDeleteWebhook(ctx, params)
+	return res, err
+}
+
+func (c *Client) sendDeleteWebhook(ctx context.Context, params DeleteWebhookParams) (res DeleteWebhookRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("deleteWebhook"),
+		semconv.HTTPRequestMethodKey.String("DELETE"),
+		semconv.URLTemplateKey.String("/webhooks/{id}"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, DeleteWebhookOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [2]string
+	pathParts[0] = "/webhooks/"
+	{
+		// Encode "id" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "id",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			if unwrapped := string(params.ID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "DELETE", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, DeleteWebhookOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+		{
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, DeleteWebhookOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+				{0b00000010},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
+
+	stage = "DecodeResponse"
+	result, err := decodeDeleteWebhookResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}
@@ -11676,6 +12162,179 @@ func (c *Client) sendGetVariables(ctx context.Context, params GetVariablesParams
 	return result, nil
 }
 
+// GetWebhook invokes getWebhook operation.
+//
+// Returns one webhook of the project in `project_id`, with the time of its last delivery and of its
+// last failed attempt.
+//
+// The response never includes the signing secret.
+//
+// Authenticate with a project secret (`oauth2`), or with the session cookie (`sessionCookie`) of a
+// signed-in person who can read the project.
+//
+// GET /webhooks/{id}
+func (c *Client) GetWebhook(ctx context.Context, params GetWebhookParams) (GetWebhookRes, error) {
+	res, err := c.sendGetWebhook(ctx, params)
+	return res, err
+}
+
+func (c *Client) sendGetWebhook(ctx context.Context, params GetWebhookParams) (res GetWebhookRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("getWebhook"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.URLTemplateKey.String("/webhooks/{id}"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, GetWebhookOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [2]string
+	pathParts[0] = "/webhooks/"
+	{
+		// Encode "id" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "id",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			if unwrapped := string(params.ID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "GET", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, GetWebhookOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+		{
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, GetWebhookOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+				{0b00000010},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
+
+	stage = "DecodeResponse"
+	result, err := decodeGetWebhookResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
 // InitClaim invokes initClaim operation.
 //
 // Starts a claim, which attaches a project created before sign-in to a team, and returns the
@@ -16287,6 +16946,200 @@ func (c *Client) sendListUserTeams(ctx context.Context, params ListUserTeamsPara
 	return result, nil
 }
 
+// ListWebhooks invokes listWebhooks operation.
+//
+// Lists the webhooks of the project in `project_id`, newest first by `created_at`, paginated with
+// `limit` and `page_token`.
+//
+// Each webhook carries the time of its last delivery and of its last failed attempt. None carries its
+// signing secret: only `createWebhook` (`POST /webhooks`) and `rotateWebhookSecret`
+// (`POST /webhooks/{id}/rotate_secret`) return it.
+//
+// Authenticate with a project secret (`oauth2`), or with the session cookie (`sessionCookie`) of a
+// signed-in person who can read the project.
+//
+// GET /webhooks
+func (c *Client) ListWebhooks(ctx context.Context, params ListWebhooksParams) (ListWebhooksRes, error) {
+	res, err := c.sendListWebhooks(ctx, params)
+	return res, err
+}
+
+func (c *Client) sendListWebhooks(ctx context.Context, params ListWebhooksParams) (res ListWebhooksRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("listWebhooks"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.URLTemplateKey.String("/webhooks"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, ListWebhooksOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [1]string
+	pathParts[0] = "/webhooks"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "limit" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "limit",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.Limit.Get(); ok {
+				if unwrapped := int(val); true {
+					return e.EncodeValue(conv.IntToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "page_token" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "page_token",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.PageToken.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "GET", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, ListWebhooksOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+		{
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, ListWebhooksOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+				{0b00000010},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
+
+	stage = "DecodeResponse"
+	result, err := decodeListWebhooksResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
 // LookupInvitation invokes lookupInvitation operation.
 //
 // Returns a lean view of the invitation for the signed-in accept page: project, role, inviter and
@@ -19145,6 +19998,205 @@ func (c *Client) sendRollbackDeployment(ctx context.Context, request OptRollback
 	return result, nil
 }
 
+// RotateWebhookSecret invokes rotateWebhookSecret operation.
+//
+// Issues a new signing secret for a webhook and returns the webhook with it.
+//
+// The `secret` appears only in this response. The previous secret stays valid for 24 hours, until
+// `previous_secret_expires_at`: during that time every delivery carries two signatures, one per
+// secret, so the endpoint can switch to the new secret without refusing a request. A second rotation
+// within those 24 hours drops the older of the two secrets at once.
+//
+// To recover from a lost response, send `Idempotency-Key` and repeat the request with the same key: it
+// returns the first response, `secret` included, and rotates nothing. Without the key, a repeated
+// request rotates again: the secret of the lost response becomes the previous one, and the secret the
+// endpoint still verifies with stops being valid at once. Give the endpoint the secret of the second
+// response right away, since it refuses every delivery until it has it.
+//
+// Authenticate with a project secret (`oauth2`), or with the session cookie (`sessionCookie`) of a
+// signed-in person who can change the project. Cookie requests follow that scheme's CSRF rules.
+//
+// POST /webhooks/{id}/rotate_secret
+func (c *Client) RotateWebhookSecret(ctx context.Context, params RotateWebhookSecretParams) (RotateWebhookSecretRes, error) {
+	res, err := c.sendRotateWebhookSecret(ctx, params)
+	return res, err
+}
+
+func (c *Client) sendRotateWebhookSecret(ctx context.Context, params RotateWebhookSecretParams) (res RotateWebhookSecretRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("rotateWebhookSecret"),
+		semconv.HTTPRequestMethodKey.String("POST"),
+		semconv.URLTemplateKey.String("/webhooks/{id}/rotate_secret"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, RotateWebhookSecretOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [3]string
+	pathParts[0] = "/webhooks/"
+	{
+		// Encode "id" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "id",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			if unwrapped := string(params.ID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	pathParts[2] = "/rotate_secret"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "POST", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	stage = "EncodeHeaderParams"
+	h := uri.NewHeaderEncoder(r.Header)
+	{
+		cfg := uri.HeaderParameterEncodingConfig{
+			Name:    "Idempotency-Key",
+			Explode: false,
+		}
+		if err := h.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.IdempotencyKey.Get(); ok {
+				return e.EncodeValue(conv.StringToString(val))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode header")
+		}
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, RotateWebhookSecretOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+		{
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, RotateWebhookSecretOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+				{0b00000010},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
+
+	stage = "DecodeResponse"
+	result, err := decodeRotateWebhookSecretResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
 // Search invokes search operation.
 //
 // Finds the resources of one project, or of the projects a person can act on, that match a text,
@@ -20052,6 +21104,199 @@ func (c *Client) sendUpdateVariables(ctx context.Context, request UpdateVariable
 
 	stage = "DecodeResponse"
 	result, err := decodeUpdateVariablesResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// UpdateWebhook invokes updateWebhook operation.
+//
+// Changes a webhook's `url`, `description`, `event_types` or `enabled`, and returns the updated
+// webhook.
+//
+// Fields you leave out keep their value. The body names at least one field: an empty body is refused
+// with `400`. `url` and `event_types` follow the rules `createWebhook` (`POST /webhooks`) states.
+//
+// A new `url` gets the events the old one had not yet acknowledged: the webhook keeps its place in the
+// project's events. The signing secret stays the same.
+//
+// `enabled: false` stops delivery. `enabled: true` starts it again from now, also for a webhook the
+// server disabled after 3 days of failures or a `410`: events stored while it was disabled are not
+// sent.
+//
+// Authenticate with a project secret (`oauth2`), or with the session cookie (`sessionCookie`) of a
+// signed-in person who can change the project. Cookie requests follow that scheme's CSRF rules.
+//
+// PATCH /webhooks/{id}
+func (c *Client) UpdateWebhook(ctx context.Context, request *UpdateWebhookRequest, params UpdateWebhookParams) (UpdateWebhookRes, error) {
+	res, err := c.sendUpdateWebhook(ctx, request, params)
+	return res, err
+}
+
+func (c *Client) sendUpdateWebhook(ctx context.Context, request *UpdateWebhookRequest, params UpdateWebhookParams) (res UpdateWebhookRes, err error) {
+	// Validate request before sending.
+	if err := func() error {
+		if err := request.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return res, errors.Wrap(err, "validate")
+	}
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("updateWebhook"),
+		semconv.HTTPRequestMethodKey.String("PATCH"),
+		semconv.URLTemplateKey.String("/webhooks/{id}"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, UpdateWebhookOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [2]string
+	pathParts[0] = "/webhooks/"
+	{
+		// Encode "id" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "id",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			if unwrapped := string(params.ID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "PATCH", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+	if err := encodeUpdateWebhookRequest(request, r); err != nil {
+		return res, errors.Wrap(err, "encode request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, UpdateWebhookOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+		{
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, UpdateWebhookOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+				{0b00000010},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer func() {
+		// Drain the body to EOF before closing, so the underlying
+		// connection can be reused by the Transport regardless of the
+		// response status code. See https://github.com/ogen-go/ogen/issues/1670.
+		_, _ = io.Copy(io.Discard, body)
+		_ = body.Close()
+	}()
+
+	stage = "DecodeResponse"
+	result, err := decodeUpdateWebhookResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}

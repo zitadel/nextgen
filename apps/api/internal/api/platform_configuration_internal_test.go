@@ -37,6 +37,7 @@ var platformConfigurationAccess = map[string]resourceAccess{
 	"releaseAccess":        releaseAccess,
 	"schemaAccess":         schemaAccess,
 	"variableAccess":       variableAccess,
+	"webhookAccess":        webhookAccess,
 }
 
 // The resources that say who may use the platform, what they hold, and its
@@ -80,6 +81,7 @@ var platformAdminOnlyOperations = []string{
 	"CreateRelease", "BuildRelease", "RevokeRelease",
 	"CreateSchema",
 	"UpdateVariables", "DeleteVariable",
+	"CreateWebhook", "UpdateWebhook", "RotateWebhookSecret",
 }
 
 // declaredResourceAccess reads the package for every resourceAccess it

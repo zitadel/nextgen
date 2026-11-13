@@ -378,6 +378,11 @@ func TestRequireProjectAccess(t *testing.T) {
 			readMiss: domain.ErrInvitationNotFound().Code, writeMiss: domain.ErrInvitationNotFound().Code,
 			denied: domain.ErrInvitationPermissionDenied().Code,
 		},
+		{
+			name: "webhooks", res: webhookAccess,
+			readMiss: domain.ErrWebhookNotFound().Code, writeMiss: domain.ErrWebhookNotFound().Code,
+			denied: domain.ErrWebhookPermissionDenied().Code,
+		},
 	}
 
 	for _, res := range resources {

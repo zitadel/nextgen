@@ -1,0 +1,23 @@
+title: UpdateWebhookRequest
+type: object
+description: |
+  The fields of the webhook to change. A field you leave out keeps its
+  value. The body names at least one field.
+additionalProperties: false
+minProperties: 1
+properties:
+  url:
+    $ref: ../webhook-url.yaml
+  description:
+    type: string
+    description: A note on what the webhook is for. Send `""` to remove it.
+    example: User sync
+  event_types:
+    $ref: ../webhook-event-types.yaml
+  enabled:
+    type: boolean
+    description: |
+      Whether the server sends events to the webhook. `false` stops
+      delivery. `true` starts it again from now: events stored while the
+      webhook was disabled are not sent.
+    example: true

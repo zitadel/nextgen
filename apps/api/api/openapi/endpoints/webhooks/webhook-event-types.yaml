@@ -1,0 +1,27 @@
+title: WebhookEventTypes
+type: array
+description: |
+  The event types the webhook receives. An event of a type that is not
+  listed is not sent. The list holds at least one entry, and no entry twice.
+
+  Each entry is an event type as `listEvents` (`GET /events`) filters by it,
+  such as `user.created`; the
+  [event webhook](/docs/reference/api/event-webhooks/eventStored) lists
+  them, in its request body. When a
+  webhook is created or updated, the server refuses a type it does not
+  write with `400` `webhook.invalid`. A type it stops writing later stays in
+  the list and matches nothing.
+
+  The entry `*` stands for every type, those added later included, except
+  `request.api`. That type is one event per API request, so a receiver that
+  calls the API for each event it gets would feed itself. `*` stands alone:
+  a list that holds it and another entry is refused with `400`
+  `webhook.invalid`. To receive `request.api`, list the types by name.
+minItems: 1
+uniqueItems: true
+items:
+  $ref: webhook-event-selector.yaml
+example:
+  - user.created
+  - user.updated
+  - user.deleted

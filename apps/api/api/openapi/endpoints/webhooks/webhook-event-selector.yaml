@@ -1,0 +1,8 @@
+title: WebhookEventSelector
+type: string
+description: |
+  An event type as `listEvents` (`GET /events`) filters by it, such as
+  `user.created`, or `*` for every type.
+pattern: '^(\*|[a-z][a-z0-9_]*(\.[a-z0-9_]+)+)$'
+x-zitadel-pattern-message: "must be * or an event type: lowercase letters, digits or _ in segments joined by dots, such as user.created"
+example: user.created

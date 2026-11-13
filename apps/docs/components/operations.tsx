@@ -7,7 +7,7 @@ import { getMDXComponents } from "@/components/mdx";
 // (operationTable in lib/source.ts), rendered with the MDX pages' components.
 const { MarkdownServer } = createMarkdownRenderer({ remarkPlugins: [remarkGfm] });
 
-// A first cell is a method or an event type, which reads as one line.
+// A first cell is a method or a webhook's name, which reads as one line.
 export function Operations({ markdown }: { markdown: string }) {
   return (
     <div className="[&_td:first-child_code]:whitespace-nowrap">

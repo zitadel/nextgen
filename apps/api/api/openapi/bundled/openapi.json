@@ -102,8 +102,12 @@
       "description": "Events are the project's audit trail: identity, session, admin and entity\nevents. These operations list and read them; filter the list by `category`\nor `event_type`. An event's `event_type` selects its typed payload.\n"
     },
     {
+      "name": "Webhooks",
+      "description": "Webhooks are the URLs a project's events are sent to. These operations\ncreate, list, read, update and delete a project's webhooks and rotate a\nwebhook's signing secret. They are not available yet: each answers\n`501` `not_implemented`.\n\nA webhook names the event types it receives, or `*` for all of them\nexcept `request.api`. The server POSTs each matching event to the\nwebhook's `url` as it stores it, one event per request and in the order\nthey were stored. The Event Webhooks section describes the request's\nbody and its delivery.\n\nEvery request to a project's webhook is signed, following\n[Standard Webhooks](https://www.standardwebhooks.com/). It carries three\nheaders:\n\n- `webhook-id`: the event's `id`. It is the same on every retry, so drop\n  duplicates by it.\n- `webhook-timestamp`: when this attempt was sent, in seconds since the\n  Unix epoch. Refuse a request whose timestamp is more than five minutes\n  from your clock.\n- `webhook-signature`: `v1,` followed by the base64 of the HMAC-SHA256\n  of `{webhook-id}.{webhook-timestamp}.{body}`, where `{body}` is the\n  request body byte for byte. The key is the webhook's secret: the\n  base64 after `whsec_`, decoded. For 24 hours after\n  `rotateWebhookSecret` the header holds two signatures separated by a\n  space, one per secret; accept the request when either matches.\n\nVerify the signature over the raw body before parsing it, and compare\nin constant time.\n"
+    },
+    {
       "name": "Event Webhooks",
-      "description": "Event webhooks are the requests the server POSTs to a webhook sink as it\nstores events, one event per request and, within a project, in the order they were\nstored. The body is the event as `GET /events` returns it; `event_type`\ntells the webhooks apart. Delivery is at least once, so drop duplicates\nby `id`. The sink is set in the server's configuration, under\n`events.export`.\n"
+      "description": "The event webhook is the request the server POSTs to a project's\nwebhook for each event the webhook receives. Its body is the same for\nevery event type: `id`, `type`, `created_at`, `project_id`, `actor`,\n`entity` and `data`, where `type` is the event type and `data` its\npayload as `getEvent` (`GET /events/{id}`) returns it. Any `2xx` status\nacknowledges the event. Delivery is at least once, so drop duplicates\nby `id`.\n\nThe sinks an operator sets in the server's configuration, under\n`events.export`, are not a project's webhooks: they get each event\nwhole, as `getEvent` returns it, and unsigned.\n"
     },
     {
       "name": "Variables",
@@ -9887,6 +9891,674 @@
         }
       }
     },
+    "/webhooks": {
+      "get": {
+        "operationId": "listWebhooks",
+        "summary": "List webhooks",
+        "description": "Lists the webhooks of the project in `project_id`, newest first by\n`created_at`, paginated with `limit` and `page_token`.\n\nEach webhook carries the time of its last delivery and of its last\nfailed attempt. None carries its signing secret: only `createWebhook`\n(`POST /webhooks`) and `rotateWebhookSecret`\n(`POST /webhooks/{id}/rotate_secret`) return it.\n\nAuthenticate with a project secret (`oauth2`), or with the session cookie\n(`sessionCookie`) of a signed-in person who can read the project.\n",
+        "tags": [
+          "Webhooks"
+        ],
+        "security": [
+          {
+            "oauth2": [
+              "webhook.read"
+            ]
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project-id"
+          },
+          {
+            "$ref": "#/components/parameters/limit"
+          },
+          {
+            "$ref": "#/components/parameters/page-token"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of the project's webhooks.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/list-webhooks-response"
+                },
+                "examples": {
+                  "webhooks": {
+                    "summary": "One delivering webhook and one failing webhook",
+                    "description": "The second webhook's last attempt got no response, so its\n`last_error_at` is later than its `last_delivered_at` and its\n`last_error_status` is `null`.\n",
+                    "value": {
+                      "data": [
+                        {
+                          "id": "hook_01KWH3B7K2M9P4R6T8V0X2Z4C6",
+                          "project_id": "proj_01KWH1P4MYS7F0N9WD3P2E4YM5",
+                          "url": "https://api.acme.com/hooks/zitadel",
+                          "description": "User sync",
+                          "event_types": [
+                            "user.created",
+                            "user.updated",
+                            "user.deleted"
+                          ],
+                          "enabled": true,
+                          "last_delivered_at": "2026-11-11T10:00:12Z",
+                          "last_error_status": null,
+                          "last_error_at": null,
+                          "previous_secret_expires_at": null,
+                          "created_at": "2026-11-11T10:00:00Z"
+                        },
+                        {
+                          "id": "hook_01KWF8Q2N5T7V9X1Z3B5D7F9H1",
+                          "project_id": "proj_01KWH1P4MYS7F0N9WD3P2E4YM5",
+                          "url": "https://siem.acme.com/zitadel",
+                          "description": "Audit log",
+                          "event_types": [
+                            "*"
+                          ],
+                          "enabled": true,
+                          "last_delivered_at": "2026-11-09T17:42:03Z",
+                          "last_error_status": null,
+                          "last_error_at": "2026-11-11T09:58:44Z",
+                          "previous_secret_expires_at": null,
+                          "created_at": "2026-11-02T13:20:00Z"
+                        }
+                      ],
+                      "next_page_token": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The page token is not valid. Send the `next_page_token` from the previous response unchanged.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller cannot read the project's webhooks.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/listWebhooks-error-response"
+          }
+        }
+      },
+      "post": {
+        "operationId": "createWebhook",
+        "summary": "Create a webhook",
+        "description": "Creates a webhook for the project in `project_id` and returns it with its\nsigning secret.\n\nThe server then POSTs each of the project's events whose type is in\n`event_types` to `url`, one event per request, signed with the secret.\nDelivery starts with the events stored after this call: a new webhook\ngets no history. A project that is not claimed yet delivers nothing until\nthe [claim](/docs/concepts/project-team-user#claim) succeeds.\n\nThe server refuses a body that breaks one of these rules:\n\n- `url` is `https`, at most 2048 characters, and carries no user info.\n- `event_types` holds at least one entry and no entry twice. Each entry\n  is an event type the server writes, or `*`, and `*` stands alone.\n- A project holds at most 10 webhooks. One more answers `409`\n  `webhook.limit_reached`: delete one with `deleteWebhook`\n  (`DELETE /webhooks/{id}`) first. Two webhooks may name the\n  same `url`.\n\nThe `secret` appears only in this response. Store it where the endpoint\ncan read it, and verify each request with it.\n\nTo recover from a lost response, send `Idempotency-Key` and repeat the\nrequest with the same key: it returns the first response, `secret`\nincluded, and creates nothing. Without the key, a repeated request\ncreates a second webhook. Then find both with `listWebhooks`\n(`GET /webhooks`), delete one, and issue a secret for the other with\n`rotateWebhookSecret` (`POST /webhooks/{id}/rotate_secret`).\n\nAuthenticate with a project secret (`oauth2`), or with the session cookie\n(`sessionCookie`) of a signed-in person who can change the project.\nCookie requests follow that scheme's CSRF rules.\n",
+        "tags": [
+          "Webhooks"
+        ],
+        "security": [
+          {
+            "oauth2": [
+              "webhook.write"
+            ]
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project-id"
+          },
+          {
+            "$ref": "#/components/parameters/idempotency-key",
+            "description": "Optional retry key. A retry carrying the same key within the retry\nwindow returns the first response, `secret` included, instead of\ncreating another webhook. Without it, a retry after a lost response\ncreates a second webhook, and the first one's secret is lost.\n"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/create-webhook-request"
+              },
+              "examples": {
+                "some_types": {
+                  "summary": "Receive the user events",
+                  "value": {
+                    "url": "https://api.acme.com/hooks/zitadel",
+                    "description": "User sync",
+                    "event_types": [
+                      "user.created",
+                      "user.updated",
+                      "user.deleted"
+                    ]
+                  }
+                },
+                "all_types": {
+                  "summary": "Receive every event type except request.api",
+                  "value": {
+                    "url": "https://siem.acme.com/zitadel",
+                    "event_types": [
+                      "*"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The webhook was created. The response carries its signing secret, this once.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/webhook-with-secret"
+                },
+                "examples": {
+                  "created": {
+                    "summary": "A new webhook, with its secret",
+                    "description": "Nothing was delivered yet, so `last_delivered_at` is `null`.\n",
+                    "value": {
+                      "id": "hook_01KWH3B7K2M9P4R6T8V0X2Z4C6",
+                      "project_id": "proj_01KWH1P4MYS7F0N9WD3P2E4YM5",
+                      "url": "https://api.acme.com/hooks/zitadel",
+                      "description": "User sync",
+                      "event_types": [
+                        "user.created",
+                        "user.updated",
+                        "user.deleted"
+                      ],
+                      "enabled": true,
+                      "last_delivered_at": null,
+                      "last_error_status": null,
+                      "last_error_at": null,
+                      "previous_secret_expires_at": null,
+                      "created_at": "2026-11-11T10:00:00Z",
+                      "secret": "whsec_C2FVsBQIhrscChlQIMV+b5sSYspob7oDZJQk1o3DdH8="
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The `url` or an entry of `event_types` is not valid, or `*` is listed beside another entry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller cannot change the project's webhooks.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The project already holds 10 webhooks. Delete one with `deleteWebhook` first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/createWebhook-error-response"
+          }
+        }
+      }
+    },
+    "/webhooks/{id}": {
+      "get": {
+        "operationId": "getWebhook",
+        "summary": "Get a webhook",
+        "description": "Returns one webhook of the project in `project_id`, with the time of its\nlast delivery and of its last failed attempt.\n\nThe response never includes the signing secret.\n\nAuthenticate with a project secret (`oauth2`), or with the session cookie\n(`sessionCookie`) of a signed-in person who can read the project.\n",
+        "tags": [
+          "Webhooks"
+        ],
+        "security": [
+          {
+            "oauth2": [
+              "webhook.read"
+            ]
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/webhook-id"
+          },
+          {
+            "$ref": "#/components/parameters/project-id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The webhook.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/webhook"
+                },
+                "examples": {
+                  "webhook": {
+                    "summary": "A webhook that is delivering",
+                    "value": {
+                      "id": "hook_01KWH3B7K2M9P4R6T8V0X2Z4C6",
+                      "project_id": "proj_01KWH1P4MYS7F0N9WD3P2E4YM5",
+                      "url": "https://api.acme.com/hooks/zitadel",
+                      "description": "User sync",
+                      "event_types": [
+                        "user.created",
+                        "user.updated",
+                        "user.deleted"
+                      ],
+                      "enabled": true,
+                      "last_delivered_at": "2026-11-11T10:00:12Z",
+                      "last_error_status": null,
+                      "last_error_at": null,
+                      "previous_secret_expires_at": null,
+                      "created_at": "2026-11-11T10:00:00Z"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller cannot read the project's webhooks.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Webhook or project not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/getWebhook-error-response"
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateWebhook",
+        "summary": "Update a webhook",
+        "description": "Changes a webhook's `url`, `description`, `event_types` or `enabled`, and\nreturns the updated webhook.\n\nFields you leave out keep their value. The body names at least one\nfield: an empty body is refused with `400`. `url` and `event_types`\nfollow the rules `createWebhook` (`POST /webhooks`) states.\n\nA new `url` gets the events the old one had not yet acknowledged: the\nwebhook keeps its place in the project's events. The signing secret\nstays the same.\n\n`enabled: false` stops delivery. `enabled: true` starts it again from\nnow, also for a webhook the server disabled after 3 days of failures or\na `410`: events stored while it was disabled are not sent.\n\nAuthenticate with a project secret (`oauth2`), or with the session cookie\n(`sessionCookie`) of a signed-in person who can change the project.\nCookie requests follow that scheme's CSRF rules.\n",
+        "tags": [
+          "Webhooks"
+        ],
+        "security": [
+          {
+            "oauth2": [
+              "webhook.write"
+            ]
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/webhook-id"
+          },
+          {
+            "$ref": "#/components/parameters/project-id"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/update-webhook-request"
+              },
+              "examples": {
+                "disable": {
+                  "summary": "Stop delivery",
+                  "value": {
+                    "enabled": false
+                  }
+                },
+                "event_types": {
+                  "summary": "Change which event types it receives",
+                  "value": {
+                    "event_types": [
+                      "session.established",
+                      "session.deleted"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The updated webhook.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/webhook"
+                },
+                "examples": {
+                  "disabled": {
+                    "summary": "The webhook after `enabled` was set to `false`",
+                    "value": {
+                      "id": "hook_01KWH3B7K2M9P4R6T8V0X2Z4C6",
+                      "project_id": "proj_01KWH1P4MYS7F0N9WD3P2E4YM5",
+                      "url": "https://api.acme.com/hooks/zitadel",
+                      "description": "User sync",
+                      "event_types": [
+                        "user.created",
+                        "user.updated",
+                        "user.deleted"
+                      ],
+                      "enabled": false,
+                      "last_delivered_at": "2026-11-11T10:00:12Z",
+                      "last_error_status": null,
+                      "last_error_at": null,
+                      "previous_secret_expires_at": null,
+                      "created_at": "2026-11-11T10:00:00Z"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The body is empty, the `url` or an entry of `event_types` is not valid, or `*` is listed beside another entry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller cannot change the project's webhooks.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Webhook or project not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/updateWebhook-error-response"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteWebhook",
+        "summary": "Delete a webhook",
+        "description": "Deletes a webhook. The server stops sending it events, including those\nit had not yet delivered, and its signing secret stops being valid.\n\nThis cannot be undone. To stop delivery and keep the webhook, send\n`enabled: false` to `updateWebhook` (`PATCH /webhooks/{id}`)\ninstead.\n\nAuthenticate with a project secret (`oauth2`), or with the session cookie\n(`sessionCookie`) of a signed-in person who administers the project.\nCookie requests follow that scheme's CSRF rules.\n",
+        "tags": [
+          "Webhooks"
+        ],
+        "security": [
+          {
+            "oauth2": [
+              "webhook.delete"
+            ]
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/webhook-id"
+          },
+          {
+            "$ref": "#/components/parameters/project-id"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The webhook was deleted."
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller cannot delete the project's webhooks.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Webhook or project not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/deleteWebhook-error-response"
+          }
+        }
+      }
+    },
+    "/webhooks/{id}/rotate_secret": {
+      "post": {
+        "operationId": "rotateWebhookSecret",
+        "summary": "Rotate a webhook's secret",
+        "description": "Issues a new signing secret for a webhook and returns the webhook with\nit.\n\nThe `secret` appears only in this response. The previous secret stays\nvalid for 24 hours, until `previous_secret_expires_at`: during that time\nevery delivery carries two signatures, one per secret, so the endpoint\ncan switch to the new secret without refusing a request. A second\nrotation within those 24 hours drops the older of the two secrets at\nonce.\n\nTo recover from a lost response, send `Idempotency-Key` and repeat the\nrequest with the same key: it returns the first response, `secret`\nincluded, and rotates nothing. Without the key, a repeated request\nrotates again: the secret of the lost response becomes the previous\none, and the secret the endpoint still verifies with stops being valid\nat once. Give the endpoint the secret of the second response right\naway, since it refuses every delivery until it has it.\n\nAuthenticate with a project secret (`oauth2`), or with the session cookie\n(`sessionCookie`) of a signed-in person who can change the project.\nCookie requests follow that scheme's CSRF rules.\n",
+        "tags": [
+          "Webhooks"
+        ],
+        "security": [
+          {
+            "oauth2": [
+              "webhook.write"
+            ]
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/webhook-id"
+          },
+          {
+            "$ref": "#/components/parameters/project-id"
+          },
+          {
+            "$ref": "#/components/parameters/idempotency-key",
+            "description": "Optional retry key. A retry carrying the same key within the retry\nwindow returns the first response, `secret` included, instead of\nrotating again. Without it, a retry after a lost response rotates a\nsecond time and drops the secret the endpoint still verifies with.\n"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The webhook, with its new signing secret, this once.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/webhook-with-secret"
+                },
+                "examples": {
+                  "rotated": {
+                    "summary": "The webhook after a rotation",
+                    "description": "The previous secret stays valid until\n`previous_secret_expires_at`, 24 hours after the rotation.\n",
+                    "value": {
+                      "id": "hook_01KWH3B7K2M9P4R6T8V0X2Z4C6",
+                      "project_id": "proj_01KWH1P4MYS7F0N9WD3P2E4YM5",
+                      "url": "https://api.acme.com/hooks/zitadel",
+                      "description": "User sync",
+                      "event_types": [
+                        "user.created",
+                        "user.updated",
+                        "user.deleted"
+                      ],
+                      "enabled": true,
+                      "last_delivered_at": "2026-11-11T10:00:12Z",
+                      "last_error_status": null,
+                      "last_error_at": null,
+                      "previous_secret_expires_at": "2026-11-12T10:30:00Z",
+                      "created_at": "2026-11-11T10:00:00Z",
+                      "secret": "whsec_9bWm2xkq0n4OZ1p5cFh3TtYJ8sVdR7uEaLwGyPqHf6I="
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid credentials.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller cannot change the project's webhooks.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Webhook or project not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/rotateWebhookSecret-error-response"
+          }
+        }
+      }
+    },
     "/variables": {
       "get": {
         "operationId": "getVariables",
@@ -10959,11 +11631,11 @@
     }
   },
   "webhooks": {
-    "flow.signup_challenge.issued": {
+    "event": {
       "post": {
-        "operationId": "flowSignupChallengeIssued",
-        "summary": "flow.signup_challenge.issued",
-        "description": "A sign-up proof-of-work challenge was issued.\n\nThe body is the event as `GET /events` returns it.\n",
+        "operationId": "eventStored",
+        "summary": "Event",
+        "description": "An event of a type the webhook receives was stored in the project. The\nserver POSTs it to the `url` of each of the project's webhooks that\nlists its type in `event_types`, one event per request.\n\nThe body has the same seven fields for every event type. `type` names\nthe event type, and `data` is that type's `payload` as `getEvent`\n(`GET /events/{id}`) returns it; select a type in the request body below\nto see its `data`. The body is not the whole event, and `data` is not\nthe resource. Read the resource with `entity.id`, or the whole event\nwith `getEvent` and the body's `id`.\n\nThe request is signed: verify its `webhook-signature` header as the\n[Webhooks](/docs/reference/api/webhooks) reference describes, over the\nraw body, before parsing it.\n",
         "tags": [
           "Event Webhooks"
         ],
@@ -10973,1488 +11645,28 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/flow-signup_challenge-issued-event"
-              }
-            }
-          }
-        },
-        "responses": {
-          "2XX": {
-            "$ref": "#/components/responses/webhook-delivered"
-          },
-          "default": {
-            "$ref": "#/components/responses/webhook-not-delivered"
-          }
-        }
-      }
-    },
-    "flow.signup_challenge.consumed": {
-      "post": {
-        "operationId": "flowSignupChallengeConsumed",
-        "summary": "flow.signup_challenge.consumed",
-        "description": "A signup proof was spent before attempting user creation.\n\nThe body is the event as `GET /events` returns it.\n",
-        "tags": [
-          "Event Webhooks"
-        ],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/flow-signup_challenge-consumed-event"
-              }
-            }
-          }
-        },
-        "responses": {
-          "2XX": {
-            "$ref": "#/components/responses/webhook-delivered"
-          },
-          "default": {
-            "$ref": "#/components/responses/webhook-not-delivered"
-          }
-        }
-      }
-    },
-    "application.created": {
-      "post": {
-        "operationId": "applicationCreated",
-        "summary": "application.created",
-        "description": "A registered application was created.\n\nThe body is the event as `GET /events` returns it.\n",
-        "tags": [
-          "Event Webhooks"
-        ],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/application-created-event"
-              }
-            }
-          }
-        },
-        "responses": {
-          "2XX": {
-            "$ref": "#/components/responses/webhook-delivered"
-          },
-          "default": {
-            "$ref": "#/components/responses/webhook-not-delivered"
-          }
-        }
-      }
-    },
-    "application.updated": {
-      "post": {
-        "operationId": "applicationUpdated",
-        "summary": "application.updated",
-        "description": "A registered application was revised. The payload holds the new\nrevision, the name when it changed, and the clients the revision added.\n\nThe body is the event as `GET /events` returns it.\n",
-        "tags": [
-          "Event Webhooks"
-        ],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/application-updated-event"
-              }
-            }
-          }
-        },
-        "responses": {
-          "2XX": {
-            "$ref": "#/components/responses/webhook-delivered"
-          },
-          "default": {
-            "$ref": "#/components/responses/webhook-not-delivered"
-          }
-        }
-      }
-    },
-    "auth.attempt.created": {
-      "post": {
-        "operationId": "authAttemptCreated",
-        "summary": "auth.attempt.created",
-        "description": "An authentication attempt started. See [Sessions and auth\nattempts](/docs/concepts/sessions-auth-attempts).\n\nThe body is the event as `GET /events` returns it.\n",
-        "tags": [
-          "Event Webhooks"
-        ],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/auth-attempt-created-event"
-              }
-            }
-          }
-        },
-        "responses": {
-          "2XX": {
-            "$ref": "#/components/responses/webhook-delivered"
-          },
-          "default": {
-            "$ref": "#/components/responses/webhook-not-delivered"
-          }
-        }
-      }
-    },
-    "auth.attempt.handed_off": {
-      "post": {
-        "operationId": "authAttemptHandedOff",
-        "summary": "auth.attempt.handed_off",
-        "description": "An authentication attempt was handed off to a session. The attempt is\ncomplete, and its verified result moves to the session.\n\nThe body is the event as `GET /events` returns it.\n",
-        "tags": [
-          "Event Webhooks"
-        ],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/auth-attempt-handed_off-event"
-              }
-            }
-          }
-        },
-        "responses": {
-          "2XX": {
-            "$ref": "#/components/responses/webhook-delivered"
-          },
-          "default": {
-            "$ref": "#/components/responses/webhook-not-delivered"
-          }
-        }
-      }
-    },
-    "auth.check.failed": {
-      "post": {
-        "operationId": "authCheckFailed",
-        "summary": "auth.check.failed",
-        "description": "A check in an authentication attempt failed, such as a wrong password.\n\nThe body is the event as `GET /events` returns it.\n",
-        "tags": [
-          "Event Webhooks"
-        ],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/auth-check-failed-event"
-              }
-            }
-          }
-        },
-        "responses": {
-          "2XX": {
-            "$ref": "#/components/responses/webhook-delivered"
-          },
-          "default": {
-            "$ref": "#/components/responses/webhook-not-delivered"
-          }
-        }
-      }
-    },
-    "auth.check.succeeded": {
-      "post": {
-        "operationId": "authCheckSucceeded",
-        "summary": "auth.check.succeeded",
-        "description": "A check in an authentication attempt succeeded. The event is also sent\nwhen a factor is recorded without a challenge, as on sign-up.\n\nThe body is the event as `GET /events` returns it.\n",
-        "tags": [
-          "Event Webhooks"
-        ],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/auth-check-succeeded-event"
-              }
-            }
-          }
-        },
-        "responses": {
-          "2XX": {
-            "$ref": "#/components/responses/webhook-delivered"
-          },
-          "default": {
-            "$ref": "#/components/responses/webhook-not-delivered"
-          }
-        }
-      }
-    },
-    "auth.factor.passkey.enrolled": {
-      "post": {
-        "operationId": "authFactorPasskeyEnrolled",
-        "summary": "auth.factor.passkey.enrolled",
-        "description": "A passkey was enrolled for a user.\n\nThe body is the event as `GET /events` returns it.\n",
-        "tags": [
-          "Event Webhooks"
-        ],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/auth-factor-passkey-enrolled-event"
-              }
-            }
-          }
-        },
-        "responses": {
-          "2XX": {
-            "$ref": "#/components/responses/webhook-delivered"
-          },
-          "default": {
-            "$ref": "#/components/responses/webhook-not-delivered"
-          }
-        }
-      }
-    },
-    "auth.factor.password.set": {
-      "post": {
-        "operationId": "authFactorPasswordSet",
-        "summary": "auth.factor.password.set",
-        "description": "A user's password was set.\n\nThe body is the event as `GET /events` returns it.\n",
-        "tags": [
-          "Event Webhooks"
-        ],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/auth-factor-password-set-event"
-              }
-            }
-          }
-        },
-        "responses": {
-          "2XX": {
-            "$ref": "#/components/responses/webhook-delivered"
-          },
-          "default": {
-            "$ref": "#/components/responses/webhook-not-delivered"
-          }
-        }
-      }
-    },
-    "auth.sso.authorization.failed": {
-      "post": {
-        "operationId": "authSsoAuthorizationFailed",
-        "summary": "auth.sso.authorization.failed",
-        "description": "A sign-in through an identity provider (SSO) failed at the provider. It\nanswered with an error, `access_denied` included, or the callback\ncarried no code.\n\nThe body is the event as `GET /events` returns it.\n",
-        "tags": [
-          "Event Webhooks"
-        ],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/auth-sso-authorization-failed-event"
-              }
-            }
-          }
-        },
-        "responses": {
-          "2XX": {
-            "$ref": "#/components/responses/webhook-delivered"
-          },
-          "default": {
-            "$ref": "#/components/responses/webhook-not-delivered"
-          }
-        }
-      }
-    },
-    "auth.sso.exchange.failed": {
-      "post": {
-        "operationId": "authSsoExchangeFailed",
-        "summary": "auth.sso.exchange.failed",
-        "description": "A sign-in through an identity provider (SSO) failed after its code\narrived. The token exchange, the ID token or userinfo validation, or the\nconnection's configuration failed.\n\nThe body is the event as `GET /events` returns it.\n",
-        "tags": [
-          "Event Webhooks"
-        ],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/auth-sso-exchange-failed-event"
-              }
-            }
-          }
-        },
-        "responses": {
-          "2XX": {
-            "$ref": "#/components/responses/webhook-delivered"
-          },
-          "default": {
-            "$ref": "#/components/responses/webhook-not-delivered"
-          }
-        }
-      }
-    },
-    "auth.sso.exchange.succeeded": {
-      "post": {
-        "operationId": "authSsoExchangeSucceeded",
-        "summary": "auth.sso.exchange.succeeded",
-        "description": "The code from a sign-in through an identity provider (SSO) was\nexchanged. This is not a sign-in: the identity may still match no user.\n\nThe body is the event as `GET /events` returns it.\n",
-        "tags": [
-          "Event Webhooks"
-        ],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/auth-sso-exchange-succeeded-event"
-              }
-            }
-          }
-        },
-        "responses": {
-          "2XX": {
-            "$ref": "#/components/responses/webhook-delivered"
-          },
-          "default": {
-            "$ref": "#/components/responses/webhook-not-delivered"
-          }
-        }
-      }
-    },
-    "auth.token.issued": {
-      "post": {
-        "operationId": "authTokenIssued",
-        "summary": "auth.token.issued",
-        "description": "A token was issued.\n\nThe body is the event as `GET /events` returns it.\n",
-        "tags": [
-          "Event Webhooks"
-        ],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/auth-token-issued-event"
-              }
-            }
-          }
-        },
-        "responses": {
-          "2XX": {
-            "$ref": "#/components/responses/webhook-delivered"
-          },
-          "default": {
-            "$ref": "#/components/responses/webhook-not-delivered"
-          }
-        }
-      }
-    },
-    "auth.token.revoked": {
-      "post": {
-        "operationId": "authTokenRevoked",
-        "summary": "auth.token.revoked",
-        "description": "A token was revoked. Deleting a session revokes its tokens too. Those\nevents carry the session's `session_id` and no `entity_id`.\n\nThe body is the event as `GET /events` returns it.\n",
-        "tags": [
-          "Event Webhooks"
-        ],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/auth-token-revoked-event"
-              }
-            }
-          }
-        },
-        "responses": {
-          "2XX": {
-            "$ref": "#/components/responses/webhook-delivered"
-          },
-          "default": {
-            "$ref": "#/components/responses/webhook-not-delivered"
-          }
-        }
-      }
-    },
-    "authz.granted": {
-      "post": {
-        "operationId": "authzGranted",
-        "summary": "authz.granted",
-        "description": "A role on a project was granted.\n\nThe body is the event as `GET /events` returns it.\n",
-        "tags": [
-          "Event Webhooks"
-        ],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/authz-granted-event"
-              }
-            }
-          }
-        },
-        "responses": {
-          "2XX": {
-            "$ref": "#/components/responses/webhook-delivered"
-          },
-          "default": {
-            "$ref": "#/components/responses/webhook-not-delivered"
-          }
-        }
-      }
-    },
-    "authz.revoked": {
-      "post": {
-        "operationId": "authzRevoked",
-        "summary": "authz.revoked",
-        "description": "A role on a project was revoked.\n\nThe body is the event as `GET /events` returns it.\n",
-        "tags": [
-          "Event Webhooks"
-        ],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/authz-revoked-event"
-              }
-            }
-          }
-        },
-        "responses": {
-          "2XX": {
-            "$ref": "#/components/responses/webhook-delivered"
-          },
-          "default": {
-            "$ref": "#/components/responses/webhook-not-delivered"
-          }
-        }
-      }
-    },
-    "branding.created": {
-      "post": {
-        "operationId": "brandingCreated",
-        "summary": "branding.created",
-        "description": "A branding revision was created.\n\nThe body is the event as `GET /events` returns it.\n",
-        "tags": [
-          "Event Webhooks"
-        ],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/branding-created-event"
-              }
-            }
-          }
-        },
-        "responses": {
-          "2XX": {
-            "$ref": "#/components/responses/webhook-delivered"
-          },
-          "default": {
-            "$ref": "#/components/responses/webhook-not-delivered"
-          }
-        }
-      }
-    },
-    "deployment.created": {
-      "post": {
-        "operationId": "deploymentCreated",
-        "summary": "deployment.created",
-        "description": "A release was deployed, or a deployment rolled back. One event per\ndeployment, however many targets it has. A deployment makes a release\nlive on a set of origins.\n\nThe body is the event as `GET /events` returns it.\n",
-        "tags": [
-          "Event Webhooks"
-        ],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/deployment-created-event"
-              }
-            }
-          }
-        },
-        "responses": {
-          "2XX": {
-            "$ref": "#/components/responses/webhook-delivered"
-          },
-          "default": {
-            "$ref": "#/components/responses/webhook-not-delivered"
-          }
-        }
-      }
-    },
-    "flowdef.created": {
-      "post": {
-        "operationId": "flowdefCreated",
-        "summary": "flowdef.created",
-        "description": "A flow definition was created. A [flow\ndefinition](/docs/concepts/flows-and-schemas) sets which step of a\nsign-in renders when, and which fields each step collects.\n\nThe body is the event as `GET /events` returns it.\n",
-        "tags": [
-          "Event Webhooks"
-        ],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/flowdef-created-event"
-              }
-            }
-          }
-        },
-        "responses": {
-          "2XX": {
-            "$ref": "#/components/responses/webhook-delivered"
-          },
-          "default": {
-            "$ref": "#/components/responses/webhook-not-delivered"
-          }
-        }
-      }
-    },
-    "flowdef.deleted": {
-      "post": {
-        "operationId": "flowdefDeleted",
-        "summary": "flowdef.deleted",
-        "description": "A flow definition was deleted.\n\nRetired: nothing sends this event any more. It stays in the API so\nstored events still decode.\n\nThe body is the event as `GET /events` returns it.\n",
-        "tags": [
-          "Event Webhooks"
-        ],
-        "deprecated": true,
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/flowdef-deleted-event"
-              }
-            }
-          }
-        },
-        "responses": {
-          "2XX": {
-            "$ref": "#/components/responses/webhook-delivered"
-          },
-          "default": {
-            "$ref": "#/components/responses/webhook-not-delivered"
-          }
-        }
-      }
-    },
-    "flowdef.updated": {
-      "post": {
-        "operationId": "flowdefUpdated",
-        "summary": "flowdef.updated",
-        "description": "A flow definition was updated.\n\nRetired: nothing sends this event any more. It stays in the API so\nstored events still decode.\n\nThe body is the event as `GET /events` returns it.\n",
-        "tags": [
-          "Event Webhooks"
-        ],
-        "deprecated": true,
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/flowdef-updated-event"
-              }
-            }
-          }
-        },
-        "responses": {
-          "2XX": {
-            "$ref": "#/components/responses/webhook-delivered"
-          },
-          "default": {
-            "$ref": "#/components/responses/webhook-not-delivered"
-          }
-        }
-      }
-    },
-    "idp.created": {
-      "post": {
-        "operationId": "idpCreated",
-        "summary": "idp.created",
-        "description": "An identity provider (IdP) connection was created.\n\nThe body is the event as `GET /events` returns it.\n",
-        "tags": [
-          "Event Webhooks"
-        ],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/idp-created-event"
-              }
-            }
-          }
-        },
-        "responses": {
-          "2XX": {
-            "$ref": "#/components/responses/webhook-delivered"
-          },
-          "default": {
-            "$ref": "#/components/responses/webhook-not-delivered"
-          }
-        }
-      }
-    },
-    "idp.identity_link.created": {
-      "post": {
-        "operationId": "idpIdentityLinkCreated",
-        "summary": "idp.identity_link.created",
-        "description": "A user was created by a sign-in through an identity provider (SSO) and\nlinked to the provider account.\n\nThe body is the event as `GET /events` returns it.\n",
-        "tags": [
-          "Event Webhooks"
-        ],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/idp-identity_link-created-event"
-              }
-            }
-          }
-        },
-        "responses": {
-          "2XX": {
-            "$ref": "#/components/responses/webhook-delivered"
-          },
-          "default": {
-            "$ref": "#/components/responses/webhook-not-delivered"
-          }
-        }
-      }
-    },
-    "idp.updated": {
-      "post": {
-        "operationId": "idpUpdated",
-        "summary": "idp.updated",
-        "description": "An IdP connection was revised. The payload holds the new revision and\nthe fields that changed.\n\nThe body is the event as `GET /events` returns it.\n",
-        "tags": [
-          "Event Webhooks"
-        ],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/idp-updated-event"
-              }
-            }
-          }
-        },
-        "responses": {
-          "2XX": {
-            "$ref": "#/components/responses/webhook-delivered"
-          },
-          "default": {
-            "$ref": "#/components/responses/webhook-not-delivered"
-          }
-        }
-      }
-    },
-    "invitation.accepted": {
-      "post": {
-        "operationId": "invitationAccepted",
-        "summary": "invitation.accepted",
-        "description": "An invitation was accepted. Grant events the acceptance writes carry\nthis event's `request_id`; there are none when the user already holds an\nidentical active grant.\n\nNot sent yet: the contract is published ahead of the code that sends it.\n\nThe body is the event as `GET /events` returns it.\n",
-        "tags": [
-          "Event Webhooks"
-        ],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/invitation-accepted-event"
-              }
-            }
-          }
-        },
-        "responses": {
-          "2XX": {
-            "$ref": "#/components/responses/webhook-delivered"
-          },
-          "default": {
-            "$ref": "#/components/responses/webhook-not-delivered"
-          }
-        }
-      }
-    },
-    "invitation.cancelled": {
-      "post": {
-        "operationId": "invitationCancelled",
-        "summary": "invitation.cancelled",
-        "description": "A pending invitation was cancelled by an administrator, or an unaccepted\none was deleted by its replacement.\n\nThe body is the event as `GET /events` returns it.\n",
-        "tags": [
-          "Event Webhooks"
-        ],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/invitation-cancelled-event"
-              }
-            }
-          }
-        },
-        "responses": {
-          "2XX": {
-            "$ref": "#/components/responses/webhook-delivered"
-          },
-          "default": {
-            "$ref": "#/components/responses/webhook-not-delivered"
-          }
-        }
-      }
-    },
-    "invitation.created": {
-      "post": {
-        "operationId": "invitationCreated",
-        "summary": "invitation.created",
-        "description": "An invitation was created, new or as the replacement of another.\n\nThe body is the event as `GET /events` returns it.\n",
-        "tags": [
-          "Event Webhooks"
-        ],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/invitation-created-event"
-              }
-            }
-          }
-        },
-        "responses": {
-          "2XX": {
-            "$ref": "#/components/responses/webhook-delivered"
-          },
-          "default": {
-            "$ref": "#/components/responses/webhook-not-delivered"
-          }
-        }
-      }
-    },
-    "invitation.rejected": {
-      "post": {
-        "operationId": "invitationRejected",
-        "summary": "invitation.rejected",
-        "description": "An invitation was declined.\n\nNot sent yet: the contract is published ahead of the code that sends it.\n\nThe body is the event as `GET /events` returns it.\n",
-        "tags": [
-          "Event Webhooks"
-        ],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/invitation-rejected-event"
-              }
-            }
-          }
-        },
-        "responses": {
-          "2XX": {
-            "$ref": "#/components/responses/webhook-delivered"
-          },
-          "default": {
-            "$ref": "#/components/responses/webhook-not-delivered"
-          }
-        }
-      }
-    },
-    "origin.added": {
-      "post": {
-        "operationId": "originAdded",
-        "summary": "origin.added",
-        "description": "An origin was added to a project. The payload holds its `pattern` and\nits `kind`, `primary` or `preview`.\n\nThe body is the event as `GET /events` returns it.\n",
-        "tags": [
-          "Event Webhooks"
-        ],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/origin-added-event"
-              }
-            }
-          }
-        },
-        "responses": {
-          "2XX": {
-            "$ref": "#/components/responses/webhook-delivered"
-          },
-          "default": {
-            "$ref": "#/components/responses/webhook-not-delivered"
-          }
-        }
-      }
-    },
-    "origin.removed": {
-      "post": {
-        "operationId": "originRemoved",
-        "summary": "origin.removed",
-        "description": "An origin was removed from a project. The payload holds its `pattern`\nand its `kind`, `primary` or `preview`.\n\nThe body is the event as `GET /events` returns it.\n",
-        "tags": [
-          "Event Webhooks"
-        ],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/origin-removed-event"
-              }
-            }
-          }
-        },
-        "responses": {
-          "2XX": {
-            "$ref": "#/components/responses/webhook-delivered"
-          },
-          "default": {
-            "$ref": "#/components/responses/webhook-not-delivered"
-          }
-        }
-      }
-    },
-    "policy.created": {
-      "post": {
-        "operationId": "policyCreated",
-        "summary": "policy.created",
-        "description": "A project published the first revision of its policy for an operation. A\npolicy guards an operation, such as setting a password.\n\nThe body is the event as `GET /events` returns it.\n",
-        "tags": [
-          "Event Webhooks"
-        ],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/policy-created-event"
-              }
-            }
-          }
-        },
-        "responses": {
-          "2XX": {
-            "$ref": "#/components/responses/webhook-delivered"
-          },
-          "default": {
-            "$ref": "#/components/responses/webhook-not-delivered"
-          }
-        }
-      }
-    },
-    "policy.updated": {
-      "post": {
-        "operationId": "policyUpdated",
-        "summary": "policy.updated",
-        "description": "A project published a new revision of its policy for an operation. The\npayload holds the new revision and its settings.\n\nThe body is the event as `GET /events` returns it.\n",
-        "tags": [
-          "Event Webhooks"
-        ],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/policy-updated-event"
-              }
-            }
-          }
-        },
-        "responses": {
-          "2XX": {
-            "$ref": "#/components/responses/webhook-delivered"
-          },
-          "default": {
-            "$ref": "#/components/responses/webhook-not-delivered"
-          }
-        }
-      }
-    },
-    "preview.removed": {
-      "post": {
-        "operationId": "previewRemoved",
-        "summary": "preview.removed",
-        "description": "A preview was removed before its expiry.\n\nThe body is the event as `GET /events` returns it.\n",
-        "tags": [
-          "Event Webhooks"
-        ],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/preview-removed-event"
-              }
-            }
-          }
-        },
-        "responses": {
-          "2XX": {
-            "$ref": "#/components/responses/webhook-delivered"
-          },
-          "default": {
-            "$ref": "#/components/responses/webhook-not-delivered"
-          }
-        }
-      }
-    },
-    "project.created": {
-      "post": {
-        "operationId": "projectCreated",
-        "summary": "project.created",
-        "description": "A project was created.\n\nThe body is the event as `GET /events` returns it.\n",
-        "tags": [
-          "Event Webhooks"
-        ],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/project-created-event"
-              }
-            }
-          }
-        },
-        "responses": {
-          "2XX": {
-            "$ref": "#/components/responses/webhook-delivered"
-          },
-          "default": {
-            "$ref": "#/components/responses/webhook-not-delivered"
-          }
-        }
-      }
-    },
-    "project.deleted": {
-      "post": {
-        "operationId": "projectDeleted",
-        "summary": "project.deleted",
-        "description": "A project was deleted.\n\nThe body is the event as `GET /events` returns it.\n",
-        "tags": [
-          "Event Webhooks"
-        ],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/project-deleted-event"
-              }
-            }
-          }
-        },
-        "responses": {
-          "2XX": {
-            "$ref": "#/components/responses/webhook-delivered"
-          },
-          "default": {
-            "$ref": "#/components/responses/webhook-not-delivered"
-          }
-        }
-      }
-    },
-    "project.updated": {
-      "post": {
-        "operationId": "projectUpdated",
-        "summary": "project.updated",
-        "description": "A project was updated. The payload holds the fields that changed, with\ntheir new values.\n\nThe body is the event as `GET /events` returns it.\n",
-        "tags": [
-          "Event Webhooks"
-        ],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/project-updated-event"
-              }
-            }
-          }
-        },
-        "responses": {
-          "2XX": {
-            "$ref": "#/components/responses/webhook-delivered"
-          },
-          "default": {
-            "$ref": "#/components/responses/webhook-not-delivered"
-          }
-        }
-      }
-    },
-    "release.created": {
-      "post": {
-        "operationId": "releaseCreated",
-        "summary": "release.created",
-        "description": "A release was created. A [release](/docs/concepts/repo-config) is an\nimmutable build of the project's configuration, which a deployment makes\nlive.\n\nThe body is the event as `GET /events` returns it.\n",
-        "tags": [
-          "Event Webhooks"
-        ],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/release-created-event"
-              }
-            }
-          }
-        },
-        "responses": {
-          "2XX": {
-            "$ref": "#/components/responses/webhook-delivered"
-          },
-          "default": {
-            "$ref": "#/components/responses/webhook-not-delivered"
-          }
-        }
-      }
-    },
-    "release.revoked": {
-      "post": {
-        "operationId": "releaseRevoked",
-        "summary": "release.revoked",
-        "description": "A release was revoked.\n\nThe body is the event as `GET /events` returns it.\n",
-        "tags": [
-          "Event Webhooks"
-        ],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/release-revoked-event"
-              }
-            }
-          }
-        },
-        "responses": {
-          "2XX": {
-            "$ref": "#/components/responses/webhook-delivered"
-          },
-          "default": {
-            "$ref": "#/components/responses/webhook-not-delivered"
-          }
-        }
-      }
-    },
-    "request.api": {
-      "post": {
-        "operationId": "requestApi",
-        "summary": "request.api",
-        "description": "An API request in the project completed. One event per request; the\nhealth, liveness, and readiness probes send none. Only this event\ncarries `metadata.client`, the requester's IP, user agent and origin;\nother events of the same request join to it through `request_id`.\n\nThe body is the event as `GET /events` returns it.\n",
-        "tags": [
-          "Event Webhooks"
-        ],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/request-api-event"
-              }
-            }
-          }
-        },
-        "responses": {
-          "2XX": {
-            "$ref": "#/components/responses/webhook-delivered"
-          },
-          "default": {
-            "$ref": "#/components/responses/webhook-not-delivered"
-          }
-        }
-      }
-    },
-    "schema.created": {
-      "post": {
-        "operationId": "schemaCreated",
-        "summary": "schema.created",
-        "description": "A schema was created.\n\nThe body is the event as `GET /events` returns it.\n",
-        "tags": [
-          "Event Webhooks"
-        ],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/schema-created-event"
-              }
-            }
-          }
-        },
-        "responses": {
-          "2XX": {
-            "$ref": "#/components/responses/webhook-delivered"
-          },
-          "default": {
-            "$ref": "#/components/responses/webhook-not-delivered"
-          }
-        }
-      }
-    },
-    "session.deleted": {
-      "post": {
-        "operationId": "sessionDeleted",
-        "summary": "session.deleted",
-        "description": "A session was revoked.\n\nThe body is the event as `GET /events` returns it.\n",
-        "tags": [
-          "Event Webhooks"
-        ],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/session-deleted-event"
-              }
-            }
-          }
-        },
-        "responses": {
-          "2XX": {
-            "$ref": "#/components/responses/webhook-delivered"
-          },
-          "default": {
-            "$ref": "#/components/responses/webhook-not-delivered"
-          }
-        }
-      }
-    },
-    "session.established": {
-      "post": {
-        "operationId": "sessionEstablished",
-        "summary": "session.established",
-        "description": "A session was established, by a sign-in or by exchanging a session.\n\nThe body is the event as `GET /events` returns it.\n",
-        "tags": [
-          "Event Webhooks"
-        ],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/session-established-event"
-              }
-            }
-          }
-        },
-        "responses": {
-          "2XX": {
-            "$ref": "#/components/responses/webhook-delivered"
-          },
-          "default": {
-            "$ref": "#/components/responses/webhook-not-delivered"
-          }
-        }
-      }
-    },
-    "team.created": {
-      "post": {
-        "operationId": "teamCreated",
-        "summary": "team.created",
-        "description": "A team was created.\n\nThe body is the event as `GET /events` returns it.\n",
-        "tags": [
-          "Event Webhooks"
-        ],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/team-created-event"
-              }
-            }
-          }
-        },
-        "responses": {
-          "2XX": {
-            "$ref": "#/components/responses/webhook-delivered"
-          },
-          "default": {
-            "$ref": "#/components/responses/webhook-not-delivered"
-          }
-        }
-      }
-    },
-    "team.deactivated": {
-      "post": {
-        "operationId": "teamDeactivated",
-        "summary": "team.deactivated",
-        "description": "A team was deactivated.\n\nThe body is the event as `GET /events` returns it.\n",
-        "tags": [
-          "Event Webhooks"
-        ],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/team-deactivated-event"
-              }
-            }
-          }
-        },
-        "responses": {
-          "2XX": {
-            "$ref": "#/components/responses/webhook-delivered"
-          },
-          "default": {
-            "$ref": "#/components/responses/webhook-not-delivered"
-          }
-        }
-      }
-    },
-    "team.updated": {
-      "post": {
-        "operationId": "teamUpdated",
-        "summary": "team.updated",
-        "description": "A team was updated. The payload holds the fields that changed, with\ntheir new values.\n\nThe body is the event as `GET /events` returns it.\n",
-        "tags": [
-          "Event Webhooks"
-        ],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/team-updated-event"
-              }
-            }
-          }
-        },
-        "responses": {
-          "2XX": {
-            "$ref": "#/components/responses/webhook-delivered"
-          },
-          "default": {
-            "$ref": "#/components/responses/webhook-not-delivered"
-          }
-        }
-      }
-    },
-    "user.create.failed": {
-      "post": {
-        "operationId": "userCreateFailed",
-        "summary": "user.create.failed",
-        "description": "A user could not be created because a unique attribute was already\ntaken. The payload's `key_name` names the unique constraint that was\nhit.\n\nThe body is the event as `GET /events` returns it.\n",
-        "tags": [
-          "Event Webhooks"
-        ],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/user-create-failed-event"
-              }
-            }
-          }
-        },
-        "responses": {
-          "2XX": {
-            "$ref": "#/components/responses/webhook-delivered"
-          },
-          "default": {
-            "$ref": "#/components/responses/webhook-not-delivered"
-          }
-        }
-      }
-    },
-    "user.created": {
-      "post": {
-        "operationId": "userCreated",
-        "summary": "user.created",
-        "description": "A user was created. The payload lists the attribute keys written, with\nvalues only for schema fields marked `x-audit`.\n\nThe body is the event as `GET /events` returns it.\n",
-        "tags": [
-          "Event Webhooks"
-        ],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/user-created-event"
-              }
-            }
-          }
-        },
-        "responses": {
-          "2XX": {
-            "$ref": "#/components/responses/webhook-delivered"
-          },
-          "default": {
-            "$ref": "#/components/responses/webhook-not-delivered"
-          }
-        }
-      }
-    },
-    "user.deleted": {
-      "post": {
-        "operationId": "userDeleted",
-        "summary": "user.deleted",
-        "description": "A user was deleted.\n\nThe body is the event as `GET /events` returns it.\n",
-        "tags": [
-          "Event Webhooks"
-        ],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/user-deleted-event"
-              }
-            }
-          }
-        },
-        "responses": {
-          "2XX": {
-            "$ref": "#/components/responses/webhook-delivered"
-          },
-          "default": {
-            "$ref": "#/components/responses/webhook-not-delivered"
-          }
-        }
-      }
-    },
-    "user.updated": {
-      "post": {
-        "operationId": "userUpdated",
-        "summary": "user.updated",
-        "description": "A user's attributes were updated. The payload lists the attribute keys\nwritten, with values only for schema fields marked `x-audit`.\n\nThe body is the event as `GET /events` returns it.\n",
-        "tags": [
-          "Event Webhooks"
-        ],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/user-updated-event"
-              }
-            }
-          }
-        },
-        "responses": {
-          "2XX": {
-            "$ref": "#/components/responses/webhook-delivered"
-          },
-          "default": {
-            "$ref": "#/components/responses/webhook-not-delivered"
-          }
-        }
-      }
-    },
-    "variable.removed": {
-      "post": {
-        "operationId": "variableRemoved",
-        "summary": "variable.removed",
-        "description": "A variable's value was removed. One event per kind removed.\n\nThe body is the event as `GET /events` returns it.\n",
-        "tags": [
-          "Event Webhooks"
-        ],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/variable-removed-event"
-              }
-            }
-          }
-        },
-        "responses": {
-          "2XX": {
-            "$ref": "#/components/responses/webhook-delivered"
-          },
-          "default": {
-            "$ref": "#/components/responses/webhook-not-delivered"
-          }
-        }
-      }
-    },
-    "variable.set": {
-      "post": {
-        "operationId": "variableSet",
-        "summary": "variable.set",
-        "description": "A variable was given a value, new or replacing one. One event per kind\nwritten. The value never appears.\n\nThe body is the event as `GET /events` returns it.\n",
-        "tags": [
-          "Event Webhooks"
-        ],
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/variable-set-event"
+                "$ref": "#/components/schemas/webhook-event"
+              },
+              "example": {
+                "id": "evt_01HZYABCDEFGHJKMNPQRSTVWXY",
+                "type": "user.created",
+                "created_at": "2026-11-11T10:00:00Z",
+                "project_id": "proj_01HZYABCDEFGHJKMNPQRSTVWXY",
+                "actor": {
+                  "type": "human",
+                  "id": "user_01HZYABCDEFGHJKMNPQRSTVWXY"
+                },
+                "entity": {
+                  "type": "user",
+                  "id": "user_01HZYABCDEFGHJKMNPQRSTVWXZ"
+                },
+                "data": {
+                  "schema_id": "sch_01HZYABCDEFGHJKMNPQRSTVWXY",
+                  "attribute_keys": [
+                    "email",
+                    "name"
+                  ]
+                }
               }
             }
           }
@@ -12524,9 +11736,9 @@
               "signing_key.create": "Permission to create signing keys (reserved; endpoints not yet available)",
               "signing_key.read": "Permission to read signing keys (reserved; endpoints not yet available)",
               "signing_key.delete": "Permission to delete signing keys (reserved; endpoints not yet available)",
-              "webhook.read": "Permission to read webhooks (reserved; endpoints not yet available)",
-              "webhook.write": "Permission to create and manage webhooks (reserved; endpoints not yet available)",
-              "webhook.delete": "Permission to delete webhooks (reserved; endpoints not yet available)",
+              "webhook.read": "Permission to read a project's webhooks",
+              "webhook.write": "Permission to create and update a project's webhooks and rotate their secrets",
+              "webhook.delete": "Permission to delete a project's webhooks",
               "session.read": "Permission to read sessions",
               "session.write": "Permission to create and manage sessions",
               "session.delete": "Permission to revoke sessions",
@@ -12580,9 +11792,9 @@
               "signing_key.create": "Permission to create signing keys (reserved; endpoints not yet available)",
               "signing_key.read": "Permission to read signing keys (reserved; endpoints not yet available)",
               "signing_key.delete": "Permission to delete signing keys (reserved; endpoints not yet available)",
-              "webhook.read": "Permission to read webhooks (reserved; endpoints not yet available)",
-              "webhook.write": "Permission to create and manage webhooks (reserved; endpoints not yet available)",
-              "webhook.delete": "Permission to delete webhooks (reserved; endpoints not yet available)",
+              "webhook.read": "Permission to read a project's webhooks",
+              "webhook.write": "Permission to create and update a project's webhooks and rotate their secrets",
+              "webhook.delete": "Permission to delete a project's webhooks",
               "session.read": "Permission to read sessions",
               "session.write": "Permission to create and manage sessions",
               "session.delete": "Permission to revoke sessions",
@@ -25308,6 +24520,324 @@
           }
         }
       },
+      "webhook-not_found": {
+        "description": "Webhook not found\n\nError code: webhook.not_found\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "webhook.not_found"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "webhook-permission_denied": {
+        "description": "Insufficient permissions to manage webhooks\n\nError code: webhook.permission_denied\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "webhook.permission_denied"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "webhook-id": {
+        "type": "string",
+        "pattern": "^[a-zA-Z0-9_-]+$",
+        "x-zitadel-pattern-message": "must be one or more letters, digits, _ or -",
+        "description": "The webhook ID (`hook_<opaque>`): the `id` that `createWebhook`\n(`POST /webhooks`) returns or `listWebhooks` (`GET /webhooks`) lists.\n",
+        "example": "hook_01KWH3B7K2M9P4R6T8V0X2Z4C6"
+      },
+      "webhook-url": {
+        "title": "WebhookUrl",
+        "type": "string",
+        "description": "The URL the server POSTs the project's events to. It is `https`, at most\n2048 characters, and carries no user info (`user:password@`).\n",
+        "pattern": "^https://[^/?#@\\\\\\s]+([/?#]\\S*)?$",
+        "x-zitadel-pattern-message": "must be an https URL with a host, no user info and no whitespace",
+        "maxLength": 2048,
+        "example": "https://api.acme.com/hooks/zitadel"
+      },
+      "webhook-event-selector": {
+        "title": "WebhookEventSelector",
+        "type": "string",
+        "description": "An event type as `listEvents` (`GET /events`) filters by it, such as\n`user.created`, or `*` for every type.\n",
+        "pattern": "^(\\*|[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+)$",
+        "x-zitadel-pattern-message": "must be * or an event type: lowercase letters, digits or _ in segments joined by dots, such as user.created",
+        "example": "user.created"
+      },
+      "webhook-event-types": {
+        "title": "WebhookEventTypes",
+        "type": "array",
+        "description": "The event types the webhook receives. An event of a type that is not\nlisted is not sent. The list holds at least one entry, and no entry twice.\n\nEach entry is an event type as `listEvents` (`GET /events`) filters by it,\nsuch as `user.created`; the\n[event webhook](/docs/reference/api/event-webhooks/eventStored) lists\nthem, in its request body. When a\nwebhook is created or updated, the server refuses a type it does not\nwrite with `400` `webhook.invalid`. A type it stops writing later stays in\nthe list and matches nothing.\n\nThe entry `*` stands for every type, those added later included, except\n`request.api`. That type is one event per API request, so a receiver that\ncalls the API for each event it gets would feed itself. `*` stands alone:\na list that holds it and another entry is refused with `400`\n`webhook.invalid`. To receive `request.api`, list the types by name.\n",
+        "minItems": 1,
+        "uniqueItems": true,
+        "items": {
+          "$ref": "#/components/schemas/webhook-event-selector"
+        },
+        "example": [
+          "user.created",
+          "user.updated",
+          "user.deleted"
+        ]
+      },
+      "webhook": {
+        "title": "Webhook",
+        "type": "object",
+        "description": "A webhook of a project: a URL the server POSTs the project's events to,\nand the event types it gets. It never carries the signing secret, which\nonly `createWebhook` (`POST /webhooks`) and `rotateWebhookSecret`\n(`POST /webhooks/{id}/rotate_secret`) return.\n\nA webhook is failing when `last_error_at` is later than\n`last_delivered_at`, or is set while `last_delivered_at` is `null`: its\nlast attempt failed. The server retries, and holds back the webhook's\nlater events until an attempt succeeds. When the endpoint has failed for\n3 days without a success, or answers `410`, the server sets `enabled` to\n`false` and stops sending.\n",
+        "required": [
+          "id",
+          "project_id",
+          "url",
+          "description",
+          "event_types",
+          "enabled",
+          "last_delivered_at",
+          "last_error_status",
+          "last_error_at",
+          "previous_secret_expires_at",
+          "created_at"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/webhook-id"
+          },
+          "project_id": {
+            "$ref": "#/components/schemas/project-id"
+          },
+          "url": {
+            "$ref": "#/components/schemas/webhook-url"
+          },
+          "description": {
+            "type": "string",
+            "description": "A note on what the webhook is for. Empty when none was given.",
+            "example": "User sync"
+          },
+          "event_types": {
+            "$ref": "#/components/schemas/webhook-event-types"
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether the server sends events to the webhook. The server sets it to\n`false` itself when the endpoint has failed for 3 days without a\nsuccess, or answers `410`. Set it back to `true` with `updateWebhook`\n(`PATCH /webhooks/{id}`).\n",
+            "example": true
+          },
+          "last_delivered_at": {
+            "description": "When the endpoint last acknowledged an event. `null` until the first\ndelivery.\n",
+            "oneOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "example": "2026-11-11T10:00:12Z"
+          },
+          "last_error_status": {
+            "description": "The HTTP status the endpoint answered the last failed attempt with.\n`null` when no attempt has failed, and also when the attempt at\n`last_error_at` got no response: the connection failed, or the\nendpoint did not answer within 10 seconds. It is never `0`.\n",
+            "oneOf": [
+              {
+                "type": "integer",
+                "format": "int32",
+                "minimum": 100,
+                "maximum": 599
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "example": 503
+          },
+          "last_error_at": {
+            "description": "When a delivery attempt last failed. `null` when none has. A later\nsuccess does not clear it: compare it with `last_delivered_at`.\n",
+            "oneOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "example": "2026-11-10T08:15:00Z"
+          },
+          "previous_secret_expires_at": {
+            "description": "Until when deliveries are also signed with the secret that\n`rotateWebhookSecret` replaced: 24 hours from the rotation. `null`\nwhen no rotation is in progress.\n",
+            "oneOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "example": null
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the webhook was created.",
+            "example": "2026-11-11T10:00:00Z"
+          }
+        }
+      },
+      "list-webhooks-response": {
+        "title": "ListWebhooksResponse",
+        "type": "object",
+        "description": "A page of a project's webhooks, newest first.",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "description": "The webhooks of this page.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/webhook"
+            }
+          },
+          "next_page_token": {
+            "description": "Token to pass as `page_token` in the next request to fetch the following page.\nAbsent when there are no more results.\n",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/page-token"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "create-webhook-request": {
+        "title": "CreateWebhookRequest",
+        "type": "object",
+        "description": "The webhook to create.",
+        "required": [
+          "url",
+          "event_types"
+        ],
+        "properties": {
+          "url": {
+            "$ref": "#/components/schemas/webhook-url"
+          },
+          "event_types": {
+            "$ref": "#/components/schemas/webhook-event-types"
+          },
+          "description": {
+            "type": "string",
+            "description": "A note on what the webhook is for.",
+            "example": "User sync"
+          }
+        }
+      },
+      "webhook-invalid": {
+        "description": "The webhook request is invalid\n\nError code: webhook.invalid\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "webhook.invalid"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "webhook-limit_reached": {
+        "description": "The project has reached its limit of 10 webhooks\n\nError code: webhook.limit_reached\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "webhook.limit_reached"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "webhook-with-secret": {
+        "title": "WebhookWithSecret",
+        "description": "A webhook together with its signing secret. Only `createWebhook` and\n`rotateWebhookSecret` answer with it: store the secret then, because no\nother response returns it.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/webhook"
+          },
+          {
+            "type": "object",
+            "required": [
+              "secret"
+            ],
+            "properties": {
+              "secret": {
+                "type": "string",
+                "description": "The secret the server signs the webhook's deliveries with: `whsec_`\nfollowed by 32 random bytes in base64. The server generates it; a\ncaller cannot choose it.\n",
+                "example": "whsec_C2FVsBQIhrscChlQIMV+b5sSYspob7oDZJQk1o3DdH8="
+              }
+            }
+          }
+        ]
+      },
+      "update-webhook-request": {
+        "title": "UpdateWebhookRequest",
+        "type": "object",
+        "description": "The fields of the webhook to change. A field you leave out keeps its\nvalue. The body names at least one field.\n",
+        "additionalProperties": false,
+        "minProperties": 1,
+        "properties": {
+          "url": {
+            "$ref": "#/components/schemas/webhook-url"
+          },
+          "description": {
+            "type": "string",
+            "description": "A note on what the webhook is for. Send `\"\"` to remove it.",
+            "example": "User sync"
+          },
+          "event_types": {
+            "$ref": "#/components/schemas/webhook-event-types"
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether the server sends events to the webhook. `false` stops\ndelivery. `true` starts it again from now: events stored while the\nwebhook was disabled are not sent.\n",
+            "example": true
+          }
+        }
+      },
       "variable-kind": {
         "type": "string",
         "description": "Which deployments a value reaches: `primary` for primary origins,\n`preview` for preview URLs. There is no fallback between kinds.\n",
@@ -26130,6 +25660,1442 @@
             "secret": true
           },
           "RETRY_COUNT": 10
+        }
+      },
+      "webhook-event-base": {
+        "type": "object",
+        "description": "The fields of every request to a project's webhook, each always present.\n`type` says which event type it is, and with it what `data` holds: the\nevent's `payload` as `getEvent` (`GET /events/{id}`) returns it, redacted\nthe same way, and `{}` when the event type has none. `data` is what the\nevent recorded, not the resource.\n",
+        "required": [
+          "id",
+          "type",
+          "created_at",
+          "project_id",
+          "actor",
+          "entity"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The event ID, in the form `evt_<opaque>`. It is the same on every\nretry, and the `id` that `getEvent` (`GET /events/{id}`) takes.\n",
+            "example": "evt_01HZYABCDEFGHJKMNPQRSTVWXY"
+          },
+          "type": {
+            "type": "string",
+            "description": "The event type, dot-separated: the event's `event_type`. It says what\n`data` holds.\n",
+            "example": "user.created"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the event was stored, on the server's clock, in UTC.",
+            "example": "2026-11-11T10:00:00Z"
+          },
+          "project_id": {
+            "$ref": "#/components/schemas/project-id"
+          },
+          "actor": {
+            "description": "Who triggered the event: the event's `actor_type` and `actor_id`.\n`null` when the event has neither. When it has only one, the other is\n`null`: a project token acting for no user gives a `type` of `service`\nand an `id` of `null`.\n",
+            "oneOf": [
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "id"
+                ],
+                "properties": {
+                  "type": {
+                    "description": "The kind of actor.",
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "human",
+                          "service",
+                          "system",
+                          "agent"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "id": {
+                    "description": "The ID of the actor, a user's for a `human`.",
+                    "oneOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "example": {
+              "type": "human",
+              "id": "user_01HZYABCDEFGHJKMNPQRSTVWXY"
+            }
+          },
+          "entity": {
+            "description": "The resource the event affected: the event's `entity_type` and\n`entity_id`. `null` when the event has neither. When it has only one,\nthe other is `null`: deleting a session revokes its tokens with a\n`type` of `token` and an `id` of `null`. To read the resource as it is\nnow, pass `id` to the operation that reads its type, such as\n`GetUserByID` (`GET /users/{user_id}`).\n",
+            "oneOf": [
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "id"
+                ],
+                "properties": {
+                  "type": {
+                    "description": "The type of resource, for example `user`.",
+                    "oneOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "id": {
+                    "description": "The ID of the resource.",
+                    "oneOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "example": {
+              "type": "user",
+              "id": "user_01HZYABCDEFGHJKMNPQRSTVWXZ"
+            }
+          }
+        }
+      },
+      "webhook-event": {
+        "title": "WebhookEvent",
+        "description": "An event as a project's webhook receives it. Read type to tell which\nevent type it is; each type carries its own data.\n",
+        "oneOf": [
+          {
+            "title": "application.created",
+            "description": "A registered application was created.\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "application.created"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/application-payload"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "title": "application.updated",
+            "description": "A registered application was revised. The payload holds the new\nrevision, the name when it changed, and the clients the revision\nadded.\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "application.updated"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/application-payload"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "title": "auth.attempt.created",
+            "description": "An authentication attempt started. See [Sessions and auth\nattempts](/docs/concepts/sessions-auth-attempts).\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "auth.attempt.created"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/empty-event-payload"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "title": "auth.attempt.handed_off",
+            "description": "An authentication attempt was handed off to a session. The attempt is\ncomplete, and its verified result moves to the session.\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "auth.attempt.handed_off"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/empty-event-payload"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "title": "auth.check.failed",
+            "description": "A check in an authentication attempt failed, such as a wrong password.\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "auth.check.failed"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/auth-check-payload"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "title": "auth.check.succeeded",
+            "description": "A check in an authentication attempt succeeded. The event is also sent\nwhen a factor is recorded without a challenge, as on sign-up.\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "auth.check.succeeded"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/auth-check-payload"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "title": "auth.factor.passkey.enrolled",
+            "description": "A passkey was enrolled for a user.\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "auth.factor.passkey.enrolled"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/auth-factor-payload"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "title": "auth.factor.password.set",
+            "description": "A user's password was set.\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "auth.factor.password.set"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/auth-factor-payload"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "title": "auth.sso.authorization.failed",
+            "description": "A sign-in through an identity provider (SSO) failed at the provider.\nIt answered with an error, `access_denied` included, or the callback\ncarried no code.\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "auth.sso.authorization.failed"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/auth-check-payload"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "title": "auth.sso.exchange.failed",
+            "description": "A sign-in through an identity provider (SSO) failed after its code\narrived. The token exchange, the ID token or userinfo validation, or\nthe connection's configuration failed.\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "auth.sso.exchange.failed"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/auth-check-payload"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "title": "auth.sso.exchange.succeeded",
+            "description": "The code from a sign-in through an identity provider (SSO) was\nexchanged. This is not a sign-in: the identity may still match no\nuser.\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "auth.sso.exchange.succeeded"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/auth-check-payload"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "title": "auth.token.issued",
+            "description": "A token was issued.\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "auth.token.issued"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/auth-token-issued-payload"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "title": "auth.token.revoked",
+            "description": "A token was revoked. Deleting a session revokes its tokens too. Those\nevents have an `entity.id` of `null`; the session's ID is `session_id`\nof the event that `getEvent` (`GET /events/{id}`) returns.\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "auth.token.revoked"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/empty-event-payload"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "title": "authz.granted",
+            "description": "A role on a project was granted.\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "authz.granted"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/authz-granted-payload"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "title": "authz.revoked",
+            "description": "A role on a project was revoked.\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "authz.revoked"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/authz-granted-payload"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "title": "branding.created",
+            "description": "A branding revision was created.\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "branding.created"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/branding-created-payload"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "title": "deployment.created",
+            "description": "A release was deployed, or a deployment rolled back. One event per\ndeployment, however many targets it has. A deployment makes a release\nlive on a set of origins.\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "deployment.created"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/deployment-created-payload"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "title": "flow.signup_challenge.consumed",
+            "description": "A signup proof was spent before attempting user creation.\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "flow.signup_challenge.consumed"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/empty-event-payload"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "title": "flow.signup_challenge.issued",
+            "description": "A sign-up proof-of-work challenge was issued.\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "flow.signup_challenge.issued"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/empty-event-payload"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "title": "flowdef.created",
+            "description": "A flow definition was created. A [flow\ndefinition](/docs/concepts/flows-and-schemas) sets which step of a\nsign-in renders when, and which fields each step collects.\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "flowdef.created"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/flowdef-payload"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "title": "flowdef.deleted",
+            "description": "A flow definition was deleted.\n\nRetired: nothing sends this event any more. It stays in the API so\nstored events still decode.\n",
+            "deprecated": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "flowdef.deleted"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/empty-event-payload"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "title": "flowdef.updated",
+            "description": "A flow definition was updated.\n\nRetired: nothing sends this event any more. It stays in the API so\nstored events still decode.\n",
+            "deprecated": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "flowdef.updated"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/flowdef-payload"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "title": "idp.created",
+            "description": "An identity provider (IdP) connection was created.\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "idp.created"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/idp-payload"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "title": "idp.identity_link.created",
+            "description": "A user was created by a sign-in through an identity provider (SSO) and\nlinked to the provider account.\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "idp.identity_link.created"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/idp-identity-link-created-payload"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "title": "idp.updated",
+            "description": "An IdP connection was revised. `data` holds the new revision and the\nfields that changed.\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "idp.updated"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/idp-payload"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "title": "invitation.accepted",
+            "description": "An invitation was accepted. The grant events the acceptance writes\nshare its `request_id`, which is on the event that `getEvent` (`GET\n/events/{id}`) returns; there are none when the user already holds an\nidentical active grant.\n\nNot sent yet: the contract is published ahead of the code that sends\nit.\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "invitation.accepted"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/invitation-accepted-payload"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "title": "invitation.cancelled",
+            "description": "A pending invitation was cancelled by an administrator, or an\nunaccepted one was deleted by its replacement.\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "invitation.cancelled"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/invitation-cancelled-payload"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "title": "invitation.created",
+            "description": "An invitation was created, new or as the replacement of another.\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "invitation.created"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/invitation-created-payload"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "title": "invitation.rejected",
+            "description": "An invitation was declined.\n\nNot sent yet: the contract is published ahead of the code that sends\nit.\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "invitation.rejected"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/invitation-rejected-payload"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "title": "origin.added",
+            "description": "An origin was added to a project. `data` holds its `pattern` and its\n`kind`, `primary` or `preview`.\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "origin.added"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/origin-payload"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "title": "origin.removed",
+            "description": "An origin was removed from a project. `data` holds its `pattern` and\nits `kind`, `primary` or `preview`.\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "origin.removed"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/origin-payload"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "title": "policy.created",
+            "description": "A project published the first revision of its policy for an operation.\nA policy guards an operation, such as setting a password.\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "policy.created"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/policy-payload"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "title": "policy.updated",
+            "description": "A project published a new revision of its policy for an operation.\n`data` holds the new revision and its settings.\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "policy.updated"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/policy-payload"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "title": "preview.removed",
+            "description": "A preview was removed before its expiry.\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "preview.removed"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/empty-event-payload"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "title": "project.created",
+            "description": "A project was created.\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "project.created"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/project-payload"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "title": "project.deleted",
+            "description": "A project was deleted.\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "project.deleted"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/empty-event-payload"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "title": "project.updated",
+            "description": "A project was updated. `data` holds the fields that changed, with\ntheir new values.\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "project.updated"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/project-payload"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "title": "release.created",
+            "description": "A release was created. A [release](/docs/concepts/repo-config) is an\nimmutable build of the project's configuration, which a deployment\nmakes live.\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "release.created"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/release-created-payload"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "title": "release.revoked",
+            "description": "A release was revoked.\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "release.revoked"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/release-revoked-payload"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "title": "request.api",
+            "description": "An API request in the project completed. One event per request; the\nhealth, liveness, and readiness probes send none. The requester's IP,\nuser agent and origin are in `metadata.client` of the event that\n`getEvent` (`GET /events/{id}`) returns, and its `request_id` joins\nthe other events of the same request to it.\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "request.api"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/request-api-payload"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "title": "schema.created",
+            "description": "A schema was created.\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "schema.created"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/schema-created-payload"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "title": "session.deleted",
+            "description": "A session was revoked.\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "session.deleted"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/session-deleted-payload"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "title": "session.established",
+            "description": "A session was established, by a sign-in or by exchanging a session.\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "session.established"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/session-established-payload"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "title": "team.created",
+            "description": "A team was created.\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "team.created"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/team-payload"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "title": "team.deactivated",
+            "description": "A team was deactivated.\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "team.deactivated"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/empty-event-payload"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "title": "team.updated",
+            "description": "A team was updated. `data` holds the fields that changed, with their\nnew values.\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "team.updated"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/team-payload"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "title": "user.create.failed",
+            "description": "A user could not be created because a unique attribute was already\ntaken. `data.key_name` names the unique constraint that was hit.\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "user.create.failed"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/user-create-failed-payload"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "title": "user.created",
+            "description": "A user was created. `data` lists the attribute keys written, with\nvalues only for schema fields marked `x-audit`.\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "user.created"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/user-created-payload"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "title": "user.deleted",
+            "description": "A user was deleted.\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "user.deleted"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/empty-event-payload"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "title": "user.updated",
+            "description": "A user's attributes were updated. `data` lists the attribute keys\nwritten, with values only for schema fields marked `x-audit`.\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "user.updated"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/user-updated-payload"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "title": "variable.removed",
+            "description": "A variable's value was removed. One event per kind removed.\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "variable.removed"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/variable-removed-payload"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "title": "variable.set",
+            "description": "A variable was given a value, new or replacing one. One event per kind\nwritten. The value never appears.\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/webhook-event-base"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "variable.set"
+                  },
+                  "data": {
+                    "$ref": "#/components/schemas/variable-set-payload"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type"
         }
       }
     },
@@ -27154,6 +28120,34 @@
         "value": {
           "code": "evt.permission_denied",
           "message": "event: permission denied"
+        }
+      },
+      "webhook-not_found": {
+        "summary": "webhook.not_found",
+        "value": {
+          "code": "webhook.not_found",
+          "message": "webhook not found"
+        }
+      },
+      "webhook-permission_denied": {
+        "summary": "webhook.permission_denied",
+        "value": {
+          "code": "webhook.permission_denied",
+          "message": "insufficient permissions to manage webhooks"
+        }
+      },
+      "webhook-invalid": {
+        "summary": "webhook.invalid",
+        "value": {
+          "code": "webhook.invalid",
+          "message": "the webhook request is invalid"
+        }
+      },
+      "webhook-limit_reached": {
+        "summary": "webhook.limit_reached",
+        "value": {
+          "code": "webhook.limit_reached",
+          "message": "the project has reached its limit of 10 webhooks"
         }
       },
       "var-not_found": {
@@ -36097,6 +37091,457 @@
           }
         }
       },
+      "listWebhooks-error-response": {
+        "description": "Error response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/auth-unauthorized"
+                },
+                {
+                  "$ref": "#/components/schemas/internal"
+                },
+                {
+                  "$ref": "#/components/schemas/not_implemented"
+                },
+                {
+                  "$ref": "#/components/schemas/req-invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/unavailable"
+                },
+                {
+                  "$ref": "#/components/schemas/webhook-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/webhook-permission_denied"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "code",
+                "mapping": {
+                  "auth.unauthorized": "#/components/schemas/auth-unauthorized",
+                  "internal": "#/components/schemas/internal",
+                  "not_implemented": "#/components/schemas/not_implemented",
+                  "req.invalid": "#/components/schemas/req-invalid",
+                  "unavailable": "#/components/schemas/unavailable",
+                  "webhook.not_found": "#/components/schemas/webhook-not_found",
+                  "webhook.permission_denied": "#/components/schemas/webhook-permission_denied"
+                }
+              }
+            },
+            "examples": {
+              "auth.unauthorized": {
+                "$ref": "#/components/examples/auth-unauthorized"
+              },
+              "internal": {
+                "$ref": "#/components/examples/internal"
+              },
+              "not_implemented": {
+                "$ref": "#/components/examples/not_implemented"
+              },
+              "req.invalid": {
+                "$ref": "#/components/examples/req-invalid"
+              },
+              "unavailable": {
+                "$ref": "#/components/examples/unavailable"
+              },
+              "webhook.not_found": {
+                "$ref": "#/components/examples/webhook-not_found"
+              },
+              "webhook.permission_denied": {
+                "$ref": "#/components/examples/webhook-permission_denied"
+              }
+            }
+          }
+        }
+      },
+      "createWebhook-error-response": {
+        "description": "Error response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/auth-csrf_invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/auth-unauthorized"
+                },
+                {
+                  "$ref": "#/components/schemas/internal"
+                },
+                {
+                  "$ref": "#/components/schemas/not_implemented"
+                },
+                {
+                  "$ref": "#/components/schemas/req-invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/unavailable"
+                },
+                {
+                  "$ref": "#/components/schemas/webhook-invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/webhook-limit_reached"
+                },
+                {
+                  "$ref": "#/components/schemas/webhook-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/webhook-permission_denied"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "code",
+                "mapping": {
+                  "auth.csrf_invalid": "#/components/schemas/auth-csrf_invalid",
+                  "auth.unauthorized": "#/components/schemas/auth-unauthorized",
+                  "internal": "#/components/schemas/internal",
+                  "not_implemented": "#/components/schemas/not_implemented",
+                  "req.invalid": "#/components/schemas/req-invalid",
+                  "unavailable": "#/components/schemas/unavailable",
+                  "webhook.invalid": "#/components/schemas/webhook-invalid",
+                  "webhook.limit_reached": "#/components/schemas/webhook-limit_reached",
+                  "webhook.not_found": "#/components/schemas/webhook-not_found",
+                  "webhook.permission_denied": "#/components/schemas/webhook-permission_denied"
+                }
+              }
+            },
+            "examples": {
+              "auth.csrf_invalid": {
+                "$ref": "#/components/examples/auth-csrf_invalid"
+              },
+              "auth.unauthorized": {
+                "$ref": "#/components/examples/auth-unauthorized"
+              },
+              "internal": {
+                "$ref": "#/components/examples/internal"
+              },
+              "not_implemented": {
+                "$ref": "#/components/examples/not_implemented"
+              },
+              "req.invalid": {
+                "$ref": "#/components/examples/req-invalid"
+              },
+              "unavailable": {
+                "$ref": "#/components/examples/unavailable"
+              },
+              "webhook.invalid": {
+                "$ref": "#/components/examples/webhook-invalid"
+              },
+              "webhook.limit_reached": {
+                "$ref": "#/components/examples/webhook-limit_reached"
+              },
+              "webhook.not_found": {
+                "$ref": "#/components/examples/webhook-not_found"
+              },
+              "webhook.permission_denied": {
+                "$ref": "#/components/examples/webhook-permission_denied"
+              }
+            }
+          }
+        }
+      },
+      "getWebhook-error-response": {
+        "description": "Error response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/auth-unauthorized"
+                },
+                {
+                  "$ref": "#/components/schemas/internal"
+                },
+                {
+                  "$ref": "#/components/schemas/not_implemented"
+                },
+                {
+                  "$ref": "#/components/schemas/req-invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/unavailable"
+                },
+                {
+                  "$ref": "#/components/schemas/webhook-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/webhook-permission_denied"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "code",
+                "mapping": {
+                  "auth.unauthorized": "#/components/schemas/auth-unauthorized",
+                  "internal": "#/components/schemas/internal",
+                  "not_implemented": "#/components/schemas/not_implemented",
+                  "req.invalid": "#/components/schemas/req-invalid",
+                  "unavailable": "#/components/schemas/unavailable",
+                  "webhook.not_found": "#/components/schemas/webhook-not_found",
+                  "webhook.permission_denied": "#/components/schemas/webhook-permission_denied"
+                }
+              }
+            },
+            "examples": {
+              "auth.unauthorized": {
+                "$ref": "#/components/examples/auth-unauthorized"
+              },
+              "internal": {
+                "$ref": "#/components/examples/internal"
+              },
+              "not_implemented": {
+                "$ref": "#/components/examples/not_implemented"
+              },
+              "req.invalid": {
+                "$ref": "#/components/examples/req-invalid"
+              },
+              "unavailable": {
+                "$ref": "#/components/examples/unavailable"
+              },
+              "webhook.not_found": {
+                "$ref": "#/components/examples/webhook-not_found"
+              },
+              "webhook.permission_denied": {
+                "$ref": "#/components/examples/webhook-permission_denied"
+              }
+            }
+          }
+        }
+      },
+      "deleteWebhook-error-response": {
+        "description": "Error response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/auth-csrf_invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/auth-unauthorized"
+                },
+                {
+                  "$ref": "#/components/schemas/internal"
+                },
+                {
+                  "$ref": "#/components/schemas/not_implemented"
+                },
+                {
+                  "$ref": "#/components/schemas/req-invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/unavailable"
+                },
+                {
+                  "$ref": "#/components/schemas/webhook-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/webhook-permission_denied"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "code",
+                "mapping": {
+                  "auth.csrf_invalid": "#/components/schemas/auth-csrf_invalid",
+                  "auth.unauthorized": "#/components/schemas/auth-unauthorized",
+                  "internal": "#/components/schemas/internal",
+                  "not_implemented": "#/components/schemas/not_implemented",
+                  "req.invalid": "#/components/schemas/req-invalid",
+                  "unavailable": "#/components/schemas/unavailable",
+                  "webhook.not_found": "#/components/schemas/webhook-not_found",
+                  "webhook.permission_denied": "#/components/schemas/webhook-permission_denied"
+                }
+              }
+            },
+            "examples": {
+              "auth.csrf_invalid": {
+                "$ref": "#/components/examples/auth-csrf_invalid"
+              },
+              "auth.unauthorized": {
+                "$ref": "#/components/examples/auth-unauthorized"
+              },
+              "internal": {
+                "$ref": "#/components/examples/internal"
+              },
+              "not_implemented": {
+                "$ref": "#/components/examples/not_implemented"
+              },
+              "req.invalid": {
+                "$ref": "#/components/examples/req-invalid"
+              },
+              "unavailable": {
+                "$ref": "#/components/examples/unavailable"
+              },
+              "webhook.not_found": {
+                "$ref": "#/components/examples/webhook-not_found"
+              },
+              "webhook.permission_denied": {
+                "$ref": "#/components/examples/webhook-permission_denied"
+              }
+            }
+          }
+        }
+      },
+      "updateWebhook-error-response": {
+        "description": "Error response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/auth-csrf_invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/auth-unauthorized"
+                },
+                {
+                  "$ref": "#/components/schemas/internal"
+                },
+                {
+                  "$ref": "#/components/schemas/not_implemented"
+                },
+                {
+                  "$ref": "#/components/schemas/req-invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/unavailable"
+                },
+                {
+                  "$ref": "#/components/schemas/webhook-invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/webhook-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/webhook-permission_denied"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "code",
+                "mapping": {
+                  "auth.csrf_invalid": "#/components/schemas/auth-csrf_invalid",
+                  "auth.unauthorized": "#/components/schemas/auth-unauthorized",
+                  "internal": "#/components/schemas/internal",
+                  "not_implemented": "#/components/schemas/not_implemented",
+                  "req.invalid": "#/components/schemas/req-invalid",
+                  "unavailable": "#/components/schemas/unavailable",
+                  "webhook.invalid": "#/components/schemas/webhook-invalid",
+                  "webhook.not_found": "#/components/schemas/webhook-not_found",
+                  "webhook.permission_denied": "#/components/schemas/webhook-permission_denied"
+                }
+              }
+            },
+            "examples": {
+              "auth.csrf_invalid": {
+                "$ref": "#/components/examples/auth-csrf_invalid"
+              },
+              "auth.unauthorized": {
+                "$ref": "#/components/examples/auth-unauthorized"
+              },
+              "internal": {
+                "$ref": "#/components/examples/internal"
+              },
+              "not_implemented": {
+                "$ref": "#/components/examples/not_implemented"
+              },
+              "req.invalid": {
+                "$ref": "#/components/examples/req-invalid"
+              },
+              "unavailable": {
+                "$ref": "#/components/examples/unavailable"
+              },
+              "webhook.invalid": {
+                "$ref": "#/components/examples/webhook-invalid"
+              },
+              "webhook.not_found": {
+                "$ref": "#/components/examples/webhook-not_found"
+              },
+              "webhook.permission_denied": {
+                "$ref": "#/components/examples/webhook-permission_denied"
+              }
+            }
+          }
+        }
+      },
+      "rotateWebhookSecret-error-response": {
+        "description": "Error response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/auth-csrf_invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/auth-unauthorized"
+                },
+                {
+                  "$ref": "#/components/schemas/internal"
+                },
+                {
+                  "$ref": "#/components/schemas/not_implemented"
+                },
+                {
+                  "$ref": "#/components/schemas/req-invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/unavailable"
+                },
+                {
+                  "$ref": "#/components/schemas/webhook-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/webhook-permission_denied"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "code",
+                "mapping": {
+                  "auth.csrf_invalid": "#/components/schemas/auth-csrf_invalid",
+                  "auth.unauthorized": "#/components/schemas/auth-unauthorized",
+                  "internal": "#/components/schemas/internal",
+                  "not_implemented": "#/components/schemas/not_implemented",
+                  "req.invalid": "#/components/schemas/req-invalid",
+                  "unavailable": "#/components/schemas/unavailable",
+                  "webhook.not_found": "#/components/schemas/webhook-not_found",
+                  "webhook.permission_denied": "#/components/schemas/webhook-permission_denied"
+                }
+              }
+            },
+            "examples": {
+              "auth.csrf_invalid": {
+                "$ref": "#/components/examples/auth-csrf_invalid"
+              },
+              "auth.unauthorized": {
+                "$ref": "#/components/examples/auth-unauthorized"
+              },
+              "internal": {
+                "$ref": "#/components/examples/internal"
+              },
+              "not_implemented": {
+                "$ref": "#/components/examples/not_implemented"
+              },
+              "req.invalid": {
+                "$ref": "#/components/examples/req-invalid"
+              },
+              "unavailable": {
+                "$ref": "#/components/examples/unavailable"
+              },
+              "webhook.not_found": {
+                "$ref": "#/components/examples/webhook-not_found"
+              },
+              "webhook.permission_denied": {
+                "$ref": "#/components/examples/webhook-permission_denied"
+              }
+            }
+          }
+        }
+      },
       "getVariables-error-response": {
         "description": "Error response",
         "content": {
@@ -36939,7 +38384,7 @@
         }
       },
       "webhook-not-delivered": {
-        "description": "Not delivered: any other status, a failed connection, or a timeout.\nThe server sends the event again on its next pass, and holds back the\nproject's later events until this one is delivered.\n"
+        "description": "Not delivered: any other status, a failed connection, or no response\nwithin 10 seconds. The server sends the event again, and holds back the\nwebhook's later events until this one is delivered.\n"
       },
       "webhook-delivered": {
         "description": "Delivered. Any 2xx status acknowledges the event; the response body is ignored."
@@ -37248,6 +38693,16 @@
           "type": "string"
         },
         "example": "evt_01HZYABCDEFGHJKMNPQRSTVWXY"
+      },
+      "webhook-id": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "description": "The webhook ID (`hook_<opaque>`): the `id` that `createWebhook`\n(`POST /webhooks`) returns or `listWebhooks` (`GET /webhooks`) lists.\n",
+        "schema": {
+          "$ref": "#/components/schemas/webhook-id"
+        },
+        "example": "hook_01KWH3B7K2M9P4R6T8V0X2Z4C6"
       },
       "variable-kind": {
         "name": "kind",

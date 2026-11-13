@@ -1,0 +1,52 @@
+# The one webhook of the API: what the server sends a project's webhook
+# (endpoints/webhooks). Its body is generated per event type by
+# gen_event_schemas (webhook-event.yaml).
+post:
+  operationId: eventStored
+  summary: Event
+  description: |
+    An event of a type the webhook receives was stored in the project. The
+    server POSTs it to the `url` of each of the project's webhooks that
+    lists its type in `event_types`, one event per request.
+
+    The body has the same seven fields for every event type. `type` names
+    the event type, and `data` is that type's `payload` as `getEvent`
+    (`GET /events/{id}`) returns it; select a type in the request body below
+    to see its `data`. The body is not the whole event, and `data` is not
+    the resource. Read the resource with `entity.id`, or the whole event
+    with `getEvent` and the body's `id`.
+
+    The request is signed: verify its `webhook-signature` header as the
+    [Webhooks](/docs/reference/api/webhooks) reference describes, over the
+    raw body, before parsing it.
+  tags:
+    - Event Webhooks
+  # Signed with the webhook's secret (the Webhooks tag), not authenticated.
+  security: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: webhook-event.yaml
+        example:
+          id: evt_01HZYABCDEFGHJKMNPQRSTVWXY
+          type: user.created
+          created_at: '2026-11-11T10:00:00Z'
+          project_id: proj_01HZYABCDEFGHJKMNPQRSTVWXY
+          actor:
+            type: human
+            id: user_01HZYABCDEFGHJKMNPQRSTVWXY
+          entity:
+            type: user
+            id: user_01HZYABCDEFGHJKMNPQRSTVWXZ
+          data:
+            schema_id: sch_01HZYABCDEFGHJKMNPQRSTVWXY
+            attribute_keys:
+              - email
+              - name
+  responses:
+    '2XX':
+      $ref: webhook-delivered.yaml
+    default:
+      $ref: webhook-not-delivered.yaml

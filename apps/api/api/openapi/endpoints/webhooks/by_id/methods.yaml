@@ -1,0 +1,212 @@
+get:
+  operationId: getWebhook
+  summary: Get a webhook
+  description: |
+    Returns one webhook of the project in `project_id`, with the time of its
+    last delivery and of its last failed attempt.
+
+    The response never includes the signing secret.
+
+    Authenticate with a project secret (`oauth2`), or with the session cookie
+    (`sessionCookie`) of a signed-in person who can read the project.
+  tags:
+    - Webhooks
+  security:
+    - oauth2:
+        - webhook.read
+    - sessionCookie: []
+  parameters:
+    - $ref: ../../../components/parameters/webhook-id.yaml
+    - $ref: ../../../components/parameters/project-id.yaml
+  responses:
+    '200':
+      description: The webhook.
+      content:
+        application/json:
+          schema:
+            $ref: ../webhook.yaml
+          examples:
+            webhook:
+              summary: A webhook that is delivering
+              value:
+                id: hook_01KWH3B7K2M9P4R6T8V0X2Z4C6
+                project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+                url: https://api.acme.com/hooks/zitadel
+                description: User sync
+                event_types:
+                  - user.created
+                  - user.updated
+                  - user.deleted
+                enabled: true
+                last_delivered_at: '2026-11-11T10:00:12Z'
+                last_error_status: null
+                last_error_at: null
+                previous_secret_expires_at: null
+                created_at: '2026-11-11T10:00:00Z'
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '403':
+      description: The caller cannot read the project's webhooks.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '404':
+      description: Webhook or project not found.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    default:
+      $ref: getWebhook-error-response.yaml
+
+patch:
+  operationId: updateWebhook
+  summary: Update a webhook
+  description: |
+    Changes a webhook's `url`, `description`, `event_types` or `enabled`, and
+    returns the updated webhook.
+
+    Fields you leave out keep their value. The body names at least one
+    field: an empty body is refused with `400`. `url` and `event_types`
+    follow the rules `createWebhook` (`POST /webhooks`) states.
+
+    A new `url` gets the events the old one had not yet acknowledged: the
+    webhook keeps its place in the project's events. The signing secret
+    stays the same.
+
+    `enabled: false` stops delivery. `enabled: true` starts it again from
+    now, also for a webhook the server disabled after 3 days of failures or
+    a `410`: events stored while it was disabled are not sent.
+
+    Authenticate with a project secret (`oauth2`), or with the session cookie
+    (`sessionCookie`) of a signed-in person who can change the project.
+    Cookie requests follow that scheme's CSRF rules.
+  tags:
+    - Webhooks
+  security:
+    - oauth2:
+        - webhook.write
+    - sessionCookie: []
+  parameters:
+    - $ref: ../../../components/parameters/webhook-id.yaml
+    - $ref: ../../../components/parameters/project-id.yaml
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: update-webhook-request.yaml
+        examples:
+          disable:
+            summary: Stop delivery
+            value:
+              enabled: false
+          event_types:
+            summary: Change which event types it receives
+            value:
+              event_types:
+                - session.established
+                - session.deleted
+  responses:
+    '200':
+      description: The updated webhook.
+      content:
+        application/json:
+          schema:
+            $ref: ../webhook.yaml
+          examples:
+            disabled:
+              summary: The webhook after `enabled` was set to `false`
+              value:
+                id: hook_01KWH3B7K2M9P4R6T8V0X2Z4C6
+                project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+                url: https://api.acme.com/hooks/zitadel
+                description: User sync
+                event_types:
+                  - user.created
+                  - user.updated
+                  - user.deleted
+                enabled: false
+                last_delivered_at: '2026-11-11T10:00:12Z'
+                last_error_status: null
+                last_error_at: null
+                previous_secret_expires_at: null
+                created_at: '2026-11-11T10:00:00Z'
+    '400':
+      description: The body is empty, the `url` or an entry of `event_types` is not valid, or `*` is listed beside another entry.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '403':
+      description: The caller cannot change the project's webhooks.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '404':
+      description: Webhook or project not found.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    default:
+      $ref: updateWebhook-error-response.yaml
+
+delete:
+  operationId: deleteWebhook
+  summary: Delete a webhook
+  description: |
+    Deletes a webhook. The server stops sending it events, including those
+    it had not yet delivered, and its signing secret stops being valid.
+
+    This cannot be undone. To stop delivery and keep the webhook, send
+    `enabled: false` to `updateWebhook` (`PATCH /webhooks/{id}`)
+    instead.
+
+    Authenticate with a project secret (`oauth2`), or with the session cookie
+    (`sessionCookie`) of a signed-in person who administers the project.
+    Cookie requests follow that scheme's CSRF rules.
+  tags:
+    - Webhooks
+  security:
+    - oauth2:
+        - webhook.delete
+    - sessionCookie: []
+  parameters:
+    - $ref: ../../../components/parameters/webhook-id.yaml
+    - $ref: ../../../components/parameters/project-id.yaml
+  responses:
+    '204':
+      description: The webhook was deleted.
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '403':
+      description: The caller cannot delete the project's webhooks.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '404':
+      description: Webhook or project not found.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    default:
+      $ref: deleteWebhook-error-response.yaml

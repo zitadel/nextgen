@@ -1,0 +1,9 @@
+title: WebhookUrl
+type: string
+description: |
+  The URL the server POSTs the project's events to. It is `https`, at most
+  2048 characters, and carries no user info (`user:password@`).
+pattern: '^https://[^/?#@\\\s]+([/?#]\S*)?$'
+x-zitadel-pattern-message: "must be an https URL with a host, no user info and no whitespace"
+maxLength: 2048
+example: https://api.acme.com/hooks/zitadel

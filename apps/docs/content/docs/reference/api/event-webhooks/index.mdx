@@ -1,35 +1,75 @@
 ---
 title: Event webhooks
-description: The requests the server sends to a webhook to deliver the project's events, one page per event type.
+description: The request the server sends a project's webhook for each event, with one body for every event type.
 ---
 
-The server can deliver the project's [events](/docs/reference/api/events) to a
-webhook as it stores them. Each event type has a page here: what happened, and
-the event the request carries.
+The server delivers a project's [events](/docs/reference/api/events) to the
+project's [webhooks](/docs/reference/api/webhooks): the URLs the project
+registered, each with the event types it receives. Every delivery is the same
+request, whatever the event type.
+
+Registering a webhook is not available yet: the Webhooks operations answer
+`501` with the code `not_implemented`, so no project receives these requests
+for now. The contract is published ahead of the server code.
+
+## The body
+
+One `POST` per event, with `Content-Type: application/json`. The body has
+these seven fields, always all of them:
+
+```json
+{
+  "id": "evt_01HZYABCDEFGHJKMNPQRSTVWXY",
+  "type": "user.created",
+  "created_at": "2026-11-11T10:00:00Z",
+  "project_id": "proj_01KWH1P4MYS7F0N9WD3P2E4YM5",
+  "actor": { "type": "human", "id": "user_01HZYABCDEFGHJKMNPQRSTVWXY" },
+  "entity": { "type": "user", "id": "user_01HZYABCDEFGHJKMNPQRSTVWXZ" },
+  "data": { "schema_id": "sch_01KWHF2XY6RN7F0N9WD3P2E4YM", "attribute_keys": ["email", "name"] }
+}
+```
+
+| Field | Value |
+| --- | --- |
+| `id` | The event's ID. It is the same on every retry. |
+| `type` | The event type, such as `user.created`: the event's `event_type`. |
+| `created_at` | When the event was stored, in UTC. |
+| `project_id` | The project the event belongs to. |
+| `actor` | Who triggered the event, as its `type` and `id`. |
+| `entity` | The resource the event affected, as its `type` and `id`. |
+| `data` | What the event recorded, which depends on `type`. |
+
+- Tell events apart by `type`. The event webhook's page lists every type: select
+  one in its request body to read what happened and what `data` holds.
+- `data` is the event's `payload` as `getEvent` (`GET /events/{id}`) returns
+  it, redacted the same way. It is `{}` for a type with no payload. It is not
+  the resource: `user.created` lists the attribute keys written, not the user.
+- `actor` and `entity` are `null` when the event has neither a type nor an ID
+  for them. When it has only one of the two, the other is `null`: a project
+  token acting for no user gives `{ "type": "service", "id": null }`.
+- The body holds nothing else. To get more, read the resource with
+  `entity.id`, or the whole event by passing `id` to `getEvent`.
 
 ## Delivery
 
-- One `POST` per event, with `Content-Type: application/json`. The body is the
-  event as `GET /events` returns it; its `event_type` names the page that
-  describes it.
-- Any 2xx status acknowledges the event. Any other status, a failed connection,
-  or no response within 10 seconds leaves it undelivered: the server sends it
-  again on its next pass, and holds back the project's later events until it
-  is delivered. Other projects' events keep going.
-- Within a project, events arrive in the order they were stored. A write
-  still in progress holds back the project's later events until it is stored,
-  so none is skipped.
+- Any 2xx status acknowledges the event. Any other status, a failed
+  connection, or no response within 10 seconds leaves it undelivered: the
+  server sends it again, and holds back the webhook's later events until it
+  is delivered.
+- Events arrive in the order they were stored.
 - Delivery is at least once, so an event can arrive twice. Drop duplicates by
-  its `id`.
-- A request carries no signature and no credentials.
-- Retention deletes events by age, 30 days by default, whether they were
-  delivered or not. An event the webhook hasn't taken by then is lost.
+  `id`.
+- Every request is signed with the webhook's secret. Verify the signature
+  over the raw body before parsing it, as
+  [Webhooks](/docs/reference/api/webhooks#verify-the-signature) describes.
+- A webhook that keeps failing is disabled:
+  [Webhooks](/docs/reference/api/webhooks#what-a-webhook-receives) says when.
 
-## Setting the webhook
+## The operator's export sink
 
-The webhook is part of the server's configuration, not of the API, so a
-project can't register one yet. On a server you run yourself, set it under
-`events.export`:
+A server's operator can also send events to a sink of their own. That is not
+a project's webhook, and the rest of this section does not describe it. On a
+server you run yourself, set it under `events.export`:
 
 ```yaml title="nextgen.yaml"
 events:
@@ -40,11 +80,15 @@ events:
         url: https://siem.example.com/zitadel/events
 ```
 
-The server delivers the events of every project, including projects nobody
-has claimed yet: the webhook is the deployment's, like its platform
-operators, who read every project's events. A new webhook URL starts with the
-oldest event still retained.
+- The sink gets each event whole, as `getEvent` returns it, and the request
+  carries no signature and no credentials.
+- It gets the events of every project, including projects nobody has claimed
+  yet: the sink is the deployment's, like its platform operators, who read
+  every project's events.
+- A new sink URL starts with the oldest event still retained.
+- Retention deletes events by age, 30 days by default, whether they were
+  delivered or not. An event the sink hasn't taken by then is lost.
 
-## Event types
+## The webhook
 
 <Operations />
