@@ -823,7 +823,7 @@ project and imports the root admin.
   `VERCEL_FORCE_NO_BUILD_CACHE_UPLOAD is set so skipping build cache upload step`.
   Never set `VERCEL_FORCE_NO_BUILD_CACHE`: it skips the restore, not the
   upload. A CLI `vercel redeploy` also builds without the build cache and
-  turbo's remote cache.
+  Turbo's remote cache.
 
   The compressed archive must stay below the Standard build machine's
   1.5 GB limit. [build-launcher.sh](../../apps/cloud/build-launcher.sh) bounds
