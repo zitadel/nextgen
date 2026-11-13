@@ -28,6 +28,9 @@ const (
 	// noScope stands in for a missing scope. No client allows it, so the
 	// library drops it.
 	noScope = "urn:zitadel:no-scope"
+	// maxStateBytes bounds the state every request stores. It leaves room for
+	// clients that encrypt their sign-in's properties into state.
+	maxStateBytes = 2048
 	// temporarilyUnavailable tells the client it may retry (RFC 6749
 	// §4.1.2.1). The library has no constructor for it.
 	temporarilyUnavailable = "temporarily_unavailable"
@@ -97,6 +100,9 @@ func (s opServer) Authorize(ctx context.Context, r *op.ClientRequest[oidc.AuthRe
 	// state is stored, so it must be text every dialect can hold.
 	if !storable(req.State) {
 		return nil, oidc.ErrInvalidRequest().WithDescription("state must be UTF-8 without NUL")
+	}
+	if len(req.State) > maxStateBytes {
+		return nil, oidc.ErrInvalidRequest().WithDescription("state must be at most %d bytes", maxStateBytes)
 	}
 	// The metadata offers the query mode only.
 	if req.ResponseMode != "" && req.ResponseMode != oidc.ResponseModeQuery {

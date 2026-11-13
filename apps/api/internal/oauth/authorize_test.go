@@ -1,11 +1,13 @@
 package oauth
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -90,9 +92,11 @@ func TestAuthorizeReachesTheLoginPage(t *testing.T) {
 		name          string
 		set           map[string]string
 		wantChallenge string
+		wantState     string
 	}{
 		{name: "without_pkce"},
 		{name: "with_pkce", set: map[string]string{"code_challenge": challenge, "code_challenge_method": "S256"}, wantChallenge: challenge},
+		{name: "state_at_limit", set: map[string]string{"state": strings.Repeat("s", 2048)}, wantState: strings.Repeat("s", 2048)},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -112,7 +116,7 @@ func TestAuthorizeReachesTheLoginPage(t *testing.T) {
 				ID:            "authreq_1",
 				ClientID:      "shop",
 				RedirectURI:   callback,
-				State:         "xyz",
+				State:         cmp.Or(tt.wantState, "xyz"),
 				Scopes:        []string{},
 				CodeChallenge: tt.wantChallenge,
 				Issuer:        "https://app.example.com/oauth/proj_123",
@@ -287,6 +291,7 @@ func TestAuthorizeRedirectsRefusalsToTheClient(t *testing.T) {
 		{name: "no_state", set: map[string]string{"state": ""}, wantError: "invalid_request"},
 		{name: "state_with_nul", set: map[string]string{"state": "xyz\x00"}, wantError: "invalid_request"},
 		{name: "state_not_utf8", set: map[string]string{"state": "xyz\xff"}, wantError: "invalid_request"},
+		{name: "state_too_long", set: map[string]string{"state": strings.Repeat("s", 2049)}, wantError: "invalid_request"},
 		{name: "no_authorization_code_grant", set: map[string]string{"client_id": "no-codes"}, wantError: "unauthorized_client"},
 		{name: "fragment_mode", set: map[string]string{"response_mode": "fragment"}, wantError: "invalid_request"},
 		{name: "request_object", set: map[string]string{"request": "eyJhbGciOiJub25lIn0.e30."}, wantError: "request_not_supported"},
