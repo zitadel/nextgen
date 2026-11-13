@@ -179,7 +179,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
         branding: {},
       };
       server.use(
-        http.post("*/flow", () => HttpResponse.json(body, { status: 201 }), { once: true }),
+        http.post("*/flows", () => HttpResponse.json(body, { status: 201 }), { once: true }),
       );
     }
 
@@ -419,7 +419,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
     // knowing the name came from its `flow-name` attribute.
     server.use(
       http.post(
-        "*/flow",
+        "*/flows",
         () =>
           HttpResponse.json(
             {
@@ -445,7 +445,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
   it("explains a flow-name that does not serve the requested purpose", async () => {
     server.use(
       http.post(
-        "*/flow",
+        "*/flows",
         () =>
           HttpResponse.json(
             {
@@ -475,7 +475,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
       status: number,
       attributes: Record<string, string> = {},
     ) => {
-      server.use(http.post("*/flow", () => HttpResponse.json(body, { status }), { once: true }));
+      server.use(http.post("*/flows", () => HttpResponse.json(body, { status }), { once: true }));
       const element = document.createElement("zitadel-login") as ZitadelLogin;
       element.project = testProject;
       for (const [name, value] of Object.entries(attributes)) element.setAttribute(name, value);
@@ -817,7 +817,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
   });
 
   it("surfaces network errors via zitadel-flow-error", async () => {
-    server.resetHandlers(http.post("*/flow", () => HttpResponse.error(), { once: true }));
+    server.resetHandlers(http.post("*/flows", () => HttpResponse.error(), { once: true }));
 
     const errorEvents: CustomEvent[] = [];
     const element = document.createElement("zitadel-login") as ZitadelLogin;
@@ -841,7 +841,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
     // flow-response unwrap and reach the user verbatim.
     server.use(
       http.post(
-        "*/flow/*/submit",
+        "*/flows/*/submit",
         () => HttpResponse.json({ code: "req.invalid", message: serverMessage }, { status: 400 }),
         { once: true },
       ),
@@ -919,7 +919,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
     // The template renders primary actions generically AND has a dedicated
     // passkey block, which must skip a passkey that is already primary.
     server.use(
-      http.post("*/flow", () =>
+      http.post("*/flows", () =>
         HttpResponse.json(
           {
             id: "flow_test",
@@ -1051,7 +1051,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
     try {
       server.use(
         http.post(
-          "*/flow/*/submit",
+          "*/flows/*/submit",
           () =>
             new Promise((resolve) => {
               releaseSubmit = () =>
@@ -1339,7 +1339,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
     // step shape with `fields.value` unset and `step.error` populated. We
     // override the mock's submit handler to mirror that wire shape.
     server.use(
-      http.post("*/flow/*/submit", () =>
+      http.post("*/flows/*/submit", () =>
         HttpResponse.json(
           {
             id: "flow_test",
@@ -1408,7 +1408,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
     const element = await mount(host);
 
     server.use(
-      http.post("*/flow/*/submit", () =>
+      http.post("*/flows/*/submit", () =>
         HttpResponse.json(
           {
             id: "flow_test",
@@ -1456,7 +1456,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
     const element = await mount(host);
 
     server.use(
-      http.post("*/flow/*/submit", () =>
+      http.post("*/flows/*/submit", () =>
         HttpResponse.json(
           {
             id: "flow_test",
@@ -1514,7 +1514,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
     const element = await mount(host);
 
     server.use(
-      http.post("*/flow/*/submit", () =>
+      http.post("*/flows/*/submit", () =>
         HttpResponse.json(
           {
             id: "flow_test",
@@ -1563,7 +1563,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
     const element = await mount(host);
 
     server.use(
-      http.post("*/flow/*/submit", () =>
+      http.post("*/flows/*/submit", () =>
         HttpResponse.json(
           {
             id: "flow_test",
@@ -1612,7 +1612,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
   ): Promise<ZitadelLogin> {
     const element = await mount(hostEl);
     server.use(
-      http.post("*/flow/*/submit", () =>
+      http.post("*/flows/*/submit", () =>
         HttpResponse.json(
           {
             id: "flow_test",
@@ -1719,7 +1719,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
     let releaseSubmit: (() => void) | undefined;
     server.use(
       http.post(
-        "*/flow/*/submit",
+        "*/flows/*/submit",
         () =>
           new Promise((resolve) => {
             releaseSubmit = () =>
@@ -1790,7 +1790,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
     let releaseSubmit: (() => void) | undefined;
     server.use(
       http.post(
-        "*/flow/*/submit",
+        "*/flows/*/submit",
         () =>
           new Promise((resolve) => {
             releaseSubmit = () =>
@@ -1923,7 +1923,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
       const held = new Promise<void>((resolve) => (release = resolve));
       server.use(
         http.get(
-          "*/flow/:id",
+          "*/flows/:id",
           async () => {
             await held;
           },
@@ -1947,7 +1947,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
       await navigateToRegisterPassword(element);
       type(element, PASSWORD_FIELD, "hunter2secure");
       server.use(
-        http.get("*/flow/:id", () =>
+        http.get("*/flows/:id", () =>
           HttpResponse.json({ code, message: "test signup failure" }, { status: status as number }),
         ),
       );
@@ -1967,7 +1967,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
       const element = await mount(host);
       await navigateToRegisterPassword(element);
       type(element, PASSWORD_FIELD, "hunter2secure");
-      server.use(http.get("*/flow/:id", () => HttpResponse.error(), { once: true }));
+      server.use(http.get("*/flows/:id", () => HttpResponse.error(), { once: true }));
       const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
       try {
         submit(element);
@@ -1986,7 +1986,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
       element.lang = "de";
       type(element, PASSWORD_FIELD, "hunter2secure");
       server.use(
-        http.get("*/flow/:id", () =>
+        http.get("*/flows/:id", () =>
           HttpResponse.json(
             { code: "flow.rate_limited", message: "signup request limit reached" },
             { status: 429 },
@@ -2094,7 +2094,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
       const { response } = internals(element);
       server.use(
         http.get(
-          "*/flow/:id",
+          "*/flows/:id",
           () => HttpResponse.json({ ...response, step: { ...response.step, gates: {} } }),
           { once: true },
         ),
@@ -2123,7 +2123,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
       const { response } = internals(element);
       server.use(
         http.get(
-          "*/flow/:id",
+          "*/flows/:id",
           () =>
             HttpResponse.json({
               ...response,
@@ -2331,7 +2331,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
         const element = await mount(host);
         server.use(
           http.get(
-            "*/flow/:id",
+            "*/flows/:id",
             () =>
               HttpResponse.json(
                 { code: "flow.rate_limited", message: "signup request limit reached" },
@@ -2414,7 +2414,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
         await waitFor(() => (proofReady(element) ? true : null));
         server.use(
           http.post(
-            "*/flow/:id/submit",
+            "*/flows/:id/submit",
             () =>
               HttpResponse.json(
                 { code: "flow.rate_limited", message: "signup request limit reached" },
@@ -2728,7 +2728,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
     // A step whose only inputs are the non-text atoms: values are read from
     // `<zl-select>` and `<zl-checkbox>` too.
     server.use(
-      http.post("*/flow", () =>
+      http.post("*/flows", () =>
         HttpResponse.json(
           {
             id: "flow_test",
@@ -2765,7 +2765,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
 
     let submittedFields: Record<string, unknown> | undefined;
     server.use(
-      http.post("*/flow/*/submit", async ({ request }) => {
+      http.post("*/flows/*/submit", async ({ request }) => {
         const body = (await request.json()) as {
           fields: Record<string, unknown>;
         };
@@ -2827,7 +2827,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
       vi.unstubAllEnvs();
     });
     server.use(
-      http.post("*/flow", () =>
+      http.post("*/flows", () =>
         HttpResponse.json(
           {
             id: "flow_test",
@@ -2855,7 +2855,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
 
     let submittedFields: Record<string, unknown> | undefined;
     server.use(
-      http.post("*/flow/*/submit", async ({ request }) => {
+      http.post("*/flows/*/submit", async ({ request }) => {
         const body = (await request.json()) as { fields: Record<string, unknown> };
         submittedFields = body.fields;
         return HttpResponse.json({
@@ -2909,7 +2909,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
         vi.unstubAllEnvs();
       });
       server.use(
-        http.post("*/flow", () =>
+        http.post("*/flows", () =>
           HttpResponse.json(
             {
               id: "flow_test",
@@ -2938,7 +2938,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
 
       let submittedFields: Record<string, unknown> | undefined;
       server.use(
-        http.post("*/flow/*/submit", async ({ request }) => {
+        http.post("*/flows/*/submit", async ({ request }) => {
           const body = (await request.json()) as { fields: Record<string, unknown> };
           submittedFields = body.fields;
           return HttpResponse.json({
@@ -2983,7 +2983,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
     // An untouched optional checkbox must submit real `false`, not "" — the
     // schema validates the property as a boolean and rejects an empty string.
     server.use(
-      http.post("*/flow", () =>
+      http.post("*/flows", () =>
         HttpResponse.json(
           {
             id: "flow_test",
@@ -3011,7 +3011,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
 
     let submittedFields: Record<string, unknown> | undefined;
     server.use(
-      http.post("*/flow/*/submit", async ({ request }) => {
+      http.post("*/flows/*/submit", async ({ request }) => {
         const body = (await request.json()) as {
           fields: Record<string, unknown>;
         };
@@ -3058,7 +3058,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
     // matched"). The orchestrator must omit the field entirely. A text field
     // in the same step still submits its "" default so required-checks run.
     server.use(
-      http.post("*/flow", () =>
+      http.post("*/flows", () =>
         HttpResponse.json(
           {
             id: "flow_test",
@@ -3095,7 +3095,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
 
     let submittedFields: Record<string, string> | undefined;
     server.use(
-      http.post("*/flow/*/submit", async ({ request }) => {
+      http.post("*/flows/*/submit", async ({ request }) => {
         const body = (await request.json()) as {
           fields: Record<string, string>;
         };
@@ -3248,7 +3248,7 @@ describe("<zitadel-login preview-state>", () => {
     let release: (() => void) | undefined;
     server.use(
       http.post(
-        "*/flow/*/submit",
+        "*/flows/*/submit",
         () =>
           new Promise((resolve) => {
             release = () =>
@@ -3317,7 +3317,7 @@ describe("<zitadel-login preview-state>", () => {
 
   it("starts no passkey ceremony for a served step that carries a challenge", async () => {
     server.use(
-      http.post("*/flow", () =>
+      http.post("*/flows", () =>
         HttpResponse.json(
           {
             id: "flow-1",
@@ -3377,7 +3377,7 @@ describe("<zitadel-login preview-state>", () => {
   /** A served step the browser's back gesture can leave. */
   function serveBackCapableStep(): void {
     server.use(
-      http.post("*/flow", () =>
+      http.post("*/flows", () =>
         HttpResponse.json(
           {
             id: "flow-1",

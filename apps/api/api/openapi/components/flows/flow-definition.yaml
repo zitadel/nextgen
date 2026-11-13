@@ -19,7 +19,7 @@ description: |
   that `zitadel deploy` publishes or through the API, and they are stored in
   the project/team configuration hierarchy. The server selects the matching
   definition from the purpose and audience when a flow starts with
-  `createFlow` (`POST /flow`).
+  `createFlow` (`POST /flows`).
 additionalProperties: false
 properties:
   "$schema":

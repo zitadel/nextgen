@@ -101,7 +101,7 @@ the same origin (the repo-root `vercel.json`). That routing is what no other
 lane can see, so this one pins it: `/console/runtime.json` still reaches the
 server, the old `/ui/console` links redirect, and a deep link comes up as the
 signed-out sign-in screen with the login widget asking for an email, which
-takes the server's runtime document and its `POST /flow`. It signs nobody in,
+takes the server's runtime document and its `POST /flows`. It signs nobody in,
 so it needs no credential but Vercel's bypass secret.
 
 [`deployment-checks.yml`](../../.github/workflows/deployment-checks.yml) runs it

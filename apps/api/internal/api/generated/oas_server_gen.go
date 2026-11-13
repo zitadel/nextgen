@@ -243,7 +243,7 @@ type Handler interface {
 	//
 	// The flow endpoints are the runtime calls the login component (`<zitadel-login>`) makes, step by
 	// step. It starts a flow here, renders the step it gets back, and submits the user's input with
-	// `submitFlowStep` (`POST /flow/{flow_id}/submit`) to get the next step. This call creates a new
+	// `submitFlowStep` (`POST /flows/{flow_id}/submit`) to get the next step. This call creates a new
 	// session implicitly, unless `session_id` is provided together with that session's `session_token`
 	// (for step-up or reauthentication on an existing session).
 	//
@@ -273,13 +273,13 @@ type Handler interface {
 	// origin is still refused unless the project lists it.
 	//
 	// The response contains an `id` field, the flow handle. Use it as the path parameter for all
-	// subsequent `/flow/{flow_id}/submit` calls.
+	// subsequent `/flows/{flow_id}/submit` calls.
 	//
 	// The response also sets an encrypted `HttpOnly` cookie (`_zflow`) containing the flow's orchestration
 	// state (current step, collected data, history). The server is stateless between requests: all flow
 	// state lives in this cookie. The browser sends it automatically on subsequent requests.
 	//
-	// POST /flow
+	// POST /flows
 	CreateFlow(ctx context.Context, req *CreateFlowRequest, params CreateFlowParams) (CreateFlowRes, error)
 	// CreateGrant implements createGrant operation.
 	//
@@ -639,8 +639,8 @@ type Handler interface {
 	// page reload or a network error.
 	//
 	// The flow endpoints are the runtime calls the login component (`<zitadel-login>`) makes, step by
-	// step. `createFlow` (`POST /flow`) starts a flow, and `submitFlowStep`
-	// (`POST /flow/{flow_id}/submit`) advances it.
+	// step. `createFlow` (`POST /flows`) starts a flow, and `submitFlowStep`
+	// (`POST /flows/{flow_id}/submit`) advances it.
 	//
 	// For a sign-up step, prepares `step.gates.signup_pow.challenge`: one that creates its user on submit,
 	// or one carrying a passkey registration that creates its user. Reuses challenges with more than a
@@ -650,7 +650,7 @@ type Handler interface {
 	// Reuses the deployment sealed into `_zflow` at `createFlow`; it does not re-resolve from `Origin`. If
 	// that release was revoked since the attempt started, the response is `409` with `rel.revoked`.
 	//
-	// GET /flow/{flow_id}
+	// GET /flows/{flow_id}
 	GetFlowStep(ctx context.Context, params GetFlowStepParams) (GetFlowStepRes, error)
 	// GetGrant implements getGrant operation.
 	//
@@ -1614,7 +1614,7 @@ type Handler interface {
 	// that meets the policy.
 	//
 	// The password policy is the one in the release that serves the caller's `Origin`, chosen as
-	// `createFlow` (`POST /flow`) chooses it. A frontend on a preview URL gets that preview's policy, and
+	// `createFlow` (`POST /flows`) chooses it. A frontend on a preview URL gets that preview's policy, and
 	// one on a primary origin the newest primary deployment's. A request with no `Origin`, or from the
 	// console when the project does not list the console's origin, gets the project's newest primary
 	// deployment.
@@ -1660,7 +1660,7 @@ type Handler interface {
 	// Submits the user's input for the current step of a flow. The server validates it, processes it (for
 	// example, verifies a credential), advances the flow through any invisible steps, and returns the next
 	// visible step. The flow endpoints are the runtime calls the login component (`<zitadel-login>`)
-	// makes, step by step; `createFlow` (`POST /flow`) starts a flow.
+	// makes, step by step; `createFlow` (`POST /flows`) starts a flow.
 	//
 	// The response sets an updated encrypted `HttpOnly` cookie (`_zflow`) with the new flow state. The
 	// server is stateless: all orchestration state is carried in this cookie between requests.
@@ -1713,7 +1713,7 @@ type Handler interface {
 	// Reuses the deployment sealed into `_zflow` at `createFlow`; it does not re-resolve from `Origin`. If
 	// that release was revoked since the attempt started, the response is `409` with `rel.revoked`.
 	//
-	// POST /flow/{flow_id}/submit
+	// POST /flows/{flow_id}/submit
 	SubmitFlowStep(ctx context.Context, req *FlowSubmitRequest, params SubmitFlowStepParams) (SubmitFlowStepRes, error)
 	// UpdateMyUser implements updateMyUser operation.
 	//

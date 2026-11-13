@@ -29900,7 +29900,7 @@ func (s *FlowCookieInvalidDetails) init() FlowCookieInvalidDetails {
 // Administrators create flow definitions, either as `.zitadel/flows/` files that `zitadel deploy`
 // publishes or through the API, and they are stored in the project/team configuration hierarchy. The
 // server selects the matching definition from the purpose and audience when a flow starts with
-// `createFlow` (`POST /flow`).
+// `createFlow` (`POST /flows`).
 // Ref: #
 type FlowDefinition struct {
 	// Editor affordance: path or URL of this file's JSON meta-schema, so an editor validates and
@@ -32827,7 +32827,7 @@ type FlowSubmitRequest struct {
 	// ID of the selected SSO provider (from `sso_providers[].id`). Required when `action` is "sso".
 	SSOProviderID OptString `json:"sso_provider_id"`
 	// The page hosting the login component, where the flow resumes after an external sign-in: the callback
-	// sends the browser here unchanged, and the page loads `GET /flow/{flow_id}` to render the next step.
+	// sends the browser here unchanged, and the page loads `GET /flows/{flow_id}` to render the next step.
 	// The client puts the flow ID in it; the login component reads `?flow=<id>` on the reload. Required
 	// when `action` is "sso". An absolute URL; the server parses it and keeps a fragment, so a hash-routed
 	// page returns to its route. Its origin must equal the request origin; any other origin is rejected
@@ -92135,7 +92135,7 @@ func (s *ReleasePointer) SetRevisionID(val string) {
 // identify its kind: a schema's is its `$id`, which may be any URL.
 //
 // `flow_definition` rather than `flow`: a release pins the definitions served at `/flow_definitions`,
-// not the runtime flows at `/flow`.
+// not the runtime flows at `/flows`.
 // Ref: #
 type ReleasePointerKind string
 

@@ -28,7 +28,7 @@ func opError(t *testing.T, err error) *OpError {
 	return oe
 }
 
-// TestLoginClassifiesErrorDetails: a 400 error-details body on POST /flow
+// TestLoginClassifiesErrorDetails: a 400 error-details body on POST /flows
 // becomes an OpError carrying the body's code and the status class.
 func TestLoginClassifiesErrorDetails(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -51,7 +51,7 @@ func TestLoginClassifiesStepError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		http.SetCookie(w, &http.Cookie{Name: "_zflow", Value: "sealed", Path: "/"})
-		if r.URL.Path == "/api/v1/flow" {
+		if r.URL.Path == "/api/v1/flows" {
 			w.WriteHeader(http.StatusCreated)
 			_, _ = w.Write([]byte(`{"id":"flow_1","session_id":"sess_1","step":{"name":"identifier","type":"form","fields":[],"actions":[],"gates":{}}}`))
 			return
@@ -97,7 +97,7 @@ func TestClassifyTransport(t *testing.T) {
 
 // TestClassifiesDefaultErrorResponse: a status the spec documents only
 // through the default error response — 403 on GET /users/{id}, 500 on POST
-// /flow — keeps the server's code instead of collapsing to
+// /flows — keeps the server's code instead of collapsing to
 // unexpected_response.
 func TestClassifiesDefaultErrorResponse(t *testing.T) {
 	for _, tc := range []struct {

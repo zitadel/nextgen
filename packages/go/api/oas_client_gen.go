@@ -264,7 +264,7 @@ type Invoker interface {
 	//
 	// The flow endpoints are the runtime calls the login component (`<zitadel-login>`) makes, step by
 	// step. It starts a flow here, renders the step it gets back, and submits the user's input with
-	// `submitFlowStep` (`POST /flow/{flow_id}/submit`) to get the next step. This call creates a new
+	// `submitFlowStep` (`POST /flows/{flow_id}/submit`) to get the next step. This call creates a new
 	// session implicitly, unless `session_id` is provided together with that session's `session_token`
 	// (for step-up or reauthentication on an existing session).
 	//
@@ -294,13 +294,13 @@ type Invoker interface {
 	// origin is still refused unless the project lists it.
 	//
 	// The response contains an `id` field, the flow handle. Use it as the path parameter for all
-	// subsequent `/flow/{flow_id}/submit` calls.
+	// subsequent `/flows/{flow_id}/submit` calls.
 	//
 	// The response also sets an encrypted `HttpOnly` cookie (`_zflow`) containing the flow's orchestration
 	// state (current step, collected data, history). The server is stateless between requests: all flow
 	// state lives in this cookie. The browser sends it automatically on subsequent requests.
 	//
-	// POST /flow
+	// POST /flows
 	CreateFlow(ctx context.Context, request *CreateFlowRequest, params CreateFlowParams) (CreateFlowRes, error)
 	// CreateGrant invokes createGrant operation.
 	//
@@ -660,8 +660,8 @@ type Invoker interface {
 	// page reload or a network error.
 	//
 	// The flow endpoints are the runtime calls the login component (`<zitadel-login>`) makes, step by
-	// step. `createFlow` (`POST /flow`) starts a flow, and `submitFlowStep`
-	// (`POST /flow/{flow_id}/submit`) advances it.
+	// step. `createFlow` (`POST /flows`) starts a flow, and `submitFlowStep`
+	// (`POST /flows/{flow_id}/submit`) advances it.
 	//
 	// For a sign-up step, prepares `step.gates.signup_pow.challenge`: one that creates its user on submit,
 	// or one carrying a passkey registration that creates its user. Reuses challenges with more than a
@@ -671,7 +671,7 @@ type Invoker interface {
 	// Reuses the deployment sealed into `_zflow` at `createFlow`; it does not re-resolve from `Origin`. If
 	// that release was revoked since the attempt started, the response is `409` with `rel.revoked`.
 	//
-	// GET /flow/{flow_id}
+	// GET /flows/{flow_id}
 	GetFlowStep(ctx context.Context, params GetFlowStepParams) (GetFlowStepRes, error)
 	// GetGrant invokes getGrant operation.
 	//
@@ -1635,7 +1635,7 @@ type Invoker interface {
 	// that meets the policy.
 	//
 	// The password policy is the one in the release that serves the caller's `Origin`, chosen as
-	// `createFlow` (`POST /flow`) chooses it. A frontend on a preview URL gets that preview's policy, and
+	// `createFlow` (`POST /flows`) chooses it. A frontend on a preview URL gets that preview's policy, and
 	// one on a primary origin the newest primary deployment's. A request with no `Origin`, or from the
 	// console when the project does not list the console's origin, gets the project's newest primary
 	// deployment.
@@ -1681,7 +1681,7 @@ type Invoker interface {
 	// Submits the user's input for the current step of a flow. The server validates it, processes it (for
 	// example, verifies a credential), advances the flow through any invisible steps, and returns the next
 	// visible step. The flow endpoints are the runtime calls the login component (`<zitadel-login>`)
-	// makes, step by step; `createFlow` (`POST /flow`) starts a flow.
+	// makes, step by step; `createFlow` (`POST /flows`) starts a flow.
 	//
 	// The response sets an updated encrypted `HttpOnly` cookie (`_zflow`) with the new flow state. The
 	// server is stateless: all orchestration state is carried in this cookie between requests.
@@ -1734,7 +1734,7 @@ type Invoker interface {
 	// Reuses the deployment sealed into `_zflow` at `createFlow`; it does not re-resolve from `Origin`. If
 	// that release was revoked since the attempt started, the response is `409` with `rel.revoked`.
 	//
-	// POST /flow/{flow_id}/submit
+	// POST /flows/{flow_id}/submit
 	SubmitFlowStep(ctx context.Context, request *FlowSubmitRequest, params SubmitFlowStepParams) (SubmitFlowStepRes, error)
 	// UpdateMyUser invokes updateMyUser operation.
 	//
@@ -3507,7 +3507,7 @@ func (c *Client) sendCreateDeployment(ctx context.Context, request *CreateDeploy
 //
 // The flow endpoints are the runtime calls the login component (`<zitadel-login>`) makes, step by
 // step. It starts a flow here, renders the step it gets back, and submits the user's input with
-// `submitFlowStep` (`POST /flow/{flow_id}/submit`) to get the next step. This call creates a new
+// `submitFlowStep` (`POST /flows/{flow_id}/submit`) to get the next step. This call creates a new
 // session implicitly, unless `session_id` is provided together with that session's `session_token`
 // (for step-up or reauthentication on an existing session).
 //
@@ -3537,13 +3537,13 @@ func (c *Client) sendCreateDeployment(ctx context.Context, request *CreateDeploy
 // origin is still refused unless the project lists it.
 //
 // The response contains an `id` field, the flow handle. Use it as the path parameter for all
-// subsequent `/flow/{flow_id}/submit` calls.
+// subsequent `/flows/{flow_id}/submit` calls.
 //
 // The response also sets an encrypted `HttpOnly` cookie (`_zflow`) containing the flow's orchestration
 // state (current step, collected data, history). The server is stateless between requests: all flow
 // state lives in this cookie. The browser sends it automatically on subsequent requests.
 //
-// POST /flow
+// POST /flows
 func (c *Client) CreateFlow(ctx context.Context, request *CreateFlowRequest, params CreateFlowParams) (CreateFlowRes, error) {
 	res, err := c.sendCreateFlow(ctx, request, params)
 	return res, err
@@ -3562,7 +3562,7 @@ func (c *Client) sendCreateFlow(ctx context.Context, request *CreateFlowRequest,
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("createFlow"),
 		semconv.HTTPRequestMethodKey.String("POST"),
-		semconv.URLTemplateKey.String("/flow"),
+		semconv.URLTemplateKey.String("/flows"),
 	}
 	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
 
@@ -3596,7 +3596,7 @@ func (c *Client) sendCreateFlow(ctx context.Context, request *CreateFlowRequest,
 	stage = "BuildURL"
 	u := uri.Clone(c.requestURL(ctx))
 	var pathParts [1]string
-	pathParts[0] = "/flow"
+	pathParts[0] = "/flows"
 	uri.AddPathParts(u, pathParts[:]...)
 
 	stage = "EncodeRequest"
@@ -7008,8 +7008,8 @@ func (c *Client) sendGetFlowDefinition(ctx context.Context, params GetFlowDefini
 // page reload or a network error.
 //
 // The flow endpoints are the runtime calls the login component (`<zitadel-login>`) makes, step by
-// step. `createFlow` (`POST /flow`) starts a flow, and `submitFlowStep`
-// (`POST /flow/{flow_id}/submit`) advances it.
+// step. `createFlow` (`POST /flows`) starts a flow, and `submitFlowStep`
+// (`POST /flows/{flow_id}/submit`) advances it.
 //
 // For a sign-up step, prepares `step.gates.signup_pow.challenge`: one that creates its user on submit,
 // or one carrying a passkey registration that creates its user. Reuses challenges with more than a
@@ -7019,7 +7019,7 @@ func (c *Client) sendGetFlowDefinition(ctx context.Context, params GetFlowDefini
 // Reuses the deployment sealed into `_zflow` at `createFlow`; it does not re-resolve from `Origin`. If
 // that release was revoked since the attempt started, the response is `409` with `rel.revoked`.
 //
-// GET /flow/{flow_id}
+// GET /flows/{flow_id}
 func (c *Client) GetFlowStep(ctx context.Context, params GetFlowStepParams) (GetFlowStepRes, error) {
 	res, err := c.sendGetFlowStep(ctx, params)
 	return res, err
@@ -7029,7 +7029,7 @@ func (c *Client) sendGetFlowStep(ctx context.Context, params GetFlowStepParams) 
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("getFlowStep"),
 		semconv.HTTPRequestMethodKey.String("GET"),
-		semconv.URLTemplateKey.String("/flow/{flow_id}"),
+		semconv.URLTemplateKey.String("/flows/{flow_id}"),
 	}
 	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
 
@@ -7063,7 +7063,7 @@ func (c *Client) sendGetFlowStep(ctx context.Context, params GetFlowStepParams) 
 	stage = "BuildURL"
 	u := uri.Clone(c.requestURL(ctx))
 	var pathParts [2]string
-	pathParts[0] = "/flow/"
+	pathParts[0] = "/flows/"
 	{
 		// Encode "flow_id" parameter.
 		e := uri.NewPathEncoder(uri.PathEncoderConfig{
@@ -18920,7 +18920,7 @@ func (c *Client) sendSearch(ctx context.Context, request *SearchRequest, params 
 // that meets the policy.
 //
 // The password policy is the one in the release that serves the caller's `Origin`, chosen as
-// `createFlow` (`POST /flow`) chooses it. A frontend on a preview URL gets that preview's policy, and
+// `createFlow` (`POST /flows`) chooses it. A frontend on a preview URL gets that preview's policy, and
 // one on a primary origin the newest primary deployment's. A request with no `Origin`, or from the
 // console when the project does not list the console's origin, gets the project's newest primary
 // deployment.
@@ -19272,7 +19272,7 @@ func (c *Client) sendSetVariables(ctx context.Context, request UpdateVariablesRe
 // Submits the user's input for the current step of a flow. The server validates it, processes it (for
 // example, verifies a credential), advances the flow through any invisible steps, and returns the next
 // visible step. The flow endpoints are the runtime calls the login component (`<zitadel-login>`)
-// makes, step by step; `createFlow` (`POST /flow`) starts a flow.
+// makes, step by step; `createFlow` (`POST /flows`) starts a flow.
 //
 // The response sets an updated encrypted `HttpOnly` cookie (`_zflow`) with the new flow state. The
 // server is stateless: all orchestration state is carried in this cookie between requests.
@@ -19325,7 +19325,7 @@ func (c *Client) sendSetVariables(ctx context.Context, request UpdateVariablesRe
 // Reuses the deployment sealed into `_zflow` at `createFlow`; it does not re-resolve from `Origin`. If
 // that release was revoked since the attempt started, the response is `409` with `rel.revoked`.
 //
-// POST /flow/{flow_id}/submit
+// POST /flows/{flow_id}/submit
 func (c *Client) SubmitFlowStep(ctx context.Context, request *FlowSubmitRequest, params SubmitFlowStepParams) (SubmitFlowStepRes, error) {
 	res, err := c.sendSubmitFlowStep(ctx, request, params)
 	return res, err
@@ -19344,7 +19344,7 @@ func (c *Client) sendSubmitFlowStep(ctx context.Context, request *FlowSubmitRequ
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("submitFlowStep"),
 		semconv.HTTPRequestMethodKey.String("POST"),
-		semconv.URLTemplateKey.String("/flow/{flow_id}/submit"),
+		semconv.URLTemplateKey.String("/flows/{flow_id}/submit"),
 	}
 	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
 
@@ -19378,7 +19378,7 @@ func (c *Client) sendSubmitFlowStep(ctx context.Context, request *FlowSubmitRequ
 	stage = "BuildURL"
 	u := uri.Clone(c.requestURL(ctx))
 	var pathParts [3]string
-	pathParts[0] = "/flow/"
+	pathParts[0] = "/flows/"
 	{
 		// Encode "flow_id" parameter.
 		e := uri.NewPathEncoder(uri.PathEncoderConfig{
