@@ -82,13 +82,16 @@ describe("toSuggestOnly", () => {
     );
   });
 
-  it("does not match a missing, an extra or a reordered suggestion", () => {
-    expect(suggesting("deploy --cwd a")).not.toSuggestOnly("deploy --cwd a", "preview rm u");
-    expect(suggesting("deploy --cwd a", "preview rm u")).not.toSuggestOnly("deploy --cwd a");
-    expect(suggesting("deploy --cwd a", "preview rm u")).not.toSuggestOnly(
-      "preview rm u",
-      "deploy --cwd a",
-    );
+  it.each([
+    ["a missing suggestion", ["deploy --cwd a"], ["deploy --cwd a", "preview rm u"]],
+    ["an extra suggestion", ["deploy --cwd a", "preview rm u"], ["deploy --cwd a"]],
+    [
+      "a reordered suggestion",
+      ["deploy --cwd a", "preview rm u"],
+      ["preview rm u", "deploy --cwd a"],
+    ],
+  ])("does not match %s", (_, suggested, expected) => {
+    expect(suggesting(...suggested)).not.toSuggestOnly(...expected);
   });
 
   it("matches no suggestions when the envelope has none", () => {

@@ -503,12 +503,14 @@ declare module "vitest" {
     toSuggest(command: string): T;
     /**
      * One of the suggested `next_commands` is exactly this, after the runner
-     * (`npx @zitadel/cli@<version>`): no flag missing, extra or repeated.
+     * (`npx @zitadel/cli@<version>`): no flag missing, extra or repeated. It
+     * checks one command; to check the whole list, use `toSuggestOnly`.
      */
     toSuggestExactly(command: string): T;
     /**
      * The suggested `next_commands` are exactly these, in this order, after the
-     * runner (`npx @zitadel/cli@<version>`): none missing and none extra.
+     * runner (`npx @zitadel/cli@<version>`): none missing and none extra. Unlike
+     * `toSuggestExactly`, which checks one command, it checks the whole list.
      */
     toSuggestOnly(...commands: string[]): T;
     /** stdout contains this text. Prefer it over `toSay` for rendered output. */

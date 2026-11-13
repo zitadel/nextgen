@@ -3023,6 +3023,24 @@ describe("api-mock releases and deployments", () => {
     }
 
     /**
+     * Drops an origin from the project's origins as its operator.
+     *
+     * @param project - The project's id and secret.
+     * @param pattern - The origin to drop.
+     * @returns The platform's answer.
+     */
+    function removeOrigin(
+      project: { id: string; secret: string },
+      pattern: string,
+    ): Promise<Response> {
+      return fetch(`${BASE}/projects/${project.id}/origins/remove`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+        body: JSON.stringify({ pattern }),
+      });
+    }
+
+    /**
      * What the live deployments view shows: each deployment with its release and
      * the origins it serves.
      *
@@ -3072,11 +3090,7 @@ describe("api-mock releases and deployments", () => {
           }),
         ),
       };
-      await fetch(`${BASE}/projects/${project.id}/origins/remove`, {
-        method: "POST",
-        headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
-        body: JSON.stringify({ pattern: reused }),
-      });
+      await removeOrigin(project, reused);
       const preview = {
         id: await idOf(
           await createDeployment(project.id, project.secret, {
@@ -3139,6 +3153,25 @@ describe("api-mock releases and deployments", () => {
         await aReplacementLive(project);
 
         const revoked = await revoke(project, release.id);
+
+        expect(revoked.status).toBe(200);
+      });
+
+      test("allows the revoke of a release only an older primary deployment named once a newer one names fewer origins", async () => {
+        const project = await newProject("revoke-older-primary");
+        await addPrimary(project.id, project.secret, "https://app.acme.com");
+        await addPrimary(project.id, project.secret, "https://app2.acme.com");
+        const older = {
+          id: await idOf(await createRelease(project.id, project.secret, rel1)),
+        };
+        await createDeployment(project.id, project.secret, {
+          release_id: older.id,
+          targets: "primary",
+        });
+        await removeOrigin(project, "https://app2.acme.com");
+        await aReplacementLive(project);
+
+        const revoked = await revoke(project, older.id);
 
         expect(revoked.status).toBe(200);
       });

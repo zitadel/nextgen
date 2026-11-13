@@ -161,12 +161,18 @@ export async function aProjectWithTwoDeploys(
  * @param prefix - The project's name, and the prefix of its directory.
  * @param served - Where the release is live.
  * @returns The directory, the release, and the deployment serving it on each
- * origin kind it was put live on. The caller removes the directory.
+ * origin kind, undefined for a kind it was not put live on. The caller removes
+ * the directory.
  */
 export async function aReleaseServedOn(
   prefix: string,
   served: { primary: boolean; preview: boolean },
-): Promise<{ cwd: string; releaseId: string; primary?: string; preview?: string }> {
+): Promise<{
+  cwd: string;
+  releaseId: string;
+  primary: string | undefined;
+  preview: string | undefined;
+}> {
   const project = await aProjectWithPrimaryOrigin(prefix);
   await callPlatform(`/projects/${project.id}/origins`, project.secret, {
     pattern: PREVIEW_PATTERN,
@@ -184,18 +190,9 @@ export async function aReleaseServedOn(
       ttl: "PT168H",
     });
   }
-  const arranged: { cwd: string; releaseId: string; primary?: string; preview?: string } = {
-    cwd: await aProjectDirectory(prefix, project),
-    releaseId,
-  };
-  if (primary !== undefined) {
-    arranged.primary = primary;
-  }
-  if (preview !== undefined) {
-    arranged.preview = preview;
-  }
+  const cwd = await aProjectDirectory(prefix, project);
 
-  return arranged;
+  return { cwd, releaseId, primary, preview };
 }
 
 /**

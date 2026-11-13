@@ -11,7 +11,8 @@ import type { Answer, ClientStubs } from "@tests/helpers/fake-client";
 export const PROJECT_ID = "proj_1";
 
 /**
- * The primary origin the deployment and project fixtures serve from.
+ * The primary origin that {@link aDeployment} serves from and that the mock
+ * project helpers register. Many specs still spell the literal out.
  */
 export const PRIMARY_ORIGIN = "https://app.acme.com";
 

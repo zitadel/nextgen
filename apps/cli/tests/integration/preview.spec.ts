@@ -2,13 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "@tests/helpers/platform";
 import { anApp, aSetUpApp } from "@tests/helpers/project";
+import { PREVIEW_PATTERN, PREVIEW_URL } from "@tests/helpers/records";
 import { expectedPublicCliCommand, pressCtrlC } from "@tests/helpers/run-cli";
 import { CREDENTIALS, PREVIEW_CREDENTIAL } from "@/lib/oclif";
 
 const platform = usePlatformMock();
 
-const PREVIEW_PATTERN = "https://*-acme.vercel.app";
-const PREVIEW_URL = "https://x-acme.vercel.app";
 const OTHER_URL = "https://y-acme.vercel.app";
 
 const UNNAMED_CI_WARNING =

@@ -1577,14 +1577,18 @@ type ServedOrigin = {
  * revoke a served release and a deployment's status all read this.
  *
  * @param projectId - The project.
+ * @param deployments - The project's deployments, newest first, which the
+ * caller reads once.
  * @returns Every deployment row of the project that serves its origin.
  */
-function servedOrigins(projectId: string): ServedOrigin[] {
+function servedOrigins(
+  projectId: string,
+  deployments: readonly DeploymentRecord[],
+): ServedOrigin[] {
   const project = store.projects.get(projectId);
   const primaries = project === undefined ? [] : primaryOrigins(project);
   const previewed = new Set<string>();
   const served: ServedOrigin[] = [];
-  const deployments = projectDeployments(projectId);
   const newestPrimary = firstPrimary(deployments);
   for (const deployment of deployments) {
     for (const { origin, expiresAt } of deployment.targets) {
@@ -1696,7 +1700,12 @@ function firstPrimary(deployments: readonly DeploymentRecord[]): DeploymentRecor
   });
 }
 
-/** The project's newest primary deployment, what a deploy or rollback replaces. */
+/**
+ * The project's newest primary deployment, what a deploy or rollback replaces.
+ *
+ * @param projectId - The project.
+ * @returns Its newest deployment that went to the primary origins, if any.
+ */
 function newestPrimaryDeployment(projectId: string): DeploymentRecord | undefined {
   return firstPrimary(projectDeployments(projectId));
 }
@@ -1708,7 +1717,7 @@ function newestPrimaryDeployment(projectId: string): DeploymentRecord | undefine
  * @param served - Everything that serves in the project now.
  * @param asked - The entries the live list asked about, all of them or the
  * ones for one origin.
- * @returns One group per matching deployment, newest first.
+ * @returns One group per matching deployment, newest first, as `served` is.
  */
 function liveGroups(
   served: readonly ServedOrigin[],
@@ -1732,9 +1741,21 @@ function liveGroups(
     groups.set(entry.deployment.id, group);
   }
 
-  return [...groups.values()].sort((a, b) => {
-    return b.deployment.seq - a.deployment.seq;
-  });
+  return [...groups.values()];
+}
+
+/**
+ * The ids of the deployments that serve at least one origin.
+ *
+ * @param served - What serves in a project now.
+ * @returns The ids of the deployments in `served`.
+ */
+function servingIds(served: readonly ServedOrigin[]): ReadonlySet<string> {
+  return new Set(
+    served.map((entry) => {
+      return entry.deployment.id;
+    }),
+  );
 }
 
 /**
@@ -1743,17 +1764,14 @@ function liveGroups(
  * being removed, makes it `inactive`.
  *
  * @param deployment - The deployment.
- * @param served - What serves in its project now, read once by the caller.
+ * @param serving - The ids of the deployments that serve an origin now.
  * @returns `live` while the deployment serves an origin, else `inactive`.
  */
 function deploymentStatus(
   deployment: DeploymentRecord,
-  served: readonly ServedOrigin[],
+  serving: ReadonlySet<string>,
 ): "live" | "inactive" {
-  const serving = served.some((entry) => {
-    return entry.deployment.id === deployment.id;
-  });
-  if (serving) {
+  if (serving.has(deployment.id)) {
     return "live";
   }
 
@@ -1776,18 +1794,20 @@ function repeats(deployment: DeploymentRecord, releaseId: string, origins: strin
  *
  * @param deployment - The deployment.
  * @param targets - The targets to report, all of them when not given.
- * @param options - Whether to expand its release, and what serves in its
- * project now when the caller already holds it.
+ * @param options - Whether to expand its release, and the ids of the
+ * deployments serving in its project now when the caller already holds them.
  * @returns The deployment as the API answers it.
  */
 function deploymentResponse(
   deployment: DeploymentRecord,
   targets: DeploymentTargetRow[] = deployment.targets,
-  options?: { release: boolean; served?: readonly ServedOrigin[] },
+  options?: { release: boolean; serving?: ReadonlySet<string> },
 ): Record<string, unknown> {
   // A caller that describes many deployments reads what serves once and passes
   // it in; a single read costs one scan.
-  const served = options?.served ?? servedOrigins(deployment.projectId);
+  const serving =
+    options?.serving ??
+    servingIds(servedOrigins(deployment.projectId, projectDeployments(deployment.projectId)));
   const body: Record<string, unknown> = {
     id: deployment.id,
     project_id: deployment.projectId,
@@ -1798,7 +1818,7 @@ function deploymentResponse(
         : { origin: target.origin, expires_at: target.expiresAt },
     ),
     kind: deploymentKind(deployment),
-    status: deploymentStatus(deployment, served),
+    status: deploymentStatus(deployment, serving),
     deployed_at: deployment.deployedAt,
     metadata: {
       reason: deployment.reason,
@@ -2177,7 +2197,7 @@ export function setupPlatformHandlers() {
       // A release an origin still serves cannot be revoked: what is live on an
       // origin must not pin it. Each origin names the deployment that pins the
       // release there, and whether it is a primary origin or a preview.
-      const servedBy = servedOrigins(release.projectId)
+      const servedBy = servedOrigins(release.projectId, projectDeployments(release.projectId))
         .filter((entry) => {
           return entry.deployment.releaseId === release.id;
         })
@@ -2401,7 +2421,9 @@ export function setupPlatformHandlers() {
       const origin = record.origin;
       const live = liveRaw === "true";
 
-      const served = servedOrigins(query.data.project_id);
+      const deployments = projectDeployments(query.data.project_id);
+      const served = servedOrigins(query.data.project_id, deployments);
+      const serving = servingIds(served);
       let items: Record<string, unknown>[];
       if (live) {
         let asked = served;
@@ -2411,11 +2433,11 @@ export function setupPlatformHandlers() {
         items = liveGroups(served, asked).map((group) => {
           return deploymentResponse(group.deployment, group.targets, {
             release: expandRelease,
-            served,
+            serving,
           });
         });
       } else {
-        let named = projectDeployments(query.data.project_id);
+        let named = deployments;
         if (origin !== undefined) {
           named = named.filter((deployment) => {
             return deployment.targets.some((target) => {
@@ -2426,7 +2448,7 @@ export function setupPlatformHandlers() {
         items = named.map((deployment) => {
           return deploymentResponse(deployment, deployment.targets, {
             release: expandRelease,
-            served,
+            serving,
           });
         });
       }
