@@ -79,22 +79,18 @@ function isDropped(path) {
  * setup wrote against the SDK's types. That is a `check` script where the
  * generator writes one (sv), else the build-mode type-check its `build`
  * starts with (create-vite's `tsc -b`, or `vue-tsc -b` for a template with
- * single-file components), else a script that only type-checks
- * (`tsc … --noEmit`, create-qwik's `build.types`).
+ * single-file components), else create-qwik's `build.types`.
  */
 function keptScripts(scripts) {
   const kept = {};
   if (scripts.dev) kept.dev = scripts.dev;
   const buildCheck = (scripts.build ?? "").match(/^(\S*tsc) -b(?=\s|$)/);
-  const noEmitCheck = Object.values(scripts).find((command) =>
-    /^tsc\s(?:.*\s)?--noEmit(?:\s|$)/.test(command),
-  );
   if (scripts.check) {
     kept.typecheck = scripts.check;
   } else if (buildCheck) {
     kept.typecheck = `${buildCheck[1]} -b`;
-  } else if (noEmitCheck) {
-    kept.typecheck = noEmitCheck;
+  } else if (scripts["build.types"]) {
+    kept.typecheck = scripts["build.types"];
   }
   return kept;
 }
@@ -368,7 +364,7 @@ function appFiles(app) {
  */
 function setupEnv() {
   const env = Object.fromEntries(
-    Object.entries(process.env).filter(([key]) => !/^(ZITADEL_|NEXTGEN_|npm_)/i.test(key)),
+    Object.entries(process.env).filter(([key]) => !/^(ZITADEL_|NEXTGEN_|npm_)/.test(key)),
   );
   return { ...env, ZITADEL_TELEMETRY: "0", DO_NOT_TRACK: "1", NO_SKILLS_PROMPT: "1" };
 }

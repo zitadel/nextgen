@@ -56,11 +56,12 @@ the env files that carry it, the CLI's own state (`zitadel.json`,
 scripts it drops or an editor would load, with its config files (one list in
 `suite/bin/conformance-fixture.mjs`). Of the generated scripts it keeps `dev`
 and the generator's own type-check as `typecheck` (sv's `check`, the `tsc -b`
-or `vue-tsc -b` create-vite's `build` starts with). It points `@zitadel/*` at
-the workspace and every dependency the pnpm catalog holds at `catalog:`. It
-adds the lane's scripts and dev dependencies. Beside the app, a fixture has
-three files of its own: `playwright.config.mts`, `conformance.spec.ts` and
-`turbo.json`, which only extends the suite's.
+or `vue-tsc -b` create-vite's `build` starts with, create-qwik's
+`build.types`). It points `@zitadel/*` at the workspace and every dependency
+the pnpm catalog holds at `catalog:`. It adds the lane's scripts and dev
+dependencies. Beside the app, a fixture has three files of its own:
+`playwright.config.mts`, `conformance.spec.ts` and `turbo.json`, which only
+extends the suite's.
 
 This lane runs the workspace's versions: the catalog's, and the lockfile's
 for a dependency the catalog does not hold. For the frameworks CI runs a
