@@ -90,8 +90,11 @@ type Known<R, Declared> = {
   readonly [Key in Exclude<keyof Declared, keyof Refused<unknown>>]: never;
 } & {
   readonly refusal: { readonly [Key in Exclude<keyof R, keyof ParseRefusal>]: never };
-  readonly values?: { readonly [Name in Parsed]?: never };
-};
+} & (Declared extends { readonly values: infer Values }
+    ? IsNever<Extract<keyof Values, Parsed>> extends true
+      ? unknown
+      : { readonly values: "a declaration's values may not give value, input or problem" }
+    : unknown);
 
 /**
  * A declaration as {@link reads} and {@link taken} take it: refused as `T`,
