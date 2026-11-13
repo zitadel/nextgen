@@ -14,7 +14,7 @@ type Answer = Readonly<{
   code?: string;
   message?: string;
   hint?: string;
-  data?: { next_commands?: string[] };
+  data?: { next_actions?: string[]; next_commands?: string[] };
 }>;
 
 /** A test of the developer's own, where the suite's test goes. */
@@ -148,30 +148,46 @@ describe("tests add", () => {
       expect(await readFile(join(dir, "package.json"), "utf8")).toContain(OWN_SCRIPT);
     });
 
-    test("suggests running Playwright on the suite's config from the shell's directory", async ({
-      dir,
-    }) => {
+    test("says to run the suite with Playwright in the app", async ({ dir }) => {
       await aProject(dir, { scripts: { "test:e2e": OWN_SCRIPT } });
 
       const answer = await testsAdd(dir);
 
-      expect(answer.data?.next_commands?.at(-1)).toBe(
-        `npm --prefix ${dir} exec -- playwright test --config ${join(dir, PLAYWRIGHT_CONFIG)}`,
+      expect(answer.data?.next_actions).toContain(
+        `The app's own test:e2e script runs ${OWN_SCRIPT}, so run the suite with Playwright in ${dir}: npx playwright test`,
       );
+    });
+
+    test("suggests no script that would not run the suite", async ({ dir }) => {
+      await aProject(dir, { scripts: { "test:e2e": OWN_SCRIPT } });
+
+      const answer = await testsAdd(dir);
+
+      expect(answer.data?.next_commands).toEqual([`npm --prefix ${dir} install`]);
     });
   });
 
   describe("with no test:e2e script", () => {
-    test("suggests the browser install and the script, with the app's package manager", async ({
+    test("suggests the install and the script, with the app's package manager", async ({ dir }) => {
+      await aProject(dir);
+
+      const answer = await testsAdd(dir);
+
+      expect(answer.data?.next_commands).toEqual([
+        `npm --prefix ${dir} install`,
+        `npm --prefix ${dir} run test:e2e`,
+      ]);
+    });
+
+    test("says to install Playwright's Chromium in the app, which no suggested command may do", async ({
       dir,
     }) => {
       await aProject(dir);
 
       const answer = await testsAdd(dir);
 
-      expect(answer.data?.next_commands?.slice(-2)).toEqual([
-        `npm --prefix ${dir} exec -- playwright install chromium`,
-        `npm --prefix ${dir} run test:e2e`,
+      expect(answer.data?.next_actions).toEqual([
+        `Install Playwright's Chromium once, in ${dir}: npx playwright install chromium`,
       ]);
     });
   });

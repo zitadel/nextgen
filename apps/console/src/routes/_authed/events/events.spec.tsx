@@ -2,9 +2,9 @@ import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { _resetLiveForTesting } from "@/features/events/use-live-events";
-import { formatEventTime } from "@/lib/date";
+import { formatClockTime, formatEventTime } from "@/lib/date";
 import { scopedPath } from "@/test/project-scope.fixture";
 import { server } from "@/test/msw";
 import { createAppRouter } from "../../../router";
@@ -158,6 +158,29 @@ async function drawer() {
 afterEach(() => {
   _resetLiveForTesting();
 });
+
+const USERS_URL = "http://localhost/api/v1/users/:id";
+
+// The rows name users by what they are called, read one by one; a user the
+// test does not name is not found, and its row keeps the ID.
+beforeEach(() => {
+  server.use(http.get(USERS_URL, () => HttpResponse.json({ error: "not found" }, { status: 404 })));
+});
+
+/** `GET /users/{id}` for these users, by ID, each with its identifier. */
+function serveUsers(identifiers: Record<string, string>) {
+  const reads: string[] = [];
+  server.use(
+    http.get(USERS_URL, ({ params }) => {
+      const id = String(params.id);
+      reads.push(id);
+      const identifier = identifiers[id];
+      if (!identifier) return undefined;
+      return HttpResponse.json({ id, identifier, schema: "", status: "active" });
+    }),
+  );
+  return reads;
+}
 
 async function renderAt(path: string) {
   const router = createAppRouter({
@@ -469,15 +492,22 @@ describe("events", () => {
     expect(requestQueries[0]?.get("order")).toBe("asc");
     const steps = section.getAllByRole("listitem");
     expect(steps).toHaveLength(2);
+    // A request's events fall within its run: each keeps its clock time
+    // rather than an offset of nothing.
+    expect(within(steps[0] as HTMLElement).getByText(formatClockTime(OCCURRED_AT))).toBeVisible();
+    expect(section.queryByText(/^\+/)).toBeNull();
     // The open event is marked, not a link; the API call behind it opens.
     expect(
       within(steps[0] as HTMLElement)
         .getByText("user.deleted")
         .closest("[aria-current]"),
     ).not.toBeNull();
+    // The API call says how long it ran.
+    expect(within(steps[1] as HTMLElement).getByText("12 ms")).toBeVisible();
     await userEvent.click(within(steps[1] as HTMLElement).getByRole("link"));
     expect(await panel.findByRole("heading", { name: "request.api" })).toBeVisible();
-    expect(panel.getByText("12 ms")).toBeInTheDocument();
+    // On its own row as well as on its step.
+    expect(panel.getAllByText("12 ms")).toHaveLength(2);
   });
 
   it("lists the whole login flow of a sign-in event in the drawer, in place of its one request", async () => {
@@ -517,11 +547,16 @@ describe("events", () => {
     await renderAt("/events/evt_attempt");
 
     const panel = await drawer();
+    // Headed by what the flow came to, as a trace by its outcome: told from
+    // the events the drawer holds, which are not all of them.
     const section = within(
-      (await panel.findByRole("heading", { name: "This login flow" })).closest(
+      (await panel.findByRole("heading", { name: "Signed in with a password" })).closest(
         "section",
       ) as HTMLElement,
     );
+    expect(section.getByText("Signed in")).toBeInTheDocument();
+    expect(section.getByText("user_admin")).toBeInTheDocument();
+    expect(section.getByText("so far")).toBeInTheDocument();
     // One range of the flow index, oldest first, and no read of the request.
     expect(flowQueries[0]?.get("flow_id")).toBe("flow_1");
     expect(flowQueries[0]?.get("order")).toBe("asc");
@@ -530,6 +565,8 @@ describe("events", () => {
     expect(panel.queryByRole("heading", { name: "This request" })).toBeNull();
 
     const steps = section.getAllByRole("listitem");
+    // Each step by its time since the first.
+    expect(within(steps[0] as HTMLElement).getByText("+0 ms")).toBeVisible();
     expect(steps.map((step) => within(step).getByText(/^(auth|session)\./).textContent)).toEqual([
       "auth.attempt.created",
       "auth.check.succeeded",
@@ -548,7 +585,7 @@ describe("events", () => {
     // A later step of the flow opens in the drawer, under the same timeline.
     await userEvent.click(within(steps[2] as HTMLElement).getByRole("link"));
     expect(await panel.findByRole("heading", { name: "session.established" })).toBeVisible();
-    expect(panel.getByRole("heading", { name: "This login flow" })).toBeVisible();
+    expect(panel.getByRole("heading", { name: "Signed in with a password" })).toBeVisible();
   });
 
   it("closes the drawer back to the list, under the same filters", async () => {
@@ -665,6 +702,7 @@ describe("events views", () => {
     const items = await screen.findAllByRole("menuitem");
     expect(items.map((item) => item.textContent)).toEqual([
       "Audit eventsSign-ins and changes to the project",
+      "Sign-insOne row per sign-in, and how it ended",
       "API requestsOne per call to the API",
       "AllBoth, in the order they happened",
     ]);
@@ -1480,5 +1518,181 @@ describe("event drawer", () => {
       errorSpy.mockRestore();
       warnSpy.mockRestore();
     }
+  });
+});
+
+describe("events sign-ins", () => {
+  const SIGNED_IN = ["session.established"];
+  const FAILED = ["auth.check.failed", "auth.sso.authorization.failed", "auth.sso.exchange.failed"];
+
+  /** An event of a login flow: no actor until it ends, and its flow and session. */
+  function step(id: string, overrides: Record<string, unknown>) {
+    return event(id, {
+      category: "auth",
+      actor_id: null,
+      actor_type: null,
+      flow_id: "flow_1",
+      session_id: "sess_1",
+      ...overrides,
+    });
+  }
+
+  it("lists one row per sign-in, by the types a sign-in ends in, with whose account and how it ended", async () => {
+    serveUsers({ user_ada: "ada@example.com" });
+    const queries = serveEvents({
+      data: [
+        step("evt_in", {
+          event_type: "session.established",
+          category: "session",
+          entity_type: "session",
+          entity_id: "sess_1",
+          user_id: "user_ada",
+          actor_type: "service",
+          payload: { user_id: "user_ada" },
+        }),
+        step("evt_failed", {
+          event_type: "auth.check.failed",
+          entity_type: "check",
+          entity_id: "ch_1",
+          flow_id: "flow_2",
+          session_id: "sess_2",
+          user_id: "user_bo",
+          payload: { check_type: "Password" },
+        }),
+        // An anonymous `POST /sessions` writes the same type, with no user.
+        step("evt_open", {
+          event_type: "session.established",
+          category: "session",
+          entity_type: "session",
+          entity_id: "sess_3",
+          flow_id: null,
+          session_id: "sess_3",
+          actor_type: "service",
+          payload: {},
+        }),
+      ],
+    });
+    await renderAt("/events?view=signins");
+
+    const rows = await screen.findAllByRole("row");
+    // The types a sign-in ends in, each one range of the type index, and no category.
+    expect(queries[0]?.getAll("event_type")).toEqual([...SIGNED_IN, ...FAILED]);
+    expect(queries[0]?.has("category")).toBe(false);
+    expectServed(queries[0]);
+    const [header, signedIn, failed, opened] = rows as HTMLElement[];
+    expect(
+      within(header as HTMLElement)
+        .getAllByRole("columnheader")
+        .map((cell) => cell.textContent),
+    ).toEqual(["Outcome", "User", "Session", "Time", "Actions"]);
+
+    const first = within(signedIn as HTMLElement);
+    expect(first.getByRole("link", { name: "Signed in" })).toHaveAttribute(
+      "href",
+      scopedPath("/events/evt_in?view=signins"),
+    );
+    // Whose account, by what it is called now, with its ID on hover.
+    expect(await first.findByText("ada@example.com")).toHaveAttribute("title", "user_ada");
+    expect(first.getByText("sess_1")).toBeInTheDocument();
+
+    // A failure says what failed; a user the console cannot read keeps its ID.
+    const second = within(failed as HTMLElement);
+    expect(second.getByRole("link", { name: "Failed" })).toBeInTheDocument();
+    expect(second.getByText("Password check failed")).toBeInTheDocument();
+    expect(second.getByText("user_bo")).toBeInTheDocument();
+
+    expect(
+      within(opened as HTMLElement).getByRole("link", { name: "Session opened" }),
+    ).toBeVisible();
+  });
+
+  it("narrows the sign-ins to how they ended, in place of a category and types", async () => {
+    const queries = serveEvents({ data: [] });
+    const router = await renderAt("/events?view=signins");
+    expect(await screen.findByText("This project has no sign-ins.")).toBeInTheDocument();
+    const sidebar = await filters();
+    expect(sidebar.queryByRole("combobox", { name: "Category" })).not.toBeInTheDocument();
+    expect(sidebar.queryByText("Type")).not.toBeInTheDocument();
+
+    await userEvent.click(sidebar.getByRole("combobox", { name: "Outcome" }));
+    expect(screen.getAllByRole("option").map((option) => option.textContent)).toEqual([
+      "Any outcome",
+      "Signed in",
+      "Failed",
+    ]);
+    await userEvent.click(screen.getByRole("option", { name: "Failed" }));
+
+    await waitFor(() => expect(queries.at(-1)?.getAll("event_type")).toEqual(FAILED));
+    expect(router.state.resolvedLocation?.search).toMatchObject({
+      view: "signins",
+      outcome: "failed",
+    });
+
+    // Another view has no outcome: it leaves with the view.
+    await chooseView("Audit events");
+    await waitFor(() => expect(queries.at(-1)?.getAll("category")).toEqual(AUDIT));
+    expect(router.state.resolvedLocation?.search.outcome).toBeUndefined();
+  });
+
+  it("names the people who acted rather than their IDs, reading each once", async () => {
+    const reads = serveUsers({ user_admin: "admin@example.com" });
+    serveEvents({ data: [event("evt_2"), event("evt_1")] });
+    await renderAt("/events");
+
+    const names = await screen.findAllByText("admin@example.com");
+    expect(names).toHaveLength(2);
+    expect(names[0]).toHaveAttribute("title", "user_admin");
+    expect(reads).toEqual(["user_admin"]);
+  });
+
+  it("marks an authentication attempt whose flow never finished as abandoned, under no filter but the view", async () => {
+    const rows = [
+      // Its flow was handed off: not abandoned.
+      step("evt_handed", { event_type: "auth.attempt.handed_off", entity_type: "auth_attempt" }),
+      step("evt_started", { event_type: "auth.attempt.created", entity_type: "auth_attempt" }),
+      // Its flow never finished, and it is far older than an attempt lives.
+      step("evt_left", {
+        event_type: "auth.attempt.created",
+        entity_type: "auth_attempt",
+        flow_id: "flow_2",
+        session_id: "sess_2",
+      }),
+    ];
+    serveEvents({ data: rows }, { data: rows });
+    await renderAt("/events");
+
+    const left = (await screen.findAllByRole("link", { name: "auth.attempt.created" }))[1];
+    expect(within(left?.closest("tr") as HTMLElement).getByText("Abandoned")).toBeInTheDocument();
+    expect(screen.getAllByText("Abandoned")).toHaveLength(1);
+
+    // A filter could hide what the flow went on to write: nothing is claimed.
+    await userEvent.click((await filters()).getByRole("combobox", { name: "Category" }));
+    await userEvent.click(screen.getByRole("option", { name: "auth" }));
+    await waitFor(() => expect(screen.queryByText("Abandoned")).not.toBeInTheDocument());
+  });
+
+  it("marks the rows of the open event's login flow", async () => {
+    const rows = [
+      step("evt_other", {
+        event_type: "auth.attempt.created",
+        entity_type: "auth_attempt",
+        flow_id: "flow_2",
+      }),
+      step("evt_check", { event_type: "auth.check.succeeded", entity_type: "check" }),
+      step("evt_attempt", { event_type: "auth.attempt.created", entity_type: "auth_attempt" }),
+    ];
+    serveEvents({ data: rows });
+    serveEvent(...rows);
+    serveFlowEvents([rows[2], rows[1]]);
+    await renderAt("/events/evt_check");
+
+    await drawer();
+    const marked = await screen.findAllByText("Of the open event’s login flow");
+    expect(marked).toHaveLength(1);
+    expect(
+      within(marked[0]?.closest("tr") as HTMLElement).getByRole("link", {
+        name: "auth.attempt.created",
+      }),
+    ).toHaveAttribute("href", expect.stringContaining("evt_attempt"));
   });
 });

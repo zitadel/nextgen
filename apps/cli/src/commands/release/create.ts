@@ -13,7 +13,7 @@ import { reportWarning } from "@/lib/warnings";
  * reject later. `messageTooLong` counts code points, as the server does, so
  * the length is its call and not the schema's. The message is trimmed.
  */
-const MESSAGE: Refused<string> = {
+const MESSAGE = {
   schema: z
     .string()
     .trim()
@@ -28,7 +28,7 @@ const MESSAGE: Refused<string> = {
       argument: "--message",
     },
   },
-};
+} as const satisfies Refused<string>;
 
 /**
  * `zitadel release create` — build a release from .zitadel/ without deploying it.

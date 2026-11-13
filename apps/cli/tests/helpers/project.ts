@@ -2086,6 +2086,19 @@ export class ScaffoldedApp {
     return this.editDocument("package.json", PackageJsonSchema, edit);
   }
 
+  /**
+   * Declares the project's package manager in `package.json`, as a project
+   * set up with pnpm, yarn or bun does, so a command that suggests one picks it.
+   *
+   * @param spec - The manager and its version, as the field holds them: `pnpm@10.0.0`.
+   * @returns When the file is written.
+   */
+  usePackageManager(spec: string): Promise<void> {
+    return this.editDocument("package.json", AnyObjectSchema, (pkg) => {
+      pkg.packageManager = spec;
+    });
+  }
+
   /** Adds a second flow definition, for a spec whose input is the flow itself. */
   addFlow(name: string, definition: unknown): Promise<void> {
     return this.writeProjectFile(

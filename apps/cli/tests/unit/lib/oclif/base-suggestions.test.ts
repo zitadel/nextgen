@@ -1,7 +1,8 @@
-import { Config, Flags } from "@oclif/core";
+import { Config, Flags, type Interfaces } from "@oclif/core";
 import { describe, expect } from "vitest";
 
 import { it } from "@tests/helpers/fixtures";
+import { rejectionOf } from "@tests/helpers/thrown-value";
 
 import { BaseCommand } from "@/lib/oclif/base";
 import { EnvironmentCommand } from "@/lib/oclif/environment-command";
@@ -120,7 +121,48 @@ class ConsentProbe extends EnvironmentCommand {
   async probe() {
     const { flags } = await this.parse(ConsentProbe);
     await this.toMeta(flags, { resolveServer: false, environment: false });
+    return this.rerun<typeof ConsentProbe.flags>({ with: { force: true } });
+  }
+
+  /**
+   * This run again, without a flag its class does not declare.
+   *
+   * @returns The command, which the run refuses to build.
+   */
+  async leavingOutAFlagItLacks() {
+    const { flags } = await this.parse(ConsentProbe);
+    await this.toMeta(flags, { resolveServer: false, environment: false });
+    return this.rerun<{ ghost: Interfaces.BooleanFlag<boolean> }>({ without: ["ghost"] });
+  }
+
+  /**
+   * A rerun that sets a flag without naming the flags it relies on, which
+   * does not compile.
+   *
+   * @returns The command.
+   */
+  async withoutNamingItsFlags() {
+    // @ts-expect-error a rerun names the flags it relies on, so `force` is unknown here
     return this.rerun({ with: { force: true } });
+  }
+
+  /**
+   * Reruns that name a flag the rerun does not rely on, or give one a value of
+   * the wrong type, none of which compiles.
+   *
+   * @returns The commands.
+   */
+  async withTheWrongFlags() {
+    return [
+      // @ts-expect-error `ghost` is not among the flags the rerun relies on
+      this.rerun<typeof ConsentProbe.flags>({ with: { ghost: true } }),
+      // @ts-expect-error `ghost` is not among the flags the rerun relies on
+      this.rerun<typeof ConsentProbe.flags>({ after: { ghost: true } }),
+      // @ts-expect-error `ghost` is not among the flags the rerun relies on
+      this.rerun<typeof ConsentProbe.flags>({ without: ["ghost"] }),
+      // @ts-expect-error `force` is a switch, so it takes no string
+      this.rerun<typeof ConsentProbe.flags>({ with: { force: "yes" } }),
+    ];
   }
 }
 
@@ -203,6 +245,15 @@ describe("BaseCommand.suggest with a server named with its credentials", () => {
 });
 
 describe("BaseCommand.rerun", () => {
+  it("refuses to leave out a flag the command does not declare", async ({ dir }) => {
+    const error = await rejectionOf(() => {
+      return new ConsentProbe(["--cwd", dir], config).leavingOutAFlagItLacks();
+    });
+
+    expect(error).toBeInstanceOf(Error);
+    expect(error).toMatchObject({ message: "variable:rm declares no --ghost to leave out" });
+  });
+
   it("puts an environment-scoped run's server back without its credentials", async ({ dir }) => {
     const retry = await new ConsentProbe(
       ["--cwd", dir, "--server", "https://user:p@ss@a.example"],

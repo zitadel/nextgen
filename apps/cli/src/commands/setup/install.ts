@@ -10,7 +10,7 @@ import {
   type PackageCommand,
   type runPackageCommand,
 } from "@/lib/package-manager";
-import { type Suggest, type SuggestedCommand, shellCommand } from "@/lib/suggestion";
+import { type Suggest, type SuggestedCommand, suggestedCommandOf } from "@/lib/suggestion";
 
 export type SetupInstall = DependencyInstall;
 
@@ -75,12 +75,10 @@ export async function installDependenciesForSetup(
   const devCommand = devCommandFor(packageManager);
   // What the reader runs, from the shell's directory; setup itself runs the
   // plain commands in `cwd`.
-  const shownInstall = inDirectory(
-    installCommandFor(packageManager),
-    input.cwdFlag,
-    input.cwd,
-  ).display;
-  const shownDev = inDirectory(devCommand, input.cwdFlag, input.cwd).display;
+  const shownInstall = suggestedCommandOf(
+    inDirectory(installCommandFor(packageManager), input.cwdFlag, input.cwd),
+  );
+  const shownDev = suggestedCommandOf(inDirectory(devCommand, input.cwdFlag, input.cwd));
   const { install } = await installDependencies({
     cwd: input.cwd,
     needed: input.scaffoldedFramework || input.depsAdded.length > 0,
@@ -107,9 +105,9 @@ export async function installDependenciesForSetup(
 
 function outcome(input: {
   install: SetupInstall;
-  devCommand: string;
+  devCommand: SuggestedCommand;
   /** {@link SetupInstall.command} as the reader runs it. */
-  installCommand: string;
+  installCommand: SuggestedCommand;
   issuer: string;
   suggest: Suggest;
   includeInstallCommand: boolean;
@@ -153,13 +151,8 @@ function outcome(input: {
     nextActions: [...verifyActions, ...customizeAndPublishActions(input.suggest)],
     // The status command is in the box's steps, so a script gets it too.
     nextCommands: input.includeInstallCommand
-      ? [
-          shellCommand(input.installCommand),
-          shellCommand(input.devCommand),
-          planCommand,
-          statusCommand,
-        ]
-      : [shellCommand(input.devCommand), planCommand, statusCommand],
+      ? [input.installCommand, input.devCommand, planCommand, statusCommand]
+      : [input.devCommand, planCommand, statusCommand],
   };
 }
 
@@ -167,12 +160,12 @@ function installFailed(
   error: unknown,
   installCommand: PackageCommand,
   devCommand: PackageCommand,
-  shownInstall: string,
+  shownInstall: SuggestedCommand,
   cwd: string,
 ): ZitadelError {
   return new ZitadelError("E_VALIDATION", `Dependency install failed: ${installCommand.display}`, {
     hint: `Run ${installCommand.display} in ${cwd}, then start the app with ${devCommand.display}.`,
-    nextCommands: [shellCommand(shownInstall)],
+    nextCommands: [shownInstall],
     details: {
       command: installCommand.display,
       cwd,

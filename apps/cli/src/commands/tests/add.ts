@@ -13,14 +13,13 @@ import { FileWriter } from "@/lib/orca/patchers/rule/file-writer";
 import type { ScaffoldPlan, ScaffoldResult } from "@/lib/orca/patchers/rule/file-writer/types";
 import {
   detectPackageManager,
-  execCommandFor,
   inDirectory,
   type PackageCommand,
   type PackageManager,
   runScriptCommandFor,
 } from "@/lib/package-manager";
 import { hasZitadelConfig, readFrameworkId, readZitadelConfig } from "@/lib/project";
-import { shellCommand, type SuggestedCommand } from "@/lib/suggestion";
+import { type SuggestedCommand, suggestedCommandOf } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import {
   PLAYWRIGHT_CONFIG,
@@ -36,40 +35,40 @@ import {
 const GUIDE_URL = "https://preview.zitadel.com/docs/guides/test-your-app";
 
 /** How a directory that `setup` has not made a project is refused. */
-const NOT_A_PROJECT_REFUSAL: Refusal = {
+const NOT_A_PROJECT_REFUSAL = {
   message: "This directory is not a Zitadel project",
   hint: "Run setup first; the test suite runs against the app it wires up.",
   next: [{ id: "setup" }],
-};
+} as const satisfies Refusal;
 
 /** How a project whose framework has no suite yet is refused. */
-const FRAMEWORK_REFUSAL: Refusal = {
+const FRAMEWORK_REFUSAL = {
   message: "tests add does not support {framework} apps yet",
   hint: `It writes a suite for: {supported}. For another framework, see ${GUIDE_URL}#other-frameworks`,
   details: { framework: "{framework}", frameworks: "{frameworks}" },
-};
+} as const satisfies Refusal;
 
 /** How an app that already has a Playwright config is refused. */
-const PLAYWRIGHT_CONFIG_REFUSAL: Refusal = {
+const PLAYWRIGHT_CONFIG_REFUSAL = {
   code: "E_CONFLICT",
   message: "This app already has a Playwright config, {config}",
   hint: `With a second config, Playwright's lookup order would pick which one runs. Add withZitadel() from ${TEST_KIT_PACKAGE}/playwright to {config} by hand: ${GUIDE_URL}`,
   details: { path: "{config}" },
-};
+} as const satisfies Refusal;
 
 /** How a directory without a `package.json` is refused. */
-const MANIFEST_REFUSAL: Refusal = {
+const MANIFEST_REFUSAL = {
   message: "package.json is required to add the test suite",
   hint: "Run tests add in the app's own directory, where setup ran.",
-};
+} as const satisfies Refusal;
 
 /** How a failed install is refused; the files are written by then. */
-const INSTALL_REFUSAL: Refusal = {
+const INSTALL_REFUSAL = {
   message: "Dependency install failed: {command}",
   hint: "The test files are written. Run {command} in {cwd} to install their dependencies.",
   next: ["{install}"],
   details: { command: "{command}", cwd: "{cwd}", message: "{message}" },
-};
+} as const satisfies Refusal;
 
 /** What the app's `package.json` declares, as far as the suite cares. */
 type Manifest = Readonly<{
@@ -188,11 +187,18 @@ export default class TestsAdd extends BaseCommand {
           return escapeControlCharacters(line);
         }),
       },
-      next: {
-        commands: this.dryRun
-          ? [await this.realRun()]
-          : this.nextCommands(packageManager, install, installCommand, ownScript, flags.cwd),
-      },
+      next: this.dryRun
+        ? { commands: [await this.realRun()] }
+        : {
+            actions: this.nextActions(ownScript),
+            commands: this.nextCommands(
+              packageManager,
+              install,
+              installCommand,
+              ownScript,
+              flags.cwd,
+            ),
+          },
     });
   }
 
@@ -256,10 +262,26 @@ export default class TestsAdd extends BaseCommand {
   }
 
   /**
+   * The steps no suggested command may take: a package manager's suggestion
+   * only installs, removes or runs a project's script, so installing
+   * Playwright's browser, and running Playwright when the app's own
+   * `test:e2e` runs something else, are said in prose, run in the app.
+   */
+  private nextActions(ownScript: unknown): string[] {
+    return [
+      `Install Playwright's Chromium once, in ${this.cwd}: npx playwright install chromium`,
+      ...(runsTheSuite(ownScript)
+        ? []
+        : [
+            `The app's own ${TEST_SCRIPT.name} script runs ${String(ownScript)}, so run the suite with Playwright in ${this.cwd}: npx playwright test`,
+          ]),
+    ];
+  }
+
+  /**
    * What the reader runs next, from the shell's directory, with the app's
-   * package manager: the install when this run skipped it, Playwright's
-   * browser, then the suite, through the project's script unless the app's
-   * own `test:e2e` runs something else.
+   * package manager: the install when this run skipped it, then the suite,
+   * through the project's script when that script is the suite's.
    */
   private nextCommands(
     packageManager: PackageManager,
@@ -268,24 +290,21 @@ export default class TestsAdd extends BaseCommand {
     ownScript: unknown,
     cwdFlag: string | undefined,
   ): SuggestedCommand[] {
-    const runsTheSuite = ownScript === undefined || ownScript === TEST_SCRIPT.command;
-    // npm runs a binary in the shell's directory even with --prefix, where
-    // Playwright would find no config, so a run elsewhere names it.
-    const config = cwdFlag === undefined ? [] : ["--config", join(this.cwd, PLAYWRIGHT_CONFIG)];
     return [
       ...(install.status === "skipped" ? [this.shown(installCommand, cwdFlag)] : []),
-      this.shown(execCommandFor(packageManager, "playwright", ["install", "chromium"]), cwdFlag),
-      this.shown(
-        runsTheSuite
-          ? runScriptCommandFor(packageManager, TEST_SCRIPT.name)
-          : execCommandFor(packageManager, "playwright", ["test", ...config]),
-        cwdFlag,
-      ),
+      ...(runsTheSuite(ownScript)
+        ? [this.shown(runScriptCommandFor(packageManager, TEST_SCRIPT.name), cwdFlag)]
+        : []),
     ];
   }
 
   /** A package manager command as the reader runs it, from the shell's directory. */
   private shown(command: PackageCommand, cwdFlag: string | undefined): SuggestedCommand {
-    return shellCommand(inDirectory(command, cwdFlag, this.cwd).display);
+    return suggestedCommandOf(inDirectory(command, cwdFlag, this.cwd));
   }
+}
+
+/** Whether the app's `test:e2e` runs the suite: absent, it is the one this command adds. */
+function runsTheSuite(ownScript: unknown): boolean {
+  return ownScript === undefined || ownScript === TEST_SCRIPT.command;
 }

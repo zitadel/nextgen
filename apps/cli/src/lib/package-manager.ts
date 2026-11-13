@@ -1,4 +1,4 @@
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { execa } from "execa";
 
 import { Cmd } from "./cmd";
@@ -8,27 +8,133 @@ import { optionArgs } from "./public-cli";
 
 export type PackageManager = "npm" | "pnpm" | "yarn" | "bun";
 
+/**
+ * What a package manager's command may do: install, remove, or run a project's
+ * own script. None runs a package the way `dlx`, `exec` or `x` would, so a
+ * suggestion of one cannot run this CLI unchecked.
+ */
+export type Verb = "add" | "dev" | "install" | "remove" | "run" | "uninstall";
+
+/** A package manager's command, as each builder here makes it. */
 export type PackageCommand = {
+  /** The package manager. */
   command: PackageManager;
+  /** What it does, recorded by the builder rather than read back from `args`. */
+  verb: Verb;
+  /** The words after the verb: its options, then the packages or the script. */
+  operands: readonly string[];
+  /** Every word passed to the package manager, options before the verb included. */
   args: string[];
+  /** The command as the person reads and runs it. */
   display: string;
 };
 
+/** Each lockfile, and the package manager that writes it, in the order they are looked for. */
+const LOCKFILES = [
+  ["pnpm-lock.yaml", "pnpm"],
+  ["yarn.lock", "yarn"],
+  ["bun.lock", "bun"],
+  ["bun.lockb", "bun"],
+  ["package-lock.json", "npm"],
+] as const satisfies ReadonlyArray<readonly [string, PackageManager]>;
+
+/**
+ * The package manager the project in `cwd` uses. A workspace keeps its
+ * lockfile and its `packageManager` field at the repository's root, not in
+ * each app, so every directory from `cwd` up to the one holding `.git` is
+ * read, nearest first ({@link projectDirectories}).
+ *
+ * @param cwd - The project's directory.
+ * @returns What the nearest `packageManager` field or lockfile names, or npm
+ *   when none does.
+ */
 export async function detectPackageManager(cwd: string): Promise<PackageManager> {
-  const declared = await packageManagerFromManifest(cwd);
-  if (declared) {
-    return declared;
+  for (const dir of await projectDirectories(cwd)) {
+    const named = await packageManagerIn(dir);
+    if (named !== undefined) {
+      return named;
+    }
   }
-  if (await pathExists(join(cwd, "pnpm-lock.yaml"))) return "pnpm";
-  if (await pathExists(join(cwd, "yarn.lock"))) return "yarn";
-  if (await pathExists(join(cwd, "bun.lock"))) return "bun";
-  if (await pathExists(join(cwd, "bun.lockb"))) return "bun";
-  if (await pathExists(join(cwd, "package-lock.json"))) return "npm";
   return "npm";
 }
 
+/**
+ * The directories whose files say which package manager `cwd` uses: `cwd`
+ * and each one above it, up to and including the repository's root (the one
+ * holding `.git`). Outside a repository only `cwd`, so nothing above a
+ * project, such as a home directory's stray lockfile, can choose for it.
+ *
+ * @param cwd - The project's directory.
+ * @returns The directories, nearest first.
+ */
+async function projectDirectories(cwd: string): Promise<string[]> {
+  const start = resolve(cwd);
+  const dirs: string[] = [];
+  let dir = start;
+  for (;;) {
+    dirs.push(dir);
+    if (await pathExists(join(dir, ".git"))) {
+      return dirs;
+    }
+    const parent = dirname(dir);
+    if (parent === dir) {
+      return [start];
+    }
+    dir = parent;
+  }
+}
+
+/**
+ * The package manager `dir` itself names: its `package.json`'s
+ * `packageManager` field first, then the first lockfile it holds.
+ *
+ * @param dir - A directory.
+ * @returns The package manager, or `undefined` when `dir` names none.
+ */
+async function packageManagerIn(dir: string): Promise<PackageManager | undefined> {
+  const declared = await packageManagerFromManifest(dir);
+  if (declared !== undefined) {
+    return declared;
+  }
+  for (const [lockfile, packageManager] of LOCKFILES) {
+    if (await pathExists(join(dir, lockfile))) {
+      return packageManager;
+    }
+  }
+  return undefined;
+}
+
 export function installCommandFor(packageManager: PackageManager): PackageCommand {
-  return command(packageManager, ["install"]);
+  return command(packageManager, "install", []);
+}
+
+/**
+ * Installs `packages` with npm's `install` or the others' `add`, at whatever
+ * version each spec names: `npm install @zitadel/cli@latest`.
+ *
+ * @param packageManager - The project's package manager.
+ * @param packages - The `name@version` specs.
+ * @returns The command.
+ */
+export function addCommandFor(
+  packageManager: PackageManager,
+  packages: ReadonlyArray<string>,
+): PackageCommand {
+  return command(packageManager, packageManager === "npm" ? "install" : "add", packages);
+}
+
+/**
+ * Removes `packages` with npm's `uninstall` or the others' `remove`.
+ *
+ * @param packageManager - The project's package manager.
+ * @param packages - The packages' names.
+ * @returns The command.
+ */
+export function removeCommandFor(
+  packageManager: PackageManager,
+  packages: ReadonlyArray<string>,
+): PackageCommand {
+  return command(packageManager, packageManager === "npm" ? "uninstall" : "remove", packages);
 }
 
 /**
@@ -43,47 +149,26 @@ export function addExactCommandFor(
 ): PackageCommand {
   switch (packageManager) {
     case "npm":
-      return command("npm", ["install", "--save-exact", ...packages]);
+      return command("npm", "install", ["--save-exact", ...packages]);
     case "pnpm":
-      return command("pnpm", ["add", "--save-exact", ...packages]);
+      return command("pnpm", "add", ["--save-exact", ...packages]);
     case "yarn":
-      return command("yarn", ["add", "--exact", ...packages]);
+      return command("yarn", "add", ["--exact", ...packages]);
     case "bun":
-      return command("bun", ["add", "--exact", ...packages]);
+      return command("bun", "add", ["--exact", ...packages]);
   }
 }
 
 export function devCommandFor(packageManager: PackageManager): PackageCommand {
   switch (packageManager) {
     case "npm":
-      return command("npm", ["run", "dev"]);
+      return command("npm", "run", ["dev"]);
     case "pnpm":
-      return command("pnpm", ["dev"]);
+      return command("pnpm", "dev", []);
     case "yarn":
-      return command("yarn", ["dev"]);
+      return command("yarn", "dev", []);
     case "bun":
-      return command("bun", ["run", "dev"]);
-  }
-}
-
-/**
- * Runs a binary the project installed, as each manager spells it: npm needs
- * `--` before the binary's own flags, and Yarn runs a binary by its name.
- */
-export function execCommandFor(
-  packageManager: PackageManager,
-  bin: string,
-  args: ReadonlyArray<string>,
-): PackageCommand {
-  switch (packageManager) {
-    case "npm":
-      return command("npm", ["exec", "--", bin, ...args]);
-    case "pnpm":
-      return command("pnpm", ["exec", bin, ...args]);
-    case "yarn":
-      return command("yarn", [bin, ...args]);
-    case "bun":
-      return command("bun", ["x", bin, ...args]);
+      return command("bun", "run", ["dev"]);
   }
 }
 
@@ -94,7 +179,7 @@ export function runScriptCommandFor(
   packageManager: PackageManager,
   script: string,
 ): PackageCommand {
-  return command(packageManager, ["run", script]);
+  return command(packageManager, "run", [script]);
 }
 
 /**
@@ -132,6 +217,8 @@ export function inDirectory(
   const dir = relative ? typed : resolved;
   return {
     command: packageCommand.command,
+    verb: packageCommand.verb,
+    operands: packageCommand.operands,
     args: [...optionArgs(flag, dir), ...packageCommand.args],
     display: [packageCommand.command, Cmd.option(flag, dir), ...packageCommand.args].join(" "),
   };
@@ -172,11 +259,25 @@ export async function runPackageCommand(
   }
 }
 
-function command(packageManager: PackageManager, args: string[]): PackageCommand {
+/**
+ * A package manager's command that does `verb`, with `operands` after it.
+ *
+ * @param packageManager - The package manager.
+ * @param verb - What it does.
+ * @param operands - The words after the verb.
+ * @returns The command.
+ */
+function command(
+  packageManager: PackageManager,
+  verb: Verb,
+  operands: ReadonlyArray<string>,
+): PackageCommand {
   return {
     command: packageManager,
-    args,
-    display: [packageManager, ...args].join(" "),
+    verb,
+    operands,
+    args: [verb, ...operands],
+    display: [packageManager, verb, ...operands].join(" "),
   };
 }
 

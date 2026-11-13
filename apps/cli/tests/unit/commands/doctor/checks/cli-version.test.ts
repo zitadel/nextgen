@@ -44,8 +44,8 @@ describe("checkCliVersion", () => {
         details: {
           current: CURRENT,
           latest: "2.0.0",
-          remedy_command: "npx @zitadel/cli@latest upgrade",
         },
+        remedy: "npx @zitadel/cli@latest upgrade",
       });
     });
 
@@ -58,9 +58,7 @@ describe("checkCliVersion", () => {
         suggest: aSuggest({ cwd: "apps/web" }, CURRENT),
       });
 
-      expect(outcome.details).toMatchObject({
-        remedy_command: "npx @zitadel/cli@latest upgrade --cwd apps/web",
-      });
+      expect(outcome.remedy).toBe("npx @zitadel/cli@latest upgrade --cwd apps/web");
     });
   });
 
