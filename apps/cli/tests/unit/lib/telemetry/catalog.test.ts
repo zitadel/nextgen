@@ -163,8 +163,7 @@ function eventName(node: ts.Expression | undefined, source: ts.SourceFile): stri
   if (!node || !ts.isIdentifier(node)) {
     return undefined;
   }
-  let found: string | undefined;
-  const visit = (child: ts.Node): void => {
+  const find = (child: ts.Node): string | undefined => {
     if (
       ts.isVariableDeclaration(child) &&
       ts.isIdentifier(child.name) &&
@@ -172,12 +171,11 @@ function eventName(node: ts.Expression | undefined, source: ts.SourceFile): stri
       child.initializer &&
       ts.isStringLiteral(child.initializer)
     ) {
-      found = child.initializer.text;
+      return child.initializer.text;
     }
-    ts.forEachChild(child, visit);
+    return ts.forEachChild(child, find);
   };
-  visit(source);
-  return found;
+  return find(source);
 }
 
 /** Every product event the commands send, by the command that sends it. */
@@ -192,7 +190,7 @@ async function trackedEvents(): Promise<TrackedEvent[]> {
       if (event === undefined) {
         throw new Error(`${file}: trackEvent names its event with neither a literal nor a const`);
       }
-      tracked.push({ command: commandId(file), event, keys: literalKeys(call.arguments[1]) });
+      tracked.push({ command: commandId(file), event, keys: keysOf(call.arguments[1]) });
     }
   }
   return tracked;
