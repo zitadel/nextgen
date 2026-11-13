@@ -1,37 +1,18 @@
 /**
  * Spec-conformance test for the api-mock.
  *
- * This test is independent of the hand-written response shapes in
- * `server.ts` / `platform-handlers.ts`. It boots the real Express mock
- * server, POSTs / GETs every mocked endpoint, and validates the response
- * against the corresponding **zod** schema orval generates from the OAS.
+ * It boots the real Express mock server and drives every route over HTTP.
+ * Every answer to an operation of the OpenAPI spec goes through
+ * `conformantFetch` (`src/__tests__/mock-routes.ts`), which fails the request
+ * when the answer breaks the contract (`src/__tests__/spec-contract.ts`): a
+ * status the operation does not declare, a success body orval's zod refuses,
+ * or an error body outside the operation's declared error set.
  *
- * The TypeScript types from `@zitadel/api/generated/model` give
- * compile-time guarantees about shape; zod validation gives **runtime**
- * guarantees about regex patterns, enum values, min/max constraints, and
- * required-vs-optional. Together they're the "golden" guarantee: if this
- * test passes, the mock's wire output is provably spec-compliant.
- *
- * Endpoints covered by zod here:
- *   - POST /sessions/exchange           → ExchangeHandoffResponse
- *   - GET  /projects/:id                → GetProjectResponse
- *   - GET  /flow_definitions            → ListFlowDefinitionsResponse
- *   - GET  /flow_definitions/:id        → GetFlowDefinitionResponse
- *
- * Endpoints covered structurally (orval emits no `*Response` zod for these
- * because they have no static response schema — POSTs that return only an
- * `id`, or out-of-spec routes):
- *   - POST /schemas                     → { id }
- *   - POST /flow_definitions            → flow-definition-response envelope
- *
- * Also covered by zod here:
- *   - POST /projects                    → CreateProjectResponse
- *   - POST /projects/:id/origins        → AddOriginResponse
- *
- * `GET /schemas/:id` is NOT zod-validated here: the mock stores whatever
- * the user POSTed verbatim, so the response shape depends on the request
- * the caller made. The structural test below just exercises the 404 path
- * (clear contract: spec-compliant error envelope).
+ * The last describe reads the routes off the handlers themselves and fails a
+ * route that is neither a spec operation nor listed in
+ * `src/__tests__/spec-exceptions.ts`, and a spec route whose success path, or
+ * any status or error code its handler names, no test here answered. A new
+ * handler therefore needs its tests here before it passes.
  */
 import type { Server } from "node:http";
 
@@ -50,15 +31,36 @@ import {
   ListFlowDefinitionsResponse,
   QueryIdpsResponse,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
+import { API_PREFIX } from "@zitadel/api/runtime/base-url";
+import { setupServer } from "msw/node";
 import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
 
+import {
+  IN_PROCESS_ORIGIN,
+  conformantFetch,
+  literalOutcomes,
+  mockRoutes,
+  observations,
+  routeKey,
+} from "./__tests__/mock-routes.js";
+import { OUT_OF_SPEC_ROUTES, SPEC_GAPS } from "./__tests__/spec-exceptions.js";
+import { specOperations, usedGaps } from "./__tests__/spec-contract.js";
 import { signHandoffToken } from "./crypto.js";
+import { PASSWORD_FIELD } from "./fixtures/login.js";
+import { setupMockHandlers } from "./handlers.js";
 import {
   expireClaimChallenge,
   expireClaimWindow,
   snapshotPlatformStore,
 } from "./platform-handlers.js";
-import { PLATFORM_PROJECT_ID, csrfTokenFor, startMockServer } from "./server.js";
+import { PLATFORM_PROJECT_ID, createMockApp, csrfTokenFor, startMockServer } from "./server.js";
+
+/**
+ * Every request below goes through the contract: an answer to a spec
+ * operation that breaks it throws (`src/__tests__/spec-contract.ts`), and the
+ * last describe proves every route was exercised.
+ */
+const fetch = conformantFetch;
 
 const PORT = 4456;
 const BASE = `http://localhost:${PORT}`;
@@ -320,7 +322,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     });
     expect(res.status).toBe(400);
     const body = (await res.json()) as Record<string, unknown>;
-    expect(body.code).toBe("sess.project_id_missing");
+    expect(body.code).toBe("req.invalid");
   });
 
   // The server cannot tell a replayed token from one it never issued (it
@@ -608,7 +610,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     const res = await fetch(`${API}/projects/proj-does-not-exist`);
     expect(res.status).toBe(404);
     const body = (await res.json()) as Record<string, unknown>;
-    expect(body.code).toBe("not_found");
+    expect(body.code).toBe("proj.not_found");
     expect(typeof body.message).toBe("string");
   });
 
@@ -633,7 +635,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect((body.id as string).startsWith("sch_")).toBe(true);
   });
 
-  test("GET and DELETE /schemas/:id look up by id without project_id", async () => {
+  test("GET /schemas/:id looks up by id without project_id", async () => {
     const create = await fetch(`${API}/schemas?project_id=proj_schema_owner`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -657,10 +659,6 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
 
     const ownerGet = await fetch(`${API}/schemas/${id}`);
     expect(ownerGet.status).toBe(200);
-    const ownerDelete = await fetch(`${API}/schemas/${id}`, {
-      method: "DELETE",
-    });
-    expect(ownerDelete.status).toBe(204);
   });
 
   test("GET /schemas/:id round-trips the raw uploaded document inside the envelope (no zod re-shaping)", async () => {
@@ -822,7 +820,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     });
     expect(res.status).toBe(400);
     const body = (await res.json()) as { code: string; details: { issues: unknown[] } };
-    expect(body.code).toBe("invalid_schema");
+    expect(body.code).toBe("sch.invalid_request");
     expect(body.details.issues).toContainEqual(
       expect.objectContaining({ path: "properties.firstName", key: "minimumLength" }),
     );
@@ -836,7 +834,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     });
     expect(res.status).toBe(400);
     const body = (await res.json()) as Record<string, unknown>;
-    expect(body.code).toBe("invalid_schema");
+    expect(body.code).toBe("sch.invalid_request");
   });
 
   test("POST /flow_definitions returns a body matching GetFlowDefinitionResponse (envelope is identical)", async () => {
@@ -901,10 +899,14 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       body: JSON.stringify({ project_id: "proj_conformance", flow_definition: flowDefinition }),
     });
     expect(res.status).toBe(400);
-    const body = (await res.json()) as { code: string; message: string; details: string };
+    const body = (await res.json()) as {
+      code: string;
+      message: string;
+      details: { details: string };
+    };
     expect(body.code).toBe("flowdef.invalid");
     expect(body.message).toBe("flow definition: invalid");
-    expect(body.details).toContain('targets unknown step "missing"');
+    expect(body.details.details).toContain('targets unknown step "missing"');
   });
 
   test("POST /flow_definitions refuses a key the definition does not have, as the server does", async () => {
@@ -917,7 +919,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       }),
     });
     expect(res.status).toBe(400);
-    expect(((await res.json()) as { code: string }).code).toBe("invalid_request");
+    expect(((await res.json()) as { code: string }).code).toBe("req.invalid");
   });
 
   test("POST /flow_definitions with a repeated name publishes a new revision", async () => {
@@ -2039,7 +2041,7 @@ describe("api-mock releases and deployments", () => {
       }),
     });
     expect(res.status).toBe(400);
-    expect(((await res.json()) as { code: string }).code).toBe("invalid_request");
+    expect(((await res.json()) as { code: string }).code).toBe("req.invalid");
   });
 
   test("builds a release whose bundle carries a connection, resolving it by slug", async () => {
@@ -2917,3 +2919,452 @@ describe("api-mock releases and deployments", () => {
     expect(((await ok.json()) as { revoked_at: string }).revoked_at).not.toBeNull();
   });
 });
+
+/**
+ * The answers no other test here needs, so the route coverage below can prove
+ * every handler's success and error paths were checked against the contract.
+ */
+describe("api-mock error paths — each refusal a handler names", () => {
+  async function newProject(name: string): Promise<{ id: string; secret: string }> {
+    const res = await fetch(`${API}/projects`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { id: string; project_secret: string };
+    return { id: body.id, secret: body.project_secret };
+  }
+
+  const send = (method: string, path: string, body?: unknown, headers?: Record<string, string>) =>
+    fetch(`${API}${path}`, {
+      method,
+      headers: { "content-type": "application/json", ...headers },
+      ...(body === undefined
+        ? {}
+        : { body: typeof body === "string" ? body : JSON.stringify(body) }),
+    });
+
+  async function expectRefusal(res: Response, status: number, code: string): Promise<void> {
+    expect({ status: res.status, code: ((await res.json()) as { code: string }).code }).toEqual({
+      status,
+      code,
+    });
+  }
+
+  const UNKNOWN_PROJECT = "proj_does_not_exist";
+
+  test("a body that is not JSON is req.invalid", async () => {
+    const { id } = await newProject("error-paths-json");
+    for (const path of [
+      "/projects",
+      `/projects/${id}/origins`,
+      `/projects/${id}/origins/remove`,
+      `/projects/${id}/previews/remove`,
+      `/releases?project_id=${id}`,
+      `/policies?project_id=${id}`,
+    ]) {
+      await expectRefusal(await send("POST", path, "{not json"), 400, "req.invalid");
+    }
+    await expectRefusal(
+      await send("PATCH", `/variables?project_id=${id}`, "{not json"),
+      400,
+      "req.invalid",
+    );
+  });
+
+  test("an origin of a project the mock does not hold is origin.not_found", async () => {
+    const pattern = { pattern: "https://app.acme.com", kind: "primary" };
+    await expectRefusal(
+      await send("POST", `/projects/${UNKNOWN_PROJECT}/origins`, pattern),
+      404,
+      "origin.not_found",
+    );
+    await expectRefusal(
+      await send("POST", `/projects/${UNKNOWN_PROJECT}/origins/remove`, {
+        pattern: pattern.pattern,
+      }),
+      404,
+      "origin.not_found",
+    );
+  });
+
+  test("a release of a project the mock does not hold is rel.project_not_found", async () => {
+    await expectRefusal(
+      await send("POST", `/releases?project_id=${UNKNOWN_PROJECT}`, {
+        pointers: [{ kind: "schema", revision_id: "sch_a" }],
+      }),
+      404,
+      "rel.project_not_found",
+    );
+    await expectRefusal(
+      await send("POST", `/releases/build?project_id=${UNKNOWN_PROJECT}`, {
+        bundle: { schemas: [] },
+      }),
+      404,
+      "rel.project_not_found",
+    );
+  });
+
+  test("a release reads back by id, and an unknown one is rel.not_found", async () => {
+    const { id } = await newProject("error-paths-release");
+    const created = await send("POST", `/releases?project_id=${id}`, {
+      pointers: [{ kind: "schema", revision_id: "sch_a" }],
+    });
+    const release = (await created.json()) as { id: string };
+    expect((await send("GET", `/releases/${release.id}?project_id=${id}`)).status).toBe(200);
+    await expectRefusal(
+      await send("GET", `/releases/rel_missing?project_id=${id}`),
+      404,
+      "rel.not_found",
+    );
+    await expectRefusal(
+      await send("POST", `/releases/rel_missing/revoke?project_id=${id}`),
+      404,
+      "rel.not_found",
+    );
+  });
+
+  test("a deployment names a project, release and targets the mock holds", async () => {
+    const { id } = await newProject("error-paths-deploy");
+    await send("POST", `/projects/${id}/origins`, {
+      pattern: "https://app.acme.com",
+      kind: "primary",
+    });
+    await send("POST", `/projects/${id}/origins`, {
+      pattern: "https://*.preview.acme.com",
+      kind: "preview",
+    });
+    const release = async (revision: string) =>
+      (
+        (await (
+          await send("POST", `/releases?project_id=${id}`, {
+            pointers: [{ kind: "schema", revision_id: revision }],
+          })
+        ).json()) as { id: string }
+      ).id;
+    const first = await release("sch_first");
+    const second = await release("sch_second");
+
+    await expectRefusal(
+      await send("POST", `/deployments?project_id=${UNKNOWN_PROJECT}`, {
+        release_id: first,
+        targets: "primary",
+      }),
+      404,
+      "env.project_not_found",
+    );
+    await expectRefusal(
+      await send("POST", `/deployments?project_id=${id}`, {
+        release_id: "rel_missing",
+        targets: "primary",
+      }),
+      404,
+      "rel.not_found",
+    );
+    const preview = "https://one.preview.acme.com";
+    await expectRefusal(
+      await send("POST", `/deployments?project_id=${id}`, {
+        release_id: first,
+        targets: [preview, preview],
+      }),
+      400,
+      "req.invalid",
+    );
+
+    const deployFirst = await send("POST", `/deployments?project_id=${id}`, {
+      release_id: first,
+      targets: "primary",
+    });
+    const firstDeployment = (await deployFirst.json()) as { id: string };
+    await expectRefusal(
+      await send("POST", `/deployments?project_id=${id}`, {
+        release_id: second,
+        targets: "primary",
+        expected_deployment_id: "dep_not_the_newest",
+      }),
+      409,
+      "dep.conflict",
+    );
+    expect(
+      (
+        await send("POST", `/deployments?project_id=${id}`, {
+          release_id: second,
+          targets: "primary",
+        })
+      ).status,
+    ).toBe(201);
+    const previewDeployment = (await (
+      await send("POST", `/deployments?project_id=${id}`, {
+        release_id: second,
+        targets: [preview],
+      })
+    ).json()) as { id: string };
+
+    // The first release is served nowhere now, so it can be revoked: neither
+    // a deploy nor a rollback may serve it again.
+    expect((await send("POST", `/releases/${first}/revoke?project_id=${id}`)).status).toBe(200);
+    await expectRefusal(
+      await send("POST", `/deployments?project_id=${id}`, {
+        release_id: first,
+        targets: "primary",
+      }),
+      409,
+      "rel.revoked",
+    );
+    await expectRefusal(
+      await send("POST", `/deployments/${firstDeployment.id}/rollback?project_id=${id}`, {}),
+      409,
+      "rel.revoked",
+    );
+    await expectRefusal(
+      await send("POST", `/deployments/${previewDeployment.id}/rollback?project_id=${id}`, {}),
+      400,
+      "dep.invalid",
+    );
+    await expectRefusal(
+      await send("POST", `/deployments/dep_missing/rollback?project_id=${id}`, {}),
+      404,
+      "dep.not_found",
+    );
+    await expectRefusal(
+      await send("GET", `/deployments/dep_missing?project_id=${id}`),
+      404,
+      "dep.not_found",
+    );
+    await expectRefusal(
+      await send("GET", `/deployments?project_id=${id}&page_token=not-a-cursor`),
+      400,
+      "req.invalid",
+    );
+  });
+
+  test("a claim needs the project secret, and an unknown challenge is claim_challenge.not_found", async () => {
+    const { id, secret } = await newProject("error-paths-claim");
+    await expectRefusal(await send("POST", `/projects/${id}/claim/init`), 401, "auth.unauthorized");
+    const init = await send("POST", `/projects/${id}/claim/init`, undefined, {
+      authorization: `Bearer ${secret}`,
+    });
+    const { challenge_id } = (await init.json()) as { challenge_id: string };
+    expect(
+      (await send("GET", `/projects/${id}/claim/window?challenge_id=${challenge_id}`)).status,
+    ).toBe(200);
+    await expectRefusal(
+      await send("GET", `/projects/${id}/claim/window?challenge_id=ch_missing`),
+      404,
+      "claim_challenge.not_found",
+    );
+    await expectRefusal(
+      await send("GET", `/projects/${id}/claim/status?challenge_id=ch_missing`, undefined, {
+        authorization: `Bearer ${secret}`,
+      }),
+      404,
+      "claim_challenge.not_found",
+    );
+  });
+
+  test("POST /users/query answers the project secret's users, and refuses without it", async () => {
+    const { secret } = await newProject("error-paths-users");
+    const ok = await send("POST", "/users/query", {}, { authorization: `Bearer ${secret}` });
+    expect(ok.status).toBe(200);
+    await expectRefusal(await send("POST", "/users/query", {}), 401, "auth.unauthorized");
+  });
+
+  test("an unknown flow definition is flowdef.not_found", async () => {
+    await expectRefusal(
+      await send("GET", "/flow_definitions/flowdef_missing"),
+      404,
+      "flowdef.not_found",
+    );
+  });
+
+  test("a policy publishes, reads back by id and revision, and refuses what it does not hold", async () => {
+    const { id } = await newProject("error-paths-policy");
+    const operation = "auth.factor.password.set";
+    await expectRefusal(
+      await send("POST", `/policies?project_id=${id}`, {
+        operation,
+        config: { min_length: 20, max_length: 10 },
+      }),
+      400,
+      "pol.invalid",
+    );
+    const published = await send("POST", `/policies?project_id=${id}`, {
+      operation,
+      config: { min_length: 12 },
+    });
+    expect(published.status).toBe(201);
+    const policy = (await published.json()) as { id: string; revision_id: string };
+    for (const path of [
+      `/policies/${policy.id}`,
+      `/policies/${policy.id}/revisions`,
+      `/policies/revisions/${policy.revision_id}`,
+    ]) {
+      expect((await send("GET", `${path}?project_id=${id}`)).status, path).toBe(200);
+      const missing = path
+        .replace(policy.id, "pol_missing")
+        .replace(policy.revision_id, "polrev_missing");
+      await expectRefusal(await send("GET", `${missing}?project_id=${id}`), 404, "pol.not_found");
+    }
+  });
+
+  test("deleting a variable the project does not hold is var.not_found", async () => {
+    const { id } = await newProject("error-paths-variables");
+    await expectRefusal(
+      await send("DELETE", `/variables/MISSING?project_id=${id}`),
+      404,
+      "var.not_found",
+    );
+  });
+
+  describe("the login flow", () => {
+    const start = async (purpose: "login" | "register") => {
+      const res = await send("POST", "/flow", { purpose, project_id: "proj_error_paths" });
+      expect(res.status).toBe(201);
+      return (await res.json()) as { id: string; session_token: string };
+    };
+
+    test("starts, reads back and advances a sign-in", async () => {
+      const flow = await start("login");
+      expect((await send("GET", `/flow/${flow.id}`)).status).toBe(200);
+      const next = await send("POST", `/flow/${flow.id}/submit`, {
+        session_token: flow.session_token,
+        action: "submit",
+        fields: { email: "error-paths@example.com" },
+      });
+      expect(next.status).toBe(200);
+    });
+
+    test("refuses an sso submission without return_target, and any submit on sso-redirect", async () => {
+      const flow = await start("login");
+      const sso = {
+        session_token: flow.session_token,
+        action: "sso",
+        fields: {},
+        sso_provider_id: "google",
+      };
+      await expectRefusal(await send("POST", `/flow/${flow.id}/submit`, sso), 400, "req.invalid");
+      const redirect = await send("POST", `/flow/${flow.id}/submit`, {
+        ...sso,
+        return_target: `${BASE}/login`,
+      });
+      expect(redirect.status).toBe(200);
+      await expectRefusal(
+        await send("POST", `/flow/${flow.id}/submit`, { action: "submit", fields: {} }),
+        400,
+        "flow.invalid_action",
+      );
+    });
+
+    test("refuses a sign-up without its proof of work", async () => {
+      const flow = await start("register");
+      const password = (await (
+        await send("POST", `/flow/${flow.id}/submit`, {
+          session_token: flow.session_token,
+          action: "submit",
+          fields: { email: "error-paths-signup@example.com", given_name: "E", family_name: "P" },
+        })
+      ).json()) as { id: string; session_token: string; step: { name: string } };
+      expect(password.step.name).toBe("register-password");
+      await expectRefusal(
+        await send("POST", `/flow/${password.id}/submit`, {
+          session_token: password.session_token,
+          action: "submit",
+          fields: { [PASSWORD_FIELD]: "hunter2-hunter2" },
+        }),
+        403,
+        "flow.proof_invalid",
+      );
+    });
+  });
+
+  /**
+   * The session handlers the Express routes shadow on the server, as the
+   * component, SDK and CLI tests reach them with `setupServer(...)`.
+   */
+  describe("in process", () => {
+    const mock = setupMockHandlers();
+    const inProcess = setupServer(...mock.handlers);
+    beforeAll(() => inProcess.listen({ onUnhandledRequest: "error" }));
+    afterAll(() => inProcess.close());
+
+    const call = (method: string, path: string, body?: unknown) =>
+      fetch(`${IN_PROCESS_ORIGIN}${API_PREFIX}${path}`, {
+        method,
+        headers: { "content-type": "application/json" },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+
+    test("exchanges a handoff token, and answers 503 when told to fail", async () => {
+      expect(
+        (
+          await call("POST", "/sessions/exchange?project_id=proj_in_process", {
+            handoff_token: "t",
+          })
+        ).status,
+      ).toBe(200);
+      mock.failNextExchange();
+      await expectRefusal(
+        await call("POST", "/sessions/exchange?project_id=proj_in_process", { handoff_token: "t" }),
+        503,
+        "unavailable",
+      );
+    });
+
+    test("answers the session reads and sign-out of a signed-out browser with 401", async () => {
+      await expectRefusal(await call("GET", "/sessions/me"), 401, "auth.unauthorized");
+      await expectRefusal(await call("GET", "/sessions/me/csrf"), 401, "auth.unauthorized");
+      await expectRefusal(await call("DELETE", "/sessions/me"), 401, "auth.unauthorized");
+    });
+  });
+});
+
+describe("api-mock route coverage — every handler answers by the contract", () => {
+  const app = createMockApp({ issuer: BASE });
+  const routes = mockRoutes(app);
+  const inSpec = new Set(specOperations.map((op) => routeKey(op.method, op.path)));
+
+  test("every route is a spec operation or listed as out of spec, with its reason", () => {
+    const listed = new Set(Object.keys(OUT_OF_SPEC_ROUTES).map((k) => routeKey(...splitKey(k))));
+    const unknown = routes
+      .map((r) => routeKey(r.method, r.path))
+      .filter((key) => !inSpec.has(key) && !listed.has(key));
+    expect(unknown, "add these to the spec or to OUT_OF_SPEC_ROUTES").toEqual([]);
+    const served = new Set(routes.map((r) => routeKey(r.method, r.path)));
+    const stale = [...listed].filter((key) => inSpec.has(key) || !served.has(key));
+    expect(stale, "OUT_OF_SPEC_ROUTES entries the spec now has or no route serves").toEqual([]);
+  });
+
+  test("every spec gap is still one an answer needs", () => {
+    expect(Object.keys(SPEC_GAPS).filter((gap) => !usedGaps.has(gap))).toEqual([]);
+  });
+
+  test("every spec route answered its success path and every status and code its handler names", () => {
+    const missing: string[] = [];
+    for (const route of routes) {
+      const key = routeKey(route.method, route.path);
+      if (!inSpec.has(key)) continue;
+      const seen = observations.filter((o) => o.transport === route.transport && o.key === key);
+      const where = `${key} (${route.transport})`;
+      const { statuses, codes } = literalOutcomes(route.source);
+      // A handler whose every literal status is a refusal (the in-process
+      // session reads of a signed-out browser) has no success path to prove.
+      const onlyRefuses = statuses.size > 0 && [...statuses].every((status) => status >= 400);
+      if (!onlyRefuses && !seen.some((o) => o.status < 400)) {
+        missing.push(`${where}: no success answer`);
+      }
+      for (const status of statuses) {
+        if (!seen.some((o) => o.status === status)) missing.push(`${where}: no ${status} answer`);
+      }
+      for (const code of codes) {
+        if (!seen.some((o) => o.code === code)) missing.push(`${where}: no ${code} answer`);
+      }
+    }
+    expect(missing).toEqual([]);
+  });
+});
+
+function splitKey(key: string): [string, string] {
+  const [method, path] = key.split(" ");
+  return [method ?? "", path ?? ""];
+}

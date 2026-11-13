@@ -98,3 +98,9 @@ default flow's switch between sign-in and sign-up (its JSDoc has the rules).
   `pnpm exec playwright install`). `pnpm test:unit` is the fast lane.
 - `src/index.spec.ts` is the handlers' contract: for a step-routing
   regression, add its case there first.
+- `src/spec-conformance.spec.ts` checks every answer against the OpenAPI spec
+  and fails a handler whose success path or named status or code no test
+  answers: test a new handler's refusals there.
+- When the mock and the spec disagree, the spec wins. A route the spec lacks,
+  or an answer the spec gets wrong about the server, goes in
+  `src/__tests__/spec-exceptions.ts` with its reason.
