@@ -187,14 +187,16 @@ function variables(
 
 // The invitation commands take flags, not `--data`: `create` says a project
 // invitation with `--relation`, `--name` and `--replaces`, and `list` filters
-// with `--status` and `--type`. A team invitation has no flag yet, so it is
+// with `--status`, once per status, and `--type`. A team invitation has no flag yet, so it is
 // `undefined` and the sample is the api call.
 function invitationFlags(verb: string, request: RequestData): string[] | undefined {
   if (verb === "list") {
-    const status = request.query.status?.values[0];
+    const statuses = request.query.status?.values ?? [];
     const type = request.query.type?.values[0];
     return [
-      ...(typeof status === "string" ? [`--status ${word(status)}`] : []),
+      ...statuses.flatMap((status) =>
+        typeof status === "string" ? [`--status ${word(status)}`] : [],
+      ),
       ...(typeof type === "string" ? [`--type ${word(type)}`] : []),
       ...listFlags(request),
     ];

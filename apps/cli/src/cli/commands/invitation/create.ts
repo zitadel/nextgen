@@ -161,7 +161,7 @@ export default class InvitationCreate extends Promptable(EnvironmentCommand) {
         ],
       },
       next: {
-        commands: [this.suggest({ id: "invitation:list", flags: { status: "pending" } })],
+        commands: [this.suggest({ id: "invitation:list", flags: { status: ["pending"] } })],
       },
     });
   }

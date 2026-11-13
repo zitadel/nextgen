@@ -121,14 +121,15 @@ export class InvitationService extends ApiService {
   }
 
   /**
-   * Every pending invitation, for a person to pick one from.
+   * Every invitation a cancel accepts, pending or declined, for a person to
+   * pick one from.
    *
-   * @returns The pending invitations, newest first.
+   * @returns The cancellable invitations, newest first.
    */
-  async pending(): Promise<readonly Invitation[]> {
+  async cancellable(): Promise<readonly Invitation[]> {
     return this.client.listInvitations.all({
       project_id: this.projectId,
-      status: "pending",
+      status: ["pending", "rejected"],
     });
   }
 

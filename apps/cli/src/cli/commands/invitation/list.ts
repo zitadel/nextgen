@@ -29,6 +29,12 @@ const STATUSES = [
   "expired",
 ] as const satisfies readonly InvitationStatus[];
 
+/**
+ * What `list` shows without `--status`: every status but accepted, as the
+ * console does. Whoever accepted is a member now, which `grants list` shows.
+ */
+const OPEN_STATUSES: readonly InvitationStatus[] = ["pending", "expired", "rejected"];
+
 /** The types `--type` narrows to, as the API declares them. */
 const TYPES = ["project_member", "team_member"] as const satisfies readonly InvitationType[];
 
@@ -61,13 +67,16 @@ export default class InvitationList extends Tabulatable(EnvironmentCommand) {
   static override examples = [
     "<%= config.bin %> invitation list",
     "<%= config.bin %> invitation list --status pending",
+    "<%= config.bin %> invitation list --status accepted --status pending",
     "<%= config.bin %> invitation list --all --json",
   ];
   static override flags = relatedFlags(
     {
       status: Flags.custom<InvitationStatus>({})({
         options: [...STATUSES],
-        description: "Only invitations with this status.",
+        multiple: true,
+        description:
+          "Only invitations with this status; repeat it for several. Without it, every status but accepted.",
       }),
       type: Flags.custom<InvitationType>({})({
         options: [...TYPES],
@@ -98,7 +107,7 @@ export default class InvitationList extends Tabulatable(EnvironmentCommand) {
     const invitationService = new InvitationService(client, projectId);
     const listed = await invitationService.page(
       {
-        status: flags.status,
+        status: [...(flags.status ?? OPEN_STATUSES)],
         type: flags.type,
         limit: flags.limit,
         page_token: flags.pageToken,
@@ -119,8 +128,11 @@ export default class InvitationList extends Tabulatable(EnvironmentCommand) {
       };
     });
     const columns = COLUMNS;
-    const empty = "No invitations yet.";
-    const footer: string[] = [];
+    const empty = "No invitations found";
+    const footer =
+      flags.status === undefined
+        ? ["Accepted invitations are left out; pass --status accepted to list them"]
+        : [];
     const page = {
       token: listed.next,
     };
