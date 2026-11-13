@@ -10,11 +10,9 @@
     "build": {
       "dependsOn": ["@zitadel/api#build"]
     },
-    "build-release": {
-      "dependsOn": ["@zitadel/api#build-release"]
-    },
     // contract.spec.ts reads these SDK specs to check their copied
     // SERVER_RENDER_CASES tables and standard-attribute test titles and bodies for drift,
+    // and that every server SDK spec still runs @zitadel/server-sdk-contract,
     // and every SDK's manifest and docs and the demo apps' manifests and sources
     // to check that apps go through their SDK, skipping what that check skips
     // (dependencies, build output and Next's next-env.d.ts).
@@ -44,8 +42,19 @@
         "$TURBO_ROOT$/packages/sdk-tanstack-start/src/react.tsx",
         "$TURBO_ROOT$/packages/sdk-*/src/*.edge.spec.{ts,tsx}",
         "$TURBO_ROOT$/packages/*/vitest.config.ts",
-        "$TURBO_ROOT$/packages/sdk-*/src/__tests__/*.test.ts",
-        "$TURBO_ROOT$/packages/sdk-*/src/__tests__/*/*.test.ts",
+        "$TURBO_ROOT$/packages/sdk-next/src/__tests__/client.edge.test.ts",
+        "$TURBO_ROOT$/packages/sdk-next/src/__tests__/middleware.test.ts",
+        "$TURBO_ROOT$/packages/sdk-nuxt/src/__tests__/server/middleware.test.ts",
+        "$TURBO_ROOT$/packages/sdk-sveltekit/src/__tests__/handle.test.ts",
+        "$TURBO_ROOT$/packages/sdk-solid-start/src/__tests__/middleware.test.ts",
+        "$TURBO_ROOT$/packages/sdk-qwik-router/src/__tests__/request-handler.test.ts",
+        "$TURBO_ROOT$/packages/sdk-tanstack-start/src/__tests__/middleware.test.ts",
+        "$TURBO_ROOT$/packages/sdk-next/src/__tests__/middleware.edge.test.ts",
+        "$TURBO_ROOT$/packages/sdk-nuxt/src/__tests__/server/middleware.edge.test.ts",
+        "$TURBO_ROOT$/packages/sdk-sveltekit/src/__tests__/handle.edge.test.ts",
+        "$TURBO_ROOT$/packages/sdk-solid-start/src/__tests__/middleware.edge.test.ts",
+        "$TURBO_ROOT$/packages/sdk-qwik-router/src/__tests__/request-handler.edge.test.ts",
+        "$TURBO_ROOT$/packages/sdk-tanstack-start/src/__tests__/middleware.edge.test.ts",
         "$TURBO_ROOT$/packages/sdk-*/package.json",
         "$TURBO_ROOT$/packages/sdk-*/README.md",
         "$TURBO_ROOT$/packages/sdk-*/skills/**/SKILL.md",

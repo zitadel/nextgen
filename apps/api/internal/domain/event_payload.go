@@ -162,7 +162,6 @@ func SchemaCreatedPayloadSnapshot(schema *JSONSchema) SchemaCreatedPayload {
 // carry a delta in the same shape. Steps are intentionally omitted (large graph).
 type FlowdefPayload struct {
 	Name       string                  `json:"name,omitempty"`
-	Status     string                  `json:"status,omitempty"`
 	UserSchema string                  `json:"user_schema,omitempty"`
 	Purposes   map[string]string       `json:"purposes,omitempty"`
 	Audience   *FlowdefAudiencePayload `json:"audience,omitempty"`
@@ -181,7 +180,6 @@ func FlowdefPayloadSnapshot(fd *FlowDefinition) FlowdefPayload {
 	}
 	return FlowdefPayload{
 		Name:       fd.Name,
-		Status:     fd.Status.String(),
 		UserSchema: fd.UserSchema,
 		Purposes:   flowdefPurposesWire(fd.Purposes),
 		Audience:   flowdefAudiencePayload(fd.Audience),
@@ -469,3 +467,38 @@ func IDPConnectionPayloadDelta(previous, next *IDPConnection) (IDPConnectionPayl
 
 // SignupChallengePayload is empty: challenge and flow IDs live on event columns.
 type SignupChallengePayload struct{}
+
+// ApplicationPayload is shared by application.created (snapshot) and
+// application.updated (delta). ClientIDs are the clients the write created,
+// each of which got a secret. The document body and the secrets stay out.
+type ApplicationPayload struct {
+	Slug       string   `json:"slug,omitempty"`
+	Name       string   `json:"name,omitempty"`
+	ClientIDs  []string `json:"client_ids,omitempty"`
+	RevisionID string   `json:"revision_id"`
+}
+
+// ApplicationPayloadSnapshot is the application.created payload. clients must
+// hold the client_ids storage filled in.
+func ApplicationPayloadSnapshot(app *Application, doc ApplicationDocument, clients []*ApplicationClient) ApplicationPayload {
+	return ApplicationPayload{Slug: app.Slug, Name: doc.Name, ClientIDs: applicationClientIDs(clients), RevisionID: app.RevisionID}
+}
+
+// ApplicationPayloadDelta is the application.updated payload: the new revision
+// id, the name when it differs from previous, and the clients the revision
+// added. The slug is fixed for the life of the application.
+func ApplicationPayloadDelta(previous, next ApplicationDocument, app *Application, clients []*ApplicationClient) ApplicationPayload {
+	payload := ApplicationPayload{ClientIDs: applicationClientIDs(clients), RevisionID: app.RevisionID}
+	if previous.Name != next.Name {
+		payload.Name = next.Name
+	}
+	return payload
+}
+
+func applicationClientIDs(clients []*ApplicationClient) []string {
+	ids := make([]string, 0, len(clients))
+	for _, client := range clients {
+		ids = append(ids, client.ClientID)
+	}
+	return ids
+}

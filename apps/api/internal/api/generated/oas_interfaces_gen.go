@@ -9,6 +9,14 @@ type AddOriginRes interface {
 	addOriginRes()
 }
 
+type ApplicationCreatedRes interface {
+	applicationCreatedRes()
+}
+
+type ApplicationUpdatedRes interface {
+	applicationUpdatedRes()
+}
+
 type AuthAttemptCreatedRes interface {
 	authAttemptCreatedRes()
 }
@@ -275,6 +283,10 @@ type GetMyUserRes interface {
 
 type GetMyUserSchemaRes interface {
 	getMyUserSchemaRes()
+}
+
+type GetOAuthSettingsByIdRes interface {
+	getOAuthSettingsByIdRes()
 }
 
 type GetPolicyRes interface {

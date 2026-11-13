@@ -16,10 +16,22 @@
  * outside the workspace) until nothing differs. `go work sync` is not
  * enough: it left the server module below versions bench requires.
  *
+ * It also fails when go.work.sum lacks checksums the workspace's module graph
+ * needs. Every turbo run lists that graph (`go list -m -json all`, even with
+ * `--dry`), and Go writes what is missing into go.work.sum: a stale file
+ * changes a committed file under every run and rehashes every Go task between
+ * two runs. A go.mod edited outside the workspace (Dependabot bumps each
+ * directory on its own) leaves it stale. Since turbo has completed the
+ * working tree's copy before this task starts, the check lists the graph
+ * against a copy of what git has staged, in a temporary workspace, and
+ * compares; `--fix` writes the result to the working tree.
+ *
  * Usage: node scripts/check-go-work.mjs [--fix]
  */
 import { execFile } from "node:child_process";
-import { join } from "node:path";
+import { copyFile, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
@@ -83,6 +95,60 @@ export function versionDifferences(own, workspace, skip) {
   return differences.sort((a, b) => a.path.localeCompare(b.path));
 }
 
+/**
+ * go.work.sum as Go leaves it after listing the workspace's module graph,
+ * starting from `sum`. Runs in a temporary copy of go.work whose `use` paths
+ * are absolute, so the committed file is never written.
+ */
+async function completedWorkSum(sum, env) {
+  const { Use } = JSON.parse(await go(".", ["work", "edit", "-json"], env));
+  const dir = await mkdtemp(join(tmpdir(), "check-go-work-"));
+  const work = join(dir, "go.work");
+  try {
+    await copyFile(join(root, "go.work"), work);
+    await writeFile(join(dir, "go.work.sum"), sum);
+    const uses = Use.flatMap(({ DiskPath }) => [
+      `-dropuse=${DiskPath}`,
+      `-use=${resolve(root, DiskPath)}`,
+    ]);
+    await go(".", ["work", "edit", ...uses, work], env);
+    // The command turbo's Go-workspace discovery runs; revisit when turbo changes it.
+    await go(".", ["list", "-mod=readonly", "-m", "-json", "all"], { ...env, GOWORK: work });
+    return await readFile(join(dir, "go.work.sum"), "utf8").catch(() => "");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
+/** Checks the staged go.work.sum, or with `fix` completes the working tree's; the exit code. */
+async function checkWorkSum(fix, env) {
+  const path = join(root, "go.work.sum");
+  let sum;
+  if (fix) {
+    sum = await readFile(path, "utf8").catch(() => "");
+  } else {
+    try {
+      sum = (await exec("git", ["show", ":go.work.sum"], { cwd: root })).stdout;
+    } catch (error) {
+      // No fallback to the working tree: turbo has completed that copy.
+      console.error(`error: git show :go.work.sum\n${error.stderr || error.message}`);
+      console.error("hint: the check reads the go.work.sum git has staged; stage it");
+      return 1;
+    }
+  }
+  const completed = await completedWorkSum(sum, env);
+  if (completed === sum) return 0;
+  if (fix) {
+    await writeFile(path, completed);
+    return 0;
+  }
+  console.error("error: the staged go.work.sum lacks checksums the workspace's module graph needs");
+  console.error(
+    "hint: run `node scripts/check-go-work.mjs --fix`, then stage and commit go.work.sum",
+  );
+  return 1;
+}
+
 async function compare(dirs, skip, envs) {
   return Promise.all(
     dirs.map(async (dir) => {
@@ -125,7 +191,7 @@ export async function main(argv = process.argv.slice(2)) {
       const drifted = (await compare(dirs, skip, envs)).filter(
         ({ differences }) => differences.length > 0,
       );
-      if (drifted.length === 0) return 0;
+      if (drifted.length === 0) return await checkWorkSum(fix, envs.workspace);
       if (!fix || round === FIX_ROUNDS) {
         console.error(
           "error: these Go modules compile with other versions inside go.work than alone:",

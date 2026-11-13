@@ -25,9 +25,9 @@ const BRANDING_PATH = ".zitadel/branding/brand.json";
 const SCHEMA_WITH_VARIABLE = aUserSchema({ $id: "https://${SCHEMA_HOST}/staff.json" });
 
 /**
- * A flow naming a variable through an `_env` key.
+ * A flow naming a variable inline.
  */
-const FLOW_WITH_VARIABLE = { ...aLoginFlow(), webhook_env: "FLOW_HOOK" };
+const FLOW_WITH_VARIABLE = { ...aLoginFlow(), audience: { app_ids: ["${FLOW_APP}"] } };
 
 /**
  * A branding whose inline template names a variable.
@@ -56,7 +56,7 @@ describe("ENVIRONMENT_RULES", () => {
   describe("environment/missing-variable", () => {
     it.each([
       ["a schema", { schemas: { "staff.json": SCHEMA_WITH_VARIABLE } }, SCHEMA_PATH, "SCHEMA_HOST"],
-      ["a flow", { flows: { "login.json": FLOW_WITH_VARIABLE } }, FLOW_PATH, "FLOW_HOOK"],
+      ["a flow", { flows: { "login.json": FLOW_WITH_VARIABLE } }, FLOW_PATH, "FLOW_APP"],
       [
         "a branding",
         { branding: { "brand.json": BRANDING_WITH_VARIABLE } },
@@ -112,7 +112,7 @@ describe("ENVIRONMENT_RULES", () => {
 
     it.each([
       ["a schema", { schemas: { "staff.json": SCHEMA_WITH_VARIABLE } }, { SCHEMA_HOST: "x.test" }],
-      ["a flow", { flows: { "login.json": FLOW_WITH_VARIABLE } }, { FLOW_HOOK: "hook" }],
+      ["a flow", { flows: { "login.json": FLOW_WITH_VARIABLE } }, { FLOW_APP: "app_1" }],
       [
         "a branding",
         { branding: { "brand.json": BRANDING_WITH_VARIABLE } },

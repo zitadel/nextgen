@@ -1,28 +1,69 @@
+import { Flags } from "@oclif/core";
 import { describe, expect, expectTypeOf, it } from "vitest";
 
 import { aSuggest } from "@tests/helpers/suggestions";
+import { thrownBy } from "@tests/helpers/thrown-value";
 
 import {
   commandOf,
   type Declared,
   declaredOf,
   distinct,
+  type FlagsOf,
   type HelpNext,
   helpOf,
-  inShell,
+  andTheRest,
   isSuggestion,
   type Next,
   renderSuggestion,
   type SuggestedCommand,
   type SuggestionId,
   type Suggestion,
+  pipedFrom,
+  readingFrom,
   shellCommand,
+  shellSteps,
+  suggestedCommandOf,
   spelled,
   suggestionWords,
   WHAT_CHANGED,
 } from "@/lib/suggestion";
+import { relatedFlags } from "@/lib/suggestion/relations";
+import {
+  addExactCommandFor,
+  devCommandFor,
+  inDirectory,
+  installCommandFor,
+  type PackageCommand,
+  removeCommandFor,
+} from "@/lib/package-manager";
+import { CLI_BINARY, CLI_PACKAGE_NAME } from "@/lib/public-cli";
 
 const VERSION = "1.0.0-alpha.25";
+
+/** An add given a valued option before its verb, as a workspace filter is. */
+const FILTERED_ADD: PackageCommand = {
+  command: "pnpm",
+  verb: "add",
+  operands: ["x"],
+  args: ["--filter", "app", "add", "x"],
+  display: "pnpm --filter app add x",
+};
+
+/** A run of this CLI's binary as a project script. */
+const CLI_RUN: PackageCommand = {
+  command: "yarn",
+  verb: "run",
+  operands: [CLI_BINARY],
+  args: ["run", CLI_BINARY],
+  display: `yarn run ${CLI_BINARY}`,
+};
+
+/** An SDK pinned at an exact version, as a dependency check installs it. */
+const SDK_PIN = "@zitadel/sdk-next@1.0.0";
+
+/** A commit message quoted as one shell word, which names the CLI and a `;`. */
+const QUOTED_MESSAGE = "'don'\\''t; zitadel deploy again'";
 
 /**
  * Holds `next` to the type every suggestion is written as, so a
@@ -34,6 +75,28 @@ const VERSION = "1.0.0-alpha.25";
 function checked(next: Next): Next {
   return next;
 }
+
+/** A command whose one switch is required, as no command in the table has yet. */
+const RequiredSwitch = {
+  flags: relatedFlags(
+    { confirm: Flags.boolean({ description: "Confirm it." }) },
+    { confirm: { required: true } },
+  ),
+};
+
+describe("FlagsOf", () => {
+  it("takes a required switch given on", () => {
+    expectTypeOf<{ confirm: true }>().toExtend<FlagsOf<typeof RequiredSwitch>>();
+  });
+
+  it("takes no required switch given off", () => {
+    expectTypeOf<{ confirm: false }>().not.toExtend<FlagsOf<typeof RequiredSwitch>>();
+  });
+
+  it("takes no required switch left out", () => {
+    expectTypeOf<Record<never, never>>().not.toExtend<FlagsOf<typeof RequiredSwitch>>();
+  });
+});
 
 describe("NextTable", () => {
   it("names a generated resource command under each verb its descriptor has", () => {
@@ -107,6 +170,22 @@ describe("a suggestion", () => {
     expect(checked({ id: "doctor", flags: { fix: true, force: true } })).toBeDefined();
   });
 
+  it("takes a value left to fill in for any flag that takes one", () => {
+    expect(aSuggest({}, VERSION)({ id: "start", flags: { port: "<port>" } })).toBe(
+      "npx @zitadel/cli@1.0.0-alpha.25 start --port '<port>'",
+    );
+  });
+
+  it("does not compile with a value left to fill in for a switch", () => {
+    // @ts-expect-error a switch takes no value to fill in
+    checked({ id: "doctor", flags: { fix: "<fix>" } });
+  });
+
+  it("does not compile with a value to fill in written without angle brackets", () => {
+    // @ts-expect-error a value to fill in is written in angle brackets
+    checked({ id: "start", flags: { port: "port" } });
+  });
+
   it("does not compile for a command that does not exist, or a command line as text", () => {
     // @ts-expect-error there is no `deplyo`
     checked({ id: "deplyo" });
@@ -158,9 +237,9 @@ describe("distinct", () => {
   });
 
   it("keeps a rendered command once", () => {
-    expect(distinct([shellCommand("docker version"), shellCommand("docker version")])).toEqual([
-      "docker version",
-    ]);
+    expect(
+      distinct([shellCommand("docker", "version"), shellCommand("docker", "version")]),
+    ).toEqual(["docker version"]);
   });
 });
 
@@ -216,20 +295,99 @@ describe("a suggested help", () => {
 });
 
 describe("shellCommand", () => {
-  it("is suggested exactly as written", () => {
-    expect(shellCommand("npm install @zitadel/cli@alpha")).toBe("npm install @zitadel/cli@alpha");
-  });
-});
-
-describe("inShell", () => {
-  it("puts a pipe before the command", () => {
-    expect(inShell(shellCommand("cat"), { before: "printf '%s' \"$S\" | " })).toBe(
-      "printf '%s' \"$S\" | cat",
+  it("is its program and its words, as written", () => {
+    expect(shellCommand("docker", "pull", "ghcr.io/zitadel/zitadel")).toBe(
+      "docker pull ghcr.io/zitadel/zitadel",
     );
   });
 
-  it("puts a redirection after it", () => {
-    expect(inShell(shellCommand("cat"), { after: " < value.txt" })).toBe("cat < value.txt");
+  it("does not compile for the CLI", () => {
+    // @ts-expect-error the CLI is suggested as an object the renderer checks
+    shellCommand("zitadel", "deploy");
+  });
+
+  it("does not compile for a runner", () => {
+    // @ts-expect-error a runner runs whatever it is given, the CLI included
+    shellCommand("npx", CLI_PACKAGE_NAME);
+  });
+
+  it("does not compile for a package manager", () => {
+    // @ts-expect-error a package manager's command goes through suggestedCommandOf
+    shellCommand("pnpm", "dlx", CLI_PACKAGE_NAME);
+  });
+
+  it("takes a word that only names the CLI, as a commit message does", () => {
+    expect(shellCommand("git", "commit", "-m", QUOTED_MESSAGE)).toBe(
+      `git commit -m ${QUOTED_MESSAGE}`,
+    );
+  });
+});
+
+describe("suggestedCommandOf", () => {
+  it.each<[string, PackageCommand]>([
+    ["an install", addExactCommandFor("npm", [SDK_PIN])],
+    ["a script in another directory", inDirectory(devCommandFor("npm"), "app", "/abs/app")],
+    ["an install in a directory named exec", inDirectory(installCommandFor("pnpm"), "exec", "/x")],
+    ["a removal of a package named like the CLI", removeCommandFor("npm", [CLI_BINARY])],
+  ])("is %s as its display shows it", (_what, command) => {
+    expect(suggestedCommandOf(command)).toBe(command.display);
+  });
+
+  it("is a command whose verb follows an option's value", () => {
+    expect(suggestedCommandOf(FILTERED_ADD)).toBe(FILTERED_ADD.display);
+  });
+
+  it("refuses a run of the CLI's binary", () => {
+    const error = thrownBy(() => {
+      return suggestedCommandOf(CLI_RUN);
+    });
+
+    expect(error).toMatchObject({
+      message: `${CLI_RUN.display} runs the CLI: suggest it as { id, args, flags }`,
+    });
+  });
+
+  it("is never a command that runs a package", () => {
+    expectTypeOf<"dlx">().not.toExtend<PackageCommand["verb"]>();
+  });
+});
+
+describe("shellSteps", () => {
+  it("runs each command after the one before it worked", () => {
+    expect(
+      shellSteps(shellCommand("cd", "app"), suggestedCommandOf(removeCommandFor("npm", ["x"]))),
+    ).toBe("cd app && npm uninstall x");
+  });
+});
+
+describe("pipedFrom", () => {
+  it("feeds the command a secret from a shell variable", () => {
+    expect(pipedFrom("CLIENT_SECRET", shellCommand("git", "status"))).toBe(
+      `printf '%s' "$CLIENT_SECRET" | git status`,
+    );
+  });
+
+  it("refuses a name no shell variable has", () => {
+    const error = thrownBy(() => {
+      return pipedFrom("A; zitadel", shellCommand("git", "status"));
+    });
+
+    expect(error).toBeInstanceOf(Error);
+    expect(error).toMatchObject({ message: "A; zitadel is no shell variable's name" });
+  });
+});
+
+describe("readingFrom", () => {
+  it("puts the redirection after the command", () => {
+    expect(readingFrom(shellCommand("git", "status"), "my value.txt")).toBe(
+      "git status < 'my value.txt'",
+    );
+  });
+});
+
+describe("andTheRest", () => {
+  it("follows the command with an ellipsis for everything else it was given", () => {
+    expect(andTheRest(shellCommand("git", "status"))).toBe("git status ...");
   });
 });
 

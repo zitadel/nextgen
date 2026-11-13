@@ -346,7 +346,7 @@ func (s *releaseService) prepareBundleFlows(
 	bundleSchemas map[string]*domain.JSONSchema,
 	failures *BundleValidationError,
 ) ([]*domain.FlowDefinition, error) {
-	bundleFlows := activeBundleFlowNames(input.FlowDefinitions)
+	bundleFlows := bundleFlowNames(input.FlowDefinitions)
 	prepared := make([]*domain.FlowDefinition, 0, len(input.FlowDefinitions))
 	for _, flow := range input.FlowDefinitions {
 		if shapeFailed(failures, domain.ReleasePointerKindFlowDefinition, flow.Index) {
@@ -382,20 +382,12 @@ func (s *releaseService) prepareBundleFlows(
 	return prepared, nil
 }
 
-// activeBundleFlowNames maps flow names in the bundle that are active, so
-// pivoting can target a sibling that is not yet persisted.
-func activeBundleFlowNames(flows []BuildFlowDefinition) map[string]bool {
+// bundleFlowNames maps the flow names in the bundle, the flows a switch or
+// pivot may target.
+func bundleFlowNames(flows []BuildFlowDefinition) map[string]bool {
 	out := make(map[string]bool, len(flows))
 	for _, flow := range flows {
-		name := strings.TrimSpace(flow.Request.Name)
-		if name == "" {
-			continue
-		}
-		status, err := domain.FlowDefinitionStatusString(flow.Request.Status)
-		if err != nil {
-			continue
-		}
-		if status == domain.FlowDefinitionStatusActive {
+		if name := strings.TrimSpace(flow.Request.Name); name != "" {
 			out[name] = true
 		}
 	}

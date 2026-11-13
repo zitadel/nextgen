@@ -1,8 +1,6 @@
 type: object
 description: |
   The request body for creating a flow definition.
-  The flow definition is created in an `active` state by default.
-  The status can also be set with the `status` attribute in the flow definition payload.
 required:
   - project_id
   - flow_definition

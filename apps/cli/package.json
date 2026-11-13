@@ -38,6 +38,7 @@
     },
     "helpClass": "./dist/lib/oclif/help",
     "hooks": {
+      "command_not_found": "./dist/hooks/command-not-found",
       "finally": "./dist/hooks/version-notice"
     },
     "additionalHelpFlags": [
@@ -46,7 +47,6 @@
     "topicSeparator": " ",
     "plugins": [
       "@oclif/plugin-help",
-      "@oclif/plugin-not-found",
       "@oclif/plugin-which",
       "@oclif/plugin-commands",
       "@oclif/plugin-autocomplete",
@@ -125,22 +125,21 @@
       },
       "skills": {
         "description": "Give coding agents the Zitadel skills."
+      },
+      "tests": {
+        "description": "Add end-to-end tests of the sign-in."
       }
     }
   },
   "type": "module",
   "scripts": {
-    "build": "tsdown",
+    "build": "tsdown && oclif manifest",
     "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.spec.json",
-    "pretest": "pnpm run build",
     "test": "vitest run",
-    "test:all": "pnpm run test",
     "check-advisories": "vitest run --config vitest.advisories.config.ts",
     "readme": "oclif readme",
-    "prepack": "tsdown && oclif manifest && publint --strict",
-    "postpack": "rm -f oclif.manifest.json",
-    "lint": "biome check .",
-    "build-release": "node ../../scripts/release-clean.mjs local-dist && pnpm run build"
+    "prepack": "publint --strict",
+    "lint": "biome check ."
   },
   "dependencies": {
     "@clack/prompts": "catalog:",
@@ -148,7 +147,6 @@
     "@oclif/plugin-autocomplete": "catalog:",
     "@oclif/plugin-commands": "catalog:",
     "@oclif/plugin-help": "catalog:",
-    "@oclif/plugin-not-found": "catalog:",
     "@oclif/plugin-search": "catalog:",
     "@oclif/plugin-version": "catalog:",
     "@oclif/plugin-which": "catalog:",

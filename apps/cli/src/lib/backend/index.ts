@@ -114,11 +114,13 @@ export {
 } from "./services/project";
 export {
   type Release,
+  ReleaseInUseError,
   type ReleaseInput,
   type ReleasePointer,
   type ReleasePointerKind,
   type ReleaseRecord,
   ReleaseService,
+  type ServingOrigin,
 } from "./services/release";
 export {
   type CreatedSchema,

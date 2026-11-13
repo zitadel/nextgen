@@ -4,9 +4,11 @@ import {
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import { describe, expect, it } from "vitest";
 
+import { getDefaultLoginFlow } from "./defaults.js";
 import {
   brandingConfigSchema,
   DEFAULT_USER_CREATE_POLICY,
+  flowConfigSchema,
   policyConfigSchema,
   policyTestFileSchema,
   schemaConfigSchema,
@@ -366,6 +368,17 @@ describe("brandingConfigSchema", () => {
         liquid_template: { $file: "./login.liquid", extra: 1 },
       }).success,
     ).toBe(false);
+  });
+});
+
+describe("flowConfigSchema", () => {
+  it("refuses a key the definition does not have, as the server does", () => {
+    const flow = getDefaultLoginFlow();
+    expect(flowConfigSchema.safeParse(flow).success).toBe(true);
+    const result = flowConfigSchema.safeParse({ ...flow, status: "active" });
+    expect(result.error?.issues).toEqual([
+      expect.objectContaining({ code: "unrecognized_keys", keys: ["status"] }),
+    ]);
   });
 });
 
