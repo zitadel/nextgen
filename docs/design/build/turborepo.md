@@ -61,8 +61,9 @@ scripts, which build through turbo (`turbo run @zitadel/<package>#<task>`).
   `console-deployment`, `demo-next-mock`, `demo-next-real`, `demo-nuxt-mock`,
   `journey` (the journey runner with the caller's options), `journey-local`
   (the umbrella over one `journey:<id>` task per CI journey), plus the docs'
-  `e2e` and `e2e-deployment`. There is no aggregate: a `turbo run` names the
-  lanes it runs.
+  `e2e` and `e2e-deployment`, and `conformance`, one task per SDK fixture
+  ([conformance/README.md](../../../conformance/README.md)). There is no
+  aggregate: a `turbo run` names the lanes it runs.
 
 ## Tasks that write files
 

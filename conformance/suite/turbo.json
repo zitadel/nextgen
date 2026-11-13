@@ -1,0 +1,12 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    // tsc reads the kit's source (the `@zitadel/source` condition); this edge
+    // puts it in the task's hash. The fixtures' tasks depend on this one, which
+    // hashes the suite, its config and the generator script.
+    "typecheck": {
+      "dependsOn": ["@zitadel/testing#build"]
+    }
+  }
+}

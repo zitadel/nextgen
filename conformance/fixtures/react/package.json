@@ -1,0 +1,45 @@
+{
+  "name": "@zitadel/conformance-react",
+  "private": true,
+  "version": "0.0.0",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "install-browsers": "playwright install chromium",
+    "generate": "conformance-fixture generate",
+    "check-generate": "conformance-fixture check",
+    "conformance": "playwright test"
+  },
+  "dependencies": {
+    "@zitadel/sdk-react": "workspace:*",
+    "react": "catalog:",
+    "react-dom": "catalog:"
+  },
+  "devDependencies": {
+    "@playwright/test": "catalog:",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
+    "@zitadel/conformance": "workspace:*",
+    "@zitadel/testing": "workspace:*",
+    "typescript": "catalog:",
+    "vite": "catalog:"
+  },
+  "conformance": {
+    "framework": "react",
+    "appPort": 3210,
+    "zitadelPort": 8210,
+    "drop": [
+      ".oxlintrc.json",
+      "public/icons.svg",
+      "src/assets/hero.png",
+      "src/assets/react.svg",
+      "src/assets/vite.svg"
+    ],
+    "dropDependencies": [
+      "oxlint"
+    ]
+  }
+}

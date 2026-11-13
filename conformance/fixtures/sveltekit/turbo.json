@@ -1,0 +1,36 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    // The conformance lane (conformance/README.md). Every fixture has these
+    // three tasks; only the SDK builds below differ, so a change to one SDK
+    // selects only the fixtures that install it.
+    //
+    // Rewrites the fixture from the built CLI's `setup`, by hand only: never
+    // cached, and no task depends on it.
+    "generate": {
+      "cache": false,
+      "outputs": [],
+      "dependsOn": ["@zitadel/cli#build", "@zitadel/server#build", "@zitadel/testing#build"]
+    },
+    // The drift check: regenerates into a temp dir and fails on any difference.
+    // The CLI build's hash holds the patchers and the framework CLI pins, and
+    // the suite's typecheck the generator script. Cached like the journeys:
+    // only the npm ranges the framework CLI writes resolve at run time.
+    "check-generate": {
+      "outputs": [],
+      "dependsOn": ["@zitadel/cli#build", "@zitadel/server#build", "@zitadel/testing#build", "@zitadel/conformance#typecheck"],
+      "env": ["ZITADEL_SERVER_BINARY"],
+      "passThroughEnv": ["CONFORMANCE_KEEP_WORK_DIR"]
+    },
+    // The shared spec against the committed app on a fresh server and project.
+    // After the drift check, so a stale fixture never passes, and because both
+    // boot a server on the fixture's Zitadel port.
+    "conformance": {
+      "outputs": [],
+      "dependsOn": ["check-generate", "install-browsers", "@zitadel/conformance#typecheck", "@zitadel/testing#build", "@zitadel/cli#build", "@zitadel/server#build", "@zitadel/sdk-svelte#build", "@zitadel/sdk-sveltekit#build"],
+      "env": ["ZITADEL_*", "NEXTGEN_*", "!ZITADEL_TELEMETRY*"],
+      "passThroughEnv": ["ZITADEL_TELEMETRY*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG"]
+    }
+  }
+}

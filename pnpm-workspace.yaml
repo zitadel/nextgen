@@ -2,6 +2,10 @@ packages:
   - "apps/*"
   - "packages/*"
   - "e2e"
+  # The SDK conformance lane: its shared suite and one fixture app per SDK
+  # (conformance/README.md).
+  - "conformance/suite"
+  - "conformance/fixtures/*"
   # The release, benchmark and mock OIDC provider projects (tools/release,
   # tools/bench, tools/oidc-mock) carry no code the workspace installs; they
   # are packages so the task runner can address their tasks (see turbo.json).
