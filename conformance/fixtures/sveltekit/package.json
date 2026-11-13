@@ -10,6 +10,7 @@
 	},
 	"scripts": {
 		"dev": "vite dev --port 3211 --strictPort",
+		"typecheck": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"install-browsers": "playwright install chromium",
 		"generate": "conformance-fixture generate",
 		"check-generate": "conformance-fixture check",
@@ -27,6 +28,7 @@
 		"@zitadel/conformance": "workspace:*",
 		"@zitadel/testing": "workspace:*",
 		"svelte": "^5.57.2",
+		"svelte-check": "^4.6.0",
 		"typescript": "catalog:",
 		"vite": "catalog:"
 	},
@@ -34,11 +36,6 @@
 		"framework": "sveltekit",
 		"appPort": 3211,
 		"zitadelPort": 8211,
-		"dropDependencies": [
-			"svelte-check"
-		],
-		"drop": [
-			"src/lib/assets/favicon.svg"
-		]
+		"generatePort": 8311
 	}
 }

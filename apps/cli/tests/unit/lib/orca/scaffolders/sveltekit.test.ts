@@ -24,7 +24,7 @@ beforeEach(() => {
 });
 
 describe("SvelteKitScaffolder", () => {
-  it("runs `sv create` then removes the starter +page.svelte", async () => {
+  it("runs `sv create` without an install, then removes the starter +page.svelte", async () => {
     mockSpawn.mockReturnValue(spawnOk());
 
     await new SvelteKitScaffolder(SUPPORTED_NODE).scaffold("/tmp/proj", "sveltekit");
@@ -41,8 +41,7 @@ describe("SvelteKitScaffolder", () => {
       "--types",
       "ts",
       "--no-add-ons",
-      "--install",
-      "npm",
+      "--no-install",
     ]);
     expect(opts).toMatchObject({ cwd: "/tmp/proj" });
     expect(mockRm).toHaveBeenCalledWith(join("/tmp/proj", "src/routes/+page.svelte"), {

@@ -1,12 +1,55 @@
 {
   "$schema": "https://turborepo.dev/schema.json",
   "extends": ["//"],
+  // The conformance lane's tasks, defined once: every fixture's turbo.json is
+  // `"extends": ["//", "@zitadel/conformance"]` (conformance/README.md). The
+  // suite itself has only the typecheck and lint scripts, so only those run here.
+  //
+  // `^build` follows a package's dependencies, devDependencies included, which
+  // the rest of the graph avoids (docs/design/build/turborepo.md). A fixture
+  // is the one place it is right: it installs and runs exactly what its
+  // manifest lists, so `^build` gives it the build of every SDK it installs,
+  // and of the kit, with no list to keep. The CLI and the server, which the
+  // kit runs but no fixture imports, are named.
   "tasks": {
-    // tsc reads the kit's source (the `@zitadel/source` condition); this edge
-    // puts it in the task's hash. The fixtures' tasks depend on this one, which
-    // hashes the suite, its config and the generator script.
+    // The suite's typecheck reads the kit's source (the `@zitadel/source`
+    // condition); a fixture's runs the generator's own check (tsc -b,
+    // svelte-check) against the SDKs' built types. The fixtures' other tasks
+    // depend on the suite's, which hashes the spec, the config and the
+    // generator script.
     "typecheck": {
-      "dependsOn": ["@zitadel/testing#build"]
+      "dependsOn": ["^build"]
+    },
+    // Rewrites a fixture from the built CLI's `setup`, by hand only: never
+    // cached, and no task depends on it.
+    "generate": {
+      "cache": false,
+      "outputs": [],
+      "dependsOn": ["@zitadel/cli#build", "@zitadel/server#build", "@zitadel/testing#build"]
+    },
+    // The drift check: regenerates into a temp dir and fails on any difference.
+    // Cached: its result is a function of the CLI build (the patchers and the
+    // framework CLI pins), the server it sets up against, the generator script
+    // and the fixture's files, as long as the pinned framework CLI writes the
+    // same files, which a fixture marked `generatorPinned: false` cannot
+    // promise; that one's check runs only nightly. The ci script names it
+    // beside `conformance`, not before it: a registry outage fails the check
+    // and still runs the lane. It sets the app up against its own port
+    // (`generatePort`), so the two run side by side.
+    "check-generate": {
+      "outputs": [],
+      "dependsOn": ["@zitadel/cli#build", "@zitadel/server#build", "@zitadel/testing#build", "@zitadel/conformance#typecheck"],
+      "env": ["ZITADEL_SERVER_BINARY"],
+      "passThroughEnv": ["CONFORMANCE_KEEP_WORK_DIR", "CONFORMANCE_UNPINNED"]
+    },
+    // The shared spec against the committed app, on a fresh server and
+    // project. Cached like the kit's other real-instance lanes; its key holds
+    // the switches that change what it tests.
+    "conformance": {
+      "outputs": [],
+      "dependsOn": ["^build", "install-browsers", "@zitadel/conformance#typecheck", "@zitadel/cli#build", "@zitadel/server#build"],
+      "env": ["ZITADEL_*", "NEXTGEN_*", "!ZITADEL_TELEMETRY*"],
+      "passThroughEnv": ["ZITADEL_TELEMETRY*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG"]
     }
   }
 }

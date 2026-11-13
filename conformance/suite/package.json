@@ -19,7 +19,8 @@
   "dependencies": {
     "@playwright/test": "catalog:",
     "@zitadel/cli": "workspace:*",
-    "@zitadel/testing": "workspace:*"
+    "@zitadel/testing": "workspace:*",
+    "semver": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",

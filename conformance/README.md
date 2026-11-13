@@ -7,8 +7,9 @@ uses it, without scaffolding an app on every run.
   framework's own generator at the version the CLI pins, then the built CLI's
   `setup`. Each is a private workspace package, `@zitadel/conformance-<id>`.
 - `suite/` (`@zitadel/conformance`) holds the one Playwright spec every
-  fixture runs (`src/suite.ts`), the config they share (`src/config.ts`), and
-  `conformance-fixture`, which generates a fixture and checks it for drift.
+  fixture runs (`src/suite.ts`), the config they share (`src/config.ts`), the
+  tasks they share (`turbo.json`), and `conformance-fixture`, which generates
+  a fixture and checks it for drift.
 
 ## Commands
 
@@ -17,6 +18,7 @@ uses it, without scaffolding an app on every run.
 | Run the lane for every fixture | `turbo run conformance` |
 | Run it for one fixture | `turbo run conformance --filter=@zitadel/conformance-react` |
 | Check a fixture for drift | `turbo run check-generate --filter=@zitadel/conformance-react` |
+| Type-check a fixture's pages | `turbo run typecheck --filter=@zitadel/conformance-react` |
 | Regenerate a fixture | `turbo run generate --filter=@zitadel/conformance-react && pnpm install` |
 | Sweep servers an aborted run left | `pnpm run cli -- stop --all` |
 
@@ -28,46 +30,73 @@ and app on fixed ports.
 Nothing in a fixture names a project or a secret. The kit boots a fresh
 server and project for every run and hands the app its id, address and
 secret through the environment (`env` in the fixture's `playwright.config.mts`).
-What setup pins at generation is only the app's dev port and, in a Vite
-proxy, the fallback server address; both are the fixture's own ports.
+What setup pins at generation is the app's dev port and, in a Vite proxy, a
+fallback server address (`generatePort`), which the kit's `ZITADEL_URL`
+overrides.
 
-`generate` keeps what setup wrote, less what the lane never reads:
+Its contract is the `conformance` field in its `package.json`:
 
-- install output, the secret and the env files that carry it, and the CLI's own
-  state (`zitadel.json`, `.zitadel/`), which the app never reads;
-- the docs setup writes for a person (`README.md`, `AGENTS.md`);
-- every script but `dev`, the dependencies only those scripts used, and the
-  generator's unused assets, as `drop` and `dropDependencies` in the fixture's
-  `conformance` field list them.
+| Field | |
+| --- | --- |
+| `framework` | the `setup --framework` id |
+| `appPort` | the app's dev port, set up with `--dev-port` and used by the lane |
+| `zitadelPort` | the lane's server |
+| `generatePort` | the server `generate` and `check-generate` set the app up against |
+| `generatorPinned` | `false` for a framework generator its pin does not fix (it fetches a template or asks npm for `latest`); its drift check then runs only in the nightly run |
 
-It points `@zitadel/*` at the workspace and a dependency at `catalog:` when
-the pnpm catalog holds the generated major. It adds the lane's scripts and
-dev dependencies. Beside the app, a fixture has its `conformance` field in
-`package.json` (framework, ports, what to drop) and three files of its own:
-`playwright.config.mts`, `conformance.spec.ts` and `turbo.json`.
+Fixtures take `32xx`, `82xx` and `83xx` with the same `xx`.
+
+`generate` keeps what setup wrote, less what no fixture commits: install
+output, the secret and the env files that carry it, the CLI's own state
+(`zitadel.json`, `.zitadel/`), which the app never reads, the docs setup
+writes for a person (`README.md`, `AGENTS.md`), and editor and npm settings.
+Of the generated scripts it keeps `dev` and the generator's own type-check
+as `typecheck` (sv's `check`, the `tsc -b` of create-vite's `build`). It
+points `@zitadel/*` at the workspace and a dependency the pnpm catalog holds
+at `catalog:`, and fails when the catalog's floor is below what the
+generator writes, naming the bump. It adds the lane's scripts and dev
+dependencies. Beside the app, a fixture has three files of its own:
+`playwright.config.mts`, `conformance.spec.ts` and `turbo.json`, which only
+extends the suite's.
+
+The lane runs the app with the SDKs linked from the workspace, so it proves
+the SDKs' code, not the packed package (exports, `files`, peer ranges); the
+journeys prove those.
 
 ## The drift check
 
 `check-generate` regenerates the fixture into a temp directory and fails, with
-a diff, when a kept file differs, is missing or is no longer written. It runs
-before the lane, so a stale fixture never passes. It catches changes to the
-patchers' templates and edits (pages, proxies and hooks, env declarations), to
-the framework CLI pins, and hand edits to a fixture.
+a diff, when a kept file differs, is missing or is no longer written. It
+catches changes to the patchers' templates and edits (pages, proxies and
+hooks, env declarations), to the framework CLI pins, and hand edits to a
+fixture. It is cached, and reruns when the CLI build, the server build, the
+kit, the suite or the fixture changes. The `ci` script names it beside
+`conformance`, so a registry outage in the check never skips the lane.
 
 It does not catch:
 
 - what `generate` drops (the `.zitadel/` configuration, `zitadel.json`, the docs);
 - what setup does to an app that is already set up, or to a pre-existing app
   (`doctor --fix`, upgrade rewrites): it covers only a fresh scaffold;
-- generator output that changes without a pin moving, which shows up as drift
-  on the next run that misses the cache.
+- generator output that changes without a pin moving, which shows up on the
+  next run that misses the cache (and every night for `generatorPinned: false`).
 
 ## Adding a fixture
 
-1. Create `fixtures/<id>/package.json` with `name` and a `conformance` field:
-   `framework` (a `setup --framework` id) and an `appPort` and `zitadelPort`
-   no other fixture or lane uses (fixtures take `32xx` and `82xx`).
-2. Copy `playwright.config.mts`, `conformance.spec.ts` and `turbo.json` from a
-   fixture of the same family, and set the SDK builds in `turbo.json`.
-3. Run the regenerate command above, then `git add -f` any file it reports as
-   ignored.
+1. Create `fixtures/<id>/package.json`:
+
+   ```json
+   {
+     "name": "@zitadel/conformance-<id>",
+     "private": true,
+     "scripts": { "generate": "conformance-fixture generate" },
+     "devDependencies": { "@zitadel/conformance": "workspace:*" },
+     "conformance": { "framework": "<id>", "appPort": 32xx, "zitadelPort": 82xx, "generatePort": 83xx }
+   }
+   ```
+
+2. Copy `turbo.json`, `playwright.config.mts` and `conformance.spec.ts` from
+   a fixture of the same family; set the env template and the spec's options
+   for the framework.
+3. Run `pnpm install && turbo run generate --filter=@zitadel/conformance-<id> && pnpm install`,
+   then `git add -f` any file it reports as ignored.

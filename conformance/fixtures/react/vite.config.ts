@@ -16,7 +16,7 @@ export default defineConfig({
             throw new Error(`ZITADEL_URL is not an http(s) URL: ${url}`);
           }
           return new URL(url).origin;
-        })(loadEnv("development", process.cwd(), "ZITADEL_").ZITADEL_URL || "http://localhost:8210"),
+        })(loadEnv("development", process.cwd(), "ZITADEL_").ZITADEL_URL || "http://localhost:8310"),
 
         changeOrigin: true,
         xfwd: true,

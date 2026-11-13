@@ -7,7 +7,7 @@
 //
 // Both run the built CLI's `setup` (which runs the framework's own generator
 // at the version the CLI pins) in an empty temp directory, against a server
-// booted on the fixture's Zitadel port, then normalize the result (below).
+// booted on the fixture's `generatePort`, then normalize the result (below).
 import { execFileSync, spawnSync } from "node:child_process";
 import { mkdir, mkdtemp, readdir, readFile, rm, unlink, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
@@ -15,6 +15,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, relative, sep } from "node:path";
 
 import { bootLocalServer } from "@zitadel/testing";
+import semver from "semver";
 
 const require = createRequire(import.meta.url);
 const workspaceRoot = join(import.meta.dirname, "..", "..", "..");
@@ -27,7 +28,8 @@ const HARNESS_FILES = new Set(["playwright.config.mts", "conformance.spec.ts", "
  * What setup leaves in the app that the fixture does not commit, for every
  * framework: install output; the secret and the env files that hold it;
  * the CLI's own state, which the app never reads (`zitadel.json`,
- * `.zitadel/`); and the docs setup writes for a person.
+ * `.zitadel/`); the docs setup writes for a person; and editor and
+ * package-manager settings, which pnpm and the workspace own.
  */
 const DROPPED_DIRS = ["node_modules", ".svelte-kit", ".zitadel", ".vscode"];
 const DROPPED_FILES = new Set([
@@ -38,15 +40,29 @@ const DROPPED_FILES = new Set([
   "README.md",
 ]);
 
-/** The scripts the lane runs; setup's others (build, lint, check) are dropped. */
-const KEPT_SCRIPTS = ["dev"];
-
-function isDropped(path, settings) {
+function isDropped(path) {
   const [first] = path.split("/");
   if (DROPPED_DIRS.includes(first)) return true;
   if (DROPPED_FILES.has(path)) return true;
-  if (first.startsWith(".env") && path !== ".env.example") return true;
-  return (settings.drop ?? []).includes(path);
+  return first.startsWith(".env") && path !== ".env.example";
+}
+
+/**
+ * The generated scripts the fixture keeps: `dev`, which the lane runs, and
+ * the generator's own type-check as `typecheck`, which compiles the pages
+ * setup wrote against the SDK's types. That is a `check` script where the
+ * generator writes one (sv), else the `tsc -b` its `build` starts with
+ * (create-vite).
+ */
+function keptScripts(scripts) {
+  const kept = {};
+  if (scripts.dev) kept.dev = scripts.dev;
+  if (scripts.check) {
+    kept.typecheck = scripts.check;
+  } else if (/^tsc -b(?:\s|$)/.test(scripts.build ?? "")) {
+    kept.typecheck = "tsc -b";
+  }
+  return kept;
 }
 
 async function main() {
@@ -58,6 +74,16 @@ async function main() {
   const manifest = JSON.parse(await readFile(join(fixtureDir, "package.json"), "utf8"));
   const settings = manifest.conformance;
   if (!settings) throw new Error(`${fixtureDir}/package.json has no "conformance" field`);
+
+  // A generator its pin does not fix (it reads a template from GitHub or asks
+  // npm for `latest`) can drift with no change here: its fixture's check runs
+  // only where CONFORMANCE_UNPINNED is true, the nightly run (ci.yml).
+  if (mode === "check" && settings.generatorPinned === false) {
+    if (process.env.CONFORMANCE_UNPINNED !== "true") {
+      console.log(`${manifest.name}: its generator is not fixed by its pin; checked nightly only`);
+      return;
+    }
+  }
 
   const work = await mkdtemp(join(tmpdir(), `zitadel-conformance-${settings.framework}-`));
   try {
@@ -79,7 +105,7 @@ async function generate(work, settings, name) {
   const app = join(work, "app");
   await mkdir(app);
   const server = await bootLocalServer({
-    port: settings.zitadelPort,
+    port: settings.generatePort,
     dir: join(work, "server"),
     serverBinary:
       process.env.ZITADEL_SERVER_BINARY ?? join(workspaceRoot, "dist", "server", "nextgen"),
@@ -117,7 +143,7 @@ async function generate(work, settings, name) {
 
   const files = new Map();
   for (const path of await listFiles(app)) {
-    if (isDropped(path, settings)) continue;
+    if (isDropped(path)) continue;
     files.set(path, await readFile(join(app, path)));
   }
   const packageJson = files.get("package.json");
@@ -131,9 +157,9 @@ async function generate(work, settings, name) {
 
 /**
  * The generated package.json, made a workspace package: the fixture's name,
- * the scripts the lane runs, the workspace's own Zitadel packages, the pnpm
- * catalog for every dependency the catalog holds at the generated major
- * (the repo's rule), and the lane's harness dependencies.
+ * the scripts it keeps and the lane's, the workspace's own Zitadel packages,
+ * the pnpm catalog for every dependency it holds (the repo's rule), and the
+ * lane's harness dependencies.
  */
 async function normalizeManifest(text, settings, name) {
   const generated = JSON.parse(text);
@@ -148,12 +174,11 @@ async function normalizeManifest(text, settings, name) {
     devDependencies,
     ...rest
   } = generated;
-  const dropped = new Set(settings.dropDependencies ?? []);
+  const behind = [];
   const mapped = (deps = {}) =>
     Object.fromEntries(
       Object.entries(deps)
-        .filter(([dep]) => !dropped.has(dep))
-        .map(([dep, range]) => [dep, workspaceRange(dep, range, catalog)])
+        .map(([dep, range]) => [dep, workspaceRange(dep, range, catalog, behind)])
         .sort(([a], [b]) => a.localeCompare(b)),
     );
   const manifest = {
@@ -163,9 +188,7 @@ async function normalizeManifest(text, settings, name) {
     license: "MIT",
     ...rest,
     scripts: {
-      ...Object.fromEntries(
-        KEPT_SCRIPTS.filter((script) => scripts[script]).map((script) => [script, scripts[script]]),
-      ),
+      ...keptScripts(scripts),
       "install-browsers": "playwright install chromium",
       generate: "conformance-fixture generate",
       "check-generate": "conformance-fixture check",
@@ -182,18 +205,31 @@ async function normalizeManifest(text, settings, name) {
     ),
     conformance: settings,
   };
+  if (behind.length > 0) {
+    // A catalog entry below what the generator writes would test the lane on
+    // an older release than a customer can install: bump the catalog first.
+    throw new Error(
+      `the pnpm catalog is behind what setup writes; bump it in pnpm-workspace.yaml:\n${behind.join("\n")}`,
+    );
+  }
   return `${JSON.stringify(manifest, null, indent)}\n`;
 }
 
-function workspaceRange(dep, range, catalog) {
+/**
+ * `workspace:*` for a Zitadel package, `catalog:` for one the catalog holds
+ * at a floor the generated range accepts, and the generated range for one it
+ * does not hold. A catalog entry whose floor the range rejects is recorded in
+ * `behind`.
+ */
+function workspaceRange(dep, range, catalog, behind) {
   if (dep.startsWith("@zitadel/")) return "workspace:*";
   const pinned = catalog.get(dep);
-  return pinned && majorOf(pinned) === majorOf(range) ? "catalog:" : range;
-}
-
-function majorOf(range) {
-  const [major, minor] = (range.match(/\d+(?:\.\d+)?/)?.[0] ?? "").split(".");
-  return major === "0" ? `0.${minor}` : major;
+  if (pinned === undefined) return range;
+  const floor = semver.minVersion(pinned);
+  if (!floor || !semver.satisfies(floor, range)) {
+    behind.push(`  ${dep}: the catalog has ${pinned}, setup writes ${range}`);
+  }
+  return "catalog:";
 }
 
 /** The default catalog of pnpm-workspace.yaml: `name: range` lines under `catalog:`. */
@@ -230,8 +266,8 @@ async function write(fixtureDir, generated) {
   if (changed.some((line) => line.endsWith(" package.json"))) {
     console.log("package.json changed: run `pnpm install` to update the lockfile");
   }
-  // The generated .gitignore can ignore a file setup writes (SvelteKit's
-  // ignores .env.example); the fixture commits what setup writes all the same.
+  // The generated .gitignore can ignore a file setup writes; the fixture
+  // commits what setup writes all the same.
   const ignored = spawnSync("git", ["check-ignore", "--no-index", "--", ...generated.keys()], {
     cwd: fixtureDir,
     encoding: "utf8",

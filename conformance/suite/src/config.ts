@@ -5,17 +5,27 @@ import { devices, type PlaywrightTestConfig } from "@playwright/test";
 import { type AppEnvTemplate, withZitadel } from "@zitadel/testing/playwright";
 
 /**
- * A fixture's `conformance` field in its package.json: the framework
- * `zitadel setup` scaffolds it for and its fixed ports. The generator
- * (`conformance-fixture generate`) reads the same field, so the ports the app
- * was set up for and the ones the lane runs it on cannot drift apart.
+ * A fixture's `conformance` field in its package.json, its whole contract: the
+ * framework `zitadel setup` scaffolds it for and its fixed ports. The
+ * generator (`conformance-fixture generate`) reads the same field, so the app
+ * port it was set up for and the one the lane runs it on cannot drift apart.
  */
 export interface FixtureSettings {
   framework: string;
   /** The app's dev-server port: `setup --dev-port`, and the kit's app origin. */
   appPort: number;
-  /** The kit's Zitadel port, and the server the generator sets the app up against. */
+  /** The kit's Zitadel port in the lane. */
   zitadelPort: number;
+  /**
+   * The port of the server the generator sets the app up against: not the
+   * lane's, so the drift check and the lane can run side by side.
+   */
+  generatePort: number;
+  /**
+   * `false` for a framework generator its pin does not fix (it fetches a
+   * template or asks npm for `latest`): its drift check runs nightly only.
+   */
+  generatorPinned?: boolean;
 }
 
 export function readFixtureSettings(fixtureDir: string): FixtureSettings {
