@@ -123,5 +123,6 @@ requires a healthy
 writes into the directory still counts as empty, so a same-directory `setup`
 scaffolds without `--force` (this is exactly what the golden path does).
 `setup` installs dependencies
-with the detected package manager by default; pass `--skip-install` when the
+with the detected package manager by default (an app in a workspace uses the
+one its repository's root names); pass `--skip-install` when the
 agent or host workflow will install dependencies separately.
