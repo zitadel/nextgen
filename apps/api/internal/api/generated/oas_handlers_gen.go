@@ -43,7 +43,7 @@ func (c *codeRecorder) Unwrap() http.ResponseWriter {
 // cannot accept their own invitation. Every unknown or finished token answers the same opaque `404`.
 //
 // Authenticate with a platform-project user session cookie (`sessionCookie`). Cookie requests follow
-// that scheme's CSRF rules. The call is rate-limited.
+// that scheme's CSRF rules.
 //
 // POST /invitations/accept
 func (s *Server) handleAcceptInvitationRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -17539,7 +17539,7 @@ func (s *Server) handleListUserTeamsRequest(args [1]string, argsEscaped bool, w 
 // Send the plaintext token from the invitation link fragment. Every unknown or finished token answers
 // the same opaque `404`. Authenticate with a platform-project user session cookie (`sessionCookie`).
 // Lookup is a read: same-origin cookie requests need no `X-Zitadel-CSRF` token (accept and reject
-// still do). The call is rate-limited.
+// still do).
 //
 // POST /invitations/lookup
 func (s *Server) handleLookupInvitationRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -19920,7 +19920,7 @@ func (s *Server) handleQueryUsersRequest(args [0]string, argsEscaped bool, w htt
 // administrators, but this response returns `metadata` as null. The inviter cannot decline their own
 // invitation; an administrator cancels it instead. Every unknown or finished token answers the same
 // opaque `404`. Authenticate with a platform-project user session cookie (`sessionCookie`). Cookie
-// requests follow that scheme's CSRF rules. The call is rate-limited.
+// requests follow that scheme's CSRF rules.
 //
 // POST /invitations/reject
 func (s *Server) handleRejectInvitationRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {

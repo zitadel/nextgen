@@ -11,7 +11,7 @@ post:
     cancels it instead. Every unknown or finished token answers the same
     opaque `404`.
     Authenticate with a platform-project user session cookie (`sessionCookie`).
-    Cookie requests follow that scheme's CSRF rules. The call is rate-limited.
+    Cookie requests follow that scheme's CSRF rules.
   tags:
     - Invitations
   security:
@@ -51,14 +51,6 @@ post:
             $ref: ../../../components/error-details.yaml
     '404':
       description: Unknown or finished invitation token.
-      content:
-        application/json:
-          schema:
-            $ref: ../../../components/error-details.yaml
-    '429':
-      description: |
-        Too many requests. Decline is rate-limited so a guessed token cannot be
-        brute-forced. Wait and retry.
       content:
         application/json:
           schema:

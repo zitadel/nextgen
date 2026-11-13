@@ -405,10 +405,6 @@ type AcceptInvitationNotFound ErrorDetails
 
 func (*AcceptInvitationNotFound) acceptInvitationRes() {}
 
-type AcceptInvitationTooManyRequests ErrorDetails
-
-func (*AcceptInvitationTooManyRequests) acceptInvitationRes() {}
-
 type AcceptInvitationUnauthorized ErrorDetails
 
 func (*AcceptInvitationUnauthorized) acceptInvitationRes() {}
@@ -60207,10 +60203,6 @@ type LookupInvitationNotFound ErrorDetails
 
 func (*LookupInvitationNotFound) lookupInvitationRes() {}
 
-type LookupInvitationTooManyRequests ErrorDetails
-
-func (*LookupInvitationTooManyRequests) lookupInvitationRes() {}
-
 type LookupInvitationUnauthorized ErrorDetails
 
 func (*LookupInvitationUnauthorized) lookupInvitationRes() {}
@@ -92362,10 +92354,6 @@ func (*RejectInvitationForbidden) rejectInvitationRes() {}
 type RejectInvitationNotFound ErrorDetails
 
 func (*RejectInvitationNotFound) rejectInvitationRes() {}
-
-type RejectInvitationTooManyRequests ErrorDetails
-
-func (*RejectInvitationTooManyRequests) rejectInvitationRes() {}
 
 type RejectInvitationUnauthorized ErrorDetails
 
