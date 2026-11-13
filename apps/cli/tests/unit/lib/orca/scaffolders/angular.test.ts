@@ -25,7 +25,7 @@ beforeEach(() => {
 });
 
 describe("AngularScaffolder", () => {
-  it("runs ng new then removes the starter app.ts/app.html", async () => {
+  it("runs ng new without an install, then removes the starter app.ts/app.html", async () => {
     await new AngularScaffolder(SUPPORTED_NODE).scaffold("/tmp/proj", "angular");
 
     const [command, args, opts] = scaffoldingCalls()[0] ?? [];
@@ -43,6 +43,7 @@ describe("AngularScaffolder", () => {
       "--style=css",
       "--ssr=false",
       "--skip-git",
+      "--skip-install",
     ]);
     expect(opts).toMatchObject({ cwd: "/tmp/proj" });
     expect(mockRm).toHaveBeenCalledWith(join("/tmp/proj", "src/app/app.ts"), { force: true });
