@@ -2,11 +2,7 @@ import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
-import { describe, expect, it, onTestFinished, vi } from "vitest";
-import {
-  NEUTRAL_MESSAGE,
-  SELF_MESSAGE,
-} from "@/features/project-settings/components/add-admin-dialog";
+import { describe, expect, it, vi } from "vitest";
 import { scopedPath } from "@/test/project-scope.fixture";
 import { makeTestSession } from "@/test/session.fixture";
 import { server } from "@/test/msw";
@@ -23,14 +19,13 @@ vi.mock("@/auth/session", async (importOriginal) => {
 /**
  * The admins section of the project page (#1238, #1462). The people and how
  * they hold access come from the project's admins list; team grants and lower
- * levels from its grants. Every read, add and remove goes against the route's
+ * levels from its grants. Every read and remove goes against the route's
  * project id, never the console's own (platform) project.
  */
 const PROJECT_ID = "proj_1";
 const PROJECTS_URL = "http://localhost/api/v1/projects";
 const GRANTS_URL = "http://localhost/api/v1/grants";
 const GRANTS_QUERY_URL = `${GRANTS_URL}/query`;
-const USERS_QUERY_URL = "http://localhost/api/v1/users/query";
 /** The signed-in address, read from the fixture rather than restated here. */
 const SELF = makeTestSession().user?.identifier ?? "";
 
@@ -138,30 +133,6 @@ function stubProject(
   return { adminReads, queries };
 }
 
-/** One `POST /grants` as the dialog sends it: which project, and what body. */
-interface GrantCreate {
-  projectId: string | null;
-  body: unknown;
-}
-
-/**
- * `POST /grants` by identifier: 202 with no body, whoever the address belongs
- * to (#1229). The returned array is every request the console sent.
- */
-function stubCreateGrant() {
-  const created: GrantCreate[] = [];
-  server.use(
-    http.post(GRANTS_URL, async ({ request }) => {
-      created.push({
-        projectId: new URL(request.url).searchParams.get("project_id"),
-        body: await request.json(),
-      });
-      return new HttpResponse(null, { status: 202 });
-    }),
-  );
-  return created;
-}
-
 /** Every `DELETE /grants/{id}` the console sends, with the project it named. */
 function stubDeleteGrant() {
   const deleted: { id: string; projectId: string | null }[] = [];
@@ -199,18 +170,6 @@ async function openRemove(name: string) {
   await userEvent.click(screen.getByRole("button", { name: `Actions for ${name}` }));
   await userEvent.click(await screen.findByRole("menuitem", { name: "Remove grant" }));
   return within(await screen.findByRole("alertdialog"));
-}
-
-async function openAddAdmin() {
-  await openAdmins();
-  await userEvent.click(screen.getByRole("button", { name: "Add admin" }));
-  const dialog = within(await screen.findByRole("dialog"));
-  return {
-    dialog,
-    input: dialog.getByRole("textbox", { name: "Email address" }),
-    // The dialog's own submit, not the trigger that shares its label.
-    submit: dialog.getByRole("button", { name: "Add admin" }),
-  };
 }
 
 describe("project admins", () => {
@@ -466,131 +425,6 @@ describe("project admins", () => {
 
     await openAdmins();
     expect(admins().getByText("No admins to show.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Add admin" })).toBeInTheDocument();
-  });
-
-  it("grants by the address that was typed, on the route's project", async () => {
-    stubProject();
-    const created = stubCreateGrant();
-    await renderProject();
-
-    const { input, submit } = await openAddAdmin();
-    await userEvent.type(input, "colleague@acme.com");
-    await userEvent.click(submit);
-
-    // The identifier locator, on the route's project, at the only level this
-    // journey grants (#769).
-    await waitFor(() =>
-      expect(created.at(-1)).toEqual({
-        projectId: PROJECT_ID,
-        body: { user: { identifier: "colleague@acme.com" }, relation: "admin" },
-      }),
-    );
-    expect(await screen.findByText(NEUTRAL_MESSAGE)).toBeInTheDocument();
-    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-  });
-
-  it("says the same thing for an address that belongs to nobody", async () => {
-    // The 202 carries no body, so the console has nothing to branch on and the
-    // operator learns nothing about who is registered.
-    stubProject();
-    stubCreateGrant();
-    let userQueries = 0;
-    server.use(
-      http.post(USERS_QUERY_URL, () => {
-        userQueries += 1;
-        return HttpResponse.json({ users: [] });
-      }),
-    );
-    await renderProject();
-
-    const { input, submit } = await openAddAdmin();
-    await userEvent.type(input, "nobody@acme.com");
-    await userEvent.click(submit);
-
-    expect(await screen.findByText(NEUTRAL_MESSAGE)).toBeInTheDocument();
-    // No directory read: the old picker listed everyone to whoever opened it.
-    expect(userQueries).toBe(0);
-  });
-
-  it("refuses the operator's own address without sending it", async () => {
-    // Different case and surrounding spaces: the comparison is on the trimmed
-    // value, case-insensitively, because the address is the same address.
-    stubProject();
-    const created = stubCreateGrant();
-    await renderProject();
-
-    const { dialog, input, submit } = await openAddAdmin();
-    await userEvent.type(input, "  Test.User@example.com  ");
-    await userEvent.click(submit);
-
-    expect(await dialog.findByRole("alert")).toHaveTextContent(SELF_MESSAGE);
-    expect(input).toBeInvalid();
-    expect(input).toHaveAccessibleDescription(SELF_MESSAGE);
-    expect(created).toHaveLength(0);
-
-    // Editing makes it a different address, and the refusal was about the old
-    // one. `FieldError` renders nothing at all when it has no message, so the
-    // alert is gone rather than empty. The replacement is a well-formed
-    // address on purpose: `toBeInvalid` also reads native constraint
-    // validation, so appending to this one would fail the format check and say
-    // nothing about the error that was meant to be cleared.
-    await userEvent.clear(input);
-    await userEvent.type(input, "colleague@acme.com");
-    expect(dialog.queryByRole("alert")).not.toBeInTheDocument();
-    expect(input).not.toBeInvalid();
-  });
-
-  it("leaves a malformed address to the browser", async () => {
-    // `type="email"` refuses it before the handler runs, so there is no
-    // console-authored format message to keep in step with the server's.
-    stubProject();
-    const created = stubCreateGrant();
-    await renderProject();
-
-    const { input, submit } = await openAddAdmin();
-    await userEvent.type(input, "not-an-email");
-    await userEvent.click(submit);
-
-    expect(input).toBeInvalid();
-    expect(created).toHaveLength(0);
-  });
-
-  it("surfaces the API's own message when the grant is refused", async () => {
-    // ADR 030 makes the payload's `message` the human-facing string. Signed in
-    // without an identifier, the console cannot run its own self check, so
-    // self-granting comes back as the API's `grant.invalid` instead. The guard
-    // reads the session on every navigation, and opening Admins is one, so the
-    // session stays this one for the whole test.
-    const { fetchSession } = await import("@/auth/session");
-    // A schema that designates no identifier leaves the field off the session
-    // user entirely, rather than carrying it as undefined.
-    const { user, ...session } = makeTestSession();
-    vi.mocked(fetchSession).mockResolvedValue({
-      ...session,
-      user: user && { user_id: user.user_id, display: user.display },
-    });
-    onTestFinished(() => {
-      vi.mocked(fetchSession).mockImplementation(async () => makeTestSession());
-    });
-    stubProject();
-    server.use(
-      http.post(GRANTS_URL, () =>
-        HttpResponse.json(
-          { code: "grant.invalid", message: "you cannot grant access to yourself" },
-          { status: 400 },
-        ),
-      ),
-    );
-    await renderProject();
-
-    const { dialog, input, submit } = await openAddAdmin();
-    await userEvent.type(input, SELF);
-    await userEvent.click(submit);
-
-    expect(await dialog.findByRole("alert")).toHaveTextContent(
-      "you cannot grant access to yourself",
-    );
   });
 
   it("removes an admin from the route's project after confirming", async () => {

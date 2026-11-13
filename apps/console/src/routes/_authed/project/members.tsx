@@ -9,10 +9,7 @@ import {
   ProjectInvitations,
   readInvitations,
 } from "@/features/invitations/components/project-invitations";
-import {
-  AddAdminButton,
-  ProjectAdmins,
-} from "@/features/project-settings/components/project-admins";
+import { ProjectAdmins } from "@/features/project-settings/components/project-admins";
 import {
   projectScopeDeps,
   requireProjectScope,
@@ -37,11 +34,6 @@ type MembersTab = "members" | "invitations";
  * The people and the grants are the same viewer check on the same project and
  * succeed or fail as one. A failed invitations read is shown in its tab rather
  * than thrown, so the members stay readable and the API's own message says why.
- *
- * Add admin stays beside Invite member on the Members tab, though the design
- * draws one button: it gives access to someone who already has an account,
- * which an invitation link does not, and it is the only way in on an instance
- * without a platform project, where invitations are refused.
  */
 export const Route = createFileRoute("/_authed/project/members")({
   staticData: {
@@ -94,18 +86,15 @@ function ProjectMembersPage() {
           <TabsTrigger value="members">Members</TabsTrigger>
           <TabsTrigger value="invitations">Invitations</TabsTrigger>
         </TabsList>
-        <div className="flex items-center gap-2">
-          {tab === "members" && <AddAdminButton projectId={projectId} onAdded={reload} />}
-          <InviteMemberButton
-            projectId={projectId}
-            projectName={project.name}
-            onInvited={() => {
-              // Closing the dialog lands on the table the new row is in.
-              open("invitations");
-              reload();
-            }}
-          />
-        </div>
+        <InviteMemberButton
+          projectId={projectId}
+          projectName={project.name}
+          onInvited={() => {
+            // Closing the dialog lands on the table the new row is in.
+            open("invitations");
+            reload();
+          }}
+        />
       </div>
 
       <TabsContent value="members">

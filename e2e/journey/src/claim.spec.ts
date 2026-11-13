@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { expect, test } from "@playwright/test";
 import { identity, registerWithPassword } from "@zitadel/testing/playwright";
 
-import { ERROR_BOUNDARY_TITLE, NEUTRAL_MESSAGE } from "../../console/support/copy";
+import { ERROR_BOUNDARY_TITLE } from "../../console/support/copy";
 import { journeyMetadataOrSkip, runCli } from "./support";
 
 /**
@@ -16,8 +16,8 @@ import { journeyMetadataOrSkip, runCli } from "./support";
  *   left to do,
  * - `zitadel console` mints a one-time link that signs the admin in to the
  *   local server's own console, with no password, and
- * - that admin can hand the project to a colleague and take it back again
- *   from the console's own Admins section (#1295).
+ * - that admin can invite a colleague into the project with a link and take
+ *   the access back again, from the Members page of the console (ADR 086).
  *
  * Claiming an anonymous project stays a cloud journey. These checks are
  * framework-independent; one suite proves them end to end without slowing
@@ -71,7 +71,7 @@ test("a local project is owned from setup, and the console signs the local admin
   expect(me.body.user?.identifier).toBe(consoleLink.data?.signed_in_as);
 });
 
-test("the setup admin can add and remove a project admin, and the colleague sees it", async ({
+test("the setup admin can invite a colleague and remove them, and the colleague sees it", async ({
   browser,
   page,
 }) => {
@@ -84,10 +84,8 @@ test("the setup admin can add and remove a project admin, and the colleague sees
   const { email, password } = identity();
 
   // The colleague signs up at the console's own sign-in screen, in their own
-  // context. That screen signs in to the platform project, which is the only
-  // place "Add admin" can find them: the grant service resolves an email
-  // against the caller's home project, so a colleague registered in the app
-  // project is silently not granted (#1295).
+  // context. That screen signs in to the platform project, which is the
+  // session an invitation is accepted with (ADR 086).
   const colleagueContext = await browser.newContext();
   try {
     const colleaguePage = await colleagueContext.newPage();
@@ -110,15 +108,28 @@ test("the setup admin can add and remove a project admin, and the colleague sees
       .getByRole("link", { name: "Members" })
       .click();
     await expect(page.getByRole("region", { name: "Admins" })).toBeVisible();
-    await page.getByRole("button", { name: "Add admin", exact: true }).click();
-    const dialog = page.getByRole("dialog", { name: "Add admin" });
-    await dialog.getByRole("textbox", { name: "Email address" }).fill(email);
-    await dialog.getByRole("button", { name: "Add admin", exact: true }).click();
-    await expect(page.getByText(NEUTRAL_MESSAGE)).toBeVisible();
 
-    // The row is what proves the write landed: it comes back from the list
-    // read, and the message above says the same thing whether or not anything
-    // was created.
+    // The admin makes a link. It is shown once, in the message to pass on, and
+    // names nobody: whoever opens it gets the role (admin by default).
+    await page.getByRole("button", { name: "Invite member", exact: true }).click();
+    const invite = page.getByRole("dialog", { name: "Invite member" });
+    await invite.getByRole("button", { name: "Create invitation", exact: true }).click();
+    const created = page.getByRole("dialog", { name: "Invitation created" });
+    const message = await created.getByRole("textbox").inputValue();
+    const link = message.match(/https?:\/\/\S+/)?.[0] ?? "";
+    expect(link).toContain("/invitations/accept#token=");
+    await created.getByRole("button", { name: "Close", exact: true }).click();
+    await expect(page.getByRole("region", { name: "Invitations" })).toBeVisible();
+
+    // The colleague opens it in their own session and joins.
+    await colleaguePage.goto(link);
+    await colleaguePage.getByRole("button", { name: "Join project", exact: true }).click();
+    await expect(colleaguePage).toHaveURL(/\/projects/, { timeout: 60_000 });
+
+    // The row is what proves the grant landed: it comes back from the list
+    // read once the admin's page is loaded again.
+    await page.reload();
+    await page.getByRole("tab", { name: "Members", exact: true }).click();
     const row = page.getByRole("row").filter({ hasText: email });
     await expect(row).toBeVisible();
     await expect(row.getByText("Admin grant", { exact: true })).toBeVisible();

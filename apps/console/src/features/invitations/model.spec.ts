@@ -91,7 +91,7 @@ describe("inviterLabel", () => {
   it("prefers the display name, then the identifier, then the id", () => {
     const inviter = { user_id: "user_1", identifier: "alex@example.com", display: "Alex Morgan" };
     expect(inviterLabel({ inviter })).toBe("Alex Morgan");
-    expect(inviterLabel({ inviter: { ...inviter, display: null } })).toBe("alex@example.com");
+    expect(inviterLabel({ inviter: { ...inviter, display: undefined } })).toBe("alex@example.com");
     expect(inviterLabel({ inviter: { user_id: "user_1" } })).toBe("user_1");
   });
 
