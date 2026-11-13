@@ -7,12 +7,15 @@ import {
   type Declared,
   type Declaring,
   declaredOf,
+  type FlagNameOf,
+  type FlagsOf,
   isSuggestion,
   type LooseNext,
   type Scope,
   type Suggest,
   type Suggested,
   type SuggestedCommand,
+  spelled,
   suggestionWords,
   withoutCredentials,
 } from ".";
@@ -50,17 +53,44 @@ export type ParsedToken = Readonly<
   { type: "arg"; input: string } | { type: "flag"; flag: string; input: string }
 >;
 
-/** How a rerun changes the command line it rebuilds, by the names code reads them. */
-export type Rerun = Readonly<{
+/**
+ * How a rerun changes the command line it rebuilds: the one shape
+ * {@link RerunOf} and {@link Rerun} both are, told apart by how they name and
+ * type the flags.
+ *
+ * @typeParam Name - How a flag to leave out is named.
+ * @typeParam Values - The flags to set, by name, with their values.
+ */
+type RerunShape<Name extends string, Values> = Readonly<{
   /** Flags to leave out. */
-  without?: readonly string[];
+  without?: readonly Name[];
   /** Flags to set ahead of the typed ones, as a `--force` retry reads. */
-  with?: Readonly<Record<string, unknown>>;
+  with?: Values;
   /** Flags to set after the typed ones, such as a next page's token. */
-  after?: Readonly<Record<string, unknown>>;
+  after?: Values;
   /** The arguments to name, where they are not the ones typed. */
   arguments?: readonly string[];
 }>;
+
+/**
+ * How a rerun changes the command line it rebuilds, checked against `Defs`:
+ * the flags the code asking for it relies on the command declaring, typed as
+ * they parse. A rerun from code that does not know which command it runs in
+ * (a mixin) names them, and the run refuses one its command does not declare.
+ *
+ * @typeParam Defs - The flags the rerun relies on, as a command declares them.
+ */
+export type RerunOf<Defs> = RerunShape<
+  FlagNameOf<{ flags: Defs }>,
+  Partial<FlagsOf<{ flags: Defs }>>
+>;
+
+/**
+ * How a rerun changes the command line it rebuilds, once its flags are only
+ * names: what {@link RerunOf} becomes after the compiler has checked it, and
+ * what the run checks again against the command it rebuilds.
+ */
+export type Rerun = RerunShape<string, Readonly<Record<string, unknown>>>;
 
 /**
  * The commands one run suggests next: rendered against what each target
@@ -91,15 +121,34 @@ export class RunSuggestions {
    */
   aimedAt(scope: Scope, cliVersion: string = this.run.cliVersion()): Suggest {
     return (next: Suggested | LooseNext) => {
-      if (typeof next === "string") {
-        return next;
-      }
-
-      return this.remembered(
-        suggestionWords(next.id, next, this.declared(next.id), scope),
-        cliVersion,
-      );
+      return this.render(next, scope, cliVersion);
     };
+  }
+
+  /**
+   * One follow-up aimed at `scope`, as `cliVersion` runs it; one rendered
+   * already is returned as it is.
+   *
+   * @param next - The follow-up.
+   * @param scope - What it is aimed at.
+   * @param cliVersion - The release it runs as.
+   * @returns The command.
+   * @throws {Error} When it names no command this CLI loaded, or input its
+   *   command does not take.
+   */
+  render(
+    next: Suggested | LooseNext,
+    scope: Scope,
+    cliVersion: string = this.run.cliVersion(),
+  ): SuggestedCommand {
+    if (typeof next === "string") {
+      return next;
+    }
+
+    return this.remembered(
+      suggestionWords(next.id, next, this.declared(next.id), scope),
+      cliVersion,
+    );
   }
 
   /**
@@ -130,6 +179,8 @@ export class RunSuggestions {
    * @param raw - Its command line, as oclif parsed it.
    * @param change - What the rerun changes.
    * @returns The command.
+   * @throws {Error} When the change leaves out a flag the command does not
+   *   declare, or, from the renderer, sets one.
    */
   rerun(
     id: string,
@@ -137,6 +188,12 @@ export class RunSuggestions {
     raw: readonly ParsedToken[],
     change: Rerun = {},
   ): SuggestedCommand {
+    const undeclared = (change.without ?? []).filter((name) => {
+      return !target.flags.has(spelled(name)) && !ANSWERING.includes(name);
+    });
+    if (undeclared.length > 0) {
+      throw new Error(`${id} declares no --${undeclared.map(spelled).join(", --")} to leave out`);
+    }
     const redact = withoutCredentials;
     const positional = (
       change.arguments ??

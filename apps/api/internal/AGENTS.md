@@ -19,6 +19,13 @@ predicate's cost grows with the rows in its tables.
 - A project created over HTTP goes through the cached handler's unwrapped
   service; remove it with `Harness.CleanupProject`.
 
+## Integration tests check the wire against the spec
+
+- Every answer of the harness's test server is checked against the OpenAPI
+  spec; fix the server or the spec for a mismatch, never the check.
+- A test that mounts the API on a server of its own puts
+  `Harness.SpecChecked` in the chain it passes to `MountAPI`.
+
 ## Errors
 
 Services and storage return `domain.Error` values, which match by `Code`

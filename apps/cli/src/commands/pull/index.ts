@@ -71,7 +71,7 @@ function isDeploymentId(target: string): target is DeploymentId {
  * What to pull: `latest` (the live release), a release id (`rel_…`) or a
  * deployment id (`dep_…`), refusing anything else.
  */
-const TARGET: Refused<PullTarget> = {
+const TARGET = {
   schema: z.string().transform((target, ctx): PullTarget => {
     if (target === "latest") {
       return LATEST_TARGET;
@@ -98,12 +98,12 @@ const TARGET: Refused<PullTarget> = {
     message: 'Don\'t know how to pull "{value}".',
     hint: "Pass 'latest', a release id (rel_…), or a deployment id (dep_…).",
   },
-};
+} as const satisfies Refused<PullTarget>;
 
 /**
  * What a release that pins two resources into one file is refused for.
  */
-const SHARED_FILE_REFUSAL: Refusal = {
+const SHARED_FILE_REFUSAL = {
   code: "E_CONFLICT",
   message: 'The release pins "{first}" and "{second}", which both go in {path}.',
   hint: "Rename one of them in the source configuration and deploy again, or reconcile the file by hand.",
@@ -111,7 +111,7 @@ const SHARED_FILE_REFUSAL: Refusal = {
     path: "{path}",
     handles: "{handles}",
   },
-};
+} as const satisfies Refusal;
 
 /**
  * The release-pointer kinds `pull` can rebuild on disk.

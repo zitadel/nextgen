@@ -1,7 +1,8 @@
 # Agent Instructions — `packages/testing`
 
 `@zitadel/testing` is the customer-facing test kit: it boots or connects to a
-real instance and drives it, and the login, from Playwright. Its API:
+real instance and drives it, and the login, from Playwright; `./vitest`
+runs backend tests against it. Its API:
 [`README.md`](README.md). The repo dogfoods it in `e2e/demo-next`'s real lane,
 `e2e/console`, the console's `dev:real` and `e2e/journey`, whose testkit variant
 installs the kit from the local registry as a customer would.
@@ -48,6 +49,8 @@ upward.
   explicitly.
 - `@playwright/test` is an optional peer: only the `./playwright` entry may
   import it, so the root entry works without Playwright.
+- `vitest` is an optional peer the same way: only `./vitest` imports it
+  (`tests/unit/entries.test.ts`), and that entry is ESM only.
 
 ## Behaviour pinned by unit tests
 

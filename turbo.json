@@ -407,9 +407,10 @@
     "//#check-adrs": {
       "inputs": ["docs/adrs/**/*.md", "scripts/check-adrs-index.mjs", "scripts/dev-process.mjs"]
     },
-    // Every module in go.work compiles with what its own go.mod selects
-    // (scripts/check-go-work.mjs). Not cached: the answer depends on every
-    // module's imports, tests included, which these inputs do not hold.
+    // Every module in go.work compiles with what its own go.mod selects, and
+    // the staged go.work.sum holds every checksum turbo's module-graph listing
+    // needs (scripts/check-go-work.mjs). Not cached: the answer depends on
+    // every module's imports, tests included, which these inputs do not hold.
     "//#check-go-work": {
       "cache": false,
       "env": ["GOFLAGS"],
@@ -477,7 +478,8 @@
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "GOFLAGS"]
     },
     // The local runtime image: the server cross-compiled for linux with the
-    // console's dist embedded. Needs Docker, so it stays out of CI.
+    // console's dist embedded. Needs Docker, so it stays out of the `ci`
+    // script; the nightly artifacts workflow runs it through smoke-container.
     "//#build-local-image": {
       "cache": false,
       "dependsOn": ["@zitadel/console#build"],
@@ -494,8 +496,17 @@
     "//#smoke-container": {
       "cache": false,
       "dependsOn": ["//#build-local-image"],
-      "inputs": ["scripts/smoke-container.mjs", "scripts/dev-process.mjs"],
+      "inputs": ["scripts/smoke-container.mjs", "scripts/dev-process.mjs", "scripts/release-manifest.mjs"],
       "passThroughEnv": ["ZITADEL_*", "DOCKER_*"]
+    },
+    // The latest published @zitadel/server writes a data dir (a project and
+    // a user); the current build migrates it and reads the user back. It
+    // installs that release from npm, so it is never cached. The nightly
+    // artifacts workflow runs it.
+    "//#smoke-upgrade": {
+      "cache": false,
+      "dependsOn": ["@zitadel/server#build"],
+      "inputs": ["scripts/smoke-upgrade.mjs", "scripts/smoke-server.mjs", "scripts/release-manifest.mjs", "scripts/dev-process.mjs"]
     }
   }
 }

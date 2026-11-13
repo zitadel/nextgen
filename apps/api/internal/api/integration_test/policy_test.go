@@ -385,9 +385,9 @@ func TestPasswordPolicyEnforced(t *testing.T) {
 			}),
 		}, api.SubmitFlowStepParams{ID: flowHeaders.Response.ID, Zflow: mustExtractZflow(t, flowHeaders.SetCookie)})
 		require.NoError(t, err)
-		require.IsType(t, &api.SubmitFlowStepBadRequest{}, submitResp, helpers.MustMarshal(t, submitResp))
-		badResp := submitResp.(*api.SubmitFlowStepBadRequest)
-		errVal, errSet := badResp.Response.Step.Error.Get()
+		require.IsType(t, &api.SubmitFlowStepBadRequestHeaders{}, submitResp, helpers.MustMarshal(t, submitResp))
+		badStep := badRequestStep(t, submitResp)
+		errVal, errSet := badStep.Step.Error.Get()
 		require.True(t, errSet)
 		assert.Equal(t, "error.x-auth-methods#password_min_length", errVal)
 	})
