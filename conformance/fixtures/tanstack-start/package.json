@@ -23,7 +23,7 @@
     "@tanstack/react-devtools": "catalog:",
     "@tanstack/react-router": "catalog:",
     "@tanstack/react-router-devtools": "catalog:",
-    "@tanstack/react-start": "1.169.5",
+    "@tanstack/react-start": "catalog:",
     "@zitadel/sdk-tanstack-start": "workspace:*",
     "nitro": "3.0.260610-beta",
     "react": "catalog:",
