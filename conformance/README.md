@@ -18,6 +18,7 @@ uses it, without scaffolding an app on every run.
 | Run the lane for every fixture | `turbo run conformance` |
 | Run it for one fixture | `turbo run conformance --filter=@zitadel/conformance-react` |
 | Check a fixture for drift | `turbo run check-generate --filter=@zitadel/conformance-react` |
+| Check a `generatorPinned: false` fixture as the nightly run does | `CONFORMANCE_UNPINNED=true turbo run check-generate --filter=<fixture> --force` |
 | Type-check a fixture's pages | `turbo run typecheck --filter=@zitadel/conformance-react` |
 | Regenerate a fixture | `turbo run generate --filter=@zitadel/conformance-react && pnpm install` |
 | Sweep servers an aborted run left | `pnpm run cli -- stop --all` |
@@ -76,6 +77,10 @@ hooks, env declarations), to the framework CLI pins, and hand edits to a
 fixture. It is cached, and reruns when the CLI build, the server build, the
 kit, the suite or the fixture changes. The `ci` script names it beside
 `conformance`, so a registry outage in the check never skips the lane.
+
+A `generatorPinned: false` fixture's check runs in `ci.yml`'s nightly run,
+which sets `CONFORMANCE_UNPINNED` and `TURBO_FORCE`. The switch is not part of
+the task's key, so a run without `--force` replays a pull request's skip.
 
 It does not catch:
 

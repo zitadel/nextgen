@@ -341,10 +341,17 @@ function appFiles(app) {
     .sort();
 }
 
-/** The caller's environment without any Zitadel setting that could steer setup. */
+/**
+ * The caller's environment without any Zitadel setting that could steer setup,
+ * and without the `npm_*` variables of the package manager that started this
+ * script. npm reads an inherited `npm_config_user_agent` as its own, so under
+ * `pnpm run` every generator setup starts through `npx` would see pnpm and
+ * install with it (the TanStack CLI then writes a `pnpm-workspace.yaml`).
+ * Without them setup runs as from a plain shell, as `npx zitadel setup` does.
+ */
 function setupEnv() {
   const env = Object.fromEntries(
-    Object.entries(process.env).filter(([key]) => !/^(ZITADEL_|NEXTGEN_)/.test(key)),
+    Object.entries(process.env).filter(([key]) => !/^(ZITADEL_|NEXTGEN_|npm_)/i.test(key)),
   );
   return { ...env, ZITADEL_TELEMETRY: "0", DO_NOT_TRACK: "1", NO_SKILLS_PROMPT: "1" };
 }
