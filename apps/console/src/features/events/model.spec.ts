@@ -1103,8 +1103,12 @@ describe("the sign-ins", () => {
       step("evt_1", "auth.attempt.created", 0),
       step("evt_2", "auth.check.failed", 3, { payload: { check_type: "Password" } }),
     ];
-    expect(flowSummary(password, { complete: true, now })?.outcome).toBe("failed");
-    expect(flowSummary(password, { complete: true, now })?.title).toBe("Sign-in failed");
+    const expired = new Date(Date.parse(at(0)) + ATTEMPT_LIFETIME_MS + 1);
+    // Refused, while the visitor may still try again: in progress.
+    expect(flowSummary(password, { complete: true, now })?.outcome).toBe("in_progress");
+    expect(flowSummary(password, { complete: true, now: expired })?.title).toBe("Sign-in failed");
+    // Not all of the flow is at hand: a success could follow the failure.
+    expect(flowSummary(password, { complete: false, now: expired })?.outcome).toBeUndefined();
     // A retry that passed is a sign-in.
     const retried = [
       ...password,
@@ -1129,12 +1133,18 @@ describe("the sign-ins", () => {
   it("marks an attempt abandoned when its flow never finished before it expired", () => {
     const loadedAt = new Date(Date.parse(at(0)) + ATTEMPT_LIFETIME_MS + 1000);
     const left = step("evt_left", "auth.attempt.created", 0, { flow_id: "flow_left" });
-    // A step taken and then left: the flow still never finished.
+    // A step taken and then left: the flow still never ended.
     const checked = step("evt_checked", "auth.check.succeeded", 5, { flow_id: "flow_left" });
     const went = step("evt_went", "auth.attempt.created", 0, { flow_id: "flow_went" });
     const handedOff = step("evt_handed", "auth.attempt.handed_off", 4, { flow_id: "flow_went" });
+    // Refused (no account, a wrong password): it ended, and its own row says how.
+    const refusedAttempt = step("evt_refused", "auth.attempt.created", 0, { flow_id: "flow_no" });
+    const refused = step("evt_no", "auth.check.failed", 3, {
+      flow_id: "flow_no",
+      payload: { check_type: "User" },
+    });
     const fresh = step("evt_fresh", "auth.attempt.created", 950, { flow_id: "flow_fresh" });
-    const rows = [fresh, handedOff, checked, went, left];
+    const rows = [fresh, handedOff, refused, checked, refusedAttempt, went, left];
 
     expect(abandonedAttempts(rows, { view: "all" }, loadedAt)).toEqual(new Set(["evt_left"]));
     expect(abandonedAttempts(rows, { view: "audit", since: "24h" }, loadedAt)).toEqual(
@@ -1142,6 +1152,8 @@ describe("the sign-ins", () => {
     );
     // A filter beyond the view and the time could hide what finished it.
     expect(abandonedAttempts(rows, { view: "audit", category: "auth" }, loadedAt).size).toBe(0);
+    // A range that ends before now may stop short of what ended a flow.
+    expect(abandonedAttempts(rows, { view: "all", to: at(600) }, loadedAt).size).toBe(0);
     expect(
       abandonedAttempts(rows, { view: "audit", type: ["auth.attempt.created"] }, loadedAt).size,
     ).toBe(0);
@@ -1156,12 +1168,12 @@ describe("the sign-ins", () => {
       event({ id: "evt_d", request_id: "req_3", flow_id: null }),
       event({ id: "evt_e", request_id: "req_3", flow_id: null }),
     ];
-    expect(belongingWith(rows, rows[1])).toEqual(new Set(["evt_a"]));
-    expect(belongingWith(rows, rows[3])).toEqual(new Set(["evt_e"]));
-    expect(belongingWith(rows, undefined).size).toBe(0);
-    expect(belongingWith(rows, event({ id: "evt_x", request_id: null, flow_id: null })).size).toBe(
-      0,
-    );
+    expect(belongingWith(rows, rows[1])).toEqual({ ids: new Set(["evt_a"]), by: "login flow" });
+    expect(belongingWith(rows, rows[3])).toEqual({ ids: new Set(["evt_e"]), by: "request" });
+    expect(belongingWith(rows, undefined).ids.size).toBe(0);
+    expect(
+      belongingWith(rows, event({ id: "evt_x", request_id: null, flow_id: null })).ids.size,
+    ).toBe(0);
   });
 
   it("orders events by when they happened, keeping the server's order within a moment", () => {
@@ -1180,6 +1192,8 @@ describe("the sign-ins", () => {
   it("writes a span of time as the drawer's timeline does", () => {
     expect(formatSpan(0)).toBe("0 s");
     expect(formatSpan(1500)).toBe("1.5 s");
+    // Tenths that round up to ten seconds read as ten seconds.
+    expect(formatSpan(9960)).toBe("10 s");
     expect(formatSpan(19_000)).toBe("19 s");
     expect(formatSpan(125_000)).toBe("2 min 5 s");
     expect(formatSpan(120_000)).toBe("2 min");

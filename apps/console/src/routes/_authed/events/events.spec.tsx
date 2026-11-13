@@ -3,9 +3,8 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { _resetUserNamesForTesting } from "@/features/events/api";
 import { _resetLiveForTesting } from "@/features/events/use-live-events";
-import { formatEventTime } from "@/lib/date";
+import { formatClockTime, formatEventTime } from "@/lib/date";
 import { scopedPath } from "@/test/project-scope.fixture";
 import { server } from "@/test/msw";
 import { createAppRouter } from "../../../router";
@@ -158,7 +157,6 @@ async function drawer() {
 
 afterEach(() => {
   _resetLiveForTesting();
-  _resetUserNamesForTesting();
 });
 
 const USERS_URL = "http://localhost/api/v1/users/:id";
@@ -494,6 +492,10 @@ describe("events", () => {
     expect(requestQueries[0]?.get("order")).toBe("asc");
     const steps = section.getAllByRole("listitem");
     expect(steps).toHaveLength(2);
+    // A request's events share a second as the API returns them: each keeps
+    // its clock time rather than an offset of nothing.
+    expect(within(steps[0] as HTMLElement).getByText(formatClockTime(OCCURRED_AT))).toBeVisible();
+    expect(section.queryByText(/^\+/)).toBeNull();
     // The open event is marked, not a link; the API call behind it opens.
     expect(
       within(steps[0] as HTMLElement)
@@ -560,6 +562,8 @@ describe("events", () => {
     expect(panel.queryByRole("heading", { name: "This request" })).toBeNull();
 
     const steps = section.getAllByRole("listitem");
+    // Each step by its time since the first.
+    expect(within(steps[0] as HTMLElement).getByText("+0 s")).toBeVisible();
     expect(steps.map((step) => within(step).getByText(/^(auth|session)\./).textContent)).toEqual([
       "auth.attempt.created",
       "auth.check.succeeded",

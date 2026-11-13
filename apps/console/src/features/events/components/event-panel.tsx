@@ -24,7 +24,7 @@ import {
   type EventsSearch,
   sharing,
 } from "../model";
-import { useUserNames } from "../use-user-names";
+import { useNamesOf } from "../use-user-names";
 import { OutcomeBadge, UserName } from "./event-people";
 import { EventSubject } from "./event-subject";
 
@@ -316,10 +316,11 @@ function PanelSection({ title, children }: { title: string; children: ReactNode 
  * when the drawer does not hold them all. A login flow is headed by what it
  * came to: whose account, when it started and how long it took.
  *
- * Each step says how long after the first it happened, and a dot on a track
- * places it in the whole, as a trace's waterfall does: a sign-up through an
- * identity provider spends most of its time at the provider, and the gap
- * shows it.
+ * In a login flow each step says how long after the first it happened, and a
+ * dot on a track places it in the whole, as a trace's waterfall does: a
+ * sign-up through an identity provider spends most of its time at the
+ * provider, and the gap shows it. A request's events fall within one second
+ * as the API returns them, so they keep their clock time.
  */
 function Timeline({
   title,
@@ -336,7 +337,7 @@ function Timeline({
   /** The list under the filter that holds them all. */
   all?: { search: EventsSearch; label: string };
 }) {
-  const names = useUserNames(timeline.items);
+  const names = useNamesOf(summary?.userId ? [summary.userId] : []);
   const start = Date.parse(timeline.items[0]?.occurred_at ?? "");
   const end = Date.parse(timeline.items.at(-1)?.occurred_at ?? "");
   const span = Math.max(end - start, 0);
@@ -379,8 +380,7 @@ function Timeline({
               key={step.id}
               event={step}
               current={step.id === current}
-              offset={at}
-              share={span > 0 ? at / span : 0}
+              place={summary ? { offset: at, share: span > 0 ? at / span : 0 } : undefined}
             />
           );
         })}
@@ -402,26 +402,33 @@ function Timeline({
 function TimelineStep({
   event,
   current,
-  offset,
-  share,
+  place,
 }: {
   event: ProjectEvent;
   current: boolean;
-  /** Milliseconds after the timeline's first event. */
-  offset: number;
-  /** Where it falls between the first event and the last, from 0 to 1. */
-  share: number;
+  /**
+   * In a login flow: milliseconds after its first event, and where it falls
+   * between the first and the last, from 0 to 1. Without it the step shows
+   * its clock time and no track.
+   */
+  place?: { offset: number; share: number };
 }) {
   const { search } = useContext(EventRowsContext);
   const line = (
     <>
-      <time
-        dateTime={event.occurred_at}
-        title={formatClockTime(event.occurred_at)}
-        className="text-muted-foreground w-14 shrink-0 text-right tabular-nums"
-      >
-        +{formatSpan(offset)}
-      </time>
+      {place ? (
+        <time
+          dateTime={event.occurred_at}
+          title={formatClockTime(event.occurred_at)}
+          className="text-muted-foreground w-14 shrink-0 text-right tabular-nums"
+        >
+          +{formatSpan(place.offset)}
+        </time>
+      ) : (
+        <time dateTime={event.occurred_at} className="text-muted-foreground shrink-0 tabular-nums">
+          {formatClockTime(event.occurred_at)}
+        </time>
+      )}
       <span className="flex min-w-0 flex-1 flex-col gap-1">
         <span className="flex min-w-0 items-center gap-3">
           <span className={cn("shrink-0", isFailure(event) && "text-destructive")}>
@@ -431,15 +438,17 @@ function TimelineStep({
             <EventSubject event={event} />
           </span>
         </span>
-        <span aria-hidden className="bg-muted relative h-1 rounded-full">
-          <span
-            className={cn(
-              "absolute top-1/2 size-2 -translate-x-1/2 -translate-y-1/2 rounded-full",
-              isFailure(event) ? "bg-destructive" : "bg-muted-foreground",
-            )}
-            style={{ left: `${(share * 100).toFixed(1)}%` }}
-          />
-        </span>
+        {place && (
+          <span aria-hidden className="bg-muted relative h-1 rounded-full">
+            <span
+              className={cn(
+                "absolute top-1/2 size-2 -translate-x-1/2 -translate-y-1/2 rounded-full",
+                isFailure(event) ? "bg-destructive" : "bg-muted-foreground",
+              )}
+              style={{ left: `${(place.share * 100).toFixed(1)}%` }}
+            />
+          </span>
+        )}
       </span>
     </>
   );

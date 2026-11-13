@@ -192,9 +192,12 @@ function EventsScreen() {
   // what belongs together reads together while the drawer tells it.
   const open = events.find((event) => event.id === eventId);
   const together = useMemo(() => belongingWith(events, open), [events, open]);
+  // An attempt is abandoned by its age when the rows were last read up to
+  // now: the load, or Live's latest read, which brought whatever came after.
+  const asOf = live.on && live.checkedAt ? live.checkedAt.getTime() : loaded.loadedAt;
   const abandoned = useMemo(
-    () => abandonedAttempts(events, loaded.search, new Date(loaded.loadedAt)),
-    [events, loaded.search, loaded.loadedAt],
+    () => abandonedAttempts(events, loaded.search, new Date(asOf)),
+    [events, loaded.search, asOf],
   );
   const signins = loaded.search.view === "signins";
   // A page short of its size that still has a token: the server stopped at
@@ -312,13 +315,8 @@ function EventsScreen() {
                     added={added.has(event.id)}
                     names={names}
                     signins={signins}
-                    together={
-                      together.has(event.id)
-                        ? open?.flow_id
-                          ? "login flow"
-                          : "request"
-                        : undefined
-                    }
+                    together={together.ids.has(event.id) ? together.by : undefined}
+                    grouped={event.id === eventId && together.ids.size > 0}
                     abandoned={abandoned.has(event.id)}
                   />
                 ))
@@ -360,6 +358,7 @@ function EventRow({
   names,
   signins,
   together,
+  grouped,
   abandoned,
 }: {
   event: ProjectEvent;
@@ -374,6 +373,8 @@ function EventRow({
   signins: boolean;
   /** Of the open event's login flow or request: marked, and named for a screen reader. */
   together?: "login flow" | "request";
+  /** Open, with other rows of its flow or request loaded: it heads their rail. */
+  grouped: boolean;
   /** An authentication attempt whose flow never finished: marked so. */
   abandoned: boolean;
 }) {
@@ -404,7 +405,7 @@ function EventRow({
         className={cn(
           RESOURCE_CELL,
           // A rail down the rows that belong with the open one.
-          (together || selected) && "shadow-[inset_3px_0_0_var(--color-primary)]",
+          (together || grouped) && "shadow-[inset_3px_0_0_var(--color-primary)]",
         )}
       >
         <span className="flex min-w-0 items-center gap-2">

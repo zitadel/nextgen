@@ -350,8 +350,11 @@ export type FlowOutcome = "signed_in" | "failed" | "abandoned" | "in_progress";
  * A login flow told from its events, oldest first, for the head of the
  * event's drawer: what it came to, whose account, how the person proved who
  * they were, and how long it took. `complete` is whether the events are all
- * of the flow's; when they are not, an outcome that would rest on what is
- * missing (abandoned, still in progress) is not claimed.
+ * of the flow's; when they are not, only a sign-in is claimed: what is missing
+ * could be the success that followed a failure. A flow whose attempt is still
+ * alive is in progress, a failure in it included, since the visitor may try
+ * again; once it has expired it failed, if anything was refused, or was
+ * abandoned.
  */
 export interface FlowSummary {
   title: string;
@@ -399,10 +402,10 @@ export function flowSummary(
 
   let outcome: FlowOutcome | undefined;
   if (signedIn) outcome = "signed_in";
-  else if (signin.length > 0) outcome = "failed";
   else if (!complete) outcome = undefined;
-  else if (now.getTime() - Date.parse(startedAt) > ATTEMPT_LIFETIME_MS) outcome = "abandoned";
-  else outcome = "in_progress";
+  else if (now.getTime() - Date.parse(startedAt) <= ATTEMPT_LIFETIME_MS) outcome = "in_progress";
+  else if (signin.length > 0) outcome = "failed";
+  else outcome = "abandoned";
 
   const methods = flowMethods(events).map((method) => SPOKEN[method] ?? method);
   const signedUp = events.some((event) => event.event_type === "user.created");
@@ -420,48 +423,65 @@ export function flowSummary(
 }
 
 /**
- * Whether anything but the view and the time narrows the list: then rows a
- * flow went on to write may be filtered out, and an attempt with nothing
- * after it says nothing about whether it was abandoned.
+ * Whether the list may lack what a flow went on to write: anything but the
+ * view and a start of the time narrows it, or the range ends before now. Then
+ * an attempt with nothing after it says nothing about whether it was
+ * abandoned.
  */
 function hidesSteps(search: EventsSearch): boolean {
+  if (search.to) return true;
   const time = Number(Boolean(search.since) || hasCustomRange(search));
   return filterCount(search) - time > 0;
 }
 
-/** The steps that finish a login flow: the attempt handed off, and the session it gave its user. */
-const FINISHING_TYPES: readonly string[] = ["auth.attempt.handed_off", "session.established"];
+/**
+ * The steps that end a login flow: the attempt handed off, the session it
+ * gave its user, or a proof or a provider's answer refused. A refused flow
+ * says so on its own row; one that ends on a step without a user (no account)
+ * writes the refused user check.
+ */
+const ENDING_TYPES: readonly string[] = [
+  "auth.attempt.handed_off",
+  "session.established",
+  ...OUTCOME_TYPES.failed,
+];
 
 /**
  * The authentication attempts among the rows that were abandoned: started
- * longer ago than an attempt lives, before the list loaded, in a login flow
- * that never finished, neither handed off nor given a session. The list is
- * newest first, so whatever finished a flow is among the rows already. A flow
- * the visitor left after a step (an address entered, a password rejected) is
- * abandoned too. Under a filter that could hide the rest of a flow, or in a
- * view without the attempts, none is marked.
+ * longer ago than an attempt lives, as of `asOf` (when the list, or Live, last
+ * read up to now), in a login flow that never ended: neither handed off, nor
+ * given a session, nor refused. The list is newest first, so whatever ended a
+ * flow is among the rows already. A flow the visitor left after a step (an
+ * address entered) is abandoned too. Under a filter or a range end that could
+ * hide the rest of a flow, or in a view without the attempts, none is marked.
  */
 export function abandonedAttempts(
   rows: readonly ProjectEvent[],
   search: EventsSearch,
-  loadedAt: Date,
+  asOf: Date,
 ): Set<string> {
   const abandoned = new Set<string>();
   if (search.view === "requests" || search.view === "signins" || hidesSteps(search)) {
     return abandoned;
   }
-  const finished = new Set(
+  const ended = new Set(
     rows
-      .filter((row) => row.flow_id && FINISHING_TYPES.includes(row.event_type))
+      .filter((row) => row.flow_id && ENDING_TYPES.includes(row.event_type))
       .map((row) => row.flow_id),
   );
   for (const row of rows) {
     if (row.event_type !== "auth.attempt.created" || !row.flow_id) continue;
-    if (finished.has(row.flow_id)) continue;
-    if (loadedAt.getTime() - Date.parse(row.occurred_at) <= ATTEMPT_LIFETIME_MS) continue;
+    if (ended.has(row.flow_id)) continue;
+    if (asOf.getTime() - Date.parse(row.occurred_at) <= ATTEMPT_LIFETIME_MS) continue;
     abandoned.add(row.id);
   }
   return abandoned;
+}
+
+/** The other loaded rows of an open event's login flow or request, and which of the two ties them. */
+export interface Belonging {
+  ids: ReadonlySet<string>;
+  by?: "login flow" | "request";
 }
 
 /**
@@ -472,17 +492,19 @@ export function abandonedAttempts(
 export function belongingWith(
   rows: readonly ProjectEvent[],
   open: ProjectEvent | undefined,
-): Set<string> {
-  if (!open) return new Set();
-  const key: "flow_id" | "request_id" | undefined = open.flow_id
+): Belonging {
+  const key: "flow_id" | "request_id" | undefined = open?.flow_id
     ? "flow_id"
-    : open.request_id
+    : open?.request_id
       ? "request_id"
       : undefined;
-  if (!key) return new Set();
-  return new Set(
-    rows.filter((row) => row.id !== open.id && row[key] === open[key]).map((row) => row.id),
-  );
+  if (!open || !key) return { ids: new Set() };
+  return {
+    ids: new Set(
+      rows.filter((row) => row.id !== open.id && row[key] === open[key]).map((row) => row.id),
+    ),
+    by: key === "flow_id" ? "login flow" : "request",
+  };
 }
 
 /**
@@ -501,7 +523,9 @@ export function inOccurrenceOrder(events: readonly ProjectEvent[]): ProjectEvent
 /** A span of time as the drawer's timeline writes it: `0 s`, `1.5 s`, `19 s`, `2 min 5 s`. */
 export function formatSpan(ms: number): string {
   const safe = Math.max(0, ms);
-  if (safe < 10_000 && safe % 1000 !== 0) return `${(safe / 1000).toFixed(1)} s`;
+  // Tenths below ten seconds, unless they round up to ten.
+  const tenths = Math.round(safe / 100);
+  if (safe % 1000 !== 0 && tenths < 100) return `${(tenths / 10).toFixed(1)} s`;
   const seconds = Math.round(safe / 1000);
   if (seconds < 60) return `${seconds} s`;
   const minutes = Math.floor(seconds / 60);
