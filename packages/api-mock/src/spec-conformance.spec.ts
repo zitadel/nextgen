@@ -3017,6 +3017,9 @@ describe("api-mock releases and deployments", () => {
   });
 
   describe("a release a primary origin and a preview serve", () => {
+    /**
+     * A preview URL that {@link PREVIEW_PATTERN} admits.
+     */
     const PREVIEW_URL = "https://acme-git-sso-acmeinc.vercel.app";
 
     /**
