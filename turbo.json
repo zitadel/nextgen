@@ -405,6 +405,10 @@
         "packages/*/tsconfig*.json",
         "e2e/package.json",
         "e2e/tsconfig*.json",
+        "conformance/suite/package.json",
+        "conformance/suite/tsconfig*.json",
+        "conformance/fixtures/*/package.json",
+        "conformance/fixtures/*/tsconfig*.json",
         "vitest.config.ts"
       ]
     },

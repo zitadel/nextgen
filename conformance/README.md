@@ -18,6 +18,7 @@ uses it, without scaffolding an app on every run.
 | Run the lane for every fixture | `turbo run conformance` |
 | Run it for one fixture | `turbo run conformance --filter=@zitadel/conformance-react` |
 | Check a fixture for drift | `turbo run check-generate --filter=@zitadel/conformance-react` |
+| Check a `generatorPinned: false` fixture as the nightly run does | `CONFORMANCE_UNPINNED=true turbo run check-generate --filter=<fixture> --force` |
 | Type-check a fixture's pages | `turbo run typecheck --filter=@zitadel/conformance-react` |
 | Regenerate a fixture | `turbo run generate --filter=@zitadel/conformance-react && pnpm install` |
 | Sweep servers an aborted run left | `pnpm run cli -- stop --all` |
@@ -52,14 +53,15 @@ Fixtures take `32xx`, `82xx` and `83xx` with the same `xx`.
 the env files that carry it, the CLI's own state (`zitadel.json`,
 `.zitadel/`), which the app never reads, the docs setup writes for a person
 (`README.md`, `AGENTS.md`), editor and npm settings, and the tooling only the
-scripts it drops would load, with its config files (one list in
+scripts it drops or an editor would load, with its config files (one list in
 `suite/bin/conformance-fixture.mjs`). Of the generated scripts it keeps `dev`
 and the generator's own type-check as `typecheck` (sv's `check`, the `tsc -b`
-or `vue-tsc -b` create-vite's `build` starts with). It points `@zitadel/*` at
-the workspace and every dependency the pnpm catalog holds at `catalog:`. It
-adds the lane's scripts and dev dependencies. Beside the app, a fixture has
-three files of its own: `playwright.config.mts`, `conformance.spec.ts` and
-`turbo.json`, which only extends the suite's.
+or `vue-tsc -b` create-vite's `build` starts with, create-qwik's
+`build.types`). It points `@zitadel/*` at the workspace and every dependency
+the pnpm catalog holds at `catalog:`. It adds the lane's scripts and dev
+dependencies. Beside the app, a fixture has three files of its own:
+`playwright.config.mts`, `conformance.spec.ts` and `turbo.json`, which only
+extends the suite's.
 
 This lane runs the workspace's versions: the catalog's, and the lockfile's
 for a dependency the catalog does not hold. For the frameworks CI runs a
@@ -81,6 +83,10 @@ hooks, env declarations), to the framework CLI pins, and hand edits to a
 fixture. It is cached, and reruns when the CLI build, the server build, the
 kit, the suite or the fixture changes. The `ci` script names it beside
 `conformance`, so a registry outage in the check never skips the lane.
+
+A `generatorPinned: false` fixture's check runs in `ci.yml`'s nightly run,
+which sets `CONFORMANCE_UNPINNED` and `TURBO_FORCE`. The switch is not part of
+the task's key, so a run without `--force` replays a pull request's skip.
 
 It does not catch:
 

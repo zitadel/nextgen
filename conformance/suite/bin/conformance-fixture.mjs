@@ -41,14 +41,30 @@ const DROPPED_FILES = new Set([
 ]);
 
 /**
- * Tooling that only the generated scripts a fixture drops (`lint`, `build`,
- * `preview`) would load, and its config files. Kept, it installs packages
- * nothing in the lane runs, which pnpm also hands other workspace packages as
- * their optional peers. Add a name here when a generator writes another; a
- * fixture has no list of its own.
+ * Tooling nothing a fixture keeps would load (only the generated scripts it
+ * drops, `lint`, `build` and `preview`, or an editor), and its config files.
+ * Kept, it installs packages nothing in the lane runs, which pnpm also hands
+ * other workspace packages as their optional peers. Add a name here when a
+ * generator writes another; a fixture has no list of its own.
  */
-const UNLOADED_DEPENDENCIES = new Set(["eslint", "eslint-config-next", "oxlint", "serve"]);
-const UNLOADED_FILES = new Set(["eslint.config.mjs", ".oxlintrc.json"]);
+const UNLOADED_DEPENDENCIES = new Set([
+  "@eslint/js",
+  "eslint",
+  "eslint-config-next",
+  "eslint-plugin-qwik",
+  "globals",
+  "oxlint",
+  "prettier",
+  "serve",
+  "typescript-eslint",
+  "typescript-plugin-css-modules",
+]);
+const UNLOADED_FILES = new Set([
+  "eslint.config.js",
+  "eslint.config.mjs",
+  ".oxlintrc.json",
+  ".prettierignore",
+]);
 
 function isDropped(path) {
   const [first] = path.split("/");
@@ -63,7 +79,7 @@ function isDropped(path) {
  * setup wrote against the SDK's types. That is a `check` script where the
  * generator writes one (sv), else the build-mode type-check its `build`
  * starts with (create-vite's `tsc -b`, or `vue-tsc -b` for a template with
- * single-file components).
+ * single-file components), else create-qwik's `build.types`.
  */
 function keptScripts(scripts) {
   const kept = {};
@@ -73,6 +89,8 @@ function keptScripts(scripts) {
     kept.typecheck = scripts.check;
   } else if (buildCheck) {
     kept.typecheck = `${buildCheck[1]} -b`;
+  } else if (scripts["build.types"]) {
+    kept.typecheck = scripts["build.types"];
   }
   return kept;
 }
@@ -181,6 +199,9 @@ async function normalizeManifest(text, settings, name) {
     name: _name,
     private: _private,
     version,
+    // The workspace's pnpm runs every fixture; a generator's own pin (`ng
+    // new` writes npm) makes corepack refuse `pnpm run dev`.
+    packageManager: _packageManager,
     scripts = {},
     dependencies,
     devDependencies,
@@ -333,10 +354,17 @@ function appFiles(app) {
     .sort();
 }
 
-/** The caller's environment without any Zitadel setting that could steer setup. */
+/**
+ * The caller's environment without any Zitadel setting that could steer setup,
+ * and without the `npm_*` variables of the package manager that started this
+ * script. npm reads an inherited `npm_config_user_agent` as its own, so under
+ * `pnpm run` every generator setup starts through `npx` would see pnpm and
+ * install with it (the TanStack CLI then writes a `pnpm-workspace.yaml`).
+ * Without them setup runs as from a plain shell, as `npx zitadel setup` does.
+ */
 function setupEnv() {
   const env = Object.fromEntries(
-    Object.entries(process.env).filter(([key]) => !/^(ZITADEL_|NEXTGEN_)/.test(key)),
+    Object.entries(process.env).filter(([key]) => !/^(ZITADEL_|NEXTGEN_|npm_)/.test(key)),
   );
   return { ...env, ZITADEL_TELEMETRY: "0", DO_NOT_TRACK: "1", NO_SKILLS_PROMPT: "1" };
 }
