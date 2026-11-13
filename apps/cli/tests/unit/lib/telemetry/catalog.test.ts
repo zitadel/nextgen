@@ -16,6 +16,7 @@ import {
 } from "@/lib/oclif/command-telemetry";
 import type { GlobalOptions } from "@/lib/oclif/types";
 import { VERCEL_MAX_PROPERTIES } from "@/lib/telemetry/vercel";
+import { keysOf } from "@tests/helpers/declarations";
 
 /**
  * `docs/product-analytics-events.yaml` is the contract for what the CLI may
@@ -94,25 +95,6 @@ function cliOf(catalog: Catalog) {
   return cli;
 }
 
-/** The keys an object literal names, spreads left out. */
-function literalKeys(node: ts.Expression | undefined): string[] {
-  if (!node || !ts.isObjectLiteralExpression(node)) {
-    return [];
-  }
-  return node.properties.flatMap((property) => {
-    if (ts.isShorthandPropertyAssignment(property)) {
-      return [property.name.text];
-    }
-    if (
-      ts.isPropertyAssignment(property) &&
-      (ts.isIdentifier(property.name) || ts.isStringLiteral(property.name))
-    ) {
-      return [property.name.text];
-    }
-    return [];
-  });
-}
-
 /** Every call in `file` that `matches` accepts. */
 async function callsIn(
   file: string,
@@ -157,7 +139,7 @@ async function recordedDimensions(): Promise<Map<string, Set<string>>> {
   const recorded = new Map<string, Set<string>>();
   for (const file of files) {
     const keys = (await callsIn(join(commandsDir, file), calls("recordTelemetry"))).flatMap(
-      (call) => literalKeys(call.arguments[0]),
+      (call) => keysOf(call.arguments[0]),
     );
     if (keys.length > 0) {
       const id = commandId(file);
@@ -186,7 +168,7 @@ async function lifecycleExtras(constant: string): Promise<string[]> {
   );
   return tracks.flatMap((track) => {
     const bag = track.arguments[1];
-    return bag && ts.isCallExpression(bag) ? literalKeys(bag.arguments[2]) : [];
+    return bag && ts.isCallExpression(bag) ? keysOf(bag.arguments[2]) : [];
   });
 }
 
