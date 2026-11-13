@@ -1762,10 +1762,11 @@ func (UnimplementedHandler) QueryUsers(ctx context.Context, req *QueryUsersReque
 // Declines a pending invitation for the signed-in user and returns the updated invitation with status
 // `rejected`.
 //
-// Send the plaintext token from the invitation link fragment. Metadata is cleared. The inviter cannot
-// decline their own invitation; an administrator cancels it instead. Every unknown or finished token
-// answers the same opaque `404`. Authenticate with a platform-project user session cookie
-// (`sessionCookie`). Cookie requests follow that scheme's CSRF rules. The call is rate-limited.
+// Send the plaintext token from the invitation link fragment. The invitation keeps its metadata for
+// administrators, but this response returns `metadata` as null. The inviter cannot decline their own
+// invitation; an administrator cancels it instead. Every unknown or finished token answers the same
+// opaque `404`. Authenticate with a platform-project user session cookie (`sessionCookie`). Cookie
+// requests follow that scheme's CSRF rules. The call is rate-limited.
 //
 // POST /invitations/reject
 func (UnimplementedHandler) RejectInvitation(ctx context.Context, req *InvitationTokenRequest) (r RejectInvitationRes, _ error) {

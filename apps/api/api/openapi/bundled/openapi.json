@@ -9355,7 +9355,7 @@
       "post": {
         "operationId": "rejectInvitation",
         "summary": "Decline an invitation",
-        "description": "Declines a pending invitation for the signed-in user and returns the\nupdated invitation with status `rejected`.\n\nSend the plaintext token from the invitation link fragment. Metadata is\ncleared. The inviter cannot decline their own invitation; an administrator\ncancels it instead. Every unknown or finished token answers the same\nopaque `404`.\nAuthenticate with a platform-project user session cookie (`sessionCookie`).\nCookie requests follow that scheme's CSRF rules. The call is rate-limited.\n",
+        "description": "Declines a pending invitation for the signed-in user and returns the\nupdated invitation with status `rejected`.\n\nSend the plaintext token from the invitation link fragment. The\ninvitation keeps its metadata for administrators, but this response\nreturns `metadata` as null. The inviter cannot decline their own invitation; an administrator\ncancels it instead. Every unknown or finished token answers the same\nopaque `404`.\nAuthenticate with a platform-project user session cookie (`sessionCookie`).\nCookie requests follow that scheme's CSRF rules. The call is rate-limited.\n",
         "tags": [
           "Invitations"
         ],
