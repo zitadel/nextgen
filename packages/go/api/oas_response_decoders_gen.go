@@ -15508,7 +15508,7 @@ func decodePublishSchemaResponse(resp *http.Response) (res PublishSchemaRes, _ e
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response CreateSchemaResponse
+			var response Schema
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -15524,6 +15524,15 @@ func decodePublishSchemaResponse(resp *http.Response) (res PublishSchemaRes, _ e
 					Err:         err,
 				}
 				return res, err
+			}
+			// Validate response.
+			if err := func() error {
+				if err := response.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return res, errors.Wrap(err, "validate")
 			}
 			return &response, nil
 		default:

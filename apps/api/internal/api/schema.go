@@ -32,7 +32,7 @@ func (h *Handler) PublishSchema(ctx context.Context, req api.PublishSchemaReq, p
 		if err != nil {
 			return nil, err
 		}
-		return &api.CreateSchemaResponse{ID: schema.URL}, nil
+		return domainSchemaToApiSchema(schema)
 	case api.SchemaURLPublishSchemaReq:
 		schema, err := h.schemaService.CreateSchemaByUrl(ctx,
 			service.CreateSchemaByURLInput{
@@ -43,7 +43,7 @@ func (h *Handler) PublishSchema(ctx context.Context, req api.PublishSchemaReq, p
 		if err != nil {
 			return nil, err
 		}
-		return &api.CreateSchemaResponse{ID: schema.URL}, nil
+		return domainSchemaToApiSchema(schema)
 	default:
 		return nil, unknownSchemaKindError
 	}

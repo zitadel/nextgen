@@ -322,9 +322,9 @@ type FlowDefinitionRecord = {
 
 /**
  * Server-side metadata wrapped around the schema body so the mock can answer
- * `POST /schemas` (returns id) and, for `GET /schemas/:schema_id` and `GET /schemas`,
- * build the `{id, schema, metadata}` envelope around the stored document
- * (list filterable by object_type).
+ * `POST /schemas`, `GET /schemas/:schema_id` and `GET /schemas` with the
+ * `{id, schema, metadata}` envelope around the stored document (list
+ * filterable by object_type).
  */
 type SchemaRecord = {
   id: string;
@@ -2950,15 +2950,20 @@ export function setupPlatformHandlers() {
 
       const schemaBody = raw as unknown as GetSchema200Schema;
       const id = `sch_${shortId()}`;
+      const createdAt = nowIso();
       store.schemas.set(id, {
         id,
         projectId: query.data.project_id,
         objectType: schemaObjectType(schemaBody),
-        createdAt: nowIso(),
+        createdAt,
         seq: ++store.lastSeq,
         body: schemaBody,
       });
-      const responseBody: PublishSchema201 = { id };
+      const responseBody: PublishSchema201 = {
+        id,
+        schema: schemaBody,
+        metadata: { created_at: createdAt },
+      };
       return HttpResponse.json(responseBody, { status: 201 });
     }),
 

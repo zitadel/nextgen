@@ -81,7 +81,7 @@ func TestCreateSchema(t *testing.T) {
 				resp, err := client.PublishSchema(t.Context(), req, params)
 				assert.NoError(t, err)
 
-				assert.IsType(t, &api.CreateSchemaResponse{}, resp, helpers.MustMarshal(t, resp))
+				assert.IsType(t, &api.Schema{}, resp, helpers.MustMarshal(t, resp))
 			})
 		}
 	})
@@ -391,8 +391,8 @@ func TestSchemaRevisions(t *testing.T) {
 					api.PublishSchemaParams{ProjectID: api.ProjectID(project.ID)},
 				)
 				require.NoError(t, err)
-				if assert.IsType(t, &api.CreateSchemaResponse{}, resp, helpers.MustMarshal(t, resp)) {
-					lastCreatedID = resp.(*api.CreateSchemaResponse).ID
+				if assert.IsType(t, &api.Schema{}, resp, helpers.MustMarshal(t, resp)) {
+					lastCreatedID = resp.(*api.Schema).ID
 				}
 			}
 
@@ -465,8 +465,8 @@ func TestSchemaKindFilter(t *testing.T) {
 		api.PublishSchemaParams{ProjectID: api.ProjectID(project.ID)},
 	)
 	require.NoError(t, err)
-	require.IsType(t, &api.CreateSchemaResponse{}, created, helpers.MustMarshal(t, created))
-	createdID := created.(*api.CreateSchemaResponse).ID
+	require.IsType(t, &api.Schema{}, created, helpers.MustMarshal(t, created))
+	createdID := created.(*api.Schema).ID
 
 	list := func(t *testing.T, params api.ListSchemasParams) []api.Schema {
 		t.Helper()
@@ -491,4 +491,50 @@ func TestSchemaKindFilter(t *testing.T) {
 	// The kind filter neither drops the schema nor adds anything to it: the same
 	// query without a kind returns the same single row.
 	assert.Len(t, list(t, base), 1)
+}
+
+// Publishing answers with the stored schema, so a caller needs no second read
+// to learn what the server kept: the answer is what getSchema returns.
+func TestPublishSchemaReturnsTheStoredSchema(t *testing.T) {
+	t.Parallel()
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+
+	sch := api.UserSchema{}
+	require.NoError(t, sch.UnmarshalJSON([]byte(fmt.Sprintf(
+		`{
+          "title": "published",
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "objectType": %q,
+          "metaSchema": "%s/user-schema.json",
+          "kind": "user-schema",
+          "type": "object",
+          "x-auth-methods": {
+            "passkey": { "enabled": true }
+          },
+          "properties": {
+            "givenName": { "type": "string" }
+          }
+        }`, "published-"+strings.ToLower(helpers.ProjectName()), helpers.BuiltinSchemaBaseURL))))
+
+	published, err := client.PublishSchema(
+		t.Context(),
+		api.PublishSchemaReq{Type: api.UserSchemaPublishSchemaReq, UserSchema: sch},
+		api.PublishSchemaParams{ProjectID: api.ProjectID(project.ID)},
+	)
+	require.NoError(t, err)
+	require.IsType(t, &api.Schema{}, published, helpers.MustMarshal(t, published))
+	created := published.(*api.Schema)
+	assert.NotEmpty(t, created.ID)
+	assert.False(t, created.Metadata.CreatedAt.IsZero(), "the answer carries when the schema was created")
+
+	read, err := client.GetSchema(t.Context(), api.GetSchemaParams{SchemaID: created.ID})
+	require.NoError(t, err)
+	require.IsType(t, &api.Schema{}, read, helpers.MustMarshal(t, read))
+	assert.JSONEq(t, helpers.MustMarshal(t, read), helpers.MustMarshal(t, created))
 }

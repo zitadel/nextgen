@@ -21256,24 +21256,6 @@ func (s *CreateReleaseRequest) SetGitDirty(val OptBool) {
 	s.GitDirty = val
 }
 
-// Ref: #
-type CreateSchemaResponse struct {
-	// The ID of the created schema.
-	ID string `json:"id"`
-}
-
-// GetID returns the value of ID.
-func (s *CreateSchemaResponse) GetID() string {
-	return s.ID
-}
-
-// SetID sets the value of ID.
-func (s *CreateSchemaResponse) SetID(val string) {
-	s.ID = val
-}
-
-func (*CreateSchemaResponse) publishSchemaRes() {}
-
 // CreateSessionErrorResponse represents sum type.
 type CreateSessionErrorResponse struct {
 	// Type selects the active sum variant, switch on this field.
@@ -96475,7 +96457,8 @@ func (s *Schema) SetMetadata(val SchemaMetadata) {
 	s.Metadata = val
 }
 
-func (*Schema) getSchemaRes() {}
+func (*Schema) getSchemaRes()     {}
+func (*Schema) publishSchemaRes() {}
 
 // Merged schema.
 // Ref: #

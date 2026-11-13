@@ -6,8 +6,9 @@ post:
     has and which attribute identifies the user.
 
     The request is either a user schema (`kind: user-schema`) or a schema URL
-    (`kind: schema-url`) that the server resolves. The response's `id` is what
-    `createUser` (`POST /users`) takes as `schema`.
+    (`kind: schema-url`) that the server resolves. The response is the stored
+    schema, as `getSchema` (`GET /schemas/{schema_id}`) returns it; its `id` is
+    what `createUser` (`POST /users`) takes as `schema`.
 
     The optional `$id` is the JSON Schema document URI that identifies the
     schema in later requests. It is a stable identity for GitOps, not a
@@ -51,16 +52,16 @@ post:
             externalValue: examples/default-human-user-schema.json
   responses:
     '201':
-      description: The ID of the created schema.
+      description: The published schema.
       content:
         application/json:
           schema:
-            $ref: create-schema-response.yaml
+            $ref: schema.yaml
           examples:
             userSchemaResponse:
               summary: |
-                An example of the response to creating a user schema.
-              externalValue: examples/create-user-schema-response-example.yaml
+                An example of the response to publishing a user schema.
+              externalValue: examples/published-schema-example.yaml
     default:
       $ref: publishSchema-error-response.yaml
 

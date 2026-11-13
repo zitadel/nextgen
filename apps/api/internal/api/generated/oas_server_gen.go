@@ -1356,7 +1356,8 @@ type Handler interface {
 	// identifies the user.
 	//
 	// The request is either a user schema (`kind: user-schema`) or a schema URL (`kind: schema-url`) that
-	// the server resolves. The response's `id` is what `createUser` (`POST /users`) takes as `schema`.
+	// the server resolves. The response is the stored schema, as `getSchema` (`GET /schemas/{schema_id}`)
+	// returns it; its `id` is what `createUser` (`POST /users`) takes as `schema`.
 	//
 	// The optional `$id` is the JSON Schema document URI that identifies the schema in later requests. It
 	// is a stable identity for GitOps, not a free-form resource key. When `$id` is omitted, the server
