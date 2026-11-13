@@ -197,7 +197,7 @@ async function copySharedTarballs(repoRoot, shared, tarballsDir, log) {
   log(`copying the shared npm tarballs from ${shared.tarballsDir}`);
   for (const dir of shared.dirs) {
     const name = await packageName(repoRoot, dir);
-    const file = `${name.replace(/^@/, "").replace("/", "-")}-${await packageVersion(repoRoot, dir)}.tgz`;
+    const file = `${name.replace(/^@/, "").replaceAll("/", "-")}-${await packageVersion(repoRoot, dir)}.tgz`;
     await copyFile(
       join(shared.tarballsDir, file),
       join(tarballsDir, file),

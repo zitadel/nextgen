@@ -37,7 +37,7 @@ await pMap(
   packages,
   async ({ tarball, manifest }) => {
     const body = publishBody(manifest, await readFile(tarball), registryUrl, ["alpha", "latest"]);
-    const response = await fetch(`${registryUrl}/${manifest.name.replace("/", "%2f")}`, {
+    const response = await fetch(`${registryUrl}/${manifest.name.replaceAll("/", "%2f")}`, {
       method: "PUT",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body),
