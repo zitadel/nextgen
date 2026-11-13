@@ -98,9 +98,10 @@ export class NotFound extends BaseCommand {
     // A real command with no subcommands followed by a word it does not take:
     // the command's own refusal. After one with subcommands, the word is a
     // subcommand that does not exist.
-    for (const prefix of Array.from({ length: words.length - 1 }, (_, drop) => {
-      return words.slice(0, words.length - 1 - drop);
+    for (const length of Array.from({ length: words.length - 1 }, (_, drop) => {
+      return words.length - 1 - drop;
     })) {
+      const prefix = words.slice(0, length);
       const exists = known.some(
         (c) => c.length === prefix.length && prefix.every((w, i) => c[i] === w),
       );
