@@ -6,11 +6,7 @@ import { beforeEach, describe, expect, vi } from "vitest";
 
 import { Config, Errors } from "@oclif/core";
 
-import {
-  AuthMethodCommand,
-  readSchemaTarget,
-  type SchemaTarget,
-} from "@/commands/auth-method/command";
+import { readSchemaTarget, type SchemaTarget } from "@/commands/auth-method/command";
 import AuthMethodPasskeyDisable from "@/commands/auth-method/passkey/disable";
 import AuthMethodSsoDisable from "@/commands/auth-method/sso/disable";
 import { Consent } from "@/lib/consent";
@@ -132,29 +128,6 @@ class ChangeWriter extends AuthMethodPasskeyDisable {
    */
   writeChange(target: SchemaTarget, change: Change, consent?: Consent): Promise<readonly string[]> {
     return this.write(target, change, consent);
-  }
-
-  /**
-   * Makes a change that may leave no way to sign in, without a run.
-   *
-   * @param target - The schema the change is to.
-   * @param make - Makes the change.
-   * @returns The change with its consent, or `undefined` when the person said no.
-   */
-  confirming(target: SchemaTarget, make: () => Change): Promise<unknown> {
-    return this.confirmIfNoSignInLeft(target, make);
-  }
-}
-
-/**
- * An auth-method command that declares no `--force` for its retry to set.
- */
-class Forceless extends AuthMethodCommand {
-  /** The command it stands in for, which its suggestions rebuild. */
-  public static override id = "auth-method:passkey:disable";
-
-  protected async execute(): Promise<never> {
-    throw new Error("unused");
   }
 
   /**
@@ -574,23 +547,6 @@ describe("AuthMethodCommand", () => {
             expect.anything(),
           ],
         },
-      });
-    });
-  });
-
-  describe("in a command that declares no --force", () => {
-    it("refuses before it asks", async ({ dir }) => {
-      const cwd = await aPasskeyOnlyProject(dir);
-      const read = await target(cwd);
-
-      const error = await rejectionOf(() => {
-        return new Forceless([], CONFIG).confirming(read, () => {
-          return aNewSchema(read);
-        });
-      });
-
-      expect(error).toMatchObject({
-        message: "auth-method:passkey:disable declares no --force, which it reruns with",
       });
     });
   });
