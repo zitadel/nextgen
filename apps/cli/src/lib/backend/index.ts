@@ -34,7 +34,13 @@ export {
   type AttemptProofResult,
   AuthAttemptService,
 } from "./services/auth-attempt";
-export { type BrandingRevision, BrandingService, type BrandingSummary } from "./services/branding";
+export {
+  type BrandingPage,
+  type BrandingQuery,
+  type BrandingRevision,
+  BrandingService,
+  type BrandingSummary,
+} from "./services/branding";
 export {
   type ClaimChallenge,
   type ClaimProgress,

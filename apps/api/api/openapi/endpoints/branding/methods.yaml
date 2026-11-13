@@ -47,12 +47,12 @@ get:
   operationId: listBranding
   x-zitadel-cli: branding list
   summary: List branding revisions
-  # Deliberately unpaginated in v1: list endpoints gain a real query
-  # mechanism together, and advertising pagination parameters the server
-  # ignores would be worse than none.
   description: |
-    Lists a project's branding revisions, newest first, capped at the 100 most
-    recent and not paginated. The first entry is the newest revision.
+    Lists a project's branding revisions, newest first, paginated with a cursor.
+    The first entry of the first page is the newest revision.
+
+    Every publish adds a revision, so the list grows without bound. Pass
+    `next_page_token` back as `page_token` to read the next page.
 
     The `id` of an entry is the revision ID that `getBranding` (`GET /branding/{branding_id}`) takes and
     that a release pins for `kind: branding`.
@@ -60,16 +60,34 @@ get:
     - Branding
   parameters:
     - $ref: ../../components/parameters/project-id.yaml
+    - $ref: ../../components/parameters/limit.yaml
+    - $ref: ../../components/parameters/page-token.yaml
   security:
     - oauth2:
         - branding.read
     - sessionCookie: []
   responses:
     '200':
-      description: The branding revisions, newest first.
+      description: A page of the project's branding revisions.
       content:
         application/json:
           schema:
             $ref: list-branding-response.yaml
+          examples:
+            firstPage:
+              summary: A page with more results behind it
+              value:
+                branding:
+                  - id: brnd_01KX3RG8A7F0N9WD3P2E4YM5C1
+                    created_at: '2026-07-14T09:11:00Z'
+                  - id: brnd_01KX2ZJ4B8C7F0N9WD3P2E4YM5
+                    created_at: '2026-07-02T15:40:00Z'
+                next_page_token: v1.dGhpcyBpcyBvcGFxdWU.SflKxwRJSMeKKF2QT4fw
+            lastPage:
+              summary: The last page
+              value:
+                branding:
+                  - id: brnd_01KWH1P4MYS7F0N9WD3P2E4YM5
+                    created_at: '2026-06-20T08:00:00Z'
     default:
       $ref: listBranding-error-response.yaml

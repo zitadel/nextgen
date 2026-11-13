@@ -11817,8 +11817,11 @@ func (s *Server) handleGetVariableRequest(args [1]string, argsEscaped bool, w ht
 
 // handleListBrandingRequest handles listBranding operation.
 //
-// Lists a project's branding revisions, newest first, capped at the 100 most recent and not paginated.
-// The first entry is the newest revision.
+// Lists a project's branding revisions, newest first, paginated with a cursor. The first entry of the
+// first page is the newest revision.
+//
+// Every publish adds a revision, so the list grows without bound. Pass `next_page_token` back as
+// `page_token` to read the next page.
 //
 // The `id` of an entry is the revision ID that `getBranding` (`GET /branding/{branding_id}`) takes and
 // that a release pins for `kind: branding`.
@@ -11984,6 +11987,14 @@ func (s *Server) handleListBrandingRequest(args [0]string, argsEscaped bool, w h
 					Name: "project_id",
 					In:   "query",
 				}: params.ProjectID,
+				{
+					Name: "limit",
+					In:   "query",
+				}: params.Limit,
+				{
+					Name: "page_token",
+					In:   "query",
+				}: params.PageToken,
 			},
 			Raw: r,
 		}

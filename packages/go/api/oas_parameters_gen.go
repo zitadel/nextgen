@@ -523,6 +523,12 @@ type ListBrandingParams struct {
 	// as "Project id" in its summary and as `project_id` with `--json`, and writes it to `.env.local` as
 	// `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
+	// Maximum number of items to return.
+	Limit OptLimit `json:",omitempty,omitzero"`
+	// Token for fetching the next page of results. Obtain this value from `next_page_token` in the
+	// previous response. Omit to start from the beginning. Its format is opaque and may change between
+	// releases.
+	PageToken OptPageToken `json:",omitempty,omitzero"`
 }
 
 // ListDeploymentVariablesParams is parameters of listDeploymentVariables operation.

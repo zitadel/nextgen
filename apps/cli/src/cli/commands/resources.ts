@@ -994,16 +994,16 @@ export const RESOURCES = {
     heading: "id",
     detail: ["id", "created_at"],
     list: list({
-      // `GET /branding` answers with the array itself and takes no cursor, so
-      // the paging flags are not generated for it.
-      paged: false,
-      item: ListBrandingResponse.element,
-      call: ({ client, projectId }) => {
+      item: ListBrandingResponse.shape.branding.element,
+      call: ({ client, projectId }: Platform, params: Query<"listBranding">) => {
         const brandingService = new BrandingService(client, projectId);
-        return brandingService.list();
+        return brandingService.page(params);
       },
       items: (page) => {
-        return page;
+        return page.items;
+      },
+      next: (page) => {
+        return page.next;
       },
     }),
     get: get({

@@ -333,9 +333,45 @@ func TestBranding(t *testing.T) {
 			require.NoError(t, err)
 			require.IsType(t, &api.ListBrandingResponse{}, listResp, "list branding: %s", helpers.MustMarshal(t, listResp))
 			list := listResp.(*api.ListBrandingResponse)
-			require.Len(t, *list, 2)
-			assert.Equal(t, rev2.ID, (*list)[0].ID)
-			assert.Equal(t, rev1.ID, (*list)[1].ID)
+			require.Len(t, list.Branding, 2)
+			assert.Equal(t, rev2.ID, list.Branding[0].ID)
+			assert.Equal(t, rev1.ID, list.Branding[1].ID)
+			assert.False(t, list.NextPageToken.Set, "expected no next_page_token when the page holds every revision")
+		})
+
+		t.Run("list pages through the revisions", func(t *testing.T) {
+			firstResp, err := client.ListBranding(t.Context(), api.ListBrandingParams{
+				ProjectID: api.ProjectID(project.ID),
+				Limit:     api.NewOptLimit(1),
+			})
+			require.NoError(t, err)
+			require.IsType(t, &api.ListBrandingResponse{}, firstResp, "first page: %s", helpers.MustMarshal(t, firstResp))
+			first := firstResp.(*api.ListBrandingResponse)
+			require.Len(t, first.Branding, 1)
+			assert.Equal(t, rev2.ID, first.Branding[0].ID)
+			require.True(t, first.NextPageToken.Set, "expected a next_page_token on a short first page")
+
+			lastResp, err := client.ListBranding(t.Context(), api.ListBrandingParams{
+				ProjectID: api.ProjectID(project.ID),
+				Limit:     api.NewOptLimit(1),
+				PageToken: api.NewOptPageToken(first.NextPageToken.Value),
+			})
+			require.NoError(t, err)
+			require.IsType(t, &api.ListBrandingResponse{}, lastResp, "last page: %s", helpers.MustMarshal(t, lastResp))
+			last := lastResp.(*api.ListBrandingResponse)
+			require.Len(t, last.Branding, 1)
+			assert.Equal(t, rev1.ID, last.Branding[0].ID)
+			assert.False(t, last.NextPageToken.Set, "expected no next_page_token on the final page")
+		})
+
+		t.Run("list refuses a page token it did not issue", func(t *testing.T) {
+			resp, err := client.ListBranding(t.Context(), api.ListBrandingParams{
+				ProjectID: api.ProjectID(project.ID),
+				PageToken: api.NewOptPageToken("not-a-cursor"),
+			})
+			require.NoError(t, err)
+			require.IsType(t, &api.ListBrandingErrorResponseStatusCode{}, resp, "bad token: %s", helpers.MustMarshal(t, resp))
+			assert.Equal(t, 400, resp.(*api.ListBrandingErrorResponseStatusCode).StatusCode)
 		})
 	})
 
