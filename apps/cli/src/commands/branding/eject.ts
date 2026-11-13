@@ -76,7 +76,7 @@ async function readsDesign(
   command: unknown,
   definition: { name: string },
 ): Promise<string> {
-  const design = await reads<string>({
+  const design = await reads({
     schema: filled,
     refusal: {
       message: "{input} was given an empty value",

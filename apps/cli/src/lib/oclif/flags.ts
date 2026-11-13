@@ -1,8 +1,21 @@
 import { Args, Flags } from "@oclif/core";
+import type { IsNever } from "type-fest";
 import { type ZodType, z } from "zod";
+
+import type { Suggestion } from "@/lib/suggestion";
 
 import type { Placeholders, ValueNames } from "./refusal";
 import { type Refusal, refusalError } from "./refusal";
+
+/**
+ * A refusal a flag or argument raises as its value parses. Its `next` entries
+ * are follow-ups and never a whole `{name}` placeholder: {@link read} has no
+ * `next` values to fill one with, so the follow-up would quietly drop out of
+ * the error.
+ */
+export interface ParseRefusal extends Refusal {
+  readonly next?: readonly Suggestion[];
+}
 
 /**
  * What a flag or argument is refused for, with the schema that decides it.
@@ -10,49 +23,87 @@ import { type Refusal, refusalError } from "./refusal";
  * was typed, `{input}` naming what took it (`--client-id`, or an argument's
  * name), `{problem}`, the first thing the schema found wrong, and anything
  * else `values` holds, such as the bounds the wording quotes.
+ *
+ * @typeParam T - What the value parses to.
  */
 export type Refused<T> = Readonly<{
   schema: ZodType<T, string>;
-  refusal: Refusal;
+  refusal: ParseRefusal;
   values?: Placeholders;
 }>;
 
-/** What {@link read} fills in every flag's and argument's refusal. */
+/** The names {@link read} fills in every flag's and argument's refusal. */
 type Parsed = "value" | "input" | "problem";
 
 /**
- * `Declared`, unless its refusal asks for a name neither the parser nor its
- * own `values` fills: then it must also carry that value, so leaving it out
- * does not compile. A refusal whose wording is only known as `string` is
- * checked by a test instead.
+ * The names a declaration's refusal asks for that neither {@link read} nor the
+ * declaration's own `values` fills.
+ *
+ * @typeParam Declared - A flag's or argument's declaration, as it is written.
  */
-type Filled<Declared> = Declared extends { readonly refusal: infer R }
-  ? [
-      Exclude<
-        ValueNames<R>,
-        Parsed | (Declared extends { readonly values: infer Values } ? keyof Values : never)
-      >,
-    ] extends [never]
-    ? Declared
-    : Declared & {
-        readonly values: {
-          readonly [Name in Exclude<ValueNames<R>, Parsed>]: NonNullable<unknown>;
-        };
-      }
-  : Declared;
+type Unfilled<Declared> = Exclude<
+  ValueNames<Declared extends { readonly refusal: infer R } ? R : never>,
+  Parsed | (Declared extends { readonly values: infer Values } ? keyof Values : never)
+>;
 
+/**
+ * What a declaration must hold besides itself for its refusal to read whole:
+ * nothing when {@link read} and its own `values` fill every name its wording
+ * asks for, and otherwise a value in `values` for each name left
+ * ({@link Unfilled}), so leaving one out does not compile.
+ *
+ * @typeParam Declared - A flag's or argument's declaration, as it is written.
+ */
+type Filled<Declared> =
+  IsNever<Unfilled<Declared>> extends true
+    ? unknown
+    : {
+        readonly values: {
+          readonly [Name in Unfilled<Declared>]: NonNullable<unknown> | null;
+        };
+      };
+
+/**
+ * A declaration as {@link reads} and {@link taken} take it: refused as `T`,
+ * and filling everything its refusal asks for. `Declared` stands on its own so
+ * the compiler infers it from the declaration as written, an inline object
+ * included, and reads its wording.
+ *
+ * @typeParam T - What the value parses to.
+ * @typeParam Declared - The declaration, as it is written.
+ */
+type Declaration<T, Declared> = Declared & Refused<T> & Filled<Declared>;
+
+/**
+ * The `parse` oclif calls with the value a flag or an argument was given.
+ *
+ * @typeParam T - What the value parses to.
+ */
+type Parse<T> = (value: string, command: unknown, definition: { name: string }) => Promise<T>;
+
+/**
+ * `value` as `refused` parses it, or the refusal it is refused with.
+ *
+ * @typeParam T - What the value parses to.
+ * @param refused - What the flag or argument is refused for.
+ * @param value - The value, as it was typed.
+ * @param input - What took it, as the refusal names it: `--client-id`, or an
+ *   argument's name.
+ * @returns The parsed value.
+ * @throws {ZitadelError} The declaration's refusal, when the schema refuses
+ *   the value.
+ */
 function read<T>(refused: Refused<T>, value: string, input: string): T {
   const parsed = refused.schema.safeParse(value);
   if (parsed.success) {
     return parsed.data;
   }
-  const refusal: Refusal = refused.refusal;
-  throw refusalError(refusal, {
-    ...refused.values,
+  const filled = {
     value,
     input,
     problem: parsed.error.issues[0]?.message ?? "it is not valid",
-  });
+  } satisfies Record<Parsed, string>;
+  throw refusalError(refused.refusal, { ...refused.values, ...filled });
 }
 
 /**
@@ -66,20 +117,35 @@ function read<T>(refused: Refused<T>, value: string, input: string): T {
  * Refusing during parse rather than in the command puts it at the same point
  * oclif's own refusal lands, so a missing value and an unusable one fail the
  * same way, and the value the command is handed is already the parsed type.
+ *
+ * @typeParam T - What the value parses to.
+ * @typeParam Declared - The declaration, as it is written. It is always
+ *   inferred, so its wording is checked against what fills it.
+ * @param refused - What the flag is refused for.
+ * @returns The `parse`, which names the value `--<flag>` in the refusal.
  */
-export function reads<T, const Declared extends Refused<T> = Refused<T>>(
-  refused: Filled<Declared> & Refused<T>,
-) {
-  return async (value: string, _command: unknown, definition: { name: string }): Promise<T> => {
+export function reads<T, const Declared extends Refused<T>>(
+  refused: Declaration<T, Declared>,
+): Parse<T> {
+  return async (value, _command, definition) => {
     return read(refused, value, `--${definition.name}`);
   };
 }
 
-/** The `parse` an argument gives `Args.custom`, named as it is. See {@link reads}. */
-export function taken<T, const Declared extends Refused<T> = Refused<T>>(
-  refused: Filled<Declared> & Refused<T>,
-) {
-  return async (value: string, _command: unknown, definition: { name: string }): Promise<T> => {
+/**
+ * The `parse` an argument gives `Args.custom`: {@link reads}, with the value
+ * named by the argument's own name in the refusal.
+ *
+ * @typeParam T - What the value parses to.
+ * @typeParam Declared - The declaration, as it is written. It is always
+ *   inferred, so its wording is checked against what fills it.
+ * @param refused - What the argument is refused for.
+ * @returns The `parse`.
+ */
+export function taken<T, const Declared extends Refused<T>>(
+  refused: Declaration<T, Declared>,
+): Parse<T> {
+  return async (value, _command, definition) => {
     return read(refused, value, definition.name);
   };
 }

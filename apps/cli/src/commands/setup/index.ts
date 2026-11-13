@@ -89,7 +89,7 @@ import {
 } from "@/lib/oclif";
 import { Destructive } from "@/lib/oclif/destructive";
 import { projectEnvFile } from "@/lib/oclif/environment-flags";
-import { filled, type Refused, reads, whole } from "@/lib/oclif/flags";
+import { filled, type ParseRefusal, type Refused, reads, whole } from "@/lib/oclif/flags";
 import { asStepsShown } from "@/lib/oclif/next-steps";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { painted } from "@/lib/oclif/rendering";
@@ -899,8 +899,8 @@ function made<T>(parse: (value: string) => Parsed<T>) {
  * The `parse` of a flag that refuses an empty value as any flag does, and
  * everything else as `refused` words it.
  */
-function readsFilled<T>(refused: Refused<T>, empty: Refusal = EMPTY_SETTING) {
-  const blank = reads<string>({
+function readsFilled<T>(refused: Refused<T>, empty: ParseRefusal = EMPTY_SETTING) {
+  const blank = reads({
     schema: filled,
     refusal: empty,
   });

@@ -176,6 +176,7 @@ describe("a refusal a flag or argument is built with", () => {
     schema: z.string(),
     refusal: { message: "{input} takes at most {max} characters" },
   } as const;
+  const LIMITED_FILLED = { ...LIMITED, values: { max: 3 } } as const;
 
   it("does not compile without a value only its declaration can fill", () => {
     // @ts-expect-error nothing fills {max}
@@ -184,6 +185,40 @@ describe("a refusal a flag or argument is built with", () => {
     taken(LIMITED);
 
     expect(reads({ ...LIMITED, values: { max: 3 } })).toBeTypeOf("function");
+  });
+
+  it("does not compile without that value when the declaration is written inline", () => {
+    // @ts-expect-error nothing fills {max}
+    reads({ schema: z.string(), refusal: { message: "{input} takes at most {max} characters" } });
+    // @ts-expect-error nothing fills {max}
+    taken({ schema: z.string(), refusal: { message: "{input} takes at most {max} characters" } });
+
+    expect(
+      taken({
+        schema: z.string(),
+        refusal: { message: "{input} takes at most {max} characters" },
+        values: { max: 3 },
+      }),
+    ).toBeTypeOf("function");
+  });
+
+  it("does not compile with a type argument that would leave the wording unread", () => {
+    // @ts-expect-error the declaration is always inferred, so its wording is read
+    reads<string>(LIMITED);
+
+    expect(reads(LIMITED_FILLED)).toBeTypeOf("function");
+  });
+
+  it("does not compile with a next entry the parse has nothing to fill", () => {
+    // @ts-expect-error a flag's refusal has no next values to fill {fix} with
+    reads({ schema: z.string(), refusal: { message: "{input} is wrong", next: ["{fix}"] } });
+
+    expect(
+      reads({
+        schema: z.string(),
+        refusal: { message: "{input} is wrong", next: [{ id: "start" }] },
+      }),
+    ).toBeTypeOf("function");
   });
 });
 
