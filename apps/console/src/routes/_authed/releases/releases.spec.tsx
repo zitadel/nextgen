@@ -278,10 +278,7 @@ describe("release detail", () => {
       targets: [{ origin: "https://acme-k3x9v2.vercel.app", expires_at: "2026-10-09T14:52:00Z" }],
       deployed_at: "2026-10-03T09:00:00Z",
     });
-    // The history also holds another release's deployment, which the card
-    // leaves out.
-    const other = deployment("dep_9", { release_id: "rel_2" });
-    serveDeployments([preview, deployment("dep_1", { status: "inactive" }), other]);
+    serveDeployments([preview, deployment("dep_1", { status: "inactive" })]);
     await renderAt("/releases/rel_1");
 
     const card = (await screen.findByText("Deployment of this release")).closest(
@@ -314,19 +311,17 @@ describe("release detail", () => {
     expect(await screen.findByText("This release has not been deployed.")).toBeInTheDocument();
   });
 
-  it("reads every page of the history for the release's own deployments", async () => {
+  it("asks for the release's own deployments, page after page", async () => {
     server.use(http.get(`${RELEASES_URL}/rel_1`, () => HttpResponse.json(release())));
     servePointers();
-    // The release's second deployment sits on the second page of the
-    // project's history, behind one of another release.
+    const asked: (string | null)[] = [];
     server.use(
       http.get(DEPLOYMENTS_URL, ({ request }) => {
-        return new URL(request.url).searchParams.get("page_token") === "next"
-          ? HttpResponse.json({ deployments: [deployment("dep_2")] })
-          : HttpResponse.json({
-              deployments: [deployment("dep_9", { release_id: "rel_2" })],
-              next_page_token: "next",
-            });
+        const params = new URL(request.url).searchParams;
+        asked.push(params.get("release_id"));
+        return params.get("page_token") === "next"
+          ? HttpResponse.json({ deployments: [deployment("dep_1", { status: "inactive" })] })
+          : HttpResponse.json({ deployments: [deployment("dep_2")], next_page_token: "next" });
       }),
     );
     await renderAt("/releases/rel_1");
@@ -334,8 +329,8 @@ describe("release detail", () => {
     const card = (await screen.findByText("Deployment of this release")).closest(
       "[data-slot=card]",
     ) as HTMLElement;
-    expect(within(card).getAllByRole("list")).toHaveLength(1);
-    expect(within(card).getByRole("link", { name: "https://app.acme.com" })).toBeInTheDocument();
+    expect(within(card).getAllByRole("list")).toHaveLength(2);
+    expect(asked).toEqual(["rel_1", "rel_1"]);
   });
 
   it("names the selected project on every read", async () => {
