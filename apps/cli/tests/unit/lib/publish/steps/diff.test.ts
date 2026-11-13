@@ -79,6 +79,11 @@ function aRunIn(
           return live.map((deployment, index) => {
             return aDeployment({
               id: `dep_${index}`,
+              kind: deployment.targets.some((target) => {
+                return target.expires_at !== undefined;
+              })
+                ? "preview"
+                : "primary",
               targets: deployment.targets,
               release_id: deployment.release ?? "rel_1",
               release: {
