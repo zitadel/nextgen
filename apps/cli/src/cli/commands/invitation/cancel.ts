@@ -1,6 +1,6 @@
 import { Args, Flags } from "@oclif/core";
 
-import { type Invitation, InvitationService } from "@/lib/backend";
+import { type Invitation, InvitationService, invitationGrant, invitationRole } from "@/lib/backend";
 import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "@/lib/oclif";
 import { dryRunResult } from "@/lib/oclif/crud/shared";
 import { Destructive } from "@/lib/oclif/destructive";
@@ -24,6 +24,9 @@ const INVITATION_ID: Refused<string> = {
   },
 };
 
+/** The product event a cancel sends once the API confirms it (ADR 086, amended). */
+const INVITATION_CANCELLED = "invitation_cancelled";
+
 /**
  * How a bare cancel is refused when it cannot pick: a dry run must not read the
  * server, and a run with nobody to ask would read it only to refuse.
@@ -31,6 +34,13 @@ const INVITATION_ID: Refused<string> = {
 const NO_ID_REFUSAL = {
   message: "Name the invitation to cancel",
   hint: "Pass its id; find one with `zitadel invitation list --status pending`.",
+  next: [{ id: "invitation:list", flags: { status: "pending" } }],
+} as const satisfies Refusal;
+
+/** How a cancel of an invitation that has already finished is refused. */
+const NOT_PENDING_REFUSAL = {
+  message: "{id} is {status}, so there is nothing to cancel",
+  hint: "Only a pending invitation can be cancelled.",
   next: [{ id: "invitation:list", flags: { status: "pending" } }],
 } as const satisfies Refusal;
 
@@ -72,13 +82,16 @@ export default class InvitationCancel extends Destructive(EnvironmentCommand) {
     if (args.invitationId === undefined && (this.dryRun || this.nonInteractive)) {
       throw refusalError(NO_ID_REFUSAL, {});
     }
-    const invitationId = args.invitationId ?? (await this.pickPending());
+    const target = args.invitationId ?? (await this.pickPending());
+    const invitationId = typeof target === "string" ? target : target.id;
 
     return this.emit(
       await this.confirmed({
         verb: "cancel",
         name: `cancel ${invitationId}`,
-        message: `Cancel ${invitationId} so its link stops working?`,
+        message: ({ invitation }) => {
+          return `Cancel ${describe(invitation)} so its link stops working?`;
+        },
         // A bare cancel picked its invitation, which a retry must name.
         arguments: [invitationId],
         preview: async () => {
@@ -89,16 +102,30 @@ export default class InvitationCancel extends Destructive(EnvironmentCommand) {
             next: await this.realRun(),
           });
         },
-        prepare: () => {
-          return this.connect();
+        // A dry run stops before this, so it needs no connection: the read
+        // that names a named invitation in the question happens here.
+        prepare: async () => {
+          const connection = await this.connect();
+          const invitation =
+            typeof target === "string"
+              ? await this.readPending(
+                  new InvitationService(connection.client, connection.projectId),
+                  target,
+                )
+              : target;
+          return { ...connection, invitation };
         },
-        apply: async (consent, { client, projectId }) => {
+        apply: async (consent, { client, projectId, invitation }) => {
           const unlocked = new InvitationService(consent.unlock(client), projectId);
-          await unlocked.cancel(invitationId);
-          const title = `Cancelled ${escapeControlCharacters(invitationId)}; its link no longer works`;
+          await unlocked.cancel(invitation.id);
+          this.trackEvent(INVITATION_CANCELLED, {
+            role: invitationGrant(invitation),
+            invitation_journey_id: invitation.journey_id,
+          });
+          const title = `Cancelled ${escapeControlCharacters(invitation.id)}; its link no longer works`;
           return {
             status: "ok",
-            data: deletedData({ title, id: invitationId }),
+            data: deletedData({ title, id: invitation.id }),
             summary: {
               title,
               sections: [],
@@ -113,10 +140,9 @@ export default class InvitationCancel extends Destructive(EnvironmentCommand) {
    * The pending invitation a person picks when the command line named none.
    * A script is told to name one instead.
    */
-  private async pickPending(): Promise<string> {
+  private async pickPending(): Promise<Invitation> {
     const { client, projectId } = await this.connect();
-    const invitationService = new InvitationService(client, projectId);
-    const pending = await invitationService.pending();
+    const pending = await new InvitationService(client, projectId).pending();
     if (pending.length === 0) {
       throw refusalError(NOTHING_PENDING_REFUSAL, {});
     }
@@ -126,13 +152,41 @@ export default class InvitationCancel extends Destructive(EnvironmentCommand) {
       retry: this.suggest({ id: "invitation:list", flags: { status: "pending" } }),
       options: pending.map((invitation) => {
         return {
-          value: invitation.id,
+          value: invitation,
           label: invitation.id,
           hint: pendingHint(invitation),
         };
       }),
     });
   }
+
+  /**
+   * The invitation the command line named, read before anyone is asked, so
+   * the question can name it and one that is no longer pending is refused:
+   * the server answers that cancel with the same 404 as a miss.
+   */
+  private async readPending(
+    invitationService: InvitationService,
+    invitationId: string,
+  ): Promise<Invitation> {
+    const invitation = await invitationService.get(invitationId);
+    if (invitation.status !== "pending") {
+      throw refusalError(NOT_PENDING_REFUSAL, {
+        id: invitation.id,
+        status: invitation.status,
+      });
+    }
+    return invitation;
+  }
+}
+
+/** The invitation as the question names it: its id, who it is for, and the role. */
+function describe(invitation: Invitation): string {
+  const whom = invitation.metadata?.name;
+  const role = invitationRole(invitation);
+  return whom === undefined
+    ? `${invitation.id} (${role})`
+    : `${invitation.id} for ${whom} (${role})`;
 }
 
 /** Who a pending invitation is for and when it expires, beside its id in the picker. */

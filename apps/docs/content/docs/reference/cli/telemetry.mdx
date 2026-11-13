@@ -12,6 +12,8 @@ Every command sends two events to Vercel Web Analytics on the Zitadel cloud (`pr
 - `cli_command_started`, once the command has read its flags.
 - `cli_command_completed` when it finishes, or `cli_command_failed` when it fails.
 
+`invitation create` also sends `invitation_created` once the server has made the invitation, and `invitation cancel` sends `invitation_cancelled` once it has cancelled one.
+
 Each event keeps at most eight properties:
 
 | Property | What it holds |
@@ -70,8 +72,9 @@ Some commands add what they did, as counts and fixed values:
 | `claim` | How the claim ended, how often it polled, and whether it opened a browser. |
 | `variables` | Whether a variable is secret, and how many `list` found, never a name or a value. |
 | `branding eject` | The design it ejected. |
-| `invitation create` | The role it invited someone into, and whether it replaced an invitation, never a name, an ID or the link. |
 | `api` | The operation it called, and whether it followed pagination. |
+
+`invitation_created` and `invitation_cancelled` carry the role the invitation grants, such as `project_editor`, and its journey ID: a random ID the invitation and its replacements share, so the time to accept can be measured. They never carry the name you gave, the invitation ID or the link. Their Vercel copies keep only the eight properties above.
 
 Mixpanel is told not to locate you by your IP address (`ip: 0`); the country comes from your timezone instead.
 

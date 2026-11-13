@@ -76,7 +76,7 @@ describe("invitation cancel", () => {
 
         const result = await app.run(["invitation", "cancel", invitation, "--force", "--json"]);
 
-        expect(result).toFailWith("E_NOT_FOUND");
+        expect(result).toFailWith("E_VALIDATION");
       });
 
       it("refuses an invitation the project does not hold", async () => {
