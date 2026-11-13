@@ -173,6 +173,16 @@ export function devCommandFor(packageManager: PackageManager): PackageCommand {
 }
 
 /**
+ * Runs one of the project's `package.json` scripts.
+ */
+export function runScriptCommandFor(
+  packageManager: PackageManager,
+  script: string,
+): PackageCommand {
+  return command(packageManager, "run", [script]);
+}
+
+/**
  * The flag that runs a package manager in another directory, and whether a
  * relative directory may be given to it: npm's `--prefix` and pnpm's `--dir`
  * read one from the shell's directory, while bun documents `--cwd` as an
