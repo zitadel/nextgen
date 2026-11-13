@@ -22,6 +22,10 @@ import Eject from "./cli/commands/eject";
 import Env from "./cli/commands/env/index";
 import EnvAdd from "./cli/commands/env/add";
 import EnvList from "./cli/commands/env/list";
+import InvitationCancel from "./cli/commands/invitation/cancel";
+import InvitationCreate from "./cli/commands/invitation/create";
+import InvitationGet from "./cli/commands/invitation/get";
+import InvitationList from "./cli/commands/invitation/list";
 import Logs from "./cli/commands/logs";
 import OriginAdd from "./cli/commands/origin/add";
 import OriginList from "./cli/commands/origin/list";
@@ -88,6 +92,10 @@ export const WORKFLOW_COMMANDS = {
   "deployment:rollback": DeploymentRollback,
   "env:add": EnvAdd,
   "env:list": EnvList,
+  "invitation:cancel": InvitationCancel,
+  "invitation:create": InvitationCreate,
+  "invitation:get": InvitationGet,
+  "invitation:list": InvitationList,
   "origin:add": OriginAdd,
   "origin:list": OriginList,
   "origin:rm": OriginRm,

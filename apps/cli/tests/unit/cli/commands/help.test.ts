@@ -65,6 +65,9 @@ Configuration and releases
   schemas           View user schemas
   variable          Manage project variables
 
+Project administration
+  invitation        Invite people into the project with a link
+
 Diagnostics and utilities
   doctor            Verify local runtime and project state
   upgrade           Upgrade this project to the latest Zitadel release

@@ -57,8 +57,6 @@ const NOT_RESOURCES: Readonly<Record<string, string>> = {
   // Registered applications are written through the API by other systems,
   // not from `.zitadel/`; the CLI has no command for them yet (#2788).
   applications: "registered applications are written through the API, not the CLI (#2788)",
-  // OpenAPI contract lands first (#2849); CLI commands follow in #2858.
-  invitations: "not yet exposed — `zitadel invitation` lands with #2858",
   search: "finds resources across types (ADR 087); a `zitadel search` command is not built yet",
   // OAuth settings are written only through a release, so there is nothing to
   // create or update here; reading them is `zitadel oauth`'s, which comes with
@@ -147,13 +145,10 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   removeOrigin:
     "not yet exposed — `zitadel origin remove` lands with the origins CLI surface (#1578)",
   listProjectAdmins: "not yet exposed; a project sub-resource listing, no command reads it yet",
-  createInvitation: "not yet exposed — `zitadel invitation create` lands with #2858",
-  listInvitations: "not yet exposed — `zitadel invitation list` lands with #2858",
-  getInvitation: "not yet exposed — `zitadel invitation get` lands with #2858",
-  cancelInvitation: "not yet exposed — `zitadel invitation cancel` lands with #2858",
-  lookupInvitation: "token redeem; CLI exempt (ADR 086 §8)",
-  acceptInvitation: "token redeem; CLI exempt (ADR 086 §8)",
-  rejectInvitation: "token redeem; CLI exempt (ADR 086 §8)",
+  // Redeeming a link is the invitee's, in the browser, on their own session.
+  lookupInvitation: "redeems a link in the browser; no command (ADR 086 §8)",
+  acceptInvitation: "redeems a link in the browser; no command (ADR 086 §8)",
+  rejectInvitation: "redeems a link in the browser; no command (ADR 086 §8)",
 };
 
 const capitalize = (word: string): string => `${word[0]?.toUpperCase() ?? ""}${word.slice(1)}`;
@@ -227,6 +222,9 @@ const STANDALONE: Readonly<Record<string, readonly string[]>> = {
   // `preview rm` removes one. `preview` reaches the release/deployment
   // operations through the `lib/backend` wrappers scanned above.
   previews: ["preview/index", "preview/list", "preview/rm"],
+  // An invitation is made, read and cancelled but never updated, and `create`
+  // asks questions the registry's create does not (ADR 086 §8).
+  invitations: ["invitation/create", "invitation/list", "invitation/get", "invitation/cancel"],
 };
 
 /**
@@ -302,6 +300,7 @@ const standaloneCommandOperations = async (): Promise<ReadonlyMap<string, Readon
     origin: ["services/origin.ts"],
     variables: ["services/variable.ts", "services/deployment.ts", "services/origin.ts"],
     previews: ["services/preview.ts", "services/origin.ts"],
+    invitations: ["services/invitation.ts"],
   };
   return new Map(
     await Promise.all(

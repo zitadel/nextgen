@@ -1,5 +1,6 @@
 post:
   operationId: createInvitation
+  x-zitadel-cli: invitation create
   summary: Create an invitation
   description: |
     Creates an invitation for a project, or replaces an existing one, and
@@ -114,6 +115,7 @@ post:
 
 get:
   operationId: listInvitations
+  x-zitadel-cli: invitation list
   summary: List invitations
   description: |
     Lists a project's invitations, newest first, in any status, paginated with

@@ -2,9 +2,10 @@
  * The groups the root help lists commands under, declared in print order and
  * named for what a developer is trying to do: get going, work against a local
  * server, manage who can sign in and how, change the project's configuration,
- * or check on it. Every command declares its own group (`static group` on the
- * class) so nothing has to be registered centrally; oclif's own utilities
- * (`autocomplete`, `search`, …) declare none and are listed with the last group.
+ * administer who works on the project, or check on it. Every command declares
+ * its own group (`static group` on the class) so nothing has to be registered
+ * centrally; oclif's own utilities (`autocomplete`, `search`, …) declare none
+ * and are listed with the last group.
  */
 export const CommandGroups = {
   gettingStarted: "Getting started",
@@ -12,6 +13,7 @@ export const CommandGroups = {
   usersAndTeams: "Users and teams",
   authentication: "Authentication",
   configuration: "Configuration and releases",
+  projectAdministration: "Project administration",
   diagnostics: "Diagnostics and utilities",
 } as const;
 

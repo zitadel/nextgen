@@ -171,6 +171,10 @@ which ships in this package.
 * [`zitadel idps create`](#zitadel-idps-create)
 * [`zitadel idps get ID`](#zitadel-idps-get-id)
 * [`zitadel idps list`](#zitadel-idps-list)
+* [`zitadel invitation cancel [INVITATION_ID]`](#zitadel-invitation-cancel-invitation_id)
+* [`zitadel invitation create`](#zitadel-invitation-create)
+* [`zitadel invitation get INVITATION_ID`](#zitadel-invitation-get-invitation_id)
+* [`zitadel invitation list`](#zitadel-invitation-list)
 * [`zitadel logs`](#zitadel-logs)
 * [`zitadel origin add PATTERN`](#zitadel-origin-add-pattern)
 * [`zitadel origin list`](#zitadel-origin-list)
@@ -229,9 +233,9 @@ Call any operation of the Zitadel API, with this project's server and project se
 ```
 USAGE
   $ zitadel api [OPERATION...] [--json] [-c <value>] [-s <value>]
-    [-n] [--dry-run] [-v] [--debug] [--color] [--telemetry] [-X
-    GET|POST|PUT|PATCH|DELETE] [-F <value>...] [--input <value>] [--paginate]
-    [-f]
+    [-n] [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>]
+    [--env-file <value>] [-X GET|POST|PUT|PATCH|DELETE] [-F <value>...] [--input
+    <value>] [--paginate] [-f]
 
 ARGUMENTS
   [OPERATION...]  An operationId (queryUsers) or a path (/users/query), then the
@@ -246,6 +250,11 @@ FLAGS
   -X, --method=GET|POST|PUT|PATCH|DELETE  The HTTP method, to choose among a
                                           path's operations.
   -c, --cwd=<value>                       Project directory to operate on.
+  -e, --env=<value>                       Environment to run against, e.g.
+                                          production. Defaults to ZITADEL_ENV,
+                                          then the hosting platform's build
+                                          (VERCEL_ENV, or Netlify's CONTEXT),
+                                          then development.
   -f, --force                             Call an operation that deletes,
                                           revokes or rolls back without the
                                           confirmation prompt. Required when
@@ -260,6 +269,11 @@ FLAGS
       --debug                             Debug logging.
       --dry-run                           Preview without mutating files or the
                                           platform.
+      --env-file=<value>                  Read ZITADEL_* values from this file
+                                          ahead of the process environment. A
+                                          relative path is read from the current
+                                          directory, not from --cwd. Cannot be
+                                          combined with --env.
       --input=<value>                     Read the JSON body from a file, or
                                           from stdin with -. --field lays over
                                           it.
@@ -292,7 +306,7 @@ EXAMPLES
 
 ## `zitadel api ls [FILTER]`
 
-List the operations of the Zitadel API that `zitadel api` calls.
+List the operations of the Zitadel API that the api command calls.
 
 ```
 USAGE
@@ -323,7 +337,7 @@ GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  List the operations of the Zitadel API that `zitadel api` calls.
+  List the operations of the Zitadel API that the api command calls.
 
 EXAMPLES
   $ zitadel api ls
@@ -357,7 +371,7 @@ FLAGS
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
       --schema=<value>   User schema to change, by file name or objectType.
-                         Required when the Project has more than one.
+                         Required when the project has more than one.
       --[no-]telemetry   Send anonymous usage analytics. Disable with
                          --no-telemetry.
 
@@ -390,7 +404,7 @@ FLAGS
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
       --schema=<value>   User schema to change, by file name or objectType.
-                         Required when the Project has more than one.
+                         Required when the project has more than one.
       --[no-]telemetry   Send anonymous usage analytics. Disable with
                          --no-telemetry.
 
@@ -425,7 +439,7 @@ FLAGS
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
       --schema=<value>   User schema to change, by file name or objectType.
-                         Required when the Project has more than one.
+                         Required when the project has more than one.
       --[no-]telemetry   Send anonymous usage analytics. Disable with
                          --no-telemetry.
 
@@ -458,7 +472,7 @@ FLAGS
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
       --schema=<value>   User schema to change, by file name or objectType.
-                         Required when the Project has more than one.
+                         Required when the project has more than one.
       --[no-]telemetry   Send anonymous usage analytics. Disable with
                          --no-telemetry.
 
@@ -495,7 +509,7 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --provider=<value>  Identity provider to remove.
       --schema=<value>    User schema to change, by file name or objectType.
-                          Required when the Project has more than one.
+                          Required when the project has more than one.
       --[no-]telemetry    Send anonymous usage analytics. Disable with
                           --no-telemetry.
 
@@ -548,7 +562,7 @@ FLAGS
                               custom OpenID Connect (OIDC) provider.
                               <options: google|custom>
       --schema=<value>        User schema to change, by file name or objectType.
-                              Required when the Project has more than one.
+                              Required when the project has more than one.
       --scopes=<value>        Scopes the custom connection requests, separated
                               by spaces or commas. Must include openid. Default:
                               openid profile email.
@@ -846,9 +860,9 @@ GLOBAL FLAGS
 DESCRIPTION
   Open the local console, signed in as the local admin.
 
-  The local admin is the one `zitadel start` created. Run this in the directory
-  `zitadel start` ran in, or one inside it: the local admin is read from the
-  nearest `.zitadel/local/` on the way up.
+  The local admin is the one the start command created. Run this in the
+  directory it ran in, or one inside it: the local admin is read from the
+  nearest .zitadel/local/ on the way up.
 
 EXAMPLES
   $ zitadel console
@@ -864,13 +878,16 @@ Apply your local configuration to Zitadel.
 USAGE
   $ zitadel deploy [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
-    <value>] [-m <value>]
+    <value>] [-f] [-m <value>]
 
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
   -e, --env=<value>       Environment to run against, e.g. production. Defaults
                           to ZITADEL_ENV, then the hosting platform's build
                           (VERCEL_ENV, or Netlify's CONTEXT), then development.
+  -f, --force             Deploy even when the release leaves existing users
+                          unable to sign in, without asking. Required for that
+                          when non-interactive.
   -m, --message=<value>   A short summary of what this release changes. Defaults
                           to the pull request's title or the current commit's
                           subject.
@@ -902,6 +919,8 @@ EXAMPLES
   $ zitadel deploy -m 'add phone_number to human-user'
 
   $ zitadel deploy --dry-run
+
+  $ zitadel deploy -m 'move users to the new schema' --force
 ```
 
 ## `zitadel deployment create`
@@ -1055,14 +1074,14 @@ USAGE
     <value>] [--env-file <value>] [-f] [-m <value>]
 
 ARGUMENTS
-  [DEPLOYMENT_ID]  The deployment to re-apply. Omit to undo the last deploy.
+  [DEPLOYMENT_ID]  The deployment to roll back to. Omit to undo the last deploy.
 
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
   -e, --env=<value>       Environment to run against, e.g. production. Defaults
                           to ZITADEL_ENV, then the hosting platform's build
                           (VERCEL_ENV, or Netlify's CONTEXT), then development.
-  -f, --force             Re-apply the deployment without the confirmation
+  -f, --force             Roll back to the deployment without the confirmation
                           prompt. Required when non-interactive.
   -m, --message=<value>   A short summary of why this rolls back.
   -n, --non-interactive   Disable prompts. Required when scripting or running as
@@ -1411,7 +1430,8 @@ FLAGS
       category (equals; values request|auth|session|admin|entity|signal; repeats
       widen), event_type (equals; repeats widen), actor_id (equals), session_id
       (equals), flow_id (equals), request_id (equals), entity_type (equals),
-      entity_id (equals), team_id (equals), created_at
+      entity_id (equals), team_id (equals), operation_id (equals; repeats widen),
+      status_class (equals; values 1xx|2xx|3xx|4xx|5xx; repeats widen), created_at
       (greater_than_or_equal|less_than).
 
   --limit=<value>
@@ -1598,7 +1618,8 @@ GLOBAL FLAGS
   --json  Format output as json.
 
 REQUIRED FIELD FLAGS
-  --relation=<option>  (required) Catalog relation on `object_type` `project`.
+  --relation=<option>  (required) The role on the project (`object_type`
+                       `project`).
                        <options: viewer|editor|admin>
 
 TEAM FIELD FLAGS
@@ -1869,16 +1890,17 @@ FLAGS
 
 OPTIONAL FIELD FLAGS
   --claim-mapping=<value>...    Repeatable claim_mapping entry: key=value for a
-                                string, key:=value for JSON. Maps user-schema
+                                string, key:=value for JSON. Maps user schema
                                 property names (keys) to provider claim names
                                 (values).
-  --subject-claim=<value>       Claim carrying the provider's stable subject
-                                identifier.
-  --template=<value>            Template hint for rendering the provider (logo,
+  --subject-claim=<value>       The claim (a named piece of user data the
+                                provider returns) that carries the provider's
+                                stable subject…
+  --template=<value>            A hint for rendering the provider (logo,
                                 colors).
   --verified-claims=<value>...  Repeatable verified_claims entry: key=value for
                                 a string, key:=value for JSON. Maps a verifiable
-                                user-schema property to its verification source:
+                                user schema property to its verification source:
                                 a claim name (read the claim) or the…
 
 RAW BODY FLAGS
@@ -1895,9 +1917,7 @@ REQUIRED FIELD FLAGS
   --display-name=<value>  (required) Shown to the user on the sign-in button.
   --protocol=<option>     (required) The protocol used by the identity provider.
                           <options: oidc>
-  --slug=<value>          (required) Stable identifier, referenced by user
-                          schemas (x-auth-methods.sso.providers) and flow steps
-                          (sso_providers).
+  --slug=<value>          (required) Stable identifier of the identity provider.
 
 GLOBAL FLAGS
   --json  Format output as json.
@@ -1907,8 +1927,8 @@ OIDC FIELD FLAGS
       For a provider that exposes no .well-known document.
 
   --oidc-client-id=<value>
-      (required with oidc.*) Either a literal in case the same client is used in
-      all environments, or a `${{ NAME }}` reference to a…
+      (required with oidc.*) Either a literal, when all environments use the same
+      client, or a `${{ NAME }}` reference to a variable, when…
 
   --oidc-client-secret=<value>
       (required with oidc.*) A reference to the variable holding the client
@@ -1925,11 +1945,12 @@ OIDC FIELD FLAGS
       JWKS endpoint, for a provider that exposes no .well-known document.
 
   --[no-]oidc-pkce-enabled
-      Send PKCE (code_challenge/code_verifier).
+      Send PKCE (`code_challenge` and `code_verifier`), which binds the code
+      exchange to the client that started it.
 
   --oidc-scopes=<value>...
-      Repeatable, one value each. Must contain `openid` - without it the provider
-      returns no id_token and the connection is not OIDC.
+      Repeatable, one value each. Must contain `openid`: without it the provider
+      returns no id_token and the sign-in is not OIDC.
 
   --oidc-static-authorize-parameters=<value>...
       Repeatable oidc.static_authorize_parameters entry: key=value for a string,
@@ -2094,6 +2115,206 @@ EXAMPLES
   $ zitadel idps list --filter slug=equals:<value> --sort slug:desc
 ```
 
+## `zitadel invitation cancel [INVITATION_ID]`
+
+Cancel a pending invitation so its link stops working.
+
+```
+USAGE
+  $ zitadel invitation cancel [INVITATION_ID] [--json] [-c <value>] [-s
+    <value>] [-n] [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e
+    <value>] [--env-file <value>] [-f]
+
+ARGUMENTS
+  [INVITATION_ID]  The invitation to cancel. Omit it to pick one of the pending
+                   invitations.
+
+FLAGS
+  -c, --cwd=<value>       Project directory to operate on.
+  -e, --env=<value>       Environment to run against, e.g. production. Defaults
+                          to ZITADEL_ENV, then the hosting platform's build
+                          (VERCEL_ENV, or Netlify's CONTEXT), then development.
+  -f, --force             Cancel the invitation without the confirmation prompt.
+                          Required when non-interactive.
+  -n, --non-interactive   Disable prompts. Required when scripting or running as
+                          an agent.
+  -s, --server=<value>    Override the resolved server URL.
+  -v, --verbose           Verbose logging.
+      --[no-]color        Colorize human output. Disable with --no-color;
+                          NO_COLOR and FORCE_COLOR are honored too.
+      --debug             Debug logging.
+      --dry-run           Preview without mutating files or the platform.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the
+                          process environment. A relative path is read from the
+                          current directory, not from --cwd. Cannot be combined
+                          with --env.
+      --[no-]telemetry    Send anonymous usage analytics. Disable with
+                          --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Cancel a pending invitation so its link stops working.
+
+EXAMPLES
+  $ zitadel invitation cancel
+
+  $ zitadel invitation cancel inv_01JCQK5R7T9V1X3Z5B7D9F1H3J
+
+  $ zitadel invitation cancel inv_01JCQK5R7T9V1X3Z5B7D9F1H3J --force
+```
+
+## `zitadel invitation create`
+
+Invite someone into the project with a link to share.
+
+```
+USAGE
+  $ zitadel invitation create [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
+    <value>] [--name <value>] [--relation viewer|editor|admin] [--replaces
+    <value>]
+
+FLAGS
+  -c, --cwd=<value>        Project directory to operate on.
+  -e, --env=<value>        Environment to run against, e.g. production. Defaults
+                           to ZITADEL_ENV, then the hosting platform's build
+                           (VERCEL_ENV, or Netlify's CONTEXT), then development.
+  -n, --non-interactive    Disable prompts. Required when scripting or running
+                           as an agent.
+  -s, --server=<value>     Override the resolved server URL.
+  -v, --verbose            Verbose logging.
+      --[no-]color         Colorize human output. Disable with --no-color;
+                           NO_COLOR and FORCE_COLOR are honored too.
+      --debug              Debug logging.
+      --dry-run            Preview without mutating files or the platform.
+      --env-file=<value>   Read ZITADEL_* values from this file ahead of the
+                           process environment. A relative path is read from the
+                           current directory, not from --cwd. Cannot be combined
+                           with --env.
+      --name=<value>       Who the invitation is for, shown to other
+                           administrators. Never matched.
+      --relation=<option>  The project role whoever accepts receives.
+                           <options: viewer|editor|admin>
+      --replaces=<value>   The invitation this one replaces; the new one keeps
+                           its journey.
+      --[no-]telemetry     Send anonymous usage analytics. Disable with
+                           --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Invite someone into the project with a link to share.
+
+EXAMPLES
+  $ zitadel invitation create
+
+  $ zitadel invitation create --name "John Doe" --relation editor
+
+  $ zitadel invitation create --replaces inv_01JCQK5R7T9V1X3Z5B7D9F1H3J --relation editor
+```
+
+## `zitadel invitation get INVITATION_ID`
+
+Read one invitation by id.
+
+```
+USAGE
+  $ zitadel invitation get INVITATION_ID [--json] [-c <value>] [-s <value>]
+    [-n] [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>]
+    [--env-file <value>]
+
+ARGUMENTS
+  INVITATION_ID  The invitation to read.
+
+FLAGS
+  -c, --cwd=<value>       Project directory to operate on.
+  -e, --env=<value>       Environment to run against, e.g. production. Defaults
+                          to ZITADEL_ENV, then the hosting platform's build
+                          (VERCEL_ENV, or Netlify's CONTEXT), then development.
+  -n, --non-interactive   Disable prompts. Required when scripting or running as
+                          an agent.
+  -s, --server=<value>    Override the resolved server URL.
+  -v, --verbose           Verbose logging.
+      --[no-]color        Colorize human output. Disable with --no-color;
+                          NO_COLOR and FORCE_COLOR are honored too.
+      --debug             Debug logging.
+      --dry-run           Preview without mutating files or the platform.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the
+                          process environment. A relative path is read from the
+                          current directory, not from --cwd. Cannot be combined
+                          with --env.
+      --[no-]telemetry    Send anonymous usage analytics. Disable with
+                          --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Read one invitation by id.
+
+EXAMPLES
+  $ zitadel invitation get inv_01JCQK5R7T9V1X3Z5B7D9F1H3J
+```
+
+## `zitadel invitation list`
+
+List the project's invitations, newest first.
+
+```
+USAGE
+  $ zitadel invitation list [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
+    <value>] [--status pending|accepted|rejected|expired] [--type
+    project_member|team_member] [--limit <value>] [-a | --page-token <value>]
+    [--plain]
+
+FLAGS
+  -a, --all                 Fetch every page instead of one.
+  -c, --cwd=<value>         Project directory to operate on.
+  -e, --env=<value>         Environment to run against, e.g. production.
+                            Defaults to ZITADEL_ENV, then the hosting platform's
+                            build (VERCEL_ENV, or Netlify's CONTEXT), then
+                            development.
+  -n, --non-interactive     Disable prompts. Required when scripting or running
+                            as an agent.
+  -s, --server=<value>      Override the resolved server URL.
+  -v, --verbose             Verbose logging.
+      --[no-]color          Colorize human output. Disable with --no-color;
+                            NO_COLOR and FORCE_COLOR are honored too.
+      --debug               Debug logging.
+      --dry-run             Preview without mutating files or the platform.
+      --env-file=<value>    Read ZITADEL_* values from this file ahead of the
+                            process environment. A relative path is read from
+                            the current directory, not from --cwd. Cannot be
+                            combined with --env.
+      --limit=<value>       Page size (server default 20, max 100).
+      --page-token=<value>  Continue from a previous page's next_page_token.
+      --plain               Tab-separated rows with no header, for piping.
+                            Implied when stdout is not a terminal.
+      --status=<option>     Only invitations with this status.
+                            <options: pending|accepted|rejected|expired>
+      --[no-]telemetry      Send anonymous usage analytics. Disable with
+                            --no-telemetry.
+      --type=<option>       Only invitations of this type.
+                            <options: project_member|team_member>
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  List the project's invitations, newest first.
+
+EXAMPLES
+  $ zitadel invitation list
+
+  $ zitadel invitation list --status pending
+
+  $ zitadel invitation list --all --json
+```
+
 ## `zitadel logs`
 
 Show local Zitadel server logs.
@@ -2128,9 +2349,9 @@ GLOBAL FLAGS
 DESCRIPTION
   Show local Zitadel server logs.
 
-  On a terminal, warnings are yellow and errors red. Run it in the directory
-  `zitadel start` ran in, or one inside it: the server is found from the nearest
-  `.zitadel/local/` on the way up.
+  On a terminal, warnings are yellow and errors red. Run it in the directory the
+  start command ran in, or one inside it: the server is found from the nearest
+  .zitadel/local/ on the way up.
 
 EXAMPLES
   $ zitadel logs --follow
@@ -2478,9 +2699,9 @@ FLAGS
                            (ZITADEL_PROJECT_SECRET) is set.
       --[no-]telemetry     Send anonymous usage analytics. Disable with
                            --no-telemetry.
-      --ttl=<value>        How long each preview stays live, e.g. 7d, 12h or
-                           90m. Between 60s and 365d. Omitted, the project's
-                           default applies.
+      --ttl=<value>        How long the preview stays live, such as 7d, 12h or
+                           90m. Between 60s and 365d. Defaults to the project's
+                           own lifetime.
 
 GLOBAL FLAGS
   --json  Format output as json.
@@ -3946,7 +4167,7 @@ GLOBAL FLAGS
   --json  Format output as json.
 
 OPTIONAL FIELD FLAGS
-  --name=<value>  The name of the team.
+  --name=<value>  The new name of the team.
 
 DESCRIPTION
   Update a team by id.
@@ -4025,9 +4246,9 @@ DESCRIPTION
   upgrading.
 
 EXAMPLES
-  npx @zitadel/cli@latest upgrade
+  $ zitadel upgrade
 
-  npx @zitadel/cli@latest upgrade --dry-run
+  $ zitadel upgrade --dry-run
 ```
 
 ## `zitadel users create`
@@ -4065,8 +4286,9 @@ REQUIRED FIELD FLAGS
   --attributes=<value>...  (required) Repeatable attributes entry: key=value for
                            a string, key:=value for JSON. The user's
                            schema-defined content.
-  --schema=<value>         (required) The schema that defines the content of
-                           `attributes`.
+  --schema=<value>         (required) The ID of the schema that defines the
+                           content of `attributes`: the `id` that `createSchema`
+                           (`POST /schemas`)…
 
 RAW BODY FLAGS
   --data=<value>    Whole body as a JSON object. Field flags and --set apply
@@ -4317,7 +4539,9 @@ FLAGS
 OPTIONAL FIELD FLAGS
   --attributes=<value>...  Repeatable attributes entry: key=value for a string,
                            key:=value for JSON. The changed attributes only.
-  --schema=<value>         The schema the user follows after this patch.
+  --schema=<value>         The ID of the schema the user follows after this
+                           patch: the `id` that `createSchema` (`POST
+                           /schemas`)…
 
 RAW BODY FLAGS
   --data=<value>    Whole body as a JSON object. Field flags and --set apply
@@ -4442,9 +4666,9 @@ Show the variables a deployment froze, the live one by default.
 
 ```
 USAGE
-  $ zitadel variable resolve [DEPLOYMENT_ID] [--json] [-c <value>] [-s <value>]
-    [-n] [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>]
-    [--env-file <value>] [--origin <value>] [--plain]
+  $ zitadel variable resolve [DEPLOYMENT_ID] [--json] [-c <value>] [-s
+    <value>] [-n] [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e
+    <value>] [--env-file <value>] [--origin <value>] [--plain]
 
 ARGUMENTS
   [DEPLOYMENT_ID]  The deployment to read; the live one when omitted.
