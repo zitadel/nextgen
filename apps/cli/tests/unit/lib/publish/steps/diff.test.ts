@@ -6,7 +6,7 @@ import { DiskStore } from "@/lib/zitadel";
 import { aConfig } from "@tests/helpers/config";
 import { it } from "@tests/helpers/fixtures";
 import { commitAll, git, write } from "@tests/helpers/git-repo";
-import { aDeployment, PROJECT_ID } from "@tests/helpers/records";
+import { aDeployment, PROJECT_ID, PRIMARY_ORIGIN } from "@tests/helpers/records";
 import { aStepContext } from "@tests/helpers/step-context";
 
 /**
@@ -34,7 +34,7 @@ type Live = Readonly<{
 /**
  * A primary origin.
  */
-const PRIMARY = { origin: "https://app.acme.com" };
+const PRIMARY = { origin: PRIMARY_ORIGIN };
 
 /**
  * Another primary origin.
