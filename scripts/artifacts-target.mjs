@@ -16,9 +16,16 @@ import { isDirectRun, runCapture } from "./dev-process.mjs";
 import { SERVER_IMAGE } from "./release-manifest.mjs";
 import { previousRelease } from "./smoke-upgrade.mjs";
 
+// A release version as the release scripts write it: what reaches
+// $GITHUB_OUTPUT and every later step's command line must be one.
+const VERSION_PATTERN = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
+
 export async function artifactsTarget(env = process.env) {
   const version = env.VERSION?.trim().replace(/^v/, "");
   if (!version) return { mode: "build", summary: "Built from this ref." };
+  if (!VERSION_PATTERN.test(version)) {
+    throw new Error(`${JSON.stringify(version)} is not a release version, such as 0.6.0`);
+  }
   // Outside the repository, whose .npmrc is the workspace's.
   const cwd = mkdtempSync(join(tmpdir(), "nextgen-target-"));
   try {
@@ -27,12 +34,14 @@ export async function artifactsTarget(env = process.env) {
     });
     const times = JSON.parse(stdout);
     if (!times[version]) throw new Error(`@zitadel/server@${version} is not published`);
+    const from = previousRelease(version, times);
+    if (!VERSION_PATTERN.test(from)) throw new Error(`npm lists an odd version: ${from}`);
     return {
       mode: "published",
       version,
       summary:
         `Published @zitadel/server@${version}: installed from npm on each runner, ` +
-        `container ${SERVER_IMAGE}:${version}, upgraded from ${previousRelease(version, times)}.`,
+        `container ${SERVER_IMAGE}:${version}, upgraded from ${from}.`,
     };
   } finally {
     rmSync(cwd, { recursive: true, force: true });
