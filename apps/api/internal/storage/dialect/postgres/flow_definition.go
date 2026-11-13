@@ -15,16 +15,15 @@ import (
 )
 
 const (
-	statusCast     = "::zitadel_nextgen.flow_definition_states"
 	purposeArrCast = "::zitadel_nextgen.flow_definition_purposes[]"
 
 	createFlowDefinitionStmt = `INSERT INTO zitadel_nextgen.flow_definitions ` +
-		`(project_id, id, name, schema_version, status, purposes, definition, created_at, updated_at) ` +
-		`VALUES ($1, $2, $3, $4, $5` + statusCast + `, $6` + purposeArrCast + `, $7, NOW(), NOW()) RETURNING created_at, updated_at`
+		`(project_id, id, name, schema_version, purposes, definition, created_at, updated_at) ` +
+		`VALUES ($1, $2, $3, $4, $5` + purposeArrCast + `, $6, NOW(), NOW()) RETURNING created_at, updated_at`
 
 	deleteFlowDefinitionStmt = `DELETE FROM zitadel_nextgen.flow_definitions WHERE project_id = $1 AND id = $2 RETURNING name`
 
-	flowDefinitionQuery = `SELECT project_id, id, name, schema_version, status, definition, created_at, updated_at ` +
+	flowDefinitionQuery = `SELECT project_id, id, name, schema_version, definition, created_at, updated_at ` +
 		`FROM zitadel_nextgen.flow_definitions`
 
 	// newestFlowDefinitionByNameStmt is one descent of
@@ -73,7 +72,6 @@ func (f flowDefinitionStatements) CreateFlowDefinition(ctx context.Context, enti
 			entity.ID,
 			entity.Name,
 			entity.SchemaVersion,
-			entity.Status.String(),
 			purposes,
 			content,
 		).Scan(&entity.CreatedAt, &entity.UpdatedAt); err != nil {
@@ -187,14 +185,13 @@ func (f flowDefinitionStatements) replaceSearchEntry(ctx context.Context, tx que
 func (f flowDefinitionStatements) scanFlowDefinition(row pgx.CollectableRow) (*domain.FlowDefinition, error) {
 	var (
 		projectID, id, name, schemaVersion string
-		status                             domain.FlowDefinitionStatus
 		definition                         []byte
 		createdAt, updatedAt               time.Time
 	)
-	if err := row.Scan(&projectID, &id, &name, &schemaVersion, &status, &definition, &createdAt, &updatedAt); err != nil {
+	if err := row.Scan(&projectID, &id, &name, &schemaVersion, &definition, &createdAt, &updatedAt); err != nil {
 		return nil, err
 	}
-	return flowdefinition.ToDomain(projectID, id, name, schemaVersion, status, createdAt, updatedAt, definition)
+	return flowdefinition.ToDomain(projectID, id, name, schemaVersion, createdAt, updatedAt, definition)
 }
 
 var _ service.FlowDefinitionStatements = (*flowDefinitionStatements)(nil)

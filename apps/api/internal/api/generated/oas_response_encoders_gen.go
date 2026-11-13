@@ -28,7 +28,6 @@ func encodeAcceptInvitationResponse(response AcceptInvitationRes, w http.Respons
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -41,7 +40,6 @@ func encodeAcceptInvitationResponse(response AcceptInvitationRes, w http.Respons
 	case *AcceptInvitationBadRequest:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
-		span.SetStatus(codes.Error, http.StatusText(400))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -54,7 +52,6 @@ func encodeAcceptInvitationResponse(response AcceptInvitationRes, w http.Respons
 	case *AcceptInvitationUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -67,7 +64,6 @@ func encodeAcceptInvitationResponse(response AcceptInvitationRes, w http.Respons
 	case *AcceptInvitationForbidden:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -80,7 +76,6 @@ func encodeAcceptInvitationResponse(response AcceptInvitationRes, w http.Respons
 	case *AcceptInvitationNotFound:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -93,7 +88,6 @@ func encodeAcceptInvitationResponse(response AcceptInvitationRes, w http.Respons
 	case *AcceptInvitationConflict:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(409)
-		span.SetStatus(codes.Error, http.StatusText(409))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -106,7 +100,6 @@ func encodeAcceptInvitationResponse(response AcceptInvitationRes, w http.Respons
 	case *AcceptInvitationTooManyRequests:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(429)
-		span.SetStatus(codes.Error, http.StatusText(429))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -124,10 +117,8 @@ func encodeAcceptInvitationResponse(response AcceptInvitationRes, w http.Respons
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -159,7 +150,6 @@ func encodeAddOriginResponse(response AddOriginRes, w http.ResponseWriter, span 
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(201)
-		span.SetStatus(codes.Ok, http.StatusText(201))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -177,10 +167,8 @@ func encodeAddOriginResponse(response AddOriginRes, w http.ResponseWriter, span 
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -204,7 +192,6 @@ func encodeBeginUserPasskeyRegistrationResponse(response BeginUserPasskeyRegistr
 	case *BeginUserPasskeyRegistrationResponse:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(201)
-		span.SetStatus(codes.Ok, http.StatusText(201))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -217,7 +204,6 @@ func encodeBeginUserPasskeyRegistrationResponse(response BeginUserPasskeyRegistr
 	case *BeginUserPasskeyRegistrationBadRequest:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
-		span.SetStatus(codes.Error, http.StatusText(400))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -230,7 +216,6 @@ func encodeBeginUserPasskeyRegistrationResponse(response BeginUserPasskeyRegistr
 	case *BeginUserPasskeyRegistrationUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -243,7 +228,6 @@ func encodeBeginUserPasskeyRegistrationResponse(response BeginUserPasskeyRegistr
 	case *BeginUserPasskeyRegistrationForbidden:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -256,7 +240,6 @@ func encodeBeginUserPasskeyRegistrationResponse(response BeginUserPasskeyRegistr
 	case *BeginUserPasskeyRegistrationNotFound:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -287,10 +270,8 @@ func encodeBeginUserPasskeyRegistrationResponse(response BeginUserPasskeyRegistr
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -322,7 +303,6 @@ func encodeBuildReleaseResponse(response BuildReleaseRes, w http.ResponseWriter,
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -343,7 +323,6 @@ func encodeBuildReleaseResponse(response BuildReleaseRes, w http.ResponseWriter,
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(201)
-		span.SetStatus(codes.Ok, http.StatusText(201))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -364,7 +343,6 @@ func encodeBuildReleaseResponse(response BuildReleaseRes, w http.ResponseWriter,
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
-		span.SetStatus(codes.Error, http.StatusText(400))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -382,10 +360,8 @@ func encodeBuildReleaseResponse(response BuildReleaseRes, w http.ResponseWriter,
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -408,14 +384,12 @@ func encodeCancelInvitationResponse(response CancelInvitationRes, w http.Respons
 	switch response := response.(type) {
 	case *CancelInvitationNoContent:
 		w.WriteHeader(204)
-		span.SetStatus(codes.Ok, http.StatusText(204))
 
 		return nil
 
 	case *CancelInvitationUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -428,7 +402,6 @@ func encodeCancelInvitationResponse(response CancelInvitationRes, w http.Respons
 	case *CancelInvitationForbidden:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -441,7 +414,6 @@ func encodeCancelInvitationResponse(response CancelInvitationRes, w http.Respons
 	case *CancelInvitationNotFound:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -459,10 +431,8 @@ func encodeCancelInvitationResponse(response CancelInvitationRes, w http.Respons
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -494,7 +464,6 @@ func encodeCompleteClaimResponse(response CompleteClaimRes, w http.ResponseWrite
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -507,7 +476,6 @@ func encodeCompleteClaimResponse(response CompleteClaimRes, w http.ResponseWrite
 	case *CompleteClaimBadRequest:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
-		span.SetStatus(codes.Error, http.StatusText(400))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -520,7 +488,6 @@ func encodeCompleteClaimResponse(response CompleteClaimRes, w http.ResponseWrite
 	case *AuthUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -533,7 +500,6 @@ func encodeCompleteClaimResponse(response CompleteClaimRes, w http.ResponseWrite
 	case *CompleteClaimForbidden:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -546,7 +512,6 @@ func encodeCompleteClaimResponse(response CompleteClaimRes, w http.ResponseWrite
 	case *CompleteClaimNotFound:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -567,7 +532,6 @@ func encodeCompleteClaimResponse(response CompleteClaimRes, w http.ResponseWrite
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(409)
-		span.SetStatus(codes.Error, http.StatusText(409))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -580,7 +544,6 @@ func encodeCompleteClaimResponse(response CompleteClaimRes, w http.ResponseWrite
 	case *CompleteClaimGone:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(410)
-		span.SetStatus(codes.Error, http.StatusText(410))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -593,7 +556,6 @@ func encodeCompleteClaimResponse(response CompleteClaimRes, w http.ResponseWrite
 	case *CompleteClaimTooManyRequests:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(429)
-		span.SetStatus(codes.Error, http.StatusText(429))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -611,10 +573,8 @@ func encodeCompleteClaimResponse(response CompleteClaimRes, w http.ResponseWrite
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -646,7 +606,6 @@ func encodeCreateApplicationResponse(response CreateApplicationRes, w http.Respo
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -667,7 +626,6 @@ func encodeCreateApplicationResponse(response CreateApplicationRes, w http.Respo
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(201)
-		span.SetStatus(codes.Ok, http.StatusText(201))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -680,7 +638,6 @@ func encodeCreateApplicationResponse(response CreateApplicationRes, w http.Respo
 	case *CreateApplicationBadRequest:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
-		span.SetStatus(codes.Error, http.StatusText(400))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -693,7 +650,6 @@ func encodeCreateApplicationResponse(response CreateApplicationRes, w http.Respo
 	case *CreateApplicationUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -706,7 +662,6 @@ func encodeCreateApplicationResponse(response CreateApplicationRes, w http.Respo
 	case *CreateApplicationForbidden:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -719,7 +674,6 @@ func encodeCreateApplicationResponse(response CreateApplicationRes, w http.Respo
 	case *CreateApplicationNotFound:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -732,7 +686,6 @@ func encodeCreateApplicationResponse(response CreateApplicationRes, w http.Respo
 	case *CreateApplicationConflict:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(409)
-		span.SetStatus(codes.Error, http.StatusText(409))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -750,10 +703,8 @@ func encodeCreateApplicationResponse(response CreateApplicationRes, w http.Respo
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -785,7 +736,6 @@ func encodeCreateAuthAttemptResponse(response CreateAuthAttemptRes, w http.Respo
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(201)
-		span.SetStatus(codes.Ok, http.StatusText(201))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -798,7 +748,6 @@ func encodeCreateAuthAttemptResponse(response CreateAuthAttemptRes, w http.Respo
 	case *ErrorDetails:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -816,10 +765,8 @@ func encodeCreateAuthAttemptResponse(response CreateAuthAttemptRes, w http.Respo
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -851,7 +798,6 @@ func encodeCreateBrandingResponse(response CreateBrandingRes, w http.ResponseWri
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(201)
-		span.SetStatus(codes.Ok, http.StatusText(201))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -864,7 +810,6 @@ func encodeCreateBrandingResponse(response CreateBrandingRes, w http.ResponseWri
 	case *ErrorDetails:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
-		span.SetStatus(codes.Error, http.StatusText(400))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -882,10 +827,8 @@ func encodeCreateBrandingResponse(response CreateBrandingRes, w http.ResponseWri
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -917,7 +860,6 @@ func encodeCreateDeploymentResponse(response CreateDeploymentRes, w http.Respons
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -938,7 +880,6 @@ func encodeCreateDeploymentResponse(response CreateDeploymentRes, w http.Respons
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(201)
-		span.SetStatus(codes.Ok, http.StatusText(201))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -959,7 +900,6 @@ func encodeCreateDeploymentResponse(response CreateDeploymentRes, w http.Respons
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
-		span.SetStatus(codes.Error, http.StatusText(400))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -972,7 +912,6 @@ func encodeCreateDeploymentResponse(response CreateDeploymentRes, w http.Respons
 	case *CreateDeploymentForbidden:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -985,7 +924,6 @@ func encodeCreateDeploymentResponse(response CreateDeploymentRes, w http.Respons
 	case *CreateDeploymentNotFound:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -1006,7 +944,6 @@ func encodeCreateDeploymentResponse(response CreateDeploymentRes, w http.Respons
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(409)
-		span.SetStatus(codes.Error, http.StatusText(409))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -1024,10 +961,8 @@ func encodeCreateDeploymentResponse(response CreateDeploymentRes, w http.Respons
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -1103,7 +1038,6 @@ func encodeCreateFlowResponse(response CreateFlowRes, w http.ResponseWriter, spa
 			}
 		}
 		w.WriteHeader(201)
-		span.SetStatus(codes.Ok, http.StatusText(201))
 
 		e := new(jx.Encoder)
 		response.Response.Encode(e)
@@ -1116,7 +1050,6 @@ func encodeCreateFlowResponse(response CreateFlowRes, w http.ResponseWriter, spa
 	case *CreateFlowBadRequest:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
-		span.SetStatus(codes.Error, http.StatusText(400))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -1129,7 +1062,6 @@ func encodeCreateFlowResponse(response CreateFlowRes, w http.ResponseWriter, spa
 	case *CreateFlowForbidden:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -1142,7 +1074,6 @@ func encodeCreateFlowResponse(response CreateFlowRes, w http.ResponseWriter, spa
 	case *CreateFlowConflict:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(409)
-		span.SetStatus(codes.Error, http.StatusText(409))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -1160,10 +1091,8 @@ func encodeCreateFlowResponse(response CreateFlowRes, w http.ResponseWriter, spa
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -1195,7 +1124,6 @@ func encodeCreateFlowDefinitionResponse(response CreateFlowDefinitionRes, w http
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(201)
-		span.SetStatus(codes.Ok, http.StatusText(201))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -1208,7 +1136,6 @@ func encodeCreateFlowDefinitionResponse(response CreateFlowDefinitionRes, w http
 	case *ErrorDetails:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
-		span.SetStatus(codes.Error, http.StatusText(400))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -1226,10 +1153,8 @@ func encodeCreateFlowDefinitionResponse(response CreateFlowDefinitionRes, w http
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -1261,7 +1186,6 @@ func encodeCreateGrantResponse(response CreateGrantRes, w http.ResponseWriter, s
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(201)
-		span.SetStatus(codes.Ok, http.StatusText(201))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -1273,14 +1197,12 @@ func encodeCreateGrantResponse(response CreateGrantRes, w http.ResponseWriter, s
 
 	case *CreateGrantAccepted:
 		w.WriteHeader(202)
-		span.SetStatus(codes.Ok, http.StatusText(202))
 
 		return nil
 
 	case *CreateGrantBadRequest:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
-		span.SetStatus(codes.Error, http.StatusText(400))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -1293,7 +1215,6 @@ func encodeCreateGrantResponse(response CreateGrantRes, w http.ResponseWriter, s
 	case *CreateGrantUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -1306,7 +1227,6 @@ func encodeCreateGrantResponse(response CreateGrantRes, w http.ResponseWriter, s
 	case *CreateGrantForbidden:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -1319,7 +1239,6 @@ func encodeCreateGrantResponse(response CreateGrantRes, w http.ResponseWriter, s
 	case *CreateGrantNotFound:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -1332,7 +1251,6 @@ func encodeCreateGrantResponse(response CreateGrantRes, w http.ResponseWriter, s
 	case *CreateGrantConflict:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(409)
-		span.SetStatus(codes.Error, http.StatusText(409))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -1345,7 +1263,6 @@ func encodeCreateGrantResponse(response CreateGrantRes, w http.ResponseWriter, s
 	case *CreateGrantTooManyRequests:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(429)
-		span.SetStatus(codes.Error, http.StatusText(429))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -1363,10 +1280,8 @@ func encodeCreateGrantResponse(response CreateGrantRes, w http.ResponseWriter, s
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -1390,7 +1305,6 @@ func encodeCreateHandoffResponse(response CreateHandoffRes, w http.ResponseWrite
 	case *HandoffResponse:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -1403,7 +1317,6 @@ func encodeCreateHandoffResponse(response CreateHandoffRes, w http.ResponseWrite
 	case *ErrorDetails:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(409)
-		span.SetStatus(codes.Error, http.StatusText(409))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -1421,10 +1334,8 @@ func encodeCreateHandoffResponse(response CreateHandoffRes, w http.ResponseWrite
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -1456,7 +1367,6 @@ func encodeCreateIdpResponse(response CreateIdpRes, w http.ResponseWriter, span 
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -1477,7 +1387,6 @@ func encodeCreateIdpResponse(response CreateIdpRes, w http.ResponseWriter, span 
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(201)
-		span.SetStatus(codes.Ok, http.StatusText(201))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -1490,7 +1399,6 @@ func encodeCreateIdpResponse(response CreateIdpRes, w http.ResponseWriter, span 
 	case *CreateIdpBadRequest:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
-		span.SetStatus(codes.Error, http.StatusText(400))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -1503,7 +1411,6 @@ func encodeCreateIdpResponse(response CreateIdpRes, w http.ResponseWriter, span 
 	case *CreateIdpUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -1516,7 +1423,6 @@ func encodeCreateIdpResponse(response CreateIdpRes, w http.ResponseWriter, span 
 	case *CreateIdpForbidden:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -1529,7 +1435,6 @@ func encodeCreateIdpResponse(response CreateIdpRes, w http.ResponseWriter, span 
 	case *CreateIdpNotFound:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -1547,10 +1452,8 @@ func encodeCreateIdpResponse(response CreateIdpRes, w http.ResponseWriter, span 
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -1582,7 +1485,6 @@ func encodeCreateInvitationResponse(response CreateInvitationRes, w http.Respons
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(201)
-		span.SetStatus(codes.Ok, http.StatusText(201))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -1595,7 +1497,6 @@ func encodeCreateInvitationResponse(response CreateInvitationRes, w http.Respons
 	case *CreateInvitationBadRequest:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
-		span.SetStatus(codes.Error, http.StatusText(400))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -1608,7 +1509,6 @@ func encodeCreateInvitationResponse(response CreateInvitationRes, w http.Respons
 	case *CreateInvitationUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -1621,7 +1521,6 @@ func encodeCreateInvitationResponse(response CreateInvitationRes, w http.Respons
 	case *CreateInvitationForbidden:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -1634,7 +1533,6 @@ func encodeCreateInvitationResponse(response CreateInvitationRes, w http.Respons
 	case *CreateInvitationNotFound:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -1647,7 +1545,6 @@ func encodeCreateInvitationResponse(response CreateInvitationRes, w http.Respons
 	case *CreateInvitationConflict:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(409)
-		span.SetStatus(codes.Error, http.StatusText(409))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -1678,10 +1575,8 @@ func encodeCreateInvitationResponse(response CreateInvitationRes, w http.Respons
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -1713,7 +1608,6 @@ func encodeCreateProjectResponse(response CreateProjectRes, w http.ResponseWrite
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(201)
-		span.SetStatus(codes.Ok, http.StatusText(201))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -1726,7 +1620,6 @@ func encodeCreateProjectResponse(response CreateProjectRes, w http.ResponseWrite
 	case *ErrorDetails:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(429)
-		span.SetStatus(codes.Error, http.StatusText(429))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -1744,10 +1637,8 @@ func encodeCreateProjectResponse(response CreateProjectRes, w http.ResponseWrite
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -1779,7 +1670,6 @@ func encodeCreateReleaseResponse(response CreateReleaseRes, w http.ResponseWrite
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -1800,7 +1690,6 @@ func encodeCreateReleaseResponse(response CreateReleaseRes, w http.ResponseWrite
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(201)
-		span.SetStatus(codes.Ok, http.StatusText(201))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -1818,10 +1707,8 @@ func encodeCreateReleaseResponse(response CreateReleaseRes, w http.ResponseWrite
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -1845,7 +1732,6 @@ func encodeCreateSchemaResponse(response CreateSchemaRes, w http.ResponseWriter,
 	case *CreateSchemaResponse:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(201)
-		span.SetStatus(codes.Ok, http.StatusText(201))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -1863,10 +1749,8 @@ func encodeCreateSchemaResponse(response CreateSchemaRes, w http.ResponseWriter,
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -1915,7 +1799,6 @@ func encodeCreateSessionResponse(response CreateSessionRes, w http.ResponseWrite
 			}
 		}
 		w.WriteHeader(201)
-		span.SetStatus(codes.Ok, http.StatusText(201))
 
 		e := new(jx.Encoder)
 		response.Response.Encode(e)
@@ -1928,7 +1811,6 @@ func encodeCreateSessionResponse(response CreateSessionRes, w http.ResponseWrite
 	case *ErrorDetails:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
-		span.SetStatus(codes.Error, http.StatusText(400))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -1946,10 +1828,8 @@ func encodeCreateSessionResponse(response CreateSessionRes, w http.ResponseWrite
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -1981,7 +1861,6 @@ func encodeCreateTeamResponse(response CreateTeamRes, w http.ResponseWriter, spa
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(201)
-		span.SetStatus(codes.Ok, http.StatusText(201))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -1994,7 +1873,6 @@ func encodeCreateTeamResponse(response CreateTeamRes, w http.ResponseWriter, spa
 	case *CreateTeamBadRequest:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
-		span.SetStatus(codes.Error, http.StatusText(400))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -2007,7 +1885,6 @@ func encodeCreateTeamResponse(response CreateTeamRes, w http.ResponseWriter, spa
 	case *CreateTeamUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -2020,7 +1897,6 @@ func encodeCreateTeamResponse(response CreateTeamRes, w http.ResponseWriter, spa
 	case *CreateTeamForbidden:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -2033,7 +1909,6 @@ func encodeCreateTeamResponse(response CreateTeamRes, w http.ResponseWriter, spa
 	case *CreateTeamNotFound:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -2046,7 +1921,6 @@ func encodeCreateTeamResponse(response CreateTeamRes, w http.ResponseWriter, spa
 	case *CreateTeamConflict:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(409)
-		span.SetStatus(codes.Error, http.StatusText(409))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -2059,7 +1933,6 @@ func encodeCreateTeamResponse(response CreateTeamRes, w http.ResponseWriter, spa
 	case *CreateTeamTooManyRequests:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(429)
-		span.SetStatus(codes.Error, http.StatusText(429))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -2077,10 +1950,8 @@ func encodeCreateTeamResponse(response CreateTeamRes, w http.ResponseWriter, spa
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -2112,7 +1983,6 @@ func encodeCreateUserResponse(response CreateUserRes, w http.ResponseWriter, spa
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(201)
-		span.SetStatus(codes.Ok, http.StatusText(201))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -2125,7 +1995,6 @@ func encodeCreateUserResponse(response CreateUserRes, w http.ResponseWriter, spa
 	case *CreateUserBadRequest:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
-		span.SetStatus(codes.Error, http.StatusText(400))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -2138,7 +2007,6 @@ func encodeCreateUserResponse(response CreateUserRes, w http.ResponseWriter, spa
 	case *CreateUserUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -2151,7 +2019,6 @@ func encodeCreateUserResponse(response CreateUserRes, w http.ResponseWriter, spa
 	case *CreateUserForbidden:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -2164,7 +2031,6 @@ func encodeCreateUserResponse(response CreateUserRes, w http.ResponseWriter, spa
 	case *CreateUserConflict:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(409)
-		span.SetStatus(codes.Error, http.StatusText(409))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -2195,10 +2061,8 @@ func encodeCreateUserResponse(response CreateUserRes, w http.ResponseWriter, spa
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -2230,7 +2094,6 @@ func encodeCreateWebhookResponse(response CreateWebhookRes, w http.ResponseWrite
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(201)
-		span.SetStatus(codes.Ok, http.StatusText(201))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -2243,7 +2106,6 @@ func encodeCreateWebhookResponse(response CreateWebhookRes, w http.ResponseWrite
 	case *CreateWebhookBadRequest:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
-		span.SetStatus(codes.Error, http.StatusText(400))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -2256,7 +2118,6 @@ func encodeCreateWebhookResponse(response CreateWebhookRes, w http.ResponseWrite
 	case *CreateWebhookUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -2269,7 +2130,6 @@ func encodeCreateWebhookResponse(response CreateWebhookRes, w http.ResponseWrite
 	case *CreateWebhookForbidden:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -2282,7 +2142,6 @@ func encodeCreateWebhookResponse(response CreateWebhookRes, w http.ResponseWrite
 	case *CreateWebhookNotFound:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -2295,7 +2154,6 @@ func encodeCreateWebhookResponse(response CreateWebhookRes, w http.ResponseWrite
 	case *CreateWebhookConflict:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(409)
-		span.SetStatus(codes.Error, http.StatusText(409))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -2313,10 +2171,8 @@ func encodeCreateWebhookResponse(response CreateWebhookRes, w http.ResponseWrite
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -2339,14 +2195,12 @@ func encodeDeleteGrantResponse(response DeleteGrantRes, w http.ResponseWriter, s
 	switch response := response.(type) {
 	case *DeleteGrantNoContent:
 		w.WriteHeader(204)
-		span.SetStatus(codes.Ok, http.StatusText(204))
 
 		return nil
 
 	case *DeleteGrantUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -2359,7 +2213,6 @@ func encodeDeleteGrantResponse(response DeleteGrantRes, w http.ResponseWriter, s
 	case *DeleteGrantForbidden:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -2372,7 +2225,6 @@ func encodeDeleteGrantResponse(response DeleteGrantRes, w http.ResponseWriter, s
 	case *DeleteGrantNotFound:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -2390,10 +2242,8 @@ func encodeDeleteGrantResponse(response DeleteGrantRes, w http.ResponseWriter, s
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -2416,14 +2266,12 @@ func encodeDeleteTeamResponse(response DeleteTeamRes, w http.ResponseWriter, spa
 	switch response := response.(type) {
 	case *DeleteTeamNoContent:
 		w.WriteHeader(204)
-		span.SetStatus(codes.Ok, http.StatusText(204))
 
 		return nil
 
 	case *DeleteTeamBadRequest:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
-		span.SetStatus(codes.Error, http.StatusText(400))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -2436,7 +2284,6 @@ func encodeDeleteTeamResponse(response DeleteTeamRes, w http.ResponseWriter, spa
 	case *DeleteTeamUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -2449,7 +2296,6 @@ func encodeDeleteTeamResponse(response DeleteTeamRes, w http.ResponseWriter, spa
 	case *DeleteTeamForbidden:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -2462,7 +2308,6 @@ func encodeDeleteTeamResponse(response DeleteTeamRes, w http.ResponseWriter, spa
 	case *DeleteTeamConflict:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(409)
-		span.SetStatus(codes.Error, http.StatusText(409))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -2480,10 +2325,8 @@ func encodeDeleteTeamResponse(response DeleteTeamRes, w http.ResponseWriter, spa
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -2506,14 +2349,12 @@ func encodeDeleteUserByIDResponse(response DeleteUserByIDRes, w http.ResponseWri
 	switch response := response.(type) {
 	case *DeleteUserByIDNoContent:
 		w.WriteHeader(204)
-		span.SetStatus(codes.Ok, http.StatusText(204))
 
 		return nil
 
 	case *DeleteUserByIDUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -2526,7 +2367,6 @@ func encodeDeleteUserByIDResponse(response DeleteUserByIDRes, w http.ResponseWri
 	case *DeleteUserByIDNotFound:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -2539,7 +2379,6 @@ func encodeDeleteUserByIDResponse(response DeleteUserByIDRes, w http.ResponseWri
 	case *DeleteUserByIDConflict:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(409)
-		span.SetStatus(codes.Error, http.StatusText(409))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -2557,10 +2396,8 @@ func encodeDeleteUserByIDResponse(response DeleteUserByIDRes, w http.ResponseWri
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -2583,7 +2420,6 @@ func encodeDeleteVariableResponse(response DeleteVariableRes, w http.ResponseWri
 	switch response := response.(type) {
 	case *DeleteVariableNoContent:
 		w.WriteHeader(204)
-		span.SetStatus(codes.Ok, http.StatusText(204))
 
 		return nil
 
@@ -2595,10 +2431,8 @@ func encodeDeleteVariableResponse(response DeleteVariableRes, w http.ResponseWri
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -2621,14 +2455,12 @@ func encodeDeleteWebhookResponse(response DeleteWebhookRes, w http.ResponseWrite
 	switch response := response.(type) {
 	case *DeleteWebhookNoContent:
 		w.WriteHeader(204)
-		span.SetStatus(codes.Ok, http.StatusText(204))
 
 		return nil
 
 	case *DeleteWebhookUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -2641,7 +2473,6 @@ func encodeDeleteWebhookResponse(response DeleteWebhookRes, w http.ResponseWrite
 	case *DeleteWebhookForbidden:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -2654,7 +2485,6 @@ func encodeDeleteWebhookResponse(response DeleteWebhookRes, w http.ResponseWrite
 	case *DeleteWebhookNotFound:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -2672,10 +2502,8 @@ func encodeDeleteWebhookResponse(response DeleteWebhookRes, w http.ResponseWrite
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -2699,7 +2527,6 @@ func encodeEvaluatePolicyResponse(response EvaluatePolicyRes, w http.ResponseWri
 	case *EvaluatePolicyResponse:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -2717,10 +2544,8 @@ func encodeEvaluatePolicyResponse(response EvaluatePolicyRes, w http.ResponseWri
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -2769,7 +2594,6 @@ func encodeExchangeHandoffResponse(response ExchangeHandoffRes, w http.ResponseW
 			}
 		}
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Response.Encode(e)
@@ -2782,7 +2606,6 @@ func encodeExchangeHandoffResponse(response ExchangeHandoffRes, w http.ResponseW
 	case *ExchangeHandoffBadRequest:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
-		span.SetStatus(codes.Error, http.StatusText(400))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -2795,7 +2618,6 @@ func encodeExchangeHandoffResponse(response ExchangeHandoffRes, w http.ResponseW
 	case *ExchangeHandoffUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -2808,7 +2630,6 @@ func encodeExchangeHandoffResponse(response ExchangeHandoffRes, w http.ResponseW
 	case *ExchangeHandoffForbidden:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -2821,7 +2642,6 @@ func encodeExchangeHandoffResponse(response ExchangeHandoffRes, w http.ResponseW
 	case *ExchangeHandoffConflict:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(409)
-		span.SetStatus(codes.Error, http.StatusText(409))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -2839,10 +2659,8 @@ func encodeExchangeHandoffResponse(response ExchangeHandoffRes, w http.ResponseW
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -2866,7 +2684,6 @@ func encodeFinishUserPasskeyRegistrationResponse(response FinishUserPasskeyRegis
 	case *FinishUserPasskeyRegistrationResponse:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(201)
-		span.SetStatus(codes.Ok, http.StatusText(201))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -2879,7 +2696,6 @@ func encodeFinishUserPasskeyRegistrationResponse(response FinishUserPasskeyRegis
 	case *FinishUserPasskeyRegistrationBadRequest:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
-		span.SetStatus(codes.Error, http.StatusText(400))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -2892,7 +2708,6 @@ func encodeFinishUserPasskeyRegistrationResponse(response FinishUserPasskeyRegis
 	case *FinishUserPasskeyRegistrationUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -2905,7 +2720,6 @@ func encodeFinishUserPasskeyRegistrationResponse(response FinishUserPasskeyRegis
 	case *FinishUserPasskeyRegistrationForbidden:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -2918,7 +2732,6 @@ func encodeFinishUserPasskeyRegistrationResponse(response FinishUserPasskeyRegis
 	case *FinishUserPasskeyRegistrationNotFound:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -2959,7 +2772,6 @@ func encodeFinishUserPasskeyRegistrationResponse(response FinishUserPasskeyRegis
 			}
 		}
 		w.WriteHeader(429)
-		span.SetStatus(codes.Error, http.StatusText(429))
 
 		e := new(jx.Encoder)
 		response.Response.Encode(e)
@@ -2990,10 +2802,8 @@ func encodeFinishUserPasskeyRegistrationResponse(response FinishUserPasskeyRegis
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -3025,7 +2835,6 @@ func encodeGetApplicationByIdResponse(response GetApplicationByIdRes, w http.Res
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -3038,7 +2847,6 @@ func encodeGetApplicationByIdResponse(response GetApplicationByIdRes, w http.Res
 	case *GetApplicationByIdUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -3051,7 +2859,6 @@ func encodeGetApplicationByIdResponse(response GetApplicationByIdRes, w http.Res
 	case *GetApplicationByIdForbidden:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -3064,7 +2871,6 @@ func encodeGetApplicationByIdResponse(response GetApplicationByIdRes, w http.Res
 	case *GetApplicationByIdNotFound:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -3082,10 +2888,8 @@ func encodeGetApplicationByIdResponse(response GetApplicationByIdRes, w http.Res
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -3117,7 +2921,6 @@ func encodeGetAuthAttemptResponse(response GetAuthAttemptRes, w http.ResponseWri
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -3135,10 +2938,8 @@ func encodeGetAuthAttemptResponse(response GetAuthAttemptRes, w http.ResponseWri
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -3170,7 +2971,6 @@ func encodeGetBrandingByIdResponse(response GetBrandingByIdRes, w http.ResponseW
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -3183,7 +2983,6 @@ func encodeGetBrandingByIdResponse(response GetBrandingByIdRes, w http.ResponseW
 	case *ErrorDetails:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -3201,10 +3000,8 @@ func encodeGetBrandingByIdResponse(response GetBrandingByIdRes, w http.ResponseW
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -3236,7 +3033,6 @@ func encodeGetClaimStatusResponse(response GetClaimStatusRes, w http.ResponseWri
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -3249,7 +3045,6 @@ func encodeGetClaimStatusResponse(response GetClaimStatusRes, w http.ResponseWri
 	case *GetClaimStatusUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -3262,7 +3057,6 @@ func encodeGetClaimStatusResponse(response GetClaimStatusRes, w http.ResponseWri
 	case *ProjPermissionDenied:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -3275,7 +3069,6 @@ func encodeGetClaimStatusResponse(response GetClaimStatusRes, w http.ResponseWri
 	case *GetClaimStatusNotFound:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -3288,7 +3081,6 @@ func encodeGetClaimStatusResponse(response GetClaimStatusRes, w http.ResponseWri
 	case *GetClaimStatusGone:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(410)
-		span.SetStatus(codes.Error, http.StatusText(410))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -3301,7 +3093,6 @@ func encodeGetClaimStatusResponse(response GetClaimStatusRes, w http.ResponseWri
 	case *GetClaimStatusTooManyRequests:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(429)
-		span.SetStatus(codes.Error, http.StatusText(429))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -3319,10 +3110,8 @@ func encodeGetClaimStatusResponse(response GetClaimStatusRes, w http.ResponseWri
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -3346,7 +3135,6 @@ func encodeGetClaimWindowResponse(response GetClaimWindowRes, w http.ResponseWri
 	case *ClaimWindowResponse:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -3359,7 +3147,6 @@ func encodeGetClaimWindowResponse(response GetClaimWindowRes, w http.ResponseWri
 	case *GetClaimWindowNotFound:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -3372,7 +3159,6 @@ func encodeGetClaimWindowResponse(response GetClaimWindowRes, w http.ResponseWri
 	case *GetClaimWindowTooManyRequests:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(429)
-		span.SetStatus(codes.Error, http.StatusText(429))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -3390,10 +3176,8 @@ func encodeGetClaimWindowResponse(response GetClaimWindowRes, w http.ResponseWri
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -3425,7 +3209,6 @@ func encodeGetDeploymentByIdResponse(response GetDeploymentByIdRes, w http.Respo
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -3443,10 +3226,8 @@ func encodeGetDeploymentByIdResponse(response GetDeploymentByIdRes, w http.Respo
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -3478,7 +3259,6 @@ func encodeGetDeploymentVariablesResponse(response GetDeploymentVariablesRes, w 
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -3496,10 +3276,8 @@ func encodeGetDeploymentVariablesResponse(response GetDeploymentVariablesRes, w 
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -3531,7 +3309,6 @@ func encodeGetEventResponse(response GetEventRes, w http.ResponseWriter, span tr
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -3544,7 +3321,6 @@ func encodeGetEventResponse(response GetEventRes, w http.ResponseWriter, span tr
 	case *GetEventUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -3557,7 +3333,6 @@ func encodeGetEventResponse(response GetEventRes, w http.ResponseWriter, span tr
 	case *GetEventForbidden:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -3570,7 +3345,6 @@ func encodeGetEventResponse(response GetEventRes, w http.ResponseWriter, span tr
 	case *GetEventNotFound:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -3588,10 +3362,8 @@ func encodeGetEventResponse(response GetEventRes, w http.ResponseWriter, span tr
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -3623,7 +3395,6 @@ func encodeGetFlowDefinitionResponse(response GetFlowDefinitionRes, w http.Respo
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -3641,10 +3412,8 @@ func encodeGetFlowDefinitionResponse(response GetFlowDefinitionRes, w http.Respo
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -3720,7 +3489,6 @@ func encodeGetFlowStepResponse(response GetFlowStepRes, w http.ResponseWriter, s
 			}
 		}
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Response.Encode(e)
@@ -3733,7 +3501,6 @@ func encodeGetFlowStepResponse(response GetFlowStepRes, w http.ResponseWriter, s
 	case *GetFlowStepNotFound:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -3746,7 +3513,6 @@ func encodeGetFlowStepResponse(response GetFlowStepRes, w http.ResponseWriter, s
 	case *GetFlowStepConflict:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(409)
-		span.SetStatus(codes.Error, http.StatusText(409))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -3759,7 +3525,6 @@ func encodeGetFlowStepResponse(response GetFlowStepRes, w http.ResponseWriter, s
 	case *GetFlowStepGone:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(410)
-		span.SetStatus(codes.Error, http.StatusText(410))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -3800,7 +3565,6 @@ func encodeGetFlowStepResponse(response GetFlowStepRes, w http.ResponseWriter, s
 			}
 		}
 		w.WriteHeader(429)
-		span.SetStatus(codes.Error, http.StatusText(429))
 
 		e := new(jx.Encoder)
 		response.Response.Encode(e)
@@ -3818,10 +3582,8 @@ func encodeGetFlowStepResponse(response GetFlowStepRes, w http.ResponseWriter, s
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -3853,7 +3615,6 @@ func encodeGetGrantResponse(response GetGrantRes, w http.ResponseWriter, span tr
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -3866,7 +3627,6 @@ func encodeGetGrantResponse(response GetGrantRes, w http.ResponseWriter, span tr
 	case *GetGrantUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -3879,7 +3639,6 @@ func encodeGetGrantResponse(response GetGrantRes, w http.ResponseWriter, span tr
 	case *GetGrantForbidden:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -3892,7 +3651,6 @@ func encodeGetGrantResponse(response GetGrantRes, w http.ResponseWriter, span tr
 	case *GetGrantNotFound:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -3910,10 +3668,8 @@ func encodeGetGrantResponse(response GetGrantRes, w http.ResponseWriter, span tr
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -3945,7 +3701,6 @@ func encodeGetIdpByIdResponse(response GetIdpByIdRes, w http.ResponseWriter, spa
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -3958,7 +3713,6 @@ func encodeGetIdpByIdResponse(response GetIdpByIdRes, w http.ResponseWriter, spa
 	case *GetIdpByIdUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -3971,7 +3725,6 @@ func encodeGetIdpByIdResponse(response GetIdpByIdRes, w http.ResponseWriter, spa
 	case *GetIdpByIdForbidden:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -3984,7 +3737,6 @@ func encodeGetIdpByIdResponse(response GetIdpByIdRes, w http.ResponseWriter, spa
 	case *GetIdpByIdNotFound:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -4002,10 +3754,8 @@ func encodeGetIdpByIdResponse(response GetIdpByIdRes, w http.ResponseWriter, spa
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -4037,7 +3787,6 @@ func encodeGetIdpRevisionByIdResponse(response GetIdpRevisionByIdRes, w http.Res
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -4050,7 +3799,6 @@ func encodeGetIdpRevisionByIdResponse(response GetIdpRevisionByIdRes, w http.Res
 	case *GetIdpRevisionByIdUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -4063,7 +3811,6 @@ func encodeGetIdpRevisionByIdResponse(response GetIdpRevisionByIdRes, w http.Res
 	case *GetIdpRevisionByIdForbidden:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -4076,7 +3823,6 @@ func encodeGetIdpRevisionByIdResponse(response GetIdpRevisionByIdRes, w http.Res
 	case *GetIdpRevisionByIdNotFound:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -4094,10 +3840,8 @@ func encodeGetIdpRevisionByIdResponse(response GetIdpRevisionByIdRes, w http.Res
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -4129,7 +3873,6 @@ func encodeGetInvitationResponse(response GetInvitationRes, w http.ResponseWrite
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -4142,7 +3885,6 @@ func encodeGetInvitationResponse(response GetInvitationRes, w http.ResponseWrite
 	case *GetInvitationUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -4155,7 +3897,6 @@ func encodeGetInvitationResponse(response GetInvitationRes, w http.ResponseWrite
 	case *GetInvitationForbidden:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -4168,7 +3909,6 @@ func encodeGetInvitationResponse(response GetInvitationRes, w http.ResponseWrite
 	case *GetInvitationNotFound:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -4186,10 +3926,8 @@ func encodeGetInvitationResponse(response GetInvitationRes, w http.ResponseWrite
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -4213,7 +3951,6 @@ func encodeGetLiveResponse(response GetLiveRes, w http.ResponseWriter, span trac
 	case *GetLiveOK:
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		writer := w
 		if closer, ok := response.Data.(io.Closer); ok {
@@ -4233,10 +3970,8 @@ func encodeGetLiveResponse(response GetLiveRes, w http.ResponseWriter, span trac
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -4258,10 +3993,8 @@ func encodeGetLiveResponse(response GetLiveRes, w http.ResponseWriter, span trac
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -4304,7 +4037,6 @@ func encodeGetMyPasswordStateResponse(response GetMyPasswordStateRes, w http.Res
 			}
 		}
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Response.Encode(e)
@@ -4317,7 +4049,6 @@ func encodeGetMyPasswordStateResponse(response GetMyPasswordStateRes, w http.Res
 	case *AuthUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -4330,7 +4061,6 @@ func encodeGetMyPasswordStateResponse(response GetMyPasswordStateRes, w http.Res
 	case *SessProjectMismatch:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -4348,10 +4078,8 @@ func encodeGetMyPasswordStateResponse(response GetMyPasswordStateRes, w http.Res
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -4402,7 +4130,6 @@ func encodeGetMySessionResponse(response GetMySessionRes, w http.ResponseWriter,
 			}
 		}
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Response.Encode(e)
@@ -4434,7 +4161,6 @@ func encodeGetMySessionResponse(response GetMySessionRes, w http.ResponseWriter,
 			}
 		}
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Response.Encode(e)
@@ -4466,7 +4192,6 @@ func encodeGetMySessionResponse(response GetMySessionRes, w http.ResponseWriter,
 			}
 		}
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Response.Encode(e)
@@ -4498,7 +4223,6 @@ func encodeGetMySessionResponse(response GetMySessionRes, w http.ResponseWriter,
 			}
 		}
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Response.Encode(e)
@@ -4516,10 +4240,8 @@ func encodeGetMySessionResponse(response GetMySessionRes, w http.ResponseWriter,
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -4562,7 +4284,6 @@ func encodeGetMySessionCsrfTokenResponse(response GetMySessionCsrfTokenRes, w ht
 			}
 		}
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Response.Encode(e)
@@ -4594,7 +4315,6 @@ func encodeGetMySessionCsrfTokenResponse(response GetMySessionCsrfTokenRes, w ht
 			}
 		}
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Response.Encode(e)
@@ -4626,7 +4346,6 @@ func encodeGetMySessionCsrfTokenResponse(response GetMySessionCsrfTokenRes, w ht
 			}
 		}
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Response.Encode(e)
@@ -4644,10 +4363,8 @@ func encodeGetMySessionCsrfTokenResponse(response GetMySessionCsrfTokenRes, w ht
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -4679,7 +4396,6 @@ func encodeGetMyUserResponse(response GetMyUserRes, w http.ResponseWriter, span 
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -4692,7 +4408,6 @@ func encodeGetMyUserResponse(response GetMyUserRes, w http.ResponseWriter, span 
 	case *ErrorDetails:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -4705,7 +4420,6 @@ func encodeGetMyUserResponse(response GetMyUserRes, w http.ResponseWriter, span 
 	case *SessProjectMismatch:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -4718,7 +4432,6 @@ func encodeGetMyUserResponse(response GetMyUserRes, w http.ResponseWriter, span 
 	case *UserNotFound:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -4736,10 +4449,8 @@ func encodeGetMyUserResponse(response GetMyUserRes, w http.ResponseWriter, span 
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -4790,7 +4501,6 @@ func encodeGetMyUserSchemaResponse(response GetMyUserSchemaRes, w http.ResponseW
 			}
 		}
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Response.Encode(e)
@@ -4803,7 +4513,6 @@ func encodeGetMyUserSchemaResponse(response GetMyUserSchemaRes, w http.ResponseW
 	case *AuthUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -4816,7 +4525,6 @@ func encodeGetMyUserSchemaResponse(response GetMyUserSchemaRes, w http.ResponseW
 	case *SessProjectMismatch:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -4829,7 +4537,6 @@ func encodeGetMyUserSchemaResponse(response GetMyUserSchemaRes, w http.ResponseW
 	case *UserNotFound:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -4847,10 +4554,8 @@ func encodeGetMyUserSchemaResponse(response GetMyUserSchemaRes, w http.ResponseW
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -4874,7 +4579,6 @@ func encodeGetOAuthSettingsByIdResponse(response GetOAuthSettingsByIdRes, w http
 	case *OAuthSettingsRevisionResponse:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -4887,7 +4591,6 @@ func encodeGetOAuthSettingsByIdResponse(response GetOAuthSettingsByIdRes, w http
 	case *ErrorDetails:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -4905,10 +4608,8 @@ func encodeGetOAuthSettingsByIdResponse(response GetOAuthSettingsByIdRes, w http
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -4940,7 +4641,6 @@ func encodeGetPolicyResponse(response GetPolicyRes, w http.ResponseWriter, span 
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -4958,10 +4658,8 @@ func encodeGetPolicyResponse(response GetPolicyRes, w http.ResponseWriter, span 
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -4993,7 +4691,6 @@ func encodeGetPolicyRevisionResponse(response GetPolicyRevisionRes, w http.Respo
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -5011,10 +4708,8 @@ func encodeGetPolicyRevisionResponse(response GetPolicyRevisionRes, w http.Respo
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -5046,7 +4741,6 @@ func encodeGetProjectResponse(response GetProjectRes, w http.ResponseWriter, spa
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -5059,7 +4753,6 @@ func encodeGetProjectResponse(response GetProjectRes, w http.ResponseWriter, spa
 	case *GetProjectUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -5072,7 +4765,6 @@ func encodeGetProjectResponse(response GetProjectRes, w http.ResponseWriter, spa
 	case *GetProjectNotFound:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -5090,10 +4782,8 @@ func encodeGetProjectResponse(response GetProjectRes, w http.ResponseWriter, spa
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -5117,7 +4807,6 @@ func encodeGetReadyResponse(response GetReadyRes, w http.ResponseWriter, span tr
 	case *GetReadyOK:
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		writer := w
 		if closer, ok := response.Data.(io.Closer); ok {
@@ -5152,10 +4841,8 @@ func encodeGetReadyResponse(response GetReadyRes, w http.ResponseWriter, span tr
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -5177,10 +4864,8 @@ func encodeGetReadyResponse(response GetReadyRes, w http.ResponseWriter, span tr
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -5212,7 +4897,6 @@ func encodeGetReleaseByIdResponse(response GetReleaseByIdRes, w http.ResponseWri
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -5230,10 +4914,8 @@ func encodeGetReleaseByIdResponse(response GetReleaseByIdRes, w http.ResponseWri
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -5265,7 +4947,6 @@ func encodeGetSchemaByIdResponse(response GetSchemaByIdRes, w http.ResponseWrite
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -5283,10 +4964,8 @@ func encodeGetSchemaByIdResponse(response GetSchemaByIdRes, w http.ResponseWrite
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -5318,7 +4997,6 @@ func encodeGetSessionResponse(response GetSessionRes, w http.ResponseWriter, spa
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -5331,7 +5009,6 @@ func encodeGetSessionResponse(response GetSessionRes, w http.ResponseWriter, spa
 	case *GetSessionUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -5344,7 +5021,6 @@ func encodeGetSessionResponse(response GetSessionRes, w http.ResponseWriter, spa
 	case *GetSessionForbidden:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -5357,7 +5033,6 @@ func encodeGetSessionResponse(response GetSessionRes, w http.ResponseWriter, spa
 	case *GetSessionNotFound:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -5375,10 +5050,8 @@ func encodeGetSessionResponse(response GetSessionRes, w http.ResponseWriter, spa
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -5410,7 +5083,6 @@ func encodeGetTeamResponse(response GetTeamRes, w http.ResponseWriter, span trac
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -5423,7 +5095,6 @@ func encodeGetTeamResponse(response GetTeamRes, w http.ResponseWriter, span trac
 	case *GetTeamUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -5436,7 +5107,6 @@ func encodeGetTeamResponse(response GetTeamRes, w http.ResponseWriter, span trac
 	case *GetTeamNotFound:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -5454,10 +5124,8 @@ func encodeGetTeamResponse(response GetTeamRes, w http.ResponseWriter, span trac
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -5489,7 +5157,6 @@ func encodeGetUserByIDResponse(response GetUserByIDRes, w http.ResponseWriter, s
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -5502,7 +5169,6 @@ func encodeGetUserByIDResponse(response GetUserByIDRes, w http.ResponseWriter, s
 	case *GetUserByIDUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -5515,7 +5181,6 @@ func encodeGetUserByIDResponse(response GetUserByIDRes, w http.ResponseWriter, s
 	case *GetUserByIDNotFound:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -5533,10 +5198,8 @@ func encodeGetUserByIDResponse(response GetUserByIDRes, w http.ResponseWriter, s
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -5560,7 +5223,6 @@ func encodeGetUserPasswordStateResponse(response GetUserPasswordStateRes, w http
 	case *UserPasswordState:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -5573,7 +5235,6 @@ func encodeGetUserPasswordStateResponse(response GetUserPasswordStateRes, w http
 	case *GetUserPasswordStateUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -5586,7 +5247,6 @@ func encodeGetUserPasswordStateResponse(response GetUserPasswordStateRes, w http
 	case *GetUserPasswordStateForbidden:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -5599,7 +5259,6 @@ func encodeGetUserPasswordStateResponse(response GetUserPasswordStateRes, w http
 	case *GetUserPasswordStateNotFound:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -5630,10 +5289,8 @@ func encodeGetUserPasswordStateResponse(response GetUserPasswordStateRes, w http
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -5665,7 +5322,6 @@ func encodeGetVariableResponse(response GetVariableRes, w http.ResponseWriter, s
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -5683,10 +5339,8 @@ func encodeGetVariableResponse(response GetVariableRes, w http.ResponseWriter, s
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -5718,7 +5372,6 @@ func encodeGetVariablesResponse(response GetVariablesRes, w http.ResponseWriter,
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -5736,10 +5389,8 @@ func encodeGetVariablesResponse(response GetVariablesRes, w http.ResponseWriter,
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -5771,7 +5422,6 @@ func encodeGetWebhookResponse(response GetWebhookRes, w http.ResponseWriter, spa
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -5784,7 +5434,6 @@ func encodeGetWebhookResponse(response GetWebhookRes, w http.ResponseWriter, spa
 	case *GetWebhookUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -5797,7 +5446,6 @@ func encodeGetWebhookResponse(response GetWebhookRes, w http.ResponseWriter, spa
 	case *GetWebhookForbidden:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -5810,7 +5458,6 @@ func encodeGetWebhookResponse(response GetWebhookRes, w http.ResponseWriter, spa
 	case *GetWebhookNotFound:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -5828,10 +5475,8 @@ func encodeGetWebhookResponse(response GetWebhookRes, w http.ResponseWriter, spa
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -5863,7 +5508,6 @@ func encodeInitClaimResponse(response InitClaimRes, w http.ResponseWriter, span 
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(201)
-		span.SetStatus(codes.Ok, http.StatusText(201))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -5876,7 +5520,6 @@ func encodeInitClaimResponse(response InitClaimRes, w http.ResponseWriter, span 
 	case *ErrorDetails:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -5889,7 +5532,6 @@ func encodeInitClaimResponse(response InitClaimRes, w http.ResponseWriter, span 
 	case *ProjNotFound:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -5910,7 +5552,6 @@ func encodeInitClaimResponse(response InitClaimRes, w http.ResponseWriter, span 
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(409)
-		span.SetStatus(codes.Error, http.StatusText(409))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -5923,7 +5564,6 @@ func encodeInitClaimResponse(response InitClaimRes, w http.ResponseWriter, span 
 	case *ProjClaimWindowExpired:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(410)
-		span.SetStatus(codes.Error, http.StatusText(410))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -5941,10 +5581,8 @@ func encodeInitClaimResponse(response InitClaimRes, w http.ResponseWriter, span 
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -5976,7 +5614,6 @@ func encodeIssueChallengeResponse(response IssueChallengeRes, w http.ResponseWri
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(201)
-		span.SetStatus(codes.Ok, http.StatusText(201))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -5994,10 +5631,8 @@ func encodeIssueChallengeResponse(response IssueChallengeRes, w http.ResponseWri
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -6029,7 +5664,6 @@ func encodeListBrandingResponse(response ListBrandingRes, w http.ResponseWriter,
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -6047,10 +5681,8 @@ func encodeListBrandingResponse(response ListBrandingRes, w http.ResponseWriter,
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -6082,7 +5714,6 @@ func encodeListDeploymentsResponse(response ListDeploymentsRes, w http.ResponseW
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -6100,10 +5731,8 @@ func encodeListDeploymentsResponse(response ListDeploymentsRes, w http.ResponseW
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -6135,7 +5764,6 @@ func encodeListEventsResponse(response ListEventsRes, w http.ResponseWriter, spa
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -6148,7 +5776,6 @@ func encodeListEventsResponse(response ListEventsRes, w http.ResponseWriter, spa
 	case *ListEventsBadRequest:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
-		span.SetStatus(codes.Error, http.StatusText(400))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -6161,7 +5788,6 @@ func encodeListEventsResponse(response ListEventsRes, w http.ResponseWriter, spa
 	case *ListEventsUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -6174,7 +5800,6 @@ func encodeListEventsResponse(response ListEventsRes, w http.ResponseWriter, spa
 	case *ListEventsForbidden:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -6192,10 +5817,8 @@ func encodeListEventsResponse(response ListEventsRes, w http.ResponseWriter, spa
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -6227,7 +5850,6 @@ func encodeListFlowDefinitionsResponse(response ListFlowDefinitionsRes, w http.R
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -6240,7 +5862,6 @@ func encodeListFlowDefinitionsResponse(response ListFlowDefinitionsRes, w http.R
 	case *ErrorDetails:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
-		span.SetStatus(codes.Error, http.StatusText(400))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -6258,10 +5879,8 @@ func encodeListFlowDefinitionsResponse(response ListFlowDefinitionsRes, w http.R
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -6293,7 +5912,6 @@ func encodeListIdpRevisionsResponse(response ListIdpRevisionsRes, w http.Respons
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -6306,7 +5924,6 @@ func encodeListIdpRevisionsResponse(response ListIdpRevisionsRes, w http.Respons
 	case *ListIdpRevisionsUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -6319,7 +5936,6 @@ func encodeListIdpRevisionsResponse(response ListIdpRevisionsRes, w http.Respons
 	case *ListIdpRevisionsForbidden:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -6332,7 +5948,6 @@ func encodeListIdpRevisionsResponse(response ListIdpRevisionsRes, w http.Respons
 	case *ListIdpRevisionsNotFound:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -6350,10 +5965,8 @@ func encodeListIdpRevisionsResponse(response ListIdpRevisionsRes, w http.Respons
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -6385,7 +5998,6 @@ func encodeListInvitationsResponse(response ListInvitationsRes, w http.ResponseW
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -6398,7 +6010,6 @@ func encodeListInvitationsResponse(response ListInvitationsRes, w http.ResponseW
 	case *ListInvitationsBadRequest:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
-		span.SetStatus(codes.Error, http.StatusText(400))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -6411,7 +6022,6 @@ func encodeListInvitationsResponse(response ListInvitationsRes, w http.ResponseW
 	case *ListInvitationsUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -6424,7 +6034,6 @@ func encodeListInvitationsResponse(response ListInvitationsRes, w http.ResponseW
 	case *ListInvitationsForbidden:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -6437,7 +6046,6 @@ func encodeListInvitationsResponse(response ListInvitationsRes, w http.ResponseW
 	case *ListInvitationsNotFound:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -6455,10 +6063,8 @@ func encodeListInvitationsResponse(response ListInvitationsRes, w http.ResponseW
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -6509,7 +6115,6 @@ func encodeListMyIdentityLinksResponse(response ListMyIdentityLinksRes, w http.R
 			}
 		}
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Response.Encode(e)
@@ -6522,7 +6127,6 @@ func encodeListMyIdentityLinksResponse(response ListMyIdentityLinksRes, w http.R
 	case *ErrorDetails:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
-		span.SetStatus(codes.Error, http.StatusText(400))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -6535,7 +6139,6 @@ func encodeListMyIdentityLinksResponse(response ListMyIdentityLinksRes, w http.R
 	case *AuthUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -6548,7 +6151,6 @@ func encodeListMyIdentityLinksResponse(response ListMyIdentityLinksRes, w http.R
 	case *SessProjectMismatch:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -6566,10 +6168,8 @@ func encodeListMyIdentityLinksResponse(response ListMyIdentityLinksRes, w http.R
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -6620,7 +6220,6 @@ func encodeListMyPasskeysResponse(response ListMyPasskeysRes, w http.ResponseWri
 			}
 		}
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Response.Encode(e)
@@ -6633,7 +6232,6 @@ func encodeListMyPasskeysResponse(response ListMyPasskeysRes, w http.ResponseWri
 	case *ErrorDetails:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
-		span.SetStatus(codes.Error, http.StatusText(400))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -6646,7 +6244,6 @@ func encodeListMyPasskeysResponse(response ListMyPasskeysRes, w http.ResponseWri
 	case *AuthUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -6659,7 +6256,6 @@ func encodeListMyPasskeysResponse(response ListMyPasskeysRes, w http.ResponseWri
 	case *SessProjectMismatch:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -6677,10 +6273,8 @@ func encodeListMyPasskeysResponse(response ListMyPasskeysRes, w http.ResponseWri
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -6731,7 +6325,6 @@ func encodeListMyProjectsResponse(response ListMyProjectsRes, w http.ResponseWri
 			}
 		}
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Response.Encode(e)
@@ -6744,7 +6337,6 @@ func encodeListMyProjectsResponse(response ListMyProjectsRes, w http.ResponseWri
 	case *ListMyProjectsBadRequest:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
-		span.SetStatus(codes.Error, http.StatusText(400))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -6757,7 +6349,6 @@ func encodeListMyProjectsResponse(response ListMyProjectsRes, w http.ResponseWri
 	case *AuthUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -6770,7 +6361,6 @@ func encodeListMyProjectsResponse(response ListMyProjectsRes, w http.ResponseWri
 	case *SessProjectMismatch:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -6801,10 +6391,8 @@ func encodeListMyProjectsResponse(response ListMyProjectsRes, w http.ResponseWri
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -6855,7 +6443,6 @@ func encodeListMyTeamsResponse(response ListMyTeamsRes, w http.ResponseWriter, s
 			}
 		}
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Response.Encode(e)
@@ -6868,7 +6455,6 @@ func encodeListMyTeamsResponse(response ListMyTeamsRes, w http.ResponseWriter, s
 	case *ErrorDetails:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
-		span.SetStatus(codes.Error, http.StatusText(400))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -6881,7 +6467,6 @@ func encodeListMyTeamsResponse(response ListMyTeamsRes, w http.ResponseWriter, s
 	case *AuthUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -6894,7 +6479,6 @@ func encodeListMyTeamsResponse(response ListMyTeamsRes, w http.ResponseWriter, s
 	case *SessProjectMismatch:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -6912,10 +6496,8 @@ func encodeListMyTeamsResponse(response ListMyTeamsRes, w http.ResponseWriter, s
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -6947,7 +6529,6 @@ func encodeListPoliciesResponse(response ListPoliciesRes, w http.ResponseWriter,
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -6965,10 +6546,8 @@ func encodeListPoliciesResponse(response ListPoliciesRes, w http.ResponseWriter,
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -7000,7 +6579,6 @@ func encodeListPolicyRevisionsResponse(response ListPolicyRevisionsRes, w http.R
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -7018,10 +6596,8 @@ func encodeListPolicyRevisionsResponse(response ListPolicyRevisionsRes, w http.R
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -7053,7 +6629,6 @@ func encodeListPreviewsResponse(response ListPreviewsRes, w http.ResponseWriter,
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -7071,10 +6646,8 @@ func encodeListPreviewsResponse(response ListPreviewsRes, w http.ResponseWriter,
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -7106,7 +6679,6 @@ func encodeListProjectAdminsResponse(response ListProjectAdminsRes, w http.Respo
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -7119,7 +6691,6 @@ func encodeListProjectAdminsResponse(response ListProjectAdminsRes, w http.Respo
 	case *ListProjectAdminsBadRequest:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
-		span.SetStatus(codes.Error, http.StatusText(400))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -7132,7 +6703,6 @@ func encodeListProjectAdminsResponse(response ListProjectAdminsRes, w http.Respo
 	case *ListProjectAdminsUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -7145,7 +6715,6 @@ func encodeListProjectAdminsResponse(response ListProjectAdminsRes, w http.Respo
 	case *ListProjectAdminsForbidden:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -7158,7 +6727,6 @@ func encodeListProjectAdminsResponse(response ListProjectAdminsRes, w http.Respo
 	case *ListProjectAdminsNotFound:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -7176,10 +6744,8 @@ func encodeListProjectAdminsResponse(response ListProjectAdminsRes, w http.Respo
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -7211,7 +6777,6 @@ func encodeListReleasesResponse(response ListReleasesRes, w http.ResponseWriter,
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -7229,10 +6794,8 @@ func encodeListReleasesResponse(response ListReleasesRes, w http.ResponseWriter,
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -7264,7 +6827,6 @@ func encodeListSchemasResponse(response ListSchemasRes, w http.ResponseWriter, s
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -7282,10 +6844,8 @@ func encodeListSchemasResponse(response ListSchemasRes, w http.ResponseWriter, s
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -7317,7 +6877,6 @@ func encodeListUserIdentityLinksResponse(response ListUserIdentityLinksRes, w ht
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -7330,7 +6889,6 @@ func encodeListUserIdentityLinksResponse(response ListUserIdentityLinksRes, w ht
 	case *ListUserIdentityLinksBadRequest:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
-		span.SetStatus(codes.Error, http.StatusText(400))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -7343,7 +6901,6 @@ func encodeListUserIdentityLinksResponse(response ListUserIdentityLinksRes, w ht
 	case *ListUserIdentityLinksUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -7356,7 +6913,6 @@ func encodeListUserIdentityLinksResponse(response ListUserIdentityLinksRes, w ht
 	case *ListUserIdentityLinksForbidden:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -7369,7 +6925,6 @@ func encodeListUserIdentityLinksResponse(response ListUserIdentityLinksRes, w ht
 	case *ListUserIdentityLinksNotFound:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -7400,10 +6955,8 @@ func encodeListUserIdentityLinksResponse(response ListUserIdentityLinksRes, w ht
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -7435,7 +6988,6 @@ func encodeListUserPasskeysResponse(response ListUserPasskeysRes, w http.Respons
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -7448,7 +7000,6 @@ func encodeListUserPasskeysResponse(response ListUserPasskeysRes, w http.Respons
 	case *ListUserPasskeysBadRequest:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
-		span.SetStatus(codes.Error, http.StatusText(400))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -7461,7 +7012,6 @@ func encodeListUserPasskeysResponse(response ListUserPasskeysRes, w http.Respons
 	case *ListUserPasskeysUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -7474,7 +7024,6 @@ func encodeListUserPasskeysResponse(response ListUserPasskeysRes, w http.Respons
 	case *ListUserPasskeysForbidden:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -7487,7 +7036,6 @@ func encodeListUserPasskeysResponse(response ListUserPasskeysRes, w http.Respons
 	case *ListUserPasskeysNotFound:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -7518,10 +7066,8 @@ func encodeListUserPasskeysResponse(response ListUserPasskeysRes, w http.Respons
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -7553,7 +7099,6 @@ func encodeListUserTeamsResponse(response ListUserTeamsRes, w http.ResponseWrite
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -7566,7 +7111,6 @@ func encodeListUserTeamsResponse(response ListUserTeamsRes, w http.ResponseWrite
 	case *ListUserTeamsBadRequest:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
-		span.SetStatus(codes.Error, http.StatusText(400))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -7579,7 +7123,6 @@ func encodeListUserTeamsResponse(response ListUserTeamsRes, w http.ResponseWrite
 	case *ListUserTeamsUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -7592,7 +7135,6 @@ func encodeListUserTeamsResponse(response ListUserTeamsRes, w http.ResponseWrite
 	case *ListUserTeamsForbidden:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -7605,7 +7147,6 @@ func encodeListUserTeamsResponse(response ListUserTeamsRes, w http.ResponseWrite
 	case *ListUserTeamsNotFound:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -7636,10 +7177,8 @@ func encodeListUserTeamsResponse(response ListUserTeamsRes, w http.ResponseWrite
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -7671,7 +7210,6 @@ func encodeListWebhooksResponse(response ListWebhooksRes, w http.ResponseWriter,
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -7684,7 +7222,6 @@ func encodeListWebhooksResponse(response ListWebhooksRes, w http.ResponseWriter,
 	case *ListWebhooksBadRequest:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
-		span.SetStatus(codes.Error, http.StatusText(400))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -7697,7 +7234,6 @@ func encodeListWebhooksResponse(response ListWebhooksRes, w http.ResponseWriter,
 	case *ListWebhooksUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -7710,7 +7246,6 @@ func encodeListWebhooksResponse(response ListWebhooksRes, w http.ResponseWriter,
 	case *ListWebhooksForbidden:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -7723,7 +7258,6 @@ func encodeListWebhooksResponse(response ListWebhooksRes, w http.ResponseWriter,
 	case *ListWebhooksNotFound:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -7741,10 +7275,8 @@ func encodeListWebhooksResponse(response ListWebhooksRes, w http.ResponseWriter,
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -7776,7 +7308,6 @@ func encodeLookupInvitationResponse(response LookupInvitationRes, w http.Respons
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -7789,7 +7320,6 @@ func encodeLookupInvitationResponse(response LookupInvitationRes, w http.Respons
 	case *LookupInvitationBadRequest:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
-		span.SetStatus(codes.Error, http.StatusText(400))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -7802,7 +7332,6 @@ func encodeLookupInvitationResponse(response LookupInvitationRes, w http.Respons
 	case *LookupInvitationUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -7815,7 +7344,6 @@ func encodeLookupInvitationResponse(response LookupInvitationRes, w http.Respons
 	case *LookupInvitationNotFound:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -7828,7 +7356,6 @@ func encodeLookupInvitationResponse(response LookupInvitationRes, w http.Respons
 	case *LookupInvitationTooManyRequests:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(429)
-		span.SetStatus(codes.Error, http.StatusText(429))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -7846,10 +7373,8 @@ func encodeLookupInvitationResponse(response LookupInvitationRes, w http.Respons
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -7881,7 +7406,6 @@ func encodePatchMyUserResponse(response PatchMyUserRes, w http.ResponseWriter, s
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -7894,7 +7418,6 @@ func encodePatchMyUserResponse(response PatchMyUserRes, w http.ResponseWriter, s
 	case *PatchMyUserBadRequest:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
-		span.SetStatus(codes.Error, http.StatusText(400))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -7907,7 +7430,6 @@ func encodePatchMyUserResponse(response PatchMyUserRes, w http.ResponseWriter, s
 	case *PatchMyUserUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -7920,7 +7442,6 @@ func encodePatchMyUserResponse(response PatchMyUserRes, w http.ResponseWriter, s
 	case *PatchMyUserForbidden:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -7933,7 +7454,6 @@ func encodePatchMyUserResponse(response PatchMyUserRes, w http.ResponseWriter, s
 	case *UserNotFound:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -7946,7 +7466,6 @@ func encodePatchMyUserResponse(response PatchMyUserRes, w http.ResponseWriter, s
 	case *PatchMyUserConflict:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(409)
-		span.SetStatus(codes.Error, http.StatusText(409))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -7964,10 +7483,8 @@ func encodePatchMyUserResponse(response PatchMyUserRes, w http.ResponseWriter, s
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -7999,7 +7516,6 @@ func encodePatchProjectResponse(response PatchProjectRes, w http.ResponseWriter,
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -8012,7 +7528,6 @@ func encodePatchProjectResponse(response PatchProjectRes, w http.ResponseWriter,
 	case *PatchProjectBadRequest:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
-		span.SetStatus(codes.Error, http.StatusText(400))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -8025,7 +7540,6 @@ func encodePatchProjectResponse(response PatchProjectRes, w http.ResponseWriter,
 	case *PatchProjectUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -8038,7 +7552,6 @@ func encodePatchProjectResponse(response PatchProjectRes, w http.ResponseWriter,
 	case *PatchProjectNotFound:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -8056,10 +7569,8 @@ func encodePatchProjectResponse(response PatchProjectRes, w http.ResponseWriter,
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -8091,7 +7602,6 @@ func encodePatchUserByIDResponse(response PatchUserByIDRes, w http.ResponseWrite
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -8104,7 +7614,6 @@ func encodePatchUserByIDResponse(response PatchUserByIDRes, w http.ResponseWrite
 	case *PatchUserByIDBadRequest:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
-		span.SetStatus(codes.Error, http.StatusText(400))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -8117,7 +7626,6 @@ func encodePatchUserByIDResponse(response PatchUserByIDRes, w http.ResponseWrite
 	case *PatchUserByIDUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -8130,7 +7638,6 @@ func encodePatchUserByIDResponse(response PatchUserByIDRes, w http.ResponseWrite
 	case *PatchUserByIDForbidden:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -8143,7 +7650,6 @@ func encodePatchUserByIDResponse(response PatchUserByIDRes, w http.ResponseWrite
 	case *PatchUserByIDNotFound:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -8156,7 +7662,6 @@ func encodePatchUserByIDResponse(response PatchUserByIDRes, w http.ResponseWrite
 	case *PatchUserByIDConflict:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(409)
-		span.SetStatus(codes.Error, http.StatusText(409))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -8174,10 +7679,8 @@ func encodePatchUserByIDResponse(response PatchUserByIDRes, w http.ResponseWrite
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -8209,7 +7712,6 @@ func encodePublishPolicyResponse(response PublishPolicyRes, w http.ResponseWrite
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(201)
-		span.SetStatus(codes.Ok, http.StatusText(201))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -8227,10 +7729,8 @@ func encodePublishPolicyResponse(response PublishPolicyRes, w http.ResponseWrite
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -8262,7 +7762,6 @@ func encodeQueryGrantsResponse(response QueryGrantsRes, w http.ResponseWriter, s
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -8275,7 +7774,6 @@ func encodeQueryGrantsResponse(response QueryGrantsRes, w http.ResponseWriter, s
 	case *QueryGrantsBadRequest:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
-		span.SetStatus(codes.Error, http.StatusText(400))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -8288,7 +7786,6 @@ func encodeQueryGrantsResponse(response QueryGrantsRes, w http.ResponseWriter, s
 	case *QueryGrantsUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -8301,7 +7798,6 @@ func encodeQueryGrantsResponse(response QueryGrantsRes, w http.ResponseWriter, s
 	case *QueryGrantsForbidden:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -8319,10 +7815,8 @@ func encodeQueryGrantsResponse(response QueryGrantsRes, w http.ResponseWriter, s
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -8354,7 +7848,6 @@ func encodeQueryIdpsResponse(response QueryIdpsRes, w http.ResponseWriter, span 
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -8367,7 +7860,6 @@ func encodeQueryIdpsResponse(response QueryIdpsRes, w http.ResponseWriter, span 
 	case *QueryIdpsBadRequest:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
-		span.SetStatus(codes.Error, http.StatusText(400))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -8380,7 +7872,6 @@ func encodeQueryIdpsResponse(response QueryIdpsRes, w http.ResponseWriter, span 
 	case *QueryIdpsUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -8393,7 +7884,6 @@ func encodeQueryIdpsResponse(response QueryIdpsRes, w http.ResponseWriter, span 
 	case *QueryIdpsForbidden:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -8406,7 +7896,6 @@ func encodeQueryIdpsResponse(response QueryIdpsRes, w http.ResponseWriter, span 
 	case *QueryIdpsNotFound:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -8424,10 +7913,8 @@ func encodeQueryIdpsResponse(response QueryIdpsRes, w http.ResponseWriter, span 
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -8459,7 +7946,6 @@ func encodeQueryProjectsResponse(response QueryProjectsRes, w http.ResponseWrite
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -8472,7 +7958,6 @@ func encodeQueryProjectsResponse(response QueryProjectsRes, w http.ResponseWrite
 	case *QueryProjectsBadRequest:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
-		span.SetStatus(codes.Error, http.StatusText(400))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -8485,7 +7970,6 @@ func encodeQueryProjectsResponse(response QueryProjectsRes, w http.ResponseWrite
 	case *QueryProjectsUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -8498,7 +7982,6 @@ func encodeQueryProjectsResponse(response QueryProjectsRes, w http.ResponseWrite
 	case *QueryProjectsForbidden:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -8511,7 +7994,6 @@ func encodeQueryProjectsResponse(response QueryProjectsRes, w http.ResponseWrite
 	case *QueryProjectsTooManyRequests:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(429)
-		span.SetStatus(codes.Error, http.StatusText(429))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -8529,10 +8011,8 @@ func encodeQueryProjectsResponse(response QueryProjectsRes, w http.ResponseWrite
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -8564,7 +8044,6 @@ func encodeQuerySessionsResponse(response QuerySessionsRes, w http.ResponseWrite
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -8577,7 +8056,6 @@ func encodeQuerySessionsResponse(response QuerySessionsRes, w http.ResponseWrite
 	case *QuerySessionsBadRequest:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
-		span.SetStatus(codes.Error, http.StatusText(400))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -8590,7 +8068,6 @@ func encodeQuerySessionsResponse(response QuerySessionsRes, w http.ResponseWrite
 	case *QuerySessionsUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -8603,7 +8080,6 @@ func encodeQuerySessionsResponse(response QuerySessionsRes, w http.ResponseWrite
 	case *QuerySessionsForbidden:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -8621,10 +8097,8 @@ func encodeQuerySessionsResponse(response QuerySessionsRes, w http.ResponseWrite
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -8656,7 +8130,6 @@ func encodeQueryTeamsResponse(response QueryTeamsRes, w http.ResponseWriter, spa
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -8669,7 +8142,6 @@ func encodeQueryTeamsResponse(response QueryTeamsRes, w http.ResponseWriter, spa
 	case *QueryTeamsBadRequest:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
-		span.SetStatus(codes.Error, http.StatusText(400))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -8682,7 +8154,6 @@ func encodeQueryTeamsResponse(response QueryTeamsRes, w http.ResponseWriter, spa
 	case *QueryTeamsUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -8695,7 +8166,6 @@ func encodeQueryTeamsResponse(response QueryTeamsRes, w http.ResponseWriter, spa
 	case *QueryTeamsForbidden:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -8708,7 +8178,6 @@ func encodeQueryTeamsResponse(response QueryTeamsRes, w http.ResponseWriter, spa
 	case *QueryTeamsNotFound:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -8721,7 +8190,6 @@ func encodeQueryTeamsResponse(response QueryTeamsRes, w http.ResponseWriter, spa
 	case *QueryTeamsTooManyRequests:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(429)
-		span.SetStatus(codes.Error, http.StatusText(429))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -8739,10 +8207,8 @@ func encodeQueryTeamsResponse(response QueryTeamsRes, w http.ResponseWriter, spa
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -8774,7 +8240,6 @@ func encodeQueryUsersResponse(response QueryUsersRes, w http.ResponseWriter, spa
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -8787,7 +8252,6 @@ func encodeQueryUsersResponse(response QueryUsersRes, w http.ResponseWriter, spa
 	case *QueryUsersBadRequest:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
-		span.SetStatus(codes.Error, http.StatusText(400))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -8800,7 +8264,6 @@ func encodeQueryUsersResponse(response QueryUsersRes, w http.ResponseWriter, spa
 	case *QueryUsersUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -8813,7 +8276,6 @@ func encodeQueryUsersResponse(response QueryUsersRes, w http.ResponseWriter, spa
 	case *QueryUsersForbidden:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -8831,10 +8293,8 @@ func encodeQueryUsersResponse(response QueryUsersRes, w http.ResponseWriter, spa
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -8866,7 +8326,6 @@ func encodeRejectInvitationResponse(response RejectInvitationRes, w http.Respons
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -8879,7 +8338,6 @@ func encodeRejectInvitationResponse(response RejectInvitationRes, w http.Respons
 	case *RejectInvitationBadRequest:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
-		span.SetStatus(codes.Error, http.StatusText(400))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -8892,7 +8350,6 @@ func encodeRejectInvitationResponse(response RejectInvitationRes, w http.Respons
 	case *RejectInvitationUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -8905,7 +8362,6 @@ func encodeRejectInvitationResponse(response RejectInvitationRes, w http.Respons
 	case *RejectInvitationForbidden:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -8918,7 +8374,6 @@ func encodeRejectInvitationResponse(response RejectInvitationRes, w http.Respons
 	case *RejectInvitationNotFound:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -8931,7 +8386,6 @@ func encodeRejectInvitationResponse(response RejectInvitationRes, w http.Respons
 	case *RejectInvitationTooManyRequests:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(429)
-		span.SetStatus(codes.Error, http.StatusText(429))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -8949,10 +8403,8 @@ func encodeRejectInvitationResponse(response RejectInvitationRes, w http.Respons
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -8975,7 +8427,6 @@ func encodeRemoveOriginResponse(response RemoveOriginRes, w http.ResponseWriter,
 	switch response := response.(type) {
 	case *RemoveOriginNoContent:
 		w.WriteHeader(204)
-		span.SetStatus(codes.Ok, http.StatusText(204))
 
 		return nil
 
@@ -8987,10 +8438,8 @@ func encodeRemoveOriginResponse(response RemoveOriginRes, w http.ResponseWriter,
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -9013,7 +8462,6 @@ func encodeRemovePreviewResponse(response RemovePreviewRes, w http.ResponseWrite
 	switch response := response.(type) {
 	case *RemovePreviewNoContent:
 		w.WriteHeader(204)
-		span.SetStatus(codes.Ok, http.StatusText(204))
 
 		return nil
 
@@ -9025,10 +8473,8 @@ func encodeRemovePreviewResponse(response RemovePreviewRes, w http.ResponseWrite
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -9068,14 +8514,12 @@ func encodeRevokeMySessionResponse(response RevokeMySessionRes, w http.ResponseW
 			}
 		}
 		w.WriteHeader(204)
-		span.SetStatus(codes.Ok, http.StatusText(204))
 
 		return nil
 
 	case *AuthUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -9088,7 +8532,6 @@ func encodeRevokeMySessionResponse(response RevokeMySessionRes, w http.ResponseW
 	case *ErrorDetails:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -9106,10 +8549,8 @@ func encodeRevokeMySessionResponse(response RevokeMySessionRes, w http.ResponseW
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -9141,7 +8582,6 @@ func encodeRevokeReleaseResponse(response RevokeReleaseRes, w http.ResponseWrite
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -9162,7 +8602,6 @@ func encodeRevokeReleaseResponse(response RevokeReleaseRes, w http.ResponseWrite
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(409)
-		span.SetStatus(codes.Error, http.StatusText(409))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -9180,10 +8619,8 @@ func encodeRevokeReleaseResponse(response RevokeReleaseRes, w http.ResponseWrite
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -9206,14 +8643,12 @@ func encodeRevokeSessionResponse(response RevokeSessionRes, w http.ResponseWrite
 	switch response := response.(type) {
 	case *RevokeSessionNoContent:
 		w.WriteHeader(204)
-		span.SetStatus(codes.Ok, http.StatusText(204))
 
 		return nil
 
 	case *RevokeSessionUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -9226,7 +8661,6 @@ func encodeRevokeSessionResponse(response RevokeSessionRes, w http.ResponseWrite
 	case *RevokeSessionForbidden:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -9244,10 +8678,8 @@ func encodeRevokeSessionResponse(response RevokeSessionRes, w http.ResponseWrite
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -9279,7 +8711,6 @@ func encodeRollbackDeploymentResponse(response RollbackDeploymentRes, w http.Res
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -9300,7 +8731,6 @@ func encodeRollbackDeploymentResponse(response RollbackDeploymentRes, w http.Res
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(201)
-		span.SetStatus(codes.Ok, http.StatusText(201))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -9313,7 +8743,6 @@ func encodeRollbackDeploymentResponse(response RollbackDeploymentRes, w http.Res
 	case *ErrorDetails:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
-		span.SetStatus(codes.Error, http.StatusText(400))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -9334,7 +8763,6 @@ func encodeRollbackDeploymentResponse(response RollbackDeploymentRes, w http.Res
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(409)
-		span.SetStatus(codes.Error, http.StatusText(409))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -9352,10 +8780,8 @@ func encodeRollbackDeploymentResponse(response RollbackDeploymentRes, w http.Res
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -9387,7 +8813,6 @@ func encodeRotateWebhookSecretResponse(response RotateWebhookSecretRes, w http.R
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -9400,7 +8825,6 @@ func encodeRotateWebhookSecretResponse(response RotateWebhookSecretRes, w http.R
 	case *RotateWebhookSecretUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -9413,7 +8837,6 @@ func encodeRotateWebhookSecretResponse(response RotateWebhookSecretRes, w http.R
 	case *RotateWebhookSecretForbidden:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -9426,7 +8849,6 @@ func encodeRotateWebhookSecretResponse(response RotateWebhookSecretRes, w http.R
 	case *RotateWebhookSecretNotFound:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -9444,10 +8866,8 @@ func encodeRotateWebhookSecretResponse(response RotateWebhookSecretRes, w http.R
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -9479,7 +8899,6 @@ func encodeSearchResponse(response SearchRes, w http.ResponseWriter, span trace.
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -9492,7 +8911,6 @@ func encodeSearchResponse(response SearchRes, w http.ResponseWriter, span trace.
 	case *SearchBadRequest:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
-		span.SetStatus(codes.Error, http.StatusText(400))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -9505,7 +8923,6 @@ func encodeSearchResponse(response SearchRes, w http.ResponseWriter, span trace.
 	case *SearchUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -9518,7 +8935,6 @@ func encodeSearchResponse(response SearchRes, w http.ResponseWriter, span trace.
 	case *SearchForbidden:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -9531,7 +8947,6 @@ func encodeSearchResponse(response SearchRes, w http.ResponseWriter, span trace.
 	case *SearchNotFound:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -9549,10 +8964,8 @@ func encodeSearchResponse(response SearchRes, w http.ResponseWriter, span trace.
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -9575,14 +8988,12 @@ func encodeSetUserPasswordResponse(response SetUserPasswordRes, w http.ResponseW
 	switch response := response.(type) {
 	case *SetUserPasswordNoContent:
 		w.WriteHeader(204)
-		span.SetStatus(codes.Ok, http.StatusText(204))
 
 		return nil
 
 	case *SetUserPasswordBadRequest:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
-		span.SetStatus(codes.Error, http.StatusText(400))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -9595,7 +9006,6 @@ func encodeSetUserPasswordResponse(response SetUserPasswordRes, w http.ResponseW
 	case *SetUserPasswordNotFound:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -9636,7 +9046,6 @@ func encodeSetUserPasswordResponse(response SetUserPasswordRes, w http.ResponseW
 			}
 		}
 		w.WriteHeader(429)
-		span.SetStatus(codes.Error, http.StatusText(429))
 
 		e := new(jx.Encoder)
 		response.Response.Encode(e)
@@ -9667,10 +9076,8 @@ func encodeSetUserPasswordResponse(response SetUserPasswordRes, w http.ResponseW
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -9746,7 +9153,6 @@ func encodeSubmitFlowStepResponse(response SubmitFlowStepRes, w http.ResponseWri
 			}
 		}
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Response.Encode(e)
@@ -9811,7 +9217,6 @@ func encodeSubmitFlowStepResponse(response SubmitFlowStepRes, w http.ResponseWri
 			}
 		}
 		w.WriteHeader(400)
-		span.SetStatus(codes.Error, http.StatusText(400))
 
 		e := new(jx.Encoder)
 		response.Response.Encode(e)
@@ -9824,7 +9229,6 @@ func encodeSubmitFlowStepResponse(response SubmitFlowStepRes, w http.ResponseWri
 	case *ErrorDetails:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(409)
-		span.SetStatus(codes.Error, http.StatusText(409))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -9865,7 +9269,6 @@ func encodeSubmitFlowStepResponse(response SubmitFlowStepRes, w http.ResponseWri
 			}
 		}
 		w.WriteHeader(429)
-		span.SetStatus(codes.Error, http.StatusText(429))
 
 		e := new(jx.Encoder)
 		response.Response.Encode(e)
@@ -9883,10 +9286,8 @@ func encodeSubmitFlowStepResponse(response SubmitFlowStepRes, w http.ResponseWri
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -9918,7 +9319,6 @@ func encodeUpdateTeamResponse(response UpdateTeamRes, w http.ResponseWriter, spa
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -9931,7 +9331,6 @@ func encodeUpdateTeamResponse(response UpdateTeamRes, w http.ResponseWriter, spa
 	case *UpdateTeamBadRequest:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
-		span.SetStatus(codes.Error, http.StatusText(400))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -9944,7 +9343,6 @@ func encodeUpdateTeamResponse(response UpdateTeamRes, w http.ResponseWriter, spa
 	case *UpdateTeamUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -9957,7 +9355,6 @@ func encodeUpdateTeamResponse(response UpdateTeamRes, w http.ResponseWriter, spa
 	case *UpdateTeamForbidden:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -9970,7 +9367,6 @@ func encodeUpdateTeamResponse(response UpdateTeamRes, w http.ResponseWriter, spa
 	case *UpdateTeamNotFound:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -9983,7 +9379,6 @@ func encodeUpdateTeamResponse(response UpdateTeamRes, w http.ResponseWriter, spa
 	case *UpdateTeamConflict:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(409)
-		span.SetStatus(codes.Error, http.StatusText(409))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -10001,10 +9396,8 @@ func encodeUpdateTeamResponse(response UpdateTeamRes, w http.ResponseWriter, spa
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -10036,7 +9429,6 @@ func encodeUpdateVariablesResponse(response UpdateVariablesRes, w http.ResponseW
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -10054,10 +9446,8 @@ func encodeUpdateVariablesResponse(response UpdateVariablesRes, w http.ResponseW
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -10089,7 +9479,6 @@ func encodeUpdateWebhookResponse(response UpdateWebhookRes, w http.ResponseWrite
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -10102,7 +9491,6 @@ func encodeUpdateWebhookResponse(response UpdateWebhookRes, w http.ResponseWrite
 	case *UpdateWebhookBadRequest:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
-		span.SetStatus(codes.Error, http.StatusText(400))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -10115,7 +9503,6 @@ func encodeUpdateWebhookResponse(response UpdateWebhookRes, w http.ResponseWrite
 	case *UpdateWebhookUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
-		span.SetStatus(codes.Error, http.StatusText(401))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -10128,7 +9515,6 @@ func encodeUpdateWebhookResponse(response UpdateWebhookRes, w http.ResponseWrite
 	case *UpdateWebhookForbidden:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
-		span.SetStatus(codes.Error, http.StatusText(403))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -10141,7 +9527,6 @@ func encodeUpdateWebhookResponse(response UpdateWebhookRes, w http.ResponseWrite
 	case *UpdateWebhookNotFound:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
-		span.SetStatus(codes.Error, http.StatusText(404))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -10159,10 +9544,8 @@ func encodeUpdateWebhookResponse(response UpdateWebhookRes, w http.ResponseWrite
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)
@@ -10194,7 +9577,6 @@ func encodeVerifyChallengeProofResponse(response VerifyChallengeProofRes, w http
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
-		span.SetStatus(codes.Ok, http.StatusText(200))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -10207,7 +9589,6 @@ func encodeVerifyChallengeProofResponse(response VerifyChallengeProofRes, w http
 	case *ErrorDetails:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(409)
-		span.SetStatus(codes.Error, http.StatusText(409))
 
 		e := new(jx.Encoder)
 		response.Encode(e)
@@ -10248,7 +9629,6 @@ func encodeVerifyChallengeProofResponse(response VerifyChallengeProofRes, w http
 			}
 		}
 		w.WriteHeader(429)
-		span.SetStatus(codes.Error, http.StatusText(429))
 
 		e := new(jx.Encoder)
 		response.Response.Encode(e)
@@ -10266,10 +9646,8 @@ func encodeVerifyChallengeProofResponse(response VerifyChallengeProofRes, w http
 			code = http.StatusOK
 		}
 		w.WriteHeader(code)
-		if st := http.StatusText(code); code >= http.StatusBadRequest {
-			span.SetStatus(codes.Error, st)
-		} else {
-			span.SetStatus(codes.Ok, st)
+		if code >= http.StatusInternalServerError {
+			span.SetStatus(codes.Error, http.StatusText(code))
 		}
 
 		e := new(jx.Encoder)

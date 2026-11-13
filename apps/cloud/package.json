@@ -9,6 +9,7 @@
     "migrate": "cd ../.. && apps/cloud/dist/nextgen-launcher migrate",
     "deploy": "sh deploy.sh",
     "schemas": "node ../../scripts/render-builtin-schemas.mjs",
+    "test": "node --test server/*.test.mjs",
     "dev": "node ../../scripts/run-cloud.mjs"
   },
   "dependencies": {

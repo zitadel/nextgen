@@ -160,8 +160,27 @@ func unfilteredListCtx(t *testing.T) context.Context {
 	return service.WithAuthzListUnrestricted(t.Context())
 }
 
-// forEachDialect runs fn once per brought-up dialect as a subtest named after the dialect.
+// oneAtATime makes every test run alone. A dialect sets it when its database
+// cannot take the tests side by side.
+var oneAtATime bool
+
+// forEachDialect runs fn once per brought-up dialect as a subtest named after
+// the dialect, beside the other tests: every test in the package shares one
+// database, so fn reads and writes only rows of its own project. A test that
+// reaches further (a statement with no project in its key, a count over a
+// whole table) calls [forEachDialectAlone].
 func forEachDialect(t *testing.T, fn func(t *testing.T, d dialect)) {
+	t.Helper()
+	if !oneAtATime {
+		t.Parallel()
+	}
+	forEachDialectAlone(t, fn)
+}
+
+// forEachDialectAlone is [forEachDialect] for a test no other test may run
+// beside. Go runs these one after another before it resumes the tests that
+// asked to run in parallel.
+func forEachDialectAlone(t *testing.T, fn func(t *testing.T, d dialect)) {
 	t.Helper()
 	require.NotEmpty(t, dialects)
 	for _, d := range dialects {

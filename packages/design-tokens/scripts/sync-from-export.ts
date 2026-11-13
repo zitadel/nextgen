@@ -1,7 +1,7 @@
 /**
  * Generic token sync from the designer's DTCG JSON exports under `figma-export/`.
  *
- *   moon run design-tokens:sync-export
+ *   turbo run sync:export --filter=@zitadel/design-tokens
  *
  * The Figma Community sync plugin pushes W3C DTCG JSON to
  * `packages/design-tokens/figma-export/` on branch `design-tokens/figma-sync`.
@@ -638,7 +638,7 @@ async function main(): Promise<void> {
     );
   }
   console.warn(
-    "Now run `moon run design-tokens:generate` and review the tokens.snapshot.spec.ts diff.",
+    "Now run `turbo run generate --filter=@zitadel/design-tokens` and review the tokens.snapshot.spec.ts diff.",
   );
 }
 

@@ -591,6 +591,7 @@ export const RESOURCES = {
       "actor_type",
       "entity_type",
       "entity_id",
+      "user_id",
       "request_id",
       "occurred_at",
     ],
@@ -615,6 +616,10 @@ export const RESOURCES = {
         },
         {
           field: "actor_id",
+          operations: ["equals"],
+        },
+        {
+          field: "user_id",
           operations: ["equals"],
         },
         {
@@ -936,9 +941,9 @@ export const RESOURCES = {
     // Addressed by flow name as well as by revision id; see `schemas`.
     idArg: "flow",
     idDescription: "flow name (newest revision) or revision id",
-    columns: ["id", "flow_definition.name", "flow_definition.status", "created_at"],
+    columns: ["id", "flow_definition.name", "created_at"],
     heading: "flow_definition.name",
-    detail: ["id", "flow_definition.name", "flow_definition.status", "created_at", "updated_at"],
+    detail: ["id", "flow_definition.name", "created_at", "updated_at"],
     list: list({
       item: ListFlowDefinitionsResponse.shape.flow_definitions.element,
       filters: [

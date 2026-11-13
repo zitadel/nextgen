@@ -41,7 +41,7 @@ INSERT INTO zitadel_nextgen.events (
     project_id, id, event_type, category,
     occurred_at, created_at,
     team_id, actor_id, actor_type,
-    entity_type, entity_id,
+    entity_type, entity_id, user_id,
     client_id, token_id, delegation_type, delegation_id, grantor, fingerprint,
     request_id, session_id, flow_id,
     operation_status, status_class,
@@ -51,11 +51,11 @@ SELECT
     $1, $2, $3, $4,
     stamp.at - ($5 * interval '1 second'), stamp.at,
     $6, $7, $8,
-    $9, $10,
-    $11, $12, $13, $14, $15, $16,
-    $17, $18, $19,
-    $20, $21,
-    $22, $23
+    $9, $10, $11,
+    $12, $13, $14, $15, $16, $17,
+    $18, $19, $20,
+    $21, $22,
+    $23, $24
 FROM stamp
 RETURNING occurred_at, created_at`
 
@@ -77,7 +77,7 @@ WHERE locktype = 'advisory'
     project_id, id, event_type, category,
     occurred_at, created_at,
     team_id, actor_id, actor_type,
-    entity_type, entity_id,
+    entity_type, entity_id, user_id,
     client_id, token_id, delegation_type, delegation_id, grantor, fingerprint,
     request_id, session_id, flow_id,
     operation_status, status_class,
@@ -147,7 +147,7 @@ func (e eventStatements) InsertEvent(ctx context.Context, event *domain.Event) e
 		event.ProjectID, event.ID, string(event.EventType), string(event.Category),
 		waitSecs,
 		nullString(event.TeamID), nullString(event.ActorID), nullActorType(event.ActorType),
-		nullString(event.EntityType), nullString(event.EntityID),
+		nullString(event.EntityType), nullString(event.EntityID), nullString(event.UserID),
 		event.ClientID, event.TokenID, event.DelegationType, event.DelegationID, event.Grantor, event.Fingerprint,
 		nullString(event.RequestID), nullString(event.SessionID), nullString(event.FlowID),
 		nullString(events.OperationStatusOf(event)), nullStatusClass(event.StatusClass),
@@ -360,6 +360,7 @@ func (e eventStatements) scanEvent(row pgx.CollectableRow) (*domain.Event, error
 		ev                                               domain.Event
 		eventType, category                              string
 		teamID, actorID, actorType, entityType, entityID sql.NullString
+		userID                                           sql.NullString
 		requestID, sessionID, flowID                     sql.NullString
 		operationStatus, statusClass                     sql.NullString
 		payload, metadata                                []byte
@@ -368,7 +369,7 @@ func (e eventStatements) scanEvent(row pgx.CollectableRow) (*domain.Event, error
 		&ev.ProjectID, &ev.ID, &eventType, &category,
 		&ev.OccurredAt, &ev.CreatedAt,
 		&teamID, &actorID, &actorType,
-		&entityType, &entityID,
+		&entityType, &entityID, &userID,
 		&ev.ClientID, &ev.TokenID, &ev.DelegationType, &ev.DelegationID, &ev.Grantor, &ev.Fingerprint,
 		&requestID, &sessionID, &flowID,
 		&operationStatus, &statusClass,
@@ -388,6 +389,7 @@ func (e eventStatements) scanEvent(row pgx.CollectableRow) (*domain.Event, error
 	}
 	ev.EntityType = nullStringPtr(entityType)
 	ev.EntityID = nullStringPtr(entityID)
+	ev.UserID = nullStringPtr(userID)
 	ev.RequestID = nullStringPtr(requestID)
 	ev.SessionID = nullStringPtr(sessionID)
 	ev.FlowID = nullStringPtr(flowID)

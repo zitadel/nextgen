@@ -20,7 +20,7 @@
  * Every slot has a block of its own. Two files in one block both count from
  * its first port, so each hands its tests the ports the other's tests hold,
  * and a start on a held port is refused. Wrapping the slot around ten blocks
- * did exactly that on CI's 16-core runner, where Vitest runs 15 workers:
+ * did exactly that on a 16-core CI runner, where Vitest ran 15 workers:
  * `start` and `status` failed whenever two slots ten apart ran them at once.
  * So `vitest.config.ts` runs at most {@link PORT_WORKERS} workers, and a slot
  * past the last block is refused, not wrapped.

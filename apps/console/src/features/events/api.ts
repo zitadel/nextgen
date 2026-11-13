@@ -1,7 +1,7 @@
 import { api } from "@/api/zitadel";
 import { LIST_PAGE_SIZE } from "@/lib/paging";
 
-import { eventsQuery, type ProjectEvent, type EventsSearch } from "./model";
+import { eventsQuery, type EventsSearch, inOccurrenceOrder, type ProjectEvent } from "./model";
 
 /** One page of a project's events, newest first. */
 interface EventPage {
@@ -68,7 +68,7 @@ export async function listNewerEvents(
 /** How many events of one request or login flow the panel lists. */
 const TIMELINE_EVENTS_LIMIT = 50;
 
-/** The events an event belongs with, oldest first; `more` says there are others. */
+/** The events an event belongs with, in the order they happened; `more` says there are others. */
 export interface EventTimeline {
   items: ProjectEvent[];
   more: boolean;
@@ -89,7 +89,7 @@ export async function listRequestEvents(
     order: "asc",
     limit: TIMELINE_EVENTS_LIMIT,
   });
-  return { items: answer.data, more: Boolean(answer.next_page_token) };
+  return { items: inOccurrenceOrder(answer.data), more: Boolean(answer.next_page_token) };
 }
 
 /**
@@ -105,7 +105,7 @@ export async function listFlowEvents(projectId: string, flowId: string): Promise
     order: "asc",
     limit: TIMELINE_EVENTS_LIMIT,
   });
-  return { items: answer.data, more: Boolean(answer.next_page_token) };
+  return { items: inOccurrenceOrder(answer.data), more: Boolean(answer.next_page_token) };
 }
 
 /** One event of the project. An id the project does not hold is a 404. */

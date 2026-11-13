@@ -1,7 +1,7 @@
 name: scaffold-advisories
 
 # Fails when a package `zitadel setup` scaffolds at a pinned version has a
-# known high or critical advisory (`cli:check-advisories`). A pinned version
+# known high or critical advisory (`@zitadel/cli#check-advisories`). A pinned version
 # never moves to a patched release by itself, and an advisory can be published
 # for it on any day, so the check runs nightly against main. It also runs on
 # pull requests that change the scaffolders or the check, so a bump onto an
@@ -31,14 +31,16 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      # Full history, same as ci.yml: in CI, moon loads changed files against
-      # `main` before running anything, and fails outright on a shallow clone
-      # where that ref does not exist.
       - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
 
-      - uses: pnpm/action-setup@v5
+      # Turbo reads the Go modules from go.work.
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: apps/api/go.mod
+          cache: true
+          cache-dependency-path: apps/api/go.sum
+
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
         with:
           run_install: false
 
@@ -50,11 +52,5 @@ jobs:
       - name: Install dependencies
         run: corepack pnpm install --frozen-lockfile
 
-      # Bare `moon` below is the workspace's own pinned @moonrepo/cli.
-      - name: Put workspace binaries on PATH
-        run: echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
-
-      # The task is `runInCI: "skip"`, so in CI `moon run` refuses it and
-      # `moon exec --ignore-ci-checks` runs it.
       - name: Check the scaffolders' pinned packages
-        run: moon exec cli:check-advisories --ignore-ci-checks
+        run: corepack pnpm exec turbo run @zitadel/cli#check-advisories
