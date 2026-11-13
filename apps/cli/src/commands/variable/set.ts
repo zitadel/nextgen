@@ -226,34 +226,34 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
           credentialSet: true,
           strict: false,
         });
-        const advice =
-          verdict === "unnamed-ci-build"
-            ? [
-                "Name the environment with --env preview: a CI build that names none is not known to be a preview, and preview skips it.",
-              ]
-            : ["Run it in the preview or development environment: preview skips any other."];
-        const next = write.preview
+        const applies =
+          "The new preview value applies to the next preview: a preview build keeps using the variables its last deploy froze.";
+        const next = !write.preview
           ? {
-              actions: [
-                "The new preview value applies to the next preview: a preview build keeps using the variables its last deploy froze.",
-                ...(verdict === "preview" ? [] : advice),
-              ],
-              commands:
-                verdict === "preview"
-                  ? [
-                      this.suggest({
-                        id: "preview",
-                        flags: { origin: ["<preview-url>"], message: WHAT_CHANGED },
-                      }),
-                    ]
-                  : [],
-            }
-          : {
               actions: [
                 "The new value applies after the next deploy: sign-ins keep using the variables the last deploy froze.",
               ],
               commands: [this.suggest({ id: "deploy", flags: { message: WHAT_CHANGED } })],
-            };
+            }
+          : verdict === "preview"
+            ? {
+                actions: [applies],
+                commands: [
+                  this.suggest({
+                    id: "preview",
+                    flags: { origin: ["<preview-url>"], message: WHAT_CHANGED },
+                  }),
+                ],
+              }
+            : {
+                actions: [
+                  applies,
+                  verdict === "unnamed-ci-build"
+                    ? "Name the environment with --env preview: a CI build that names none is not known to be a preview, and preview skips it."
+                    : "Run it in the preview or development environment: preview skips any other.",
+                ],
+                commands: [],
+              };
 
         return this.emit({
           status: "ok",

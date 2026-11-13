@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, vi } from "vitest";
 
-import { it as base } from "@tests/helpers/fixtures";
+import { recording } from "@tests/helpers/fixtures";
 
 const rosie = vi.hoisted(() => ({ agents: vi.fn() }));
 const homedir = vi.hoisted(() => vi.fn<() => string>());
@@ -15,7 +15,6 @@ vi.mock("node:os", async (importOriginal) => {
 });
 
 import { installLogSink } from "@/lib/log";
-import { recordLog } from "@tests/helpers/log";
 import { claimSkills, eligibleForSkills, showSkillsHint } from "@/lib/skills-hint";
 import { aSuggest } from "@tests/helpers/suggestions";
 
@@ -27,16 +26,7 @@ const skillsAdd = aSuggest({}, "1.2.3")({ id: "skills:add" });
 const envIn = (dir: string): NodeJS.ProcessEnv => ({ XDG_CONFIG_HOME: dir });
 
 /** `it` with what was said through `log`, which every test records. */
-const it = base.extend<{ recorded: ReturnType<typeof recordLog>; said: () => string[] }>({
-  recorded: [
-    // biome-ignore lint/correctness/noEmptyPattern: Vitest requires a destructured first argument.
-    async ({}, use) => {
-      const recorded = recordLog();
-      await use(recorded);
-      recorded.stop();
-    },
-    { auto: true },
-  ],
+const it = recording.extend<{ said: () => string[] }>({
   said: ({ recorded }, use) => {
     return use(() => {
       return recorded.said.map((line) => {

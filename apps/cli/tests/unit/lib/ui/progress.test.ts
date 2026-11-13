@@ -1,10 +1,10 @@
 import { stripVTControlCharacters as stripAnsi } from "node:util";
-import { describe, expect, test } from "vitest";
+import { describe, expect } from "vitest";
 
 import { Chain } from "@/lib/ui/chain";
 import { Progress } from "@/lib/ui/progress";
-import { recordLog } from "@tests/helpers/log";
-import { atTerminal, type Terminal } from "@tests/helpers/keyboard";
+import { atScreenRecording } from "@tests/helpers/fixtures";
+import type { Terminal } from "@tests/helpers/keyboard";
 
 /** The chain progress draws into, as a person watching a wizard or a normal command sees it. */
 const chain = (interactive: boolean, chained = true): Chain =>
@@ -20,29 +20,11 @@ const drawn = (screen: Terminal): string[] =>
     .map((line) => line.trimEnd().replace(/^(\S) {2}/, "$1 "))
     .filter((line) => line !== "" && line !== "│" && !line.startsWith("┌"));
 
-/** `it` with what was said through `log`, which every test records. */
-const it = test.extend<{
-  screen: Terminal;
-  recorded: ReturnType<typeof recordLog>;
+/** `it` with the terminal the run is at and what was said through `log`, which every test records. */
+const it = atScreenRecording.extend<{
   at: (level: string) => string[];
   said: () => string[];
 }>({
-  screen: [
-    // biome-ignore lint/correctness/noEmptyPattern: Vitest requires a destructured first argument.
-    async ({}, use) => {
-      await use(atTerminal());
-    },
-    { auto: true },
-  ],
-  recorded: [
-    // biome-ignore lint/correctness/noEmptyPattern: Vitest requires a destructured first argument.
-    async ({}, use) => {
-      const recorded = recordLog();
-      await use(recorded);
-      recorded.stop();
-    },
-    { auto: true },
-  ],
   at: ({ recorded }, use) => {
     return use((level) => {
       return recorded.said

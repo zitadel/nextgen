@@ -107,7 +107,7 @@ export default class Status extends EnvironmentCommand {
       server.runtime?.backend === "binary" && server.process !== undefined
         ? `${backend}, pid ${server.process.pid}`
         : backend;
-    const dockerSaid =
+    const dockerNote =
       backend === "docker" && !server.docker.available
         ? `, and Docker could not be asked about it${server.docker.error === undefined ? "" : `: ${escapeControlCharacters(server.docker.error)}`}`
         : "";
@@ -141,7 +141,7 @@ export default class Status extends EnvironmentCommand {
               unhealthy: `The local server is running at ${serverUrl} (${how}) but does not answer`,
               running: `The local server is running and healthy at ${serverUrl} (${how})`,
             }[server.lifecycle]
-          }${dockerSaid}.`,
+          }${dockerNote}.`,
           escapeControlCharacters(
             `${[
               ...("project_id" in project && project.project_id !== undefined

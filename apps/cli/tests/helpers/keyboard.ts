@@ -258,11 +258,12 @@ export function answering(...answers: ReadonlyArray<Answer | undefined>): Person
   const queue = [...answers];
   const seen: Seen[] = [];
   const closings: boolean[] = [];
-  const written: string[] = [];
-  /** How much had been drawn each time the person looked at the screen, so a look sees only what is new. */
-  const reads: number[] = [];
+  // biome-ignore lint/plugin: the fake keyboard's state across newListener ticks
+  let frame = "";
+  // biome-ignore lint/plugin: the fake keyboard's state across newListener ticks
+  let waiting = false;
   const terminal = atTerminal((text) => {
-    written.push(text);
+    frame += text;
     closings.push(text.includes(SHOW_CURSOR));
   });
 
@@ -282,17 +283,19 @@ export function answering(...answers: ReadonlyArray<Answer | undefined>): Person
   };
 
   terminal.keyboard.on("newListener", (event) => {
-    if (event !== "keypress") {
+    if (event !== "keypress" || waiting) {
       return;
     }
+    waiting = true;
     queueMicrotask(() => {
-      const frame = written.slice(reads.at(-1) ?? 0).join("");
+      waiting = false;
       const drawn = read(frame.slice(Math.max(frame.lastIndexOf(HIDE_CURSOR), 0)));
-      if (drawn.question !== "") {
-        seen.push({ question: drawn.question, choices: drawn.choices });
-        press(drawn);
+      frame = "";
+      if (drawn.question === "") {
+        return;
       }
-      reads.push(written.length);
+      seen.push({ question: drawn.question, choices: drawn.choices });
+      press(drawn);
     });
   });
 

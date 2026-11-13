@@ -66,6 +66,8 @@ export type Session = {
    * Draws a prompt between the caller's own steps: what it does before `draw`
    * opens the chain the prompt belongs to, and what it does once `draw`
    * settles, answered or not, spaces what follows it.
+   *
+   * @typeParam T - What the prompt resolves to.
    */
   around?: <T>(draw: () => Promise<T>) => Promise<T>;
 };

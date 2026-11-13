@@ -3,6 +3,7 @@
  * step that may be ended from several places.
  */
 export class Once {
+  /** Whether the action has been given to {@link Once.run} yet. */
   private ran = false;
 
   /**
@@ -31,10 +32,14 @@ export class Once {
 /**
  * A value made on first use and shared by every use after it, for a read that
  * is only worth starting when something needs it.
+ *
+ * @typeParam T - What the value is.
  */
 export class Lazy<T> {
+  /** Builds the value; called at most once. */
   private readonly make: () => T;
 
+  /** The value, once made; empty until the first {@link Lazy.get}. */
   private made: { readonly value: T } | undefined;
 
   /**

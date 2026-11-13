@@ -1,42 +1,17 @@
 import { stripVTControlCharacters as stripAnsi } from "node:util";
-import { afterEach, describe, expect, test } from "vitest";
+import { afterEach, describe, expect } from "vitest";
 
 import { log } from "@/lib/log";
 import { PromptCancelled, ZitadelError } from "@/lib/errors";
 import { DrawnSpinner } from "@/lib/ui/spinner";
 import { Ui } from "@/lib/ui/ui";
-import {
-  type Answer,
-  answering,
-  atTerminal,
-  type Person,
-  type Terminal,
-} from "@tests/helpers/keyboard";
+import { atScreen as it } from "@tests/helpers/fixtures";
+import { answering, type Terminal } from "@tests/helpers/keyboard";
 
 const watched = () => new Ui({ interactive: true, force: false });
 const normally = () => new Ui({ interactive: true, force: false }, "plain");
 const forced = () => new Ui({ interactive: true, force: true });
 const scripted = () => new Ui({ interactive: false, force: false });
-
-/** `it` with the terminal the run is at, and a person to answer at it. */
-const it = test.extend<{
-  screen: Terminal;
-  answering: (...answers: ReadonlyArray<Answer | undefined>) => Person;
-}>({
-  screen: [
-    // biome-ignore lint/correctness/noEmptyPattern: Vitest requires a destructured first argument.
-    async ({}, use) => {
-      await use(atTerminal());
-    },
-    { auto: true },
-  ],
-  // biome-ignore lint/correctness/noEmptyPattern: Vitest requires a destructured first argument.
-  answering: async ({}, use) => {
-    await use((...answers) => {
-      return answering(...answers);
-    });
-  },
-});
 
 afterEach(() => {
   DrawnSpinner.active.clear();
@@ -47,7 +22,7 @@ const errors = (screen: Terminal) => stripAnsi(screen.errors());
 
 describe("Ui", () => {
   describe("the questions a command may ask", () => {
-    it("opens the chain the question is drawn in", async ({ answering }) => {
+    it("opens the chain the question is drawn in", async () => {
       const person = answering(true);
       const ui = watched();
       ui.describe("Removing an origin");
@@ -73,9 +48,7 @@ describe("Ui", () => {
       expect(printed(screen)).toBe("");
     });
 
-    it("asks a plain yes or no anyway, whatever the command's --force means", async ({
-      answering,
-    }) => {
+    it("asks a plain yes or no anyway, whatever the command's --force means", async () => {
       const person = answering(false);
 
       const answer = await forced()

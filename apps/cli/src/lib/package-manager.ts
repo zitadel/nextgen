@@ -79,7 +79,8 @@ async function projectDirectories(
   }
   const parent = dirname(dir);
   if (parent === dir) {
-    return dirs.slice(0, 1);
+    // No project root above: only the directory the walk began in counts.
+    return [below[0] ?? dir];
   }
   return projectDirectories(parent, dirs);
 }

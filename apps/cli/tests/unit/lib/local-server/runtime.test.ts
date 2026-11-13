@@ -296,15 +296,21 @@ describe("readPlatformRuntime", () => {
 
 /** A response whose body reports, once a reader has read it to the end, that it was read. */
 function aResponseWhoseBodyIsRead(status: number): { response: Response; isRead: () => boolean } {
-  const pull = vi.fn((controller: ReadableStreamDefaultController<Uint8Array>) => {
-    if (pull.mock.calls.length === 1) {
-      controller.enqueue(new TextEncoder().encode("ok"));
-      return;
-    }
-    controller.close();
-  });
-  const body = new ReadableStream<Uint8Array>({ pull }, { highWaterMark: 0 });
-  return { response: new Response(body, { status }), isRead: () => pull.mock.calls.length > 1 };
+  const pulls: string[] = [];
+  const body = new ReadableStream<Uint8Array>(
+    {
+      pull(controller) {
+        pulls.push("pull");
+        if (pulls.length === 1) {
+          controller.enqueue(new TextEncoder().encode("ok"));
+          return;
+        }
+        controller.close();
+      },
+    },
+    { highWaterMark: 0 },
+  );
+  return { response: new Response(body, { status }), isRead: () => pulls.length > 1 };
 }
 
 describe("retargetMalformedRuntime", () => {

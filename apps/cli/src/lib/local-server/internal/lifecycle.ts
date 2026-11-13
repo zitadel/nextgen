@@ -330,11 +330,6 @@ export class Lifecycle<R extends ServerRecord> {
    * Claims a free port and launches the server on it, moving to the next port
    * when another process takes the claimed one first.
    *
-   * @remarks
-   * The claim is released before the next attempt claims, whatever the outcome.
-   * A claim that cannot be removed is a file whose owner is gone, which the
-   * next start takes over; it must not hide how this start ended.
-   *
    * @param requested - The port the user asked for, when they did.
    * @param preferred - The port to try first; it moves with each attempt.
    * @param attempt - The attempt this is, from zero.
@@ -371,6 +366,8 @@ export class Lifecycle<R extends ServerRecord> {
         throw error;
       })
       .finally(async () => {
+        // A claim that cannot be removed is a file whose owner is gone, which
+        // the next start takes over; it must not hide how this start ended.
         await claim.release().catch(() => {
           return undefined;
         });

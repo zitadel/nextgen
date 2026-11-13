@@ -1,17 +1,12 @@
 import { stripVTControlCharacters as stripAnsi } from "node:util";
-import { afterEach, describe, expect, test, vi } from "vitest";
+import { afterEach, describe, expect, vi } from "vitest";
 
 import { PromptCancelled, ZitadelError } from "@/lib/errors";
 import { Chain } from "@/lib/ui/chain";
 import { DrawnSpinner } from "@/lib/ui/spinner";
 import { GUIDE, MARK } from "@/lib/ui/marks";
-import {
-  type Answer,
-  answering,
-  atTerminal,
-  type Person,
-  type Terminal,
-} from "@tests/helpers/keyboard";
+import { atScreen as it } from "@tests/helpers/fixtures";
+import { answering, type Person, type Terminal } from "@tests/helpers/keyboard";
 import { asTerminal } from "@tests/helpers/terminal";
 
 const watching = () => new Chain({ interactive: true, force: false });
@@ -20,26 +15,6 @@ const scripted = () => new Chain({ interactive: false, force: false });
 
 /** How long clack waits between one frame of a spinner and the next. */
 const FRAME = 100;
-
-/** `it` with the terminal the run is at, and a person to answer at it. */
-const it = test.extend<{
-  screen: Terminal;
-  answering: (...answers: ReadonlyArray<Answer | undefined>) => Person;
-}>({
-  screen: [
-    // biome-ignore lint/correctness/noEmptyPattern: Vitest requires a destructured first argument.
-    async ({}, use) => {
-      await use(atTerminal());
-    },
-    { auto: true },
-  ],
-  // biome-ignore lint/correctness/noEmptyPattern: Vitest requires a destructured first argument.
-  answering: async ({}, use) => {
-    await use((...answers) => {
-      return answering(...answers);
-    });
-  },
-});
 
 afterEach(() => {
   vi.useRealTimers();
@@ -362,9 +337,7 @@ describe("a normal command's chain, which is no chain at all", () => {
     running.clear();
   });
 
-  it("clears a running spinner before a question is drawn and draws it again after the answer", async ({
-    answering,
-  }) => {
+  it("clears a running spinner before a question is drawn and draws it again after the answer", async () => {
     const person = answering(true);
     const chain = watching();
     const running = aSpinnerRunning(chain, "Deploying");
@@ -418,7 +391,7 @@ describe("a normal command's chain, which is no chain at all", () => {
 
   // `--force` is a flag about whether to ask. The only difference it may make
   // to what a person sees is that the question is absent.
-  it("looks the same forced as it does answering, but for the question", async ({ answering }) => {
+  it("looks the same forced as it does answering, but for the question", async () => {
     const run = (force: boolean, person: Person) => async () => {
       const chain = new Chain({ interactive: true, force }, "plain");
       removing(chain);
@@ -442,7 +415,7 @@ describe("a normal command's chain, which is no chain at all", () => {
     expect(answerer.asked()).toEqual(["Remove B from the project?"]);
   });
 
-  it("asks its questions without the guide a wizard draws", async ({ answering }) => {
+  it("asks its questions without the guide a wizard draws", async () => {
     const person = answering(true);
 
     await asTerminal(() =>
@@ -456,7 +429,7 @@ describe("a normal command's chain, which is no chain at all", () => {
     expect(stripAnsi(person.plain())).not.toContain("│");
   });
 
-  it("asks a wizard's questions with the guide", async ({ answering }) => {
+  it("asks a wizard's questions with the guide", async () => {
     const person = answering(true);
 
     await asTerminal(() =>

@@ -1,18 +1,20 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { Lazy, Once } from "@/lib/once";
 
 describe("Once", () => {
   it("runs the first action and ignores the rest", () => {
     const once = new Once();
-    const first = vi.fn();
-    const second = vi.fn();
+    const ran: string[] = [];
 
-    once.run(first);
-    once.run(second);
+    once.run(() => {
+      ran.push("first");
+    });
+    once.run(() => {
+      ran.push("second");
+    });
 
-    expect(first).toHaveBeenCalledTimes(1);
-    expect(second).not.toHaveBeenCalled();
+    expect(ran).toEqual(["first"]);
   });
 
   it("says whether it has run", () => {
@@ -26,34 +28,37 @@ describe("Once", () => {
 
 describe("Lazy", () => {
   it("makes nothing until it is asked", () => {
-    const make = vi.fn(() => {
+    const made: number[] = [];
+
+    new Lazy(() => {
+      made.push(1);
       return 1;
     });
 
-    new Lazy(make);
-
-    expect(make).not.toHaveBeenCalled();
+    expect(made).toEqual([]);
   });
 
   it("makes the value once and shares it", () => {
-    const make = vi.fn(() => {
+    const made: number[] = [];
+    const lazy = new Lazy(() => {
+      made.push(1);
       return {};
     });
-    const lazy = new Lazy(make);
 
     expect(lazy.get()).toBe(lazy.get());
-    expect(make).toHaveBeenCalledTimes(1);
+    expect(made).toHaveLength(1);
   });
 
   it("keeps a value that is undefined", () => {
-    const make = vi.fn(() => {
+    const made: number[] = [];
+    const lazy = new Lazy(() => {
+      made.push(1);
       return undefined;
     });
-    const lazy = new Lazy(make);
 
     lazy.get();
     lazy.get();
 
-    expect(make).toHaveBeenCalledTimes(1);
+    expect(made).toHaveLength(1);
   });
 });

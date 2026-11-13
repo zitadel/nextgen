@@ -1,4 +1,5 @@
 import { Config } from "@oclif/core";
+import { EventEmitter, once } from "node:events";
 import { existsSync } from "node:fs";
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import type { IncomingMessage } from "node:http";
@@ -7,7 +8,6 @@ import { parseEnv } from "node:util";
 
 import { DEFAULT_SETUP_PRESET, DEFAULT_SETUP_USE_CASE } from "@zitadel/config/defaults";
 import { HttpResponse, http, passthrough } from "msw";
-import pWaitFor from "p-wait-for";
 import { beforeEach, describe, expect, vi } from "vitest";
 
 vi.mock("@clack/prompts", async () => {
@@ -429,6 +429,7 @@ async function aCapturingPlatform(
   const projects: CreatedOnPlatform[] = [];
   const deployments: RequestedDeployment[] = [];
   const failing = { releases: false, signupPolicy: false, signupPolicyHangs: false };
+  const signupPolicyAsked = new EventEmitter();
   const url = await serve(async (req, res) => {
     const path = new URL(req.url ?? "/", "http://localhost").pathname;
     requests.push(`${req.method ?? "GET"} ${path}`);
@@ -454,6 +455,7 @@ async function aCapturingPlatform(
       path === "/api/v1/policies/evaluate" &&
       failing.signupPolicyHangs
     ) {
+      signupPolicyAsked.emit("asked");
       return;
     }
     if (req.method === "POST" && path === "/api/v1/policies/evaluate" && failing.signupPolicy) {
@@ -506,11 +508,9 @@ async function aCapturingPlatform(
     predatesTheSignupPolicy() {
       failing.signupPolicy = true;
     },
-    hangsOnTheSignupPolicy() {
+    async hangsOnTheSignupPolicy() {
       failing.signupPolicyHangs = true;
-      return pWaitFor(() => {
-        return requests.includes("POST /api/v1/policies/evaluate");
-      });
+      await once(signupPolicyAsked, "asked");
     },
   };
 }

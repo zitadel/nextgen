@@ -251,13 +251,15 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
             })),
         ...more,
       ];
+      const pretty = plain
+        ? rows(await this.renderList(plain, view))
+        : this.jsonEnabled()
+          ? painted(await this.renderList(plain, view))
+          : undefined;
       return {
         status: "ok",
         data: view.items === undefined ? view.data : this.canonicalData(view, token),
-        ...(plain ? { pretty: rows(await this.renderList(plain, view)) } : {}),
-        ...(!plain && this.jsonEnabled()
-          ? { pretty: painted(await this.renderList(plain, view)) }
-          : {}),
+        ...(pretty === undefined ? {} : { pretty }),
         ...(plain && !this.jsonEnabled() && aside.length > 0 ? { footer: aside.join("\n") } : {}),
         summary: await this.listSummary(view, more, !plain && !this.jsonEnabled()),
         ...(nextCommand === undefined ? {} : { next: { commands: [nextCommand] } }),

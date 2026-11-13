@@ -444,13 +444,15 @@ export default class EnvAdd extends Promptable(BaseCommand) {
     // The runnable `origin add` is in the next steps; the line here is
     // for the one they cannot hold: a placeholder origin, or a file
     // without the project secret it would authenticate with.
+    const needsProjectSecret = needsOrigin && !writtenKeys.has("ZITADEL_PROJECT_SECRET");
+    const needsPlaceholder = needsOrigin && !needsProjectSecret && issuer === undefined;
     const originGuidance = [
-      ...(needsOrigin && writtenKeys.has("ZITADEL_PROJECT_SECRET") && issuer === undefined
+      ...(needsPlaceholder
         ? [
             `Allow this project's origin: ${suggestOnNew({ id: "origin:add", args: { pattern: "<your-app-url>" }, flags: { kind: "primary" } })}`,
           ]
         : []),
-      ...(needsOrigin && !writtenKeys.has("ZITADEL_PROJECT_SECRET")
+      ...(needsProjectSecret
         ? [
             `Allow this project's origin once ZITADEL_PROJECT_SECRET is in ${environment.file}: ${suggestOnNew({ id: "origin:add", args: { pattern: issuer ?? "<your-app-url>" }, flags: { kind: "primary" } })}`,
           ]
@@ -461,6 +463,7 @@ export default class EnvAdd extends Promptable(BaseCommand) {
     // release is deployed the project refuses sign-in, and the `.zitadel/`
     // files in this directory are not served.
     const undeployed = createdProject && deployment === undefined;
+    const needsOriginFirst = undeployed && !hasSomewhereToLand;
     const deployGuidance = [
       ...(undeployed
         ? [
@@ -468,7 +471,7 @@ export default class EnvAdd extends Promptable(BaseCommand) {
           ]
         : []),
       // With an origin, the deploy is in the next steps.
-      ...(undeployed && !hasSomewhereToLand
+      ...(needsOriginFirst
         ? [
             `Give it an origin first: ${suggestOnNew({ id: "origin:add", args: { pattern: "<your-app-url>" }, flags: { kind: "primary" } })}`,
             `Then deploy to it: ${suggestOnNew({ id: "deploy", flags: { message: WHAT_CHANGED } })}`,

@@ -87,15 +87,10 @@ export class Progress {
     const report = Progress.collect(lines);
     if (!this.drawing.interactive) {
       narration.start(label);
-      const worked = async (): Promise<T> => {
-        try {
-          return await work(report);
-        } catch (error) {
-          narration.fail(`${label} failed`);
-          throw error;
-        }
-      };
-      const result = await worked();
+      const result = await work(report).catch((error: unknown) => {
+        narration.fail(`${label} failed`);
+        throw error;
+      });
       for (const { verb, subject } of lines) {
         narration.info(`${verb} ${subject}`);
       }

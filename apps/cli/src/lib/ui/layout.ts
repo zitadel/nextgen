@@ -260,7 +260,7 @@ export class Facts implements Renderable {
  */
 const argumentBreaks = (command: string): readonly number[] => {
   // Indexes are UTF-16 units, as `slice` reads them; quotes and spaces are never half a pair.
-  return command.split("").reduce<{ at: readonly number[]; quote?: string; escaped: boolean }>(
+  return command.split("").reduce<{ at: number[]; quote?: string; escaped: boolean }>(
     (scan, character, index) => {
       if (scan.escaped) {
         return { at: scan.at, quote: scan.quote, escaped: false };
@@ -283,7 +283,8 @@ const argumentBreaks = (command: string): readonly number[] => {
         return { at: scan.at, quote: character, escaped: false };
       }
       if (character === " ") {
-        return { at: [...scan.at, index], quote: scan.quote, escaped: false };
+        scan.at.push(index);
+        return { at: scan.at, quote: scan.quote, escaped: false };
       }
       return scan;
     },

@@ -377,28 +377,36 @@ export abstract class Store implements ConfigStore {
    *   code.
    */
   private async readFileAt(path: string): Promise<StoredFile> {
-    try {
-      const text = (
-        await this.fs.promises.readFile(this.root.resolve(path).toString(), "utf8")
-      ).toString();
-      try {
-        const body: unknown = JSON.parse(text);
-        if (!isJsonValue(body) || !isJsonObject(body)) {
-          return UnparsedFile.notAnObject(path);
+    const text = await this.fs.promises
+      .readFile(this.root.resolve(path).toString(), "utf8")
+      .then((contents) => {
+        return contents.toString();
+      })
+      .catch((error: unknown) => {
+        const code = Store.errnoOf(error);
+        // A directory named like a file cannot be parsed, but it hides nothing
+        // else: it is reported as the broken entry it is.
+        if (code === "EISDIR") {
+          return undefined;
         }
-        return { path, body };
-      } catch {
-        return UnparsedFile.invalidJson(path, text);
-      }
-    } catch (error) {
-      const code = Store.errnoOf(error);
-      // A directory named like a file cannot be parsed, but it hides nothing
-      // else: it is reported as the broken entry it is.
-      if (code === "EISDIR") {
-        return UnparsedFile.directory(path);
-      }
-      throw Store.unreadable(path, code);
+        throw Store.unreadable(path, code);
+      });
+    if (text === undefined) {
+      return UnparsedFile.directory(path);
     }
+    // `JSON.parse` never returns `undefined`, so it marks the text that is not JSON.
+    const body: unknown = await Promise.resolve(text)
+      .then(JSON.parse)
+      .catch(() => {
+        return undefined;
+      });
+    if (body === undefined) {
+      return UnparsedFile.invalidJson(path, text);
+    }
+    if (!isJsonValue(body) || !isJsonObject(body)) {
+      return UnparsedFile.notAnObject(path);
+    }
+    return { path, body };
   }
 
   /**

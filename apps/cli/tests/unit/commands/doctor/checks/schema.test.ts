@@ -87,15 +87,15 @@ function deploying(...slugs: readonly string[]): void {
  * @returns A reader of how many listings have been asked for so far.
  */
 function countingListings(): () => number {
-  const asked = vi.fn();
+  const asked: string[] = [];
   server.use(
-    http.post("*/idps/query", () => {
-      asked();
+    http.post("*/idps/query", ({ request }) => {
+      asked.push(request.url);
       return HttpResponse.json({ idps: [], next_page_token: null });
     }),
   );
   return () => {
-    return asked.mock.calls.length;
+    return asked.length;
   };
 }
 

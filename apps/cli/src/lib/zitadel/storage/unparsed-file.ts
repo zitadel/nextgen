@@ -125,13 +125,14 @@ export class UnparsedFile {
    *   no error or cannot follow the text.
    */
   private static placeParserFinds(text: string): string | undefined {
-    const places: string[] = [];
+    // biome-ignore lint/plugin: first error wins inside a visitor callback
+    let place: string | undefined;
     try {
       visit(
         text,
         {
           onError: (_error, _offset, _length, line, character) => {
-            places.push(`line ${line + 1}, column ${character + 1}`);
+            place ??= `line ${line + 1}, column ${character + 1}`;
           },
         },
         STRICT_JSON,
@@ -139,6 +140,6 @@ export class UnparsedFile {
     } catch {
       return undefined;
     }
-    return places.at(0);
+    return place;
   }
 }
