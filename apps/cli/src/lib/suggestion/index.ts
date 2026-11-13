@@ -5,6 +5,7 @@ import { type ByName, type Named, named } from "@/lib/names";
 import { newestCliCommand, optionArgs, publicCliCommand } from "@/lib/public-cli";
 
 import type { RELATIONS } from "./relations";
+import { runsTheCli, type StartsWithTheCli } from "./shell";
 
 /**
  * A command the CLI suggests running next — a `next.commands` entry on a
@@ -435,43 +436,38 @@ function canonical(value: unknown): string {
   });
 }
 
-/** The ways a command line can run this CLI, which a suggestion of it never spells by hand. */
-type CliInvocation = `${"zitadel" | "npx @zitadel/cli" | "@zitadel/cli"}${" " | "@"}${string}`;
-
 /**
- * `Command`, unless it runs this CLI: then a message in its place, so writing
- * one by hand does not compile.
- */
-type NotTheCli<Command extends string> = Command extends CliInvocation | "zitadel"
-  ? "run the CLI through a suggestion object, not shellCommand"
-  : Command;
-
-/**
- * Each step of a shell command line that runs this CLI: a word or package
- * runner that starts it, at the start of the line or after `&&`, `||`, `;` or
- * a pipe.
- */
-const RUNS_THE_CLI =
-  /(?:^|&&|\|\||;|\|)\s*(?:zitadel|(?:npx|bunx|pnpm\s+dlx|yarn\s+dlx)(?:\s+-y)?\s+@zitadel\/cli(?:@\S*)?|@zitadel\/cli(?:@\S*)?)(?=\s|$)/;
-
-/**
- * A command that is not the CLI (`npm install …`, `rm …`), suggested as written.
- * One that runs the CLI is refused: as a literal by the compiler, and as a
- * string built at run time when it is made, since only the renderer checks a
- * CLI command against what it names.
+ * Nothing more than `Command`, unless the compiler can tell that it starts by
+ * running this CLI ({@link StartsWithTheCli}): then a property no string has,
+ * so the call does not compile and the error says what to write instead.
  *
+ * @typeParam Command - The command line, as the call spells it.
+ */
+type NotTheCli<Command extends string> = Command extends StartsWithTheCli
+  ? { readonly "suggest the CLI as { id, args, flags }": never }
+  : unknown;
+
+/**
+ * A command that is not the CLI (`npm install …`, `rm …`), suggested as
+ * written. One that runs the CLI is refused, since only the renderer checks a
+ * CLI command against the command it names: a literal the compiler can read as
+ * starting with the CLI does not compile ({@link StartsWithTheCli}), and any
+ * line that runs it in some step throws when it is made ({@link runsTheCli}).
+ *
+ * @typeParam Command - The command line, as the call spells it.
  * @param command - The command line, as a shell runs it.
  * @returns The command.
- * @throws {Error} When the command runs this CLI.
+ * @throws {Error} When a step of the command runs this CLI.
  */
 export function shellCommand<const Command extends string>(
   command: Command & NotTheCli<Command>,
 ): SuggestedCommand {
-  if (RUNS_THE_CLI.test(command)) {
-    throw new Error(`${command} runs the CLI: suggest it as { id, args, flags } instead`);
+  const line: string = command;
+  if (runsTheCli(line)) {
+    throw new Error(`${line} runs the CLI: suggest it as { id, args, flags } instead`);
   }
 
-  return command as string as SuggestedCommand;
+  return line as SuggestedCommand;
 }
 
 /**
