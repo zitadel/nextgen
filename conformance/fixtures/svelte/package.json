@@ -1,0 +1,36 @@
+{
+  "name": "@zitadel/conformance-svelte",
+  "private": true,
+  "version": "0.0.0",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "typecheck": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json",
+    "install-browsers": "playwright install chromium",
+    "generate": "conformance-fixture generate",
+    "check-generate": "conformance-fixture check",
+    "conformance": "playwright test"
+  },
+  "dependencies": {
+    "@zitadel/sdk-svelte": "workspace:*"
+  },
+  "devDependencies": {
+    "@playwright/test": "catalog:",
+    "@sveltejs/vite-plugin-svelte": "^7.3.1",
+    "@tsconfig/svelte": "^5.0.8",
+    "@types/node": "catalog:",
+    "@zitadel/conformance": "workspace:*",
+    "@zitadel/testing": "workspace:*",
+    "svelte": "^5.57.2",
+    "svelte-check": "^4.7.7",
+    "typescript": "catalog:",
+    "vite": "catalog:"
+  },
+  "conformance": {
+    "framework": "svelte",
+    "appPort": 3213,
+    "zitadelPort": 8213,
+    "generatePort": 8313
+  }
+}

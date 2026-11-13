@@ -1,0 +1,34 @@
+{
+  "name": "@zitadel/conformance-solid",
+  "private": true,
+  "version": "0.0.0",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "typecheck": "tsc -b",
+    "install-browsers": "playwright install chromium",
+    "generate": "conformance-fixture generate",
+    "check-generate": "conformance-fixture check",
+    "conformance": "playwright test"
+  },
+  "dependencies": {
+    "@zitadel/sdk-solid": "workspace:*",
+    "solid-js": "^1.9.17"
+  },
+  "devDependencies": {
+    "@playwright/test": "catalog:",
+    "@types/node": "catalog:",
+    "@zitadel/conformance": "workspace:*",
+    "@zitadel/testing": "workspace:*",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vite-plugin-solid": "^2.11.14"
+  },
+  "conformance": {
+    "framework": "solid",
+    "appPort": 3214,
+    "zitadelPort": 8214,
+    "generatePort": 8314
+  }
+}

@@ -46,16 +46,20 @@ Its contract is the `conformance` field in its `package.json`:
 
 Fixtures take `32xx`, `82xx` and `83xx` with the same `xx`.
 
-`generate` keeps what setup wrote, less what no fixture commits: install
-output, the secret and the env files that carry it, the CLI's own state
-(`zitadel.json`, `.zitadel/`), which the app never reads, the docs setup
-writes for a person (`README.md`, `AGENTS.md`), and editor and npm settings.
-Of the generated scripts it keeps `dev` and the generator's own type-check
-as `typecheck` (sv's `check`, the `tsc -b` of create-vite's `build`). It
-points `@zitadel/*` at the workspace and a dependency the pnpm catalog holds
-at `catalog:`, and fails when the catalog's floor is below what the
-generator writes, naming the bump. It adds the lane's scripts and dev
-dependencies. Beside the app, a fixture has three files of its own:
+`generate` keeps what a commit of the app would hold, by the app's own
+`.gitignore` (which leaves out install output and generated types such as
+`.nuxt/` and `next-env.d.ts`), less what no fixture commits: the secret and
+the env files that carry it, the CLI's own state (`zitadel.json`,
+`.zitadel/`), which the app never reads, the docs setup writes for a person
+(`README.md`, `AGENTS.md`), and editor and npm settings. Of the generated
+scripts it keeps `dev` and the generator's own type-check as `typecheck`
+(sv's `check`, the `tsc -b` or `vue-tsc -b` create-vite's `build` starts
+with). It points `@zitadel/*` at the workspace and a dependency the pnpm
+catalog holds at `catalog:`, and fails when the catalog's floor is below
+what the generator writes, naming the bump; a catalog ahead of it
+(create-next-app's exact pins and older majors) stays `catalog:`, so a
+fixture never runs an older release than a customer gets. It adds the
+lane's scripts and dev dependencies. Beside the app, a fixture has three files of its own:
 `playwright.config.mts`, `conformance.spec.ts` and `turbo.json`, which only
 extends the suite's.
 
