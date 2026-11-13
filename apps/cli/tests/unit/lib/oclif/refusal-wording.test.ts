@@ -15,11 +15,24 @@ const ALWAYS = ["value", "input", "problem"];
  */
 const PLACEHOLDER = /(?<!\$)\{([\w-]+)\}/g;
 
-/** What a flag or argument is refused for, filled only by `read`. */
-const REFUSED = /const (\w+): Refused<[^>]*> = \{/g;
+/**
+ * What a flag or argument is refused for, filled only by `read`: an object a
+ * const holds, typed `: Refused<T>` or followed by `as const satisfies
+ * Refused<T>` ({@link SATISFIES_REFUSED}).
+ */
+const REFUSED = /const (\w+)(: Refused<[^>]*>)? = \{/g;
 
-/** A refusal thrown by hand, filled by whoever throws it. */
-const REFUSAL = /const (\w+): Refusal = \{/g;
+/** What follows a `Refused` declared without a type, once its object closes. */
+const SATISFIES_REFUSED = " as const satisfies Refused<";
+
+/**
+ * A refusal thrown by hand, filled by whoever throws it: typed `: Refusal`, or
+ * followed by `as const satisfies Refusal` ({@link SATISFIES_REFUSAL}).
+ */
+const REFUSAL = /const (\w+)(: Refusal)? = \{/g;
+
+/** What follows a `Refusal` declared without a type, once its object closes. */
+const SATISFIES_REFUSAL = " as const satisfies Refusal";
 
 /**
  * Where a refusal is thrown: everything from the call to the values it hands
@@ -89,16 +102,30 @@ async function declared(): Promise<Declared[]> {
     const source = await readFile(join(root, file), "utf8");
     for (const match of source.matchAll(REFUSED)) {
       const opened = match.index + match[0].length - 1;
-      found.push({ file, text: literalAt(source, opened) });
+      const literal = literalAt(source, opened);
+      if (
+        match[2] === undefined &&
+        !source.startsWith(SATISFIES_REFUSED, opened + literal.length)
+      ) {
+        continue;
+      }
+      found.push({ file, text: literal });
     }
     for (const match of source.matchAll(REFUSAL)) {
       const opened = match.index + match[0].length - 1;
+      const literal = literalAt(source, opened);
+      if (
+        match[2] === undefined &&
+        !source.startsWith(SATISFIES_REFUSAL, opened + literal.length)
+      ) {
+        continue;
+      }
       const thrown = [...source.matchAll(THROWN)]
         .filter((throwing) => (throwing[1] ?? "").includes(match[1] as string))
         .map((throwing) => valuesAt(source, throwing.index + throwing[0].length - 1));
       // A refusal nothing throws is dead, which another test would catch; it
       // is weighed on its wording alone.
-      found.push({ file, text: [literalAt(source, opened), ...thrown].join("\n") });
+      found.push({ file, text: [literal, ...thrown].join("\n") });
     }
   }
   return found;
@@ -124,10 +151,10 @@ function unfilled(text: string): string[] {
 
 /**
  * A refusal's wording reaches the person, so a placeholder nothing fills shows
- * them `{min}` where a number belonged. The compiler refuses one for a refusal
- * declared `as const satisfies Refusal` (or `Refused`), whose wording it can
- * read; this covers the few it cannot, declared with a type annotation because
- * a `next` suggestion in a flag's own refusal would make its type circular.
+ * them `{min}` where a number belonged. The compiler refuses one where it can
+ * read the wording; this weighs every refusal, so one it cannot read is caught
+ * too: wording joined with `+`, a refusal chosen by a condition, a refusal
+ * typed with an annotation because its `next` would make its type circular.
  */
 describe("what a flag or argument is refused for", () => {
   it("asks only for what something fills", async () => {
