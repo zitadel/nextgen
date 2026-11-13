@@ -8,14 +8,16 @@
     // Regenerate the embed (@zitadel/server#generate) before this when the OpenAPI
     // YAML changes.
     //
-    // Turbo hashes every NEXT_* variable into the tasks of a Next.js package,
-    // and on Vercel each deployment brings its own: NEXT_DEPLOYMENT_ID (see
-    // build), and Vercel's own variables under NEXT_PUBLIC_VERCEL_ (the
-    // deployment's URL, its commit), which the docs service's builds hash
-    // too: a preview missed both tasks with their inputs unchanged. Neither
-    // reads one, so both drop them all and hit the cache there.
+    // Turbo's Next.js inference hashes NEXT_PUBLIC_*, NEXT_DEPLOYMENT_ID and,
+    // when VERCEL_SKEW_PROTECTION_ENABLED is set, VERCEL_DEPLOYMENT_ID into
+    // every task of this package. The hosted cloud's project has Skew
+    // Protection on, so every deployment brings a new ID (see build). Vercel's
+    // NEXT_PUBLIC_VERCEL_* (its URL, its commit) change with it, and turbo
+    // drops those only where Vercel names their prefix (see the root's
+    // globalEnv). Neither task reads any of them, so both drop them all and
+    // hit the cache across deployments.
     "generate": {
-      "env": ["!NEXT_*"],
+      "env": ["!NEXT_*", "!VERCEL_DEPLOYMENT_ID"],
       "inputs": [
         "$TURBO_EXTENDS$",
         "$TURBO_ROOT$/apps/api/api/openapi/bundled/openapi.json",
@@ -39,7 +41,7 @@
     // The live examples (components/examples) import the components, the
     // mock and the client the mock calls, each from its dist/.
     "typecheck": {
-      "env": ["!NEXT_*"],
+      "env": ["!NEXT_*", "!VERCEL_DEPLOYMENT_ID"],
       "dependsOn": [
         "generate",
         "@zitadel/api#generate",
