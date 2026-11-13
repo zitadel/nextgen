@@ -109,8 +109,8 @@ Resource IDs are prefixed opaque strings (`user_01H…`, `proj_01H…`,
 prefixed form in `example:` fields, never the retired dictionary slug
 (`river-8421`).
 
-- Name a resource's own ID `id`. The short-lived sign-in objects keep the name a
-  reference to them uses: `session_id`, `attempt_id`, `challenge_id`, `registration_id`.
+- Name a resource's own ID `id`. A session, auth attempt, challenge and passkey
+  registration use `session_id`, `attempt_id`, `challenge_id`, `registration_id`.
 
 ## CLI commands — `x-zitadel-cli`
 
