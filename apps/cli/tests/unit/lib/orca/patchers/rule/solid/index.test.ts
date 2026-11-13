@@ -32,17 +32,6 @@ function writeContents(plan: ScaffoldPlan, path: string): string | undefined {
 }
 
 describe("SolidPatcher.plan", () => {
-  it("writes the server's address to .env.local, where the dev proxy reads it", () => {
-    const env = new SolidPatcher()
-      .plan(ctx())
-      .ops.filter(
-        (op): op is Extract<FileOp, { kind: "merge-env" }> =>
-          op.kind === "merge-env" && op.path === ".env.local",
-      );
-
-    expect(env.map((op) => op.entries.ZITADEL_URL)).toContain("https://api.zitadel.cloud");
-  });
-
   it("writes the managed App.tsx and merges the Vite config", () => {
     const plan = new SolidPatcher().plan(ctx());
     expect(writeContents(plan, "src/App.tsx")).toContain(MANAGED_MARKER);

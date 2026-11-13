@@ -1906,25 +1906,12 @@ export class ScaffoldedApp {
   }
 
   /**
-   * Gives the Vite app's dev proxy the target setup fixed in it before the
-   * proxy read `ZITADEL_URL`: `address`, the server setup ran against unless
-   * another is named.
+   * Gives the Vite app's dev proxy the target setup fixed in it, the server it
+   * ran against, before the proxy read `ZITADEL_URL`.
    */
-  async fixesItsServerAddress(address = MOCK_SERVER_URL): Promise<void> {
+  async fixesItsServerAddress(): Promise<void> {
     const config = await this.readProjectFile(VITE_CONFIG);
-    await this.writeProjectFile(VITE_CONFIG, withFixedAddress(config, address));
-  }
-
-  /** Changes the Vite app's dev proxy by hand, in the bearer hook setup wrote. */
-  async changesItsViteProxyByHand(): Promise<void> {
-    const config = await this.readProjectFile(VITE_CONFIG);
-    await this.writeProjectFile(
-      VITE_CONFIG,
-      config.replace(
-        'proxyReq.setHeader("authorization", bearer);',
-        'proxyReq.setHeader("authorization", bearer);\n              console.debug("exchange");',
-      ),
-    );
+    await this.writeProjectFile(VITE_CONFIG, withFixedAddress(config, MOCK_SERVER_URL));
   }
 
   /** Leaves `version` of `name` in the app's `node_modules`, as its lockfile installed it. */

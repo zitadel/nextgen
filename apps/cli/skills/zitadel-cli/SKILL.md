@@ -1037,18 +1037,23 @@ reads the cookies they keep. `doctor --fix` replaces hooks that are as the CLI
 wrote them; ones changed by hand must be updated by hand, which the failure
 says. Browsers signed in before the change sign in again.
 
-A Vite app's dev proxy reaches the server at `ZITADEL_URL`, read as Vite's
-`loadEnv` reads it: the process environment first, then the env files, among
-them `.env.local`, where `setup` writes it for every framework. So a test run
-points the app at its own server through the environment. Without it the dev
-server refuses to start, naming the variable and `.env.local`; `vite build`
-does not need it. A proxy an older CLI wrote fixes the server's address in
-`vite.config.*`: the app still works, but `doctor` fails it (`managed-files`,
-`outdated managed config wiring`). `doctor --fix` moves a proxy that is as the
-CLI wrote it and names the server `zitadel.json` names onto `ZITADEL_URL`, and
-writes that server to `.env.local` unless the file sets `ZITADEL_URL` already.
-A proxy changed by hand, or fixing another address, must be moved by hand,
-which the failure says.
+A Vite app's dev proxy (React, Vue, Solid, Svelte, Qwik) reaches the server
+at `ZITADEL_URL`, read with Vite's `loadEnv`: the process environment first,
+then `.env.development.local` (which `setup` writes it to, beside
+`.env.local`), `.env.development`, `.env.local` and `.env`, then the address
+`setup` ran against, which `vite.config.*` carries as the fallback. So a test
+run points the app at its own server through the environment, and an app
+without the variable keeps working. A `ZITADEL_URL` without an http(s) scheme
+stops the config from loading, naming the variable; one with a path is reduced
+to its origin. A proxy an older CLI wrote fixes the address in
+`vite.config.*`: it still works, and `doctor` warns (`managed-files`,
+`unapplied managed config edit(s)`). `doctor --fix`, which `upgrade` runs,
+turns it into the current target with that address as the fallback, moving
+nothing between files. It leaves the proxy alone, with a warning naming both
+addresses and the file, while the env files set `ZITADEL_URL` to another
+server, and it warns about a proxy changed by hand or a target set on purpose
+without touching either. Angular's `proxy.conf.cjs` reads the process
+environment, then `.env.local`, and stops when neither sets `ZITADEL_URL`.
 
 ## Testing the app
 

@@ -56,7 +56,20 @@ export type PatchContext = PatchView &
      * that existed before the record, so legacy restores stay full-page.
      */
     posture?: ScaffoldPosture;
+    /**
+     * The `ZITADEL_URL` the app's development env files set, read by
+     * `doctor` in Vite's order ({@link DevelopmentServerUrl}), so a repair
+     * never moves an app onto a server those files name. Setup leaves it out.
+     */
+    developmentServerUrl?: DevelopmentServerUrl;
   }>;
+
+/**
+ * `ZITADEL_URL` as the first development env file that assigns it sets it,
+ * in Vite's order: `.env.development.local`, `.env.development`,
+ * `.env.local`, `.env`. `value` may be empty.
+ */
+export type DevelopmentServerUrl = Readonly<{ value: string; file: string }>;
 
 /** Where and how a patch is applied. Family-neutral (no file-op coupling). */
 export type PatchExecOptions = Readonly<{

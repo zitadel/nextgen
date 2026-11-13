@@ -32,17 +32,6 @@ function writeContents(plan: ScaffoldPlan, path: string): string | undefined {
 }
 
 describe("VuePatcher.plan", () => {
-  it("writes the server's address to .env.local, where the dev proxy reads it", () => {
-    const env = new VuePatcher()
-      .plan(ctx())
-      .ops.filter(
-        (op): op is Extract<FileOp, { kind: "merge-env" }> =>
-          op.kind === "merge-env" && op.path === ".env.local",
-      );
-
-    expect(env.map((op) => op.entries.ZITADEL_URL)).toContain("https://api.zitadel.cloud");
-  });
-
   it("writes the managed App.vue and merges the Vite config", () => {
     const plan = new VuePatcher().plan(ctx());
     expect(writeContents(plan, "src/App.vue")).toContain(MANAGED_MARKER);

@@ -1,6 +1,6 @@
 import { sdkVersionForCli } from "@/lib/public-cli";
 import type { FileOp } from "@/lib/orca/patchers/rule/file-writer/types";
-import type { PatchContext, PatchView } from "@/lib/orca/patchers/types";
+import type { DevelopmentServerUrl, PatchContext, PatchView } from "@/lib/orca/patchers/types";
 import { AbstractRulePatcher } from "@/lib/orca/patchers/rule/base";
 import { PUBLIC_PROJECT_ID_VARIABLE } from "@/lib/orca/patchers/rule/public-project-id";
 import {
@@ -50,8 +50,8 @@ export class SveltePatcher extends AbstractRulePatcher implements ViteSupport {
     return framework === "svelte";
   }
 
-  viteProxyOp(devPort: number, previousPort?: number): FileOp {
-    return buildViteProxyOp(devPort, previousPort);
+  viteProxyOp(devPort: number, server: string, previousPort?: number): FileOp {
+    return buildViteProxyOp(devPort, server, previousPort);
   }
 
   viteSessionCookieOp(): FileOp {
@@ -62,8 +62,8 @@ export class SveltePatcher extends AbstractRulePatcher implements ViteSupport {
     return buildViteApiPrefixOp();
   }
 
-  viteServerAddressOp(server: string): FileOp {
-    return buildViteServerAddressOp(server);
+  viteServerAddressOp(override?: DevelopmentServerUrl): FileOp {
+    return buildViteServerAddressOp(override);
   }
 
   protected override async preflight(_ctx: PatchContext, cwd: string): Promise<void> {
@@ -71,16 +71,16 @@ export class SveltePatcher extends AbstractRulePatcher implements ViteSupport {
   }
 
   protected devPortOps(ctx: PatchContext, previousPort: number | undefined): FileOp[] {
-    return [this.viteProxyOp(ctx.framework.devPort, previousPort)];
+    return [this.viteProxyOp(ctx.framework.devPort, ctx.server, previousPort)];
   }
 
   protected routeOps(ctx: PatchContext): FileOp[] {
     return [
       { kind: "write", path: ROOT.path, contents: appTemplate(ctx) },
-      this.viteProxyOp(ctx.framework.devPort),
+      this.viteProxyOp(ctx.framework.devPort, ctx.server),
       this.viteSessionCookieOp(),
       this.viteApiPrefixOp(),
-      this.viteServerAddressOp(ctx.server),
+      this.viteServerAddressOp(this.developmentServerUrl(ctx)),
       // Vite only exposes VITE_-prefixed vars to client code (import.meta.env).
       {
         kind: "merge-env",

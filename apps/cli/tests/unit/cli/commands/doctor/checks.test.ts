@@ -31,7 +31,7 @@ import { write } from "@tests/helpers/git-repo";
 import { readJson } from "@tests/helpers/local-project";
 import { bearerOnlyProxyConf, v1ProxyConf } from "@tests/helpers/proxy-conf";
 import { rejectionOf } from "@tests/helpers/thrown-value";
-import { viteConfig, withFixedAddress } from "@tests/helpers/vite-config";
+import { viteConfig, withFixedAddress, withoutBlankLines } from "@tests/helpers/vite-config";
 
 /**
  * The project the config and the secret name.
@@ -330,14 +330,33 @@ async function anAngularProject(dir: string): Promise<void> {
 }
 
 /**
+ * `ZITADEL_URL` in the env files setup writes, as it writes them: the server
+ * `zitadel.json` names.
+ */
+const SETUP_ENV_FILES = {
+  ".env.local": `ZITADEL_ISSUER=http://localhost:5173\nZITADEL_URL=${CLOUD}\n`,
+  ".env.development.local": `ZITADEL_URL=${CLOUD}\n`,
+};
+
+/**
+ * A server other than {@link CLOUD}.
+ */
+const OTHER_SERVER = "https://other.example";
+
+/**
  * Fills `dir` with a React (Vite) managed project whose `vite.config.ts` is
- * `config` and whose `.env.local` holds `env` beside the issuer.
+ * `config`, with `files` beside it, its env files as setup writes them unless
+ * `files` replaces one.
  *
  * @param dir - The directory to fill.
  * @param config - The Vite config.
- * @param env - Extra `.env.local` lines.
+ * @param files - Files written over the project's own, such as an env file.
  */
-async function aReactProject(dir: string, config: string, env: string = ""): Promise<void> {
+async function aReactProject(
+  dir: string,
+  config: string,
+  files: Readonly<Record<string, string>> = {},
+): Promise<void> {
   await write(dir, {
     "package.json": JSON.stringify({
       name: "demo",
@@ -348,9 +367,10 @@ async function aReactProject(dir: string, config: string, env: string = ""): Pro
       server: CLOUD,
       framework: { id: "react" },
     }),
-    ".env.local": `ZITADEL_ISSUER=http://localhost:5173\n${env}`,
+    ...SETUP_ENV_FILES,
     [VITE_CONFIG]: config,
     "src/App.tsx": `${MANAGED_MARKER}\nexport default function App() {}\n`,
+    ...files,
   });
   await writeSecret(dir, SECRET);
 }
@@ -1629,39 +1649,68 @@ describe("ManagedFilesCheck", () => {
 
   describe("with a Vite project's dev proxy", () => {
     it("passes a proxy that reads the server's address from ZITADEL_URL", async ({ dir }) => {
-      await aReactProject(dir, viteConfig());
+      await aReactProject(dir, viteConfig(CLOUD));
 
       const outcome = await new ManagedFilesCheck().run(aCheckContext(dir));
 
       expect(outcome.status).toBe("pass");
     });
 
-    it("fails on a proxy that fixes the server's address, offering doctor --fix", async ({
+    it("warns, offering doctor --fix, on a proxy that fixes the server's address", async ({
       dir,
     }) => {
-      await aReactProject(dir, withFixedAddress(viteConfig(), CLOUD));
+      await aReactProject(dir, withFixedAddress(viteConfig(CLOUD), CLOUD));
 
       const outcome = await new ManagedFilesCheck().run(aCheckContext(dir));
 
       expect(outcome).toMatchObject({
-        status: "fail",
-        message: expect.stringMatching(
-          /outdated managed config wiring: vite\.config\.ts[\s\S]*doctor --fix reads it from ZITADEL_URL/,
+        status: "warn",
+        message: expect.stringContaining(
+          "unapplied managed config edit(s): vite.config.ts (doctor --fix applies them)",
         ),
       });
     });
 
-    it("fails on a proxy that fixes another server's address, leaving it to the developer", async ({
+    it("warns, naming both addresses and the file, while .env.development.local names another server", async ({
       dir,
     }) => {
-      await aReactProject(dir, withFixedAddress(viteConfig(), "https://other.example"));
+      await aReactProject(dir, withFixedAddress(viteConfig(CLOUD), CLOUD), {
+        ".env.development.local": `ZITADEL_URL=${OTHER_SERVER}\n`,
+      });
 
       const outcome = await new ManagedFilesCheck().run(aCheckContext(dir));
 
       expect(outcome).toMatchObject({
-        status: "fail",
-        message: expect.stringContaining("must read ZITADEL_URL by hand"),
+        status: "warn",
+        message: expect.stringContaining(
+          `fixes ${CLOUD}, but .env.development.local sets ZITADEL_URL to ${OTHER_SERVER}`,
+        ),
       });
+    });
+
+    it("warns, not fails, on a proxy whose bearer hook was changed by hand", async ({ dir }) => {
+      await aReactProject(
+        dir,
+        withFixedAddress(viteConfig(CLOUD), CLOUD).replace(
+          'proxyReq.setHeader("authorization", bearer);',
+          'proxyReq.setHeader("authorization", bearer);\n            console.debug("exchange");',
+        ),
+      );
+
+      const outcome = await new ManagedFilesCheck().run(aCheckContext(dir));
+
+      expect(outcome).toMatchObject({
+        status: "warn",
+        message: expect.stringContaining("was changed since zitadel setup wrote it"),
+      });
+    });
+
+    it("says why a config it cannot read is unverifiable once", async ({ dir }) => {
+      await aReactProject(dir, "module.exports = () => ({});\n");
+
+      const outcome = await new ManagedFilesCheck().run(aCheckContext(dir));
+
+      expect(outcome.message.match(/vite\.config\.ts \(/g)).toHaveLength(1);
     });
   });
 
@@ -2292,53 +2341,87 @@ describe("ManagedFilesCheck", () => {
     });
 
     describe("with a Vite proxy that fixes the server's address", () => {
-      it("moves the proxy onto ZITADEL_URL", async ({ dir }) => {
-        await aReactProject(dir, withFixedAddress(viteConfig(), CLOUD));
+      it("moves the proxy onto ZITADEL_URL, keeping the address as its fallback", async ({
+        dir,
+      }) => {
+        await aReactProject(dir, withFixedAddress(viteConfig(CLOUD), CLOUD));
 
         await new ManagedFilesCheck().fix(aCheckContext(dir));
 
-        expect(await textOf(dir, VITE_CONFIG)).toBe(viteConfig());
-      });
-
-      it("carries the address into .env.local", async ({ dir }) => {
-        await aReactProject(dir, withFixedAddress(viteConfig(), CLOUD));
-
-        await new ManagedFilesCheck().fix(aCheckContext(dir));
-
-        expect(await textOf(dir, ".env.local")).toMatch(
-          /^ZITADEL_URL=https:\/\/api\.zitadel\.cloud$/m,
+        expect(withoutBlankLines(await textOf(dir, VITE_CONFIG))).toBe(
+          withoutBlankLines(viteConfig(CLOUD)),
         );
       });
 
-      it("keeps the ZITADEL_URL .env.local already sets", async ({ dir }) => {
-        await aReactProject(
-          dir,
-          withFixedAddress(viteConfig(), CLOUD),
-          "ZITADEL_URL=https://api.zitadel.cloud/\n",
-        );
+      it.for([".env.local", ".env.development.local"])(
+        "leaves the ZITADEL_URL in %s as it was",
+        async (file, { dir }) => {
+          await aReactProject(dir, withFixedAddress(viteConfig(CLOUD), CLOUD));
+
+          await new ManagedFilesCheck().fix(aCheckContext(dir));
+
+          expect((await textOf(dir, file)).match(/^ZITADEL_URL=.*$/gm)).toEqual([
+            `ZITADEL_URL=${CLOUD}`,
+          ]);
+        },
+      );
+
+      it("moves a proxy whose env files set ZITADEL_URL empty, so the app keeps its address", async ({
+        dir,
+      }) => {
+        await aReactProject(dir, withFixedAddress(viteConfig(CLOUD), CLOUD), {
+          ".env.development.local": "ZITADEL_URL=\n",
+        });
 
         await new ManagedFilesCheck().fix(aCheckContext(dir));
 
-        expect((await textOf(dir, ".env.local")).match(/^ZITADEL_URL=.*$/gm)).toEqual([
-          "ZITADEL_URL=https://api.zitadel.cloud/",
-        ]);
+        expect(withoutBlankLines(await textOf(dir, VITE_CONFIG))).toBe(
+          withoutBlankLines(viteConfig(CLOUD)),
+        );
       });
 
       it("leaves the check passing", async ({ dir }) => {
-        await aReactProject(dir, withFixedAddress(viteConfig(), CLOUD));
+        await aReactProject(dir, withFixedAddress(viteConfig(CLOUD), CLOUD));
 
         await new ManagedFilesCheck().fix(aCheckContext(dir));
 
         expect((await new ManagedFilesCheck().run(aCheckContext(dir))).status).toBe("pass");
       });
 
-      it("leaves a proxy that fixes another server's address as it is", async ({ dir }) => {
-        const elsewhere = withFixedAddress(viteConfig(), "https://other.example");
-        await aReactProject(dir, elsewhere);
+      it("changes nothing when run a second time", async ({ dir }) => {
+        await aReactProject(dir, withFixedAddress(viteConfig(CLOUD), CLOUD));
+        await new ManagedFilesCheck().fix(aCheckContext(dir));
+        const once = await textOf(dir, VITE_CONFIG);
 
         await new ManagedFilesCheck().fix(aCheckContext(dir));
 
-        expect(await textOf(dir, VITE_CONFIG)).toBe(elsewhere);
+        expect(await textOf(dir, VITE_CONFIG)).toBe(once);
+      });
+
+      it.for([
+        ["while .env.development.local names another server", CLOUD, OTHER_SERVER],
+        ["once its target was changed to another server", OTHER_SERVER, CLOUD],
+      ] as const)("leaves the proxy as it is %s", async ([, target, envServer], { dir }) => {
+        const config = withFixedAddress(viteConfig(CLOUD), target);
+        await aReactProject(dir, config, {
+          ".env.development.local": `ZITADEL_URL=${envServer}\n`,
+        });
+
+        await new ManagedFilesCheck().fix(aCheckContext(dir));
+
+        expect(await textOf(dir, VITE_CONFIG)).toBe(config);
+      });
+
+      it("leaves a literal put back after the move as it is", async ({ dir }) => {
+        const pinned = withFixedAddress(viteConfig(CLOUD), CLOUD).replace(
+          "zitadel:proxy:v3",
+          "zitadel:proxy:v4",
+        );
+        await aReactProject(dir, pinned);
+
+        await new ManagedFilesCheck().fix(aCheckContext(dir));
+
+        expect(await textOf(dir, VITE_CONFIG)).toBe(pinned);
       });
     });
 
