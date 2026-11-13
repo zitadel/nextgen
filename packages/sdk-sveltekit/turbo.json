@@ -3,16 +3,16 @@
   "extends": ["//"],
   "tasks": {
     // The edge spec imports this package's built dist, and the middleware and
-    // edge specs run the cases of @zitadel/server-sdk-contract, whose
+    // edge specs run the cases of @zitadel/framework-contract, whose
     // typecheck edge puts its source in this task's hash.
     "typecheck": {
-      "dependsOn": ["build", "@zitadel/server-sdk-contract#typecheck"]
+      "dependsOn": ["build", "@zitadel/framework-contract#typecheck"]
     },
     "build": {
       "dependsOn": ["@zitadel/sdk-core#build"]
     },
     "test": {
-      "dependsOn": ["build", "@zitadel/server-sdk-contract#typecheck"]
+      "dependsOn": ["build", "@zitadel/framework-contract#typecheck"]
     },
     // tsup's declaration pass resolves the workspace packages, which need
     // api's generated client and the built dependencies.

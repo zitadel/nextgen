@@ -6,6 +6,8 @@ import ZitadelLogout from "./lib/ZitadelLogout.svelte";
 import ZitadelSession from "./lib/ZitadelSession.svelte";
 import { type WidgetName, widgetNames, widgetTags } from "@zitadel/sdk-core/types";
 
+import { describeServerStandardAttributes } from "@zitadel/framework-contract/server-render";
+
 /** The attributes of the first `<tag>` in server-rendered HTML. */
 function serverAttributes(
   tag: string,
@@ -136,42 +138,7 @@ async function renderAttributes(
   );
 }
 
-// standard-attributes-server:begin
-describe.each(widgetNames)("%s server-rendered standard attributes", (widget) => {
-  it("puts the standard attributes into the server markup", async () => {
-    const attributes = await renderAttributes(widget, {
-      id: "probe",
-      title: "probe",
-      slot: "probe",
-      role: "region",
-      tabindex: "3",
-      "data-testid": "probe",
-      "aria-label": "probe",
-    });
-    expect(attributes).toMatchObject({
-      id: "probe",
-      title: "probe",
-      slot: "probe",
-      role: "region",
-      tabindex: "3",
-      "data-testid": "probe",
-      "aria-label": "probe",
-    });
-  });
-
-  it("leaves props outside the standard set out of the server markup", async () => {
-    const attributes = await renderAttributes(widget, {
-      srcdoc: "probe",
-      onclick: "probe",
-      part: "probe",
-      dir: "probe",
-    });
-    for (const name of ["srcdoc", "onclick", "part", "dir"]) {
-      expect(attributes).not.toHaveProperty(name);
-    }
-  });
-});
-// standard-attributes-server:end
+describeServerStandardAttributes(renderAttributes);
 
 describe("the package entry on a Node server", () => {
   it.each(widgetNames)(

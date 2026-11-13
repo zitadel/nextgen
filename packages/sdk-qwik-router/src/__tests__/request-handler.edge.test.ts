@@ -2,7 +2,7 @@ import { createNextgenOnRequest } from "@zitadel/sdk-qwik-router/server";
 
 import type { NextgenMiddlewareOptions } from "@zitadel/sdk-core/middleware";
 
-import { CLIENT_ADDRESS, describeEdgeServer } from "@zitadel/server-sdk-contract/edge";
+import { CLIENT_ADDRESS, describeEdgeServer } from "@zitadel/framework-contract/server-edge";
 
 /** Sends a request through the built handler, the way Qwik Router would, and returns the answer. */
 async function serve(request: Request, options: NextgenMiddlewareOptions): Promise<Response> {

@@ -1,5 +1,5 @@
 /**
- * The server middleware contract (`@zitadel/server-sdk-contract/middleware`)
+ * The server middleware contract (`@zitadel/framework-contract/middleware`)
  * for Qwik Router: this file is the glue between its cases and this SDK's handler.
  */
 
@@ -8,9 +8,9 @@ import type { RequestHandler } from "@qwik.dev/router";
 import { expectTypeOf, vi } from "vitest";
 
 import type { AuthResult } from "@zitadel/sdk-core/middleware";
-import type { Served, ServeInit, ServeOptions } from "@zitadel/server-sdk-contract/middleware";
+import type { Served, ServeInit, ServeOptions } from "@zitadel/framework-contract/middleware";
 
-import { describeServerMiddleware } from "@zitadel/server-sdk-contract/middleware";
+import { describeServerMiddleware } from "@zitadel/framework-contract/middleware";
 
 import type { QwikCookieOptions, QwikRequestEvent } from "../request-handler";
 

@@ -1683,6 +1683,22 @@ importers:
         specifier: 'catalog:'
         version: 4.1.12(@edge-runtime/vm@5.0.0)(@opentelemetry/api@1.9.1)(@types/node@24.19.1)(@vitest/browser-playwright@4.1.12)(@vitest/coverage-v8@4.1.12)(jsdom@29.0.2(@noble/hashes@1.8.0))(msw@2.14.6(@types/node@24.19.1)(typescript@6.0.3))(vite@8.3.5(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.51.2)(tsx@4.21.0)(yaml@2.9.1))
 
+  packages/framework-contract:
+    dependencies:
+      '@zitadel/sdk-core':
+        specifier: workspace:*
+        version: link:../sdk-core
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.12(@edge-runtime/vm@5.0.0)(@opentelemetry/api@1.9.1)(@types/node@24.19.1)(@vitest/browser-playwright@4.1.12)(@vitest/coverage-v8@4.1.12)(jsdom@29.0.2(@noble/hashes@1.8.0))(msw@2.14.6(@types/node@24.19.1)(typescript@6.0.3))(vite@8.3.5(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.51.2)(tsx@4.21.0)(yaml@2.9.1))
+    devDependencies:
+      '@types/node':
+        specifier: ^24.19.1
+        version: 24.19.1
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+
   packages/sdk-angular:
     dependencies:
       '@zitadel/api':
@@ -1743,6 +1759,9 @@ importers:
       '@zitadel/api-mock':
         specifier: workspace:*
         version: link:../api-mock
+      '@zitadel/framework-contract':
+        specifier: workspace:*
+        version: link:../framework-contract
       '@zitadel/vitest-config':
         specifier: workspace:*
         version: link:../vitest-config
@@ -1847,9 +1866,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.12(@vitest/browser@4.1.12)(vitest@4.1.12)
-      '@zitadel/server-sdk-contract':
+      '@zitadel/framework-contract':
         specifier: workspace:*
-        version: link:../server-sdk-contract
+        version: link:../framework-contract
       '@zitadel/vitest-config':
         specifier: workspace:*
         version: link:../vitest-config
@@ -1902,9 +1921,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.12(@vitest/browser@4.1.12)(vitest@4.1.12)
-      '@zitadel/server-sdk-contract':
+      '@zitadel/framework-contract':
         specifier: workspace:*
-        version: link:../server-sdk-contract
+        version: link:../framework-contract
       '@zitadel/vitest-config':
         specifier: workspace:*
         version: link:../vitest-config
@@ -1957,6 +1976,9 @@ importers:
       '@zitadel/api-mock':
         specifier: workspace:*
         version: link:../api-mock
+      '@zitadel/framework-contract':
+        specifier: workspace:*
+        version: link:../framework-contract
       '@zitadel/vitest-config':
         specifier: workspace:*
         version: link:../vitest-config
@@ -2003,9 +2025,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.12(@vitest/browser@4.1.12)(vitest@4.1.12)
-      '@zitadel/server-sdk-contract':
+      '@zitadel/framework-contract':
         specifier: workspace:*
-        version: link:../server-sdk-contract
+        version: link:../framework-contract
       '@zitadel/vitest-config':
         specifier: workspace:*
         version: link:../vitest-config
@@ -2058,6 +2080,9 @@ importers:
       '@zitadel/api-mock':
         specifier: workspace:*
         version: link:../api-mock
+      '@zitadel/framework-contract':
+        specifier: workspace:*
+        version: link:../framework-contract
       '@zitadel/vitest-config':
         specifier: workspace:*
         version: link:../vitest-config
@@ -2116,6 +2141,9 @@ importers:
       '@zitadel/api-mock':
         specifier: workspace:*
         version: link:../api-mock
+      '@zitadel/framework-contract':
+        specifier: workspace:*
+        version: link:../framework-contract
       '@zitadel/vitest-config':
         specifier: workspace:*
         version: link:../vitest-config
@@ -2168,9 +2196,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.12(@vitest/browser@4.1.12)(vitest@4.1.12)
-      '@zitadel/server-sdk-contract':
+      '@zitadel/framework-contract':
         specifier: workspace:*
-        version: link:../server-sdk-contract
+        version: link:../framework-contract
       '@zitadel/vitest-config':
         specifier: workspace:*
         version: link:../vitest-config
@@ -2220,6 +2248,9 @@ importers:
       '@zitadel/api-mock':
         specifier: workspace:*
         version: link:../api-mock
+      '@zitadel/framework-contract':
+        specifier: workspace:*
+        version: link:../framework-contract
       '@zitadel/vitest-config':
         specifier: workspace:*
         version: link:../vitest-config
@@ -2269,9 +2300,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.12(@vitest/browser@4.1.12)(vitest@4.1.12)
-      '@zitadel/server-sdk-contract':
+      '@zitadel/framework-contract':
         specifier: workspace:*
-        version: link:../server-sdk-contract
+        version: link:../framework-contract
       '@zitadel/vitest-config':
         specifier: workspace:*
         version: link:../vitest-config
@@ -2324,9 +2355,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.12(@vitest/browser@4.1.12)(vitest@4.1.12)
-      '@zitadel/server-sdk-contract':
+      '@zitadel/framework-contract':
         specifier: workspace:*
-        version: link:../server-sdk-contract
+        version: link:../framework-contract
       '@zitadel/vitest-config':
         specifier: workspace:*
         version: link:../vitest-config
@@ -2373,6 +2404,9 @@ importers:
       '@zitadel/api-mock':
         specifier: workspace:*
         version: link:../api-mock
+      '@zitadel/framework-contract':
+        specifier: workspace:*
+        version: link:../framework-contract
       '@zitadel/vitest-config':
         specifier: workspace:*
         version: link:../vitest-config
@@ -2397,22 +2431,6 @@ importers:
       vue:
         specifier: 'catalog:'
         version: 3.5.44(typescript@6.0.3)
-
-  packages/server-sdk-contract:
-    dependencies:
-      '@zitadel/sdk-core':
-        specifier: workspace:*
-        version: link:../sdk-core
-      vitest:
-        specifier: 'catalog:'
-        version: 4.1.12(@edge-runtime/vm@5.0.0)(@opentelemetry/api@1.9.1)(@types/node@24.19.1)(@vitest/browser-playwright@4.1.12)(@vitest/coverage-v8@4.1.12)(jsdom@29.0.2(@noble/hashes@1.8.0))(msw@2.14.6(@types/node@24.19.1)(typescript@6.0.3))(vite@8.3.5(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.51.2)(tsx@4.21.0)(yaml@2.9.1))
-    devDependencies:
-      '@types/node':
-        specifier: ^24.19.1
-        version: 24.19.1
-      typescript:
-        specifier: 'catalog:'
-        version: 6.0.3
 
   packages/testing:
     dependencies:

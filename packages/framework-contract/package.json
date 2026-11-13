@@ -1,0 +1,27 @@
+{
+  "name": "@zitadel/framework-contract",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The test cases every framework SDK runs through its own glue: the server SDKs' middleware and edge cases, and the client SDKs' edge, server-render and standard-attribute cases. Workspace tooling only; nothing is published.",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    "./client-edge": "./src/client-edge.ts",
+    "./middleware": "./src/middleware.ts",
+    "./server-edge": "./src/server-edge.ts",
+    "./server-render": "./src/server-render.ts",
+    "./standard-attributes": "./src/standard-attributes.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "biome check ."
+  },
+  "dependencies": {
+    "@zitadel/sdk-core": "workspace:*",
+    "vitest": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:"
+  }
+}

@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { NextgenMiddlewareOptions } from "@zitadel/sdk-core/middleware";
 
-import { CLIENT_ADDRESS, describeEdgeServer } from "@zitadel/server-sdk-contract/edge";
+import { CLIENT_ADDRESS, describeEdgeServer } from "@zitadel/framework-contract/server-edge";
 
 import { setRuntimeConfig } from "../stubs/nuxt-imports";
 

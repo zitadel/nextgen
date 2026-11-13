@@ -1,5 +1,5 @@
 /**
- * The server middleware contract (`@zitadel/server-sdk-contract/middleware`)
+ * The server middleware contract (`@zitadel/framework-contract/middleware`)
  * for Nuxt: this file is the glue between its cases and this SDK's handler.
  */
 
@@ -9,9 +9,9 @@ import { createApp, toWebHandler } from "h3";
 import { beforeEach, expectTypeOf, vi } from "vitest";
 
 import type { AuthResult } from "@zitadel/sdk-core/middleware";
-import type { Served, ServeInit, ServeOptions } from "@zitadel/server-sdk-contract/middleware";
+import type { Served, ServeInit, ServeOptions } from "@zitadel/framework-contract/middleware";
 
-import { describeServerMiddleware } from "@zitadel/server-sdk-contract/middleware";
+import { describeServerMiddleware } from "@zitadel/framework-contract/middleware";
 
 import { createNextgenMiddleware, getAuth } from "../../runtime/server/middleware";
 import { setRuntimeConfig } from "../stubs/nuxt-imports";
