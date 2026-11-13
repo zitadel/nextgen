@@ -41,6 +41,24 @@ import { CLI_BINARY, CLI_PACKAGE_NAME } from "@/lib/public-cli";
 
 const VERSION = "1.0.0-alpha.25";
 
+/** An add given a valued option before its verb, as a workspace filter is. */
+const FILTERED_ADD: PackageCommand = {
+  command: "pnpm",
+  verb: "add",
+  operands: ["x"],
+  args: ["--filter", "app", "add", "x"],
+  display: "pnpm --filter app add x",
+};
+
+/** A run of this CLI's binary as a project script. */
+const CLI_RUN: PackageCommand = {
+  command: "yarn",
+  verb: "run",
+  operands: [CLI_BINARY],
+  args: ["run", CLI_BINARY],
+  display: `yarn run ${CLI_BINARY}`,
+};
+
 /** An SDK pinned at an exact version, as a dependency check installs it. */
 const SDK_PIN = "@zitadel/sdk-next@1.0.0";
 
@@ -305,27 +323,31 @@ describe("suggestedCommandOf", () => {
     expect(suggestedCommandOf(command)).toBe(command.display);
   });
 
-  it.each<[string, PackageCommand]>([
-    ["dlx", { command: "pnpm", args: ["dlx", CLI_PACKAGE_NAME], display: "pnpm dlx" }],
-    [
-      "exec behind a flag",
-      { command: "npm", args: ["--silent", "exec", CLI_BINARY], display: "npm" },
-    ],
-    [
-      "x behind a boolean flag",
-      { command: "bun", args: ["-r", "x", CLI_PACKAGE_NAME], display: "bun" },
-    ],
-    ["run of the binary", { command: "yarn", args: ["run", CLI_BINARY], display: "yarn run" }],
-    ["the binary as a script", { command: "pnpm", args: [CLI_BINARY, "deploy"], display: "pnpm" }],
-  ])("refuses a command that runs a package or the CLI through %s", (_how, command) => {
+  it("is a command whose verb follows an option's value", () => {
+    expect(suggestedCommandOf(FILTERED_ADD)).toBe(FILTERED_ADD.display);
+  });
+
+  it("refuses a run of the CLI's binary", () => {
     const error = thrownBy(() => {
-      return suggestedCommandOf(command);
+      return suggestedCommandOf(CLI_RUN);
     });
 
-    expect(error).toBeInstanceOf(Error);
     expect(error).toMatchObject({
-      message: `${command.display} may run a package: suggest the CLI as { id, args, flags }`,
+      message: `${CLI_RUN.display} runs the CLI: suggest it as { id, args, flags }`,
     });
+  });
+
+  it("is never a command that runs a package", () => {
+    const dlx: PackageCommand = {
+      command: "pnpm",
+      // @ts-expect-error dlx runs a package, which no verb does
+      verb: "dlx",
+      operands: [CLI_PACKAGE_NAME],
+      args: ["dlx", CLI_PACKAGE_NAME],
+      display: "pnpm dlx",
+    };
+
+    expect(dlx.verb).toBe("dlx");
   });
 });
 

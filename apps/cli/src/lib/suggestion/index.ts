@@ -2,7 +2,7 @@ import type { Interfaces } from "@oclif/core";
 
 import { Cmd } from "@/lib/cmd";
 import { type ByName, type Named, named } from "@/lib/names";
-import { DIRECTORY_FLAGS, type PackageCommand } from "@/lib/package-manager";
+import type { PackageCommand } from "@/lib/package-manager";
 import { CLI_BINARY, newestCliCommand, optionArgs, publicCliCommand } from "@/lib/public-cli";
 
 import type { RELATIONS } from "./relations";
@@ -453,7 +453,7 @@ function canonical(value: unknown): string {
  * The programs a shell suggestion may name: each one runs only itself, so a
  * suggestion of one can never run this CLI. A package manager is not among
  * them, since it can run a package (`pnpm dlx`); its commands are suggested
- * through {@link suggestedCommandOf}, which knows their verbs.
+ * through {@link suggestedCommandOf}, whose verbs cannot run one.
  */
 const PROGRAMS = ["cd", "docker", "git", "rm"] as const;
 
@@ -477,35 +477,20 @@ export function shellCommand(program: Program, ...words: readonly string[]): Sug
 }
 
 /**
- * The verbs a package manager's suggestion may use: each installs, removes or
- * runs a project's own script, and none runs a package the way `dlx`, `exec`
- * or `x` would.
- */
-const VERBS = ["add", "dev", "install", "remove", "run", "uninstall"] as const;
-
-/**
  * A package manager's command as a suggestion, written as its own `display`
  * shows it, so the suggestion and the hint that quotes the command read the
- * same. Its verb, the first word that is neither an option nor the directory
- * an option names, must be one of {@link VERBS}, and `run` may not run this
- * CLI's binary: anything else could run the CLI where nothing checks it.
+ * same. Its verb, which the builder records, can only install, remove or run a
+ * project's own script, and `run` may not run this CLI's binary: that would run
+ * the CLI where nothing checks it.
  *
  * @param command - The package manager's command, as `lib/package-manager`
  *   builds it.
  * @returns The command.
- * @throws {Error} When it runs a package, or this CLI.
+ * @throws {Error} When it runs this CLI.
  */
 export function suggestedCommandOf(command: PackageCommand): SuggestedCommand {
-  const operands = command.args.filter((word, at) => {
-    return !word.startsWith("-") && !DIRECTORY_FLAGS.has(command.args[at - 1] ?? "");
-  });
-  const [verb, script] = operands;
-  if (
-    verb === undefined ||
-    !(VERBS as readonly string[]).includes(verb) ||
-    (verb === "run" && script === CLI_BINARY)
-  ) {
-    throw new Error(`${command.display} may run a package: suggest the CLI as { id, args, flags }`);
+  if (command.verb === "run" && command.operands[0] === CLI_BINARY) {
+    throw new Error(`${command.display} runs the CLI: suggest it as { id, args, flags }`);
   }
 
   return command.display as SuggestedCommand;

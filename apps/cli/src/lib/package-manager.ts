@@ -8,9 +8,24 @@ import { optionArgs } from "./public-cli";
 
 export type PackageManager = "npm" | "pnpm" | "yarn" | "bun";
 
+/**
+ * What a package manager's command may do: install, remove, or run a project's
+ * own script. None runs a package the way `dlx`, `exec` or `x` would, so a
+ * suggestion of one cannot run this CLI unchecked.
+ */
+export type Verb = "add" | "dev" | "install" | "remove" | "run" | "uninstall";
+
+/** A package manager's command, as each builder here makes it. */
 export type PackageCommand = {
+  /** The package manager. */
   command: PackageManager;
+  /** What it does, recorded by the builder rather than read back from `args`. */
+  verb: Verb;
+  /** The words after the verb: its options, then the packages or the script. */
+  operands: readonly string[];
+  /** Every word passed to the package manager, options before the verb included. */
   args: string[];
+  /** The command as the person reads and runs it. */
   display: string;
 };
 
@@ -28,7 +43,7 @@ export async function detectPackageManager(cwd: string): Promise<PackageManager>
 }
 
 export function installCommandFor(packageManager: PackageManager): PackageCommand {
-  return command(packageManager, ["install"]);
+  return command(packageManager, "install", []);
 }
 
 /**
@@ -43,7 +58,7 @@ export function addCommandFor(
   packageManager: PackageManager,
   packages: ReadonlyArray<string>,
 ): PackageCommand {
-  return command(packageManager, [packageManager === "npm" ? "install" : "add", ...packages]);
+  return command(packageManager, packageManager === "npm" ? "install" : "add", packages);
 }
 
 /**
@@ -57,7 +72,7 @@ export function removeCommandFor(
   packageManager: PackageManager,
   packages: ReadonlyArray<string>,
 ): PackageCommand {
-  return command(packageManager, [packageManager === "npm" ? "uninstall" : "remove", ...packages]);
+  return command(packageManager, packageManager === "npm" ? "uninstall" : "remove", packages);
 }
 
 /**
@@ -72,26 +87,26 @@ export function addExactCommandFor(
 ): PackageCommand {
   switch (packageManager) {
     case "npm":
-      return command("npm", ["install", "--save-exact", ...packages]);
+      return command("npm", "install", ["--save-exact", ...packages]);
     case "pnpm":
-      return command("pnpm", ["add", "--save-exact", ...packages]);
+      return command("pnpm", "add", ["--save-exact", ...packages]);
     case "yarn":
-      return command("yarn", ["add", "--exact", ...packages]);
+      return command("yarn", "add", ["--exact", ...packages]);
     case "bun":
-      return command("bun", ["add", "--exact", ...packages]);
+      return command("bun", "add", ["--exact", ...packages]);
   }
 }
 
 export function devCommandFor(packageManager: PackageManager): PackageCommand {
   switch (packageManager) {
     case "npm":
-      return command("npm", ["run", "dev"]);
+      return command("npm", "run", ["dev"]);
     case "pnpm":
-      return command("pnpm", ["dev"]);
+      return command("pnpm", "dev", []);
     case "yarn":
-      return command("yarn", ["dev"]);
+      return command("yarn", "dev", []);
     case "bun":
-      return command("bun", ["run", "dev"]);
+      return command("bun", "run", ["dev"]);
   }
 }
 
@@ -108,16 +123,6 @@ const DIRECTORY_FLAG: Record<PackageManager, { flag: string; relative: boolean }
   yarn: { flag: "--cwd", relative: false },
   bun: { flag: "--cwd", relative: false },
 };
-
-/**
- * Each option {@link DIRECTORY_FLAG} names, whose next word is a directory and
- * never what the command does.
- */
-export const DIRECTORY_FLAGS: ReadonlySet<string> = new Set(
-  Object.values(DIRECTORY_FLAG).map(({ flag }) => {
-    return flag;
-  }),
-);
 
 /**
  * `packageCommand` as suggested from the shell's directory when the project is
@@ -140,6 +145,8 @@ export function inDirectory(
   const dir = relative ? typed : resolved;
   return {
     command: packageCommand.command,
+    verb: packageCommand.verb,
+    operands: packageCommand.operands,
     args: [...optionArgs(flag, dir), ...packageCommand.args],
     display: [packageCommand.command, Cmd.option(flag, dir), ...packageCommand.args].join(" "),
   };
@@ -180,11 +187,25 @@ export async function runPackageCommand(
   }
 }
 
-function command(packageManager: PackageManager, args: string[]): PackageCommand {
+/**
+ * A package manager's command that does `verb`, with `operands` after it.
+ *
+ * @param packageManager - The package manager.
+ * @param verb - What it does.
+ * @param operands - The words after the verb.
+ * @returns The command.
+ */
+function command(
+  packageManager: PackageManager,
+  verb: Verb,
+  operands: ReadonlyArray<string>,
+): PackageCommand {
   return {
     command: packageManager,
-    args,
-    display: [packageManager, ...args].join(" "),
+    verb,
+    operands,
+    args: [verb, ...operands],
+    display: [packageManager, verb, ...operands].join(" "),
   };
 }
 
