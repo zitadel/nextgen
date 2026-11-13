@@ -26,66 +26,19 @@ import { ConflictError } from "@/lib/backend/errors";
 export type ServingOrigin = Readonly<RevokeRelease409DetailsOriginsItem>;
 
 /**
- * The refusal to revoke a release an origin still serves.
- *
- * @remarks
- * Raised only when the server's answer names the origins and every one is a
- * primary origin or a preview, so a caller that catches it always has at least
- * one, and {@link ReleaseInUseError.primaries} and
- * {@link ReleaseInUseError.previews} between them hold all of them. It is a
- * {@link ConflictError} that carries the server's answer as it came, so a
- * caller that does not know it handles it as the plain conflict it also is.
+ * What revoking a release came to: `revoked` with the release, or `in-use` with
+ * every origin that still serves it, in the order the server named them.
  */
-export class ReleaseInUseError extends ConflictError {
-  /**
-   * The error's name, which a caller that cannot import the class matches on.
-   */
-  override readonly name: string = "ReleaseInUseError";
-
-  /**
-   * Every origin that serves the release, in the order the server named them.
-   */
-  readonly origins: readonly ServingOrigin[];
-
-  /**
-   * @param message - The server's message.
-   * @param origins - Every origin that serves the release.
-   * @param options - What the conflict carried (status, URL, body, request id,
-   * hint and details) and the conflict itself, as the cause.
-   */
-  constructor(
-    message: string,
-    origins: readonly ServingOrigin[],
-    options: ConstructorParameters<typeof ConflictError>[1] = {},
-  ) {
-    super(message, options);
-    this.origins = origins;
-  }
-
-  /**
-   * The origins that serve the release as primary origins, which a different
-   * release put live on them frees.
-   *
-   * @returns Those of {@link ReleaseInUseError.origins} that are primary origins.
-   */
-  get primaries(): readonly ServingOrigin[] {
-    return this.origins.filter((origin) => {
-      return origin.kind === RevokeRelease409DetailsOriginsItemKind.primary;
-    });
-  }
-
-  /**
-   * The origins that serve the release as previews, which removing the preview
-   * frees.
-   *
-   * @returns Those of {@link ReleaseInUseError.origins} that are previews.
-   */
-  get previews(): readonly ServingOrigin[] {
-    return this.origins.filter((origin) => {
-      return origin.kind === RevokeRelease409DetailsOriginsItemKind.preview;
-    });
-  }
-}
+export type RevokeOutcome = Readonly<
+  | {
+      outcome: "revoked";
+      release: Release;
+    }
+  | {
+      outcome: "in-use";
+      origins: readonly ServingOrigin[];
+    }
+>;
 
 /**
  * The origins a `rel.in_use` answer names, as the API documents them.
@@ -93,7 +46,7 @@ export class ReleaseInUseError extends ConflictError {
  * @remarks
  * The generated client types the 409 body but, as every error body, does not
  * validate it, so the answer is checked here before it is trusted. The kinds
- * are the two {@link ReleaseInUseError} explains. A kind the API adds is
+ * are the two the API documents: a primary origin is freed by putting another release live on it, a preview by removing it. A kind the API adds is
  * therefore not parsed, and the refusal stays the plain conflict rather than
  * naming an origin it cannot say how to free.
  */
@@ -203,32 +156,26 @@ export class ReleaseService extends ApiService {
    * Revoke a release so its content is never served again. Idempotent.
    *
    * @param releaseId - The release to revoke.
-   * @returns The release, now revoked.
-   * @throws ReleaseInUseError when an origin still serves the release, naming
-   * each such origin.
+   * @returns `revoked` with the release, or `in-use` with each origin that still
+   * serves it.
+   * @throws ConflictError for any other conflict, and any other failure as the
+   * client raised it, including a `rel.in_use` answer that names no origin the
+   * API documents.
    */
-  async revoke(releaseId: string): Promise<Release> {
+  async revoke(releaseId: string): Promise<RevokeOutcome> {
     try {
-      return await this.client.revokeRelease(releaseId, {
+      const release = await this.client.revokeRelease(releaseId, {
         project_id: this.projectId,
       });
+      return { outcome: "revoked", release };
     } catch (error) {
-      if (!(error instanceof ConflictError) || error.serverCode !== "rel.in_use") {
-        throw error;
+      if (error instanceof ConflictError && error.serverCode === "rel.in_use") {
+        const served = InUseBody.safeParse(error.body);
+        if (served.success) {
+          return { outcome: "in-use", origins: served.data.details.origins };
+        }
       }
-      const served = InUseBody.safeParse(error.body);
-      if (!served.success) {
-        throw error;
-      }
-      throw new ReleaseInUseError(error.message, served.data.details.origins, {
-        status: error.status,
-        url: error.url,
-        body: error.body,
-        requestId: error.requestId,
-        hint: error.hint,
-        details: error.details,
-        cause: error,
-      });
+      throw error;
     }
   }
 }

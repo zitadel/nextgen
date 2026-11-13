@@ -165,6 +165,8 @@ type OriginKind = "primary" | "preview";
  *
  * @param prefix - The project's name, and the prefix of its directory.
  * @param served - Where the release is live.
+ * @param morePrimaries - Patterns of further primary origins, which a primary
+ * deployment serves the release on as well.
  * @returns The directory, the release, and `deploymentOn`, which names the
  * deployment serving the release on an origin kind and throws for a kind it
  * was not put live on. The caller removes the directory.
@@ -172,8 +174,15 @@ type OriginKind = "primary" | "preview";
 export async function aReleaseServedOn(
   prefix: string,
   served: { primary: boolean; preview: boolean },
+  morePrimaries: readonly string[] = [],
 ): Promise<{ cwd: string; releaseId: string; deploymentOn(kind: OriginKind): string }> {
   const project = await aProjectWithPrimaryOrigin(prefix);
+  for (const pattern of morePrimaries) {
+    await callPlatform(`/projects/${project.id}/origins`, project.secret, {
+      pattern,
+      kind: "primary",
+    });
+  }
   await callPlatform(`/projects/${project.id}/origins`, project.secret, {
     pattern: PREVIEW_PATTERN,
     kind: "preview",
