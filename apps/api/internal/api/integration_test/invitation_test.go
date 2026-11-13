@@ -490,8 +490,8 @@ func TestInvitationRedeem(t *testing.T) {
 		assert.Equal(t, api.InvitationStatusRejected, member.Status)
 		assert.True(t, member.AcceptedBy.IsNull())
 		assert.True(t, member.RejectedAt.Set)
-		// A decline keeps who the link was for, for the administrators.
-		assert.Equal(t, "Jane Doe", member.Metadata.Value.Name)
+		// The link holder doesn't see the metadata; the administrators still do.
+		assert.True(t, member.Metadata.IsNull())
 
 		require.IsType(t, &api.AcceptInvitationNotFound{}, accept(t, colleague, token))
 		events := invitationEvents(t, owner, projectID, created.ID)
@@ -676,6 +676,29 @@ func TestInvitationRedeem(t *testing.T) {
 		assert.Equal(t, 1, lost)
 		// Only the winner holds the relation.
 		assert.Equal(t, 1, len(grants(t, firstID)["viewer"])+len(grants(t, secondID)["viewer"]))
+	})
+
+	t.Run("one user accepting two links at once gets one grant", func(t *testing.T) {
+		t.Parallel()
+		_, firstToken := invite(t, owner, api.InvitationProjectMemberPayloadRelationEditor)
+		_, secondToken := invite(t, owner, api.InvitationProjectMemberPayloadRelationEditor)
+		colleagueID, colleague := newColleague(t)
+
+		results := make([]api.AcceptInvitationRes, 2)
+		var wg sync.WaitGroup
+		for i, token := range []string{firstToken, secondToken} {
+			wg.Go(func() {
+				resp, err := colleague.AcceptInvitation(t.Context(), &api.InvitationTokenRequest{Token: token})
+				assert.NoError(t, err)
+				results[i] = resp
+			})
+		}
+		wg.Wait()
+
+		for _, resp := range results {
+			accepted(t, resp)
+		}
+		assert.Len(t, grants(t, colleagueID)["editor"], 1)
 	})
 
 	t.Run("an expired invitation answers as unknown", func(t *testing.T) {

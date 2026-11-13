@@ -688,6 +688,7 @@ func TestInvitationService_Accept(t *testing.T) {
 			svc, s, _, events := newMockedInvitationService(t, grantPlatformProjID)
 			entity := pendingInvitation(new("user_admin"))
 			expectInvitationByToken(s, entity)
+			s.EXPECT().LockProject(gomock.Any(), invitationProjectID).Return(nil)
 			expectClaimedProject(s, invitationProjectID)
 			expectActiveUserPrincipal(s, accepter)
 			s.EXPECT().ListAuthzAssignments(gomock.Any(), invitationProjectID, domain.AuthzPrincipalTypeUser, accepter, false).Return(tc.held, nil)
@@ -787,6 +788,8 @@ func TestInvitationService_Accept(t *testing.T) {
 			svc, s, _, _ := newMockedInvitationService(t, grantPlatformProjID)
 			entity := pendingInvitation(tc.createdBy)
 			expectInvitationByToken(s, entity)
+			// A self-accept is refused before the lock.
+			s.EXPECT().LockProject(gomock.Any(), invitationProjectID).Return(nil).AnyTimes()
 			if tc.setup != nil {
 				tc.setup(s, entity)
 			}
@@ -807,6 +810,7 @@ func TestInvitationService_Accept(t *testing.T) {
 		svc, s, _, _ := newMockedInvitationService(t, grantPlatformProjID)
 		entity := pendingInvitation(nil)
 		expectInvitationByToken(s, entity)
+		s.EXPECT().LockProject(gomock.Any(), invitationProjectID).Return(nil)
 		expectClaimedProject(s, invitationProjectID)
 		expectActiveUserPrincipal(s, accepter)
 		s.EXPECT().ListAuthzAssignments(gomock.Any(), invitationProjectID, domain.AuthzPrincipalTypeUser, accepter, false).Return(nil, nil)

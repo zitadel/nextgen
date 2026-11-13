@@ -381,6 +381,11 @@ func (s *InvitationService) Accept(ctx context.Context, token, userID string, in
 		if entity.CreatedBy != nil && *entity.CreatedBy == userID {
 			return domain.ErrInvitationSelfAccept()
 		}
+		// Serializes the grant writes of accepts racing on other links, and
+		// locks the project before the row, as create does.
+		if err := stmts.LockProject(ctx, entity.ProjectID); err != nil {
+			return err
+		}
 		claimed, err := projectIsClaimedOrExempt(ctx, stmts, s.platformProjectID, entity.ProjectID)
 		if err != nil {
 			return err
@@ -468,8 +473,9 @@ func (s *InvitationService) Reject(ctx context.Context, token, userID string) (_
 	if err != nil {
 		return nil, mapInvitationError(err, "failed to reject invitation")
 	}
-	// A decline keeps the metadata, so the response shows it as reads do.
-	return decryptInvitation(decrypterOfWritingKey(ctx, s.keys), rejected)
+	// The metadata stays for administrators; the link holder doesn't see it.
+	rejected.EncryptedMetadata = nil
+	return &Invitation{Invitation: rejected}, nil
 }
 
 // pendingInvitationByToken finds the invitation a link's token redeems. An
