@@ -7,11 +7,23 @@ import { story as StyledLoginStory } from "@/components/examples/styled-login.st
 
 The login component ships with a built-in template that follows your project without any files in your repo. Its look comes from your app. Style it from your own stylesheet with [`--zl-*` tokens and CSS parts](#style-the-login-from-your-app), and put any page layout around it in your own code: a split screen, a brand pane, marketing copy.
 
-To change the login's *structure*, eject its template. Ejecting means taking ownership of the template: the CLI copies a starter design into `.zitadel/branding/`, and once you deploy it, the login renders your files ([Eject a design](#eject-a-design)).
+To change the login's *structure*, eject its template with `branding eject`. Ejecting means you take ownership of the template. The command copies a starter design into `.zitadel/branding/`. `zitadel setup` does not create that folder. Once you deploy it, the login renders your files ([Eject a design](#eject-a-design)).
 
 ## Style the login from your app
 
 Two hooks reach inside the login's shadow DOM, the isolated tree its markup lives in, from your app's stylesheet. Both are stable across releases. Both win over the branding your project publishes, so the login matches your app without a branding revision.
+
+Put these rules in a stylesheet that loads on every page, not in a CSS module or a scoped `<style>`.
+
+- Next.js: in an app that `zitadel setup` or `create-next-app` created, the root layout (`app/layout.tsx`) already imports `app/globals.css`. With a `src` folder, both sit under `src/app/`. In another app, use the stylesheet your root layout imports.
+- Nuxt: `zitadel setup` creates no global stylesheet. Create `app/assets/css/main.css`, or `assets/css/main.css` in an app without an `app/` folder. Then add a `css` key to `nuxt.config.ts`. Keep every key the file already has:
+
+```ts
+export default defineNuxtConfig({
+  // Keep the keys your file already has, such as `modules` and `vue`.
+  css: ["~/assets/css/main.css"],
+});
+```
 
 ### Tokens
 
@@ -54,6 +66,7 @@ A flat, hard-edged look, for example, needs both hooks:
 ```css
 zitadel-login {
   --zl-font-family-sans: "Space Mono", ui-monospace, monospace;
+  --zl-font-family-heading: "Space Mono", ui-monospace, monospace;
   --zl-primary: #0a0a0a;
   --zl-primary-foreground: #c6ff00;
   --zl-radius-xs: 0;
@@ -73,6 +86,8 @@ zitadel-login::part(button-root) {
 }
 ```
 
+The example sets `--zl-font-family-heading` to the same font as `--zl-font-family-sans`. The card title, field labels and alert titles use the heading font. Without it, they keep the default font. The branding `typography.font_family` sets both tokens for the same reason.
+
 The login draws its own card, so give that card your frame through `card-card` rather than wrapping the element in a second box.
 
 The example applies the same stylesheet to a live login, which runs against a mock of the flow API in your browser. Change a value, and the stylesheet under the login shows what your app would write:
@@ -80,6 +95,40 @@ The example applies the same stylesheet to a live login, which runs against a mo
 <StyledLoginStory.WithControl />
 
 `<zitadel-session>` and `<zitadel-logout>` take the same tokens but expose no parts: frame them from your own markup.
+
+### Light and dark themes
+
+The login renders in a light or a dark theme. It marks the active one on the element as `data-theme="light"` or `data-theme="dark"`.
+
+A token you set on `zitadel-login` applies to both themes. When you change a surface, change its text colour with it. Set `--zl-card` together with `--zl-card-foreground`, or the card text can become hard to read in one theme.
+
+To give one theme its own values, select on `data-theme`:
+
+```css
+zitadel-login {
+  --zl-primary: #4f46e5;
+  --zl-primary-foreground: #ffffff;
+}
+
+zitadel-login[data-theme="dark"] {
+  --zl-card: #111827;
+  --zl-card-foreground: #f9fafb;
+}
+```
+
+The login picks its theme in this order:
+
+1. The element's `theme` attribute: `light`, `dark` or `auto`. `auto` follows the visitor's operating system setting.
+2. `theme.mode` in your branding ([Brand the light and dark themes](#brand-the-light-and-dark-themes)).
+3. The variant's default: `variant="page"` is dark, `variant="widget"` is `auto`.
+
+A branding that sets only one side, such as only `theme.dark`, always shows that side.
+
+When `zitadel setup` adds sign-in pages to an existing Next.js or Nuxt app, the pages use `variant="widget"` and also set `theme="auto"`. That attribute wins over `theme.mode`. Remove `theme="auto"` from those pages to let your branding decide. Setup sets no `theme` on any other page it writes.
+
+With `variant="widget"`, the theme changes only the login's card. The page around the card is your app's, so set its colours in your own stylesheet. With `variant="page"`, the login paints the whole page in the theme.
+
+`<zitadel-session>` and `<zitadel-logout>` do not read your branding, so `theme.mode` does not reach them. Set their `theme` attribute yourself.
 
 ## Put the login in your own page
 
@@ -169,6 +218,50 @@ Each design decides which images it shows: `centered` shows the logo, `minimal` 
 `typography.font_family` sets the typeface for body and headings; include a generic family as a fallback. `typography.font_url` is a stylesheet that loads the face. It needs a `font_family`, must be `https://`, and is loaded only when the login runs as `variant="page"`. Setup generates page-variant sign-in pages only when it creates the Next.js or Nuxt app itself, in an empty directory. In a Next.js or Nuxt app that already exists, even a new one, and in every SPA template, the login runs as `variant="widget"`. Load the font from your own page there.
 
 Without `font_url` the login loads no font of its own: it renders in Arimo where the browser already has it, and in the system font otherwise, so it sends no request to a font host. A `font_url` on a third-party host such as Google Fonts sends every visitor's IP address to that host, which under the GDPR can require their consent. Serve the stylesheet and font files from your own domain to avoid that.
+
+### Brand the light and dark themes
+
+`theme` in `branding.json` holds a look for each theme:
+
+- `theme.mode` picks the theme: `light`, `dark` or `auto`. The element's `theme` attribute wins over it ([Light and dark themes](#light-and-dark-themes)).
+- `theme.light` and `theme.dark` each take a `logo_url` and a `palette`. A side's palette applies only to that theme.
+
+```json
+{
+  "$schema": "../meta/branding.json",
+  "layout": "centered",
+  "theme": {
+    "mode": "auto",
+    "light": {
+      "logo_url": "https://cdn.example.com/logo-on-light.svg",
+      "palette": {
+        "primary": "#4f46e5",
+        "on_primary": "#ffffff",
+        "background": "#f9fafb",
+        "surface": "#ffffff",
+        "text": "#111827"
+      }
+    },
+    "dark": {
+      "logo_url": "https://cdn.example.com/logo-on-dark.svg",
+      "palette": {
+        "primary": "#818cf8",
+        "on_primary": "#111827",
+        "background": "#030712",
+        "surface": "#111827",
+        "text": "#f9fafb"
+      }
+    }
+  },
+  "liquid_template": { "$file": "./login.liquid" }
+}
+```
+
+`surface` colours the card. `background` colours the page around the card, which you see only with `variant="page"`. The create operation in the [branding API reference](/docs/reference/api/branding) lists every palette key.
+
+Set a logo on both sides or on neither. A side without its own `logo_url` shows no logo, even when the other side has one. The top-level `logo_url` applies only when neither side sets one.
+
+`deploy --dry-run` checks that the top-level `logo_url` and `hero_url` load. It does not check the logos under `theme`, so open the login in both themes to see them.
 
 ## Publish your design as a revision
 
