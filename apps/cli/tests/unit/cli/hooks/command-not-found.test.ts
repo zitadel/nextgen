@@ -1,37 +1,16 @@
 import { Config, Errors } from "@oclif/core";
-import { operations } from "@zitadel/api/generated/operations";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { RESOURCES } from "@/cli/commands/resources";
 import { NotFound } from "@/cli/hooks/command-not-found";
 import { EXIT_CODES } from "@/lib/errors";
+import { COLLECTION_PLURALS, LISTED_COLLECTIONS } from "@tests/helpers/collections";
 import { cliPackageRoot } from "@tests/helpers/oclif-build";
 import { expectedPublicCliCommand, parseJson, printing } from "@tests/helpers/run-cli";
 import { rejectionOf, thrownBy } from "@tests/helpers/thrown-value";
 
 const config = await Config.load(cliPackageRoot);
 const argv = process.argv;
-
-/**
- * Each command that lists a collection, with the name the API gives that
- * collection: the field its page holds the items under (`policies` for
- * `policy list`). That name is the plural someone who knows the API, or the
- * CLI from before its nouns were singular, types for the command's noun, and
- * it comes from the spec, not from the rule the hook forms a plural by.
- */
-const LISTED = operations.flatMap((operation) => {
-  const [noun, verb] = operation.cli?.split(" ") ?? [];
-  return noun !== undefined && verb === "list" && operation.paging !== null
-    ? [{ noun, collection: operation.paging.items.replaceAll("_", "-") }]
-    : [];
-});
-
-/** The collections whose name is not their command's own (`branding` is both). */
-const PLURALS = LISTED.filter(({ noun, collection }) => {
-  return collection !== noun;
-}).map(({ noun, collection }) => {
-  return [collection, noun] as const;
-});
 
 afterEach(() => {
   process.argv = argv;
@@ -54,10 +33,10 @@ describe("NotFound", () => {
   });
 
   describe("when the word typed is the plural of a command's noun", () => {
-    it.each(PLURALS)("offers, for %s, the help of %s first", async (plural, noun) => {
+    it.each(COLLECTION_PLURALS)("offers, for %s alone, the help of %s", async (plural, noun) => {
       const { stdout } = await printing(() => {
         return rejectionOf(() => {
-          return NotFound.run([plural, "list", "--json"], config);
+          return NotFound.run([plural, "--json"], config);
         });
       });
 
@@ -67,8 +46,40 @@ describe("NotFound", () => {
       });
     });
 
+    it.each(COLLECTION_PLURALS)(
+      "reads %s as %s when a word that is no command of it follows",
+      async (plural, noun) => {
+        const { stdout } = await printing(() => {
+          return rejectionOf(() => {
+            return NotFound.run([plural, "frobnicate", "--json"], config);
+          });
+        });
+
+        expect(parseJson(stdout)).toMatchObject({
+          command: `${noun}:frobnicate`,
+          message: `${noun} frobnicate is not a zitadel command`,
+          next_commands: [expectedPublicCliCommand(`${noun} --help`)],
+        });
+      },
+    );
+
+    it("offers the command a word after the plural is one edit from", async () => {
+      const { stdout } = await printing(() => {
+        return rejectionOf(() => {
+          return NotFound.run(["policies", "lst", "--json"], config);
+        });
+      });
+
+      expect(parseJson(stdout)).toMatchObject({
+        next_commands: [
+          expectedPublicCliCommand("policy list --help"),
+          expectedPublicCliCommand("policy --help"),
+        ],
+      });
+    });
+
     it("covers every resource the registry generates commands for", () => {
-      const listed = LISTED.map(({ noun }) => {
+      const listed = LISTED_COLLECTIONS.map(({ noun }) => {
         return noun;
       });
 

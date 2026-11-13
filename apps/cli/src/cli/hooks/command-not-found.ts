@@ -3,6 +3,7 @@ import { distance } from "fastest-levenshtein";
 
 import { EXIT_CODES, ZitadelError } from "@/lib/errors";
 import { type Admitted, BaseCommand } from "@/lib/oclif/base";
+import { aliasedNouns } from "@/lib/oclif/plural-aliases";
 import type { JsonEnvelope } from "@/lib/oclif/types";
 import { regularPlural } from "@/lib/plural";
 import { commandOf, type SuggestedCommand } from "@/lib/suggestion";
@@ -20,7 +21,9 @@ export const UNKNOWN_COMMAND_EXIT_CODE = 127;
  * It names the command as far as it was wrong: the longest run of words that
  * is a topic, and the one word after it that is not a command there, which it
  * repeats as typed. The words after that one may be arguments, which a refusal
- * never repeats. It suggests the
+ * never repeats. A plural the commands of a noun answer to (`users`) is read
+ * as that noun when a word follows it, so the word is looked up among the
+ * noun's commands. It suggests the
  * help of the one visible command a word is the plural of (`policies` for
  * `policy`), or else is a single edit from, never the command itself, which
  * would run without the flags typed, so a typo can never turn into a
@@ -71,7 +74,11 @@ export class NotFound extends BaseCommand {
     const blank = split.findIndex((word) => {
       return word.trim() === "";
     });
-    const words = blank === -1 ? split : split.slice(0, blank);
+    const read = blank === -1 ? split : split.slice(0, blank);
+    // `users frob` names no command of `user`: the plural runs that noun's
+    // commands, so what follows it is one of them or it is nothing.
+    const noun = aliasedNouns(this.config.commands).get(read[0] ?? "");
+    const words = noun === undefined || read.length < 2 ? read : [noun, ...read.slice(1)];
     // The next word of every visible command under `parent`.
     const under = (parent: readonly string[]): string[] => {
       return visible

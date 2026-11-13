@@ -250,12 +250,13 @@ installed version. **Do not guess a command name.** Before running any command y
 are not certain of, look it up first and use the exact name the CLI prints:
 command and resource names and the exact verb are whatever the CLI shows, never
 what you would assume. A resource's noun is singular (`user list`,
-`policy get`, `flow-definition list`); `branding` has no other form. A
-wrong guess costs a failed call and a round of recovery; one cheap lookup up
-front avoids it. `zitadel --help` lists each family of commands (`user`,
-`release`) as one row, so it stays short; `zitadel commands` is the flat list of
-every command, verbs included, and `zitadel <family> --help` lists one family's
-verbs. Treat the CLI's own output as authoritative over anything you remember:
+`policy get`, `flow-definition list`); `branding` has no other form. The
+plural runs the same command (`users list`), but nothing lists it, and every
+output names the singular. A wrong guess costs a failed call and a round of
+recovery; one cheap lookup up front avoids it. `zitadel --help` lists each
+family of commands (`user`, `release`) as one row, so it stays short;
+`zitadel commands` is the flat list of every command, verbs included, and
+`zitadel <family> --help` lists one family's verbs. Treat the CLI's own output as authoritative over anything you remember:
 
 ```sh
 npx @zitadel/cli@latest --help               # every command family, grouped by purpose
@@ -566,8 +567,8 @@ without an envelope. In human mode a cancel prints no error block. A name the
 CLI cannot resolve to a command, an unknown command or an unknown subcommand,
 is an `E_VALIDATION` envelope like any other, but it exits 127, as a shell
 does for a command it cannot find. Its `next_commands` are the `--help` of the
-command it was the plural of (`policies` names `policy --help`) or one edit
-from, and of the topic. It is never run as a different command. Its message
+command it was the plural of (`policies` alone names `policy --help`) or one
+edit from, and of the topic. It is never run as a different command. Its message
 names the first word that is no command where it was typed, as typed, and
 never a word after that one. A stray extra word after a
 real command is that command refusing an argument it does not take: an

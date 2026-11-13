@@ -5,6 +5,7 @@ import { showSkillsHint } from "@/lib/skills-hint";
 import { suggesterFor } from "@/lib/suggestion";
 
 import { COMMAND_GROUPS, type CommandGroup, CommandGroups, compareInGroup } from "./groups";
+import { aliasedCommands, aliasedNouns } from "./plural-aliases";
 
 /** A loaded command plus the root-help statics `BaseCommand` (`./base`) declares. */
 type GroupedCommand = Command.Loadable & { group?: CommandGroup; groupOrder?: number };
@@ -26,9 +27,24 @@ const PLUGIN_SUMMARIES: Readonly<Record<string, string>> = {
  * `release`) is one row, and its own help lists the operations. Only
  * {@link showRootHelp} is replaced; per-command and per-topic help
  * (`start --help`, `schema --help`) stay oclif's own, with a pointer back to
- * the root screen added. Wired in via `oclif.helpClass` in `package.json`.
+ * the root screen added. Help asked for under a plural the commands answer to
+ * (`users --help`, `users list --help`) is the help of the noun and of its
+ * command, spelled as they are declared. Wired in via `oclif.helpClass` in
+ * `package.json`.
  */
 export default class ZitadelHelp extends Help {
+  override async showHelp(argv: string[]): Promise<void> {
+    const nouns = aliasedNouns(this.config.commands);
+    const subject = argv.findIndex((word) => {
+      return !word.startsWith("-");
+    });
+    await super.showHelp(
+      argv.map((word, at) => {
+        return at === subject ? (nouns.get(word) ?? word) : word;
+      }),
+    );
+  }
+
   protected override async showRootHelp(): Promise<void> {
     const { bin } = this.config;
     const commands = this.rootCommands();
@@ -81,7 +97,9 @@ export default class ZitadelHelp extends Help {
   }
 
   override async showCommandHelp(command: Command.Loadable): Promise<void> {
-    await super.showCommandHelp(command);
+    const id = aliasedCommands(this.config.commands).get(command.id);
+    const declared = id === undefined ? undefined : this.config.findCommand(id);
+    await super.showCommandHelp(declared ?? command);
     this.log(exploreAllCommands(this.config.version));
   }
 

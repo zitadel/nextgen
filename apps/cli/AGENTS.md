@@ -121,6 +121,8 @@
     `tests/unit/lib/oclif/refusal-wording.test.ts` weighs every refusal.
 - No `flags/`, `args/` or `rules/` directory, and no helper module beside a
   command.
+- Name a command's noun in the singular and declare no plural alias: `src/index.ts` gives every
+  `<noun> <verb>` command a hidden one; a noun without a plural goes in `NO_PLURAL`, with why.
 - Write every refusal once, as a `Refusal` template with `{name}` placeholders
   (`src/lib/oclif/refusal.ts`), never a `ZitadelError` built by hand; its `next`
   entries are `{ id, … }` objects, and a `{name}` one is filled from `refusalError`'s

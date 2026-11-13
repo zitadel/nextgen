@@ -144,6 +144,24 @@ describe("root help", () => {
     expect(stripAnsi(stdout)).toContain("schema list");
   });
 
+  it("shows a noun's help when asked under its plural", async () => {
+    const { stdout } = await runCliForTest(["schemas", "--help"]);
+
+    expect(stripAnsi(stdout)).toContain("USAGE\n  $ zitadel schema COMMAND");
+  });
+
+  it("shows a command's help as it is declared when asked under its noun's plural", async () => {
+    const { stdout } = await runCliForTest(["schemas", "list", "--help"]);
+
+    expect(stripAnsi(stdout)).toContain("USAGE\n  $ zitadel schema list");
+  });
+
+  it("lists no plural among a noun's commands", async () => {
+    const { stdout } = await runCliForTest(["schema", "--help"]);
+
+    expect(stripAnsi(stdout)).not.toContain("schemas ");
+  });
+
   it.each([
     { label: "a command", argv: ["claim", "--help"] },
     { label: "a family of commands", argv: ["user", "--help"] },

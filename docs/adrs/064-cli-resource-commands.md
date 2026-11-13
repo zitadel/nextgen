@@ -11,7 +11,10 @@
 > `deployment rollback`. §3's `environments` question is settled as `env`,
 > which is singular under the same rule. Rationale and the noun list:
 > [`docs/design/glossary.md` §11](../design/glossary.md#11-cli-grammar).
-> The shipped commands are renamed without a deprecation window (alpha).
+> The singular is the documented form. The plural of every noun stays
+> accepted and is never shown: `zitadel users list` runs `zitadel user list`
+> (changed 2026-11-13; the note first said the plural commands were renamed
+> without a deprecation window).
 >
 > **Amendment (2026-10-15):** §6 and §13 are extended by
 > [ADR 071](071-cli-resource-properties.md). Every leaf of a request body gets

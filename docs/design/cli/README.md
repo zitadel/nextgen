@@ -47,7 +47,7 @@ A resource command performs a direct operation on a resource:
 zitadel <resource> <verb> [id] [flags]
 ```
 
-Resource names are singular ([glossary §11](../glossary.md#11-cli-grammar)):
+Resource names are singular; the plural runs the same command and is never shown ([glossary §11](../glossary.md#11-cli-grammar)):
 
 ```bash
 zitadel user create

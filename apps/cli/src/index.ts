@@ -47,6 +47,7 @@ import VariableList from "./cli/commands/variable/list";
 import VariableResolve from "./cli/commands/variable/resolve";
 import VariableRm from "./cli/commands/variable/rm";
 import VariableSet from "./cli/commands/variable/set";
+import { answeringToPlurals } from "./lib/oclif/plural-aliases";
 
 /**
  * The hand-written commands of the explicit oclif command table
@@ -106,13 +107,28 @@ export const WORKFLOW_COMMANDS = {
 } as const satisfies Record<string, typeof Command>;
 
 /**
- * Every command the CLI runs: the hand-written ones, then the generated
- * resource commands.
+ * The nouns whose commands answer to no plural, and why. Every other
+ * `<noun> <verb>` command also runs as `<plural> <verb>`, which nothing lists.
  */
-export const COMMANDS: Record<string, typeof Command> = {
-  ...WORKFLOW_COMMANDS,
-  ...RESOURCE_COMMANDS,
+export const NO_PLURAL: Readonly<Record<string, string>> = {
+  api: "names the API, which is one thing, and calls an operation of it",
+  branding: "a mass noun: a project has branding, not brandings",
+  skills: "named in the plural already",
+  tests: "named in the plural already",
 };
+
+/**
+ * Every command the CLI runs: the hand-written ones, then the generated
+ * resource commands. A command names its noun in the singular
+ * (`zitadel user list`), and answers to the plural as well.
+ */
+export const COMMANDS: Record<string, typeof Command> = answeringToPlurals(
+  {
+    ...WORKFLOW_COMMANDS,
+    ...RESOURCE_COMMANDS,
+  },
+  new Set(Object.keys(NO_PLURAL)),
+);
 
 declare module "@/lib/suggestion" {
   /**
