@@ -516,7 +516,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
   protected async rerun<Defs extends object = Record<never, never>>(
     change: RerunOf<NoInfer<Defs>> = {},
   ): Promise<SuggestedCommand> {
-    return this.rebuilt(change, this.id ?? "");
+    return this.rebuilt(change);
   }
 
   /**
@@ -524,12 +524,13 @@ export abstract class BaseCommand extends Interruptible(Command) {
    * implementation {@link again}, {@link rerun} and {@link realRun} share.
    *
    * @param change - What the rerun changes.
-   * @param id - The running command.
+   * @param id - The running command; this run's own id unless {@link again}
+   *   names it.
    * @returns The command.
    * @throws {Error} When the change names a flag the running command does not
    *   declare.
    */
-  private async rebuilt(change: Rerun, id: string): Promise<SuggestedCommand> {
+  private async rebuilt(change: Rerun, id: string = this.id ?? ""): Promise<SuggestedCommand> {
     const { raw } = await this.parseOnce();
     // Read off the running class itself rather than looked up by id: this run
     // is the command, whatever table it was loaded from.
@@ -552,7 +553,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
    * @returns The command.
    */
   protected async realRun(): Promise<SuggestedCommand> {
-    return this.rebuilt({ without: ["dryRun"] }, this.id ?? "");
+    return this.rebuilt({ without: ["dryRun"] });
   }
 
   /**

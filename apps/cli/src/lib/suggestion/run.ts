@@ -54,6 +54,25 @@ export type ParsedToken = Readonly<
 >;
 
 /**
+ * How a rerun changes the command line it rebuilds: the one shape
+ * {@link RerunOf} and {@link Rerun} both are, told apart by how they name and
+ * type the flags.
+ *
+ * @typeParam Name - How a flag to leave out is named.
+ * @typeParam Values - The flags to set, by name, with their values.
+ */
+type RerunShape<Name extends string, Values> = Readonly<{
+  /** Flags to leave out. */
+  without?: readonly Name[];
+  /** Flags to set ahead of the typed ones, as a `--force` retry reads. */
+  with?: Values;
+  /** Flags to set after the typed ones, such as a next page's token. */
+  after?: Values;
+  /** The arguments to name, where they are not the ones typed. */
+  arguments?: readonly string[];
+}>;
+
+/**
  * How a rerun changes the command line it rebuilds, checked against `Defs`:
  * the flags the code asking for it relies on the command declaring, typed as
  * they parse. A rerun from code that does not know which command it runs in
@@ -61,28 +80,13 @@ export type ParsedToken = Readonly<
  *
  * @typeParam Defs - The flags the rerun relies on, as a command declares them.
  */
-export type RerunOf<Defs> = Readonly<{
-  /** Flags to leave out. */
-  without?: readonly FlagNameOf<{ flags: Defs }>[];
-  /** Flags to set ahead of the typed ones, as a `--force` retry reads. */
-  with?: Partial<FlagsOf<{ flags: Defs }>>;
-  /** Flags to set after the typed ones, such as a next page's token. */
-  after?: Partial<FlagsOf<{ flags: Defs }>>;
-  /** The arguments to name, where they are not the ones typed. */
-  arguments?: readonly string[];
-}>;
+export type RerunOf<Defs> = RerunShape<
+  FlagNameOf<{ flags: Defs }>,
+  Partial<FlagsOf<{ flags: Defs }>>
+>;
 
 /** How a rerun changes the command line it rebuilds, once its flags are only names. */
-export type Rerun = Readonly<{
-  /** Flags to leave out. */
-  without?: readonly string[];
-  /** Flags to set ahead of the typed ones, as a `--force` retry reads. */
-  with?: Readonly<Record<string, unknown>>;
-  /** Flags to set after the typed ones, such as a next page's token. */
-  after?: Readonly<Record<string, unknown>>;
-  /** The arguments to name, where they are not the ones typed. */
-  arguments?: readonly string[];
-}>;
+export type Rerun = RerunShape<string, Readonly<Record<string, unknown>>>;
 
 /**
  * The commands one run suggests next: rendered against what each target
