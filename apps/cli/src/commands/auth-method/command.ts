@@ -120,9 +120,7 @@ export type SchemaTargetInput = {
  */
 const EXTERNAL_SCHEMA_REFUSAL = {
   message: "{file} points at an external schema",
-  hint:
-    "Its sign-in methods live in the schema at its url, which the server fetches. " +
-    "Edit x-auth-methods there instead.",
+  hint: "Its sign-in methods live in the schema at its url, which the server fetches. Edit x-auth-methods there instead.",
   details: {
     file: "{file}",
     url: "{url}",

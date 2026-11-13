@@ -71,9 +71,7 @@ const NOTHING_TO_PAGE_REFUSAL = {
 const FORCE_REQUIRED_REFUSAL = {
   code: "E_CONFIRMATION_REQUIRED",
   message: "Cannot call {operation} without --force in non-interactive mode",
-  hint:
-    "Ask a person first: {question} Once they agree, run the same command again, " +
-    "with its --field values or the pipe into --input, and add --force.",
+  hint: "Ask a person first: {question} Once they agree, run the same command again, with its --field values or the pipe into --input, and add --force.",
   details: { question: "{question}" },
 } as const satisfies Refusal;
 

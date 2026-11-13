@@ -454,9 +454,7 @@ export function customSettingsOf(flags: {
 const NO_LOCAL_SERVER_REFUSAL = {
   code: "E_LOCAL_SERVER_NOT_RUNNING",
   message: "Local Zitadel server is not running",
-  hint:
-    "{reason}Start local Zitadel first, then rerun setup. {scripting}{recovery}" +
-    "After setup succeeds, follow its next_commands to start the app and verify registration, logout, and login in the browser.",
+  hint: "{reason}Start local Zitadel first, then rerun setup. {scripting}{recovery}After setup succeeds, follow its next_commands to start the app and verify registration, logout, and login in the browser.",
   next: [{ id: "start" }, "{setup}"],
 } as const satisfies Refusal;
 
@@ -477,32 +475,21 @@ const SECRET_WITHOUT_CONFIG_REFUSAL = {
 const WORKTREE_UNKNOWN_REFUSAL = {
   code: "E_CONFLICT",
   message: "Could not tell whether the git working tree is clean: {reason}",
-  hint:
-    "Setup commits the files it writes, and will not do that without knowing the tree " +
-    "started clean. Fix what git is reporting, then run setup again, or pass --no-git to " +
-    "set up without touching version control.",
+  hint: "Setup commits the files it writes, and will not do that without knowing the tree started clean. Fix what git is reporting, then run setup again, or pass --no-git to set up without touching version control.",
 } as const satisfies Refusal;
 
 /** How a repository where a commit would land in the wrong place is refused. */
 const WORKTREE_BLOCKED_REFUSAL = {
   code: "E_CONFLICT",
   message: "Setup cannot commit here: {blocked}",
-  hint:
-    "Setup commits the project so the first release records a commit. Finish or abort what " +
-    "is under way, or check out a branch, then run setup again, or pass --no-git to set up " +
-    "without touching version control.",
+  hint: "Setup commits the project so the first release records a commit. Finish or abort what is under way, or check out a branch, then run setup again, or pass --no-git to set up without touching version control.",
 } as const satisfies Refusal;
 
 /** How a repository holding work the CLI did not write is refused. */
 const WORKTREE_DIRTY_REFUSAL = {
   code: "E_CONFLICT",
   message: "The git working tree has {parts}",
-  hint:
-    "Setup commits the project directory so the first release records a commit, and it will not " +
-    "do that while there is work it did not write, which would be committed under setup's name. " +
-    "See them with git status, commit or stash them, then run setup again. If you have just scaffolded " +
-    "the app yourself, committing it first is the expected step. To set up without touching " +
-    "version control at all, pass --no-git.",
+  hint: "Setup commits the project directory so the first release records a commit, and it will not do that while there is work it did not write, which would be committed under setup's name. See them with git status, commit or stash them, then run setup again. If you have just scaffolded the app yourself, committing it first is the expected step. To set up without touching version control at all, pass --no-git.",
   details: {
     modified: "{modified}",
     untracked: "{untracked}",
@@ -513,10 +500,7 @@ const WORKTREE_DIRTY_REFUSAL = {
 const SERVER_VERSION_REFUSAL = {
   code: "E_CONFLICT",
   message: "The local Zitadel server runs {running}, but this CLI ships {expected}",
-  hint:
-    "A server another CLI release started serves that release's API, so setup would stop " +
-    "halfway. Run start to restart it on {expected}; its data stays. {where}" +
-    "Then rerun setup.",
+  hint: "A server another CLI release started serves that release's API, so setup would stop halfway. Run start to restart it on {expected}; its data stays. {where}Then rerun setup.",
   next: ["{start}", "{setup}"],
   details: {
     server_url: "{serverUrl}",
