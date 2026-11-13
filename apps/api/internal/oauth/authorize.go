@@ -38,9 +38,7 @@ type AuthRequestStore interface {
 	Create(ctx context.Context, request *domain.AuthRequest) (bindingNonce string, err error)
 }
 
-// VerifyAuthRequest finds the issuer and the client. Its errors are answered
-// here and never reach the client, because the redirect URI is not checked
-// yet: an issuer this server does not serve is a 404, an unknown client a 400.
+// VerifyAuthRequest finds the issuer and the client.
 func (s opServer) VerifyAuthRequest(ctx context.Context, r *op.Request[oidc.AuthRequest]) (*op.ClientRequest[oidc.AuthRequest], error) {
 	issuer, ok := IssuerFromContext(ctx)
 	if !ok {
@@ -84,8 +82,7 @@ func (s opServer) VerifyAuthRequest(ctx context.Context, r *op.Request[oidc.Auth
 
 // Authorize stores the request and sends the browser to the issuer's login
 // page with the request's handle, binding the handle to the browser with a
-// cookie (ADR 081 §8). The redirect URI is valid here, so an error the
-// client can act on goes back to it.
+// cookie (ADR 081 §8).
 func (s opServer) Authorize(ctx context.Context, r *op.ClientRequest[oidc.AuthRequest]) (*op.Redirect, error) {
 	req := r.Data
 	c := r.Client.(*client)

@@ -72,8 +72,9 @@ func (s *applicationService) Get(ctx context.Context, projectID, id string) (_ *
 	return s.get(ctx, projectID, domain.ApplicationFieldID, id)
 }
 
-// Client implements [ApplicationService]. deploymentID is unused: a
-// registered client is data, not part of a release (ADR 081 §10).
+// Client implements [ApplicationService]. It finds registered clients only,
+// which every deployment shares, so deploymentID is unused until it also
+// finds the clients a release declares (ADR 082 §3).
 func (s *applicationService) Client(ctx context.Context, projectID, _, clientID string) (_ domain.ApplicationClientDocument, err error) {
 	ctx, end := startSpan(ctx, "ApplicationService.Client")
 	defer end(&err)
@@ -104,7 +105,7 @@ func (s *applicationService) Client(ctx context.Context, projectID, _, clientID 
 	return doc.Clients[i], nil
 }
 
-// validate checks document against the application.json schema, then against
+// validate checks the document against the application.json schema, then against
 // the rules of the authorization server the schema cannot express.
 func (s *applicationService) validate(document []byte) (domain.ApplicationDocument, error) {
 	if _, err := validateBuiltinSchema(s.schemas, domain.SchemaKindApplication, document); err != nil {

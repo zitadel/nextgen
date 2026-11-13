@@ -323,6 +323,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	applicationService := service.NewApplicationService(serviceDBPool, schemaValidator, secrets.NewRandomSecretGenerator())
 	deploymentService := service.NewDeploymentService(serviceDBPool, variableService)
 	eventService := service.NewEventService(serviceDBPool, cfg.Platform.ResolvedProjectID())
+	authRequestService := service.NewAuthRequestService(serviceDBPool)
 	// Operation policies (ADR 066). Every template is compiled and checked
 	// here, so a template the server cannot evaluate stops it before it
 	// serves traffic. A project's published instance is resolved per password
@@ -535,7 +536,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 			Admission:       oauth.DenyAll{},
 			Settings:        oauth.NotEnabled{},
 			Clients:         applicationService,
-			AuthRequests:    service.NewAuthRequestService(serviceDBPool),
+			AuthRequests:    authRequestService,
 		})
 	}
 
