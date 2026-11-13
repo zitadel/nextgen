@@ -436,7 +436,7 @@ Two workable setups; the prototype's draft uses the first.
 | Shared with | the cloud deployments (same team cache, apart by key: the root `turbo.json` hashes `VERCEL` into every task, so a build CI did is no hit there) | CI only |
 | Cost | free, within a fair-use limit of 1 TB/month of uploads on Pro; artifacts expire after 7 days | part of the Depot plan (as moon's cache today) |
 | Forks | no token, local cache only | same |
-| Write policy | `TURBO_CACHE=local:rw,remote:rw` on every run: pull requests, the merge queue, pushes to main (which run the gate alone), the nightly run and runs by hand, as moon's runs write Depot's cache; on Vercel, every build reads and writes as Vercel's cache policies allow, a preview main's entries and its own branch's (see "Who may write to the cache") | same flags |
+| Write policy | `TURBO_CACHE=local:rw,remote:rw` on every run: pull requests, the merge queue, pushes to main (which run the gate alone), the nightly run and runs by hand, as moon's runs write Depot's cache; on Vercel, every build reads and writes as Vercel's cache policies allow: a preview reads main's entries and its own branch's, and writes only its own (see "Who may write to the cache") | same flags |
 
 Recommendation: Vercel's, for the one shared cache and because the cloud
 deployments use it already. Set up on 2026-10-12: the variable
