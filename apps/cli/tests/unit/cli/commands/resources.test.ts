@@ -367,7 +367,10 @@ describe("users list", () => {
       http.get(`${SERVER}/api/v1/events`, ({ request }) => {
         const token = new URL(request.url).searchParams.get("page_token");
         tokens.push(token);
-        return HttpResponse.json({ data: [], next_page_token: token === null ? "p\u001b2" : null });
+        return HttpResponse.json({
+          events: [],
+          next_page_token: token === null ? "p\u001b2" : null,
+        });
       }),
     );
 
@@ -1165,7 +1168,7 @@ describe("next page suggestion", () => {
     const cwd = await makeProject();
     server.use(
       http.get(`${SERVER}/api/v1/events`, () =>
-        HttpResponse.json({ data: [{ id: "evt_1" }], next_page_token: "p2" }),
+        HttpResponse.json({ events: [{ id: "evt_1" }], next_page_token: "p2" }),
       ),
     );
 
@@ -1775,7 +1778,7 @@ describe("other resources", () => {
       http.get(`${SERVER}/api/v1/events`, ({ request }) => {
         urls.push(request.url);
         return HttpResponse.json({
-          data: [{ id: "evt_1", event_type: "user.created", category: "entity" }],
+          events: [{ id: "evt_1", event_type: "user.created", category: "entity" }],
         });
       }),
     );
@@ -1817,7 +1820,7 @@ describe("other resources", () => {
     server.use(
       http.get(`${SERVER}/api/v1/events`, ({ request }) => {
         urls.push(request.url);
-        return HttpResponse.json({ data: [] });
+        return HttpResponse.json({ events: [] });
       }),
     );
     // The events registry declares `sortParam: "order"`, so the shared
@@ -2475,7 +2478,7 @@ describe("the registry builders", () => {
       ],
       call: ({ client, projectId }: Platform, params: Omit<ListEventsParams, "project_id">) =>
         client.listEvents({ ...params, project_id: projectId }),
-      items: (page: ListEvents200) => page.data,
+      items: (page: ListEvents200) => page.events,
       next: (page: ListEvents200) => page.next_page_token,
     });
   });
@@ -2508,7 +2511,7 @@ describe("the registry builders", () => {
       filters: [{ field: "actor_id", operations: ["equals"], combine: "or" }],
       call: ({ client, projectId }: Platform, params: Omit<ListEventsParams, "project_id">) =>
         client.listEvents({ ...params, project_id: projectId }),
-      items: (page: ListEvents200) => page.data,
+      items: (page: ListEvents200) => page.events,
       next: (page: ListEvents200) => page.next_page_token,
     });
   });
@@ -2519,7 +2522,7 @@ describe("the registry builders", () => {
       filters: [{ field: "event_type", operations: ["equals"] }],
       call: ({ client, projectId }: Platform, params: Omit<ListEventsParams, "project_id">) =>
         client.listEvents({ ...params, project_id: projectId }),
-      items: (page: ListEvents200) => page.data,
+      items: (page: ListEvents200) => page.events,
       next: (page: ListEvents200) => page.next_page_token,
     });
   });
@@ -2536,7 +2539,7 @@ describe("the registry builders", () => {
       ],
       call: ({ client, projectId }: Platform, params: Omit<ListEventsParams, "project_id">) =>
         client.listEvents({ ...params, project_id: projectId }),
-      items: (page: ListEvents200) => page.data,
+      items: (page: ListEvents200) => page.events,
       next: (page: ListEvents200) => page.next_page_token,
     });
   });
@@ -2547,7 +2550,7 @@ describe("the registry builders", () => {
       filters: [{ field: "created_after", operations: ["greater_than"] }],
       call: ({ client, projectId }: Platform, params: Omit<ListEventsParams, "project_id">) =>
         client.listEvents({ ...params, project_id: projectId }),
-      items: (page: ListEvents200) => page.data,
+      items: (page: ListEvents200) => page.events,
       next: (page: ListEvents200) => page.next_page_token,
     });
   });
@@ -2559,7 +2562,7 @@ describe("the registry builders", () => {
       sortParam: "order",
       call: ({ client, projectId }: Platform, params: Omit<ListEventsParams, "project_id">) =>
         client.listEvents({ ...params, project_id: projectId }),
-      items: (page: ListEvents200) => page.data,
+      items: (page: ListEvents200) => page.events,
       next: (page: ListEvents200) => page.next_page_token,
     });
   });

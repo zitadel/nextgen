@@ -32,9 +32,7 @@ const bundled = JSON.parse(
 
 /** Departures to fix, each in a PR of its own: every fix changes the contract. */
 const KNOWN_VIOLATIONS = {
-  "list-response-shape": {
-    listEvents: "names its array `data`, not `events`",
-  },
+  "list-response-shape": {},
   "list-pagination": {},
   "query-sort-field": {
     queryProjects: "sorts by the shared `filter-field`",

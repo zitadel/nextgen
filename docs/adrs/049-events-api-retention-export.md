@@ -134,7 +134,7 @@ extension** (predicate filters only — keyset pagination stays on
 
 - `payload` and `metadata` are returned **as stored** — already redacted at emit
   time per [ADR 048 §8](048-wide-events-internal-audit-primitive.md).
-- List response wraps items in `{ "data": [...], "next_page_token": "..." }` per
+- List response wraps items in `{ "events": [...], "next_page_token": "..." }` per
   [ADR 027](027-cursor-based-pagination.md). No total count. List omits
   `deliveries` to keep payloads small.
 

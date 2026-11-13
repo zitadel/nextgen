@@ -142,7 +142,7 @@ func TestListEventsByUser(t *testing.T) {
 			require.NoError(t, err)
 			page, ok := resp.(*api.ListEventsResponse)
 			require.True(t, ok, helpers.MustMarshal(t, resp))
-			for _, event := range page.Data {
+			for _, event := range page.Events {
 				raw, err := event.MarshalJSON()
 				require.NoError(t, err)
 				var item listed

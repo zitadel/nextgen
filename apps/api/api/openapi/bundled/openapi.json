@@ -25344,10 +25344,10 @@
         "type": "object",
         "description": "A page of events.",
         "required": [
-          "data"
+          "events"
         ],
         "properties": {
-          "data": {
+          "events": {
             "description": "The events of this page. A filter the server matches event by event can\nleave it shorter than `limit`, or empty, while more events remain:\n`next_page_token` says whether they do.\n",
             "type": "array",
             "items": {

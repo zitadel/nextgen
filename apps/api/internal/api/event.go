@@ -87,14 +87,14 @@ func (h *Handler) ListEvents(ctx context.Context, params api.ListEventsParams) (
 	}
 
 	resp := &api.ListEventsResponse{
-		Data: make([]api.Event, 0, len(result.Events)),
+		Events: make([]api.Event, 0, len(result.Events)),
 	}
 	for _, e := range result.Events {
 		item, err := eventToAPI(e)
 		if err != nil {
 			return nil, err
 		}
-		resp.Data = append(resp.Data, *item)
+		resp.Events = append(resp.Events, *item)
 	}
 	if result.NextPageToken != "" {
 		resp.NextPageToken = api.NewOptNilPageToken(api.PageToken(result.NextPageToken))

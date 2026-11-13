@@ -1,4 +1,4 @@
-import type { ListEvents200DataItem, ListEventsParams } from "@zitadel/api/generated/model";
+import type { ListEvents200EventsItem, ListEventsParams } from "@zitadel/api/generated/model";
 
 /**
  * One event, as `GET /events` and `GET /events/{event_id}` return it: an
@@ -6,7 +6,7 @@ import type { ListEvents200DataItem, ListEventsParams } from "@zitadel/api/gener
  * step, a change to a record or an API request. The API, the CLI and
  * the console's Events screen all call them events.
  */
-export type ProjectEvent = ListEvents200DataItem;
+export type ProjectEvent = ListEvents200EventsItem;
 
 /** What Events' audit view, and Overview's card of it, say of a project with none. */
 export const NO_AUDIT_EVENTS = "This project has no audit events.";
