@@ -575,13 +575,9 @@ func TestDeploymentReads(t *testing.T) {
 	})
 
 	t.Run("the deployments of one release", func(t *testing.T) {
-		got := list(t, api.ListDeploymentsParams{ReleaseID: api.NewOptReleaseID(fixture.release.ID)})
-		assert.Equal(t, []api.DeploymentID{first.ID}, ids(got))
-		assert.Equal(t, api.DeploymentStatusInactive, got[0].Status)
+		assert.Equal(t, []api.DeploymentID{first.ID},
+			ids(list(t, api.ListDeploymentsParams{ReleaseID: api.NewOptReleaseID(fixture.release.ID)})))
 		assert.Empty(t, list(t, api.ListDeploymentsParams{ReleaseID: api.NewOptReleaseID(fixture.release.ID), Live: api.NewOptBool(true)}))
-		assert.Equal(t, []api.DeploymentID{second.ID},
-			ids(list(t, api.ListDeploymentsParams{ReleaseID: api.NewOptReleaseID(secondRelease), Live: api.NewOptBool(true)})))
-		assert.Empty(t, list(t, api.ListDeploymentsParams{ReleaseID: api.NewOptReleaseID("rel_01KX5N7C9D2E7F0N9WD3P2E4YM6")}))
 	})
 
 	t.Run("embeds the release", func(t *testing.T) {

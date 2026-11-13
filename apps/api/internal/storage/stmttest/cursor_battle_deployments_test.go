@@ -71,7 +71,7 @@ func battleLiveDeployments(t *testing.T, d dialect) {
 	orderAsc := deployment.NewestFirst()
 	orderAsc.Direction = database.OrderAsc
 	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.DeploymentField]) (*database.ListResult[*domain.Deployment], error) {
-		opts := deployment.LiveListOptions(projectID, nil, page.Limit)
+		opts := deployment.ListOptions(projectID, nil, nil, page.Limit)
 		opts.Pagination = page
 		return d.stmts.ListLiveDeployments(unfilteredListCtx(t), now, opts)
 	}, func(e *domain.Deployment) string { return e.ID }, 2)
