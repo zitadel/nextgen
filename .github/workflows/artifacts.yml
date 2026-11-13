@@ -76,7 +76,7 @@ jobs:
       - id: target
         run: node scripts/artifacts-target.mjs
         env:
-          VERSION: ${{ inputs.version }}
+          VERSION: ${{ inputs.version || (github.event_name == 'pull_request' && '0.6.0') || '' }}
           RELEASE_RUN_STARTED_AT: ${{ github.event.workflow_run.run_started_at }}
           RELEASE_RUN_UPDATED_AT: ${{ github.event.workflow_run.updated_at }}
 
