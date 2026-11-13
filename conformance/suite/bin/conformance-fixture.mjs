@@ -41,14 +41,30 @@ const DROPPED_FILES = new Set([
 ]);
 
 /**
- * Tooling that only the generated scripts a fixture drops (`lint`, `build`,
- * `preview`) would load, and its config files. Kept, it installs packages
- * nothing in the lane runs, which pnpm also hands other workspace packages as
- * their optional peers. Add a name here when a generator writes another; a
- * fixture has no list of its own.
+ * Tooling nothing a fixture keeps would load (only the generated scripts it
+ * drops, `lint`, `build` and `preview`, or an editor), and its config files.
+ * Kept, it installs packages nothing in the lane runs, which pnpm also hands
+ * other workspace packages as their optional peers. Add a name here when a
+ * generator writes another; a fixture has no list of its own.
  */
-const UNLOADED_DEPENDENCIES = new Set(["eslint", "eslint-config-next", "oxlint", "serve"]);
-const UNLOADED_FILES = new Set(["eslint.config.mjs", ".oxlintrc.json"]);
+const UNLOADED_DEPENDENCIES = new Set([
+  "@eslint/js",
+  "eslint",
+  "eslint-config-next",
+  "eslint-plugin-qwik",
+  "globals",
+  "oxlint",
+  "prettier",
+  "serve",
+  "typescript-eslint",
+  "typescript-plugin-css-modules",
+]);
+const UNLOADED_FILES = new Set([
+  "eslint.config.js",
+  "eslint.config.mjs",
+  ".oxlintrc.json",
+  ".prettierignore",
+]);
 
 function isDropped(path) {
   const [first] = path.split("/");
@@ -63,16 +79,22 @@ function isDropped(path) {
  * setup wrote against the SDK's types. That is a `check` script where the
  * generator writes one (sv), else the build-mode type-check its `build`
  * starts with (create-vite's `tsc -b`, or `vue-tsc -b` for a template with
- * single-file components).
+ * single-file components), else a script that only type-checks
+ * (`tsc … --noEmit`, create-qwik's `build.types`).
  */
 function keptScripts(scripts) {
   const kept = {};
   if (scripts.dev) kept.dev = scripts.dev;
   const buildCheck = (scripts.build ?? "").match(/^(\S*tsc) -b(?=\s|$)/);
+  const noEmitCheck = Object.values(scripts).find((command) =>
+    /^tsc\s(?:.*\s)?--noEmit(?:\s|$)/.test(command),
+  );
   if (scripts.check) {
     kept.typecheck = scripts.check;
   } else if (buildCheck) {
     kept.typecheck = `${buildCheck[1]} -b`;
+  } else if (noEmitCheck) {
+    kept.typecheck = noEmitCheck;
   }
   return kept;
 }
@@ -181,6 +203,9 @@ async function normalizeManifest(text, settings, name) {
     name: _name,
     private: _private,
     version,
+    // The workspace's pnpm runs every fixture; a generator's own pin (`ng
+    // new` writes npm) makes corepack refuse `pnpm run dev`.
+    packageManager: _packageManager,
     scripts = {},
     dependencies,
     devDependencies,
