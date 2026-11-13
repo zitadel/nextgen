@@ -91,7 +91,7 @@ export function useAccountListItems(): NavItem[] {
 
 /**
  * The root's Settings list (D29, D42): the platform project's own Settings
- * pages (General, Admins) for someone who may act on it, each drawn for that
+ * pages (General, Members) for someone who may act on it, each drawn for that
  * project, then what an add-on adds (the hosted cloud's Billing, Support and
  * Email).
  */

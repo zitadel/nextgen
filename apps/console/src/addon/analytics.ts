@@ -8,7 +8,15 @@ import { addon } from "@/addon";
  */
 type Events = {
   copied_command: { page: "projects"; snippet: "setup" };
+  // Root ADR 086 §9. Never the token, the link, the metadata or the
+  // invitation's id: the journey id is random and names no resource.
+  invitation_created: InvitationEvent;
+  invitation_accepted: InvitationEvent;
+  invitation_rejected: InvitationEvent;
 };
+
+/** `role` is the type and its role combined: `project_editor`. */
+type InvitationEvent = { role: string; invitation_journey_id: string };
 
 /** Reports `event`; the add-on adds the header every console event carries. */
 export function trackEvent<E extends keyof Events>(event: E, properties: Events[E]): void {

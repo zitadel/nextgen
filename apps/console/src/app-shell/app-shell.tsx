@@ -243,7 +243,7 @@ const NAV_LABEL: Record<NavView, string> = {
  * (`useSettingsListItems`). A row stays marked on the screens
  * beneath it, so a resource's detail keeps its list marked. The project's
  * Settings row opens a list the same way, under a heading that leads back to
- * the project: its General and Admins pages (D40).
+ * the project: its General and Members pages (D40).
  *
  * Events is one screen's own list, under a heading that leads back to the
  * project's, or to the root's for the platform project's Events (D42): a

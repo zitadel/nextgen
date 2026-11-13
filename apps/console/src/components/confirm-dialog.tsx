@@ -26,7 +26,9 @@ export const CONFIRM_TITLE = "font-serif text-lg leading-7 font-normal";
 const HEADER = "flex flex-col gap-1.5 p-6 text-left";
 
 /**
- * A destructive action the operator confirms: remove, revoke, delete.
+ * An action the operator confirms: remove, revoke, delete, or with
+ * `variant="default"` one that destroys nothing but still wants a second look,
+ * such as replacing a link.
  *
  * `onConfirm` is the request, with whatever follows it (a toast, a reload).
  * The dialog closes when it resolves, and a rejection is shown inline (ADR
@@ -44,6 +46,8 @@ export function ConfirmDialog({
   title,
   description,
   action,
+  cancel,
+  variant,
   fallback,
   onConfirm,
 }: {
@@ -53,6 +57,10 @@ export function ConfirmDialog({
   description: ReactNode;
   /** The confirming button's label. */
   action: string;
+  /** The dismissing button's label, where `Cancel` would read as the action. */
+  cancel?: string;
+  /** `default` for an action that destroys nothing. */
+  variant?: "destructive" | "default";
   /** The message when the request fails without one of its own. */
   fallback: string;
   onConfirm: () => Promise<void>;
@@ -64,6 +72,8 @@ export function ConfirmDialog({
           title={title}
           description={description}
           action={action}
+          cancel={cancel}
+          variant={variant}
           fallback={fallback}
           onConfirm={onConfirm}
           onDone={() => onOpenChange(false)}
@@ -77,6 +87,8 @@ function ConfirmBody({
   title,
   description,
   action,
+  cancel = "Cancel",
+  variant = "destructive",
   fallback,
   onConfirm,
   onDone,
@@ -84,6 +96,8 @@ function ConfirmBody({
   title: ReactNode;
   description: ReactNode;
   action: string;
+  cancel?: string;
+  variant?: "destructive" | "default";
   fallback: string;
   onConfirm: () => Promise<void>;
   onDone: () => void;
@@ -102,12 +116,12 @@ function ConfirmBody({
       </AlertDialogHeader>
       <AlertDialogFooter className={DIALOG_FOOTER}>
         <AlertDialogCancel className="px-2.5!" disabled={confirm.pending}>
-          Cancel
+          {cancel}
         </AlertDialogCancel>
         {/* Not `AlertDialogAction`: that closes on click, before the request
             settles. */}
         <Button
-          variant="destructive"
+          variant={variant}
           className="px-2.5"
           loading={confirm.pending}
           onClick={() => void confirm.run()}
