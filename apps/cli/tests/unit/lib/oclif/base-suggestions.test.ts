@@ -145,6 +145,25 @@ class ConsentProbe extends EnvironmentCommand {
     // @ts-expect-error a rerun names the flags it relies on, so `force` is unknown here
     return this.rerun({ with: { force: true } });
   }
+
+  /**
+   * Reruns that name a flag the rerun does not rely on, or give one a value of
+   * the wrong type, none of which compiles.
+   *
+   * @returns The commands.
+   */
+  async withTheWrongFlags() {
+    return [
+      // @ts-expect-error `ghost` is not among the flags the rerun relies on
+      this.rerun<typeof ConsentProbe.flags>({ with: { ghost: true } }),
+      // @ts-expect-error `ghost` is not among the flags the rerun relies on
+      this.rerun<typeof ConsentProbe.flags>({ after: { ghost: true } }),
+      // @ts-expect-error `ghost` is not among the flags the rerun relies on
+      this.rerun<typeof ConsentProbe.flags>({ without: ["ghost"] }),
+      // @ts-expect-error `force` is a switch, so it takes no string
+      this.rerun<typeof ConsentProbe.flags>({ with: { force: "yes" } }),
+    ];
+  }
 }
 
 const config = await Config.load(cliPackageRoot);
