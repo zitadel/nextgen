@@ -131,7 +131,9 @@ describe("a suggestion", () => {
   });
 
   it("takes a value left to fill in for any flag that takes one, but not for a switch", () => {
-    expect(checked({ id: "start", flags: { port: "<port>" } })).toBeDefined();
+    expect(aSuggest({}, VERSION)({ id: "start", flags: { port: "<port>" } })).toBe(
+      "npx @zitadel/cli@1.0.0-alpha.25 start --port '<port>'",
+    );
     // @ts-expect-error a switch takes no value to fill in
     checked({ id: "doctor", flags: { fix: "<fix>" } });
     // @ts-expect-error a value to fill in is written in angle brackets
