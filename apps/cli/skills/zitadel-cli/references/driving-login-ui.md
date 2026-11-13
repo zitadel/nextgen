@@ -114,7 +114,9 @@ what the user wants enforced; never invent expectations for them. `setup` writes
 the password policy with a `min_length` of 15; pass `--password-min-length <n>`
 only when the user asks for another value (`0` sets none). Managed files carry
 a marker comment; `eject` removes only
-files that still carry it, preserving anything the user replaced. For app-local
+files that still carry it, preserving anything the user replaced. It leaves the
+SDK installed: `next_commands` holds its removal, in the project's own package
+manager (`pnpm remove @zitadel/sdk-next`), for the user to run. For app-local
 development, `--server local` resolves through `.zitadel/local/runtime.json` and
 requires a healthy
 `npx @zitadel/cli@latest start` runtime. The `.zitadel/local/` that `start`
