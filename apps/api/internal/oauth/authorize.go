@@ -21,6 +21,9 @@ const (
 	// sets it on every request it forwards (ADR 081 §7).
 	LoginPathHeader  = "X-Zitadel-Login-Path"
 	defaultLoginPath = "/login"
+	// noScope stands in for a missing scope. No client allows it, so the
+	// library drops it.
+	noScope = "urn:zitadel:no-scope"
 )
 
 // AuthRequestStore stores an authorization request with its expiry and
@@ -56,6 +59,11 @@ func (s opServer) VerifyAuthRequest(ctx context.Context, r *op.Request[oidc.Auth
 		}
 		return nil, op.NewStatusError(oidc.ErrInvalidClient().WithDescription("unknown client"), http.StatusBadRequest)
 	}
+	// TODO(zitadel/oidc#1041): drop the placeholder once an op.Server client
+	// can allow a request without a scope, which the library refuses.
+	if len(r.Data.Scopes) == 0 {
+		r.Data.Scopes = oidc.SpaceDelimitedArray{noScope}
+	}
 	c := newClient(r.Data.ClientID, doc, r.Data.RedirectURI)
 	c.settings = settings
 	return &op.ClientRequest[oidc.AuthRequest]{Request: r, Client: c}, nil
@@ -87,12 +95,21 @@ func (s opServer) Authorize(ctx context.Context, r *op.ClientRequest[oidc.AuthRe
 	if err != nil {
 		return nil, op.NewStatusError(oidc.ErrInvalidRequest().WithDescription("invalid login path"), http.StatusBadRequest)
 	}
+	// The server does not serve the standard scopes yet, so they are ignored
+	// (ADR 082 §2). The library keeps them and drops every other scope.
+	scopes := slices.DeleteFunc(req.Scopes, func(scope string) bool {
+		switch scope {
+		case oidc.ScopeOpenID, oidc.ScopeProfile, oidc.ScopeEmail, oidc.ScopeAddress, oidc.ScopePhone, oidc.ScopeOfflineAccess:
+			return true
+		}
+		return false
+	})
 	request := &domain.AuthRequest{
 		ProjectID:     issuer.ProjectID,
 		ClientID:      c.id,
 		RedirectURI:   req.RedirectURI,
 		State:         req.State,
-		Scopes:        req.Scopes,
+		Scopes:        scopes,
 		CodeChallenge: req.CodeChallenge,
 		Issuer:        issuer.URL.String(),
 		DeploymentID:  c.settings.DeploymentID,

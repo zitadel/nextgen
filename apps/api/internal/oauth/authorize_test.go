@@ -69,7 +69,6 @@ func authorizeQuery(set map[string]string) string {
 		"client_id":     {"shop"},
 		"redirect_uri":  {callback},
 		"response_type": {"code"},
-		"scope":         {"openid"},
 		"state":         {"xyz"},
 	}
 	for k, v := range set {
@@ -114,7 +113,7 @@ func TestAuthorizeReachesTheLoginPage(t *testing.T) {
 				ClientID:      "shop",
 				RedirectURI:   callback,
 				State:         "xyz",
-				Scopes:        []string{"openid"},
+				Scopes:        []string{},
 				CodeChallenge: tt.wantChallenge,
 				Issuer:        "https://app.example.com/oauth/proj_123",
 				DeploymentID:  "dep_1",
@@ -140,6 +139,40 @@ func TestAuthorizeOnLoopback(t *testing.T) {
 	assert.Equal(t, "_zauth_authreq_1=nonce; Path=/; Max-Age=900; HttpOnly; SameSite=Lax", rec.Header().Get("Set-Cookie"))
 	require.Len(t, store.stored, 1)
 	assert.Equal(t, "http://127.0.0.1:4000/callback", store.stored[0].RedirectURI)
+}
+
+// A request without a scope is accepted. Until the server serves the
+// standard scopes they are ignored, like any scope no client allows, so every
+// request is stored with no scopes (ADR 082 §2).
+func TestAuthorizeScopes(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name  string
+		scope string
+	}{
+		{name: "none"},
+		// The library lets this through today; a version that refuses it
+		// like a missing scope turns this case red.
+		{name: "only_spaces", scope: " "},
+		{name: "custom", scope: "read"},
+		{name: "openid", scope: "openid"},
+		{name: "every_standard_scope", scope: "openid profile email address phone offline_access"},
+		{name: "standard_and_custom", scope: "openid read"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			store := &authRequests{}
+			mux := newMux(t, Config{Settings: deployed, Clients: shop, AuthRequests: store})
+
+			rec := send(t, mux, http.MethodGet, authorizePath+authorizeQuery(map[string]string{"scope": tt.scope}), "app.example.com", browser)
+
+			require.Equal(t, http.StatusFound, rec.Code, rec.Body.String())
+			assert.Equal(t, "https://app.example.com/login?auth_request=authreq_1", rec.Header().Get("Location"))
+			require.Len(t, store.stored, 1)
+			assert.Empty(t, store.stored[0].Scopes)
+		})
+	}
 }
 
 func TestAuthorizeLoginPath(t *testing.T) {
