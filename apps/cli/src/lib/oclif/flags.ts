@@ -36,14 +36,25 @@ export type Refused<T> = Readonly<{
 type Parsed = "value" | "input" | "problem";
 
 /**
+ * The names `Values` is sure to fill: each key it always has, with a value that
+ * is never `undefined`. An optional key, one that may hold `undefined`, or an
+ * index signature such as {@link Placeholders} fills nothing for certain.
+ *
+ * @typeParam Values - A declaration's `values`.
+ */
+type FilledBy<Values> = {
+  [Key in keyof Values]-?: string extends Key ? never : undefined extends Values[Key] ? never : Key;
+}[keyof Values];
+
+/**
  * The names a declaration's refusal asks for that neither {@link read} nor the
- * declaration's own `values` fills.
+ * declaration's own `values` is sure to fill ({@link FilledBy}).
  *
  * @typeParam Declared - A flag's or argument's declaration, as it is written.
  */
 type Unfilled<Declared> = Exclude<
   ValueNames<Declared extends { readonly refusal: infer R } ? R : never>,
-  Parsed | (Declared extends { readonly values: infer Values } ? keyof Values : never)
+  Parsed | (Declared extends { readonly values: infer Values } ? FilledBy<Values> : never)
 >;
 
 /**

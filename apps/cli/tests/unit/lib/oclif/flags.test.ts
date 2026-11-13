@@ -177,6 +177,7 @@ describe("a refusal a flag or argument is built with", () => {
     refusal: { message: "{input} takes at most {max} characters" },
   } as const;
   const LIMITED_FILLED = { ...LIMITED, values: { max: 3 } } as const;
+  const OPTIONAL_MAX: { readonly max?: number } = {};
 
   it("does not compile without a value only its declaration can fill", () => {
     // @ts-expect-error nothing fills {max}
@@ -200,6 +201,15 @@ describe("a refusal a flag or argument is built with", () => {
         values: { max: 3 },
       }),
     ).toBeTypeOf("function");
+  });
+
+  it("does not compile with a value that may not be there", () => {
+    // @ts-expect-error an undefined {max} leaves the braces in the wording
+    reads({ ...LIMITED, values: { max: undefined } });
+    // @ts-expect-error an optional {max} may leave the braces in the wording
+    reads({ ...LIMITED, values: OPTIONAL_MAX });
+
+    expect(reads(LIMITED_FILLED)).toBeTypeOf("function");
   });
 
   it("does not compile with a type argument that would leave the wording unread", () => {

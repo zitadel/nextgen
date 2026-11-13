@@ -1,4 +1,4 @@
-import type { IsNever } from "type-fest";
+import type { Alphanumeric, IsNever } from "type-fest";
 
 import { ZitadelError, type ZitadelErrorCode } from "@/lib/errors";
 import type { Suggested, Suggestion } from "@/lib/suggestion";
@@ -85,21 +85,8 @@ export function unmetBy(
  */
 const PLACEHOLDER = /\{([\w-]+)\}/g;
 
-/**
- * Each character of `Text`, as a union of one-character strings.
- *
- * @typeParam Text - The characters, written as one string.
- * @typeParam Found - The characters read so far. Carrying them keeps each step
- *   in tail position, which a string of 64 characters needs.
- */
-type CharacterOf<
-  Text extends string,
-  Found extends string = never,
-> = Text extends `${infer Character}${infer Rest}` ? CharacterOf<Rest, Found | Character> : Found;
-
 /** A character a placeholder's name may have, as `[\w-]` in {@link PLACEHOLDER} matches one. */
-type NameCharacter =
-  CharacterOf<"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-">;
+type NameCharacter = Alphanumeric | "_" | "-";
 
 /**
  * Whether `Text` is a placeholder's name: one or more {@link NameCharacter}s.
@@ -248,12 +235,13 @@ type Worded = "message" | "hint" | "details";
  * The names `R`'s message, hint and details ask `values` for. Each part is
  * read on its own: one known only as `string`, as every part of a refusal
  * typed {@link Refusal} is, asks for nothing, and the others are still read.
+ * A refusal chosen by a condition asks for what either one asks for.
  *
  * @typeParam R - The refusal, as its declaration or the call spells it.
  */
-export type ValueNames<R> = {
-  [Part in Worded & keyof R]: NamesInValue<R[Part]>;
-}[Worded & keyof R];
+export type ValueNames<R> = R extends unknown
+  ? { [Part in Worded & keyof R]: NamesInValue<R[Part]> }[Worded & keyof R]
+  : never;
 
 /**
  * The names `R`'s whole-placeholder `next` entries ask the `next` values for

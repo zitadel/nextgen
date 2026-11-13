@@ -12,6 +12,12 @@ const WIDE_NEXT: Refusal = { message: "No server", next: ["{next}"] };
 /** A hint known only as text, beside a message written as a literal. */
 const WIDE_HINT: string = "Try another one.";
 
+/** A refusal whose details ask for a value, one of two a condition chooses between. */
+const DETAILED = { message: "No schema", details: { known: "{known}" } } as const;
+
+/** A refusal that asks for nothing, the other of the two. */
+const PLAIN = { message: "No schemas yet" } as const;
+
 describe("interpolate", () => {
   it("fills each placeholder from the values", () => {
     expect(interpolate("{flag} cannot be {value}", { flag: "--port", value: 0 })).toBe(
@@ -160,6 +166,15 @@ describe("refusalError's values", () => {
     refusalError(named, {});
 
     expect(refusalError(named, { thing: "schema" }).message).toBe("No schema");
+  });
+
+  it("asks for what either of two refusals chosen by a condition asks for", () => {
+    const chosen = WIDE_HINT.length > 0 ? DETAILED : PLAIN;
+
+    // @ts-expect-error the detailed refusal's details ask for {known}
+    refusalError(chosen, {});
+
+    expect(refusalError(chosen, { known: "a" }).message).toBe("No schema");
   });
 
   it("asks for a name inside doubled braces, as the run fills it", () => {
