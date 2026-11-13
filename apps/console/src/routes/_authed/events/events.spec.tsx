@@ -492,8 +492,8 @@ describe("events", () => {
     expect(requestQueries[0]?.get("order")).toBe("asc");
     const steps = section.getAllByRole("listitem");
     expect(steps).toHaveLength(2);
-    // A request's events share a second as the API returns them: each keeps
-    // its clock time rather than an offset of nothing.
+    // A request's events fall within its run: each keeps its clock time
+    // rather than an offset of nothing.
     expect(within(steps[0] as HTMLElement).getByText(formatClockTime(OCCURRED_AT))).toBeVisible();
     expect(section.queryByText(/^\+/)).toBeNull();
     // The open event is marked, not a link; the API call behind it opens.
@@ -502,9 +502,12 @@ describe("events", () => {
         .getByText("user.deleted")
         .closest("[aria-current]"),
     ).not.toBeNull();
+    // The API call says how long it ran.
+    expect(within(steps[1] as HTMLElement).getByText("12 ms")).toBeVisible();
     await userEvent.click(within(steps[1] as HTMLElement).getByRole("link"));
     expect(await panel.findByRole("heading", { name: "request.api" })).toBeVisible();
-    expect(panel.getByText("12 ms")).toBeInTheDocument();
+    // On its own row as well as on its step.
+    expect(panel.getAllByText("12 ms")).toHaveLength(2);
   });
 
   it("lists the whole login flow of a sign-in event in the drawer, in place of its one request", async () => {
@@ -563,7 +566,7 @@ describe("events", () => {
 
     const steps = section.getAllByRole("listitem");
     // Each step by its time since the first.
-    expect(within(steps[0] as HTMLElement).getByText("+0 s")).toBeVisible();
+    expect(within(steps[0] as HTMLElement).getByText("+0 ms")).toBeVisible();
     expect(steps.map((step) => within(step).getByText(/^(auth|session)\./).textContent)).toEqual([
       "auth.attempt.created",
       "auth.check.succeeded",

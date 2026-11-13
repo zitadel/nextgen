@@ -5,6 +5,7 @@ import {
   AROUND_MINUTES,
   ATTEMPT_LIFETIME_MS,
   belongingWith,
+  flowPlaces,
   flowSummary,
   formatSpan,
   inOccurrenceOrder,
@@ -1189,14 +1190,66 @@ describe("the sign-ins", () => {
     ]);
   });
 
+  it("places a login flow's steps to the millisecond, one offset per request", () => {
+    const ms = (iso: string) => ({ occurred_at: iso, created_at: iso });
+    // A password sign-in as preview.zitadel.com stored it: the request event
+    // at the request's start, its other events as they were stored.
+    const flow = [
+      step("evt_req1", "request.api", 0, {
+        category: "request",
+        request_id: "req_1",
+        payload: { duration_ms: 29 },
+        ...ms("2026-11-12T23:33:50.892Z"),
+      }),
+      step("evt_attempt", "auth.attempt.created", 0, {
+        request_id: "req_1",
+        ...ms("2026-11-12T23:33:50.915Z"),
+      }),
+      step("evt_check", "auth.check.succeeded", 0, {
+        request_id: "req_2",
+        ...ms("2026-11-12T23:34:00.640Z"),
+      }),
+      step("evt_req2", "request.api", 0, {
+        category: "request",
+        request_id: "req_2",
+        payload: { duration_ms: 412 },
+        ...ms("2026-11-12T23:34:00.601Z"),
+      }),
+      step("evt_session", "session.established", 0, {
+        category: "session",
+        user_id: "user_1",
+        ...ms("2026-11-12T23:34:01.050Z"),
+      }),
+    ];
+    const { offsets, spanMs } = flowPlaces(flow);
+    expect(Object.fromEntries(offsets)).toEqual({
+      evt_req1: 0,
+      // Stored 23 ms into its request, not a step of its own.
+      evt_attempt: 0,
+      evt_check: 9709,
+      evt_req2: 9709,
+      evt_session: 10_158,
+    });
+    // To where the last event, or the last request, ended.
+    expect(spanMs).toBe(10_158);
+    expect(flowPlaces(flow.slice(0, 4)).spanMs).toBe(9709 + 412);
+    expect(flowPlaces([]).spanMs).toBe(0);
+    expect(
+      flowSummary(flow, { complete: true, now: new Date("2026-11-12T23:35:00Z") })?.durationMs,
+    ).toBe(10_158);
+    expect(formatSpan(spanMs)).toBe("10 s");
+  });
+
   it("writes a span of time as the drawer's timeline does", () => {
-    expect(formatSpan(0)).toBe("0 s");
+    expect(formatSpan(0)).toBe("0 ms");
+    expect(formatSpan(29)).toBe("29 ms");
+    expect(formatSpan(999.6)).toBe("1.0 s");
     expect(formatSpan(1500)).toBe("1.5 s");
     // Tenths that round up to ten seconds read as ten seconds.
     expect(formatSpan(9960)).toBe("10 s");
     expect(formatSpan(19_000)).toBe("19 s");
     expect(formatSpan(125_000)).toBe("2 min 5 s");
     expect(formatSpan(120_000)).toBe("2 min");
-    expect(formatSpan(-5)).toBe("0 s");
+    expect(formatSpan(-5)).toBe("0 ms");
   });
 });
