@@ -248,7 +248,7 @@ func (s *InvitationService) List(ctx context.Context, req ListInvitationsRequest
 		invitations = append(invitations, item)
 	}
 	if req.ExpandInviter {
-		if err := s.resolveInviters(ctx, invitations); err != nil {
+		if err := s.resolveInviters(ctx, req.ProjectID, invitations); err != nil {
 			return nil, err
 		}
 	}
@@ -291,7 +291,7 @@ type InvitationLookup struct {
 }
 
 // resolveInviters sets each invitation's Inviter from its CreatedBy.
-func (s *InvitationService) resolveInviters(ctx context.Context, invitations []*Invitation) error {
+func (s *InvitationService) resolveInviters(ctx context.Context, projectID string, invitations []*Invitation) error {
 	var ids []string
 	for _, item := range invitations {
 		if item.CreatedBy != nil && !slices.Contains(ids, *item.CreatedBy) {
@@ -301,7 +301,7 @@ func (s *InvitationService) resolveInviters(ctx context.Context, invitations []*
 	if len(ids) == 0 {
 		return nil
 	}
-	refs, err := s.inviterRefs(ctx, ids)
+	refs, err := s.inviterRefs(ctx, projectID, ids)
 	if err != nil {
 		return err
 	}
@@ -313,33 +313,36 @@ func (s *InvitationService) resolveInviters(ctx context.Context, invitations []*
 	return nil
 }
 
-// inviterRefs resolves invitation creators, platform or local users, in their
-// home projects. Every id gets a ref: one that no longer resolves degrades to
-// its id.
-func (s *InvitationService) inviterRefs(ctx context.Context, ids []string) (map[string]domain.UserRef, error) {
+// inviterRefs resolves invitation creators in one batch per home: a creator
+// is a platform user or a local user of projectID, the only users who can
+// administer it. One that no longer resolves degrades to its id.
+func (s *InvitationService) inviterRefs(ctx context.Context, projectID string, ids []string) (map[string]domain.UserRef, error) {
 	out := make(map[string]domain.UserRef, len(ids))
-	byHome := map[string][]string{}
-	for _, id := range ids {
-		out[id] = domain.UserRef{UserID: id}
-		home, err := s.db.Statements().GetResourceScope(ctx, id)
+	pending := ids
+	for _, home := range []string{s.platformProjectID, projectID} {
+		if home == "" || len(pending) == 0 {
+			continue
+		}
+		refs, err := s.refs.ResolveUserRefs(ctx, home, pending)
 		if err != nil {
-			if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
-				continue
-			}
 			return nil, domain.ErrInternal(err).WithMessage("failed to resolve the inviter")
 		}
-		if home.ResourceKind == domain.ResourceKindUser {
-			byHome[home.ProjectID] = append(byHome[home.ProjectID], id)
+		var rest []string
+		for _, id := range pending {
+			if ref, ok := refs[id]; ok {
+				out[id] = ref
+			} else {
+				rest = append(rest, id)
+			}
+		}
+		pending = rest
+		// The platform project's own invitations need only the one batch.
+		if home == projectID {
+			break
 		}
 	}
-	for projectID, homed := range byHome {
-		refs, err := s.refs.ResolveUserRefs(ctx, projectID, homed)
-		if err != nil {
-			return nil, domain.ErrInternal(err).WithMessage("failed to resolve the inviter")
-		}
-		for id, ref := range refs {
-			out[id] = ref
-		}
+	for _, id := range pending {
+		out[id] = domain.UserRef{UserID: id}
 	}
 	return out, nil
 }
@@ -367,7 +370,7 @@ func (s *InvitationService) Lookup(ctx context.Context, token, userID string) (_
 	}
 	found := &InvitationLookup{Invitation: entity, ProjectName: project.Name}
 	if entity.CreatedBy != nil {
-		refs, err := s.inviterRefs(ctx, []string{*entity.CreatedBy})
+		refs, err := s.inviterRefs(ctx, entity.ProjectID, []string{*entity.CreatedBy})
 		if err != nil {
 			return nil, err
 		}
