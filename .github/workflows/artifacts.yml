@@ -1,7 +1,7 @@
 name: artifacts
 
 # What a release ships, run the way users run it. `full-pr` builds and packs
-# every artifact on Linux arm64 but never starts the macOS or Windows server,
+# every artifact on Linux arm64 but never starts the macOS server,
 # the container or a data dir an older release wrote; this workflow does,
 # nightly on main (04:41 UTC), on demand against any branch
 # (`gh workflow run artifacts.yml --ref <branch>`), and on PRs that change this
@@ -9,8 +9,9 @@ name: artifacts
 #
 # - binaries: the five platform packages' build-binary, the release's own
 #   cross-compile, once on Linux.
-# - start: each binary on its own platform: start on an empty data dir,
-#   /readyz, stop (scripts/smoke-server.mjs).
+# - start: the macOS and Linux binaries, each on its own platform: start on
+#   an empty data dir, /readyz, stop (scripts/smoke-server.mjs). The Windows
+#   binary is built and published but not started here.
 # - linux: the container smoke (//#smoke-container) and the upgrade from the
 #   latest published release (//#smoke-upgrade), in one turbo run.
 on:
@@ -73,7 +74,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner: [macos-15, macos-15-intel, windows-2025, ubuntu-24.04, ubuntu-24.04-arm]
+        runner: [macos-15, macos-15-intel, ubuntu-24.04, ubuntu-24.04-arm]
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 15
     steps:

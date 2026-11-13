@@ -8,8 +8,8 @@
 // Without an argument it runs this host's release binary: the bin/ of its
 // platform package (apps/server-<platform>), which that package's
 // build-binary task writes. The nightly artifacts workflow
-// (.github/workflows/artifacts.yml) runs it on every published platform with
-// the binaries one Linux job cross-compiled.
+// (.github/workflows/artifacts.yml) runs it on macOS and Linux with the
+// binaries one Linux job cross-compiled. It does not run on Windows.
 import { spawn } from "node:child_process";
 import { chmodSync, existsSync, mkdtempSync, rmSync } from "node:fs";
 import { createServer } from "node:net";
@@ -28,8 +28,10 @@ export function hostReleaseBinary(platform = process.platform, arch = process.ar
   const entry = SERVER_PLATFORM_PACKAGES.find(
     (candidate) => candidate.packageName === `@zitadel/server-${platform}-${arch}`,
   );
-  if (!entry) throw new Error(`no server release binary for ${platform}/${arch}`);
-  return join(repoRoot, entry.packageDir, "bin", platform === "win32" ? "nextgen.exe" : "nextgen");
+  if (!entry || platform === "win32") {
+    throw new Error(`no server release binary to smoke for ${platform}/${arch}`);
+  }
+  return join(repoRoot, entry.packageDir, "bin", "nextgen");
 }
 
 async function freePort() {
@@ -60,13 +62,13 @@ export async function runServerCommand({ binary, dataDir, args, env = {} }) {
 
 /**
  * Starts `binary --migrate` on `dataDir`, listening on a free loopback port,
- * and resolves once GET /readyz answers 200. `stop()` sends SIGTERM (on
- * Windows the process is terminated) and resolves with the exit.
+ * and resolves once GET /readyz answers 200. `stop()` sends SIGTERM and
+ * resolves with the exit.
  */
 export async function startServer({ binary, dataDir, env = {}, timeoutMs = 120_000 }) {
   if (!existsSync(binary)) throw new Error(`no server binary at ${binary}`);
   // A downloaded artifact loses its mode bits.
-  if (process.platform !== "win32") chmodSync(binary, 0o755);
+  chmodSync(binary, 0o755);
   const port = await freePort();
   const url = `http://127.0.0.1:${port}`;
   const child = spawn(binary, ["--migrate"], {
@@ -130,9 +132,8 @@ export async function smokeServer({ binary = hostReleaseBinary() } = {}) {
     const server = await startServer({ binary, dataDir });
     const readyMs = Date.now() - started;
     const result = await server.stop();
-    // A signal is the clean end on POSIX; Windows has no SIGTERM, so a
-    // terminated process there reports exit code 1.
-    if (process.platform !== "win32" && result.code !== 0 && result.signal !== "SIGTERM") {
+    // The server exits 0 on SIGTERM; a SIGTERM exit is clean too.
+    if (result.code !== 0 && result.signal !== "SIGTERM") {
       throw new Error(
         `${binary} did not stop cleanly (code ${result.code}, signal ${result.signal}):\n${result.output}`,
       );

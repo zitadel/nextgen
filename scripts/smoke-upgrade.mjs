@@ -43,14 +43,13 @@ async function installRelease(version, dir) {
     ],
     { cwd: dir },
   );
-  const binary = process.platform === "win32" ? "nextgen.exe" : "nextgen";
   return join(
     dir,
     "node_modules",
     "@zitadel",
     `server-${process.platform}-${process.arch}`,
     "bin",
-    binary,
+    "nextgen",
   );
 }
 
