@@ -96,14 +96,15 @@ export class Cache {
    * @param entry - The answer.
    */
   async set(key: string, entry: CacheEntry): Promise<void> {
-    if (this.file === undefined) {
+    const { file } = this;
+    if (file === undefined) {
       return;
     }
     this.entries = this.load().then((entries) => {
       return { ...entries, [key]: entry };
     });
     this.writing = this.writing.then(() => {
-      return this.persist(this.file);
+      return this.persist(file);
     });
     await this.writing;
   }
@@ -113,10 +114,7 @@ export class Cache {
    *
    * @param file - Where entries are kept.
    */
-  private async persist(file: string | undefined): Promise<void> {
-    if (file === undefined) {
-      return;
-    }
+  private async persist(file: string): Promise<void> {
     try {
       const entries = await this.load();
       const temporary = `${file}.${process.pid}.tmp`;

@@ -9,6 +9,12 @@ import { Release } from "./release";
 const CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 /**
+ * How long a lookup that found nothing is remembered, much shorter than an
+ * answer, so one failed request does not hide a release for a day.
+ */
+const FAILURE_MAX_AGE_MS = 60 * 60 * 1000;
+
+/**
  * How long a lookup may take. It is advice, so it must never hold up the command
  * that asked.
  */
@@ -90,7 +96,8 @@ export class ReleaseChannel {
 
     if (!fresh && cached !== undefined) {
       const age = Date.now() - cached.checked_at;
-      if (age >= 0 && age < CACHE_MAX_AGE_MS) {
+      const window = cached.version === undefined ? FAILURE_MAX_AGE_MS : CACHE_MAX_AGE_MS;
+      if (age >= 0 && age < window) {
         return Release.from(cached.version);
       }
     }

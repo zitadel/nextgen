@@ -119,13 +119,20 @@ describe("ReleaseChannel.latest", () => {
     expect((await channel().latest())?.version).toBe("1.5.0");
   });
 
-  it("remembers a failed lookup, so an offline machine waits only once a day", async () => {
+  it("remembers a failed lookup, so an offline machine waits only once an hour", async () => {
     down();
 
     const first = await channel().latest();
     await channel().latest();
 
     expect([first, requests]).toEqual([undefined, ["asked"]]);
+  });
+
+  it("asks again once a remembered failure is an hour old", async () => {
+    await cacheHolds({ [KEY]: { checked_at: Date.now() - 2 * 60 * 60 * 1000 } });
+    publishes({ latest: "2.0.0" });
+
+    expect((await channel().latest())?.version).toBe("2.0.0");
   });
 
   it("skips the cache when asked for a fresh answer", async () => {

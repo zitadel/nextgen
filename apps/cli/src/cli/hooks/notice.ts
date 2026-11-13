@@ -39,13 +39,15 @@ export async function updateNotice(input: {
   if (updateCheckDisabled(env)) {
     return undefined;
   }
-  const release = await releaseChannel(cliVersion, env).latest();
+  const [release, dependencies] = await Promise.all([
+    releaseChannel(cliVersion, env).latest(),
+    Dependencies.read(cwd, ZITADEL_SCOPE).catch(() => {
+      return undefined;
+    }),
+  ]);
   if (release === undefined) {
     return undefined;
   }
-  const dependencies = await Dependencies.read(cwd, ZITADEL_SCOPE).catch(() => {
-    return undefined;
-  });
 
   const behind: string[] = [];
   if (release.isNewerThan(cliVersion)) {
