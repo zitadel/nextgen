@@ -31,7 +31,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
-import { usePlatformAccess } from "@/features/platform/access";
+import { usePlatformAccess, useRootSearch } from "@/features/platform/access";
 import { queryActiveTeams } from "@/features/teams/api";
 import { useAsync } from "@/hooks/use-async";
 import { withoutTrailingSlash } from "@/lib/base-path";
@@ -49,6 +49,8 @@ import {
   useRememberRecentProject,
 } from "@/features/projects/recent-projects";
 
+import { ALL_PROJECTS, PLATFORM, rootName } from "./root-name";
+
 /**
  * The top bar's context, a path from the root down, as Vercel's bar runs from
  * the team to the project (D44): at the root, the root's pill alone; in a
@@ -57,8 +59,9 @@ import {
  *
  * The root is the platform for someone who may act on it (D42), whose screens
  * it holds, and otherwise All projects. Every screen above every project is
- * the root's, Projects and Settings too: the bar names the root there, even
- * while a project stays selected for the way back (D36).
+ * the root's, Projects and Settings too, and holds the root as the selection
+ * (the `_authed` guard): the bar names the root there, never the project left
+ * behind, which the pill's Recent leads back to.
  *
  * The pill is the design system's searchable picker (`Combobox`): it opens on
  * a search field, matched on the server across every project the person can
@@ -78,15 +81,6 @@ const NO_PROJECTS = "No projects";
 
 /** What the project pill says while projects exist but none is selected. */
 const NO_SELECTION = "Select a project";
-
-/**
- * The root for someone who may not act on the platform, whose root holds only
- * their projects (D44), and what the list's footer opens: Projects.
- */
-const ALL_PROJECTS = "All projects";
-
-/** The root for someone who may act on the platform project (D42, D44). */
-const PLATFORM = "Platform";
 
 /** What tells the platform's row from a project's in the list. */
 const PLATFORM_DESCRIPTION = "Above every project";
@@ -124,7 +118,7 @@ export function ContextSwitcher({
   /**
    * The screen is the root's (D44): Projects, Settings, the person's profile,
    * or a screen drawn for the reserved platform project (D42). The bar names
-   * the root alone then, never a project, whichever stays selected (D36).
+   * the root alone then.
    */
   root?: boolean;
 }) {
@@ -178,22 +172,18 @@ function CrumbSlash() {
 }
 
 /**
- * What the root is called, and its glyph (D44): the platform, for someone who
- * may act on it, whose screens it holds; for anyone else it holds only their
- * projects, and says so.
- */
-function rootName(platform: string | undefined): { label: string; Icon: LucideIcon } {
-  return platform ? { label: PLATFORM, Icon: Hexagon } : { label: ALL_PROJECTS, Icon: Boxes };
-}
-
-/**
  * The way up from a project to the root, in the bar: Projects, which the root
- * opens on. The selection rides along (D36), so the way back is the pill.
+ * opens on, holding the root rather than the project (D44). The way back is
+ * the pill's Recent.
  */
 function RootCrumb({ platform }: { platform: string | undefined }) {
   const { label, Icon } = rootName(platform);
   return (
-    <Link to="/projects" className={cn(TRIGGER, "text-muted-foreground hover:text-foreground")}>
+    <Link
+      to="/projects"
+      search={{ project: platform }}
+      className={cn(TRIGGER, "text-muted-foreground hover:text-foreground")}
+    >
       <Icon size={16} className="shrink-0" aria-hidden />
       <span className="min-w-0 truncate leading-5">{label}</span>
     </Link>
@@ -230,6 +220,7 @@ function ProjectSwitcher({
   const navigate = useNavigate();
   const scopeTo = useScopeTarget();
   const selected = useProjectScope();
+  const rootSearch = useRootSearch();
   // Read as the list opens, so it holds what was opened since it last did.
   const recents = useMemo(() => (open ? readRecentProjects(userId) : []), [open, userId]);
 
@@ -279,10 +270,9 @@ function ProjectSwitcher({
   }
 
   const label = current && (current.name ?? current.id);
-  // The row the pill stands for, which the list marks: the root, or the
-  // project. A project kept selected above every project (D36) is not where
-  // the person is, so the root is marked then.
-  const marked = root ? platform : selected;
+  // The row the pill stands for, which the list marks: the selection, which
+  // is the platform at its root and nothing at a root without it (D44).
+  const marked = selected;
   const { label: rootLabel, Icon: RootIcon } = rootName(platform);
 
   return (
@@ -319,7 +309,7 @@ function ProjectSwitcher({
         footer={{
           label: ALL_PROJECTS,
           icon: <Boxes aria-hidden />,
-          onSelect: () => void navigate({ to: "/projects" }),
+          onSelect: () => void navigate({ to: "/projects", search: rootSearch }),
         }}
         label="Projects"
         // Wider than the pill: a row carries a name and its host or id.

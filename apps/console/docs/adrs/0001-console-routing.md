@@ -253,15 +253,18 @@ the sidebar.
 > the root down, as Vercel's runs from the team to the project. On every
 > screen that shows the account or root Settings list, and on any drawn for
 > the platform project, it is the root's pill alone: `Platform` for someone
-> who may act on the platform project, `All projects` for anyone else. A
-> project kept selected there (D36, D38) stays in the URL but is not named.
-> Inside a project the bar reads the root, a link to Projects, then the
+> who may act on the platform project, `All projects` for anyone else. Those
+> screens (`/projects`, `/settings` with anything beneath it, `/account`)
+> hold the root as the selection: the `_authed` guard sets `?project=` to the
+> platform project for someone who may act on it and drops it for anyone
+> else, and gives them no default, so no project stays selected there
+> unnamed. Links up carry it already (`useRootSearch`). Inside a project the bar reads the root, a link to Projects, then the
 > project's pill (`Platform / fabis-app ▾`), then the team on a team's page.
 > The pill's list offers the platform in a section of its own above the
 > projects and checks the row the pill stands for; choosing the platform keeps
 > a list screen the root has and otherwise opens Projects. This replaces
-> D38's pill on Projects and `/settings` and D42's `All projects` for the
-> root.
+> D36's kept selection, D38's pill on Projects and `/settings` and D42's
+> `All projects` for the root.
 
 > **Amendment (2026-11-10, design decision D35):** `/` is a screen again, the
 > project's Overview, declaring `scope: "project"` and the portal list's first

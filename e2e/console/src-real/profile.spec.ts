@@ -26,8 +26,8 @@ test("shows the signed-in person's email, read-only", async ({ page, zitadel, se
   await expect(email).toBeDisabled();
 
   // Above every project, apart from the root Settings: the account's list,
-  // with no row of its own. The person's one project stays selected (D36),
-  // but the screen is the root's, so the pill names the root (D44).
+  // with no row of its own. The screen is the root's, so it holds no project
+  // and the pill names the root (D44).
   const account = page.getByRole("navigation", { name: "Account" });
   await expect(account.getByRole("link", { name: "Projects" })).toBeVisible();
   await expect(account.getByRole("link", { name: "Profile" })).toHaveCount(0);

@@ -123,18 +123,36 @@ describe("landing routes", () => {
   });
 
   it("selects the only project on an unscoped screen too", async () => {
-    // `/projects` opened directly agrees with `/`: one project, so it is selected.
+    // System needs no project, and agrees with `/`: one project, so it is selected.
+    server.use(
+      http.get("http://localhost/api/v1/users/me/projects", () =>
+        HttpResponse.json({ projects: [project("proj_1", "Acme")] }),
+      ),
+      http.get("http://localhost/api/v1/readyz", () => HttpResponse.text("ok")),
+    );
+    const router = await renderAt("/system");
+
+    await waitFor(() =>
+      expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_1" }),
+    );
+    expect(router.state.resolvedLocation?.pathname).toBe("/system");
+  });
+
+  it("holds the root on Projects, never a project, however it is opened", async () => {
+    // Projects is the root's (D44): with one project, or with one carried in
+    // the URL, it holds no selection for someone who may not act on the
+    // platform.
     server.use(
       http.get("http://localhost/api/v1/users/me/projects", () =>
         HttpResponse.json({ projects: [project("proj_1", "Acme")] }),
       ),
     );
-    const router = await renderAt("/projects");
+    const router = await renderAt("/projects?project=proj_1");
 
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
     await waitFor(() =>
-      expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_1" }),
+      expect(router.state.resolvedLocation?.search).not.toHaveProperty("project"),
     );
-    expect(router.state.resolvedLocation?.pathname).toBe("/projects");
   });
 
   it("asks for the person's projects once for the guard and the switcher", async () => {

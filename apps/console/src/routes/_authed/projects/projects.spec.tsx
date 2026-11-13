@@ -154,7 +154,7 @@ describe("projects screen", () => {
     expect(table.getAllByRole("button", { name: "Copy the ID of maxtest1" })).toHaveLength(2);
   });
 
-  it("names the root in the bar while a project stays selected, and singles out no row", async () => {
+  it("holds the root rather than the project it was opened from, and singles out no row", async () => {
     server.use(
       http.get(PROJECTS_URL, () =>
         HttpResponse.json({ projects: [listed("proj_1", "River"), listed("proj_2", "Delta")] }),
@@ -164,9 +164,9 @@ describe("projects screen", () => {
 
     const table = within(await screen.findByRole("table"));
     await table.findByRole("link", { name: "Delta" });
-    // The selection outlives the way up here (D36), but Projects is the
-    // root's: the pill names the root, not the project (D44). The list is
-    // every project's, so no row is singled out.
+    // Projects is the root's: it holds the root, not the project it was
+    // opened from, and the pill names the root (D44). The list is every
+    // project's, so no row is singled out.
     const pill = screen.getByRole("button", { name: "Switch project" });
     await waitFor(() => expect(pill).toHaveTextContent("All projects"));
     expect(pill).not.toHaveTextContent("Delta");

@@ -394,10 +394,10 @@ describe("app shell navigation", () => {
 
     await userEvent.click(screen.getByRole("link", { name: "Home" }));
     await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
-    // The selection rides along (D36), but Projects is the root's: the bar
-    // names the root, which for someone who may not act on the platform holds
-    // their projects alone (D44), and no project before it.
-    expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_1" });
+    // Projects is the root's, so it holds the root, not the project left
+    // behind (D44): for someone who may not act on the platform, no selection.
+    // The bar names that root, their projects alone, and no project before it.
+    expect(router.state.resolvedLocation?.search).not.toHaveProperty("project");
     const bar = within(screen.getByRole("navigation", { name: "Context" }));
     const pill = bar.getByRole("button", { name: "Switch project" });
     await waitFor(() => expect(pill).toHaveTextContent("All projects"));
@@ -446,13 +446,16 @@ describe("platform root", () => {
       "href",
       scopedPath("/deployments", "proj_platform"),
     );
-    // Projects and Settings keep the selection (D36).
+    // The root's own screens hold the platform too (D44): Projects is opened
+    // with it selected, not the one project, and so are its rows.
+    await waitFor(() =>
+      expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_platform" }),
+    );
     expect(nav.getByRole("link", { name: "Projects" })).toHaveAttribute(
       "href",
-      scopedPath("/projects", "proj_1"),
+      scopedPath("/projects", "proj_platform"),
     );
-    // On Projects the one project stays selected (D36), but the bar names the
-    // root, the platform, whose screen this is (D44).
+    // The bar names the root, the platform, whose screen this is (D44).
     const pill = screen.getByRole("button", { name: "Switch project" });
     await waitFor(() => expect(pill).toHaveTextContent("Platform"));
     expect(pill).not.toHaveTextContent("console-dev");
@@ -626,16 +629,18 @@ describe("platform root", () => {
     renderShell("/users?project=proj_platform");
     await userEvent.click(await screen.findByRole("button", { name: "Search" }));
     const dialog = within(await screen.findByRole("dialog", { name: "Go to" }));
-    // Before anything is typed, no group names the platform as a project.
-    expect(await dialog.findByRole("option", { name: "Teams" })).toBeInTheDocument();
-    expect(dialog.queryByRole("group", { name: /Platform/ })).not.toBeInTheDocument();
+    // Before anything is typed, the root's screens are the root's, named the
+    // platform as the bar names it (D44), and no group names it as a project.
+    const root = within(await dialog.findByRole("group", { name: "Platform" }));
+    expect(await root.findByRole("option", { name: "Teams" })).toBeInTheDocument();
+    expect(dialog.queryByRole("group", { name: /Pages in/ })).not.toBeInTheDocument();
 
     await userEvent.type(
       dialog.getByPlaceholderText("Go to a page, user, team or project, or run an action"),
       "deploy",
     );
     await waitFor(() =>
-      expect(rows(dialog.getByRole("listbox"))).toEqual(["Deployments · Account"]),
+      expect(rows(dialog.getByRole("listbox"))).toEqual(["Deployments · Platform"]),
     );
   });
 
@@ -651,7 +656,7 @@ describe("platform root", () => {
     await waitFor(() =>
       expect(rows(dialog.getByRole("listbox"))).toEqual([
         "Deployments · console-dev",
-        "Deployments · Account",
+        "Deployments · Platform",
       ]),
     );
   });
@@ -713,12 +718,13 @@ describe("platform root", () => {
       "ada",
     );
 
-    // The selected project's hit first among equal matches (D39).
+    // Projects holds the platform (D44), so its hits come first among equal
+    // matches, as the selected project's do (D39).
     await waitFor(() =>
       expect(rows(dialog.getByRole("listbox"))).toEqual([
-        "Ada Lovelace · ada@acme.example · console-dev",
         "Ada Admin · ada@zitadel.example · Users",
         "Ada's team · Teams",
+        "Ada Lovelace · ada@acme.example · console-dev",
       ]),
     );
     expect(dialog.queryByRole("option", { name: /Platform/ })).not.toBeInTheDocument();
@@ -739,11 +745,11 @@ describe("settings view", () => {
     await userEvent.click(screen.getByRole("button", { name: /^Account:/ }));
     expect(await screen.findByRole("menuitem", { name: "Log out" })).toBeInTheDocument();
     // The person heads the menu and opens their profile, apart from the root
-    // Settings (D42). The selection rides along, so the pill's list still
-    // marks the project.
+    // Settings (D42). The profile is the root's, so it holds the root, not
+    // the project (D44).
     expect(screen.getByRole("menuitem", { name: /^Test User/ })).toHaveAttribute(
       "href",
-      scopedPath("/account", "proj_1"),
+      "/account",
     );
     // Settings' own pages are not repeated beside it.
     expect(screen.queryByRole("menuitem", { name: "Profile" })).not.toBeInTheDocument();
@@ -773,10 +779,10 @@ describe("settings view", () => {
   it("goes back up to the account's list from the Settings heading", async () => {
     const router = renderShell("/settings/invoices");
     const nav = within(await screen.findByRole("navigation", { name: "Settings" }));
-    // A row of the left nav (D13), named for where it leads. One project, so
-    // it is selected here too, and Projects keeps it.
+    // A row of the left nav (D13), named for where it leads. Settings holds
+    // the root, no project, even with one to choose (D44), and so does Projects.
     const heading = nav.getByRole("link", { name: "Settings: back to Projects" });
-    expect(heading).toHaveAttribute("href", scopedPath("/projects", "proj_1"));
+    expect(heading).toHaveAttribute("href", "/projects");
 
     await userEvent.click(heading);
     await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
@@ -792,11 +798,11 @@ describe("settings view", () => {
 
     expect(screen.getByRole("button", { name: "Search" })).toBeInTheDocument();
     expect(document.querySelector('[data-sidebar="trigger"]')).toBeInTheDocument();
-    // The selection outlives the way up (D36), but Settings is the root's, so
-    // the pill names the root (D44); its list leads back into the project.
+    // Settings is the root's: it holds no project, and the pill names the
+    // root (D44); its list leads into the project.
     const pill = screen.getByRole("button", { name: "Switch project" });
     await waitFor(() => expect(pill).toHaveTextContent("All projects"));
-    expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_1" });
+    expect(router.state.resolvedLocation?.search).not.toHaveProperty("project");
 
     await userEvent.click(pill);
     const list = within(await screen.findByRole("listbox", { name: "Projects" }));
@@ -2445,7 +2451,7 @@ describe("search", () => {
     ).toBeInTheDocument();
   });
 
-  it("above every project searches all of them, the selected one's matches first", async () => {
+  it("above every project searches all of them, none of them first", async () => {
     const asked: (string | null)[] = [];
     server.use(
       http.get(MY_PROJECTS, () =>
@@ -2471,7 +2477,7 @@ describe("search", () => {
         });
       }),
     );
-    // Projects, with console-dev still selected (D36).
+    // Projects, opened from console-dev: it holds the root, not the project (D44).
     renderShell(scopedPath("/projects", "proj_1"));
     await userEvent.click(await screen.findByRole("button", { name: "Search" }));
     const dialog = within(await screen.findByRole("dialog", { name: "Go to" }));
@@ -2480,10 +2486,11 @@ describe("search", () => {
       "supp",
     );
 
+    // No project is selected there, so none ranks first: the server's order.
     await waitFor(() =>
       expect(rows(dialog.getByRole("listbox"))).toEqual([
-        "Support · console-dev",
         "Support · Delta",
+        "Support · console-dev",
       ]),
     );
     expect(asked.length).toBeGreaterThan(0);
