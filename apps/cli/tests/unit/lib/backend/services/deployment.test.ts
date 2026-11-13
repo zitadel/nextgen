@@ -83,6 +83,37 @@ describe("Deployment.servesPrimary", () => {
   });
 });
 
+describe("Deployment.kind", () => {
+  it("is primary for a deployment to primary origins", () => {
+    expect(Deployment.of(primary("dep_1")).kind).toBe("primary");
+  });
+
+  it("is preview for a deployment to preview URLs", () => {
+    expect(Deployment.of(preview("dep_1")).kind).toBe("preview");
+  });
+});
+
+describe("Deployment.expiresAt", () => {
+  it("is null for a primary deployment", () => {
+    expect(Deployment.of(primary("dep_1")).expiresAt).toBeNull();
+  });
+
+  it("is the expiry a preview deployment set", () => {
+    expect(Deployment.of(preview("dep_1")).expiresAt).toBe("2030-01-01T00:00:00Z");
+  });
+
+  it("is the earliest when the targets differ", () => {
+    expect(
+      Deployment.of(
+        record("dep_1", [
+          { origin: "https://a.acme.com", expires_at: "2030-01-02T00:00:00Z" },
+          { origin: "https://b.acme.com", expires_at: "2030-01-01T00:00:00Z" },
+        ]),
+      ).expiresAt,
+    ).toBe("2030-01-01T00:00:00Z");
+  });
+});
+
 describe("Deployment.reason", () => {
   it("answers the reason the API recorded", () => {
     expect(Deployment.of(record("dep_1", [], { reason: "rollback" })).reason).toBe("rollback");

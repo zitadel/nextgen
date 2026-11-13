@@ -47,6 +47,7 @@ func tryDeploy(t *testing.T, stmts service.AllStatements, projectID, releaseID s
 	t.Helper()
 	entity, err := domain.NewDeployment(projectID, releaseID, args.kind, origins, args.metadata)
 	require.NoError(t, err)
+	entity.PreviewTTL = args.ttl
 	serving, err := stmts.GetNewestPerOrigin(t.Context(), projectID, entity.Origins())
 	require.NoError(t, err)
 	if err := stmts.CreateDeployment(t.Context(), entity, serving); err != nil {
@@ -112,6 +113,59 @@ func TestDeploymentStatements_FanOutIsOneOperation(t *testing.T) {
 		scope, err := d.stmts.GetResourceScopeInProject(t.Context(), domain.ResourceKindDeployment, projectID, dep.ID)
 		require.NoError(t, err)
 		assert.Equal(t, projectID, scope.ProjectID)
+	})
+}
+
+// A preview deployment records the expiry it set on each target, and a later
+// deployment to the URL, which renews the preview, leaves it alone. A primary
+// deployment records none.
+func TestDeploymentStatements_PreviewExpiryIsFixedByTheDeployment(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureReleaseProject(t, d.stmts)
+		rel := createRelease(t, d.stmts, projectID, "0001", domain.ReleaseMetadata{})
+
+		primary := deploy(t, d.stmts, projectID, rel.ID, []string{appOrigin}, deployArgs{})
+		short := deploy(t, d.stmts, projectID, rel.ID, []string{gitOrigin, shaOrigin}, previewDeploy(3*time.Minute))
+		long := deploy(t, d.stmts, projectID, rel.ID, []string{gitOrigin}, previewDeploy(7*24*time.Hour))
+
+		expiries := func(dep *domain.Deployment) []*time.Time {
+			return dep.Expiries()
+		}
+		for name, read := range map[string]func(string) *domain.Deployment{
+			"get": func(id string) *domain.Deployment {
+				got, err := d.stmts.GetDeploymentByID(t.Context(), projectID, id)
+				require.NoError(t, err)
+				return got
+			},
+			"list": func(id string) *domain.Deployment {
+				for _, origin := range []string{appOrigin, gitOrigin, shaOrigin} {
+					for _, item := range history(t, d.stmts, projectID, origin) {
+						if item.ID == id {
+							return item
+						}
+					}
+				}
+				require.Failf(t, "deployment missing from the list", id)
+				return nil
+			},
+		} {
+			t.Run(name, func(t *testing.T) {
+				assert.Equal(t, []*time.Time{nil}, expiries(read(primary.ID)))
+
+				gotShort := read(short.ID)
+				require.Len(t, gotShort.Targets, 2)
+				for _, target := range gotShort.Targets {
+					require.NotNil(t, target.ExpiresAt)
+					assert.True(t, short.DeployedAt.Add(3*time.Minute).Equal(*target.ExpiresAt),
+						"%s expires at %s, want %s", target.Origin, target.ExpiresAt, short.DeployedAt.Add(3*time.Minute))
+				}
+
+				gotLong := read(long.ID)
+				require.Len(t, gotLong.Targets, 1)
+				require.NotNil(t, gotLong.Targets[0].ExpiresAt)
+				assert.True(t, long.DeployedAt.Add(7*24*time.Hour).Equal(*gotLong.Targets[0].ExpiresAt))
+			})
+		}
 	})
 }
 

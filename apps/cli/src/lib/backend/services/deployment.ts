@@ -182,6 +182,36 @@ export class Deployment {
   }
 
   /**
+   * Whether this deployment went to the project's primary origins or to
+   * preview URLs.
+   *
+   * @returns The kind the API recorded, which it always records.
+   */
+  get kind(): ListDeployments200DeploymentsItem["kind"] {
+    return this.record.kind;
+  }
+
+  /**
+   * When the preview this deployment made expires: the expiry the deployment
+   * set on its targets, which a later deployment to the same URL does not
+   * change.
+   *
+   * @returns The earliest expiry of its targets, or null for a deployment
+   *   that never expires, a primary one.
+   */
+  get expiresAt(): string | null {
+    const expiries = this.targets.flatMap((target) => {
+      return target.expires_at == null ? [] : [target.expires_at];
+    });
+    if (expiries.length === 0) {
+      return null;
+    }
+    return expiries.reduce((earliest, expiry) => {
+      return Date.parse(expiry) < Date.parse(earliest) ? expiry : earliest;
+    });
+  }
+
+  /**
    * Why this deployment was made: a deploy, a rollback, a preview.
    *
    * @returns The reason the API recorded, which it always records.

@@ -21,8 +21,9 @@ const (
 		` (project_id, id, release_id, origin_kind, metadata, deployed_at) VALUES (?, ?, ?, ?, ?, ?)`
 	// Sets bind as one JSON array, read back by json_each.
 	createDeploymentOriginsStmt = `INSERT INTO deployment_origins` +
-		` (project_id, deployment_id, origin, release_id, origin_kind, deployed_at, seq)` +
-		` SELECT ?, ?, json_extract(value, '$.origin'), ?, ?, ?, json_extract(value, '$.seq') FROM json_each(?)`
+		` (project_id, deployment_id, origin, release_id, origin_kind, deployed_at, seq, expires_at)` +
+		` SELECT ?, ?, json_extract(value, '$.origin'), ?, ?, ?, json_extract(value, '$.seq'),` +
+		` json_extract(value, '$.expires_at') FROM json_each(?)`
 	deploymentQuery = `SELECT project_id, id, release_id, origin_kind, metadata, deployed_at FROM deployments`
 )
 
@@ -63,21 +64,26 @@ func (ds deploymentStatements) CreateDeployment(ctx context.Context, entity *dom
 		return err
 	}
 	type target struct {
-		Origin string `json:"origin"`
-		Seq    int64  `json:"seq"`
+		Origin    string `json:"origin"`
+		Seq       int64  `json:"seq"`
+		ExpiresAt *int64 `json:"expires_at"`
 	}
 	origins, seqs := entity.Origins(), deployment.NextSeqs(entity.Origins(), read)
-	rows := make([]target, len(origins))
-	for i, origin := range origins {
-		rows[i] = target{Origin: origin, Seq: seqs[i]}
-	}
-	targets, err := encodeJSON(rows)
-	if err != nil {
-		return err
-	}
 	var deployedAt time.Time
 	err = withTransaction(ctx, ds.client, func(ctx context.Context, tx queryExecutor) error {
 		deployedAt = deployment.Stamp(time.Now())
+		entity.StampExpiry(deployedAt)
+		rows := make([]target, len(origins))
+		for i, origin := range origins {
+			rows[i] = target{Origin: origin, Seq: seqs[i]}
+			if expiresAt := entity.Targets[i].ExpiresAt; expiresAt != nil {
+				rows[i].ExpiresAt = new(expiresAt.UnixNano())
+			}
+		}
+		targets, err := encodeJSON(rows)
+		if err != nil {
+			return err
+		}
 		if _, err := tx.Exec(ctx, createDeploymentStmt,
 			entity.ProjectID, entity.ID, entity.ReleaseID, entity.OriginKind.String(), string(metadata), deployedAt.UnixNano(),
 		); err != nil {
@@ -224,11 +230,15 @@ func (ds deploymentStatements) collectOrigins(ctx context.Context, query string,
 			scanned      domain.OriginDeployment
 			kind         string
 			deployedNano int64
+			expiresNano  sql.NullInt64
 		)
-		if err := rows.Scan(&scanned.Origin, &scanned.DeploymentID, &scanned.ReleaseID, &kind, &deployedNano, &scanned.Seq); err != nil {
+		if err := rows.Scan(&scanned.Origin, &scanned.DeploymentID, &scanned.ReleaseID, &kind, &deployedNano, &scanned.Seq, &expiresNano); err != nil {
 			return scanned, err
 		}
 		scanned.DeployedAt = timeFromUnixNano(deployedNano)
+		if expiresNano.Valid {
+			scanned.ExpiresAt = new(timeFromUnixNano(expiresNano.Int64))
+		}
 		return deployment.WithKind(scanned, kind)
 	})
 	if err != nil {

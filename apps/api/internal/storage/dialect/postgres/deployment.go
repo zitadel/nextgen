@@ -23,8 +23,9 @@ const (
 		` (project_id, id, release_id, origin_kind, metadata, deployed_at)` +
 		` VALUES ($1, $2, $3, $4, $5, clock_timestamp()) RETURNING deployed_at`
 	createDeploymentOriginsStmt = `INSERT INTO zitadel_nextgen.deployment_origins` +
-		` (project_id, deployment_id, origin, release_id, origin_kind, deployed_at, seq)` +
-		` SELECT $1, $2, o.origin, $3, $4, $5, o.seq FROM unnest($6::text[], $7::bigint[]) AS o(origin, seq)`
+		` (project_id, deployment_id, origin, release_id, origin_kind, deployed_at, seq, expires_at)` +
+		` SELECT $1, $2, o.origin, $3, $4, $5, o.seq, o.expires_at` +
+		` FROM unnest($6::text[], $7::bigint[], $8::timestamptz[]) AS o(origin, seq, expires_at)`
 	deploymentQuery = `SELECT project_id, id, release_id, origin_kind, metadata, deployed_at FROM zitadel_nextgen.deployments`
 )
 
@@ -67,9 +68,10 @@ func (ds deploymentStatements) CreateDeployment(ctx context.Context, entity *dom
 		).Scan(&deployedAt); err != nil {
 			return wrapError(err)
 		}
+		entity.StampExpiry(deployedAt)
 		if _, err := tx.Exec(ctx, createDeploymentOriginsStmt,
 			entity.ProjectID, entity.ID, entity.ReleaseID, entity.OriginKind.String(), deployedAt,
-			entity.Origins(), deployment.NextSeqs(entity.Origins(), read),
+			entity.Origins(), deployment.NextSeqs(entity.Origins(), read), entity.Expiries(),
 		); err != nil {
 			return wrapError(err)
 		}
@@ -205,10 +207,11 @@ func (ds deploymentStatements) collectOrigins(ctx context.Context, query string,
 			scanned domain.OriginDeployment
 			kind    string
 		)
-		if err := row.Scan(&scanned.Origin, &scanned.DeploymentID, &scanned.ReleaseID, &kind, &scanned.DeployedAt, &scanned.Seq); err != nil {
+		if err := row.Scan(&scanned.Origin, &scanned.DeploymentID, &scanned.ReleaseID, &kind, &scanned.DeployedAt, &scanned.Seq, &scanned.ExpiresAt); err != nil {
 			return scanned, err
 		}
 		scanned.DeployedAt = scanned.DeployedAt.UTC()
+		scanned.ExpiresAt = deployment.UTC(scanned.ExpiresAt)
 		return deployment.WithKind(scanned, kind)
 	})
 	if err != nil {

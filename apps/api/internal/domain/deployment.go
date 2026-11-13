@@ -111,9 +111,12 @@ type DeploymentMetadata struct {
 	DeployedByType *EventActorType `json:"deployed_by_type"`
 }
 
-// DeploymentTarget is one origin a deployment covered.
+// DeploymentTarget is one origin a deployment covered. ExpiresAt is the expiry
+// a preview deployment set on its URL, fixed when it is made; a later
+// deployment to the URL does not change it. It is nil on a primary deployment.
 type DeploymentTarget struct {
-	Origin string `json:"origin"`
+	Origin    string     `json:"origin"`
+	ExpiresAt *time.Time `json:"expires_at,omitempty"`
 }
 
 // Deployment is an append-only record of a release going live on a set of
@@ -128,6 +131,31 @@ type Deployment struct {
 	Targets    []DeploymentTarget   `json:"targets"`
 	Metadata   DeploymentMetadata   `json:"metadata"`
 	DeployedAt time.Time            `json:"deployed_at"`
+	// PreviewTTL is how long a preview deployment keeps its previews live,
+	// counted from DeployedAt. It is only read when the deployment is written.
+	PreviewTTL time.Duration `json:"-"`
+}
+
+// StampExpiry sets the expiry of every target of a preview deployment to
+// deployedAt plus its PreviewTTL, and leaves a primary deployment's targets
+// without one. A storage statement calls it once deployedAt is known.
+func (d *Deployment) StampExpiry(deployedAt time.Time) {
+	for i := range d.Targets {
+		d.Targets[i].ExpiresAt = nil
+		if d.OriginKind == DeploymentOriginKindPreview {
+			expiresAt := deployedAt.Add(d.PreviewTTL).UTC()
+			d.Targets[i].ExpiresAt = &expiresAt
+		}
+	}
+}
+
+// Expiries returns each target's expiry, in the order of Origins.
+func (d *Deployment) Expiries() []*time.Time {
+	expiries := make([]*time.Time, len(d.Targets))
+	for i, target := range d.Targets {
+		expiries[i] = target.ExpiresAt
+	}
+	return expiries
 }
 
 // Origins returns the deployment's origins in order.
@@ -148,6 +176,8 @@ type OriginDeployment struct {
 	Kind         DeploymentOriginKind
 	DeployedAt   time.Time
 	Seq          int64
+	// ExpiresAt is the expiry a preview deployment set on the origin.
+	ExpiresAt *time.Time
 }
 
 // NewestOriginDeployment returns the newest of deployments, ordered by

@@ -97,7 +97,7 @@ func ToDomain(row Row) (*domain.Deployment, error) {
 func AttachTargets(items []*domain.Deployment, rows []domain.OriginDeployment) {
 	byID := make(map[string][]domain.DeploymentTarget, len(items))
 	for _, row := range rows {
-		byID[row.DeploymentID] = append(byID[row.DeploymentID], domain.DeploymentTarget{Origin: row.Origin})
+		byID[row.DeploymentID] = append(byID[row.DeploymentID], domain.DeploymentTarget{Origin: row.Origin, ExpiresAt: row.ExpiresAt})
 	}
 	for _, item := range items {
 		targets := byID[item.ID]
@@ -123,6 +123,15 @@ func DeploymentIDs(items []*domain.Deployment) []string {
 		ids[i] = item.ID
 	}
 	return ids
+}
+
+// UTC normalizes a scanned expiry the way DeployedAt is: Spanner returns UTC
+// while pgx defaults to local. A NULL stays nil.
+func UTC(t *time.Time) *time.Time {
+	if t == nil {
+		return nil
+	}
+	return new(t.UTC())
 }
 
 // Stamp truncates now to the microsecond every dialect keeps.

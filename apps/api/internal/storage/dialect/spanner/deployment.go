@@ -32,7 +32,7 @@ var (
 	deploymentSchema = deployment.NewSchema(deploymentTables)
 
 	deploymentColumns = []string{"project_id", "id", "release_id", "origin_kind", "metadata", "deployed_at"}
-	originColumns     = []string{"project_id", "deployment_id", "origin", "release_id", "origin_kind", "deployed_at", "seq"}
+	originColumns     = []string{"project_id", "deployment_id", "origin", "release_id", "origin_kind", "deployed_at", "seq", "expires_at"}
 
 	originsQuery        = deployment.OriginsSelect(originsTable) + ` WHERE t.project_id = @p1 AND t.deployment_id IN UNNEST(@p2)`
 	newestPerOriginStmt = deployment.OriginsSelect(originsTable) +
@@ -83,10 +83,15 @@ func (ds deploymentStatements) CreateDeployment(ctx context.Context, entity *dom
 		// so one mutation applies them at commit.
 		origins := entity.Origins()
 		seqs := deployment.NextSeqs(origins, read)
+		entity.StampExpiry(stamped)
 		mutations := make([]*spanner.Mutation, 0, len(origins))
 		for i, origin := range origins {
+			expiresAt := spanner.NullTime{}
+			if target := entity.Targets[i].ExpiresAt; target != nil {
+				expiresAt = spanner.NullTime{Time: *target, Valid: true}
+			}
 			mutations = append(mutations, spanner.Insert(originsTable, originColumns, []any{
-				entity.ProjectID, entity.ID, origin, entity.ReleaseID, entity.OriginKind.String(), stamped, seqs[i],
+				entity.ProjectID, entity.ID, origin, entity.ReleaseID, entity.OriginKind.String(), stamped, seqs[i], expiresAt,
 			}))
 		}
 		if _, err := tx.BufferWrite(ctx, mutations); err != nil {
@@ -219,11 +224,15 @@ func (ds deploymentStatements) collectOrigins(ctx context.Context, query string,
 			var (
 				scanned domain.OriginDeployment
 				kind    string
+				expires spanner.NullTime
 			)
-			if err := row.Columns(&scanned.Origin, &scanned.DeploymentID, &scanned.ReleaseID, &kind, &scanned.DeployedAt, &scanned.Seq); err != nil {
+			if err := row.Columns(&scanned.Origin, &scanned.DeploymentID, &scanned.ReleaseID, &kind, &scanned.DeployedAt, &scanned.Seq, &expires); err != nil {
 				return scanned, err
 			}
 			scanned.DeployedAt = scanned.DeployedAt.UTC()
+			if expires.Valid {
+				scanned.ExpiresAt = deployment.UTC(&expires.Time)
+			}
 			return deployment.WithKind(scanned, kind)
 		})
 		return err

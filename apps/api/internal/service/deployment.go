@@ -312,6 +312,7 @@ func (s *DeploymentService) create(ctx context.Context, input CreateDeploymentIn
 
 		// A copy per attempt: each one mints its own id and stamp.
 		written := *entity
+		written.PreviewTTL = input.PreviewTTL
 		if err := stmts.CreateDeployment(ctx, &written, read); err != nil {
 			// The release was read above, so the only reference left to
 			// trip is the project.
@@ -325,7 +326,7 @@ func (s *DeploymentService) create(ctx context.Context, input CreateDeploymentIn
 		}
 		if written.OriginKind == domain.DeploymentOriginKindPreview {
 			if err := stmts.UpsertPreviews(ctx, written.ProjectID, written.Origins(),
-				written.DeployedAt.Add(input.PreviewTTL), written.DeployedAt); err != nil {
+				*written.Targets[0].ExpiresAt, written.DeployedAt); err != nil {
 				return err
 			}
 		}

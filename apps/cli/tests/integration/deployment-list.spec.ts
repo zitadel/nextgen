@@ -9,7 +9,7 @@ import {
 } from "@tests/helpers/project";
 import { cliVersion, expectedPublicCliCommand, pressCtrlC } from "@tests/helpers/run-cli";
 import { asTerminal, offTerminal, RENDERINGS } from "@tests/helpers/terminal";
-import { PRIMARY_ORIGIN } from "@tests/helpers/records";
+import { PREVIEW_PATTERN, PREVIEW_URL, PRIMARY_ORIGIN } from "@tests/helpers/records";
 
 const platform = usePlatformMock();
 
@@ -444,8 +444,34 @@ describe("deployment list", () => {
         expect(result).toPrintPlainRow(
           deployed.deployment_id ?? "",
           deployed.release_id ?? "",
+          "primary",
           "deploy",
           "http://localhost:3000, https://app.example.com",
+          "",
+          /^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/,
+        );
+      });
+
+      it("prints a preview's kind and the expiry preview list shows, piped", async () => {
+        const app = await aSetUpApp();
+        await app.addOrigin(PREVIEW_PATTERN, "preview");
+        await app.previewData(PREVIEW_URL);
+        const previews = app.envelopeOf<{ items: { expires_at: string }[] }>(
+          await app.run(["preview", "list", "--json"]),
+        );
+        const expires = previews.data.items[0]?.expires_at ?? "";
+
+        const result = await offTerminal(() =>
+          app.run(["deployment", "list", "--live", "--plain"]),
+        );
+
+        expect(result).toPrintPlainRow(
+          /^dep_/,
+          /^rel_/,
+          "preview",
+          "deploy",
+          PREVIEW_URL,
+          expires,
           /^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/,
         );
       });
