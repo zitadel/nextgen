@@ -33,10 +33,9 @@ describe("releaseChannel cache", () => {
 
     await releaseChannel("1.0.0", { XDG_CONFIG_HOME: dir }).latest({ fresh: true });
 
-    const cached = JSON.parse(
-      await readFile(join(dir, "zitadel", "cli", "update-check.json"), "utf8"),
-    ) as Record<string, unknown>;
-    expect(Object.values(cached)).toMatchObject([{ version: "2.0.0" }]);
+    expect(await readFile(join(dir, "zitadel", "cli", "update-check.json"), "utf8")).toContain(
+      '"version":"2.0.0"',
+    );
   });
 });
 

@@ -68,6 +68,16 @@ describe("Cache", () => {
     expect(Object.keys(JSON.parse(await readFile(file, "utf8")))).toEqual(["fresh"]);
   });
 
+  it("leaves out of the rewrite an entry dated in the future", async ({ dir }) => {
+    const file = join(dir, "cache.json");
+    const ahead = Date.now() + 40 * 24 * 60 * 60 * 1000;
+    await writeFile(file, JSON.stringify({ skewed: { checked_at: ahead } }));
+
+    await new Cache(file).set("fresh", { checked_at: Date.now() });
+
+    expect(Object.keys(JSON.parse(await readFile(file, "utf8")))).toEqual(["fresh"]);
+  });
+
   it("removes its temporary file when the file cannot be replaced", async ({ dir }) => {
     await mkdir(join(dir, "cache.json"));
 

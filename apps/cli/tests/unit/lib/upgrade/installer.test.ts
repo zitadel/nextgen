@@ -69,18 +69,17 @@ describe("PackageInstaller.install", () => {
     });
 
     expect(error).toBeInstanceOf(InstallError);
-    expect((error as InstallError).command).toBe(install.shown);
-    expect((error as InstallError).cause).toBeDefined();
+    expect(error).toMatchObject({ command: install.shown, cause: expect.anything() });
   });
 
   it("wraps a package manager that runs and exits non-zero, with the exit as the cause", async () => {
     const dir = await project({ "@zitadel/api": "1.0.0" });
     const run: PlannedInstall["run"] = {
-      command: process.execPath as PlannedInstall["run"]["command"],
-      verb: "add",
+      command: "npm",
+      verb: "run",
       operands: [],
-      args: ["-e", "process.exit(3)"],
-      display: "node -e process.exit(3)",
+      args: ["exec", "--", "node", "-e", "process.exit(3)"],
+      display: "npm exec -- node -e process.exit(3)",
     };
     const install: PlannedInstall = { run, shown: run };
 
@@ -89,6 +88,6 @@ describe("PackageInstaller.install", () => {
     });
 
     expect(error).toBeInstanceOf(InstallError);
-    expect(((error as InstallError).cause as { code?: number }).code).toBe(3);
+    expect(error).toMatchObject({ cause: { code: 3 } });
   });
 });

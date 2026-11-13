@@ -120,7 +120,9 @@ describe("Upgrader.apply when the install fails", () => {
     });
 
     expect(error).toBeInstanceOf(InstallError);
-    expect((error as InstallError).command.display).toContain("@zitadel/sdk-next@2.0.0");
-    expect((error as InstallError).cause).toBeDefined();
+    expect(error).toMatchObject({
+      command: { display: expect.stringContaining("@zitadel/sdk-next@2.0.0") },
+      cause: expect.anything(),
+    });
   });
 });

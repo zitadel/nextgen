@@ -95,7 +95,7 @@ export class Cache {
   /**
    * Keeps an answer next to the others in the file. The cache is only an
    * optimisation, so a home that cannot be written costs one more question next
-   * time and is never an error. Entries older than {@link RETENTION_MS} are left
+   * time and is never an error. Entries older than {@link RETENTION_MS}, or dated in the future, are left
    * out of the rewrite.
    *
    * The file is written to a temporary name of its own, removed again if the
@@ -115,7 +115,8 @@ export class Cache {
     this.entries = this.load().then((entries) => {
       const kept: Record<string, CacheEntry> = {};
       for (const [name, held] of Object.entries(entries)) {
-        if (Date.now() - held.checked_at < RETENTION_MS) {
+        const age = Date.now() - held.checked_at;
+        if (age >= 0 && age < RETENTION_MS) {
           kept[name] = held;
         }
       }
