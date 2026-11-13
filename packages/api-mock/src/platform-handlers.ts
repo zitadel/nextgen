@@ -1506,6 +1506,27 @@ function listedPrimaries(projectId: string): string[] {
 }
 
 /**
+ * Compares two strings by code unit, which for the ASCII URLs the mock holds is
+ * the byte order the server sorts them in (`strings.Compare`). `localeCompare`
+ * orders punctuation differently, so `https://a.test:3000` would come before
+ * `https://a.test.dev` here and after it on the server.
+ *
+ * @param a - The first string.
+ * @param b - The second string.
+ * @returns A negative number when `a` sorts first, a positive one when `b` does, else zero.
+ */
+function byteOrder(a: string, b: string): number {
+  if (a < b) {
+    return -1;
+  }
+  if (a > b) {
+    return 1;
+  }
+
+  return 0;
+}
+
+/**
  * Whether a concrete origin matches one of the project's preview patterns. A
  * `*` in a pattern matches one or more characters that are not a dot, as the
  * origin rule (#1582) defines it.
@@ -1573,9 +1594,9 @@ type ServedOrigin = {
 };
 
 /**
- * Where the deployments of a project are live now, one entry per deployment
- * row, newest deployment first, decided row by row as the server's `RowServes`
- * does.
+ * Where the deployments of a project are live now, one entry per origin a
+ * deployment serves (a row of the server's deployment origins), newest
+ * deployment first, decided row by row as the server's `RowServes` does.
  *
  * A primary row serves while its deployment is the project's newest primary
  * deployment, on every origin it names, whatever the project lists now. A
@@ -1590,7 +1611,8 @@ type ServedOrigin = {
  * @param projectId - The project.
  * @param deployments - The project's deployments, newest first, which the
  * caller reads once.
- * @returns Every deployment row of the project that serves its origin.
+ * @returns One entry for each origin of each deployment of the project that is
+ * served.
  */
 function servedOrigins(
   projectId: string,
@@ -1853,6 +1875,31 @@ function deploymentResponse(
     }
   }
   return body;
+}
+
+/**
+ * The refusal of a write whose `expected_deployment_id` is not the deployment
+ * it replaces. It names that deployment as live, as the server does, because it
+ * is the newest to the targets whether or not a removed or expired preview
+ * still serves them.
+ *
+ * @param newest - The deployment the write replaces, if there is one.
+ * @returns The `409 dep.conflict` answer, naming no deployment when there is none.
+ */
+function guardConflict(newest: DeploymentRecord | undefined) {
+  let named: Record<string, unknown> | null = null;
+  if (newest !== undefined) {
+    named = deploymentResponse(newest, new Set([newest.id]));
+  }
+
+  return HttpResponse.json(
+    errorBody(
+      "dep.conflict",
+      "deployment: the newest deployment to the targets does not match expected_deployment_id",
+      { deployment: named },
+    ),
+    { status: 409 },
+  );
 }
 
 /**
@@ -2225,7 +2272,9 @@ export function setupPlatformHandlers() {
       if (servedBy.length > 0) {
         return HttpResponse.json(
           errorBody("rel.in_use", "release: still served by an origin", {
-            origins: servedBy.sort((a, b) => a.origin.localeCompare(b.origin)),
+            origins: servedBy.sort((a, b) => {
+              return byteOrder(a.origin, b.origin);
+            }),
           }),
           { status: 409 },
         );
@@ -2356,17 +2405,7 @@ export function setupPlatformHandlers() {
               .sort((a, b) => b.seq - a.seq)[0]
           : newestPrimaryDeployment(project.id);
         if (newest?.id !== expectedId) {
-          return HttpResponse.json(
-            errorBody(
-              "dep.conflict",
-              "deployment: the newest deployment to the targets does not match expected_deployment_id",
-              {
-                deployment:
-                  newest === undefined ? null : deploymentResponse(newest, servingNow(project.id)),
-              },
-            ),
-            { status: 409 },
-          );
+          return guardConflict(newest);
         }
       }
 
@@ -2560,19 +2599,8 @@ export function setupPlatformHandlers() {
           ? rollbackData.expected_deployment_id
           : undefined;
       const newestPrimary = newestPrimaryDeployment(project.id);
-      if (
-        expectedRollbackId !== undefined &&
-        newestPrimary &&
-        newestPrimary.id !== expectedRollbackId
-      ) {
-        return HttpResponse.json(
-          errorBody(
-            "dep.conflict",
-            "deployment: the newest deployment to the targets does not match expected_deployment_id",
-            { deployment: deploymentResponse(newestPrimary, servingNow(project.id)) },
-          ),
-          { status: 409 },
-        );
+      if (expectedRollbackId !== undefined && newestPrimary?.id !== expectedRollbackId) {
+        return guardConflict(newestPrimary);
       }
       if (newestPrimary && repeats(newestPrimary, target.releaseId, origins)) {
         return HttpResponse.json(deploymentResponse(newestPrimary, servingNow(project.id)), {

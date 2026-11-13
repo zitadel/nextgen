@@ -2492,7 +2492,7 @@ describe("api-mock releases and deployments", () => {
     });
   });
 
-  test("names a removed preview as the deployment a new one to its URL replaces", async () => {
+  test("names a removed preview as the live deployment a new one to its URL replaces", async () => {
     const project = await newProject("deploy-guard-removed-preview");
     await addPrimary(project.id, project.secret, "https://app.acme.com");
     await addPreview(project.id, project.secret, "https://*-acme.vercel.app");
@@ -2527,7 +2527,7 @@ describe("api-mock releases and deployments", () => {
     expect(refused.status).toBe(409);
     expect(await refused.json()).toMatchObject({
       code: "dep.conflict",
-      details: { deployment: { id: preview.id } },
+      details: { deployment: { id: preview.id, status: "live" } },
     });
   });
 
@@ -3142,6 +3142,37 @@ describe("api-mock releases and deployments", () => {
       return { project, release, reused, primary, preview };
     }
 
+    /**
+     * The status a deployment is read with by its ID.
+     *
+     * @param projectId - The project.
+     * @param deploymentId - The deployment.
+     * @returns Its status, `live` or `inactive`.
+     */
+    async function statusOf(projectId: string, deploymentId: string): Promise<string> {
+      const response = await fetch(`${BASE}/deployments/${deploymentId}?project_id=${projectId}`);
+      const deployment = (await response.json()) as { status: string };
+
+      return deployment.status;
+    }
+
+    /**
+     * The status of every deployment the history lists.
+     *
+     * @param projectId - The project.
+     * @returns Each deployment's id and status, newest first.
+     */
+    async function historyStatuses(projectId: string) {
+      const response = await fetch(`${BASE}/deployments?project_id=${projectId}`);
+      const history = (await response.json()) as {
+        deployments: { id: string; status: string }[];
+      };
+
+      return history.deployments.map((deployment) => {
+        return [deployment.id, deployment.status];
+      });
+    }
+
     describe("revoking it", () => {
       test("names each origin with its kind and the deployment that pins the release there", async () => {
         const { project, release, primary, preview } = await aReleaseServedTwice("revoke-both");
@@ -3159,6 +3190,23 @@ describe("api-mock releases and deployments", () => {
             ],
           },
         });
+      });
+
+      test("lists the origins in byte order, as the server does", async () => {
+        const project = await newProject("revoke-byte-order");
+        await addPrimary(project.id, project.secret, "https://app.test:3000");
+        await addPrimary(project.id, project.secret, "https://app.test.dev");
+        const release = await released(project, rel1);
+        await deployed(project, { release_id: release.id, targets: "primary" });
+
+        const refused = await revoke(project, release.id);
+
+        const body = (await refused.json()) as { details: { origins: { origin: string }[] } };
+        expect(
+          body.details.origins.map((entry) => {
+            return entry.origin;
+          }),
+        ).toEqual(["https://app.test.dev", "https://app.test:3000"]);
       });
 
       test("still names the primary origin once the preview is removed", async () => {
@@ -3313,6 +3361,59 @@ describe("api-mock releases and deployments", () => {
           [replacement.deployment.id, replacement.release.id, ["https://app.acme.com"]],
           [preview.id, release.id, [PREVIEW_URL]],
         ]);
+      });
+    });
+
+    describe("a deployment's status", () => {
+      test("is live for a preview deployment while its preview serves", async () => {
+        const { project, preview } = await aReleaseServedTwice("status-preview-live");
+
+        const status = await statusOf(project.id, preview.id);
+
+        expect(status).toBe("live");
+      });
+
+      test("turns inactive for a preview deployment once its preview is removed", async () => {
+        const { project, preview } = await aReleaseServedTwice("status-preview-removed");
+        await removePreview(project);
+
+        const status = await statusOf(project.id, preview.id);
+
+        expect(status).toBe("inactive");
+      });
+
+      test("turns inactive for a preview deployment once its preview has expired", async () => {
+        const { project, preview } = await aReleaseServedTwice("status-preview-expired");
+        vi.useFakeTimers({ toFake: ["Date"] });
+        try {
+          vi.setSystemTime(Date.now() + 8 * 24 * 3_600_000);
+
+          const status = await statusOf(project.id, preview.id);
+
+          expect(status).toBe("inactive");
+        } finally {
+          vi.useRealTimers();
+        }
+      });
+
+      test("lists a removed preview's deployment inactive beside the live primary one", async () => {
+        const { project, primary, preview } = await aReleaseServedTwice("status-history");
+        await removePreview(project);
+
+        const history = await historyStatuses(project.id);
+
+        expect(history).toEqual([
+          [preview.id, "inactive"],
+          [primary.id, "live"],
+        ]);
+      });
+
+      test("stays live for the newest primary deployment once the project stops listing its origin", async () => {
+        const { project, primary } = await aPrimaryUrlReusedByAPreview("status-unlisted");
+
+        const status = await statusOf(project.id, primary.id);
+
+        expect(status).toBe("live");
       });
     });
   });
