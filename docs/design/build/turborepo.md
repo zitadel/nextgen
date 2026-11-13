@@ -231,8 +231,9 @@ scripts, which build through turbo (`turbo run @zitadel/<package>#<task>`).
 
 - Strict mode: a task sees `PATH`, `HOME`, `SHELL`, `CI`, `TERM`, `LANG`,
   `GITHUB_ACTIONS`, `RUNNER_TEMP`, `VERCEL`, `COREPACK_*`, `TURBO_*`, what
-  framework inference adds (`VITE_*` for Vite packages, `NEXT_*` for Next.js)
-  and what the task lists. `env` names variables that change the output and
+  framework inference adds (`VITE_*` for Vite packages; `NEXT_PUBLIC_*`,
+  `NEXT_DEPLOYMENT_ID` and, when `VERCEL_SKEW_PROTECTION_ENABLED` is set,
+  `VERCEL_DEPLOYMENT_ID` for Next.js) and what the task lists. `env` names variables that change the output and
   are hashed (`CONSOLE_ADDON`, `GOFLAGS`, the cached e2e lanes' `ZITADEL_*`
   and `NEXTGEN_*`, the journeys' `JOURNEY_*` but `JOURNEY_WORK_DIR`); `passThroughEnv`
   names variables a task reads at run time without affecting its output
@@ -375,8 +376,9 @@ previews in separate entries, and keep no local cache. Writing takes the
 team's token, which a fork's pull request never gets unapproved. The docs'
 and the website's builds never hit there: a Next.js build bakes in its
 deployment (Skew Protection's ID in its asset URLs, Vercel's URLs in its
-metadata), so their keys hold `VERCEL_DEPLOYMENT_ID`. Turbo infers every
-`NEXT_*` variable into every task of a Next.js package, and each deployment
-brings its own (`NEXT_DEPLOYMENT_ID`, and Vercel's `NEXT_PUBLIC_VERCEL_*`,
-which these services' builds hash too), so the docs' `generate` and
-`typecheck`, which read none, drop them (`!NEXT_*`) and still hit.
+metadata), so their keys hold `VERCEL_DEPLOYMENT_ID`. The project has Skew
+Protection on, so Vercel sets `VERCEL_SKEW_PROTECTION_ENABLED` and turbo's
+Next.js inference hashes that new-per-deployment ID into every other task of
+a Next.js package too ([Environment](#environment)). The docs' `generate` and
+`typecheck`, which read none of what it adds, drop it all
+(`!NEXT_*`, `!VERCEL_DEPLOYMENT_ID`) and hit across deployments.
