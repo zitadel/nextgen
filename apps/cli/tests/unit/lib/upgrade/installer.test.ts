@@ -46,7 +46,7 @@ describe("PackageInstaller.plan", () => {
 
     const install = await installerIn(dir).plan(await aPlan(dir));
 
-    expect(install?.display).toContain("@zitadel/api@2.0.0");
+    expect(install?.shown.display).toContain("@zitadel/api@2.0.0");
   });
 
   it("has nothing to install when no package moves", async () => {
@@ -69,20 +69,20 @@ describe("PackageInstaller.install", () => {
     });
 
     expect(error).toBeInstanceOf(InstallError);
-    expect((error as InstallError).command).toBe(install.display);
+    expect((error as InstallError).command).toBe(install.shown);
     expect((error as InstallError).cause).toBeDefined();
   });
 
   it("wraps a package manager that runs and exits non-zero, with the exit as the cause", async () => {
     const dir = await project({ "@zitadel/api": "1.0.0" });
-    const install: PlannedInstall = {
-      run: {
-        command: process.execPath as PlannedInstall["run"]["command"],
-        args: ["-e", "process.exit(3)"],
-        display: "node -e process.exit(3)",
-      },
+    const run: PlannedInstall["run"] = {
+      command: process.execPath as PlannedInstall["run"]["command"],
+      verb: "add",
+      operands: [],
+      args: ["-e", "process.exit(3)"],
       display: "node -e process.exit(3)",
     };
+    const install: PlannedInstall = { run, shown: run };
 
     const error = await rejectionOf(() => {
       return installerIn(dir).install(install);

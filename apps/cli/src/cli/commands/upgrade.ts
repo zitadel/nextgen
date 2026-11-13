@@ -11,7 +11,7 @@ import { newestCliCommand } from "@/lib/public-cli";
 import { type BreakingChange, breakingChanges, RELEASE_NOTES_URL } from "@/lib/release-notes";
 import { SHARED_SKILLS_DIR } from "@/lib/skills/add";
 import { arrow, command, dim, mark, strong, url } from "@/lib/style";
-import { type SuggestedCommand, shellCommand } from "@/lib/suggestion";
+import { type SuggestedCommand, suggestedCommandOf } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 import { releaseChannel } from "@/lib/upgrade/config";
 import { UPDATE_CHECK_VARIABLE, ZITADEL_CLI, ZITADEL_SCOPE } from "@/lib/upgrade/defaults";
@@ -128,7 +128,7 @@ export default class Upgrade extends BaseCommand {
       }
       throw new ZitadelError("E_VALIDATION", "Could not install the new packages", {
         hint: `${errorMessage(error.cause)}. Nothing else changed; fix that and rerun.`,
-        nextCommands: [shellCommand(error.command), await this.again("upgrade", {})],
+        nextCommands: [suggestedCommandOf(error.command), await this.again("upgrade", {})],
       });
     });
 

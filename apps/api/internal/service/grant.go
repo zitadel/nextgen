@@ -82,14 +82,12 @@ func (s *GrantService) Create(ctx context.Context, input CreateGrantInput) (_ *G
 	}
 	// An unclaimed project has no owner who may share it (ADR 053 §2, ADR 054 §4 amendments).
 	// The platform project granting on itself and servers without a platform project are unaffected.
-	if s.platformProjectID != "" && input.ProjectID != s.platformProjectID {
-		claimed, err := projectIsClaimed(ctx, s.v2Pool.Statements(), input.ProjectID)
-		if err != nil {
-			return nil, err
-		}
-		if !claimed {
-			return nil, domain.ErrGrantProjectUnclaimed()
-		}
+	claimed, err := projectIsClaimedOrExempt(ctx, s.v2Pool.Statements(), s.platformProjectID, input.ProjectID)
+	if err != nil {
+		return nil, err
+	}
+	if !claimed {
+		return nil, domain.ErrGrantProjectUnclaimed()
 	}
 	if input.Identifier != "" {
 		return s.createByIdentifier(ctx, input)
@@ -422,6 +420,9 @@ func emitManagedGrant(ctx context.Context, stmts EventStatements, typ domain.Eve
 	ev := audit.WithEntity(audit.FromContext(ctx, typ, domain.EventCategoryAdmin), "authz_assignment", a.ID)
 	ev.ProjectID = a.ProjectID
 	ev.TeamID = nil
+	if userID := a.PrincipalUserID(); userID != "" {
+		ev.UserID = &userID
+	}
 	ev, err := audit.WithPayload(ev, payload)
 	if err != nil {
 		return err

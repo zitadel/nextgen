@@ -10,6 +10,7 @@ import {
 } from "@tests/helpers/platform-project";
 import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
 import { onTerminalReadingAFile } from "@tests/helpers/terminal";
+import { PRIMARY_ORIGIN } from "@tests/helpers/records";
 
 const SERVER = PLATFORM_URL;
 const { server, dirs } = usePlatformServer();
@@ -90,7 +91,7 @@ async function resolve(cwd: string, ...args: string[]) {
 describe("variable resolve", () => {
   it("shows the variables the one live deployment froze", async () => {
     const cwd = await aProject({
-      deployments: [aDeployment("dep_1", "https://app.acme.com")],
+      deployments: [aDeployment("dep_1", PRIMARY_ORIGIN)],
       variables: {
         API_URL: {
           value: "https://api.acme.com",
@@ -105,7 +106,7 @@ describe("variable resolve", () => {
 
     expect(exitCode).toBe(0);
     expect(envelope.data.deployment_id).toBe("dep_1");
-    expect(envelope.data.origins).toEqual(["https://app.acme.com"]);
+    expect(envelope.data.origins).toEqual([PRIMARY_ORIGIN]);
     expect(envelope.data.items).toMatchObject([
       {
         name: "API_URL",
@@ -151,16 +152,16 @@ describe("variable resolve", () => {
       origins: [
         {
           kind: "primary",
-          pattern: "https://app.acme.com",
+          pattern: PRIMARY_ORIGIN,
         },
       ],
     });
 
-    const { stdout } = await resolve(cwd, "--origin", "https://app.acme.com");
+    const { stdout } = await resolve(cwd, "--origin", PRIMARY_ORIGIN);
 
     expect(parseJson(stdout)).toMatchObject({
       status: "error",
-      message: "Nothing is deployed to https://app.acme.com.",
+      message: `Nothing is deployed to ${PRIMARY_ORIGIN}.`,
       hint: expect.stringContaining("Deploy to it first"),
     });
   });
@@ -231,7 +232,7 @@ describe("variable resolve", () => {
 
   it("reads a deployment that is not live", async () => {
     const cwd = await aProject({
-      deployments: [aDeployment("dep_new", "https://app.acme.com")],
+      deployments: [aDeployment("dep_new", PRIMARY_ORIGIN)],
       frozen: {
         dep_old: {
           OLD: "kept",

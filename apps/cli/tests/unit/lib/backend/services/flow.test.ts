@@ -108,7 +108,6 @@ describe("FlowService.create", () => {
 
     const flowDefinition = {
       name: "default-login",
-      status: "active" as const,
       user_schema: "sch_1",
       purposes: { login: "step-1" },
       steps: [],

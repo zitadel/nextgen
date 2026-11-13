@@ -12,6 +12,7 @@ import { asTerminal as asPerson } from "@tests/helpers/terminal";
 
 import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
 import { runCommand } from "@tests/helpers/run-cli";
+import { PRIMARY_ORIGIN, PREVIEW_PATTERN } from "@tests/helpers/records";
 
 const SERVER = "https://api.zitadel.example";
 
@@ -63,7 +64,7 @@ function remove(cwd: string, extra: string[] = []) {
   return runCliForTest([
     "origin",
     "rm",
-    "https://app.acme.com",
+    PRIMARY_ORIGIN,
     ...extra,
     "--cwd",
     cwd,
@@ -80,9 +81,9 @@ describe("origin rm", () => {
     const result = await remove(cwd, ["--force"]);
 
     expect(result.exitCode).toBe(0);
-    expect(removed).toEqual([{ pattern: "https://app.acme.com" }]);
+    expect(removed).toEqual([{ pattern: PRIMARY_ORIGIN }]);
     expect(parseJson(result.stdout)).toMatchObject({
-      data: { pattern: "https://app.acme.com", deleted: true },
+      data: { pattern: PRIMARY_ORIGIN, deleted: true },
     });
   });
 
@@ -98,7 +99,7 @@ describe("origin rm", () => {
 
     expect(result.exitCode).toBe(0);
     expect(parseJson(result.stdout)).toMatchObject({
-      data: { pattern: "https://app.acme.com", deleted: true },
+      data: { pattern: PRIMARY_ORIGIN, deleted: true },
       warnings: [expect.stringContaining("remaining origins could not be read")],
     });
   });
@@ -182,7 +183,7 @@ describe("origin rm", () => {
     const result = await runCliForTest([
       "origin",
       "rm",
-      "https://*-acme.vercel.app",
+      PREVIEW_PATTERN,
       "--cwd",
       cwd,
       "--server",
@@ -192,7 +193,7 @@ describe("origin rm", () => {
     ]);
 
     const envelope = parseJson(result.stdout) as { next_commands?: string[] };
-    expect(envelope.next_commands?.[0]).toContain("origin rm 'https://*-acme.vercel.app' --force");
+    expect(envelope.next_commands?.[0]).toContain(`origin rm '${PREVIEW_PATTERN}' --force`);
   });
 });
 
@@ -201,13 +202,7 @@ describe("origin rm asked on a terminal", () => {
     const cwd = await anAppDir();
     const talk = answering(false);
     await asPerson(() =>
-      runCommand(OriginRm, "origin:rm", [
-        "https://app.acme.com",
-        "--cwd",
-        cwd,
-        "--server",
-        serverUrl,
-      ]),
+      runCommand(OriginRm, "origin:rm", [PRIMARY_ORIGIN, "--cwd", cwd, "--server", serverUrl]),
     );
     return talk;
   };
@@ -216,7 +211,7 @@ describe("origin rm asked on a terminal", () => {
     const talk = await removingOn(SERVER);
 
     expect(talk.asked()).toEqual([
-      "Remove https://app.acme.com from project proj_unit on api.zitadel.example?",
+      `Remove ${PRIMARY_ORIGIN} from project proj_unit on api.zitadel.example?`,
     ]);
   });
 
@@ -243,7 +238,7 @@ describe("origin rm asked on a terminal", () => {
     const talk = await removingOn("http://localhost:8112");
 
     expect(talk.asked()).toEqual([
-      "Remove https://app.acme.com from project proj_unit on localhost:8112?",
+      `Remove ${PRIMARY_ORIGIN} from project proj_unit on localhost:8112?`,
     ]);
   });
 });

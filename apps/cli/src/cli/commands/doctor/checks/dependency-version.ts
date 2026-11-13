@@ -1,6 +1,7 @@
 import semver from "semver";
 
 import { addExactCommandFor, detectPackageManager } from "@/lib/package-manager";
+import { suggestedCommandOf } from "@/lib/suggestion";
 import { Dependencies } from "@/lib/upgrade/dependencies";
 import { ZITADEL_SCOPE } from "@/lib/upgrade/defaults";
 
@@ -58,15 +59,6 @@ export class DependencyVersionCheck implements SanityCheck {
       return !semver.eq(dependency.specifier, ctx.cliVersion);
     });
     if (mismatched.length > 0) {
-      // Repair with the project's own package manager and an exact-save flag:
-      // a bare `npm install` would switch managers on a pnpm/yarn/bun project
-      // and write a caret range — exactly the float this check ignores.
-      const remedy = addExactCommandFor(
-        await detectPackageManager(ctx.cwd),
-        mismatched.map((dependency) => {
-          return `${dependency.name}@${ctx.cliVersion}`;
-        }),
-      ).display;
       return {
         ...base,
         status: "warn",
@@ -86,8 +78,18 @@ export class DependencyVersionCheck implements SanityCheck {
               expected: ctx.cliVersion,
             };
           }),
-          remedy_command: remedy,
         },
+        // Repair with the project's own package manager and an exact-save flag:
+        // a bare `npm install` would switch managers on a pnpm/yarn/bun project
+        // and write a caret range — exactly the float this check ignores.
+        remedy: suggestedCommandOf(
+          addExactCommandFor(
+            await detectPackageManager(ctx.cwd),
+            mismatched.map((dependency) => {
+              return `${dependency.name}@${ctx.cliVersion}`;
+            }),
+          ),
+        ),
       };
     }
     return {
@@ -103,9 +105,9 @@ export class DependencyVersionCheck implements SanityCheck {
   /**
    * No auto-fix: repair's dependency op is deliberately additive-only (it
    * never rewrites a version the user declared), so the repair ships as the
-   * package-manager-aware install command in `details.remedy_command` — the
-   * doctor command surfaces it in the envelope's `next_commands` and under the
-   * category in its report.
+   * package-manager-aware install command in `remedy` — the doctor command
+   * surfaces it in the envelope's `next_commands` and `details.remedy_command`,
+   * and under the category in its report.
    */
   async fix(_ctx: CheckContext): Promise<void> {
     return;

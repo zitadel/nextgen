@@ -19,6 +19,7 @@ import {
 } from "@tests/helpers/run-cli";
 import { type Answer, answering } from "@tests/helpers/keyboard";
 import { asOneLine, asTerminal } from "@tests/helpers/terminal";
+import { PRIMARY_ORIGIN } from "@tests/helpers/records";
 
 const personAnswering = (...answers: Answer[]) => answering(...answers);
 
@@ -146,7 +147,7 @@ describe("env add", () => {
     it("names the new environment in every follow-up, not this run's", async () => {
       const cwd = await makeProject("next");
 
-      const { envelope } = await add(cwd, "--app-url", "https://app.acme.com");
+      const { envelope } = await add(cwd, "--app-url", PRIMARY_ORIGIN);
 
       expect(suggested(envelope).length).toBeGreaterThan(0);
       for (const command of suggested(envelope)) {
@@ -165,7 +166,7 @@ describe("env add", () => {
     it("offers the deploy that makes the new environment serve .zitadel/", async () => {
       const cwd = await makeProject("next");
 
-      const { envelope } = await add(cwd, "--app-url", "https://app.acme.com");
+      const { envelope } = await add(cwd, "--app-url", PRIMARY_ORIGIN);
 
       expect(suggested(envelope).some((command) => command.includes("deploy --message"))).toBe(
         true,
@@ -244,7 +245,7 @@ describe("env add", () => {
     it("names the deploy a person should run, against the new environment", async () => {
       const cwd = await makeProject("next");
 
-      const out = await addRendered(cwd, "--app-url", "https://app.acme.com");
+      const out = await addRendered(cwd, "--app-url", PRIMARY_ORIGIN);
 
       expect(asOneLine(out)).toContain(
         expectedPublicCliCommand(
@@ -256,7 +257,7 @@ describe("env add", () => {
     it("names the deploy a person should run only once", async () => {
       const cwd = await makeProject("next");
 
-      const out = stripAnsi(await addRendered(cwd, "--app-url", "https://app.acme.com"));
+      const out = stripAnsi(await addRendered(cwd, "--app-url", PRIMARY_ORIGIN));
 
       expect(out.split("deploy --message '<what changed>'")).toHaveLength(2);
     });
@@ -285,7 +286,7 @@ describe("env add", () => {
         "--project",
         "proj_existing",
         "--app-url",
-        "https://app.acme.com",
+        PRIMARY_ORIGIN,
       );
 
       expect(suggested(envelope).some((command) => command.includes("origin add"))).toBe(false);
@@ -318,23 +319,17 @@ describe("env add", () => {
     it("names the app origin it already has in the step that waits on the secret", async () => {
       const cwd = await makeProject("next");
 
-      const out = await addRendered(
-        cwd,
-        "--project",
-        "proj_existing",
-        "--app-url",
-        "https://app.acme.com",
-      );
+      const out = await addRendered(cwd, "--project", "proj_existing", "--app-url", PRIMARY_ORIGIN);
 
       expect(out).toContain(
-        `origin add https://app.acme.com --kind primary --env-file ${cwd}/.env.production.local`,
+        `origin add ${PRIMARY_ORIGIN} --kind primary --env-file ${cwd}/.env.production.local`,
       );
     });
 
     it("offers no origin add for a project it created, which already holds the app URL", async () => {
       const cwd = await makeProject("next");
 
-      const { envelope } = await add(cwd, "--app-url", "https://app.acme.com");
+      const { envelope } = await add(cwd, "--app-url", PRIMARY_ORIGIN);
 
       expect(suggested(envelope).some((command) => command.includes("origin add"))).toBe(false);
     });
@@ -342,10 +337,10 @@ describe("env add", () => {
     it("restricts a bound project to the app's origin first", async () => {
       const cwd = await makeProject("next");
 
-      const { envelope } = await addBound(cwd, "--app-url", "https://app.acme.com");
+      const { envelope } = await addBound(cwd, "--app-url", PRIMARY_ORIGIN);
 
       expect(suggested(envelope)[0]).toContain(
-        `origin add https://app.acme.com --kind primary --env-file ${cwd}/.env.production.local`,
+        `origin add ${PRIMARY_ORIGIN} --kind primary --env-file ${cwd}/.env.production.local`,
       );
     });
   });
@@ -494,10 +489,10 @@ describe("env add", () => {
     it("records the normalized --app-url as ZITADEL_ISSUER", async () => {
       const cwd = await makeProject();
 
-      await add(cwd, "--app-url", "https://app.acme.com/some/path");
+      await add(cwd, "--app-url", `${PRIMARY_ORIGIN}/some/path`);
 
       expect(await readFile(join(cwd, ".env.production.local"), "utf8")).toContain(
-        "ZITADEL_ISSUER=https://app.acme.com\n",
+        `ZITADEL_ISSUER=${PRIMARY_ORIGIN}\n`,
       );
     });
   });
@@ -514,10 +509,10 @@ describe("env add", () => {
     it("registers the app's own URL as a primary origin", async () => {
       const cwd = await makeProject();
 
-      await add(cwd, "--app-url", "https://app.acme.com/some/path");
+      await add(cwd, "--app-url", `${PRIMARY_ORIGIN}/some/path`);
 
       expect(created[0]).toMatchObject({
-        origins: [{ pattern: "https://app.acme.com", kind: "primary" }],
+        origins: [{ pattern: PRIMARY_ORIGIN, kind: "primary" }],
       });
     });
   });
@@ -629,11 +624,11 @@ describe("env add", () => {
     it("gives the app URL as the issuer, as an origin", async () => {
       const cwd = await makeProject("next");
 
-      const { envelope } = await add(cwd, "--app-url", "https://app.acme.com/login");
+      const { envelope } = await add(cwd, "--app-url", `${PRIMARY_ORIGIN}/login`);
 
       expect(
         envelope.data.platform.production.find((v) => v.name === "ZITADEL_ISSUER")?.value,
-      ).toBe("https://app.acme.com");
+      ).toBe(PRIMARY_ORIGIN);
     });
 
     it("leaves the issuer a placeholder when no app URL was given", async () => {
@@ -736,7 +731,7 @@ describe("env add asked on a terminal", () => {
       ),
       http.post(`${SERVER}/api/v1/deployments`, () =>
         HttpResponse.json(
-          { id: "dep_1", targets: [{ origin: "https://app.acme.com", expires_at: null }] },
+          { id: "dep_1", targets: [{ origin: PRIMARY_ORIGIN, expires_at: null }] },
           { status: 201 },
         ),
       ),
@@ -759,16 +754,7 @@ describe("env add asked on a terminal", () => {
     const talk = personAnswering(...answers);
     const result = await asTerminal(() =>
       EnvAdd.run(
-        [
-          "staging",
-          "--cwd",
-          cwd,
-          "--server",
-          SERVER,
-          "--app-url",
-          "https://app.acme.com",
-          ...extra,
-        ],
+        ["staging", "--cwd", cwd, "--server", SERVER, "--app-url", PRIMARY_ORIGIN, ...extra],
         cliPackageRoot,
       ),
     );
@@ -784,7 +770,7 @@ describe("env add asked on a terminal", () => {
     expect((envelope as { data: { deployment: unknown } }).data.deployment).toMatchObject({
       release_id: "rel_1",
       deployment_id: "dep_1",
-      origins: ["https://app.acme.com"],
+      origins: [PRIMARY_ORIGIN],
     });
     expect(asked).toContain(OFFER);
   });

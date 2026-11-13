@@ -113,8 +113,9 @@ var reasonOnlyOperations = map[string]reasonOnly{
 	"RejectInvitation": {classTokenCredential, "the invitation token is the credential"},
 	"CompleteClaim":    {classTokenCredential, "the claim challenge and the platform session are the credential (verifyClaimSession)"},
 
-	"CreateApplication":  {classNotImplemented, "answers 501"},
-	"GetApplicationById": {classNotImplemented, "answers 501"},
+	"CreateApplication":    {classNotImplemented, "answers 501"},
+	"GetApplicationById":   {classNotImplemented, "answers 501"},
+	"GetOAuthSettingsById": {classNotImplemented, "answers 501 until the OAuth settings are stored"},
 }
 
 // ungatedClasses maps each ungated operation to the classes it is listed in.

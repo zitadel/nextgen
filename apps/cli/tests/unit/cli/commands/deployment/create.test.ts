@@ -9,6 +9,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { runCliForTest, stripAnsi } from "@tests/helpers/run-cli";
 import { setupServer } from "msw/node";
 import { tmpdir } from "node:os";
+import { PRIMARY_ORIGIN } from "@tests/helpers/records";
 
 describe("-m", () => {
   it("trims a message", async () => {
@@ -127,23 +128,23 @@ describe("deployment create at a terminal", () => {
 
   describe("deployment create", () => {
     it("answers with one clause, and never a list item spliced into the footer", async () => {
-      const cwd = await aProject(["https://app.acme.com"]);
+      const cwd = await aProject([PRIMARY_ORIGIN]);
 
       const res = await deploy(cwd);
 
       expect(res.exitCode).toBe(0);
       const shown = stripAnsi(res.stdout);
       expect(shown).toContain("Deployed rel_1 · project proj_test");
-      expect(shown).not.toContain("- https://app.acme.com");
+      expect(shown).not.toContain(`- ${PRIMARY_ORIGIN}`);
     });
 
     it("names the origins in one sentence, not a list", async () => {
-      const cwd = await aProject(["https://app.acme.com", "https://admin.acme.com"]);
+      const cwd = await aProject([PRIMARY_ORIGIN, "https://admin.acme.com"]);
 
       const res = await deploy(cwd);
 
       const shown = stripAnsi(res.stdout);
-      expect(shown).toContain("Live on https://app.acme.com and https://admin.acme.com.");
+      expect(shown).toContain(`Live on ${PRIMARY_ORIGIN} and https://admin.acme.com.`);
     });
   });
 });

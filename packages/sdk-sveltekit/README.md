@@ -206,3 +206,7 @@ work-email copy for a business audience.
 6. `iss` must be present and must equal `url`
 7. `exp` must be present and in the future (with `clockSkewMs` tolerance); `nbf` and `iat` are validated when present
 8. Opaque (non-JWT) tokens fall back to validation via `GET /sessions/me`
+
+## Testing
+
+To test an app that uses this SDK end to end, against a real local Zitadel server, use [`@zitadel/testing`](https://github.com/zitadel/nextgen/tree/main/packages/testing#readme) ([guide](https://preview.zitadel.com/docs/guides/test-your-app)).

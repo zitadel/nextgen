@@ -1,44 +1,29 @@
-import { readFile, readdir } from "node:fs/promises";
-import { join, sep } from "node:path";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import type { Interfaces } from "@oclif/core";
+import ts from "typescript";
 import { describe, expect, it } from "vitest";
+
+import {
+  callsOf,
+  declaredAs,
+  identifiersIn,
+  nodesOf,
+  parsedFile,
+  sourcesUnder,
+} from "@tests/helpers/declarations";
 
 import { WORKFLOW_COMMANDS } from "@/index";
 import { relationsOf } from "@/lib/suggestion/relations";
 
 const commands = fileURLToPath(new URL("../../../../src/cli/commands", import.meta.url));
 
-/** A `const NAME: Refused<T>` — what one flag or argument is refused for. */
-const REFUSED = /const (\w+): Refused<[^>]*> = \{/g;
-
 /**
  * The ways a flag's refusal is raised by the flag itself: the `parse` it gives
  * `Flags.custom`/`Args.custom`, or a command's own wrapper around one.
  */
-const RAISED_BY_THE_FLAG = /\b(?:reads|taken|readsFilled)\(\s*(\w+)/g;
-
-/** Where a command's class begins: everything after it runs, nothing before it does. */
-const CLASS = /^export default class /m;
-
-/**
- * `source` with its comments and its strings taken out, so a flag's name
- * counts where the code names it and not where the prose beside it happens to
- * use the same word.
- */
-function code(source: string): string {
-  return source
-    .replace(/\/\*[\s\S]*?\*\//g, " ")
-    .replace(/\/\/[^\n]*/g, " ")
-    .replace(/"[^"\n]*"|'[^'\n]*'|`[^`]*`/g, '""');
-}
-
-/** Every `.ts` file under `src/cli/commands`, as a path relative to it. */
-async function files(): Promise<string[]> {
-  const found = await readdir(commands, { recursive: true });
-  return found.filter((file) => file.endsWith(".ts")).map((file) => file.split(sep).join("/"));
-}
+const RAISED_BY_THE_FLAG = ["reads", "taken", "readsFilled"];
 
 /**
  * What a command declares and what its class does with it. The class is the
@@ -46,18 +31,31 @@ async function files(): Promise<string[]> {
  * happens in it too. The module around it holds the refusals, the schemas and
  * the readers a prompt shares with a flag.
  */
-type Command = Readonly<{ file: string; refused: string[]; body: string }>;
+type Command = Readonly<{ file: string; refused: string[]; run: ts.ClassDeclaration }>;
 
+/**
+ * Every command under `src/cli/commands` that declares a `Refused`, with its class.
+ *
+ * @returns The commands.
+ */
 async function declared(): Promise<Command[]> {
   const found: Command[] = [];
-  for (const file of await files()) {
-    const source = await readFile(join(commands, file), "utf8");
-    const refused = [...source.matchAll(REFUSED)].map((match) => match[1] as string);
-    const at = CLASS.exec(source)?.index;
-    if (refused.length === 0 || at === undefined) {
+  for (const file of await sourcesUnder(commands)) {
+    const source = await parsedFile(join(commands, file));
+    const refused = declaredAs(source, "Refused").map((declaration) => {
+      return declaration.name;
+    });
+    const run = nodesOf(source, ts.isClassDeclaration).find((declaration) => {
+      return (
+        declaration.modifiers?.some((modifier) => {
+          return modifier.kind === ts.SyntaxKind.DefaultKeyword;
+        }) === true
+      );
+    });
+    if (refused.length === 0 || run === undefined) {
       continue;
     }
-    found.push({ file, refused, body: code(source.slice(at)) });
+    found.push({ file, refused, run });
   }
   return found;
 }
@@ -79,13 +77,17 @@ async function declared(): Promise<Command[]> {
 describe("what a flag is refused for", () => {
   it("is applied by the flag, and nowhere else in the command", async () => {
     const taken = (await declared()).flatMap((command) => {
-      const applied = [...command.body.matchAll(RAISED_BY_THE_FLAG)].map(
-        (match) => match[1] as string,
-      );
+      const named = identifiersIn(command.run);
+      const applied = callsOf(command.run, RAISED_BY_THE_FLAG).flatMap((call) => {
+        const first = call.arguments[0];
+        return first !== undefined && ts.isIdentifier(first) ? [first.text] : [];
+      });
       return command.refused
         .filter((name) => {
-          const named = [...command.body.matchAll(new RegExp(`\\b${name}\\b`, "g"))];
-          return named.length > applied.filter((one) => one === name).length;
+          return (
+            named.filter((one) => one === name).length >
+            applied.filter((one) => one === name).length
+          );
         })
         .map((name) => `${command.file}: ${name}`);
     });

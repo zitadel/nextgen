@@ -35,10 +35,10 @@ const DEPLOYMENT_ID: Refused<string> = {
 };
 
 /** What naming both a deployment and an origin is refused for: the deployment already says which. */
-const DEPLOYMENT_AND_ORIGIN_REFUSAL: Refusal = {
+const DEPLOYMENT_AND_ORIGIN_REFUSAL = {
   message: "Name a deployment or an origin, not both.",
   hint: "A deployment id already says which deployment to read; `--origin` only picks the live one.",
-};
+} as const satisfies Refusal;
 
 /** The columns `resolve` renders, in order. */
 const COLUMNS = ["name", "value"] as const;
@@ -151,9 +151,9 @@ export default class VariableResolve extends Tabulatable(EnvironmentCommand) {
       }
     }
 
-    // The live list narrows each deployment to the origins it still serves, so
-    // this names exactly what the resolved map runs on — the chosen origin,
-    // stated in the output.
+    // The live list names every origin a deployment still serves, so this names
+    // exactly what the resolved map runs on: all of the deployment's origins,
+    // the one asked for among them.
     const live = found.deployment;
     const items = await deploymentService.variables(live.id);
     const origins = [...live.origins].sort();

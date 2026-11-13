@@ -7,15 +7,19 @@ protection differently, so a regression in one does not show in the other.
 
 | Lane | Specs | Backend | App |
 | --- | --- | --- | --- |
-| `moon run e2e:demo-next-mock` | `demo-next/src/` | `@zitadel/api-mock` on `:8080` | `:3002` |
-| `moon run e2e:demo-next-real` | `demo-next/src-real/` | a real instance on `:8092` (`@zitadel/testing`) | `:3002` |
-| `moon run e2e:demo-nuxt-mock` | `demo-nuxt/src/` | `@zitadel/api-mock` on `:8081` | `:3001` |
+| `demo-next-mock` | `demo-next/src/` | `@zitadel/api-mock` on `:8080` | `:3002` |
+| `demo-next-real` | `demo-next/src-real/` | a real instance on `:8092` (`@zitadel/testing`) | `:3002` |
+| `demo-nuxt-mock` | `demo-nuxt/src/` | `@zitadel/api-mock` on `:8081` | `:3001` |
 
-The Nuxt lane's mock gets its own port so both mock lanes run side by side.
+Run a lane with `turbo run <lane> --filter=@zitadel/e2e`. The Nuxt lane's mock
+gets its own port so both mock lanes run side by side. The Nuxt lane serves
+the demo's production build (`@zitadel/demo-nuxt#build`), never `nuxt dev`:
+beside the build, a dev server would need the `.nuxt/` that Nuxt locks to one
+process.
 Install browsers once with
 `corepack pnpm --filter @zitadel/e2e exec playwright install`. How the lanes
 run in CI and locally:
-[`packages/testing/AGENTS.md`](../../packages/testing/AGENTS.md#moon-and-the-e2e-lanes).
+[`packages/testing/AGENTS.md`](../../packages/testing/AGENTS.md#turbo-and-the-e2e-lanes).
 
 ## What belongs here
 

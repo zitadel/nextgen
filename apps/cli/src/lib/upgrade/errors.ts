@@ -1,3 +1,5 @@
+import type { PackageCommand } from "@/lib/package-manager";
+
 /**
  * The newest release could not be looked up. Its message is generic on purpose:
  * a caller words the failure for its own person, with its own suggestions.
@@ -22,13 +24,13 @@ export class InstallError extends Error {
   /**
    * The install, as the person's shell reads it, so it can be offered again.
    */
-  readonly command: string;
+  readonly command: PackageCommand;
 
   /**
    * @param command - The install, as the person's shell reads it.
    * @param cause - What the package manager failed with.
    */
-  constructor(command: string, cause: unknown) {
+  constructor(command: PackageCommand, cause: unknown) {
     super("Could not install the new packages", { cause });
     this.name = "InstallError";
     this.command = command;

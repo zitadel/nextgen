@@ -21,7 +21,7 @@ export type PlannedInstall = Readonly<{
   /**
    * The command as the person's shell reads it, from the directory they typed.
    */
-  display: string;
+  shown: PackageCommand;
 }>;
 
 /**
@@ -80,7 +80,7 @@ export class PackageInstaller {
     const run = addExactCommandFor(manager, [...plan.specs]);
     return {
       run,
-      display: inDirectory(run, typedCwd, cwd).display,
+      shown: inDirectory(run, typedCwd, cwd),
     };
   }
 
@@ -97,7 +97,7 @@ export class PackageInstaller {
         redirectStdoutToStderr: this.options.redirectStdoutToStderr,
       });
     } catch (error) {
-      throw new InstallError(install.display, error);
+      throw new InstallError(install.shown, error);
     }
   }
 }

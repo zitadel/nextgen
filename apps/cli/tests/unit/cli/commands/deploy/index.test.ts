@@ -4,6 +4,7 @@ import { Origins } from "@/lib/backend";
 
 import Deploy, { missingPrimaryOrigin } from "@/cli/commands/deploy/index";
 import { parseFlag } from "@tests/helpers/inputs";
+import { PREVIEW_PATTERN } from "@tests/helpers/records";
 
 const ISSUER = "http://localhost:3000";
 const PREVIEW_ISSUER = Origins.wrap([{ pattern: ISSUER, kind: "preview" }]);
@@ -43,7 +44,7 @@ describe("missingPrimaryOrigin", () => {
 
   it("suggests adding the issuer as primary when the project does not hold it", () => {
     const outcome = outcomeFor({
-      origins: Origins.wrap([{ pattern: "https://*-acme.vercel.app", kind: "preview" }]),
+      origins: Origins.wrap([{ pattern: PREVIEW_PATTERN, kind: "preview" }]),
     });
 
     expect(outcome.next).toEqual([

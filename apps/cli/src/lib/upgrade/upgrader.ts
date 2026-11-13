@@ -118,13 +118,13 @@ export class Upgrader {
     if (dryRun) {
       return {
         installed: false,
-        installCommand: install.display,
+        installCommand: install.shown.display,
       };
     }
     await installer.install(install);
     return {
       installed: true,
-      installCommand: install.display,
+      installCommand: install.shown.display,
     };
   }
 }

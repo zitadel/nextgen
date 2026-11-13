@@ -19,30 +19,30 @@ const DEFAULT_TAIL = 200;
  * refused too, because Docker is handed it verbatim and the binary backend
  * reads it as the whole log.
  */
-const TAIL: Refused<number> = {
+const TAIL = {
   schema: whole.pipe(z.number().min(1)),
   refusal: {
     message: "{value} is not a valid tail",
     hint: "Use a positive integer.",
   },
-};
+} as const satisfies Refused<number>;
 
 /**
  * How following the lines into the envelope is refused: following writes lines
  * as the server writes them, which is a stream and never the one envelope
  * `--json` promises.
  */
-const FOLLOW_IS_NOT_JSON_REFUSAL: Refusal = {
+const FOLLOW_IS_NOT_JSON_REFUSAL = {
   message: "Cannot stream logs with --json",
   hint: "Run without --json, or omit --follow.",
-};
+} as const satisfies Refusal;
 
 /** How a directory where `zitadel start` never ran is refused. */
-const NOT_STARTED_REFUSAL: Refusal = {
+const NOT_STARTED_REFUSAL = {
   message: "Local Zitadel runtime has not been started",
   hint: "Start the local server first.",
   next: [{ id: "start" }],
-};
+} as const satisfies Refusal;
 
 /**
  * `zitadel logs` — show local Zitadel server logs.
