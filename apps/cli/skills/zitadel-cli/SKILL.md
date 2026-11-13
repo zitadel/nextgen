@@ -1036,7 +1036,19 @@ project per test run, seeds users and sessions through the API, and ships
 Playwright fixtures and login helpers. It never uses the project `setup`
 created or the runtime `start` runs.
 
-- Install it only when asked: `npm install --save-dev @zitadel/testing@latest @playwright/test`.
+- Add it only when asked; `setup` installs no test tooling. In a Next.js app
+  that `setup` wired up, `tests add --non-interactive --json` writes
+  `playwright.config.mts` and `e2e/sign-in.spec.ts`, adds `@zitadel/testing`
+  (pinned to the CLI's version) and `@playwright/test` as dev dependencies,
+  and installs them (`--skip-install` leaves that to `next_commands`).
+  `data.files_written`, `data.dependencies_added` and `data.install` say what
+  it did; `next_commands` install Chromium and run the suite. A rerun that
+  finds its own files writes nothing.
+- `tests add` refuses with `E_CONFLICT` a test file of the app's own
+  (`--force` replaces it) and an app with a Playwright config under another
+  name; add `withZitadel()` to that config by hand. Another framework is
+  `E_VALIDATION`: install the kit and write the config as the guide below
+  shows.
 - Seed a user per test (`seed.user()`) and drive the real login
   (`loginWithPassword`) to test the sign-in itself.
 - Start other tests signed in (`authenticatedPage`, or `seed.session()` for a

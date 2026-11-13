@@ -468,6 +468,33 @@
       "examples": []
     },
     {
+      "id": "tests add",
+      "group": "Local development",
+      "description": "Add a first end-to-end test of the sign-in to this app.\n\nWrites playwright.config.mts and e2e/sign-in.spec.ts, wired to @zitadel/testing, and adds it and @playwright/test as dev dependencies. Each test run boots its own Zitadel server and project, so the test never touches the project setup created. Supports Next.js apps.",
+      "args": [],
+      "flags": [
+        {
+          "name": "force",
+          "char": "f",
+          "description": "Overwrite a test file that holds something else.",
+          "type": "boolean"
+        },
+        {
+          "name": "skip-install",
+          "description": "Do not install the new dev dependencies.",
+          "type": "boolean"
+        }
+      ],
+      "examples": [
+        {
+          "command": "tests add"
+        },
+        {
+          "command": "tests add --skip-install"
+        }
+      ]
+    },
+    {
       "id": "users create",
       "group": "Users and teams",
       "description": "Create a user.",
