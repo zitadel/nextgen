@@ -117,13 +117,17 @@ describe("release revoke refused for a release an origin serves", () => {
     expect(result).toHintAt(`${PREVIEW_URL} (preview, ${project.preview})`);
   });
 
-  it("names a primary origin and a preview each with its own deployment", async () => {
-    const { result, project } = await revokingServedOn({ primary: true, preview: true });
+  it.each([
+    ["a primary origin", PRIMARY_ORIGIN, "primary"],
+    ["a preview", PREVIEW_URL, "preview"],
+  ] as const)(
+    "names %s with its kind and deployment when a primary origin and a preview both serve it",
+    async (_, origin, kind) => {
+      const { result, project } = await revokingServedOn({ primary: true, preview: true });
 
-    expect(result).toHintAt(
-      `${PRIMARY_ORIGIN} (primary, ${project.primary}) and ${PREVIEW_URL} (preview, ${project.preview})`,
-    );
-  });
+      expect(result).toHintAt(`${origin} (${kind}, ${project[kind]})`);
+    },
+  );
 
   it.each([
     [
