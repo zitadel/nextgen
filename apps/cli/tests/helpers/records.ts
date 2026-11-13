@@ -12,7 +12,7 @@ export const PROJECT_ID = "proj_1";
 
 /**
  * The primary origin that {@link aDeployment} serves from and that the mock
- * project helpers register. Many specs still spell the literal out.
+ * project helpers register.
  */
 export const PRIMARY_ORIGIN = "https://app.acme.com";
 
@@ -29,7 +29,7 @@ export const PREVIEW_URL = "https://x-acme.vercel.app";
 
 /**
  * A deployment as the API answers one: `dep_1`, serving `rel_1` live on the
- * primary origin `https://app.acme.com`.
+ * primary origin {@link PRIMARY_ORIGIN}.
  *
  * @param overrides - Fields to set in place of the defaults.
  * @returns The deployment record.

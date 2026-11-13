@@ -66,10 +66,14 @@ describe("ReleaseService.revoke", () => {
   });
 
   describe("when an origin still serves the release", () => {
-    /** A primary origin that serves the release, as the server names it. */
+    /**
+     * A primary origin that serves the release, as the server names it.
+     */
     const PRIMARY = { origin: PRIMARY_ORIGIN, deployment_id: "dep_1", kind: "primary" };
 
-    /** A preview that serves the release, as the server names it. */
+    /**
+     * A preview that serves the release, as the server names it.
+     */
     const PREVIEW = { origin: PREVIEW_URL, deployment_id: "dep_2", kind: "preview" };
 
     /**
@@ -86,11 +90,25 @@ describe("ReleaseService.revoke", () => {
       };
     }
 
-    /** The URL the server refused the revoke at. */
+    /**
+     * The URL the server refused the revoke at.
+     */
     const REVOKE_URL = "https://zitadel.test/api/v1/releases/rel_1/revoke";
 
-    /** The request id the server refused the revoke under. */
+    /**
+     * The request id the server refused the revoke under.
+     */
     const REQUEST_ID = "req_1";
+
+    /**
+     * The hint the refused conflict carried.
+     */
+    const CONFLICT_HINT = "Remove the preview first.";
+
+    /**
+     * The details the refused conflict carried.
+     */
+    const CONFLICT_DETAILS = { release_id: "rel_1" };
 
     /**
      * A service whose server refuses the revoke.
@@ -105,6 +123,8 @@ describe("ReleaseService.revoke", () => {
           url: REVOKE_URL,
           body,
           requestId: REQUEST_ID,
+          hint: CONFLICT_HINT,
+          details: CONFLICT_DETAILS,
         });
       };
 
@@ -155,6 +175,8 @@ describe("ReleaseService.revoke", () => {
         url: REVOKE_URL,
         body: anInUseAnswer([PRIMARY]),
         requestId: REQUEST_ID,
+        hint: CONFLICT_HINT,
+        details: CONFLICT_DETAILS,
         serverCode: "rel.in_use",
         cause: expect.any(ConflictError),
       });

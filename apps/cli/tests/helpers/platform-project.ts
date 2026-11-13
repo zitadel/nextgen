@@ -153,7 +153,9 @@ export async function aProjectWithTwoDeploys(
   return { cwd: await aProjectDirectory(prefix, project), undone };
 }
 
-/** The kinds of origin a release can be served on. */
+/**
+ * The kinds of origin a release can be served on.
+ */
 type OriginKind = "primary" | "preview";
 
 /**

@@ -37,17 +37,21 @@ export type ServingOrigin = Readonly<RevokeRelease409DetailsOriginsItem>;
  * caller that does not know it handles it as the plain conflict it also is.
  */
 export class ReleaseInUseError extends ConflictError {
-  /** The error's name, which a caller that cannot import the class matches on. */
+  /**
+   * The error's name, which a caller that cannot import the class matches on.
+   */
   override readonly name: string = "ReleaseInUseError";
 
-  /** Every origin that serves the release, in the order the server named them. */
+  /**
+   * Every origin that serves the release, in the order the server named them.
+   */
   readonly origins: readonly ServingOrigin[];
 
   /**
    * @param message - The server's message.
    * @param origins - Every origin that serves the release.
-   * @param options - What the server's answer carried (status, URL, body and
-   * request id) and the conflict it came from, as the cause.
+   * @param options - What the conflict carried (status, URL, body, request id,
+   * hint and details) and the conflict itself, as the cause.
    */
   constructor(
     message: string,
@@ -221,6 +225,8 @@ export class ReleaseService extends ApiService {
         url: error.url,
         body: error.body,
         requestId: error.requestId,
+        hint: error.hint,
+        details: error.details,
         cause: error,
       });
     }
