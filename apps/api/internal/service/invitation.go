@@ -313,20 +313,33 @@ func (s *InvitationService) resolveInviters(ctx context.Context, invitations []*
 	return nil
 }
 
-// inviterRefs resolves invitation creators, who are platform users. Every id
-// gets a ref: a missing user degrades to its id.
+// inviterRefs resolves invitation creators, platform or local users, in their
+// home projects. Every id gets a ref: one that no longer resolves degrades to
+// its id.
 func (s *InvitationService) inviterRefs(ctx context.Context, ids []string) (map[string]domain.UserRef, error) {
-	refs, err := s.refs.ResolveUserRefs(ctx, s.platformProjectID, ids)
-	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to resolve the inviter")
-	}
 	out := make(map[string]domain.UserRef, len(ids))
+	byHome := map[string][]string{}
 	for _, id := range ids {
-		ref, ok := refs[id]
-		if !ok {
-			ref = domain.UserRef{UserID: id}
+		out[id] = domain.UserRef{UserID: id}
+		home, err := s.db.Statements().GetResourceScope(ctx, id)
+		if err != nil {
+			if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+				continue
+			}
+			return nil, domain.ErrInternal(err).WithMessage("failed to resolve the inviter")
 		}
-		out[id] = ref
+		if home.ResourceKind == domain.ResourceKindUser {
+			byHome[home.ProjectID] = append(byHome[home.ProjectID], id)
+		}
+	}
+	for projectID, homed := range byHome {
+		refs, err := s.refs.ResolveUserRefs(ctx, projectID, homed)
+		if err != nil {
+			return nil, domain.ErrInternal(err).WithMessage("failed to resolve the inviter")
+		}
+		for id, ref := range refs {
+			out[id] = ref
+		}
 	}
 	return out, nil
 }
@@ -335,12 +348,15 @@ func (s *InvitationService) inviterRefs(ctx context.Context, ids []string) (map[
 // through stmts inside the accept's transaction.
 type InviterCheck func(ctx context.Context, stmts AllStatements, projectID, userID string) (bool, error)
 
-// Lookup finds a pending invitation by its link's token.
-func (s *InvitationService) Lookup(ctx context.Context, token string) (_ *InvitationLookup, err error) {
+// Lookup finds a pending invitation by its link's token for userID.
+func (s *InvitationService) Lookup(ctx context.Context, token, userID string) (_ *InvitationLookup, err error) {
 	ctx, end := startSpan(ctx, "InvitationService.Lookup")
 	defer end(&err)
 
 	stmts := s.db.Statements()
+	if err := requireActiveRedeemer(ctx, stmts, userID); err != nil {
+		return nil, mapInvitationError(err, "failed to look up invitation")
+	}
 	entity, err := pendingInvitationByToken(ctx, stmts, token, time.Now().UTC())
 	if err != nil {
 		return nil, mapInvitationError(err, "failed to look up invitation")
@@ -457,6 +473,9 @@ func (s *InvitationService) Reject(ctx context.Context, token, userID string) (_
 	var rejected *domain.Invitation
 	err = s.db.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		stmts := tx.Statements()
+		if err := requireActiveRedeemer(ctx, stmts, userID); err != nil {
+			return err
+		}
 		now := time.Now().UTC()
 		entity, err := pendingInvitationByToken(ctx, stmts, token, now)
 		if err != nil {
@@ -478,6 +497,31 @@ func (s *InvitationService) Reject(ctx context.Context, token, userID string) (_
 	// The metadata stays for administrators; the link holder doesn't see it.
 	rejected.EncryptedMetadata = nil
 	return &Invitation{Invitation: rejected}, nil
+}
+
+// requireActiveRedeemer refuses a session whose user was deactivated or
+// removed: deactivation leaves sessions usable, and these calls run no
+// authorization check that would catch it.
+func requireActiveRedeemer(ctx context.Context, stmts AllStatements, userID string) error {
+	home, err := stmts.GetResourceScope(ctx, userID)
+	if err != nil {
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+			return domain.ErrAuthUnauthorized(nil)
+		}
+		return err
+	}
+	_, err = stmts.GetUser(ctx, database.And(
+		database.Equal(database.Col(domain.UserFieldProjectID), home.ProjectID),
+		database.Equal(database.Col(domain.UserFieldID), userID),
+		database.Equal(database.Col(domain.UserFieldStatus), domain.UserStatusActive.String()),
+	), UserQueryOptions{})
+	if err != nil {
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+			return domain.ErrAuthUnauthorized(nil)
+		}
+		return err
+	}
+	return nil
 }
 
 // pendingInvitationByToken finds the invitation a link's token redeems. An

@@ -188,10 +188,11 @@ func invitationProjectMemberResponse(inv *service.Invitation, now time.Time) api
 }
 
 func (h *Handler) LookupInvitation(ctx context.Context, req *api.InvitationTokenRequest) (api.LookupInvitationRes, error) {
-	if _, err := h.invitationRedeemer(ctx); err != nil {
+	userID, err := h.invitationRedeemer(ctx)
+	if err != nil {
 		return nil, err
 	}
-	found, err := h.invitationService.Lookup(ctx, req.Token)
+	found, err := h.invitationService.Lookup(ctx, req.Token, userID)
 	if err != nil {
 		return nil, err
 	}

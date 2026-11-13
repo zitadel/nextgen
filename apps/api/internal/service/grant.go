@@ -225,6 +225,10 @@ func (s *GrantService) EnsureUserGrant(ctx context.Context, stmts AllStatements,
 	// Expired rows still hold the unique binding, so clear them first.
 	for _, asgn := range expired {
 		if err := stmts.RevokeAuthzAssignment(ctx, projectID, asgn.ID); err != nil {
+			// An administrator revoked it since the read: already cleared.
+			if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+				continue
+			}
 			return err
 		}
 		if err := emitManagedGrant(ctx, stmts, domain.EventTypeAuthzRevoked, asgn, domain.AuthzRevokedPayload{

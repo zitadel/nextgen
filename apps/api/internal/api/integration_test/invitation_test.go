@@ -545,6 +545,26 @@ func TestInvitationRedeem(t *testing.T) {
 		require.IsType(t, &api.GetInvitationNotFound{}, gone, helpers.MustMarshal(t, gone))
 	})
 
+	t.Run("a deactivated user can't redeem", func(t *testing.T) {
+		t.Parallel()
+		created, token := invite(t, owner, api.InvitationProjectMemberPayloadRelationViewer)
+		colleagueID, colleague := newColleague(t)
+		// Deactivation leaves the session usable; the redeem calls refuse it.
+		require.NoError(t, stmts.DeactivateUser(t.Context(), platform.ID, colleagueID))
+
+		require.IsType(t, &api.LookupInvitationUnauthorized{}, lookup(t, colleague, token))
+		require.IsType(t, &api.RejectInvitationUnauthorized{}, reject(t, colleague, token))
+		require.IsType(t, &api.AcceptInvitationUnauthorized{}, accept(t, colleague, token))
+
+		got, err := owner.GetInvitation(t.Context(), api.GetInvitationParams{ID: created.ID, ProjectID: projectID})
+		require.NoError(t, err)
+		inv, ok := got.(*api.Invitation)
+		require.True(t, ok, helpers.MustMarshal(t, got))
+		member, ok := inv.GetInvitationProjectMember()
+		require.True(t, ok)
+		assert.Equal(t, api.InvitationStatusPending, member.Status)
+	})
+
 	t.Run("refusals", func(t *testing.T) {
 		t.Parallel()
 		_, token := invite(t, owner, api.InvitationProjectMemberPayloadRelationEditor)
