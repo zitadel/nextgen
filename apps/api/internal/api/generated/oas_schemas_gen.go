@@ -33192,8 +33192,9 @@ func (s *FlowResponseHeaders) SetResponse(val FlowResponse) {
 	s.Response = val
 }
 
-func (*FlowResponseHeaders) createFlowRes()  {}
-func (*FlowResponseHeaders) getFlowStepRes() {}
+func (*FlowResponseHeaders) createFlowRes()     {}
+func (*FlowResponseHeaders) getFlowStepRes()    {}
+func (*FlowResponseHeaders) submitFlowStepRes() {}
 
 // Merged schema.
 // Ref: #
@@ -110631,9 +110632,113 @@ func (s *StepTexts) SetDescriptionKey(val OptNilString) {
 	s.DescriptionKey = val
 }
 
-type SubmitFlowStepBadRequest FlowResponseHeaders
+// SubmitFlowStepBadRequest represents sum type.
+type SubmitFlowStepBadRequest struct {
+	// Type selects the active sum variant, switch on this field.
+	Type         SubmitFlowStepBadRequestType
+	FlowResponse FlowResponse
+	ErrorDetails ErrorDetails
+}
 
-func (*SubmitFlowStepBadRequest) submitFlowStepRes() {}
+// SubmitFlowStepBadRequestType is oneOf type of SubmitFlowStepBadRequest.
+type SubmitFlowStepBadRequestType string
+
+// Possible values for SubmitFlowStepBadRequestType.
+const (
+	FlowResponseSubmitFlowStepBadRequest SubmitFlowStepBadRequestType = "FlowResponse"
+	ErrorDetailsSubmitFlowStepBadRequest SubmitFlowStepBadRequestType = "ErrorDetails"
+)
+
+// IsFlowResponse reports whether SubmitFlowStepBadRequest is FlowResponse.
+func (s SubmitFlowStepBadRequest) IsFlowResponse() bool {
+	return s.Type == FlowResponseSubmitFlowStepBadRequest
+}
+
+// IsErrorDetails reports whether SubmitFlowStepBadRequest is ErrorDetails.
+func (s SubmitFlowStepBadRequest) IsErrorDetails() bool {
+	return s.Type == ErrorDetailsSubmitFlowStepBadRequest
+}
+
+// SetFlowResponse sets SubmitFlowStepBadRequest to FlowResponse.
+func (s *SubmitFlowStepBadRequest) SetFlowResponse(v FlowResponse) {
+	s.Type = FlowResponseSubmitFlowStepBadRequest
+	s.FlowResponse = v
+}
+
+// GetFlowResponse returns FlowResponse and true boolean if SubmitFlowStepBadRequest is FlowResponse.
+func (s SubmitFlowStepBadRequest) GetFlowResponse() (v FlowResponse, ok bool) {
+	if !s.IsFlowResponse() {
+		return v, false
+	}
+	return s.FlowResponse, true
+}
+
+// NewFlowResponseSubmitFlowStepBadRequest returns new SubmitFlowStepBadRequest from FlowResponse.
+func NewFlowResponseSubmitFlowStepBadRequest(v FlowResponse) SubmitFlowStepBadRequest {
+	var s SubmitFlowStepBadRequest
+	s.SetFlowResponse(v)
+	return s
+}
+
+// SetErrorDetails sets SubmitFlowStepBadRequest to ErrorDetails.
+func (s *SubmitFlowStepBadRequest) SetErrorDetails(v ErrorDetails) {
+	s.Type = ErrorDetailsSubmitFlowStepBadRequest
+	s.ErrorDetails = v
+}
+
+// GetErrorDetails returns ErrorDetails and true boolean if SubmitFlowStepBadRequest is ErrorDetails.
+func (s SubmitFlowStepBadRequest) GetErrorDetails() (v ErrorDetails, ok bool) {
+	if !s.IsErrorDetails() {
+		return v, false
+	}
+	return s.ErrorDetails, true
+}
+
+// NewErrorDetailsSubmitFlowStepBadRequest returns new SubmitFlowStepBadRequest from ErrorDetails.
+func NewErrorDetailsSubmitFlowStepBadRequest(v ErrorDetails) SubmitFlowStepBadRequest {
+	var s SubmitFlowStepBadRequest
+	s.SetErrorDetails(v)
+	return s
+}
+
+// SubmitFlowStepBadRequestHeaders wraps SubmitFlowStepBadRequest with response headers.
+type SubmitFlowStepBadRequestHeaders struct {
+	CacheControl OptString
+	SetCookie    []string
+	Response     SubmitFlowStepBadRequest
+}
+
+// GetCacheControl returns the value of CacheControl.
+func (s *SubmitFlowStepBadRequestHeaders) GetCacheControl() OptString {
+	return s.CacheControl
+}
+
+// GetSetCookie returns the value of SetCookie.
+func (s *SubmitFlowStepBadRequestHeaders) GetSetCookie() []string {
+	return s.SetCookie
+}
+
+// GetResponse returns the value of Response.
+func (s *SubmitFlowStepBadRequestHeaders) GetResponse() SubmitFlowStepBadRequest {
+	return s.Response
+}
+
+// SetCacheControl sets the value of CacheControl.
+func (s *SubmitFlowStepBadRequestHeaders) SetCacheControl(val OptString) {
+	s.CacheControl = val
+}
+
+// SetSetCookie sets the value of SetCookie.
+func (s *SubmitFlowStepBadRequestHeaders) SetSetCookie(val []string) {
+	s.SetCookie = val
+}
+
+// SetResponse sets the value of Response.
+func (s *SubmitFlowStepBadRequestHeaders) SetResponse(val SubmitFlowStepBadRequest) {
+	s.Response = val
+}
+
+func (*SubmitFlowStepBadRequestHeaders) submitFlowStepRes() {}
 
 // SubmitFlowStepErrorResponse represents sum type.
 type SubmitFlowStepErrorResponse struct {
@@ -111935,10 +112040,6 @@ func (s *SubmitFlowStepErrorResponseStatusCode) SetResponse(val SubmitFlowStepEr
 }
 
 func (*SubmitFlowStepErrorResponseStatusCode) submitFlowStepRes() {}
-
-type SubmitFlowStepOK FlowResponseHeaders
-
-func (*SubmitFlowStepOK) submitFlowStepRes() {}
 
 // Merged schema.
 // Ref: #

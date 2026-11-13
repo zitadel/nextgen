@@ -1,4 +1,14 @@
-const CLI_PACKAGE_NAME = "@zitadel/cli";
+/**
+ * The package this CLI is published as, which `npx` fetches and runs:
+ * `npx @zitadel/cli@1.0.0 deploy`.
+ */
+export const CLI_PACKAGE_NAME = "@zitadel/cli";
+
+/**
+ * The name of the binary the package installs, which is how a person runs an
+ * installed CLI and how a `hint:` quotes one: `zitadel deploy`.
+ */
+export const CLI_BINARY = "zitadel";
 
 export function npmDistTagForCliVersion(cliVersion: string): string {
   const normalized = cliVersion.trim().replace(/^v/, "");
@@ -61,11 +71,11 @@ export function newestCliCommand(args: string, cliVersion: string): string {
 }
 
 export function normalizePublicCliCommand(command: string, cliVersion: string): string {
-  if (command === "zitadel") {
+  if (command === CLI_BINARY) {
     return publicCliCommand("", cliVersion);
   }
-  if (command.startsWith("zitadel ")) {
-    return publicCliCommand(command.slice("zitadel ".length), cliVersion);
+  if (command.startsWith(`${CLI_BINARY} `)) {
+    return publicCliCommand(command.slice(`${CLI_BINARY} `.length), cliVersion);
   }
   return command;
 }

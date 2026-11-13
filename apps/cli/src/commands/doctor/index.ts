@@ -102,7 +102,7 @@ const MAX_PORT = 65_535;
  * A TCP port, refusing what is not a whole number from 1 to 65535, which is no
  * port a server can listen on.
  */
-const PORT: Refused<number> = {
+const PORT = {
   schema: whole.pipe(z.number().min(MIN_PORT).max(MAX_PORT)),
   refusal: {
     message: "{value} is not a TCP port",
@@ -112,7 +112,7 @@ const PORT: Refused<number> = {
     min: MIN_PORT,
     max: MAX_PORT,
   },
-};
+} as const satisfies Refused<number>;
 
 /** What doctor is about, worked out once however many times it is asked for. */
 /**
@@ -596,7 +596,7 @@ export function failureAdvice(
   if (failedNames.has("image")) {
     return {
       hint: "The local Zitadel image is not available. Check Docker registry access, build it locally, or pass --image / ZITADEL_LOCAL_IMAGE.",
-      nextCommands: [shellCommand(`docker pull ${Cmd.quote(image)}`), again.rerun],
+      nextCommands: [shellCommand("docker", "pull", Cmd.quote(image)), again.rerun],
     };
   }
 
@@ -777,11 +777,9 @@ export function advisoryForWarnings(
     );
   }
 
-  const upgrade = remedyCommandOf(
-    warnings.find((check) => {
-      return check.name === "cli-version";
-    }),
-  );
+  const upgrade = warnings.find((check) => {
+    return check.name === "cli-version";
+  })?.remedy;
   if (upgrade !== undefined) {
     fix(
       "cli-version",
@@ -790,11 +788,9 @@ export function advisoryForWarnings(
     );
   }
 
-  const dependencyRemedy = remedyCommandOf(
-    warnings.find((check) => {
-      return check.name === "dependency-version";
-    }),
-  );
+  const dependencyRemedy = warnings.find((check) => {
+    return check.name === "dependency-version";
+  })?.remedy;
   // `upgrade` already moves the pins; aligning them with this older CLI as well
   // would send them backwards from where it leaves them.
   if (dependencyRemedy !== undefined && upgrade === undefined) {
@@ -1141,24 +1137,6 @@ function formatListeners(listeners: Awaited<ReturnType<typeof listenersForPort>>
         .join(" ");
     })
     .join(", ");
-}
-
-/**
- * A warning may carry its own repair as `details.remedy_command` (today: the
- * dependency-version check's package-manager-aware exact-pin install).
- * Surfacing that string keeps the structured advisory identical to the
- * command quoted in the warning's prose.
- */
-function remedyCommandOf(check: CheckOutcome | undefined): SuggestedCommand | undefined {
-  if (check?.status !== "warn") {
-    return undefined;
-  }
-  const details = check.details;
-  if (typeof details !== "object" || details === null) {
-    return undefined;
-  }
-  const remedy = (details as { remedy_command?: unknown }).remedy_command;
-  return typeof remedy === "string" && remedy.length > 0 ? shellCommand(remedy) : undefined;
 }
 
 /**

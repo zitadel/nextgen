@@ -19,7 +19,13 @@ import { AGENTS_HEADER, removeGuidanceSection } from "@/lib/orca/patchers/rule/g
 import type { EjectActions } from "@/lib/orca/patchers/types";
 import { MANAGED_MARKER } from "@/lib/paths";
 import { readRendererId, readZitadelConfig } from "@/lib/project";
-import { shellCommand, type SuggestedCommand } from "@/lib/suggestion";
+import { detectPackageManager, type PackageManager, removeCommandFor } from "@/lib/package-manager";
+import {
+  type SuggestedCommand,
+  shellCommand,
+  shellSteps,
+  suggestedCommandOf,
+} from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
 
 /**
@@ -69,9 +75,11 @@ function assembleNextCommands(
   // `--cwd` as typed: the backups and the package.json are in that directory,
   // so a command run from the shell's would miss them or touch another project.
   dir: string | undefined,
+  // The project's own: another one would write a lockfile of its own.
+  packageManager: PackageManager,
 ): ReadonlyArray<SuggestedCommand> {
-  const inDir = (command: string) => {
-    return shellCommand(dir === undefined ? command : `cd ${Cmd.quote(dir)} && ${command}`);
+  const inDir = (command: SuggestedCommand) => {
+    return dir === undefined ? command : shellSteps(shellCommand("cd", Cmd.quote(dir)), command);
   };
   const commands: SuggestedCommand[] = [];
   if (backedUp.length > 0) {
@@ -79,12 +87,12 @@ function assembleNextCommands(
     // `<rel> -> <backup>`), so this destructive glob can't also sweep up
     // unrelated `.env*.ejected-*` files a user happens to keep.
     const patterns = backedUp.map((entry) => {
-      return `${entry.split(" -> ")[0]}.ejected-*`;
+      return `${Cmd.quote(entry.split(" -> ")[0] ?? "")}.ejected-*`;
     });
-    commands.push(inDir(`rm -f ${patterns.join(" ")}`));
+    commands.push(inDir(shellCommand("rm", "-f", ...patterns)));
   }
   for (const dep of dependencies) {
-    commands.push(inDir(`npm uninstall ${dep}`));
+    commands.push(inDir(suggestedCommandOf(removeCommandFor(packageManager, [dep]))));
   }
   return commands;
 }
@@ -95,6 +103,8 @@ type Ejection = {
   removed: string[];
   preserved: string[];
   backedUp: string[];
+  /** The project's own package manager, which removes the SDK packages it added. */
+  packageManager: PackageManager;
 };
 
 /**
@@ -106,7 +116,12 @@ async function ejectProject(cwd: string, permit: "plan" | Consent): Promise<Ejec
   if (!dryRun) {
     Consent.assert(permit);
   }
-  const actions = await resolveEjectActions(cwd);
+  // The package manager is read before anything is removed, so nothing the
+  // ejection deletes can change it.
+  const [actions, packageManager] = await Promise.all([
+    resolveEjectActions(cwd),
+    detectPackageManager(cwd),
+  ]);
   const removed: string[] = [];
   const preserved: string[] = [];
   const backedUp: string[] = [];
@@ -201,13 +216,14 @@ async function ejectProject(cwd: string, permit: "plan" | Consent): Promise<Ejec
     removed,
     preserved,
     backedUp,
+    packageManager,
   };
 }
 
 /** The result of an ejection, or of its plan. */
 function ejected(
   cwd: string,
-  { actions, removed, preserved, backedUp }: Ejection,
+  { actions, removed, preserved, backedUp, packageManager }: Ejection,
   // `--cwd` as typed, for the follow-up commands.
   dir: string | undefined,
   setItUp: SuggestedCommand,
@@ -334,7 +350,7 @@ function ejected(
       sections: [],
       lines,
     },
-    next: { commands: assembleNextCommands(backedUp, actions.dependencies, dir) },
+    next: { commands: assembleNextCommands(backedUp, actions.dependencies, dir, packageManager) },
   };
 }
 

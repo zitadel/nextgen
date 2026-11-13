@@ -108,9 +108,19 @@ post:
             $ref: ../../../components/flows/flow-response.yaml
     '400':
       description: |
-        Validation or proof verification failed. Returns the same step
-        with an `error` field. The session token and cookie are still rotated.
-        Correct the input and submit the step again.
+        The submission was refused, in one of two shapes:
+
+        - The same step with an `error` field, when validation or proof
+          verification of the input failed. The session token and cookie are
+          still rotated. Correct the input and submit the step again.
+        - An error, when the request was refused before the step could take
+          it. It sets no `Set-Cookie`, so the flow cookie stays as it was:
+          `req.invalid` for a field that
+          does not decode, or an sso submission whose `return_target` is
+          missing, does not parse or is not on the request's `Origin`;
+          `flow.invalid_action` for an action the step does not offer;
+          `flow.unsupported` for a submission the flow cannot take yet.
+          Fix the request; the step is unchanged.
       headers:
         Set-Cookie:
           $ref: ../../../components/headers/set-cookie-flow.yaml
@@ -119,7 +129,9 @@ post:
       content:
         application/json:
           schema:
-            $ref: ../../../components/flows/flow-response.yaml
+            oneOf:
+              - $ref: ../../../components/flows/flow-response.yaml
+              - $ref: ../../../components/error-details.yaml
     '409':
       description: |
         Conflict. The flow session moved on under another request

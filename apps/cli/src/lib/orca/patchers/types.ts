@@ -121,8 +121,9 @@ export type PatchResult = Readonly<{
  * - `envBackups` — env files renamed to a timestamped backup rather than deleted.
  * - `dependencies` — package-manager dependencies the integration added.
  *   `eject` does NOT modify `package.json` (the lockfile and other deps might
- *   conflict), but surfaces an `npm uninstall <name>` line in `next_commands`
- *   so the user can finish the revert manually.
+ *   conflict), but suggests removing each in `next_commands`, with the project's own
+ *   package manager (`pnpm remove <name>`), so the user can finish the revert
+ *   manually.
  * - `configEdits` — user config files the integration merged into via an `edit`
  *   op (e.g. `vite.config.ts`, `angular.json`, `nuxt.config.ts`). `eject` cannot
  *   reverse an in-place merge, so it surfaces these as manual cleanup steps

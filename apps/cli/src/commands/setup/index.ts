@@ -89,7 +89,15 @@ import {
 } from "@/lib/oclif";
 import { Destructive } from "@/lib/oclif/destructive";
 import { projectEnvFile } from "@/lib/oclif/environment-flags";
-import { filled, type Refused, reads, whole } from "@/lib/oclif/flags";
+import {
+  type Declaration,
+  filled,
+  type ParseRefusal,
+  type ReadAlone,
+  type Refused,
+  reads,
+  whole,
+} from "@/lib/oclif/flags";
 import { asStepsShown } from "@/lib/oclif/next-steps";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 import { painted } from "@/lib/oclif/rendering";
@@ -125,7 +133,8 @@ import { writeScaffoldManifest } from "@/lib/scaffold-manifest";
 import { hostUnlessDefault, type ResolvedServer, resolveServer } from "@/lib/server";
 import { id as styleId, path as stylePath, url as styleUrl } from "@/lib/style";
 import {
-  inShell,
+  andTheRest,
+  pipedFrom,
   type NextOf,
   type Scope,
   type Suggest,
@@ -444,79 +453,63 @@ export function customSettingsOf(flags: {
 }
 
 /** How `--server local` with nothing running is refused. */
-const NO_LOCAL_SERVER_REFUSAL: Refusal = {
+const NO_LOCAL_SERVER_REFUSAL = {
   code: "E_LOCAL_SERVER_NOT_RUNNING",
   message: "Local Zitadel server is not running",
-  hint:
-    "{reason}Start local Zitadel first, then rerun setup. {scripting}{recovery}" +
-    "After setup succeeds, follow its next_commands to start the app and verify registration, logout, and login in the browser.",
+  hint: "{reason}Start local Zitadel first, then rerun setup. {scripting}{recovery}After setup succeeds, follow its next_commands to start the app and verify registration, logout, and login in the browser.",
   next: [{ id: "start" }, "{setup}"],
-};
+} as const satisfies Refusal;
 
 /** How a `--cwd` that is a file, or lies under one, is refused. */
-const NOT_A_DIRECTORY_REFUSAL: Refusal = {
+const NOT_A_DIRECTORY_REFUSAL = {
   message: "{cwd} is not a directory",
   hint: "Point --cwd at the app's directory, or at one that does not exist yet for setup to create.",
-};
+} as const satisfies Refusal;
 
 /** How a directory holding a project secret with no configuration is refused. */
-const SECRET_WITHOUT_CONFIG_REFUSAL: Refusal = {
+const SECRET_WITHOUT_CONFIG_REFUSAL = {
   code: "E_CONFLICT",
   message: ".zitadel/secret exists without zitadel.json",
   hint: "Move the secret aside or restore zitadel.json before running setup.",
-};
+} as const satisfies Refusal;
 
 /** How a repository git cannot answer about is refused. */
-const WORKTREE_UNKNOWN_REFUSAL: Refusal = {
+const WORKTREE_UNKNOWN_REFUSAL = {
   code: "E_CONFLICT",
   message: "Could not tell whether the git working tree is clean: {reason}",
-  hint:
-    "Setup commits the files it writes, and will not do that without knowing the tree " +
-    "started clean. Fix what git is reporting, then run setup again, or pass --no-git to " +
-    "set up without touching version control.",
-};
+  hint: "Setup commits the files it writes, and will not do that without knowing the tree started clean. Fix what git is reporting, then run setup again, or pass --no-git to set up without touching version control.",
+} as const satisfies Refusal;
 
 /** How a repository where a commit would land in the wrong place is refused. */
-const WORKTREE_BLOCKED_REFUSAL: Refusal = {
+const WORKTREE_BLOCKED_REFUSAL = {
   code: "E_CONFLICT",
   message: "Setup cannot commit here: {blocked}",
-  hint:
-    "Setup commits the project so the first release records a commit. Finish or abort what " +
-    "is under way, or check out a branch, then run setup again, or pass --no-git to set up " +
-    "without touching version control.",
-};
+  hint: "Setup commits the project so the first release records a commit. Finish or abort what is under way, or check out a branch, then run setup again, or pass --no-git to set up without touching version control.",
+} as const satisfies Refusal;
 
 /** How a repository holding work the CLI did not write is refused. */
-const WORKTREE_DIRTY_REFUSAL: Refusal = {
+const WORKTREE_DIRTY_REFUSAL = {
   code: "E_CONFLICT",
   message: "The git working tree has {parts}",
-  hint:
-    "Setup commits the project directory so the first release records a commit, and it will not " +
-    "do that while there is work it did not write, which would be committed under setup's name. " +
-    "See them with git status, commit or stash them, then run setup again. If you have just scaffolded " +
-    "the app yourself, committing it first is the expected step. To set up without touching " +
-    "version control at all, pass --no-git.",
+  hint: "Setup commits the project directory so the first release records a commit, and it will not do that while there is work it did not write, which would be committed under setup's name. See them with git status, commit or stash them, then run setup again. If you have just scaffolded the app yourself, committing it first is the expected step. To set up without touching version control at all, pass --no-git.",
   details: {
     modified: "{modified}",
     untracked: "{untracked}",
   },
-};
+} as const satisfies Refusal;
 
 /** How a local server another CLI release started is refused. */
-const SERVER_VERSION_REFUSAL: Refusal = {
+const SERVER_VERSION_REFUSAL = {
   code: "E_CONFLICT",
   message: "The local Zitadel server runs {running}, but this CLI ships {expected}",
-  hint:
-    "A server another CLI release started serves that release's API, so setup would stop " +
-    "halfway. Run start to restart it on {expected}; its data stays. {where}" +
-    "Then rerun setup.",
+  hint: "A server another CLI release started serves that release's API, so setup would stop halfway. Run start to restart it on {expected}; its data stays. {where}Then rerun setup.",
   next: ["{start}", "{setup}"],
   details: {
     server_url: "{serverUrl}",
     server_version: "{running}",
     cli_server_version: "{expected}",
   },
-};
+} as const satisfies Refusal;
 
 /** What setup needs to know about the run before it detects or writes anything. */
 export type SetupPreflight = Readonly<{
@@ -737,42 +730,42 @@ export type SetupFlagsToCheck = Readonly<{
   ssoScopes?: string;
 }>;
 
-const DESIGN_REMOVED_REFUSAL: Refusal = {
+const DESIGN_REMOVED_REFUSAL = {
   message: "setup no longer applies a login template, so --design was removed",
   hint: `Rerun setup without --design. ${PAGE_LAYOUT_HINT} To own the widget's structure after setup, eject one of: ${BRANDING_DESIGNS.join(", ")}.`,
   next: [{ id: "branding:eject" }],
-};
+} as const satisfies Refusal;
 
-const CLIENT_ID_NEEDS_SSO_REFUSAL: Refusal = {
+const CLIENT_ID_NEEDS_SSO_REFUSAL = {
   message: "--sso-client-id needs --sso",
   hint: "Name the provider with --sso, e.g. --sso google.",
-};
+} as const satisfies Refusal;
 
-const SETTING_NEEDS_SSO_REFUSAL: Refusal = {
+const SETTING_NEEDS_SSO_REFUSAL = {
   message: `{flag} needs --sso ${CUSTOM_PROVIDER}`,
   hint: `Name the provider with --sso ${CUSTOM_PROVIDER}.`,
-};
+} as const satisfies Refusal;
 
-const SETTINGS_NEED_CUSTOM_REFUSAL: Refusal = {
+const SETTINGS_NEED_CUSTOM_REFUSAL = {
   message: "{names} only applies to a custom connection",
   hint: `Add --sso ${CUSTOM_PROVIDER}, or remove {them}.`,
   details: {
     flags: "{flags}",
   },
-};
+} as const satisfies Refusal;
 
-const CUSTOM_CONNECTION_INCOMPLETE_REFUSAL: Refusal = {
+const CUSTOM_CONNECTION_INCOMPLETE_REFUSAL = {
   message: "A custom connection needs {list}",
   hint: `Describe the connection, e.g. ${customExample(SETUP_FLAG_NAMES)}`,
   details: {
     missing: "{missing}",
   },
-};
+} as const satisfies Refusal;
 
-const SSO_NEEDS_CLIENT_ID_REFUSAL: Refusal = {
+const SSO_NEEDS_CLIENT_ID_REFUSAL = {
   message: "--sso {sso} needs --sso-client-id",
   hint: "Register {registration} and pass its client id.",
-};
+} as const satisfies Refusal;
 
 /** Where an application for `provider` is registered, for the hint to name. */
 function whereToRegister(flags: SetupFlagsToCheck, provider: string): string {
@@ -856,10 +849,10 @@ export function refuseUnusableFlags(flags: SetupFlagsToCheck, scripted: boolean)
  * is to pass one or leave the flag out, which is not what to do about a value
  * the provider would reject, so the two are worded apart.
  */
-const EMPTY_SETTING: Refusal = {
+const EMPTY_SETTING = {
   message: "the value is empty",
   hint: "Pass a value for {input}, or omit it entirely.",
-};
+} as const satisfies Refusal;
 
 /**
  * A trimmed value one of the platform's own parsers accepts, kept as it was
@@ -897,14 +890,33 @@ function made<T>(parse: (value: string) => Parsed<T>) {
 
 /**
  * The `parse` of a flag that refuses an empty value as any flag does, and
- * everything else as `refused` words it.
+ * everything else as `refused` words it. It takes the declaration as
+ * {@link reads} does, so the wording is checked where the flag is declared.
+ *
+ * @typeParam T - What the value parses to.
+ * @typeParam R - The declaration's refusal, as it is written.
+ * @typeParam Declared - The declaration, as it is written.
+ * @typeParam Empty - The refusal for an empty value, as it is written. It
+ *   has no `values`, so it may ask only for what the parse fills
+ *   ({@link ReadAlone}).
+ * @param refused - What a value that is not empty is refused for.
+ * @param empty - What an empty value is refused with; {@link EMPTY_SETTING}
+ *   when it is left out.
+ * @returns The `parse`.
  */
-function readsFilled<T>(refused: Refused<T>, empty: Refusal = EMPTY_SETTING) {
-  const blank = reads<string>({
+function readsFilled<
+  T,
+  const R extends ParseRefusal,
+  const Declared extends Refused<T>,
+  const Empty extends ParseRefusal = typeof EMPTY_SETTING,
+>(refused: Declaration<T, R, Declared>, empty?: Empty & ReadAlone<Empty>) {
+  const emptied: ParseRefusal = empty ?? EMPTY_SETTING;
+  const blank = reads({
     schema: filled,
-    refusal: empty,
+    refusal: emptied,
   });
-  const value = reads(refused);
+  const declared: Refused<T> = refused;
+  const value = reads(declared);
   return async (given: string, command: unknown, definition: { name: string }): Promise<T> => {
     await blank(given, command, definition);
     return value(given, command, definition);
@@ -998,7 +1010,7 @@ const MAX_PORT = 65_535;
  * A TCP port, refusing what is not a whole number from 1 to 65535, which is no
  * port a server can listen on.
  */
-const PORT: Refused<number> = {
+const PORT = {
   schema: whole.pipe(z.number().min(MIN_PORT).max(MAX_PORT)),
   refusal: {
     message: "{value} is not a TCP port",
@@ -1008,7 +1020,7 @@ const PORT: Refused<number> = {
     min: MIN_PORT,
     max: MAX_PORT,
   },
-};
+} as const satisfies Refused<number>;
 
 /**
  * The port a value names, for the dev-port prompt, so a port typed at the
@@ -1797,7 +1809,7 @@ export default class Setup extends Destructive(BaseCommand) {
         : {
             actions: [],
             boxActions: [],
-            commands: [] as SuggestedCommand[],
+            commands: [],
           };
 
     const writtenRel = allFilesWritten.map((file) => {
@@ -1905,7 +1917,7 @@ export default class Setup extends Destructive(BaseCommand) {
       : {
           actions: [],
           boxActions: [],
-          commands: [] as SuggestedCommand[],
+          commands: [],
         };
     // Only when the project is the local admin's: the console lists nothing
     // else for them, so the command would open an empty console otherwise.
@@ -1928,7 +1940,7 @@ export default class Setup extends Destructive(BaseCommand) {
       : {
           actions: [],
           boxActions: [],
-          commands: [] as SuggestedCommand[],
+          commands: [],
         };
     // A run that skipped social sign-in says how to add it later, the way
     // `consoleStep` says how to open the console.
@@ -1951,7 +1963,7 @@ export default class Setup extends Destructive(BaseCommand) {
         : {
             actions: [],
             boxActions: [],
-            commands: [] as SuggestedCommand[],
+            commands: [],
           };
     // This run again without `--dry-run`, with every other flag as typed, which
     // is what a preview's one follow-up is.
@@ -2744,11 +2756,11 @@ async function removeSetupMarkers(cwd: string): Promise<void> {
 const README = "README.md";
 
 /**
- * The client id a suggested `setup` leaves for the reader to fill in. It is a
- * placeholder for a client id, so it stands as the type the flag parses to
- * though it is not one a provider issued.
+ * The client id a suggested `setup` leaves for the reader to fill in. It is no
+ * client id a provider issued, but a `FillIn` (`src/lib/suggestion`), which a
+ * suggestion takes for any flag's value.
  */
-const ID_TO_FILL_IN = "<id>" as ClientId;
+const ID_TO_FILL_IN = "<id>";
 
 /**
  * What setup's default configuration left behind.
@@ -3053,12 +3065,9 @@ export async function ssoFromFlags(
     stdin: true,
     // A concrete rerun for an agent, never carrying the value: the secret is
     // piped from the caller's own environment.
-    retry: inShell(
-      suggest({ id: "setup", flags: { sso: flags.sso, ssoClientId: ID_TO_FILL_IN } }),
-      {
-        before: `printf '%s' "$CLIENT_SECRET" | `,
-        after: " ...",
-      },
+    retry: pipedFrom(
+      "CLIENT_SECRET",
+      andTheRest(suggest({ id: "setup", flags: { sso: flags.sso, ssoClientId: ID_TO_FILL_IN } })),
     ),
   });
   return {

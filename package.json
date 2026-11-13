@@ -23,7 +23,8 @@
     "check-go-work": "node scripts/assert-file.mjs scripts/check-go-work.test.mjs && vitest run scripts/check-go-work.test.mjs && node scripts/check-go-work.mjs",
     "server-debug": "node scripts/run-server-debug.mjs",
     "build-local-image": "node scripts/build-local-runtime-image.mjs",
-    "smoke-container": "node scripts/smoke-container.mjs"
+    "smoke-container": "node scripts/smoke-container.mjs",
+    "smoke-upgrade": "node scripts/smoke-upgrade.mjs"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "catalog:",

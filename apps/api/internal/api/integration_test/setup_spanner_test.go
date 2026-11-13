@@ -29,5 +29,5 @@ func runTests(m *testing.M) int {
 	defer pool.Close(ctx)
 
 	harness.DB = service.NewPool(pool)
-	return m.Run()
+	return harness.ReportSpecConformance(m.Run())
 }
