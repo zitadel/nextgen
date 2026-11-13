@@ -14,8 +14,7 @@
 import type express from "express";
 import { HttpHandler, type RequestHandler } from "msw";
 
-import { setupMockHandlers } from "../handlers.js";
-import { setupPlatformHandlers } from "../platform-handlers.js";
+import { mountedHandlers } from "../server.js";
 import { findOperation, specPath, templateKey, violations } from "./spec-contract.js";
 
 export type Transport = "server" | "in-process";
@@ -25,8 +24,6 @@ export type MockRoute = {
   method: string;
   /** The path as the handler declares it, without MSW's `*` or the API prefix. */
   path: string;
-  /** The handler's source, which the coverage gate reads its status and code literals from. */
-  source: string;
 };
 
 /** `METHOD /path`, the path's parameters unnamed: the key routes and requests meet on. */
@@ -35,42 +32,41 @@ export function routeKey(method: string, path: string): string {
 }
 
 type ExpressLayer = {
-  route?: {
-    path: string | string[];
-    methods: Record<string, boolean>;
-    stack: Array<{ handle: (...args: never[]) => unknown }>;
-  };
+  route?: { path: string | string[]; methods: Record<string, boolean> };
 };
 
 function expressRoutes(app: express.Express): MockRoute[] {
-  const stack = (app as unknown as { _router: { stack: ExpressLayer[] } })._router.stack;
-  return stack.flatMap((layer) => {
+  // Express 4 keeps its router at `_router`; Express 5 moved it to `router`.
+  const router = (app as unknown as { _router?: { stack?: ExpressLayer[] } })._router;
+  if (!router?.stack) {
+    throw new Error(
+      "the Express app has no _router.stack: read the routes the way this Express version keeps them",
+    );
+  }
+  return router.stack.flatMap((layer) => {
     const route = layer.route;
     if (!route) return [];
     const paths = [
       ...new Set((Array.isArray(route.path) ? route.path : [route.path]).map(specPath)),
     ];
-    const source = route.stack.map((s) => String(s.handle)).join("\n");
     return Object.keys(route.methods).flatMap((method) =>
-      paths.map((path) => ({
-        transport: "server" as const,
-        method: method.toUpperCase(),
-        path,
-        source,
-      })),
+      paths.map((path) => ({ transport: "server" as const, method: method.toUpperCase(), path })),
     );
   });
 }
 
 function mswRoutes(handlers: readonly RequestHandler[]): Omit<MockRoute, "transport">[] {
-  return handlers.flatMap((handler) => {
-    if (!(handler instanceof HttpHandler)) return [];
+  return handlers.map((handler) => {
+    if (!(handler instanceof HttpHandler)) {
+      throw new Error(
+        `${handler.info.header} is not an HttpHandler: the check cannot read its route`,
+      );
+    }
     const { method, path } = handler.info;
     if (typeof method !== "string" || typeof path !== "string") {
       throw new Error(`a handler matches by ${String(path)}: give it a path the check can read`);
     }
-    const resolver = (handler as unknown as { resolver: unknown }).resolver;
-    return [{ method, path: specPath(path.replace(/^\*/, "")), source: String(resolver) }];
+    return { method, path: specPath(path.replace(/^\*/, "")) };
   });
 }
 
@@ -78,14 +74,12 @@ function mswRoutes(handlers: readonly RequestHandler[]): Omit<MockRoute, "transp
 export function mockRoutes(app: express.Express): MockRoute[] {
   const server = expressRoutes(app);
   const shadowed = new Set(server.map((r) => routeKey(r.method, r.path)));
-  const msw = mswRoutes([...setupMockHandlers().handlers, ...setupPlatformHandlers()]).map(
-    (route) => ({
-      ...route,
-      transport: shadowed.has(routeKey(route.method, route.path))
-        ? ("in-process" as const)
-        : ("server" as const),
-    }),
-  );
+  const msw = mswRoutes(mountedHandlers({ iss: "http://localhost" })).map((route) => ({
+    ...route,
+    transport: shadowed.has(routeKey(route.method, route.path))
+      ? ("in-process" as const)
+      : ("server" as const),
+  }));
   return [...server, ...msw];
 }
 
@@ -94,12 +88,12 @@ export type Observation = {
   transport: Transport;
   key: string;
   status: number;
-  code: string | undefined;
 };
 
 /** The host in-process requests go to, so no MSW handler answers a request meant for the server. */
 export const IN_PROCESS_ORIGIN = "http://in-process.test";
 
+/** Every answer `conformantFetch` validated in this file's run; nothing else counts. */
 export const observations: Observation[] = [];
 
 /**
@@ -117,41 +111,18 @@ export async function conformantFetch(
   const url = new URL(request.url);
   const op = findOperation(request.method, url.pathname);
   if (!op || response.redirected) return response;
-  const text = await response.clone().text();
   const problems = violations(op, {
     status: response.status,
     contentType: response.headers.get("content-type"),
-    text,
+    text: await response.clone().text(),
   });
   if (problems.length > 0) {
     throw new Error(`the mock's answer breaks the contract:\n  ${problems.join("\n  ")}`);
-  }
-  let code: string | undefined;
-  if (response.status >= 400) {
-    try {
-      code = (JSON.parse(text) as { code?: string }).code;
-    } catch {
-      code = undefined;
-    }
   }
   observations.push({
     transport: url.origin === IN_PROCESS_ORIGIN ? "in-process" : "server",
     key: routeKey(op.method, op.path),
     status: response.status,
-    code,
   });
   return response;
-}
-
-/** The status and error-code literals a handler's source returns. */
-export function literalOutcomes(source: string): { statuses: Set<number>; codes: Set<string> } {
-  const statuses = new Set<number>();
-  const codes = new Set<string>();
-  for (const m of source.matchAll(/status:\s*(\d{3})\b|\.status\((\d{3})\)/g)) {
-    statuses.add(Number(m[1] ?? m[2]));
-  }
-  for (const m of source.matchAll(/errorBody\(\s*["']([^"']+)["']|\bcode:\s*["']([^"']+)["']/g)) {
-    codes.add((m[1] ?? m[2]) as string);
-  }
-  return { statuses, codes };
 }

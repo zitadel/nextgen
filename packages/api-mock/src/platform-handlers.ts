@@ -2374,11 +2374,16 @@ export function setupPlatformHandlers() {
       if (!body.ok) {
         return body.response;
       }
-      const target = store.deployments.get(path.data.deployment_id);
-      // A deployment exists only in a project the mock holds, which it never
-      // deletes: a deployment of this project means the project is there.
+      // As on the server, project access is checked first: a write to a
+      // project it does not hold is env.project_not_found.
       const project = store.projects.get(query.data.project_id);
-      if (!target || target.projectId !== query.data.project_id || !project) {
+      if (!project) {
+        return HttpResponse.json(errorBody("env.project_not_found", "project not found"), {
+          status: 404,
+        });
+      }
+      const target = store.deployments.get(path.data.deployment_id);
+      if (!target || target.projectId !== project.id) {
         return HttpResponse.json(errorBody("dep.not_found", "deployment: not found"), {
           status: 404,
         });

@@ -2152,8 +2152,11 @@ describe("setup", () => {
                 ),
               ],
             },
-            // The server refuses the minted id in a query as req.invalid, which
-            // is also how a server without the sign-up policy answers the probe.
+            // This pins a misleading warning. The server refuses the minted id
+            // in the probe's query as req.invalid, and the probe
+            // (serverTakesSignupPolicy in src/commands/setup/index.ts) reads any
+            // req.invalid as a server without the sign-up policy, so setup
+            // drops user.create.json for a server that takes it.
             warnings: [
               `The server does not take a sign-up policy yet, so setup wrote none. Upgrade the server, then add .zitadel/policies/user.create.json and run ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))}.`,
               `The project was set up but its first deploy failed: request does not conform to spec. Run ${expectedPublicCliCommand(app.asSetupSuggests("deploy --message '<what changed>'"))} to publish .zitadel/.`,

@@ -43,6 +43,7 @@ import type { ExchangeHandoff200, GetMySession200 } from "@zitadel/api/generated
 import { API_PREFIX } from "@zitadel/api/runtime/base-url";
 import cookieParser from "cookie-parser";
 import express from "express";
+import type { RequestHandler } from "msw";
 
 import { applyBranding } from "./branding.js";
 import { JWK, verifyHandoffToken } from "./crypto.js";
@@ -548,9 +549,18 @@ export function createMockApp(options: { issuer: string }): express.Express {
     res.status(204).end();
   });
 
-  app.use(createMiddleware(...setupMockHandlers({ iss }).handlers, ...setupPlatformHandlers()));
+  app.use(createMiddleware(...mountedHandlers({ iss })));
 
   return app;
+}
+
+/**
+ * The MSW handlers the app mounts behind its own routes: the flow and session
+ * handlers, then the platform handlers. The conformance spec reads its routes
+ * from this list, so a handler set mounted anywhere else goes unchecked.
+ */
+export function mountedHandlers(options: { iss: string }): RequestHandler[] {
+  return [...setupMockHandlers({ iss: options.iss }).handlers, ...setupPlatformHandlers()];
 }
 
 /**

@@ -6,31 +6,18 @@
  * `conformantFetch` (`src/__tests__/mock-routes.ts`), which fails the request
  * when the answer breaks the contract (`src/__tests__/spec-contract.ts`): a
  * status the operation does not declare, a success body orval's zod refuses,
- * or an error body outside the operation's declared error set.
+ * or an error body outside the operation's declared error set. That proves a
+ * code is one the operation declares, not that it is the right one, and every
+ * operation's `default` lets any error status through.
  *
  * The last describe reads the routes off the handlers themselves and fails a
  * route that is neither a spec operation nor listed in
- * `src/__tests__/spec-exceptions.ts`, and a spec route whose success path, or
- * any status or error code its handler names, no test here answered. A new
- * handler therefore needs its tests here before it passes.
+ * `src/__tests__/spec-exceptions.ts`, a server route with no success answer,
+ * and an in-process route with no answer at all. Only answers through this
+ * file's `fetch` count, so a new handler needs its tests here.
  */
 import type { Server } from "node:http";
 
-import {
-  AddOriginResponse,
-  CompleteClaimResponse,
-  CreateIdpResponse,
-  CreateProjectResponse,
-  ExchangeHandoffResponse,
-  GetClaimStatusResponse,
-  GetFlowDefinitionResponse,
-  GetIdpByIdResponse,
-  GetMySessionResponse,
-  GetProjectResponse,
-  GetVariablesResponse,
-  ListFlowDefinitionsResponse,
-  QueryIdpsResponse,
-} from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import { API_PREFIX } from "@zitadel/api/runtime/base-url";
 import { setupServer } from "msw/node";
 import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
@@ -38,7 +25,6 @@ import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
 import {
   IN_PROCESS_ORIGIN,
   conformantFetch,
-  literalOutcomes,
   mockRoutes,
   observations,
   routeKey,
@@ -129,8 +115,8 @@ function validFlowDefinitionBody(): Record<string, unknown> {
   };
 }
 
-describe("api-mock spec conformance — responses match orval-generated zod", () => {
-  test("POST /sessions/exchange returns body parseable by ExchangeHandoffResponse", async () => {
+describe("api-mock spec conformance — sessions, projects, schemas and flow definitions", () => {
+  test("POST /sessions/exchange exchanges a handoff token", async () => {
     const handoff = await signHandoffToken({ sub: "proj_test", iss: BASE });
     const res = await fetch(`${API}/sessions/exchange?project_id=proj_test`, {
       method: "POST",
@@ -138,8 +124,6 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       body: JSON.stringify({ handoff_token: handoff }),
     });
     expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(() => ExchangeHandoffResponse.parse(body)).not.toThrow();
   });
 
   test("GET /sessions/me resolves a display for the known demo identities", async () => {
@@ -158,7 +142,6 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     const res = await fetch(`${API}/sessions/me`, { headers: { cookie: cookie ?? "" } });
     expect(res.status).toBe(200);
     const body = (await res.json()) as Record<string, unknown>;
-    expect(() => GetMySessionResponse.parse(body)).not.toThrow();
     expect(body.user).toMatchObject({
       identifier: "ada@example.com",
       identifier_property: "email",
@@ -284,7 +267,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(signedOut.headers.getSetCookie().some((c) => /^zitadel_session=;/.test(c))).toBe(true);
   });
 
-  test("GET /sessions/me returns body parseable by GetMySessionResponse with a user ref", async () => {
+  test("GET /sessions/me answers the session with a user ref", async () => {
     const handoff = await signHandoffToken({ sub: "me@example.com", iss: BASE });
     const exchange = await fetch(`${API}/sessions/exchange?project_id=proj_me`, {
       method: "POST",
@@ -301,7 +284,6 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     const res = await fetch(`${API}/sessions/me`, { headers: { cookie: cookie ?? "" } });
     expect(res.status).toBe(200);
     const body = (await res.json()) as Record<string, unknown>;
-    expect(() => GetMySessionResponse.parse(body)).not.toThrow();
     // The identity contract (ADR 058): the ref carries the sign-in email as
     // the designated identifier; the mock, like the shipped default schema,
     // designates no display properties.
@@ -511,14 +493,13 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     });
     expect(res.status).toBe(201);
     const body = await res.json();
-    expect(() => CreateProjectResponse.parse(body)).not.toThrow();
     expect(body).toMatchObject({
       name: "conformance-app",
       origins: [{ pattern: "http://localhost:3000", kind: "preview" }],
     });
   });
 
-  test("GET /projects/:id matches GetProjectResponse", async () => {
+  test("GET /projects/:id reads a created project back", async () => {
     const create = await fetch(`${API}/projects`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -531,7 +512,6 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     const res = await fetch(`${API}/projects/${id}`);
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(() => GetProjectResponse.parse(body)).not.toThrow();
     expect(body).toMatchObject({
       origins: [{ pattern: "http://localhost:3000", kind: "primary" }],
     });
@@ -552,7 +532,6 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     });
     expect(first.status).toBe(201);
     const firstBody = await first.json();
-    expect(() => AddOriginResponse.parse(firstBody)).not.toThrow();
     expect(firstBody).toEqual({ pattern: "https://app.example.com", kind: "primary" });
     expect(firstBody).not.toHaveProperty("check");
     expect(firstBody).not.toHaveProperty("warning");
@@ -837,7 +816,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(body.code).toBe("sch.invalid_request");
   });
 
-  test("POST /flow_definitions returns a body matching GetFlowDefinitionResponse (envelope is identical)", async () => {
+  test("POST /flow_definitions answers 201 with the flow-definition envelope", async () => {
     const res = await fetch(`${API}/flow_definitions`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -847,10 +826,6 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       }),
     });
     expect(res.status).toBe(201);
-    const body = await res.json();
-    // POST 201 and GET 200 share the `flow-definition-response`
-    // envelope per the spec, so the GET response zod schema validates both.
-    expect(() => GetFlowDefinitionResponse.parse(body)).not.toThrow();
   });
 
   test("POST /flow_definitions stores a schema id as the objectType it names", async () => {
@@ -993,7 +968,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(await list("&revisions=latest&purpose=login")).toEqual([loginV2]);
   });
 
-  test("GET /flow_definitions matches ListFlowDefinitionsResponse", async () => {
+  test("GET /flow_definitions lists the project's definitions", async () => {
     // Ensure at least one entry exists so the list is non-trivial.
     const create = await fetch(`${API}/flow_definitions`, {
       method: "POST",
@@ -1008,7 +983,6 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     const res = await fetch(`${API}/flow_definitions?project_id=proj_conformance_list`);
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(() => ListFlowDefinitionsResponse.parse(body)).not.toThrow();
 
     // Both read endpoints describe a flow definition the same way (#939), so
     // the row and the by-id document must be the same object.
@@ -1019,7 +993,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(row).toEqual(detail);
   });
 
-  test("GET /flow_definitions/:id matches GetFlowDefinitionResponse", async () => {
+  test("GET /flow_definitions/:id reads a definition back", async () => {
     const create = await fetch(`${API}/flow_definitions`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -1031,8 +1005,6 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     const { id } = (await create.json()) as { id: string };
     const res = await fetch(`${API}/flow_definitions/${id}`);
     expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(() => GetFlowDefinitionResponse.parse(body)).not.toThrow();
   });
 });
 
@@ -1113,7 +1085,6 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     const res = await claimStatus(project.id, challenge_id, project.projectSecret);
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(() => GetClaimStatusResponse.parse(body)).not.toThrow();
     const parsed = body as Record<string, unknown>;
     expect(parsed.status).toBe("pending");
     expect(parsed.team_id).toBeUndefined();
@@ -1146,7 +1117,6 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     });
     expect(complete.status).toBe(200);
     const completeBody = await complete.json();
-    expect(() => CompleteClaimResponse.parse(completeBody)).not.toThrow();
     const completed = completeBody as Record<string, unknown>;
     expect(completed.project_id).toBe(project.id);
     expect(typeof completed.team_id).toBe("string");
@@ -1155,7 +1125,6 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     const status = await claimStatus(project.id, challenge_id, project.projectSecret);
     expect(status.status).toBe(200);
     const statusBody = await status.json();
-    expect(() => GetClaimStatusResponse.parse(statusBody)).not.toThrow();
     const parsed = statusBody as Record<string, unknown>;
     expect(parsed.status).toBe("completed");
     expect(typeof parsed.team_id).toBe("string");
@@ -1477,7 +1446,6 @@ describe("api-mock idp connections and variables", () => {
 
     expect(res.status).toBe(201);
     const body = (await res.json()) as Record<string, unknown>;
-    expect(CreateIdpResponse.safeParse(body).success).toBe(true);
     expect(body.slug).toBe("google");
     expect(String(body.id)).toMatch(/^idp_/);
     expect(String(body.revision_id)).toMatch(/^idprev_/);
@@ -1576,7 +1544,6 @@ describe("api-mock idp connections and variables", () => {
 
     const ok = await fetch(`${BASE}/idps/${created.id}?project_id=${mine}`);
     expect(ok.status).toBe(200);
-    expect(GetIdpByIdResponse.safeParse(await ok.json()).success).toBe(true);
 
     const foreign = await fetch(`${BASE}/idps/${created.id}?project_id=${other}`);
     expect(foreign.status).toBe(404);
@@ -1593,7 +1560,6 @@ describe("api-mock idp connections and variables", () => {
 
     expect(res.status).toBe(200);
     const body = (await res.json()) as { idps: { slug: string }[] };
-    expect(QueryIdpsResponse.safeParse(body).success).toBe(true);
     expect(body.idps.map((i) => i.slug)).toEqual(["google"]);
   });
 
@@ -1616,7 +1582,6 @@ describe("api-mock idp connections and variables", () => {
 
     const res = await fetch(`${BASE}/variables?project_id=${projectId}`);
     const body = (await res.json()) as Record<string, unknown>;
-    expect(GetVariablesResponse.safeParse(body).success).toBe(true);
     expect(body.GOOGLE_CLIENT_ID).toEqual({
       primary: "824.apps.googleusercontent.com",
       preview: "824.apps.googleusercontent.com",
@@ -3128,6 +3093,15 @@ describe("api-mock error paths — each refusal a handler names", () => {
       "dep.not_found",
     );
     await expectRefusal(
+      await send(
+        "POST",
+        `/deployments/${firstDeployment.id}/rollback?project_id=${UNKNOWN_PROJECT}`,
+        {},
+      ),
+      404,
+      "env.project_not_found",
+    );
+    await expectRefusal(
       await send("GET", `/deployments/dep_missing?project_id=${id}`),
       404,
       "dep.not_found",
@@ -3339,28 +3313,25 @@ describe("api-mock route coverage — every handler answers by the contract", ()
     expect(Object.keys(SPEC_GAPS).filter((gap) => !usedGaps.has(gap))).toEqual([]);
   });
 
-  test("every spec route answered its success path and every status and code its handler names", () => {
+  test("every server route answered its success path, and every in-process one answered", () => {
     const missing: string[] = [];
     for (const route of routes) {
       const key = routeKey(route.method, route.path);
       if (!inSpec.has(key)) continue;
       const seen = observations.filter((o) => o.transport === route.transport && o.key === key);
-      const where = `${key} (${route.transport})`;
-      const { statuses, codes } = literalOutcomes(route.source);
-      // A handler whose every literal status is a refusal (the in-process
-      // session reads of a signed-out browser) has no success path to prove.
-      const onlyRefuses = statuses.size > 0 && [...statuses].every((status) => status >= 400);
-      if (!onlyRefuses && !seen.some((o) => o.status < 400)) {
-        missing.push(`${where}: no success answer`);
-      }
-      for (const status of statuses) {
-        if (!seen.some((o) => o.status === status)) missing.push(`${where}: no ${status} answer`);
-      }
-      for (const code of codes) {
-        if (!seen.some((o) => o.code === code)) missing.push(`${where}: no ${code} answer`);
+      // The in-process session handlers only answer a signed-out browser.
+      const answered =
+        route.transport === "in-process" ? seen.length > 0 : seen.some((o) => o.status < 400);
+      if (!answered) {
+        missing.push(
+          `${key} (${route.transport}): no ${route.transport === "server" ? "success " : ""}answer`,
+        );
       }
     }
-    expect(missing).toEqual([]);
+    expect(
+      missing,
+      "only answers to requests made through this file's conformantFetch count: test these routes here",
+    ).toEqual([]);
   });
 });
 

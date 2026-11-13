@@ -20,6 +20,7 @@ import {
   getCreateFlowMockHandler,
   getGetFlowStepMockHandler,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.msw";
+import { exchangeHandoffQueryProjectIdRegExp } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import type {
   CreateFlow201,
   CreateFlow201StepPurpose,
@@ -184,7 +185,8 @@ function exchangedSession(projectId: string | undefined): ExchangeHandoff200 {
   return {
     session: {
       session_id: "sess_mock",
-      project_id: projectId && /^[a-zA-Z0-9_-]+$/.test(projectId) ? projectId : "proj_mock",
+      project_id:
+        projectId && exchangeHandoffQueryProjectIdRegExp.test(projectId) ? projectId : "proj_mock",
       state: "active",
       user_id: "user_mock",
       factors: [{ method: "password", verified_at: created.toISOString() }],
