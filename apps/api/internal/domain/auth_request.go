@@ -20,7 +20,7 @@ type AuthRequest struct {
 	ID          string
 	ClientID    string
 	RedirectURI string
-	// State is the client's state, empty when it sent none.
+	// State is the client's state.
 	State  string
 	Scopes []string
 	// CodeChallenge is the S256 PKCE challenge, empty without PKCE.

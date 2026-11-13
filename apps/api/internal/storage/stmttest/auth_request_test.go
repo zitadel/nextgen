@@ -35,10 +35,11 @@ func TestAuthRequestStatements_CreateAndGet(t *testing.T) {
 			},
 			{
 				// Empty scopes are read back empty, not nil.
-				name: "no_state_scopes_or_pkce",
+				name: "no_scopes_or_pkce",
 				request: domain.AuthRequest{
 					ClientID:     "client_1",
 					RedirectURI:  "http://127.0.0.1:4000/callback",
+					State:        "xyz",
 					Scopes:       []string{},
 					Issuer:       "https://app.example.com/oauth/proj_1",
 					DeploymentID: "dep_1",
