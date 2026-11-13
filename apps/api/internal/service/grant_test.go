@@ -836,6 +836,15 @@ func TestGrantService_Get(t *testing.T) {
 	})
 }
 
+func TestGrantService_EnsureUserGrant_RefusesUnknownRelation(t *testing.T) {
+	t.Parallel()
+	// No statement may run: the mock fails on any call.
+	statements := servicemocks.NewMockAllStatements(gomock.NewController(t))
+	svc := newMockedGrantService(t, grantPlatformProjID, nil)
+	err := svc.EnsureUserGrant(t.Context(), statements, "proj_customer", "user_1", "team", time.Now())
+	require.ErrorIs(t, err, domain.ErrGrantInvalid())
+}
+
 func TestGrantService_Revoke(t *testing.T) {
 	t.Parallel()
 

@@ -9334,7 +9334,7 @@
       "post": {
         "operationId": "rejectInvitation",
         "summary": "Decline an invitation",
-        "description": "Declines a pending invitation for the signed-in user and returns the\nupdated invitation with status `rejected`.\n\nSend the plaintext token from the invitation link fragment. Metadata is\ncleared. Every unknown or finished token answers the same opaque `404`.\nAuthenticate with a platform-project user session cookie (`sessionCookie`).\nCookie requests follow that scheme's CSRF rules. The call is rate-limited.\n",
+        "description": "Declines a pending invitation for the signed-in user and returns the\nupdated invitation with status `rejected`.\n\nSend the plaintext token from the invitation link fragment. Metadata is\ncleared. The inviter cannot decline their own invitation; an administrator\ncancels it instead. Every unknown or finished token answers the same\nopaque `404`.\nAuthenticate with a platform-project user session cookie (`sessionCookie`).\nCookie requests follow that scheme's CSRF rules. The call is rate-limited.\n",
         "tags": [
           "Invitations"
         ],
@@ -9385,7 +9385,7 @@
             }
           },
           "403": {
-            "description": "CSRF failed (`auth.csrf_invalid`).",
+            "description": "The inviter cannot decline their own invitation, or CSRF failed\n(`auth.csrf_invalid`).\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -11690,7 +11690,7 @@
       "post": {
         "operationId": "invitationAccepted",
         "summary": "invitation.accepted",
-        "description": "An invitation was accepted. Grant events the acceptance writes carry\nthis event's `request_id`; there are none when the user already holds an\nidentical active grant.\n\nNot sent yet: the contract is published ahead of the code that sends it.\n\nThe body is the event as `GET /events` returns it.\n",
+        "description": "An invitation was accepted. Grant events the acceptance writes carry\nthis event's `request_id`; there are none when the user already holds an\nidentical active grant.\n\nThe body is the event as `GET /events` returns it.\n",
         "tags": [
           "Event Webhooks"
         ],
@@ -11777,7 +11777,7 @@
       "post": {
         "operationId": "invitationRejected",
         "summary": "invitation.rejected",
-        "description": "An invitation was declined.\n\nNot sent yet: the contract is published ahead of the code that sends it.\n\nThe body is the event as `GET /events` returns it.\n",
+        "description": "An invitation was declined.\n\nThe body is the event as `GET /events` returns it.\n",
         "tags": [
           "Event Webhooks"
         ],
@@ -22608,6 +22608,17 @@
           "created_by_type": {
             "$ref": "#/components/schemas/invitation-created-by-type"
           },
+          "inviter": {
+            "description": "The user who created the invitation, resolved so the accept page can\nname them: render `display`, falling back to `identifier`, then\n`user_id`. Null when a project secret created it.\n",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/user-ref"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "expires_at": {
             "type": "string",
             "format": "date-time",
@@ -22691,6 +22702,26 @@
           }
         }
       },
+      "inv-inviter_not_admin": {
+        "description": "The inviter no longer administers the project\n\nError code: inv.inviter_not_admin\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "inv.inviter_not_admin"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
       "inv-self_accept": {
         "description": "The inviter cannot accept their own invitation\n\nError code: inv.self_accept\n",
         "allOf": [
@@ -22703,6 +22734,26 @@
               "code": {
                 "type": "string",
                 "const": "inv.self_accept"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "inv-self_reject": {
+        "description": "The inviter cannot decline their own invitation\n\nError code: inv.self_reject\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "inv.self_reject"
               }
             },
             "required": [
@@ -27135,11 +27186,25 @@
           "message": "claim the project before inviting into it"
         }
       },
+      "inv-inviter_not_admin": {
+        "summary": "inv.inviter_not_admin",
+        "value": {
+          "code": "inv.inviter_not_admin",
+          "message": "the inviter no longer administers the project"
+        }
+      },
       "inv-self_accept": {
         "summary": "inv.self_accept",
         "value": {
           "code": "inv.self_accept",
           "message": "the inviter cannot accept their own invitation"
+        }
+      },
+      "inv-self_reject": {
+        "summary": "inv.self_reject",
+        "value": {
+          "code": "inv.self_reject",
+          "message": "the inviter cannot decline their own invitation"
         }
       },
       "evt-not_found": {
@@ -35659,7 +35724,13 @@
                   "$ref": "#/components/schemas/auth-unauthorized"
                 },
                 {
+                  "$ref": "#/components/schemas/evt-invalid"
+                },
+                {
                   "$ref": "#/components/schemas/internal"
+                },
+                {
+                  "$ref": "#/components/schemas/inv-inviter_not_admin"
                 },
                 {
                   "$ref": "#/components/schemas/inv-not_found"
@@ -35688,7 +35759,9 @@
                 "mapping": {
                   "auth.csrf_invalid": "#/components/schemas/auth-csrf_invalid",
                   "auth.unauthorized": "#/components/schemas/auth-unauthorized",
+                  "evt.invalid": "#/components/schemas/evt-invalid",
                   "internal": "#/components/schemas/internal",
+                  "inv.inviter_not_admin": "#/components/schemas/inv-inviter_not_admin",
                   "inv.not_found": "#/components/schemas/inv-not_found",
                   "inv.platform_required": "#/components/schemas/inv-platform_required",
                   "inv.project_unclaimed": "#/components/schemas/inv-project_unclaimed",
@@ -35706,8 +35779,14 @@
               "auth.unauthorized": {
                 "$ref": "#/components/examples/auth-unauthorized"
               },
+              "evt.invalid": {
+                "$ref": "#/components/examples/evt-invalid"
+              },
               "internal": {
                 "$ref": "#/components/examples/internal"
+              },
+              "inv.inviter_not_admin": {
+                "$ref": "#/components/examples/inv-inviter_not_admin"
               },
               "inv.not_found": {
                 "$ref": "#/components/examples/inv-not_found"
@@ -35747,10 +35826,16 @@
                   "$ref": "#/components/schemas/auth-unauthorized"
                 },
                 {
+                  "$ref": "#/components/schemas/evt-invalid"
+                },
+                {
                   "$ref": "#/components/schemas/internal"
                 },
                 {
                   "$ref": "#/components/schemas/inv-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/inv-self_reject"
                 },
                 {
                   "$ref": "#/components/schemas/not_implemented"
@@ -35767,8 +35852,10 @@
                 "mapping": {
                   "auth.csrf_invalid": "#/components/schemas/auth-csrf_invalid",
                   "auth.unauthorized": "#/components/schemas/auth-unauthorized",
+                  "evt.invalid": "#/components/schemas/evt-invalid",
                   "internal": "#/components/schemas/internal",
                   "inv.not_found": "#/components/schemas/inv-not_found",
+                  "inv.self_reject": "#/components/schemas/inv-self_reject",
                   "not_implemented": "#/components/schemas/not_implemented",
                   "req.invalid": "#/components/schemas/req-invalid",
                   "unavailable": "#/components/schemas/unavailable"
@@ -35782,11 +35869,17 @@
               "auth.unauthorized": {
                 "$ref": "#/components/examples/auth-unauthorized"
               },
+              "evt.invalid": {
+                "$ref": "#/components/examples/evt-invalid"
+              },
               "internal": {
                 "$ref": "#/components/examples/internal"
               },
               "inv.not_found": {
                 "$ref": "#/components/examples/inv-not_found"
+              },
+              "inv.self_reject": {
+                "$ref": "#/components/examples/inv-self_reject"
               },
               "not_implemented": {
                 "$ref": "#/components/examples/not_implemented"

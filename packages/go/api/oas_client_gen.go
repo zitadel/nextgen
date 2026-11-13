@@ -1494,9 +1494,10 @@ type Invoker interface {
 	// Declines a pending invitation for the signed-in user and returns the updated invitation with status
 	// `rejected`.
 	//
-	// Send the plaintext token from the invitation link fragment. Metadata is cleared. Every unknown or
-	// finished token answers the same opaque `404`. Authenticate with a platform-project user session
-	// cookie (`sessionCookie`). Cookie requests follow that scheme's CSRF rules. The call is rate-limited.
+	// Send the plaintext token from the invitation link fragment. Metadata is cleared. The inviter cannot
+	// decline their own invitation; an administrator cancels it instead. Every unknown or finished token
+	// answers the same opaque `404`. Authenticate with a platform-project user session cookie
+	// (`sessionCookie`). Cookie requests follow that scheme's CSRF rules. The call is rate-limited.
 	//
 	// POST /invitations/reject
 	RejectInvitation(ctx context.Context, request *InvitationTokenRequest) (RejectInvitationRes, error)
@@ -18017,9 +18018,10 @@ func (c *Client) sendQueryUsers(ctx context.Context, request *QueryUsersRequest,
 // Declines a pending invitation for the signed-in user and returns the updated invitation with status
 // `rejected`.
 //
-// Send the plaintext token from the invitation link fragment. Metadata is cleared. Every unknown or
-// finished token answers the same opaque `404`. Authenticate with a platform-project user session
-// cookie (`sessionCookie`). Cookie requests follow that scheme's CSRF rules. The call is rate-limited.
+// Send the plaintext token from the invitation link fragment. Metadata is cleared. The inviter cannot
+// decline their own invitation; an administrator cancels it instead. Every unknown or finished token
+// answers the same opaque `404`. Authenticate with a platform-project user session cookie
+// (`sessionCookie`). Cookie requests follow that scheme's CSRF rules. The call is rate-limited.
 //
 // POST /invitations/reject
 func (c *Client) RejectInvitation(ctx context.Context, request *InvitationTokenRequest) (RejectInvitationRes, error) {

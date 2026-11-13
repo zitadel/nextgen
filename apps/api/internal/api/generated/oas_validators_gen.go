@@ -10785,6 +10785,24 @@ func (s *InvitationLookupProjectMemberResponse) Validate() error {
 		})
 	}
 	if err := func() error {
+		if value, ok := s.Inviter.Get(); ok {
+			if err := func() error {
+				if err := value.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "inviter",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if err := s.Status.Validate(); err != nil {
 			return err
 		}
@@ -10896,6 +10914,24 @@ func (s *InvitationLookupTeamMemberResponse) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "created_by_type",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if value, ok := s.Inviter.Get(); ok {
+			if err := func() error {
+				if err := value.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "inviter",
 			Error: err,
 		})
 	}

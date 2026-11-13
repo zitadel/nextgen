@@ -2,20 +2,19 @@ package api
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
 
 	api "github.com/zitadel/nextgen/internal/api/generated"
+	"github.com/zitadel/nextgen/internal/authz/resolver"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
+	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-// invitationStubPhase stays 0; its other cases only feed gen_openapi_errors
-// the token endpoints' codes until #2853. Keep each switch to its op's set.
-var invitationStubPhase int
-
-// WithInvitationService wires the invitation admin endpoints, like
+// WithInvitationService wires the invitation endpoints, like
 // WithPolicyService.
 func (h *Handler) WithInvitationService(s *service.InvitationService) *Handler {
 	h.invitationService = s
@@ -173,40 +172,116 @@ func invitationProjectMemberResponse(inv *service.Invitation, now time.Time) api
 }
 
 func (h *Handler) LookupInvitation(ctx context.Context, req *api.InvitationTokenRequest) (api.LookupInvitationRes, error) {
-	_ = req
-	switch invitationStubPhase {
-	case 1:
-		return nil, domain.ErrInvitationNotFound()
-	default:
-		return nil, domain.ErrNotImplemented()
+	if _, err := h.invitationRedeemer(ctx); err != nil {
+		return nil, err
 	}
+	found, err := h.invitationService.Lookup(ctx, req.Token)
+	if err != nil {
+		return nil, err
+	}
+	if found.Type != domain.InvitationTypeProjectMember || found.ProjectMember == nil {
+		return nil, domain.ErrInternal(fmt.Errorf("invitation %q has an unknown type %q", found.ID, found.Type))
+	}
+	view := api.InvitationLookupProjectMemberResponse{
+		ProjectID:   api.ProjectID(found.ProjectID),
+		ProjectName: found.ProjectName,
+		ExpiresAt:   found.ExpiresAt,
+		Status:      api.InvitationStatus(found.StatusAt(time.Now())),
+		Type:        api.InvitationLookupProjectMemberResponseTypeProjectMember,
+		ProjectMember: api.InvitationProjectMemberPayload{
+			Relation: api.InvitationProjectMemberPayloadRelation(found.ProjectMember.Relation),
+		},
+	}
+	if found.CreatedBy != nil {
+		view.CreatedBy.SetTo(*found.CreatedBy)
+	} else {
+		view.CreatedBy.SetToNull()
+	}
+	if found.CreatedByType != nil {
+		view.CreatedByType.SetTo(api.InvitationLookupProjectMemberResponseCreatedByType(*found.CreatedByType))
+	} else {
+		view.CreatedByType.SetToNull()
+	}
+	if found.Inviter != nil {
+		view.Inviter.SetTo(userRefToAPI(*found.Inviter))
+	} else {
+		view.Inviter.SetToNull()
+	}
+	resp := api.NewInvitationLookupProjectMemberResponseInvitationLookupResponse(view)
+	return &resp, nil
 }
 
 func (h *Handler) AcceptInvitation(ctx context.Context, req *api.InvitationTokenRequest) (api.AcceptInvitationRes, error) {
-	_ = req
-	switch invitationStubPhase {
-	case 1:
-		// Unknown and finished tokens share the public not_found.
-		return nil, domain.ErrInvitationNotFound()
-	case 2:
-		return nil, domain.ErrInvitationSelfAccept()
-	case 3:
-		return nil, domain.ErrInvitationProjectUnclaimed()
-	case 4:
-		return nil, domain.ErrInvitationPlatformRequired()
-	default:
-		return nil, domain.ErrNotImplemented()
+	userID, err := h.invitationRedeemer(ctx)
+	if err != nil {
+		return nil, err
 	}
+	// A literal, not the method value: gen_openapi_errors follows a func
+	// literal argument.
+	accepted, err := h.invitationService.Accept(ctx, req.Token, userID, func(ctx context.Context, stmts service.AllStatements, projectID, inviterID string) (bool, error) {
+		return h.inviterIsAdmin(ctx, stmts, projectID, inviterID)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return invitationResponse(accepted, time.Now())
 }
 
 func (h *Handler) RejectInvitation(ctx context.Context, req *api.InvitationTokenRequest) (api.RejectInvitationRes, error) {
-	_ = req
-	switch invitationStubPhase {
-	case 1:
-		return nil, domain.ErrInvitationNotFound()
-	default:
-		return nil, domain.ErrNotImplemented()
+	userID, err := h.invitationRedeemer(ctx)
+	if err != nil {
+		return nil, err
 	}
+	rejected, err := h.invitationService.Reject(ctx, req.Token, userID)
+	if err != nil {
+		return nil, err
+	}
+	return invitationResponse(rejected, time.Now())
+}
+
+// invitationRedeemer is the user redeeming a link: only a session of a user
+// homed in the platform project may (ADR 086 §10).
+func (h *Handler) invitationRedeemer(ctx context.Context) (string, error) {
+	token, _ := sessionTokenFromContext(ctx)
+	self, err := domain.SelfFromSession(token, time.Now())
+	if err != nil {
+		return "", invalidSessionCredential(err)
+	}
+	if h.platformProjectID != "" && self.ProjectID() != h.platformProjectID {
+		return "", invalidSessionCredential(domain.ErrSessionTokenInvalid())
+	}
+	return self.UserID(), nil
+}
+
+// inviterIsAdmin asks whether the invitation's creator still holds admin on
+// the project, as POST /invitations checked when it was created.
+func (h *Handler) inviterIsAdmin(ctx context.Context, stmts service.AllStatements, projectID, userID string) (bool, error) {
+	home, err := stmts.GetResourceScope(ctx, userID)
+	if err != nil {
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+			return false, nil
+		}
+		return false, err
+	}
+	if home.ResourceKind != domain.ResourceKindUser {
+		return false, nil
+	}
+	req := resolver.Request{
+		PrincipalType: domain.AuthzPrincipalTypeUser,
+		PrincipalID:   userID,
+		ProjectID:     projectID,
+		HomeProjectID: home.ProjectID,
+		ObjectType:    "project",
+		Relation:      projectRelation(opDelete),
+	}
+	if h.platformProjectID != "" && home.ProjectID == h.platformProjectID {
+		req.PlatformProjectID = h.platformProjectID
+	}
+	dec, err := resolver.New().Check(ctx, stmts, req)
+	if err != nil {
+		return false, domain.ErrInternal(err).WithMessage("authz permission check failed")
+	}
+	return dec == resolver.DecisionAllow, nil
 }
 
 func invitationErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
@@ -219,7 +294,10 @@ func invitationErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		return errorResponseWithStatusCode(http.StatusNotFound, domain.ErrInvitationNotFound())
 	case domain.ErrInvitationNotFound().Code:
 		return errorResponseWithStatusCode(http.StatusNotFound, err)
-	case domain.ErrInvitationPermissionDenied().Code, domain.ErrInvitationSelfAccept().Code:
+	case domain.ErrInvitationPermissionDenied().Code,
+		domain.ErrInvitationSelfAccept().Code,
+		domain.ErrInvitationSelfReject().Code,
+		domain.ErrInvitationInviterNotAdmin().Code:
 		return errorResponseWithStatusCode(http.StatusForbidden, err)
 	case domain.ErrInvitationProjectUnclaimed().Code,
 		domain.ErrInvitationPendingLimit().Code,
