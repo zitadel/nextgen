@@ -21,7 +21,7 @@ const LIMIT_MIN = 1;
 const LIMIT_MAX = 100;
 
 /** The page size `--limit` asks for, as the server bounds it. */
-const LIMIT: Refused<number> = {
+const LIMIT = {
   schema: whole.pipe(z.number().min(LIMIT_MIN).max(LIMIT_MAX)),
   refusal: {
     message: "{value} is not a valid {input}",
@@ -31,7 +31,7 @@ const LIMIT: Refused<number> = {
     min: LIMIT_MIN,
     max: LIMIT_MAX,
   },
-};
+} as const satisfies Refused<number>;
 
 /**
  * `zitadel preview list` — show the project's live previews.

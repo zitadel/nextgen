@@ -188,8 +188,8 @@ func TestClaimHappyPath(t *testing.T) {
 		}),
 	}, api.SubmitFlowStepParams{ID: flowID, Zflow: zflow})
 	require.NoError(t, err)
-	require.IsType(t, &api.SubmitFlowStepOK{}, idResp, helpers.MustMarshal(t, idResp))
-	idOK := idResp.(*api.SubmitFlowStepOK)
+	require.IsType(t, &api.FlowResponseHeaders{}, idResp, helpers.MustMarshal(t, idResp))
+	idOK := idResp.(*api.FlowResponseHeaders)
 	require.Equal(t, "password", idOK.Response.Step.Name)
 	zflow = mustExtractZflow(t, idOK.SetCookie)
 
@@ -200,8 +200,8 @@ func TestClaimHappyPath(t *testing.T) {
 		}),
 	}, api.SubmitFlowStepParams{ID: flowID, Zflow: zflow})
 	require.NoError(t, err)
-	require.IsType(t, &api.SubmitFlowStepOK{}, pwResp, helpers.MustMarshal(t, pwResp))
-	pwOK := pwResp.(*api.SubmitFlowStepOK)
+	require.IsType(t, &api.FlowResponseHeaders{}, pwResp, helpers.MustMarshal(t, pwResp))
+	pwOK := pwResp.(*api.FlowResponseHeaders)
 	require.Equal(t, "done", pwOK.Response.Step.Name)
 	handoffToken, hasToken := pwOK.Response.HandoffToken.Get()
 	require.True(t, hasToken, "expected handoff token after successful password login")

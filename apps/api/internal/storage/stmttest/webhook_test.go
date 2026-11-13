@@ -48,8 +48,11 @@ func eventsAfterWebhookCursor(t *testing.T, stmts service.AllStatements, hook *d
 	return ids
 }
 
+// Every test of a webhook runs alone (forEachDialectAlone): leasing has no
+// project in its key, so a lease taken beside another test would claim that
+// test's webhooks, and theirs would come back held.
 func TestWebhookStatements_CreateGetUpdateDelete(t *testing.T) {
-	forEachDialect(t, func(t *testing.T, d dialect) {
+	forEachDialectAlone(t, func(t *testing.T, d dialect) {
 		projectID := ensureProject(t, d.stmts)
 		created := createWebhook(t, d.stmts, projectID, testWebhookURL)
 
@@ -107,7 +110,7 @@ func TestWebhookStatements_CreateGetUpdateDelete(t *testing.T) {
 // A webhook is reachable only through its own project, and an id that names
 // nothing answers the same.
 func TestWebhookStatements_NotFound(t *testing.T) {
-	forEachDialect(t, func(t *testing.T, d dialect) {
+	forEachDialectAlone(t, func(t *testing.T, d dialect) {
 		projectID := ensureProject(t, d.stmts)
 		otherProjectID := ensureProject(t, d.stmts)
 		created := createWebhook(t, d.stmts, projectID, testWebhookURL)
@@ -141,7 +144,7 @@ func TestWebhookStatements_NotFound(t *testing.T) {
 }
 
 func TestWebhookStatements_ListNewestFirst(t *testing.T) {
-	forEachDialect(t, func(t *testing.T, d dialect) {
+	forEachDialectAlone(t, func(t *testing.T, d dialect) {
 		projectID := ensureProject(t, d.stmts)
 		var want []string
 		for range 3 {
@@ -157,7 +160,7 @@ func TestWebhookStatements_ListNewestFirst(t *testing.T) {
 }
 
 func TestWebhookStatements_RotateSecret(t *testing.T) {
-	forEachDialect(t, func(t *testing.T, d dialect) {
+	forEachDialectAlone(t, func(t *testing.T, d dialect) {
 		projectID := ensureProject(t, d.stmts)
 		created := createWebhook(t, d.stmts, projectID, testWebhookURL)
 		expires := time.Now().Add(24 * time.Hour).UTC().Truncate(time.Microsecond)
@@ -183,7 +186,7 @@ func TestWebhookStatements_RotateSecret(t *testing.T) {
 }
 
 func TestWebhookStatements_ProjectLimit(t *testing.T) {
-	forEachDialect(t, func(t *testing.T, d dialect) {
+	forEachDialectAlone(t, func(t *testing.T, d dialect) {
 		projectID := ensureProject(t, d.stmts)
 		otherProjectID := ensureProject(t, d.stmts)
 		var last *domain.Webhook
@@ -209,7 +212,7 @@ func TestWebhookStatements_ProjectLimit(t *testing.T) {
 // Creates that race for the project's last places must not overshoot the
 // limit: each sees the others' webhooks before it writes its own.
 func TestWebhookStatements_ProjectLimitHoldsUnderConcurrentCreates(t *testing.T) {
-	forEachDialect(t, func(t *testing.T, d dialect) {
+	forEachDialectAlone(t, func(t *testing.T, d dialect) {
 		projectID := ensureProject(t, d.stmts)
 		const free, racers = 2, 6
 		for range domain.WebhookProjectLimit - free {
@@ -245,7 +248,7 @@ func TestWebhookStatements_ProjectLimitHoldsUnderConcurrentCreates(t *testing.T)
 // A URL is not a key: two webhooks of one project, and one of another
 // project, can name the same one.
 func TestWebhookStatements_SharedURL(t *testing.T) {
-	forEachDialect(t, func(t *testing.T, d dialect) {
+	forEachDialectAlone(t, func(t *testing.T, d dialect) {
 		projectID := ensureProject(t, d.stmts)
 		otherProjectID := ensureProject(t, d.stmts)
 
@@ -257,7 +260,7 @@ func TestWebhookStatements_SharedURL(t *testing.T) {
 }
 
 func TestWebhookStatements_ProjectDeleteCascades(t *testing.T) {
-	forEachDialect(t, func(t *testing.T, d dialect) {
+	forEachDialectAlone(t, func(t *testing.T, d dialect) {
 		projectID := ensureProject(t, d.stmts)
 		created := createWebhook(t, d.stmts, projectID, testWebhookURL)
 
@@ -274,7 +277,7 @@ func TestWebhookStatements_ProjectDeleteCascades(t *testing.T) {
 // while it was disabled (ADR 090 §4): its cursor is past every event stored
 // before, and before every event stored after.
 func TestWebhookStatements_CursorStartsAtNow(t *testing.T) {
-	forEachDialect(t, func(t *testing.T, d dialect) {
+	forEachDialectAlone(t, func(t *testing.T, d dialect) {
 		projectID := ensureProject(t, d.stmts)
 		insert := func(id string) {
 			t.Helper()
@@ -331,7 +334,7 @@ func leaseDue(t *testing.T, stmts service.AllStatements, projectID, holder strin
 // lease runs out or its holder gives it back, and a holder that lost it
 // writes nothing.
 func TestWebhookStatements_Lease(t *testing.T) {
-	forEachDialect(t, func(t *testing.T, d dialect) {
+	forEachDialectAlone(t, func(t *testing.T, d dialect) {
 		projectID := ensureProject(t, d.stmts)
 		hook := createWebhook(t, d.stmts, projectID, testWebhookURL)
 		now := time.Now().UTC().Truncate(time.Microsecond)
@@ -374,7 +377,7 @@ func TestWebhookStatements_Lease(t *testing.T) {
 // Servers that lease at the same moment share the due webhooks out: each
 // webhook goes to exactly one of them.
 func TestWebhookStatements_LeaseHoldsUnderConcurrentCalls(t *testing.T) {
-	forEachDialect(t, func(t *testing.T, d dialect) {
+	forEachDialectAlone(t, func(t *testing.T, d dialect) {
 		projectID := ensureProject(t, d.stmts)
 		want := map[string]int{}
 		for range 4 {
@@ -408,7 +411,7 @@ func TestWebhookStatements_LeaseHoldsUnderConcurrentCalls(t *testing.T) {
 
 // A lease takes no more than its limit, the longest due first.
 func TestWebhookStatements_LeaseLimit(t *testing.T) {
-	forEachDialect(t, func(t *testing.T, d dialect) {
+	forEachDialectAlone(t, func(t *testing.T, d dialect) {
 		projectID := ensureProject(t, d.stmts)
 		for range 3 {
 			createWebhook(t, d.stmts, projectID, testWebhookURL)
@@ -457,7 +460,7 @@ func TestWebhookStatements_LeaseOfOneProject(t *testing.T) {
 }
 
 func TestWebhookStatements_RecordProgressAndFailure(t *testing.T) {
-	forEachDialect(t, func(t *testing.T, d dialect) {
+	forEachDialectAlone(t, func(t *testing.T, d dialect) {
 		projectID := ensureProject(t, d.stmts)
 		hook := createWebhook(t, d.stmts, projectID, testWebhookURL)
 		now := time.Now().UTC().Truncate(time.Microsecond)
@@ -518,7 +521,7 @@ func TestWebhookStatements_RecordProgressAndFailure(t *testing.T) {
 }
 
 func TestWebhookStatements_DisableFailed(t *testing.T) {
-	forEachDialect(t, func(t *testing.T, d dialect) {
+	forEachDialectAlone(t, func(t *testing.T, d dialect) {
 		projectID := ensureProject(t, d.stmts)
 		hook := createWebhook(t, d.stmts, projectID, testWebhookURL)
 		now := time.Now().UTC().Truncate(time.Microsecond)
@@ -544,7 +547,7 @@ func TestWebhookStatements_DisableFailed(t *testing.T) {
 // A webhook the project's admins disabled while a delivery held it is not
 // disabled a second time, with a second event.
 func TestWebhookStatements_DisableFailedSkipsADisabledWebhook(t *testing.T) {
-	forEachDialect(t, func(t *testing.T, d dialect) {
+	forEachDialectAlone(t, func(t *testing.T, d dialect) {
 		projectID := ensureProject(t, d.stmts)
 		hook := createWebhook(t, d.stmts, projectID, testWebhookURL)
 		now := time.Now().UTC()
@@ -559,7 +562,7 @@ func TestWebhookStatements_DisableFailedSkipsADisabledWebhook(t *testing.T) {
 // Enabling a disabled webhook starts it clean (ADR 090 §4): not failing, due
 // at once, and out of the hands of a delivery that began before.
 func TestWebhookStatements_EnableClearsDeliveryState(t *testing.T) {
-	forEachDialect(t, func(t *testing.T, d dialect) {
+	forEachDialectAlone(t, func(t *testing.T, d dialect) {
 		projectID := ensureProject(t, d.stmts)
 		hook := createWebhook(t, d.stmts, projectID, testWebhookURL)
 		now := time.Now().UTC().Truncate(time.Microsecond)

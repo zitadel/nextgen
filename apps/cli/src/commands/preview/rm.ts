@@ -12,7 +12,7 @@ import { escapeControlCharacters } from "@/lib/terminal-text";
  * The preview URL to remove. It refuses a blank value, and drops a trailing
  * slash that names the same origin but, sent as typed, would match nothing.
  */
-const URL: Refused<string> = {
+const URL = {
   schema: filled.transform((url) => {
     return url.replace(/\/+$/, "");
   }),
@@ -20,7 +20,7 @@ const URL: Refused<string> = {
     message: "{input} was given an empty value",
     hint: "Pass a value for {input}, or omit it entirely.",
   },
-};
+} as const satisfies Refused<string>;
 
 /**
  * `zitadel preview rm <url>` — end a live preview before it expires.

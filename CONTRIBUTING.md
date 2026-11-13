@@ -296,6 +296,13 @@ Omni, weekly on `main` and on demand, and is not a required check. To run it
 against a branch, use `gh workflow run spanner.yml --ref <branch>`, or run
 the task locally, where it still starts the Spanner emulator.
 
+The released artifacts (the server on macOS and Linux, the container, an
+upgrade from an older release) run in the separate `artifacts` workflow,
+which is not a required check; its header says when and what
+([`artifacts.yml`](.github/workflows/artifacts.yml)). To run it on a branch,
+use `gh workflow run artifacts.yml --ref <branch>`; to test a published
+release, `gh workflow run artifacts.yml -f version=<version>`.
+
 The PR title check is not part of `full-pr` either. It runs in the separate
 `pr-title` workflow, which a title edit starts on its own; see
 [Title format](#title-format).
@@ -321,7 +328,7 @@ SQLite integration tests use a local file database and need no Docker:
 
 ```sh
 turbo run test:sqlite --filter=@zitadel/server
-# or: go -C apps/api test -v -tags sqlite_integration -timeout=5m ./...
+# or, with every untagged test too: go -C apps/api test -v -tags sqlite_integration -timeout=5m ./...
 ```
 
 Postgres and Spanner integration tests use
@@ -335,7 +342,7 @@ Docker.
 ```sh
 # Postgres (testcontainer, or ZITADEL_TEST_POSTGRES_URL)
 turbo run test:postgres --filter=@zitadel/server
-# or: go -C apps/api test -v -tags postgres_integration -timeout=10m ./...
+# or, with every untagged test too: go -C apps/api test -v -tags postgres_integration -timeout=10m ./...
 
 # Spanner (prefer the turbo task — see emulator-testcontainer note below)
 turbo run test:spanner --filter=@zitadel/server

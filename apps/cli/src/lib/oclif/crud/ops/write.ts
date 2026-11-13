@@ -157,11 +157,11 @@ const describeWrite = <
 };
 
 /** What a write without a body to send is refused for. */
-const NEEDS_BODY_REFUSAL: Refusal = {
+const NEEDS_BODY_REFUSAL = {
   message: "{command} needs a body",
   hint: "Pass the body's fields as flags (the help below lists them), --set <path>=<value>, or --data '<json>' / --file <path>.",
   next: ["{help}"],
-};
+} as const satisfies Refusal;
 
 const givesBody = (flags: Json, fields: readonly BodyField[]): boolean => {
   return (

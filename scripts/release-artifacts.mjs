@@ -7,7 +7,11 @@ import { fileURLToPath } from "node:url";
 
 import { run, runReplayed } from "./dev-process.mjs";
 import { mapAll } from "./map-all.mjs";
-import { PUBLIC_PACKAGE_DIRS, SERVER_PLATFORM_PACKAGES } from "./release-manifest.mjs";
+import {
+  PUBLIC_PACKAGE_DIRS,
+  SERVER_IMAGE,
+  SERVER_PLATFORM_PACKAGES,
+} from "./release-manifest.mjs";
 import {
   assertServerBuildPackage,
   gitInfo,
@@ -15,10 +19,13 @@ import {
   serverModuleRoot,
 } from "./server-build.mjs";
 
-export { PUBLIC_PACKAGE_DIRS, SERVER_PLATFORM_PACKAGES } from "./release-manifest.mjs";
+export {
+  PUBLIC_PACKAGE_DIRS,
+  SERVER_IMAGE,
+  SERVER_PLATFORM_PACKAGES,
+} from "./release-manifest.mjs";
 export { gitInfo } from "./server-build.mjs";
 
-export const SERVER_IMAGE = "ghcr.io/zitadel/nextgen";
 export const SERVER_PACKAGE = "@zitadel/server";
 export const SERVER_PACKAGE_MANIFEST = "apps/server/package.json";
 export const SERVER_PLATFORMS = [

@@ -1512,6 +1512,9 @@ importers:
       '@zitadel/vitest-config':
         specifier: workspace:*
         version: link:../vitest-config
+      ajv:
+        specifier: 'catalog:'
+        version: 8.20.0
       msw:
         specifier: 'catalog:'
         version: 2.14.6(@types/node@24.19.1)(typescript@6.0.3)
