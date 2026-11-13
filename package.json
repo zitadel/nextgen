@@ -40,7 +40,7 @@
     "tsx": "catalog:",
     "turbo": "catalog:",
     "typescript": "catalog:",
-    "verdaccio": "6.10.5",
+    "verdaccio": "6.11.1",
     "vite": "catalog:",
     "vitest": "catalog:",
     "yaml": "catalog:"
