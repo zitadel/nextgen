@@ -11,6 +11,7 @@ require (
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace v1.38.0
 	github.com/KimMachineGun/automemlimit v1.0.1
 	github.com/descope/virtualwebauthn v1.0.5
+	github.com/getkin/kin-openapi v0.153.0
 	github.com/go-faker/faker/v4 v4.12.0
 	github.com/go-faster/errors v0.8.0
 	github.com/go-faster/jx v1.2.0
@@ -72,8 +73,12 @@ require (
 )
 
 require (
+	github.com/go-openapi/jsonpointer v1.0.1 // indirect
+	github.com/gorilla/mux v1.8.0 // indirect
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58 // indirect
+	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3 // indirect
 	github.com/yuin/goldmark v1.8.2 // indirect
+	go.yaml.in/yaml/v4 v4.0.0 // indirect
 )
 
 require (

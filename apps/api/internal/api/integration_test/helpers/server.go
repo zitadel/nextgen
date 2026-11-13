@@ -4,9 +4,11 @@ package helpers
 
 import (
 	"bytes"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"sync"
 	"testing"
 
@@ -62,9 +64,51 @@ func (h *Harness) EnsureTestServer(t testing.TB) *httptest.Server {
 		api.MountAPI(mux, func(next http.Handler) http.Handler {
 			return h.withServerLog(api.WithSessionStateNoStore(api.WithCSRFRequest(next)))
 		}, h.withServerLog, h.EnsureAPIServers(t))
-		h.testServer.value = httptest.NewServer(mux)
+		h.testServer.value = httptest.NewServer(h.SpecChecked(t, mux))
 	}
 	return h.testServer.value
+}
+
+// EnsureSpecValidator loads the OpenAPI document every answer of the test
+// server is checked against, once per run.
+func (h *Harness) EnsureSpecValidator(t testing.TB) *SpecValidator {
+	t.Helper()
+	h.specValidator.mutex.Lock()
+	defer h.specValidator.mutex.Unlock()
+
+	if h.specValidator.value == nil {
+		validator, err := NewSpecValidator(knownSpecMismatches)
+		require.NoError(t, err)
+		h.specValidator.value = validator
+	}
+	return h.specValidator.value
+}
+
+// SpecChecked checks every answer next gives against the OpenAPI spec. The
+// test server goes through it; a test that mounts the API on a server of its
+// own wraps that server's handler in it.
+func (h *Harness) SpecChecked(t testing.TB, next http.Handler) http.Handler {
+	t.Helper()
+	return h.EnsureSpecValidator(t).Wrap(next)
+}
+
+// ReportSpecConformance ends a run: it prints what the spec validator
+// checked and every answer that did not match the spec, and turns a passing
+// run's exit code into a failure when one did not. Call it from TestMain
+// with m.Run's code.
+func (h *Harness) ReportSpecConformance(code int) int {
+	validator := h.specValidator.Get()
+	if validator == nil {
+		return code
+	}
+	fmt.Fprintln(os.Stderr, validator.Summary())
+	if err := validator.CheckSpecConformance(); err != nil {
+		fmt.Fprintln(os.Stderr, "FAIL:", err)
+		if code == 0 {
+			return 1
+		}
+	}
+	return code
 }
 
 // APIBaseURL is where the test server answers the API: its origin, then
