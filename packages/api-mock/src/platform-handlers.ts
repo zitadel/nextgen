@@ -52,6 +52,11 @@ import {
   BuildReleaseBody,
   buildReleaseBodyBundleFlowDefinitionsMax,
   BuildReleaseQueryParams,
+  CancelInvitationParams,
+  CancelInvitationQueryParams,
+  CreateInvitationBody,
+  CreateInvitationQueryParams,
+  CreateInvitationResponse,
   CreateDeploymentBody,
   CreateDeploymentQueryParams,
   CreateProjectBody,
@@ -75,6 +80,9 @@ import {
   GetIdpByIdParams,
   GetIdpByIdQueryParams,
   GetIdpByIdResponse,
+  GetInvitationParams,
+  GetInvitationQueryParams,
+  GetInvitationResponse,
   GetPolicyParams,
   GetPolicyQueryParams,
   GetPolicyResponse,
@@ -95,6 +103,8 @@ import {
   InitClaimParams,
   ListDeploymentsQueryParams,
   ListFlowDefinitionsQueryParams,
+  ListInvitationsQueryParams,
+  ListInvitationsResponse,
   ListFlowDefinitionsResponse,
   ListPreviewsParams,
   ListPreviewsQueryParams,
@@ -468,6 +478,29 @@ type PreviewRecord = {
   seq: number;
 };
 
+/**
+ * An invitation as the server stores it: the token stays server-side, so no
+ * read can return the link again.
+ */
+type InvitationRecord = {
+  id: string;
+  projectId: string;
+  relation: "viewer" | "editor" | "admin";
+  metadata: { name: string } | null;
+  status: "pending" | "accepted" | "rejected";
+  createdAt: string;
+  expiresAt: string;
+  journeyId: string;
+  acceptedBy: string | null;
+  acceptedAt: string | null;
+  seq: number;
+};
+
+/** How long an invitation's link stays redeemable (`domain.InvitationExpiration`). */
+const INVITATION_TTL_MS = 72 * 60 * 60 * 1000;
+
+const INVITATION_NOT_FOUND = errorBody("inv.not_found", "invitation not found");
+
 type Store = {
   projects: Map<string, ProjectRecord>;
   schemas: Map<string, SchemaRecord>;
@@ -477,6 +510,7 @@ type Store = {
   deployments: Map<string, DeploymentRecord>;
   previews: Map<string, PreviewRecord>;
   policies: Map<string, PolicyRecord>;
+  invitations: Map<string, InvitationRecord>;
   /**
    * Owner key -> variable name -> value. The project level and each
    * environment are separate owners: the project does not see into its
@@ -503,6 +537,7 @@ function makeStore(): Store {
     deployments: new Map(),
     previews: new Map(),
     policies: new Map(),
+    invitations: new Map(),
     variables: new Map(),
     claimChallenges: new Map(),
     claims: new Map(),
@@ -1033,6 +1068,20 @@ export function expireClaimChallenge(challengeId: string): void {
   const challenge = store.claimChallenges.get(challengeId);
   if (challenge) {
     challenge.expiresAt = new Date(Date.now() - 1000).toISOString();
+  }
+}
+
+/**
+ * Marks an invitation accepted, as redeeming its link would: final, and its
+ * metadata cleared. The mock serves no accept, so a test arranges it here.
+ */
+export function acceptInvitation(invitationId: string): void {
+  const invitation = store.invitations.get(invitationId);
+  if (invitation) {
+    invitation.status = "accepted";
+    invitation.metadata = null;
+    invitation.acceptedBy = `user_${shortId()}`;
+    invitation.acceptedAt = nowIso();
   }
 }
 
@@ -1949,6 +1998,40 @@ function upsertRelease(
   };
   store.releases.set(id, record);
   return HttpResponse.json(releaseResponse(record), { status: 201 });
+}
+
+/** An invitation's status on read: a pending one past its expiry is `expired`. */
+function invitationStatus(
+  invitation: InvitationRecord,
+): "pending" | "accepted" | "rejected" | "expired" {
+  return invitation.status === "pending" && Date.parse(invitation.expiresAt) <= Date.now()
+    ? "expired"
+    : invitation.status;
+}
+
+/** An invitation as every read answers it, without the link. */
+function invitationResponse(invitation: InvitationRecord): Record<string, unknown> {
+  return {
+    id: invitation.id,
+    project_id: invitation.projectId,
+    type: "project_member",
+    project_member: { relation: invitation.relation },
+    metadata: invitation.metadata,
+    status: invitationStatus(invitation),
+    created_by: null,
+    created_by_type: "service",
+    created_at: invitation.createdAt,
+    expires_at: invitation.expiresAt,
+    journey_id: invitation.journeyId,
+    accepted_by: invitation.acceptedBy,
+    accepted_at: invitation.acceptedAt,
+  };
+}
+
+/** The project's invitation `id`, if it holds one. */
+function projectInvitation(projectId: string, id: string): InvitationRecord | undefined {
+  const invitation = store.invitations.get(id);
+  return invitation?.projectId === projectId ? invitation : undefined;
 }
 
 export function setupPlatformHandlers() {
@@ -3562,6 +3645,134 @@ export function setupPlatformHandlers() {
         return out.response;
       }
       return HttpResponse.json(out.data);
+    }),
+    // Invitations (ADR 086), as `internal/service/invitation.go` keeps them.
+    http.post("*/invitations", async ({ request }) => {
+      const query = parse(CreateInvitationQueryParams, queryRecord(request));
+      if (!query.ok) {
+        return query.response;
+      }
+      const raw = await readJson(request);
+      if (raw === null) {
+        return HttpResponse.json(INVALID_JSON, { status: 400 });
+      }
+      const body = parse(CreateInvitationBody, raw);
+      if (!body.ok) {
+        return body.response;
+      }
+      if (body.data.type !== "project_member") {
+        return HttpResponse.json(
+          errorBody("not_implemented", "This feature is not implemented yet."),
+          { status: 501 },
+        );
+      }
+      const projectId = query.data.project_id;
+      if (!store.projects.has(projectId)) {
+        return HttpResponse.json(errorBody("proj.not_found", "resource not found"), {
+          status: 404,
+        });
+      }
+      let journeyId: string = randomUUID();
+      let metadata = body.data.metadata ?? null;
+      const replaces = body.data.replaces_invitation_id;
+      if (replaces !== undefined) {
+        const original = projectInvitation(projectId, replaces);
+        // The server answers a replace of an accepted invitation as not found.
+        if (original === undefined || original.status === "accepted") {
+          return HttpResponse.json(INVITATION_NOT_FOUND, { status: 404 });
+        }
+        journeyId = original.journeyId;
+        metadata = body.data.metadata ?? original.metadata;
+        store.invitations.delete(original.id);
+      }
+      const now = Date.now();
+      const invitation: InvitationRecord = {
+        id: `inv_${shortId()}`,
+        projectId,
+        relation: body.data.project_member.relation,
+        metadata,
+        status: "pending",
+        createdAt: new Date(now).toISOString(),
+        expiresAt: new Date(now + INVITATION_TTL_MS).toISOString(),
+        journeyId,
+        acceptedBy: null,
+        acceptedAt: null,
+        seq: ++store.lastSeq,
+      };
+      store.invitations.set(invitation.id, invitation);
+      const token = randomBytes(32).toString("base64url");
+      const out = parseOut(CreateInvitationResponse, {
+        ...invitationResponse(invitation),
+        link: `${new URL(request.url).origin}/invitations/accept#token=${token}`,
+      });
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data, { status: 201 });
+    }),
+
+    http.get("*/invitations", ({ request }) => {
+      const query = parse(ListInvitationsQueryParams, listQueryRecord(request));
+      if (!query.ok) {
+        return query.response;
+      }
+      const { project_id: projectId, status, type, limit, page_token: pageToken } = query.data;
+      // The mock keeps project invitations only, so a `team_member` filter matches none.
+      const invitations = [...store.invitations.values()]
+        .filter((invitation) => invitation.projectId === projectId)
+        .filter((invitation) => status === undefined || invitationStatus(invitation) === status)
+        .filter(() => type === undefined || type === "project_member")
+        .sort((a, b) => b.seq - a.seq);
+      const paged = pageOf(invitations, limit, pageToken);
+      if (!paged.ok) {
+        return paged.response;
+      }
+      const out = parseOut(ListInvitationsResponse, {
+        invitations: paged.page.map(invitationResponse),
+        next_page_token: paged.next ?? null,
+      });
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data);
+    }),
+
+    http.get("*/invitations/:id", ({ params, request }) => {
+      const path = parse(GetInvitationParams, params);
+      if (!path.ok) {
+        return path.response;
+      }
+      const query = parse(GetInvitationQueryParams, queryRecord(request));
+      if (!query.ok) {
+        return query.response;
+      }
+      const invitation = projectInvitation(query.data.project_id, path.data.id);
+      if (invitation === undefined) {
+        return HttpResponse.json(INVITATION_NOT_FOUND, { status: 404 });
+      }
+      const out = parseOut(GetInvitationResponse, invitationResponse(invitation));
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data);
+    }),
+
+    http.delete("*/invitations/:id", ({ params, request }) => {
+      const path = parse(CancelInvitationParams, params);
+      if (!path.ok) {
+        return path.response;
+      }
+      const query = parse(CancelInvitationQueryParams, queryRecord(request));
+      if (!query.ok) {
+        return query.response;
+      }
+      const invitation = projectInvitation(query.data.project_id, path.data.id);
+      // Only a pending invitation can be cancelled; the server answers any other as not found.
+      if (invitation === undefined || invitationStatus(invitation) !== "pending") {
+        return HttpResponse.json(INVITATION_NOT_FOUND, { status: 404 });
+      }
+      store.invitations.delete(invitation.id);
+      return new HttpResponse(null, { status: 204 });
     }),
   ];
 }
