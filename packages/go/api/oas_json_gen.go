@@ -151093,6 +151093,209 @@ func (s *StepTexts) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes SubmitFlowStepBadRequest as json.
+func (s SubmitFlowStepBadRequest) Encode(e *jx.Encoder) {
+	switch s.Type {
+	case FlowResponseSubmitFlowStepBadRequest:
+		s.FlowResponse.Encode(e)
+	case ErrorDetailsSubmitFlowStepBadRequest:
+		s.ErrorDetails.Encode(e)
+	}
+}
+
+func (s SubmitFlowStepBadRequest) encodeFields(e *jx.Encoder) {
+	switch s.Type {
+	case FlowResponseSubmitFlowStepBadRequest:
+		s.FlowResponse.encodeFields(e)
+	case ErrorDetailsSubmitFlowStepBadRequest:
+		s.ErrorDetails.encodeFields(e)
+	}
+}
+
+// Decode decodes SubmitFlowStepBadRequest from json.
+func (s *SubmitFlowStepBadRequest) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode SubmitFlowStepBadRequest to nil")
+	}
+	// Sum type fields.
+	if typ := d.Next(); typ != jx.Object {
+		return errors.Errorf("unexpected json type %q", typ)
+	}
+
+	var found bool
+	if err := d.Capture(func(d *jx.Decoder) error {
+		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
+			switch string(key) {
+			case "branding":
+				// Type-based discrimination: check if field has expected JSON type
+				if typ := d.Next(); typ != jx.Object {
+					// Field exists but has wrong type, not a match for this variant
+					return d.Skip()
+				}
+				match := FlowResponseSubmitFlowStepBadRequest
+				if found && s.Type != match {
+					s.Type = ""
+					return errors.Errorf("multiple oneOf matches: (%v, %v)", s.Type, match)
+				}
+				found = true
+				s.Type = match
+			case "code":
+				// Type-based discrimination: check if field has expected JSON type
+				if typ := d.Next(); typ != jx.String {
+					// Field exists but has wrong type, not a match for this variant
+					return d.Skip()
+				}
+				match := ErrorDetailsSubmitFlowStepBadRequest
+				if found && s.Type != match {
+					s.Type = ""
+					return errors.Errorf("multiple oneOf matches: (%v, %v)", s.Type, match)
+				}
+				found = true
+				s.Type = match
+			case "details":
+				// Type-based discrimination: check if field has expected JSON type
+				if typ := d.Next(); typ != jx.Object {
+					// Field exists but has wrong type, not a match for this variant
+					return d.Skip()
+				}
+				match := ErrorDetailsSubmitFlowStepBadRequest
+				if found && s.Type != match {
+					s.Type = ""
+					return errors.Errorf("multiple oneOf matches: (%v, %v)", s.Type, match)
+				}
+				found = true
+				s.Type = match
+			case "handoff_token":
+				// Type-based discrimination: check if field has expected JSON type
+				if typ := d.Next(); typ != jx.String {
+					// Field exists but has wrong type, not a match for this variant
+					return d.Skip()
+				}
+				match := FlowResponseSubmitFlowStepBadRequest
+				if found && s.Type != match {
+					s.Type = ""
+					return errors.Errorf("multiple oneOf matches: (%v, %v)", s.Type, match)
+				}
+				found = true
+				s.Type = match
+			case "handoff_token_expires_at":
+				match := FlowResponseSubmitFlowStepBadRequest
+				if found && s.Type != match {
+					s.Type = ""
+					return errors.Errorf("multiple oneOf matches: (%v, %v)", s.Type, match)
+				}
+				found = true
+				s.Type = match
+			case "id":
+				// Type-based discrimination: check if field has expected JSON type
+				if typ := d.Next(); typ != jx.String {
+					// Field exists but has wrong type, not a match for this variant
+					return d.Skip()
+				}
+				match := FlowResponseSubmitFlowStepBadRequest
+				if found && s.Type != match {
+					s.Type = ""
+					return errors.Errorf("multiple oneOf matches: (%v, %v)", s.Type, match)
+				}
+				found = true
+				s.Type = match
+			case "message":
+				// Type-based discrimination: check if field has expected JSON type
+				if typ := d.Next(); typ != jx.String {
+					// Field exists but has wrong type, not a match for this variant
+					return d.Skip()
+				}
+				match := ErrorDetailsSubmitFlowStepBadRequest
+				if found && s.Type != match {
+					s.Type = ""
+					return errors.Errorf("multiple oneOf matches: (%v, %v)", s.Type, match)
+				}
+				found = true
+				s.Type = match
+			case "redirect_uri":
+				match := FlowResponseSubmitFlowStepBadRequest
+				if found && s.Type != match {
+					s.Type = ""
+					return errors.Errorf("multiple oneOf matches: (%v, %v)", s.Type, match)
+				}
+				found = true
+				s.Type = match
+			case "session_id":
+				// Type-based discrimination: check if field has expected JSON type
+				if typ := d.Next(); typ != jx.String {
+					// Field exists but has wrong type, not a match for this variant
+					return d.Skip()
+				}
+				match := FlowResponseSubmitFlowStepBadRequest
+				if found && s.Type != match {
+					s.Type = ""
+					return errors.Errorf("multiple oneOf matches: (%v, %v)", s.Type, match)
+				}
+				found = true
+				s.Type = match
+			case "session_token":
+				// Type-based discrimination: check if field has expected JSON type
+				if typ := d.Next(); typ != jx.String {
+					// Field exists but has wrong type, not a match for this variant
+					return d.Skip()
+				}
+				match := FlowResponseSubmitFlowStepBadRequest
+				if found && s.Type != match {
+					s.Type = ""
+					return errors.Errorf("multiple oneOf matches: (%v, %v)", s.Type, match)
+				}
+				found = true
+				s.Type = match
+			case "step":
+				// Type-based discrimination: check if field has expected JSON type
+				if typ := d.Next(); typ != jx.Object {
+					// Field exists but has wrong type, not a match for this variant
+					return d.Skip()
+				}
+				match := FlowResponseSubmitFlowStepBadRequest
+				if found && s.Type != match {
+					s.Type = ""
+					return errors.Errorf("multiple oneOf matches: (%v, %v)", s.Type, match)
+				}
+				found = true
+				s.Type = match
+			}
+			return d.Skip()
+		})
+	}); err != nil {
+		return errors.Wrap(err, "capture")
+	}
+	if !found {
+		return errors.New("unable to detect sum type variant")
+	}
+	switch s.Type {
+	case FlowResponseSubmitFlowStepBadRequest:
+		if err := s.FlowResponse.Decode(d); err != nil {
+			return err
+		}
+	case ErrorDetailsSubmitFlowStepBadRequest:
+		if err := s.ErrorDetails.Decode(d); err != nil {
+			return err
+		}
+	default:
+		return errors.Errorf("inferred invalid type: %s", s.Type)
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s SubmitFlowStepBadRequest) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *SubmitFlowStepBadRequest) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes SubmitFlowStepErrorResponse as json.
 func (s SubmitFlowStepErrorResponse) Encode(e *jx.Encoder) {
 	e.ObjStart()

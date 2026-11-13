@@ -2217,7 +2217,7 @@
             }
           },
           "400": {
-            "description": "Validation or proof verification failed. Returns the same step\nwith an `error` field. The session token and cookie are still rotated.\nCorrect the input and submit the step again.\n",
+            "description": "The submission was refused, in one of two shapes:\n\n- The same step with an `error` field, when validation or proof\n  verification of the input failed. The session token and cookie are\n  still rotated. Correct the input and submit the step again.\n- An error, when the request was refused before the step could take\n  it, and the cookie is not rotated: `req.invalid` for a field that\n  does not decode, or an sso submission whose `return_target` is\n  missing, does not parse or is not on the request's `Origin`;\n  `flow.invalid_action` for an action the step does not offer;\n  `flow.unsupported` for a submission the flow cannot take yet.\n  Fix the request; the step is unchanged.\n",
             "headers": {
               "Set-Cookie": {
                 "$ref": "#/components/headers/set-cookie-flow"
@@ -2229,7 +2229,14 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/flow-response"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/flow-response"
+                    },
+                    {
+                      "$ref": "#/components/schemas/error-details"
+                    }
+                  ]
                 }
               }
             }

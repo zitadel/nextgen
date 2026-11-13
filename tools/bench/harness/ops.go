@@ -102,7 +102,7 @@ func Login(ctx context.Context, c *api.Client, t Target) (LoginResult, error) {
 	return LoginResult{HandoffToken: handoff, SessionID: step.Response.SessionID}, nil
 }
 
-func submit(ctx context.Context, c *api.Client, op, id, zflow string, fields map[string]string) (*api.SubmitFlowStepOK, error) {
+func submit(ctx context.Context, c *api.Client, op, id, zflow string, fields map[string]string) (*api.FlowResponseHeaders, error) {
 	raw := make(api.FlowSubmitRequestFields, len(fields))
 	for k, v := range fields {
 		b, err := json.Marshal(v)
@@ -117,7 +117,7 @@ func submit(ctx context.Context, c *api.Client, op, id, zflow string, fields map
 		return nil, Classify(op, err)
 	}
 	switch r := res.(type) {
-	case *api.SubmitFlowStepOK:
+	case *api.FlowResponseHeaders:
 		// A rejected input is a 200 with the same step and an error key, not
 		// a 4xx, so it has to be checked here or it counts as a success.
 		if e, ok := r.Response.Step.Error.Get(); ok {
@@ -125,9 +125,13 @@ func submit(ctx context.Context, c *api.Client, op, id, zflow string, fields map
 				Err: fmt.Errorf("step %q answered error %q", r.Response.Step.Name, e)}
 		}
 		return r, nil
-	case *api.SubmitFlowStepBadRequest:
-		return nil, &OpError{Op: op, Status: http.StatusBadRequest, Code: CodeStepError,
-			Err: fmt.Errorf("step %q answered error %q", r.Response.Step.Name, r.Response.Step.Error.Or(""))}
+	case *api.SubmitFlowStepBadRequestHeaders:
+		if step, ok := r.Response.GetFlowResponse(); ok {
+			return nil, &OpError{Op: op, Status: http.StatusBadRequest, Code: CodeStepError,
+				Err: fmt.Errorf("step %q answered error %q", step.Step.Name, step.Step.Error.Or(""))}
+		}
+		return nil, &OpError{Op: op, Status: http.StatusBadRequest, Code: string(r.Response.ErrorDetails.Code),
+			Err: fmt.Errorf("submission refused: %s", r.Response.ErrorDetails.Message)}
 	default:
 		return nil, classifyResponse(op, http.StatusConflict, res)
 	}
