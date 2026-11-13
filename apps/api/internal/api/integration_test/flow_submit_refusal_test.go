@@ -61,6 +61,18 @@ func TestFlowSubmitRefusesAMalformedSubmission(t *testing.T) {
 			resp, body = postFlow(t, "/flow/"+opened.ID+"/submit", submission, appOrigin, &http.Cookie{Name: "_zflow", Value: flowCookie(t, resp)})
 			assert.Equal(t, http.StatusBadRequest, resp.StatusCode, string(body))
 			assert.Equal(t, tc.code, errorCode(body), string(body))
+			assert.Empty(t, resp.Header.Values("Set-Cookie"), "a refusal leaves the flow cookie as it was")
 		})
 	}
+}
+
+// badRequestStep is the step a 400 echoes with its error set; it fails the
+// test when resp is a refusal (the error envelope) instead.
+func badRequestStep(t *testing.T, resp api.SubmitFlowStepRes) api.FlowResponse {
+	t.Helper()
+	bad, ok := resp.(*api.SubmitFlowStepBadRequestHeaders)
+	require.True(t, ok, "not a 400: %s", helpers.MustMarshal(t, resp))
+	step, ok := bad.Response.GetFlowResponse()
+	require.True(t, ok, "a refusal, not the step: %s", helpers.MustMarshal(t, resp))
+	return step
 }

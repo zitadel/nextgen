@@ -130,8 +130,9 @@ func submit(ctx context.Context, c *api.Client, op, id, zflow string, fields map
 			return nil, &OpError{Op: op, Status: http.StatusBadRequest, Code: CodeStepError,
 				Err: fmt.Errorf("step %q answered error %q", step.Step.Name, step.Step.Error.Or(""))}
 		}
-		return nil, &OpError{Op: op, Status: http.StatusBadRequest, Code: string(r.Response.ErrorDetails.Code),
-			Err: fmt.Errorf("submission refused: %s", r.Response.ErrorDetails.Message)}
+		refusal, _ := r.Response.GetErrorDetails()
+		return nil, &OpError{Op: op, Status: http.StatusBadRequest, Code: string(refusal.Code),
+			Err: fmt.Errorf("submission refused: %s", refusal.Message)}
 	default:
 		return nil, classifyResponse(op, http.StatusConflict, res)
 	}

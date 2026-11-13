@@ -322,11 +322,12 @@ func TestPasswordRegisterFlow_PasswordOverTheCap(t *testing.T) {
 	require.NoError(t, err)
 	require.IsType(t, &api.SubmitFlowStepBadRequestHeaders{}, submitResp, helpers.MustMarshal(t, submitResp))
 	badResp := submitResp.(*api.SubmitFlowStepBadRequestHeaders)
-	require.Equal(t, "signup", badResp.Response.FlowResponse.Step.Name)
-	errVal, errSet := badResp.Response.FlowResponse.Step.Error.Get()
+	badStep := badRequestStep(t, submitResp)
+	require.Equal(t, "signup", badStep.Step.Name)
+	errVal, errSet := badStep.Step.Error.Get()
 	require.True(t, errSet, "expected an error on the step")
 	require.Equal(t, "error.x-auth-methods#password_max_length", errVal)
-	_, hasToken := badResp.Response.FlowResponse.HandoffToken.Get()
+	_, hasToken := badStep.HandoffToken.Get()
 	require.False(t, hasToken, "no handoff token on a refused password")
 
 	retryResp, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
@@ -409,12 +410,13 @@ func TestPasswordRegisterFlow_DuplicateEmail(t *testing.T) {
 	// on the same step and the HTTP layer maps it to 400.
 	require.IsType(t, &api.SubmitFlowStepBadRequestHeaders{}, submitResp, helpers.MustMarshal(t, submitResp))
 	badResp := submitResp.(*api.SubmitFlowStepBadRequestHeaders)
-	require.Equal(t, "signup", badResp.Response.FlowResponse.Step.Name, "duplicate email must keep flow on signup step")
-	errVal, errSet := badResp.Response.FlowResponse.Step.Error.Get()
+	badStep := badRequestStep(t, submitResp)
+	require.Equal(t, "signup", badStep.Step.Name, "duplicate email must keep flow on signup step")
+	errVal, errSet := badStep.Step.Error.Get()
 	require.True(t, errSet, "expected an error on the step")
 	require.Equal(t, domain.FlowStepErrorUserAlreadyExists, errVal)
-	require.False(t, badResp.Response.FlowResponse.Step.Complete.Set, "expected non-terminal step")
-	_, hasToken := badResp.Response.FlowResponse.HandoffToken.Get()
+	require.False(t, badStep.Step.Complete.Set, "expected non-terminal step")
+	_, hasToken := badStep.HandoffToken.Get()
 	require.False(t, hasToken, "no handoff token on rejected registration")
 
 	// A corrected email continues the sign-up on the new attempt.

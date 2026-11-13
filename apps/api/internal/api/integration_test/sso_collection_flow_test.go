@@ -134,7 +134,7 @@ func (f *ssoCollectionFixture) submit(t *testing.T, flow ssoFlow, fields map[str
 func (f *ssoCollectionFixture) requireStepError(t *testing.T, flow ssoFlow, resp api.SubmitFlowStepRes, subject, stepError string) {
 	t.Helper()
 	require.IsType(t, &api.SubmitFlowStepBadRequestHeaders{}, resp, helpers.MustMarshal(t, resp))
-	got := resp.(*api.SubmitFlowStepBadRequestHeaders).Response.FlowResponse
+	got := badRequestStep(t, resp)
 	assert.Equal(t, "register-sso", got.Step.Name)
 	assert.Equal(t, stepError, got.Step.Error.Value)
 	assert.False(t, got.HandoffToken.Set)

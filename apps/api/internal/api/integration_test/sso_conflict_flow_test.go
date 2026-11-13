@@ -223,7 +223,7 @@ func TestSSOConflictBackAfterSignInAsksToSignIn(t *testing.T) {
 
 	resp := f.submitAction(t, flow, "submit", map[string]string{"x-auth-methods#password": "correct-horse-battery-staple"})
 	require.IsType(t, &api.SubmitFlowStepBadRequestHeaders{}, resp, helpers.MustMarshal(t, resp))
-	got := resp.(*api.SubmitFlowStepBadRequestHeaders).Response.FlowResponse
+	got := badRequestStep(t, resp)
 	assert.Equal(t, "sso-conflict", got.Step.Name)
 	assert.Equal(t, "error.sign_in_first", got.Step.Error.Value)
 	assert.False(t, got.HandoffToken.Set)

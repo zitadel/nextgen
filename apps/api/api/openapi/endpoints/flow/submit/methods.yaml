@@ -114,7 +114,8 @@ post:
           verification of the input failed. The session token and cookie are
           still rotated. Correct the input and submit the step again.
         - An error, when the request was refused before the step could take
-          it, and the cookie is not rotated: `req.invalid` for a field that
+          it. It sets no `Set-Cookie`, so the flow cookie stays as it was:
+          `req.invalid` for a field that
           does not decode, or an sso submission whose `return_target` is
           missing, does not parse or is not on the request's `Origin`;
           `flow.invalid_action` for an action the step does not offer;
