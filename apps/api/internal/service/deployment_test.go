@@ -128,6 +128,7 @@ func expectInsert(statements *servicemocks.MockAllStatements, read []domain.Orig
 		DoAndReturn(func(_ context.Context, entity *domain.Deployment, _ []domain.OriginDeployment) error {
 			entity.ID = "dep_new"
 			entity.DeployedAt = deployedAt
+			entity.StampExpiry(deployedAt)
 			return nil
 		})
 	statements.EXPECT().EnsureVariableSet(gomock.Any(), set).Return(nil)

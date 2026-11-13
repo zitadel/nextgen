@@ -471,7 +471,7 @@ Each invocation prints one JSON object:
   the deployment went through (`deployment list --live`). Never treat `ok` as
   proof that the change is what you meant to publish.
 - `deployment list` prints `kind` (`primary` or `preview`) and, for a preview
-  deployment, `expires`: the expiry that deployment set, also in `--json` as
+  deployment, `expires`, the last two columns, after `deployed_at`: the expiry that deployment set, also in `--json` as
   `targets[].expires_at`. A later deploy to the same URL does not change it, and
   `preview list` shows the one the preview has now.
 - `deploy --dry-run` and `deployment create --dry-run` emit `data.targets` as

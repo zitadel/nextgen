@@ -444,11 +444,11 @@ describe("deployment list", () => {
         expect(result).toPrintPlainRow(
           deployed.deployment_id ?? "",
           deployed.release_id ?? "",
-          "primary",
           "deploy",
           "http://localhost:3000, https://app.example.com",
-          "",
           /^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/,
+          "primary",
+          "",
         );
       });
 
@@ -468,11 +468,11 @@ describe("deployment list", () => {
         expect(result).toPrintPlainRow(
           /^dep_/,
           /^rel_/,
-          "preview",
           "deploy",
           PREVIEW_URL,
-          expires,
           /^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/,
+          "preview",
+          expires,
         );
       });
 

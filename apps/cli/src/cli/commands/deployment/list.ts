@@ -33,11 +33,11 @@ const LIMIT = {
 const COLUMNS = [
   "id",
   "release_id",
-  "kind",
   "reason",
   "origins",
-  "expires",
   "deployed_at",
+  "kind",
+  "expires",
 ] as const;
 
 /**
@@ -103,11 +103,11 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
       return {
         id: deployment.id,
         release_id: deployment.release_id,
-        kind: deployment.kind,
         reason: deployment.reason ?? "deploy",
         origins: deployment.origins.join(", "),
-        expires: deployment.expiresAt,
         deployed_at: deployment.deployed_at,
+        kind: deployment.kind,
+        expires: deployment.expiresAt,
       };
     });
     const columns = COLUMNS;
