@@ -321,11 +321,16 @@ export function signinOf(event: ProjectEvent): Signin | undefined {
       "check_type" in event.payload && typeof event.payload.check_type === "string"
         ? checkLabel(event.payload.check_type)
         : undefined;
+    // A user check fails when no account has the identifier: a mistyped
+    // address, or the first step of a sign-up, which the server records the
+    // same way before it creates the account.
     const failure =
       event.event_type === "auth.check.failed"
-        ? check
-          ? `${check} check failed`
-          : "A check failed"
+        ? check === "User"
+          ? "No account matched"
+          : check
+            ? `${check} check failed`
+            : "A check failed"
         : "Single sign-on failed";
     return { outcome: "failed", userId: event.user_id || undefined, failure };
   }

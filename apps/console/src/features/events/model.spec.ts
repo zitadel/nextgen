@@ -1066,6 +1066,10 @@ describe("the sign-ins", () => {
     expect(signinOf(event({ event_type: "auth.check.failed", payload: {} }))?.failure).toBe(
       "A check failed",
     );
+    expect(
+      signinOf(event({ event_type: "auth.check.failed", payload: { check_type: "User" } }))
+        ?.failure,
+    ).toBe("No account matched");
     expect(signinOf(event({ event_type: "auth.sso.exchange.failed", payload: {} }))?.failure).toBe(
       "Single sign-on failed",
     );
