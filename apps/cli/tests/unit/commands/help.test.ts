@@ -88,7 +88,7 @@ Examples
 
 /**
  * A package root laid out as the published tarball is: `package.json`, `dist`,
- * and an `oclif.manifest.json` generated the way `prepack` (`oclif manifest`)
+ * and an `oclif.manifest.json` generated the way `build` (`oclif manifest`)
  * generates it, so oclif loads commands from the manifest instead of scanning
  * `dist/commands`. `node_modules` is linked so the plugins resolve.
  */

@@ -5,9 +5,11 @@ package integration_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -229,4 +231,70 @@ func TestPlatformOperatorReadsUnclaimedEvents(t *testing.T) {
 		status, raw = consoleCall(t, peer, http.MethodGet, get, "")
 		assert.Equal(t, http.StatusNotFound, status, raw)
 	})
+}
+
+// TestPlatformProjectReadGatesTheRoot pins the read the console lists its root
+// pages on (D42, Console ADR 0004 §5): GET /projects/{platform project}
+// answers for someone who can act on that project and for nobody else. A
+// person homed in it, and one who owns a team in it as every hosted customer
+// does, are refused: being signed in to the platform project grants nothing
+// (ADR 053 §9).
+func TestPlatformProjectReadGatesTheRoot(t *testing.T) {
+	t.Parallel()
+
+	platform := harness.EnsurePlatformProject(t)
+	path := "/projects/" + platform.ID
+
+	operatorID := platformUser(t)
+	grantPlatformOperator(t, operatorID)
+
+	adminID := platformUser(t)
+	admin := harness.SeedProjectAdmin(t, platform.ID, adminID)
+	t.Cleanup(func() {
+		_ = harness.EnsureServiceDB(t).Statements().RevokeAuthzAssignment(context.Background(), platform.ID, admin.ID)
+	})
+
+	teamOwnerID, _ := harness.CreateUserOwnedByTeam(t, platform.ID)
+
+	for name, tc := range map[string]struct {
+		userID string
+		status int
+	}{
+		"an operator": {operatorID, http.StatusOK},
+		"an administrator of the platform project": {adminID, http.StatusOK},
+		"a person homed in it":                     {platformUser(t), http.StatusNotFound},
+		// A team-scoped grant is a foothold in the project, so the miss reads
+		// as a refusal; the console takes either for "not yours".
+		"the owner of a team in it": {teamOwnerID, http.StatusForbidden},
+	} {
+		t.Run(name, func(t *testing.T) {
+			status, body := consoleCall(t, platformSessionCookie(t, tc.userID), http.MethodGet, path, "")
+			assert.Equal(t, tc.status, status, body)
+		})
+	}
+}
+
+// TestPinnedPlatformProjectKeepsItsRelations pins the other side of Console
+// ADR 0004 §1: writing configuration asks for the admin role on the reserved
+// platform project only, the row bootstrap provisions. The harness's platform
+// project is an ordinary project the deployment pins, as a self-hoster's only
+// project is, so an editor of it still adds an origin from the Console.
+func TestPinnedPlatformProjectKeepsItsRelations(t *testing.T) {
+	t.Parallel()
+
+	platform := harness.EnsurePlatformProject(t)
+	require.NotEqual(t, domain.PlatformProjectID, platform.ID, "the harness pins an ordinary project")
+	path := "/projects/" + platform.ID + "/origins"
+
+	editorID := platformUser(t)
+	editor := harness.SeedProjectEditor(t, platform.ID, editorID)
+	pattern := fmt.Sprintf("https://pinned-%d.example.com", time.Now().UnixNano())
+	t.Cleanup(func() {
+		_ = harness.EnsureProjectService(t).RemoveOrigin(context.Background(), platform.ID, pattern)
+		_ = harness.EnsureServiceDB(t).Statements().RevokeAuthzAssignment(context.Background(), platform.ID, editor.ID)
+	})
+
+	status, body := consoleCall(t, platformSessionCookie(t, editorID), http.MethodPost, path,
+		fmt.Sprintf(`{"pattern":%q,"kind":"preview"}`, pattern))
+	assert.Less(t, status, http.StatusBadRequest, body)
 }

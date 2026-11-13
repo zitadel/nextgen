@@ -41,8 +41,8 @@ interface EventField {
 }
 
 /**
- * The envelope values an event carries, in reading order: who, through what,
- * on what, and the ids that tie it to other events. A value the event does
+ * The envelope values an event carries, in reading order: who, whose account,
+ * through what, on what, and the ids that tie it to other events. A value the event does
  * not carry has no row, since the server stores an unset one as empty or
  * `null` and neither says anything.
  */
@@ -51,6 +51,7 @@ export function eventFields(event: ProjectEvent): EventField[] {
     { label: "Category", value: event.category },
     { label: "Actor", value: event.actor_id, id: true },
     { label: "Actor type", value: event.actor_type },
+    { label: "User", value: event.user_id, id: true },
     { label: "Application", value: event.client_id, id: true },
     { label: "Token", value: event.token_id, id: true },
     { label: "Delegation", value: event.delegation_type },
@@ -68,19 +69,26 @@ export function eventFields(event: ProjectEvent): EventField[] {
 }
 
 /**
- * The list's three views. The server keeps two kinds of event: the changes
+ * The list's views. The server keeps two kinds of event: the changes
  * and sign-ins it writes with what they record, which are the project's audit
  * events, and one per API request, written in batches and dropped under load.
  * `audit` leaves the requests out, since every screen that is opened adds
  * some; `requests` is them alone; `all` reads both together, as following one
  * request through its changes needs.
+ *
+ * `signins` lists one row per sign-in, as Vercel's Request Logs list one row
+ * per request and its Traces one per trace: the event each sign-in ends in
+ * ({@link SIGNIN_OUTCOME_TYPES}), read from the type index, so its pages fill
+ * and no sign-in is put together from the rows a page happens to hold. Its
+ * steps open with the event, through the login flow they share.
  */
-export const EVENT_VIEWS = ["audit", "requests", "all"] as const;
+export const EVENT_VIEWS = ["audit", "signins", "requests", "all"] as const;
 export type EventView = (typeof EVENT_VIEWS)[number];
 
 /** What the views call themselves in the Events list of the sidebar. */
 export const VIEW_LABEL: Record<EventView, string> = {
   audit: "Audit events",
+  signins: "Sign-ins",
   requests: "API requests",
   all: "All",
 };
@@ -88,6 +96,7 @@ export const VIEW_LABEL: Record<EventView, string> = {
 /** What each view holds, under its name in the view picker. */
 export const VIEW_DESCRIPTION: Record<EventView, string> = {
   audit: "Sign-ins and changes to the project",
+  signins: "One row per sign-in, and how it ended",
   requests: "One per call to the API",
   all: "Both, in the order they happened",
 };
@@ -244,6 +253,325 @@ export function isFailure(event: ProjectEvent): boolean {
 }
 
 /**
+ * How a sign-in ended, as the Sign-ins view narrows by it: a session that
+ * the sign-in gave its user, or a proof or an identity provider's answer that
+ * was rejected.
+ */
+export const SIGNIN_OUTCOMES = ["signed_in", "failed"] as const;
+export type SigninOutcome = (typeof SIGNIN_OUTCOMES)[number];
+
+export const SIGNIN_OUTCOME_LABEL: Record<SigninOutcome, string> = {
+  signed_in: "Signed in",
+  failed: "Failed",
+};
+
+/** The event types each outcome is written as: each one range of the type index. */
+const OUTCOME_TYPES: Record<SigninOutcome, readonly ProjectEvent["event_type"][]> = {
+  signed_in: ["session.established"],
+  failed: ["auth.check.failed", "auth.sso.authorization.failed", "auth.sso.exchange.failed"],
+};
+
+/** Every type a sign-in ends in: what the Sign-ins view reads. */
+export const SIGNIN_OUTCOME_TYPES: readonly string[] = SIGNIN_OUTCOMES.flatMap(
+  (outcome) => OUTCOME_TYPES[outcome],
+);
+
+/**
+ * A check's type as a person reads it. The server writes its enum's name
+ * (`Password`, `SSOCallback`); a type the console does not know yet is shown
+ * as it is.
+ */
+const CHECK_LABEL: Record<string, string> = {
+  user: "User",
+  password: "Password",
+  passkey: "Passkey",
+  passkeyregistration: "Passkey registration",
+  ssocallback: "Single sign-on",
+  sso: "Single sign-on",
+};
+
+function checkLabel(checkType: string | undefined): string | undefined {
+  if (!checkType) return undefined;
+  return CHECK_LABEL[checkType.toLowerCase()] ?? checkType;
+}
+
+/**
+ * One row of the Sign-ins view: how the sign-in ended, whose account it was
+ * (`user_id`, or for a session written before the column the user its payload
+ * names), and for a failure what failed.
+ *
+ * `session.established` is also written for a session opened without a user
+ * (an anonymous `POST /sessions`): that row is `opened`, not a sign-in, and
+ * says so rather than being left out, since the type index cannot tell the
+ * two apart.
+ */
+export interface Signin {
+  outcome: SigninOutcome | "opened";
+  userId?: string;
+  failure?: string;
+}
+
+export function signinOf(event: ProjectEvent): Signin | undefined {
+  if (event.event_type === "session.established") {
+    const userId = event.user_id || event.payload.user_id || undefined;
+    return userId ? { outcome: "signed_in", userId } : { outcome: "opened" };
+  }
+  if (OUTCOME_TYPES.failed.includes(event.event_type)) {
+    const check =
+      "check_type" in event.payload && typeof event.payload.check_type === "string"
+        ? checkLabel(event.payload.check_type)
+        : undefined;
+    // A user check fails when no account has the identifier: a mistyped
+    // address, or the first step of a sign-up, which the server records the
+    // same way before it creates the account.
+    const failure =
+      event.event_type === "auth.check.failed"
+        ? check === "User"
+          ? "No account matched"
+          : check
+            ? `${check} check failed`
+            : "A check failed"
+        : "Single sign-on failed";
+    return { outcome: "failed", userId: event.user_id || undefined, failure };
+  }
+  return undefined;
+}
+
+/**
+ * How long an authentication attempt lives (the server's `AuthAttemptTTL`):
+ * one that has ended nothing by then never will.
+ */
+export const ATTEMPT_LIFETIME_MS = 15 * MINUTE_MS;
+
+/** What became of a login flow, as its events tell it. */
+export type FlowOutcome = "signed_in" | "failed" | "abandoned" | "in_progress";
+
+/**
+ * A login flow told from its events, oldest first, for the head of the
+ * event's drawer: what it came to, whose account, how the person proved who
+ * they were, and how long it took. `complete` is whether the events are all
+ * of the flow's; when they are not, only a sign-in is claimed: what is missing
+ * could be the success that followed a failure. A flow whose attempt is still
+ * alive is in progress, a failure in it included, since the visitor may try
+ * again; once it has expired it failed, if anything was refused, or was
+ * abandoned.
+ */
+export interface FlowSummary {
+  title: string;
+  outcome: FlowOutcome | undefined;
+  userId?: string;
+  startedAt: string;
+  durationMs: number;
+}
+
+/** The check types a flow passed, in order, once each; the user check names no proof. */
+function flowMethods(events: readonly ProjectEvent[]): string[] {
+  const methods = events.flatMap((event) => {
+    if (event.event_type === "auth.sso.exchange.succeeded") return ["single sign-on"];
+    if (event.event_type !== "auth.check.succeeded") return [];
+    const label = checkLabel(event.payload.check_type);
+    return label && label !== "User" ? [label.toLowerCase()] : [];
+  });
+  return [...new Set(methods)];
+}
+
+const SPOKEN: Record<string, string> = {
+  password: "a password",
+  passkey: "a passkey",
+  "passkey registration": "a new passkey",
+  "single sign-on": "single sign-on",
+};
+
+export function flowSummary(
+  events: readonly ProjectEvent[],
+  { complete, now }: { complete: boolean; now: Date },
+): FlowSummary | undefined {
+  const first = events[0];
+  const last = events.at(-1);
+  if (!first || !last) return undefined;
+  const signin = events
+    .map(signinOf)
+    .filter((step): step is Signin => step !== undefined && step.outcome !== "opened");
+  const signedIn = signin.find((step) => step.outcome === "signed_in");
+  const startedAt = first.occurred_at;
+  const durationMs = flowPlaces(events).spanMs;
+  const userId =
+    signedIn?.userId ??
+    [...events].reverse().find((event) => event.user_id)?.user_id ??
+    signin.find((step) => step.userId)?.userId;
+
+  let outcome: FlowOutcome | undefined;
+  if (signedIn) outcome = "signed_in";
+  else if (!complete) outcome = undefined;
+  else if (now.getTime() - Date.parse(startedAt) <= ATTEMPT_LIFETIME_MS) outcome = "in_progress";
+  else if (signin.length > 0) outcome = "failed";
+  else outcome = "abandoned";
+
+  const methods = flowMethods(events).map((method) => SPOKEN[method] ?? method);
+  const signedUp = events.some((event) => event.event_type === "user.created");
+  const title =
+    outcome === "signed_in"
+      ? `${signedUp ? "Signed up" : "Signed in"}${methods.length ? ` with ${methods.join(" and ")}` : ""}`
+      : outcome === "failed"
+        ? "Sign-in failed"
+        : outcome === "abandoned"
+          ? "Sign-in abandoned"
+          : outcome === "in_progress"
+            ? "Sign-in in progress"
+            : "This login flow";
+  return { title, outcome, userId, startedAt, durationMs };
+}
+
+/**
+ * Where each step of a login flow falls, in milliseconds after its first
+ * event, and how long the flow ran. The events one request wrote share the
+ * request's first moment: the server stamps its `request.api` event at the
+ * request's start and the others as it stores them, so a gap between them is
+ * the request's own work, which its `duration_ms` tells, not a wait between
+ * steps. The span runs from the first event to where the last request ended.
+ */
+export interface FlowPlaces {
+  offsets: ReadonlyMap<string, number>;
+  spanMs: number;
+}
+
+export function flowPlaces(events: readonly ProjectEvent[]): FlowPlaces {
+  const offsets = new Map<string, number>();
+  const at = (event: ProjectEvent) => Date.parse(event.occurred_at);
+  if (events.length === 0) return { offsets, spanMs: 0 };
+  const start = Math.min(...events.map(at));
+  const requestStart = new Map<string, number>();
+  for (const event of events) {
+    if (!event.request_id) continue;
+    const seen = requestStart.get(event.request_id);
+    if (seen === undefined || at(event) < seen) requestStart.set(event.request_id, at(event));
+  }
+  let end = start;
+  for (const event of events) {
+    const moment = (event.request_id ? requestStart.get(event.request_id) : undefined) ?? at(event);
+    offsets.set(event.id, moment - start);
+    const took = event.event_type === "request.api" ? event.payload.duration_ms : 0;
+    end = Math.max(end, at(event) + took);
+  }
+  return { offsets, spanMs: end - start };
+}
+
+/**
+ * Whether the list may lack what a flow went on to write: anything but the
+ * view and a start of the time narrows it, or the range ends before now. Then
+ * an attempt with nothing after it says nothing about whether it was
+ * abandoned.
+ */
+function hidesSteps(search: EventsSearch): boolean {
+  if (search.to) return true;
+  const time = Number(Boolean(search.since) || hasCustomRange(search));
+  return filterCount(search) - time > 0;
+}
+
+/**
+ * The steps that end a login flow: the attempt handed off, the session it
+ * gave its user, or a proof or a provider's answer refused. A refused flow
+ * says so on its own row; one that ends on a step without a user (no account)
+ * writes the refused user check.
+ */
+const ENDING_TYPES: readonly string[] = [
+  "auth.attempt.handed_off",
+  "session.established",
+  ...OUTCOME_TYPES.failed,
+];
+
+/**
+ * The authentication attempts among the rows that were abandoned: started
+ * longer ago than an attempt lives, as of `asOf` (when the list, or Live, last
+ * read up to now), in a login flow that never ended: neither handed off, nor
+ * given a session, nor refused. The list is newest first, so whatever ended a
+ * flow is among the rows already. A flow the visitor left after a step (an
+ * address entered) is abandoned too. Under a filter or a range end that could
+ * hide the rest of a flow, or in a view without the attempts, none is marked.
+ */
+export function abandonedAttempts(
+  rows: readonly ProjectEvent[],
+  search: EventsSearch,
+  asOf: Date,
+): Set<string> {
+  const abandoned = new Set<string>();
+  if (search.view === "requests" || search.view === "signins" || hidesSteps(search)) {
+    return abandoned;
+  }
+  const ended = new Set(
+    rows
+      .filter((row) => row.flow_id && ENDING_TYPES.includes(row.event_type))
+      .map((row) => row.flow_id),
+  );
+  for (const row of rows) {
+    if (row.event_type !== "auth.attempt.created" || !row.flow_id) continue;
+    if (ended.has(row.flow_id)) continue;
+    if (asOf.getTime() - Date.parse(row.occurred_at) <= ATTEMPT_LIFETIME_MS) continue;
+    abandoned.add(row.id);
+  }
+  return abandoned;
+}
+
+/** The other loaded rows of an open event's login flow or request, and which of the two ties them. */
+export interface Belonging {
+  ids: ReadonlySet<string>;
+  by?: "login flow" | "request";
+}
+
+/**
+ * The loaded rows that belong with an open event: its login flow's, or else
+ * its request's, as its drawer lists them. Only rows the list holds; the
+ * drawer reads the rest.
+ */
+export function belongingWith(
+  rows: readonly ProjectEvent[],
+  open: ProjectEvent | undefined,
+): Belonging {
+  const key: "flow_id" | "request_id" | undefined = open?.flow_id
+    ? "flow_id"
+    : open?.request_id
+      ? "request_id"
+      : undefined;
+  if (!open || !key) return { ids: new Set() };
+  return {
+    ids: new Set(
+      rows.filter((row) => row.id !== open.id && row[key] === open[key]).map((row) => row.id),
+    ),
+    by: key === "flow_id" ? "login flow" : "request",
+  };
+}
+
+/**
+ * Events in the order they happened (`occurred_at`), keeping the server's
+ * order between events of the same moment. A read of one request or login
+ * flow comes back in the order the events were stored, and the API requests
+ * are stored in batches, after the changes they made.
+ */
+export function inOccurrenceOrder(events: readonly ProjectEvent[]): ProjectEvent[] {
+  return events
+    .map((event, index) => ({ event, index, at: Date.parse(event.occurred_at) }))
+    .sort((a, b) => a.at - b.at || a.index - b.index)
+    .map(({ event }) => event);
+}
+
+/**
+ * A span of time as the drawer's timeline writes it: `0 ms`, `29 ms`,
+ * `1.5 s`, `19 s`, `2 min 5 s`.
+ */
+export function formatSpan(ms: number): string {
+  const safe = Math.max(0, ms);
+  if (safe < 999.5) return `${Math.round(safe)} ms`;
+  // Tenths below ten seconds, unless they round up to ten.
+  const tenths = Math.round(safe / 100);
+  if (safe % 1000 !== 0 && tenths < 100) return `${(tenths / 10).toFixed(1)} s`;
+  const seconds = Math.round(safe / 1000);
+  if (seconds < 60) return `${seconds} s`;
+  const minutes = Math.floor(seconds / 60);
+  const rest = seconds % 60;
+  return rest ? `${minutes} min ${rest} s` : `${minutes} min`;
+}
+
+/**
  * The filters that narrow by one value the event carries: typed or pasted
  * into the Events list of the sidebar or the search above the table, or set
  * from an event (a row's menu, the event's panel). `name` is what the value
@@ -257,6 +585,7 @@ export function isFailure(event: ProjectEvent): boolean {
 export const VALUE_FILTERS = [
   { key: "type", label: "Type", name: "type", prefix: "type" },
   { key: "actor", label: "Actor", name: "actor", prefix: "actor" },
+  { key: "user", label: "User", name: "user", prefix: "user" },
   { key: "resource", label: "Resource", name: "resource", prefix: "resource" },
   { key: "resource_type", label: "Resource type", name: "resource type", prefix: "resource_type" },
   { key: "client", label: "Application", name: "application", prefix: "app" },
@@ -279,6 +608,7 @@ const FILTER_BY_KEY = Object.fromEntries(VALUE_FILTERS.map((filter) => [filter.k
 const EVENT_VALUE: Record<ValueFilterKey, (event: ProjectEvent) => string | null | undefined> = {
   type: (event) => event.event_type,
   actor: (event) => event.actor_id,
+  user: (event) => event.user_id,
   resource: (event) => event.entity_id,
   resource_type: (event) => event.entity_type,
   client: (event) => event.client_id,
@@ -314,6 +644,7 @@ export type EventsSearch = {
   to?: string;
   type?: string[];
   status?: StatusClass[];
+  outcome?: SigninOutcome;
 } & Partial<Record<IdFilterKey, string>>;
 
 /**
@@ -345,6 +676,8 @@ function byRequest(search: EventsSearch): boolean {
  *   category beside it. That also keeps types on their own one range of
  *   their index each, which always fills its pages.
  * - The requests are one category themselves, so they take no other.
+ * - The sign-ins are their own types, so they take no category; an outcome
+ *   narrows them alone.
  * - A range with fixed ends replaces one counted back from now.
  *
  * Everything else combines: the ids with each other, with types, with any
@@ -352,10 +685,13 @@ function byRequest(search: EventsSearch): boolean {
  */
 export function servedSearch(search: EventsSearch): EventsSearch {
   const time = search.from || search.to ? { ...search, since: undefined } : search;
-  if (byRequest(time)) return { ...time, view: "requests", category: undefined, type: undefined };
-  if (time.type?.length) return { ...time, view: "all", category: undefined };
-  if (time.view === "requests") return { ...time, category: undefined };
-  return time;
+  if (byRequest(time)) {
+    return { ...time, view: "requests", category: undefined, type: undefined, outcome: undefined };
+  }
+  if (time.type?.length) return { ...time, view: "all", category: undefined, outcome: undefined };
+  if (time.view === "requests") return { ...time, category: undefined, outcome: undefined };
+  if (time.view === "signins") return { ...time, category: undefined };
+  return time.outcome ? { ...time, outcome: undefined } : time;
 }
 
 /** An RFC 3339 moment, normalised; anything unparseable is no bound at all. */
@@ -411,6 +747,7 @@ export function parseEventsSearch(search: Record<string, unknown>): EventsSearch
     to,
     type: eventTypes(search.type),
     status: statusClasses(search.status),
+    outcome: SIGNIN_OUTCOMES.find((known) => known === search.outcome),
   };
   for (const { key } of VALUE_FILTERS) {
     if (key === "type") continue;
@@ -431,6 +768,7 @@ export function filterCount(search: EventsSearch): number {
     Number(Boolean(search.category)) +
     Number(Boolean(search.since) || hasCustomRange(search)) +
     Number(Boolean(search.status?.length)) +
+    Number(Boolean(search.outcome)) +
     VALUE_FILTERS.filter(({ key }) => (key === "type" ? search.type?.length : search[key])).length
   );
 }
@@ -459,6 +797,7 @@ export function eventsQuery(
   | "category"
   | "event_type"
   | "actor_id"
+  | "user_id"
   | "entity_id"
   | "entity_type"
   | "client_id"
@@ -474,19 +813,24 @@ export function eventsQuery(
   const served = servedSearch(search);
   // An operation or a status class matches API requests alone: one range of
   // their own index, with no category to send beside it.
-  const category: ListEventsParams["category"] = byRequest(served)
-    ? undefined
-    : served.view === "requests"
-      ? ["request"]
-      : served.category
-        ? [served.category]
-        : served.view === "audit"
-          ? [...AUDIT_VIEW_CATEGORIES]
-          : undefined;
+  const category: ListEventsParams["category"] =
+    byRequest(served) || served.view === "signins"
+      ? undefined
+      : served.view === "requests"
+        ? ["request"]
+        : served.category
+          ? [served.category]
+          : served.view === "audit"
+            ? [...AUDIT_VIEW_CATEGORIES]
+            : undefined;
   return {
     category,
-    event_type: served.type,
+    event_type:
+      served.view === "signins"
+        ? [...(served.outcome ? OUTCOME_TYPES[served.outcome] : SIGNIN_OUTCOME_TYPES)]
+        : served.type,
     actor_id: served.actor,
+    user_id: served.user,
     entity_id: served.resource,
     entity_type: served.resource_type,
     client_id: served.client,
@@ -501,7 +845,10 @@ export function eventsQuery(
   };
 }
 
-/** The list in another view. Only the All view holds types, and only the requests' an operation or a status. */
+/**
+ * The list in another view. Only the All view holds types, only the requests'
+ * an operation or a status, and only the sign-ins' an outcome.
+ */
 export function withView(current: EventsSearch, view: EventView): EventsSearch {
   return servedSearch({
     ...current,
@@ -509,7 +856,16 @@ export function withView(current: EventsSearch, view: EventView): EventsSearch {
     type: view === "all" ? current.type : undefined,
     operation: view === "requests" ? current.operation : undefined,
     status: view === "requests" ? current.status : undefined,
+    outcome: view === "signins" ? current.outcome : undefined,
   });
+}
+
+/** The sign-ins narrowed to one way of ending, or to none. */
+export function withOutcome(
+  current: EventsSearch,
+  outcome: SigninOutcome | undefined,
+): EventsSearch {
+  return servedSearch({ ...current, outcome });
 }
 
 /** The list narrowed to one category, or to none. A category takes no type beside it. */
@@ -635,13 +991,16 @@ const PREFIXES: Record<string, ValueFilterKey> = {
  * server holds, never by text, so a term says which field, or is read by its
  * shape:
  *
- * - `actor:…`, `resource:…`, `resource_type:…`, `app:…`, `device:…` and the
- *   other filters' prefixes ({@link VALUE_FILTERS}) name the filter.
+ * - `actor:…`, `user:…`, `resource:…`, `resource_type:…`, `app:…`, `device:…`
+ *   and the other filters' prefixes ({@link VALUE_FILTERS}) name the filter.
  * - `evt_…` is an event, and opens it.
  * - `req_…` (or a 32-digit trace id), `sess_…`, `flow_…` and `app_…` are a
  *   request, a session, a login flow and an application.
  * - Words joined by dots are an event type, and one camel-cased word, as
  *   `createUser`, is an API operation.
+ * - `user_…` may be whose account something happened to or who did
+ *   something, so it means both a user and an actor, and the person says
+ *   which. What happened to the account holds the changes to the user too.
  * - Any other id may be who did something or what it was done to, so it
  *   means both an actor and a resource, and the person says which.
  *
@@ -663,6 +1022,7 @@ export function searchMeanings(term: string): SearchMeaning[] {
   if (value.startsWith("sess_")) return [filter("session")];
   if (value.startsWith("flow_")) return [filter("flow")];
   if (value.startsWith("app_")) return [filter("client")];
+  if (value.startsWith("user_")) return [filter("user"), filter("actor")];
   if (EVENT_TYPE.test(value)) return [filter("type")];
   if (OPERATION.test(value)) return [filter("operation")];
   return [filter("actor"), filter("resource")];
@@ -679,6 +1039,7 @@ const CSV_COLUMNS = [
   ["actor_type", (event: ProjectEvent) => event.actor_type],
   ["entity_type", (event: ProjectEvent) => event.entity_type],
   ["entity_id", (event: ProjectEvent) => event.entity_id],
+  ["user_id", (event: ProjectEvent) => event.user_id],
   ["client_id", (event: ProjectEvent) => event.client_id],
   ["request_id", (event: ProjectEvent) => event.request_id],
   ["session_id", (event: ProjectEvent) => event.session_id],

@@ -66,7 +66,6 @@ const FLOW = {
   id: "flow_1",
   flow_definition: {
     name: "default-login",
-    status: "active",
     // Both, as the checked-in default flow definition carries them.
     purposes: { login: "identifier", register: "register" },
     steps: [],
@@ -186,7 +185,6 @@ describe("branding screen", () => {
       id: "flow_2",
       flow_definition: {
         name: "login-only",
-        status: "active",
         purposes: { login: "identifier" },
         steps: [],
       },

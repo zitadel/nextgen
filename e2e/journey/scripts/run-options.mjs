@@ -11,9 +11,7 @@ const PREEXISTING_FRAMEWORK_IDS = ["next", "nuxt"];
 // The options CI sets, as environment variables beside the arguments. CI's
 // turbo job cannot pass them after `--`: turbo puts those arguments into the
 // cache key of every task in the run (vercel/turborepo#14770), so the
-// runner's dependencies would be rebuilt instead of restored. ci.yml cannot
-// either: it runs the journey as a dependency of `e2e:all`, whose command
-// moon fixes.
+// runner's dependencies would be rebuilt instead of restored.
 const ENV_VALUE_OPTIONS = [
   ["JOURNEY_CONCURRENCY", "--concurrency"],
   ["JOURNEY_MATRIX", "--matrix"],
@@ -37,49 +35,40 @@ export function journeyArgsFromEnv(env) {
 }
 
 /**
- * Packing the tarballs takes a `moon run release:pack` of the runner's own: a
- * second moon graph, whose release builds wipe and rebuild the dist folders of
- * the CLI, the SDKs, the test kit and the console. Inside a workflow it races
- * the graph that runs the journey (its build tasks rewrite the dist folders
- * being packed), and in `e2e:all` it races the lanes beside the journey, which
+ * Packing the tarballs takes a `turbo run pack --filter=@zitadel/release` of
+ * the runner's own: a second turbo run, whose builds rewrite the dist folders
+ * of the CLI, the SDKs, the test kit and the console. Inside a workflow it
+ * races the run that started the journey (its build tasks rewrite the dist
+ * folders being packed), and beside other e2e lanes it races them, as they
  * read those folders. So there the caller hands over prebuilt tarballs, and a
- * run without them stops here. The moon task unsets CI and GITHUB_ACTIONS, so
- * GITHUB_RUN_ID is what tells a workflow run apart; the e2e:all lane sets
- * JOURNEY_TARBALLS_REQUIRED.
+ * workflow run (GITHUB_RUN_ID) without them stops here. Turbo's journey tasks
+ * pass `--packed`: they depend on the builds of what they install, and pack
+ * only those, without a turbo run of their own.
  */
 export function assertPrebuiltTarballs(options, env) {
-  if (options.tarballsDir) {
+  if (options.tarballsDir || options.packed) {
     return;
   }
   if (env.GITHUB_RUN_ID) {
     throw new Error(
       "in GitHub Actions the workflow must hand the journey prebuilt tarballs " +
         "(JOURNEY_TARBALLS_DIR or --tarballs-dir); packing them here would start " +
-        "a second moon graph inside the running one",
-    );
-  }
-  if (env.JOURNEY_TARBALLS_REQUIRED === "1") {
-    throw new Error(
-      "e2e:journey-local runs beside the other e2e lanes, and packing its own " +
-        "tarballs would rebuild the dist folders they read. Pack them first " +
-        "(`moon run release:pack`) and hand them over with " +
-        "JOURNEY_TARBALLS_DIR=dist/release/<version>/npm, or run the journey " +
-        "alone with `moon run e2e:journey -- --ci`, which packs its own",
+        "a second turbo run inside the running one",
     );
   }
 }
 
 /**
  * The framework lanes start the mock OIDC provider (tools/oidc-mock) when
- * `moon run oidc-mock:build` has built it; run by hand without it, the specs
- * that need it skip themselves. Under --ci a missing binary stops the run, so
- * those specs never skip silently there.
+ * `turbo run build --filter=oidc-mock` has built it; run by hand without it,
+ * the specs that need it skip themselves. Under --ci a missing binary stops
+ * the run, so those specs never skip silently there.
  */
 export function assertOidcMock(options, binary) {
   if (options.ci && !existsSync(binary)) {
     throw new Error(
       `the mock OIDC provider binary is missing (${binary}); ` +
-        "build it with `moon run oidc-mock:build`",
+        "build it with `turbo run build --filter=oidc-mock`",
     );
   }
 }
@@ -92,10 +81,12 @@ export function parseLocalJourneyArgs(args) {
     image: "",
     keep: false,
     matrix: "full",
+    only: "",
     preexistingApp: false,
     preset: "",
     remote: false,
     runtime: "binary",
+    packed: false,
     suite: "frameworks",
     tarballsDir: "",
     workDir: "",
@@ -124,6 +115,15 @@ export function parseLocalJourneyArgs(args) {
       }
       case "--ci": {
         parsed.ci = true;
+        break;
+      }
+      case "--only": {
+        parsed.only = readValue(args, ++index, arg);
+        if (!/^[a-z-]+\/[a-z-]+$/.test(parsed.only)) {
+          throw new Error(
+            `--only takes <variant>/<framework>, e.g. fresh-app/vue; got ${parsed.only}`,
+          );
+        }
         break;
       }
       case "--matrix": {
@@ -165,6 +165,10 @@ export function parseLocalJourneyArgs(args) {
         parsed.tarballsDir = readValue(args, ++index, arg);
         break;
       }
+      case "--packed": {
+        parsed.packed = true;
+        break;
+      }
       case "--preexisting-app": {
         parsed.preexistingApp = true;
         break;
@@ -193,6 +197,12 @@ export function parseLocalJourneyArgs(args) {
 
   if (parsed.runtime === "binary" && parsed.image) {
     throw new Error("--image requires --runtime docker");
+  }
+  if (parsed.only && !parsed.ci) {
+    throw new Error("--only picks one journey of the --ci set; add --ci");
+  }
+  if (parsed.only && explicitMatrix) {
+    throw new Error("--only runs one journey; drop --matrix");
   }
   if (parsed.ci) {
     // --ci runs a fixed set of variants (fresh-app matrix, passkey preset,

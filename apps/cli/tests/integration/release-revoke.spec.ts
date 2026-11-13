@@ -296,6 +296,8 @@ describe("release revoke", () => {
           source: MOCK_SERVER_URL,
           code: "E_CONFLICT",
           message: "release: still served by an origin",
+          hint: expect.any(String),
+          next_commands: expect.any(Array),
           details: {
             status: 409,
             url: expect.stringMatching(

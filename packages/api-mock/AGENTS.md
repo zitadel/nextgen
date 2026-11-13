@@ -3,11 +3,11 @@
 `@zitadel/api-mock` stands in for the Zitadel API: MSW handlers for the typed
 `@zitadel/api` Flow API and the platform API, and a standalone server built on
 the same handlers. Storybook, the component, SDK and CLI tests use it in
-process; the demos run the server (`moon run api-mock:start`).
+process; the demos run the server (`turbo run start --filter=@zitadel/api-mock`).
 
 It is not published, but it builds to `dist/` (tsdown) like every package:
 consumers resolve its export map (`@zitadel/source` points in-repo tooling at
-the source) and depend on `api-mock:build`.
+the source) and depend on `@zitadel/api-mock#build`.
 
 ## The flow shape mirrors the real default flow
 
