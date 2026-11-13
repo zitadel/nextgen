@@ -60,17 +60,6 @@ export class DependencyVersionCheck implements SanityCheck {
       return !semver.eq(version, ctx.cliVersion);
     });
     if (mismatched.length > 0) {
-      // Repair with the project's own package manager and an exact-save flag:
-      // a bare `npm install` would switch managers on a pnpm/yarn/bun project
-      // and write a caret range — exactly the float this check ignores.
-      const remedy = suggestedCommandOf(
-        addExactCommandFor(
-          await detectPackageManager(ctx.cwd),
-          mismatched.map(([name]) => {
-            return `${name}@${ctx.cliVersion}`;
-          }),
-        ),
-      );
       return {
         ...base,
         status: "warn",
@@ -91,7 +80,17 @@ export class DependencyVersionCheck implements SanityCheck {
             };
           }),
         },
-        remedy,
+        // Repair with the project's own package manager and an exact-save flag:
+        // a bare `npm install` would switch managers on a pnpm/yarn/bun project
+        // and write a caret range — exactly the float this check ignores.
+        remedy: suggestedCommandOf(
+          addExactCommandFor(
+            await detectPackageManager(ctx.cwd),
+            mismatched.map(([name]) => {
+              return `${name}@${ctx.cliVersion}`;
+            }),
+          ),
+        ),
       };
     }
     return {
