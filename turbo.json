@@ -382,6 +382,8 @@
         "scripts/render-builtin-schemas.test.mjs",
         "scripts/turbo-run-summary.mjs",
         "scripts/turbo-run-summary.test.mjs",
+        "scripts/artifacts-failure-issue.mjs",
+        "scripts/artifacts-failure-issue.test.mjs",
         "apps/api/api/openapi/endpoints/schemas/*.json",
         // The built-in schemas' renderer matches the server's default
         // namespace.
