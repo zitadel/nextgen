@@ -19,13 +19,15 @@ const level = (name, value) => ({
   name,
   sum: { dataPoints: [{ attributes: [], value }], aggregationTemporality: CUMULATIVE },
 });
+// The queue with every instrument sent, to test what happens to each kind.
+const queueOfAll = (options = {}) => new MetricQueue({ isReported: () => true, ...options });
 const histogram = (name, point, temporality = DELTA) => ({
   name,
   histogram: { dataPoints: [{ attributes: [], ...point }], aggregationTemporality: temporality },
 });
 
 test("a counter's increases are added up per series until they are taken", () => {
-  const queue = new MetricQueue();
+  const queue = queueOfAll();
   for (const increase of [3, 2]) {
     queue.ingest(
       exportOf(
@@ -46,7 +48,7 @@ test("a counter's increases are added up per series until they are taken", () =>
 });
 
 test("a cumulative counter is turned into its increase, also after a restart", () => {
-  const queue = new MetricQueue();
+  const queue = queueOfAll();
   const increases = [];
   for (const value of [5, 5, 8, 2]) {
     queue.ingest(exportOf(counter("events", value, CUMULATIVE)));
@@ -62,9 +64,9 @@ test("a cumulative counter is turned into its increase, also after a restart", (
   );
 });
 
-test("a level is sent when it changes and repeated after a while", () => {
+test("a level is sent when it rises and repeated after a while", () => {
   let now = 0;
-  const queue = new MetricQueue({ levelRepeatMs: 1000, now: () => now });
+  const queue = queueOfAll({ levelRepeatMs: 1000, now: () => now });
   const gauge = (value) => ({
     name: "entries",
     gauge: { dataPoints: [{ attributes: [], value }] },
@@ -80,28 +82,50 @@ test("a level is sent when it changes and repeated after a while", () => {
   assert.deepEqual(levels(), [], "unchanged");
   now = 500;
   queue.ingest(exportOf(level("connections", 3), gauge(7)));
-  assert.deepEqual(levels(), [["connections", 3]]);
+  assert.deepEqual(levels(), [["connections", 3]], "a rise is sent at once");
   now = 1200;
   queue.ingest(exportOf(level("connections", 3), gauge(7)));
   assert.deepEqual(levels(), [["entries", 7]], "repeated after levelRepeatMs");
 });
 
-test("only the latest of a level's changes is sent", () => {
-  const queue = new MetricQueue();
-  for (const value of [2, 5, 3]) {
+test("a level is sent as the highest it reached, and a fall only after a while", () => {
+  let now = 0;
+  const queue = queueOfAll({ levelRepeatMs: 1000, now: () => now });
+  const values = () => queue.take(100).map((point) => point.value);
+
+  // A request takes a connection and gives it back between two sends.
+  for (const value of [0, 1, 0]) {
     queue.ingest(exportOf(level("connections", value)));
   }
-  assert.deepEqual(
-    queue.take(100).map((point) => point.value),
-    [3],
-  );
-  queue.ingest(exportOf(level("connections", 3)));
+  assert.deepEqual(values(), [1], "the peak, not the latest");
+
+  // The same again: nothing new to say, however many requests do it.
+  for (const value of [0, 1, 0, 1, 0]) {
+    queue.ingest(exportOf(level("connections", value)));
+  }
   assert.equal(queue.queued, 0);
+  assert.equal(queue.age, 0, "a level that did not rise does not wait to be sent");
+  assert.deepEqual(values(), []);
+
+  // A higher peak is sent at once.
+  queue.ingest(exportOf(level("connections", 4)));
+  queue.ingest(exportOf(level("connections", 0)));
+  assert.equal(queue.queued, 1);
+  assert.deepEqual(values(), [4]);
+
+  // The fall is sent once levelRepeatMs passed, as the highest since.
+  now = 600;
+  queue.ingest(exportOf(level("connections", 0)));
+  queue.ingest(exportOf(level("connections", 1)));
+  assert.deepEqual(values(), []);
+  now = 1100;
+  queue.ingest(exportOf(level("connections", 0)));
+  assert.deepEqual(values(), [1]);
 });
 
 test("age is how long the oldest waiting data point has waited", () => {
   let now = 1000;
-  const queue = new MetricQueue({ now: () => now });
+  const queue = queueOfAll({ now: () => now });
   assert.equal(queue.age, 0);
   queue.ingest(exportOf(counter("events", 1)));
   now = 1400;
@@ -119,7 +143,7 @@ test("age is how long the oldest waiting data point has waited", () => {
 });
 
 test("a histogram is one data point per recorded value", () => {
-  const queue = new MetricQueue();
+  const queue = queueOfAll();
   queue.ingest(
     exportOf(
       // Values in one bucket are replayed as their mean: the sum stays exact.
@@ -155,31 +179,53 @@ test("a histogram is one data point per recorded value", () => {
   assert.ok(Math.abs(spread[3] - 0.3) < 1e-12);
 });
 
-test("what Vercel already has another way is not sent", () => {
+test("only the instruments named for Vercel are sent", () => {
   const queue = new MetricQueue();
+  const duration = (name) =>
+    histogram(name, { count: 1, sum: 0.01, bucketCounts: [1], explicitBounds: [] });
   queue.ingest(
     exportOf(
-      histogram("db.client.operation.duration", {
-        count: 1,
-        sum: 0.01,
-        bucketCounts: [1],
-        explicitBounds: [],
-      }),
+      // A data point per value or per request, and the spans tell the same.
+      duration("db.client.operation.duration"),
+      duration("zitadel.audit.insert.duration"),
+      duration("zitadel.auth.credential.validation.duration"),
+      duration("ogen.server.duration"),
       counter("ogen.server.request_count", 4),
-      counter("ogen.server.errors_count", 1),
-      level("db.client.connection.count", 2),
       counter("zitadel.audit.events.written", 1),
+      counter("zitadel.auth.token.revocation_checks", 1),
+      counter("zitadel.cache.lookups", 1),
+      // Not named yet: an instrument the server adds is not sent by itself.
+      counter("zitadel.something.new", 1),
+      // What only a metric says.
+      counter("zitadel.auth.attempt.outcomes", 1),
+      counter("zitadel.flow.step.transitions", 2),
+      counter("zitadel.password_hashing.rejected", 1),
+      counter("zitadel.cache.evictions", 1),
+      level("db.client.connection.count", 2),
+      level("zitadel.password_hashing.in_flight", 1),
+      level("zitadel.password_hashing.waiting", 3),
     ),
   );
   assert.deepEqual(
-    queue.take(100).map((point) => point.name),
-    ["db.client.connection.count", "zitadel.audit.events.written"],
+    queue
+      .take(100)
+      .map((point) => point.name)
+      .sort(),
+    [
+      "db.client.connection.count",
+      "zitadel.auth.attempt.outcomes",
+      "zitadel.cache.evictions",
+      "zitadel.flow.step.transitions",
+      "zitadel.password_hashing.in_flight",
+      "zitadel.password_hashing.rejected",
+      "zitadel.password_hashing.waiting",
+    ],
   );
   assert.equal(queue.unsupported, 0);
 });
 
 test("what has no replay is counted, not sent", () => {
-  const queue = new MetricQueue();
+  const queue = queueOfAll();
   queue.ingest(
     exportOf(
       histogram(
@@ -196,7 +242,7 @@ test("what has no replay is counted, not sent", () => {
 });
 
 test("attributes are strings Vercel accepts", () => {
-  const queue = new MetricQueue();
+  const queue = queueOfAll();
   queue.ingest(
     exportOf({
       name: "n".repeat(80),
@@ -228,7 +274,7 @@ test("attributes are strings Vercel accepts", () => {
 });
 
 test("take hands out at most what an invocation may send, counters and levels first", () => {
-  const queue = new MetricQueue({ maxQueued: 5 });
+  const queue = queueOfAll({ maxQueued: 5 });
   const one = (value) =>
     histogram("duration", { count: 1, sum: value, bucketCounts: [1], explicitBounds: [] });
   for (let i = 1; i <= 8; i++) {
