@@ -80,7 +80,7 @@ type EnvironmentFlags = {
  * accepted. Refuses a blank value, naming the flag; `parseClientId` then
  * blesses what is left as one the provider could have issued.
  */
-const CLIENT_ID: Refused<ClientId> = {
+const CLIENT_ID = {
   schema: filled.transform((id) => {
     return validated(parseClientId(id));
   }),
@@ -88,7 +88,7 @@ const CLIENT_ID: Refused<ClientId> = {
     message: "{input} was given an empty value",
     hint: "Pass a value for {input}, or omit it entirely.",
   },
-};
+} as const satisfies Refused<ClientId>;
 
 /**
  * One of the settings that describe a custom connection, refused with what
@@ -133,19 +133,19 @@ function settingFlag(flag: string, parse: (value: string) => Parsed<unknown>) {
  * `required` so that its own refusal, which carries no hint, never answers
  * first; this one names the next move.
  */
-const PROVIDER_IS_NAMED_REFUSAL: Refusal = {
+const PROVIDER_IS_NAMED_REFUSAL = {
   message: "Name the provider to enable",
   hint: `Pass --provider, e.g. --provider ${IDP_PROVIDERS[0]}.`,
-};
+} as const satisfies Refusal;
 
 /**
  * What a Project with no development issuer is refused for.
  */
-const NO_ISSUER_REFUSAL: Refusal = {
+const NO_ISSUER_REFUSAL = {
   message: "This project has no development issuer",
   hint: "Set the project up first, or set ZITADEL_ISSUER to the origin your app serves from.",
   next: [{ id: "setup" }],
-};
+} as const satisfies Refusal;
 
 /**
  * The origin the app serves from, as the run's environment names it.
@@ -888,8 +888,14 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     const { mappings, verifications, scopes, createsUsers, unmapped, usedBy } =
       change.after.connections.summarize(connection);
     const verifiedBy = new Map(
-      verifications.map(({ property, claim }) => {
-        return [property, claim];
+      verifications.flatMap(({ property, claim }): ReadonlyArray<readonly [string, string]> => {
+        if (claim === true) {
+          return [[property, "always counts as verified"]];
+        }
+        if (typeof claim === "string") {
+          return [[property, `counts as verified when ${text(claim)} is true`]];
+        }
+        return [];
       }),
     );
     const sections = [
@@ -900,13 +906,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
               ? `When someone signs in with ${text(connection.displayName)} for the first time, Zitadel fills in their new user like this:`
               : `${text(connection.displayName)} does not create users in Zitadel, so these claims are not used to fill one:`,
             ...mappings.map(({ property, claim }) => {
-              const how = verifiedBy.get(property);
-              const verified =
-                how === true
-                  ? "always counts as verified"
-                  : typeof how === "string"
-                    ? `counts as verified when ${text(how)} is true`
-                    : "is not treated as verified";
+              const verified = verifiedBy.get(property) ?? "is not treated as verified";
               return [
                 `- ${text(property)} comes from the provider's ${text(claim)} claim.`,
                 `  It ${verified}.`,

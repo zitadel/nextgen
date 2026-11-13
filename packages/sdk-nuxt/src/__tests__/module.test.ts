@@ -299,7 +299,7 @@ describe("client plugin", () => {
 
 // The module auto-imports `runtime/composables` from the published dist, so a
 // composable the build leaves out is an undefined global in every app page
-// (`useZitadelProject is not defined`). `sdk-nuxt:test` runs after the build.
+// (`useZitadelProject is not defined`). `@zitadel/sdk-nuxt#test` runs after the build.
 describe("auto-imported composables", () => {
   const source = join(import.meta.dirname, "../runtime/composables");
   const built = join(import.meta.dirname, "../../dist/runtime/composables");

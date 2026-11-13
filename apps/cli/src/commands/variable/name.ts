@@ -5,22 +5,22 @@ import { filled } from "@/lib/oclif/flags";
 import { type Refusal, refusalError } from "@/lib/oclif/refusal";
 
 /** What a name holding anything but letters, digits and underscores is refused for. */
-const VARIABLE_NAME_INVALID_REFUSAL: Refusal = {
+const VARIABLE_NAME_INVALID_REFUSAL = {
   message: "Invalid variable name {value}.",
   hint: "A variable name contains only letters, digits and underscores.",
-};
+} as const satisfies Refusal;
 
 /** What a name the platform would refuse for its length is refused for. */
-const VARIABLE_NAME_TOO_LONG_REFUSAL: Refusal = {
+const VARIABLE_NAME_TOO_LONG_REFUSAL = {
   message: "Variable name is {length} characters; the limit is {max}.",
   hint: "Shorten the name.",
-};
+} as const satisfies Refusal;
 
 /** What a blank name is refused for, named after the argument that took it. */
-const VARIABLE_NAME_EMPTY_REFUSAL: Refusal = {
+const VARIABLE_NAME_EMPTY_REFUSAL = {
   message: "{input} was given an empty value",
   hint: "Pass a value for {input}, or omit it entirely.",
-};
+} as const satisfies Refusal;
 
 /**
  * The variable name `input` holds, trimmed as the one a prompt would have

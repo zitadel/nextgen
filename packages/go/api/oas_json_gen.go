@@ -1445,6 +1445,1134 @@ func (s *AlreadyClaimedResponseDetailsAdditional) UnmarshalJSON(data []byte) err
 }
 
 // Encode implements json.Marshaler.
+func (s *AppClientIDTaken) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *AppClientIDTaken) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("code")
+		e.Str("app.client_id_taken")
+	}
+	{
+		e.FieldStart("message")
+		e.Str(s.Message)
+	}
+	{
+		if s.Details.Set {
+			e.FieldStart("details")
+			s.Details.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfAppClientIDTaken = [3]string{
+	0: "code",
+	1: "message",
+	2: "details",
+}
+
+// Decode decodes AppClientIDTaken from json.
+func (s *AppClientIDTaken) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode AppClientIDTaken to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "code":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.Code = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"code\"")
+			}
+		case "message":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := d.Str()
+				s.Message = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"message\"")
+			}
+		case "details":
+			if err := func() error {
+				s.Details.Reset()
+				if err := s.Details.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"details\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode AppClientIDTaken")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfAppClientIDTaken) {
+					name = jsonFieldsNameOfAppClientIDTaken[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *AppClientIDTaken) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *AppClientIDTaken) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s AppClientIDTakenDetails) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields implements json.Marshaler.
+func (s AppClientIDTakenDetails) encodeFields(e *jx.Encoder) {
+	for k, elem := range s {
+		e.FieldStart(k)
+
+		if len(elem) != 0 {
+			e.Raw(elem)
+		}
+	}
+}
+
+// Decode decodes AppClientIDTakenDetails from json.
+func (s *AppClientIDTakenDetails) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode AppClientIDTakenDetails to nil")
+	}
+	m := s.init()
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		var elem jx.Raw
+		if err := func() error {
+			v, err := d.RawAppend(nil)
+			elem = jx.Raw(v)
+			if err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrapf(err, "decode field %q", k)
+		}
+		m[string(k)] = elem
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode AppClientIDTakenDetails")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s AppClientIDTakenDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *AppClientIDTakenDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *AppFieldImmutable) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *AppFieldImmutable) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("code")
+		e.Str("app.field_immutable")
+	}
+	{
+		e.FieldStart("message")
+		e.Str(s.Message)
+	}
+	{
+		if s.Details.Set {
+			e.FieldStart("details")
+			s.Details.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfAppFieldImmutable = [3]string{
+	0: "code",
+	1: "message",
+	2: "details",
+}
+
+// Decode decodes AppFieldImmutable from json.
+func (s *AppFieldImmutable) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode AppFieldImmutable to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "code":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.Code = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"code\"")
+			}
+		case "message":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := d.Str()
+				s.Message = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"message\"")
+			}
+		case "details":
+			if err := func() error {
+				s.Details.Reset()
+				if err := s.Details.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"details\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode AppFieldImmutable")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfAppFieldImmutable) {
+					name = jsonFieldsNameOfAppFieldImmutable[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *AppFieldImmutable) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *AppFieldImmutable) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s AppFieldImmutableDetails) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields implements json.Marshaler.
+func (s AppFieldImmutableDetails) encodeFields(e *jx.Encoder) {
+	for k, elem := range s {
+		e.FieldStart(k)
+
+		if len(elem) != 0 {
+			e.Raw(elem)
+		}
+	}
+}
+
+// Decode decodes AppFieldImmutableDetails from json.
+func (s *AppFieldImmutableDetails) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode AppFieldImmutableDetails to nil")
+	}
+	m := s.init()
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		var elem jx.Raw
+		if err := func() error {
+			v, err := d.RawAppend(nil)
+			elem = jx.Raw(v)
+			if err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrapf(err, "decode field %q", k)
+		}
+		m[string(k)] = elem
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode AppFieldImmutableDetails")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s AppFieldImmutableDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *AppFieldImmutableDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *AppInvalid) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *AppInvalid) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("code")
+		e.Str("app.invalid")
+	}
+	{
+		e.FieldStart("message")
+		e.Str(s.Message)
+	}
+	{
+		if s.Details.Set {
+			e.FieldStart("details")
+			s.Details.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfAppInvalid = [3]string{
+	0: "code",
+	1: "message",
+	2: "details",
+}
+
+// Decode decodes AppInvalid from json.
+func (s *AppInvalid) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode AppInvalid to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "code":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.Code = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"code\"")
+			}
+		case "message":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := d.Str()
+				s.Message = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"message\"")
+			}
+		case "details":
+			if err := func() error {
+				s.Details.Reset()
+				if err := s.Details.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"details\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode AppInvalid")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfAppInvalid) {
+					name = jsonFieldsNameOfAppInvalid[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *AppInvalid) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *AppInvalid) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s AppInvalidDetails) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields implements json.Marshaler.
+func (s AppInvalidDetails) encodeFields(e *jx.Encoder) {
+	for k, elem := range s {
+		e.FieldStart(k)
+
+		if len(elem) != 0 {
+			e.Raw(elem)
+		}
+	}
+}
+
+// Decode decodes AppInvalidDetails from json.
+func (s *AppInvalidDetails) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode AppInvalidDetails to nil")
+	}
+	m := s.init()
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		var elem jx.Raw
+		if err := func() error {
+			v, err := d.RawAppend(nil)
+			elem = jx.Raw(v)
+			if err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrapf(err, "decode field %q", k)
+		}
+		m[string(k)] = elem
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode AppInvalidDetails")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s AppInvalidDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *AppInvalidDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *AppNotFound) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *AppNotFound) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("code")
+		e.Str("app.not_found")
+	}
+	{
+		e.FieldStart("message")
+		e.Str(s.Message)
+	}
+	{
+		if s.Details.Set {
+			e.FieldStart("details")
+			s.Details.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfAppNotFound = [3]string{
+	0: "code",
+	1: "message",
+	2: "details",
+}
+
+// Decode decodes AppNotFound from json.
+func (s *AppNotFound) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode AppNotFound to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "code":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.Code = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"code\"")
+			}
+		case "message":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := d.Str()
+				s.Message = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"message\"")
+			}
+		case "details":
+			if err := func() error {
+				s.Details.Reset()
+				if err := s.Details.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"details\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode AppNotFound")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfAppNotFound) {
+					name = jsonFieldsNameOfAppNotFound[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *AppNotFound) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *AppNotFound) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s AppNotFoundDetails) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields implements json.Marshaler.
+func (s AppNotFoundDetails) encodeFields(e *jx.Encoder) {
+	for k, elem := range s {
+		e.FieldStart(k)
+
+		if len(elem) != 0 {
+			e.Raw(elem)
+		}
+	}
+}
+
+// Decode decodes AppNotFoundDetails from json.
+func (s *AppNotFoundDetails) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode AppNotFoundDetails to nil")
+	}
+	m := s.init()
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		var elem jx.Raw
+		if err := func() error {
+			v, err := d.RawAppend(nil)
+			elem = jx.Raw(v)
+			if err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrapf(err, "decode field %q", k)
+		}
+		m[string(k)] = elem
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode AppNotFoundDetails")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s AppNotFoundDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *AppNotFoundDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *AppPermissionDenied) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *AppPermissionDenied) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("code")
+		e.Str("app.permission_denied")
+	}
+	{
+		e.FieldStart("message")
+		e.Str(s.Message)
+	}
+	{
+		if s.Details.Set {
+			e.FieldStart("details")
+			s.Details.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfAppPermissionDenied = [3]string{
+	0: "code",
+	1: "message",
+	2: "details",
+}
+
+// Decode decodes AppPermissionDenied from json.
+func (s *AppPermissionDenied) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode AppPermissionDenied to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "code":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.Code = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"code\"")
+			}
+		case "message":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := d.Str()
+				s.Message = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"message\"")
+			}
+		case "details":
+			if err := func() error {
+				s.Details.Reset()
+				if err := s.Details.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"details\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode AppPermissionDenied")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfAppPermissionDenied) {
+					name = jsonFieldsNameOfAppPermissionDenied[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *AppPermissionDenied) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *AppPermissionDenied) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s AppPermissionDeniedDetails) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields implements json.Marshaler.
+func (s AppPermissionDeniedDetails) encodeFields(e *jx.Encoder) {
+	for k, elem := range s {
+		e.FieldStart(k)
+
+		if len(elem) != 0 {
+			e.Raw(elem)
+		}
+	}
+}
+
+// Decode decodes AppPermissionDeniedDetails from json.
+func (s *AppPermissionDeniedDetails) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode AppPermissionDeniedDetails to nil")
+	}
+	m := s.init()
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		var elem jx.Raw
+		if err := func() error {
+			v, err := d.RawAppend(nil)
+			elem = jx.Raw(v)
+			if err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrapf(err, "decode field %q", k)
+		}
+		m[string(k)] = elem
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode AppPermissionDeniedDetails")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s AppPermissionDeniedDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *AppPermissionDeniedDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *AppRevisionConflict) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *AppRevisionConflict) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("code")
+		e.Str("app.revision_conflict")
+	}
+	{
+		e.FieldStart("message")
+		e.Str(s.Message)
+	}
+	{
+		if s.Details.Set {
+			e.FieldStart("details")
+			s.Details.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfAppRevisionConflict = [3]string{
+	0: "code",
+	1: "message",
+	2: "details",
+}
+
+// Decode decodes AppRevisionConflict from json.
+func (s *AppRevisionConflict) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode AppRevisionConflict to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "code":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.Code = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"code\"")
+			}
+		case "message":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := d.Str()
+				s.Message = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"message\"")
+			}
+		case "details":
+			if err := func() error {
+				s.Details.Reset()
+				if err := s.Details.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"details\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode AppRevisionConflict")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfAppRevisionConflict) {
+					name = jsonFieldsNameOfAppRevisionConflict[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *AppRevisionConflict) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *AppRevisionConflict) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s AppRevisionConflictDetails) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields implements json.Marshaler.
+func (s AppRevisionConflictDetails) encodeFields(e *jx.Encoder) {
+	for k, elem := range s {
+		e.FieldStart(k)
+
+		if len(elem) != 0 {
+			e.Raw(elem)
+		}
+	}
+}
+
+// Decode decodes AppRevisionConflictDetails from json.
+func (s *AppRevisionConflictDetails) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode AppRevisionConflictDetails to nil")
+	}
+	m := s.init()
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		var elem jx.Raw
+		if err := func() error {
+			v, err := d.RawAppend(nil)
+			elem = jx.Raw(v)
+			if err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrapf(err, "decode field %q", k)
+		}
+		m[string(k)] = elem
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode AppRevisionConflictDetails")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s AppRevisionConflictDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *AppRevisionConflictDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
 func (s *Application) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
@@ -2029,6 +3157,768 @@ func (s *ApplicationClientType) UnmarshalJSON(data []byte) error {
 }
 
 // Encode implements json.Marshaler.
+func (s *ApplicationCreatedEvent) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *ApplicationCreatedEvent) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("id")
+		e.Str(s.ID)
+	}
+	{
+		e.FieldStart("project_id")
+		s.ProjectID.Encode(e)
+	}
+	{
+		if s.TeamID.Set {
+			e.FieldStart("team_id")
+			s.TeamID.Encode(e)
+		}
+	}
+	{
+		e.FieldStart("event_type")
+		e.Str("application.created")
+	}
+	{
+		e.FieldStart("category")
+		s.Category.Encode(e)
+	}
+	{
+		e.FieldStart("occurred_at")
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
+	}
+	{
+		e.FieldStart("created_at")
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
+	}
+	{
+		if s.ActorID.Set {
+			e.FieldStart("actor_id")
+			s.ActorID.Encode(e)
+		}
+	}
+	{
+		if s.ActorType.Set {
+			e.FieldStart("actor_type")
+			s.ActorType.Encode(e)
+		}
+	}
+	{
+		if s.EntityType.Set {
+			e.FieldStart("entity_type")
+			s.EntityType.Encode(e)
+		}
+	}
+	{
+		if s.EntityID.Set {
+			e.FieldStart("entity_id")
+			s.EntityID.Encode(e)
+		}
+	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
+		}
+	}
+	{
+		e.FieldStart("client_id")
+		e.Str(s.ClientID)
+	}
+	{
+		if s.TokenID.Set {
+			e.FieldStart("token_id")
+			s.TokenID.Encode(e)
+		}
+	}
+	{
+		if s.DelegationType.Set {
+			e.FieldStart("delegation_type")
+			s.DelegationType.Encode(e)
+		}
+	}
+	{
+		if s.DelegationID.Set {
+			e.FieldStart("delegation_id")
+			s.DelegationID.Encode(e)
+		}
+	}
+	{
+		if s.Grantor.Set {
+			e.FieldStart("grantor")
+			s.Grantor.Encode(e)
+		}
+	}
+	{
+		if s.Fingerprint.Set {
+			e.FieldStart("fingerprint")
+			s.Fingerprint.Encode(e)
+		}
+	}
+	{
+		if s.RequestID.Set {
+			e.FieldStart("request_id")
+			s.RequestID.Encode(e)
+		}
+	}
+	{
+		if s.SessionID.Set {
+			e.FieldStart("session_id")
+			s.SessionID.Encode(e)
+		}
+	}
+	{
+		if s.FlowID.Set {
+			e.FieldStart("flow_id")
+			s.FlowID.Encode(e)
+		}
+	}
+	{
+		if s.Metadata.Set {
+			e.FieldStart("metadata")
+			s.Metadata.Encode(e)
+		}
+	}
+	{
+		e.FieldStart("payload")
+		s.Payload.Encode(e)
+	}
+}
+
+var jsonFieldsNameOfApplicationCreatedEvent = [23]string{
+	0:  "id",
+	1:  "project_id",
+	2:  "team_id",
+	3:  "event_type",
+	4:  "category",
+	5:  "occurred_at",
+	6:  "created_at",
+	7:  "actor_id",
+	8:  "actor_type",
+	9:  "entity_type",
+	10: "entity_id",
+	11: "user_id",
+	12: "client_id",
+	13: "token_id",
+	14: "delegation_type",
+	15: "delegation_id",
+	16: "grantor",
+	17: "fingerprint",
+	18: "request_id",
+	19: "session_id",
+	20: "flow_id",
+	21: "metadata",
+	22: "payload",
+}
+
+// Decode decodes ApplicationCreatedEvent from json.
+func (s *ApplicationCreatedEvent) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ApplicationCreatedEvent to nil")
+	}
+	var requiredBitSet [3]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "id":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.ID = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"id\"")
+			}
+		case "project_id":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				if err := s.ProjectID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"project_id\"")
+			}
+		case "team_id":
+			if err := func() error {
+				s.TeamID.Reset()
+				if err := s.TeamID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"team_id\"")
+			}
+		case "event_type":
+			requiredBitSet[0] |= 1 << 3
+			if err := func() error {
+				v, err := d.Str()
+				s.EventType = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"event_type\"")
+			}
+		case "category":
+			requiredBitSet[0] |= 1 << 4
+			if err := func() error {
+				if err := s.Category.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"category\"")
+			}
+		case "occurred_at":
+			requiredBitSet[0] |= 1 << 5
+			if err := func() error {
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
+				s.OccurredAt = v
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"occurred_at\"")
+			}
+		case "created_at":
+			requiredBitSet[0] |= 1 << 6
+			if err := func() error {
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
+				s.CreatedAt = v
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"created_at\"")
+			}
+		case "actor_id":
+			if err := func() error {
+				s.ActorID.Reset()
+				if err := s.ActorID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"actor_id\"")
+			}
+		case "actor_type":
+			if err := func() error {
+				s.ActorType.Reset()
+				if err := s.ActorType.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"actor_type\"")
+			}
+		case "entity_type":
+			if err := func() error {
+				s.EntityType.Reset()
+				if err := s.EntityType.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"entity_type\"")
+			}
+		case "entity_id":
+			if err := func() error {
+				s.EntityID.Reset()
+				if err := s.EntityID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"entity_id\"")
+			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
+		case "client_id":
+			requiredBitSet[1] |= 1 << 4
+			if err := func() error {
+				v, err := d.Str()
+				s.ClientID = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"client_id\"")
+			}
+		case "token_id":
+			if err := func() error {
+				s.TokenID.Reset()
+				if err := s.TokenID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"token_id\"")
+			}
+		case "delegation_type":
+			if err := func() error {
+				s.DelegationType.Reset()
+				if err := s.DelegationType.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"delegation_type\"")
+			}
+		case "delegation_id":
+			if err := func() error {
+				s.DelegationID.Reset()
+				if err := s.DelegationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"delegation_id\"")
+			}
+		case "grantor":
+			if err := func() error {
+				s.Grantor.Reset()
+				if err := s.Grantor.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"grantor\"")
+			}
+		case "fingerprint":
+			if err := func() error {
+				s.Fingerprint.Reset()
+				if err := s.Fingerprint.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"fingerprint\"")
+			}
+		case "request_id":
+			if err := func() error {
+				s.RequestID.Reset()
+				if err := s.RequestID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"request_id\"")
+			}
+		case "session_id":
+			if err := func() error {
+				s.SessionID.Reset()
+				if err := s.SessionID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"session_id\"")
+			}
+		case "flow_id":
+			if err := func() error {
+				s.FlowID.Reset()
+				if err := s.FlowID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"flow_id\"")
+			}
+		case "metadata":
+			if err := func() error {
+				s.Metadata.Reset()
+				if err := s.Metadata.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"metadata\"")
+			}
+		case "payload":
+			requiredBitSet[2] |= 1 << 6
+			if err := func() error {
+				if err := s.Payload.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"payload\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode ApplicationCreatedEvent")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [3]uint8{
+		0b01111011,
+		0b00010000,
+		0b01000000,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfApplicationCreatedEvent) {
+					name = jsonFieldsNameOfApplicationCreatedEvent[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *ApplicationCreatedEvent) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ApplicationCreatedEvent) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes ApplicationCreatedEventActorType as json.
+func (s ApplicationCreatedEventActorType) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes ApplicationCreatedEventActorType from json.
+func (s *ApplicationCreatedEventActorType) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ApplicationCreatedEventActorType to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch ApplicationCreatedEventActorType(v) {
+	case ApplicationCreatedEventActorTypeHuman:
+		*s = ApplicationCreatedEventActorTypeHuman
+	case ApplicationCreatedEventActorTypeService:
+		*s = ApplicationCreatedEventActorTypeService
+	case ApplicationCreatedEventActorTypeSystem:
+		*s = ApplicationCreatedEventActorTypeSystem
+	case ApplicationCreatedEventActorTypeAgent:
+		*s = ApplicationCreatedEventActorTypeAgent
+	default:
+		*s = ApplicationCreatedEventActorType(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s ApplicationCreatedEventActorType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ApplicationCreatedEventActorType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes ApplicationCreatedEventCategory as json.
+func (s ApplicationCreatedEventCategory) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes ApplicationCreatedEventCategory from json.
+func (s *ApplicationCreatedEventCategory) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ApplicationCreatedEventCategory to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch ApplicationCreatedEventCategory(v) {
+	case ApplicationCreatedEventCategoryRequest:
+		*s = ApplicationCreatedEventCategoryRequest
+	case ApplicationCreatedEventCategoryAuth:
+		*s = ApplicationCreatedEventCategoryAuth
+	case ApplicationCreatedEventCategorySession:
+		*s = ApplicationCreatedEventCategorySession
+	case ApplicationCreatedEventCategoryAdmin:
+		*s = ApplicationCreatedEventCategoryAdmin
+	case ApplicationCreatedEventCategoryEntity:
+		*s = ApplicationCreatedEventCategoryEntity
+	case ApplicationCreatedEventCategorySignal:
+		*s = ApplicationCreatedEventCategorySignal
+	default:
+		*s = ApplicationCreatedEventCategory(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s ApplicationCreatedEventCategory) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ApplicationCreatedEventCategory) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes ApplicationCreatedEventDelegationType as json.
+func (s ApplicationCreatedEventDelegationType) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes ApplicationCreatedEventDelegationType from json.
+func (s *ApplicationCreatedEventDelegationType) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ApplicationCreatedEventDelegationType to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch ApplicationCreatedEventDelegationType(v) {
+	case ApplicationCreatedEventDelegationTypeDirect:
+		*s = ApplicationCreatedEventDelegationTypeDirect
+	case ApplicationCreatedEventDelegationTypeDelegated:
+		*s = ApplicationCreatedEventDelegationTypeDelegated
+	case ApplicationCreatedEventDelegationTypePatShared:
+		*s = ApplicationCreatedEventDelegationTypePatShared
+	case ApplicationCreatedEventDelegationTypeExchanged:
+		*s = ApplicationCreatedEventDelegationTypeExchanged
+	default:
+		*s = ApplicationCreatedEventDelegationType(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s ApplicationCreatedEventDelegationType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ApplicationCreatedEventDelegationType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *ApplicationPayload) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *ApplicationPayload) encodeFields(e *jx.Encoder) {
+	{
+		if s.Slug.Set {
+			e.FieldStart("slug")
+			s.Slug.Encode(e)
+		}
+	}
+	{
+		if s.Name.Set {
+			e.FieldStart("name")
+			s.Name.Encode(e)
+		}
+	}
+	{
+		if s.ClientIds != nil {
+			e.FieldStart("client_ids")
+			e.ArrStart()
+			for _, elem := range s.ClientIds {
+				e.Str(elem)
+			}
+			e.ArrEnd()
+		}
+	}
+	{
+		e.FieldStart("revision_id")
+		e.Str(s.RevisionID)
+	}
+}
+
+var jsonFieldsNameOfApplicationPayload = [4]string{
+	0: "slug",
+	1: "name",
+	2: "client_ids",
+	3: "revision_id",
+}
+
+// Decode decodes ApplicationPayload from json.
+func (s *ApplicationPayload) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ApplicationPayload to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "slug":
+			if err := func() error {
+				s.Slug.Reset()
+				if err := s.Slug.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"slug\"")
+			}
+		case "name":
+			if err := func() error {
+				s.Name.Reset()
+				if err := s.Name.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"name\"")
+			}
+		case "client_ids":
+			if err := func() error {
+				s.ClientIds = make([]string, 0)
+				if err := d.Arr(func(d *jx.Decoder) error {
+					var elem string
+					v, err := d.Str()
+					elem = string(v)
+					if err != nil {
+						return err
+					}
+					s.ClientIds = append(s.ClientIds, elem)
+					return nil
+				}); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"client_ids\"")
+			}
+		case "revision_id":
+			requiredBitSet[0] |= 1 << 3
+			if err := func() error {
+				v, err := d.Str()
+				s.RevisionID = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"revision_id\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode ApplicationPayload")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00001000,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfApplicationPayload) {
+					name = jsonFieldsNameOfApplicationPayload[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *ApplicationPayload) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ApplicationPayload) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
 func (s *ApplicationResponse) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
@@ -2203,6 +4093,608 @@ func (s *ApplicationResponse) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *ApplicationResponse) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *ApplicationUpdatedEvent) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *ApplicationUpdatedEvent) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("id")
+		e.Str(s.ID)
+	}
+	{
+		e.FieldStart("project_id")
+		s.ProjectID.Encode(e)
+	}
+	{
+		if s.TeamID.Set {
+			e.FieldStart("team_id")
+			s.TeamID.Encode(e)
+		}
+	}
+	{
+		e.FieldStart("event_type")
+		e.Str("application.updated")
+	}
+	{
+		e.FieldStart("category")
+		s.Category.Encode(e)
+	}
+	{
+		e.FieldStart("occurred_at")
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
+	}
+	{
+		e.FieldStart("created_at")
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
+	}
+	{
+		if s.ActorID.Set {
+			e.FieldStart("actor_id")
+			s.ActorID.Encode(e)
+		}
+	}
+	{
+		if s.ActorType.Set {
+			e.FieldStart("actor_type")
+			s.ActorType.Encode(e)
+		}
+	}
+	{
+		if s.EntityType.Set {
+			e.FieldStart("entity_type")
+			s.EntityType.Encode(e)
+		}
+	}
+	{
+		if s.EntityID.Set {
+			e.FieldStart("entity_id")
+			s.EntityID.Encode(e)
+		}
+	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
+		}
+	}
+	{
+		e.FieldStart("client_id")
+		e.Str(s.ClientID)
+	}
+	{
+		if s.TokenID.Set {
+			e.FieldStart("token_id")
+			s.TokenID.Encode(e)
+		}
+	}
+	{
+		if s.DelegationType.Set {
+			e.FieldStart("delegation_type")
+			s.DelegationType.Encode(e)
+		}
+	}
+	{
+		if s.DelegationID.Set {
+			e.FieldStart("delegation_id")
+			s.DelegationID.Encode(e)
+		}
+	}
+	{
+		if s.Grantor.Set {
+			e.FieldStart("grantor")
+			s.Grantor.Encode(e)
+		}
+	}
+	{
+		if s.Fingerprint.Set {
+			e.FieldStart("fingerprint")
+			s.Fingerprint.Encode(e)
+		}
+	}
+	{
+		if s.RequestID.Set {
+			e.FieldStart("request_id")
+			s.RequestID.Encode(e)
+		}
+	}
+	{
+		if s.SessionID.Set {
+			e.FieldStart("session_id")
+			s.SessionID.Encode(e)
+		}
+	}
+	{
+		if s.FlowID.Set {
+			e.FieldStart("flow_id")
+			s.FlowID.Encode(e)
+		}
+	}
+	{
+		if s.Metadata.Set {
+			e.FieldStart("metadata")
+			s.Metadata.Encode(e)
+		}
+	}
+	{
+		e.FieldStart("payload")
+		s.Payload.Encode(e)
+	}
+}
+
+var jsonFieldsNameOfApplicationUpdatedEvent = [23]string{
+	0:  "id",
+	1:  "project_id",
+	2:  "team_id",
+	3:  "event_type",
+	4:  "category",
+	5:  "occurred_at",
+	6:  "created_at",
+	7:  "actor_id",
+	8:  "actor_type",
+	9:  "entity_type",
+	10: "entity_id",
+	11: "user_id",
+	12: "client_id",
+	13: "token_id",
+	14: "delegation_type",
+	15: "delegation_id",
+	16: "grantor",
+	17: "fingerprint",
+	18: "request_id",
+	19: "session_id",
+	20: "flow_id",
+	21: "metadata",
+	22: "payload",
+}
+
+// Decode decodes ApplicationUpdatedEvent from json.
+func (s *ApplicationUpdatedEvent) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ApplicationUpdatedEvent to nil")
+	}
+	var requiredBitSet [3]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "id":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.ID = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"id\"")
+			}
+		case "project_id":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				if err := s.ProjectID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"project_id\"")
+			}
+		case "team_id":
+			if err := func() error {
+				s.TeamID.Reset()
+				if err := s.TeamID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"team_id\"")
+			}
+		case "event_type":
+			requiredBitSet[0] |= 1 << 3
+			if err := func() error {
+				v, err := d.Str()
+				s.EventType = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"event_type\"")
+			}
+		case "category":
+			requiredBitSet[0] |= 1 << 4
+			if err := func() error {
+				if err := s.Category.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"category\"")
+			}
+		case "occurred_at":
+			requiredBitSet[0] |= 1 << 5
+			if err := func() error {
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
+				s.OccurredAt = v
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"occurred_at\"")
+			}
+		case "created_at":
+			requiredBitSet[0] |= 1 << 6
+			if err := func() error {
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
+				s.CreatedAt = v
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"created_at\"")
+			}
+		case "actor_id":
+			if err := func() error {
+				s.ActorID.Reset()
+				if err := s.ActorID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"actor_id\"")
+			}
+		case "actor_type":
+			if err := func() error {
+				s.ActorType.Reset()
+				if err := s.ActorType.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"actor_type\"")
+			}
+		case "entity_type":
+			if err := func() error {
+				s.EntityType.Reset()
+				if err := s.EntityType.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"entity_type\"")
+			}
+		case "entity_id":
+			if err := func() error {
+				s.EntityID.Reset()
+				if err := s.EntityID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"entity_id\"")
+			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
+		case "client_id":
+			requiredBitSet[1] |= 1 << 4
+			if err := func() error {
+				v, err := d.Str()
+				s.ClientID = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"client_id\"")
+			}
+		case "token_id":
+			if err := func() error {
+				s.TokenID.Reset()
+				if err := s.TokenID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"token_id\"")
+			}
+		case "delegation_type":
+			if err := func() error {
+				s.DelegationType.Reset()
+				if err := s.DelegationType.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"delegation_type\"")
+			}
+		case "delegation_id":
+			if err := func() error {
+				s.DelegationID.Reset()
+				if err := s.DelegationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"delegation_id\"")
+			}
+		case "grantor":
+			if err := func() error {
+				s.Grantor.Reset()
+				if err := s.Grantor.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"grantor\"")
+			}
+		case "fingerprint":
+			if err := func() error {
+				s.Fingerprint.Reset()
+				if err := s.Fingerprint.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"fingerprint\"")
+			}
+		case "request_id":
+			if err := func() error {
+				s.RequestID.Reset()
+				if err := s.RequestID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"request_id\"")
+			}
+		case "session_id":
+			if err := func() error {
+				s.SessionID.Reset()
+				if err := s.SessionID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"session_id\"")
+			}
+		case "flow_id":
+			if err := func() error {
+				s.FlowID.Reset()
+				if err := s.FlowID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"flow_id\"")
+			}
+		case "metadata":
+			if err := func() error {
+				s.Metadata.Reset()
+				if err := s.Metadata.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"metadata\"")
+			}
+		case "payload":
+			requiredBitSet[2] |= 1 << 6
+			if err := func() error {
+				if err := s.Payload.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"payload\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode ApplicationUpdatedEvent")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [3]uint8{
+		0b01111011,
+		0b00010000,
+		0b01000000,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfApplicationUpdatedEvent) {
+					name = jsonFieldsNameOfApplicationUpdatedEvent[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *ApplicationUpdatedEvent) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ApplicationUpdatedEvent) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes ApplicationUpdatedEventActorType as json.
+func (s ApplicationUpdatedEventActorType) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes ApplicationUpdatedEventActorType from json.
+func (s *ApplicationUpdatedEventActorType) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ApplicationUpdatedEventActorType to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch ApplicationUpdatedEventActorType(v) {
+	case ApplicationUpdatedEventActorTypeHuman:
+		*s = ApplicationUpdatedEventActorTypeHuman
+	case ApplicationUpdatedEventActorTypeService:
+		*s = ApplicationUpdatedEventActorTypeService
+	case ApplicationUpdatedEventActorTypeSystem:
+		*s = ApplicationUpdatedEventActorTypeSystem
+	case ApplicationUpdatedEventActorTypeAgent:
+		*s = ApplicationUpdatedEventActorTypeAgent
+	default:
+		*s = ApplicationUpdatedEventActorType(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s ApplicationUpdatedEventActorType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ApplicationUpdatedEventActorType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes ApplicationUpdatedEventCategory as json.
+func (s ApplicationUpdatedEventCategory) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes ApplicationUpdatedEventCategory from json.
+func (s *ApplicationUpdatedEventCategory) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ApplicationUpdatedEventCategory to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch ApplicationUpdatedEventCategory(v) {
+	case ApplicationUpdatedEventCategoryRequest:
+		*s = ApplicationUpdatedEventCategoryRequest
+	case ApplicationUpdatedEventCategoryAuth:
+		*s = ApplicationUpdatedEventCategoryAuth
+	case ApplicationUpdatedEventCategorySession:
+		*s = ApplicationUpdatedEventCategorySession
+	case ApplicationUpdatedEventCategoryAdmin:
+		*s = ApplicationUpdatedEventCategoryAdmin
+	case ApplicationUpdatedEventCategoryEntity:
+		*s = ApplicationUpdatedEventCategoryEntity
+	case ApplicationUpdatedEventCategorySignal:
+		*s = ApplicationUpdatedEventCategorySignal
+	default:
+		*s = ApplicationUpdatedEventCategory(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s ApplicationUpdatedEventCategory) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ApplicationUpdatedEventCategory) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes ApplicationUpdatedEventDelegationType as json.
+func (s ApplicationUpdatedEventDelegationType) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes ApplicationUpdatedEventDelegationType from json.
+func (s *ApplicationUpdatedEventDelegationType) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ApplicationUpdatedEventDelegationType to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch ApplicationUpdatedEventDelegationType(v) {
+	case ApplicationUpdatedEventDelegationTypeDirect:
+		*s = ApplicationUpdatedEventDelegationTypeDirect
+	case ApplicationUpdatedEventDelegationTypeDelegated:
+		*s = ApplicationUpdatedEventDelegationTypeDelegated
+	case ApplicationUpdatedEventDelegationTypePatShared:
+		*s = ApplicationUpdatedEventDelegationTypePatShared
+	case ApplicationUpdatedEventDelegationTypeExchanged:
+		*s = ApplicationUpdatedEventDelegationTypeExchanged
+	default:
+		*s = ApplicationUpdatedEventDelegationType(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s ApplicationUpdatedEventDelegationType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ApplicationUpdatedEventDelegationType) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -3784,11 +6276,11 @@ func (s *AuthAttemptCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -3812,6 +6304,12 @@ func (s *AuthAttemptCreatedEvent) encodeFields(e *jx.Encoder) {
 		if s.EntityID.Set {
 			e.FieldStart("entity_id")
 			s.EntityID.Encode(e)
+		}
+	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
 		}
 	}
 	{
@@ -3878,7 +6376,7 @@ func (s *AuthAttemptCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfAuthAttemptCreatedEvent = [22]string{
+var jsonFieldsNameOfAuthAttemptCreatedEvent = [23]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -3890,17 +6388,18 @@ var jsonFieldsNameOfAuthAttemptCreatedEvent = [22]string{
 	8:  "actor_type",
 	9:  "entity_type",
 	10: "entity_id",
-	11: "client_id",
-	12: "token_id",
-	13: "delegation_type",
-	14: "delegation_id",
-	15: "grantor",
-	16: "fingerprint",
-	17: "request_id",
-	18: "session_id",
-	19: "flow_id",
-	20: "metadata",
-	21: "payload",
+	11: "user_id",
+	12: "client_id",
+	13: "token_id",
+	14: "delegation_type",
+	15: "delegation_id",
+	16: "grantor",
+	17: "fingerprint",
+	18: "request_id",
+	19: "session_id",
+	20: "flow_id",
+	21: "metadata",
+	22: "payload",
 }
 
 // Decode decodes AuthAttemptCreatedEvent from json.
@@ -3969,7 +6468,7 @@ func (s *AuthAttemptCreatedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -3981,7 +6480,7 @@ func (s *AuthAttemptCreatedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -4030,8 +6529,18 @@ func (s *AuthAttemptCreatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"entity_id\"")
 			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
 		case "client_id":
-			requiredBitSet[1] |= 1 << 3
+			requiredBitSet[1] |= 1 << 4
 			if err := func() error {
 				v, err := d.Str()
 				s.ClientID = string(v)
@@ -4133,7 +6642,7 @@ func (s *AuthAttemptCreatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 5
+			requiredBitSet[2] |= 1 << 6
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -4153,8 +6662,8 @@ func (s *AuthAttemptCreatedEvent) Decode(d *jx.Decoder) error {
 	var failures []validate.FieldError
 	for i, mask := range [3]uint8{
 		0b01111011,
-		0b00001000,
-		0b00100000,
+		0b00010000,
+		0b01000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -4369,11 +6878,11 @@ func (s *AuthAttemptHandedOffEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -4397,6 +6906,12 @@ func (s *AuthAttemptHandedOffEvent) encodeFields(e *jx.Encoder) {
 		if s.EntityID.Set {
 			e.FieldStart("entity_id")
 			s.EntityID.Encode(e)
+		}
+	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
 		}
 	}
 	{
@@ -4463,7 +6978,7 @@ func (s *AuthAttemptHandedOffEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfAuthAttemptHandedOffEvent = [22]string{
+var jsonFieldsNameOfAuthAttemptHandedOffEvent = [23]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -4475,17 +6990,18 @@ var jsonFieldsNameOfAuthAttemptHandedOffEvent = [22]string{
 	8:  "actor_type",
 	9:  "entity_type",
 	10: "entity_id",
-	11: "client_id",
-	12: "token_id",
-	13: "delegation_type",
-	14: "delegation_id",
-	15: "grantor",
-	16: "fingerprint",
-	17: "request_id",
-	18: "session_id",
-	19: "flow_id",
-	20: "metadata",
-	21: "payload",
+	11: "user_id",
+	12: "client_id",
+	13: "token_id",
+	14: "delegation_type",
+	15: "delegation_id",
+	16: "grantor",
+	17: "fingerprint",
+	18: "request_id",
+	19: "session_id",
+	20: "flow_id",
+	21: "metadata",
+	22: "payload",
 }
 
 // Decode decodes AuthAttemptHandedOffEvent from json.
@@ -4554,7 +7070,7 @@ func (s *AuthAttemptHandedOffEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -4566,7 +7082,7 @@ func (s *AuthAttemptHandedOffEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -4615,8 +7131,18 @@ func (s *AuthAttemptHandedOffEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"entity_id\"")
 			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
 		case "client_id":
-			requiredBitSet[1] |= 1 << 3
+			requiredBitSet[1] |= 1 << 4
 			if err := func() error {
 				v, err := d.Str()
 				s.ClientID = string(v)
@@ -4718,7 +7244,7 @@ func (s *AuthAttemptHandedOffEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 5
+			requiredBitSet[2] |= 1 << 6
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -4738,8 +7264,8 @@ func (s *AuthAttemptHandedOffEvent) Decode(d *jx.Decoder) error {
 	var failures []validate.FieldError
 	for i, mask := range [3]uint8{
 		0b01111011,
-		0b00001000,
-		0b00100000,
+		0b00010000,
+		0b01000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -5275,11 +7801,11 @@ func (s *AuthCheckFailedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -5303,6 +7829,12 @@ func (s *AuthCheckFailedEvent) encodeFields(e *jx.Encoder) {
 		if s.EntityID.Set {
 			e.FieldStart("entity_id")
 			s.EntityID.Encode(e)
+		}
+	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
 		}
 	}
 	{
@@ -5369,7 +7901,7 @@ func (s *AuthCheckFailedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfAuthCheckFailedEvent = [22]string{
+var jsonFieldsNameOfAuthCheckFailedEvent = [23]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -5381,17 +7913,18 @@ var jsonFieldsNameOfAuthCheckFailedEvent = [22]string{
 	8:  "actor_type",
 	9:  "entity_type",
 	10: "entity_id",
-	11: "client_id",
-	12: "token_id",
-	13: "delegation_type",
-	14: "delegation_id",
-	15: "grantor",
-	16: "fingerprint",
-	17: "request_id",
-	18: "session_id",
-	19: "flow_id",
-	20: "metadata",
-	21: "payload",
+	11: "user_id",
+	12: "client_id",
+	13: "token_id",
+	14: "delegation_type",
+	15: "delegation_id",
+	16: "grantor",
+	17: "fingerprint",
+	18: "request_id",
+	19: "session_id",
+	20: "flow_id",
+	21: "metadata",
+	22: "payload",
 }
 
 // Decode decodes AuthCheckFailedEvent from json.
@@ -5460,7 +7993,7 @@ func (s *AuthCheckFailedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -5472,7 +8005,7 @@ func (s *AuthCheckFailedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -5521,8 +8054,18 @@ func (s *AuthCheckFailedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"entity_id\"")
 			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
 		case "client_id":
-			requiredBitSet[1] |= 1 << 3
+			requiredBitSet[1] |= 1 << 4
 			if err := func() error {
 				v, err := d.Str()
 				s.ClientID = string(v)
@@ -5624,7 +8167,7 @@ func (s *AuthCheckFailedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 5
+			requiredBitSet[2] |= 1 << 6
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -5644,8 +8187,8 @@ func (s *AuthCheckFailedEvent) Decode(d *jx.Decoder) error {
 	var failures []validate.FieldError
 	for i, mask := range [3]uint8{
 		0b01111011,
-		0b00001000,
-		0b00100000,
+		0b00010000,
+		0b01000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -5990,11 +8533,11 @@ func (s *AuthCheckSucceededEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -6018,6 +8561,12 @@ func (s *AuthCheckSucceededEvent) encodeFields(e *jx.Encoder) {
 		if s.EntityID.Set {
 			e.FieldStart("entity_id")
 			s.EntityID.Encode(e)
+		}
+	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
 		}
 	}
 	{
@@ -6084,7 +8633,7 @@ func (s *AuthCheckSucceededEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfAuthCheckSucceededEvent = [22]string{
+var jsonFieldsNameOfAuthCheckSucceededEvent = [23]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -6096,17 +8645,18 @@ var jsonFieldsNameOfAuthCheckSucceededEvent = [22]string{
 	8:  "actor_type",
 	9:  "entity_type",
 	10: "entity_id",
-	11: "client_id",
-	12: "token_id",
-	13: "delegation_type",
-	14: "delegation_id",
-	15: "grantor",
-	16: "fingerprint",
-	17: "request_id",
-	18: "session_id",
-	19: "flow_id",
-	20: "metadata",
-	21: "payload",
+	11: "user_id",
+	12: "client_id",
+	13: "token_id",
+	14: "delegation_type",
+	15: "delegation_id",
+	16: "grantor",
+	17: "fingerprint",
+	18: "request_id",
+	19: "session_id",
+	20: "flow_id",
+	21: "metadata",
+	22: "payload",
 }
 
 // Decode decodes AuthCheckSucceededEvent from json.
@@ -6175,7 +8725,7 @@ func (s *AuthCheckSucceededEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -6187,7 +8737,7 @@ func (s *AuthCheckSucceededEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -6236,8 +8786,18 @@ func (s *AuthCheckSucceededEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"entity_id\"")
 			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
 		case "client_id":
-			requiredBitSet[1] |= 1 << 3
+			requiredBitSet[1] |= 1 << 4
 			if err := func() error {
 				v, err := d.Str()
 				s.ClientID = string(v)
@@ -6339,7 +8899,7 @@ func (s *AuthCheckSucceededEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 5
+			requiredBitSet[2] |= 1 << 6
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -6359,8 +8919,8 @@ func (s *AuthCheckSucceededEvent) Decode(d *jx.Decoder) error {
 	var failures []validate.FieldError
 	for i, mask := range [3]uint8{
 		0b01111011,
-		0b00001000,
-		0b00100000,
+		0b00010000,
+		0b01000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -6763,11 +9323,11 @@ func (s *AuthFactorPasskeyEnrolledEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -6791,6 +9351,12 @@ func (s *AuthFactorPasskeyEnrolledEvent) encodeFields(e *jx.Encoder) {
 		if s.EntityID.Set {
 			e.FieldStart("entity_id")
 			s.EntityID.Encode(e)
+		}
+	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
 		}
 	}
 	{
@@ -6857,7 +9423,7 @@ func (s *AuthFactorPasskeyEnrolledEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfAuthFactorPasskeyEnrolledEvent = [22]string{
+var jsonFieldsNameOfAuthFactorPasskeyEnrolledEvent = [23]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -6869,17 +9435,18 @@ var jsonFieldsNameOfAuthFactorPasskeyEnrolledEvent = [22]string{
 	8:  "actor_type",
 	9:  "entity_type",
 	10: "entity_id",
-	11: "client_id",
-	12: "token_id",
-	13: "delegation_type",
-	14: "delegation_id",
-	15: "grantor",
-	16: "fingerprint",
-	17: "request_id",
-	18: "session_id",
-	19: "flow_id",
-	20: "metadata",
-	21: "payload",
+	11: "user_id",
+	12: "client_id",
+	13: "token_id",
+	14: "delegation_type",
+	15: "delegation_id",
+	16: "grantor",
+	17: "fingerprint",
+	18: "request_id",
+	19: "session_id",
+	20: "flow_id",
+	21: "metadata",
+	22: "payload",
 }
 
 // Decode decodes AuthFactorPasskeyEnrolledEvent from json.
@@ -6948,7 +9515,7 @@ func (s *AuthFactorPasskeyEnrolledEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -6960,7 +9527,7 @@ func (s *AuthFactorPasskeyEnrolledEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -7009,8 +9576,18 @@ func (s *AuthFactorPasskeyEnrolledEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"entity_id\"")
 			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
 		case "client_id":
-			requiredBitSet[1] |= 1 << 3
+			requiredBitSet[1] |= 1 << 4
 			if err := func() error {
 				v, err := d.Str()
 				s.ClientID = string(v)
@@ -7112,7 +9689,7 @@ func (s *AuthFactorPasskeyEnrolledEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 5
+			requiredBitSet[2] |= 1 << 6
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -7132,8 +9709,8 @@ func (s *AuthFactorPasskeyEnrolledEvent) Decode(d *jx.Decoder) error {
 	var failures []validate.FieldError
 	for i, mask := range [3]uint8{
 		0b01111011,
-		0b00001000,
-		0b00100000,
+		0b00010000,
+		0b01000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -7348,11 +9925,11 @@ func (s *AuthFactorPasswordSetEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -7376,6 +9953,12 @@ func (s *AuthFactorPasswordSetEvent) encodeFields(e *jx.Encoder) {
 		if s.EntityID.Set {
 			e.FieldStart("entity_id")
 			s.EntityID.Encode(e)
+		}
+	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
 		}
 	}
 	{
@@ -7442,7 +10025,7 @@ func (s *AuthFactorPasswordSetEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfAuthFactorPasswordSetEvent = [22]string{
+var jsonFieldsNameOfAuthFactorPasswordSetEvent = [23]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -7454,17 +10037,18 @@ var jsonFieldsNameOfAuthFactorPasswordSetEvent = [22]string{
 	8:  "actor_type",
 	9:  "entity_type",
 	10: "entity_id",
-	11: "client_id",
-	12: "token_id",
-	13: "delegation_type",
-	14: "delegation_id",
-	15: "grantor",
-	16: "fingerprint",
-	17: "request_id",
-	18: "session_id",
-	19: "flow_id",
-	20: "metadata",
-	21: "payload",
+	11: "user_id",
+	12: "client_id",
+	13: "token_id",
+	14: "delegation_type",
+	15: "delegation_id",
+	16: "grantor",
+	17: "fingerprint",
+	18: "request_id",
+	19: "session_id",
+	20: "flow_id",
+	21: "metadata",
+	22: "payload",
 }
 
 // Decode decodes AuthFactorPasswordSetEvent from json.
@@ -7533,7 +10117,7 @@ func (s *AuthFactorPasswordSetEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -7545,7 +10129,7 @@ func (s *AuthFactorPasswordSetEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -7594,8 +10178,18 @@ func (s *AuthFactorPasswordSetEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"entity_id\"")
 			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
 		case "client_id":
-			requiredBitSet[1] |= 1 << 3
+			requiredBitSet[1] |= 1 << 4
 			if err := func() error {
 				v, err := d.Str()
 				s.ClientID = string(v)
@@ -7697,7 +10291,7 @@ func (s *AuthFactorPasswordSetEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 5
+			requiredBitSet[2] |= 1 << 6
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -7717,8 +10311,8 @@ func (s *AuthFactorPasswordSetEvent) Decode(d *jx.Decoder) error {
 	var failures []validate.FieldError
 	for i, mask := range [3]uint8{
 		0b01111011,
-		0b00001000,
-		0b00100000,
+		0b00010000,
+		0b01000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -8284,11 +10878,11 @@ func (s *AuthSSOAuthorizationFailedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -8312,6 +10906,12 @@ func (s *AuthSSOAuthorizationFailedEvent) encodeFields(e *jx.Encoder) {
 		if s.EntityID.Set {
 			e.FieldStart("entity_id")
 			s.EntityID.Encode(e)
+		}
+	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
 		}
 	}
 	{
@@ -8378,7 +10978,7 @@ func (s *AuthSSOAuthorizationFailedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfAuthSSOAuthorizationFailedEvent = [22]string{
+var jsonFieldsNameOfAuthSSOAuthorizationFailedEvent = [23]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -8390,17 +10990,18 @@ var jsonFieldsNameOfAuthSSOAuthorizationFailedEvent = [22]string{
 	8:  "actor_type",
 	9:  "entity_type",
 	10: "entity_id",
-	11: "client_id",
-	12: "token_id",
-	13: "delegation_type",
-	14: "delegation_id",
-	15: "grantor",
-	16: "fingerprint",
-	17: "request_id",
-	18: "session_id",
-	19: "flow_id",
-	20: "metadata",
-	21: "payload",
+	11: "user_id",
+	12: "client_id",
+	13: "token_id",
+	14: "delegation_type",
+	15: "delegation_id",
+	16: "grantor",
+	17: "fingerprint",
+	18: "request_id",
+	19: "session_id",
+	20: "flow_id",
+	21: "metadata",
+	22: "payload",
 }
 
 // Decode decodes AuthSSOAuthorizationFailedEvent from json.
@@ -8469,7 +11070,7 @@ func (s *AuthSSOAuthorizationFailedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -8481,7 +11082,7 @@ func (s *AuthSSOAuthorizationFailedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -8530,8 +11131,18 @@ func (s *AuthSSOAuthorizationFailedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"entity_id\"")
 			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
 		case "client_id":
-			requiredBitSet[1] |= 1 << 3
+			requiredBitSet[1] |= 1 << 4
 			if err := func() error {
 				v, err := d.Str()
 				s.ClientID = string(v)
@@ -8633,7 +11244,7 @@ func (s *AuthSSOAuthorizationFailedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 5
+			requiredBitSet[2] |= 1 << 6
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -8653,8 +11264,8 @@ func (s *AuthSSOAuthorizationFailedEvent) Decode(d *jx.Decoder) error {
 	var failures []validate.FieldError
 	for i, mask := range [3]uint8{
 		0b01111011,
-		0b00001000,
-		0b00100000,
+		0b00010000,
+		0b01000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -8869,11 +11480,11 @@ func (s *AuthSSOExchangeFailedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -8897,6 +11508,12 @@ func (s *AuthSSOExchangeFailedEvent) encodeFields(e *jx.Encoder) {
 		if s.EntityID.Set {
 			e.FieldStart("entity_id")
 			s.EntityID.Encode(e)
+		}
+	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
 		}
 	}
 	{
@@ -8963,7 +11580,7 @@ func (s *AuthSSOExchangeFailedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfAuthSSOExchangeFailedEvent = [22]string{
+var jsonFieldsNameOfAuthSSOExchangeFailedEvent = [23]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -8975,17 +11592,18 @@ var jsonFieldsNameOfAuthSSOExchangeFailedEvent = [22]string{
 	8:  "actor_type",
 	9:  "entity_type",
 	10: "entity_id",
-	11: "client_id",
-	12: "token_id",
-	13: "delegation_type",
-	14: "delegation_id",
-	15: "grantor",
-	16: "fingerprint",
-	17: "request_id",
-	18: "session_id",
-	19: "flow_id",
-	20: "metadata",
-	21: "payload",
+	11: "user_id",
+	12: "client_id",
+	13: "token_id",
+	14: "delegation_type",
+	15: "delegation_id",
+	16: "grantor",
+	17: "fingerprint",
+	18: "request_id",
+	19: "session_id",
+	20: "flow_id",
+	21: "metadata",
+	22: "payload",
 }
 
 // Decode decodes AuthSSOExchangeFailedEvent from json.
@@ -9054,7 +11672,7 @@ func (s *AuthSSOExchangeFailedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -9066,7 +11684,7 @@ func (s *AuthSSOExchangeFailedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -9115,8 +11733,18 @@ func (s *AuthSSOExchangeFailedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"entity_id\"")
 			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
 		case "client_id":
-			requiredBitSet[1] |= 1 << 3
+			requiredBitSet[1] |= 1 << 4
 			if err := func() error {
 				v, err := d.Str()
 				s.ClientID = string(v)
@@ -9218,7 +11846,7 @@ func (s *AuthSSOExchangeFailedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 5
+			requiredBitSet[2] |= 1 << 6
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -9238,8 +11866,8 @@ func (s *AuthSSOExchangeFailedEvent) Decode(d *jx.Decoder) error {
 	var failures []validate.FieldError
 	for i, mask := range [3]uint8{
 		0b01111011,
-		0b00001000,
-		0b00100000,
+		0b00010000,
+		0b01000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -9454,11 +12082,11 @@ func (s *AuthSSOExchangeSucceededEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -9482,6 +12110,12 @@ func (s *AuthSSOExchangeSucceededEvent) encodeFields(e *jx.Encoder) {
 		if s.EntityID.Set {
 			e.FieldStart("entity_id")
 			s.EntityID.Encode(e)
+		}
+	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
 		}
 	}
 	{
@@ -9548,7 +12182,7 @@ func (s *AuthSSOExchangeSucceededEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfAuthSSOExchangeSucceededEvent = [22]string{
+var jsonFieldsNameOfAuthSSOExchangeSucceededEvent = [23]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -9560,17 +12194,18 @@ var jsonFieldsNameOfAuthSSOExchangeSucceededEvent = [22]string{
 	8:  "actor_type",
 	9:  "entity_type",
 	10: "entity_id",
-	11: "client_id",
-	12: "token_id",
-	13: "delegation_type",
-	14: "delegation_id",
-	15: "grantor",
-	16: "fingerprint",
-	17: "request_id",
-	18: "session_id",
-	19: "flow_id",
-	20: "metadata",
-	21: "payload",
+	11: "user_id",
+	12: "client_id",
+	13: "token_id",
+	14: "delegation_type",
+	15: "delegation_id",
+	16: "grantor",
+	17: "fingerprint",
+	18: "request_id",
+	19: "session_id",
+	20: "flow_id",
+	21: "metadata",
+	22: "payload",
 }
 
 // Decode decodes AuthSSOExchangeSucceededEvent from json.
@@ -9639,7 +12274,7 @@ func (s *AuthSSOExchangeSucceededEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -9651,7 +12286,7 @@ func (s *AuthSSOExchangeSucceededEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -9700,8 +12335,18 @@ func (s *AuthSSOExchangeSucceededEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"entity_id\"")
 			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
 		case "client_id":
-			requiredBitSet[1] |= 1 << 3
+			requiredBitSet[1] |= 1 << 4
 			if err := func() error {
 				v, err := d.Str()
 				s.ClientID = string(v)
@@ -9803,7 +12448,7 @@ func (s *AuthSSOExchangeSucceededEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 5
+			requiredBitSet[2] |= 1 << 6
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -9823,8 +12468,8 @@ func (s *AuthSSOExchangeSucceededEvent) Decode(d *jx.Decoder) error {
 	var failures []validate.FieldError
 	for i, mask := range [3]uint8{
 		0b01111011,
-		0b00001000,
-		0b00100000,
+		0b00010000,
+		0b01000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -10039,11 +12684,11 @@ func (s *AuthTokenIssuedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -10067,6 +12712,12 @@ func (s *AuthTokenIssuedEvent) encodeFields(e *jx.Encoder) {
 		if s.EntityID.Set {
 			e.FieldStart("entity_id")
 			s.EntityID.Encode(e)
+		}
+	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
 		}
 	}
 	{
@@ -10133,7 +12784,7 @@ func (s *AuthTokenIssuedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfAuthTokenIssuedEvent = [22]string{
+var jsonFieldsNameOfAuthTokenIssuedEvent = [23]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -10145,17 +12796,18 @@ var jsonFieldsNameOfAuthTokenIssuedEvent = [22]string{
 	8:  "actor_type",
 	9:  "entity_type",
 	10: "entity_id",
-	11: "client_id",
-	12: "token_id",
-	13: "delegation_type",
-	14: "delegation_id",
-	15: "grantor",
-	16: "fingerprint",
-	17: "request_id",
-	18: "session_id",
-	19: "flow_id",
-	20: "metadata",
-	21: "payload",
+	11: "user_id",
+	12: "client_id",
+	13: "token_id",
+	14: "delegation_type",
+	15: "delegation_id",
+	16: "grantor",
+	17: "fingerprint",
+	18: "request_id",
+	19: "session_id",
+	20: "flow_id",
+	21: "metadata",
+	22: "payload",
 }
 
 // Decode decodes AuthTokenIssuedEvent from json.
@@ -10224,7 +12876,7 @@ func (s *AuthTokenIssuedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -10236,7 +12888,7 @@ func (s *AuthTokenIssuedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -10285,8 +12937,18 @@ func (s *AuthTokenIssuedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"entity_id\"")
 			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
 		case "client_id":
-			requiredBitSet[1] |= 1 << 3
+			requiredBitSet[1] |= 1 << 4
 			if err := func() error {
 				v, err := d.Str()
 				s.ClientID = string(v)
@@ -10388,7 +13050,7 @@ func (s *AuthTokenIssuedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 5
+			requiredBitSet[2] |= 1 << 6
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -10408,8 +13070,8 @@ func (s *AuthTokenIssuedEvent) Decode(d *jx.Decoder) error {
 	var failures []validate.FieldError
 	for i, mask := range [3]uint8{
 		0b01111011,
-		0b00001000,
-		0b00100000,
+		0b00010000,
+		0b01000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -10700,11 +13362,11 @@ func (s *AuthTokenRevokedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -10728,6 +13390,12 @@ func (s *AuthTokenRevokedEvent) encodeFields(e *jx.Encoder) {
 		if s.EntityID.Set {
 			e.FieldStart("entity_id")
 			s.EntityID.Encode(e)
+		}
+	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
 		}
 	}
 	{
@@ -10794,7 +13462,7 @@ func (s *AuthTokenRevokedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfAuthTokenRevokedEvent = [22]string{
+var jsonFieldsNameOfAuthTokenRevokedEvent = [23]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -10806,17 +13474,18 @@ var jsonFieldsNameOfAuthTokenRevokedEvent = [22]string{
 	8:  "actor_type",
 	9:  "entity_type",
 	10: "entity_id",
-	11: "client_id",
-	12: "token_id",
-	13: "delegation_type",
-	14: "delegation_id",
-	15: "grantor",
-	16: "fingerprint",
-	17: "request_id",
-	18: "session_id",
-	19: "flow_id",
-	20: "metadata",
-	21: "payload",
+	11: "user_id",
+	12: "client_id",
+	13: "token_id",
+	14: "delegation_type",
+	15: "delegation_id",
+	16: "grantor",
+	17: "fingerprint",
+	18: "request_id",
+	19: "session_id",
+	20: "flow_id",
+	21: "metadata",
+	22: "payload",
 }
 
 // Decode decodes AuthTokenRevokedEvent from json.
@@ -10885,7 +13554,7 @@ func (s *AuthTokenRevokedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -10897,7 +13566,7 @@ func (s *AuthTokenRevokedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -10946,8 +13615,18 @@ func (s *AuthTokenRevokedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"entity_id\"")
 			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
 		case "client_id":
-			requiredBitSet[1] |= 1 << 3
+			requiredBitSet[1] |= 1 << 4
 			if err := func() error {
 				v, err := d.Str()
 				s.ClientID = string(v)
@@ -11049,7 +13728,7 @@ func (s *AuthTokenRevokedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 5
+			requiredBitSet[2] |= 1 << 6
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -11069,8 +13748,8 @@ func (s *AuthTokenRevokedEvent) Decode(d *jx.Decoder) error {
 	var failures []validate.FieldError
 	for i, mask := range [3]uint8{
 		0b01111011,
-		0b00001000,
-		0b00100000,
+		0b00010000,
+		0b01000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -11473,11 +14152,11 @@ func (s *AuthzGrantedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -11501,6 +14180,12 @@ func (s *AuthzGrantedEvent) encodeFields(e *jx.Encoder) {
 		if s.EntityID.Set {
 			e.FieldStart("entity_id")
 			s.EntityID.Encode(e)
+		}
+	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
 		}
 	}
 	{
@@ -11567,7 +14252,7 @@ func (s *AuthzGrantedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfAuthzGrantedEvent = [22]string{
+var jsonFieldsNameOfAuthzGrantedEvent = [23]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -11579,17 +14264,18 @@ var jsonFieldsNameOfAuthzGrantedEvent = [22]string{
 	8:  "actor_type",
 	9:  "entity_type",
 	10: "entity_id",
-	11: "client_id",
-	12: "token_id",
-	13: "delegation_type",
-	14: "delegation_id",
-	15: "grantor",
-	16: "fingerprint",
-	17: "request_id",
-	18: "session_id",
-	19: "flow_id",
-	20: "metadata",
-	21: "payload",
+	11: "user_id",
+	12: "client_id",
+	13: "token_id",
+	14: "delegation_type",
+	15: "delegation_id",
+	16: "grantor",
+	17: "fingerprint",
+	18: "request_id",
+	19: "session_id",
+	20: "flow_id",
+	21: "metadata",
+	22: "payload",
 }
 
 // Decode decodes AuthzGrantedEvent from json.
@@ -11658,7 +14344,7 @@ func (s *AuthzGrantedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -11670,7 +14356,7 @@ func (s *AuthzGrantedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -11719,8 +14405,18 @@ func (s *AuthzGrantedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"entity_id\"")
 			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
 		case "client_id":
-			requiredBitSet[1] |= 1 << 3
+			requiredBitSet[1] |= 1 << 4
 			if err := func() error {
 				v, err := d.Str()
 				s.ClientID = string(v)
@@ -11822,7 +14518,7 @@ func (s *AuthzGrantedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 5
+			requiredBitSet[2] |= 1 << 6
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -11842,8 +14538,8 @@ func (s *AuthzGrantedEvent) Decode(d *jx.Decoder) error {
 	var failures []validate.FieldError
 	for i, mask := range [3]uint8{
 		0b01111011,
-		0b00001000,
-		0b00100000,
+		0b00010000,
+		0b01000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -12155,11 +14851,11 @@ func (s *AuthzRevokedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -12183,6 +14879,12 @@ func (s *AuthzRevokedEvent) encodeFields(e *jx.Encoder) {
 		if s.EntityID.Set {
 			e.FieldStart("entity_id")
 			s.EntityID.Encode(e)
+		}
+	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
 		}
 	}
 	{
@@ -12249,7 +14951,7 @@ func (s *AuthzRevokedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfAuthzRevokedEvent = [22]string{
+var jsonFieldsNameOfAuthzRevokedEvent = [23]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -12261,17 +14963,18 @@ var jsonFieldsNameOfAuthzRevokedEvent = [22]string{
 	8:  "actor_type",
 	9:  "entity_type",
 	10: "entity_id",
-	11: "client_id",
-	12: "token_id",
-	13: "delegation_type",
-	14: "delegation_id",
-	15: "grantor",
-	16: "fingerprint",
-	17: "request_id",
-	18: "session_id",
-	19: "flow_id",
-	20: "metadata",
-	21: "payload",
+	11: "user_id",
+	12: "client_id",
+	13: "token_id",
+	14: "delegation_type",
+	15: "delegation_id",
+	16: "grantor",
+	17: "fingerprint",
+	18: "request_id",
+	19: "session_id",
+	20: "flow_id",
+	21: "metadata",
+	22: "payload",
 }
 
 // Decode decodes AuthzRevokedEvent from json.
@@ -12340,7 +15043,7 @@ func (s *AuthzRevokedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -12352,7 +15055,7 @@ func (s *AuthzRevokedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -12401,8 +15104,18 @@ func (s *AuthzRevokedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"entity_id\"")
 			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
 		case "client_id":
-			requiredBitSet[1] |= 1 << 3
+			requiredBitSet[1] |= 1 << 4
 			if err := func() error {
 				v, err := d.Str()
 				s.ClientID = string(v)
@@ -12504,7 +15217,7 @@ func (s *AuthzRevokedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 5
+			requiredBitSet[2] |= 1 << 6
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -12524,8 +15237,8 @@ func (s *AuthzRevokedEvent) Decode(d *jx.Decoder) error {
 	var failures []validate.FieldError
 	for i, mask := range [3]uint8{
 		0b01111011,
-		0b00001000,
-		0b00100000,
+		0b00010000,
+		0b01000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -13848,11 +16561,11 @@ func (s *BrandingCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -13876,6 +16589,12 @@ func (s *BrandingCreatedEvent) encodeFields(e *jx.Encoder) {
 		if s.EntityID.Set {
 			e.FieldStart("entity_id")
 			s.EntityID.Encode(e)
+		}
+	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
 		}
 	}
 	{
@@ -13942,7 +16661,7 @@ func (s *BrandingCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfBrandingCreatedEvent = [22]string{
+var jsonFieldsNameOfBrandingCreatedEvent = [23]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -13954,17 +16673,18 @@ var jsonFieldsNameOfBrandingCreatedEvent = [22]string{
 	8:  "actor_type",
 	9:  "entity_type",
 	10: "entity_id",
-	11: "client_id",
-	12: "token_id",
-	13: "delegation_type",
-	14: "delegation_id",
-	15: "grantor",
-	16: "fingerprint",
-	17: "request_id",
-	18: "session_id",
-	19: "flow_id",
-	20: "metadata",
-	21: "payload",
+	11: "user_id",
+	12: "client_id",
+	13: "token_id",
+	14: "delegation_type",
+	15: "delegation_id",
+	16: "grantor",
+	17: "fingerprint",
+	18: "request_id",
+	19: "session_id",
+	20: "flow_id",
+	21: "metadata",
+	22: "payload",
 }
 
 // Decode decodes BrandingCreatedEvent from json.
@@ -14033,7 +16753,7 @@ func (s *BrandingCreatedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -14045,7 +16765,7 @@ func (s *BrandingCreatedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -14094,8 +16814,18 @@ func (s *BrandingCreatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"entity_id\"")
 			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
 		case "client_id":
-			requiredBitSet[1] |= 1 << 3
+			requiredBitSet[1] |= 1 << 4
 			if err := func() error {
 				v, err := d.Str()
 				s.ClientID = string(v)
@@ -14197,7 +16927,7 @@ func (s *BrandingCreatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 5
+			requiredBitSet[2] |= 1 << 6
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -14217,8 +16947,8 @@ func (s *BrandingCreatedEvent) Decode(d *jx.Decoder) error {
 	var failures []validate.FieldError
 	for i, mask := range [3]uint8{
 		0b01111011,
-		0b00001000,
-		0b00100000,
+		0b00010000,
+		0b01000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -21018,14 +23748,21 @@ func (s *ConfigurationBundle) encodeFields(e *jx.Encoder) {
 			s.Branding.Encode(e)
 		}
 	}
+	{
+		if s.OAuth.Set {
+			e.FieldStart("oauth")
+			s.OAuth.Encode(e)
+		}
+	}
 }
 
-var jsonFieldsNameOfConfigurationBundle = [5]string{
+var jsonFieldsNameOfConfigurationBundle = [6]string{
 	0: "schemas",
 	1: "flow_definitions",
 	2: "idps",
 	3: "policies",
 	4: "branding",
+	5: "oauth",
 }
 
 // Decode decodes ConfigurationBundle from json.
@@ -21113,6 +23850,16 @@ func (s *ConfigurationBundle) Decode(d *jx.Decoder) error {
 				return nil
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"branding\"")
+			}
+		case "oauth":
+			if err := func() error {
+				s.OAuth.Reset()
+				if err := s.OAuth.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"oauth\"")
 			}
 		default:
 			return errors.Errorf("unexpected field %q", k)
@@ -21404,11 +24151,123 @@ func (s CreateApplicationErrorResponse) Encode(e *jx.Encoder) {
 
 func (s CreateApplicationErrorResponse) encodeFields(e *jx.Encoder) {
 	switch s.Type {
+	case AppClientIDTakenCreateApplicationErrorResponse:
+		e.FieldStart("code")
+		e.Str("app.client_id_taken")
+		{
+			s := s.AppClientIDTaken
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case AppFieldImmutableCreateApplicationErrorResponse:
+		e.FieldStart("code")
+		e.Str("app.field_immutable")
+		{
+			s := s.AppFieldImmutable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case AppInvalidCreateApplicationErrorResponse:
+		e.FieldStart("code")
+		e.Str("app.invalid")
+		{
+			s := s.AppInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case AppNotFoundCreateApplicationErrorResponse:
+		e.FieldStart("code")
+		e.Str("app.not_found")
+		{
+			s := s.AppNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case AppPermissionDeniedCreateApplicationErrorResponse:
+		e.FieldStart("code")
+		e.Str("app.permission_denied")
+		{
+			s := s.AppPermissionDenied
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case AppRevisionConflictCreateApplicationErrorResponse:
+		e.FieldStart("code")
+		e.Str("app.revision_conflict")
+		{
+			s := s.AppRevisionConflict
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case AuthUnauthorizedCreateApplicationErrorResponse:
 		e.FieldStart("code")
 		e.Str("auth.unauthorized")
 		{
 			s := s.AuthUnauthorized
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case EvtInvalidCreateApplicationErrorResponse:
+		e.FieldStart("code")
+		e.Str("evt.invalid")
+		{
+			s := s.EvtInvalid
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -21510,8 +24369,29 @@ func (s *CreateApplicationErrorResponse) Decode(d *jx.Decoder) error {
 					return err
 				}
 				switch typ {
+				case "app.client_id_taken":
+					s.Type = AppClientIDTakenCreateApplicationErrorResponse
+					found = true
+				case "app.field_immutable":
+					s.Type = AppFieldImmutableCreateApplicationErrorResponse
+					found = true
+				case "app.invalid":
+					s.Type = AppInvalidCreateApplicationErrorResponse
+					found = true
+				case "app.not_found":
+					s.Type = AppNotFoundCreateApplicationErrorResponse
+					found = true
+				case "app.permission_denied":
+					s.Type = AppPermissionDeniedCreateApplicationErrorResponse
+					found = true
+				case "app.revision_conflict":
+					s.Type = AppRevisionConflictCreateApplicationErrorResponse
+					found = true
 				case "auth.unauthorized":
 					s.Type = AuthUnauthorizedCreateApplicationErrorResponse
+					found = true
+				case "evt.invalid":
+					s.Type = EvtInvalidCreateApplicationErrorResponse
 					found = true
 				case "internal":
 					s.Type = InternalCreateApplicationErrorResponse
@@ -21539,8 +24419,36 @@ func (s *CreateApplicationErrorResponse) Decode(d *jx.Decoder) error {
 		return errors.New("unable to detect sum type variant")
 	}
 	switch s.Type {
+	case AppClientIDTakenCreateApplicationErrorResponse:
+		if err := s.AppClientIDTaken.Decode(d); err != nil {
+			return err
+		}
+	case AppFieldImmutableCreateApplicationErrorResponse:
+		if err := s.AppFieldImmutable.Decode(d); err != nil {
+			return err
+		}
+	case AppInvalidCreateApplicationErrorResponse:
+		if err := s.AppInvalid.Decode(d); err != nil {
+			return err
+		}
+	case AppNotFoundCreateApplicationErrorResponse:
+		if err := s.AppNotFound.Decode(d); err != nil {
+			return err
+		}
+	case AppPermissionDeniedCreateApplicationErrorResponse:
+		if err := s.AppPermissionDenied.Decode(d); err != nil {
+			return err
+		}
+	case AppRevisionConflictCreateApplicationErrorResponse:
+		if err := s.AppRevisionConflict.Decode(d); err != nil {
+			return err
+		}
 	case AuthUnauthorizedCreateApplicationErrorResponse:
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
+			return err
+		}
+	case EvtInvalidCreateApplicationErrorResponse:
+		if err := s.EvtInvalid.Decode(d); err != nil {
 			return err
 		}
 	case InternalCreateApplicationErrorResponse:
@@ -36366,11 +39274,11 @@ func (s *DeploymentCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -36394,6 +39302,12 @@ func (s *DeploymentCreatedEvent) encodeFields(e *jx.Encoder) {
 		if s.EntityID.Set {
 			e.FieldStart("entity_id")
 			s.EntityID.Encode(e)
+		}
+	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
 		}
 	}
 	{
@@ -36460,7 +39374,7 @@ func (s *DeploymentCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfDeploymentCreatedEvent = [22]string{
+var jsonFieldsNameOfDeploymentCreatedEvent = [23]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -36472,17 +39386,18 @@ var jsonFieldsNameOfDeploymentCreatedEvent = [22]string{
 	8:  "actor_type",
 	9:  "entity_type",
 	10: "entity_id",
-	11: "client_id",
-	12: "token_id",
-	13: "delegation_type",
-	14: "delegation_id",
-	15: "grantor",
-	16: "fingerprint",
-	17: "request_id",
-	18: "session_id",
-	19: "flow_id",
-	20: "metadata",
-	21: "payload",
+	11: "user_id",
+	12: "client_id",
+	13: "token_id",
+	14: "delegation_type",
+	15: "delegation_id",
+	16: "grantor",
+	17: "fingerprint",
+	18: "request_id",
+	19: "session_id",
+	20: "flow_id",
+	21: "metadata",
+	22: "payload",
 }
 
 // Decode decodes DeploymentCreatedEvent from json.
@@ -36551,7 +39466,7 @@ func (s *DeploymentCreatedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -36563,7 +39478,7 @@ func (s *DeploymentCreatedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -36612,8 +39527,18 @@ func (s *DeploymentCreatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"entity_id\"")
 			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
 		case "client_id":
-			requiredBitSet[1] |= 1 << 3
+			requiredBitSet[1] |= 1 << 4
 			if err := func() error {
 				v, err := d.Str()
 				s.ClientID = string(v)
@@ -36715,7 +39640,7 @@ func (s *DeploymentCreatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 5
+			requiredBitSet[2] |= 1 << 6
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -36735,8 +39660,8 @@ func (s *DeploymentCreatedEvent) Decode(d *jx.Decoder) error {
 	var failures []validate.FieldError
 	for i, mask := range [3]uint8{
 		0b01111011,
-		0b00001000,
-		0b00100000,
+		0b00010000,
+		0b01000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -39946,6 +42871,254 @@ func (s Event) Encode(e *jx.Encoder) {
 
 func (s Event) encodeFields(e *jx.Encoder) {
 	switch s.Type {
+	case ApplicationCreatedEventEvent:
+		e.FieldStart("event_type")
+		e.Str("application.created")
+		{
+			s := s.ApplicationCreatedEvent
+			{
+				e.FieldStart("id")
+				e.Str(s.ID)
+			}
+			{
+				e.FieldStart("project_id")
+				s.ProjectID.Encode(e)
+			}
+			{
+				if s.TeamID.Set {
+					e.FieldStart("team_id")
+					s.TeamID.Encode(e)
+				}
+			}
+			{
+				e.FieldStart("category")
+				s.Category.Encode(e)
+			}
+			{
+				e.FieldStart("occurred_at")
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
+			}
+			{
+				e.FieldStart("created_at")
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
+			}
+			{
+				if s.ActorID.Set {
+					e.FieldStart("actor_id")
+					s.ActorID.Encode(e)
+				}
+			}
+			{
+				if s.ActorType.Set {
+					e.FieldStart("actor_type")
+					s.ActorType.Encode(e)
+				}
+			}
+			{
+				if s.EntityType.Set {
+					e.FieldStart("entity_type")
+					s.EntityType.Encode(e)
+				}
+			}
+			{
+				if s.EntityID.Set {
+					e.FieldStart("entity_id")
+					s.EntityID.Encode(e)
+				}
+			}
+			{
+				if s.UserID.Set {
+					e.FieldStart("user_id")
+					s.UserID.Encode(e)
+				}
+			}
+			{
+				e.FieldStart("client_id")
+				e.Str(s.ClientID)
+			}
+			{
+				if s.TokenID.Set {
+					e.FieldStart("token_id")
+					s.TokenID.Encode(e)
+				}
+			}
+			{
+				if s.DelegationType.Set {
+					e.FieldStart("delegation_type")
+					s.DelegationType.Encode(e)
+				}
+			}
+			{
+				if s.DelegationID.Set {
+					e.FieldStart("delegation_id")
+					s.DelegationID.Encode(e)
+				}
+			}
+			{
+				if s.Grantor.Set {
+					e.FieldStart("grantor")
+					s.Grantor.Encode(e)
+				}
+			}
+			{
+				if s.Fingerprint.Set {
+					e.FieldStart("fingerprint")
+					s.Fingerprint.Encode(e)
+				}
+			}
+			{
+				if s.RequestID.Set {
+					e.FieldStart("request_id")
+					s.RequestID.Encode(e)
+				}
+			}
+			{
+				if s.SessionID.Set {
+					e.FieldStart("session_id")
+					s.SessionID.Encode(e)
+				}
+			}
+			{
+				if s.FlowID.Set {
+					e.FieldStart("flow_id")
+					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.Metadata.Set {
+					e.FieldStart("metadata")
+					s.Metadata.Encode(e)
+				}
+			}
+			{
+				e.FieldStart("payload")
+				s.Payload.Encode(e)
+			}
+		}
+	case ApplicationUpdatedEventEvent:
+		e.FieldStart("event_type")
+		e.Str("application.updated")
+		{
+			s := s.ApplicationUpdatedEvent
+			{
+				e.FieldStart("id")
+				e.Str(s.ID)
+			}
+			{
+				e.FieldStart("project_id")
+				s.ProjectID.Encode(e)
+			}
+			{
+				if s.TeamID.Set {
+					e.FieldStart("team_id")
+					s.TeamID.Encode(e)
+				}
+			}
+			{
+				e.FieldStart("category")
+				s.Category.Encode(e)
+			}
+			{
+				e.FieldStart("occurred_at")
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
+			}
+			{
+				e.FieldStart("created_at")
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
+			}
+			{
+				if s.ActorID.Set {
+					e.FieldStart("actor_id")
+					s.ActorID.Encode(e)
+				}
+			}
+			{
+				if s.ActorType.Set {
+					e.FieldStart("actor_type")
+					s.ActorType.Encode(e)
+				}
+			}
+			{
+				if s.EntityType.Set {
+					e.FieldStart("entity_type")
+					s.EntityType.Encode(e)
+				}
+			}
+			{
+				if s.EntityID.Set {
+					e.FieldStart("entity_id")
+					s.EntityID.Encode(e)
+				}
+			}
+			{
+				if s.UserID.Set {
+					e.FieldStart("user_id")
+					s.UserID.Encode(e)
+				}
+			}
+			{
+				e.FieldStart("client_id")
+				e.Str(s.ClientID)
+			}
+			{
+				if s.TokenID.Set {
+					e.FieldStart("token_id")
+					s.TokenID.Encode(e)
+				}
+			}
+			{
+				if s.DelegationType.Set {
+					e.FieldStart("delegation_type")
+					s.DelegationType.Encode(e)
+				}
+			}
+			{
+				if s.DelegationID.Set {
+					e.FieldStart("delegation_id")
+					s.DelegationID.Encode(e)
+				}
+			}
+			{
+				if s.Grantor.Set {
+					e.FieldStart("grantor")
+					s.Grantor.Encode(e)
+				}
+			}
+			{
+				if s.Fingerprint.Set {
+					e.FieldStart("fingerprint")
+					s.Fingerprint.Encode(e)
+				}
+			}
+			{
+				if s.RequestID.Set {
+					e.FieldStart("request_id")
+					s.RequestID.Encode(e)
+				}
+			}
+			{
+				if s.SessionID.Set {
+					e.FieldStart("session_id")
+					s.SessionID.Encode(e)
+				}
+			}
+			{
+				if s.FlowID.Set {
+					e.FieldStart("flow_id")
+					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.Metadata.Set {
+					e.FieldStart("metadata")
+					s.Metadata.Encode(e)
+				}
+			}
+			{
+				e.FieldStart("payload")
+				s.Payload.Encode(e)
+			}
+		}
 	case AuthAttemptCreatedEventEvent:
 		e.FieldStart("event_type")
 		e.Str("auth.attempt.created")
@@ -39971,11 +43144,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -39999,6 +43172,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.EntityID.Set {
 					e.FieldStart("entity_id")
 					s.EntityID.Encode(e)
+				}
+			}
+			{
+				if s.UserID.Set {
+					e.FieldStart("user_id")
+					s.UserID.Encode(e)
 				}
 			}
 			{
@@ -40089,11 +43268,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -40117,6 +43296,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.EntityID.Set {
 					e.FieldStart("entity_id")
 					s.EntityID.Encode(e)
+				}
+			}
+			{
+				if s.UserID.Set {
+					e.FieldStart("user_id")
+					s.UserID.Encode(e)
 				}
 			}
 			{
@@ -40207,11 +43392,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -40235,6 +43420,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.EntityID.Set {
 					e.FieldStart("entity_id")
 					s.EntityID.Encode(e)
+				}
+			}
+			{
+				if s.UserID.Set {
+					e.FieldStart("user_id")
+					s.UserID.Encode(e)
 				}
 			}
 			{
@@ -40325,11 +43516,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -40353,6 +43544,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.EntityID.Set {
 					e.FieldStart("entity_id")
 					s.EntityID.Encode(e)
+				}
+			}
+			{
+				if s.UserID.Set {
+					e.FieldStart("user_id")
+					s.UserID.Encode(e)
 				}
 			}
 			{
@@ -40443,11 +43640,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -40471,6 +43668,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.EntityID.Set {
 					e.FieldStart("entity_id")
 					s.EntityID.Encode(e)
+				}
+			}
+			{
+				if s.UserID.Set {
+					e.FieldStart("user_id")
+					s.UserID.Encode(e)
 				}
 			}
 			{
@@ -40561,11 +43764,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -40589,6 +43792,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.EntityID.Set {
 					e.FieldStart("entity_id")
 					s.EntityID.Encode(e)
+				}
+			}
+			{
+				if s.UserID.Set {
+					e.FieldStart("user_id")
+					s.UserID.Encode(e)
 				}
 			}
 			{
@@ -40679,11 +43888,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -40707,6 +43916,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.EntityID.Set {
 					e.FieldStart("entity_id")
 					s.EntityID.Encode(e)
+				}
+			}
+			{
+				if s.UserID.Set {
+					e.FieldStart("user_id")
+					s.UserID.Encode(e)
 				}
 			}
 			{
@@ -40797,11 +44012,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -40825,6 +44040,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.EntityID.Set {
 					e.FieldStart("entity_id")
 					s.EntityID.Encode(e)
+				}
+			}
+			{
+				if s.UserID.Set {
+					e.FieldStart("user_id")
+					s.UserID.Encode(e)
 				}
 			}
 			{
@@ -40915,11 +44136,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -40943,6 +44164,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.EntityID.Set {
 					e.FieldStart("entity_id")
 					s.EntityID.Encode(e)
+				}
+			}
+			{
+				if s.UserID.Set {
+					e.FieldStart("user_id")
+					s.UserID.Encode(e)
 				}
 			}
 			{
@@ -41033,11 +44260,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -41061,6 +44288,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.EntityID.Set {
 					e.FieldStart("entity_id")
 					s.EntityID.Encode(e)
+				}
+			}
+			{
+				if s.UserID.Set {
+					e.FieldStart("user_id")
+					s.UserID.Encode(e)
 				}
 			}
 			{
@@ -41151,11 +44384,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -41179,6 +44412,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.EntityID.Set {
 					e.FieldStart("entity_id")
 					s.EntityID.Encode(e)
+				}
+			}
+			{
+				if s.UserID.Set {
+					e.FieldStart("user_id")
+					s.UserID.Encode(e)
 				}
 			}
 			{
@@ -41269,11 +44508,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -41297,6 +44536,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.EntityID.Set {
 					e.FieldStart("entity_id")
 					s.EntityID.Encode(e)
+				}
+			}
+			{
+				if s.UserID.Set {
+					e.FieldStart("user_id")
+					s.UserID.Encode(e)
 				}
 			}
 			{
@@ -41387,11 +44632,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -41415,6 +44660,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.EntityID.Set {
 					e.FieldStart("entity_id")
 					s.EntityID.Encode(e)
+				}
+			}
+			{
+				if s.UserID.Set {
+					e.FieldStart("user_id")
+					s.UserID.Encode(e)
 				}
 			}
 			{
@@ -41505,11 +44756,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -41533,6 +44784,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.EntityID.Set {
 					e.FieldStart("entity_id")
 					s.EntityID.Encode(e)
+				}
+			}
+			{
+				if s.UserID.Set {
+					e.FieldStart("user_id")
+					s.UserID.Encode(e)
 				}
 			}
 			{
@@ -41623,11 +44880,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -41651,6 +44908,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.EntityID.Set {
 					e.FieldStart("entity_id")
 					s.EntityID.Encode(e)
+				}
+			}
+			{
+				if s.UserID.Set {
+					e.FieldStart("user_id")
+					s.UserID.Encode(e)
 				}
 			}
 			{
@@ -41741,11 +45004,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -41769,6 +45032,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.EntityID.Set {
 					e.FieldStart("entity_id")
 					s.EntityID.Encode(e)
+				}
+			}
+			{
+				if s.UserID.Set {
+					e.FieldStart("user_id")
+					s.UserID.Encode(e)
 				}
 			}
 			{
@@ -41859,11 +45128,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -41887,6 +45156,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.EntityID.Set {
 					e.FieldStart("entity_id")
 					s.EntityID.Encode(e)
+				}
+			}
+			{
+				if s.UserID.Set {
+					e.FieldStart("user_id")
+					s.UserID.Encode(e)
 				}
 			}
 			{
@@ -41977,11 +45252,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -42005,6 +45280,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.EntityID.Set {
 					e.FieldStart("entity_id")
 					s.EntityID.Encode(e)
+				}
+			}
+			{
+				if s.UserID.Set {
+					e.FieldStart("user_id")
+					s.UserID.Encode(e)
 				}
 			}
 			{
@@ -42095,11 +45376,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -42123,6 +45404,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.EntityID.Set {
 					e.FieldStart("entity_id")
 					s.EntityID.Encode(e)
+				}
+			}
+			{
+				if s.UserID.Set {
+					e.FieldStart("user_id")
+					s.UserID.Encode(e)
 				}
 			}
 			{
@@ -42213,11 +45500,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -42241,6 +45528,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.EntityID.Set {
 					e.FieldStart("entity_id")
 					s.EntityID.Encode(e)
+				}
+			}
+			{
+				if s.UserID.Set {
+					e.FieldStart("user_id")
+					s.UserID.Encode(e)
 				}
 			}
 			{
@@ -42331,11 +45624,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -42359,6 +45652,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.EntityID.Set {
 					e.FieldStart("entity_id")
 					s.EntityID.Encode(e)
+				}
+			}
+			{
+				if s.UserID.Set {
+					e.FieldStart("user_id")
+					s.UserID.Encode(e)
 				}
 			}
 			{
@@ -42449,11 +45748,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -42477,6 +45776,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.EntityID.Set {
 					e.FieldStart("entity_id")
 					s.EntityID.Encode(e)
+				}
+			}
+			{
+				if s.UserID.Set {
+					e.FieldStart("user_id")
+					s.UserID.Encode(e)
 				}
 			}
 			{
@@ -42567,11 +45872,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -42595,6 +45900,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.EntityID.Set {
 					e.FieldStart("entity_id")
 					s.EntityID.Encode(e)
+				}
+			}
+			{
+				if s.UserID.Set {
+					e.FieldStart("user_id")
+					s.UserID.Encode(e)
 				}
 			}
 			{
@@ -42685,11 +45996,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -42713,6 +46024,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.EntityID.Set {
 					e.FieldStart("entity_id")
 					s.EntityID.Encode(e)
+				}
+			}
+			{
+				if s.UserID.Set {
+					e.FieldStart("user_id")
+					s.UserID.Encode(e)
 				}
 			}
 			{
@@ -42803,11 +46120,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -42831,6 +46148,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.EntityID.Set {
 					e.FieldStart("entity_id")
 					s.EntityID.Encode(e)
+				}
+			}
+			{
+				if s.UserID.Set {
+					e.FieldStart("user_id")
+					s.UserID.Encode(e)
 				}
 			}
 			{
@@ -42921,11 +46244,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -42949,6 +46272,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.EntityID.Set {
 					e.FieldStart("entity_id")
 					s.EntityID.Encode(e)
+				}
+			}
+			{
+				if s.UserID.Set {
+					e.FieldStart("user_id")
+					s.UserID.Encode(e)
 				}
 			}
 			{
@@ -43039,11 +46368,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -43067,6 +46396,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.EntityID.Set {
 					e.FieldStart("entity_id")
 					s.EntityID.Encode(e)
+				}
+			}
+			{
+				if s.UserID.Set {
+					e.FieldStart("user_id")
+					s.UserID.Encode(e)
 				}
 			}
 			{
@@ -43157,11 +46492,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -43185,6 +46520,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.EntityID.Set {
 					e.FieldStart("entity_id")
 					s.EntityID.Encode(e)
+				}
+			}
+			{
+				if s.UserID.Set {
+					e.FieldStart("user_id")
+					s.UserID.Encode(e)
 				}
 			}
 			{
@@ -43275,11 +46616,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -43303,6 +46644,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.EntityID.Set {
 					e.FieldStart("entity_id")
 					s.EntityID.Encode(e)
+				}
+			}
+			{
+				if s.UserID.Set {
+					e.FieldStart("user_id")
+					s.UserID.Encode(e)
 				}
 			}
 			{
@@ -43393,11 +46740,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -43421,6 +46768,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.EntityID.Set {
 					e.FieldStart("entity_id")
 					s.EntityID.Encode(e)
+				}
+			}
+			{
+				if s.UserID.Set {
+					e.FieldStart("user_id")
+					s.UserID.Encode(e)
 				}
 			}
 			{
@@ -43511,11 +46864,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -43539,6 +46892,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.EntityID.Set {
 					e.FieldStart("entity_id")
 					s.EntityID.Encode(e)
+				}
+			}
+			{
+				if s.UserID.Set {
+					e.FieldStart("user_id")
+					s.UserID.Encode(e)
 				}
 			}
 			{
@@ -43629,11 +46988,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -43657,6 +47016,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.EntityID.Set {
 					e.FieldStart("entity_id")
 					s.EntityID.Encode(e)
+				}
+			}
+			{
+				if s.UserID.Set {
+					e.FieldStart("user_id")
+					s.UserID.Encode(e)
 				}
 			}
 			{
@@ -43747,11 +47112,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -43775,6 +47140,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.EntityID.Set {
 					e.FieldStart("entity_id")
 					s.EntityID.Encode(e)
+				}
+			}
+			{
+				if s.UserID.Set {
+					e.FieldStart("user_id")
+					s.UserID.Encode(e)
 				}
 			}
 			{
@@ -43865,11 +47236,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -43893,6 +47264,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.EntityID.Set {
 					e.FieldStart("entity_id")
 					s.EntityID.Encode(e)
+				}
+			}
+			{
+				if s.UserID.Set {
+					e.FieldStart("user_id")
+					s.UserID.Encode(e)
 				}
 			}
 			{
@@ -43983,11 +47360,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -44011,6 +47388,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.EntityID.Set {
 					e.FieldStart("entity_id")
 					s.EntityID.Encode(e)
+				}
+			}
+			{
+				if s.UserID.Set {
+					e.FieldStart("user_id")
+					s.UserID.Encode(e)
 				}
 			}
 			{
@@ -44101,11 +47484,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -44129,6 +47512,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.EntityID.Set {
 					e.FieldStart("entity_id")
 					s.EntityID.Encode(e)
+				}
+			}
+			{
+				if s.UserID.Set {
+					e.FieldStart("user_id")
+					s.UserID.Encode(e)
 				}
 			}
 			{
@@ -44219,11 +47608,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -44247,6 +47636,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.EntityID.Set {
 					e.FieldStart("entity_id")
 					s.EntityID.Encode(e)
+				}
+			}
+			{
+				if s.UserID.Set {
+					e.FieldStart("user_id")
+					s.UserID.Encode(e)
 				}
 			}
 			{
@@ -44337,11 +47732,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -44365,6 +47760,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.EntityID.Set {
 					e.FieldStart("entity_id")
 					s.EntityID.Encode(e)
+				}
+			}
+			{
+				if s.UserID.Set {
+					e.FieldStart("user_id")
+					s.UserID.Encode(e)
 				}
 			}
 			{
@@ -44455,11 +47856,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -44483,6 +47884,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.EntityID.Set {
 					e.FieldStart("entity_id")
 					s.EntityID.Encode(e)
+				}
+			}
+			{
+				if s.UserID.Set {
+					e.FieldStart("user_id")
+					s.UserID.Encode(e)
 				}
 			}
 			{
@@ -44573,11 +47980,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -44601,6 +48008,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.EntityID.Set {
 					e.FieldStart("entity_id")
 					s.EntityID.Encode(e)
+				}
+			}
+			{
+				if s.UserID.Set {
+					e.FieldStart("user_id")
+					s.UserID.Encode(e)
 				}
 			}
 			{
@@ -44691,11 +48104,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -44719,6 +48132,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.EntityID.Set {
 					e.FieldStart("entity_id")
 					s.EntityID.Encode(e)
+				}
+			}
+			{
+				if s.UserID.Set {
+					e.FieldStart("user_id")
+					s.UserID.Encode(e)
 				}
 			}
 			{
@@ -44809,11 +48228,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -44837,6 +48256,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.EntityID.Set {
 					e.FieldStart("entity_id")
 					s.EntityID.Encode(e)
+				}
+			}
+			{
+				if s.UserID.Set {
+					e.FieldStart("user_id")
+					s.UserID.Encode(e)
 				}
 			}
 			{
@@ -44927,11 +48352,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -44955,6 +48380,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.EntityID.Set {
 					e.FieldStart("entity_id")
 					s.EntityID.Encode(e)
+				}
+			}
+			{
+				if s.UserID.Set {
+					e.FieldStart("user_id")
+					s.UserID.Encode(e)
 				}
 			}
 			{
@@ -45045,11 +48476,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -45073,6 +48504,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.EntityID.Set {
 					e.FieldStart("entity_id")
 					s.EntityID.Encode(e)
+				}
+			}
+			{
+				if s.UserID.Set {
+					e.FieldStart("user_id")
+					s.UserID.Encode(e)
 				}
 			}
 			{
@@ -45163,11 +48600,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -45191,6 +48628,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.EntityID.Set {
 					e.FieldStart("entity_id")
 					s.EntityID.Encode(e)
+				}
+			}
+			{
+				if s.UserID.Set {
+					e.FieldStart("user_id")
+					s.UserID.Encode(e)
 				}
 			}
 			{
@@ -45281,11 +48724,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -45309,6 +48752,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.EntityID.Set {
 					e.FieldStart("entity_id")
 					s.EntityID.Encode(e)
+				}
+			}
+			{
+				if s.UserID.Set {
+					e.FieldStart("user_id")
+					s.UserID.Encode(e)
 				}
 			}
 			{
@@ -45399,11 +48848,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -45427,6 +48876,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.EntityID.Set {
 					e.FieldStart("entity_id")
 					s.EntityID.Encode(e)
+				}
+			}
+			{
+				if s.UserID.Set {
+					e.FieldStart("user_id")
+					s.UserID.Encode(e)
 				}
 			}
 			{
@@ -45517,11 +48972,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -45545,6 +49000,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.EntityID.Set {
 					e.FieldStart("entity_id")
 					s.EntityID.Encode(e)
+				}
+			}
+			{
+				if s.UserID.Set {
+					e.FieldStart("user_id")
+					s.UserID.Encode(e)
 				}
 			}
 			{
@@ -45635,11 +49096,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -45663,6 +49124,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.EntityID.Set {
 					e.FieldStart("entity_id")
 					s.EntityID.Encode(e)
+				}
+			}
+			{
+				if s.UserID.Set {
+					e.FieldStart("user_id")
+					s.UserID.Encode(e)
 				}
 			}
 			{
@@ -45753,11 +49220,11 @@ func (s Event) encodeFields(e *jx.Encoder) {
 			}
 			{
 				e.FieldStart("occurred_at")
-				json.EncodeDateTime(e, s.OccurredAt)
+				json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				e.FieldStart("created_at")
-				json.EncodeDateTime(e, s.CreatedAt)
+				json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 			}
 			{
 				if s.ActorID.Set {
@@ -45781,6 +49248,12 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				if s.EntityID.Set {
 					e.FieldStart("entity_id")
 					s.EntityID.Encode(e)
+				}
+			}
+			{
+				if s.UserID.Set {
+					e.FieldStart("user_id")
+					s.UserID.Encode(e)
 				}
 			}
 			{
@@ -45872,6 +49345,12 @@ func (s *Event) Decode(d *jx.Decoder) error {
 					return err
 				}
 				switch typ {
+				case "application.created":
+					s.Type = ApplicationCreatedEventEvent
+					found = true
+				case "application.updated":
+					s.Type = ApplicationUpdatedEventEvent
+					found = true
 				case "auth.attempt.created":
 					s.Type = AuthAttemptCreatedEventEvent
 					found = true
@@ -46036,6 +49515,14 @@ func (s *Event) Decode(d *jx.Decoder) error {
 		return errors.New("unable to detect sum type variant")
 	}
 	switch s.Type {
+	case ApplicationCreatedEventEvent:
+		if err := s.ApplicationCreatedEvent.Decode(d); err != nil {
+			return err
+		}
+	case ApplicationUpdatedEventEvent:
+		if err := s.ApplicationUpdatedEvent.Decode(d); err != nil {
+			return err
+		}
 	case AuthAttemptCreatedEventEvent:
 		if err := s.AuthAttemptCreatedEvent.Decode(d); err != nil {
 			return err
@@ -50346,10 +53833,6 @@ func (s *FlowDefinition) encodeFields(e *jx.Encoder) {
 		e.Str(s.Name)
 	}
 	{
-		e.FieldStart("status")
-		s.Status.Encode(e)
-	}
-	{
 		e.FieldStart("user_schema")
 		e.Str(s.UserSchema)
 	}
@@ -50373,14 +53856,13 @@ func (s *FlowDefinition) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfFlowDefinition = [7]string{
+var jsonFieldsNameOfFlowDefinition = [6]string{
 	0: "$schema",
 	1: "name",
-	2: "status",
-	3: "user_schema",
-	4: "purposes",
-	5: "audience",
-	6: "steps",
+	2: "user_schema",
+	3: "purposes",
+	4: "audience",
+	5: "steps",
 }
 
 // Decode decodes FlowDefinition from json.
@@ -50414,18 +53896,8 @@ func (s *FlowDefinition) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"name\"")
 			}
-		case "status":
-			requiredBitSet[0] |= 1 << 2
-			if err := func() error {
-				if err := s.Status.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"status\"")
-			}
 		case "user_schema":
-			requiredBitSet[0] |= 1 << 3
+			requiredBitSet[0] |= 1 << 2
 			if err := func() error {
 				v, err := d.Str()
 				s.UserSchema = string(v)
@@ -50437,7 +53909,7 @@ func (s *FlowDefinition) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"user_schema\"")
 			}
 		case "purposes":
-			requiredBitSet[0] |= 1 << 4
+			requiredBitSet[0] |= 1 << 3
 			if err := func() error {
 				if err := s.Purposes.Decode(d); err != nil {
 					return err
@@ -50457,7 +53929,7 @@ func (s *FlowDefinition) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"audience\"")
 			}
 		case "steps":
-			requiredBitSet[0] |= 1 << 6
+			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
 				s.Steps = make([]FlowDefinitionStep, 0)
 				if err := d.Arr(func(d *jx.Decoder) error {
@@ -50484,7 +53956,7 @@ func (s *FlowDefinition) Decode(d *jx.Decoder) error {
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [1]uint8{
-		0b01011110,
+		0b00101110,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -50899,46 +54371,6 @@ func (s *FlowDefinitionResponse) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes FlowDefinitionStatus as json.
-func (s FlowDefinitionStatus) Encode(e *jx.Encoder) {
-	e.Str(string(s))
-}
-
-// Decode decodes FlowDefinitionStatus from json.
-func (s *FlowDefinitionStatus) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode FlowDefinitionStatus to nil")
-	}
-	v, err := d.StrBytes()
-	if err != nil {
-		return err
-	}
-	// Try to use constant string.
-	switch FlowDefinitionStatus(v) {
-	case FlowDefinitionStatusActive:
-		*s = FlowDefinitionStatusActive
-	case FlowDefinitionStatusDraft:
-		*s = FlowDefinitionStatusDraft
-	default:
-		*s = FlowDefinitionStatus(v)
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s FlowDefinitionStatus) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *FlowDefinitionStatus) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
 // Encode implements json.Marshaler.
 func (s *FlowDefinitionStep) Encode(e *jx.Encoder) {
 	e.ObjStart()
@@ -51025,6 +54457,7 @@ func (s *FlowDefinitionStep) Decode(d *jx.Decoder) error {
 		return errors.New("invalid: unable to decode FlowDefinitionStep to nil")
 	}
 	var requiredBitSet [1]uint8
+	s.setDefaults()
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
@@ -53428,11 +56861,11 @@ func (s *FlowSignupChallengeConsumedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -53456,6 +56889,12 @@ func (s *FlowSignupChallengeConsumedEvent) encodeFields(e *jx.Encoder) {
 		if s.EntityID.Set {
 			e.FieldStart("entity_id")
 			s.EntityID.Encode(e)
+		}
+	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
 		}
 	}
 	{
@@ -53522,7 +56961,7 @@ func (s *FlowSignupChallengeConsumedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfFlowSignupChallengeConsumedEvent = [22]string{
+var jsonFieldsNameOfFlowSignupChallengeConsumedEvent = [23]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -53534,17 +56973,18 @@ var jsonFieldsNameOfFlowSignupChallengeConsumedEvent = [22]string{
 	8:  "actor_type",
 	9:  "entity_type",
 	10: "entity_id",
-	11: "client_id",
-	12: "token_id",
-	13: "delegation_type",
-	14: "delegation_id",
-	15: "grantor",
-	16: "fingerprint",
-	17: "request_id",
-	18: "session_id",
-	19: "flow_id",
-	20: "metadata",
-	21: "payload",
+	11: "user_id",
+	12: "client_id",
+	13: "token_id",
+	14: "delegation_type",
+	15: "delegation_id",
+	16: "grantor",
+	17: "fingerprint",
+	18: "request_id",
+	19: "session_id",
+	20: "flow_id",
+	21: "metadata",
+	22: "payload",
 }
 
 // Decode decodes FlowSignupChallengeConsumedEvent from json.
@@ -53613,7 +57053,7 @@ func (s *FlowSignupChallengeConsumedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -53625,7 +57065,7 @@ func (s *FlowSignupChallengeConsumedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -53674,8 +57114,18 @@ func (s *FlowSignupChallengeConsumedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"entity_id\"")
 			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
 		case "client_id":
-			requiredBitSet[1] |= 1 << 3
+			requiredBitSet[1] |= 1 << 4
 			if err := func() error {
 				v, err := d.Str()
 				s.ClientID = string(v)
@@ -53777,7 +57227,7 @@ func (s *FlowSignupChallengeConsumedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 5
+			requiredBitSet[2] |= 1 << 6
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -53797,8 +57247,8 @@ func (s *FlowSignupChallengeConsumedEvent) Decode(d *jx.Decoder) error {
 	var failures []validate.FieldError
 	for i, mask := range [3]uint8{
 		0b01111011,
-		0b00001000,
-		0b00100000,
+		0b00010000,
+		0b01000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -54013,11 +57463,11 @@ func (s *FlowSignupChallengeIssuedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -54041,6 +57491,12 @@ func (s *FlowSignupChallengeIssuedEvent) encodeFields(e *jx.Encoder) {
 		if s.EntityID.Set {
 			e.FieldStart("entity_id")
 			s.EntityID.Encode(e)
+		}
+	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
 		}
 	}
 	{
@@ -54107,7 +57563,7 @@ func (s *FlowSignupChallengeIssuedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfFlowSignupChallengeIssuedEvent = [22]string{
+var jsonFieldsNameOfFlowSignupChallengeIssuedEvent = [23]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -54119,17 +57575,18 @@ var jsonFieldsNameOfFlowSignupChallengeIssuedEvent = [22]string{
 	8:  "actor_type",
 	9:  "entity_type",
 	10: "entity_id",
-	11: "client_id",
-	12: "token_id",
-	13: "delegation_type",
-	14: "delegation_id",
-	15: "grantor",
-	16: "fingerprint",
-	17: "request_id",
-	18: "session_id",
-	19: "flow_id",
-	20: "metadata",
-	21: "payload",
+	11: "user_id",
+	12: "client_id",
+	13: "token_id",
+	14: "delegation_type",
+	15: "delegation_id",
+	16: "grantor",
+	17: "fingerprint",
+	18: "request_id",
+	19: "session_id",
+	20: "flow_id",
+	21: "metadata",
+	22: "payload",
 }
 
 // Decode decodes FlowSignupChallengeIssuedEvent from json.
@@ -54198,7 +57655,7 @@ func (s *FlowSignupChallengeIssuedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -54210,7 +57667,7 @@ func (s *FlowSignupChallengeIssuedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -54259,8 +57716,18 @@ func (s *FlowSignupChallengeIssuedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"entity_id\"")
 			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
 		case "client_id":
-			requiredBitSet[1] |= 1 << 3
+			requiredBitSet[1] |= 1 << 4
 			if err := func() error {
 				v, err := d.Str()
 				s.ClientID = string(v)
@@ -54362,7 +57829,7 @@ func (s *FlowSignupChallengeIssuedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 5
+			requiredBitSet[2] |= 1 << 6
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -54382,8 +57849,8 @@ func (s *FlowSignupChallengeIssuedEvent) Decode(d *jx.Decoder) error {
 	var failures []validate.FieldError
 	for i, mask := range [3]uint8{
 		0b01111011,
-		0b00001000,
-		0b00100000,
+		0b00010000,
+		0b01000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -54680,6 +58147,7 @@ func (s *FlowStep) Decode(d *jx.Decoder) error {
 		return errors.New("invalid: unable to decode FlowStep to nil")
 	}
 	var requiredBitSet [2]uint8
+	s.setDefaults()
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
@@ -56225,11 +59693,11 @@ func (s *FlowdefCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -56253,6 +59721,12 @@ func (s *FlowdefCreatedEvent) encodeFields(e *jx.Encoder) {
 		if s.EntityID.Set {
 			e.FieldStart("entity_id")
 			s.EntityID.Encode(e)
+		}
+	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
 		}
 	}
 	{
@@ -56319,7 +59793,7 @@ func (s *FlowdefCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfFlowdefCreatedEvent = [22]string{
+var jsonFieldsNameOfFlowdefCreatedEvent = [23]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -56331,17 +59805,18 @@ var jsonFieldsNameOfFlowdefCreatedEvent = [22]string{
 	8:  "actor_type",
 	9:  "entity_type",
 	10: "entity_id",
-	11: "client_id",
-	12: "token_id",
-	13: "delegation_type",
-	14: "delegation_id",
-	15: "grantor",
-	16: "fingerprint",
-	17: "request_id",
-	18: "session_id",
-	19: "flow_id",
-	20: "metadata",
-	21: "payload",
+	11: "user_id",
+	12: "client_id",
+	13: "token_id",
+	14: "delegation_type",
+	15: "delegation_id",
+	16: "grantor",
+	17: "fingerprint",
+	18: "request_id",
+	19: "session_id",
+	20: "flow_id",
+	21: "metadata",
+	22: "payload",
 }
 
 // Decode decodes FlowdefCreatedEvent from json.
@@ -56410,7 +59885,7 @@ func (s *FlowdefCreatedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -56422,7 +59897,7 @@ func (s *FlowdefCreatedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -56471,8 +59946,18 @@ func (s *FlowdefCreatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"entity_id\"")
 			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
 		case "client_id":
-			requiredBitSet[1] |= 1 << 3
+			requiredBitSet[1] |= 1 << 4
 			if err := func() error {
 				v, err := d.Str()
 				s.ClientID = string(v)
@@ -56574,7 +60059,7 @@ func (s *FlowdefCreatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 5
+			requiredBitSet[2] |= 1 << 6
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -56594,8 +60079,8 @@ func (s *FlowdefCreatedEvent) Decode(d *jx.Decoder) error {
 	var failures []validate.FieldError
 	for i, mask := range [3]uint8{
 		0b01111011,
-		0b00001000,
-		0b00100000,
+		0b00010000,
+		0b01000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -56810,11 +60295,11 @@ func (s *FlowdefDeletedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -56838,6 +60323,12 @@ func (s *FlowdefDeletedEvent) encodeFields(e *jx.Encoder) {
 		if s.EntityID.Set {
 			e.FieldStart("entity_id")
 			s.EntityID.Encode(e)
+		}
+	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
 		}
 	}
 	{
@@ -56904,7 +60395,7 @@ func (s *FlowdefDeletedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfFlowdefDeletedEvent = [22]string{
+var jsonFieldsNameOfFlowdefDeletedEvent = [23]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -56916,17 +60407,18 @@ var jsonFieldsNameOfFlowdefDeletedEvent = [22]string{
 	8:  "actor_type",
 	9:  "entity_type",
 	10: "entity_id",
-	11: "client_id",
-	12: "token_id",
-	13: "delegation_type",
-	14: "delegation_id",
-	15: "grantor",
-	16: "fingerprint",
-	17: "request_id",
-	18: "session_id",
-	19: "flow_id",
-	20: "metadata",
-	21: "payload",
+	11: "user_id",
+	12: "client_id",
+	13: "token_id",
+	14: "delegation_type",
+	15: "delegation_id",
+	16: "grantor",
+	17: "fingerprint",
+	18: "request_id",
+	19: "session_id",
+	20: "flow_id",
+	21: "metadata",
+	22: "payload",
 }
 
 // Decode decodes FlowdefDeletedEvent from json.
@@ -56995,7 +60487,7 @@ func (s *FlowdefDeletedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -57007,7 +60499,7 @@ func (s *FlowdefDeletedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -57056,8 +60548,18 @@ func (s *FlowdefDeletedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"entity_id\"")
 			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
 		case "client_id":
-			requiredBitSet[1] |= 1 << 3
+			requiredBitSet[1] |= 1 << 4
 			if err := func() error {
 				v, err := d.Str()
 				s.ClientID = string(v)
@@ -57159,7 +60661,7 @@ func (s *FlowdefDeletedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 5
+			requiredBitSet[2] |= 1 << 6
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -57179,8 +60681,8 @@ func (s *FlowdefDeletedEvent) Decode(d *jx.Decoder) error {
 	var failures []validate.FieldError
 	for i, mask := range [3]uint8{
 		0b01111011,
-		0b00001000,
-		0b00100000,
+		0b00010000,
+		0b01000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -58130,12 +61632,6 @@ func (s *FlowdefPayload) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
-		if s.Status.Set {
-			e.FieldStart("status")
-			s.Status.Encode(e)
-		}
-	}
-	{
 		if s.UserSchema.Set {
 			e.FieldStart("user_schema")
 			s.UserSchema.Encode(e)
@@ -58155,12 +61651,11 @@ func (s *FlowdefPayload) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfFlowdefPayload = [5]string{
+var jsonFieldsNameOfFlowdefPayload = [4]string{
 	0: "name",
-	1: "status",
-	2: "user_schema",
-	3: "purposes",
-	4: "audience",
+	1: "user_schema",
+	2: "purposes",
+	3: "audience",
 }
 
 // Decode decodes FlowdefPayload from json.
@@ -58180,16 +61675,6 @@ func (s *FlowdefPayload) Decode(d *jx.Decoder) error {
 				return nil
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"name\"")
-			}
-		case "status":
-			if err := func() error {
-				s.Status.Reset()
-				if err := s.Status.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"status\"")
 			}
 		case "user_schema":
 			if err := func() error {
@@ -59192,11 +62677,11 @@ func (s *FlowdefUpdatedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -59220,6 +62705,12 @@ func (s *FlowdefUpdatedEvent) encodeFields(e *jx.Encoder) {
 		if s.EntityID.Set {
 			e.FieldStart("entity_id")
 			s.EntityID.Encode(e)
+		}
+	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
 		}
 	}
 	{
@@ -59286,7 +62777,7 @@ func (s *FlowdefUpdatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfFlowdefUpdatedEvent = [22]string{
+var jsonFieldsNameOfFlowdefUpdatedEvent = [23]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -59298,17 +62789,18 @@ var jsonFieldsNameOfFlowdefUpdatedEvent = [22]string{
 	8:  "actor_type",
 	9:  "entity_type",
 	10: "entity_id",
-	11: "client_id",
-	12: "token_id",
-	13: "delegation_type",
-	14: "delegation_id",
-	15: "grantor",
-	16: "fingerprint",
-	17: "request_id",
-	18: "session_id",
-	19: "flow_id",
-	20: "metadata",
-	21: "payload",
+	11: "user_id",
+	12: "client_id",
+	13: "token_id",
+	14: "delegation_type",
+	15: "delegation_id",
+	16: "grantor",
+	17: "fingerprint",
+	18: "request_id",
+	19: "session_id",
+	20: "flow_id",
+	21: "metadata",
+	22: "payload",
 }
 
 // Decode decodes FlowdefUpdatedEvent from json.
@@ -59377,7 +62869,7 @@ func (s *FlowdefUpdatedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -59389,7 +62881,7 @@ func (s *FlowdefUpdatedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -59438,8 +62930,18 @@ func (s *FlowdefUpdatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"entity_id\"")
 			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
 		case "client_id":
-			requiredBitSet[1] |= 1 << 3
+			requiredBitSet[1] |= 1 << 4
 			if err := func() error {
 				v, err := d.Str()
 				s.ClientID = string(v)
@@ -59541,7 +63043,7 @@ func (s *FlowdefUpdatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 5
+			requiredBitSet[2] |= 1 << 6
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -59561,8 +63063,8 @@ func (s *FlowdefUpdatedEvent) Decode(d *jx.Decoder) error {
 	var failures []validate.FieldError
 	for i, mask := range [3]uint8{
 		0b01111011,
-		0b00001000,
-		0b00100000,
+		0b00010000,
+		0b01000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -59977,6 +63479,38 @@ func (s GetApplicationByIdErrorResponse) Encode(e *jx.Encoder) {
 
 func (s GetApplicationByIdErrorResponse) encodeFields(e *jx.Encoder) {
 	switch s.Type {
+	case AppNotFoundGetApplicationByIdErrorResponse:
+		e.FieldStart("code")
+		e.Str("app.not_found")
+		{
+			s := s.AppNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case AppPermissionDeniedGetApplicationByIdErrorResponse:
+		e.FieldStart("code")
+		e.Str("app.permission_denied")
+		{
+			s := s.AppPermissionDenied
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case AuthUnauthorizedGetApplicationByIdErrorResponse:
 		e.FieldStart("code")
 		e.Str("auth.unauthorized")
@@ -60083,6 +63617,12 @@ func (s *GetApplicationByIdErrorResponse) Decode(d *jx.Decoder) error {
 					return err
 				}
 				switch typ {
+				case "app.not_found":
+					s.Type = AppNotFoundGetApplicationByIdErrorResponse
+					found = true
+				case "app.permission_denied":
+					s.Type = AppPermissionDeniedGetApplicationByIdErrorResponse
+					found = true
 				case "auth.unauthorized":
 					s.Type = AuthUnauthorizedGetApplicationByIdErrorResponse
 					found = true
@@ -60112,6 +63652,14 @@ func (s *GetApplicationByIdErrorResponse) Decode(d *jx.Decoder) error {
 		return errors.New("unable to detect sum type variant")
 	}
 	switch s.Type {
+	case AppNotFoundGetApplicationByIdErrorResponse:
+		if err := s.AppNotFound.Decode(d); err != nil {
+			return err
+		}
+	case AppPermissionDeniedGetApplicationByIdErrorResponse:
+		if err := s.AppPermissionDenied.Decode(d); err != nil {
+			return err
+		}
 	case AuthUnauthorizedGetApplicationByIdErrorResponse:
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
 			return err
@@ -66382,6 +69930,189 @@ func (s GetMyUserSchemaErrorResponse) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *GetMyUserSchemaErrorResponse) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes GetOAuthSettingsByIdErrorResponse as json.
+func (s GetOAuthSettingsByIdErrorResponse) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+func (s GetOAuthSettingsByIdErrorResponse) encodeFields(e *jx.Encoder) {
+	switch s.Type {
+	case AuthUnauthorizedGetOAuthSettingsByIdErrorResponse:
+		e.FieldStart("code")
+		e.Str("auth.unauthorized")
+		{
+			s := s.AuthUnauthorized
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case InternalGetOAuthSettingsByIdErrorResponse:
+		e.FieldStart("code")
+		e.Str("internal")
+		{
+			s := s.Internal
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case NotImplementedGetOAuthSettingsByIdErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ReqInvalidGetOAuthSettingsByIdErrorResponse:
+		e.FieldStart("code")
+		e.Str("req.invalid")
+		{
+			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableGetOAuthSettingsByIdErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	}
+}
+
+// Decode decodes GetOAuthSettingsByIdErrorResponse from json.
+func (s *GetOAuthSettingsByIdErrorResponse) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode GetOAuthSettingsByIdErrorResponse to nil")
+	}
+	// Sum type discriminator.
+	if typ := d.Next(); typ != jx.Object {
+		return errors.Errorf("unexpected json type %q", typ)
+	}
+
+	var found bool
+	if err := d.Capture(func(d *jx.Decoder) error {
+		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
+			if found {
+				return d.Skip()
+			}
+			switch string(key) {
+			case "code":
+				typ, err := d.Str()
+				if err != nil {
+					return err
+				}
+				switch typ {
+				case "auth.unauthorized":
+					s.Type = AuthUnauthorizedGetOAuthSettingsByIdErrorResponse
+					found = true
+				case "internal":
+					s.Type = InternalGetOAuthSettingsByIdErrorResponse
+					found = true
+				case "not_implemented":
+					s.Type = NotImplementedGetOAuthSettingsByIdErrorResponse
+					found = true
+				case "req.invalid":
+					s.Type = ReqInvalidGetOAuthSettingsByIdErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableGetOAuthSettingsByIdErrorResponse
+					found = true
+				default:
+					return errors.Errorf("unknown type %s", typ)
+				}
+				return nil
+			}
+			return d.Skip()
+		})
+	}); err != nil {
+		return errors.Wrap(err, "capture")
+	}
+	if !found {
+		return errors.New("unable to detect sum type variant")
+	}
+	switch s.Type {
+	case AuthUnauthorizedGetOAuthSettingsByIdErrorResponse:
+		if err := s.AuthUnauthorized.Decode(d); err != nil {
+			return err
+		}
+	case InternalGetOAuthSettingsByIdErrorResponse:
+		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case NotImplementedGetOAuthSettingsByIdErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
+	case ReqInvalidGetOAuthSettingsByIdErrorResponse:
+		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableGetOAuthSettingsByIdErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
+			return err
+		}
+	default:
+		return errors.Errorf("inferred invalid type: %s", s.Type)
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s GetOAuthSettingsByIdErrorResponse) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *GetOAuthSettingsByIdErrorResponse) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -72756,11 +76487,11 @@ func (s *IdpCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -72784,6 +76515,12 @@ func (s *IdpCreatedEvent) encodeFields(e *jx.Encoder) {
 		if s.EntityID.Set {
 			e.FieldStart("entity_id")
 			s.EntityID.Encode(e)
+		}
+	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
 		}
 	}
 	{
@@ -72850,7 +76587,7 @@ func (s *IdpCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfIdpCreatedEvent = [22]string{
+var jsonFieldsNameOfIdpCreatedEvent = [23]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -72862,17 +76599,18 @@ var jsonFieldsNameOfIdpCreatedEvent = [22]string{
 	8:  "actor_type",
 	9:  "entity_type",
 	10: "entity_id",
-	11: "client_id",
-	12: "token_id",
-	13: "delegation_type",
-	14: "delegation_id",
-	15: "grantor",
-	16: "fingerprint",
-	17: "request_id",
-	18: "session_id",
-	19: "flow_id",
-	20: "metadata",
-	21: "payload",
+	11: "user_id",
+	12: "client_id",
+	13: "token_id",
+	14: "delegation_type",
+	15: "delegation_id",
+	16: "grantor",
+	17: "fingerprint",
+	18: "request_id",
+	19: "session_id",
+	20: "flow_id",
+	21: "metadata",
+	22: "payload",
 }
 
 // Decode decodes IdpCreatedEvent from json.
@@ -72941,7 +76679,7 @@ func (s *IdpCreatedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -72953,7 +76691,7 @@ func (s *IdpCreatedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -73002,8 +76740,18 @@ func (s *IdpCreatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"entity_id\"")
 			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
 		case "client_id":
-			requiredBitSet[1] |= 1 << 3
+			requiredBitSet[1] |= 1 << 4
 			if err := func() error {
 				v, err := d.Str()
 				s.ClientID = string(v)
@@ -73105,7 +76853,7 @@ func (s *IdpCreatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 5
+			requiredBitSet[2] |= 1 << 6
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -73125,8 +76873,8 @@ func (s *IdpCreatedEvent) Decode(d *jx.Decoder) error {
 	var failures []validate.FieldError
 	for i, mask := range [3]uint8{
 		0b01111011,
-		0b00001000,
-		0b00100000,
+		0b00010000,
+		0b01000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -73945,11 +77693,11 @@ func (s *IdpIdentityLinkCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -73973,6 +77721,12 @@ func (s *IdpIdentityLinkCreatedEvent) encodeFields(e *jx.Encoder) {
 		if s.EntityID.Set {
 			e.FieldStart("entity_id")
 			s.EntityID.Encode(e)
+		}
+	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
 		}
 	}
 	{
@@ -74039,7 +77793,7 @@ func (s *IdpIdentityLinkCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfIdpIdentityLinkCreatedEvent = [22]string{
+var jsonFieldsNameOfIdpIdentityLinkCreatedEvent = [23]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -74051,17 +77805,18 @@ var jsonFieldsNameOfIdpIdentityLinkCreatedEvent = [22]string{
 	8:  "actor_type",
 	9:  "entity_type",
 	10: "entity_id",
-	11: "client_id",
-	12: "token_id",
-	13: "delegation_type",
-	14: "delegation_id",
-	15: "grantor",
-	16: "fingerprint",
-	17: "request_id",
-	18: "session_id",
-	19: "flow_id",
-	20: "metadata",
-	21: "payload",
+	11: "user_id",
+	12: "client_id",
+	13: "token_id",
+	14: "delegation_type",
+	15: "delegation_id",
+	16: "grantor",
+	17: "fingerprint",
+	18: "request_id",
+	19: "session_id",
+	20: "flow_id",
+	21: "metadata",
+	22: "payload",
 }
 
 // Decode decodes IdpIdentityLinkCreatedEvent from json.
@@ -74130,7 +77885,7 @@ func (s *IdpIdentityLinkCreatedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -74142,7 +77897,7 @@ func (s *IdpIdentityLinkCreatedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -74191,8 +77946,18 @@ func (s *IdpIdentityLinkCreatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"entity_id\"")
 			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
 		case "client_id":
-			requiredBitSet[1] |= 1 << 3
+			requiredBitSet[1] |= 1 << 4
 			if err := func() error {
 				v, err := d.Str()
 				s.ClientID = string(v)
@@ -74294,7 +78059,7 @@ func (s *IdpIdentityLinkCreatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 5
+			requiredBitSet[2] |= 1 << 6
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -74314,8 +78079,8 @@ func (s *IdpIdentityLinkCreatedEvent) Decode(d *jx.Decoder) error {
 	var failures []validate.FieldError
 	for i, mask := range [3]uint8{
 		0b01111011,
-		0b00001000,
-		0b00100000,
+		0b00010000,
+		0b01000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -75964,11 +79729,11 @@ func (s *IdpUpdatedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -75992,6 +79757,12 @@ func (s *IdpUpdatedEvent) encodeFields(e *jx.Encoder) {
 		if s.EntityID.Set {
 			e.FieldStart("entity_id")
 			s.EntityID.Encode(e)
+		}
+	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
 		}
 	}
 	{
@@ -76058,7 +79829,7 @@ func (s *IdpUpdatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfIdpUpdatedEvent = [22]string{
+var jsonFieldsNameOfIdpUpdatedEvent = [23]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -76070,17 +79841,18 @@ var jsonFieldsNameOfIdpUpdatedEvent = [22]string{
 	8:  "actor_type",
 	9:  "entity_type",
 	10: "entity_id",
-	11: "client_id",
-	12: "token_id",
-	13: "delegation_type",
-	14: "delegation_id",
-	15: "grantor",
-	16: "fingerprint",
-	17: "request_id",
-	18: "session_id",
-	19: "flow_id",
-	20: "metadata",
-	21: "payload",
+	11: "user_id",
+	12: "client_id",
+	13: "token_id",
+	14: "delegation_type",
+	15: "delegation_id",
+	16: "grantor",
+	17: "fingerprint",
+	18: "request_id",
+	19: "session_id",
+	20: "flow_id",
+	21: "metadata",
+	22: "payload",
 }
 
 // Decode decodes IdpUpdatedEvent from json.
@@ -76149,7 +79921,7 @@ func (s *IdpUpdatedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -76161,7 +79933,7 @@ func (s *IdpUpdatedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -76210,8 +79982,18 @@ func (s *IdpUpdatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"entity_id\"")
 			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
 		case "client_id":
-			requiredBitSet[1] |= 1 << 3
+			requiredBitSet[1] |= 1 << 4
 			if err := func() error {
 				v, err := d.Str()
 				s.ClientID = string(v)
@@ -76313,7 +80095,7 @@ func (s *IdpUpdatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 5
+			requiredBitSet[2] |= 1 << 6
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -76333,8 +80115,8 @@ func (s *IdpUpdatedEvent) Decode(d *jx.Decoder) error {
 	var failures []validate.FieldError
 	for i, mask := range [3]uint8{
 		0b01111011,
-		0b00001000,
-		0b00100000,
+		0b00010000,
+		0b01000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -79089,11 +82871,11 @@ func (s *InvitationAcceptedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -79117,6 +82899,12 @@ func (s *InvitationAcceptedEvent) encodeFields(e *jx.Encoder) {
 		if s.EntityID.Set {
 			e.FieldStart("entity_id")
 			s.EntityID.Encode(e)
+		}
+	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
 		}
 	}
 	{
@@ -79183,7 +82971,7 @@ func (s *InvitationAcceptedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfInvitationAcceptedEvent = [22]string{
+var jsonFieldsNameOfInvitationAcceptedEvent = [23]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -79195,17 +82983,18 @@ var jsonFieldsNameOfInvitationAcceptedEvent = [22]string{
 	8:  "actor_type",
 	9:  "entity_type",
 	10: "entity_id",
-	11: "client_id",
-	12: "token_id",
-	13: "delegation_type",
-	14: "delegation_id",
-	15: "grantor",
-	16: "fingerprint",
-	17: "request_id",
-	18: "session_id",
-	19: "flow_id",
-	20: "metadata",
-	21: "payload",
+	11: "user_id",
+	12: "client_id",
+	13: "token_id",
+	14: "delegation_type",
+	15: "delegation_id",
+	16: "grantor",
+	17: "fingerprint",
+	18: "request_id",
+	19: "session_id",
+	20: "flow_id",
+	21: "metadata",
+	22: "payload",
 }
 
 // Decode decodes InvitationAcceptedEvent from json.
@@ -79274,7 +83063,7 @@ func (s *InvitationAcceptedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -79286,7 +83075,7 @@ func (s *InvitationAcceptedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -79335,8 +83124,18 @@ func (s *InvitationAcceptedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"entity_id\"")
 			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
 		case "client_id":
-			requiredBitSet[1] |= 1 << 3
+			requiredBitSet[1] |= 1 << 4
 			if err := func() error {
 				v, err := d.Str()
 				s.ClientID = string(v)
@@ -79438,7 +83237,7 @@ func (s *InvitationAcceptedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 5
+			requiredBitSet[2] |= 1 << 6
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -79458,8 +83257,8 @@ func (s *InvitationAcceptedEvent) Decode(d *jx.Decoder) error {
 	var failures []validate.FieldError
 	for i, mask := range [3]uint8{
 		0b01111011,
-		0b00001000,
-		0b00100000,
+		0b00010000,
+		0b01000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -80469,11 +84268,11 @@ func (s *InvitationCancelledEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -80497,6 +84296,12 @@ func (s *InvitationCancelledEvent) encodeFields(e *jx.Encoder) {
 		if s.EntityID.Set {
 			e.FieldStart("entity_id")
 			s.EntityID.Encode(e)
+		}
+	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
 		}
 	}
 	{
@@ -80563,7 +84368,7 @@ func (s *InvitationCancelledEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfInvitationCancelledEvent = [22]string{
+var jsonFieldsNameOfInvitationCancelledEvent = [23]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -80575,17 +84380,18 @@ var jsonFieldsNameOfInvitationCancelledEvent = [22]string{
 	8:  "actor_type",
 	9:  "entity_type",
 	10: "entity_id",
-	11: "client_id",
-	12: "token_id",
-	13: "delegation_type",
-	14: "delegation_id",
-	15: "grantor",
-	16: "fingerprint",
-	17: "request_id",
-	18: "session_id",
-	19: "flow_id",
-	20: "metadata",
-	21: "payload",
+	11: "user_id",
+	12: "client_id",
+	13: "token_id",
+	14: "delegation_type",
+	15: "delegation_id",
+	16: "grantor",
+	17: "fingerprint",
+	18: "request_id",
+	19: "session_id",
+	20: "flow_id",
+	21: "metadata",
+	22: "payload",
 }
 
 // Decode decodes InvitationCancelledEvent from json.
@@ -80654,7 +84460,7 @@ func (s *InvitationCancelledEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -80666,7 +84472,7 @@ func (s *InvitationCancelledEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -80715,8 +84521,18 @@ func (s *InvitationCancelledEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"entity_id\"")
 			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
 		case "client_id":
-			requiredBitSet[1] |= 1 << 3
+			requiredBitSet[1] |= 1 << 4
 			if err := func() error {
 				v, err := d.Str()
 				s.ClientID = string(v)
@@ -80818,7 +84634,7 @@ func (s *InvitationCancelledEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 5
+			requiredBitSet[2] |= 1 << 6
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -80838,8 +84654,8 @@ func (s *InvitationCancelledEvent) Decode(d *jx.Decoder) error {
 	var failures []validate.FieldError
 	for i, mask := range [3]uint8{
 		0b01111011,
-		0b00001000,
-		0b00100000,
+		0b00010000,
+		0b01000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -81160,11 +84976,11 @@ func (s *InvitationCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -81188,6 +85004,12 @@ func (s *InvitationCreatedEvent) encodeFields(e *jx.Encoder) {
 		if s.EntityID.Set {
 			e.FieldStart("entity_id")
 			s.EntityID.Encode(e)
+		}
+	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
 		}
 	}
 	{
@@ -81254,7 +85076,7 @@ func (s *InvitationCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfInvitationCreatedEvent = [22]string{
+var jsonFieldsNameOfInvitationCreatedEvent = [23]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -81266,17 +85088,18 @@ var jsonFieldsNameOfInvitationCreatedEvent = [22]string{
 	8:  "actor_type",
 	9:  "entity_type",
 	10: "entity_id",
-	11: "client_id",
-	12: "token_id",
-	13: "delegation_type",
-	14: "delegation_id",
-	15: "grantor",
-	16: "fingerprint",
-	17: "request_id",
-	18: "session_id",
-	19: "flow_id",
-	20: "metadata",
-	21: "payload",
+	11: "user_id",
+	12: "client_id",
+	13: "token_id",
+	14: "delegation_type",
+	15: "delegation_id",
+	16: "grantor",
+	17: "fingerprint",
+	18: "request_id",
+	19: "session_id",
+	20: "flow_id",
+	21: "metadata",
+	22: "payload",
 }
 
 // Decode decodes InvitationCreatedEvent from json.
@@ -81345,7 +85168,7 @@ func (s *InvitationCreatedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -81357,7 +85180,7 @@ func (s *InvitationCreatedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -81406,8 +85229,18 @@ func (s *InvitationCreatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"entity_id\"")
 			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
 		case "client_id":
-			requiredBitSet[1] |= 1 << 3
+			requiredBitSet[1] |= 1 << 4
 			if err := func() error {
 				v, err := d.Str()
 				s.ClientID = string(v)
@@ -81509,7 +85342,7 @@ func (s *InvitationCreatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 5
+			requiredBitSet[2] |= 1 << 6
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -81529,8 +85362,8 @@ func (s *InvitationCreatedEvent) Decode(d *jx.Decoder) error {
 	var failures []validate.FieldError
 	for i, mask := range [3]uint8{
 		0b01111011,
-		0b00001000,
-		0b00100000,
+		0b00010000,
+		0b01000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -83734,11 +87567,11 @@ func (s *InvitationRejectedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -83762,6 +87595,12 @@ func (s *InvitationRejectedEvent) encodeFields(e *jx.Encoder) {
 		if s.EntityID.Set {
 			e.FieldStart("entity_id")
 			s.EntityID.Encode(e)
+		}
+	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
 		}
 	}
 	{
@@ -83828,7 +87667,7 @@ func (s *InvitationRejectedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfInvitationRejectedEvent = [22]string{
+var jsonFieldsNameOfInvitationRejectedEvent = [23]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -83840,17 +87679,18 @@ var jsonFieldsNameOfInvitationRejectedEvent = [22]string{
 	8:  "actor_type",
 	9:  "entity_type",
 	10: "entity_id",
-	11: "client_id",
-	12: "token_id",
-	13: "delegation_type",
-	14: "delegation_id",
-	15: "grantor",
-	16: "fingerprint",
-	17: "request_id",
-	18: "session_id",
-	19: "flow_id",
-	20: "metadata",
-	21: "payload",
+	11: "user_id",
+	12: "client_id",
+	13: "token_id",
+	14: "delegation_type",
+	15: "delegation_id",
+	16: "grantor",
+	17: "fingerprint",
+	18: "request_id",
+	19: "session_id",
+	20: "flow_id",
+	21: "metadata",
+	22: "payload",
 }
 
 // Decode decodes InvitationRejectedEvent from json.
@@ -83919,7 +87759,7 @@ func (s *InvitationRejectedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -83931,7 +87771,7 @@ func (s *InvitationRejectedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -83980,8 +87820,18 @@ func (s *InvitationRejectedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"entity_id\"")
 			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
 		case "client_id":
-			requiredBitSet[1] |= 1 << 3
+			requiredBitSet[1] |= 1 << 4
 			if err := func() error {
 				v, err := d.Str()
 				s.ClientID = string(v)
@@ -84083,7 +87933,7 @@ func (s *InvitationRejectedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 5
+			requiredBitSet[2] |= 1 << 6
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -84103,8 +87953,8 @@ func (s *InvitationRejectedEvent) Decode(d *jx.Decoder) error {
 	var failures []validate.FieldError
 	for i, mask := range [3]uint8{
 		0b01111011,
-		0b00001000,
-		0b00100000,
+		0b00010000,
+		0b01000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -94033,6 +97883,517 @@ func (s *NotImplementedDetails) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode implements json.Marshaler.
+func (s *OAuthSettings) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *OAuthSettings) encodeFields(e *jx.Encoder) {
+	{
+		if s.Schema.Set {
+			e.FieldStart("$schema")
+			s.Schema.Encode(e)
+		}
+	}
+	{
+		e.FieldStart("enabled")
+		e.Bool(s.Enabled)
+	}
+}
+
+var jsonFieldsNameOfOAuthSettings = [2]string{
+	0: "$schema",
+	1: "enabled",
+}
+
+// Decode decodes OAuthSettings from json.
+func (s *OAuthSettings) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode OAuthSettings to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "$schema":
+			if err := func() error {
+				s.Schema.Reset()
+				if err := s.Schema.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"$schema\"")
+			}
+		case "enabled":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := d.Bool()
+				s.Enabled = bool(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"enabled\"")
+			}
+		default:
+			return errors.Errorf("unexpected field %q", k)
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode OAuthSettings")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000010,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfOAuthSettings) {
+					name = jsonFieldsNameOfOAuthSettings[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *OAuthSettings) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OAuthSettings) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *OAuthSettingsRevisionResponse) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *OAuthSettingsRevisionResponse) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("id")
+		e.Str(s.ID)
+	}
+	{
+		e.FieldStart("created_at")
+		json.EncodeDateTime(e, s.CreatedAt)
+	}
+	{
+		e.FieldStart("oauth")
+		s.OAuth.Encode(e)
+	}
+}
+
+var jsonFieldsNameOfOAuthSettingsRevisionResponse = [3]string{
+	0: "id",
+	1: "created_at",
+	2: "oauth",
+}
+
+// Decode decodes OAuthSettingsRevisionResponse from json.
+func (s *OAuthSettingsRevisionResponse) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode OAuthSettingsRevisionResponse to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "id":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.ID = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"id\"")
+			}
+		case "created_at":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := json.DecodeDateTime(d)
+				s.CreatedAt = v
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"created_at\"")
+			}
+		case "oauth":
+			requiredBitSet[0] |= 1 << 2
+			if err := func() error {
+				if err := s.OAuth.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"oauth\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode OAuthSettingsRevisionResponse")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000111,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfOAuthSettingsRevisionResponse) {
+					name = jsonFieldsNameOfOAuthSettingsRevisionResponse[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *OAuthSettingsRevisionResponse) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OAuthSettingsRevisionResponse) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes AppClientIDTakenDetails as json.
+func (o OptAppClientIDTakenDetails) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes AppClientIDTakenDetails from json.
+func (o *OptAppClientIDTakenDetails) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptAppClientIDTakenDetails to nil")
+	}
+	o.Set = true
+	o.Value = make(AppClientIDTakenDetails)
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptAppClientIDTakenDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptAppClientIDTakenDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes AppFieldImmutableDetails as json.
+func (o OptAppFieldImmutableDetails) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes AppFieldImmutableDetails from json.
+func (o *OptAppFieldImmutableDetails) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptAppFieldImmutableDetails to nil")
+	}
+	o.Set = true
+	o.Value = make(AppFieldImmutableDetails)
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptAppFieldImmutableDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptAppFieldImmutableDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes AppInvalidDetails as json.
+func (o OptAppInvalidDetails) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes AppInvalidDetails from json.
+func (o *OptAppInvalidDetails) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptAppInvalidDetails to nil")
+	}
+	o.Set = true
+	o.Value = make(AppInvalidDetails)
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptAppInvalidDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptAppInvalidDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes AppNotFoundDetails as json.
+func (o OptAppNotFoundDetails) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes AppNotFoundDetails from json.
+func (o *OptAppNotFoundDetails) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptAppNotFoundDetails to nil")
+	}
+	o.Set = true
+	o.Value = make(AppNotFoundDetails)
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptAppNotFoundDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptAppNotFoundDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes AppPermissionDeniedDetails as json.
+func (o OptAppPermissionDeniedDetails) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes AppPermissionDeniedDetails from json.
+func (o *OptAppPermissionDeniedDetails) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptAppPermissionDeniedDetails to nil")
+	}
+	o.Set = true
+	o.Value = make(AppPermissionDeniedDetails)
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptAppPermissionDeniedDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptAppPermissionDeniedDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes AppRevisionConflictDetails as json.
+func (o OptAppRevisionConflictDetails) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes AppRevisionConflictDetails from json.
+func (o *OptAppRevisionConflictDetails) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptAppRevisionConflictDetails to nil")
+	}
+	o.Set = true
+	o.Value = make(AppRevisionConflictDetails)
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptAppRevisionConflictDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptAppRevisionConflictDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes ApplicationCreatedEventDelegationType as json.
+func (o OptApplicationCreatedEventDelegationType) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	e.Str(string(o.Value))
+}
+
+// Decode decodes ApplicationCreatedEventDelegationType from json.
+func (o *OptApplicationCreatedEventDelegationType) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptApplicationCreatedEventDelegationType to nil")
+	}
+	o.Set = true
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptApplicationCreatedEventDelegationType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptApplicationCreatedEventDelegationType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes ApplicationUpdatedEventDelegationType as json.
+func (o OptApplicationUpdatedEventDelegationType) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	e.Str(string(o.Value))
+}
+
+// Decode decodes ApplicationUpdatedEventDelegationType from json.
+func (o *OptApplicationUpdatedEventDelegationType) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptApplicationUpdatedEventDelegationType to nil")
+	}
+	o.Set = true
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptApplicationUpdatedEventDelegationType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptApplicationUpdatedEventDelegationType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes AttAlreadyHandedOffDetails as json.
 func (o OptAttAlreadyHandedOffDetails) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -99676,6 +104037,104 @@ func (s *OptLimit) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes ApplicationCreatedEventActorType as json.
+func (o OptNilApplicationCreatedEventActorType) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	if o.Null {
+		e.Null()
+		return
+	}
+	e.Str(string(o.Value))
+}
+
+// Decode decodes ApplicationCreatedEventActorType from json.
+func (o *OptNilApplicationCreatedEventActorType) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptNilApplicationCreatedEventActorType to nil")
+	}
+	if d.Next() == jx.Null {
+		if err := d.Null(); err != nil {
+			return err
+		}
+
+		var v ApplicationCreatedEventActorType
+		o.Value = v
+		o.Set = true
+		o.Null = true
+		return nil
+	}
+	o.Set = true
+	o.Null = false
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptNilApplicationCreatedEventActorType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptNilApplicationCreatedEventActorType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes ApplicationUpdatedEventActorType as json.
+func (o OptNilApplicationUpdatedEventActorType) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	if o.Null {
+		e.Null()
+		return
+	}
+	e.Str(string(o.Value))
+}
+
+// Decode decodes ApplicationUpdatedEventActorType from json.
+func (o *OptNilApplicationUpdatedEventActorType) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptNilApplicationUpdatedEventActorType to nil")
+	}
+	if d.Next() == jx.Null {
+		if err := d.Null(); err != nil {
+			return err
+		}
+
+		var v ApplicationUpdatedEventActorType
+		o.Value = v
+		o.Set = true
+		o.Null = true
+		return nil
+	}
+	o.Set = true
+	o.Null = false
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptNilApplicationUpdatedEventActorType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptNilApplicationUpdatedEventActorType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes AuthAttemptCreatedEventActorType as json.
 func (o OptNilAuthAttemptCreatedEventActorType) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -103337,6 +107796,39 @@ func (s OptNotImplementedDetails) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *OptNotImplementedDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes OAuthSettings as json.
+func (o OptOAuthSettings) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes OAuthSettings from json.
+func (o *OptOAuthSettings) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptOAuthSettings to nil")
+	}
+	o.Set = true
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptOAuthSettings) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptOAuthSettings) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -108187,11 +112679,11 @@ func (s *OriginAddedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -108215,6 +112707,12 @@ func (s *OriginAddedEvent) encodeFields(e *jx.Encoder) {
 		if s.EntityID.Set {
 			e.FieldStart("entity_id")
 			s.EntityID.Encode(e)
+		}
+	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
 		}
 	}
 	{
@@ -108281,7 +112779,7 @@ func (s *OriginAddedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfOriginAddedEvent = [22]string{
+var jsonFieldsNameOfOriginAddedEvent = [23]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -108293,17 +112791,18 @@ var jsonFieldsNameOfOriginAddedEvent = [22]string{
 	8:  "actor_type",
 	9:  "entity_type",
 	10: "entity_id",
-	11: "client_id",
-	12: "token_id",
-	13: "delegation_type",
-	14: "delegation_id",
-	15: "grantor",
-	16: "fingerprint",
-	17: "request_id",
-	18: "session_id",
-	19: "flow_id",
-	20: "metadata",
-	21: "payload",
+	11: "user_id",
+	12: "client_id",
+	13: "token_id",
+	14: "delegation_type",
+	15: "delegation_id",
+	16: "grantor",
+	17: "fingerprint",
+	18: "request_id",
+	19: "session_id",
+	20: "flow_id",
+	21: "metadata",
+	22: "payload",
 }
 
 // Decode decodes OriginAddedEvent from json.
@@ -108372,7 +112871,7 @@ func (s *OriginAddedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -108384,7 +112883,7 @@ func (s *OriginAddedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -108433,8 +112932,18 @@ func (s *OriginAddedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"entity_id\"")
 			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
 		case "client_id":
-			requiredBitSet[1] |= 1 << 3
+			requiredBitSet[1] |= 1 << 4
 			if err := func() error {
 				v, err := d.Str()
 				s.ClientID = string(v)
@@ -108536,7 +113045,7 @@ func (s *OriginAddedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 5
+			requiredBitSet[2] |= 1 << 6
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -108556,8 +113065,8 @@ func (s *OriginAddedEvent) Decode(d *jx.Decoder) error {
 	var failures []validate.FieldError
 	for i, mask := range [3]uint8{
 		0b01111011,
-		0b00001000,
-		0b00100000,
+		0b00010000,
+		0b01000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -109863,11 +114372,11 @@ func (s *OriginRemovedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -109891,6 +114400,12 @@ func (s *OriginRemovedEvent) encodeFields(e *jx.Encoder) {
 		if s.EntityID.Set {
 			e.FieldStart("entity_id")
 			s.EntityID.Encode(e)
+		}
+	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
 		}
 	}
 	{
@@ -109957,7 +114472,7 @@ func (s *OriginRemovedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfOriginRemovedEvent = [22]string{
+var jsonFieldsNameOfOriginRemovedEvent = [23]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -109969,17 +114484,18 @@ var jsonFieldsNameOfOriginRemovedEvent = [22]string{
 	8:  "actor_type",
 	9:  "entity_type",
 	10: "entity_id",
-	11: "client_id",
-	12: "token_id",
-	13: "delegation_type",
-	14: "delegation_id",
-	15: "grantor",
-	16: "fingerprint",
-	17: "request_id",
-	18: "session_id",
-	19: "flow_id",
-	20: "metadata",
-	21: "payload",
+	11: "user_id",
+	12: "client_id",
+	13: "token_id",
+	14: "delegation_type",
+	15: "delegation_id",
+	16: "grantor",
+	17: "fingerprint",
+	18: "request_id",
+	19: "session_id",
+	20: "flow_id",
+	21: "metadata",
+	22: "payload",
 }
 
 // Decode decodes OriginRemovedEvent from json.
@@ -110048,7 +114564,7 @@ func (s *OriginRemovedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -110060,7 +114576,7 @@ func (s *OriginRemovedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -110109,8 +114625,18 @@ func (s *OriginRemovedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"entity_id\"")
 			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
 		case "client_id":
-			requiredBitSet[1] |= 1 << 3
+			requiredBitSet[1] |= 1 << 4
 			if err := func() error {
 				v, err := d.Str()
 				s.ClientID = string(v)
@@ -110212,7 +114738,7 @@ func (s *OriginRemovedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 5
+			requiredBitSet[2] |= 1 << 6
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -110232,8 +114758,8 @@ func (s *OriginRemovedEvent) Decode(d *jx.Decoder) error {
 	var failures []validate.FieldError
 	for i, mask := range [3]uint8{
 		0b01111011,
-		0b00001000,
-		0b00100000,
+		0b00010000,
+		0b01000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -115698,11 +120224,11 @@ func (s *PolicyCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -115726,6 +120252,12 @@ func (s *PolicyCreatedEvent) encodeFields(e *jx.Encoder) {
 		if s.EntityID.Set {
 			e.FieldStart("entity_id")
 			s.EntityID.Encode(e)
+		}
+	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
 		}
 	}
 	{
@@ -115792,7 +120324,7 @@ func (s *PolicyCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfPolicyCreatedEvent = [22]string{
+var jsonFieldsNameOfPolicyCreatedEvent = [23]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -115804,17 +120336,18 @@ var jsonFieldsNameOfPolicyCreatedEvent = [22]string{
 	8:  "actor_type",
 	9:  "entity_type",
 	10: "entity_id",
-	11: "client_id",
-	12: "token_id",
-	13: "delegation_type",
-	14: "delegation_id",
-	15: "grantor",
-	16: "fingerprint",
-	17: "request_id",
-	18: "session_id",
-	19: "flow_id",
-	20: "metadata",
-	21: "payload",
+	11: "user_id",
+	12: "client_id",
+	13: "token_id",
+	14: "delegation_type",
+	15: "delegation_id",
+	16: "grantor",
+	17: "fingerprint",
+	18: "request_id",
+	19: "session_id",
+	20: "flow_id",
+	21: "metadata",
+	22: "payload",
 }
 
 // Decode decodes PolicyCreatedEvent from json.
@@ -115883,7 +120416,7 @@ func (s *PolicyCreatedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -115895,7 +120428,7 @@ func (s *PolicyCreatedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -115944,8 +120477,18 @@ func (s *PolicyCreatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"entity_id\"")
 			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
 		case "client_id":
-			requiredBitSet[1] |= 1 << 3
+			requiredBitSet[1] |= 1 << 4
 			if err := func() error {
 				v, err := d.Str()
 				s.ClientID = string(v)
@@ -116047,7 +120590,7 @@ func (s *PolicyCreatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 5
+			requiredBitSet[2] |= 1 << 6
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -116067,8 +120610,8 @@ func (s *PolicyCreatedEvent) Decode(d *jx.Decoder) error {
 	var failures []validate.FieldError
 	for i, mask := range [3]uint8{
 		0b01111011,
-		0b00001000,
-		0b00100000,
+		0b00010000,
+		0b01000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -116549,11 +121092,11 @@ func (s *PolicyUpdatedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -116577,6 +121120,12 @@ func (s *PolicyUpdatedEvent) encodeFields(e *jx.Encoder) {
 		if s.EntityID.Set {
 			e.FieldStart("entity_id")
 			s.EntityID.Encode(e)
+		}
+	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
 		}
 	}
 	{
@@ -116643,7 +121192,7 @@ func (s *PolicyUpdatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfPolicyUpdatedEvent = [22]string{
+var jsonFieldsNameOfPolicyUpdatedEvent = [23]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -116655,17 +121204,18 @@ var jsonFieldsNameOfPolicyUpdatedEvent = [22]string{
 	8:  "actor_type",
 	9:  "entity_type",
 	10: "entity_id",
-	11: "client_id",
-	12: "token_id",
-	13: "delegation_type",
-	14: "delegation_id",
-	15: "grantor",
-	16: "fingerprint",
-	17: "request_id",
-	18: "session_id",
-	19: "flow_id",
-	20: "metadata",
-	21: "payload",
+	11: "user_id",
+	12: "client_id",
+	13: "token_id",
+	14: "delegation_type",
+	15: "delegation_id",
+	16: "grantor",
+	17: "fingerprint",
+	18: "request_id",
+	19: "session_id",
+	20: "flow_id",
+	21: "metadata",
+	22: "payload",
 }
 
 // Decode decodes PolicyUpdatedEvent from json.
@@ -116734,7 +121284,7 @@ func (s *PolicyUpdatedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -116746,7 +121296,7 @@ func (s *PolicyUpdatedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -116795,8 +121345,18 @@ func (s *PolicyUpdatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"entity_id\"")
 			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
 		case "client_id":
-			requiredBitSet[1] |= 1 << 3
+			requiredBitSet[1] |= 1 << 4
 			if err := func() error {
 				v, err := d.Str()
 				s.ClientID = string(v)
@@ -116898,7 +121458,7 @@ func (s *PolicyUpdatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 5
+			requiredBitSet[2] |= 1 << 6
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -116918,8 +121478,8 @@ func (s *PolicyUpdatedEvent) Decode(d *jx.Decoder) error {
 	var failures []validate.FieldError
 	for i, mask := range [3]uint8{
 		0b01111011,
-		0b00001000,
-		0b00100000,
+		0b00010000,
+		0b01000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -117460,11 +122020,11 @@ func (s *PreviewRemovedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -117488,6 +122048,12 @@ func (s *PreviewRemovedEvent) encodeFields(e *jx.Encoder) {
 		if s.EntityID.Set {
 			e.FieldStart("entity_id")
 			s.EntityID.Encode(e)
+		}
+	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
 		}
 	}
 	{
@@ -117554,7 +122120,7 @@ func (s *PreviewRemovedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfPreviewRemovedEvent = [22]string{
+var jsonFieldsNameOfPreviewRemovedEvent = [23]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -117566,17 +122132,18 @@ var jsonFieldsNameOfPreviewRemovedEvent = [22]string{
 	8:  "actor_type",
 	9:  "entity_type",
 	10: "entity_id",
-	11: "client_id",
-	12: "token_id",
-	13: "delegation_type",
-	14: "delegation_id",
-	15: "grantor",
-	16: "fingerprint",
-	17: "request_id",
-	18: "session_id",
-	19: "flow_id",
-	20: "metadata",
-	21: "payload",
+	11: "user_id",
+	12: "client_id",
+	13: "token_id",
+	14: "delegation_type",
+	15: "delegation_id",
+	16: "grantor",
+	17: "fingerprint",
+	18: "request_id",
+	19: "session_id",
+	20: "flow_id",
+	21: "metadata",
+	22: "payload",
 }
 
 // Decode decodes PreviewRemovedEvent from json.
@@ -117645,7 +122212,7 @@ func (s *PreviewRemovedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -117657,7 +122224,7 @@ func (s *PreviewRemovedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -117706,8 +122273,18 @@ func (s *PreviewRemovedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"entity_id\"")
 			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
 		case "client_id":
-			requiredBitSet[1] |= 1 << 3
+			requiredBitSet[1] |= 1 << 4
 			if err := func() error {
 				v, err := d.Str()
 				s.ClientID = string(v)
@@ -117809,7 +122386,7 @@ func (s *PreviewRemovedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 5
+			requiredBitSet[2] |= 1 << 6
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -117829,8 +122406,8 @@ func (s *PreviewRemovedEvent) Decode(d *jx.Decoder) error {
 	var failures []validate.FieldError
 	for i, mask := range [3]uint8{
 		0b01111011,
-		0b00001000,
-		0b00100000,
+		0b00010000,
+		0b01000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -120883,11 +125460,11 @@ func (s *ProjectCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -120911,6 +125488,12 @@ func (s *ProjectCreatedEvent) encodeFields(e *jx.Encoder) {
 		if s.EntityID.Set {
 			e.FieldStart("entity_id")
 			s.EntityID.Encode(e)
+		}
+	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
 		}
 	}
 	{
@@ -120977,7 +125560,7 @@ func (s *ProjectCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfProjectCreatedEvent = [22]string{
+var jsonFieldsNameOfProjectCreatedEvent = [23]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -120989,17 +125572,18 @@ var jsonFieldsNameOfProjectCreatedEvent = [22]string{
 	8:  "actor_type",
 	9:  "entity_type",
 	10: "entity_id",
-	11: "client_id",
-	12: "token_id",
-	13: "delegation_type",
-	14: "delegation_id",
-	15: "grantor",
-	16: "fingerprint",
-	17: "request_id",
-	18: "session_id",
-	19: "flow_id",
-	20: "metadata",
-	21: "payload",
+	11: "user_id",
+	12: "client_id",
+	13: "token_id",
+	14: "delegation_type",
+	15: "delegation_id",
+	16: "grantor",
+	17: "fingerprint",
+	18: "request_id",
+	19: "session_id",
+	20: "flow_id",
+	21: "metadata",
+	22: "payload",
 }
 
 // Decode decodes ProjectCreatedEvent from json.
@@ -121068,7 +125652,7 @@ func (s *ProjectCreatedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -121080,7 +125664,7 @@ func (s *ProjectCreatedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -121129,8 +125713,18 @@ func (s *ProjectCreatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"entity_id\"")
 			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
 		case "client_id":
-			requiredBitSet[1] |= 1 << 3
+			requiredBitSet[1] |= 1 << 4
 			if err := func() error {
 				v, err := d.Str()
 				s.ClientID = string(v)
@@ -121232,7 +125826,7 @@ func (s *ProjectCreatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 5
+			requiredBitSet[2] |= 1 << 6
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -121252,8 +125846,8 @@ func (s *ProjectCreatedEvent) Decode(d *jx.Decoder) error {
 	var failures []validate.FieldError
 	for i, mask := range [3]uint8{
 		0b01111011,
-		0b00001000,
-		0b00100000,
+		0b00010000,
+		0b01000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -121468,11 +126062,11 @@ func (s *ProjectDeletedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -121496,6 +126090,12 @@ func (s *ProjectDeletedEvent) encodeFields(e *jx.Encoder) {
 		if s.EntityID.Set {
 			e.FieldStart("entity_id")
 			s.EntityID.Encode(e)
+		}
+	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
 		}
 	}
 	{
@@ -121562,7 +126162,7 @@ func (s *ProjectDeletedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfProjectDeletedEvent = [22]string{
+var jsonFieldsNameOfProjectDeletedEvent = [23]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -121574,17 +126174,18 @@ var jsonFieldsNameOfProjectDeletedEvent = [22]string{
 	8:  "actor_type",
 	9:  "entity_type",
 	10: "entity_id",
-	11: "client_id",
-	12: "token_id",
-	13: "delegation_type",
-	14: "delegation_id",
-	15: "grantor",
-	16: "fingerprint",
-	17: "request_id",
-	18: "session_id",
-	19: "flow_id",
-	20: "metadata",
-	21: "payload",
+	11: "user_id",
+	12: "client_id",
+	13: "token_id",
+	14: "delegation_type",
+	15: "delegation_id",
+	16: "grantor",
+	17: "fingerprint",
+	18: "request_id",
+	19: "session_id",
+	20: "flow_id",
+	21: "metadata",
+	22: "payload",
 }
 
 // Decode decodes ProjectDeletedEvent from json.
@@ -121653,7 +126254,7 @@ func (s *ProjectDeletedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -121665,7 +126266,7 @@ func (s *ProjectDeletedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -121714,8 +126315,18 @@ func (s *ProjectDeletedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"entity_id\"")
 			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
 		case "client_id":
-			requiredBitSet[1] |= 1 << 3
+			requiredBitSet[1] |= 1 << 4
 			if err := func() error {
 				v, err := d.Str()
 				s.ClientID = string(v)
@@ -121817,7 +126428,7 @@ func (s *ProjectDeletedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 5
+			requiredBitSet[2] |= 1 << 6
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -121837,8 +126448,8 @@ func (s *ProjectDeletedEvent) Decode(d *jx.Decoder) error {
 	var failures []validate.FieldError
 	for i, mask := range [3]uint8{
 		0b01111011,
-		0b00001000,
-		0b00100000,
+		0b00010000,
+		0b01000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -122749,11 +127360,11 @@ func (s *ProjectUpdatedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -122777,6 +127388,12 @@ func (s *ProjectUpdatedEvent) encodeFields(e *jx.Encoder) {
 		if s.EntityID.Set {
 			e.FieldStart("entity_id")
 			s.EntityID.Encode(e)
+		}
+	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
 		}
 	}
 	{
@@ -122843,7 +127460,7 @@ func (s *ProjectUpdatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfProjectUpdatedEvent = [22]string{
+var jsonFieldsNameOfProjectUpdatedEvent = [23]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -122855,17 +127472,18 @@ var jsonFieldsNameOfProjectUpdatedEvent = [22]string{
 	8:  "actor_type",
 	9:  "entity_type",
 	10: "entity_id",
-	11: "client_id",
-	12: "token_id",
-	13: "delegation_type",
-	14: "delegation_id",
-	15: "grantor",
-	16: "fingerprint",
-	17: "request_id",
-	18: "session_id",
-	19: "flow_id",
-	20: "metadata",
-	21: "payload",
+	11: "user_id",
+	12: "client_id",
+	13: "token_id",
+	14: "delegation_type",
+	15: "delegation_id",
+	16: "grantor",
+	17: "fingerprint",
+	18: "request_id",
+	19: "session_id",
+	20: "flow_id",
+	21: "metadata",
+	22: "payload",
 }
 
 // Decode decodes ProjectUpdatedEvent from json.
@@ -122934,7 +127552,7 @@ func (s *ProjectUpdatedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -122946,7 +127564,7 @@ func (s *ProjectUpdatedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -122995,8 +127613,18 @@ func (s *ProjectUpdatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"entity_id\"")
 			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
 		case "client_id":
-			requiredBitSet[1] |= 1 << 3
+			requiredBitSet[1] |= 1 << 4
 			if err := func() error {
 				v, err := d.Str()
 				s.ClientID = string(v)
@@ -123098,7 +127726,7 @@ func (s *ProjectUpdatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 5
+			requiredBitSet[2] |= 1 << 6
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -123118,8 +127746,8 @@ func (s *ProjectUpdatedEvent) Decode(d *jx.Decoder) error {
 	var failures []validate.FieldError
 	for i, mask := range [3]uint8{
 		0b01111011,
-		0b00001000,
-		0b00100000,
+		0b00010000,
+		0b01000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -131865,11 +136493,11 @@ func (s *ReleaseCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -131893,6 +136521,12 @@ func (s *ReleaseCreatedEvent) encodeFields(e *jx.Encoder) {
 		if s.EntityID.Set {
 			e.FieldStart("entity_id")
 			s.EntityID.Encode(e)
+		}
+	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
 		}
 	}
 	{
@@ -131959,7 +136593,7 @@ func (s *ReleaseCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfReleaseCreatedEvent = [22]string{
+var jsonFieldsNameOfReleaseCreatedEvent = [23]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -131971,17 +136605,18 @@ var jsonFieldsNameOfReleaseCreatedEvent = [22]string{
 	8:  "actor_type",
 	9:  "entity_type",
 	10: "entity_id",
-	11: "client_id",
-	12: "token_id",
-	13: "delegation_type",
-	14: "delegation_id",
-	15: "grantor",
-	16: "fingerprint",
-	17: "request_id",
-	18: "session_id",
-	19: "flow_id",
-	20: "metadata",
-	21: "payload",
+	11: "user_id",
+	12: "client_id",
+	13: "token_id",
+	14: "delegation_type",
+	15: "delegation_id",
+	16: "grantor",
+	17: "fingerprint",
+	18: "request_id",
+	19: "session_id",
+	20: "flow_id",
+	21: "metadata",
+	22: "payload",
 }
 
 // Decode decodes ReleaseCreatedEvent from json.
@@ -132050,7 +136685,7 @@ func (s *ReleaseCreatedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -132062,7 +136697,7 @@ func (s *ReleaseCreatedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -132111,8 +136746,18 @@ func (s *ReleaseCreatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"entity_id\"")
 			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
 		case "client_id":
-			requiredBitSet[1] |= 1 << 3
+			requiredBitSet[1] |= 1 << 4
 			if err := func() error {
 				v, err := d.Str()
 				s.ClientID = string(v)
@@ -132214,7 +136859,7 @@ func (s *ReleaseCreatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 5
+			requiredBitSet[2] |= 1 << 6
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -132234,8 +136879,8 @@ func (s *ReleaseCreatedEvent) Decode(d *jx.Decoder) error {
 	var failures []validate.FieldError
 	for i, mask := range [3]uint8{
 		0b01111011,
-		0b00001000,
-		0b00100000,
+		0b00010000,
+		0b01000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -133076,6 +137721,8 @@ func (s *ReleasePointerKind) Decode(d *jx.Decoder) error {
 		*s = ReleasePointerKindIdp
 	case ReleasePointerKindPolicy:
 		*s = ReleasePointerKindPolicy
+	case ReleasePointerKindOAuth:
+		*s = ReleasePointerKindOAuth
 	default:
 		*s = ReleasePointerKind(v)
 	}
@@ -133242,11 +137889,11 @@ func (s *ReleaseRevokedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -133270,6 +137917,12 @@ func (s *ReleaseRevokedEvent) encodeFields(e *jx.Encoder) {
 		if s.EntityID.Set {
 			e.FieldStart("entity_id")
 			s.EntityID.Encode(e)
+		}
+	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
 		}
 	}
 	{
@@ -133336,7 +137989,7 @@ func (s *ReleaseRevokedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfReleaseRevokedEvent = [22]string{
+var jsonFieldsNameOfReleaseRevokedEvent = [23]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -133348,17 +138001,18 @@ var jsonFieldsNameOfReleaseRevokedEvent = [22]string{
 	8:  "actor_type",
 	9:  "entity_type",
 	10: "entity_id",
-	11: "client_id",
-	12: "token_id",
-	13: "delegation_type",
-	14: "delegation_id",
-	15: "grantor",
-	16: "fingerprint",
-	17: "request_id",
-	18: "session_id",
-	19: "flow_id",
-	20: "metadata",
-	21: "payload",
+	11: "user_id",
+	12: "client_id",
+	13: "token_id",
+	14: "delegation_type",
+	15: "delegation_id",
+	16: "grantor",
+	17: "fingerprint",
+	18: "request_id",
+	19: "session_id",
+	20: "flow_id",
+	21: "metadata",
+	22: "payload",
 }
 
 // Decode decodes ReleaseRevokedEvent from json.
@@ -133427,7 +138081,7 @@ func (s *ReleaseRevokedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -133439,7 +138093,7 @@ func (s *ReleaseRevokedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -133488,8 +138142,18 @@ func (s *ReleaseRevokedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"entity_id\"")
 			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
 		case "client_id":
-			requiredBitSet[1] |= 1 << 3
+			requiredBitSet[1] |= 1 << 4
 			if err := func() error {
 				v, err := d.Str()
 				s.ClientID = string(v)
@@ -133591,7 +138255,7 @@ func (s *ReleaseRevokedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 5
+			requiredBitSet[2] |= 1 << 6
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -133611,8 +138275,8 @@ func (s *ReleaseRevokedEvent) Decode(d *jx.Decoder) error {
 	var failures []validate.FieldError
 	for i, mask := range [3]uint8{
 		0b01111011,
-		0b00001000,
-		0b00100000,
+		0b00010000,
+		0b01000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -135049,11 +139713,11 @@ func (s *RequestAPIEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -135077,6 +139741,12 @@ func (s *RequestAPIEvent) encodeFields(e *jx.Encoder) {
 		if s.EntityID.Set {
 			e.FieldStart("entity_id")
 			s.EntityID.Encode(e)
+		}
+	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
 		}
 	}
 	{
@@ -135143,7 +139813,7 @@ func (s *RequestAPIEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfRequestAPIEvent = [22]string{
+var jsonFieldsNameOfRequestAPIEvent = [23]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -135155,17 +139825,18 @@ var jsonFieldsNameOfRequestAPIEvent = [22]string{
 	8:  "actor_type",
 	9:  "entity_type",
 	10: "entity_id",
-	11: "client_id",
-	12: "token_id",
-	13: "delegation_type",
-	14: "delegation_id",
-	15: "grantor",
-	16: "fingerprint",
-	17: "request_id",
-	18: "session_id",
-	19: "flow_id",
-	20: "metadata",
-	21: "payload",
+	11: "user_id",
+	12: "client_id",
+	13: "token_id",
+	14: "delegation_type",
+	15: "delegation_id",
+	16: "grantor",
+	17: "fingerprint",
+	18: "request_id",
+	19: "session_id",
+	20: "flow_id",
+	21: "metadata",
+	22: "payload",
 }
 
 // Decode decodes RequestAPIEvent from json.
@@ -135234,7 +139905,7 @@ func (s *RequestAPIEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -135246,7 +139917,7 @@ func (s *RequestAPIEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -135295,8 +139966,18 @@ func (s *RequestAPIEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"entity_id\"")
 			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
 		case "client_id":
-			requiredBitSet[1] |= 1 << 3
+			requiredBitSet[1] |= 1 << 4
 			if err := func() error {
 				v, err := d.Str()
 				s.ClientID = string(v)
@@ -135398,7 +140079,7 @@ func (s *RequestAPIEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 5
+			requiredBitSet[2] |= 1 << 6
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -135418,8 +140099,8 @@ func (s *RequestAPIEvent) Decode(d *jx.Decoder) error {
 	var failures []validate.FieldError
 	for i, mask := range [3]uint8{
 		0b01111011,
-		0b00001000,
-		0b00100000,
+		0b00010000,
+		0b01000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -140244,11 +144925,11 @@ func (s *SchemaCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -140272,6 +144953,12 @@ func (s *SchemaCreatedEvent) encodeFields(e *jx.Encoder) {
 		if s.EntityID.Set {
 			e.FieldStart("entity_id")
 			s.EntityID.Encode(e)
+		}
+	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
 		}
 	}
 	{
@@ -140338,7 +145025,7 @@ func (s *SchemaCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfSchemaCreatedEvent = [22]string{
+var jsonFieldsNameOfSchemaCreatedEvent = [23]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -140350,17 +145037,18 @@ var jsonFieldsNameOfSchemaCreatedEvent = [22]string{
 	8:  "actor_type",
 	9:  "entity_type",
 	10: "entity_id",
-	11: "client_id",
-	12: "token_id",
-	13: "delegation_type",
-	14: "delegation_id",
-	15: "grantor",
-	16: "fingerprint",
-	17: "request_id",
-	18: "session_id",
-	19: "flow_id",
-	20: "metadata",
-	21: "payload",
+	11: "user_id",
+	12: "client_id",
+	13: "token_id",
+	14: "delegation_type",
+	15: "delegation_id",
+	16: "grantor",
+	17: "fingerprint",
+	18: "request_id",
+	19: "session_id",
+	20: "flow_id",
+	21: "metadata",
+	22: "payload",
 }
 
 // Decode decodes SchemaCreatedEvent from json.
@@ -140429,7 +145117,7 @@ func (s *SchemaCreatedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -140441,7 +145129,7 @@ func (s *SchemaCreatedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -140490,8 +145178,18 @@ func (s *SchemaCreatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"entity_id\"")
 			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
 		case "client_id":
-			requiredBitSet[1] |= 1 << 3
+			requiredBitSet[1] |= 1 << 4
 			if err := func() error {
 				v, err := d.Str()
 				s.ClientID = string(v)
@@ -140593,7 +145291,7 @@ func (s *SchemaCreatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 5
+			requiredBitSet[2] |= 1 << 6
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -140613,8 +145311,8 @@ func (s *SchemaCreatedEvent) Decode(d *jx.Decoder) error {
 	var failures []validate.FieldError
 	for i, mask := range [3]uint8{
 		0b01111011,
-		0b00001000,
-		0b00100000,
+		0b00010000,
+		0b01000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -144028,11 +148726,11 @@ func (s *SessionDeletedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -144056,6 +148754,12 @@ func (s *SessionDeletedEvent) encodeFields(e *jx.Encoder) {
 		if s.EntityID.Set {
 			e.FieldStart("entity_id")
 			s.EntityID.Encode(e)
+		}
+	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
 		}
 	}
 	{
@@ -144122,7 +148826,7 @@ func (s *SessionDeletedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfSessionDeletedEvent = [22]string{
+var jsonFieldsNameOfSessionDeletedEvent = [23]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -144134,17 +148838,18 @@ var jsonFieldsNameOfSessionDeletedEvent = [22]string{
 	8:  "actor_type",
 	9:  "entity_type",
 	10: "entity_id",
-	11: "client_id",
-	12: "token_id",
-	13: "delegation_type",
-	14: "delegation_id",
-	15: "grantor",
-	16: "fingerprint",
-	17: "request_id",
-	18: "session_id",
-	19: "flow_id",
-	20: "metadata",
-	21: "payload",
+	11: "user_id",
+	12: "client_id",
+	13: "token_id",
+	14: "delegation_type",
+	15: "delegation_id",
+	16: "grantor",
+	17: "fingerprint",
+	18: "request_id",
+	19: "session_id",
+	20: "flow_id",
+	21: "metadata",
+	22: "payload",
 }
 
 // Decode decodes SessionDeletedEvent from json.
@@ -144213,7 +148918,7 @@ func (s *SessionDeletedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -144225,7 +148930,7 @@ func (s *SessionDeletedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -144274,8 +148979,18 @@ func (s *SessionDeletedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"entity_id\"")
 			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
 		case "client_id":
-			requiredBitSet[1] |= 1 << 3
+			requiredBitSet[1] |= 1 << 4
 			if err := func() error {
 				v, err := d.Str()
 				s.ClientID = string(v)
@@ -144377,7 +149092,7 @@ func (s *SessionDeletedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 5
+			requiredBitSet[2] |= 1 << 6
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -144397,8 +149112,8 @@ func (s *SessionDeletedEvent) Decode(d *jx.Decoder) error {
 	var failures []validate.FieldError
 	for i, mask := range [3]uint8{
 		0b01111011,
-		0b00001000,
-		0b00100000,
+		0b00010000,
+		0b01000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -144676,11 +149391,11 @@ func (s *SessionEstablishedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -144704,6 +149419,12 @@ func (s *SessionEstablishedEvent) encodeFields(e *jx.Encoder) {
 		if s.EntityID.Set {
 			e.FieldStart("entity_id")
 			s.EntityID.Encode(e)
+		}
+	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
 		}
 	}
 	{
@@ -144770,7 +149491,7 @@ func (s *SessionEstablishedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfSessionEstablishedEvent = [22]string{
+var jsonFieldsNameOfSessionEstablishedEvent = [23]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -144782,17 +149503,18 @@ var jsonFieldsNameOfSessionEstablishedEvent = [22]string{
 	8:  "actor_type",
 	9:  "entity_type",
 	10: "entity_id",
-	11: "client_id",
-	12: "token_id",
-	13: "delegation_type",
-	14: "delegation_id",
-	15: "grantor",
-	16: "fingerprint",
-	17: "request_id",
-	18: "session_id",
-	19: "flow_id",
-	20: "metadata",
-	21: "payload",
+	11: "user_id",
+	12: "client_id",
+	13: "token_id",
+	14: "delegation_type",
+	15: "delegation_id",
+	16: "grantor",
+	17: "fingerprint",
+	18: "request_id",
+	19: "session_id",
+	20: "flow_id",
+	21: "metadata",
+	22: "payload",
 }
 
 // Decode decodes SessionEstablishedEvent from json.
@@ -144861,7 +149583,7 @@ func (s *SessionEstablishedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -144873,7 +149595,7 @@ func (s *SessionEstablishedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -144922,8 +149644,18 @@ func (s *SessionEstablishedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"entity_id\"")
 			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
 		case "client_id":
-			requiredBitSet[1] |= 1 << 3
+			requiredBitSet[1] |= 1 << 4
 			if err := func() error {
 				v, err := d.Str()
 				s.ClientID = string(v)
@@ -145025,7 +149757,7 @@ func (s *SessionEstablishedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 5
+			requiredBitSet[2] |= 1 << 6
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -145045,8 +149777,8 @@ func (s *SessionEstablishedEvent) Decode(d *jx.Decoder) error {
 	var failures []validate.FieldError
 	for i, mask := range [3]uint8{
 		0b01111011,
-		0b00001000,
-		0b00100000,
+		0b00010000,
+		0b01000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -147178,6 +151910,209 @@ func (s *StepTexts) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes SubmitFlowStepBadRequest as json.
+func (s SubmitFlowStepBadRequest) Encode(e *jx.Encoder) {
+	switch s.Type {
+	case FlowResponseSubmitFlowStepBadRequest:
+		s.FlowResponse.Encode(e)
+	case ErrorDetailsSubmitFlowStepBadRequest:
+		s.ErrorDetails.Encode(e)
+	}
+}
+
+func (s SubmitFlowStepBadRequest) encodeFields(e *jx.Encoder) {
+	switch s.Type {
+	case FlowResponseSubmitFlowStepBadRequest:
+		s.FlowResponse.encodeFields(e)
+	case ErrorDetailsSubmitFlowStepBadRequest:
+		s.ErrorDetails.encodeFields(e)
+	}
+}
+
+// Decode decodes SubmitFlowStepBadRequest from json.
+func (s *SubmitFlowStepBadRequest) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode SubmitFlowStepBadRequest to nil")
+	}
+	// Sum type fields.
+	if typ := d.Next(); typ != jx.Object {
+		return errors.Errorf("unexpected json type %q", typ)
+	}
+
+	var found bool
+	if err := d.Capture(func(d *jx.Decoder) error {
+		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
+			switch string(key) {
+			case "branding":
+				// Type-based discrimination: check if field has expected JSON type
+				if typ := d.Next(); typ != jx.Object {
+					// Field exists but has wrong type, not a match for this variant
+					return d.Skip()
+				}
+				match := FlowResponseSubmitFlowStepBadRequest
+				if found && s.Type != match {
+					s.Type = ""
+					return errors.Errorf("multiple oneOf matches: (%v, %v)", s.Type, match)
+				}
+				found = true
+				s.Type = match
+			case "code":
+				// Type-based discrimination: check if field has expected JSON type
+				if typ := d.Next(); typ != jx.String {
+					// Field exists but has wrong type, not a match for this variant
+					return d.Skip()
+				}
+				match := ErrorDetailsSubmitFlowStepBadRequest
+				if found && s.Type != match {
+					s.Type = ""
+					return errors.Errorf("multiple oneOf matches: (%v, %v)", s.Type, match)
+				}
+				found = true
+				s.Type = match
+			case "details":
+				// Type-based discrimination: check if field has expected JSON type
+				if typ := d.Next(); typ != jx.Object {
+					// Field exists but has wrong type, not a match for this variant
+					return d.Skip()
+				}
+				match := ErrorDetailsSubmitFlowStepBadRequest
+				if found && s.Type != match {
+					s.Type = ""
+					return errors.Errorf("multiple oneOf matches: (%v, %v)", s.Type, match)
+				}
+				found = true
+				s.Type = match
+			case "handoff_token":
+				// Type-based discrimination: check if field has expected JSON type
+				if typ := d.Next(); typ != jx.String {
+					// Field exists but has wrong type, not a match for this variant
+					return d.Skip()
+				}
+				match := FlowResponseSubmitFlowStepBadRequest
+				if found && s.Type != match {
+					s.Type = ""
+					return errors.Errorf("multiple oneOf matches: (%v, %v)", s.Type, match)
+				}
+				found = true
+				s.Type = match
+			case "handoff_token_expires_at":
+				match := FlowResponseSubmitFlowStepBadRequest
+				if found && s.Type != match {
+					s.Type = ""
+					return errors.Errorf("multiple oneOf matches: (%v, %v)", s.Type, match)
+				}
+				found = true
+				s.Type = match
+			case "id":
+				// Type-based discrimination: check if field has expected JSON type
+				if typ := d.Next(); typ != jx.String {
+					// Field exists but has wrong type, not a match for this variant
+					return d.Skip()
+				}
+				match := FlowResponseSubmitFlowStepBadRequest
+				if found && s.Type != match {
+					s.Type = ""
+					return errors.Errorf("multiple oneOf matches: (%v, %v)", s.Type, match)
+				}
+				found = true
+				s.Type = match
+			case "message":
+				// Type-based discrimination: check if field has expected JSON type
+				if typ := d.Next(); typ != jx.String {
+					// Field exists but has wrong type, not a match for this variant
+					return d.Skip()
+				}
+				match := ErrorDetailsSubmitFlowStepBadRequest
+				if found && s.Type != match {
+					s.Type = ""
+					return errors.Errorf("multiple oneOf matches: (%v, %v)", s.Type, match)
+				}
+				found = true
+				s.Type = match
+			case "redirect_uri":
+				match := FlowResponseSubmitFlowStepBadRequest
+				if found && s.Type != match {
+					s.Type = ""
+					return errors.Errorf("multiple oneOf matches: (%v, %v)", s.Type, match)
+				}
+				found = true
+				s.Type = match
+			case "session_id":
+				// Type-based discrimination: check if field has expected JSON type
+				if typ := d.Next(); typ != jx.String {
+					// Field exists but has wrong type, not a match for this variant
+					return d.Skip()
+				}
+				match := FlowResponseSubmitFlowStepBadRequest
+				if found && s.Type != match {
+					s.Type = ""
+					return errors.Errorf("multiple oneOf matches: (%v, %v)", s.Type, match)
+				}
+				found = true
+				s.Type = match
+			case "session_token":
+				// Type-based discrimination: check if field has expected JSON type
+				if typ := d.Next(); typ != jx.String {
+					// Field exists but has wrong type, not a match for this variant
+					return d.Skip()
+				}
+				match := FlowResponseSubmitFlowStepBadRequest
+				if found && s.Type != match {
+					s.Type = ""
+					return errors.Errorf("multiple oneOf matches: (%v, %v)", s.Type, match)
+				}
+				found = true
+				s.Type = match
+			case "step":
+				// Type-based discrimination: check if field has expected JSON type
+				if typ := d.Next(); typ != jx.Object {
+					// Field exists but has wrong type, not a match for this variant
+					return d.Skip()
+				}
+				match := FlowResponseSubmitFlowStepBadRequest
+				if found && s.Type != match {
+					s.Type = ""
+					return errors.Errorf("multiple oneOf matches: (%v, %v)", s.Type, match)
+				}
+				found = true
+				s.Type = match
+			}
+			return d.Skip()
+		})
+	}); err != nil {
+		return errors.Wrap(err, "capture")
+	}
+	if !found {
+		return errors.New("unable to detect sum type variant")
+	}
+	switch s.Type {
+	case FlowResponseSubmitFlowStepBadRequest:
+		if err := s.FlowResponse.Decode(d); err != nil {
+			return err
+		}
+	case ErrorDetailsSubmitFlowStepBadRequest:
+		if err := s.ErrorDetails.Decode(d); err != nil {
+			return err
+		}
+	default:
+		return errors.Errorf("inferred invalid type: %s", s.Type)
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s SubmitFlowStepBadRequest) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *SubmitFlowStepBadRequest) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes SubmitFlowStepErrorResponse as json.
 func (s SubmitFlowStepErrorResponse) Encode(e *jx.Encoder) {
 	e.ObjStart()
@@ -148502,11 +153437,11 @@ func (s *TeamCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -148530,6 +153465,12 @@ func (s *TeamCreatedEvent) encodeFields(e *jx.Encoder) {
 		if s.EntityID.Set {
 			e.FieldStart("entity_id")
 			s.EntityID.Encode(e)
+		}
+	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
 		}
 	}
 	{
@@ -148596,7 +153537,7 @@ func (s *TeamCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfTeamCreatedEvent = [22]string{
+var jsonFieldsNameOfTeamCreatedEvent = [23]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -148608,17 +153549,18 @@ var jsonFieldsNameOfTeamCreatedEvent = [22]string{
 	8:  "actor_type",
 	9:  "entity_type",
 	10: "entity_id",
-	11: "client_id",
-	12: "token_id",
-	13: "delegation_type",
-	14: "delegation_id",
-	15: "grantor",
-	16: "fingerprint",
-	17: "request_id",
-	18: "session_id",
-	19: "flow_id",
-	20: "metadata",
-	21: "payload",
+	11: "user_id",
+	12: "client_id",
+	13: "token_id",
+	14: "delegation_type",
+	15: "delegation_id",
+	16: "grantor",
+	17: "fingerprint",
+	18: "request_id",
+	19: "session_id",
+	20: "flow_id",
+	21: "metadata",
+	22: "payload",
 }
 
 // Decode decodes TeamCreatedEvent from json.
@@ -148687,7 +153629,7 @@ func (s *TeamCreatedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -148699,7 +153641,7 @@ func (s *TeamCreatedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -148748,8 +153690,18 @@ func (s *TeamCreatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"entity_id\"")
 			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
 		case "client_id":
-			requiredBitSet[1] |= 1 << 3
+			requiredBitSet[1] |= 1 << 4
 			if err := func() error {
 				v, err := d.Str()
 				s.ClientID = string(v)
@@ -148851,7 +153803,7 @@ func (s *TeamCreatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 5
+			requiredBitSet[2] |= 1 << 6
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -148871,8 +153823,8 @@ func (s *TeamCreatedEvent) Decode(d *jx.Decoder) error {
 	var failures []validate.FieldError
 	for i, mask := range [3]uint8{
 		0b01111011,
-		0b00001000,
-		0b00100000,
+		0b00010000,
+		0b01000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -149087,11 +154039,11 @@ func (s *TeamDeactivatedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -149115,6 +154067,12 @@ func (s *TeamDeactivatedEvent) encodeFields(e *jx.Encoder) {
 		if s.EntityID.Set {
 			e.FieldStart("entity_id")
 			s.EntityID.Encode(e)
+		}
+	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
 		}
 	}
 	{
@@ -149181,7 +154139,7 @@ func (s *TeamDeactivatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfTeamDeactivatedEvent = [22]string{
+var jsonFieldsNameOfTeamDeactivatedEvent = [23]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -149193,17 +154151,18 @@ var jsonFieldsNameOfTeamDeactivatedEvent = [22]string{
 	8:  "actor_type",
 	9:  "entity_type",
 	10: "entity_id",
-	11: "client_id",
-	12: "token_id",
-	13: "delegation_type",
-	14: "delegation_id",
-	15: "grantor",
-	16: "fingerprint",
-	17: "request_id",
-	18: "session_id",
-	19: "flow_id",
-	20: "metadata",
-	21: "payload",
+	11: "user_id",
+	12: "client_id",
+	13: "token_id",
+	14: "delegation_type",
+	15: "delegation_id",
+	16: "grantor",
+	17: "fingerprint",
+	18: "request_id",
+	19: "session_id",
+	20: "flow_id",
+	21: "metadata",
+	22: "payload",
 }
 
 // Decode decodes TeamDeactivatedEvent from json.
@@ -149272,7 +154231,7 @@ func (s *TeamDeactivatedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -149284,7 +154243,7 @@ func (s *TeamDeactivatedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -149333,8 +154292,18 @@ func (s *TeamDeactivatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"entity_id\"")
 			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
 		case "client_id":
-			requiredBitSet[1] |= 1 << 3
+			requiredBitSet[1] |= 1 << 4
 			if err := func() error {
 				v, err := d.Str()
 				s.ClientID = string(v)
@@ -149436,7 +154405,7 @@ func (s *TeamDeactivatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 5
+			requiredBitSet[2] |= 1 << 6
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -149456,8 +154425,8 @@ func (s *TeamDeactivatedEvent) Decode(d *jx.Decoder) error {
 	var failures []validate.FieldError
 	for i, mask := range [3]uint8{
 		0b01111011,
-		0b00001000,
-		0b00100000,
+		0b00010000,
+		0b01000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -151152,11 +156121,11 @@ func (s *TeamUpdatedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -151180,6 +156149,12 @@ func (s *TeamUpdatedEvent) encodeFields(e *jx.Encoder) {
 		if s.EntityID.Set {
 			e.FieldStart("entity_id")
 			s.EntityID.Encode(e)
+		}
+	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
 		}
 	}
 	{
@@ -151246,7 +156221,7 @@ func (s *TeamUpdatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfTeamUpdatedEvent = [22]string{
+var jsonFieldsNameOfTeamUpdatedEvent = [23]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -151258,17 +156233,18 @@ var jsonFieldsNameOfTeamUpdatedEvent = [22]string{
 	8:  "actor_type",
 	9:  "entity_type",
 	10: "entity_id",
-	11: "client_id",
-	12: "token_id",
-	13: "delegation_type",
-	14: "delegation_id",
-	15: "grantor",
-	16: "fingerprint",
-	17: "request_id",
-	18: "session_id",
-	19: "flow_id",
-	20: "metadata",
-	21: "payload",
+	11: "user_id",
+	12: "client_id",
+	13: "token_id",
+	14: "delegation_type",
+	15: "delegation_id",
+	16: "grantor",
+	17: "fingerprint",
+	18: "request_id",
+	19: "session_id",
+	20: "flow_id",
+	21: "metadata",
+	22: "payload",
 }
 
 // Decode decodes TeamUpdatedEvent from json.
@@ -151337,7 +156313,7 @@ func (s *TeamUpdatedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -151349,7 +156325,7 @@ func (s *TeamUpdatedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -151398,8 +156374,18 @@ func (s *TeamUpdatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"entity_id\"")
 			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
 		case "client_id":
-			requiredBitSet[1] |= 1 << 3
+			requiredBitSet[1] |= 1 << 4
 			if err := func() error {
 				v, err := d.Str()
 				s.ClientID = string(v)
@@ -151501,7 +156487,7 @@ func (s *TeamUpdatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 5
+			requiredBitSet[2] |= 1 << 6
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -151521,8 +156507,8 @@ func (s *TeamUpdatedEvent) Decode(d *jx.Decoder) error {
 	var failures []validate.FieldError
 	for i, mask := range [3]uint8{
 		0b01111011,
-		0b00001000,
-		0b00100000,
+		0b00010000,
+		0b01000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -154580,11 +159566,11 @@ func (s *UserCreateFailedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -154608,6 +159594,12 @@ func (s *UserCreateFailedEvent) encodeFields(e *jx.Encoder) {
 		if s.EntityID.Set {
 			e.FieldStart("entity_id")
 			s.EntityID.Encode(e)
+		}
+	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
 		}
 	}
 	{
@@ -154674,7 +159666,7 @@ func (s *UserCreateFailedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfUserCreateFailedEvent = [22]string{
+var jsonFieldsNameOfUserCreateFailedEvent = [23]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -154686,17 +159678,18 @@ var jsonFieldsNameOfUserCreateFailedEvent = [22]string{
 	8:  "actor_type",
 	9:  "entity_type",
 	10: "entity_id",
-	11: "client_id",
-	12: "token_id",
-	13: "delegation_type",
-	14: "delegation_id",
-	15: "grantor",
-	16: "fingerprint",
-	17: "request_id",
-	18: "session_id",
-	19: "flow_id",
-	20: "metadata",
-	21: "payload",
+	11: "user_id",
+	12: "client_id",
+	13: "token_id",
+	14: "delegation_type",
+	15: "delegation_id",
+	16: "grantor",
+	17: "fingerprint",
+	18: "request_id",
+	19: "session_id",
+	20: "flow_id",
+	21: "metadata",
+	22: "payload",
 }
 
 // Decode decodes UserCreateFailedEvent from json.
@@ -154765,7 +159758,7 @@ func (s *UserCreateFailedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -154777,7 +159770,7 @@ func (s *UserCreateFailedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -154826,8 +159819,18 @@ func (s *UserCreateFailedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"entity_id\"")
 			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
 		case "client_id":
-			requiredBitSet[1] |= 1 << 3
+			requiredBitSet[1] |= 1 << 4
 			if err := func() error {
 				v, err := d.Str()
 				s.ClientID = string(v)
@@ -154929,7 +159932,7 @@ func (s *UserCreateFailedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 5
+			requiredBitSet[2] |= 1 << 6
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -154949,8 +159952,8 @@ func (s *UserCreateFailedEvent) Decode(d *jx.Decoder) error {
 	var failures []validate.FieldError
 	for i, mask := range [3]uint8{
 		0b01111011,
-		0b00001000,
-		0b00100000,
+		0b00010000,
+		0b01000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -155601,11 +160604,11 @@ func (s *UserCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -155629,6 +160632,12 @@ func (s *UserCreatedEvent) encodeFields(e *jx.Encoder) {
 		if s.EntityID.Set {
 			e.FieldStart("entity_id")
 			s.EntityID.Encode(e)
+		}
+	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
 		}
 	}
 	{
@@ -155695,7 +160704,7 @@ func (s *UserCreatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfUserCreatedEvent = [22]string{
+var jsonFieldsNameOfUserCreatedEvent = [23]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -155707,17 +160716,18 @@ var jsonFieldsNameOfUserCreatedEvent = [22]string{
 	8:  "actor_type",
 	9:  "entity_type",
 	10: "entity_id",
-	11: "client_id",
-	12: "token_id",
-	13: "delegation_type",
-	14: "delegation_id",
-	15: "grantor",
-	16: "fingerprint",
-	17: "request_id",
-	18: "session_id",
-	19: "flow_id",
-	20: "metadata",
-	21: "payload",
+	11: "user_id",
+	12: "client_id",
+	13: "token_id",
+	14: "delegation_type",
+	15: "delegation_id",
+	16: "grantor",
+	17: "fingerprint",
+	18: "request_id",
+	19: "session_id",
+	20: "flow_id",
+	21: "metadata",
+	22: "payload",
 }
 
 // Decode decodes UserCreatedEvent from json.
@@ -155786,7 +160796,7 @@ func (s *UserCreatedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -155798,7 +160808,7 @@ func (s *UserCreatedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -155847,8 +160857,18 @@ func (s *UserCreatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"entity_id\"")
 			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
 		case "client_id":
-			requiredBitSet[1] |= 1 << 3
+			requiredBitSet[1] |= 1 << 4
 			if err := func() error {
 				v, err := d.Str()
 				s.ClientID = string(v)
@@ -155950,7 +160970,7 @@ func (s *UserCreatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 5
+			requiredBitSet[2] |= 1 << 6
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -155970,8 +160990,8 @@ func (s *UserCreatedEvent) Decode(d *jx.Decoder) error {
 	var failures []validate.FieldError
 	for i, mask := range [3]uint8{
 		0b01111011,
-		0b00001000,
-		0b00100000,
+		0b00010000,
+		0b01000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -156354,11 +161374,11 @@ func (s *UserDeletedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -156382,6 +161402,12 @@ func (s *UserDeletedEvent) encodeFields(e *jx.Encoder) {
 		if s.EntityID.Set {
 			e.FieldStart("entity_id")
 			s.EntityID.Encode(e)
+		}
+	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
 		}
 	}
 	{
@@ -156448,7 +161474,7 @@ func (s *UserDeletedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfUserDeletedEvent = [22]string{
+var jsonFieldsNameOfUserDeletedEvent = [23]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -156460,17 +161486,18 @@ var jsonFieldsNameOfUserDeletedEvent = [22]string{
 	8:  "actor_type",
 	9:  "entity_type",
 	10: "entity_id",
-	11: "client_id",
-	12: "token_id",
-	13: "delegation_type",
-	14: "delegation_id",
-	15: "grantor",
-	16: "fingerprint",
-	17: "request_id",
-	18: "session_id",
-	19: "flow_id",
-	20: "metadata",
-	21: "payload",
+	11: "user_id",
+	12: "client_id",
+	13: "token_id",
+	14: "delegation_type",
+	15: "delegation_id",
+	16: "grantor",
+	17: "fingerprint",
+	18: "request_id",
+	19: "session_id",
+	20: "flow_id",
+	21: "metadata",
+	22: "payload",
 }
 
 // Decode decodes UserDeletedEvent from json.
@@ -156539,7 +161566,7 @@ func (s *UserDeletedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -156551,7 +161578,7 @@ func (s *UserDeletedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -156600,8 +161627,18 @@ func (s *UserDeletedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"entity_id\"")
 			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
 		case "client_id":
-			requiredBitSet[1] |= 1 << 3
+			requiredBitSet[1] |= 1 << 4
 			if err := func() error {
 				v, err := d.Str()
 				s.ClientID = string(v)
@@ -156703,7 +161740,7 @@ func (s *UserDeletedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 5
+			requiredBitSet[2] |= 1 << 6
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -156723,8 +161760,8 @@ func (s *UserDeletedEvent) Decode(d *jx.Decoder) error {
 	var failures []validate.FieldError
 	for i, mask := range [3]uint8{
 		0b01111011,
-		0b00001000,
-		0b00100000,
+		0b00010000,
+		0b01000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -159904,11 +164941,11 @@ func (s *UserUpdatedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -159932,6 +164969,12 @@ func (s *UserUpdatedEvent) encodeFields(e *jx.Encoder) {
 		if s.EntityID.Set {
 			e.FieldStart("entity_id")
 			s.EntityID.Encode(e)
+		}
+	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
 		}
 	}
 	{
@@ -159998,7 +165041,7 @@ func (s *UserUpdatedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfUserUpdatedEvent = [22]string{
+var jsonFieldsNameOfUserUpdatedEvent = [23]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -160010,17 +165053,18 @@ var jsonFieldsNameOfUserUpdatedEvent = [22]string{
 	8:  "actor_type",
 	9:  "entity_type",
 	10: "entity_id",
-	11: "client_id",
-	12: "token_id",
-	13: "delegation_type",
-	14: "delegation_id",
-	15: "grantor",
-	16: "fingerprint",
-	17: "request_id",
-	18: "session_id",
-	19: "flow_id",
-	20: "metadata",
-	21: "payload",
+	11: "user_id",
+	12: "client_id",
+	13: "token_id",
+	14: "delegation_type",
+	15: "delegation_id",
+	16: "grantor",
+	17: "fingerprint",
+	18: "request_id",
+	19: "session_id",
+	20: "flow_id",
+	21: "metadata",
+	22: "payload",
 }
 
 // Decode decodes UserUpdatedEvent from json.
@@ -160089,7 +165133,7 @@ func (s *UserUpdatedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -160101,7 +165145,7 @@ func (s *UserUpdatedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -160150,8 +165194,18 @@ func (s *UserUpdatedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"entity_id\"")
 			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
 		case "client_id":
-			requiredBitSet[1] |= 1 << 3
+			requiredBitSet[1] |= 1 << 4
 			if err := func() error {
 				v, err := d.Str()
 				s.ClientID = string(v)
@@ -160253,7 +165307,7 @@ func (s *UserUpdatedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 5
+			requiredBitSet[2] |= 1 << 6
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -160273,8 +165327,8 @@ func (s *UserUpdatedEvent) Decode(d *jx.Decoder) error {
 	var failures []validate.FieldError
 	for i, mask := range [3]uint8{
 		0b01111011,
-		0b00001000,
-		0b00100000,
+		0b00010000,
+		0b01000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -162147,11 +167201,11 @@ func (s *VariableRemovedEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -162175,6 +167229,12 @@ func (s *VariableRemovedEvent) encodeFields(e *jx.Encoder) {
 		if s.EntityID.Set {
 			e.FieldStart("entity_id")
 			s.EntityID.Encode(e)
+		}
+	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
 		}
 	}
 	{
@@ -162241,7 +167301,7 @@ func (s *VariableRemovedEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfVariableRemovedEvent = [22]string{
+var jsonFieldsNameOfVariableRemovedEvent = [23]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -162253,17 +167313,18 @@ var jsonFieldsNameOfVariableRemovedEvent = [22]string{
 	8:  "actor_type",
 	9:  "entity_type",
 	10: "entity_id",
-	11: "client_id",
-	12: "token_id",
-	13: "delegation_type",
-	14: "delegation_id",
-	15: "grantor",
-	16: "fingerprint",
-	17: "request_id",
-	18: "session_id",
-	19: "flow_id",
-	20: "metadata",
-	21: "payload",
+	11: "user_id",
+	12: "client_id",
+	13: "token_id",
+	14: "delegation_type",
+	15: "delegation_id",
+	16: "grantor",
+	17: "fingerprint",
+	18: "request_id",
+	19: "session_id",
+	20: "flow_id",
+	21: "metadata",
+	22: "payload",
 }
 
 // Decode decodes VariableRemovedEvent from json.
@@ -162332,7 +167393,7 @@ func (s *VariableRemovedEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -162344,7 +167405,7 @@ func (s *VariableRemovedEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -162393,8 +167454,18 @@ func (s *VariableRemovedEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"entity_id\"")
 			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
 		case "client_id":
-			requiredBitSet[1] |= 1 << 3
+			requiredBitSet[1] |= 1 << 4
 			if err := func() error {
 				v, err := d.Str()
 				s.ClientID = string(v)
@@ -162496,7 +167567,7 @@ func (s *VariableRemovedEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 5
+			requiredBitSet[2] |= 1 << 6
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -162516,8 +167587,8 @@ func (s *VariableRemovedEvent) Decode(d *jx.Decoder) error {
 	var failures []validate.FieldError
 	for i, mask := range [3]uint8{
 		0b01111011,
-		0b00001000,
-		0b00100000,
+		0b00010000,
+		0b01000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -162894,11 +167965,11 @@ func (s *VariableSetEvent) encodeFields(e *jx.Encoder) {
 	}
 	{
 		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
+		json.EncodeTimeFormat(e, s.OccurredAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
+		json.EncodeTimeFormat(e, s.CreatedAt, "2006-01-02T15:04:05.999Z07:00")
 	}
 	{
 		if s.ActorID.Set {
@@ -162922,6 +167993,12 @@ func (s *VariableSetEvent) encodeFields(e *jx.Encoder) {
 		if s.EntityID.Set {
 			e.FieldStart("entity_id")
 			s.EntityID.Encode(e)
+		}
+	}
+	{
+		if s.UserID.Set {
+			e.FieldStart("user_id")
+			s.UserID.Encode(e)
 		}
 	}
 	{
@@ -162988,7 +168065,7 @@ func (s *VariableSetEvent) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfVariableSetEvent = [22]string{
+var jsonFieldsNameOfVariableSetEvent = [23]string{
 	0:  "id",
 	1:  "project_id",
 	2:  "team_id",
@@ -163000,17 +168077,18 @@ var jsonFieldsNameOfVariableSetEvent = [22]string{
 	8:  "actor_type",
 	9:  "entity_type",
 	10: "entity_id",
-	11: "client_id",
-	12: "token_id",
-	13: "delegation_type",
-	14: "delegation_id",
-	15: "grantor",
-	16: "fingerprint",
-	17: "request_id",
-	18: "session_id",
-	19: "flow_id",
-	20: "metadata",
-	21: "payload",
+	11: "user_id",
+	12: "client_id",
+	13: "token_id",
+	14: "delegation_type",
+	15: "delegation_id",
+	16: "grantor",
+	17: "fingerprint",
+	18: "request_id",
+	19: "session_id",
+	20: "flow_id",
+	21: "metadata",
+	22: "payload",
 }
 
 // Decode decodes VariableSetEvent from json.
@@ -163079,7 +168157,7 @@ func (s *VariableSetEvent) Decode(d *jx.Decoder) error {
 		case "occurred_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.OccurredAt = v
 				if err != nil {
 					return err
@@ -163091,7 +168169,7 @@ func (s *VariableSetEvent) Decode(d *jx.Decoder) error {
 		case "created_at":
 			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
-				v, err := json.DecodeDateTime(d)
+				v, err := json.DecodeTimeFormat(d, "2006-01-02T15:04:05.999Z07:00")
 				s.CreatedAt = v
 				if err != nil {
 					return err
@@ -163140,8 +168218,18 @@ func (s *VariableSetEvent) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"entity_id\"")
 			}
+		case "user_id":
+			if err := func() error {
+				s.UserID.Reset()
+				if err := s.UserID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"user_id\"")
+			}
 		case "client_id":
-			requiredBitSet[1] |= 1 << 3
+			requiredBitSet[1] |= 1 << 4
 			if err := func() error {
 				v, err := d.Str()
 				s.ClientID = string(v)
@@ -163243,7 +168331,7 @@ func (s *VariableSetEvent) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"metadata\"")
 			}
 		case "payload":
-			requiredBitSet[2] |= 1 << 5
+			requiredBitSet[2] |= 1 << 6
 			if err := func() error {
 				if err := s.Payload.Decode(d); err != nil {
 					return err
@@ -163263,8 +168351,8 @@ func (s *VariableSetEvent) Decode(d *jx.Decoder) error {
 	var failures []validate.FieldError
 	for i, mask := range [3]uint8{
 		0b01111011,
-		0b00001000,
-		0b00100000,
+		0b00010000,
+		0b01000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.

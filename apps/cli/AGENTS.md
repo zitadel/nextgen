@@ -15,11 +15,18 @@
 - `start`, `stop`, `status`, `logs`, `reset`, `console`, `doctor` and how
   `setup` finds a local server:
   [`src/lib/local-server/AGENTS.md`](src/lib/local-server/AGENTS.md).
+- No `let` in `src` or `tests`: `biome-plugins/no-let.grit` rejects it; the only escape is a
+  `// biome-ignore lint/plugin: <reason>` stating the mechanism.
+- `src/lib/orca/patchers` edits and drops code into the customer's project, so no
+  style or lint sweep may touch it: [`src/lib/orca/AGENTS.md`](src/lib/orca/AGENTS.md).
 - Imports: reach `src/` with `@/` (`@/lib/errors`), never `../`; `./` stays for siblings.
 - Scaffold posture: [ADR 044](../../docs/adrs/044-scaffold-embedding-posture-defaults.md)
   (`src/lib/orca/patchers/posture.ts`); scaffolded-file drift:
   [ADR 042](../../docs/adrs/042-scaffolded-file-ownership-and-drift-detection.md)
   (`src/lib/scaffold-manifest.ts`).
+- Run a framework CLI only at its pin in
+  `src/lib/orca/scaffolders/framework-clis/package.json`, never a dist-tag;
+  Dependabot bumps it there, and a bump needs a changeset.
 - Claim: [ADR 046](../../docs/adrs/046-claim-lifecycle-v2.md).
 - The fresh-app journey: [`e2e/journey/AGENTS.md`](../../e2e/journey/AGENTS.md).
 - Never write a suggested command (`next.commands`, `nextCommands`, a `retry`) as a
@@ -40,8 +47,10 @@
   aimed elsewhere); a runtime-only resource id is `resourceSuggestion(topic, verb)`.
 - Point at a command's help as `{ id, help: true }` (`helpOf(id)` for a runtime
   id), never as `<command> --help` written in a hint.
-- `shellCommand` is for anything that is not the CLI; `inShell` wraps a pipe or
-  redirection around a suggestion.
+- Suggest `cd`, `docker`, `git` or `rm` as `shellCommand(program, ...words)`,
+  quoting a value a person typed with `Cmd.quote`.
+- Suggest a package manager's command with `suggestedCommandOf`, chain commands
+  with `shellSteps`, and wrap one with `pipedFrom`, `readingFrom` or `andTheRest`.
 - Pass a result's next steps as `next` (`src/lib/oclif/next-steps.ts`), never
   in its data: `emit` writes them to the envelope and prints every one.
 - A GritQL rule (`biome-plugins/no-raw-next-commands.grit`) rejects a
@@ -91,9 +100,8 @@
   that disagree as an `if`, a precondition the project or server decides as an
   async function returning what it found. There is no framework for either, and
   none is wanted.
-- Keep it all in the command's own file: a `const NAME: Refused<T>` above the
-  class, named for the flag and nothing else, then the flag declared inline in
-  `static flags` as `Flags.custom<T>({ parse: reads(NAME) })({ … })`.
+- Keep it in the command's file: a `Refused` const above the class, named for
+  the flag, then the flag inline as `Flags.custom<T>({ parse: reads(NAME) })`.
 - Never hold a flag in a const to use it once: the declaration belongs at the
   one place the command declares its flags. Only a flag every command takes
   (`serverFlag`, `plainFlag`, the environment flags) has a const, because it
@@ -102,18 +110,22 @@
   `--port`. Within a topic, share it where duplicating would copy real logic —
   `variable/name.ts` holds one argument three variable commands take.
 - Name a `Refused` for its flag (`PORT`, `TTL`) and a `Refusal` for what it
-  refuses, ending `_REFUSAL`, so the two read apart. A `Refused`'s wording must
-  stand on its own: `read` fills `{value}`, `{input}` and `{problem}`, and
-  anything else comes from its `values`. A `Refusal` is filled where it is
-  thrown. Either way a name nothing fills reaches the person as braces, so a
-  unit test weighs every refusal against what fills it
-  (`tests/unit/lib/oclif/refusal-wording.test.ts`).
+  refuses, ending `_REFUSAL`, so the two read apart.
+- Fill a `Refused`'s wording from `read` (`{value}`, `{input}`, `{problem}`)
+  and its own `values`; fill a `Refusal` where it is thrown.
+- Write a refusal's wording as one literal, never joined with `+`, so the
+  compiler reads it; `refusal-wording.test.ts` fails on a joined one.
+- Declare a refusal `as const satisfies`, never `: Refusal` or `: Refused<T>`,
+  so the compiler refuses a throw or a `reads` that leaves a name unfilled.
+  - Annotate one only where its `next` would make the type circular;
+    `tests/unit/lib/oclif/refusal-wording.test.ts` weighs every refusal.
 - No `flags/`, `args/` or `rules/` directory, and no helper module beside a
   command.
 - Write every refusal once, as a `Refusal` template with `{name}` placeholders
   (`src/lib/oclif/refusal.ts`), never a `ZitadelError` built by hand; its `next`
   entries are `{ id, … }` objects, and a `{name}` one is filled from `refusalError`'s
   third argument, never from its values.
+  - A flag's refusal has no third argument: its `next` holds objects only.
   - A `next` entry that is only a placeholder takes its value as it is, so a
     check that found two steps hands over both.
 - Declare a flag or argument by its CLI spelling and read it as code reads it

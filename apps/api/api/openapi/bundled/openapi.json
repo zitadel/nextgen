@@ -62,6 +62,10 @@
       "description": "Branding sets how the login looks: its layout, asset URLs and Liquid\ntemplate. Each publish creates an immutable revision. The login renders\nthe revision the deployed release pins.\n"
     },
     {
+      "name": "OAuth Settings",
+      "description": "OAuth settings say whether a project's OAuth authorization server\nanswers. A release publishes them as an immutable revision, and this\noperation reads one back. There is no operation that publishes them on\ntheir own.\n"
+    },
+    {
       "name": "Identity Providers",
       "description": "Identity providers are the external login providers a project offers.\nEach is published as a revisioned connection document and referenced by\nits slug from user schemas and flow definitions. These operations create\nor revise a connection, query connections, read one by ID, and read its\nrevisions. A slug resolves through the query.\n"
     },
@@ -1675,7 +1679,7 @@
       "get": {
         "operationId": "listMyProjects",
         "summary": "List the projects I can act on",
-        "description": "Lists the projects the signed-in user can act on: those they hold an active\ngrant on, either directly or through a team they are a member of. For a\nplatform operator, someone who runs the deployment, that is every project of\nthe deployment. Ordered by project ID unless `order` asks for creation\ntime, and paged with an opaque cursor.\n\nThis is not the same question as `queryProjects` (`POST /projects/query`), which answers with the one\nproject the calling credential is bound to. Here the session is the caller\nand the grants are the answer, so the list spans projects.\n\nWith `name_contains`, only the projects whose name contains that text are\nlisted. The search runs on the server together with the grants, so it\nreaches every project the user can act on, however many there are, and\npages like the full list.\n\nWith `project_id`, the projects are listed only when the session belongs to\nthat project. It names the project the session was signed in to, not one to\nlist.\n",
+        "description": "Lists the projects the signed-in user can act on: those they hold an active\ngrant on, either directly or through a team they are a member of. For a\nplatform operator, someone who runs the deployment, that is every project of\nthe deployment. Ordered by project ID unless `order` asks for creation\ntime, and paged with an opaque cursor.\n\nThis is not the same question as `queryProjects` (`POST /projects/query`), which answers with the one\nproject the calling credential is bound to. Here the session is the caller\nand the grants are the answer, so the list spans projects.\n\nWith `name_contains`, only the projects whose name contains that text are\nlisted. The search runs on the server together with the grants, so it\nreaches every project the user can act on, however many there are, and\npages like the full list.\n\nWith `project_id`, the projects are listed only when the session belongs to\nthat project. It names the project the session was signed in to, not one to\nlist.\n\nWith `exclude_platform`, the deployment's reserved platform project is left\nout: the project the console signs in to, which holds the console's\naccounts rather than an application's users. A deployment without one lists\nthe same projects either way.\n",
         "tags": [
           "Projects"
         ],
@@ -1710,6 +1714,16 @@
               "$ref": "#/components/schemas/sort-direction"
             },
             "example": "desc"
+          },
+          {
+            "name": "exclude_platform",
+            "in": "query",
+            "required": false,
+            "description": "Leaves out the deployment's reserved platform project, the one the\nconsole signs in to. Defaults to `false`. Send the same value with\nevery `page_token` the list returns.\n",
+            "schema": {
+              "type": "boolean"
+            },
+            "example": true
           },
           {
             "$ref": "#/components/parameters/session-project-id"
@@ -2203,7 +2217,7 @@
             }
           },
           "400": {
-            "description": "Validation or proof verification failed. Returns the same step\nwith an `error` field. The session token and cookie are still rotated.\nCorrect the input and submit the step again.\n",
+            "description": "The submission was refused, in one of two shapes:\n\n- The same step with an `error` field, when validation or proof\n  verification of the input failed. The session token and cookie are\n  still rotated. Correct the input and submit the step again.\n- An error, when the request was refused before the step could take\n  it. It sets no `Set-Cookie`, so the flow cookie stays as it was:\n  `req.invalid` for a field that\n  does not decode, or an sso submission whose `return_target` is\n  missing, does not parse or is not on the request's `Origin`;\n  `flow.invalid_action` for an action the step does not offer;\n  `flow.unsupported` for a submission the flow cannot take yet.\n  Fix the request; the step is unchanged.\n",
             "headers": {
               "Set-Cookie": {
                 "$ref": "#/components/headers/set-cookie-flow"
@@ -2215,7 +2229,14 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/flow-response"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/flow-response"
+                    },
+                    {
+                      "$ref": "#/components/schemas/error-details"
+                    }
+                  ]
                 }
               }
             }
@@ -4473,7 +4494,6 @@
                     "schema_uri": "https://zitadel.com/schemas/v1/flow-definition.json",
                     "flow_definition": {
                       "name": "default-login",
-                      "status": "active",
                       "user_schema": "human-user",
                       "purposes": {
                         "login": "identifier",
@@ -4611,7 +4631,6 @@
                     "schema_uri": "https://zitadel.com/schemas/v1/flow-definition.json",
                     "flow_definition": {
                       "name": "password-login",
-                      "status": "active",
                       "user_schema": "human-user",
                       "purposes": {
                         "login": "identifier"
@@ -4668,7 +4687,6 @@
                     "schema_uri": "https://zitadel.com/schemas/v1/flow-definition.json",
                     "flow_definition": {
                       "name": "password-register",
-                      "status": "active",
                       "user_schema": "human-user",
                       "purposes": {
                         "register": "signup"
@@ -4709,7 +4727,6 @@
                     "schema_uri": "https://zitadel.com/schemas/v1/flow-definition.json",
                     "flow_definition": {
                       "name": "passkey-login",
-                      "status": "active",
                       "user_schema": "human-user",
                       "purposes": {
                         "login": "signin"
@@ -4748,7 +4765,6 @@
                     "schema_uri": "https://zitadel.com/schemas/v1/flow-definition.json",
                     "flow_definition": {
                       "name": "passkey-register",
-                      "status": "active",
                       "user_schema": "human-user",
                       "purposes": {
                         "register": "signup"
@@ -4787,7 +4803,6 @@
                     "schema_uri": "https://zitadel.com/schemas/v1/flow-definition.json",
                     "flow_definition": {
                       "name": "combined-password",
-                      "status": "active",
                       "user_schema": "human-user",
                       "purposes": {
                         "login": "identifier",
@@ -4904,7 +4919,6 @@
                     "schema_uri": "https://zitadel.com/schemas/v1/flow-definition.json",
                     "flow_definition": {
                       "name": "combined-password-passkey",
-                      "status": "active",
                       "user_schema": "human-user",
                       "purposes": {
                         "login": "identifier",
@@ -5925,6 +5939,56 @@
         }
       }
     },
+    "/oauth_settings/{oauth_settings_id}": {
+      "get": {
+        "operationId": "getOAuthSettingsById",
+        "summary": "Get an OAuth settings revision by ID",
+        "description": "Returns one OAuth settings revision, including its stored settings. Pass\nthe `revision_id` of the `kind: oauth` pointer on a release, which\n`buildRelease` (`POST /releases/build`) and `getReleaseById`\n(`GET /releases/{release_id}`) return.\n\nA release is the only writer of OAuth settings, so there is no operation\nthat publishes a revision on its own: put `oauth` in the bundle that\n`buildRelease` takes.\n",
+        "tags": [
+          "OAuth Settings"
+        ],
+        "security": [
+          {
+            "oauth2": [
+              "oauth_settings.read"
+            ]
+          },
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/oauth-settings-id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The OAuth settings revision.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/oauth-settings-revision-response"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No OAuth settings revision was found with the given ID.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error-details"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/getOAuthSettingsById-error-response"
+          }
+        }
+      }
+    },
     "/idps": {
       "post": {
         "operationId": "createIdp",
@@ -6851,7 +6915,7 @@
       "post": {
         "operationId": "createApplication",
         "summary": "Create or revise a registered application",
-        "description": "Creates or revises a registered application that authenticates its users\nvia Zitadel. If the slug does not already exist in the project, a new\napplication is created. If one with that slug already exists, a revision\nis created.\n\nA revision gets a new `revision_id` and does not modify the application's\n`id`. Sending an unchanged document also creates a revision. Each client\nis matched to the stored one by its slug and keeps its `client_id`: a\nrevision that changes a client's `client_id` is rejected with\n`application.field_immutable`. A revision keeps every client of the\nstored document: one that omits a client is also rejected with\n`application.field_immutable`, since removing a client is not available\nyet. A client with a new slug is a new client. It takes the `client_id`\nthe document supplies, or the server generates one, and every response\ncarries it in `definition`. A `client_id` another client of the project\nholds, or ever held, is rejected with `application.client_id_taken`.\n\nEvery new client gets a secret, generated by the server and returned once\nin `client_secrets`. The server stores only its hash, so no later read\nreturns it.\n\nThe document is validated against the `application.json` schema before\nanything is stored, and then against the rules the authorization server\napplies: `refresh_token` comes with `authorization_code`, a client with\n`authorization_code` has at least one redirect URI, and each redirect\nURI meets the rules `redirect_uris` states. A document that breaks one\nis refused with `application.invalid`, whose details identify the\nsetting.\n\nIf the document is refused, no change is stored and an existing\napplication keeps its current revision.\n",
+        "description": "Creates or revises a registered application that authenticates its users\nvia Zitadel. If the slug does not already exist in the project, a new\napplication is created. If one with that slug already exists, a revision\nis created.\n\nA revision gets a new `revision_id` and does not modify the application's\n`id`. Sending an unchanged document also creates a revision. Each client\nis matched to the stored one by its slug and keeps its `client_id`: a\nrevision that changes a client's `client_id` is rejected with\n`app.field_immutable`. A revision keeps every client of the\nstored document: one that omits a client is also rejected with\n`app.field_immutable`, since removing a client is not available\nyet. A client with a new slug is a new client. It takes the `client_id`\nthe document supplies, or the server generates one, and every response\ncarries it in `definition`. A `client_id` another client of the project\nholds, or ever held, is rejected with `app.client_id_taken`.\n\nEvery new client gets a secret, generated by the server and returned once\nin `client_secrets`. The server stores only its hash, so no later read\nreturns it.\n\nThe document is validated against the `application.json` schema before\nanything is stored, and then against the rules the authorization server\napplies: `refresh_token` comes with `authorization_code`, a client with\n`authorization_code` has at least one redirect URI, and each redirect\nURI meets the rules `redirect_uris` states. A document that breaks one\nis refused with `app.invalid`, whose details identify the\nsetting.\n\nIf the document is refused, no change is stored and an existing\napplication keeps its current revision.\n",
         "tags": [
           "Applications"
         ],
@@ -6868,7 +6932,7 @@
           },
           {
             "$ref": "#/components/parameters/idempotency-key",
-            "description": "Optional retry key. A retry carrying the same key within the retry\nwindow returns the first response, `client_secrets` included,\ninstead of creating another revision. Without it, a retry after a\nlost response finds the clients already stored and returns no\nsecret.\n"
+            "description": "Optional. Once honored, a retry with the same key and body returns\nthe first request's status and a new secret for each client the first\nrequest created, and writes no revision.\n\nNot honored yet: sending the same request again, for example after\nits response was lost, creates another revision and returns no\nsecret, because the clients the first request created are already\nstored.\n"
           }
         ],
         "requestBody": {
@@ -7080,7 +7144,7 @@
             }
           },
           "409": {
-            "description": "A `client_id` in the document is held, or was once held, by another\nclient of the project. Pick another id, or leave it out so the\nserver generates one.\n",
+            "description": "A `client_id` in the document is held, or was once held, by another\nclient of the project (`app.client_id_taken`). Pick another\nid, or leave it out so the server generates one.\n\nOr another revision of the same application was created at the same\ninstant (`app.revision_conflict`). Send the document again.\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -7181,7 +7245,7 @@
             }
           },
           "404": {
-            "description": "No application with this ID exists in the given project.\n",
+            "description": "No application with this ID exists in the given project\n(`app.not_found`).\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -7931,7 +7995,7 @@
         "operationId": "buildRelease",
         "x-zitadel-cli": "deploy",
         "summary": "Build a release from files",
-        "description": "Builds a release from the resources in `.zitadel/` as authored on disk,\ngrouped by kind, in one transaction.\n\nA release is a snapshot of the project's configuration. A failure anywhere\nleaves no revision and no release. The caller records nothing. The CLI's\n`deploy` command builds its release with this operation.\n\nIf the project already holds a release with the same content, the same\n`content_hash`, the request answers `200` with that release and allocates\nnothing, however long ago it was built. Metadata is excluded from the\ncomparison, so the same content under a different `message` is the same\nrelease.\n\nOtherwise every resource is compared with the project's newest revision of\nthe same handle. Unchanged content reuses that revision, and changed\ncontent allocates a new one. The request answers `201` with the new\nrelease. A policy whose config matches only an older revision allocates a\nnew one too, so the policy reads back as the config the build carried.\n\nA structurally malformed request is refused while decoding with\n`req.invalid`, naming the offending fields. A well-formed bundle is then\nchecked resource by resource, as each kind's create endpoint checks it,\nand every failure is reported at once. The request answers `400` with\n`rel.invalid`, and `details.resources` lists each resource that failed.\nFix each listed resource and build again. A handle that resolves neither\nin the bundle nor in the project answers `rel.unresolved_reference`,\nnaming the pointer and the handle. Add the missing resource to the bundle.\n\nBuilding writes revisions, so besides `release.write` it needs the write\nscope of every kind the bundle carries a resource of: `schema.write`,\n`flow_definition.write`, `branding.write`, `idp.write` and `policy.write`,\nas the per-kind create endpoints do. A missing scope answers `403` with\n`rel.permission_denied`, naming the kind. Request a token with that scope.\nAn empty kind needs no scope.\n\nBuilding a release does not deploy it. A release is not tied to an origin,\nand the same release can later be deployed to any number of origins\nunchanged. Pass the returned `id` to `createDeployment` (`POST /deployments`).\n",
+        "description": "Builds a release from the resources in `.zitadel/` as authored on disk,\ngrouped by kind, in one transaction.\n\nA release is a snapshot of the project's configuration. A failure anywhere\nleaves no revision and no release. The caller records nothing. The CLI's\n`deploy` command builds its release with this operation.\n\nIf the project already holds a release with the same content, the same\n`content_hash`, the request answers `200` with that release and allocates\nnothing, however long ago it was built. Metadata is excluded from the\ncomparison, so the same content under a different `message` is the same\nrelease.\n\nOtherwise every resource is compared with the project's newest revision of\nthe same handle. Unchanged content reuses that revision, and changed\ncontent allocates a new one. The request answers `201` with the new\nrelease. A policy whose config matches only an older revision allocates a\nnew one too, so the policy reads back as the config the build carried.\n\nA structurally malformed request is refused while decoding with\n`req.invalid`, naming the offending fields. A well-formed bundle is then\nchecked resource by resource, as each kind's create endpoint checks it,\nand every failure is reported at once. The request answers `400` with\n`rel.invalid`, and `details.resources` lists each resource that failed.\nFix each listed resource and build again. A handle that resolves neither\nin the bundle nor in the project answers `rel.unresolved_reference`,\nnaming the pointer and the handle. Add the missing resource to the bundle.\n\nBuilding writes revisions, so besides `release.write` it needs the write\nscope of every kind the bundle carries a resource of: `schema.write`,\n`flow_definition.write`, `branding.write`, `idp.write`, `policy.write`\nand `oauth_settings.write`, as the per-kind create endpoints do. A missing scope answers `403` with\n`rel.permission_denied`, naming the kind. Request a token with that scope.\nAn empty kind needs no scope.\n\nBuilding a release does not deploy it. A release is not tied to an origin,\nand the same release can later be deployed to any number of origins\nunchanged. Pass the returned `id` to `createDeployment` (`POST /deployments`).\n",
         "tags": [
           "Releases"
         ],
@@ -7957,7 +8021,7 @@
               "examples": {
                 "bundle": {
                   "summary": "Built from the files on disk",
-                  "description": "The CLI's form: the schemas, flow definitions and branding as\nauthored, the flow naming its schema by `objectType`. The\nschema's `metaSchema` is the one the server publishes at\n`/user-schema.json`. The server reuses whichever revisions\nalready match and allocates the rest.\n",
+                  "description": "The CLI's form: the schemas, flow definitions, branding and\nOAuth settings as authored, the flow naming its schema by\n`objectType`. The\nschema's `metaSchema` is the one the server publishes at\n`/user-schema.json`. The server reuses whichever revisions\nalready match and allocates the rest.\n",
                   "value": {
                     "bundle": {
                       "schemas": [
@@ -7987,7 +8051,6 @@
                       "flow_definitions": [
                         {
                           "name": "default-login",
-                          "status": "active",
                           "user_schema": "human-user",
                           "purposes": {
                             "login": "identify"
@@ -8068,6 +8131,9 @@
                       "branding": {
                         "layout": "centered",
                         "liquid_template": "<main>{{ step.name }}</main>"
+                      },
+                      "oauth": {
+                        "enabled": true
                       }
                     },
                     "message": "add phone_number to human-user",
@@ -8137,7 +8203,7 @@
                 "examples": {
                   "builtFromBundle": {
                     "summary": "Built from a bundle",
-                    "description": "Each pointer carries the handle the server read from the\nresource, and the revision it reused or allocated for it. The\nhandle is `objectType` for a schema, `name` for a flow\ndefinition, `default` for branding and `slug` for an IdP\nconnection.\n",
+                    "description": "Each pointer carries the handle the server read from the\nresource, and the revision it reused or allocated for it. The\nhandle is `objectType` for a schema, `name` for a flow\ndefinition, `default` for branding and for OAuth settings,\nand `slug` for an IdP connection.\n",
                     "value": {
                       "id": "rel_01KX3RG8A7F0N9WD3P2E4YM5C1",
                       "project_id": "proj_01KWH1P4MYS7F0N9WD3P2E4YM5",
@@ -8171,6 +8237,11 @@
                           "kind": "idp",
                           "handle": "google",
                           "revision_id": "idprev_01KWHF2XY6RN7F0N9WD3P2E4YM"
+                        },
+                        {
+                          "kind": "oauth",
+                          "handle": "default",
+                          "revision_id": "oauthset_01KWHG3M5QZ27F0N9WD3P2E4YM"
                         }
                       ]
                     }
@@ -9512,7 +9583,7 @@
         "operationId": "listEvents",
         "x-zitadel-cli": "events list",
         "summary": "List events",
-        "description": "Lists a project's audit events, newest first. Pass `order=asc` for oldest\nfirst. Requires `events.read`.\n\nA project that is not claimed yet returns an empty list: its events are\nstored but stay invisible until the\n[claim](/docs/concepts/project-team-user#claim) succeeds. The deployment's\nplatform operators read them from the start.\n\nTeam-scoped credentials see only the events whose `team_id` matches the\ncredential's team. Team-scoped credentials are not issued today.\n\nEach item carries an `event_type` that says which type of event it is, and\nthe matching `payload`. To read one event, pass its `id` to `getEvent` (`GET /events/{id}`).\n\nFilters combine. These are answered from an index and fill their pages: no\nfilter, `category`, `event_type`, `status_class`, `operation_id` with or\nwithout `status_class`, `request_id`, `flow_id`, and `session_id`,\n`entity_id`, `actor_id` or `entity_type` with or without `category`, each\nwith or without the time bounds. Any other filter or combination is\nmatched event by event, over at most a few thousand events per request.\nSuch a page can hold fewer events than `limit`, or none, and still carry\n`next_page_token`: keep passing the token until a response has none.\n",
+        "description": "Lists a project's audit events, newest first. Pass `order=asc` for oldest\nfirst. Requires `events.read`.\n\nA project that is not claimed yet returns an empty list: its events are\nstored but stay invisible until the\n[claim](/docs/concepts/project-team-user#claim) succeeds. The deployment's\nplatform operators read them from the start.\n\nTeam-scoped credentials see only the events whose `team_id` matches the\ncredential's team. Team-scoped credentials are not issued today.\n\nEach item carries an `event_type` that says which type of event it is, and\nthe matching `payload`. To read one event, pass its `id` to `getEvent` (`GET /events/{id}`).\n\nFilters combine. These are answered from an index and fill their pages: no\nfilter, `category`, `event_type`, `status_class`, `operation_id` with or\nwithout `status_class`, `request_id`, `flow_id`, and `session_id`,\n`entity_id`, `user_id`, `actor_id` or `entity_type` with or without\n`category`, each with or without the time bounds. Any other filter or combination is\nmatched event by event, over at most a few thousand events per request.\nSuch a page can hold fewer events than `limit`, or none, and still carry\n`next_page_token`: keep passing the token until a response has none.\n",
         "tags": [
           "Events"
         ],
@@ -9568,6 +9639,14 @@
             "name": "actor_id",
             "in": "query",
             "description": "Only events triggered by this actor ID.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "user_id",
+            "in": "query",
+            "description": "Only events that concern this user ID, whoever triggered them: the\nuser's sign-ins, sessions and credentials, and the changes made to\nthe user. Events recorded by a server version before this filter\nexisted are not matched; they leave the list as retention removes\nthem.\n",
             "schema": {
               "type": "string"
             }
@@ -10945,6 +11024,64 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/flow-signup_challenge-consumed-event"
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "$ref": "#/components/responses/webhook-delivered"
+          },
+          "default": {
+            "$ref": "#/components/responses/webhook-not-delivered"
+          }
+        }
+      }
+    },
+    "application.created": {
+      "post": {
+        "operationId": "applicationCreated",
+        "summary": "application.created",
+        "description": "A registered application was created.\n\nThe body is the event as `GET /events` returns it.\n",
+        "tags": [
+          "Event Webhooks"
+        ],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/application-created-event"
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "$ref": "#/components/responses/webhook-delivered"
+          },
+          "default": {
+            "$ref": "#/components/responses/webhook-not-delivered"
+          }
+        }
+      }
+    },
+    "application.updated": {
+      "post": {
+        "operationId": "applicationUpdated",
+        "summary": "application.updated",
+        "description": "A registered application was revised. The payload holds the new\nrevision, the name when it changed, and the clients the revision added.\n\nThe body is the event as `GET /events` returns it.\n",
+        "tags": [
+          "Event Webhooks"
+        ],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/application-updated-event"
               }
             }
           }
@@ -12382,6 +12519,8 @@
               "project.write": "Permission to create and manage projects",
               "branding.read": "Permission to read branding revisions",
               "branding.write": "Permission to publish branding revisions",
+              "oauth_settings.read": "Permission to read OAuth settings revisions",
+              "oauth_settings.write": "Permission to publish OAuth settings revisions through a release",
               "policy.read": "Permission to read operation policies",
               "policy.write": "Permission to publish operation policies",
               "idp.read": "Permission to read identity provider connections",
@@ -12436,6 +12575,8 @@
               "project.write": "Permission to create and manage projects",
               "branding.read": "Permission to read branding revisions",
               "branding.write": "Permission to publish branding revisions",
+              "oauth_settings.read": "Permission to read OAuth settings revisions",
+              "oauth_settings.write": "Permission to publish OAuth settings revisions through a release",
               "policy.read": "Permission to read operation policies",
               "policy.write": "Permission to publish operation policies",
               "idp.read": "Permission to read identity provider connections",
@@ -18138,14 +18279,6 @@
           }
         ]
       },
-      "flow-definition-status": {
-        "type": "string",
-        "enum": [
-          "active",
-          "draft"
-        ],
-        "description": "The lifecycle state of this flow definition.\n\nactive: The flow definition is ready to be used. The server can select it for new flows.\ndraft: The server will not select it for new flows, and existing flows must handle it gracefully if they reference this definition.\n\nA revision's status is fixed at creation. Publish a new revision to change it.\n"
-      },
       "flow-audience": {
         "type": "object",
         "additionalProperties": false,
@@ -18628,7 +18761,6 @@
         "type": "object",
         "required": [
           "name",
-          "status",
           "user_schema",
           "purposes",
           "steps"
@@ -18649,9 +18781,6 @@
               "combined-auth"
             ],
             "description": "Stable identifier for this flow, and the name a cross-flow `switch` or\n`pivot` transition will target once the server runs them. Every\nrevision of a flow shares its `name`; publishing a definition under an\nexisting `name` adds a revision to that flow. Renaming is not\nsupported: the `name` is part of the public contract another\ndefinition may reference. It acts as the human display label as well;\nthere is no separate slug.\n"
-          },
-          "status": {
-            "$ref": "#/components/schemas/flow-definition-status"
           },
           "user_schema": {
             "type": "string",
@@ -18823,7 +18952,7 @@
       },
       "create-flow-definition-request": {
         "type": "object",
-        "description": "The request body for creating a flow definition.\nThe flow definition is created in an `active` state by default.\nThe status can also be set with the `status` attribute in the flow definition payload.\n",
+        "description": "The request body for creating a flow definition.\n",
         "required": [
           "project_id",
           "flow_definition"
@@ -19394,6 +19523,50 @@
           },
           "branding": {
             "$ref": "#/components/schemas/branding"
+          }
+        }
+      },
+      "oauth-settings": {
+        "x-meta-schema": true,
+        "type": "object",
+        "description": "The OAuth settings of a project: whether the project's OAuth authorization\nserver answers. It has one shape in two places: the `oauth` resource of the\nbundle `buildRelease` (`POST /releases/build`) takes, which publishes it as\na new immutable revision, and the read-only revision\n`getOAuthSettingsById` (`GET /oauth_settings/{oauth_settings_id}`)\nreturns. Locally it is the descriptor in `.zitadel/` that `zitadel deploy`\npublishes with the rest of the bundle.\n\nA release is the only writer: there is no operation that publishes OAuth\nsettings on their own. A release without `oauth` leaves the authorization\nserver off.\n",
+        "additionalProperties": false,
+        "required": [
+          "enabled"
+        ],
+        "properties": {
+          "$schema": {
+            "type": "string",
+            "description": "Editor affordance: path or URL of this file's JSON meta-schema, so an\neditor validates and autocompletes it. The CLI strips it before upload;\nthe platform ignores it.\n"
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether the project's OAuth authorization server answers. While it is\n`false`, or the deployed release pins no OAuth settings, the server\npublishes no authorization server metadata for the project and refuses\nevery OAuth request to it.\n",
+            "example": true
+          }
+        }
+      },
+      "oauth-settings-revision-response": {
+        "type": "object",
+        "description": "A stored OAuth settings revision. `oauth` echoes the canonical stored\nsettings, so a client such as the CLI can reconcile local files with the\nserver's stored state.\n",
+        "required": [
+          "id",
+          "created_at",
+          "oauth"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The unique identifier of this OAuth settings revision.",
+            "example": "oauthset_01KWHG3M5QZ27F0N9WD3P2E4YM"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When this revision was published."
+          },
+          "oauth": {
+            "$ref": "#/components/schemas/oauth-settings"
           }
         }
       },
@@ -19997,6 +20170,126 @@
             "description": "The application document. If its slug does not already exist in the\nproject, a new application is created. If one with that\nslug already exists, this becomes a new revision of it. The document is\nvalidated against the `application.json` schema, and returned as the\n`definition` in the response with each client's `client_id` filled in.\n"
           }
         }
+      },
+      "app-client_id_taken": {
+        "description": "Application: another client of the project holds this client_id\n\nError code: app.client_id_taken\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "app.client_id_taken"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "app-field_immutable": {
+        "description": "Application: a revision may not change a client's client_id or remove a client\n\nError code: app.field_immutable\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "app.field_immutable"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "app-invalid": {
+        "description": "Application: invalid\n\nError code: app.invalid\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "app.invalid"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "app-not_found": {
+        "description": "Application: not found\n\nError code: app.not_found\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "app.not_found"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "app-permission_denied": {
+        "description": "Application: the caller's project role does not allow this operation\n\nError code: app.permission_denied\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "app.permission_denied"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
+      },
+      "app-revision_conflict": {
+        "description": "Application: another revision of the same application was created at the same instant\n\nError code: app.revision_conflict\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/error-details"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "app.revision_conflict"
+              }
+            },
+            "required": [
+              "code"
+            ]
+          }
+        ]
       },
       "application-response": {
         "type": "object",
@@ -20627,7 +20920,7 @@
       "release-content-hash": {
         "title": "ReleaseContentHash",
         "type": "string",
-        "description": "The content digest of a release: `sha256:` followed by 64 lowercase hex\ncharacters. Always the full digest; no short form is accepted anywhere.\n\nThe digest covers the content of the resources the release pins and\nnothing else. Revision ids, metadata and the project are not part of it.\nA bundle that carries every resource it references therefore has the same\ndigest on every project, and a client can compute it before sending\nanything. When a bundle leaves a referenced resource to the project, the\nrelease pins the project's revision of it too, and the digest covers that\nresource as the project holds it.\n\nTo compute it:\n\n1. Take every resource in the release as the `bundle` of\n   `POST /releases/build` carries it, with `kind` set to `schema`,\n   `flow_definition`, `branding` or `idp`, and `handle` set to the\n   schema's `objectType`, the flow definition's `name`, `default` for\n   branding, or the identity provider's `slug`.\n   A `schema-url` entry's content is the entry as written, and its handle\n   is the `objectType` of the document the URL serves.\n2. Build the JSON document\n   `{\"version\": 1, \"resources\": [{\"kind\": …, \"handle\": …, \"content\": …}, …]}`,\n   with `resources` sorted by `kind`, then by `handle`.\n3. Serialise that document as canonical JSON (RFC 8785).\n4. The digest is the SHA-256 of those bytes, written as `sha256:` and\n   lowercase hex.\n\nA release built from `pointers` has the digest its pinned revisions would\nhave if they were sent as a bundle.\n\nThe digest identifies a release on the wire but never appears in a path,\nwhich takes the `rel_` id. Fields that look a release up by content say\nso by name: the `content_hash` filter of `GET /releases`, and\n`content_hash` in place of `release_id` on `POST /deployments`.\n",
+        "description": "The content digest of a release: `sha256:` followed by 64 lowercase hex\ncharacters. Always the full digest; no short form is accepted anywhere.\n\nThe digest covers the content of the resources the release pins and\nnothing else. Revision ids, metadata and the project are not part of it.\nA bundle that carries every resource it references therefore has the same\ndigest on every project, and a client can compute it before sending\nanything. When a bundle leaves a referenced resource to the project, the\nrelease pins the project's revision of it too, and the digest covers that\nresource as the project holds it.\n\nTo compute it:\n\n1. Take every resource in the release as the `bundle` of\n   `POST /releases/build` carries it, with `kind` set to `schema`,\n   `flow_definition`, `branding`, `idp` or `oauth`, and `handle` set to the\n   schema's `objectType`, the flow definition's `name`, `default` for\n   branding and oauth, or the identity provider's `slug`.\n   A `schema-url` entry's content is the entry as written, and its handle\n   is the `objectType` of the document the URL serves.\n2. Build the JSON document\n   `{\"version\": 1, \"resources\": [{\"kind\": …, \"handle\": …, \"content\": …}, …]}`,\n   with `resources` sorted by `kind`, then by `handle`.\n3. Serialise that document as canonical JSON (RFC 8785).\n4. The digest is the SHA-256 of those bytes, written as `sha256:` and\n   lowercase hex.\n\nA release built from `pointers` has the digest its pinned revisions would\nhave if they were sent as a bundle.\n\nThe digest identifies a release on the wire but never appears in a path,\nwhich takes the `rel_` id. Fields that look a release up by content say\nso by name: the `content_hash` filter of `GET /releases`, and\n`content_hash` in place of `release_id` on `POST /deployments`.\n",
         "pattern": "^sha256:[0-9a-f]{64}$",
         "x-zitadel-pattern-message": "must be sha256: followed by 64 lowercase hex digits",
         "minLength": 71,
@@ -20821,7 +21114,8 @@
           "flow_definition",
           "branding",
           "idp",
-          "policy"
+          "policy",
+          "oauth"
         ],
         "example": "schema"
       },
@@ -20996,7 +21290,7 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 256,
-            "description": "Which resource this pointer pins, independent of which revision of it.\n`revision_id` chooses the revision, and `handle` says what the revision\nis a revision *of*. The server determines it when the release is\nassembled; the caller does not supply it:\n\n- `schema` — the document's `objectType`, so `human-user` and\n  `machine-user` are separate resources a release pins separately\n- `flow_definition` — the definition's `name`, likewise for\n  `default-login` and `b2b-login`\n- `branding` — always `default`. A project has one branding, so there is\n  nothing to distinguish. It is revisioned like everything else, and\n  `revision_id` is what varies between releases.\n- `idp` — the connection's `slug`, so `google` and `github` are\n  separate resources a release pins separately\n- `policy` — the policy's `operation`, so a project's password policy\n  is one resource however often it is revised\n\nResources inside a release reference each other by handle, not by\nrevision ID. The same handle therefore names the same resource in every\nrelease.\n",
+            "description": "Which resource this pointer pins, independent of which revision of it.\n`revision_id` chooses the revision, and `handle` says what the revision\nis a revision *of*. The server determines it when the release is\nassembled; the caller does not supply it:\n\n- `schema` — the document's `objectType`, so `human-user` and\n  `machine-user` are separate resources a release pins separately\n- `flow_definition` — the definition's `name`, likewise for\n  `default-login` and `b2b-login`\n- `branding` — always `default`. A project has one branding, so there is\n  nothing to distinguish. It is revisioned like everything else, and\n  `revision_id` is what varies between releases.\n- `oauth` — always `default`, likewise: a project has one set of OAuth\n  settings, and `revision_id` is what varies between releases.\n- `idp` — the connection's `slug`, so `google` and `github` are\n  separate resources a release pins separately\n- `policy` — the policy's `operation`, so a project's password policy\n  is one resource however often it is revised\n\nResources inside a release reference each other by handle, not by\nrevision ID. The same handle therefore names the same resource in every\nrelease.\n",
             "example": "human-user"
           },
           "revision_id": {
@@ -21069,7 +21363,7 @@
       "configuration-bundle": {
         "title": "ConfigurationBundle",
         "type": "object",
-        "description": "The resources of a project's `.zitadel/` directory as authored on disk,\ngrouped by kind.\n\nResources reference each other by handle. A flow definition's\n`user_schema` names a schema by its `objectType`. A flow step's\n`sso_providers`, like a schema's `x-auth-methods.sso.providers`, name\nidentity provider (IdP) connections by `slug`. A reference resolves to the\nresource with that handle in this bundle. Failing that, it resolves to the\nproject's newest revision of it, which the release then pins as well. A\nhandle that neither holds refuses the release, naming the pointer and the\nhandle. A bundle that references only resources it carries builds the same\nrelease on any project.\n\nA handle names one resource of its kind in a bundle. The server refuses the\nrelease with `rel.invalid`, with an entry for each such resource, when the\nbundle holds:\n- two schemas with the same `objectType`;\n- two flow definitions with the same `name`;\n- two IdP connections with the same `slug`;\n- two policies for the same `operation`;\n- a schema without an `objectType`.\n\nEach kind is optional, and the arrays may be empty: a project that never\nejected its branding omits `branding`. The bundle carries at least one\nresource. The release it builds pins at most 50 resources, which counts the\nresources the bundle carries plus those resolved from the project. The\nserver refuses anything outside that with `rel.invalid`. Unknown keys are\nrefused.\n",
+        "description": "The resources of a project's `.zitadel/` directory as authored on disk,\ngrouped by kind.\n\nResources reference each other by handle. A flow definition's\n`user_schema` names a schema by its `objectType`. A flow step's\n`sso_providers`, like a schema's `x-auth-methods.sso.providers`, name\nidentity provider (IdP) connections by `slug`. A reference resolves to the\nresource with that handle in this bundle. Failing that, it resolves to the\nproject's newest revision of it, which the release then pins as well. A\nhandle that neither holds refuses the release, naming the pointer and the\nhandle. A bundle that references only resources it carries builds the same\nrelease on any project.\n\nA handle names one resource of its kind in a bundle. The server refuses the\nrelease with `rel.invalid`, with an entry for each such resource, when the\nbundle holds:\n- two schemas with the same `objectType`;\n- two flow definitions with the same `name`;\n- two IdP connections with the same `slug`;\n- two policies for the same `operation`;\n- a schema without an `objectType`.\n\nEach kind is optional, and the arrays may be empty: a project that never\nejected its branding omits `branding`, and one that never turned on its\nOAuth authorization server omits `oauth`. `branding` and `oauth` are\nsingle objects, because a project has one of each. The bundle carries at\nleast one resource. The release it builds pins at most 50 resources, which\ncounts the resources the bundle carries plus those resolved from the\nproject. The server refuses anything outside that with `rel.invalid`.\nUnknown keys are refused.\n",
         "additionalProperties": false,
         "properties": {
           "schemas": {
@@ -21121,6 +21415,10 @@
           "branding": {
             "$ref": "#/components/schemas/branding",
             "description": "The descriptor from `.zitadel/branding/branding.json` with its template\ninlined, exactly as `POST /branding` takes it. A project has one\nbranding, so this is a single object.\n"
+          },
+          "oauth": {
+            "$ref": "#/components/schemas/oauth-settings",
+            "description": "The project's OAuth settings. A project has one set of them, so this is\na single object, and the release is its only writer: there is no\nper-kind create endpoint. Omit it to leave the project's OAuth\nauthorization server off.\n"
           }
         }
       },
@@ -21175,7 +21473,7 @@
               "index": {
                 "type": "integer",
                 "minimum": 0,
-                "description": "The resource's position in its kind's array in the bundle; `0` for the branding."
+                "description": "The resource's position in its kind's array in the bundle; `0` for the branding and for the OAuth settings, which are single objects."
               },
               "handle": {
                 "type": "string",
@@ -22654,12 +22952,14 @@
           "occurred_at": {
             "type": "string",
             "format": "date-time",
-            "description": "When the action happened, on the server's clock."
+            "x-ogen-time-format": "2006-01-02T15:04:05.999Z07:00",
+            "description": "When the action happened, on the server's clock, to the millisecond.\n"
           },
           "created_at": {
             "type": "string",
             "format": "date-time",
-            "description": "When the event was stored, on the server's clock."
+            "x-ogen-time-format": "2006-01-02T15:04:05.999Z07:00",
+            "description": "When the event was stored, on the server's clock, to the millisecond.\n"
           },
           "actor_id": {
             "description": "The ID of the actor that triggered the event.",
@@ -22702,6 +23002,17 @@
           },
           "entity_id": {
             "description": "The ID of the resource the event affected.",
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "user_id": {
+            "description": "The ID of the user the event concerns, whoever triggered it: the user a\nsession, a token, a sign-in check or a credential belongs to, or the\nuser a change was made to. Absent on an event that concerns no user.\n",
             "oneOf": [
               {
                 "type": "string"
@@ -22776,6 +23087,83 @@
             "$ref": "#/components/schemas/event-metadata"
           }
         }
+      },
+      "application-payload": {
+        "title": "ApplicationPayload",
+        "type": "object",
+        "description": "Payload for `application.created`, which holds every field, and\n`application.updated`, which holds the new `revision_id`, `name` when it\nchanged, and `client_ids` when the revision added a client. The application\nID is the event's `entity_id`. The application document and the client\nsecrets are never included.\n",
+        "required": [
+          "revision_id"
+        ],
+        "properties": {
+          "slug": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "client_ids": {
+            "type": "array",
+            "description": "The `client_id` of each client the write created. Each of them got a new\nsecret.\n",
+            "items": {
+              "type": "string"
+            }
+          },
+          "revision_id": {
+            "type": "string",
+            "description": "The revision the write appended."
+          }
+        }
+      },
+      "application-created-event": {
+        "title": "ApplicationCreatedEvent",
+        "description": "An event of type application.created, with the shared event fields and its own payload.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/event-base"
+          },
+          {
+            "type": "object",
+            "required": [
+              "event_type",
+              "payload"
+            ],
+            "properties": {
+              "event_type": {
+                "type": "string",
+                "const": "application.created"
+              },
+              "payload": {
+                "$ref": "#/components/schemas/application-payload"
+              }
+            }
+          }
+        ]
+      },
+      "application-updated-event": {
+        "title": "ApplicationUpdatedEvent",
+        "description": "An event of type application.updated, with the shared event fields and its own payload.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/event-base"
+          },
+          {
+            "type": "object",
+            "required": [
+              "event_type",
+              "payload"
+            ],
+            "properties": {
+              "event_type": {
+                "type": "string",
+                "const": "application.updated"
+              },
+              "payload": {
+                "$ref": "#/components/schemas/application-payload"
+              }
+            }
+          }
+        ]
       },
       "empty-event-payload": {
         "title": "EmptyEventPayload",
@@ -23323,9 +23711,6 @@
         "description": "Payload for `flowdef.created`: the fields of the created flow definition\nrevision, without its steps. The retired `flowdef.updated` event carries the\nchanged fields in the same shape.\n",
         "properties": {
           "name": {
-            "type": "string"
-          },
-          "status": {
             "type": "string"
           },
           "user_schema": {
@@ -24784,6 +25169,12 @@
         "description": "An event of any type. Read event_type to tell which type it is; each type\ncarries its own typed payload.\n",
         "oneOf": [
           {
+            "$ref": "#/components/schemas/application-created-event"
+          },
+          {
+            "$ref": "#/components/schemas/application-updated-event"
+          },
+          {
             "$ref": "#/components/schemas/auth-attempt-created-event"
           },
           {
@@ -24937,6 +25328,8 @@
         "discriminator": {
           "propertyName": "event_type",
           "mapping": {
+            "application.created": "#/components/schemas/application-created-event",
+            "application.updated": "#/components/schemas/application-updated-event",
             "auth.attempt.created": "#/components/schemas/auth-attempt-created-event",
             "auth.attempt.handed_off": "#/components/schemas/auth-attempt-handed_off-event",
             "auth.check.failed": "#/components/schemas/auth-check-failed-event",
@@ -26639,6 +27032,48 @@
         "value": {
           "code": "idp.revision_conflict",
           "message": "identity provider connection: another revision of the same connection was created at the same instant"
+        }
+      },
+      "app-client_id_taken": {
+        "summary": "app.client_id_taken",
+        "value": {
+          "code": "app.client_id_taken",
+          "message": "application: another client of the project holds this client_id"
+        }
+      },
+      "app-field_immutable": {
+        "summary": "app.field_immutable",
+        "value": {
+          "code": "app.field_immutable",
+          "message": "application: a revision may not change a client's client_id or remove a client"
+        }
+      },
+      "app-invalid": {
+        "summary": "app.invalid",
+        "value": {
+          "code": "app.invalid",
+          "message": "application: invalid"
+        }
+      },
+      "app-not_found": {
+        "summary": "app.not_found",
+        "value": {
+          "code": "app.not_found",
+          "message": "application: not found"
+        }
+      },
+      "app-permission_denied": {
+        "summary": "app.permission_denied",
+        "value": {
+          "code": "app.permission_denied",
+          "message": "application: the caller's project role does not allow this operation"
+        }
+      },
+      "app-revision_conflict": {
+        "summary": "app.revision_conflict",
+        "value": {
+          "code": "app.revision_conflict",
+          "message": "application: another revision of the same application was created at the same instant"
         }
       },
       "pol-not_found": {
@@ -33144,6 +33579,59 @@
           }
         }
       },
+      "getOAuthSettingsById-error-response": {
+        "description": "Error response",
+        "content": {
+          "application/json": {
+            "schema": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/auth-unauthorized"
+                },
+                {
+                  "$ref": "#/components/schemas/internal"
+                },
+                {
+                  "$ref": "#/components/schemas/not_implemented"
+                },
+                {
+                  "$ref": "#/components/schemas/req-invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/unavailable"
+                }
+              ],
+              "discriminator": {
+                "propertyName": "code",
+                "mapping": {
+                  "auth.unauthorized": "#/components/schemas/auth-unauthorized",
+                  "internal": "#/components/schemas/internal",
+                  "not_implemented": "#/components/schemas/not_implemented",
+                  "req.invalid": "#/components/schemas/req-invalid",
+                  "unavailable": "#/components/schemas/unavailable"
+                }
+              }
+            },
+            "examples": {
+              "auth.unauthorized": {
+                "$ref": "#/components/examples/auth-unauthorized"
+              },
+              "internal": {
+                "$ref": "#/components/examples/internal"
+              },
+              "not_implemented": {
+                "$ref": "#/components/examples/not_implemented"
+              },
+              "req.invalid": {
+                "$ref": "#/components/examples/req-invalid"
+              },
+              "unavailable": {
+                "$ref": "#/components/examples/unavailable"
+              }
+            }
+          }
+        }
+      },
       "createIdp-error-response": {
         "description": "Error response",
         "content": {
@@ -33521,7 +34009,28 @@
             "schema": {
               "oneOf": [
                 {
+                  "$ref": "#/components/schemas/app-client_id_taken"
+                },
+                {
+                  "$ref": "#/components/schemas/app-field_immutable"
+                },
+                {
+                  "$ref": "#/components/schemas/app-invalid"
+                },
+                {
+                  "$ref": "#/components/schemas/app-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/app-permission_denied"
+                },
+                {
+                  "$ref": "#/components/schemas/app-revision_conflict"
+                },
+                {
                   "$ref": "#/components/schemas/auth-unauthorized"
+                },
+                {
+                  "$ref": "#/components/schemas/evt-invalid"
                 },
                 {
                   "$ref": "#/components/schemas/internal"
@@ -33539,7 +34048,14 @@
               "discriminator": {
                 "propertyName": "code",
                 "mapping": {
+                  "app.client_id_taken": "#/components/schemas/app-client_id_taken",
+                  "app.field_immutable": "#/components/schemas/app-field_immutable",
+                  "app.invalid": "#/components/schemas/app-invalid",
+                  "app.not_found": "#/components/schemas/app-not_found",
+                  "app.permission_denied": "#/components/schemas/app-permission_denied",
+                  "app.revision_conflict": "#/components/schemas/app-revision_conflict",
                   "auth.unauthorized": "#/components/schemas/auth-unauthorized",
+                  "evt.invalid": "#/components/schemas/evt-invalid",
                   "internal": "#/components/schemas/internal",
                   "not_implemented": "#/components/schemas/not_implemented",
                   "req.invalid": "#/components/schemas/req-invalid",
@@ -33548,8 +34064,29 @@
               }
             },
             "examples": {
+              "app.client_id_taken": {
+                "$ref": "#/components/examples/app-client_id_taken"
+              },
+              "app.field_immutable": {
+                "$ref": "#/components/examples/app-field_immutable"
+              },
+              "app.invalid": {
+                "$ref": "#/components/examples/app-invalid"
+              },
+              "app.not_found": {
+                "$ref": "#/components/examples/app-not_found"
+              },
+              "app.permission_denied": {
+                "$ref": "#/components/examples/app-permission_denied"
+              },
+              "app.revision_conflict": {
+                "$ref": "#/components/examples/app-revision_conflict"
+              },
               "auth.unauthorized": {
                 "$ref": "#/components/examples/auth-unauthorized"
+              },
+              "evt.invalid": {
+                "$ref": "#/components/examples/evt-invalid"
               },
               "internal": {
                 "$ref": "#/components/examples/internal"
@@ -33574,6 +34111,12 @@
             "schema": {
               "oneOf": [
                 {
+                  "$ref": "#/components/schemas/app-not_found"
+                },
+                {
+                  "$ref": "#/components/schemas/app-permission_denied"
+                },
+                {
                   "$ref": "#/components/schemas/auth-unauthorized"
                 },
                 {
@@ -33592,6 +34135,8 @@
               "discriminator": {
                 "propertyName": "code",
                 "mapping": {
+                  "app.not_found": "#/components/schemas/app-not_found",
+                  "app.permission_denied": "#/components/schemas/app-permission_denied",
                   "auth.unauthorized": "#/components/schemas/auth-unauthorized",
                   "internal": "#/components/schemas/internal",
                   "not_implemented": "#/components/schemas/not_implemented",
@@ -33601,6 +34146,12 @@
               }
             },
             "examples": {
+              "app.not_found": {
+                "$ref": "#/components/examples/app-not_found"
+              },
+              "app.permission_denied": {
+                "$ref": "#/components/examples/app-permission_denied"
+              },
               "auth.unauthorized": {
                 "$ref": "#/components/examples/auth-unauthorized"
               },
@@ -36735,6 +37286,16 @@
         },
         "example": "brnd_01KWH1P4MYS7F0N9WD3P2E4YM5"
       },
+      "oauth-settings-id": {
+        "name": "oauth_settings_id",
+        "in": "path",
+        "required": true,
+        "description": "The OAuth settings revision ID: the `revision_id` of the `kind: oauth`\npointer on the release that `buildRelease` (`POST /releases/build`) or\n`getReleaseById` (`GET /releases/{release_id}`) returns.\n",
+        "schema": {
+          "type": "string"
+        },
+        "example": "oauthset_01KWHG3M5QZ27F0N9WD3P2E4YM"
+      },
       "idp-id": {
         "name": "id",
         "in": "path",
@@ -36890,7 +37451,7 @@
         "example": "private, no-store"
       },
       "set-cookie-flow": {
-        "description": "The cookies this response sets, one `Set-Cookie` line per element; the\ngenerated server emits the lines separately, since the comma-joined form\nOpenAPI prescribes for array headers is invalid for `Set-Cookie`\n(RFC 6265). Browsers never expose the header to script, so this shape\nconcerns server-side and generated non-browser clients only.\n\nThe first element is always `_zflow`, the encrypted flow state: HttpOnly,\nSecure, SameSite=Strict, Path=/. Starting a flow and every submit\nresponse rotate it, including validation failures; `GET /flow/{id}`\nsets it only when the render resolved a parked SSO identity. The\n`sso-redirect` response appends the browser-binding cookie the callback\nchecks.\n",
+        "description": "The cookies this response sets, one `Set-Cookie` line per element; the\ngenerated server emits the lines separately, since the comma-joined form\nOpenAPI prescribes for array headers is invalid for `Set-Cookie`\n(RFC 6265). Browsers never expose the header to script, so this shape\nconcerns server-side and generated non-browser clients only.\n\nThe first element is always `_zflow`, the encrypted flow state: HttpOnly,\nSecure, SameSite=Strict, Path=/. Starting a flow and every submit\nresponse that returns a step rotate it, including validation failures; a\nsubmission refused with an error sets no cookie. `GET /flow/{id}`\nsets it only when the render resolved a parked SSO identity. The\n`sso-redirect` response appends the browser-binding cookie the callback\nchecks.\n",
         "schema": {
           "type": "array",
           "items": {

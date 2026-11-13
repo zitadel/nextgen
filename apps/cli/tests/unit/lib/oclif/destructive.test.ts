@@ -1,4 +1,4 @@
-import { Args, type Config, Flags } from "@oclif/core";
+import { Args, type Config, Flags, type Interfaces } from "@oclif/core";
 import { describe, expect, it, vi } from "vitest";
 
 import { Consent } from "@/lib/consent";
@@ -6,6 +6,7 @@ import { BaseCommand } from "@/lib/oclif/base";
 import { Destructive, type DestructiveChange, Settled } from "@/lib/oclif/destructive";
 import type { CommandResult } from "@/lib/oclif/types";
 import { answering } from "@tests/helpers/keyboard";
+import { rejectionOf } from "@tests/helpers/thrown-value";
 
 const GATE: Omit<DestructiveChange<string | undefined>, "apply"> = {
   verb: "remove",
@@ -34,7 +35,7 @@ class Removing extends Destructive(BaseCommand) {
   // Drawn, so a question is clack's prompt, which is the one these tests answer.
   public static override wizard: boolean | undefined = true;
   public static override readonly args = { name: Args.string() };
-  public static override readonly flags = {
+  public static override readonly flags: Interfaces.FlagInput = {
     force: Flags.boolean({ char: "f" }),
     preview: Flags.boolean(),
     env: Flags.string(),
@@ -88,8 +89,27 @@ class Unnamed extends Removing {
   public static override readonly args = Removing.args;
 }
 
+/** A destructive command that declares no `--force` for its retry to set. */
+class Forceless extends Removing {
+  public static override readonly flags = {
+    preview: Flags.boolean(),
+    env: Flags.string(),
+    message: Flags.string(),
+  };
+}
+
 describe("Destructive", () => {
   describe("confirmed", () => {
+    it("refuses to ask in a command that declares no --force", async () => {
+      const error = await rejectionOf(() => {
+        return new Forceless({ force: true }).remove();
+      });
+
+      expect(error).toMatchObject({
+        message: "variable:rm declares no --force, which it reruns with",
+      });
+    });
+
     it("answers a dry run with the preview", async () => {
       const command = new Removing({ dryRun: true });
 

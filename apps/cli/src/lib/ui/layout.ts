@@ -121,9 +121,9 @@ const columnRows = (lines: readonly string[]): boolean[] => {
     return /^[\u2500\u2501-]{3,}$/.test(bare(line).trim());
   };
   const neighbour = (index: number, step: 1 | -1): number[] | undefined => {
-    let at = index + step;
-    while (lines[at] !== undefined && isRule(lines[at] ?? "")) {
-      at += step;
+    const at = index + step;
+    if (lines[at] !== undefined && isRule(lines[at] ?? "")) {
+      return neighbour(at, step);
     }
     return starts[at];
   };
@@ -260,9 +260,12 @@ export class Facts implements Renderable {
  */
 const argumentBreaks = (command: string): number[] => {
   const at: number[] = [];
+  // biome-ignore lint/plugin: the quote the scan is inside, changed as it reads
   let quote: string | undefined;
+  // biome-ignore lint/plugin: whether the last character was a backslash
   let escaped = false;
   // Indexes are UTF-16 units, as `slice` reads them; quotes and spaces are never half a pair.
+  // biome-ignore lint/plugin: the scan position, read through one character at a time
   for (let index = 0; index < command.length; index += 1) {
     const character = command.charAt(index);
     if (escaped) {
@@ -305,7 +308,9 @@ const argumentBreaks = (command: string): number[] => {
  */
 export const wrapCommand = (command: string, width: number, lead = ""): string[] => {
   const lines: string[] = [];
+  // biome-ignore lint/plugin: the rest of the command, shortened by each line cut off, so wrapping is a loop and cannot overflow the stack
   let rest = command;
+  // biome-ignore lint/plugin: the lead for the line being filled
   let indent = lead;
   while (indent.length + rest.length > width) {
     const cut = argumentBreaks(rest)

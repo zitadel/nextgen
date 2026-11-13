@@ -5,7 +5,7 @@
     // Turns the committed OpenAPI embed and its error YAML into .generated/,
     // which lib/openapi.ts and lib/error-reference.ts import, plus the CLI's
     // command reference (its reference test) and release notes (Changesets).
-    // Regenerate the embed (server:generate) before this when the OpenAPI
+    // Regenerate the embed (@zitadel/server#generate) before this when the OpenAPI
     // YAML changes.
     //
     // Turbo hashes every NEXT_* variable into the tasks of a Next.js package,
@@ -52,10 +52,10 @@
     // app/global.css imports the design tokens' CSS variables, which the
     // repository commits, so that build needs no generation of them.
     //
-    // The build waits for typecheck, as in moon.yml: `next build` empties
-    // .next/types, where tsc reads the route types, so side by side
-    // typecheck failed with TS2304. A task-guard mutex would leave a gap: a
-    // cache hit restores .next without running the script.
+    // The build waits for typecheck: `next build` empties .next/types, where
+    // tsc reads the route types, so side by side typecheck failed with
+    // TS2304. A task-guard mutex would leave a gap: a cache hit restores
+    // .next without running the script.
     //
     // The hosted cloud's docs service builds through this task. A Next.js
     // build on Vercel bakes its deployment in: Skew Protection's ID into
@@ -71,7 +71,6 @@
       "dependsOn": [
         "typecheck",
         "generate",
-        "@zitadel/design-tokens#generate",
         "@zitadel/api#build",
         "@zitadel/api-mock#build",
         "@zitadel/components#build"
@@ -81,7 +80,6 @@
     "dev": {
       "dependsOn": [
         "generate",
-        "@zitadel/design-tokens#generate",
         "@zitadel/api#build",
         "@zitadel/api-mock#build",
         "@zitadel/components#build"
@@ -93,6 +91,7 @@
     // The site's contract suite (tests/, playwright.config.mts); Playwright
     // serves the build on port 3003.
     "e2e": {
+      "cache": false,
       "dependsOn": ["build"],
       "passThroughEnv": ["PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "GITHUB_*"]
     },

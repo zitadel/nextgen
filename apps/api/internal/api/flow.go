@@ -245,10 +245,10 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 	// Validation error: state machine keeps the user on the step with Error set.
 	if result.Step != nil && result.Step.Error != nil {
 		logFlowStepFailure(ctx, state.ProjectID, result.Step)
-		return &api.SubmitFlowStepBadRequest{
+		return &api.SubmitFlowStepBadRequestHeaders{
 			SetCookie:    []string{flowSetCookie(ctx, cookieValue, false)},
 			CacheControl: api.NewOptString(sessionStateCacheControl),
-			Response:     flowResp,
+			Response:     api.NewFlowResponseSubmitFlowStepBadRequest(flowResp),
 		}, nil
 	}
 
@@ -259,7 +259,7 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 	if result.SSOBindingNonce != "" {
 		cookies = append(cookies, ssoBindingSetCookie(ctx, result.SSOBindingNonce))
 	}
-	return &api.SubmitFlowStepOK{
+	return &api.FlowResponseHeaders{
 		SetCookie:    cookies,
 		CacheControl: api.NewOptString(sessionStateCacheControl),
 		Response:     flowResp,
