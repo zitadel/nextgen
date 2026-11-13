@@ -83,7 +83,7 @@ jobs:
       - id: target
         run: node scripts/artifacts-target.mjs
         env:
-          VERSION: ${{ inputs.version || github.event.release.tag_name || (github.event_name == 'pull_request' && 'v0.6.0') }}
+          VERSION: ${{ inputs.version || github.event.release.tag_name }}
 
   binaries:
     needs: target
