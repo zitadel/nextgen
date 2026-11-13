@@ -296,6 +296,15 @@ Omni, weekly on `main` and on demand, and is not a required check. To run it
 against a branch, use `gh workflow run spanner.yml --ref <branch>`, or run
 the task locally, where it still starts the Spanner emulator.
 
+The released artifacts run in the separate `artifacts` workflow
+([`artifacts.yml`](.github/workflows/artifacts.yml)), nightly on `main`, on
+demand (`gh workflow run artifacts.yml --ref <branch>`) and on PRs that
+change it; it is not a required check. It starts each platform's release
+binary on its own OS ([`smoke-server.mjs`](scripts/smoke-server.mjs)), runs
+the container smoke (`turbo run //#smoke-container`, Docker), and upgrades a
+data dir the latest published `@zitadel/server` wrote
+(`turbo run //#smoke-upgrade`, no Docker).
+
 The PR title check is not part of `full-pr` either. It runs in the separate
 `pr-title` workflow, which a title edit starts on its own; see
 [Title format](#title-format).

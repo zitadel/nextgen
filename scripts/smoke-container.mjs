@@ -4,7 +4,8 @@
 //
 // This is the only check that covers the whole container contract at once: the
 // Dockerfile's data dir default, the declared non-root USER, and the server's
-// own directory handling. CI has no Docker, so it is opt-in; the CI-enforced
+// own directory handling. The `ci` script has no Docker, so the nightly
+// artifacts workflow (.github/workflows/artifacts.yml) runs it; the CI-enforced
 // halves are TestDefaultServerDataDirHasNoSideEffects (cmd/server) and the
 // Dockerfile parity assertion in the CLI's docker unit tests.
 import { setTimeout as delay } from "node:timers/promises";

@@ -1,0 +1,120 @@
+name: artifacts
+
+# What a release ships, run the way users run it. `full-pr` builds and packs
+# every artifact on Linux arm64 but never starts the macOS or Windows server,
+# the container or a data dir an older release wrote; this workflow does,
+# nightly on main (04:41 UTC), on demand against any branch
+# (`gh workflow run artifacts.yml --ref <branch>`), and on PRs that change this
+# file. It is not a required check.
+#
+# - binaries: the five platform packages' build-binary, the release's own
+#   cross-compile, once on Linux.
+# - start: each binary on its own platform: start on an empty data dir,
+#   /readyz, stop (scripts/smoke-server.mjs).
+# - linux: the container smoke (//#smoke-container) and the upgrade from the
+#   latest published release (//#smoke-upgrade), in one turbo run.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "41 4 * * *"
+  pull_request:
+    paths:
+      - .github/workflows/artifacts.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: artifacts-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # No remote cache token here: every task this runs is uncached anyway.
+  TURBO_CACHE: local:rw
+
+jobs:
+  binaries:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: apps/api/go.mod
+          cache: true
+          cache-dependency-path: apps/api/go.sum
+
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Build the release binaries
+        run: corepack pnpm exec turbo run build-binary --filter='@zitadel/server-*' --output-logs=errors-only
+
+      # Stored relative to apps/: server-<platform>/bin/nextgen[.exe].
+      - uses: actions/upload-artifact@v7
+        with:
+          name: server-binaries
+          path: apps/server-*/bin/
+          if-no-files-found: error
+          retention-days: 7
+
+  start:
+    needs: binaries
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-15, macos-15-intel, windows-2025, ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: server-binaries
+          path: apps
+
+      # The script needs no dependencies; it picks this runner's binary.
+      - name: Start, check and stop the server
+        run: node scripts/smoke-server.mjs
+
+  linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: apps/api/go.mod
+          cache: true
+          cache-dependency-path: apps/api/go.sum
+
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Smoke the container and the upgrade
+        run: corepack pnpm exec turbo run //#smoke-container //#smoke-upgrade --continue --output-logs=errors-only
