@@ -1,10 +1,32 @@
 import { Args, Flags } from "@oclif/core";
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
 import { z } from "zod";
 
-import { filled, reads, serverFlag, taken, whole } from "@/lib/oclif/flags";
+import { filled, type ReadAlone, reads, serverFlag, taken, whole } from "@/lib/oclif/flags";
+import type { Placeholders } from "@/lib/oclif/refusal";
 import { parseArg, parseFlag } from "@tests/helpers/inputs";
 import { parseJson, runCliForTest } from "@tests/helpers/run-cli";
+
+/** A refusal's wording that asks for a bound only its declaration can give. */
+const LIMITED_WORDING = "{input} takes at most {max} characters";
+
+/** A refusal's wording that asks for nothing the parse does not fill. */
+const WRONG_WORDING = "{input} is wrong";
+
+/** A hint for {@link WRONG_WORDING}. */
+const HINT = "Pass another one.";
+
+/** Which of two refusals a declaration picks, known only when it runs. */
+const CHOOSE: boolean = HINT.length > 0;
+
+/** One of two wordings a condition picks between, asking for `{a}`. */
+const NEEDS_A = "{input} needs {a}";
+
+/** The other, asking for `{b}`. */
+const NEEDS_B = "{input} needs {b}";
+
+/** Values typed as wide as `Placeholders`, which name nothing for certain. */
+const WIDE_VALUES: Placeholders = { max: 3 };
 
 /**
  * `required: true` asks only whether a token reached argv, and an empty one
@@ -171,6 +193,111 @@ describe("a flag built with reads", () => {
   });
 });
 
+describe("a refusal a flag or argument is built with", () => {
+  const LIMITED = { schema: z.string(), refusal: { message: LIMITED_WORDING } } as const;
+  const LIMITED_FILLED = { ...LIMITED, values: { max: 3 } } as const;
+  const OPTIONAL_MAX: { readonly max?: number } = {};
+
+  it("does not compile in reads without a value only its declaration can fill", () => {
+    // @ts-expect-error nothing fills {max}
+    reads(LIMITED);
+  });
+
+  it("does not compile in taken without a value only its declaration can fill", () => {
+    // @ts-expect-error nothing fills {max}
+    taken(LIMITED);
+  });
+
+  it("compiles with the value its declaration gives", () => {
+    expect(reads(LIMITED_FILLED)).toBeTypeOf("function");
+  });
+
+  it("does not compile in reads without that value when the declaration is written inline", () => {
+    // @ts-expect-error nothing fills {max}
+    reads({ schema: z.string(), refusal: { message: LIMITED_WORDING } });
+  });
+
+  it("does not compile in taken without that value when the declaration is written inline", () => {
+    // @ts-expect-error nothing fills {max}
+    taken({ schema: z.string(), refusal: { message: LIMITED_WORDING } });
+  });
+
+  it("compiles with that value written inline", () => {
+    expect(
+      taken({ schema: z.string(), refusal: { message: LIMITED_WORDING }, values: { max: 3 } }),
+    ).toBeTypeOf("function");
+  });
+
+  it("does not compile with a value that is undefined", () => {
+    // @ts-expect-error an undefined {max} leaves the braces in the wording
+    reads({ ...LIMITED, values: { max: undefined } });
+  });
+
+  it("does not compile with a value that is optional", () => {
+    // @ts-expect-error an optional {max} may leave the braces in the wording
+    reads({ ...LIMITED, values: OPTIONAL_MAX });
+  });
+
+  it("does not compile with a value the parse would replace", () => {
+    // @ts-expect-error the parse fills {value} with what was typed
+    reads({ schema: z.string(), refusal: { message: WRONG_WORDING }, values: { value: 3 } });
+  });
+
+  it("does not compile with a value the parse would replace, even as undefined", () => {
+    reads({
+      schema: z.string(),
+      refusal: { message: WRONG_WORDING },
+      // @ts-expect-error not even as undefined, which would read as a value given
+      values: { input: undefined },
+    });
+  });
+
+  it("does not compile with values whose names it cannot see", () => {
+    // @ts-expect-error values as wide as Placeholders may hide a name the parse replaces
+    reads({ schema: z.string(), refusal: { message: WRONG_WORDING }, values: WIDE_VALUES });
+  });
+
+  it("does not compile with a key a refusal does not have", () => {
+    // @ts-expect-error a refusal has no hnt, so the hint would be lost
+    reads({ schema: z.string(), refusal: { message: WRONG_WORDING, hnt: HINT } });
+  });
+
+  it("does not compile with a key a declaration does not have", () => {
+    // @ts-expect-error a declaration has no vaules, so the values would be lost
+    reads({ schema: z.string(), refusal: { message: WRONG_WORDING }, vaules: { max: 3 } });
+  });
+
+  it("does not compile without what either of two refusals chosen by a condition asks for", () => {
+    reads({
+      schema: z.string(),
+      refusal: CHOOSE ? { message: NEEDS_A } : { message: NEEDS_B },
+      // @ts-expect-error the second refusal asks for {b}
+      values: { a: 1 },
+    });
+  });
+
+  it("compiles with what both of two refusals chosen by a condition ask for", () => {
+    expect(
+      reads({
+        schema: z.string(),
+        refusal: CHOOSE ? { message: NEEDS_A } : { message: NEEDS_B },
+        values: { a: 1, b: 2 },
+      }),
+    ).toBeTypeOf("function");
+  });
+
+  it("does not compile with a next entry the parse has nothing to fill", () => {
+    // @ts-expect-error a flag's refusal has no next values to fill {fix} with
+    reads({ schema: z.string(), refusal: { message: WRONG_WORDING, next: ["{fix}"] } });
+  });
+
+  it("compiles with a next entry that is a whole suggestion", () => {
+    expect(
+      reads({ schema: z.string(), refusal: { message: WRONG_WORDING, next: [{ id: "start" }] } }),
+    ).toBeTypeOf("function");
+  });
+});
+
 describe("an argument built with taken", () => {
   const nameArg = Args.custom<string>({
     parse: taken({
@@ -201,5 +328,18 @@ describe("the server flag", () => {
       code: "E_VALIDATION",
       message: `Invalid server "${value}"`,
     });
+  });
+});
+
+describe("ReadAlone", () => {
+  it("asks nothing of a refusal that wants only what the parse fills", () => {
+    expectTypeOf<ReadAlone<{ readonly message: "{input} is empty" }>>().toEqualTypeOf<unknown>();
+  });
+
+  it("refuses a refusal that wants what only values could fill, values beside it or not", () => {
+    expectTypeOf<{
+      readonly message: "{max}";
+      readonly values: { readonly max: 5 };
+    }>().not.toExtend<ReadAlone<{ readonly message: "{max}" }>>();
   });
 });

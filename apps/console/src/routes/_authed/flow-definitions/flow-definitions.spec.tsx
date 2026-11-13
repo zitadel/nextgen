@@ -25,7 +25,6 @@ const SCHEMAS_URL = "http://localhost/api/v1/schemas";
  */
 const DEFINITION = {
   name: "default-login",
-  status: "active",
   user_schema: "human-user",
   purposes: { register: "register", login: "identifier" },
   steps: [
@@ -98,29 +97,6 @@ describe("login flows list", () => {
     // and links to the schema it names.
     const schema = screen.getByRole("link", { name: "Minimal" });
     expect(schema).toHaveAttribute("href", scopedPath("/schemas/sch_1"));
-  });
-
-  it("marks a draft flow and leaves an active one unmarked", async () => {
-    const draft = {
-      ...DETAIL_RESPONSE,
-      id: "flow_2",
-      flow_definition: { ...DEFINITION, name: "passkey-login", status: "draft" },
-      user_schema: SCHEMA_EMBED,
-    };
-    server.use(
-      http.get(FLOWS_URL, () =>
-        HttpResponse.json({
-          flow_definitions: [{ ...DETAIL_RESPONSE, user_schema: SCHEMA_EMBED }, draft],
-        }),
-      ),
-    );
-    await renderAt("/flow-definitions");
-
-    // Only the draft is marked: the engine picks the newest *active*
-    // definition, so an all-active list stays exactly as the design draws it.
-    await screen.findByRole("link", { name: "Default login" });
-    expect(screen.getByText("Draft")).toBeInTheDocument();
-    expect(screen.queryByText("Active")).not.toBeInTheDocument();
   });
 
   it("asks for the embedded user schema", async () => {

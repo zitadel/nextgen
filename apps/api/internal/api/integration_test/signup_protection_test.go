@@ -64,8 +64,8 @@ func TestSignupProofRequiredAndCompletedCookieRejected(t *testing.T) {
 	req.GateProofs = currentSignupProofs(t, client, start.Response.ID, cookie)
 	done, err := client.SubmitFlowStep(t.Context(), req, params)
 	require.NoError(t, err)
-	require.IsType(t, &api.SubmitFlowStepOK{}, done, helpers.MustMarshal(t, done))
-	require.Equal(t, "done", done.(*api.SubmitFlowStepOK).Response.Step.Name)
+	require.IsType(t, &api.FlowResponseHeaders{}, done, helpers.MustMarshal(t, done))
+	require.Equal(t, "done", done.(*api.FlowResponseHeaders).Response.Step.Name)
 	// Replaying the old cookie and proof cannot create a second user or run a KDF.
 	replay, err := client.SubmitFlowStep(t.Context(), req, params)
 	require.NoError(t, err)

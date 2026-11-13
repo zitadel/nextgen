@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, vi } from "vitest";
 
 import type { JsonObject } from "@/lib/zitadel";
 import {
+  aPasswordFlow,
   authMethodJson,
   authMethodText,
   LOGIN_FLOW_FILE,
@@ -28,6 +29,7 @@ import {
 import { usePlatformServer } from "@tests/helpers/platform-project";
 import { expectedPublicCliCommand, parseJson, runCliForTest } from "@tests/helpers/run-cli";
 import { asOneLine } from "@tests/helpers/terminal";
+import { PRIMARY_ORIGIN } from "@tests/helpers/records";
 
 /**
  * The subcommand and provider every Google run names.
@@ -84,7 +86,7 @@ const CALLBACK_URI = "http://localhost:3000/__nextgen/idp/google/callback";
 /**
  * The primary origin a deploy lands the app on.
  */
-const DEPLOYED_ORIGIN = "https://app.acme.com";
+const DEPLOYED_ORIGIN = PRIMARY_ORIGIN;
 
 /**
  * The URI the developer registers for the primary origin.
@@ -973,7 +975,7 @@ describe("auth-method sso enable", () => {
             id: String(params.id),
             name: "app",
             lifecycle: "active",
-            origins: [{ pattern: "https://app.acme.com\u001b[2J", kind: "primary" }],
+            origins: [{ pattern: `${PRIMARY_ORIGIN}\u001b[2J`, kind: "primary" }],
           });
         }),
       );
@@ -986,7 +988,7 @@ describe("auth-method sso enable", () => {
         return runCliForTest(authMethodText(cwd, ...GOOGLE, "--client-id", CLIENT_ID));
       });
 
-      expect(result.stdout).toContain("https://app.acme.com\\x1b[2J/__nextgen/idp/google/callback");
+      expect(result.stdout).toContain(`${PRIMARY_ORIGIN}\\x1b[2J/__nextgen/idp/google/callback`);
     });
   });
 
@@ -1580,12 +1582,12 @@ describe("auth-method sso enable", () => {
     });
   });
 
-  describe("when no active flow offers a way to sign in", () => {
+  describe("when no flow offers a way to sign in", () => {
     it("warns that nobody can sign in", async ({ dir }) => {
       const cwd = await aProject(dir);
       await writeJson(cwd, LOGIN_FLOW_FILE, {
-        ...loginFlow("default-human-user"),
-        status: "draft",
+        ...aPasswordFlow("default-human-user"),
+        purposes: { register: "identifier" },
       });
 
       const result = await withStdin(SECRET, () => {
@@ -1594,7 +1596,7 @@ describe("auth-method sso enable", () => {
 
       expect(parseJson(result.stdout)).toMatchObject({
         warnings: expect.arrayContaining([
-          "No active login flow for default-human-user offers a method it enables, so nobody can sign in until one does.",
+          "No login flow for default-human-user offers a method it enables, so nobody can sign in until one does.",
         ]),
       });
     });

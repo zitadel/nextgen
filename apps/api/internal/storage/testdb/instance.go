@@ -26,14 +26,16 @@ import (
 // Application Default Credentials.
 const instanceEnv = "ZITADEL_TEST_SPANNER_INSTANCE"
 
-func provision(ctx context.Context) (string, func(), error) {
+// provision creates a uniquely named database on the instance, with schema
+// as the statements it is created with (none for an empty database).
+func provision(ctx context.Context, schema []string) (string, func(), error) {
 	project, instance, err := parseInstancePath(strings.TrimSpace(os.Getenv(instanceEnv)))
 	if err != nil {
 		return "", func() {}, err
 	}
 
 	dbID := uniqueDatabaseID()
-	if err := createDatabase(ctx, project, instance, dbID); err != nil {
+	if err := createDatabase(ctx, project, instance, dbID, schema); err != nil {
 		return "", func() {}, fmt.Errorf("unable to create Spanner test database %q: %w", dbID, err)
 	}
 
@@ -48,7 +50,7 @@ func provision(ctx context.Context) (string, func(), error) {
 	return dsn, drop, nil
 }
 
-func createDatabase(ctx context.Context, project, instance, dbID string, opts ...option.ClientOption) error {
+func createDatabase(ctx context.Context, project, instance, dbID string, schema []string, opts ...option.ClientOption) error {
 	client, err := database_admin.NewDatabaseAdminClient(ctx, opts...)
 	if err != nil {
 		return fmt.Errorf("database admin client: %w", err)
@@ -58,6 +60,7 @@ func createDatabase(ctx context.Context, project, instance, dbID string, opts ..
 	op, err := client.CreateDatabase(ctx, &databasepb.CreateDatabaseRequest{
 		Parent:          fmt.Sprintf("projects/%s/instances/%s", project, instance),
 		CreateStatement: "CREATE DATABASE `" + dbID + "`",
+		ExtraStatements: schema,
 	})
 	if err != nil {
 		return fmt.Errorf("create database: %w", err)

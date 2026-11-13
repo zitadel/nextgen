@@ -90,16 +90,18 @@
   "assist": {
     "enabled": false
   },
-  "plugins": [
-    "./biome-plugins/no-swallowed-chmod.grit",
-    "./biome-plugins/no-removed-key.grit",
-    "./biome-plugins/no-raw-next-commands.grit",
-    "./biome-plugins/no-consent-bypass.grit",
-    "./biome-plugins/no-flag-alias.grit",
-    "./biome-plugins/no-cli-spelling-read.grit",
-    "./biome-plugins/no-own-colour.grit"
-  ],
+  "plugins": ["./biome-plugins/no-swallowed-chmod.grit", "./biome-plugins/no-removed-key.grit"],
   "overrides": [
+    {
+      "includes": ["**/apps/cli/src/**"],
+      "plugins": [
+        "./biome-plugins/no-raw-next-commands.grit",
+        "./biome-plugins/no-consent-bypass.grit",
+        "./biome-plugins/no-flag-alias.grit",
+        "./biome-plugins/no-cli-spelling-read.grit",
+        "./biome-plugins/no-own-colour.grit"
+      ]
+    },
     {
       "includes": ["**/*.{test,spec}.{ts,tsx,mts,cts}", "**/__tests__/**", "**/tests/**"],
       "linter": {

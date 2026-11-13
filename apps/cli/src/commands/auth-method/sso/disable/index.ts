@@ -14,10 +14,10 @@ import type { UnusedConnection, UserSchema } from "@/lib/zitadel";
  * change; the refusal lists the providers the schema offers, well-formed or
  * not.
  */
-const NAME_PROVIDER_REFUSAL: Refusal = {
+const NAME_PROVIDER_REFUSAL = {
   message: "Name the provider to remove",
   hint: "Pass --provider, e.g. --provider {example}. {schema} offers: {offered}.",
-};
+} as const satisfies Refusal;
 
 /**
  * `zitadel auth-method sso disable` — remove one provider from a schema

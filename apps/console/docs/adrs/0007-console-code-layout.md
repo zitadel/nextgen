@@ -116,8 +116,8 @@ not a line limit.
 
 ### 6. Biome enforces the layers
 
-`style/noRestrictedImports` overrides in the root `biome.json` fail `moon run
-console:lint` when a file imports upward, by `@/` alias or by relative path.
+`style/noRestrictedImports` overrides in the root `biome.json` fail `turbo run
+lint --filter=@zitadel/console` when a file imports upward, by `@/` alias or by relative path.
 Keep that table and §1's in step.
 
 ## Considered and left

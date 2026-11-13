@@ -15,8 +15,9 @@ set -eu
 cd "$(dirname "$0")/../.."
 repo="$PWD"
 
-# Vercel supplies GOOS/GOARCH for the function's architecture. Go caches
-# compilation for that target; each deployment links fresh commit/date metadata.
+# On Vercel, install-go.sh sets GOOS/GOARCH for the function's architecture.
+# Go caches compilation for that target; each deployment links fresh
+# commit/date metadata.
 export CGO_ENABLED=0
 
 # Bound the persistent module cache to the workspace's current dependency set.

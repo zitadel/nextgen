@@ -2300,6 +2300,7 @@ func decodeCreateFlowResponse(resp *http.Response) (res CreateFlowRes, _ error) 
 				if err := func() error {
 					if err := h.HasParam(cfg); err == nil {
 						if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
+							wrapper.SetCookie = nil
 							return d.DecodeArray(func(d uri.Decoder) error {
 								var wrapperDotSetCookieVal string
 								if err := func() error {
@@ -7352,6 +7353,7 @@ func decodeGetFlowStepResponse(resp *http.Response) (res GetFlowStepRes, _ error
 				if err := func() error {
 					if err := h.HasParam(cfg); err == nil {
 						if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
+							wrapper.SetCookie = nil
 							return d.DecodeArray(func(d uri.Decoder) error {
 								var wrapperDotSetCookieVal string
 								if err := func() error {
@@ -19152,7 +19154,7 @@ func decodeSubmitFlowStepResponse(resp *http.Response) (res SubmitFlowStepRes, _
 			}(); err != nil {
 				return res, errors.Wrap(err, "validate")
 			}
-			var wrapper SubmitFlowStepOK
+			var wrapper FlowResponseHeaders
 			wrapper.Response = response
 			h := uri.NewHeaderDecoder(resp.Header)
 			// Parse "Cache-Control" header.
@@ -19201,6 +19203,7 @@ func decodeSubmitFlowStepResponse(resp *http.Response) (res SubmitFlowStepRes, _
 				if err := func() error {
 					if err := h.HasParam(cfg); err == nil {
 						if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
+							wrapper.SetCookie = nil
 							return d.DecodeArray(func(d uri.Decoder) error {
 								var wrapperDotSetCookieVal string
 								if err := func() error {
@@ -19249,7 +19252,7 @@ func decodeSubmitFlowStepResponse(resp *http.Response) (res SubmitFlowStepRes, _
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response FlowResponse
+			var response SubmitFlowStepBadRequest
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -19275,7 +19278,7 @@ func decodeSubmitFlowStepResponse(resp *http.Response) (res SubmitFlowStepRes, _
 			}(); err != nil {
 				return res, errors.Wrap(err, "validate")
 			}
-			var wrapper SubmitFlowStepBadRequest
+			var wrapper SubmitFlowStepBadRequestHeaders
 			wrapper.Response = response
 			h := uri.NewHeaderDecoder(resp.Header)
 			// Parse "Cache-Control" header.
@@ -19324,6 +19327,7 @@ func decodeSubmitFlowStepResponse(resp *http.Response) (res SubmitFlowStepRes, _
 				if err := func() error {
 					if err := h.HasParam(cfg); err == nil {
 						if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
+							wrapper.SetCookie = nil
 							return d.DecodeArray(func(d uri.Decoder) error {
 								var wrapperDotSetCookieVal string
 								if err := func() error {

@@ -7060,17 +7060,6 @@ func (s *FlowDefinition) Validate() error {
 		})
 	}
 	if err := func() error {
-		if err := s.Status.Validate(); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "status",
-			Error: err,
-		})
-	}
-	if err := func() error {
 		if err := s.Purposes.Validate(); err != nil {
 			return err
 		}
@@ -7238,17 +7227,6 @@ func (s *FlowDefinitionResponse) Validate() error {
 		return &validate.Error{Fields: failures}
 	}
 	return nil
-}
-
-func (s FlowDefinitionStatus) Validate() error {
-	switch s {
-	case "active":
-		return nil
-	case "draft":
-		return nil
-	default:
-		return errors.Errorf("invalid value: %v", s)
-	}
 }
 
 func (s *FlowDefinitionStep) Validate() error {
@@ -18534,18 +18512,39 @@ func (s StepActionKind) Validate() error {
 	}
 }
 
-func (s *SubmitFlowStepBadRequest) Validate() error {
-	alias := (*FlowResponseHeaders)(s)
-	if err := alias.Validate(); err != nil {
-		return err
+func (s SubmitFlowStepBadRequest) Validate() error {
+	switch s.Type {
+	case FlowResponseSubmitFlowStepBadRequest:
+		if err := s.FlowResponse.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ErrorDetailsSubmitFlowStepBadRequest:
+		return nil // no validation needed
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
 	}
-	return nil
 }
 
-func (s *SubmitFlowStepOK) Validate() error {
-	alias := (*FlowResponseHeaders)(s)
-	if err := alias.Validate(); err != nil {
-		return err
+func (s *SubmitFlowStepBadRequestHeaders) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Response.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "Response",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
 	}
 	return nil
 }

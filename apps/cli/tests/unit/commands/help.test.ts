@@ -38,6 +38,7 @@ Local development
   stop              Stop the local Zitadel server
   reset             Delete the local Zitadel server runtime and data
   eject             Remove managed files and local Zitadel state
+  tests             Add end-to-end tests of the sign-in
 
 Users and teams
   users             Create and manage users
@@ -88,7 +89,7 @@ Examples
 
 /**
  * A package root laid out as the published tarball is: `package.json`, `dist`,
- * and an `oclif.manifest.json` generated the way `prepack` (`oclif manifest`)
+ * and an `oclif.manifest.json` generated the way `build` (`oclif manifest`)
  * generates it, so oclif loads commands from the manifest instead of scanning
  * `dist/commands`. `node_modules` is linked so the plugins resolve.
  */
