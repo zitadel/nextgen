@@ -165,7 +165,9 @@ func checkAuthRequest(req *oidc.AuthRequest, c *client) error {
 		if req.CodeChallengeMethod != oidc.CodeChallengeMethodS256 {
 			return oidc.ErrInvalidRequest().WithDescription("code_challenge_method must be S256")
 		}
-		if digest, err := base64.RawURLEncoding.DecodeString(req.CodeChallenge); err != nil || len(digest) != sha256.Size {
+		// The re-encoding check refuses what the decoder lets through: CR/LF and nonzero trailing bits.
+		digest, err := base64.RawURLEncoding.DecodeString(req.CodeChallenge)
+		if err != nil || len(digest) != sha256.Size || base64.RawURLEncoding.EncodeToString(digest) != req.CodeChallenge {
 			return oidc.ErrInvalidRequest().WithDescription("code_challenge must be a base64url SHA-256 digest")
 		}
 	}
