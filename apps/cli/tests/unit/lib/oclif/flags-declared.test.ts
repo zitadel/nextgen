@@ -10,8 +10,13 @@ import { relationsOf } from "@/lib/suggestion/relations";
 
 const commands = fileURLToPath(new URL("../../../../src/commands", import.meta.url));
 
-/** A `const NAME: Refused<T>` — what one flag or argument is refused for. */
-const REFUSED = /const (\w+): Refused<[^>]*> = \{/g;
+/**
+ * What one flag or argument is refused for, either way a command declares it:
+ * `const NAME = { … } as const satisfies Refused<T>`, whose body closes no line
+ * at the margin before its own end, or `const NAME: Refused<T> = { … }`.
+ */
+const REFUSED =
+  /const (\w+)(?:: Refused<[^>]*> = \{| = \{(?:[^\n]|\n(?!\}))*\n\} as const satisfies Refused<)/g;
 
 /**
  * The ways a flag's refusal is raised by the flag itself: the `parse` it gives
