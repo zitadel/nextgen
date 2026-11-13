@@ -26,13 +26,13 @@ test("shows the signed-in person's email, read-only", async ({ page, zitadel, se
   await expect(email).toBeDisabled();
 
   // Above every project, apart from the root Settings: the account's list,
-  // with no row of its own. The person's one project stays selected, so the
-  // pill still names it (D36).
+  // with no row of its own. The screen is the root's, so it holds no project
+  // and the pill names the root (D44).
   const account = page.getByRole("navigation", { name: "Account" });
   await expect(account.getByRole("link", { name: "Projects" })).toBeVisible();
   await expect(account.getByRole("link", { name: "Profile" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Switch project" })).not.toHaveText(
-    /All projects|Select a project|No projects/,
+  await expect(page.getByRole("button", { name: "Switch project" })).toHaveText(
+    /^(All projects|Platform)$/,
   );
   await expectNoErrorBoundary(page);
 });

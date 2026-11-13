@@ -245,7 +245,7 @@ column in every index's sort key.
   then its steps with the time between them.
 - The CSV gains the token and the client context.
 
-**Today (2026-11-12, [D44](../decisions.md)):** names when the page loads, for
+**Today (2026-11-12, [D45](../decisions.md)):** names when the page loads, for
 users. A Sign-ins view lists the events a sign-in ends in, one per row, and an
 event's drawer heads its login flow with its outcome, user and duration. Rows
 still show the server's types; the sentence a row, keys by name and the

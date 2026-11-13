@@ -5,7 +5,6 @@ package integration_test
 import (
 	"encoding/base64"
 	"encoding/json"
-	"net/url"
 	"testing"
 	"time"
 
@@ -37,9 +36,8 @@ func TestPasskeyRegistrationFlow(t *testing.T) {
 
 	userSchemaURL := "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml"
 
-	rpOriginStr := testServer.URL
-	rpOriginURL, err := url.Parse(rpOriginStr)
-	require.NoError(t, err)
+	rpOriginURL := passkeyOrigin(t, testServer.URL)
+	rpOriginStr := rpOriginURL.String()
 	rpIDStr := rpOriginURL.Hostname()
 
 	// Suffix user and credential IDs per run so the test stays re-runnable

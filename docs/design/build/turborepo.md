@@ -207,8 +207,9 @@ scripts, which build through turbo (`turbo run @zitadel/<package>#<task>`).
   Dependabot); only the npm ranges those releases write resolve at run time,
   so the nightly run sets `TURBO_FORCE` and reruns them.
 - Each journey depends on the builds of exactly what it installs
-  (`journey-packages` plus its framework's SDK), and packs only those; so an
-  SDK change selects only the journeys that install it.
+  (`journey-packages`, which packs what every journey installs once per run,
+  plus its framework's SDK, which it packs itself); so an SDK change selects
+  only the journeys that install it.
   `@zitadel/release#pack` packs and checks the full release set.
 - A cached lane's pass is the hashed tree's: its key holds the switches that
   change what it tests (`env`, below), and as a turbo task it never uses a

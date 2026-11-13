@@ -71,3 +71,13 @@ export function usePlatformAccess(): string | undefined {
   }, [platform]);
   return read ?? undefined;
 }
+
+/**
+ * What a link up to one of the root's screens carries (D44): the platform
+ * project for someone who may act on it, and otherwise no selection, which
+ * `undefined` removes from the retained `?project=`. The `_authed` guard
+ * would set it anyway; the link saves the redirect.
+ */
+export function useRootSearch(): { project: string | undefined } {
+  return { project: usePlatformAccess() };
+}

@@ -394,11 +394,15 @@ describe("app shell navigation", () => {
 
     await userEvent.click(screen.getByRole("link", { name: "Home" }));
     await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
-    // The selection rides along, and the pill still names it (D36).
-    expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_1" });
-    const pill = await screen.findByRole("button", { name: "Switch project" });
-    await waitFor(() => expect(pill).toHaveTextContent("console-dev"));
-    expect(pill).not.toHaveTextContent("All projects");
+    // Projects is the root's, so it holds the root, not the project left
+    // behind (D44): for someone who may not act on the platform, no selection.
+    // The bar names that root, their projects alone, and no project before it.
+    expect(router.state.resolvedLocation?.search).not.toHaveProperty("project");
+    const bar = within(screen.getByRole("navigation", { name: "Context" }));
+    const pill = bar.getByRole("button", { name: "Switch project" });
+    await waitFor(() => expect(pill).toHaveTextContent("All projects"));
+    expect(pill).not.toHaveTextContent("console-dev");
+    expect(bar.queryByRole("link", { name: "All projects" })).not.toBeInTheDocument();
   });
 
   it("does not advertise screens that have no endpoint behind them", async () => {
@@ -442,14 +446,19 @@ describe("platform root", () => {
       "href",
       scopedPath("/deployments", "proj_platform"),
     );
-    // Projects and Settings keep the selection (D36).
+    // The root's own screens hold the platform too (D44): Projects is opened
+    // with it selected, not the one project, and so are its rows.
+    await waitFor(() =>
+      expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_platform" }),
+    );
     expect(nav.getByRole("link", { name: "Projects" })).toHaveAttribute(
       "href",
-      scopedPath("/projects", "proj_1"),
+      scopedPath("/projects", "proj_platform"),
     );
-    // On Projects the one project stays selected, and the pill names it.
+    // The bar names the root, the platform, whose screen this is (D44).
     const pill = screen.getByRole("button", { name: "Switch project" });
-    await waitFor(() => expect(pill).toHaveTextContent("console-dev"));
+    await waitFor(() => expect(pill).toHaveTextContent("Platform"));
+    expect(pill).not.toHaveTextContent("console-dev");
     // None of the platform's rows is marked while the screen is not its own.
     expect(nav.getByRole("link", { name: "Projects" })).toHaveAttribute("data-active", "true");
     expect(nav.getByRole("link", { name: "Users" })).toHaveAttribute("data-active", "false");
@@ -462,22 +471,109 @@ describe("platform root", () => {
     expect(root.getByRole("link", { name: "Users" })).toHaveAttribute("data-active", "true");
     expect(root.getByRole("link", { name: "Projects" })).toHaveAttribute("data-active", "false");
     expect(screen.queryByRole("navigation", { name: "Primary" })).not.toBeInTheDocument();
-    // The bar says the root, never a project named Platform.
-    await waitFor(() => expect(pill).toHaveTextContent("All projects"));
-    expect(pill).not.toHaveTextContent("Platform");
+    // The bar says the root, the platform, and no project beside it (D44).
+    await waitFor(() => expect(pill).toHaveTextContent("Platform"));
+    expect(
+      within(screen.getByRole("navigation", { name: "Context" })).getAllByRole("button"),
+    ).toHaveLength(1);
   });
 
-  it("never offers the platform project as a project, in the pill's list or its recents", async () => {
-    renderShell("/users?project=proj_platform");
+  it("offers the platform apart from the projects, checked at the root, never as a recent one", async () => {
+    // A browser that kept the platform project as a recent one, as before D42.
+    localStorage.setItem(
+      RECENT_KEY,
+      JSON.stringify([
+        { id: "proj_platform", name: "Platform" },
+        { id: "proj_1", name: "console-dev" },
+      ]),
+    );
+    const router = renderShell("/users?project=proj_platform");
     const pill = await screen.findByRole("button", { name: "Switch project" });
-    await waitFor(() => expect(pill).toHaveTextContent("All projects"));
+    await waitFor(() => expect(pill).toHaveTextContent("Platform"));
 
     await userEvent.click(pill);
     const list = within(await screen.findByRole("listbox"));
-    expect(await list.findByRole("option", { name: /console-dev/ })).toBeInTheDocument();
-    expect(list.queryByRole("option", { name: /Platform/ })).not.toBeInTheDocument();
-    // Nor is it remembered as one the person opened.
-    expect(JSON.stringify({ ...localStorage })).not.toContain("proj_platform");
+    // Its own section, first, and the row the pill stands for.
+    const own = within(await list.findByRole("group", { name: "Platform" }));
+    const row = own.getByRole("option", { name: /^Platform/ });
+    expect(row.querySelector(".lucide-check")).not.toBeNull();
+    // The projects follow, none of them it, and none checked.
+    const recent = within(list.getByRole("group", { name: "Recent" }));
+    expect(recent.getAllByRole("option").map((option) => option.textContent)).toEqual([
+      expect.stringContaining("console-dev"),
+    ]);
+    expect(recent.getByRole("option").querySelector(".lucide-check")).toBeNull();
+    expect(list.getAllByRole("option", { name: /Platform/ })).toHaveLength(1);
+
+    // Choosing a project keeps the screen, now the project's, under the root.
+    await userEvent.click(recent.getByRole("option", { name: /console-dev/ }));
+    await waitFor(() =>
+      expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_1" }),
+    );
+    expect(router.state.resolvedLocation?.pathname).toBe("/users");
+    expect(await screen.findByRole("navigation", { name: "Primary" })).toBeInTheDocument();
+    // Opened from the root, it is remembered; the platform never is.
+    expect(JSON.stringify({ ...localStorage })).toContain("proj_1");
+    await waitFor(() => expect(JSON.stringify({ ...localStorage })).not.toContain("proj_platform"));
+  });
+
+  it("heads a project with the root in the bar, the way back up", async () => {
+    const router = renderShell(scopedPath("/users", "proj_1"));
+    const bar = within(await screen.findByRole("navigation", { name: "Context" }));
+    // Platform / console-dev, as Vercel's bar reads team / project (D44).
+    const up = await bar.findByRole("link", { name: "Platform" });
+    await waitFor(() =>
+      expect(bar.getByRole("button", { name: "Switch project" })).toHaveTextContent("console-dev"),
+    );
+
+    // The pill's list checks the project, not the platform.
+    await userEvent.click(bar.getByRole("button", { name: "Switch project" }));
+    const list = within(await screen.findByRole("listbox"));
+    const project = await list.findByRole("option", { name: /console-dev/ });
+    expect(project.querySelector(".lucide-check")).not.toBeNull();
+    const platform = list.getByRole("option", { name: /^Platform/ });
+    expect(platform.querySelector(".lucide-check")).toBeNull();
+
+    // Choosing the platform keeps the screen: the root has Users too.
+    await userEvent.click(platform);
+    await waitFor(() =>
+      expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_platform" }),
+    );
+    expect(router.state.resolvedLocation?.pathname).toBe("/users");
+    expect(await screen.findByRole("navigation", { name: "Account" })).toBeInTheDocument();
+    expect(bar.queryByRole("link", { name: "Platform" })).not.toBeInTheDocument();
+
+    expect(up).not.toBeInTheDocument();
+
+    // And back in the project, the root's crumb opens Projects, the root's home.
+    await userEvent.click(bar.getByRole("button", { name: "Switch project" }));
+    await userEvent.click(
+      await within(await screen.findByRole("listbox")).findByRole("option", {
+        name: /console-dev/,
+      }),
+    );
+    await userEvent.click(await bar.findByRole("link", { name: "Platform" }));
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
+    await waitFor(() =>
+      expect(bar.getByRole("button", { name: "Switch project" })).toHaveTextContent("Platform"),
+    );
+  });
+
+  it("opens Projects when the platform is chosen where the root has no such screen", async () => {
+    // A project's Overview: the root has none, its home is Projects (D42).
+    const router = renderShell(scopedPath("/", "proj_1"));
+    const pill = await screen.findByRole("button", { name: "Switch project" });
+    await waitFor(() => expect(pill).toHaveTextContent("console-dev"));
+    await userEvent.click(pill);
+    await userEvent.click(
+      await within(await screen.findByRole("listbox")).findByRole("option", {
+        name: /^Platform/,
+      }),
+    );
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
+    // The platform is the selection then, not the project left behind.
+    expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_platform" });
+    await waitFor(() => expect(pill).toHaveTextContent("Platform"));
   });
 
   it("lists the platform project's Settings pages in the root's Settings, before the add-on's", async () => {
@@ -516,9 +612,7 @@ describe("platform root", () => {
     );
     expect(nav.getByRole("link", { name: "Admins" })).toHaveAttribute("data-active", "true");
     expect(screen.queryByRole("navigation", { name: "Project settings" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Switch project" })).toHaveTextContent(
-      "All projects",
-    );
+    expect(screen.getByRole("button", { name: "Switch project" })).toHaveTextContent("Platform");
   });
 
   it("opens the platform project's Events under a heading that leads back to Projects", async () => {
@@ -535,16 +629,18 @@ describe("platform root", () => {
     renderShell("/users?project=proj_platform");
     await userEvent.click(await screen.findByRole("button", { name: "Search" }));
     const dialog = within(await screen.findByRole("dialog", { name: "Go to" }));
-    // Before anything is typed, no group names the platform as a project.
-    expect(await dialog.findByRole("option", { name: "Teams" })).toBeInTheDocument();
-    expect(dialog.queryByRole("group", { name: /Platform/ })).not.toBeInTheDocument();
+    // Before anything is typed, the root's screens are the root's, named the
+    // platform as the bar names it (D44), and no group names it as a project.
+    const root = within(await dialog.findByRole("group", { name: "Platform" }));
+    expect(await root.findByRole("option", { name: "Teams" })).toBeInTheDocument();
+    expect(dialog.queryByRole("group", { name: /Pages in/ })).not.toBeInTheDocument();
 
     await userEvent.type(
       dialog.getByPlaceholderText("Go to a page, user, team or project, or run an action"),
       "deploy",
     );
     await waitFor(() =>
-      expect(rows(dialog.getByRole("listbox"))).toEqual(["Deployments · Account"]),
+      expect(rows(dialog.getByRole("listbox"))).toEqual(["Deployments · Platform"]),
     );
   });
 
@@ -560,7 +656,7 @@ describe("platform root", () => {
     await waitFor(() =>
       expect(rows(dialog.getByRole("listbox"))).toEqual([
         "Deployments · console-dev",
-        "Deployments · Account",
+        "Deployments · Platform",
       ]),
     );
   });
@@ -622,12 +718,13 @@ describe("platform root", () => {
       "ada",
     );
 
-    // The selected project's hit first among equal matches (D39).
+    // Projects holds the platform (D44), so its hits come first among equal
+    // matches, as the selected project's do (D39).
     await waitFor(() =>
       expect(rows(dialog.getByRole("listbox"))).toEqual([
-        "Ada Lovelace · ada@acme.example · console-dev",
         "Ada Admin · ada@zitadel.example · Users",
         "Ada's team · Teams",
+        "Ada Lovelace · ada@acme.example · console-dev",
       ]),
     );
     expect(dialog.queryByRole("option", { name: /Platform/ })).not.toBeInTheDocument();
@@ -635,9 +732,7 @@ describe("platform root", () => {
     await userEvent.click(dialog.getByRole("option", { name: /^Ada Admin/ }));
     await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/users/user_p"));
     expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_platform" });
-    expect(screen.getByRole("button", { name: "Switch project" })).toHaveTextContent(
-      "All projects",
-    );
+    expect(screen.getByRole("button", { name: "Switch project" })).toHaveTextContent("Platform");
   });
 });
 
@@ -650,11 +745,11 @@ describe("settings view", () => {
     await userEvent.click(screen.getByRole("button", { name: /^Account:/ }));
     expect(await screen.findByRole("menuitem", { name: "Log out" })).toBeInTheDocument();
     // The person heads the menu and opens their profile, apart from the root
-    // Settings (D42). The selection rides along, so the pill's list still
-    // marks the project.
+    // Settings (D42). The profile is the root's, so it holds the root, not
+    // the project (D44).
     expect(screen.getByRole("menuitem", { name: /^Test User/ })).toHaveAttribute(
       "href",
-      scopedPath("/account", "proj_1"),
+      "/account",
     );
     // Settings' own pages are not repeated beside it.
     expect(screen.queryByRole("menuitem", { name: "Profile" })).not.toBeInTheDocument();
@@ -684,10 +779,10 @@ describe("settings view", () => {
   it("goes back up to the account's list from the Settings heading", async () => {
     const router = renderShell("/settings/invoices");
     const nav = within(await screen.findByRole("navigation", { name: "Settings" }));
-    // A row of the left nav (D13), named for where it leads. One project, so
-    // it is selected here too, and Projects keeps it.
+    // A row of the left nav (D13), named for where it leads. Settings holds
+    // the root, no project, even with one to choose (D44), and so does Projects.
     const heading = nav.getByRole("link", { name: "Settings: back to Projects" });
-    expect(heading).toHaveAttribute("href", scopedPath("/projects", "proj_1"));
+    expect(heading).toHaveAttribute("href", "/projects");
 
     await userEvent.click(heading);
     await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
@@ -697,17 +792,17 @@ describe("settings view", () => {
     );
   });
 
-  it("keeps the bar in Settings, its pill on the selected project", async () => {
+  it("keeps the bar in Settings, its pill on the root", async () => {
     const router = renderShell("/settings/invoices");
     await screen.findByRole("navigation", { name: "Settings" });
 
     expect(screen.getByRole("button", { name: "Search" })).toBeInTheDocument();
     expect(document.querySelector('[data-sidebar="trigger"]')).toBeInTheDocument();
-    // The selection outlives the way up (D36), and the pill's list leads
-    // back into it.
+    // Settings is the root's: it holds no project, and the pill names the
+    // root (D44); its list leads into the project.
     const pill = screen.getByRole("button", { name: "Switch project" });
-    await waitFor(() => expect(pill).toHaveTextContent("console-dev"));
-    expect(pill).not.toHaveTextContent("All projects");
+    await waitFor(() => expect(pill).toHaveTextContent("All projects"));
+    expect(router.state.resolvedLocation?.search).not.toHaveProperty("project");
 
     await userEvent.click(pill);
     const list = within(await screen.findByRole("listbox", { name: "Projects" }));
@@ -2356,7 +2451,7 @@ describe("search", () => {
     ).toBeInTheDocument();
   });
 
-  it("above every project searches all of them, the selected one's matches first", async () => {
+  it("above every project searches all of them, none of them first", async () => {
     const asked: (string | null)[] = [];
     server.use(
       http.get(MY_PROJECTS, () =>
@@ -2382,7 +2477,7 @@ describe("search", () => {
         });
       }),
     );
-    // Projects, with console-dev still selected (D36).
+    // Projects, opened from console-dev: it holds the root, not the project (D44).
     renderShell(scopedPath("/projects", "proj_1"));
     await userEvent.click(await screen.findByRole("button", { name: "Search" }));
     const dialog = within(await screen.findByRole("dialog", { name: "Go to" }));
@@ -2391,10 +2486,11 @@ describe("search", () => {
       "supp",
     );
 
+    // No project is selected there, so none ranks first: the server's order.
     await waitFor(() =>
       expect(rows(dialog.getByRole("listbox"))).toEqual([
-        "Support · console-dev",
         "Support · Delta",
+        "Support · console-dev",
       ]),
     );
     expect(asked.length).toBeGreaterThan(0);

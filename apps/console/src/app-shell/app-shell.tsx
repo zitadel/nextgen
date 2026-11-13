@@ -28,6 +28,7 @@ import {
   useNavItems,
   useSettingsListItems,
 } from "./use-nav-items";
+import { useRootSearch } from "@/features/platform/access";
 import { usePlatformSelected } from "@/features/projects/project-scope";
 import { cn } from "@/lib/utils";
 import type { NavView } from "@/nav";
@@ -42,9 +43,10 @@ import { SETTINGS_PATH, type ShellUser, UserMenuItem } from "./user-menu";
  * the sidebar surface uses `background` per the design (see `ui/sidebar.tsx`).
  *
  * Every screen is drawn in this one frame (D27). What changes with where the
- * person is is the sidebar's list (`useShellView`), never the frame or the
- * selected project (D36), so going from a project to Projects, and from there
- * into Settings, moves nothing but the list. Both Settings rows open a list of
+ * person is is the sidebar's list (`useShellView`) and the bar, never the
+ * frame, so going from a project to Projects, and from there into Settings,
+ * moves nothing else. Those are the root's, which holds the root as the
+ * selection, never the project left behind (D44). Both Settings rows open a list of
  * their own: Projects' the root settings, a project's that project's (D40).
  * Opening a list from a row of another slides it in from the right, and the
  * way back from the left (`useListEntrance`).
@@ -131,13 +133,18 @@ function useShellView(): NavView {
 }
 
 /**
- * Home is Projects, the list of every project, from any screen. The selected
- * project rides along (`_authed` retains `?project=`) and stays selected there
- * (D36).
+ * Home is Projects, the list of every project, from any screen. It is the
+ * root's, so it holds the root rather than the project left behind (D44).
  */
 function HomeLink({ className }: { className: string }) {
+  const rootSearch = useRootSearch();
   return (
-    <Link to="/projects" aria-label="Home" className={`inline-flex items-center ${className}`}>
+    <Link
+      to="/projects"
+      search={rootSearch}
+      aria-label="Home"
+      className={`inline-flex items-center ${className}`}
+    >
       <ZitadelLogo className="h-[21px] w-auto" />
     </Link>
   );
@@ -404,25 +411,21 @@ function ListHeading({
 }
 
 /**
- * The top bar: the project switcher, and the team switcher on a team's page.
- * 56px and ruled underneath, level with the sidebar's brand header. Search and
- * the collapse toggle live in the sidebar and the theme in the account menu,
- * so the bar carries none of them.
+ * The top bar: the way from the root down to the project, and the team on a
+ * team's page (D44). 56px and ruled underneath, level with the sidebar's brand
+ * header. Search and the collapse toggle live in the sidebar and the theme in
+ * the account menu, so the bar carries none of them.
  */
 function ContextBar({ view, userId }: { view: NavView; userId?: string }) {
-  // A screen drawn for the platform project is the root's (D42): the pill
-  // says the root there, never a project named Platform.
-  const root = usePlatformSelected();
+  // The root's screens: those above every project (Projects, Settings, the
+  // profile), and any drawn for the platform project (D42). The bar names the
+  // root on them, never a project (D44).
+  const atPlatform = usePlatformSelected();
+  const root = view === "account" || view === "settings" || atPlatform;
   return (
     <div className={TOP_BAR}>
       {/* The signed-in person, whose recent projects the switcher keeps. */}
-      {/* Above every project, with none selected, the pill says so, and its
-          list leads into one. */}
-      <ContextSwitcher
-        userId={userId}
-        allProjects={view === "account" || view === "settings"}
-        root={root}
-      />
+      <ContextSwitcher userId={userId} root={root} />
     </div>
   );
 }
