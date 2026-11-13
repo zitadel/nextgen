@@ -4123,7 +4123,7 @@
       "post": {
         "operationId": "publishSchema",
         "summary": "Publish a schema",
-        "description": "Publishes a user schema, the JSON Schema that says which attributes a user\nhas and which attribute identifies the user.\n\nThe request is either a user schema (`kind: user-schema`) or a schema URL\n(`kind: schema-url`) that the server resolves. The response's `id` is what\n`createUser` (`POST /users`) takes as `schema`.\n\nThe optional `$id` is the JSON Schema document URI that identifies the\nschema in later requests. It is a stable identity for GitOps, not a\nfree-form resource key. When `$id` is omitted, the server generates a\n`sch_*` URL. When provided, `$id` must be unique within the project and\nshould ideally be a valid URI pointing at where the schema can be accessed.\nA `$id` that already exists in the project is refused; pick another or\nomit it.\n",
+        "description": "Publishes a user schema, the JSON Schema that says which attributes a user\nhas and which attribute identifies the user.\n\nThe request is either a user schema (`kind: user-schema`) or a schema URL\n(`kind: schema-url`) that the server resolves. The response is the stored\nschema, as `getSchema` (`GET /schemas/{schema_id}`) returns it; its `id` is\nwhat `createUser` (`POST /users`) takes as `schema`.\n\nThe optional `$id` is the JSON Schema document URI that identifies the\nschema in later requests. It is a stable identity for GitOps, not a\nfree-form resource key. When `$id` is omitted, the server generates a\n`sch_*` URL. When provided, `$id` must be unique within the project and\nshould ideally be a valid URI pointing at where the schema can be accessed.\nA `$id` that already exists in the project is refused; pick another or\nomit it.\n",
         "tags": [
           "Schemas"
         ],
@@ -4301,17 +4301,45 @@
         },
         "responses": {
           "201": {
-            "description": "The ID of the created schema.",
+            "description": "The published schema.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/create-schema-response"
+                  "$ref": "#/components/schemas/schema"
                 },
                 "examples": {
                   "userSchemaResponse": {
-                    "summary": "An example of the response to creating a user schema.\n",
+                    "summary": "An example of the response to publishing a user schema.\n",
                     "value": {
-                      "id": "sch_abcd1234_efgh5678"
+                      "id": "sch_01H455VB4213EF62K49QF6M73F",
+                      "schema": {
+                        "$schema": "https://json-schema.org/draft/2020-12/schema",
+                        "kind": "user-schema",
+                        "type": "object",
+                        "description": "This is an example of a user schema definition.",
+                        "objectType": "human-user",
+                        "x-auth-methods": {
+                          "password": {
+                            "enabled": false
+                          },
+                          "passkey": {
+                            "enabled": true
+                          }
+                        },
+                        "required": [
+                          "email"
+                        ],
+                        "properties": {
+                          "email": {
+                            "type": "string",
+                            "format": "email",
+                            "description": "The user's email address."
+                          }
+                        }
+                      },
+                      "metadata": {
+                        "created_at": "2026-07-14T09:11:00Z"
+                      }
                     }
                   }
                 }
@@ -5852,13 +5880,19 @@
         "operationId": "listBranding",
         "x-zitadel-cli": "branding list",
         "summary": "List branding revisions",
-        "description": "Lists a project's branding revisions, newest first, capped at the 100 most\nrecent and not paginated. The first entry is the newest revision.\n\nThe `id` of an entry is the revision ID that `getBranding` (`GET /branding/{branding_id}`) takes and\nthat a release pins for `kind: branding`.\n",
+        "description": "Lists a project's branding revisions, newest first, paginated with a cursor.\nThe first entry of the first page is the newest revision.\n\nEvery publish adds a revision, so the list grows without bound. Pass\n`next_page_token` back as `page_token` to read the next page.\n\nThe `id` of an entry is the revision ID that `getBranding` (`GET /branding/{branding_id}`) takes and\nthat a release pins for `kind: branding`.\n",
         "tags": [
           "Branding"
         ],
         "parameters": [
           {
             "$ref": "#/components/parameters/project-id"
+          },
+          {
+            "$ref": "#/components/parameters/limit"
+          },
+          {
+            "$ref": "#/components/parameters/page-token"
           }
         ],
         "security": [
@@ -5873,11 +5907,40 @@
         ],
         "responses": {
           "200": {
-            "description": "The branding revisions, newest first.",
+            "description": "A page of the project's branding revisions.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/list-branding-response"
+                },
+                "examples": {
+                  "firstPage": {
+                    "summary": "A page with more results behind it",
+                    "value": {
+                      "branding": [
+                        {
+                          "id": "brnd_01KX3RG8A7F0N9WD3P2E4YM5C1",
+                          "created_at": "2026-07-14T09:11:00Z"
+                        },
+                        {
+                          "id": "brnd_01KX2ZJ4B8C7F0N9WD3P2E4YM5",
+                          "created_at": "2026-07-02T15:40:00Z"
+                        }
+                      ],
+                      "next_page_token": "v1.dGhpcyBpcyBvcGFxdWU.SflKxwRJSMeKKF2QT4fw"
+                    }
+                  },
+                  "lastPage": {
+                    "summary": "The last page",
+                    "value": {
+                      "branding": [
+                        {
+                          "id": "brnd_01KWH1P4MYS7F0N9WD3P2E4YM5",
+                          "created_at": "2026-06-20T08:00:00Z"
+                        }
+                      ]
+                    }
+                  }
                 }
               }
             }
@@ -18179,18 +18242,6 @@
           }
         ]
       },
-      "create-schema-response": {
-        "type": "object",
-        "required": [
-          "id"
-        ],
-        "properties": {
-          "id": {
-            "type": "string",
-            "description": "The ID of the created schema."
-          }
-        }
-      },
       "flow-definition-expand": {
         "type": "string",
         "description": "A related entity to embed on each returned flow definition.\n\n- `user_schema`: the user schema the flow operates on, embedded as\n  `user_schema` on each entry. It is the same object `GET /schemas/{schema_id}`\n  returns. The property is omitted when not requested. It is `null` when the\n  referenced schema no longer resolves or the caller may not read it, so\n  \"did not ask\" stays distinguishable from \"cannot resolve\". Requesting it\n  requires read access to schemas.\n",
@@ -19420,25 +19471,49 @@
           }
         ]
       },
+      "branding-revision-summary": {
+        "title": "BrandingRevisionSummary",
+        "description": "A branding revision without its configuration: the shape `GET /branding`\nreturns. Read the configuration with `GET /branding/{branding_id}`.\n",
+        "type": "object",
+        "required": [
+          "id",
+          "created_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The unique identifier of this branding revision."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When this revision was published."
+          }
+        }
+      },
       "list-branding-response": {
-        "type": "array",
-        "description": "Branding revisions, newest first.",
-        "items": {
-          "type": "object",
-          "required": [
-            "id",
-            "created_at"
-          ],
-          "properties": {
-            "id": {
-              "type": "string",
-              "description": "The unique identifier of this branding revision."
-            },
-            "created_at": {
-              "type": "string",
-              "format": "date-time",
-              "description": "When this revision was published."
+        "type": "object",
+        "description": "A page of the project's branding revisions, newest first.",
+        "required": [
+          "branding"
+        ],
+        "properties": {
+          "branding": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/branding-revision-summary"
             }
+          },
+          "next_page_token": {
+            "description": "Token to pass as `page_token` in the next request to fetch the following page.\nAbsent when there are no more results.\n",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/page-token"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         }
       },
@@ -25285,10 +25360,10 @@
         "type": "object",
         "description": "A page of events.",
         "required": [
-          "data"
+          "events"
         ],
         "properties": {
-          "data": {
+          "events": {
             "description": "The events of this page. A filter the server matches event by event can\nleave it shorter than `limit`, or empty, while more events remain:\n`next_page_token` says whether they do.\n",
             "type": "array",
             "items": {

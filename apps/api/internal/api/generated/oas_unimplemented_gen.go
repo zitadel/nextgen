@@ -1116,8 +1116,11 @@ func (UnimplementedHandler) GetVariable(ctx context.Context, params GetVariableP
 
 // ListBranding implements listBranding operation.
 //
-// Lists a project's branding revisions, newest first, capped at the 100 most recent and not paginated.
-// The first entry is the newest revision.
+// Lists a project's branding revisions, newest first, paginated with a cursor. The first entry of the
+// first page is the newest revision.
+//
+// Every publish adds a revision, so the list grows without bound. Pass `next_page_token` back as
+// `page_token` to read the next page.
 //
 // The `id` of an entry is the revision ID that `getBranding` (`GET /branding/{branding_id}`) takes and
 // that a release pins for `kind: branding`.
@@ -1610,7 +1613,8 @@ func (UnimplementedHandler) PublishPolicy(ctx context.Context, req PublishPolicy
 // identifies the user.
 //
 // The request is either a user schema (`kind: user-schema`) or a schema URL (`kind: schema-url`) that
-// the server resolves. The response's `id` is what `createUser` (`POST /users`) takes as `schema`.
+// the server resolves. The response is the stored schema, as `getSchema` (`GET /schemas/{schema_id}`)
+// returns it; its `id` is what `createUser` (`POST /users`) takes as `schema`.
 //
 // The optional `$id` is the JSON Schema document URI that identifies the schema in later requests. It
 // is a stable identity for GitOps, not a free-form resource key. When `$id` is omitted, the server

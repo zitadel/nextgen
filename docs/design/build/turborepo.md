@@ -61,8 +61,9 @@ scripts, which build through turbo (`turbo run @zitadel/<package>#<task>`).
   `console-deployment`, `demo-next-mock`, `demo-next-real`, `demo-nuxt-mock`,
   `journey` (the journey runner with the caller's options), `journey-local`
   (the umbrella over one `journey:<id>` task per CI journey), plus the docs'
-  `e2e` and `e2e-deployment`. There is no aggregate: a `turbo run` names the
-  lanes it runs.
+  `e2e` and `e2e-deployment`, and `conformance`, one task per SDK fixture
+  ([conformance/README.md](../../../conformance/README.md)). There is no
+  aggregate: a `turbo run` names the lanes it runs.
 
 ## Tasks that write files
 
@@ -97,8 +98,11 @@ scripts, which build through turbo (`turbo run @zitadel/<package>#<task>`).
 - Edges are explicit (`dependsOn: ["@zitadel/components#build"]`). `^build`
   is not used: it follows devDependencies,
   and the console's `@zitadel/testing` would pull the CLI and the server build
-  into every console build (and close a cycle). The one `^` edge is the Go
-  modules' `^go-sources`, which follows their go.mod requires.
+  into every console build (and close a cycle). The `^` edges are the Go
+  modules' `^go-sources`, which follows their go.mod requires, and the
+  conformance fixtures' `^build` (`conformance/suite/turbo.json`): a fixture
+  installs and runs exactly what its manifest lists, so it follows its
+  devDependencies on purpose.
 - Every dependency's result is part of a task's hash, whether or not it has
   outputs. Give a task that writes files its real `outputs` all the same: a
   cache hit restores only those, and a dependent finds anything else
@@ -206,6 +210,12 @@ scripts, which build through turbo (`turbo run @zitadel/<package>#<task>`).
   (`apps/cli/src/lib/orca/scaffolders/framework-clis/package.json`, bumped by
   Dependabot); only the npm ranges those releases write resolve at run time,
   so the nightly run sets `TURBO_FORCE` and reruns them.
+- The conformance lane (`conformance`) and its drift check
+  (`check-generate`) are cached on the same grounds: the check runs the
+  framework CLI at its pin and installs nothing, so its answer is a function
+  of the CLI and server builds, the suite and the fixture. A fixture whose
+  generator its pin does not fix (`generatorPinned: false`) gives up that
+  promise; its check runs only in the nightly run (`CONFORMANCE_UNPINNED`).
 - Each journey depends on the builds of exactly what it installs
   (`journey-packages`, which packs what every journey installs once per run,
   plus its framework's SDK, which it packs itself); so an SDK change selects
@@ -231,8 +241,9 @@ scripts, which build through turbo (`turbo run @zitadel/<package>#<task>`).
 
 - Strict mode: a task sees `PATH`, `HOME`, `SHELL`, `CI`, `TERM`, `LANG`,
   `GITHUB_ACTIONS`, `RUNNER_TEMP`, `VERCEL`, `COREPACK_*`, `TURBO_*`, what
-  framework inference adds (`VITE_*` for Vite packages, `NEXT_*` for Next.js)
-  and what the task lists. `env` names variables that change the output and
+  framework inference adds (`VITE_*` for Vite packages; `NEXT_PUBLIC_*`,
+  `NEXT_DEPLOYMENT_ID` and, when `VERCEL_SKEW_PROTECTION_ENABLED` is set,
+  `VERCEL_DEPLOYMENT_ID` for Next.js) and what the task lists. `env` names variables that change the output and
   are hashed (`CONSOLE_ADDON`, `GOFLAGS`, the cached e2e lanes' `ZITADEL_*`
   and `NEXTGEN_*`, the journeys' `JOURNEY_*` but `JOURNEY_WORK_DIR`); `passThroughEnv`
   names variables a task reads at run time without affecting its output
@@ -251,9 +262,15 @@ scripts, which build through turbo (`turbo run @zitadel/<package>#<task>`).
   cache keys in that one build than everywhere else. The package lists it in
   its `env` and its config reads it (the console's `CONSOLE_*` variables and
   `vite.config.ts`).
-- On Vercel, turbo puts `VERCEL_TARGET_ENV` (`production` or `preview`)
-  into every task's hash, its default, so production and preview builds
-  keep separate cache entries. The `VITE_VERCEL_*` variables Vercel sets
+- On Vercel, turbo's default puts `VERCEL_TARGET_ENV` (`production` or
+  `preview`) into every task's hash, and a preview then never restores what
+  main's production build stored. The root `turbo.json` drops it
+  (`globalEnv`), so both environments compute the same keys; which artifacts
+  a build may restore is Vercel's to enforce, by branch
+  ([Commands](#commands)). `VERCEL` is hashed in its place, which keeps the
+  keys of Vercel's builds apart from CI's and a checkout's. A build whose
+  output depends on the environment lists it (the console's `VERCEL_ENV`).
+  The `VITE_VERCEL_*` variables Vercel sets
   are kept out of every hash (`globalEnv` in the root `turbo.json`): turbo
   leaves them out only in the Vite service's build, and the same packages
   would get other keys in the storybook's and the server's builds.
@@ -370,13 +387,20 @@ needs, and strict mode would hide one nobody listed. Two project variables, `TUR
 and `TURBO_PLATFORM_ENV_DISABLED`, turn off telemetry and turbo's warning
 about each project variable `turbo.json` does not pass
 ([runbook](../../runbooks/cloud.md)). The other services use the cache as Vercel sets it up:
-their builds read and write the team's remote cache, production and
-previews in separate entries, and keep no local cache. Writing takes the
+their builds read and write the team's remote cache and keep no local
+cache. Vercel sorts the artifacts by branch
+([cache policies](https://vercel.com/docs/monorepos/remote-caching#how-cache-policies-isolate-artifacts)):
+a build of `main` reads and writes main's; a preview reads main's and its
+own branch's, never another branch's, and writes only its own. Production
+and previews compute the same keys ([Environment](#environment)), so a
+branch's first preview restores from main's build every package it does not
+change, and no branch can put an artifact before production. Writing takes the
 team's token, which a fork's pull request never gets unapproved. The docs'
 and the website's builds never hit there: a Next.js build bakes in its
 deployment (Skew Protection's ID in its asset URLs, Vercel's URLs in its
-metadata), so their keys hold `VERCEL_DEPLOYMENT_ID`. Turbo infers every
-`NEXT_*` variable into every task of a Next.js package, and each deployment
-brings its own (`NEXT_DEPLOYMENT_ID`, and Vercel's `NEXT_PUBLIC_VERCEL_*`,
-which these services' builds hash too), so the docs' `generate` and
-`typecheck`, which read none, drop them (`!NEXT_*`) and still hit.
+metadata), so their keys hold `VERCEL_DEPLOYMENT_ID`. The project has Skew
+Protection on, so Vercel sets `VERCEL_SKEW_PROTECTION_ENABLED` and turbo's
+Next.js inference hashes that new-per-deployment ID into every other task of
+a Next.js package too ([Environment](#environment)). The docs' `generate` and
+`typecheck`, which read none of what it adds, drop it all
+(`!NEXT_*`, `!VERCEL_DEPLOYMENT_ID`) and hit across deployments.

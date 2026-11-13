@@ -1,0 +1,104 @@
+### Fixture for scripts/openapi-casing-rules.test.mjs. Nothing here may trip
+### rule/path-id-parameter-pattern: `…_id` path parameters whose schema has a
+### pattern, inline or by $ref, and parameters the rule leaves alone: a path
+### parameter that is not an ID, and `…_id` parameters outside the path.
+openapi: 3.1.0
+info:
+  title: path id clean
+  version: 1.0.0
+  license:
+    name: Apache-2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+servers:
+  - url: https://example.test
+security: []
+tags:
+  - name: Fixture
+    description: Fixture operations.
+paths:
+  /things:
+    get:
+      operationId: listThings
+      summary: List things
+      description: Lists things.
+      tags:
+        - Fixture
+      parameters:
+        - name: owner_id
+          in: query
+          schema:
+            type: string
+        - name: request_id
+          in: header
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+        "400":
+          description: bad request
+  /things/{thing_id}:
+    parameters:
+      - $ref: "#/components/parameters/thing-id"
+    get:
+      operationId: getThing
+      summary: Get a thing
+      description: Gets a thing.
+      tags:
+        - Fixture
+      responses:
+        "200":
+          description: ok
+        "400":
+          description: bad request
+  /things/{thing_id}/parts/{part_id}:
+    get:
+      operationId: getThingPart
+      summary: Get a part
+      description: Gets a part.
+      tags:
+        - Fixture
+      parameters:
+        - $ref: "#/components/parameters/thing-id"
+        - name: part_id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: ^part_[0-9A-Za-z]+$
+      responses:
+        "200":
+          description: ok
+        "400":
+          description: bad request
+  /labels/{label_name}:
+    get:
+      operationId: getLabel
+      summary: Get a label
+      description: Gets a label.
+      tags:
+        - Fixture
+      parameters:
+        # Not an ID: a name, which an enum or a free string may describe.
+        - name: label_name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+        "400":
+          description: bad request
+components:
+  parameters:
+    thing-id:
+      name: thing_id
+      in: path
+      required: true
+      schema:
+        $ref: "#/components/schemas/thing-id"
+  schemas:
+    thing-id:
+      type: string
+      pattern: ^thing_[0-9A-Za-z]+$

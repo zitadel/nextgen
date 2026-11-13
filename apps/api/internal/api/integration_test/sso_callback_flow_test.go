@@ -276,7 +276,7 @@ func TestSSOCallbackEventsJoinTheLoginFlow(t *testing.T) {
 	page, ok := listed.(*api.ListEventsResponse)
 	require.True(t, ok, helpers.MustMarshal(t, listed))
 	var types []string
-	for _, event := range page.Data {
+	for _, event := range page.Events {
 		raw, err := event.MarshalJSON()
 		require.NoError(t, err)
 		var envelope struct {

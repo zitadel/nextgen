@@ -1,15 +1,16 @@
-type: array
-description: Branding revisions, newest first.
-items:
-  type: object
-  required:
-    - id
-    - created_at
-  properties:
-    id:
-      type: string
-      description: The unique identifier of this branding revision.
-    created_at:
-      type: string
-      format: date-time
-      description: When this revision was published.
+type: object
+description: A page of the project's branding revisions, newest first.
+required:
+  - branding
+properties:
+  branding:
+    type: array
+    items:
+      $ref: branding-revision-summary.yaml
+  next_page_token:
+    description: |
+      Token to pass as `page_token` in the next request to fetch the following page.
+      Absent when there are no more results.
+    oneOf:
+      - $ref: ../../components/schemas/page-token.yaml
+      - type: 'null'

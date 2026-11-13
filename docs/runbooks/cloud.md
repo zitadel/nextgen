@@ -706,8 +706,10 @@ project and imports the root admin.
 
   - Vercel bills a custom metric by the data point, so the wrapper sends
     only the instruments its list names, with the reasons
-    ([`metrics.mjs`](../../apps/cloud/server/metrics.mjs)). A custom metric
-    has no `environment`: filter it by `deploymentId`, not `--prod`.
+    ([`metrics.mjs`](../../apps/cloud/server/metrics.mjs)). Vercel gives a
+    custom metric no `environment`; the wrapper adds it to every data point,
+    so `--prod` and `environment:production` filter one as they do Vercel's
+    own metrics.
 
 - **Policy violations:** a browser's report of a Content-Security-Policy
   violation is a `WARN` line `content security policy violation` from the
@@ -794,9 +796,12 @@ project and imports the root admin.
   1Password (production and preview have different passwords). Anyone else
   registers through the console's sign-in page.
 - **Turbo's remote cache:** the JavaScript services build through turbo and read and
-  write the team's remote cache, production and previews in separate
-  entries: the console, the schemas and the packages the docs and the
-  website render. The docs' and the website's own builds never come from it:
+  write the team's remote cache: the console, the schemas and the packages
+  the docs and the website render. A preview restores main's entries and its
+  own branch's, never another branch's, and writes only its own
+  ([Vercel's cache policies](https://vercel.com/docs/monorepos/remote-caching#how-cache-policies-isolate-artifacts)),
+  so a branch's first build restores from main's build every package it does
+  not change. The docs' and the website's own builds never come from it:
   their keys hold the deployment's ID. The launcher build is `cache: false`
   everywhere; see [its task definition](../../apps/cloud/turbo.json) for the
   security and deployment-ordering reasons. Migration and deployment remain
@@ -815,11 +820,21 @@ project and imports the root admin.
   [`install:cloud` script](../../package.json). A redeploy without the build
   cache also clears dependencies retained from an older, broader install.
 
-  The compressed archive must stay below the Standard build machine's
-  1.5 GB limit. [build-launcher.sh](../../apps/cloud/build-launcher.sh) bounds
+  Only production saves an archive. The Preview environment sets
+  `VERCEL_FORCE_NO_BUILD_CACHE_UPLOAD=1`, so a preview restores production's
+  archive and skips creating and uploading its own. That step runs after
+  `Deployment completed` and took longer than the build itself, and Vercel
+  bills it as build time. A preview's log ends with
+  `VERCEL_FORCE_NO_BUILD_CACHE_UPLOAD is set so skipping build cache upload step`.
+  Never set `VERCEL_FORCE_NO_BUILD_CACHE`: it skips the restore, not the
+  upload. A CLI `vercel redeploy` also builds without the build cache and
+  Turbo's remote cache.
+
+  The archive must stay below Vercel's 5 GB limit, the same on every build
+  machine type. [build-launcher.sh](../../apps/cloud/build-launcher.sh) bounds
   the Go caches and removes duplicate data while preserving the preset's
   toolchain. A successful deployment alone does not prove its cache was
-  saved: check the final log for `Uploading build cache [...]`, not
+  saved: check production's final log for `Uploading build cache [...]`, not
   `Build cache size ... exceeds limit`, and note the creation time. On the
   next build, check `Restored build cache` and the launcher's build duration.
 

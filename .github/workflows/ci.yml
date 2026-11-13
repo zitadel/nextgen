@@ -49,6 +49,9 @@ env:
   # release within them that breaks setup shows here first, not in a pull
   # request that happens to rerun the journey.
   TURBO_FORCE: ${{ github.event_name == 'schedule' }}
+  # The same run checks the conformance fixtures whose framework generator
+  # its pin does not fix (`generatorPinned: false`, conformance/README.md).
+  CONFORMANCE_UNPINNED: ${{ github.event_name == 'schedule' }}
 
 jobs:
   full-pr:
@@ -202,6 +205,8 @@ jobs:
           path: |
             e2e/*/test-results
             e2e/*/playwright-report
+            conformance/fixtures/*/test-results
+            conformance/fixtures/*/playwright-report
             ${{ runner.temp }}/ci-journey/*/diagnostics
             packages/components/test-output/vitest/junit.xml
             packages/components/src/**/__screenshots__/**

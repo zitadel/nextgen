@@ -173,8 +173,8 @@ func invitationEvents(t *testing.T, client *helpers.ApiClient, projectID api.Pro
 	require.NoError(t, err)
 	page, ok := resp.(*api.ListEventsResponse)
 	require.True(t, ok, helpers.MustMarshal(t, resp))
-	events := make([]invitationEvent, 0, len(page.Data))
-	for _, event := range page.Data {
+	events := make([]invitationEvent, 0, len(page.Events))
+	for _, event := range page.Events {
 		raw, err := event.MarshalJSON()
 		require.NoError(t, err)
 		var decoded invitationEvent

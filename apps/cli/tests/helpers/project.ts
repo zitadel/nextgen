@@ -544,6 +544,39 @@ export class ScaffoldedApp {
     }
   }
 
+  /**
+   * The paths the next commit of everything would take: those under version
+   * control, and those outside it that no ignore rule keeps out. Read from git,
+   * which decides it, without committing.
+   */
+  async committableFiles(): Promise<string[]> {
+    const { stdout } = await execFileAsync(
+      "git",
+      [
+        "-c",
+        "core.quotePath=false",
+        "ls-files",
+        "--cached",
+        "--others",
+        "--exclude-standard",
+        "-z",
+      ],
+      { cwd: this.path },
+    );
+    return stdout.split("\0").filter((line) => line !== "");
+  }
+
+  /**
+   * Puts an app set up without git in the state a setup before this CLI left a
+   * SvelteKit app in: `gitignore` as its `.gitignore`, and everything it does
+   * not ignore committed, so `.env.example`, which it ignores, never was.
+   */
+  async leftByAnOlderSetup(gitignore: string): Promise<void> {
+    await this.replaceGitignore(gitignore);
+    await execFileAsync("git", ["init", "--quiet"], { cwd: this.path });
+    await this.commitEverything();
+  }
+
   /** Commits everything outstanding, as the developer would before deploying. */
   async commitEverything(): Promise<void> {
     await execFileAsync("git", ["add", "--all"], { cwd: this.path });
@@ -1903,6 +1936,11 @@ export class ScaffoldedApp {
 
   writeProjectFile(relativePath: string, contents: string): Promise<void> {
     return writeFile(join(this.path, relativePath), contents);
+  }
+
+  /** Gives the app `contents` as its `.gitignore`, as its framework's generator or the developer left it. */
+  replaceGitignore(contents: string): Promise<void> {
+    return this.writeProjectFile(".gitignore", contents);
   }
 
   /**

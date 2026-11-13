@@ -545,7 +545,7 @@ func TestListAuthzTeamScopedOnlyPartialView(t *testing.T) {
 	brandResp, err := client.ListBranding(t.Context(), api.ListBrandingParams{ProjectID: api.ProjectID(project.ID)})
 	require.NoError(t, err)
 	require.IsType(t, &api.ListBrandingResponse{}, brandResp, helpers.MustMarshal(t, brandResp))
-	brands := *brandResp.(*api.ListBrandingResponse)
+	brands := brandResp.(*api.ListBrandingResponse).Branding
 	require.Len(t, brands, 1)
 	assert.Equal(t, brandIn, brands[0].ID)
 

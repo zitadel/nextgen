@@ -37,6 +37,12 @@ async function namingProblems(name) {
 
 const NAMING_RULES = ["rule/operation-id-verb-camel-case", "rule/path-parameter-not-id"];
 
+/** Lints a fixture and returns only the ID path parameter pattern problems. */
+async function pathIdProblems(name) {
+  const problems = await lint({ ref: fixture(name), config });
+  return problems.filter((p) => p.ruleId === "rule/path-id-parameter-pattern");
+}
+
 function flagged(problems, ruleId, value) {
   return problems.some((p) => p.ruleId === ruleId && p.message.includes(`"${value}"`));
 }
@@ -94,6 +100,25 @@ test("allowed verbs, acronyms, webhooks and non-path `id` parameters are left al
   // The webhook's `thingCreated` opens with no allowed verb: it passes only
   // because the rule is scoped to operations under `paths`.
   assert.deepEqual(await namingProblems("naming-clean.yaml"), []);
+});
+
+test("every ID path parameter without a pattern is reported, each in its own place", async () => {
+  // The shared schema is reported where it is defined: the walk meets it under
+  // the query parameter first, which the rule skips, and must still check it
+  // under the path parameter.
+  const found = (await pathIdProblems("path-id-violations.yaml")).map((p) => p.location[0].pointer);
+  assert.deepEqual(
+    found.sort(),
+    [
+      "#/components/parameters/thing-id/schema/pattern",
+      "#/components/schemas/plain-string/pattern",
+      "#/paths/~1things~1{thing_id}/parameters/0/schema/pattern",
+    ].sort(),
+  );
+});
+
+test("patterned ID path parameters and non-ID or non-path parameters are left alone", async () => {
+  assert.deepEqual(await pathIdProblems("path-id-clean.yaml"), []);
 });
 
 test("every verb the operationId rule allows is one the spec uses", async () => {
