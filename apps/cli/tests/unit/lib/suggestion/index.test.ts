@@ -2,7 +2,6 @@ import { Flags } from "@oclif/core";
 import { describe, expect, expectTypeOf, it } from "vitest";
 
 import { aSuggest } from "@tests/helpers/suggestions";
-import { thrownBy } from "@tests/helpers/thrown-value";
 
 import {
   commandOf,
@@ -253,52 +252,29 @@ describe("shellCommand", () => {
     expect(shellCommand("npm install @zitadel/cli@alpha")).toBe("npm install @zitadel/cli@alpha");
   });
 
-  it("does not compile for a literal that starts by running the CLI, which it refuses too", () => {
-    const refused = [
-      thrownBy(() => {
-        // @ts-expect-error the CLI is suggested as an object the renderer checks
-        return shellCommand("zitadel deploy --dry-run");
-      }),
-      thrownBy(() => {
-        // @ts-expect-error the CLI is suggested as an object the renderer checks
-        return shellCommand("npx @zitadel/cli@1.0.0 deploy");
-      }),
-      thrownBy(() => {
-        // @ts-expect-error the CLI is suggested as an object the renderer checks
-        return shellCommand("npx --yes @zitadel/cli deploy");
-      }),
-      thrownBy(() => {
-        // @ts-expect-error the CLI is suggested as an object the renderer checks
-        return shellCommand("bunx @zitadel/cli");
-      }),
-      thrownBy(() => {
-        // @ts-expect-error the CLI is suggested as an object the renderer checks
-        return shellCommand("pnpm exec zitadel start");
-      }),
-      thrownBy(() => {
-        // @ts-expect-error the CLI is suggested as an object the renderer checks
-        return shellCommand(`zitadel deploy --env ${ENVIRONMENT}`);
-      }),
+  it("does not compile for a line that starts by running the CLI", () => {
+    const written = [
+      // @ts-expect-error the CLI is suggested as an object the renderer checks
+      shellCommand("zitadel deploy --dry-run"),
+      // @ts-expect-error the CLI is suggested as an object the renderer checks
+      shellCommand("npx @zitadel/cli@1.0.0 deploy"),
+      // @ts-expect-error the CLI is suggested as an object the renderer checks
+      shellCommand("npx --yes @zitadel/cli deploy"),
+      // @ts-expect-error the CLI is suggested as an object the renderer checks
+      shellCommand("bunx @zitadel/cli"),
+      // @ts-expect-error the CLI is suggested as an object the renderer checks
+      shellCommand("pnpm exec zitadel start"),
+      // @ts-expect-error the CLI is suggested as an object the renderer checks
+      shellCommand(`zitadel deploy --env ${ENVIRONMENT}`),
+      // @ts-expect-error one of the lines it may be runs the CLI
+      shellCommand(ENVIRONMENT === "prod" ? "zitadel deploy" : "ls"),
     ];
 
-    expect(refused).toEqual(Array(refused.length).fill(expect.any(Error)));
+    expect(written).toHaveLength(7);
   });
 
-  it("refuses a line built at run time that runs the CLI in a later step", () => {
-    const line: string = "cd app && zitadel deploy";
-
-    const error = thrownBy(() => {
-      return shellCommand(line);
-    });
-
-    expect(error).toBeInstanceOf(Error);
-    expect(error).toMatchObject({
-      message: "cd app && zitadel deploy runs the CLI: suggest it as { id, args, flags } instead",
-    });
-  });
-
-  it("takes a line built at run time whose quoted text mentions the CLI", () => {
-    const line: string = "git commit -m 'rename flow; zitadel deploy again' -- .zitadel";
+  it("takes a line built at run time whose quoted text mentions the CLI as it is", () => {
+    const line: string = "git commit -m 'don'\\''t; zitadel deploy again' -- .zitadel";
 
     expect(shellCommand(line)).toBe(line);
   });

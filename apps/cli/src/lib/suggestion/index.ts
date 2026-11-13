@@ -2,10 +2,15 @@ import type { Interfaces } from "@oclif/core";
 
 import { Cmd } from "@/lib/cmd";
 import { type ByName, type Named, named } from "@/lib/names";
-import { newestCliCommand, optionArgs, publicCliCommand } from "@/lib/public-cli";
+import {
+  type CLI_BINARY,
+  type CLI_PACKAGE_NAME,
+  newestCliCommand,
+  optionArgs,
+  publicCliCommand,
+} from "@/lib/public-cli";
 
 import type { RELATIONS } from "./relations";
-import { runsTheCli, type StartsWithTheCli } from "./shell";
 
 /**
  * A command the CLI suggests running next — a `next.commands` entry on a
@@ -446,36 +451,67 @@ function canonical(value: unknown): string {
   });
 }
 
+/** A package runner as a command line starts with one: `npx`, or a manager's `pnpm dlx`. */
+type Runner =
+  | "bunx"
+  | "npx"
+  | "pnpx"
+  | `${"bun" | "npm" | "pnpm" | "yarn"} ${"dlx" | "exec" | "x"}`;
+
+/** This CLI as a runner is given it: its package, at a version or not, or its binary. */
+type Launched =
+  | typeof CLI_BINARY
+  | typeof CLI_PACKAGE_NAME
+  | `${typeof CLI_PACKAGE_NAME}@${string}`;
+
 /**
- * Nothing more than `Command`, unless the compiler can tell that it starts by
+ * A command line that starts by running this CLI: the binary itself, a package
+ * manager running the binary, or a package runner given the CLI, with or
+ * without `-y`. A template counts as well as a literal, so
+ * `` `zitadel deploy --env ${env}` `` matches whatever `env` holds.
+ */
+type StartsWithTheCli =
+  | typeof CLI_BINARY
+  | `${typeof CLI_BINARY} ${string}`
+  | `${"bun" | "npm" | "pnpm" | "yarn"} ${typeof CLI_BINARY}${"" | ` ${string}`}`
+  | `${Runner} ${"" | "-y " | "--yes "}${Launched}${"" | ` ${string}`}`;
+
+/**
+ * Nothing more than `Command`, unless any one spelling it may have starts by
  * running this CLI ({@link StartsWithTheCli}): then a property no string has,
- * so the call does not compile and the error says what to write instead.
+ * so the call does not compile and the error says what to write instead. A
+ * union counts when one of its members runs the CLI, so `cond ? "zitadel
+ * deploy" : "ls"` is refused too.
  *
  * @typeParam Command - The command line, as the call spells it.
  */
-type NotTheCli<Command extends string> = Command extends StartsWithTheCli
+type NotTheCli<Command extends string> = true extends (
+  Command extends StartsWithTheCli
+    ? true
+    : never
+)
   ? { readonly "suggest the CLI as { id, args, flags }": never }
   : unknown;
 
 /**
  * A command that is not the CLI (`npm install …`, `rm …`), suggested as
- * written. One that runs the CLI is refused, since only the renderer checks a
- * CLI command against the command it names: a literal the compiler can read as
- * starting with the CLI does not compile ({@link StartsWithTheCli}), and any
- * line that runs it in some step throws when it is made ({@link runsTheCli}).
+ * written. One that starts by running the CLI does not compile, since only the
+ * renderer checks a CLI command against the command it names: suggest it as
+ * `{ id, args, flags }` instead.
+ *
+ * The check is the compiler's alone. A line built from text known only as
+ * `string`, such as a path or a commit message the person typed, is taken as
+ * it is: reading shell syntax at run time would mistake quoted text for a
+ * command and fail a run over its own advice.
  *
  * @typeParam Command - The command line, as the call spells it.
  * @param command - The command line, as a shell runs it.
  * @returns The command.
- * @throws {Error} When a step of the command runs this CLI.
  */
 export function shellCommand<const Command extends string>(
   command: Command & NotTheCli<Command>,
 ): SuggestedCommand {
   const line: string = command;
-  if (runsTheCli(line)) {
-    throw new Error(`${line} runs the CLI: suggest it as { id, args, flags } instead`);
-  }
 
   return line as SuggestedCommand;
 }
