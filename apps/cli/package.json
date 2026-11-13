@@ -122,6 +122,9 @@
       },
       "skills": {
         "description": "Give coding agents the Zitadel skills."
+      },
+      "tests": {
+        "description": "Add end-to-end tests of the sign-in."
       }
     }
   },

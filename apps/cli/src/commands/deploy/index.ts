@@ -3,6 +3,7 @@ import { Flags } from "@oclif/core";
 import { z } from "zod";
 
 import { Origins } from "@/lib/backend";
+import { Cmd } from "@/lib/cmd";
 import { CANCELLED, confirmationHint, ZitadelError } from "@/lib/errors";
 import {
   type Admitted,
@@ -28,6 +29,7 @@ import {
   type Suggested,
   type SuggestedCommand,
   shellCommand,
+  shellSteps,
   WHAT_CHANGED,
 } from "@/lib/suggestion";
 import { escapeControlCharacters } from "@/lib/terminal-text";
@@ -39,7 +41,7 @@ import { reportWarning } from "@/lib/warnings";
  * reject later. `messageTooLong` counts code points, as the server does, so
  * the length is its call and not the schema's. The message is trimmed.
  */
-const MESSAGE: Refused<string> = {
+const MESSAGE = {
   schema: z
     .string()
     .trim()
@@ -54,7 +56,7 @@ const MESSAGE: Refused<string> = {
       argument: "--message",
     },
   },
-};
+} as const satisfies Refused<string>;
 
 /**
  * What a deploy with no primary origin to land on tells the developer, naming
@@ -119,29 +121,41 @@ export function missingPrimaryOrigin(input: {
  */
 const LOCKOUT_ACTION = "deploy a release that leaves existing users unable to sign in";
 
-const NEEDS_MESSAGE_REFUSAL: Refusal = {
+const NEEDS_MESSAGE_REFUSAL = {
   message: "A deploy needs a message in non-interactive mode",
   hint: "Pass -m/--message with a short summary of what this release changes, or deploy from a clean git commit.",
-};
+} as const satisfies Refusal;
 
 /** How a project with nowhere to land a deploy is refused. */
-const NO_PRIMARY_ORIGIN_REFUSAL: Refusal = {
+const NO_PRIMARY_ORIGIN_REFUSAL = {
   message: "The project has no primary origin to deploy to",
   hint: "{hint}",
   next: ["{next}"],
-};
+} as const satisfies Refusal;
 
 /**
  * The commit that keeps what was deployed in git, aimed at the directory that
  * was deployed: `git` runs where the caller is, which is not where a `--cwd`
  * deploy ran. It carries the message the deploy used, so it can be run as it is.
+ *
+ * @param deployed - The directory that was deployed.
+ * @param message - The message the deploy was given, if any.
+ * @returns `git add` then `git commit` of `.zitadel/`, one after the other.
  */
-function commitConfig(deployed: string, message: string | undefined): string {
-  const quote = (text: string): string => {
-    return `'${text.replaceAll("'", "'\\''")}'`;
-  };
-  const git = resolve(deployed) === process.cwd() ? "git" : `git -C ${quote(deployed)}`;
-  return `${git} add .zitadel && ${git} commit -m ${quote(message ?? "<what changed>")} -- .zitadel`;
+function commitConfig(deployed: string, message: string | undefined): SuggestedCommand {
+  const where = resolve(deployed) === process.cwd() ? [] : ["-C", Cmd.quote(deployed)];
+  return shellSteps(
+    shellCommand("git", ...where, "add", ".zitadel"),
+    shellCommand(
+      "git",
+      ...where,
+      "commit",
+      "-m",
+      Cmd.quote(message ?? "<what changed>"),
+      "--",
+      ".zitadel",
+    ),
+  );
 }
 
 /**
@@ -347,7 +361,7 @@ export default class Deploy extends Destructive(EnvironmentCommand) {
       next: {
         commands: [
           this.suggest({ id: "deployment:list" }),
-          ...(configUncommitted ? [shellCommand(commitConfig(this.cwd, message))] : []),
+          ...(configUncommitted ? [commitConfig(this.cwd, message)] : []),
         ],
       },
     });

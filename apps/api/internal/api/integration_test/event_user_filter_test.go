@@ -90,10 +90,12 @@ func TestListEventsByUser(t *testing.T) {
 			require.NoError(t, err)
 			var answer api.FlowResponseHeaders
 			switch r := resp.(type) {
-			case *api.SubmitFlowStepOK:
-				answer = api.FlowResponseHeaders(*r)
-			case *api.SubmitFlowStepBadRequest:
-				answer = api.FlowResponseHeaders(*r)
+			case *api.FlowResponseHeaders:
+				answer = *r
+			case *api.SubmitFlowStepBadRequestHeaders:
+				step, ok := r.Response.GetFlowResponse()
+				require.True(t, ok, "a refusal, not a step: %s", helpers.MustMarshal(t, resp))
+				answer = api.FlowResponseHeaders{CacheControl: r.CacheControl, SetCookie: r.SetCookie, Response: step}
 			default:
 				require.Failf(t, "the step answered neither a step nor a refusal", "%s", helpers.MustMarshal(t, resp))
 			}

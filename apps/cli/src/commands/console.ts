@@ -13,11 +13,11 @@ import { escapeControlCharacters } from "@/lib/terminal-text";
 import { section } from "@/lib/ui";
 
 /** How a directory with no local admin, and no parent holding one, is refused. */
-const NO_LOCAL_ADMIN_REFUSAL: Refusal = {
+const NO_LOCAL_ADMIN_REFUSAL = {
   message: "No local admin in this directory or its parents",
   hint: "Run this from the directory the local server was started in, or one inside it. If it was never started, start it first; that is what creates the local admin the console signs in as.",
   next: [{ id: "start" }],
-};
+} as const satisfies Refusal;
 
 /**
  * `zitadel console` — open the local console signed in as the local

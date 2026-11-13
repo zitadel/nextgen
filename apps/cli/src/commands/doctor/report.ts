@@ -79,15 +79,27 @@ export function categoryOf(checkName: string): CheckCategory {
   );
 }
 
-/** The checks as the envelope carries them. */
+/**
+ * The checks as the envelope carries them: each with its category, and a
+ * warning's remedy written into its details as `remedy_command`, after what
+ * the check found.
+ *
+ * @param checks - The checks, as they ran.
+ * @returns The checks for the envelope.
+ */
 export function withCategories(
   checks: readonly CheckOutcome[],
-): Array<CheckOutcome & { category: CheckCategory }> {
+): Array<Omit<CheckOutcome, "remedy"> & { category: CheckCategory }> {
+  // Each branch destructures the check it narrowed: a remedy comes only with
+  // details that are an object, which destructuring both at once would forget.
   return checks.map((check) => {
-    return {
-      ...check,
-      category: categoryOf(check.name),
-    };
+    const category = categoryOf(check.name);
+    if (check.remedy === undefined) {
+      const { remedy: _none, ...found } = check;
+      return { ...found, category };
+    }
+    const { remedy, ...found } = check;
+    return { ...found, details: { ...found.details, remedy_command: remedy }, category };
   });
 }
 
@@ -356,11 +368,8 @@ function remediesOf(category: CheckCategory, checks: readonly CheckOutcome[]): s
     .filter((check) => {
       return check.status !== "pass";
     })
-    .map((check) => {
-      return detailsOf(check)?.remedy_command;
-    })
-    .filter((remedy): remedy is string => {
-      return typeof remedy === "string";
+    .flatMap((check) => {
+      return check.remedy === undefined ? [] : [check.remedy];
     });
   return category === "versions" ? remedies.slice(0, 1) : [...new Set(remedies)];
 }

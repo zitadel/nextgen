@@ -1,4 +1,4 @@
-import { Flags } from "@oclif/core";
+import { Flags, type Interfaces } from "@oclif/core";
 
 import { Cmd } from "@/lib/cmd";
 import { isObject } from "@/lib/json";
@@ -9,6 +9,17 @@ import type { BaseCommand } from "./base";
 import { listData } from "./envelope";
 import { painted, type Rendering, rows } from "./rendering";
 import type { CommandResult, JsonEnvelope } from "./types";
+
+/**
+ * The flags a paged list declares, which the command for its next page sets:
+ * the run again with the new `--page-token` and without `--all`. The mixin
+ * cannot see its host's flags, so it names the ones it relies on here, and the
+ * run refuses the next page if the host does not declare them.
+ */
+type PagingFlags = Readonly<{
+  "page-token": Interfaces.OptionFlag<string | undefined>;
+  all: Interfaces.BooleanFlag<boolean>;
+}>;
 
 /** A class that can be extended, abstract or not, whatever arguments it takes. */
 // biome-ignore lint/suspicious/noExplicitAny: the constructor of any command, which a mixin cannot name
@@ -225,7 +236,7 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
       const nextCommand =
         token === null
           ? undefined
-          : await this.rerun({
+          : await this.rerun<PagingFlags>({
               without: ["pageToken", "all"],
               after: { pageToken: token, ...(this.jsonEnabled() ? { json: true } : {}) },
             });

@@ -38,6 +38,7 @@ Local development
   stop              Stop the local Zitadel server
   reset             Delete the local Zitadel server runtime and data
   eject             Remove managed files and local Zitadel state
+  tests             Add end-to-end tests of the sign-in
 
 Users and teams
   users             Create and manage users

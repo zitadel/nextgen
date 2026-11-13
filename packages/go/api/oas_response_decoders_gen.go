@@ -19154,7 +19154,7 @@ func decodeSubmitFlowStepResponse(resp *http.Response) (res SubmitFlowStepRes, _
 			}(); err != nil {
 				return res, errors.Wrap(err, "validate")
 			}
-			var wrapper SubmitFlowStepOK
+			var wrapper FlowResponseHeaders
 			wrapper.Response = response
 			h := uri.NewHeaderDecoder(resp.Header)
 			// Parse "Cache-Control" header.
@@ -19252,7 +19252,7 @@ func decodeSubmitFlowStepResponse(resp *http.Response) (res SubmitFlowStepRes, _
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response FlowResponse
+			var response SubmitFlowStepBadRequest
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -19278,7 +19278,7 @@ func decodeSubmitFlowStepResponse(resp *http.Response) (res SubmitFlowStepRes, _
 			}(); err != nil {
 				return res, errors.Wrap(err, "validate")
 			}
-			var wrapper SubmitFlowStepBadRequest
+			var wrapper SubmitFlowStepBadRequestHeaders
 			wrapper.Response = response
 			h := uri.NewHeaderDecoder(resp.Header)
 			// Parse "Cache-Control" header.
