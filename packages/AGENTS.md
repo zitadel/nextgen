@@ -47,14 +47,10 @@ change needs a changeset, and the whole train versions together.
   package's own tests, and imports the built package by its name, as a
   consumer's bundler resolves it, never the source. It needs the package's
   `build` before it typechecks or runs.
-  The contract spec in `sdk-core` holds the specs to one shape: the client
-  SDKs' `edge-entry` and `edge-render` blocks must carry the same titles and,
-  byte for byte, the same body, and every edge project declaration must read
-  the same. Only the glue above a block, which hands a render to the
-  framework, is the framework's own.
-- **Server SDKs run one test contract**: write a middleware or edge case once in
-  `@zitadel/server-sdk-contract`; a server SDK's spec is its adapter, plus
-  cases only that framework has.
+  Every edge project declaration reads the same; the contract spec in
+  `sdk-core` checks it.
+- **Write shared cases once**, in `@zitadel/server-sdk-contract` or
+  `@zitadel/client-sdk-contract`; an SDK's spec holds its glue and own cases.
 - **One Agent Skill per framework SDK**, at `<pkg>/skills/<name>/SKILL.md`,
   plus `skills/zitadel-components/SKILL.md` for `@zitadel/components`; the
   top-level `skills/zitadel` routes to them. A new framework SDK adds its

@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { ZitadelLogin, ZitadelLogout, ZitadelSession } from "@zitadel/components";
 import { DISPATCHED_EVENTS } from "@zitadel/components/events";
 import { describe, expect, it } from "vitest";
@@ -19,97 +18,6 @@ import {
   standardAttributes,
   widgetTags,
 } from "./types.js";
-
-/**
- * The spec files the guards below read, by SDK: `client` is the spec that carries
- * the SDK's client-side tests, `server` the one that carries its server-markup
- * tests. Angular is not here: its wrapper forwards no standard attribute, since
- * its component tag already is the element that carries them, so it has no
- * standard-attribute block (see {@link ANGULAR_SPEC}).
- */
-const SDK_SPECS = {
-  "sdk-react": {
-    client: "../../sdk-react/src/index.spec.tsx",
-    server: "../../sdk-react/src/index.spec.tsx",
-  },
-  "sdk-vue": {
-    client: "../../sdk-vue/src/components.spec.ts",
-    server: "../../sdk-vue/src/components.spec.ts",
-  },
-  "sdk-svelte": {
-    client: "../../sdk-svelte/src/index.spec.ts",
-    server: "../../sdk-svelte/src/index.ssr.spec.ts",
-  },
-  "sdk-solid": {
-    client: "../../sdk-solid/src/index.spec.tsx",
-    server: "../../sdk-solid/src/index.ssr.spec.tsx",
-  },
-  "sdk-qwik": {
-    client: "../../sdk-qwik/src/index.spec.tsx",
-    server: "../../sdk-qwik/src/index.ssr.spec.tsx",
-  },
-} as const;
-
-/** Angular's spec: it carries the shared server-render table but no standard-attribute block. */
-const ANGULAR_SPEC = "../../sdk-angular/src/lib/components.spec.ts";
-
-/** The first place two lists of test titles differ, or "" when they are the same. */
-const firstDifference = (titles: readonly string[], canonical: readonly string[]): string => {
-  const length = Math.max(titles.length, canonical.length);
-  for (let index = 0; index < length; index++) {
-    if (titles[index] !== canonical[index]) {
-      return `test ${index + 1} is ${JSON.stringify(titles[index])}, expected ${JSON.stringify(canonical[index])}`;
-    }
-  }
-  return "";
-};
-
-// Matches `it("title"`, `it.each(…)("title"`, `describe("title"` and `describe.each(…)("title"`.
-const BLOCK_TITLE = /\b(?:it|describe)(?:\.each\([^)]*\))?\(\s*(["'`])((?:\\.|(?!\1)[^\\])*)\1/g;
-
-/** Where the `// name:edge` marker comment, alone on its line, starts; -1 when there is none. */
-const markerAt = (source: string, name: string, edge: "begin" | "end"): number => {
-  const marker = new RegExp(`^[ \\t]*// ${name}:${edge}[ \\t]*$`, "m").exec(source);
-  return marker ? marker.index + marker[0].indexOf("//") : -1;
-};
-
-const blockIn = (source: string, name: string): string | undefined => {
-  const begin = markerAt(source, name, "begin");
-  const end = markerAt(source, name, "end");
-  return begin >= 0 && end > begin ? source.slice(begin, end) : undefined;
-};
-
-const titlesIn = (block: string): string[] =>
-  Array.from(block.matchAll(BLOCK_TITLE), (match) => match[2] ?? "");
-
-/**
- * What is wrong with the `name` blocks of the given sources: a block that is
- * missing, one whose titles are not the canonical ones, in order and without an
- * extra, and one whose body is not the first source's, byte for byte.
- */
-const problems = (
-  sources: Readonly<Record<string, string>>,
-  name: string,
-  canonical: readonly string[],
-): string[] => {
-  const blocks = Object.entries(sources).map(
-    ([sdk, source]) => [sdk, source, blockIn(source, name)] as const,
-  );
-  const reference = blocks[0]?.[2];
-  return blocks.flatMap(([sdk, source, block]) => {
-    if (block === undefined) return [`${sdk} has no ${name} block`];
-    const found = [];
-    const difference = firstDifference(titlesIn(block), canonical);
-    if (difference) found.push(`${sdk}: ${difference}`);
-    if (block !== reference) found.push(`${sdk}: the body differs from the first SDK's`);
-    const outside = titlesIn(source.replace(block, "")).filter((title) =>
-      canonical.includes(title),
-    );
-    if (outside.length > 0)
-      found.push(`${sdk}: ${JSON.stringify(outside[0])} is also tested outside the block`);
-    return found;
-  });
-};
 
 /**
  * The element↔contract drift guard.
@@ -289,36 +197,6 @@ describe("config types ↔ element properties", () => {
 });
 
 /**
- * The SDK specs that write widget attributes into markup each carry the same
- * server-render table between two marker comments, so every SDK is held to the
- * same cases. Only the SDK's own `renderAttributes` differs. This fails when
- * the copies drift apart.
- */
-describe("server-render cases ↔ SDK specs", () => {
-  const SPECS = [
-    SDK_SPECS["sdk-react"].client,
-    SDK_SPECS["sdk-vue"].client,
-    ANGULAR_SPEC,
-    SDK_SPECS["sdk-svelte"].client,
-    SDK_SPECS["sdk-solid"].server,
-    SDK_SPECS["sdk-qwik"].server,
-  ];
-
-  const casesIn = (spec: string): string => {
-    const source = readFileSync(fileURLToPath(new URL(spec, import.meta.url)), "utf8");
-    const begin = source.indexOf("// server-render-cases:begin");
-    const end = source.indexOf("// server-render-cases:end");
-    expect(begin, `${spec} has no server-render cases`).toBeGreaterThanOrEqual(0);
-    expect(end, `${spec} has an unterminated server-render cases block`).toBeGreaterThan(begin);
-    return source.slice(begin, end);
-  };
-
-  it.each(SPECS)("%s carries the same cases as the React spec", (spec) => {
-    expect(casesIn(spec)).toBe(casesIn(SPECS[0]!));
-  });
-});
-
-/**
  * The standard attributes and the widget props are disjoint by construction: a
  * wrapper hands the element the standard attributes besides its own props, so
  * if a widget prop shared a name with one, the wrapper would shadow it.
@@ -334,144 +212,6 @@ describe("standard attributes ↔ widget props", () => {
       ...Object.fromEntries(Object.values(handlers).map((n) => [n, true])),
     };
     expect(standardAttributes(props)).toEqual({});
-  });
-});
-
-/**
- * The standard-attribute tests.
- *
- * Every SPA SDK except Angular passes the element's standard HTML attributes to
- * the widget element, and every SDK spec proves it with the same tests between
- * marker comments: the same titles, in the same order, with none missing, none
- * extra and none unmarked inside the block, and the same bodies, byte for byte.
- * Only the glue above each block (`mountWidget`, `renderAttributes` and the two
- * props type aliases) differs. A behaviour left untested in one SDK, or tested
- * under another title, fails here instead of drifting unnoticed.
- *
- * One documented exception: Angular's component tag already is the element that
- * carries the standard attributes, so its wrapper does not forward anything and
- * its spec has no block.
- */
-describe("standard-attribute tests ↔ SDK specs", () => {
-  const CLIENT_TITLES = [
-    "%s standard attributes",
-    "forwards the class to the widget element",
-    "forwards the style to the widget element",
-    "forwards the id to the widget element",
-    "forwards data attributes to the widget element",
-    "forwards aria attributes to the widget element",
-    "forwards the remaining standard attributes to the widget element",
-    "forwards the slot to the widget element",
-    "renders a false aria or data attribute as the string false",
-    "updates a forwarded attribute when the prop changes",
-    "removes a forwarded attribute when the prop is removed",
-    "does not forward props outside the standard set",
-    "gives access to the widget element through a ref",
-    "accepts the standard attributes in its props",
-    "rejects the attributes it does not forward in its props",
-  ];
-
-  const SERVER_TITLES = [
-    "%s server-rendered standard attributes",
-    "puts the standard attributes into the server markup",
-    "leaves props outside the standard set out of the server markup",
-  ];
-
-  const read = (spec: string): string =>
-    readFileSync(fileURLToPath(new URL(spec, import.meta.url)), "utf8");
-
-  const specsOf = (side: "client" | "server"): Record<string, string> =>
-    Object.fromEntries(
-      Object.entries(SDK_SPECS).flatMap(([sdk, specs]) => {
-        const spec =
-          side === "client" ? specs.client : "server" in specs ? specs.server : undefined;
-        return spec === undefined ? [] : [[sdk, read(spec)]];
-      }),
-    );
-
-  it.each([
-    ["standard-attributes", "client", CLIENT_TITLES],
-    ["standard-attributes-server", "server", SERVER_TITLES],
-  ] as const)("the %s block is canonical in every SDK", (name, side, canonical) => {
-    expect(problems(specsOf(side), name, canonical)).toEqual([]);
-  });
-
-  it("has no block in Angular, the one documented exception", () => {
-    const angular = read(ANGULAR_SPEC);
-    expect(blockIn(angular, "standard-attributes")).toBeUndefined();
-    expect(blockIn(angular, "standard-attributes-server")).toBeUndefined();
-  });
-
-  // The guard's own logic, on sources it is made to reject.
-  describe("the guard", () => {
-    const block = [
-      "// x:begin",
-      'describe.each(widgetNames)("%s group", (widget) => {',
-      '  it("first", () => {});',
-      '  it.each([1, 2])("second", () => {});',
-      "});",
-      "// x:end",
-    ].join("\n");
-    const canonical = ["%s group", "first", "second"];
-    const check = (other: string): string[] => problems({ one: block, two: other }, "x", canonical);
-
-    it("accepts blocks that match", () => {
-      expect(check(block)).toEqual([]);
-    });
-
-    it("reads it, it.each and describe.each titles", () => {
-      expect(titlesIn(blockIn(block, "x") ?? "")).toEqual(canonical);
-    });
-
-    it("sees a dropped title", () => {
-      expect(check(block.replace('  it("first", () => {});\n', ""))).toHaveLength(2);
-    });
-
-    it("sees a renamed title", () => {
-      expect(check(block.replace('"first"', '"primary"'))).toHaveLength(2);
-    });
-
-    it("sees a reordered title", () => {
-      const swapped = block
-        .replace('  it("first", () => {});\n', "")
-        .replace(
-          '  it.each([1, 2])("second", () => {});',
-          '  it.each([1, 2])("second", () => {});\n  it("first", () => {});',
-        );
-      expect(check(swapped)).toHaveLength(2);
-    });
-
-    it("sees an extra test inside the block", () => {
-      expect(
-        check(block.replace("});\n// x:end", '  it("extra", () => {});\n});\n// x:end')),
-      ).toHaveLength(2);
-    });
-
-    it("sees a changed body and names it", () => {
-      expect(
-        check(block.replace('it("first", () => {})', 'it("first", () => { run(); })')),
-      ).toEqual(["two: the body differs from the first SDK's"]);
-    });
-
-    it("sees a canonical test outside the block", () => {
-      expect(check(`it("first", () => {});\n${block}`)).toEqual([
-        'two: "first" is also tested outside the block',
-      ]);
-    });
-
-    it("sees a block that is missing or unterminated", () => {
-      expect(check("nothing here")).toEqual(["two has no x block"]);
-      expect(check("// x:begin\nno end")).toEqual(["two has no x block"]);
-    });
-
-    it("does not take a longer marker for its own", () => {
-      expect(check(block.replace("// x:end", "// x:end2"))).toEqual(["two has no x block"]);
-      expect(check(block.replace("// x:begin", "// x:begin2"))).toEqual(["two has no x block"]);
-    });
-
-    it("does not take a marker inside other text for its own", () => {
-      expect(check(block.replace("// x:end", "y // x:end"))).toEqual(["two has no x block"]);
-    });
   });
 });
 
@@ -568,12 +308,6 @@ describe("widget loading ↔ SDK packages", () => {
   it("turbo.json lists the files the checks read as test inputs", () => {
     const config = read(`${packagesDir}sdk-core/turbo.json`);
     for (const input of [
-      ...new Set(
-        [ANGULAR_SPEC, ...Object.values(SDK_SPECS).flatMap((specs) => Object.values(specs))].map(
-          (spec) => spec.replace("../../", "packages/"),
-        ),
-      ),
-      "packages/sdk-next/src/__tests__/client.edge.test.ts",
       "packages/sdk-*/package.json",
       "packages/sdk-*/README.md",
       "packages/sdk-*/skills/**/SKILL.md",
@@ -853,11 +587,8 @@ describe("client SDK entries ↔ @zitadel/components", () => {
 });
 
 /**
- * The client SDK edge specs. Each loads its built package inside the edge VM and
- * carries the same `edge-entry` block and, but for `@zitadel/sdk-next/client`,
- * which renders no widget, the same `edge-render` block: the same titles and the
- * same body, byte for byte. Only the render call and the imports are the
- * framework's.
+ * Every edge project is declared the same way: the shared `edgeProject()` from
+ * `@zitadel/vitest-config`, right under one shared comment.
  */
 const EDGE_COMMENT =
   "      // Runs the edge specs in the edge-runtime VM; see edgeProject in vitest.shared.mjs.";
@@ -882,44 +613,9 @@ const edgeConfigProblems = (source: string): string[] => {
   return found;
 };
 
-describe("client SDK edge specs", () => {
+describe("edge project declarations", () => {
   const packagesDir = `${resolve(process.cwd(), "..")}/`;
   const read = (path: string): string => readFileSync(`${packagesDir}${path}`, "utf8");
-
-  const ENTRY_TITLES = [
-    "the SDK entry in the edge runtime",
-    "runs without a DOM",
-    "keeps the locale data it re-exports",
-  ];
-  const EDGE_TITLES = [
-    "the SDK in the edge runtime",
-    "renders the login widget as its custom element with its attributes",
-    "renders the session widget as its custom element with its attributes",
-    "renders the logout widget as its custom element with its attributes",
-    "writes the purpose and the resumed flow into the login markup",
-    "omits the language when none is set",
-  ];
-
-  const WRAPPERS = {
-    "sdk-react": "sdk-react/src/index.edge.spec.tsx",
-    "sdk-vue": "sdk-vue/src/index.edge.spec.ts",
-    "sdk-angular": "sdk-angular/src/public-api.edge.spec.ts",
-    "sdk-svelte": "sdk-svelte/src/index.edge.spec.ts",
-    "sdk-solid": "sdk-solid/src/index.edge.spec.tsx",
-    "sdk-qwik": "sdk-qwik/src/index.edge.spec.tsx",
-  };
-  const NEXT = { "sdk-next": "sdk-next/src/__tests__/client.edge.test.ts" };
-
-  const sourcesOf = (specs: Record<string, string>): Record<string, string> =>
-    Object.fromEntries(Object.entries(specs).map(([sdk, path]) => [sdk, read(path)]));
-
-  it("has the entry block in every client SDK, sdk-next included", () => {
-    expect(problems(sourcesOf({ ...WRAPPERS, ...NEXT }), "edge-entry", ENTRY_TITLES)).toEqual([]);
-  });
-
-  it("has the render block in every SDK that renders widgets", () => {
-    expect(problems(sourcesOf(WRAPPERS), "edge-render", EDGE_TITLES)).toEqual([]);
-  });
 
   it("declares the edge project the same way in every config", () => {
     const configs = [
@@ -962,38 +658,122 @@ describe("client SDK edge specs", () => {
 });
 
 /**
- * Each server SDK spec runs the shared cases of `@zitadel/server-sdk-contract`:
- * one that stops calling them, or moves where neither Vitest nor this check
- * looks, would drop them without a failing test.
+ * Each SDK spec runs the shared cases of its contract package: one that stops
+ * calling them, or moves where neither Vitest nor this check looks, would drop
+ * them without a failing test. The SDKs checked are the ones whose manifests
+ * depend on a contract package, so a new one cannot be left out, and each needs
+ * the edge to that package's `typecheck`, without which a contract edit leaves
+ * its cached test results in place.
  */
-describe("server SDK specs ↔ @zitadel/server-sdk-contract", () => {
+describe("SDK specs ↔ the contract packages", () => {
   const packagesDir = `${resolve(process.cwd(), "..")}/`;
-  const CALLS = {
-    "describeServerMiddleware(": [
-      "sdk-next/src/__tests__/middleware.test.ts",
-      "sdk-nuxt/src/__tests__/server/middleware.test.ts",
-      "sdk-sveltekit/src/__tests__/handle.test.ts",
-      "sdk-solid-start/src/__tests__/middleware.test.ts",
-      "sdk-qwik-router/src/__tests__/request-handler.test.ts",
-      "sdk-tanstack-start/src/__tests__/middleware.test.ts",
-    ],
-    "describeEdgeServer(": [
-      "sdk-next/src/__tests__/middleware.edge.test.ts",
-      "sdk-nuxt/src/__tests__/server/middleware.edge.test.ts",
-      "sdk-sveltekit/src/__tests__/handle.edge.test.ts",
-      "sdk-solid-start/src/__tests__/middleware.edge.test.ts",
-      "sdk-qwik-router/src/__tests__/request-handler.edge.test.ts",
-      "sdk-tanstack-start/src/__tests__/middleware.edge.test.ts",
-    ],
+  const read = (path: string): string => readFileSync(`${packagesDir}${path}`, "utf8");
+  type Task = { dependsOn?: string[]; inputs?: string[] };
+  /** A package's turbo tasks: its turbo.json, read as JSON without its comment lines. */
+  const tasksOf = (dir: string): Record<string, Task> =>
+    JSON.parse(read(`${dir}/turbo.json`).replace(/^\s*\/\/.*$/gm, "")).tasks;
+
+  const CALLS: Record<string, Record<string, readonly string[]>> = {
+    "@zitadel/server-sdk-contract": {
+      "describeServerMiddleware(": [
+        "sdk-next/src/__tests__/middleware.test.ts",
+        "sdk-nuxt/src/__tests__/server/middleware.test.ts",
+        "sdk-sveltekit/src/__tests__/handle.test.ts",
+        "sdk-solid-start/src/__tests__/middleware.test.ts",
+        "sdk-qwik-router/src/__tests__/request-handler.test.ts",
+        "sdk-tanstack-start/src/__tests__/middleware.test.ts",
+      ],
+      "describeEdgeServer(": [
+        "sdk-next/src/__tests__/middleware.edge.test.ts",
+        "sdk-nuxt/src/__tests__/server/middleware.edge.test.ts",
+        "sdk-sveltekit/src/__tests__/handle.edge.test.ts",
+        "sdk-solid-start/src/__tests__/middleware.edge.test.ts",
+        "sdk-qwik-router/src/__tests__/request-handler.edge.test.ts",
+        "sdk-tanstack-start/src/__tests__/middleware.edge.test.ts",
+      ],
+    },
+    "@zitadel/client-sdk-contract": {
+      "describeEdgeEntry(": [
+        "sdk-react/src/index.edge.spec.tsx",
+        "sdk-vue/src/index.edge.spec.ts",
+        "sdk-angular/src/public-api.edge.spec.ts",
+        "sdk-svelte/src/index.edge.spec.ts",
+        "sdk-solid/src/index.edge.spec.tsx",
+        "sdk-qwik/src/index.edge.spec.tsx",
+        "sdk-next/src/__tests__/client.edge.test.ts",
+      ],
+      // `@zitadel/sdk-next/client` renders no widget: Next renders through the
+      // React SDK's components, which sdk-react's own edge spec covers.
+      "describeEdgeRender(": [
+        "sdk-react/src/index.edge.spec.tsx",
+        "sdk-vue/src/index.edge.spec.ts",
+        "sdk-angular/src/public-api.edge.spec.ts",
+        "sdk-svelte/src/index.edge.spec.ts",
+        "sdk-solid/src/index.edge.spec.tsx",
+        "sdk-qwik/src/index.edge.spec.tsx",
+      ],
+      "describeServerRenderCases(": [
+        "sdk-react/src/index.spec.tsx",
+        "sdk-vue/src/components.spec.ts",
+        "sdk-angular/src/lib/components.spec.ts",
+        "sdk-svelte/src/index.spec.ts",
+        "sdk-solid/src/index.ssr.spec.tsx",
+        "sdk-qwik/src/index.ssr.spec.tsx",
+      ],
+      // Angular's component tag already is the element that carries the standard
+      // attributes, so its wrapper forwards none and runs neither of these.
+      "describeServerStandardAttributes(": [
+        "sdk-react/src/index.spec.tsx",
+        "sdk-vue/src/components.spec.ts",
+        "sdk-svelte/src/index.ssr.spec.ts",
+        "sdk-solid/src/index.ssr.spec.tsx",
+        "sdk-qwik/src/index.ssr.spec.tsx",
+      ],
+      "describeStandardAttributes<": [
+        "sdk-react/src/index.spec.tsx",
+        "sdk-vue/src/components.spec.ts",
+        "sdk-svelte/src/index.spec.ts",
+        "sdk-solid/src/index.spec.tsx",
+        "sdk-qwik/src/index.spec.tsx",
+      ],
+    },
   };
-  const specs = Object.entries(CALLS).flatMap(([call, paths]) => paths.map((path) => [path, call]));
+  const specs = Object.values(CALLS).flatMap((calls) =>
+    Object.entries(calls).flatMap(([call, paths]) => paths.map((path) => [path, call] as const)),
+  );
 
   it.each(specs)("%s calls %s", (path, call) => {
-    expect(readFileSync(`${packagesDir}${path}`, "utf8")).toContain(call);
+    expect(read(path)).toContain(call);
   });
 
-  it("turbo.json lists the specs as test inputs", () => {
-    const config = readFileSync(`${packagesDir}sdk-core/turbo.json`, "utf8");
-    for (const [path] of specs) expect(config).toContain(`packages/${path}`);
+  it.each(Object.keys(CALLS))(
+    "%s runs in every SDK that depends on it, with its edge",
+    (contract) => {
+      const dependents = readdirSync(packagesDir).filter(
+        (dir) =>
+          existsSync(`${packagesDir}${dir}/package.json`) &&
+          JSON.parse(read(`${dir}/package.json`)).devDependencies?.[contract] !== undefined,
+      );
+      const callers = new Set(
+        Object.values(CALLS[contract] ?? {})
+          .flat()
+          .map((path) => path.slice(0, path.indexOf("/"))),
+      );
+      expect([...callers].sort()).toEqual(dependents.sort());
+      for (const dir of dependents) {
+        for (const task of ["test", "typecheck"]) {
+          expect(tasksOf(dir)[task]?.dependsOn, `${dir}#${task}`).toContain(
+            `${contract}#typecheck`,
+          );
+        }
+      }
+    },
+  );
+
+  it("turbo.json's test inputs list exactly the specs this check reads", () => {
+    const inputs = (tasksOf("sdk-core").test?.inputs ?? [])
+      .filter((input) => /\.(spec|test)\.tsx?$/.test(input))
+      .map((input) => input.replace("$TURBO_ROOT$/packages/", ""));
+    expect(inputs.sort()).toEqual([...new Set(specs.map(([path]) => path))].sort());
   });
 });
