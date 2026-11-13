@@ -183,6 +183,7 @@ export const EVENT_TYPES = [
   "auth.check.succeeded",
   "auth.factor.passkey.enrolled",
   "auth.factor.password.set",
+  "auth.request.created",
   "auth.sso.authorization.failed",
   "auth.sso.exchange.failed",
   "auth.sso.exchange.succeeded",

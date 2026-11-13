@@ -11249,6 +11249,35 @@
         }
       }
     },
+    "auth.request.created": {
+      "post": {
+        "operationId": "authRequestCreated",
+        "summary": "auth.request.created",
+        "description": "An app started a sign-in at the OAuth authorization endpoint. The\npayload names the app by its `client_id`.\n\nThe body is the event as `GET /events` returns it.\n",
+        "tags": [
+          "Event Webhooks"
+        ],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/auth-request-created-event"
+              }
+            }
+          }
+        },
+        "responses": {
+          "2XX": {
+            "$ref": "#/components/responses/webhook-delivered"
+          },
+          "default": {
+            "$ref": "#/components/responses/webhook-not-delivered"
+          }
+        }
+      }
+    },
     "auth.sso.authorization.failed": {
       "post": {
         "operationId": "authSsoAuthorizationFailed",
@@ -23254,6 +23283,44 @@
           }
         ]
       },
+      "auth-request-created-payload": {
+        "title": "AuthRequestCreatedPayload",
+        "type": "object",
+        "description": "Payload for `auth.request.created` events.",
+        "required": [
+          "client_id"
+        ],
+        "properties": {
+          "client_id": {
+            "type": "string"
+          }
+        }
+      },
+      "auth-request-created-event": {
+        "title": "AuthRequestCreatedEvent",
+        "description": "An event of type auth.request.created, with the shared event fields and its own payload.\n",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/event-base"
+          },
+          {
+            "type": "object",
+            "required": [
+              "event_type",
+              "payload"
+            ],
+            "properties": {
+              "event_type": {
+                "type": "string",
+                "const": "auth.request.created"
+              },
+              "payload": {
+                "$ref": "#/components/schemas/auth-request-created-payload"
+              }
+            }
+          }
+        ]
+      },
       "auth-sso-authorization-failed-event": {
         "title": "AuthSsoAuthorizationFailedEvent",
         "description": "An event of type auth.sso.authorization.failed, with the shared event fields and its own payload.\n",
@@ -25091,6 +25158,9 @@
             "$ref": "#/components/schemas/auth-factor-password-set-event"
           },
           {
+            "$ref": "#/components/schemas/auth-request-created-event"
+          },
+          {
             "$ref": "#/components/schemas/auth-sso-authorization-failed-event"
           },
           {
@@ -25234,6 +25304,7 @@
             "auth.check.succeeded": "#/components/schemas/auth-check-succeeded-event",
             "auth.factor.passkey.enrolled": "#/components/schemas/auth-factor-passkey-enrolled-event",
             "auth.factor.password.set": "#/components/schemas/auth-factor-password-set-event",
+            "auth.request.created": "#/components/schemas/auth-request-created-event",
             "auth.sso.authorization.failed": "#/components/schemas/auth-sso-authorization-failed-event",
             "auth.sso.exchange.failed": "#/components/schemas/auth-sso-exchange-failed-event",
             "auth.sso.exchange.succeeded": "#/components/schemas/auth-sso-exchange-succeeded-event",

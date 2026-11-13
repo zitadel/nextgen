@@ -6212,6 +6212,482 @@ func (s *AuthMethods) SetOtp(val OptAuthMethod) {
 
 // Merged schema.
 // Ref: #
+type AuthRequestCreatedEvent struct {
+	// The event ID, in the form `evt_<opaque>`.
+	ID        string    `json:"id"`
+	ProjectID ProjectID `json:"project_id"`
+	// The team the actor operated under when the event was emitted, if any.
+	TeamID OptNilString `json:"team_id"`
+	// Merged property.
+	EventType string `json:"event_type"`
+	// The category of the event.
+	Category AuthRequestCreatedEventCategory `json:"category"`
+	// When the action happened, on the server's clock, to the millisecond.
+	OccurredAt time.Time `json:"occurred_at"`
+	// When the event was stored, on the server's clock, to the millisecond.
+	CreatedAt time.Time `json:"created_at"`
+	// The ID of the actor that triggered the event.
+	ActorID OptNilString `json:"actor_id"`
+	// The kind of actor that triggered the event.
+	ActorType OptNilAuthRequestCreatedEventActorType `json:"actor_type"`
+	// The type of resource the event affected.
+	EntityType OptNilString `json:"entity_type"`
+	// The ID of the resource the event affected.
+	EntityID OptNilString `json:"entity_id"`
+	// The ID of the user the event concerns, whoever triggered it: the user a session, a token, a sign-in
+	// check or a credential belongs to, or the user a change was made to. Absent on an event that concerns
+	// no user.
+	UserID OptNilString `json:"user_id"`
+	// The application or agent that produced the event.
+	ClientID string `json:"client_id"`
+	// The ID of the token in use when the event was emitted, when there was one.
+	TokenID OptString `json:"token_id"`
+	// The kind of delegation. Absent when unset.
+	DelegationType OptAuthRequestCreatedEventDelegationType `json:"delegation_type"`
+	DelegationID   OptString                                `json:"delegation_id"`
+	Grantor        OptString                                `json:"grantor"`
+	// A device fingerprint ID that correlates events from the same device.
+	Fingerprint OptString `json:"fingerprint"`
+	// The ID of the HTTP request that caused the event. Events of one request share it. Only the
+	// `request.api` event of a request carries `metadata.client`.
+	RequestID OptNilString `json:"request_id"`
+	// The ID of the session the event belongs to.
+	SessionID OptNilString `json:"session_id"`
+	// An ID that correlates the events of one login flow.
+	FlowID   OptNilString              `json:"flow_id"`
+	Metadata OptEventMetadata          `json:"metadata"`
+	Payload  AuthRequestCreatedPayload `json:"payload"`
+}
+
+// GetID returns the value of ID.
+func (s *AuthRequestCreatedEvent) GetID() string {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *AuthRequestCreatedEvent) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *AuthRequestCreatedEvent) GetTeamID() OptNilString {
+	return s.TeamID
+}
+
+// GetEventType returns the value of EventType.
+func (s *AuthRequestCreatedEvent) GetEventType() string {
+	return s.EventType
+}
+
+// GetCategory returns the value of Category.
+func (s *AuthRequestCreatedEvent) GetCategory() AuthRequestCreatedEventCategory {
+	return s.Category
+}
+
+// GetOccurredAt returns the value of OccurredAt.
+func (s *AuthRequestCreatedEvent) GetOccurredAt() time.Time {
+	return s.OccurredAt
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *AuthRequestCreatedEvent) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetActorID returns the value of ActorID.
+func (s *AuthRequestCreatedEvent) GetActorID() OptNilString {
+	return s.ActorID
+}
+
+// GetActorType returns the value of ActorType.
+func (s *AuthRequestCreatedEvent) GetActorType() OptNilAuthRequestCreatedEventActorType {
+	return s.ActorType
+}
+
+// GetEntityType returns the value of EntityType.
+func (s *AuthRequestCreatedEvent) GetEntityType() OptNilString {
+	return s.EntityType
+}
+
+// GetEntityID returns the value of EntityID.
+func (s *AuthRequestCreatedEvent) GetEntityID() OptNilString {
+	return s.EntityID
+}
+
+// GetUserID returns the value of UserID.
+func (s *AuthRequestCreatedEvent) GetUserID() OptNilString {
+	return s.UserID
+}
+
+// GetClientID returns the value of ClientID.
+func (s *AuthRequestCreatedEvent) GetClientID() string {
+	return s.ClientID
+}
+
+// GetTokenID returns the value of TokenID.
+func (s *AuthRequestCreatedEvent) GetTokenID() OptString {
+	return s.TokenID
+}
+
+// GetDelegationType returns the value of DelegationType.
+func (s *AuthRequestCreatedEvent) GetDelegationType() OptAuthRequestCreatedEventDelegationType {
+	return s.DelegationType
+}
+
+// GetDelegationID returns the value of DelegationID.
+func (s *AuthRequestCreatedEvent) GetDelegationID() OptString {
+	return s.DelegationID
+}
+
+// GetGrantor returns the value of Grantor.
+func (s *AuthRequestCreatedEvent) GetGrantor() OptString {
+	return s.Grantor
+}
+
+// GetFingerprint returns the value of Fingerprint.
+func (s *AuthRequestCreatedEvent) GetFingerprint() OptString {
+	return s.Fingerprint
+}
+
+// GetRequestID returns the value of RequestID.
+func (s *AuthRequestCreatedEvent) GetRequestID() OptNilString {
+	return s.RequestID
+}
+
+// GetSessionID returns the value of SessionID.
+func (s *AuthRequestCreatedEvent) GetSessionID() OptNilString {
+	return s.SessionID
+}
+
+// GetFlowID returns the value of FlowID.
+func (s *AuthRequestCreatedEvent) GetFlowID() OptNilString {
+	return s.FlowID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *AuthRequestCreatedEvent) GetMetadata() OptEventMetadata {
+	return s.Metadata
+}
+
+// GetPayload returns the value of Payload.
+func (s *AuthRequestCreatedEvent) GetPayload() AuthRequestCreatedPayload {
+	return s.Payload
+}
+
+// SetID sets the value of ID.
+func (s *AuthRequestCreatedEvent) SetID(val string) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *AuthRequestCreatedEvent) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *AuthRequestCreatedEvent) SetTeamID(val OptNilString) {
+	s.TeamID = val
+}
+
+// SetEventType sets the value of EventType.
+func (s *AuthRequestCreatedEvent) SetEventType(val string) {
+	s.EventType = val
+}
+
+// SetCategory sets the value of Category.
+func (s *AuthRequestCreatedEvent) SetCategory(val AuthRequestCreatedEventCategory) {
+	s.Category = val
+}
+
+// SetOccurredAt sets the value of OccurredAt.
+func (s *AuthRequestCreatedEvent) SetOccurredAt(val time.Time) {
+	s.OccurredAt = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *AuthRequestCreatedEvent) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetActorID sets the value of ActorID.
+func (s *AuthRequestCreatedEvent) SetActorID(val OptNilString) {
+	s.ActorID = val
+}
+
+// SetActorType sets the value of ActorType.
+func (s *AuthRequestCreatedEvent) SetActorType(val OptNilAuthRequestCreatedEventActorType) {
+	s.ActorType = val
+}
+
+// SetEntityType sets the value of EntityType.
+func (s *AuthRequestCreatedEvent) SetEntityType(val OptNilString) {
+	s.EntityType = val
+}
+
+// SetEntityID sets the value of EntityID.
+func (s *AuthRequestCreatedEvent) SetEntityID(val OptNilString) {
+	s.EntityID = val
+}
+
+// SetUserID sets the value of UserID.
+func (s *AuthRequestCreatedEvent) SetUserID(val OptNilString) {
+	s.UserID = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *AuthRequestCreatedEvent) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetTokenID sets the value of TokenID.
+func (s *AuthRequestCreatedEvent) SetTokenID(val OptString) {
+	s.TokenID = val
+}
+
+// SetDelegationType sets the value of DelegationType.
+func (s *AuthRequestCreatedEvent) SetDelegationType(val OptAuthRequestCreatedEventDelegationType) {
+	s.DelegationType = val
+}
+
+// SetDelegationID sets the value of DelegationID.
+func (s *AuthRequestCreatedEvent) SetDelegationID(val OptString) {
+	s.DelegationID = val
+}
+
+// SetGrantor sets the value of Grantor.
+func (s *AuthRequestCreatedEvent) SetGrantor(val OptString) {
+	s.Grantor = val
+}
+
+// SetFingerprint sets the value of Fingerprint.
+func (s *AuthRequestCreatedEvent) SetFingerprint(val OptString) {
+	s.Fingerprint = val
+}
+
+// SetRequestID sets the value of RequestID.
+func (s *AuthRequestCreatedEvent) SetRequestID(val OptNilString) {
+	s.RequestID = val
+}
+
+// SetSessionID sets the value of SessionID.
+func (s *AuthRequestCreatedEvent) SetSessionID(val OptNilString) {
+	s.SessionID = val
+}
+
+// SetFlowID sets the value of FlowID.
+func (s *AuthRequestCreatedEvent) SetFlowID(val OptNilString) {
+	s.FlowID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *AuthRequestCreatedEvent) SetMetadata(val OptEventMetadata) {
+	s.Metadata = val
+}
+
+// SetPayload sets the value of Payload.
+func (s *AuthRequestCreatedEvent) SetPayload(val AuthRequestCreatedPayload) {
+	s.Payload = val
+}
+
+type AuthRequestCreatedEventActorType string
+
+const (
+	AuthRequestCreatedEventActorTypeHuman   AuthRequestCreatedEventActorType = "human"
+	AuthRequestCreatedEventActorTypeService AuthRequestCreatedEventActorType = "service"
+	AuthRequestCreatedEventActorTypeSystem  AuthRequestCreatedEventActorType = "system"
+	AuthRequestCreatedEventActorTypeAgent   AuthRequestCreatedEventActorType = "agent"
+)
+
+// AllValues returns all AuthRequestCreatedEventActorType values.
+func (AuthRequestCreatedEventActorType) AllValues() []AuthRequestCreatedEventActorType {
+	return []AuthRequestCreatedEventActorType{
+		AuthRequestCreatedEventActorTypeHuman,
+		AuthRequestCreatedEventActorTypeService,
+		AuthRequestCreatedEventActorTypeSystem,
+		AuthRequestCreatedEventActorTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s AuthRequestCreatedEventActorType) MarshalText() ([]byte, error) {
+	switch s {
+	case AuthRequestCreatedEventActorTypeHuman:
+		return []byte(s), nil
+	case AuthRequestCreatedEventActorTypeService:
+		return []byte(s), nil
+	case AuthRequestCreatedEventActorTypeSystem:
+		return []byte(s), nil
+	case AuthRequestCreatedEventActorTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *AuthRequestCreatedEventActorType) UnmarshalText(data []byte) error {
+	switch AuthRequestCreatedEventActorType(data) {
+	case AuthRequestCreatedEventActorTypeHuman:
+		*s = AuthRequestCreatedEventActorTypeHuman
+		return nil
+	case AuthRequestCreatedEventActorTypeService:
+		*s = AuthRequestCreatedEventActorTypeService
+		return nil
+	case AuthRequestCreatedEventActorTypeSystem:
+		*s = AuthRequestCreatedEventActorTypeSystem
+		return nil
+	case AuthRequestCreatedEventActorTypeAgent:
+		*s = AuthRequestCreatedEventActorTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The category of the event.
+type AuthRequestCreatedEventCategory string
+
+const (
+	AuthRequestCreatedEventCategoryRequest AuthRequestCreatedEventCategory = "request"
+	AuthRequestCreatedEventCategoryAuth    AuthRequestCreatedEventCategory = "auth"
+	AuthRequestCreatedEventCategorySession AuthRequestCreatedEventCategory = "session"
+	AuthRequestCreatedEventCategoryAdmin   AuthRequestCreatedEventCategory = "admin"
+	AuthRequestCreatedEventCategoryEntity  AuthRequestCreatedEventCategory = "entity"
+	AuthRequestCreatedEventCategorySignal  AuthRequestCreatedEventCategory = "signal"
+)
+
+// AllValues returns all AuthRequestCreatedEventCategory values.
+func (AuthRequestCreatedEventCategory) AllValues() []AuthRequestCreatedEventCategory {
+	return []AuthRequestCreatedEventCategory{
+		AuthRequestCreatedEventCategoryRequest,
+		AuthRequestCreatedEventCategoryAuth,
+		AuthRequestCreatedEventCategorySession,
+		AuthRequestCreatedEventCategoryAdmin,
+		AuthRequestCreatedEventCategoryEntity,
+		AuthRequestCreatedEventCategorySignal,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s AuthRequestCreatedEventCategory) MarshalText() ([]byte, error) {
+	switch s {
+	case AuthRequestCreatedEventCategoryRequest:
+		return []byte(s), nil
+	case AuthRequestCreatedEventCategoryAuth:
+		return []byte(s), nil
+	case AuthRequestCreatedEventCategorySession:
+		return []byte(s), nil
+	case AuthRequestCreatedEventCategoryAdmin:
+		return []byte(s), nil
+	case AuthRequestCreatedEventCategoryEntity:
+		return []byte(s), nil
+	case AuthRequestCreatedEventCategorySignal:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *AuthRequestCreatedEventCategory) UnmarshalText(data []byte) error {
+	switch AuthRequestCreatedEventCategory(data) {
+	case AuthRequestCreatedEventCategoryRequest:
+		*s = AuthRequestCreatedEventCategoryRequest
+		return nil
+	case AuthRequestCreatedEventCategoryAuth:
+		*s = AuthRequestCreatedEventCategoryAuth
+		return nil
+	case AuthRequestCreatedEventCategorySession:
+		*s = AuthRequestCreatedEventCategorySession
+		return nil
+	case AuthRequestCreatedEventCategoryAdmin:
+		*s = AuthRequestCreatedEventCategoryAdmin
+		return nil
+	case AuthRequestCreatedEventCategoryEntity:
+		*s = AuthRequestCreatedEventCategoryEntity
+		return nil
+	case AuthRequestCreatedEventCategorySignal:
+		*s = AuthRequestCreatedEventCategorySignal
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The kind of delegation. Absent when unset.
+type AuthRequestCreatedEventDelegationType string
+
+const (
+	AuthRequestCreatedEventDelegationTypeDirect    AuthRequestCreatedEventDelegationType = "direct"
+	AuthRequestCreatedEventDelegationTypeDelegated AuthRequestCreatedEventDelegationType = "delegated"
+	AuthRequestCreatedEventDelegationTypePatShared AuthRequestCreatedEventDelegationType = "pat_shared"
+	AuthRequestCreatedEventDelegationTypeExchanged AuthRequestCreatedEventDelegationType = "exchanged"
+)
+
+// AllValues returns all AuthRequestCreatedEventDelegationType values.
+func (AuthRequestCreatedEventDelegationType) AllValues() []AuthRequestCreatedEventDelegationType {
+	return []AuthRequestCreatedEventDelegationType{
+		AuthRequestCreatedEventDelegationTypeDirect,
+		AuthRequestCreatedEventDelegationTypeDelegated,
+		AuthRequestCreatedEventDelegationTypePatShared,
+		AuthRequestCreatedEventDelegationTypeExchanged,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s AuthRequestCreatedEventDelegationType) MarshalText() ([]byte, error) {
+	switch s {
+	case AuthRequestCreatedEventDelegationTypeDirect:
+		return []byte(s), nil
+	case AuthRequestCreatedEventDelegationTypeDelegated:
+		return []byte(s), nil
+	case AuthRequestCreatedEventDelegationTypePatShared:
+		return []byte(s), nil
+	case AuthRequestCreatedEventDelegationTypeExchanged:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *AuthRequestCreatedEventDelegationType) UnmarshalText(data []byte) error {
+	switch AuthRequestCreatedEventDelegationType(data) {
+	case AuthRequestCreatedEventDelegationTypeDirect:
+		*s = AuthRequestCreatedEventDelegationTypeDirect
+		return nil
+	case AuthRequestCreatedEventDelegationTypeDelegated:
+		*s = AuthRequestCreatedEventDelegationTypeDelegated
+		return nil
+	case AuthRequestCreatedEventDelegationTypePatShared:
+		*s = AuthRequestCreatedEventDelegationTypePatShared
+		return nil
+	case AuthRequestCreatedEventDelegationTypeExchanged:
+		*s = AuthRequestCreatedEventDelegationTypeExchanged
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Payload for `auth.request.created` events.
+// Ref: #
+type AuthRequestCreatedPayload struct {
+	ClientID string `json:"client_id"`
+}
+
+// GetClientID returns the value of ClientID.
+func (s *AuthRequestCreatedPayload) GetClientID() string {
+	return s.ClientID
+}
+
+// SetClientID sets the value of ClientID.
+func (s *AuthRequestCreatedPayload) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// Merged schema.
+// Ref: #
 type AuthSSOAuthorizationFailedEvent struct {
 	// The event ID, in the form `evt_<opaque>`.
 	ID        string    `json:"id"`
@@ -27417,6 +27893,7 @@ type Event struct {
 	AuthCheckSucceededEvent          AuthCheckSucceededEvent
 	AuthFactorPasskeyEnrolledEvent   AuthFactorPasskeyEnrolledEvent
 	AuthFactorPasswordSetEvent       AuthFactorPasswordSetEvent
+	AuthRequestCreatedEvent          AuthRequestCreatedEvent
 	AuthSSOAuthorizationFailedEvent  AuthSSOAuthorizationFailedEvent
 	AuthSSOExchangeFailedEvent       AuthSSOExchangeFailedEvent
 	AuthSSOExchangeSucceededEvent    AuthSSOExchangeSucceededEvent
@@ -27476,6 +27953,7 @@ const (
 	AuthCheckSucceededEventEvent          EventType = "auth.check.succeeded"
 	AuthFactorPasskeyEnrolledEventEvent   EventType = "auth.factor.passkey.enrolled"
 	AuthFactorPasswordSetEventEvent       EventType = "auth.factor.password.set"
+	AuthRequestCreatedEventEvent          EventType = "auth.request.created"
 	AuthSSOAuthorizationFailedEventEvent  EventType = "auth.sso.authorization.failed"
 	AuthSSOExchangeFailedEventEvent       EventType = "auth.sso.exchange.failed"
 	AuthSSOExchangeSucceededEventEvent    EventType = "auth.sso.exchange.succeeded"
@@ -27547,6 +28025,9 @@ func (s Event) IsAuthFactorPasskeyEnrolledEvent() bool {
 
 // IsAuthFactorPasswordSetEvent reports whether Event is AuthFactorPasswordSetEvent.
 func (s Event) IsAuthFactorPasswordSetEvent() bool { return s.Type == AuthFactorPasswordSetEventEvent }
+
+// IsAuthRequestCreatedEvent reports whether Event is AuthRequestCreatedEvent.
+func (s Event) IsAuthRequestCreatedEvent() bool { return s.Type == AuthRequestCreatedEventEvent }
 
 // IsAuthSSOAuthorizationFailedEvent reports whether Event is AuthSSOAuthorizationFailedEvent.
 func (s Event) IsAuthSSOAuthorizationFailedEvent() bool {
@@ -27855,6 +28336,27 @@ func (s Event) GetAuthFactorPasswordSetEvent() (v AuthFactorPasswordSetEvent, ok
 func NewAuthFactorPasswordSetEventEvent(v AuthFactorPasswordSetEvent) Event {
 	var s Event
 	s.SetAuthFactorPasswordSetEvent(v)
+	return s
+}
+
+// SetAuthRequestCreatedEvent sets Event to AuthRequestCreatedEvent.
+func (s *Event) SetAuthRequestCreatedEvent(v AuthRequestCreatedEvent) {
+	s.Type = AuthRequestCreatedEventEvent
+	s.AuthRequestCreatedEvent = v
+}
+
+// GetAuthRequestCreatedEvent returns AuthRequestCreatedEvent and true boolean if Event is AuthRequestCreatedEvent.
+func (s Event) GetAuthRequestCreatedEvent() (v AuthRequestCreatedEvent, ok bool) {
+	if !s.IsAuthRequestCreatedEvent() {
+		return v, false
+	}
+	return s.AuthRequestCreatedEvent, true
+}
+
+// NewAuthRequestCreatedEventEvent returns new Event from AuthRequestCreatedEvent.
+func NewAuthRequestCreatedEventEvent(v AuthRequestCreatedEvent) Event {
+	var s Event
+	s.SetAuthRequestCreatedEvent(v)
 	return s
 }
 
@@ -61282,6 +61784,52 @@ func (o OptAuthMethod) Or(d AuthMethod) AuthMethod {
 	return d
 }
 
+// NewOptAuthRequestCreatedEventDelegationType returns new OptAuthRequestCreatedEventDelegationType with value set to v.
+func NewOptAuthRequestCreatedEventDelegationType(v AuthRequestCreatedEventDelegationType) OptAuthRequestCreatedEventDelegationType {
+	return OptAuthRequestCreatedEventDelegationType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptAuthRequestCreatedEventDelegationType is optional AuthRequestCreatedEventDelegationType.
+type OptAuthRequestCreatedEventDelegationType struct {
+	Value AuthRequestCreatedEventDelegationType
+	Set   bool
+}
+
+// IsSet returns true if OptAuthRequestCreatedEventDelegationType was set.
+func (o OptAuthRequestCreatedEventDelegationType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptAuthRequestCreatedEventDelegationType) Reset() {
+	var v AuthRequestCreatedEventDelegationType
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptAuthRequestCreatedEventDelegationType) SetTo(v AuthRequestCreatedEventDelegationType) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptAuthRequestCreatedEventDelegationType) Get() (v AuthRequestCreatedEventDelegationType, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptAuthRequestCreatedEventDelegationType) Or(d AuthRequestCreatedEventDelegationType) AuthRequestCreatedEventDelegationType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptAuthSSOAuthorizationFailedEventDelegationType returns new OptAuthSSOAuthorizationFailedEventDelegationType with value set to v.
 func NewOptAuthSSOAuthorizationFailedEventDelegationType(v AuthSSOAuthorizationFailedEventDelegationType) OptAuthSSOAuthorizationFailedEventDelegationType {
 	return OptAuthSSOAuthorizationFailedEventDelegationType{
@@ -69042,6 +69590,74 @@ func (o OptNilAuthFactorPasswordSetEventActorType) Get() (v AuthFactorPasswordSe
 
 // Or returns value if set, or given parameter if does not.
 func (o OptNilAuthFactorPasswordSetEventActorType) Or(d AuthFactorPasswordSetEventActorType) AuthFactorPasswordSetEventActorType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilAuthRequestCreatedEventActorType returns new OptNilAuthRequestCreatedEventActorType with value set to v.
+func NewOptNilAuthRequestCreatedEventActorType(v AuthRequestCreatedEventActorType) OptNilAuthRequestCreatedEventActorType {
+	return OptNilAuthRequestCreatedEventActorType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilAuthRequestCreatedEventActorType is optional nullable AuthRequestCreatedEventActorType.
+type OptNilAuthRequestCreatedEventActorType struct {
+	Value AuthRequestCreatedEventActorType
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilAuthRequestCreatedEventActorType was set.
+func (o OptNilAuthRequestCreatedEventActorType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilAuthRequestCreatedEventActorType) Reset() {
+	var v AuthRequestCreatedEventActorType
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilAuthRequestCreatedEventActorType) SetTo(v AuthRequestCreatedEventActorType) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilAuthRequestCreatedEventActorType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilAuthRequestCreatedEventActorType) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v AuthRequestCreatedEventActorType
+	o.Value = v
+}
+
+// IsEmpty returns true if the field was omitted from the payload (not Set and not Null).
+func (o OptNilAuthRequestCreatedEventActorType) IsEmpty() bool {
+	return !o.Set && !o.Null
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilAuthRequestCreatedEventActorType) Get() (v AuthRequestCreatedEventActorType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilAuthRequestCreatedEventActorType) Or(d AuthRequestCreatedEventActorType) AuthRequestCreatedEventActorType {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -112855,6 +113471,7 @@ func (*WebhookDelivered) authCheckFailedRes()             {}
 func (*WebhookDelivered) authCheckSucceededRes()          {}
 func (*WebhookDelivered) authFactorPasskeyEnrolledRes()   {}
 func (*WebhookDelivered) authFactorPasswordSetRes()       {}
+func (*WebhookDelivered) authRequestCreatedRes()          {}
 func (*WebhookDelivered) authSsoAuthorizationFailedRes()  {}
 func (*WebhookDelivered) authSsoExchangeFailedRes()       {}
 func (*WebhookDelivered) authSsoExchangeSucceededRes()    {}
@@ -112923,6 +113540,7 @@ func (*WebhookNotDelivered) authCheckFailedRes()             {}
 func (*WebhookNotDelivered) authCheckSucceededRes()          {}
 func (*WebhookNotDelivered) authFactorPasskeyEnrolledRes()   {}
 func (*WebhookNotDelivered) authFactorPasswordSetRes()       {}
+func (*WebhookNotDelivered) authRequestCreatedRes()          {}
 func (*WebhookNotDelivered) authSsoAuthorizationFailedRes()  {}
 func (*WebhookNotDelivered) authSsoExchangeFailedRes()       {}
 func (*WebhookNotDelivered) authSsoExchangeSucceededRes()    {}

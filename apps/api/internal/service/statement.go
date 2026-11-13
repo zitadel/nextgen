@@ -45,6 +45,7 @@ type AllStatements interface {
 	TokenStatements
 	SessionStatements
 	AuthAttemptStatements
+	AuthRequestStatements
 	UserStatements
 	UserPasswordStatements
 	UserTOTPStatements
@@ -800,6 +801,18 @@ type VariableSetStatements interface {
 	// deployment that was never linked -- or does not exist, or belongs to
 	// another project -- returns NoRowFoundError.
 	GetDeploymentVariables(ctx context.Context, projectID, deploymentID string) (*domain.VariableSet, error)
+}
+
+// AuthRequestStatements persists the authorization requests the endpoint
+// hands to the login (ADR 081 §8). Rows are never updated.
+type AuthRequestStatements interface {
+	Statements
+	// CreateAuthRequest inserts request, generates its id when empty, and sets
+	// created_at.
+	CreateAuthRequest(ctx context.Context, request *domain.AuthRequest) error
+	// GetAuthRequest returns the request, expired or not, or a
+	// [database.NoRowFoundError].
+	GetAuthRequest(ctx context.Context, projectID, id string) (*domain.AuthRequest, error)
 }
 
 // InvitationStatements persists invitations (ADR 086). A pending invitation

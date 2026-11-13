@@ -751,6 +751,44 @@ func (c *MockAllStatementsCreateAuthAttemptCall) DoAndReturn(f func(context.Cont
 	return c
 }
 
+// CreateAuthRequest mocks base method.
+func (m *MockAllStatements) CreateAuthRequest(ctx context.Context, request *domain.AuthRequest) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateAuthRequest", ctx, request)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CreateAuthRequest indicates an expected call of CreateAuthRequest.
+func (mr *MockAllStatementsMockRecorder) CreateAuthRequest(ctx, request any) *MockAllStatementsCreateAuthRequestCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateAuthRequest", reflect.TypeOf((*MockAllStatements)(nil).CreateAuthRequest), ctx, request)
+	return &MockAllStatementsCreateAuthRequestCall{Call: call}
+}
+
+// MockAllStatementsCreateAuthRequestCall wrap *gomock.Call
+type MockAllStatementsCreateAuthRequestCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsCreateAuthRequestCall) Return(arg0 error) *MockAllStatementsCreateAuthRequestCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsCreateAuthRequestCall) Do(f func(context.Context, *domain.AuthRequest) error) *MockAllStatementsCreateAuthRequestCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsCreateAuthRequestCall) DoAndReturn(f func(context.Context, *domain.AuthRequest) error) *MockAllStatementsCreateAuthRequestCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // CreateAuthzAssignment mocks base method.
 func (m *MockAllStatements) CreateAuthzAssignment(ctx context.Context, assignment *domain.AuthzAssignment) error {
 	m.ctrl.T.Helper()
@@ -2966,6 +3004,45 @@ func (c *MockAllStatementsGetAuthAttemptByIDCall) Do(f func(context.Context, str
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAllStatementsGetAuthAttemptByIDCall) DoAndReturn(f func(context.Context, string, string) (*domain.AuthAttempt, error)) *MockAllStatementsGetAuthAttemptByIDCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// GetAuthRequest mocks base method.
+func (m *MockAllStatements) GetAuthRequest(ctx context.Context, projectID, id string) (*domain.AuthRequest, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetAuthRequest", ctx, projectID, id)
+	ret0, _ := ret[0].(*domain.AuthRequest)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetAuthRequest indicates an expected call of GetAuthRequest.
+func (mr *MockAllStatementsMockRecorder) GetAuthRequest(ctx, projectID, id any) *MockAllStatementsGetAuthRequestCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAuthRequest", reflect.TypeOf((*MockAllStatements)(nil).GetAuthRequest), ctx, projectID, id)
+	return &MockAllStatementsGetAuthRequestCall{Call: call}
+}
+
+// MockAllStatementsGetAuthRequestCall wrap *gomock.Call
+type MockAllStatementsGetAuthRequestCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsGetAuthRequestCall) Return(arg0 *domain.AuthRequest, arg1 error) *MockAllStatementsGetAuthRequestCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsGetAuthRequestCall) Do(f func(context.Context, string, string) (*domain.AuthRequest, error)) *MockAllStatementsGetAuthRequestCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsGetAuthRequestCall) DoAndReturn(f func(context.Context, string, string) (*domain.AuthRequest, error)) *MockAllStatementsGetAuthRequestCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

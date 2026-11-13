@@ -70,6 +70,7 @@ the dialect generator is the only mint path, not that create always overwrites.
 | signing key | `sig_key` |
 | session | `sess` |
 | auth attempt | `att` |
+| authorization request (`auth_requests`) | `authreq` |
 | check / challenge | `ch` |
 | token row | `tkn` |
 | user agent | `ua` |

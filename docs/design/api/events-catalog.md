@@ -191,6 +191,7 @@ tracked below.
 | Signup challenge issued | `flow.signup_challenge.issued` | `auth` | `challenge` | _(empty; challenge ID and flow ID on event columns)_ |
 | Signup proof consumed | `flow.signup_challenge.consumed` | `auth` | `challenge` | _(empty; challenge ID and flow ID on event columns)_ |
 | `CreateAuthAttempt` | `auth.attempt.created` | `auth` | `auth_attempt` | _(empty; `flow_id` / `session_id` columns)_ |
+| `CreateAuthRequest` (OAuth authorization endpoint) | `auth.request.created` | `auth` | `auth_request` | `client_id` |
 | `HandoffAuthAttempt` | `auth.attempt.handed_off` | `auth` | `auth_attempt` | _(empty; `session_id` column set)_ |
 | Challenge failed (not a sign-up's identifier that matches no account: that lookup asks whether the identifier is free, and counts only toward the challenge's failures) | `auth.check.failed` | `auth` | `check` | `check_id`, `check_type`, `auth_attempt_id` |
 | Challenge succeeded | `auth.check.succeeded` | `auth` | `check` | `check_id`, `check_type`, `auth_attempt_id` |
