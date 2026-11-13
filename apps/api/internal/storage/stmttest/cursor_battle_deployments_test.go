@@ -50,7 +50,7 @@ func battleDeploymentsOfOrigin(t *testing.T, d dialect) {
 	orderAsc := deployment.NewestFirst()
 	orderAsc.Direction = database.OrderAsc
 	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.DeploymentField]) (*database.ListResult[*domain.Deployment], error) {
-		opts := deployment.ListOptions(projectID, new(appOrigin), page.Limit)
+		opts := deployment.ListOptions(projectID, new(appOrigin), nil, page.Limit)
 		opts.Pagination = page
 		return d.stmts.ListDeployments(unfilteredListCtx(t), opts)
 	}, func(e *domain.Deployment) string { return e.ID }, 2)

@@ -3328,6 +3328,45 @@ describe("api-mock releases and deployments", () => {
       });
     });
 
+    describe("the deployments of one release", () => {
+      /**
+       * The ids of the deployments a list narrowed to one release answers.
+       *
+       * @param projectId - The project.
+       * @param releaseId - The release to narrow the list to.
+       * @param live - List the live view instead of the history.
+       * @returns The deployment ids, newest first.
+       */
+      async function ofRelease(projectId: string, releaseId: string, live = false) {
+        const view = live ? "&live=true" : "";
+        const response = await fetch(
+          `${BASE}/deployments?project_id=${projectId}&release_id=${releaseId}${view}`,
+        );
+        const listed = (await response.json()) as { deployments: { id: string }[] };
+
+        return listed.deployments.map((deployment) => {
+          return deployment.id;
+        });
+      }
+
+      test("lists every deployment of the release in the history, superseded ones included", async () => {
+        const { project, release, primary, preview } = await aReleaseServedTwice("release-history");
+        const replacement = await aReplacementLive(project);
+
+        expect(await ofRelease(project.id, release.id)).toEqual([preview.id, primary.id]);
+        expect(await ofRelease(project.id, replacement.release.id)).toEqual([
+          replacement.deployment.id,
+        ]);
+      });
+
+      test("lists only the live deployments that serve the release in the live view", async () => {
+        const { project, release, preview } = await aReleaseServedTwice("release-live");
+        await aReplacementLive(project);
+
+        expect(await ofRelease(project.id, release.id, true)).toEqual([preview.id]);
+      });
+    });
+
     describe("a deployment's status", () => {
       test("is live for a preview deployment while its preview serves", async () => {
         const { project, preview } = await aReleaseServedTwice("status-preview-live");

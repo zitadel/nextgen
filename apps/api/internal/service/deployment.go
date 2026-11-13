@@ -62,6 +62,8 @@ type ListDeploymentsInput struct {
 	ProjectID string
 	// Origin narrows the list to one origin's history.
 	Origin *string
+	// ReleaseID narrows the list to one release's deployments.
+	ReleaseID *string
 	// Live lists what is served now instead of the history.
 	Live bool
 	// IncludeReleases embeds the release each deployment made live (ADR 059).
@@ -414,7 +416,7 @@ func (s *DeploymentService) List(ctx context.Context, input ListDeploymentsInput
 // listHistory lists the project's deployments newest first, with the ids of
 // the listed ones that are live now.
 func (s *DeploymentService) listHistory(ctx context.Context, input ListDeploymentsInput) (*database.ListResult[*domain.Deployment], map[string]bool, error) {
-	opts := deployment.ListOptions(input.ProjectID, input.Origin, uint32(normalizeLimit(input.Limit)))
+	opts := deployment.ListOptions(input.ProjectID, input.Origin, input.ReleaseID, uint32(normalizeLimit(input.Limit)))
 	opts.Pagination.Cursor = []byte(input.PageToken)
 	result, err := s.v2Pool.Statements().ListDeployments(ctx, opts)
 	if err != nil {
@@ -429,7 +431,7 @@ func (s *DeploymentService) listHistory(ctx context.Context, input ListDeploymen
 // an origin, it is the one deployment serving it.
 func (s *DeploymentService) listLive(ctx context.Context, input ListDeploymentsInput) (*database.ListResult[*domain.Deployment], map[string]bool, error) {
 	now := time.Now()
-	opts := deployment.LiveListOptions(input.ProjectID, nil, uint32(normalizeLimit(input.Limit)))
+	opts := deployment.LiveListOptions(input.ProjectID, input.ReleaseID, uint32(normalizeLimit(input.Limit)))
 	opts.Pagination.Cursor = []byte(input.PageToken)
 	if input.Origin != nil {
 		opts.Filter = database.And(opts.Filter, deployment.ServesOrigin(*input.Origin, now))
