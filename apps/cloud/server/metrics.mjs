@@ -98,18 +98,36 @@ function scalar(value) {
   return undefined;
 }
 
-function attributesOf(point) {
+// A data point's attributes with the ones every data point carries (always),
+// which count toward Vercel's limit and replace its own of the same name.
+function attributesOf(point, always) {
   const attributes = {};
-  let kept = 0;
+  let kept = Object.keys(always).length;
   for (const { key, value } of point.attributes ?? []) {
     const text = scalar(value);
     if (key === "" || text === undefined || text === "" || kept === maxAttributes) {
       continue;
     }
-    attributes[clip(key)] = clip(text);
+    const name = clip(key);
+    if (Object.hasOwn(always, name)) {
+      continue;
+    }
+    attributes[name] = clip(text);
     kept++;
   }
-  return attributes;
+  return Object.assign(attributes, always);
+}
+
+/**
+ * What every data point of this deployment carries beside its own attributes:
+ * its environment (production, preview). Vercel attaches the deployment, the
+ * region and the request to a custom metric but not the environment, which
+ * its own metrics have, so without it a chart of sign-ins mixes every preview
+ * with production. Under the name Vercel's own metrics use, one filter,
+ * `environment:production`, selects these as it does those.
+ */
+export function deploymentAttributes(env) {
+  return env.VERCEL_ENV ? { environment: clip(env.VERCEL_ENV) } : {};
 }
 
 function seriesKey(name, attributes) {
@@ -162,6 +180,7 @@ export class MetricQueue {
   #levelRepeatMs;
   #now;
   #reported;
+  #always;
   dropped = 0;
   unsupported = 0;
 
@@ -170,8 +189,10 @@ export class MetricQueue {
     levelRepeatMs = 60_000,
     now = Date.now,
     isReported = reported,
+    attributes = {},
   } = {}) {
     this.#reported = isReported;
+    this.#always = attributes;
     this.#maxQueued = maxQueued;
     this.#levelRepeatMs = levelRepeatMs;
     this.#now = now;
@@ -196,7 +217,7 @@ export class MetricQueue {
     if (!Number.isFinite(point.value)) {
       return;
     }
-    const attributes = attributesOf(point);
+    const attributes = attributesOf(point, this.#always);
     const key = seriesKey(name, attributes);
     const level = this.#levels.get(key) ?? {
       name,
@@ -218,7 +239,7 @@ export class MetricQueue {
     if (!Number.isFinite(point.value)) {
       return;
     }
-    const attributes = attributesOf(point);
+    const attributes = attributesOf(point, this.#always);
     const key = seriesKey(name, attributes);
     let increase = point.value;
     if (temporality === CUMULATIVE) {
@@ -277,7 +298,7 @@ export class MetricQueue {
             }
           } else if (metric.histogram?.aggregationTemporality === DELTA) {
             for (const point of metric.histogram.dataPoints) {
-              const attributes = attributesOf(point);
+              const attributes = attributesOf(point, this.#always);
               for (const value of histogramValues(point)) {
                 this.#value(name, value, attributes);
               }
