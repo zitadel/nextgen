@@ -8,6 +8,7 @@ Versioned Zitadel local config schemas and defaults — the contract behind the
 | Import                                             | What it carries                                                                                           |
 | -------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | `@zitadel/config/schemas`                          | Zod schemas for the local config files (`schemaConfigSchema`, `flowConfigSchema`, `brandingConfigSchema`) |
+| `@zitadel/config/application-presets`              | Application presets (`webApplication`, `APPLICATION_PRESETS`); runs in the browser                        |
 | `@zitadel/config/branding-url`                     | Canonical loopback HTTP URL predicate shared by config and browser render gates                           |
 | `@zitadel/config/branding-contrast`                | Contrast pairs, thresholds and measurement for a branding palette                                         |
 | `@zitadel/config/css-color`                        | Resolves the colour forms a branding palette accepts to sRGB                                              |
