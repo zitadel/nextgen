@@ -50,7 +50,6 @@ export async function checkCliVersion(input: {
     details: {
       current: cliVersion,
       latest,
-      remedy_command: upgrade,
     },
     remedy: upgrade,
   };

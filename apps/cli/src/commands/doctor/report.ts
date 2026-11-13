@@ -1,5 +1,6 @@
 import wrapAnsi from "wrap-ansi";
 
+import { isObject } from "@/lib/json";
 import { type NextSteps, renderNextSteps } from "@/lib/oclif/next-steps";
 import type { Suggest } from "@/lib/suggestion";
 import { arrow, command, dim, mark, statusColor, strong } from "@/lib/style";
@@ -79,15 +80,25 @@ export function categoryOf(checkName: string): CheckCategory {
   );
 }
 
-/** The checks as the envelope carries them. */
+/**
+ * The checks as the envelope carries them: each with its category, and a
+ * warning's remedy written into its details as `remedy_command`, after what
+ * the check found.
+ *
+ * @param checks - The checks, as they ran.
+ * @returns The checks for the envelope.
+ */
 export function withCategories(
   checks: readonly CheckOutcome[],
 ): Array<Omit<CheckOutcome, "remedy"> & { category: CheckCategory }> {
-  return checks.map(({ remedy: _typed, ...check }) => {
-    // The remedy's text is in `details.remedy_command`; the typed copy is the
-    // CLI's own and stays out of the envelope.
+  return checks.map(({ remedy, ...check }) => {
     return {
       ...check,
+      ...(remedy === undefined
+        ? {}
+        : {
+            details: { ...(isObject(check.details) ? check.details : {}), remedy_command: remedy },
+          }),
       category: categoryOf(check.name),
     };
   });

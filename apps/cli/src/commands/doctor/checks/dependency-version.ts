@@ -90,7 +90,6 @@ export class DependencyVersionCheck implements SanityCheck {
               expected: ctx.cliVersion,
             };
           }),
-          remedy_command: remedy,
         },
         remedy,
       };
@@ -108,9 +107,9 @@ export class DependencyVersionCheck implements SanityCheck {
   /**
    * No auto-fix: repair's dependency op is deliberately additive-only (it
    * never rewrites a version the user declared), so the repair ships as the
-   * package-manager-aware install command in `details.remedy_command` — the
-   * doctor command surfaces it in the envelope's `next_commands` and under the
-   * category in its report.
+   * package-manager-aware install command in `remedy` — the doctor command
+   * surfaces it in the envelope's `next_commands` and `details.remedy_command`,
+   * and under the category in its report.
    */
   async fix(_ctx: CheckContext): Promise<void> {
     return;

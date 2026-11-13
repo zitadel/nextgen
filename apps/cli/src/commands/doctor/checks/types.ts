@@ -19,9 +19,9 @@ export type CheckOutcome = {
   code?: ZitadelErrorCode;
   hint?: string;
   /**
-   * The command that repairs a warning, as the check rendered it: kept typed
-   * here so nothing reads it back out of `details` as a bare string. The
-   * envelope carries its text as `details.remedy_command`, never this field.
+   * The command that repairs a warning, as the check rendered it, and the one
+   * place a check gives it: the report quotes it, and the envelope writes it
+   * into the check's `details.remedy_command` ({@link withCategories}).
    */
   remedy?: SuggestedCommand;
 };

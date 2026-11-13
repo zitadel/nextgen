@@ -19,6 +19,9 @@ import { aSuggest } from "@tests/helpers/suggestions";
  */
 const SECRET_MISSING = ".zitadel/secret was not found";
 
+/** An SDK pinned at an exact version, as the dependency check's remedy installs it. */
+const SDK_PIN = "@zitadel/sdk-next@1.0.0";
+
 /**
  * The command that upgrades the CLI.
  */
@@ -31,7 +34,7 @@ const BEHIND: CheckOutcome = {
   name: "cli-version",
   status: "warn",
   message: "behind",
-  details: { latest: "2.0.0", remedy_command: UPGRADE },
+  details: { latest: "2.0.0" },
   remedy: aSuggest()({ id: "upgrade" }),
 };
 
@@ -136,6 +139,18 @@ describe("withCategories", () => {
     expect(checks).toEqual([
       { name: "port", status: "pass", message: "port ok", category: "local_server" },
     ]);
+  });
+
+  it("writes a warning's remedy into its details, after what the check found", () => {
+    const [check] = withCategories([BEHIND]);
+
+    expect(check).toEqual({
+      name: "cli-version",
+      status: "warn",
+      message: "behind",
+      details: { latest: "2.0.0", remedy_command: UPGRADE },
+      category: "versions",
+    });
   });
 });
 
@@ -283,8 +298,7 @@ describe("renderDoctorReport", () => {
           name: "dependency-version",
           status: "warn",
           message: "pins differ",
-          details: { remedy_command: "npm install --save-exact @zitadel/sdk-next@1.0.0" },
-          remedy: shellCommand("npm", "install", "--save-exact", "@zitadel/sdk-next@1.0.0"),
+          remedy: shellCommand("npm", "install", "--save-exact", SDK_PIN),
         },
       ]);
 

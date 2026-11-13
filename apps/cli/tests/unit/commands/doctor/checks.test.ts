@@ -2652,7 +2652,6 @@ describe("DependencyVersionCheck", () => {
           { name: "@zitadel/sdk-next", declared: TRAILING, expected: RELEASE },
           { name: "@zitadel/testing", declared: TRAILING, expected: RELEASE },
         ],
-        remedy_command: `npm install --save-exact @zitadel/sdk-next@${RELEASE} @zitadel/testing@${RELEASE}`,
       });
     });
 
@@ -2672,7 +2671,7 @@ describe("DependencyVersionCheck", () => {
 
       expect(outcome).toMatchObject({
         status: "warn",
-        details: { remedy_command: `pnpm add --save-exact @zitadel/sdk-next@${RELEASE}` },
+        remedy: `pnpm add --save-exact @zitadel/sdk-next@${RELEASE}`,
       });
     });
   });
