@@ -22,7 +22,8 @@
       "!**/generated",
       "!**/dist",
       "!**/out-tsc",
-      "!**/.nuxt-typecheck"
+      "!**/.nuxt-typecheck",
+      "!**/conformance/fixtures"
     ]
   },
   "formatter": {

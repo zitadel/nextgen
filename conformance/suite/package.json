@@ -1,0 +1,29 @@
+{
+  "name": "@zitadel/conformance",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The SDK conformance lane's shared parts: the Playwright suite every fixture runs, its config, and the script that generates and drift-checks the fixtures. Workspace tooling only; nothing is published.",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/suite.ts",
+    "./config": "./src/config.ts"
+  },
+  "bin": {
+    "conformance-fixture": "./bin/conformance-fixture.mjs"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "biome check ."
+  },
+  "dependencies": {
+    "@playwright/test": "catalog:",
+    "@zitadel/cli": "workspace:*",
+    "@zitadel/testing": "workspace:*",
+    "semver": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:"
+  }
+}

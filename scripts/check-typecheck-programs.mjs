@@ -47,6 +47,17 @@ function projectDirs() {
   }
   // The root-level e2e package is a package itself, not a folder of them.
   if (existsSync(join("e2e", "package.json"))) dirs.push("e2e");
+  // The conformance lane's suite and its fixtures (conformance/README.md).
+  if (existsSync(join("conformance", "suite", "package.json")))
+    dirs.push(join("conformance", "suite"));
+  const fixtures = join("conformance", "fixtures");
+  if (existsSync(fixtures)) {
+    for (const entry of readdirSync(fixtures, { withFileTypes: true })) {
+      if (entry.isDirectory() && existsSync(join(fixtures, entry.name, "package.json"))) {
+        dirs.push(join(fixtures, entry.name));
+      }
+    }
+  }
   return dirs;
 }
 

@@ -61,8 +61,9 @@ scripts, which build through turbo (`turbo run @zitadel/<package>#<task>`).
   `console-deployment`, `demo-next-mock`, `demo-next-real`, `demo-nuxt-mock`,
   `journey` (the journey runner with the caller's options), `journey-local`
   (the umbrella over one `journey:<id>` task per CI journey), plus the docs'
-  `e2e` and `e2e-deployment`. There is no aggregate: a `turbo run` names the
-  lanes it runs.
+  `e2e` and `e2e-deployment`, and `conformance`, one task per SDK fixture
+  ([conformance/README.md](../../../conformance/README.md)). There is no
+  aggregate: a `turbo run` names the lanes it runs.
 
 ## Tasks that write files
 
@@ -97,8 +98,11 @@ scripts, which build through turbo (`turbo run @zitadel/<package>#<task>`).
 - Edges are explicit (`dependsOn: ["@zitadel/components#build"]`). `^build`
   is not used: it follows devDependencies,
   and the console's `@zitadel/testing` would pull the CLI and the server build
-  into every console build (and close a cycle). The one `^` edge is the Go
-  modules' `^go-sources`, which follows their go.mod requires.
+  into every console build (and close a cycle). The `^` edges are the Go
+  modules' `^go-sources`, which follows their go.mod requires, and the
+  conformance fixtures' `^build` (`conformance/suite/turbo.json`): a fixture
+  installs and runs exactly what its manifest lists, so it follows its
+  devDependencies on purpose.
 - Every dependency's result is part of a task's hash, whether or not it has
   outputs. Give a task that writes files its real `outputs` all the same: a
   cache hit restores only those, and a dependent finds anything else
@@ -206,6 +210,12 @@ scripts, which build through turbo (`turbo run @zitadel/<package>#<task>`).
   (`apps/cli/src/lib/orca/scaffolders/framework-clis/package.json`, bumped by
   Dependabot); only the npm ranges those releases write resolve at run time,
   so the nightly run sets `TURBO_FORCE` and reruns them.
+- The conformance lane (`conformance`) and its drift check
+  (`check-generate`) are cached on the same grounds: the check runs the
+  framework CLI at its pin and installs nothing, so its answer is a function
+  of the CLI and server builds, the suite and the fixture. A fixture whose
+  generator its pin does not fix (`generatorPinned: false`) gives up that
+  promise; its check runs only in the nightly run (`CONFORMANCE_UNPINNED`).
 - Each journey depends on the builds of exactly what it installs
   (`journey-packages`, which packs what every journey installs once per run,
   plus its framework's SDK, which it packs itself); so an SDK change selects
