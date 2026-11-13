@@ -417,3 +417,53 @@ erasure rule and §10's state changes (#2852).
   its own. A rejected original has none left to move.
 - Cancel is unchanged: it deletes only a pending invitation, and an expired
   one keeps its row until the cleanup job exists.
+
+## Amendment (2026-11-12): the adapter's grant call and redeem rules
+
+This refines §3's lookup and §4's adapter and self-accept rules (#2853).
+
+- **The grant service takes the caller's transaction.** `GrantService.Create`
+  opens its own transaction, and transactions don't nest, so the
+  `project_member` adapter calls `EnsureUserGrant`, which runs in the
+  invitation's transaction.
+- **The duplicate rules live in that method, not in the adapter.** On
+  Postgres a unique violation aborts the transaction, so a refused duplicate
+  can't be read as success afterwards. `EnsureUserGrant` reads the user's
+  grants on the project first, and compares them by relation:
+  - an active grant of the same relation is already done;
+  - an expired one is revoked and created again;
+  - otherwise it creates the grant.
+
+  §4 says "if it starts accepting duplicates, the adapter gets simpler":
+  `EnsureUserGrant` is that path, and the adapter only maps the invitation's
+  type to the call.
+- **Accept changes the status before it grants.** The guarded status change
+  locks the row, so of two racing accepts the loser misses it and gets
+  `404 inv.not_found`, before any grant is written.
+- **Like accepting, the inviter can't decline their own invitation**
+  (`inv.self_reject`). An administrator cancels it instead, so a mistaken
+  decline doesn't record a `rejected` the invitee never made.
+- **Lookup names the inviter.** The invitee can't read platform users, so
+  lookup returns the creator as a user reference, as the members list does.
+  It is null when a project secret created the invitation.
+
+## Amendment (2026-11-13): a decline keeps the metadata, and the list's filters
+
+This replaces §4's erasure rule for declines and §4's cancel rule, and the
+matching sentence in the 2026-11-11 amendment.
+
+- **A decline keeps `metadata`.** The administrators still see who the
+  declined link was for. Accept still nulls it in the same transaction.
+- **`rejected_at` records when the invitee declined,** as `accepted_at` does
+  for accept. It is set only on a rejected invitation.
+- **Cancel deletes a pending or a rejected invitation.** It is how an
+  administrator removes a declined invitation and its metadata before the
+  cleanup job exists. An expired invitation still keeps its row.
+- **Replace moves a rejected original's metadata** when the replace sends none
+  of its own.
+- **The list's `status` filter repeats** (`status=pending&status=expired`)
+  and matches any of the values, as the events list's filters do. The console
+  hides accepted invitations by listing the other statuses.
+- **The list expands the inviter** with `expand=inviter`: `inviter` is the
+  creator as a user reference, as lookup returns it, and null when a project
+  secret created the invitation.

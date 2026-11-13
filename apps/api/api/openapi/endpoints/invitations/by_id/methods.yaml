@@ -49,10 +49,10 @@ delete:
   operationId: cancelInvitation
   summary: Cancel an invitation
   description: |
-    Deletes a pending invitation. Its link can no longer be redeemed. Only a
-    `pending` invitation can be cancelled; a finished invitation answers the
-    same opaque `404` as a miss. Expired invitations keep their row until a
-    later cleanup job removes them.
+    Deletes a pending or rejected invitation. A pending invitation's link can
+    no longer be redeemed; a rejected one's row and metadata are removed. An
+    accepted or expired invitation answers the same opaque `404` as a miss.
+    Expired invitations keep their row until a later cleanup job removes them.
 
     Authenticate with a project secret (`oauth2`) or a console session cookie
     (`sessionCookie`). Cancelling needs the same project `admin` check as

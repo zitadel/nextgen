@@ -79,7 +79,7 @@ func TestInvitationLifecycle(t *testing.T) {
 
 		listed, err := client.ListInvitations(t.Context(), api.ListInvitationsParams{
 			ProjectID: projectID,
-			Status:    api.NewOptInvitationStatus(api.InvitationStatusPending),
+			Status:    []api.InvitationStatus{api.InvitationStatusPending},
 		})
 		require.NoError(t, err)
 		page, ok := listed.(*api.ListInvitationsResponse)

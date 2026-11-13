@@ -94,10 +94,10 @@ type Handler interface {
 	BuildRelease(ctx context.Context, req *BuildReleaseRequest, params BuildReleaseParams) (BuildReleaseRes, error)
 	// CancelInvitation implements cancelInvitation operation.
 	//
-	// Deletes a pending invitation. Its link can no longer be redeemed. Only a
-	// `pending` invitation can be cancelled; a finished invitation answers the
-	// same opaque `404` as a miss. Expired invitations keep their row until a
-	// later cleanup job removes them.
+	// Deletes a pending or rejected invitation. A pending invitation's link can
+	// no longer be redeemed; a rejected one's row and metadata are removed. An
+	// accepted or expired invitation answers the same opaque `404` as a miss.
+	// Expired invitations keep their row until a later cleanup job removes them.
 	// Authenticate with a project secret (`oauth2`) or a console session cookie
 	// (`sessionCookie`). Cancelling needs the same project `admin` check as
 	// `createGrant` (`POST /grants`). Cookie requests follow that scheme's CSRF
@@ -1133,8 +1133,11 @@ type Handler interface {
 	//
 	// Lists a project's invitations, newest first, in any status, paginated with
 	// `limit` and `page_token`.
-	// Optional `status` and `type` filters narrow the page. `expired` is derived
-	// on read from `expires_at`. Authenticate with a project secret (`oauth2`) or
+	// Optional `status` and `type` filters narrow the page. Repeat `status` to
+	// match any of several statuses, for example
+	// `status=pending&status=expired&status=rejected`. `expired` is derived on
+	// read from `expires_at`. `expand=inviter` adds `inviter` to each
+	// invitation. Authenticate with a project secret (`oauth2`) or
 	// a console session cookie (`sessionCookie`). Listing needs the same project
 	// `admin` check as `createGrant` (`POST /grants`).
 	//
@@ -1458,7 +1461,9 @@ type Handler interface {
 	// Declines a pending invitation for the signed-in user and returns the
 	// updated invitation with status `rejected`.
 	// Send the plaintext token from the invitation link fragment. Metadata is
-	// cleared. Every unknown or finished token answers the same opaque `404`.
+	// cleared. The inviter cannot decline their own invitation; an administrator
+	// cancels it instead. Every unknown or finished token answers the same
+	// opaque `404`.
 	// Authenticate with a platform-project user session cookie (`sessionCookie`).
 	// Cookie requests follow that scheme's CSRF rules. The call is rate-limited.
 	//

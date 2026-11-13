@@ -119,8 +119,11 @@ get:
     Lists a project's invitations, newest first, in any status, paginated with
     `limit` and `page_token`.
 
-    Optional `status` and `type` filters narrow the page. `expired` is derived
-    on read from `expires_at`. Authenticate with a project secret (`oauth2`) or
+    Optional `status` and `type` filters narrow the page. Repeat `status` to
+    match any of several statuses, for example
+    `status=pending&status=expired&status=rejected`. `expired` is derived on
+    read from `expires_at`. `expand=inviter` adds `inviter` to each
+    invitation. Authenticate with a project secret (`oauth2`) or
     a console session cookie (`sessionCookie`). Listing needs the same project
     `admin` check as `createGrant` (`POST /grants`).
   tags:
@@ -136,9 +139,16 @@ get:
     - name: status
       in: query
       required: false
-      description: Only invitations with this status.
+      description: |
+        Only invitations with this status. Repeat the parameter to match any
+        of several statuses.
+      style: form
+      explode: true
       schema:
-        $ref: invitation-status.yaml
+        type: array
+        uniqueItems: true
+        items:
+          $ref: invitation-status.yaml
     - name: type
       in: query
       required: false
@@ -148,6 +158,17 @@ get:
         enum:
           - project_member
           - team_member
+    - name: expand
+      in: query
+      required: false
+      description: Related objects to embed on each returned invitation.
+      style: form
+      explode: true
+      schema:
+        type: array
+        uniqueItems: true
+        items:
+          $ref: invitation-expand.yaml
   responses:
     '200':
       description: A page of the project's invitations.
