@@ -1,7 +1,7 @@
 # Events a person can read
 
-> **Status:** draft proposal, 2026-11-11. Decision 3 is built; nothing else
-> below is, unless a section says "Today". Decisions carry the markers of
+> **Status:** draft proposal, 2026-11-11. Decision 3 is built, and part of
+> decision 7 (2026-11-12); nothing else below is, unless a section says "Today". Decisions carry the markers of
 > [README.md](README.md#status-markers). Once settled they become an amendment
 > of [ADR 048](../../adrs/048-wide-events-internal-audit-primitive.md), entries
 > in [events-catalog.md](events-catalog.md) and, for the console, entries in
@@ -244,6 +244,12 @@ column in every index's sort key.
 - **A sign-in's panel**: the outcome, its context (browser, address, origin),
   then its steps with the time between them.
 - The CSV gains the token and the client context.
+
+**Today (2026-11-12, [D44](../decisions.md)):** names when the page loads, for
+users. A Sign-ins view lists the events a sign-in ends in, one per row, and an
+event's drawer heads its login flow with its outcome, user and duration. Rows
+still show the server's types; the sentence a row, keys by name and the
+browser context wait on decisions 2, 4 and 5.
 
 ## Not proposed
 

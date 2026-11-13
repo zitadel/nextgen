@@ -33,12 +33,14 @@ import {
   ResourceTitle,
   RowMenu,
 } from "@/components/resource-list";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table";
 import { listProjectEvents } from "@/features/events/api";
 import { EventSheet, EventRowsContext } from "@/features/events/components/event-panel";
 import { EventSearchField } from "@/features/events/components/event-search-field";
+import { ActorName, OutcomeBadge, UserName } from "@/features/events/components/event-people";
 import { EventSubject } from "@/features/events/components/event-subject";
 import {
   ExportMenu,
@@ -47,7 +49,9 @@ import {
   SidebarFilters,
 } from "@/features/events/components/events-toolbar";
 import {
+  abandonedAttempts,
   around,
+  belongingWith,
   eventFilterValues,
   isFailure,
   isNarrowed,
@@ -59,8 +63,10 @@ import {
   narrowedBy,
   parseEventsSearch,
   rangeStart,
+  signinOf,
 } from "@/features/events/model";
 import { useLiveEvents } from "@/features/events/use-live-events";
+import { useUserNames } from "@/features/events/use-user-names";
 import { requireProjectScope, useRequiredProjectScope } from "@/features/projects/project-scope";
 import { useLoadMore } from "@/hooks/use-load-more";
 import { useScrollEdges } from "@/hooks/use-scroll-edges";
@@ -91,6 +97,14 @@ import { cn } from "@/lib/utils";
  * behind it. The list then says that not every event was read, and its
  * button reads **Keep looking**.
  *
+ * What belongs together reads together (D44), as Vercel groups by what its
+ * server knows rather than by the rows a page holds. The **Sign-ins** view
+ * lists one row per sign-in, read as the event it ended in: how it ended,
+ * whose account, its session. In the other views the rows stay one per event;
+ * while one is open, the loaded rows of its login flow (or else its request)
+ * are marked, and the drawer tells the whole flow. An authentication attempt
+ * nothing of its flow followed reads Abandoned. Users are named, not IDs.
+ *
  * The search, on a row of its own under the title, holds the filters set by a pasted value, as
  * chips: an id, an event type, an operation, or a filter named before its
  * value (`EventSearchField`). Its empty field offers **My activity**, the list
@@ -118,8 +132,9 @@ export const Route = createFileRoute("/_authed/events")({
       createdAfter,
     });
     // The filters and the range's start the page answers: `Load more`
-    // continues these, not the ones a newer navigation is on its way to.
-    return { ...page, search: deps, createdAfter };
+    // continues these, not the ones a newer navigation is on its way to. When
+    // it was read: an attempt is abandoned by its age then.
+    return { ...page, search: deps, createdAfter, loadedAt: Date.now() };
   },
   component: EventsScreen,
 });
@@ -127,6 +142,7 @@ export const Route = createFileRoute("/_authed/events")({
 /** The empty table's sentence, by what was asked for. */
 const NOTHING: Record<EventView, string> = {
   audit: NO_AUDIT_EVENTS,
+  signins: "This project has no sign-ins.",
   requests: "This project has no API requests.",
   all: "This project has no events.",
 };
@@ -171,6 +187,16 @@ function EventsScreen() {
     [live.events, loaded.items, paging.extra],
   );
   const added = useMemo(() => new Set(live.events.map((event) => event.id)), [live.events]);
+  const names = useUserNames(events);
+  // The open event's login flow, or its request, among the rows: marked, so
+  // what belongs together reads together while the drawer tells it.
+  const open = events.find((event) => event.id === eventId);
+  const together = useMemo(() => belongingWith(events, open), [events, open]);
+  const abandoned = useMemo(
+    () => abandonedAttempts(events, loaded.search, new Date(loaded.loadedAt)),
+    [events, loaded.search, loaded.loadedAt],
+  );
+  const signins = loaded.search.view === "signins";
   // A page short of its size that still has a token: the server stopped at
   // its bound, not at the end of the events (root ADR 048).
   const newestRows = newest.of === loaded ? newest.rows : loaded.items.length;
@@ -246,9 +272,19 @@ function EventsScreen() {
           <Table className={cn(RESOURCE_TABLE_FIXED, "min-w-[60rem]")}>
             <TableHeader>
               <ResourceHeaderRow>
-                <ResourceHeadCell className="w-[26%]">Event</ResourceHeadCell>
-                <ResourceHeadCell className="w-[27%]">Details</ResourceHeadCell>
-                <ResourceHeadCell className="w-[15%]">Actor</ResourceHeadCell>
+                {signins ? (
+                  <>
+                    <ResourceHeadCell className="w-[17%]">Outcome</ResourceHeadCell>
+                    <ResourceHeadCell className="w-[33%]">User</ResourceHeadCell>
+                    <ResourceHeadCell className="w-[18%]">Session</ResourceHeadCell>
+                  </>
+                ) : (
+                  <>
+                    <ResourceHeadCell className="w-[26%]">Event</ResourceHeadCell>
+                    <ResourceHeadCell className="w-[27%]">Details</ResourceHeadCell>
+                    <ResourceHeadCell className="w-[15%]">Actor</ResourceHeadCell>
+                  </>
+                )}
                 {/* No width: Time takes what the others and the menu column leave. */}
                 <ResourceHeadCell>Time</ResourceHeadCell>
                 {/* Pinned, as on Users: the table scrolls in its card, and the menu
@@ -274,6 +310,16 @@ function EventsScreen() {
                     search={search}
                     selected={event.id === eventId}
                     added={added.has(event.id)}
+                    names={names}
+                    signins={signins}
+                    together={
+                      together.has(event.id)
+                        ? open?.flow_id
+                          ? "login flow"
+                          : "request"
+                        : undefined
+                    }
+                    abandoned={abandoned.has(event.id)}
                   />
                 ))
               )}
@@ -311,6 +357,10 @@ function EventRow({
   search,
   selected,
   added,
+  names,
+  signins,
+  together,
+  abandoned,
 }: {
   event: ProjectEvent;
   search: EventsSearch;
@@ -318,11 +368,18 @@ function EventRow({
   selected: boolean;
   /** Read by Live after the list loaded: it fades in. */
   added: boolean;
+  /** What the users the rows name are called. */
+  names: ReadonlyMap<string, string>;
+  /** Drawn as a sign-in: how it ended, whose account, which session. */
+  signins: boolean;
+  /** Of the open event's login flow or request: marked, and named for a screen reader. */
+  together?: "login flow" | "request";
+  /** An authentication attempt nothing followed: marked so. */
+  abandoned: boolean;
 }) {
   const navigate = useNavigate();
   const params = { eventId: event.id };
-  // A system actor has no id: its kind is all there is to name.
-  const actor = event.actor_id || event.actor_type;
+  const signin = signins ? signinOf(event) : undefined;
   // A value the list is narrowed to already would narrow it no further.
   const narrowings = eventFilterValues(event).filter(
     ({ filter, value }) => !isNarrowedTo(search, filter.key, value),
@@ -338,32 +395,76 @@ function EventRow({
         // For the pinned menu cell's hover.
         "group",
         failure && "bg-destructive/5 hover:bg-destructive/10",
+        together && !selected && "bg-muted/50",
         selected && "bg-muted hover:bg-muted",
         added && "animate-in fade-in-0 duration-700 motion-reduce:animate-none",
       )}
     >
-      <TableCell className={RESOURCE_CELL}>
-        <Link
-          to="/events/$eventId"
-          params={params}
-          search={search}
-          className={`${RESOURCE_ROW_LINK} max-w-full`}
-        >
-          <span className={cn("truncate", failure && "text-destructive")} title={event.event_type}>
-            {event.event_type}
-          </span>
-        </Link>
-      </TableCell>
-      <TableCell className={RESOURCE_CELL}>
-        <EventSubject event={event} />
-      </TableCell>
-      <TableCell className={RESOURCE_CELL}>
-        {actor ? (
-          <IdText id={actor} title={actor} className="text-foreground text-sm" />
-        ) : (
-          <span className="text-muted-foreground">—</span>
+      <TableCell
+        className={cn(
+          RESOURCE_CELL,
+          // A rail down the rows that belong with the open one.
+          (together || selected) && "shadow-[inset_2px_0_0_var(--color-ring)]",
         )}
+      >
+        <span className="flex min-w-0 items-center gap-2">
+          <Link
+            to="/events/$eventId"
+            params={params}
+            search={search}
+            className={`${RESOURCE_ROW_LINK} min-w-0`}
+          >
+            {signin ? (
+              <OutcomeBadge outcome={signin.outcome} />
+            ) : (
+              <span
+                className={cn("truncate", failure && "text-destructive")}
+                title={event.event_type}
+              >
+                {event.event_type}
+              </span>
+            )}
+          </Link>
+          {abandoned && (
+            <Badge variant="outline" title="Nothing of its login flow followed before it expired">
+              Abandoned
+            </Badge>
+          )}
+          {together && <span className="sr-only">Of the open event’s {together}</span>}
+        </span>
       </TableCell>
+      {signin ? (
+        <>
+          <TableCell className={RESOURCE_CELL}>
+            <span className="flex min-w-0 items-center gap-2 text-sm">
+              {signin.userId ? (
+                <UserName id={signin.userId} names={names} />
+              ) : (
+                <span className="text-muted-foreground">—</span>
+              )}
+              {signin.failure && (
+                <span className="text-muted-foreground shrink-0">{signin.failure}</span>
+              )}
+            </span>
+          </TableCell>
+          <TableCell className={RESOURCE_CELL}>
+            {event.session_id ? (
+              <IdText id={event.session_id} title={event.session_id} className="text-sm" />
+            ) : (
+              <span className="text-muted-foreground">—</span>
+            )}
+          </TableCell>
+        </>
+      ) : (
+        <>
+          <TableCell className={RESOURCE_CELL}>
+            <EventSubject event={event} />
+          </TableCell>
+          <TableCell className={RESOURCE_CELL}>
+            <ActorName actorId={event.actor_id} actorType={event.actor_type} names={names} />
+          </TableCell>
+        </>
+      )}
       <TableCell className={cn(RESOURCE_CELL_MUTED, "tabular-nums")}>
         <time dateTime={event.occurred_at}>{formatEventTime(event.occurred_at)}</time>
       </TableCell>

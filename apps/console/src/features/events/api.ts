@@ -1,4 +1,5 @@
 import { api } from "@/api/zitadel";
+import { userIdentity } from "@/features/users/model";
 import { LIST_PAGE_SIZE } from "@/lib/paging";
 
 import { eventsQuery, type ProjectEvent, type EventsSearch } from "./model";
@@ -125,4 +126,44 @@ export async function listRecentEvents(projectId: string, limit: number): Promis
     limit,
   });
   return answer.data;
+}
+
+/**
+ * What each user is called now (`display`, else `identifier`), by ID: one
+ * `GET /users/{id}` per user the page names, read once a session and shared by
+ * every row. Events keep IDs only, so a user who is gone, or one the operator
+ * may not read, has no name and stays an ID; that answer is not kept.
+ */
+const userNames = new Map<string, Promise<string | undefined>>();
+
+export async function readUserNames(ids: readonly string[]): Promise<Map<string, string>> {
+  const unique = [...new Set(ids)];
+  const names = await Promise.all(
+    unique.map((id) => {
+      let name = userNames.get(id);
+      if (!name) {
+        name = api
+          .getUserByID(id)
+          .then((user) => userIdentity(user))
+          .catch(() => {
+            // Not kept: a later page asks again.
+            userNames.delete(id);
+            return undefined;
+          });
+        userNames.set(id, name);
+      }
+      return name;
+    }),
+  );
+  const named = new Map<string, string>();
+  unique.forEach((id, index) => {
+    const name = names[index];
+    if (name && name !== id) named.set(id, name);
+  });
+  return named;
+}
+
+/** Forgets every name read, between tests. */
+export function _resetUserNamesForTesting() {
+  userNames.clear();
 }
