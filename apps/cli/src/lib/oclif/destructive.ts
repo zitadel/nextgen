@@ -7,7 +7,12 @@ import type { BaseCommand } from "./base";
 import { Promptable } from "./promptable";
 import type { CommandResult } from "./types";
 
-/** The flag a destructive command declares, which its `--force` retry sets. */
+/**
+ * The flag every destructive command declares, which the retry a refused
+ * confirmation suggests sets: the run again with `--force`. The mixin cannot
+ * see its host's flags, so it names the one it relies on here, and the run
+ * refuses the retry if the host does not declare it.
+ */
 type ConsentFlags = Readonly<{ force: Interfaces.BooleanFlag<boolean> }>;
 
 /** A class that can be extended, abstract or not, whatever arguments it takes. */

@@ -58,6 +58,8 @@ export type ParsedToken = Readonly<
  * the flags the code asking for it relies on the command declaring, typed as
  * they parse. A rerun from code that does not know which command it runs in
  * (a mixin) names them, and the run refuses one its command does not declare.
+ *
+ * @typeParam Defs - The flags the rerun relies on, as a command declares them.
  */
 export type RerunOf<Defs> = Readonly<{
   /** Flags to leave out. */

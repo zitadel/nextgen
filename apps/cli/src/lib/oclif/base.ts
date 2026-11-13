@@ -504,15 +504,19 @@ export abstract class BaseCommand extends Interruptible(Command) {
    * run then refuses one the command does not declare
    * ({@link RunSuggestions.rerun}).
    *
+   * @typeParam Defs - The flags the rerun relies on the command declaring, as
+   *   a command declares them. Nothing infers it, so a caller names it.
    * @param change - What the rerun changes, by the names code reads them.
    * @returns The command.
+   * @throws {Error} When the change names a flag the running command does not
+   *   declare.
    * @example
    * await this.rerun<{ force: Interfaces.BooleanFlag<boolean> }>({ with: { force: true } });
    */
   protected async rerun<Defs extends object = Record<never, never>>(
     change: RerunOf<NoInfer<Defs>> = {},
   ): Promise<SuggestedCommand> {
-    return this.rebuilt(change as Rerun, this.id ?? "");
+    return this.rebuilt(change, this.id ?? "");
   }
 
   /**
@@ -522,6 +526,8 @@ export abstract class BaseCommand extends Interruptible(Command) {
    * @param change - What the rerun changes.
    * @param id - The running command.
    * @returns The command.
+   * @throws {Error} When the change names a flag the running command does not
+   *   declare.
    */
   private async rebuilt(change: Rerun, id: string): Promise<SuggestedCommand> {
     const { raw } = await this.parseOnce();

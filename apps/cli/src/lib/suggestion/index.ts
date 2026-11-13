@@ -178,6 +178,9 @@ type FlagValues<Class> = {
  * code reads them: every flag it declares typed as it parses, its required
  * flags given, its `exclusive` flags never both given, and its `dependsOn`
  * flags given with what they depend on.
+ *
+ * @typeParam Class - A command class, or anything with the `flags` one
+ *   declares, as a mixin names the flags it relies on.
  */
 export type FlagsOf<Class> = FlagValues<Class> & Exclusions<Class> & Dependencies<Class>;
 
@@ -255,7 +258,14 @@ export type Checked<Id extends string> = Id extends SuggestionId
  */
 export type Next = { [Id in SuggestionId]: NextOf<Id> }[SuggestionId];
 
-/** The flags of the command class `Class` by the names code reads them. */
+/**
+ * The name of each flag the command class `Class` declares, as code reads it
+ * (`dryRun` for `--dry-run`), leaving out the flags that only say how a run
+ * answers.
+ *
+ * @typeParam Class - A command class, or anything with the `flags` one
+ *   declares.
+ */
 export type FlagNameOf<Class> = Named<FlagKey<Class>>;
 
 /** The flags of `Id` by the names code reads them, for a rerun's `without`. */

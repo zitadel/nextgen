@@ -2744,9 +2744,9 @@ async function removeSetupMarkers(cwd: string): Promise<void> {
 const README = "README.md";
 
 /**
- * The client id a suggested `setup` leaves for the reader to fill in. It is a
- * placeholder for a client id, so it stands as the type the flag parses to
- * though it is not one a provider issued.
+ * The client id a suggested `setup` leaves for the reader to fill in. It is no
+ * client id a provider issued, but a `FillIn` (`src/lib/suggestion`), which a
+ * suggestion takes for any flag's value.
  */
 const ID_TO_FILL_IN = "<id>";
 
