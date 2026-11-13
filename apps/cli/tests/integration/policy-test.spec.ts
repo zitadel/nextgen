@@ -34,7 +34,7 @@ async function aRelease(app: ScaffoldedApp): Promise<string> {
   return app.envelopeOf<{ release_id: string }>(result).data.release_id;
 }
 
-describe("policies test", () => {
+describe("policy test", () => {
   describe("against an invalid server", () => {
     describe("that is not a zitadel api", () => {
       it("fails", async () => {
@@ -48,7 +48,7 @@ describe("policies test", () => {
         expect(app.envelopeOf(result)).toEqual({
           status: "error",
           cli_version: cliVersion.version,
-          command: "policies:test",
+          command: "policy:test",
           source: MOCK_SERVER_URL,
           code: "E_NOT_FOUND",
           message: expect.stringMatching(
@@ -75,7 +75,7 @@ describe("policies test", () => {
         expect(app.envelopeOf(result)).toEqual({
           status: "error",
           cli_version: cliVersion.version,
-          command: "policies:test",
+          command: "policy:test",
           source: MOCK_SERVER_URL,
           code: "E_NETWORK",
           message: "down",
@@ -93,7 +93,7 @@ describe("policies test", () => {
     it("holds its invariants in every rendering", async () => {
       const app = await aSetUpApp();
       platform.servesAHostileOrigin();
-      const args = ["policies", "test"];
+      const args = ["policy", "test"];
 
       await app.inEveryRendering((how) => app.run(how.json ? [...args, "--json"] : args, how.env));
     });
@@ -109,7 +109,7 @@ describe("policies test", () => {
         expect(result).toSucceed();
         expect(app.envelopeOf(result)).toEqual({
           cli_version: cliVersion.version,
-          command: "policies:test",
+          command: "policy:test",
           source: MOCK_SERVER_URL,
           status: "ok",
           data: {
@@ -154,7 +154,7 @@ describe("policies test", () => {
         expect(app.envelopeOf(result)).toEqual({
           status: "error",
           cli_version: cliVersion.version,
-          command: "policies:test",
+          command: "policy:test",
           source: MOCK_SERVER_URL,
           code: "E_VALIDATION",
           message: "1 of 1 policy test cases failed",
@@ -194,7 +194,7 @@ describe("policies test", () => {
         expect(result).toSucceed();
         expect(app.envelopeOf(result)).toEqual({
           cli_version: cliVersion.version,
-          command: "policies:test",
+          command: "policy:test",
           source: MOCK_SERVER_URL,
           status: "ok",
           data: {
@@ -234,7 +234,7 @@ describe("policies test", () => {
         expect(result).toSucceed();
         expect(app.envelopeOf(result)).toEqual({
           cli_version: cliVersion.version,
-          command: "policies:test",
+          command: "policy:test",
           source: MOCK_SERVER_URL,
           status: "ok",
           data: {
@@ -272,7 +272,7 @@ describe("policies test", () => {
 
         expect(app.envelopeOf(result)).toEqual({
           cli_version: cliVersion.version,
-          command: "policies:test",
+          command: "policy:test",
           source: MOCK_SERVER_URL,
           status: "ok",
           data: {
@@ -310,7 +310,7 @@ describe("policies test", () => {
         expect(app.envelopeOf(result)).toEqual({
           status: "error",
           cli_version: cliVersion.version,
-          command: "policies:test",
+          command: "policy:test",
           source: MOCK_SERVER_URL,
           code: "E_VALIDATION",
           message: "The policy test files are not valid",
@@ -332,7 +332,7 @@ describe("policies test", () => {
         expect(result).toBeSkipped();
         expect(app.envelopeOf(result)).toEqual({
           cli_version: cliVersion.version,
-          command: "policies:test",
+          command: "policy:test",
           source: MOCK_SERVER_URL,
           status: "skipped",
           reason: "no-policy-tests",
@@ -350,7 +350,7 @@ describe("policies test", () => {
         expect(app.envelopeOf(result)).toEqual({
           status: "error",
           cli_version: cliVersion.version,
-          command: "policies:test",
+          command: "policy:test",
           source: MOCK_SERVER_URL,
           code: "E_NOT_FOUND",
           message: "release: not found",
@@ -377,7 +377,7 @@ describe("policies test", () => {
         expect(app.envelopeOf(await result)).toEqual({
           status: "error",
           cli_version: cliVersion.version,
-          command: "policies:test",
+          command: "policy:test",
           source: MOCK_SERVER_URL,
           code: "E_CANCELLED",
           message: "Cancelled",
@@ -403,7 +403,7 @@ describe("policies test", () => {
         await app.writePolicyTest([TOO_SHORT, LONG_ENOUGH]);
 
         const result = await asTerminal(() =>
-          app.run(["policies", "test", "--non-interactive"], colour),
+          app.run(["policy", "test", "--non-interactive"], colour),
         );
 
         expect(result).toPrint("2 passed");

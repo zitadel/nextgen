@@ -108,7 +108,7 @@ export class FlowService extends ApiService {
     const current = first.items[0];
     if (current === undefined) {
       throw new NotFoundError(`No flow definition named "${reference}"`, {
-        hint: "Run `flow-definitions list` to see the flows this project has.",
+        hint: "Run `flow-definition list` to see the flows this project has.",
       });
     }
     return current;

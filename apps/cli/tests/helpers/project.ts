@@ -1619,16 +1619,16 @@ export class ScaffoldedApp {
 
   /** The providers the platform has registered. */
   registeredIdps(): Promise<RegisteredIdp[]> {
-    return this.listed<RegisteredIdp>("idps");
+    return this.listed<RegisteredIdp>("idp");
   }
 
   /** The policies the platform holds, each at its newest revision. */
   publishedPolicies(): Promise<PublishedPolicy[]> {
-    return this.listed<PublishedPolicy>("policies");
+    return this.listed<PublishedPolicy>("policy");
   }
 
   publishedSchemas(): Promise<PublishedSchema[]> {
-    return this.listed<PublishedSchema>("schemas");
+    return this.listed<PublishedSchema>("schema");
   }
 
   /** The one schema a scaffolded project publishes. */
@@ -1637,7 +1637,7 @@ export class ScaffoldedApp {
   }
 
   publishedFlows(): Promise<PublishedFlow[]> {
-    return this.listed<PublishedFlow>("flow-definitions");
+    return this.listed<PublishedFlow>("flow-definition");
   }
 
   /** The one login flow a scaffolded project publishes. */
@@ -1673,7 +1673,7 @@ export class ScaffoldedApp {
   }
 
   /**
-   * The auth methods the published user schema names, as `schemas list`
+   * The auth methods the published user schema names, as `schema list`
    * reports them.
    *
    * @returns The schema's `x-auth-methods`, empty when it names none.
@@ -2099,9 +2099,9 @@ export class ScaffoldedApp {
     );
   }
 
-  /** Runs `zitadel policies test` with `args`. */
+  /** Runs `zitadel policy test` with `args`. */
   testPolicies(args: string[] = []): Promise<CliResult> {
-    return this.run(["policies", "test", "--non-interactive", ...args]);
+    return this.run(["policy", "test", "--non-interactive", ...args]);
   }
 
   /** Removes the committed password policy file, as the developer owning it would. */

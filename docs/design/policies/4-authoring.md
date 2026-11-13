@@ -35,10 +35,10 @@ one per guarded operation and named after it. A file is the publish body
   publishes a changed config as a new revision of the operation's policy and
   pins it; an unchanged one reuses the newest revision. Like an IdP
   connection, a policy keeps one id while the server keeps its revisions.
-- `zitadel policies test [operation]` evaluates the cases in
+- `zitadel policy test [operation]` evaluates the cases in
   `<operation>.test.json` against the sibling policy file, or with
   `--release <id>` against the revision a release pins (see [Testing](#testing)).
-- `zitadel policies list` and `zitadel policies get <id|operation>` read
+- `zitadel policy list` and `zitadel policy get <id|operation>` read
   policies back at their newest revision. Per
   [ADR 064](../../adrs/064-cli-resource-commands.md) a configuration resource
   gets `list` and `get` only; the file is the writer.
@@ -87,7 +87,7 @@ second evaluator would drift. The server evaluates instead.
   config; a release that pins none enforces nothing.
 - `.zitadel/policies/<operation>.test.json` holds the cases (input, facts,
   expected decision), against `.zitadel/meta/policy-test.json`.
-  `zitadel policies test` runs them against the sibling policy file or,
+  `zitadel policy test` runs them against the sibling policy file or,
   with `--release`, against a built release
   ([#1445](https://github.com/zitadel/nextgen/issues/1445)). `deploy` does
   not carry test files.

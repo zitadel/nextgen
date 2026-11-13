@@ -383,7 +383,7 @@ describe("flowConfigSchema", () => {
 });
 
 /**
- * The gate `zitadel policies test` runs on a `.zitadel/policies/*.test.json`
+ * The gate `zitadel policy test` runs on a `.zitadel/policies/*.test.json`
  * file before it sends a case: strict like the editor's `policy-test.json`.
  */
 describe("policyTestFileSchema", () => {

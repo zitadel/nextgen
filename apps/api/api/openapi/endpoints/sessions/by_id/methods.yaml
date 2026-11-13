@@ -1,6 +1,6 @@
 get:
   operationId: getSession
-  x-zitadel-cli: sessions get
+  x-zitadel-cli: session get
   summary: Get a session by ID
   description: |
     Returns the current state of a session, including its factors and all currently satisfied assurance levels.
@@ -47,7 +47,7 @@ get:
 
 delete:
   operationId: revokeSession
-  x-zitadel-cli: sessions revoke
+  x-zitadel-cli: session revoke
   summary: Revoke a session
   description: |
     Revokes a session by deleting it, immediately and for good. A later

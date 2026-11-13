@@ -67,7 +67,7 @@ post:
 
 get:
   operationId: listSchemas
-  x-zitadel-cli: schemas list
+  x-zitadel-cli: schema list
   summary: List schemas
   description: |
     Lists the schemas of a project, newest first, paginated with a cursor.

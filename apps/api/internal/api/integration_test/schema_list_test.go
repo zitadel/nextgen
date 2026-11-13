@@ -111,7 +111,7 @@ func TestListSchemasPagination(t *testing.T) {
 }
 
 // GET /schemas answers two cardinalities from one endpoint (#923): `all` is the
-// revision history `schemas list` reads, `latest` is the one-row-per-schema the
+// revision history `schema list` reads, `latest` is the one-row-per-schema the
 // console directory shows. Which one is being asked for is a parameter of its
 // own, so both stay reachable with or without an object_type filter.
 func TestListSchemasRevisions(t *testing.T) {
