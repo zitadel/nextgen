@@ -226,10 +226,10 @@ describe("a refusal a flag or argument is built with", () => {
   it("does not compile with a value the parse would replace", () => {
     // @ts-expect-error the parse fills {value} with what was typed
     reads({ schema: z.string(), refusal: { message: WRONG_WORDING }, values: { value: 3 } });
-    // @ts-expect-error not even as undefined, which would read as a value given
     reads({
       schema: z.string(),
       refusal: { message: WRONG_WORDING },
+      // @ts-expect-error not even as undefined, which would read as a value given
       values: { input: undefined },
     });
 
